@@ -50,7 +50,7 @@ from typing import Any, Iterable, Mapping, Optional, Tuple
 # dependency-free contract (see the module docstring).
 from common import met_energy  # #4158 owner ruling 2026-09-25: the ONE cardio-modality MET classification
 from common.activity_overlap import hr_intervals, overlap_seconds  # #4158: the ONE HR-covered-interval derivation
-from common.hevy_schema import SET_DURATION_FIELD
+from common.hevy_schema import SET_DURATION_FIELD, loaded_distance_shape  # #5373: a carry's distance is a step count, never metres
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC) — pure, no clock read
 
 #: The single method label every published target carries (ADR-105).
@@ -250,6 +250,9 @@ def worked_set_seconds(
       * a weight-rep set with no logged duration is charged the stated
         ``WORK_SECONDS_PER_REP_SET`` assumption (40 s) — counted separately so the
         payload can say how much of the total is measured and how much is assumed;
+      * a CARRY set (#5373 — `common.hevy_schema.loaded_distance_shape`): its
+        distance field is the owner's step count, never metres, so it is never a
+        cardio block or a walk pace; untimed, it is charged the same 40 s assumption;
       * a set with neither reps nor a duration contributes nothing.
 
     **Warmup sets are counted as work.** The thing being excluded here is REST, not
@@ -295,12 +298,16 @@ def worked_set_seconds(
         workout_other_secs = 0.0
         for ex in exercises:
             name = ex.get("name") or ex.get("title") or ""
+            # #5373: on a carry the distance field is his STEP COUNT (`distance_unit_convention: steps`), never metres — so it is
+            # never a cardio distance or a walk pace; the carry set is a loaded worked set. Read by the set SHAPE (the catalog's
+            # rule is the Hevy type that shape IS), because this module reads no catalog and imports nothing from `training`.
+            steps = loaded_distance_shape(ex.get("sets"))
             for st in ex.get("sets") or []:
                 dur = _num(st.get(SET_DURATION_FIELD))
                 if dur is None:
                     dur = _num(st.get("duration_seconds"))  # raw Hevy API wire name (pre-normalization)
                 reps = _num(st.get("reps")) or 0.0
-                distance = _num(st.get("distance_m")) or 0.0
+                distance = 0.0 if steps else (_num(st.get("distance_m")) or 0.0)
                 if dur is not None and dur > 0:
                     n_sets += 1
                     n_logged += 1
@@ -318,7 +325,9 @@ def worked_set_seconds(
                             workout_other_secs += dur
                     else:
                         hold_measured += dur
-                elif reps > 0:
+                elif reps > 0 or (steps and (_num(st.get("distance_m")) or _num(st.get("distance_meters")) or 0.0) > 0):
+                    # #5373: an untimed carry set (steps, no reps) is charged the same stated per-set assumption as a rep set
+                    # — the 60-step carry the program doses is ~40 s at a loaded cadence (session_cues.CARRY_EXPOSURE)
                     assumed += WORK_SECONDS_PER_REP_SET
                     n_sets += 1
                     touched = True

@@ -7,6 +7,7 @@ Strength training helpers: exercise classification, 1RM estimation, volume track
 # mcp/, which is staged only into the MCP bundle (deploy/build_bundle.py::stage_mcp).
 # Re-exported here so `from mcp.strength_helpers import normalize_hevy_items` keeps
 # working for every existing caller.
+from training.logging_conventions import AS_LOGGED, total_load  # #5373: per-hand vs total-carried load
 from training.muscle_volume import attribute_exercise, normalize_hevy_items  # noqa: F401
 
 # #4071: the exercise -> muscle taxonomy lives in ONE place,
@@ -213,8 +214,9 @@ def extract_hevy_sessions(
     """
     Given raw DynamoDB hevy items and a target exercise name (fuzzy) OR an exact Hevy
     `template_id`, return a list of session dicts sorted by date.
-    Each session: {date, sets: [{set_type, weight_lbs, reps, estimated_1rm}], best_1rm, best_weight, volume,
-    template_id, identity}
+    Each session: {date, sets: [{set_type, weight_lbs, reps, estimated_1rm}], best_1rm, best_weight, load_convention,
+    volume_lbs, template_id, identity}. `best_weight` is as logged (per hand on a dumbbell exercise — `load_convention`
+    says so); `volume_lbs` is the total moved (#5373).
 
     #4069: sets are selected by template IDENTITY only (`exercise_identity`). A `template_id`
     selects its canonical identity — so a confirmed alias id is the same movement, and nothing
@@ -255,7 +257,10 @@ def extract_hevy_sessions(
                 continue
             best_1rm = max((s["estimated_1rm"] for s in sets_out if s["estimated_1rm"]), default=None)
             best_weight = max((s["weight_lbs"] for s in sets_out), default=0)
-            volume = sum(s["weight_lbs"] * s["reps"] for s in sets_out)
+            # #5373: `best_weight` stays the logged number (Hevy's unit for this movement, labelled by `load_convention`);
+            # the session volume is the TOTAL moved — a per-hand dumbbell load counts both hands
+            convention = ex.get("load_convention") or AS_LOGGED
+            volume = sum(total_load(s["weight_lbs"], convention) * s["reps"] for s in sets_out)
             sessions.append(
                 {
                     "date": date_str,
@@ -266,6 +271,7 @@ def extract_hevy_sessions(
                     "sets": sets_out,
                     "best_1rm": best_1rm,
                     "best_weight": best_weight,
+                    "load_convention": convention,
                     "volume_lbs": round(volume, 1),
                     "set_count": len(sets_out),
                 }

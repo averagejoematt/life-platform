@@ -37,7 +37,8 @@
     "primary_muscle": "Hevy primary_muscle_group through training/muscle_volume.HEVY_MUSCLE_GROUP (column 1); volume_muscle is column 0 (muscle_volume.MUSCLES).",
     "generator_eligibility": "training/movement_catalog.generator_eligible: skill_tier <= ceiling AND (reviewed OR a default_rep_range) AND not plyometric, bar the charter's lower-leg prep carve-out while the prep is on (#5090). No frequency gate (owner ruling C, #4108).",
     "anchor_family": "training/movement_catalog.anchor_family: program_structure.classify_movement(title) AND primary muscle in the anchor's primary_muscles AND loaded (Hevy weight_reps; any rep-based type for vertical_pull).",
-    "coach_added": "A never-trained exercise may be added as {title, hevy_template_id_hint, provenance: coach_added}; the builder fills absent fields from Hevy metadata and keeps every written field. See training/movement_catalog.py."
+    "coach_added": "A never-trained exercise may be added as {title, hevy_template_id_hint, provenance: coach_added}; the builder fills absent fields from Hevy metadata and keeps every written field. See training/movement_catalog.py.",
+    "logging_conventions": "training/logging_conventions.derive_conventions (#5373, the owner's rules): distance_unit_convention=steps on every Hevy short_distance_weight entry (he counts steps and types the count in the yards field; no gym markings); load_convention=total_carried on a carry by title (carry/farmer/suitcase), per_hand on a bilateral dumbbell exercise (one dumbbell's weight logged); absent = as logged. Written only where absent, so a hand-written value wins."
   },
   "movements": {
     "db_bench_press_flat": {
@@ -61,7 +62,8 @@
       "sessions": 36,
       "first_done": "2021-06-10",
       "last_done": "2024-11-03",
-      "anchor_family": "bench"
+      "anchor_family": "bench",
+      "load_convention": "per_hand"
     },
     "machine_chest_press": {
       "title": "Chest Press (Machine)",
@@ -105,7 +107,8 @@
       "sessions": 71,
       "first_done": "2021-06-15",
       "last_done": "2026-09-19",
-      "anchor_family": "bench"
+      "anchor_family": "bench",
+      "load_convention": "per_hand"
     },
     "cable_chest_fly": {
       "title": "Cable Fly Crossovers",
@@ -227,7 +230,8 @@
       "sessions": 68,
       "first_done": "2021-04-18",
       "last_done": "2026-10-04",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_curl": {
       "title": "Bicep Curl (Dumbbell)",
@@ -248,7 +252,8 @@
       "sessions": 63,
       "first_done": "2021-06-12",
       "last_done": "2026-10-18",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "cable_tricep_pushdown": {
       "title": "Triceps Pushdown",
@@ -421,7 +426,8 @@
       "sessions": 0,
       "first_done": null,
       "last_done": null,
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "barbell_bench_press": {
       "title": "Bench Press (Barbell)",
@@ -465,7 +471,8 @@
       "sessions": 46,
       "first_done": "2023-01-04",
       "last_done": "2026-10-18",
-      "anchor_family": "overhead_press"
+      "anchor_family": "overhead_press",
+      "load_convention": "per_hand"
     },
     "reverse_pec_deck": {
       "title": "Rear Delt Reverse Fly (Machine)",
@@ -643,7 +650,8 @@
       "sessions": 78,
       "first_done": "2021-04-13",
       "last_done": "2026-09-20",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "shrug_barbell": {
       "title": "Shrug (Barbell)",
@@ -773,7 +781,8 @@
       "sessions": 51,
       "first_done": "2021-06-11",
       "last_done": "2025-04-08",
-      "anchor_family": "squat"
+      "anchor_family": "squat",
+      "load_convention": "per_hand"
     },
     "seated_cable_row_bar_grip": {
       "title": "Seated Cable Row - Bar Grip",
@@ -1072,7 +1081,8 @@
       "sessions": 25,
       "first_done": "2021-06-15",
       "last_done": "2025-05-21",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "tricep_pushdown": {
       "title": "Tricep Pushdown",
@@ -1120,7 +1130,8 @@
       "sessions": 24,
       "first_done": "2021-10-28",
       "last_done": "2026-09-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "pullover_dumbbell": {
       "title": "Pullover (Dumbbell)",
@@ -1270,7 +1281,8 @@
       "sessions": 19,
       "first_done": "2023-05-23",
       "last_done": "2025-05-21",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "overhead_press_barbell": {
       "title": "Overhead Press (Barbell)",
@@ -1451,7 +1463,8 @@
       "sessions": 16,
       "first_done": "2021-04-13",
       "last_done": "2025-05-21",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "pull_up_assisted": {
       "title": "Pull Up (Assisted)",
@@ -1529,7 +1542,8 @@
       "sessions": 13,
       "first_done": "2023-04-28",
       "last_done": "2025-04-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "chin_up_weighted": {
       "title": "Chin Up (Weighted)",
@@ -1580,7 +1594,8 @@
       "sessions": 12,
       "first_done": "2024-09-17",
       "last_done": "2025-09-15",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "lying_leg_curl_machine": {
       "title": "Lying Leg Curl (Machine)",
@@ -1655,7 +1670,8 @@
       "sessions": 11,
       "first_done": "2024-09-18",
       "last_done": "2025-04-08",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "straight_arm_pulldown": {
       "title": "Straight Arm Pulldown",
@@ -1754,7 +1770,8 @@
       "sessions": 10,
       "first_done": "2021-04-12",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "chin_up_assisted": {
       "title": "Chin Up (Assisted)",
@@ -1929,7 +1946,8 @@
       "sessions": 9,
       "first_done": "2024-09-16",
       "last_done": "2025-03-09",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "farmers_walk": {
       "title": "Farmers Walk",
@@ -1949,7 +1967,9 @@
       "sessions": 9,
       "first_done": "2023-04-21",
       "last_done": "2026-06-20",
-      "anchor_family": null
+      "anchor_family": null,
+      "distance_unit_convention": "steps",
+      "load_convention": "total_carried"
     },
     "jump_rope": {
       "title": "Jump Rope",
@@ -2126,7 +2146,8 @@
       "sessions": 8,
       "first_done": "2024-10-31",
       "last_done": "2025-03-13",
-      "anchor_family": "squat"
+      "anchor_family": "squat",
+      "load_convention": "per_hand"
     },
     "db_floor_flyes": {
       "title": "DB Floor Flyes",
@@ -2150,7 +2171,8 @@
       "sessions": 8,
       "first_done": "2024-07-21",
       "last_done": "2025-02-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_step_up": {
       "title": "Db Step Up",
@@ -2174,7 +2196,8 @@
       "sessions": 8,
       "first_done": "2024-09-18",
       "last_done": "2025-04-22",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "lateral_raise_machine": {
       "title": "Lateral Raise (Machine)",
@@ -2273,7 +2296,8 @@
       "sessions": 8,
       "first_done": "2023-05-29",
       "last_done": "2025-03-02",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "superman_press_outs": {
       "title": "Superman Press Outs",
@@ -2321,7 +2345,8 @@
       "sessions": 7,
       "first_done": "2023-05-03",
       "last_done": "2025-04-14",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "angels_and_devils": {
       "title": "Angels And Devils",
@@ -2468,7 +2493,8 @@
       "sessions": 7,
       "first_done": "2024-09-17",
       "last_done": "2025-02-20",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_no_money_curls": {
       "title": "DB No Money Curls",
@@ -2492,7 +2518,8 @@
       "sessions": 7,
       "first_done": "2024-09-20",
       "last_done": "2025-02-27",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "er_wall_slides": {
       "title": "ER Wall slides",
@@ -2635,7 +2662,8 @@
       "sessions": 7,
       "first_done": "2023-04-24",
       "last_done": "2025-03-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "underhand_barbell_dead_rows": {
       "title": "Underhand Barbell Dead Rows",
@@ -2685,7 +2713,8 @@
       "sessions": 6,
       "first_done": "2021-04-18",
       "last_done": "2025-01-19",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "cable_kickback": {
       "title": "Cable Kickback",
@@ -2757,7 +2786,8 @@
       "sessions": 6,
       "first_done": "2024-10-01",
       "last_done": "2025-10-28",
-      "anchor_family": "row"
+      "anchor_family": "row",
+      "load_convention": "per_hand"
     },
     "db_reverse_lunge": {
       "title": "DB Reverse Lunge",
@@ -2781,7 +2811,8 @@
       "sessions": 6,
       "first_done": "2024-10-03",
       "last_done": "2025-03-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_straight_bar_curls": {
       "title": "Db Straight Bar Curls",
@@ -2805,7 +2836,8 @@
       "sessions": 6,
       "first_done": "2024-09-20",
       "last_done": "2025-04-12",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "elbows_tucked_db_bench": {
       "title": "Elbows Tucked DB Bench",
@@ -2829,7 +2861,8 @@
       "sessions": 6,
       "first_done": "2024-10-02",
       "last_done": "2025-04-12",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "hip_band_ladder": {
       "title": "Hip Band Ladder",
@@ -2951,7 +2984,8 @@
       "sessions": 6,
       "first_done": "2024-09-19",
       "last_done": "2024-12-30",
-      "anchor_family": "overhead_press"
+      "anchor_family": "overhead_press",
+      "load_convention": "per_hand"
     },
     "skullcrusher_barbell": {
       "title": "Skullcrusher (Barbell)",
@@ -3148,7 +3182,8 @@
       "sessions": 5,
       "first_done": "2024-09-19",
       "last_done": "2024-12-28",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_cheat_laterals": {
       "title": "DB Cheat laterals",
@@ -3172,7 +3207,8 @@
       "sessions": 5,
       "first_done": "2024-10-04",
       "last_done": "2025-03-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_gun_carries": {
       "title": "DB Gun carries",
@@ -3192,7 +3228,8 @@
       "sessions": 5,
       "first_done": "2024-11-25",
       "last_done": "2025-09-14",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "total_carried"
     },
     "db_high_pulls": {
       "title": "DB High Pulls",
@@ -3216,7 +3253,8 @@
       "sessions": 5,
       "first_done": "2024-10-01",
       "last_done": "2025-01-09",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_hip_thrust": {
       "title": "DB Hip Thrust",
@@ -3240,7 +3278,8 @@
       "sessions": 5,
       "first_done": "2024-09-18",
       "last_done": "2024-11-12",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "db_tripod_rows": {
       "title": "DB Tripod Rows",
@@ -3264,7 +3303,8 @@
       "sessions": 5,
       "first_done": "2024-09-16",
       "last_done": "2024-11-10",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "deadlift_dumbbell": {
       "title": "Deadlift (Dumbbell)",
@@ -3292,7 +3332,8 @@
       "sessions": 5,
       "first_done": "2021-06-11",
       "last_done": "2025-04-13",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "doorway_face_pulls": {
       "title": "Doorway Face Pulls",
@@ -3340,7 +3381,8 @@
       "sessions": 5,
       "first_done": "2024-10-01",
       "last_done": "2025-01-13",
-      "anchor_family": "row"
+      "anchor_family": "row",
+      "load_convention": "per_hand"
     },
     "incline_db_squeeze_press": {
       "title": "Incline DB Squeeze Press",
@@ -3364,7 +3406,8 @@
       "sessions": 5,
       "first_done": "2025-04-04",
       "last_done": "2025-05-12",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "nsfw": {
       "title": "NSFW",
@@ -3749,7 +3792,8 @@
       "sessions": 4,
       "first_done": "2021-06-10",
       "last_done": "2021-07-19",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_drag_curls": {
       "title": "DB Drag Curls",
@@ -3773,7 +3817,8 @@
       "sessions": 4,
       "first_done": "2024-10-05",
       "last_done": "2024-11-10",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_rear_delt_rows": {
       "title": "DB Rear Delt Rows",
@@ -3797,7 +3842,8 @@
       "sessions": 4,
       "first_done": "2024-10-04",
       "last_done": "2025-03-19",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_ucv_raise": {
       "title": "DB UCV Raise",
@@ -3821,7 +3867,8 @@
       "sessions": 4,
       "first_done": "2024-09-30",
       "last_done": "2024-11-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_waiter_curls": {
       "title": "DB Waiter Curls",
@@ -3845,7 +3892,8 @@
       "sessions": 4,
       "first_done": "2024-12-21",
       "last_done": "2025-03-09",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "dead_arm_hang": {
       "title": "Dead Arm Hang",
@@ -3889,7 +3937,8 @@
       "sessions": 4,
       "first_done": "2024-10-03",
       "last_done": "2024-11-08",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "flag": {
       "title": "Flag",
@@ -4081,7 +4130,8 @@
       "sessions": 4,
       "first_done": "2024-10-04",
       "last_done": "2024-11-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "plyo_step_ups": {
       "title": "Plyo Step Ups",
@@ -4105,7 +4155,8 @@
       "sessions": 4,
       "first_done": "2024-10-27",
       "last_done": "2025-03-16",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "prone_w_raise": {
       "title": "Prone W Raise",
@@ -4228,7 +4279,8 @@
       "sessions": 4,
       "first_done": "2024-12-05",
       "last_done": "2025-04-14",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "sprinter_switches": {
       "title": "Sprinter Switches",
@@ -4519,7 +4571,8 @@
       "sessions": 3,
       "first_done": "2024-10-05",
       "last_done": "2025-03-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_alt_side_lunges": {
       "title": "DB Alt Side Lunges",
@@ -4543,7 +4596,8 @@
       "sessions": 3,
       "first_done": "2024-12-20",
       "last_done": "2024-12-31",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_bench_front_squats": {
       "title": "DB Bench Front Squats",
@@ -4567,7 +4621,8 @@
       "sessions": 3,
       "first_done": "2024-10-23",
       "last_done": "2025-01-03",
-      "anchor_family": "squat"
+      "anchor_family": "squat",
+      "load_convention": "per_hand"
     },
     "db_crush_grip_squats": {
       "title": "DB Crush Grip Squats",
@@ -4591,7 +4646,8 @@
       "sessions": 3,
       "first_done": "2025-03-26",
       "last_done": "2025-04-28",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_external_rotation": {
       "title": "DB External Rotation",
@@ -4615,7 +4671,8 @@
       "sessions": 3,
       "first_done": "2023-09-04",
       "last_done": "2023-09-20",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_incline_curls": {
       "title": "DB Incline Curls",
@@ -4639,7 +4696,8 @@
       "sessions": 3,
       "first_done": "2025-02-09",
       "last_done": "2025-05-13",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_push_press": {
       "title": "DB Push Press",
@@ -4663,7 +4721,8 @@
       "sessions": 3,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_speed_press": {
       "title": "DB Speed Press",
@@ -4687,7 +4746,8 @@
       "sessions": 3,
       "first_done": "2024-12-03",
       "last_done": "2025-09-15",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "dead_arm_scap_rows": {
       "title": "Dead Arm Scap Rows",
@@ -4711,7 +4771,8 @@
       "sessions": 3,
       "first_done": "2025-01-03",
       "last_done": "2025-02-09",
-      "anchor_family": "row"
+      "anchor_family": "row",
+      "load_convention": "per_hand"
     },
     "dead_bug": {
       "title": "Dead Bug",
@@ -4831,7 +4892,8 @@
       "sessions": 3,
       "first_done": "2023-01-03",
       "last_done": "2025-04-13",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "total_carried"
     },
     "floor_press_dumbbell": {
       "title": "Floor Press (Dumbbell)",
@@ -4858,7 +4920,8 @@
       "sessions": 3,
       "first_done": "2024-09-30",
       "last_done": "2025-01-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "glute_ham_raise": {
       "title": "Glute Ham Raise",
@@ -5108,7 +5171,8 @@
       "sessions": 3,
       "first_done": "2025-02-18",
       "last_done": "2025-09-14",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "leaning_step_ups": {
       "title": "Leaning Step Ups",
@@ -5132,7 +5196,8 @@
       "sessions": 3,
       "first_done": "2024-10-23",
       "last_done": "2025-02-12",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "leg_press_horizontal_machine": {
       "title": "Leg Press Horizontal (Machine)",
@@ -5435,7 +5500,8 @@
       "sessions": 3,
       "first_done": "2025-01-09",
       "last_done": "2025-02-16",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "shoulder_press": {
       "title": "Shoulder Press",
@@ -5558,7 +5624,8 @@
       "sessions": 3,
       "first_done": "2024-12-31",
       "last_done": "2025-02-12",
-      "anchor_family": "squat"
+      "anchor_family": "squat",
+      "load_convention": "per_hand"
     },
     "standing_banded_fondas": {
       "title": "Standing Banded Fondas",
@@ -5630,7 +5697,8 @@
       "sessions": 3,
       "first_done": "2025-01-03",
       "last_done": "2025-01-20",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "static_creeping_lunges": {
       "title": "Static Creeping Lunges",
@@ -5654,7 +5722,8 @@
       "sessions": 3,
       "first_done": "2024-10-23",
       "last_done": "2024-12-31",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "straight_arm_lat_pulldown_cable": {
       "title": "Straight Arm Lat Pulldown (Cable)",
@@ -5700,7 +5769,9 @@
       "sessions": 3,
       "first_done": "2026-06-19",
       "last_done": "2026-09-26",
-      "anchor_family": null
+      "anchor_family": null,
+      "distance_unit_convention": "steps",
+      "load_convention": "total_carried"
     },
     "wall_sit": {
       "title": "Wall Sit",
@@ -5818,7 +5889,8 @@
       "sessions": 2,
       "first_done": "2023-05-22",
       "last_done": "2023-05-29",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "3d_curls": {
       "title": "3D Curls",
@@ -5890,7 +5962,8 @@
       "sessions": 2,
       "first_done": "2023-04-17",
       "last_done": "2023-09-04",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "alternating_rotation_shoulder_press": {
       "title": "Alternating Rotation Shoulder Press",
@@ -5914,7 +5987,8 @@
       "sessions": 2,
       "first_done": "2023-04-17",
       "last_done": "2023-09-04",
-      "anchor_family": "overhead_press"
+      "anchor_family": "overhead_press",
+      "load_convention": "per_hand"
     },
     "banded_clam_shells": {
       "title": "Banded Clam Shells",
@@ -6376,7 +6450,8 @@
       "sessions": 2,
       "first_done": "2024-10-29",
       "last_done": "2024-11-10",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_over_and_backs": {
       "title": "DB Over And Backs",
@@ -6400,7 +6475,8 @@
       "sessions": 2,
       "first_done": "2025-01-06",
       "last_done": "2025-01-19",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_power_incline_bombs": {
       "title": "DB Power Incline Bombs",
@@ -6424,7 +6500,8 @@
       "sessions": 2,
       "first_done": "2025-02-13",
       "last_done": "2025-03-16",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_rocket_squats": {
       "title": "DB Rocket Squats",
@@ -6448,7 +6525,8 @@
       "sessions": 2,
       "first_done": "2024-10-27",
       "last_done": "2024-11-08",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_single_leg_rdl_calf_raises": {
       "title": "DB Single leg RDL calf Raises",
@@ -6472,7 +6550,8 @@
       "sessions": 2,
       "first_done": "2024-10-31",
       "last_done": "2024-11-12",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_stiff_legged_deadlift": {
       "title": "DB Stiff Legged Deadlift",
@@ -6496,7 +6575,8 @@
       "sessions": 2,
       "first_done": "2025-01-15",
       "last_done": "2025-02-18",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "db_t_bar_rows": {
       "title": "DB T Bar rows",
@@ -6520,7 +6600,8 @@
       "sessions": 2,
       "first_done": "2024-12-31",
       "last_done": "2025-01-13",
-      "anchor_family": "row"
+      "anchor_family": "row",
+      "load_convention": "per_hand"
     },
     "db_underhand_dip": {
       "title": "DB Underhand Dip",
@@ -6544,7 +6625,8 @@
       "sessions": 2,
       "first_done": "2024-09-30",
       "last_done": "2024-10-14",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_wide_arc_shoulder_press": {
       "title": "DB Wide Arc Shoulder Press",
@@ -6568,7 +6650,8 @@
       "sessions": 2,
       "first_done": "2025-03-27",
       "last_done": "2025-04-04",
-      "anchor_family": "overhead_press"
+      "anchor_family": "overhead_press",
+      "load_convention": "per_hand"
     },
     "deadlift_twist": {
       "title": "Deadlift Twist",
@@ -6643,7 +6726,8 @@
       "sessions": 2,
       "first_done": "2023-05-15",
       "last_done": "2023-05-29",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "dual_handle_underhand_pulldowns": {
       "title": "Dual Handle Underhand Pulldowns",
@@ -6691,7 +6775,8 @@
       "sessions": 2,
       "first_done": "2025-01-02",
       "last_done": "2025-01-15",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "hack_squat_machine": {
       "title": "Hack Squat (Machine)",
@@ -6838,7 +6923,8 @@
       "sessions": 2,
       "first_done": "2025-03-24",
       "last_done": "2025-04-04",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "jump_back_start_10_yard_sprint": {
       "title": "Jump Back Start 10 Yard Sprint",
@@ -7010,7 +7096,8 @@
       "sessions": 2,
       "first_done": "2023-04-17",
       "last_done": "2023-09-04",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "leaning_speed_step_ups": {
       "title": "Leaning Speed Step Ups",
@@ -7174,7 +7261,8 @@
       "sessions": 2,
       "first_done": "2024-10-30",
       "last_done": "2024-11-11",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "prisoner_squats": {
       "title": "Prisoner Squats",
@@ -7276,7 +7364,8 @@
       "sessions": 2,
       "first_done": "2024-12-15",
       "last_done": "2025-02-15",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "rear_delt_fly": {
       "title": "Rear Delt fly",
@@ -7353,7 +7442,8 @@
       "sessions": 2,
       "first_done": "2023-04-28",
       "last_done": "2023-05-22",
-      "anchor_family": "row"
+      "anchor_family": "row",
+      "load_convention": "per_hand"
     },
     "reverse_lunge_dumbbell": {
       "title": "Reverse Lunge (Dumbbell)",
@@ -7380,7 +7470,8 @@
       "sessions": 2,
       "first_done": "2025-01-20",
       "last_done": "2025-02-05",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "ring_inverted_rows": {
       "title": "Ring Inverted Rows",
@@ -7472,7 +7563,8 @@
       "sessions": 2,
       "first_done": "2023-04-19",
       "last_done": "2023-09-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "single_leg_drop_sticks": {
       "title": "Single Leg Drop Sticks",
@@ -7588,7 +7680,8 @@
       "sessions": 2,
       "first_done": "2024-10-02",
       "last_done": "2024-10-16",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "slick_floor_bridge_hammer_curls": {
       "title": "Slick Floor Bridge Hammer Curls",
@@ -7775,7 +7868,8 @@
       "sessions": 2,
       "first_done": "2023-04-19",
       "last_done": "2023-09-06",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "tke_split_squat_drops": {
       "title": "TKE Split Squat Drops",
@@ -7799,7 +7893,8 @@
       "sessions": 2,
       "first_done": "2024-12-17",
       "last_done": "2024-12-23",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "tricep_extension": {
       "title": "Tricep Extension",
@@ -7874,7 +7969,8 @@
       "sessions": 2,
       "first_done": "2022-08-23",
       "last_done": "2025-02-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "triceps_extension_machine": {
       "title": "Triceps Extension (Machine)",
@@ -7922,7 +8018,8 @@
       "sessions": 2,
       "first_done": "2024-10-30",
       "last_done": "2024-11-11",
-      "anchor_family": "bench"
+      "anchor_family": "bench",
+      "load_convention": "per_hand"
     },
     "walking_hip_circles": {
       "title": "Walking Hip Circles",
@@ -7969,7 +8066,9 @@
       "sessions": 2,
       "first_done": "2025-10-29",
       "last_done": "2025-11-05",
-      "anchor_family": null
+      "anchor_family": null,
+      "distance_unit_convention": "steps",
+      "load_convention": "per_hand"
     },
     "walking_reverse_lunge_and_twist": {
       "title": "Walking Reverse Lunge And Twist",
@@ -8233,7 +8332,8 @@
       "sessions": 1,
       "first_done": "2024-12-31",
       "last_done": "2024-12-31",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "alternating_side_kickthrough": {
       "title": "Alternating Side Kickthrough",
@@ -8352,7 +8452,8 @@
       "sessions": 1,
       "first_done": "2025-02-18",
       "last_done": "2025-02-18",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "banded_db_curls": {
       "title": "Banded DB Curls",
@@ -8376,7 +8477,8 @@
       "sessions": 1,
       "first_done": "2025-01-06",
       "last_done": "2025-01-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "banded_lying_hamstring_curls": {
       "title": "Banded Lying Hamstring Curls",
@@ -8547,7 +8649,8 @@
       "sessions": 1,
       "first_done": "2023-05-21",
       "last_done": "2023-05-21",
-      "anchor_family": "bench"
+      "anchor_family": "bench",
+      "load_convention": "per_hand"
     },
     "bent_arm_lateral_raises": {
       "title": "Bent Arm Lateral Raises",
@@ -8571,7 +8674,8 @@
       "sessions": 1,
       "first_done": "2024-12-30",
       "last_done": "2024-12-30",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "bicep_curl_for_time": {
       "title": "Bicep Curl For Time",
@@ -8591,7 +8695,8 @@
       "sessions": 1,
       "first_done": "2025-04-09",
       "last_done": "2025-04-09",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "bodyweight_tricep_extensions": {
       "title": "Bodyweight Tricep Extensions",
@@ -8710,7 +8815,8 @@
       "sessions": 1,
       "first_done": "2025-02-01",
       "last_done": "2025-02-01",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "bulgarian_split_squat_with_twist": {
       "title": "Bulgarian Split squat with Twist",
@@ -8734,7 +8840,8 @@
       "sessions": 1,
       "first_done": "2023-04-26",
       "last_done": "2023-04-26",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "cable_3d_crossovers": {
       "title": "Cable 3D Crossovers",
@@ -8854,7 +8961,8 @@
       "sessions": 1,
       "first_done": "2025-04-27",
       "last_done": "2025-04-27",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "clean_and_jerk": {
       "title": "Clean and Jerk",
@@ -8902,7 +9010,8 @@
       "sessions": 1,
       "first_done": "2023-05-21",
       "last_done": "2023-05-21",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "crossover_stepup": {
       "title": "Crossover Stepup",
@@ -8974,7 +9083,8 @@
       "sessions": 1,
       "first_done": "2024-10-22",
       "last_done": "2024-10-22",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "curl_and_press": {
       "title": "Curl And Press",
@@ -8998,7 +9108,8 @@
       "sessions": 1,
       "first_done": "2023-05-15",
       "last_done": "2023-05-15",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_adductor_slides": {
       "title": "DB Adductor Slides",
@@ -9022,7 +9133,8 @@
       "sessions": 1,
       "first_done": "2025-01-12",
       "last_done": "2025-01-12",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_bw_calf_jumps": {
       "title": "DB/BW Calf Jumps",
@@ -9046,7 +9158,8 @@
       "sessions": 1,
       "first_done": "2025-01-20",
       "last_done": "2025-01-20",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_diamond_press": {
       "title": "DB Diamond Press",
@@ -9070,7 +9183,8 @@
       "sessions": 1,
       "first_done": "2024-12-30",
       "last_done": "2024-12-30",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_frog_press": {
       "title": "DB Frog Press",
@@ -9094,7 +9208,8 @@
       "sessions": 1,
       "first_done": "2025-01-06",
       "last_done": "2025-01-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_gravediggers": {
       "title": "DB Gravediggers",
@@ -9118,7 +9233,8 @@
       "sessions": 1,
       "first_done": "2025-03-16",
       "last_done": "2025-03-16",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_heel_touch_squats": {
       "title": "DB Heel Touch Squats",
@@ -9142,7 +9258,8 @@
       "sessions": 1,
       "first_done": "2025-04-22",
       "last_done": "2025-04-22",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_hip_huggers": {
       "title": "DB Hip huggers",
@@ -9166,7 +9283,8 @@
       "sessions": 1,
       "first_done": "2025-01-19",
       "last_done": "2025-01-19",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_incline_power_bombs": {
       "title": "DB Incline power Bombs",
@@ -9190,7 +9308,8 @@
       "sessions": 1,
       "first_done": "2025-01-02",
       "last_done": "2025-01-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_incline_variable_curls": {
       "title": "DB Incline Variable Curls",
@@ -9214,7 +9333,8 @@
       "sessions": 1,
       "first_done": "2025-02-02",
       "last_done": "2025-02-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_lat_pullovers": {
       "title": "DB Lat Pullovers",
@@ -9262,7 +9382,8 @@
       "sessions": 1,
       "first_done": "2025-04-13",
       "last_done": "2025-04-13",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "total_carried"
     },
     "db_reach_across_single_leg_rdl": {
       "title": "DB Reach Across Single Leg RDL",
@@ -9286,7 +9407,8 @@
       "sessions": 1,
       "first_done": "2025-01-12",
       "last_done": "2025-01-12",
-      "anchor_family": "hinge"
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "db_scoop_press": {
       "title": "DB Scoop Press",
@@ -9310,7 +9432,8 @@
       "sessions": 1,
       "first_done": "2025-03-13",
       "last_done": "2025-03-13",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_shot_put": {
       "title": "DB Shot Put",
@@ -9334,7 +9457,8 @@
       "sessions": 1,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_shovel_curls": {
       "title": "DB Shovel Curls",
@@ -9358,7 +9482,8 @@
       "sessions": 1,
       "first_done": "2025-01-13",
       "last_done": "2025-01-13",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_single_arm_overhead_press": {
       "title": "DB Single Arm Overhead Press",
@@ -9406,7 +9531,8 @@
       "sessions": 1,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_split_snatch_side_variation": {
       "title": "DB Split Snatch Side Variation",
@@ -9430,7 +9556,8 @@
       "sessions": 1,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_sumo_drop_squat": {
       "title": "DB Sumo Drop Squat",
@@ -9454,7 +9581,8 @@
       "sessions": 1,
       "first_done": "2025-01-12",
       "last_done": "2025-01-12",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "dead_arm_switch_grip_hang": {
       "title": "Dead Arm Switch Grip Hang",
@@ -9523,7 +9651,8 @@
       "sessions": 1,
       "first_done": "2025-02-13",
       "last_done": "2025-02-13",
-      "anchor_family": "bench"
+      "anchor_family": "bench",
+      "load_convention": "per_hand"
     },
     "depth_jumps": {
       "title": "Depth Jumps",
@@ -9547,7 +9676,8 @@
       "sessions": 1,
       "first_done": "2025-02-08",
       "last_done": "2025-02-08",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "depth_ploymetric_push_up": {
       "title": "Depth Ploymetric Push-up",
@@ -9643,7 +9773,8 @@
       "sessions": 1,
       "first_done": "2025-01-06",
       "last_done": "2025-01-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "dual_lip_busters": {
       "title": "Dual Lip Busters",
@@ -9694,7 +9825,8 @@
       "sessions": 1,
       "first_done": "2023-05-01",
       "last_done": "2023-05-01",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "dumbbell_twists": {
       "title": "Dumbbell Twists",
@@ -9718,7 +9850,8 @@
       "sessions": 1,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "eccentric_step_aways": {
       "title": "Eccentric Step Aways",
@@ -9766,7 +9899,8 @@
       "sessions": 1,
       "first_done": "2025-02-02",
       "last_done": "2025-02-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "finger_tip_mountain_climbers": {
       "title": "Finger Tip Mountain Climbers",
@@ -10323,7 +10457,8 @@
       "sessions": 1,
       "first_done": "2025-02-06",
       "last_done": "2025-02-06",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "incline_db_kickbacks": {
       "title": "Incline DB Kickbacks",
@@ -10347,7 +10482,8 @@
       "sessions": 1,
       "first_done": "2025-01-02",
       "last_done": "2025-01-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "incline_db_skull_crushers": {
       "title": "Incline DB Skull crushers",
@@ -10371,7 +10507,8 @@
       "sessions": 1,
       "first_done": "2025-01-02",
       "last_done": "2025-01-02",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "incline_db_triceps_x_tensions": {
       "title": "Incline DB Triceps X-Tensions",
@@ -10395,7 +10532,8 @@
       "sessions": 1,
       "first_done": "2025-03-24",
       "last_done": "2025-03-24",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "inverted_chin_curls": {
       "title": "Inverted Chin Curls",
@@ -10518,7 +10656,8 @@
       "sessions": 1,
       "first_done": "2025-04-28",
       "last_done": "2025-04-28",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "kettlebell_goblet_squat": {
       "title": "Kettlebell Goblet Squat",
@@ -11082,7 +11221,8 @@
       "sessions": 1,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "lunge_jumps": {
       "title": "Lunge Jumps",
@@ -11262,7 +11402,8 @@
       "sessions": 1,
       "first_done": "2024-10-21",
       "last_done": "2024-10-21",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "offset_lunges": {
       "title": "Offset Lunges",
@@ -11286,7 +11427,8 @@
       "sessions": 1,
       "first_done": "2025-01-23",
       "last_done": "2025-01-23",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "one_arm_bench_press": {
       "title": "One Arm Bench Press",
@@ -11387,7 +11529,8 @@
       "sessions": 1,
       "first_done": "2025-04-22",
       "last_done": "2025-04-22",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "overhead_press": {
       "title": "Overhead Press",
@@ -11650,7 +11793,8 @@
       "sessions": 1,
       "first_done": "2023-07-23",
       "last_done": "2023-07-23",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "push_up_close_grip": {
       "title": "Push Up - Close Grip",
@@ -11774,7 +11918,8 @@
       "sessions": 1,
       "first_done": "2025-01-16",
       "last_done": "2025-01-16",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "reverse_grip_lat_pulldown_cable": {
       "title": "Reverse Grip Lat Pulldown (Cable)",
@@ -11851,7 +11996,8 @@
       "sessions": 1,
       "first_done": "2023-04-21",
       "last_done": "2023-04-21",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "reverse_lunge_front_rack": {
       "title": "Reverse Lunge Front Rack",
@@ -12069,7 +12215,8 @@
       "sessions": 1,
       "first_done": "2023-04-21",
       "last_done": "2023-04-21",
-      "anchor_family": "row"
+      "anchor_family": "row",
+      "load_convention": "per_hand"
     },
     "russian_v_ups": {
       "title": "Russian V Ups",
@@ -12117,7 +12264,8 @@
       "sessions": 1,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "total_carried"
     },
     "sandbag_shouldering": {
       "title": "Sandbag Shouldering",
@@ -12213,7 +12361,8 @@
       "sessions": 1,
       "first_done": "2025-01-09",
       "last_done": "2025-01-09",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "seated_bicep_curls": {
       "title": "Seated Bicep Curls",
@@ -12263,7 +12412,8 @@
       "sessions": 1,
       "first_done": "2026-06-22",
       "last_done": "2026-06-22",
-      "anchor_family": "overhead_press"
+      "anchor_family": "overhead_press",
+      "load_convention": "per_hand"
     },
     "shrug_machine": {
       "title": "Shrug (Machine)",
@@ -12430,7 +12580,8 @@
       "sessions": 1,
       "first_done": "2023-05-22",
       "last_done": "2023-05-22",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "single_leg_standing_calf_raise_dumbbell": {
       "title": "Single Leg Standing Calf Raise (Dumbbell)",
@@ -12454,7 +12605,8 @@
       "sessions": 1,
       "first_done": "2025-01-20",
       "last_done": "2025-01-20",
-      "anchor_family": null
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "single_leg_static_balance_with_eyes_closed": {
       "title": "Single Leg Static Balance With Eyes Closed",

@@ -45,6 +45,12 @@ the band's HIGH end (`progression.ceiling_tier` in the charter says so): a compo
 catalog entry names an `anchor_family`; anything else is an isolation movement, whose earlier
 sets read the compounds band and whose LAST working set reads the isolation band.
 
+THE LOGGED UNIT (#5373). A load here is the number he logs for THIS movement, and Hevy takes the
+same number back: one dumbbell's weight on a bilateral dumbbell exercise (`per_hand`), the sum
+on a carry (`total_carried`). The rule never converts between them — a percentage step is the
+same on either — but every load in a reason is labelled (`_lb(kg, load_convention)`: "55 lb per
+hand"), and the result carries `load_convention`, so no reader takes a per-hand 50 for a total.
+
 Pure: inputs are values the caller already loaded; the only read is the charter (bundled,
 cached, fail-soft). No boto3, no clock.
 """
@@ -53,6 +59,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
+from training.logging_conventions import AS_LOGGED, load_label  # #5373: per-hand vs total-carried, named on every load
 from training.rep_scheme import LB_IN_KG
 from training.training_charter import charter_value, charter_version
 
@@ -151,9 +158,12 @@ def rule_summary() -> dict[str, Any]:
 # ── helpers ───────────────────────────────────────────────────────────────────────
 
 
-def _lb(kg: float) -> str:
+def _lb(kg: float, load_convention: str | None = None) -> str:
+    """A load in lb, labelled by how it was logged (#5373): '55 lb per hand' on a bilateral dumbbell exercise, '120 lb total
+    carried' on a carry, bare when the logged number is the whole load."""
     lb = float(kg) / LB_IN_KG
-    return f"{lb:.0f} lb" if abs(lb - round(lb)) < 0.05 else f"{lb:.1f} lb"
+    text = f"{lb:.0f} lb" if abs(lb - round(lb)) < 0.05 else f"{lb:.1f} lb"
+    return text + load_label(load_convention or AS_LOGGED)
 
 
 def _num(v: Any) -> float | None:
@@ -305,6 +315,7 @@ def stall_step(
     rep_range: tuple[int, int] | None,
     rule: dict[str, Any] | None = None,
     stall: dict[str, Any] | None = None,
+    load_convention: str | None = None,
 ) -> dict[str, Any] | None:
     """The step the stall rule proposes for ONE movement, or None when it does not hold.
 
@@ -319,7 +330,7 @@ def stall_step(
         return None
     run = verdict["run"]
     load, reps = float(run[-1]["load_kg"]), int(run[-1]["reps"])
-    seen = f"{_lb(load)} x {reps} {len(run)} times at self-reported RPE <= {float(stall['max_rpe']):g} ({_dates(run)})"
+    seen = f"{_lb(load, load_convention)} x {reps} {len(run)} times at self-reported RPE <= {float(stall['max_rpe']):g} ({_dates(run)})"
     out: dict[str, Any] = {
         "basis": BASIS_STEP,
         "trigger": TRIGGER_STALL_RULE,
@@ -333,14 +344,14 @@ def stall_step(
     if rep_hi is not None and reps < rep_hi:
         add = max(1, min(int(stall.get("rep_step_max") or 1), rep_hi - reps))
         out.update(step_kind=STEP_KIND_REPS, next_load_kg=load, next_reps=reps + add)
-        out["reason"] = f"+{add} rep{'s' if add > 1 else ''} to {reps + add} at {_lb(load)}: {seen}"
+        out["reason"] = f"+{add} rep{'s' if add > 1 else ''} to {reps + add} at {_lb(load, load_convention)}: {seen}"
         return out
     inc = step_kg(load, rule)
     if not inc:
         return None
     back = int(rep_range[0]) if rep_range else reps
     out.update(step_kind=STEP_KIND_LOAD, next_load_kg=load + inc, next_reps=back)
-    out["reason"] = f"+{_lb(inc)} to {_lb(load + inc)}: {seen}; reps back to {back}"
+    out["reason"] = f"+{_lb(inc, load_convention)} to {_lb(load + inc, load_convention)}: {seen}; reps back to {back}"
     return out
 
 
@@ -359,6 +370,7 @@ def next_prescription(
     rule: dict[str, Any] | None = None,
     limits: dict[str, Any] | None = None,
     stall: dict[str, Any] | None = None,
+    load_convention: str | None = None,
 ) -> dict[str, Any]:
     """The next load and rep target for ONE movement.
 
@@ -366,7 +378,9 @@ def next_prescription(
     `{date, sets: [{weight_kg, reps, rpe, type?}], exposure?, prescribed_kg?}` — the
     `exercise_history` index shape; `exposure` (heavy / volume / ...) and the prescription
     are used when on file. `current_kg`: the load the engine already holds for this slot
-    (the floor / ramp). `rep_range`: the slot's (bottom, top)."""
+    (the floor / ramp). `rep_range`: the slot's (bottom, top). `load_convention` (#5373, the catalog entry's —
+    `logging_conventions.load_convention_of`): the loads stay in the logged unit (Hevy takes the per-hand number back), and
+    every load in the reason is labelled with it, so a per-hand 50 never reads as a 50-lb total."""
     rule = gain_rule() if rule is None else rule
     limits = effort_limits() if limits is None else limits
     out: dict[str, Any] = {
@@ -375,6 +389,7 @@ def next_prescription(
         "basis": BASIS_HOLD,
         "reason": "",
         "movement_class": cls,
+        "load_convention": load_convention or AS_LOGGED,
         "charter_version": charter_version(),
     }
     if re_entry_reason:
@@ -415,13 +430,13 @@ def next_prescription(
                 basis=BASIS_STEP,
                 trigger=TRIGGER_GAIN_RULE,
                 step_kind=STEP_KIND_LOAD,
-                reason=f"+{_lb(inc)} to {_lb(load + inc)}: {need} top sets at the top of {rep_lo}-{rep_hi}, RPE <= {ceiling:g}, {days}; reps back to {rep_lo}",
+                reason=f"+{_lb(inc, load_convention)} to {_lb(load + inc, load_convention)}: {need} top sets at the top of {rep_lo}-{rep_hi}, RPE <= {ceiling:g}, {days}; reps back to {rep_lo}",
             )
             return out
 
     # #5057: the stall rule — after the gain rule's step, before a floor raise (a floor at the
     # load he has repeated is the repetition it ends)
-    stalled = stall_step([s for s, _t in exposures], rep_range=(rep_lo, rep_hi), rule=rule, stall=stall)
+    stalled = stall_step([s for s, _t in exposures], rep_range=(rep_lo, rep_hi), rule=rule, stall=stall, load_convention=load_convention)
     if stalled is not None and float(stalled["from_load_kg"]) >= cur - LOAD_TOLERANCE_KG:
         out.update(stalled)
         return out
@@ -429,13 +444,13 @@ def next_prescription(
     if load > cur + LOAD_TOLERANCE_KG:
         if breach is not None:
             out["reason"] = (
-                f"hold {_lb(cur) if cur else 'the floor'}: {_lb(load)} on {_day(last.get('date'))} was logged at RPE {breach['rpe']:g}, "
+                f"hold {_lb(cur, load_convention) if cur else 'the floor'}: {_lb(load, load_convention)} on {_day(last.get('date'))} was logged at RPE {breach['rpe']:g}, "
                 f"above the {cls} ceiling RPE {breach['ceiling_rpe']:g} + {breach['limit_rpe'] - breach['ceiling_rpe']:g} — a breach, not a floor"
             )
             return out
         if _unlogged(last_top):
             out["reason"] = (
-                f"hold: {_lb(load)} on {_day(last.get('date'))} has a set with no RPE logged — not evidence it sat under the ceiling"
+                f"hold: {_lb(load, load_convention)} on {_day(last.get('date'))} has a set with no RPE logged — not evidence it sat under the ceiling"
             )
             return out
         mine = _num(last.get("prescribed_kg"))
@@ -444,7 +459,7 @@ def next_prescription(
         out.update(
             next_load_kg=load,
             basis=BASIS_FLOOR_RAISE,
-            reason=f"floor {_lb(load)}: {who} on {_day(last.get('date'))} at RPE <= {top_rpe:g}, within the {cls} ceiling",
+            reason=f"floor {_lb(load, load_convention)}: {who} on {_day(last.get('date'))} at RPE <= {top_rpe:g}, within the {cls} ceiling",
         )
         return out
 
@@ -452,7 +467,7 @@ def next_prescription(
         # #5052 (the 2026-10-23 calf read): the gain rule needs the performed load at or above the prescribed one, so a
         # run at a LOWER load never counts — say so, rather than "2 of 2 at the top" beside a hold
         out["reason"] = (
-            f"hold {_lb(cur)}: the top sets on {_day(last.get('date'))} were at {_lb(load)}, below the prescribed load — "
+            f"hold {_lb(cur, load_convention)}: the top sets on {_day(last.get('date'))} were at {_lb(load, load_convention)}, below the prescribed load — "
             f"the gain rule counts top sets at or above it"
         )
         return out
@@ -462,7 +477,9 @@ def next_prescription(
             hits += 1
         else:
             break
-    out["reason"] = f"hold {_lb(cur or load)}: {hits} of {need} top sets at the top of {rep_lo}-{rep_hi} at or under the ceiling"
+    out["reason"] = (
+        f"hold {_lb(cur or load, load_convention)}: {hits} of {need} top sets at the top of {rep_lo}-{rep_hi} at or under the ceiling"
+    )
     return out
 
 
