@@ -22,10 +22,10 @@
   },
   "ai-tokens-platform-daily-total": {
     "added": "2026-10-02",
-    "cause": "rolling-24h output tokens above the bar on an attended Bedrock night (owner's word)",
-    "cause_observed": "2026-10-18",
-    "citation": "self-clearing, 24 h: the 2026-10-18 episode is the owner-authorized season re-stage + repair passes (#4537, #4993) and the forced analyzer; clears as the rolling window passes 2026-10-19 ~05:00Z; the bar class is #4517 · Prior entry (2026-10-18T07:55Z): #4517 — the episode beginning 2026-10-01T20:00:34Z (13:00 PT) is the class #4517 re-derives: 250,000 sat inside the measured daily distribution. The re-derived bar (337,000; log-normal mean+3 SD, n=30, 30-day backtest 0 …",
-    "updated": "2026-10-18"
+    "cause": "rolling-24h output tokens above the bar on one owner-ruled laptop eval run (dev-session caller)",
+    "cause_observed": "2026-10-26",
+    "citation": "self-clearing, 24 h: the 2026-10-26 episode (ALARM 05:41Z) is one owner-ruled laptop run — the open-weight swap eval (single process, DEV_AI_BUDGET_USD=15 for that command only), 2026-10-26 05:12–06:10Z: CallerClass dev-session put ~337,000 output tokens into the rolling day (gpt-oss reasoning tokens + the Sonnet pairwise judge), on top of the platform's ordinary day. It clears as the rolling 24 h passes ~2026-10-27T06:15Z; if still ALARM after 2026-10-27T09:00Z, read AnthropicOutputTokens by LambdaFunction before re-citing. The bar class itself is #4517.",
+    "updated": "2026-10-26"
   },
   "ai-tokens-platform-daily-total-genesis-window": {
     "added": "2026-09-05",
@@ -126,10 +126,10 @@
   },
   "ai-tokens-platform-daily-total-urgent": {
     "added": "2026-10-01",
-    "cause_observed": "2026-10-18",
-    "cause": "rolling-24h output tokens above the urgent bar on an attended Bedrock night (owner's word)",
-    "citation": "self-clearing, 24 h: same episode as ai-tokens-platform-daily-total — the owner-authorized season re-stage + repairs (#4537, #4993) and the forced analyzer on 2026-10-18; clears as the rolling window passes 2026-10-19 ~05:00Z; the bar class is #4517 · Prior entry (2026-10-18T07:55Z): #4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision vis…",
-    "updated": "2026-10-18"
+    "cause_observed": "2026-10-26",
+    "cause": "rolling-24h output tokens above the bar on one owner-ruled laptop eval run (dev-session caller)",
+    "citation": "self-clearing, 24 h: the 2026-10-26 episode (ALARM 05:41Z) is one owner-ruled laptop run — the open-weight swap eval (single process, DEV_AI_BUDGET_USD=15 for that command only), 2026-10-26 05:12–06:10Z: CallerClass dev-session put ~337,000 output tokens into the rolling day (gpt-oss reasoning tokens + the Sonnet pairwise judge), on top of the platform's ordinary day. It clears as the rolling 24 h passes ~2026-10-27T06:15Z; if still ALARM after 2026-10-27T09:00Z, read AnthropicOutputTokens by LambdaFunction before re-citing. The bar class itself is #4517.",
+    "updated": "2026-10-26"
   },
   "chronicle-delivery-heartbeat": {
     "added": "2026-10-04",
@@ -248,7 +248,15 @@
   },
   "ai-dev-session-month-high": {
     "added": "2026-10-25",
-    "citation": "self-clearing, dated: expected RED from its first governor run after deploy — October's dev-session total is already over the $48 bar ($63.42 month-to-date at 2026-10-25 22:00Z, CallerClass=dev-session EstimatedCostUSD: $30.68 on 10-01..03, $27.37 on 10-18, $3.40 on 10-23). The governor's DevSessionSpendMTD gauge restarts at 0 on 2026-11-01 and the alarm returns to OK at the 2026-11-01T00:00Z governor run. Expiry: if still ALARM after 2026-11-01T09:00Z, read DevSessionSpendMTD and the November dev-session series before re-citing.",
-    "note": "Deploys red-bound on purpose (the cost-metric-drift-sustained precedent): it states a true condition, the October envelope already spent. Added with the alarm itself, before it exists live."
+    "citation": "self-clearing, dated: RED since its first governor publish 2026-10-26T08:01Z — DevSessionSpendMTD 67.78 against the $48 bar (80% of the $60 calendar-month dev-session cap, live since 2026-10-26). October's dev-session total was already over the cap before deploy; the gauge restarts at 0 on 2026-11-01 and the alarm returns to OK at the 2026-11-01T00:00Z governor run. Expiry: if still ALARM after 2026-11-01T09:00Z, read DevSessionSpendMTD and the November dev-session series before re-citing. Whether the cap should apply to October at all is an open owner ruling: #5406.",
+    "note": "Deploys red-bound on purpose (the cost-metric-drift-sustained precedent): it states a true condition, the October envelope already spent. Added with the alarm itself, before it exists live.",
+    "cause_observed": "2026-10-26",
+    "updated": "2026-10-26"
+  },
+  "qa-smoke-failures": {
+    "added": "2026-10-26",
+    "cause_observed": "2026-10-26",
+    "cause": "one recurring reader-truth false positive on /api/coaches (finding e8f2c1, temporal_contradiction): the judge reads _meta.generated_at (UTC) as after Pacific today on every Pacific-evening run",
+    "citation": "#5402 — ALARM 2026-10-25T05:31Z (the finding confirmed high on a second pass) → OK 2026-10-26T05:30Z; the same finding recurs nightly at WARN. The deterministic ruling + prompt line ship in PR #5404 (wave 5); this entry is pruned when #5402 closes on a Pacific-evening run with no e8f2c1-class finding."
   }
 }
