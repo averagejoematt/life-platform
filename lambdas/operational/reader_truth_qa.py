@@ -130,6 +130,7 @@ from operational.reader_truth_rulings import (  # noqa: F401
     is_prior_cycle_archive,
     is_self_refuted,
     is_sparsity_objection,
+    is_utc_instant_read_as_future,
     is_utc_offset_misread,
     is_vagueness_objection,
     is_wake_frame_correct,
@@ -314,12 +315,22 @@ def _iso_week_line(phase):
     )
 
 
+# #5402: "today" is the PACIFIC date, but payload stamps (`_meta.generated_at`, anything with
+# a trailing Z) are UTC. Between ~00:00Z and ~07:00Z the UTC date is a day ahead of Pacific
+# today with no contradiction at all; the judge read exactly that as "generated AFTER today"
+# on every Pacific evening. is_utc_instant_read_as_future is the deterministic backstop.
+_UTC_FRAME_LINE = (
+    " `_meta.generated_at` and every timestamp ending in Z are UTC instants, while today is the PACIFIC date: "
+    "a UTC instant whose Pacific date is today is NOT after today."
+)
+
+
 def _phase_line(phase):
     if phase["pre_start"]:
         return (
             f"The experiment has NOT started yet — Day 1 is {phase['start_date']}, "
             f"{phase['days_until_start']} day(s) away (today is {phase['today']}). The site runs an honest "
-            f"pre-start countdown; ZERO days of current-experiment data can exist yet." + _cycle_line(phase)
+            f"pre-start countdown; ZERO days of current-experiment data can exist yet." + _cycle_line(phase) + _UTC_FRAME_LINE
         )
     return (
         f"Today ({phase['today']}) is Day {phase['day_n']} of the experiment (Day 1 = {phase['start_date']}). "
@@ -338,6 +349,7 @@ def _phase_line(phase):
         f"{phase['day_n']} day(s) is impossible. Never flag a number for being smaller than {phase['day_n']}."
         + _cycle_line(phase)
         + _iso_week_line(phase)
+        + _UTC_FRAME_LINE
     )
 
 
@@ -900,6 +912,16 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     print(
                         f"  ↩ reader-truth: dropped a finding on {f['page']} whose own UTC→Pacific "
                         f"conversion is wrong (DST offset misapplied): {f['note'][:120]}"
+                    )
+                    continue
+                # #5402: a UTC instant (`_meta.generated_at`, Z often dropped by the
+                # judge) read as "after today" while its PACIFIC date is not — the
+                # judge compared a UTC calendar date to the Pacific phase date.
+                # Printed, never silently swallowed.
+                if is_utc_instant_read_as_future(f, phase["today"]):
+                    print(
+                        f"  ↩ reader-truth: dropped a finding on {f['page']} that reads a UTC instant as after "
+                        f"today when its Pacific date is not (UTC vs Pacific frame, #5402): {f['note'][:120]}"
                     )
                     continue
                 # #2741: the durable-design-copy retirement, enforced. Every quoted
