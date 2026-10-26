@@ -624,7 +624,14 @@ _PK_RULES: list = [
     # cycle that produced it — the same sentence that settles outbound_events.
     (
         lambda pk, sk: pk
-        in ("COACH#nudge_ledger", "COACH#outbound_ledger", "COACH#steps_nudge", "COACH#protein_nudge", "COACH#evening_checkin"),
+        in (
+            "COACH#nudge_ledger",
+            "COACH#outbound_ledger",
+            "COACH#steps_nudge",
+            "COACH#protein_nudge",
+            "COACH#evening_checkin",
+            "COACH#morning_checkin",
+        ),
         SYSTEM_STATE,
     ),
     # Coach intelligence tier — all experiment-scoped.

@@ -499,3 +499,10 @@ def two_consecutive_ignored(rows: list, provenance: str, role_coach: str = "coac
         if any((r or {}).get("role") == role_matthew for r in ordered[i + 1 :]):
             return False
     return True
+
+
+def run_morning_stamped(run, table, now_pt) -> dict:
+    """#5132: run the morning check-in and stamp its outcome row (``coach.morning_checkin_ledger``) for the dead-man."""
+    from coach import morning_checkin_ledger
+
+    return morning_checkin_ledger.run_stamped(run, table, now_pt)

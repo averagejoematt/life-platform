@@ -245,6 +245,7 @@ from experiment.phase_filter import singleton_visible  # hoisted from two functi
 from intelligence import (
     held_record_ttl as _held,  # #4703: a HOLD renews the prior record's ttl
     training_session_facts,  # #5398: THE session count over the 30-day read (module at its size ceiling)
+    vendor_outage_breaker as _outage,  # #5412: a vendor 5xx burst in one run = at most 2 failure metrics
     weight_recency,
 )
 
@@ -1069,7 +1070,7 @@ def _gate_prose(
         )
 
     def _regen(_correction):
-        from common.retry_utils import call_anthropic_raw
+        from intelligence.vendor_outage_breaker import call_guarded as call_anthropic_raw  # #5412
 
         # #3170: same shared_system as the primary call — a regen is not a weaker contract.
         _req = _anthropic_req(prompt + "\n\n" + _correction, api_key, system=shared_system)
@@ -1143,7 +1144,7 @@ def generate_and_cache(expert_key, shared_system=None):
 
     # Phase 3.4 (2026-05-16): retry via retry_utils → bedrock_client.invoke_with_retry, the one policy (#4279).
     try:
-        from common.retry_utils import call_anthropic_raw
+        from intelligence.vendor_outage_breaker import call_guarded as call_anthropic_raw  # #5412
 
         result = call_anthropic_raw(req, timeout=60)
     except urllib.error.HTTPError as e:
@@ -1263,7 +1264,7 @@ def generate_and_cache(expert_key, shared_system=None):
                     # Phase 3.4 + CRIT-AI-01 (2026-05-16): correction call now retries via
                     # retry_utils (was raw urlopen, no retry — caused silent quality failures
                     # when Anthropic was briefly unavailable mid-observatory).
-                    from common.retry_utils import call_anthropic_raw
+                    from intelligence.vendor_outage_breaker import call_guarded as call_anthropic_raw  # #5412
 
                     corr_result = call_anthropic_raw(corr_req, timeout=60)
                     corrected_text = "".join(b["text"] for b in corr_result.get("content", []) if b.get("type") == "text")
@@ -1452,7 +1453,7 @@ def generate_synthesis(all_coach_outputs):
     # mid-string → json.loads threw and the whole synthesis fail-closed to the previous
     # day's (stale) record (the /cockpit/ "collapsed to one session/week" bug).
     # Phase 3.4: retry via retry_utils; lenient parse per _lenient_json (B4).
-    from common.retry_utils import call_anthropic_raw
+    from intelligence.vendor_outage_breaker import call_guarded as call_anthropic_raw  # #5412
 
     synthesis = None
     last_err = None
@@ -1635,7 +1636,7 @@ def generate_experiment_arc():
 
     api_key = _get_api_key()
 
-    from common.retry_utils import call_anthropic_raw
+    from intelligence.vendor_outage_breaker import call_guarded as call_anthropic_raw  # #5412
 
     parsed = None
     last_err = None
@@ -1757,7 +1758,7 @@ def generate_month_rollup():
 
     api_key = _get_api_key()
 
-    from common.retry_utils import call_anthropic_raw
+    from intelligence.vendor_outage_breaker import call_guarded as call_anthropic_raw  # #5412
 
     parsed = None
     last_err = None
@@ -1815,33 +1816,26 @@ def _absent_coaches():
     return instrument_presence.absent_coaches(table)
 
 
+def _response(payload):
+    return {"statusCode": 200, "body": json.dumps(payload, default=str)}
+
+
 def lambda_handler(event, context):
     try:
         # C-1: refresh just the cross-week arc without re-running the 8 narratives
         # (manual/test repopulate). The weekly 'all' pass also regenerates it — its input (field_notes WEEK#, Sundays) changes weekly (#3366).
         if event.get("arc_only"):
             arc = generate_experiment_arc()
-            return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {"experiment_arc": {"status": "ok", "weeks": arc.get("week_count")} if arc else {"status": "skipped"}},
-                    default=str,
-                ),
-            }
+            return _response({"experiment_arc": {"status": "ok", "weeks": arc.get("week_count")} if arc else {"status": "skipped"}})
         # #1115: refresh just the month rollup (manual/test repopulate).
         if event.get("month_only"):
             rollup = generate_month_rollup()
-            return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {"month_rollup": {"status": "ok", "weeks": rollup.get("week_count")} if rollup else {"status": "skipped"}},
-                    default=str,
-                ),
-            }
+            return _response({"month_rollup": {"status": "ok", "weeks": rollup.get("week_count")} if rollup else {"status": "skipped"}})
         target = event.get("expert", "all")
         experts_to_run = EXPERTS if target == "all" else [target]
         results = {}
         all_outputs = {}
+        _outage.begin_run(context)  # #5412: per-invocation state (a warm container reuses the module)
 
         # COST-OPT: Build shared system prompt once — cached across all expert calls
         shared_system = _build_shared_system_prompt()
@@ -1873,13 +1867,15 @@ def lambda_handler(event, context):
             except Exception as e:
                 logger.error(f"Failed to generate {expert_key}: {e}")
                 results[expert_key] = {"status": "error", "error": str(e)}
+                if _outage.tripped():  # #5412: vendor outage — the prior record keeps serving (renewed like a hold, #4703)
+                    _held.renew_held(table, CACHE_PK, f"EXPERT#{expert_key}", _held.WEEKLY_TTL_DAYS)
 
         # #4703: too many held reads to synthesize — the board-level records are held with them, so renew them.
         if target == "all" and len(all_outputs) < 3 and any(r.get("status") == "skipped_empty" for r in results.values()):
             for _sk, _d in _held.BOARD_RECORDS:
                 _held.renew_held(table, CACHE_PK, _sk, _d)
-        # Synthesis pass — only when running all experts
-        if target == "all" and len(all_outputs) >= 3:
+        # Synthesis pass — only when running all experts (never into a tripped vendor outage, #5412)
+        if target == "all" and len(all_outputs) >= 3 and not _outage.tripped():
             try:
                 synthesis = generate_synthesis(all_outputs)
                 if synthesis:
@@ -1911,10 +1907,7 @@ def lambda_handler(event, context):
                 logger.error(f"Month-rollup failed: {e}")
                 results["month_rollup"] = {"status": "error", "error": str(e)}
 
-        return {
-            "statusCode": 200,
-            "body": json.dumps(results, default=str),
-        }
+        return _response(results)
     except Exception as e:
         logger.error(f"Handler failed: {e}")
         raise
