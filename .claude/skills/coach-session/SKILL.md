@@ -200,6 +200,11 @@ He authors at night and trains the next morning with **zero chance to adjust.**
   "+<the step the engine wrote>: the gain rule's trigger met at the top of the range, RPE inside
   the ceiling"; quote the load and step the engine wrote, never a number from memory. Hevy stores kg;
   convert for display.
+- **How he logs (#5373).** Logging conventions (owner): on a carry (the farmers walk) the Hevy
+  'yards' number is his STEP COUNT (no distance markings in the gym) and the weight is the TOTAL
+  carried, both hands; every other dumbbell exercise is logged PER HAND (one dumbbell's weight) —
+  never ask what is in each hand. Quote a carry as the detail tool renders it ("N steps (~X yd,
+  est. from unloaded stride)") and never as a measured distance.
 - **Finishers:** read the actual exercise list of the last sessions before programming core,
   carries or a finisher; don't repeat one anti-movement pattern on consecutive days.
 - **Commit** records the spec durably at `config/coaching/routine_specs/<type>/<routine_id>.json`;
@@ -215,5 +220,7 @@ He authors at night and trains the next morning with **zero chance to adjust.**
   bike is fine.
 - ACWR: strength load (Hevy) and cardio load (Strava) are tracked separately; read an ACWR
   alert in that siloed context.
+- How he records the gym (owner ruling 2026-10-26, #5370): lift = Hevy, with Hevy's watch app for HR; cardio = the
+  Hevy block as the plan + the watch Workout app for HR; mobility = the Hevy block + the pliability app. Echoes fold in code.
 - Never congratulate him on the 100 lb milestone: it is a goal, not an achievement.
 - Nothing medical leaves this chat: not in an issue, a commit, a routine title or site copy.

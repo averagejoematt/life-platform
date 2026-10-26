@@ -194,6 +194,7 @@ if _SCRIPTS_DIR not in sys.path:
 
 import ci_job_timeouts  # noqa: E402 — #3678: the timeout-ceiling registry `scan_cancelled` feeds civ
 import ci_run_verdicts as civ  # noqa: E402 — must follow the sys.path insert above
+import reconcile_child_guard as rcg  # noqa: E402 — #5384: the stranded-reconcile classifier (sibling: this file is at the size ceiling)
 
 # #3608 box 2's EXPECTED-job derivation. It lives in a sibling module because this
 # file hit the #1665 hard ceiling of 1000 logical lines and the sanctioned payment
@@ -238,6 +239,7 @@ STRANDED_APPROVAL = "stranded-approval"
 STRANDED_PLAN = "stranded-plan"
 NO_VERDICT = "no-verdict"
 MISSING_JOB = "missing-job"  # #3608 box 2: an EXPECTED job never attached to the run.
+STRANDED_RECONCILE = "stranded-reconcile"  # #5384: the reconcile child deferred to a parent run that was rejected.
 
 
 def _parse_iso(ts: str | None) -> datetime | None:
@@ -603,6 +605,7 @@ def classify_pipeline(
     completed_jobs: list[dict] | None = None,
     expected_jobs: dict[str, str] | None = None,
     changed_paths: list[str] | None = None,
+    stranded_reconcile: dict | None = None,
 ) -> dict:
     """Classify main's pipeline state. Pure — fixture-tested offline (#1901/#2052).
 
@@ -648,8 +651,14 @@ def classify_pipeline(
         if missing_jobs:
             kind = MISSING_JOB
 
+    # #5384: a green reconcile run whose Deploy deferred to a parent run that was rejected/failed.
+    # Same precedence as MISSING_JOB — only re-labels an otherwise-GREEN verdict.
+    if kind == GREEN and stranded_reconcile:
+        kind = STRANDED_RECONCILE
+
     return {
         "kind": kind,
+        "stranded_reconcile": stranded_reconcile,
         "missing_jobs": missing_jobs,
         "sha": (completed or {}).get("headSha"),
         "run": completed,
@@ -719,6 +728,17 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
             "   renamed or deleted in the same push whose run this is.\n"
             "   Read the run's job list (`gh run view <id> --json jobs`) against\n"
             f"   `.github/workflows/{CI_CD_WORKFLOW_FILE}`'s jobs block before declaring main green."
+        )
+        return 1, "\n".join(lines + notices)
+
+    if kind == STRANDED_RECONCILE:
+        sr = state["stranded_reconcile"]
+        child, parent = sr["child"], sr["parent"]
+        lines.append(
+            f"🛑 STRANDED RECONCILE DEPLOY (#5384) — run {child.get('databaseId')} (sha {(child.get('headSha') or '')[:8]}, the bot's reconcile\n"
+            f"   commit) is green with `Deploy` SKIPPED because its Plan deferred to its parent's run {parent.get('databaseId')}\n"
+            f"   (sha {(parent.get('headSha') or '')[:8]}, #4250) — and that run concluded {parent.get('conclusion')}. Nothing shipped this merge.\n"
+            f"   Recovery: {sr['recovery']}"
         )
         return 1, "\n".join(lines + notices)
 
@@ -922,7 +942,7 @@ def main() -> int:
                 "--limit",
                 "20",
                 "--json",
-                "status,conclusion,headSha,databaseId,createdAt",
+                "status,conclusion,headSha,databaseId,createdAt,displayTitle",
             ]
         )
     except Exception as e:
@@ -977,8 +997,16 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001 — unreadable jobs means NO absence claim, never a false green-over-absence
             print(f"⚠️  check_main_green: could not read jobs for the winning run ({e}) — absent-job check skipped (#3608).")
 
+    # #5384: the stranded-reconcile shape. Unreadable data means NO claim (None), never a false verdict.
+    try:
+        stranded = rcg.stranded_reconcile_shape(runs, _probe_jobs, rcg._parents_of)
+    except Exception as e:  # noqa: BLE001
+        stranded = None
+        print(f"⚠️  check_main_green: could not evaluate the stranded-reconcile shape ({str(e)[:80]}) (#5384).")
+
     state = classify_pipeline(
         runs,
+        stranded_reconcile=stranded,
         latest_failure_jobs=jobs,
         rejected=rejected,
         cancelled_verdicts=cancelled_verdicts,

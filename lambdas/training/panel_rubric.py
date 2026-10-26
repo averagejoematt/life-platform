@@ -548,16 +548,34 @@ def _scrub(text: str) -> str:
     return re.sub(r"\s{2,}", " ", _BLIND_SCRUB.sub("", str(text or ""))).strip()
 
 
-def _set_line(sets: list[Any]) -> str:
+def _set_line(sets: list[Any], entry: dict[str, Any] | None = None) -> str:
+    """'3 x 8-12 @ 50 lb per hand' — the sets as a judge reads them. #5373: a distance-dosed set renders its dose, never '? reps' —
+    steps on a carry (`distance_unit_convention: steps`: his step count), metres otherwise; a timed set its seconds; a load is
+    labelled by the entry's `load_convention` (per hand / total carried)."""
+    from training import logging_conventions as lc  # noqa: PLC0415
+
     work = [s for s in sets if str(s.type or "normal") != "warmup"]
     warm = len(sets) - len(work)
     if not work:
         secs = sum(int(s.duration_seconds or 0) for s in sets)
         return f"{round(secs / 60)} min"
     s0 = work[0]
-    reps = f"{s0.rep_range_start}-{s0.rep_range_end}" if s0.rep_range_start and s0.rep_range_end else str(s0.reps or "?")
-    load = f" @ {round(float(s0.weight_kg) / LB_IN_KG)} lb" if s0.weight_kg else ""
-    return f"{len(work)} x {reps}{load}" + (f" (+{warm} warm-up)" if warm else "")
+    if s0.rep_range_start and s0.rep_range_end:
+        dose = f"{s0.rep_range_start}-{s0.rep_range_end}"
+    elif s0.reps:
+        dose = str(s0.reps)
+    elif s0.distance_meters:
+        unit = (
+            "steps" if lc.distance_unit_of(entry or {"hevy_type": "short_distance_weight" if s0.weight_kg else None}) == lc.STEPS else "m"
+        )
+        dose = f"{int(s0.distance_meters)} {unit}"
+    elif s0.duration_seconds:
+        dose = f"{int(s0.duration_seconds)} s"
+    else:
+        dose = "?"
+    label = lc.load_label(lc.load_convention_of(entry)) if entry else ""
+    load = f" @ {round(float(s0.weight_kg) / LB_IN_KG)} lb{label}" if s0.weight_kg else ""
+    return f"{len(work)} x {dose}{load}" + (f" (+{warm} warm-up)" if warm else "")
 
 
 def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> str:
@@ -576,7 +594,7 @@ def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> s
         for b in ir.exercises:
             title = str((catalog.get(b.movement_key) or {}).get("title") or b.movement_key.replace("_", " "))
             rest = f", rest {b.rest_seconds}s" if b.rest_seconds else ""
-            lines.append(f"  - {title}: {_set_line(list(b.sets or []))}{rest}")
+            lines.append(f"  - {title}: {_set_line(list(b.sets or []), catalog.get(b.movement_key))}{rest}")
             if b.notes:
                 lines.append(f"      cue: {_scrub(b.notes)[:300]}")
             prog = (floors.get(b.movement_key) or {}).get("progression") or {}

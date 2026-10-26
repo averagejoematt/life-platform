@@ -7,7 +7,9 @@
 # THE OTHER HALF OF THE LEASE: a gated run must be APPROVED or REJECTED, never left
 # waiting (#2467). The reject path is `bash deploy/reject_deployment.sh <run_id>` —
 # use it whenever the run's sha is already an ancestor of main, because approving
-# would deploy a tree missing every later merge. A rejected run concludes `failure`
+# would deploy a tree missing every later merge — EXCEPT when the later commit is the
+# reconcile bot's `[skip-reconcile]` child of that run (#5384): the child defers its deploy to
+# its parent, so that parent run is the one to APPROVE (reject_deployment.sh refuses it). A rejected run concludes `failure`
 # with `Deploy` as its sole red job; that is NOT a red main and
 # `scripts/check_main_green.py` reads it as such since #2590.
 #

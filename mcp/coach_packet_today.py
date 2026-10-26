@@ -49,7 +49,7 @@ from typing import Any, Callable
 from common.pacific_time import pacific_clock_label, pacific_today, pacific_weekday, parse_iso_utc, shift_day_key
 from training import walking_volume
 
-TODAY_VIEW_VERSION = "coach-packet-today@1.0.0"
+TODAY_VIEW_VERSION = "coach-packet-today@1.1.0"  # 1.1.0 #5373: a Hevy session's carries — steps + the estimated distance
 
 RowReader = Callable[[str], list[dict[str, Any]]]
 
@@ -89,6 +89,27 @@ def read_strava_day(day: str) -> list[dict[str, Any]]:
     from mcp import core
 
     return [it for it in core.query_source_range("strava", day, day) or [] if str(it.get("date") or it.get("sk") or "")[-10:] == day]
+
+
+def read_stride_day(day: str) -> dict[str, Any] | None:
+    """#5373: his stride for a carry's estimated distance on `day` — the detail tool's own read (`tools_hevy._carry_stride`)."""
+    from mcp.tools_hevy import _carry_stride
+
+    return _carry_stride(day)
+
+
+def _carries(w: dict[str, Any], stride: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """#5373: the session's carries, each set rendered "N steps (~X yd, est. from unloaded stride)" (steps only with no measured
+    stride) with the load as logged and its convention (`total_carried`) — `training.carry_line`, the detail tool's line."""
+    from training.carry_line import carry_line
+
+    out = []
+    for ex in w.get("exercises") or []:
+        line = carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets"), template_id=ex.get("template_id"), stride=stride)
+        if line:
+            keep = ("load_lb", "load_convention", "steps", "estimated_yd", "rendered")
+            out.append({"name": ex.get("name") or ex.get("title"), "template_id": ex.get("template_id"), **{k: line[k] for k in keep}})
+    return out
 
 
 # ── activities, each once ─────────────────────────────────────────────────────────────
@@ -179,6 +200,7 @@ def _hevy_item(w: dict[str, Any], index: list[dict[str, Any]]) -> dict[str, Any]
         "exercise_count": w.get("exercise_count"),
         "set_count": w.get("set_count"),
         "cardio_blocks": [{"name": b["label"], "modality": b["modality"], "seconds": b["seconds"]} for b in blocks],
+        "carries": _carries(w, None),  # #5373: re-rendered with his stride by `today_view` when the day has a carry
     }
 
 
@@ -257,6 +279,7 @@ def today_view(
     today: str | None = None,
     read_hevy: RowReader | None = None,
     read_strava: RowReader | None = None,
+    read_stride: Callable[[str], dict[str, Any] | None] | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """(value, status) for the packet's `today` field: the day BEFORE `target_date` (Pacific) —
     what a night-before debrief reviews. Readers are injectable for the fixture; the
@@ -291,6 +314,17 @@ def today_view(
 
     failed = sorted(n for n, r in rows.items() if r is None)
     items, removed, record = activities_on_day(day, rows["hevy"], rows["strava"])
+    # #5373: a carry's steps plus his labelled estimated distance — the stride is read only when the day has a carry
+    stride = None
+    if any(it.get("carries") for it in items):
+        try:
+            stride = (read_stride or read_stride_day)(day)
+        except Exception:  # noqa: BLE001 — steps only; the line never invents a stride
+            stride = None
+        by_uid = {w.get("workout_uid"): w for w in rows["hevy"] or []}
+        for it in items:
+            if it.get("carries") and it.get("workout_uid") in by_uid:
+                it["carries"] = _carries(by_uid[it["workout_uid"]], stride)
 
     def _inject(source: str, _s: str, _e: str) -> list[dict[str, Any]]:
         got = rows.get(source)
@@ -358,6 +392,11 @@ def today_view(
         "honesty": honesty,
         "version": TODAY_VIEW_VERSION,
     }
+    if stride is not None or any(it.get("carries") for it in items):
+        from training.logging_conventions import CONVENTIONS_LINE
+
+        value["carry_stride"] = stride  # #5373: the stride the carry lines were rendered with (state, n_days, window)
+        value["logging_conventions"] = CONVENTIONS_LINE
     if len(failed) == 2 or (failed and not items):
         errors = "; ".join(f"{n}: {sources[n]['error']}" for n in failed)
         return value, input_status(READ_FAILED, error=f"SourceReadError: {errors}")

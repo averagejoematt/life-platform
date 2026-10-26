@@ -242,7 +242,8 @@ LEDGER: dict[str, dict] = {
         note=(
             "The budget-tier ladder itself (ADR-063/133) — alarms in three stacks including the "
             "#3059 budget-tier-unreadable detector, a dashboard, and two readers. Also minted "
-            "from log text by a MetricFilter in monitoring_budget_alarms.py."
+            "from log text by a MetricFilter in monitoring_budget_alarms.py. #5135 adds one fixed "
+            "series, DevSessionSpendMTD (the dev-session envelope's month, read by ai-dev-session-month-high)."
         ),
     ),
     "LifePlatform/AICanary": _row(

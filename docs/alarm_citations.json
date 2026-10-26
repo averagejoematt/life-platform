@@ -245,5 +245,10 @@
     "added": "2026-10-25",
     "citation": "#5128 (closed on live proof) — the dead-man fired correctly on 2026-10-24/25 for the W42 miss (generated:false after the Sunday cron), cleared after the W42 regenerate at 15:18Z and stayed OK through the W43 run at 18:00:05Z. A true positive by the instrument this issue built, not a defect.",
     "note": "Session CF 2026-10-25: answered as a flap per the fired-and-cleared rule; state OK at 19:06Z."
+  },
+  "ai-dev-session-month-high": {
+    "added": "2026-10-25",
+    "citation": "self-clearing, dated: expected RED from its first governor run after deploy — October's dev-session total is already over the $48 bar ($63.42 month-to-date at 2026-10-25 22:00Z, CallerClass=dev-session EstimatedCostUSD: $30.68 on 10-01..03, $27.37 on 10-18, $3.40 on 10-23). The governor's DevSessionSpendMTD gauge restarts at 0 on 2026-11-01 and the alarm returns to OK at the 2026-11-01T00:00Z governor run. Expiry: if still ALARM after 2026-11-01T09:00Z, read DevSessionSpendMTD and the November dev-session series before re-citing.",
+    "note": "Deploys red-bound on purpose (the cost-metric-drift-sustained precedent): it states a true condition, the October envelope already spent. Added with the alarm itself, before it exists live."
   }
 }

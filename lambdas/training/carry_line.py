@@ -8,10 +8,15 @@ load and a distance, no reps. Two facts make the usual arithmetic wrong, both th
   * so `weight x distance` is neither a tonnage nor a work figure, and a carry set has no reps to make a rep-tonnage.
 
 So a carry stays OUT of the rep-tonnage sum (`weight x reps` is 0 for it by construction) and is reported on its own line as the
-load as logged and the step count from the distance field. The step-to-distance conversion (his stride) and the load convention
-(the total carried, both hands) are the definition layer of #5373 — NOT built here; this line says what the fields are and stops.
+load as logged and the step count from the distance field.
 
-Pure: reads stored/normalized set dicts (`weight_kg` | `weight_lbs`, `reps`, `distance_m` | `distance_meters`, `type`).
+#5373 (the definition layer, `training.logging_conventions`): the line names the exercise's `load_convention` (`total_carried` on
+the farmers walk — the load is the sum of both hands) and `distance_unit: steps`, and — given his stride (`trailing_stride`) —
+renders each set as "N steps (~X yd, est. from unloaded stride)"; with no measured stride, "N steps". The yards are an estimate
+from his UNLOADED walking stride and are never compared to a true distance.
+
+Pure: reads stored/normalized set dicts (`weight_kg` | `weight_lbs`, `reps`, `distance_m` | `distance_meters`, `type`); the stride is
+passed in; the conventions resolve through the catalog (`logging_conventions.load_convention_for`).
 """
 
 from __future__ import annotations
@@ -23,8 +28,8 @@ _KG_TO_LB = 2.20462
 _CARRY_TITLE = re.compile(r"carry|farmer|suitcase", re.I)
 
 STEPS_BASIS = (
-    "the distance field on a carry is his step count (owner, 2026-10-25), not a distance; the load is as logged. "
-    "Carries are outside the rep-tonnage sum; no weight x distance is computed."
+    "the distance field on a carry is his step count (owner, 2026-10-25), not a distance; the load is the TOTAL carried (both "
+    "hands). Carries are outside the rep-tonnage sum; no weight x distance is computed."
 )
 
 
@@ -62,9 +67,12 @@ def is_carry(name: str, sets: Any) -> bool:
     return any(_load_lb(s) for s in work) or bool(_CARRY_TITLE.search(name or ""))
 
 
-def carry_line(name: str, sets: Any) -> dict[str, Any] | None:
-    """`{sets, load_lb, steps, steps_total, steps_basis, excluded_from_rep_tonnage}` for a carry exercise, else None.
-    `load_lb` and `steps` are per working set, in set order; a set with no load logged reads None, never 0."""
+def carry_line(name: str, sets: Any, *, template_id: Any = None, stride: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """`{sets, load_lb, load_convention, distance_unit, steps, steps_total, estimated_yd, rendered, stride, steps_basis,
+    excluded_from_rep_tonnage}` for a carry exercise, else None. `load_lb`, `steps`, `estimated_yd` and `rendered` are per working
+    set, in set order; a set with no load logged reads None, never 0. `estimated_yd` is None without a measured `stride`."""
+    from training import logging_conventions as lc  # noqa: PLC0415 — lazy: the catalog read stays off the import path
+
     if not is_carry(name, sets):
         return None
     work = _working(sets)
@@ -72,8 +80,13 @@ def carry_line(name: str, sets: Any) -> dict[str, Any] | None:
     return {
         "sets": len(work),
         "load_lb": [_load_lb(s) for s in work],
+        "load_convention": lc.load_convention_for(name, template_id, sets),
+        "distance_unit": lc.STEPS,
         "steps": steps,
         "steps_total": sum(n for n in steps if n),
+        "estimated_yd": [lc.estimated_yards(n, stride) if n else None for n in steps],
+        "rendered": [lc.render_steps(n, stride) if n else None for n in steps],
+        "stride": stride,
         "steps_basis": STEPS_BASIS,
         "excluded_from_rep_tonnage": True,
     }

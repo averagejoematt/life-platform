@@ -3936,3 +3936,30 @@ GUARD_PROOFS["guard::deploy/rollback_fleet.sh"] = {
     ),
     "proved_on": "2026-10-25",
 }
+GUARD_PROOFS["guard::scripts/reconcile_child_guard.py"] = {
+    "gate_name": "scripts/reconcile_child_guard.py",
+    "command": (
+        "python3 -m pytest tests/test_reconcile_child_guard_5384.py -q   # baseline 11 passed; the end-to-end tests run the "
+        "real deploy/reject_deployment.sh against a PATH-first stub `gh` and assert whether a rejecting POST was sent"
+    ),
+    "mutation": (
+        "Three, each in the real tracked file (md5 9b9ab547… before and after, restored by copying back). M1: "
+        '`if parents_of(run["head_sha"]) == [target_sha]:` replaced by `if True:` — any later reconcile-subject run protects. '
+        "M2: the unreadable-verdict return changed from EXIT_INDETERMINATE to EXIT_CLEAR — a failed API read lets the reject through "
+        "blind. M3: `is_reconcile_subject` made `return False` — the bot's commit is never recognised, so the 2026-10-26 incident "
+        "shape is cleared."
+    ),
+    "observed": (
+        "2026-10-26. BASELINE 11 passed. M1 RED: 2 failed, 9 passed (test_every_non_protecting_shape_is_clear, "
+        "test_unreadable_verdict_refuses_rather_than_rejecting_blind). M2 RED: 1 failed, 10 passed "
+        "(test_unreadable_verdict_refuses_rather_than_rejecting_blind). M3 RED: 5 failed, 6 passed (incl. "
+        "test_script_refuses_to_reject_the_run_a_reconcile_child_defers_to). REVERTED 11 passed."
+    ),
+    "scope": (
+        "Decides only whether a NEWER ci-cd.yml run on main is the bot's single-parent reconcile commit whose parent is the "
+        "target run's head sha (the real parent list from the commits API, not the subject alone). It does not judge whether the "
+        "child's Plan actually deferred (that is check_deploy_deadman --deploy-base); it refuses on the shape, and `--force-ancestor` "
+        "on reject_deployment.sh overrides. Also carries stranded_reconcile_shape, the post-hoc detector check_main_green renders."
+    ),
+    "proved_on": "2026-10-26",
+}

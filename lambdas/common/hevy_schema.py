@@ -26,6 +26,41 @@ the stored field now derive it from here rather than each spelling it independen
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 #: The key every NORMALIZED Hevy set row carries for its measured duration
 #: (see ``hevy_common._normalize_set``). Import this — never re-type the literal.
 SET_DURATION_FIELD = "duration_sec"
+
+#: #5373: the Hevy exercise type whose distance field is the owner's STEP COUNT — a loaded distance (the farmers walk, the
+#: suitcase carry, the dumbbell walking lunge). The gym has no distance markings, so on these he counts steps and types the
+#: count into the yards field. `training.logging_conventions` writes `distance_unit_convention: steps` onto every catalog
+#: entry of this type; the rule lives here because `health.tdee` (which may import nothing from `training`) reads it too.
+STEP_COUNT_HEVY_TYPES = frozenset({"short_distance_weight"})
+
+_WARMUP_TYPES = frozenset({"warmup", "warm_up", "warm-up"})
+
+
+def _num(v: object) -> float:
+    try:
+        return float(v) if isinstance(v, (int, float, str, Decimal)) and v != "" else 0.0  # DynamoDB hands back Decimal
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def loaded_distance_shape(sets: object) -> bool:
+    """#5373: True when an exercise's sets have the shape of `STEP_COUNT_HEVY_TYPES` — a working set carrying a load AND a
+    distance, and no set carrying reps. Pure. That shape is the type: on such an exercise the distance field is a step count,
+    never metres. (A timed cardio block has a distance but no load; a rep set has reps.)"""
+    work = [
+        s
+        for s in (sets if isinstance(sets, (list, tuple)) else [])
+        if isinstance(s, dict) and str(s.get("set_type") or s.get("type") or "normal").strip().lower() not in _WARMUP_TYPES
+    ]
+    if not work or any(_num(s.get("reps")) > 0 for s in work):
+        return False
+    return any(
+        (_num(s.get("distance_m")) or _num(s.get("distance_meters"))) > 0
+        and (_num(s.get("weight_kg")) > 0 or _num(s.get("weight_lbs")) > 0)
+        for s in work
+    )

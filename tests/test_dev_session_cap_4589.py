@@ -62,9 +62,12 @@ def test_decide_refuses_at_the_run_limit_and_at_the_day_limit():
     assert "in the last 24 hours" in said and "the limit is $10.00" in said
 
 
-def test_an_override_is_this_runs_cap_and_replaces_the_day_check():
-    assert cap.decide(30.0, 500.0, 40.0) is None, "a named number is consent for this run"
+def test_an_override_is_this_runs_cap_and_bounds_the_day_total():
+    # #5135 changed the second half: a named number used to REPLACE the day check, which
+    # let successive named runs stack ($27.37 on 2026-10-18). It now bounds the total.
+    assert cap.decide(30.0, 5.0, 40.0) is None, "a named number is consent for this run"
     assert "set by DEV_AI_BUDGET_USD" in cap.decide(40.0, 0.0, 40.0)
+    assert "does not add to it" in cap.decide(1.0, 39.0, 40.0), "the named number is a ceiling on the 24-hour total"
 
 
 @pytest.mark.parametrize("raw, expected", [("40", 40.0), (" 7.5 ", 7.5), ("", None), ("0", None), ("-3", None), ("lots", None)])
@@ -132,7 +135,8 @@ def test_spend_from_earlier_runs_today_counts_against_the_day_limit(laptop):
         _call()
     assert "in the last 24 hours" in str(stop.value)
     assert laptop.bedrock.invoke_model.call_count == 1
-    assert laptop.cloudwatch.get_metric_statistics.call_count == 1, "the day is read once per run"
+    # One day read + one month read, at the first call; not again until REFRESH_SECONDS (#5135).
+    assert laptop.cloudwatch.get_metric_statistics.call_count == 2, "the windows are read once, not per call"
 
 
 def test_a_day_already_over_its_limit_refuses_the_first_call(laptop):
@@ -143,7 +147,7 @@ def test_a_day_already_over_its_limit_refuses_the_first_call(laptop):
 
 
 def test_a_named_number_lets_the_run_go_that_far_and_no_further(laptop, monkeypatch):
-    laptop.cloudwatch.get_metric_statistics.return_value = {"Datapoints": [{"Sum": 50.0}]}
+    laptop.cloudwatch.get_metric_statistics.return_value = {"Datapoints": [{"Sum": 1.0}]}
     monkeypatch.setenv(cap.OVERRIDE_ENV, "9")
     for _ in range(3):  # $9
         _call()

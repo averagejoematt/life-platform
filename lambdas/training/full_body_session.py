@@ -47,6 +47,14 @@ _AUTOREG_DROP_ACCESSORIES_AT = 0.6
 bad day'. Subtract-only: nothing is ever added on a green day."""
 
 
+def _carry_stride(target_date: str) -> dict[str, Any]:
+    """#5373: his stride for a carry's routine note (`logging_conventions.load_stride_failsoft` — the median watch step length
+    over the 14 completed days before the target; a failed read is steps only). A module attribute, so a test can stub it."""
+    from training.logging_conventions import load_stride_failsoft
+
+    return load_stride_failsoft(target_date)
+
+
 def _blocks_from_prescription(
     rx: dict[str, Any],
     catalog: dict[str, Any],
@@ -55,9 +63,11 @@ def _blocks_from_prescription(
     *,
     anchors_only: bool = False,
     top_plus_one: bool = False,
+    stride: dict[str, Any] | None = None,
 ) -> tuple[list[ExerciseBlock], list[dict[str, Any]], list[str]]:
     """(blocks, exposures-in-block-order, unresolved lines). `top_plus_one` is the Minimum
-    Viable Session: every anchor as its first two sets (top set + one back-off)."""
+    Viable Session: every anchor as its first two sets (top set + one back-off). `stride` (#5373):
+    his measured stride, for a carry cue's labelled estimated distance; None = steps only."""
     history_index, weight_index, cardio_index, whoop_index = note_indexes or ({}, {}, {}, {})
     blocks: list[ExerciseBlock] = []
     used: list[dict[str, Any]] = []
@@ -95,7 +105,9 @@ def _blocks_from_prescription(
         # History first (the ADR-068 one-best-line convention every note reader expects to
         # lead), then the §3 prescription; the floor cue is appended after both.
         # #5317: the cue is generated from the sets THIS block carries (the Minimum Viable Session cuts them to two)
-        cue = program_structure.exposure_cue(e["intensity"], sets_spec)
+        # #5373: a carry's cue gets his stride (the labelled estimated distance); every other cue is called exactly as before
+        carry_kw = {"stride": stride} if e["intensity"] == "carry" else {}
+        cue = program_structure.exposure_cue(e["intensity"], sets_spec, **carry_kw)
         notes = f"{note} {cue}".strip() if note else cue
         tag = f"{e['kind']}:{e.get('pattern') or key}:{e['intensity']}"
         blocks.append(
@@ -288,7 +300,12 @@ def full_body_routines(
     # through the module attribute, so ONE patch point (routine_generator._load_note_indexes)
     # stubs the history read for both paths
     note_indexes = _rg._load_note_indexes(week_cfg, notes_mode)
-    blocks, used, unresolved = _blocks_from_prescription(rx, load_catalog, note_indexes, notes_mode, anchors_only=drop_accessories)
+    # #5373: his stride, read only when the session carries a carry (one fail-soft apple_health read, the same patch-point shape)
+    has_carry = not drop_accessories and any(e.get("intensity") == "carry" for e in rx["exposures"])
+    stride = _carry_stride(inputs.target_date) if has_carry else None
+    blocks, used, unresolved = _blocks_from_prescription(
+        rx, load_catalog, note_indexes, notes_mode, anchors_only=drop_accessories, stride=stride
+    )
     for line in unresolved:
         rationale.append(f"UNRESOLVED — {line}")
 

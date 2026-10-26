@@ -532,6 +532,11 @@ def caller_class(env=None) -> str:
         the workflow is the remediation agent's.
       • Anything else — a laptop, an MCP session, a scratch script → `dev-session`.
 
+    #5135: `dev-session` is therefore every workstation call (laptop, agent lane, script)
+    PLUS a Lambda container that declares a dev context (today only the MCP Lambda). Which
+    of those the dev-session cap refuses and which it only counts toward the $60-a-month
+    envelope is written in `ai/dev_session_cap.py` (COVERAGE) — keep the two in step.
+
     The one self-reported input, INVOCATION_CONTEXT, is honored in a single
     direction: it can only move a call OUT of `prod-cron` and into `dev-session`.
     Nothing a caller can set moves spend INTO the class the projection trusts, so

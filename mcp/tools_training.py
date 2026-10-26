@@ -13,6 +13,7 @@ from training import (
     training_load,  # #4075: the ONE load model (computed_metrics' TSB)
     zone2_minutes,  # #4627: THE Zone 2 computation
 )
+from training.muscle_volume import session_tonnage_lbs  # #5373: the TOTAL moved (per-hand dumbbell load x 2)
 
 from mcp.core import get_profile, query_source
 from mcp.helpers import classify_hr_zone, compute_ewa, warm_start_seed
@@ -374,14 +375,14 @@ def _get_training_periodization(args):
                 }
             )
 
-    # Strength volume per week from Hevy (#4636): every logged set's load x reps, in lb —
-    # the same all-sets tonnage the weekly digest's `ex_hevy_workouts` reports.
+    # Strength volume per week from Hevy (#4636): every logged set's load x reps, in lb — the same
+    # all-sets tonnage the weekly digest's `ex_hevy_workouts` reports — as the TOTAL moved (#5373:
+    # `muscle_volume.session_tonnage_lbs` counts a per-hand dumbbell load both hands; a carry adds 0).
     for workout in normalize_hevy_items(hevy_items):
         date = workout.get("date")
         if not date:
             continue
-        wk = _week_key(date)
-        weeks[wk]["total_volume_lbs"] += sum(s["weight_lbs"] * s["reps"] for ex in workout["exercises"] for s in ex["sets"])
+        weeks[_week_key(date)]["total_volume_lbs"] += session_tonnage_lbs(workout)
 
     # #4627: Zone 2 minutes per ISO week from THE shared computation — minutes in each device's
     # own Zone 2, each session once across Strava + Whoop; Hevy cardio blocks are not Zone 2.
