@@ -94,6 +94,11 @@ RULE_CLASSIFICATION = {
         "category + night-scoped surface + (one-day date span OR quoted as_of_date/night_of satisfying the convention, fresh vs today)",
     ),
     "is_utc_offset_misread": ("structural", "category + surface + the note's own UTC→Pacific arithmetic recomputed and found wrong"),
+    "is_utc_instant_read_as_future": (
+        "structural",
+        "category + every cited ISO instant's Pacific date (common.pacific_time) <= today, one's UTC date > today, "
+        "no other cited date outside {today, yesterday, those UTC dates}",
+    ),
     "is_durable_design_copy": ("structural", "category + every quoted span is registered DURABLE_DESIGN_COPY"),
     "is_vagueness_objection": (
         "tiebreak",
@@ -168,8 +173,8 @@ def test_every_is_rule_is_classified():
         "Classify the new rule structural-vs-tiebreak (see the module header's bar) before merging."
     )
     assert (
-        len(found) == 17
-    ), f"the ledger holds {len(found)} rules; the sweep counts 17 (#3337 + #3379 + #4845 + #4834 x2) — update the sweep with the count"
+        len(found) == 18
+    ), f"the ledger holds {len(found)} rules; the sweep counts 18 (#3337 + #3379 + #4845 + #4834 x2 + #5402) — update the sweep with the count"
 
 
 def test_no_rule_is_classified_purely_lexical():

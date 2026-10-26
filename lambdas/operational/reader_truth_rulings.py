@@ -47,7 +47,7 @@ tests/test_reader_truth_structural_rulings_3337.py hold each one to it.
 """
 
 import re
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone
 
 # The evidence layer (#3337) — the parsers and the judge's structured `basis`
 # field that a structural ruling decides on. `quoted_spans`, `normalize_copy`,
@@ -289,6 +289,78 @@ def is_utc_offset_misread(finding):
     normalized_stated = {s.upper().replace("  ", " ").strip() for s in stated}
     normalized_correct = {c.upper().replace("  ", " ").strip() for c in correct}
     return not (normalized_stated & normalized_correct)
+
+
+# ── a UTC instant read as "after today" when its PACIFIC date is not (#5402) ──
+#
+# THE OBSERVED FAILURE (2026-10-25 → 10-26, repeated every Pacific evening). The
+# judge's ground truth is the PACIFIC date ("Today (2026-10-25) is Day 50"), but
+# `/api/coaches` carries `_meta.generated_at` as a UTC instant. Between ~00:00Z and
+# ~07:00Z the UTC calendar date is one ahead of the Pacific one, so:
+#
+#   "The _meta.generated_at timestamp shows 2026-10-26T06:15:02, which is AFTER the
+#    current date of 2026-10-25. The payload timestamp contradicts the ground truth."
+#
+# 06:15Z on 10-26 is 23:15 PDT on 10-25 — the same Pacific day. There is no
+# contradiction; the same note concedes the coach's "through October 25" is fine. It
+# was confirmed `high` on four runs 10-25 03:02Z-05:30Z (the `qa-smoke-failures`
+# ALARM) and recurs in every Pacific-evening run since. This is the sibling of
+# `is_utc_offset_misread` above (the model's own UTC→Pacific arithmetic is wrong), but
+# there the model converted badly; here it did not convert at all.
+#
+# THE MODEL DROPS THE Z. Measured on the live notes: the instant is quoted as
+# `2026-10-26T06:15:02` and `2026-10-25T04:45:01` — the trailing Z is gone. A ruling
+# keyed on `...Z` would never have fired on the wire. The platform's one stated
+# semantic (`common.pacific_time.parse_iso_utc`, #1964) is that a tz-less instant is
+# UTC ("every naive stamp this platform actually receives is a UTC instant with the Z
+# dropped"), so this ruling reads the instant through that parser too.
+#
+# SCOPE — narrow on purpose. All required:
+#   * a temporal_contradiction (any surface — the live one is `/api/coaches`);
+#   * the note quotes at least one ISO instant (date + time) whose UTC calendar date
+#     is after `today`;
+#   * EVERY such instant has a Pacific date on or before `today` — one genuinely
+#     future instant (Pacific date after today) keeps the finding;
+#   * every OTHER date the note cites is `today`, yesterday (the "through the last
+#     complete day" design) or the UTC date of one of those instants — a note that
+#     also cites an older date is making a staleness claim (the 10-18 "through" date
+#     on 10-23/24) that this ruling must not swallow, and a bare future date survives.
+# Without `today` the ruling is unavailable and the finding survives (fail-closed).
+# The Pacific date comes ONLY from `common.pacific_time.pacific_date_of` — the one
+# frame; no second ZoneInfo here (#1964).
+_ISO_INSTANT_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?")
+
+
+def is_utc_instant_read_as_future(finding, today=None):
+    """True when the only "after today" evidence is a UTC instant that is still today in Pacific (#5402)."""
+    if finding.get("category") != "temporal_contradiction" or not today:
+        return False
+    from common.pacific_time import pacific_date_of, parse_iso_utc
+
+    try:
+        today_d = date.fromisoformat(str(today))
+    except ValueError:
+        return False
+    note = finding.get("note") or ""
+    instants = _ISO_INSTANT_RE.findall(note)
+    if not instants:
+        return False
+    utc_dates = set()
+    for raw in instants:
+        stamp = parse_iso_utc(raw)
+        pacific = pacific_date_of(raw)
+        if stamp is None or pacific is None:
+            return False
+        utc_date = stamp.astimezone(timezone.utc).date()
+        if pacific > today_d.isoformat():
+            return False  # a genuinely-future instant in the Pacific frame: a real finding
+        if utc_date > today_d:
+            utc_dates.add(utc_date.isoformat())
+    if not utc_dates:
+        return False  # no instant reads as "after today" in UTC, so this is not the class
+    allowed = {today_d.isoformat(), (today_d - timedelta(days=1)).isoformat()} | utc_dates
+    others = note_dates(_ISO_INSTANT_RE.sub(" ", note), default_year=today_d.year)
+    return all(d in allowed for d in others)
 
 
 # ── durable design copy: the rubric's exempt vocabulary, enforced (#2741) ─────
