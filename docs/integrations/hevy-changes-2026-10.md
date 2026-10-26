@@ -1,6 +1,6 @@
 # Hevy changes since July 2026, and pinned exercise notes
 
-**Issue:** #5010 (epic #4625), #5047 (epic #3742, §6) · **Verified:** 2026-10-18 · **Status:** research done; defensive code shipped; the three note types mapped and named in code (§6); the pinned-note write question is an owner decision
+**Issue:** #5010 (epic #4625), #5047 (epic #3742, §6) · **Verified:** 2026-10-26 · **Status:** research done and re-verified 2026-10-26 (§7: the spec is unchanged, three point releases added nothing new, no pinned exercise note in the data yet); defensive code shipped; the three note types mapped and named in code (§6); the pinned-note write question is an owner decision
 **Contract captures:** `tests/fixtures/hevy_openapi_5010/` (live 2026-10-18 + the Wayback 2026-08-17 baseline), pinned by `tests/test_hevy_pinned_notes_5010.py`
 
 ## The short answer
@@ -9,19 +9,22 @@ Hevy's **pinned exercise notes are not in the public API.** No schema in the liv
 
 One question stays open: **does Hevy copy the pinned text into a saved workout's `exercises[].notes`?** The API can't answer that yet. Every live workout through 2026-10-16 had only Matthew's own session notes, and the keys were the documented set. That doesn't settle it, because no exercise had a pinned note at the time, as far as the data shows. The platform now has a marker rule (§4.1) so it stays correct whichever way this turns out. One test would settle it (§5).
 
+**Re-checked 2026-10-26 (§7).** The live spec is identical to the 10-18 capture, so the answer above still holds. The five sessions logged 10-18 → 10-25 hold no pinned exercise note either, so the open question is still open and the §5 test is still the owner's to run.
+
 ## 1. What changed since the July 2026 community update
 
 ### App (consumer) side
 
 | When | Version | Change | Source |
 |---|---|---|---|
+| Oct 20 – 23 | iOS 3.2.1–3.2.3 | Point releases (Oct 20, 21 and 23). Each repeats the 3.2.0 "What's New" text word for word, so no new feature is named. 3.2.3 is current on 2026-10-26. | App Store version history (read 2026-10-26) |
 | ~2026-10-13 | iOS 3.2.0 | **"Notes, rebuilt."** You can pin a note to an exercise so it shows every time you train it, pin one to a routine, or add a one-off note for that day's workout. Also: share to Snapchat. | App Store "What's New" |
 | Sep 3 – Oct 2 | iOS 3.1.12–3.1.16 | Send workouts to ChatGPT and Claude from the finish screen; 5 new languages | App Store version history |
 | Aug 28 | iOS 3.1.11 | Gym tagging on workouts; choose a split (Full Body / Upper-Lower / PPL); female templates | App Store version history |
 | Aug 20 | iOS 3.1.10 | Set-row UI redesign (RPE colour scale); Progressive Overload for reps-only exercises | App Store version history |
 | Aug 6 – 14 | iOS 3.1.8–3.1.9 | Trainer "Program Variety"; Injury Management | App Store version history |
 | Jul 24 – 30 | iOS 3.1.6–3.1.7 | Bug fixes | App Store version history |
-| July 2026 | — | Latest community-update post: "Trainer, native redesign, faster app" | hevyapp.com/community-updates |
+| July 2026 | — | Latest community-update post: "Trainer, native redesign, faster app". Still the latest on 2026-10-26. | hevyapp.com/community-updates |
 
 Hevy's feature page describes the note model as it now stands:
 
@@ -29,9 +32,11 @@ Hevy's feature page describes the note model as it now stands:
 - **Pinned Routine Notes** are what a note added in a routine now defaults to. They show "only for the exercise in that routine". This is the same thing the API calls the routine's `exercises[].notes`, which the platform writes.
 - **Workout notes** are per session and "saved with the workout". The API calls these the workout's `exercises[].notes`, and the note extractor reads them.
 
-The page doesn't say whether a pinned exercise note is copied into the saved workout.
+The page doesn't say whether a pinned exercise note is copied into the saved workout. It still didn't on 2026-10-26.
 
 ### API side (live spec diffed against Wayback captures; the repo held no copy of the 2026-08-27 contract)
+
+**Re-captured 2026-10-26: no change.** The `swaggerDoc` parsed from the live `swagger-ui-init.js` is equal, as JSON, to the 2026-10-18 fixture: the same 22 operations, the same schemas, `info.version` still `0.0.1`. `ExerciseTemplate` and `Routine` still have no `notes`. The fixture was left as it is, because a byte-identical re-capture adds nothing.
 
 The spec still has **22 operations**, the same set as 2026-08-17. Nothing was added or removed, and there is still no DELETE or PATCH. `info.version` is still the placeholder `0.0.1`. The changes between 2026-08-17 and 2026-10-18:
 
@@ -46,7 +51,7 @@ The spec still has **22 operations**, the same set as 2026-08-17. Nothing was ad
 | Pagination | `pageSize` maximums documented: 10 for workouts, events, routines and folders; 100 for templates; 10 for body measurements | Already conforming. The callers use 10 and 100. |
 | User info | New `username`, `weight_unit`, `distance_unit`, `is_pro` | None (not read). |
 | Body measurements | POST now returns `201` with an empty body | None (not used). |
-| Docs header | Title is now "Hevy Public API Docs". New advice: "if you update data from Hevy hourly or daily, please don't send your requests exactly at xx:00. Put some random minute instead." | **Applies to us.** `hevy-backfill` runs `cron(0 * * * ? *)`, on the hour (`cdk/stacks/ingestion_stack.py`). Proposed in §4.5. |
+| Docs header | Title is now "Hevy Public API Docs". New advice: "if you update data from Hevy hourly or daily, please don't send your requests exactly at xx:00. Put some random minute instead." | **Applies to us.** `hevy-backfill` runs `cron(0 * * * ? *)`, on the hour. The expression now lives in `config/schedules.json` (#4284), not the stack file. It's still on the hour on 2026-10-26: every raw object in §7 landed at `:00:07`. Proposed in §4. |
 
 ## 2. How pinned notes are exposed, with the evidence for each claim
 
@@ -54,7 +59,7 @@ The spec still has **22 operations**, the same set as 2026-08-17. Nothing was ad
 |---|---|---|
 | Exposed through the API at all? | **No.** | Live spec (`swaggerDoc` in `api.hevyapp.com/docs/swagger-ui-init.js`, 2026-10-18): the strings "pinned", "persistent", "sticky" and "exercise_note" appear nowhere. The only `notes` properties are on `Routine.exercises[]`, `Workout.exercises[]`, `Exercise`, and the routine and workout request bodies. `test_no_schema_declares_a_pinned_note` pins this. |
 | Per exercise template or per user? | **In the app: per exercise, inside one user's account.** The API doesn't say. | hevyapp.com/features/exercise-notes ("exercise-specific"; added from Profile › Exercises › How to tab). `ExerciseTemplate` has no note property. The live GET for D8F7F851 (Cycling), 79D0BB3A (Bench) and a custom template returned `{id, title, type, primary_muscle_group, secondary_muscle_groups, equipment, is_custom, thumbnail_url}` and nothing else. |
-| Readable? | **No.** | As above. No GET returns one. |
+| Readable? | **No.** | As above. No GET returns one. Unchanged in the 2026-10-26 re-capture. |
 | Writable? | **No.** | The template operations are only `GET` list, `GET` by id, and `POST` create-custom. `CreateCustomExerciseRequestBody.exercise` has no `notes`. There is no template PUT, PATCH or DELETE. |
 | Inside workout payloads, merged into or separate from `exercises[].notes`? | **Not separate:** there is no separate field. **Merged: can't be determined from the API yet.** | Live `GET /v1/workouts` (2026-10-14, 15 and 16) and the raw S3 payload `raw/hevy/e9f10998-….json` (2026-10-16): exercise keys are exactly `{exercise_template_id, index, notes, sets, superset_id, title}`, and the notes are Matthew's own session text ("Level 11 flat"). As far as the data shows, no pinned note existed yet, so these payloads can't show whether one would be copied. |
 
@@ -84,7 +89,7 @@ Fixtures are the live 2026-10-15 and 10-16 Hevy rows, `tests/fixtures/hevy_opena
 1. **Bike level and seat from pinned notes:** not possible while pinned notes can't be read through the API. Revisit if a spec re-capture adds a field; the contract test will fail when it does.
 2. **The remaining readers of the setup marker:** `site_api_training` (public workout notes), `muscle_volume`, `mcp/strength_helpers` (`note_raw`). Whether setup text should appear on the public site is a publication question, so it's left to the owner.
 3. **The marker itself is an owner convention.** It only works if Matthew starts each pinned note with `📌` or `Setup:`. If Hevy turns out to copy pinned text and he doesn't use a marker, the old behaviour is unchanged: the text gets parsed.
-4. **Move `hevy-backfill` off the top of the hour**, from `cron(0 * * * ? *)` to a fixed odd minute such as `cron(17 * * * ? *)`, per Hevy's new docs advice. This is a one-line CDK change plus an owner-attended `cdk deploy LifePlatformIngestion`.
+4. **Move `hevy-backfill` off the top of the hour**, from `cron(0 * * * ? *)` to a fixed odd minute such as `cron(17 * * * ? *)`, per Hevy's new docs advice. Since #4284 this is a one-line edit to the `hevy-backfill` entry in `config/schedules.json`, plus an owner-attended `cdk deploy LifePlatformIngestion`. Still not built on 2026-10-26.
 
 ## 5. Owner decision box (`gate:owner`, this one decision only)
 
@@ -157,6 +162,28 @@ routine.
 pinned exercise note once the API allows it. Today it cannot. Recommended answer: no, setup
 notes stay his.
 
+## 7. Re-verified 2026-10-26
+
+### What was re-checked
+
+| Check | Result |
+|---|---|
+| Live OpenAPI (`swaggerDoc` in `api.hevyapp.com/docs/swagger-ui-init.js`), diffed against `hevy_openapi_2026-10-18.json` | **Equal as JSON.** 22 operations; no schema added, removed or changed; "pinned", "persistent", "sticky" and "exercise_note" appear nowhere in the file. The fixture is unchanged, and `test_hevy_pinned_notes_5010.py` and `test_hevy_note_types_5047.py` still pass against it. |
+| App Store version history | 3.2.1 (Oct 20), 3.2.2 (Oct 21) and 3.2.3 (Oct 23) since 3.2.0. All three repeat the 3.2.0 text. Rows added to §1. |
+| hevyapp.com community updates | Latest post is still July 2026. |
+| hevyapp.com/features/exercise-notes | Same description of the three note types. Still says nothing on whether a pinned exercise note is copied into a saved workout. |
+| `hevy-backfill` schedule | Still on the hour. The expression moved to `config/schedules.json`; §1 and §4 now point there. |
+
+### Has a pinned exercise note appeared in the data? (read 2026-10-26)
+
+**No.** The data from 2026-10-18 to 10-25 holds no pinned exercise note.
+
+- **Raw S3.** Five workouts landed in `raw/hevy/<uuid>.json` (the flat-uuid `raw_layout`): sessions on 10-18, 10-19, 10-21, 10-23 and 10-25, all logged from a routine. Across their 43 exercise rows, 12 carry a note. None of the 12 has a line starting with `📌`, `Setup:` or `Pinned:`. No note line repeats across two sessions of the same exercise. The exercise keys are still exactly the documented six, and every workout `description` is empty.
+- **One pattern rules out a merged pinned note.** Every exercise done more than once in the window has either an empty note in at least one session or different text each time. Cycling, for example, appears in all five sessions and has a note in only two, with different text each time. If an exercise had a pinned note and Hevy copied it into the workout, that text would show up in every session of the exercise. The data can't say which of two things is true: Matthew hasn't pinned a note yet, or Hevy doesn't copy pinned notes into workouts.
+- **DynamoDB.** There are five `SOURCE#hevy` rows for the same dates, one for each raw file. Each row's per-exercise `notes` matches the raw text exactly. Rows from 10-19 onward carry `owner_session_note`. The 10-18 row was ingested before #5047 merged, so it doesn't. The extractor wrote 12 `SOURCE#training_notes#EXERCISE#…` records for the 12 noted exercise-sessions, and none of them has `setup_raw` or `setup_only`. That means the marker split hasn't fired in production yet.
+
+**So §2's open question is still open.** The §5 one-session test is the only way to settle it, and running it is Matthew's call. So are the other two §5 boxes: the marker convention, and the rule that the platform never writes pinned notes. This lane decided none of them and wrote no code for them.
+
 ## Sources
 
 - https://www.hevyapp.com/community-updates/ (latest post: July 2026)
@@ -165,4 +192,5 @@ notes stay his.
 - https://play.google.com/store/apps/details?id=com.hevy (fetched, but no readable release notes came back)
 - r/Hevy "Pinned notes" thread: not reachable (Reddit blocks automated fetches)
 - https://api.hevyapp.com/docs/swagger-ui-init.js (the embedded `swaggerDoc`, 2026-10-18); Wayback captures `20260428075209`, `20260817182101`, `20261010114847`
+- Re-verification, 2026-10-26: `api.hevyapp.com/docs/swagger-ui-init.js`; the App Store version history (`apps.apple.com/us/app/…/id1458862350`, plus `itunes.apple.com/lookup?id=1458862350`); `hevyapp.com/community-updates/`; `hevyapp.com/features/exercise-notes/`; the S3 objects `raw/hevy/{d8c4408d,a5318af7,e982a3d5,8f4a487e,15a2ac5c}-….json`; the DynamoDB `SOURCE#hevy` rows for 2026-10-18 to 10-26, and the `SOURCE#training_notes#EXERCISE#…` rows for the same dates
 - Live read-only `GET`s, 2026-10-18: `/v1/exercise_templates/{D8F7F851,79D0BB3A,cb2d3813-…}`, `/v1/exercise_templates?pageSize=100`, `/v1/routines`, `/v1/workouts?pageSize=3`; for §6, `/v1/workouts?page=1..3&pageSize=10` and `/v1/routines/{id}` for each routine they name; the DynamoDB `SOURCE#hevy` rows for 2026-09-20 to 10-16; S3 `raw/hevy/e9f10998-….json`
