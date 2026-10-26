@@ -10,11 +10,24 @@
 # at day 8. Fresh runs (the retired check_deploy_wedge.py's STALE_GATE_REJECT_HOURS was 24)
 # still get actioned on Matthew's say-so via deploy/approve_deployment.sh.
 #
-# Usage: bash deploy/reject_deployment.sh <run_id> [comment]
+# THE ONE RUN IT REFUSES TO REJECT (#5384): the run whose head is the PARENT of the reconcile
+# bot's `chore(reconcile): ... [skip-reconcile]` commit. That child's Plan defers to its parent
+# ("the run at its parent is alive or deployed; that run ships this tree", #4250) and skips its
+# own Deploy, so rejecting the parent strands the merge undeployed (2026-10-26, ~20 min dark).
+# `scripts/reconcile_child_guard.py` decides; the answer is to APPROVE the parent
+# (`bash deploy/approve_deployment.sh <run_id>`). `--force-ancestor` is the explicit override
+# for a real merge train whose parent run is genuinely superseded.
+#
+# Usage: bash deploy/reject_deployment.sh [--force-ancestor] <run_id> [comment]
 #   <run_id>  the waiting CI/CD run's databaseId (from `gh run list`)
 #   [comment] optional rejection comment
 set -euo pipefail
-RUN_ID="${1:?usage: reject_deployment.sh <run_id> [comment]}"
+FORCE_ANCESTOR=0
+if [ "${1:-}" = "--force-ancestor" ]; then
+  FORCE_ANCESTOR=1
+  shift
+fi
+RUN_ID="${1:?usage: reject_deployment.sh [--force-ancestor] <run_id> [comment]}"
 COMMENT="${2:-Rejected: stale gated run — a Deploy parked at the gate holds the deploy-group slot (#2467).}"
 REPO="averagejoematt/life-platform"
 # shellcheck source=deploy/lib/deploy_gate_lease.sh
@@ -29,6 +42,17 @@ if [ "${ENV_IDS}" = "[]" ]; then
   echo "No pending deployments to reject for run ${RUN_ID}."
   surface_gate_lease_holder "${REPO}" "${RUN_ID}"
   exit 0
+fi
+
+if [ "${FORCE_ANCESTOR}" = "1" ]; then
+  echo "--force-ancestor: skipping the reconcile-child guard (#5384) — you own the stranded-deploy risk."
+else
+  GUARD_RC=0
+  python3 "$(cd "$(dirname "$0")" && pwd)/../scripts/reconcile_child_guard.py" "${RUN_ID}" || GUARD_RC=$?
+  if [ "${GUARD_RC}" != "0" ]; then
+    echo "Not rejecting run ${RUN_ID} (guard exit ${GUARD_RC}). Nothing was changed." >&2
+    exit "${GUARD_RC}"
+  fi
 fi
 echo "Rejecting environment_ids=${ENV_IDS} ..."
 
