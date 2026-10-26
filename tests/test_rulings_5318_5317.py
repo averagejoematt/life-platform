@@ -53,8 +53,11 @@ MOVEMENTS = CATALOG["movements"]
 INDEX_SUBSET = json.loads((REPO / "tests" / "fixtures" / "hevy_template_index_carries_5318.json").read_text())
 ROLES = list(program_structure.SESSION_SEQUENCE["session_roles"])
 UH, LH, SA, UV, LV = "upper_heavy", "lower_heavy", "shoulders_arms", "upper_volume", "lower_volume"
-CARRY = "farmers_carry"
-CARRY_TID = "ce871c4e-6071-4523-bc2a-333e29f58114"  # read back by GET /v1/exercise_templates on 2026-10-24
+CARRY = "farmers_walk"
+CARRY_TID = "50C613D0"  # Hevy's standard 'Farmers Walk' (#5372) — the template he logs; B3's custom ce871c4e was never used
+RETIRED_CUSTOM_TID = (
+    "ce871c4e-6071-4523-bc2a-333e29f58114"  # the custom 'Farmers Carry' B3 first named: read back 2026-10-24, left on his account
+)
 SHRUG_TID = MOVEMENTS["shrug_dumbbell"]["hevy_template_id_hint"]
 LB = 0.45359237
 
@@ -74,12 +77,12 @@ def _norm(title: str) -> str:
 # ── #5317: the cue is the sets' own ──────────────────────────────────────────────────────────
 _HEAVY = re.compile(r"^HEAVY: (\d+) top sets? of (\d+)–(\d+) @ RPE [\d.]+–[\d.]+(?:, then (\d+) back-offs? at −(\d+) % of the top set)?")
 _GROUP = re.compile(r"(\d+) sets? of (\d+)–(\d+)")
-_CARRY_CUE = re.compile(r"^CARRY: (\d+) carr(?:y|ies) of (\d+) s @ RPE")
+_CARRY_CUE = re.compile(r"^CARRY: (\d+) carr(?:y|ies) of (\d+) steps @ RPE")
 _LABEL = {"heavy": "HEAVY", "moderate": "MODERATE", "volume": "VOLUME", "accessory": "ACCESSORY", "carry": "CARRY"}
 
 
 def cue_mismatches(intensity: str, cue: str, sets: list[dict]) -> list[str]:
-    """Every way `cue` disagrees with `sets`: the label, the set count, the rep range (or the carry's duration)."""
+    """Every way `cue` disagrees with `sets`: the label, the set count, the rep range (or the carry's step dose)."""
     out: list[str] = []
     if not cue.startswith(_LABEL[intensity] + ":"):
         out.append(f"label: {cue[:20]!r} for a {intensity} exposure")
@@ -100,8 +103,8 @@ def cue_mismatches(intensity: str, cue: str, sets: list[dict]) -> list[str]:
         m = _CARRY_CUE.match(cue)
         if not m:
             return out + [f"unparseable carry cue {cue!r}"]
-        if int(m.group(1)) != len(sets) or {int(m.group(2))} != {int(s["duration_seconds"]) for s in sets}:
-            out.append(f"carry: cue {m.group(1)} x {m.group(2)} s vs sets {[s.get('duration_seconds') for s in sets]}")
+        if int(m.group(1)) != len(sets) or {int(m.group(2))} != {int(s["distance_meters"]) for s in sets}:
+            out.append(f"carry: cue {m.group(1)} x {m.group(2)} steps vs sets {[s.get('distance_meters') for s in sets]}")
         return out
     head = cue.split("@", 1)[0]
     said = [(int(n), [int(lo), int(hi)]) for n, lo, hi in _GROUP.findall(head)]
@@ -306,7 +309,7 @@ def test_b3_the_shoulders_arms_set_count_is_unchanged_and_the_shrug_is_gone():
     carry = next(e for e in after["exposures"] if e["movement_key"] == CARRY)
     shrug = next(e for e in before["exposures"] if e["movement_key"] == "shrug_dumbbell")
     assert len(carry["sets"]) == len(shrug["sets"]) == 2 and carry["intensity"] == "carry"
-    assert all(s.get("duration_seconds") and "reps" not in s for s in carry["sets"])  # timed: Hevy's weight_duration type
+    assert all(s.get("distance_meters") and "reps" not in s and "duration_seconds" not in s for s in carry["sets"])  # #5372: distance-typed
     for role, tmpl in program_structure.SESSION_TEMPLATES.items():
         assert "shrug_dumbbell" not in tmpl["accessories"], role
     assert "shrug_dumbbell" not in program_structure.ACCESSORY_POOL["upper"] and CARRY in program_structure.ACCESSORY_POOL["upper"]
@@ -326,22 +329,57 @@ def test_b3_the_carry_counts_toward_core_and_forearms_and_holds_the_trap_floor()
     assert stripped["abs"] == 4 and stripped.get("forearms", 0) == 0
 
 
-def test_b3_hevys_existing_farmers_carry_template_resolves_exactly():
-    """'Use Hevy's existing farmer's carry template. Don't create one: if no exact title matches, report it and stop.' The
-    catalog entry's title matches EXACTLY one template in the live Hevy index (captured 2026-10-24), its id is the entry's
-    hint, it was never created by the platform (coach_added on an existing id) and every draft resolves it by that hint."""
+def test_b3_the_carry_is_the_template_he_logs_and_the_custom_one_is_retired():
+    """#5372: B3 'Use Hevy's existing farmer's carry template' resolved to the custom 'Farmers Carry' (ce871c4e…), which he never
+    logged; he logs Hevy's standard 'Farmers Walk' (50C613D0, distance-typed). The programmed key is `farmers_walk`; the
+    `farmers_carry` key is retired (no catalog entry), and the custom template is only left alone on his account."""
     entry = MOVEMENTS[CARRY]
-    assert entry["title"] == "Farmers Carry" and entry["hevy_template_id_hint"] == CARRY_TID and entry["provenance"] == "coach_added"
+    assert (
+        entry["title"] == "Farmers Walk" and entry["hevy_template_id_hint"] == CARRY_TID and entry["hevy_type"] == "short_distance_weight"
+    )
+    assert entry["is_custom"] is False and entry["provenance"] == "hevy_history"
+    assert "farmers_carry" not in MOVEMENTS
+    assert all(str(m.get("hevy_template_id_hint") or "").lower() != RETIRED_CUSTOM_TID for m in MOVEMENTS.values())
     hits = [v for k, v in INDEX_SUBSET["templates"].items() if k == _norm(entry["title"])]
     assert len(hits) == 1 and hits[0]["id"] == CARRY_TID and hits[0]["title"] == entry["title"]
-    # the exact match is the carry, not a near title the index also carries
-    near = {"farmers walk", "db overhead farmers carry", "suitcase carry", "sandbag carry"}
-    assert near <= set(INDEX_SUBSET["templates"]) and all(INDEX_SUBSET["templates"][n]["id"] != CARRY_TID for n in near)
+    assert INDEX_SUBSET["templates"]["farmers carry"]["id"] == RETIRED_CUSTOM_TID  # still on his account; the platform never deletes it
     from training import in_block_variant
 
     assert in_block_variant.template_id_for(CARRY, MOVEMENTS) == (CARRY_TID, "catalog_hint")
     carry = next(e for e in _rx(SA)["exposures"] if e["movement_key"] == CARRY)
     assert carry["resolution_note"] is None  # resolved from the catalog, not a fallback
+
+
+def test_5372_the_compiled_carry_block_is_the_standard_template_with_distance_typed_sets():
+    """The compiled routine for the shoulders+arms day emits `50C613D0` with distance-typed sets (a step count in the distance field,
+    no reps, no duration, no load) — what Hevy's `short_distance_weight` type takes."""
+    from training import hevy_compiler, in_block_variant
+
+    blocks, _used, _u = full_body_session._blocks_from_prescription(_rx(SA), CATALOG, None, "one_best_line")
+    carry = [b for b in blocks if b.movement_key == CARRY]
+    assert len(carry) == 1
+    wire = hevy_compiler._exercise_to_wire(carry[0], lambda key: in_block_variant.template_id_for(key, MOVEMENTS)[0])
+    assert (
+        CARRY_TID in wire.values()
+    )  # the exercise's template id (the key is the compiler's to name: tests/test_hevy_compiler_isolation.py)
+    assert len(wire["sets"]) == 2
+    for st in wire["sets"]:
+        assert st["distance_meters"] == program_structure.CARRY_EXPOSURE["carry_steps"]
+        assert not ({"reps", "duration_seconds", "weight_kg", "rep_range"} & set(st))
+
+
+def test_5372_a_stored_routine_that_still_names_the_retired_key_reads_as_the_walk():
+    """A routine pushed before the retirement keeps `farmers_carry` in its stored IR; adherence resolves it to the key it folded into."""
+    from health import adherence_calc
+    from training.movement_catalog import RETIRED_KEYS, canonical_key
+
+    assert (
+        RETIRED_KEYS == {"farmers_carry": CARRY}
+        and canonical_key("farmers_carry") == CARRY
+        and canonical_key("squat_barbell") == "squat_barbell"
+    )
+    assert adherence_calc._ir_movement_to_template(CATALOG, "farmers_carry") == CARRY_TID
+    assert adherence_calc._catalog_entry_for("farmers_carry", CATALOG)["title"] == "Farmers Walk"
 
 
 def test_b3_no_load_is_inferred_from_the_shrug():
@@ -356,7 +394,7 @@ def test_b3_no_load_is_inferred_from_the_shrug():
             0
         ]
     blocks = [b for b in ideal.exercises if b.movement_key == CARRY]
-    assert len(blocks) == 1 and all(s.weight_kg is None and s.duration_seconds for s in blocks[0].sets)
+    assert len(blocks) == 1 and all(s.weight_kg is None and s.distance_meters and not s.duration_seconds for s in blocks[0].sets)
     assert "his own pick on the first exposure" in blocks[0].notes
     rx = _rx(SA)
     load_ramp.annotate_prescription(rx, MOVEMENTS, shrug_hist, weights, target_date="2026-10-30", week=5)
@@ -369,7 +407,7 @@ def test_b3_the_carry_block_is_lifting_never_a_second_cardio_block():
     cardio block (the session carries ONE cardio block) or count it against the cardio cap."""
     blocks = [
         ExerciseBlock(movement_key="treadmill", sets=[Set(duration_seconds=20 * 60)], rest_seconds=0),
-        ExerciseBlock(movement_key=CARRY, sets=[Set(duration_seconds=40), Set(duration_seconds=40)], rest_seconds=90),
+        ExerciseBlock(movement_key=CARRY, sets=[Set(distance_meters=60), Set(distance_meters=60)], rest_seconds=90),
     ]
     shape = session_shape.enforce_session_shape(blocks, MOVEMENTS)
     assert [b.movement_key for b in blocks] == ["treadmill", CARRY] and shape["actions"] == []

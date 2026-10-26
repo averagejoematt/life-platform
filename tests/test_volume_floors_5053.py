@@ -73,7 +73,7 @@ def test_every_floor_movement_is_in_a_role_and_in_the_pool():
     accs = {r: t["accessories"] for r, t in program_structure.SESSION_TEMPLATES.items()}
     flat = {a for v in accs.values() for a in v}
     # #5318 (owner ruling B3): the farmer's carry is the trap slot now (it replaced the dumbbell shrug)
-    assert {"db_lateral_raise", "face_pull", "reverse_pec_deck", "farmers_carry", "calf_raise_machine", "machine_crunch"} <= flat
+    assert {"db_lateral_raise", "face_pull", "reverse_pec_deck", "farmers_walk", "calf_raise_machine", "machine_crunch"} <= flat
     pool = {k for v in program_structure.ACCESSORY_POOL.values() for k in v}
     assert flat <= pool
     # delts 3x/week, with a rear-delt slot on an upper day and the lateral raise on the aesthetic day

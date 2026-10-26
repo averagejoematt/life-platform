@@ -236,7 +236,9 @@ def test_a_chat_drafted_treadmill_block_gets_its_OWN_shape_not_the_bikes():
     tread = next(b for b in ir.exercises if b.movement_key == "treadmill")
     # #5076: the incline walk's dose — his steepest walk on record (6 % at 2.8 mph, 23 Jun) sits under the
     # menu's band, so the walk starts at the band's floor incline at that speed
-    assert tread.notes.split("\n")[0] == "Treadmill · 60 min · incline 8% at 2.8 mph walk · RPE 4–6, full sentences, average HR ≤ 120 bpm"
+    assert tread.notes.split("\n")[0] == (
+        "Treadmill · 60 min · incline 8% at 2.8 mph walk · 8% for 60 · check in every 10 min · RPE 4–6, full sentences, average HR ≤ 120 bpm"
+    )
     assert cn.LINE1_RE.match(tread.notes.split("\n")[0])
     assert "level" not in tread.notes.lower()  # no level exists in his treadmill notes; none may be implied
     assert out["cardio_cues"] == 1

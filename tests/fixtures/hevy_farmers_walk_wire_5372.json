@@ -1,0 +1,35 @@
+{
+  "_comment": "#5372: a SYNTHETIC Hevy /v1/workouts item in the wire shape the live 2026-10-25 farmers-walk session had (exercise 'Farmers Walk', template 50C613D0, three sets each with `distance_meters` and a weight, no reps, no RPE) — invented ids and values (the public repo carries no real loads or body numbers). `distance_meters` is the key Hevy passes the typed number through under; on a carry the number is the owner's STEP COUNT.",
+  "id": "00000000-5372-4000-8000-000000000001",
+  "title": "Shoulders + Arms (synthetic)",
+  "routine_id": "",
+  "start_time": "2026-10-25T20:00:00+00:00",
+  "end_time": "2026-10-25T20:40:00+00:00",
+  "updated_at": "2026-10-25T20:41:00+00:00",
+  "exercises": [
+    {
+      "index": 0,
+      "title": "Lateral Raise (Dumbbell)",
+      "notes": "",
+      "exercise_template_id": "422B08F1",
+      "supersets_id": null,
+      "sets": [
+        {"index": 0, "type": "normal", "weight_kg": 10.0, "reps": 12, "distance_meters": null, "duration_seconds": null, "rpe": 8.0, "custom_metric": null},
+        {"index": 1, "type": "normal", "weight_kg": 10.0, "reps": 11, "distance_meters": null, "duration_seconds": null, "rpe": 8.5, "custom_metric": null},
+        {"index": 2, "type": "normal", "weight_kg": 10.0, "reps": 10, "distance_meters": null, "duration_seconds": null, "rpe": 9.0, "custom_metric": null}
+      ]
+    },
+    {
+      "index": 1,
+      "title": "Farmers Walk",
+      "notes": "",
+      "exercise_template_id": "50C613D0",
+      "supersets_id": null,
+      "sets": [
+        {"index": 0, "type": "normal", "weight_kg": 40.0, "reps": null, "distance_meters": 60, "duration_seconds": null, "rpe": null, "custom_metric": null},
+        {"index": 1, "type": "normal", "weight_kg": 40.0, "reps": null, "distance_meters": 62, "duration_seconds": null, "rpe": null, "custom_metric": null},
+        {"index": 2, "type": "normal", "weight_kg": 40.0, "reps": null, "distance_meters": 58, "duration_seconds": null, "rpe": null, "custom_metric": null}
+      ]
+    }
+  ]
+}

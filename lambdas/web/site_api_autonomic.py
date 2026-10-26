@@ -327,7 +327,9 @@ def _compute_zone2_breakdown(
     `today` is injectable so the calendar boundary can be pinned in tests."""
     pt_today = today or datetime.now(PT).strftime("%Y-%m-%d")
     sessions = [
-        s for s in z2m.counted_sessions(strava_items, whoop_items, apple_items) if s["date"] >= (start_date or "") and s["date"] <= pt_today
+        s
+        for s in z2m.counted_sessions(strava_items, whoop_items, apple_items, hevy_rows=hevy_items)
+        if s["date"] >= (start_date or "") and s["date"] <= pt_today
     ]
     if not sessions:
         return {
@@ -411,7 +413,7 @@ def handle_zone2_breakdown() -> dict:
         strava = _query_source("strava", start, today)
         whoop = _query_source("whoop", start, _shift(today, 1))  # a Pacific evening workout is keyed the next UTC day
         hevy = _query_source("hevy", start, today)
-        apple = _query_source("apple_health", start, today)  # #5353: the watch is the third source
+        apple = _query_source("apple_health", start, _shift(today, 1))  # #5353: the watch is the third source (UTC-start keyed)
         payload = _compute_zone2_breakdown(strava, whoop, hevy, today=today, start_date=start, apple_items=apple)
         _last = (payload.get("current_week") or {}).get("source_last_activity")
         return _ok(with_baseline_change(payload), cache_seconds=1800, content_as_of=_last)

@@ -51,6 +51,20 @@ NO MODEL CALL. The issue's box is "AI writes prose only; numbers come from code"
 would add value to, so there is no Bedrock call and no budget class — the menu's lines are templates over the code's
 numbers (`lines`). The grocery list (#5104 box 1, "generated from the menu") reads the cook days of this menu.
 
+THE FIXED MEALS (owner ruling 2026-10-26, Session CH: "Plan around the Fuller dinner"): from the week of 2026-10-25
+the owner eats a prepared meal-service dinner every day, one container whose printed label is the truth. The
+owner-only twin's `fixed_meals` key (`training.training_charter`, the same channel as the anchors) lists each fixed
+feeding: `id`, `label`, `slot` (dinner = the day's last feeding; breakfast = its first), the label values (`kcal`,
+`protein_g`, `carb_g`, `fat_g`; `fibre_g` may be null — unknown, counted as none, so the anchors carry the whole fibre
+floor), `days` (the weekday names it applies to) and `source` (free text). On a day it applies to, the fixed feeding is
+subtracted from the day's band and floors before the cores and the search (`targets.remaining`), counts as ONE of the
+charter's feedings (the four feedings of 40 g+ stand: the anchors build the others, and the cores are sized to the
+remainder's share), sits in its slot inside the window, and is rendered as fixed ("log its printed label"). It is never
+moved, shrunk or dropped: a remainder the anchors cannot fit is a day marked unfit with each miss named (the fixed meal
+named first), and an unreadable fixed row refuses the menu (`fixed_meal_unreadable`) rather than plan a day of food on
+top of a dinner it cannot see. No `fixed_meals` key (or an empty list) is the menu exactly as before. The quality rows
+and the food panel's plan carry the fixed feeding with its nutrition, so both grade the whole day.
+
 OWNER-ONLY. The menu carries his foods: it is served on the owner's MCP read (`get_exercise_notes action='weekly_menu'`)
 and nowhere public.
 """
@@ -68,10 +82,15 @@ from health import food_quality, travel_food
 
 logger = logging.getLogger(__name__)
 
-VERSION = "weekly-menu@1.1.0"  # 1.1.0 #5105: the food-quality targets (fatty fish placed, the quality report)
+VERSION = "weekly-menu@1.2.0"  # 1.2.0 #5103: the fixed meals (a fixed dinner planned around); 1.1.0 #5105: food quality
 ISSUE = "#5103"
 POLICY_PATH = "nutrition.weekly_menu"
 ANCHORS_PATH = "anchor_foods"  # the owner-only twin's key (training_charter.PRIVATE_KEYS)
+FIXED_PATH = "fixed_meals"  # the owner-only twin's fixed feedings (training_charter.PRIVATE_KEYS) — the meal-service dinner
+FIXED = "fixed"  # the `when` of a fixed feeding
+# Where a fixed feeding sits among the day's feedings: breakfast is the first, dinner the last.
+SLOTS = ("breakfast", "dinner")
+FIXED_REQUIRED = ("kcal", "protein_g", "carb_g", "fat_g")  # fibre_g may be null (unknown; counted as none)
 MACROS = travel_food.MACROS  # kcal, protein_g, carb_g, fat_g, fibre_g
 GRAMS = ("protein_g", "carb_g", "fat_g", "fibre_g")
 # The exchange rate between a floor gram short and a calorie: the Atwater factors (fibre at the carbohydrate rate, as
@@ -92,7 +111,8 @@ NO_CALORIE_TARGET = "no_calorie_target"
 NO_POLICY = "no_policy"
 NO_PLAN = "no_plan"
 DAY_UNFIT = "day_unfit"
-REASON_CODES = (NO_ANCHOR_TABLE, TOO_FEW_ANCHORS, NO_FEEDING_CORE, NO_CALORIE_TARGET, NO_POLICY, NO_PLAN, DAY_UNFIT)
+FIXED_MEAL_UNREADABLE = "fixed_meal_unreadable"
+REASON_CODES = (NO_ANCHOR_TABLE, TOO_FEW_ANCHORS, NO_FEEDING_CORE, NO_CALORIE_TARGET, NO_POLICY, NO_PLAN, DAY_UNFIT, FIXED_MEAL_UNREADABLE)
 
 CharterReader = Callable[[str], Any]
 Counts = dict[str, int]
@@ -174,6 +194,74 @@ def parse_anchors(raw: Any, cap: int) -> tuple[list[dict[str, Any]], list[str]]:
             }
         )
     usable.sort(key=lambda a: a["id"])
+    return usable, problems
+
+
+def _weekdays(raw: Any) -> Optional[list[str]]:
+    """A fixed row's `days` as weekday names in week order (a full name or its first three letters, any case), or None
+    when the list is empty, not a list, or names something that is not a weekday."""
+    if not isinstance(raw, list) or not raw:
+        return None
+    keys = {n.lower(): n for n in WEEKDAY_NAMES} | {n[:3].lower(): n for n in WEEKDAY_NAMES}
+    named = [keys.get(str(d).strip().lower()) if isinstance(d, str) else None for d in raw]
+    if None in named:
+        return None
+    return [n for n in WEEKDAY_NAMES if n in named]
+
+
+def parse_fixed_meals(raw: Any) -> tuple[list[dict[str, Any]], list[str]]:
+    """The owner-only twin's fixed feedings and one line per unreadable row. Absent (None) or an empty list is no fixed
+    meal and no problem. A row is unreadable when it has no id or a duplicate one, a slot outside SLOTS, a missing or
+    negative label value (fibre_g may be null), no calories, or no readable weekday; two rows on the same weekday and
+    slot are a problem too. The caller refuses the menu on any problem: a fixed meal is never silently dropped."""
+    if raw is None or raw == []:
+        return [], []
+    if not isinstance(raw, list):
+        return [], [f"{FIXED_PATH} is not a list of fixed feedings"]
+    usable: list[dict[str, Any]] = []
+    problems: list[str] = []
+    seen: set[str] = set()
+    for i, row in enumerate(raw):
+        rid = str((row or {}).get("id") or "").strip() if isinstance(row, dict) else ""
+        tag = f"fixed {rid or f'row {i}'}"
+        if not rid:
+            problems.append(f"{tag}: no id")
+            continue
+        if rid in seen:
+            problems.append(f"{tag}: duplicate id")
+            continue
+        seen.add(rid)
+        vals = {m: _num(row.get(m)) for m in FIXED_REQUIRED}
+        fib_raw = row.get("fibre_g")
+        fib = _num(fib_raw)
+        bad = [m for m, v in vals.items() if v is None or v < 0] + (["fibre_g"] if fib_raw is not None and (fib is None or fib < 0) else [])
+        if bad or not vals["kcal"]:
+            problems.append(f"{tag}: unreadable label value(s) {bad or ['kcal']}")
+            continue
+        slot = str(row.get("slot") or "").strip().lower()
+        if slot not in SLOTS:
+            problems.append(f"{tag}: slot {row.get('slot')!r} is not one of {list(SLOTS)}")
+            continue
+        days = _weekdays(row.get("days"))
+        if days is None:
+            problems.append(f"{tag}: days {row.get('days')!r} names no readable weekday list")
+            continue
+        usable.append(
+            {
+                "id": rid,
+                "label": str(row.get("label") or rid),
+                "slot": slot,
+                **{m: float(v or 0.0) for m, v in vals.items()},
+                "fibre_g": fib,  # None: unknown (counted as none, so the anchors carry the whole fibre floor)
+                "days": days,
+                "source": str(row.get("source") or "") or None,
+            }
+        )
+    clash = sorted(
+        {(d, m["slot"]) for m in usable for d in m["days"] if sum(1 for o in usable if o["slot"] == m["slot"] and d in o["days"]) > 1}
+    )
+    problems += [f"fixed {slot} on {day}: more than one fixed row" for day, slot in clash]
+    usable.sort(key=lambda m: (SLOTS.index(m["slot"]), m["id"]))
     return usable, problems
 
 
@@ -399,32 +487,91 @@ def _check(tot: Mapping[str, float], feedings: Sequence[Mapping[str, Any]], t: M
     return checks, misses
 
 
+def _fixed_vec(fixed_meals: Sequence[Mapping[str, Any]]) -> tuple[float, ...]:
+    """The macro vector of the day's fixed feedings (an unknown fibre counted as none)."""
+    return tuple(sum(float(m.get(k) or 0.0) for m in fixed_meals) for k in MACROS)
+
+
+def remainder(t: Mapping[str, Any], fixed_meals: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """What the day leaves the anchors once its fixed feedings are subtracted: the band and the kcal moved down by the
+    fixed kcal, each floor less the fixed grams (never below 0), the feedings less one per fixed feeding. `fibre_unknown`
+    names the fixed rows whose fibre is null (counted as none: the anchors carry the whole fibre floor)."""
+    fx = dict(zip(MACROS, _fixed_vec(fixed_meals)))
+    lo, hi = t["band"]
+    return {
+        "fixed": [m["id"] for m in fixed_meals],
+        "fixed_kcal": round(fx["kcal"], 1),
+        "fixed_g": {g: round(fx[g], 1) for g in GRAMS},
+        "kcal": round(float(t["kcal"]) - fx["kcal"], 1),
+        "band": [round(lo - fx["kcal"], 1), round(hi - fx["kcal"], 1)],
+        "floors_g": {m: round(max(0.0, float(f) - fx[m]), 1) for m, f in t["floors_g"].items()},
+        "feedings": max(0, int(t["feedings"]) - len(fixed_meals)),
+        "fibre_unknown": [m["id"] for m in fixed_meals if m.get("fibre_g") is None],
+    }
+
+
 def _lay_out(
-    cores: Sequence[Counts], sides: Counts, t: Mapping[str, Any], post_slot: Optional[int], by_id: Mapping[str, Any]
+    cores: Sequence[Counts],
+    sides: Counts,
+    t: Mapping[str, Any],
+    post_slot: Optional[int],
+    by_id: Mapping[str, Any],
+    fixed_meals: Sequence[Mapping[str, Any]] = (),
 ) -> list[dict]:
     """The day's feedings: the cores in order, each side serving dealt to the feeding with the fewest kcal so far
-    (largest sides first, ids breaking ties), each feeding placed in the window."""
+    (largest sides first, ids breaking ties), the fixed feedings in their slots (breakfast first, dinner last, never
+    given a side), each feeding placed in the window. A day whose every feeding is fixed deals its sides onto the last
+    fixed feeding (its items then list them)."""
     per = [dict(c) for c in cores]
     kcal = [_totals(c, by_id)["kcal"] for c in per]
     servings = sorted(((by_id[k]["kcal"], k) for k, n in sides.items() for _ in range(n)), key=lambda x: (-x[0], x[1]))
+    spill: Counts = {}
     for k_kcal, k in servings:
+        if not per:
+            spill[k] = spill.get(k, 0) + 1
+            continue
         i = min(range(len(per)), key=lambda j: (kcal[j], j))
         per[i][k] = per[i].get(k, 0) + 1
         kcal[i] += k_kcal
+    order: list[tuple[str, Any]] = [(FIXED, m) for m in fixed_meals if m["slot"] == "breakfast"]
+    order += [("anchor", i) for i in range(len(per))]
+    order += [(FIXED, m) for m in fixed_meals if m["slot"] == "dinner"]
     hours = _num(t.get("eating_hours"))
-    step = hours / len(per) if hours and per else None
+    step = hours / len(order) if hours and order else None
+    last_fixed = max((j for j, (kind, _x) in enumerate(order) if kind == FIXED), default=None)
     out = []
-    for i, counts in enumerate(per):
-        when = POST_SESSION if i == post_slot else ("first" if i == 0 else "meal")
+    for pos, (kind, x) in enumerate(order):
+        offset = round(pos * step, 2) if step is not None else None
+        if kind == FIXED:
+            extra = spill if pos == last_fixed else {}
+            side = _totals(extra, by_id)
+            out.append(
+                {
+                    "name": f"feeding {pos + 1} (fixed {x['slot']})",
+                    "when": FIXED,
+                    "slot": x["slot"],
+                    "window_offset_h": offset,
+                    "need_g": t["feeding_threshold_g"],
+                    "fixed": {"id": x["id"], "label": x["label"], "source": x.get("source"), "fibre_known": x.get("fibre_g") is not None},
+                    "items": [
+                        {"item": k, "servings": n, "label": by_id[k]["label"], "serving": by_id[k]["serving"]}
+                        for k, n in sorted(extra.items())
+                    ],
+                    **{m: round(float(x.get(m) or 0.0) + side[m], 1) for m in MACROS},
+                }
+            )
+            continue
+        i, counts = x, per[x]
+        when = POST_SESSION if i == post_slot else ("first" if pos == 0 else "meal")
         need = t["post_session_protein_g"] if i == post_slot else t["feeding_threshold_g"]
         items = [
             {"item": k, "servings": n, "label": by_id[k]["label"], "serving": by_id[k]["serving"]} for k, n in sorted(counts.items()) if n
         ]
         out.append(
             {
-                "name": f"feeding {i + 1}" + (" (post-session)" if when == POST_SESSION else ""),
+                "name": f"feeding {pos + 1}" + (" (post-session)" if when == POST_SESSION else ""),
                 "when": when,
-                "window_offset_h": round(i * step, 2) if step is not None else None,
+                "window_offset_h": offset,
                 "need_g": need,
                 "items": items,
                 **_totals(counts, by_id),
@@ -442,12 +589,16 @@ def fit_day(
     *,
     exclude: Iterable[str] = (),
     fixed: Optional[Mapping[str, int]] = None,
+    fixed_meals: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """One plan day fitted from the anchors. `index` is the day's position in the week (the core rotation). `exclude`
     keeps anchors off the day; `fixed` pins servings into it (counted, never moved) — the week's fatty-fish placement
-    (#5105) uses both."""
+    (#5105) uses both. `fixed_meals` are the parsed fixed feedings (`parse_fixed_meals`); the ones whose `days` name
+    this weekday are subtracted first (`remainder`, reported as `targets.remaining`), counted as feedings and laid in
+    their slots."""
     t = day_targets(day, read)
     weekday = WEEKDAY_NAMES[datetime.strptime(str(day.get("date"))[:10], "%Y-%m-%d").weekday()]  # a calendar-day key
+    today = [m for m in fixed_meals if weekday in m["days"]]
     base = {
         "date": day.get("date"),
         "weekday": weekday,
@@ -457,39 +608,64 @@ def fit_day(
     }
     if not _ready(t):
         return {**base, "fits": False, "reason_code": NO_CALORIE_TARGET, "misses": ["no resolved kcal or an unreadable charter rule"]}
+    rem = remainder(t, today) if today else None
+    if rem is not None:
+        t = {**t, "remaining": rem}
+        base["targets"] = t
+    n_anchor = rem["feedings"] if rem is not None else t["feedings"]  # the feedings the anchors build
     by_id = {a["id"]: a for a in anchors}
     pinned: Counts = {k: int(n) for k, n in (fixed or {}).items() if n and k in by_id}
     off = set(exclude) | set(pinned)
     anchors = [a for a in anchors if a["id"] not in off]  # the foods the search may move
     caps = {a["id"]: int(a["cap"]) for a in anchors}
     fixed_vec = _vec(pinned, by_id)
-    post_slot = 1 if (t["post_session_protein_g"] is not None and t["feedings"] > 1) else (0 if t["post_session_protein_g"] else None)
-    share = float(t["kcal"]) / t["feedings"]  # a core is at most one feeding's share of the day: protein-led, never a whole meal plan
-    cores = [c for c in feeding_cores(anchors, float(t["feeding_threshold_g"]), pol["core_max"]) if _totals(c, by_id)["kcal"] <= share]
-    post_cores = (
-        [c for c in feeding_cores(anchors, float(t["post_session_protein_g"]), pol["core_max"]) if _totals(c, by_id)["kcal"] <= share]
-        if post_slot is not None
-        else cores
-    )
-    if not cores or not post_cores:
+    if today:
+        fixed_vec = tuple(a + b for a, b in zip(fixed_vec, _fixed_vec(today)))  # counted in every total, never moved
+    pps = t["post_session_protein_g"]
+    post_slot = 1 if (pps is not None and n_anchor > 1) else (0 if pps and n_anchor else None)
+    # A core is at most one feeding's share of what the anchors have (the day, less its fixed feedings): protein-led,
+    # never a whole meal plan.
+    share = (float(rem["kcal"]) if rem is not None else float(t["kcal"])) / n_anchor if n_anchor else 0.0
+
+    def _pool(need: float, capped: bool) -> list[Counts]:
+        return [c for c in feeding_cores(anchors, need, pol["core_max"]) if not capped or _totals(c, by_id)["kcal"] <= share]
+
+    cores = _pool(float(t["feeding_threshold_g"]), True)
+    post_cores = _pool(float(pps), True) if post_slot is not None else cores
+    if today and n_anchor and (not cores or not post_cores):
+        # The fixed feedings leave less than any core: the day is still fitted (with the uncapped cores) and the check
+        # names what the remainder cannot hold — the fixed meal is never shrunk or dropped to make room.
+        cores = _pool(float(t["feeding_threshold_g"]), False)
+        post_cores = _pool(float(pps), False) if post_slot is not None else cores
+    if n_anchor and (not cores or not post_cores):
         return {
             **base,
             "fits": False,
             "reason_code": NO_FEEDING_CORE,
             "misses": ["no anchor combination reaches the feeding threshold inside one feeding's share of the day's kcal"],
         }
-    pools = [post_cores if slot == post_slot else cores for slot in range(t["feedings"])]
+    pools = [post_cores if slot == post_slot else cores for slot in range(n_anchor)]
     best: Optional[dict[str, Any]] = None
-    span = t["feedings"] + len(WEEKDAY_NAMES)  # the rotation pool's size (see _pick_cores)
+    span = n_anchor + len(WEEKDAY_NAMES)  # the rotation pool's size (see _pick_cores)
+    fx = dict(zip(MACROS, _fixed_vec(today)))
     for offset in [(index + j) % span for j in range(span)]:  # the day's own rotation first, then the next starts
-        start = _pick_cores(cores, post_cores, t["feedings"], post_slot, offset, caps)
+        start = _pick_cores(cores, post_cores, n_anchor, post_slot, offset, caps)
         if start is None:
             continue
         picked, sides = _search_day(start, pools, anchors, t, fixed_vec)
         sides = _merge(sides, pinned)
-        feedings = _lay_out(picked, sides, t, post_slot, by_id)
+        feedings = _lay_out(picked, sides, t, post_slot, by_id, today)
         tot = _totals(_used(picked, sides), by_id)
+        if today:
+            tot = {m: round(tot[m] + fx[m], 1) for m in MACROS}
         checks, misses = _check(tot, feedings, t)
+        if rem is not None and misses:
+            misses.insert(
+                0,
+                f"after the fixed {' + '.join(m['slot'] for m in today)} ({rem['fixed_kcal']:g} kcal, "
+                f"{rem['fixed_g']['protein_g']:g} g protein) the anchors had {rem['band'][0]:g}-{rem['band'][1]:g} kcal "
+                f"for {n_anchor} feeding(s)",
+            )
         cand = {"feedings": feedings, "totals": tot, "checks": checks, "misses": misses, "fits": all(checks.values()), "rotation": offset}
         if best is None or _cost(tot, t) < _cost(best["totals"], t):
             best = cand
@@ -516,21 +692,23 @@ def _fit_week(
     pol: Mapping[str, Any],
     qpol: Mapping[str, Any],
     read: CharterReader,
+    fixed_meals: Sequence[Mapping[str, Any]] = (),
 ) -> list[dict[str, Any]]:
     """Every day fitted, with the fatty-fish target enforced (#5105): every day is first fitted with the fatty-fish
     anchors kept off it, then the low end of the charter's weekly range is placed — one pinned serving on each of that
     many days, spread across the week (the day nearest each even slot first, the next nearest when a day cannot fit
     it), the fish anchors taken in turn. A day the fish-free fit cannot build (fish was its only protein core) is
     fitted with fish allowed; the quality report then names any count outside the range. With no readable range or no
-    tagged anchor the week is fitted as before."""
+    tagged anchor the week is fitted as before. The fixed feedings (`fixed_meals`) ride every fit: the fish is placed
+    around them."""
     fish = _fish_ids(anchors)
     rng = qpol.get("fish_range")
     if not fish or rng is None:
-        return [fit_day(d, anchors, pol, i, read) for i, d in enumerate(days)]
+        return [fit_day(d, anchors, pol, i, read, fixed_meals=fixed_meals) for i, d in enumerate(days)]
     fitted = []
     for i, d in enumerate(days):
-        day = fit_day(d, anchors, pol, i, read, exclude=fish)
-        fitted.append(fit_day(d, anchors, pol, i, read) if day.get("reason_code") == NO_FEEDING_CORE else day)
+        day = fit_day(d, anchors, pol, i, read, exclude=fish, fixed_meals=fixed_meals)
+        fitted.append(fit_day(d, anchors, pol, i, read, fixed_meals=fixed_meals) if day.get("reason_code") == NO_FEEDING_CORE else day)
     placed = [sum(i_["servings"] for f in d.get("feedings") or [] for i_ in f["items"] if i_["item"] in fish) for d in fitted]
     free = [i for i, n in enumerate(placed) if not n]
     need = max(0, math.ceil(rng[0] - sum(placed)))
@@ -540,7 +718,7 @@ def _fit_week(
         for i in sorted(free, key=lambda j: (abs(j + 0.5 - ideal), j)):
             if i in chosen:
                 continue
-            cand = fit_day(days[i], anchors, pol, i, read, exclude=fish, fixed={fish[k % len(fish)]: 1})
+            cand = fit_day(days[i], anchors, pol, i, read, exclude=fish, fixed={fish[k % len(fish)]: 1}, fixed_meals=fixed_meals)
             if cand.get("fits") or (not fitted[i].get("fits") and cand.get("feedings")):
                 fitted[i] = cand
                 chosen.add(i)
@@ -554,13 +732,15 @@ def build(
     read: Optional[CharterReader] = None,
     anchors_raw: Any = None,
     priorities: Optional[Mapping[str, Any]] = None,
+    fixed_meals_raw: Any = None,
 ) -> dict[str, Any]:
     """The week's menu over a `food_panel.build_food_plan` plan. `anchors_raw` is the anchor table (default: the
-    owner-only twin's `anchor_foods`); `priorities` is the owner-only lab-driven priorities row
-    (`training.lab_priorities.from_rows`, #5111) when the caller holds one. Never raises: an unbuildable menu is
-    `{built: False, reason_code, reason}` with a code from REASON_CODES; a built menu with a day the anchors cannot fit
-    carries `fits_all: False`, `reason_code: day_unfit` and each day's misses; a week that misses a food-quality target
-    (#5105) carries `quality_met: False` and each miss named in `quality.misses`."""
+    owner-only twin's `anchor_foods`); `fixed_meals_raw` the fixed feedings (default: the twin's `fixed_meals`; absent
+    or empty is the menu exactly as before, an unreadable row refuses it with `fixed_meal_unreadable`); `priorities`
+    is the owner-only lab-driven priorities row (`training.lab_priorities.from_rows`, #5111) when the caller holds one.
+    Never raises: an unbuildable menu is `{built: False, reason_code, reason}` with a code from REASON_CODES; a built
+    menu with a day the anchors cannot fit carries `fits_all: False`, `reason_code: day_unfit` and each day's misses; a
+    week that misses a food-quality target (#5105) carries `quality_met: False` and each miss named in `quality.misses`."""
     read = read or _default_reader
     days = [d for d in (plan or {}).get("days") or [] if isinstance(d, dict)]
     if not days:
@@ -578,8 +758,16 @@ def build(
             f"{len(anchors)} usable anchor food(s), fewer than the charter's min_anchors {pol['min_anchors']}",
             anchor_problems=problems,
         )
+    fixed_meals, fixed_problems = parse_fixed_meals(read(FIXED_PATH) if fixed_meals_raw is None else fixed_meals_raw)
+    if fixed_problems:
+        return _refused(
+            FIXED_MEAL_UNREADABLE,
+            f"the owner-only twin's {FIXED_PATH} has an unreadable row (a fixed meal is never dropped): {'; '.join(fixed_problems)}",
+            fixed_meal_problems=fixed_problems,
+            anchor_problems=problems,
+        )
     qpol = food_quality.policy(read)
-    fitted = _fit_week(days, anchors, pol, qpol, read)
+    fitted = _fit_week(days, anchors, pol, qpol, read, fixed_meals)
     refused = next((d for d in fitted if d.get("reason_code") in (NO_CALORIE_TARGET, NO_FEEDING_CORE)), None)
     if refused is not None:
         return _refused(str(refused["reason_code"]), f"{refused['date']}: {'; '.join(refused['misses'])}", anchor_problems=problems)
@@ -607,21 +795,35 @@ def build(
         "anchor_problems": problems,
         "days": fitted,
     }
+    if fixed_meals:
+        menu["fixed_meals"] = fixed_meals  # the fixed feedings planned around (owner data, owner-only menu)
     menu["grocery_list"] = grocery_list(menu, anchors)
     menu["lines"] = lines(menu)
     return menu
 
 
 # ── what reads the menu: the panel's plan, the grocery list, the words ────────────────────────────────────────
+def _plan_feeding(f: Mapping[str, Any]) -> dict[str, Any]:
+    """One menu feeding as the food panel's plan row: its timing and protein; a fixed feeding also carries its slot,
+    its id and its label values, so the panel grades the whole day."""
+    row: dict[str, Any] = {"when": f["when"], "protein_g": f["protein_g"]}
+    if f.get("fixed"):
+        row.update(fixed=True, slot=f.get("slot"), id=f["fixed"].get("id"), **{m: f.get(m) for m in MACROS if m != "protein_g"})
+        if not f["fixed"].get("fibre_known"):
+            row["fibre_g"] = None  # unknown on the label table (the day's fibre counts it as none)
+    return row
+
+
 def food_plan(plan: Mapping[str, Any], menu: Mapping[str, Any]) -> dict[str, Any]:
     """The food plan with each day's intended feedings replaced by the MENU's (the grams the anchors actually carry,
-    the post-session one tagged) — the plan `training.food_panel.prescore` grades. A copy; the plan is untouched."""
+    the post-session one tagged, a fixed feeding with its label values) — the plan `training.food_panel.prescore`
+    grades. A copy; the plan is untouched."""
     out = copy.deepcopy(dict(plan))
     by_date = {d["date"]: d for d in menu.get("days") or [] if d.get("feedings")}
     for d in out.get("days") or []:
         m = by_date.get(d.get("date"))
         if m is not None:
-            d["feedings"] = [{"when": f["when"], "protein_g": f["protein_g"]} for f in m["feedings"]]
+            d["feedings"] = [_plan_feeding(f) for f in m["feedings"]]
     out["case_id"] = f"{out.get('case_id') or 'food'}::menu"
     q = menu.get("quality") or {}
     out["quality_days"] = q.get("rows") or []  # #5105: what training.food_panel checks the week's quality targets over
@@ -656,6 +858,19 @@ def grocery_list(menu: Mapping[str, Any], anchors: Iterable[Mapping[str, Any]], 
     return out
 
 
+def _feeding_line(f: Mapping[str, Any]) -> str:
+    head = f"{f['name']} (+{f['window_offset_h']:g} h): "
+    items = ", ".join(f"{i['servings']:g} x {i['label']}" for i in f["items"])
+    fx = f.get("fixed")
+    if not fx:
+        return head + items
+    fib = f"{f['fibre_g']:g} g fibre" if fx.get("fibre_known") else "fibre unknown"
+    return (
+        head + f"{f.get('slot')}: {fx['label']} — fixed, planned at {f['kcal']:g} kcal, {f['protein_g']:g} g protein, {fib}; "
+        "log its printed label" + (f"; with {items}" if items else "")
+    )
+
+
 def lines(menu: Mapping[str, Any]) -> list[str]:
     """The menu in words: one line per day (its target, what the anchors land at, its feedings) — templates over the
     code's numbers, no model."""
@@ -665,10 +880,7 @@ def lines(menu: Mapping[str, Any]) -> list[str]:
         if not d.get("feedings"):
             out.append(f"{d.get('weekday')} {d.get('date')}: not fitted ({'; '.join(d.get('misses') or [])})")
             continue
-        fed = "; ".join(
-            f"{f['name']} (+{f['window_offset_h']:g} h): " + ", ".join(f"{i['servings']:g} x {i['label']}" for i in f["items"])
-            for f in d["feedings"]
-        )
+        fed = "; ".join(_feeding_line(f) for f in d["feedings"])
         verdict = "fits" if d.get("fits") else "DOES NOT FIT: " + "; ".join(d.get("misses") or [])
         out.append(
             f"{d['weekday']} {d['date']} ({d.get('day_type')}, {d.get('service')}): target {t.get('kcal')} kcal; "

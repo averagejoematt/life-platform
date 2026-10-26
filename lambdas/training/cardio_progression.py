@@ -154,15 +154,38 @@ def structured_level(notes: str | None) -> dict[str, Any]:
       ``level_range``         one reference but a span ("L9-10") — not a session level
       ``multi_level_session`` two or more distinct references ("level 9 for 20 and then
                               level 6 for 10"): a single number would misreport the ride
+      ``shaped_session``      #5374 — a ride stated on the watch clock ("8/12 for 2 mins for
+                              20 mins / … / 8 level up every 2 mins from 40 to 60 to level 18",
+                              `training.wrist_clock.parse_note`): `level` stays None and the
+                              levels he actually rode come back as `levels`, `level_minutes`,
+                              `base_level`, `top_level` and the structured `shape`
       ``no_level_in_note``    nothing matched
       ``no_note``             the exercise carried no note at all
 
     The `multi_level_session` refusal is not hypothetical — 2026-06-22 and 2026-06-25 are
     both live examples, and both would have been silently mislabelled "level 9".
+
+    Neither is `shaped_session`: his 10-25 ride (the note above) carries ONE "level N" reference —
+    "to level 18", the END of a ramp — so the single-level reader returned `ok`, level 18, for a
+    ride that spent 20 of its 60 minutes at level 8 (#5374). The clock grammar is read first.
     """
     text = (notes or "").strip()
     if not text:
         return {"level": None, "status": "no_note", "raw": "", "source": "note_regex_deterministic"}
+    shaped = _clock_shape(text)
+    if shaped is not None:
+        return {
+            "level": None,
+            "status": "shaped_session",
+            "raw": text,
+            "source": "wrist_clock_grammar",
+            "levels": shaped["levels"],
+            "level_minutes": shaped["level_minutes"],
+            "base_level": shaped["base_level"],
+            "top_level": shaped["top_level"],
+            "mean_level": shaped["mean_level"],
+            "shape": {k: shaped.get(k) for k in ("family", "total_min", "change_points", "clauses", "unparsed")},
+        }
     spans: list[tuple[int, int]] = []
     for m in LEVEL_RE.finditer(text):
         low = int(m.group(1))
@@ -192,6 +215,18 @@ def structured_level(notes: str | None) -> dict[str, Any]:
     out["level"] = low
     out["status"] = "ok"
     return out
+
+
+def _clock_shape(text: str) -> dict[str, Any] | None:
+    """The note's clock shape when it is a multi-level ride on the clock (an alternation, ramp or sprint with at least
+    one level read), else None. `training.wrist_clock` is pure and has no extractor dependency, so a level decision
+    still never depends on the LLM layer."""
+    from training import wrist_clock
+
+    shape = wrist_clock.parse_note(text)
+    if shape["status"] != "shaped" or not shape.get("levels"):
+        return None
+    return shape
 
 
 def speed_mph(distance_m: Any, duration_sec: Any) -> float | None:
@@ -354,6 +389,7 @@ def cardio_facts(
 
     excluded: dict[str, int] = {}
     series: list[dict[str, Any]] = []
+    shaped: list[dict[str, Any]] = []
     calibration: list[dict[str, Any]] = []
     for s in sessions:
         note = s.get("note") or ""
@@ -362,6 +398,21 @@ def cardio_facts(
         anchors = _calibration_anchors(note)
         if anchors:
             calibration.append({"date": s.get("date"), "anchors": anchors, "raw": note})
+        if lvl["status"] == "shaped_session":
+            # #5374: read for the levels he rode, kept OUT of the speed series — a mixed-level ride's speed is not
+            # speed at one level, so it can never move a hold/raise verdict
+            shaped.append(
+                {
+                    "date": s.get("date"),
+                    "levels": lvl["levels"],
+                    "level_minutes": lvl["level_minutes"],
+                    "base_level": lvl["base_level"],
+                    "top_level": lvl["top_level"],
+                    "mean_level": lvl["mean_level"],
+                    "family": lvl["shape"]["family"],
+                    "speed_mph": spd,
+                }
+            )
         if lvl["status"] != "ok":
             excluded[lvl["status"]] = excluded.get(lvl["status"], 0) + 1
             continue
@@ -387,6 +438,7 @@ def cardio_facts(
             }
         )
     series.sort(key=lambda r: str(r["date"]))
+    shaped.sort(key=lambda r: str(r["date"]))
 
     last = sessions[0]
     last_level = structured_level(last.get("note") or "")
@@ -408,9 +460,16 @@ def cardio_facts(
         "last_speed_mph": speed_mph(last.get("distance_m"), last.get("duration_sec")),
         "last_level": last_level["level"],
         "last_level_status": last_level["status"],
+        # #5374: the last ride's clock shape when it was one (its levels, never one of them as "the" level)
+        "last_shape": (
+            {k: last_level.get(k) for k in ("levels", "base_level", "top_level", "mean_level", "level_minutes", "shape")}
+            if last_level["status"] == "shaped_session"
+            else None
+        ),
         "last_note": (last.get("note") or "").strip(),
         "last_hr": last_hr,
         "series": series,
+        "shaped": shaped,
         "excluded": excluded,
         "calibration": calibration,
         "version": CARDIO_PROGRESSION_VERSION,
@@ -437,13 +496,17 @@ def _calibration_anchors(note: str) -> list[dict[str, Any]]:
 # ── the rule ──────────────────────────────────────────────────────────────────────────
 
 
-def level_verdict(series: list[dict[str, Any]] | None, level: int | None) -> dict[str, Any]:
+def level_verdict(series: list[dict[str, Any]] | None, level: int | None, shaped: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Hold, raise, or say why neither can be claimed. Never asserts improvement.
 
     `claims_improvement` is the load-bearing key: it is True ONLY for a `raise` verdict,
     which needs `N_REQUIRED_AT_LEVEL` sessions at that level AND a between-block gain of
     at least one within-level SD of his own speed. Any surface rendering a progress claim
     must read that flag rather than inspecting `delta_mph` itself.
+
+    `shaped` (#5374) is `cardio_facts(...)["shaped"]`: his clock-shaped rides. They are READ —
+    `shaped_arm` says how many touched the level, for how many minutes, and the top level he rode
+    — and never enter the speed comparison (a mixed-level ride's speed is not speed at one level).
     """
     out: dict[str, Any] = {
         "level": level,
@@ -479,9 +542,16 @@ def level_verdict(series: list[dict[str, Any]] | None, level: int | None) -> dic
         ),
     }
 
+    out["shaped_arm"] = _shaped_arm(shaped, level)
     if level is None:
         out["verdict"] = "no_level"
         out["basis"] = "the last ride's note carried no single parseable level, so there is no level to hold or raise"
+        if out["shaped_arm"]["n_rides"]:
+            last = (shaped or [])[-1]
+            out["basis"] += (
+                f"; his last clock-shaped ride ({last.get('date')}) rode levels {last.get('base_level')}–{last.get('top_level')}"
+                " and is read for its levels, not its speed"
+            )
         return out
     if len(at) < 2:
         out["basis"] = f"n={len(at)} at level {level}: no within-level variance estimate yet, so no effect size can be honest"
@@ -519,6 +589,22 @@ def level_verdict(series: list[dict[str, Any]] | None, level: int | None) -> dic
     return out
 
 
+def _shaped_arm(shaped: list[dict[str, Any]] | None, level: int | None) -> dict[str, Any]:
+    """What his clock-shaped rides say about `level` (#5374): the rides that touched it and the minutes he spent at it.
+    With no level, every shaped ride is counted and the top level ridden is named."""
+    rides = list(shaped or [])
+    key = None if level is None else f"{level:g}"
+    touching = rides if key is None else [r for r in rides if key in (r.get("level_minutes") or {})]
+    return {
+        "status": "read" if rides else "none",
+        "n_rides": len(touching),
+        "minutes_at_level": None if key is None else sum(int((r.get("level_minutes") or {}).get(key, 0)) for r in touching),
+        "top_level_ridden": max((r["top_level"] for r in rides if r.get("top_level") is not None), default=None),
+        "dates": [r.get("date") for r in touching],
+        "in_speed_comparison": False,
+    }
+
+
 # ── the cue ───────────────────────────────────────────────────────────────────────────
 
 _NOTE_QUOTE_MAX = 120
@@ -554,8 +640,11 @@ def render_cardio_cue(facts: dict[str, Any], verdict: dict[str, Any] | None = No
         return ""
 
     head = "Last: "
+    shape = facts.get("last_shape") or {}
     if facts.get("last_level") is not None:
         head += f"level {facts['last_level']}, "
+    elif shape.get("base_level") is not None:
+        head += f"levels {shape['base_level']}–{shape['top_level']}, "  # #5374: a clock-shaped ride
     if dist_m and dist_m > 0:
         head += f"{dist_m / METERS_PER_MILE:.2f} mi in {dur}"
         if spd:

@@ -12,23 +12,42 @@ the combining lives here).
 
 THE RULE
 
-Two records from DIFFERENT sources are one workout when they are the same activity FAMILY and
-their intervals overlap by at least half of the SHORTER interval (`OVERLAP_SHARE`). Identity is by
-vendor id, never display name: a record seen twice from one source (the same `strava_id`, Apple
-`id` or Hevy workout id) is one member, and two records from one source are never folded into one
-identity — a source's own two records are two sessions, or that source's de-dup problem
-(`common.strava_read_seam` owns Strava's multi-device one).
+Two records from DIFFERENT sources are one workout when their activity FAMILIES are compatible and
+their intervals overlap by at least half of the SHORTER interval (`OVERLAP_SHARE`). Compatible means
+the same family, or a label that names no family on either side (`other:<name>` — WHOOP calls a gym
+session "activity" or "Cross Training" that Strava calls WeightTraining; an unnamed label is no
+evidence AGAINST the overlap). Identity is by vendor id, never display name: a record seen twice
+from one source (the same `strava_id`, Apple `id`, Whoop `workout_id` or Hevy workout id) is one
+member. Two records from one source that overlap each other are never one identity — a source's own
+two records of the same minutes are that source's de-dup problem (`common.strava_read_seam` owns
+Strava's multi-device one). Two DISJOINT records from one source may join one identity as its
+CHUNKS (#5369): WHOOP auto-detects a long gym session in pieces (the 2026-10-25 visit carried two
+WHOOP lifting pieces inside one Hevy lift), so a record joins an identity already holding its source
+when it overlaps none of that source's members there and lies at least OVERLAP_SHARE inside a member
+of ANOTHER source.
 
-Families reuse the walking-volume layer's vocabulary (`training.walking_volume` STRAVA_COUNTED_TYPES
-and HEVY_COUNTED_NAMES), so "walking" here is the walking that layer counts. A Hevy session yields
-one member per counted cardio block (timed by the session, since a block carries a duration but no
-clock) plus one `strength` member when it carries any other exercise.
+Families reuse the walking-volume layer's vocabulary (`training.walking_volume` STRAVA_COUNTED_TYPES,
+HEVY_COUNTED_NAMES and APPLE_COUNTED_NAMES), so "walking" here is the walking that layer counts. A
+Hevy session yields one member per timed block of a named family — the counted cardio blocks plus a
+`mobility` block (Stretching; #5369 — the owner ruled Hevy the ONE routine source, its mobility block
+included) — each timed by the session, since a block carries a duration but no clock, plus one
+`strength` member when it carries any other exercise.
+
+WHAT REACHES THE RESOLVER FROM STRAVA (#5369)
+
+The Strava records pass the read seam (`common.strava_read_seam`, which folds WHOOP's same-sport
+pieces into Hevy's push of the session) and then Hevy's OWN push (`common.activity_overlap.HEVY_DEVICE`)
+is dropped wherever a timed Hevy session it overlaps is in hand: the Hevy session IS that record, and
+its Strava copy is an echo. A Hevy push carrying a seam graft (`hr_from_strava_id`) stays — its zones
+are the folded wearable copy's, the only trace of that record. Whoop's own workout rows are a source
+(`whoop_members`), last in precedence.
 
 COUNTED ONCE
 
-An identity's duration is ONE member's, by source precedence — the logged Hevy block, else
-Strava's moving time, else Apple's duration (the order `resolve_workout_identities` builds members in) — the same order the walking-volume layer's #4068 de-dup
-claims time in. `identity_totals` sums identities, never members.
+An identity's duration is ONE source's, by precedence — the logged Hevy block, else Strava's moving
+time, else Apple's duration, else Whoop's (the order `resolve_workout_identities` builds members in) —
+the same order the walking-volume layer's #4068 de-dup claims time in; that source's chunks are
+summed. `identity_totals` sums identities, never members.
 
 WHAT STAYS OWNER-ONLY
 
@@ -47,9 +66,10 @@ both is one member. A workout another app wrote into HealthKit (WHOOP, Hevy) is 
 `apple_health/<origin>`, distinct from the watch's own `apple_health`, so it can fold into the
 watch's identity instead of standing beside it.
 
-Pure functions only — no AWS. Wired into no live reader yet: walking_volume's #4068 de-dup is a
-different, ruled rule (a partly-overlapping Strava walk keeps its UNcovered seconds), so it is
-cross-checked against this resolver in tests rather than routed through it.
+Pure functions only — no AWS. The live reader is `training.zone2_minutes.counted_sessions`
+(#5369), which retired its own same-session grouping for this resolver. walking_volume's #4068
+de-dup is a different, ruled rule (a partly-overlapping Strava walk keeps its UNcovered seconds),
+so it is cross-checked against this resolver in tests rather than routed through it.
 """
 
 from __future__ import annotations
@@ -58,11 +78,16 @@ import hashlib
 from datetime import datetime, timedelta
 from typing import Any, Iterable, Optional
 
+from common.activity_overlap import HEVY_DEVICE, overlap_seconds
 from common.pacific_time import parse_iso_utc
+from common.strava_read_seam import STRAVA_SOURCE, strava_read_seam
 
-from training.walking_volume import HEVY_COUNTED_NAMES, STRAVA_COUNTED_TYPES
+from training.walking_volume import APPLE_COUNTED_NAMES, HEVY_COUNTED_NAMES, STRAVA_COUNTED_TYPES, apple_workout_source
 
-WORKOUT_IDENTITY_VERSION = "workout-identity@1.0.0"
+WORKOUT_IDENTITY_VERSION = "workout-identity@1.1.0"  # 1.1.0 (#5369): mobility, Whoop, chunks, unnamed-label overlap, Hevy echoes
+
+MOBILITY = "mobility"
+OTHER_PREFIX = "other:"
 
 OVERLAP_SHARE = 0.5
 
@@ -74,27 +99,56 @@ _STRAVA_EXTRA: dict[str, str] = {
     "weighttraining": "strength",
     "workout": "strength",  # a Hevy session mirrored into Strava arrives as Workout/WeightTraining (#3930)
     "crossfit": "strength",
+    "yoga": MOBILITY,
 }
 STRAVA_FAMILY: dict[str, str] = {**STRAVA_COUNTED_TYPES, **_STRAVA_EXTRA}
 
 # HealthKit workout names as Health Auto Export sends them (lower-cased) → family.
+# The walking/cycling names are walking_volume's APPLE_COUNTED_NAMES (one vocabulary).
 APPLE_FAMILY: dict[str, str] = {
-    "walking": "walking",
-    "outdoor walk": "walking",
-    "indoor walk": "walking",
-    "hiking": "walking",
+    **APPLE_COUNTED_NAMES,
     "running": "running",
     "outdoor run": "running",
     "indoor run": "running",
-    "cycling": "cycling",
-    "outdoor cycle": "cycling",
-    "indoor cycle": "cycling",
-    "outdoor cycling": "cycling",  # the name HAE sends for a watch ride (live raw archive, 2026-10-21)
-    "indoor cycling": "cycling",
     "traditional strength training": "strength",
     "functional strength training": "strength",
     "strength training": "strength",
+    # #5369: the pliability app writes its sessions into HealthKit as Flexibility
+    "flexibility": MOBILITY,
+    "yoga": MOBILITY,
+    "cooldown": MOBILITY,
+    "mind and body": MOBILITY,
 }
+
+# Hevy exercise-name substrings beyond walking_volume's counted cardio (#5369): the mobility block.
+# The live 13–19 Sep window's own name is "Stretching" (walking_volume's HEVY_COUNTED_NAMES note).
+_HEVY_EXTRA_NAMES: tuple[tuple[str, str], ...] = (
+    ("stretch", MOBILITY),
+    ("mobility", MOBILITY),
+    ("yoga", MOBILITY),
+    ("foam roll", MOBILITY),
+    ("pliability", MOBILITY),
+)
+HEVY_FAMILY_NAMES: tuple[tuple[str, str], ...] = HEVY_COUNTED_NAMES + _HEVY_EXTRA_NAMES
+
+# Whoop `vendor_sport_name` / `sport_name` substrings (lower-cased) → family, first match wins. A name
+# none matches ("activity", "Cross Training") is `other:<name>` — compatible with any family.
+WHOOP_FAMILY_TOKENS: tuple[tuple[str, str], ...] = (
+    ("stretch", MOBILITY),
+    ("yoga", MOBILITY),
+    ("mobility", MOBILITY),
+    ("weight", "strength"),
+    ("lift", "strength"),
+    ("strength", "strength"),
+    ("functional", "strength"),
+    ("cycl", "cycling"),
+    ("spin", "cycling"),
+    ("bik", "cycling"),
+    ("walk", "walking"),
+    ("hik", "walking"),
+    ("ruck", "walking"),
+    ("run", "running"),
+)
 
 # Never on a public projection, at any depth.
 OWNER_ONLY_KEYS = frozenset(
@@ -151,38 +205,37 @@ def _owner_only(rec: dict[str, Any]) -> dict[str, Any]:
 
 def _hevy_family(name: str) -> Optional[str]:
     nl = (name or "").strip().lower()
-    for key, family in HEVY_COUNTED_NAMES:
+    for key, family in HEVY_FAMILY_NAMES:
         if key in nl:
             return family
     return None
 
 
+def whoop_family(name: str) -> str:
+    """The family of a Whoop sport name, or `other:<name>` when no token names one."""
+    nl = (name or "").strip().lower()
+    for key, family in WHOOP_FAMILY_TOKENS:
+        if key in nl:
+            return family
+    return OTHER_PREFIX + nl
+
+
 # ── members: one normalised record per (source, vendor id, family) ───────────────────
 
 
-_APPLE_DEVICE_TOKENS = ("apple watch", "iphone", "ipad")
-
-
-def _apple_source(w: dict[str, Any]) -> str:
-    """`apple_health` for a workout the watch/phone recorded (or one with no origin on record);
-    `apple_health/<origin>` for one another app wrote INTO HealthKit (a WHOOP or Hevy workout
-    HAE re-exports) — so the two are distinct sources the resolver may fold into one identity,
-    never two records of one source that it must keep apart."""
-    src = w.get("source")
-    name = str((src.get("name") if isinstance(src, dict) else src) or "").replace("\xa0", " ").strip().lower()
-    if not name or any(tok in name for tok in _APPLE_DEVICE_TOKENS):
-        return "apple_health"
-    return "apple_health/" + "".join(ch if ch.isalnum() else "_" for ch in name).strip("_")
+# Moved to walking_volume (the one Apple vocabulary, read by the watch backstop too); kept by name.
+_apple_source = apple_workout_source
 
 
 def _apple_records(items: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """Bare workout records, or apple_health DATE# day rows whose `apple_workouts` map
-    (health_auto_export_workouts.py, #4973) holds one summary per HAE workout id."""
+    (health_auto_export_workouts.py, #4973) holds one summary per HAE workout id. A summary with
+    no `id` of its own takes its map key, so a reader keyed on the map agrees with this one."""
     out: list[dict[str, Any]] = []
     for item in items or ():
         nested = item.get("apple_workouts")
         if isinstance(nested, dict):
-            out.extend(v for v in nested.values() if isinstance(v, dict))
+            out.extend(v if v.get("id") else {**v, "id": k} for k, v in nested.items() if isinstance(v, dict))
         else:
             out.append(item)
     return out
@@ -247,8 +300,9 @@ def _hevy_id(w: dict[str, Any]) -> str:
 
 
 def hevy_members(workouts: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
-    """Hevy sessions (`DATE#d#WORKOUT#<id>` sub-items): one member per counted cardio family, timed
-    by the session, plus one `strength` member for the session's other exercises."""
+    """Hevy sessions (`DATE#d#WORKOUT#<id>` sub-items): one member per timed block family (counted
+    cardio, and mobility since #5369), timed by the session, plus one `strength` member for the
+    session's other exercises."""
     out = []
     for w in workouts or ():
         wid = _hevy_id(w)
@@ -285,6 +339,71 @@ def hevy_members(workouts: Iterable[dict[str, Any]] | None) -> list[dict[str, An
     return out
 
 
+def whoop_members(rows: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Whoop WORKOUT sub-rows (`DATE#d#WORKOUT#<id>`; day rows ignored) — one member per
+    `workout_id` (a session crossing 00:00 UTC is stored under two date keys, #4629)."""
+    out: list[dict[str, Any]] = []
+    for row in rows or ():
+        sk = str(row.get("sk") or "")
+        if "#WORKOUT#" not in sk and not row.get("workout_id"):
+            continue
+        start, end = _parse(row.get("start_time")), _parse(row.get("end_time"))
+        name = str(row.get("vendor_sport_name") or row.get("sport_name") or "")
+        out.append(
+            {
+                "source": "whoop",
+                "id": str(row.get("workout_id") or sk.split("#WORKOUT#", 1)[-1]),
+                "family": whoop_family(name),
+                "start": start,
+                "end": end,
+                "seconds": (end - start).total_seconds() if start is not None and end is not None and end > start else 0.0,
+                "owner_only": {},
+            }
+        )
+    return out
+
+
+def _hevy_intervals(workouts: Iterable[dict[str, Any]] | None) -> list[tuple[datetime, datetime]]:
+    out: list[tuple[datetime, datetime]] = []
+    for w in workouts or ():
+        start, end = _parse(w.get("start_time")), _parse(w.get("end_time"))
+        if start is not None and end is not None and end > start:
+            out.append((start, end))
+    return out
+
+
+def is_hevy_echo(activity: dict[str, Any], hevy_intervals: list[tuple[datetime, datetime]]) -> bool:
+    """True for Hevy's own Strava push of a session whose timed Hevy record is in hand (#5369) —
+    `common.activity_overlap.HEVY_DEVICE`, overlapping one of `hevy_intervals`. A push carrying a
+    seam graft (`hr_from_strava_id`) is not an echo: its zones are a folded wearable record's."""
+    if str(activity.get("device_name") or "").strip().lower() != HEVY_DEVICE or activity.get("hr_from_strava_id"):
+        return False
+    start = _parse(activity.get("start_date"))
+    elapsed = _float(activity.get("elapsed_time_seconds") or activity.get("elapsed_time") or activity.get("moving_time_seconds"))
+    if start is None or elapsed <= 0:
+        return False
+    return overlap_seconds(start, start + timedelta(seconds=elapsed), hevy_intervals) > 0
+
+
+def strava_without_echoes(items: Iterable[dict[str, Any]] | None, hevy: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """The Strava records the resolver may see: the read seam over the day rows (idempotent — a row
+    already through it passes unchanged), then Hevy's own pushes dropped where the Hevy session is in
+    hand (`is_hevy_echo`). Day rows keep their shape (only `activities` is filtered); bare activities
+    are filtered directly."""
+    rows = strava_read_seam(STRAVA_SOURCE, [r for r in items or () if isinstance(r, dict)]) or []
+    intervals = _hevy_intervals(hevy)
+    if not intervals:
+        return list(rows)
+    out: list[dict[str, Any]] = []
+    for item in rows:
+        nested = item.get("activities")
+        if isinstance(nested, list):
+            out.append({**item, "activities": [a for a in nested if not is_hevy_echo(a, intervals)]})
+        elif not is_hevy_echo(item, intervals):
+            out.append(item)
+    return out
+
+
 # ── clustering ───────────────────────────────────────────────────────────────────────
 
 
@@ -302,9 +421,15 @@ def _identity_id(members: list[dict[str, Any]]) -> str:
     return "wid_" + hashlib.sha256(key.encode()).hexdigest()[:12]
 
 
+def compatible(fa: str, fb: str) -> bool:
+    """Same family, or either label names none (`other:<name>`)."""
+    return fa == fb or fa.startswith(OTHER_PREFIX) or fb.startswith(OTHER_PREFIX)
+
+
 def _identity(members: list[dict[str, Any]]) -> dict[str, Any]:
     by_rank = sorted(members, key=lambda m: m["rank"])
     counted = by_rank[0]
+    counted_seconds = sum(m["seconds"] for m in members if m["source"] == counted["source"])  # its chunks summed
     timed = [m for m in members if m["start"] is not None and m["end"] is not None]
     ids: dict[str, list[str]] = {}
     for m in by_rank:
@@ -314,7 +439,7 @@ def _identity(members: list[dict[str, Any]]) -> dict[str, Any]:
         "family": counted["family"],
         "start": min(m["start"] for m in timed).isoformat() if timed else None,
         "end": max(m["end"] for m in timed).isoformat() if timed else None,
-        "seconds": counted["seconds"],
+        "seconds": counted_seconds,
         "seconds_source": counted["source"],
         "sources": list(ids),
         "members": ids,
@@ -328,17 +453,25 @@ def resolve_workout_identities(
     apple: Iterable[dict[str, Any]] | None = None,
     strava: Iterable[dict[str, Any]] | None = None,
     hevy: Iterable[dict[str, Any]] | None = None,
+    whoop: Iterable[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Cluster the three sources' workout records into identities, oldest first.
+    """Cluster the four sources' workout records into identities, oldest first.
 
-    Members are placed in precedence order (Hevy, then Strava, then Apple — so a logged block
-    anchors its identity and supplies its duration), each joining the identity of its family it
-    overlaps most — at least OVERLAP_SHARE of the shorter interval against some member — that does
-    not already hold a record from its source. An untimed record cannot be placed in time and is
-    its own identity (`untimed: true`)."""
+    Members are placed in precedence order (Hevy, then Strava, then Apple, then Whoop — so a logged
+    block anchors its identity and supplies its duration), each joining the compatible identity it
+    overlaps most — at least OVERLAP_SHARE of the shorter interval against a member of ANOTHER source.
+    An identity already holding the member's source takes it only as a disjoint chunk (it overlaps
+    none of that source's members there). Strava arrives through `strava_without_echoes`. An untimed
+    record cannot be placed in time and is its own identity (`untimed: true`)."""
     seen: set[tuple[str, str]] = set()
     members: list[dict[str, Any]] = []
-    for rank, (build, records) in enumerate(((hevy_members, hevy), (strava_members, strava), (apple_members, apple))):
+    sources = (
+        (hevy_members, hevy),
+        (strava_members, strava_without_echoes(strava, hevy) if strava else None),
+        (apple_members, apple),
+        (whoop_members, whoop),
+    )
+    for rank, (build, records) in enumerate(sources):
         for m in build(records):
             key = (m["source"], m["id"])
             if m["id"] and key in seen:
@@ -350,9 +483,15 @@ def resolve_workout_identities(
     for m in members:
         best, best_share = None, 0.0
         for c in clusters:
-            if c[0]["family"] != m["family"] or any(x["source"] == m["source"] for x in c):
+            if not compatible(c[0]["family"], m["family"]):
                 continue
-            share = max(_overlap_share(m, x) for x in c)
+            own = [x for x in c if x["source"] == m["source"]]
+            if own and any(_overlap_share(m, x) > 0 for x in own):
+                continue  # that source already recorded these minutes: its de-dup problem, not a chunk
+            others = [x for x in c if x["source"] != m["source"]]
+            if not others:
+                continue
+            share = max(_overlap_share(m, x) for x in others)
             if share >= OVERLAP_SHARE and share > best_share:
                 best, best_share = c, share
         if best is None:

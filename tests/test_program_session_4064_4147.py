@@ -191,7 +191,7 @@ def test_mutation_control_without_the_aesthetic_days_press_and_raises_delts_fall
     """The frequency check can fail: strip the shoulders+arms day of its press, lateral raise and face pull and the delts
     are trained on two sessions only — under the charter's 3."""
     sa = program_structure.SESSION_TEMPLATES[SA]
-    with patch.dict(sa, {"anchors": [], "accessories": ["db_curl", "cable_tricep_pushdown", "farmers_carry"]}):
+    with patch.dict(sa, {"anchors": [], "accessories": ["db_curl", "cable_tricep_pushdown", "farmers_walk"]}):
         delts = program_structure.weekly_sets_by_muscle(CATALOG["movements"])["delts"]
     assert delts["frequency_per_wk"] == 2 < delts["frequency_target"]
 
@@ -240,9 +240,9 @@ def test_no_plyometrics_and_no_max_effort_singles():
     assert set(excl["methods"]) >= {"plyometrics", "max_effort_singles"} and excl["provenance"] == "owner"
     for role in program_structure.SESSION_TEMPLATES:
         for e in _rx(role)["exposures"]:
-            # #5318: a carry is timed, not a rep range — it carries a duration instead, and no rep floor applies
+            # #5318/#5372: a carry is distance-dosed, not a rep range — it carries a distance (his step count) instead, and no rep floor applies
             assert all(
-                s["reps"][0] >= excl["min_reps_any_exposure"] if e["intensity"] != "carry" else s["duration_seconds"] > 0 for s in e["sets"]
+                s["reps"][0] >= excl["min_reps_any_exposure"] if e["intensity"] != "carry" else s["distance_meters"] > 0 for s in e["sets"]
             ), (role, e["movement_key"])
             assert not any(w in (e["movement_key"] or "") for w in ("jump", "plyo", "box", "bound")), (role, e["movement_key"])
 
@@ -497,10 +497,10 @@ def test_generator_builds_the_five_day_order_after_the_cut_over_and_the_fifth_ro
     # #5075: each accessory SLOT serves its rotation variant for the week (the template's accessory at block 1's first
     # phase); the slots are the template's, in its order, and the pinned farmer's carry never rotates
     rot = sa.inputs_snapshot["rotation"]
-    slots = ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "farmers_carry"]
+    slots = ["db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown", "farmers_walk"]
     assert program_structure.SESSION_TEMPLATES[SA]["accessories"] == slots
     assert [b.movement_key for b in sa.exercises] == ["machine_shoulder_press"] + [rot["variants"].get(a, a) for a in slots]
-    assert sa.exercises[-1].movement_key == "farmers_carry"  # #5318 (owner ruling B3): the farmer's carry replaced the dumbbell shrug
+    assert sa.exercises[-1].movement_key == "farmers_walk"  # #5318 (owner ruling B3): the farmer's carry replaced the dumbbell shrug
     shape = sa.inputs_snapshot["session_shape"]
     assert shape["lifting_minutes"] <= shape["lifting_cap_minutes"] == 75 and shape["cardio_blocks"] == []
 

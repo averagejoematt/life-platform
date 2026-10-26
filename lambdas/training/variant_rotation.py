@@ -71,7 +71,7 @@ PROVENANCE = "cadence + family names: owner (charter `rotation`, 2026-10-18); sl
 LOADED_HEVY_TYPES = (None, "weight_reps")
 
 PINNED_SLOTS: dict[str, str] = {
-    "shoulders_arms.farmers_carry": "owner ruling B3, 2026-10-24 (#5318): the farmer's carry replaced the shrug — never rotated",
+    "shoulders_arms.farmers_walk": "owner ruling B3, 2026-10-24 (#5318): the farmer's carry replaced the shrug — never rotated",
 }
 """Accessory slots the owner pinned: they serve their template movement in every phase and are never written to the ledger."""
 

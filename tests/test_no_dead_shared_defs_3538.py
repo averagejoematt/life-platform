@@ -128,14 +128,8 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "tests/test_workout_identity_4973.py instead. The first live caller is #4973 box 1 (full Apple "
         "workout capture); delete this entry when it lands."
     ),
-    "lambdas/training/workout_identity.py:resolve_workout_identities": (
-        "#4973's one-workout-identity resolver, landed fixture-tested and deliberately wired into no live "
-        "reader: no Apple Watch workout exists in the store yet (#4968 configures the watch), and the one "
-        "reader that already de-dups workouts in time (training/walking_volume.py, the #4068 rule) keeps "
-        "its ruled partial-overlap arithmetic and is cross-checked against this resolver in "
-        "tests/test_workout_identity_4973.py instead. The first live caller is #4973 box 1 (full Apple "
-        "workout capture); delete this entry when it lands."
-    ),
+    # `workout_identity.resolve_workout_identities` was allowlisted here until its first live caller;
+    # #5369 wired it into `training.zone2_minutes.counted_sessions`, so the entry is gone.
     # `ai_calls.call_training_coach_v2` was allowlisted here as one seat of the ADR-153 coach
     # family, kept until retiring the seat was a coaching-team decision. #5071 box 3 is that
     # decision: the wrapper is deleted and the entry with it.

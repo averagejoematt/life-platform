@@ -298,7 +298,8 @@ def today_view(
             raise RuntimeError(f"{source} read failed")
         return got
 
-    layer = shared_quantities.walking_layer_for_day(day, today=now, read=_inject)
+    # This listing reads Hevy and Strava itself, so the watch backstop (#5369) is not wired here.
+    layer = shared_quantities.walking_layer_for_day(day, today=now, read=_inject, with_apple=False)
     walking = (
         {k: layer.get(k) for k in ("total_hr", "by_source", "by_modality", "total_is_floor", "dedup", "honesty", "definition", "partial")}
         if layer

@@ -438,8 +438,17 @@ CONSUMERS[("lambdas/ingestion/health_auto_export_workouts.py", "apple_workouts")
 )
 CONSUMERS[("lambdas/training/workout_identity.py", "apple_workouts")] = _d(
     SAW,
-    "The one-workout-identity resolver (#4973) reads `apple_workouts` records to cluster sessions; no live caller "
-    "yet, and every output goes through public_projection, which strips names, places and owner-only blocks.",
+    "The one-workout-identity resolver (#4973) reads `apple_workouts` records (id/name/start/end/duration/source) to "
+    "cluster sessions; its live caller since #5369 is training.zone2_minutes, which serves minutes only, and every "
+    "identity a surface could print goes through public_projection, which strips names, places and owner-only blocks.",
+)
+# #5369/#5371: the watch backstop in the walking layer reads the watch's own walking/cycling workouts.
+CONSUMERS[("lambdas/training/walking_volume.py", "apple_workouts")] = _d(
+    SAW,
+    "The walking layer's watch backstop (#5369/#5371) reads `apple_workouts` records for name, start/end, duration and "
+    "the HealthKit origin only (`apple_sessions`), so a walk only the watch recorded joins the de-duplicated hours; no "
+    "heart rate, distance, route or device name leaves it — the layer and recent_aerobic's per-walk row carry minutes, "
+    "the start and the workout's type word (tests/test_gym_visit_one_source_5369.py).",
 )
 
 # #5353: the zone-2 Apple leg reads the owner-only per-workout HR bins to compute aggregate minutes.

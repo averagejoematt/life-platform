@@ -14,6 +14,10 @@ through the same Dropbox drop and land on the same DATE# row, so neither may era
 other: a summary MERGES its fields onto the day (UpdateItem), and a diary re-write
 carries the stored summary fields forward (`carry_summary_fields`).
 
+A granular export can also arrive as ONE CSV PER TICKED METRIC (Date + that metric's columns,
+Date as an Excel serial): `summary_partial`. It merges only the columns it carries and never
+creates a food-less day (`partial_summary_requests`).
+
 Each invocation processes the full uploaded CSV and upserts one DynamoDB
 item per day. Fully idempotent.
 
@@ -28,7 +32,7 @@ import math
 import os
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
@@ -150,6 +154,25 @@ def safe_float(val):
 _DATE_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y")
 
 
+def excel_serial_to_iso(cell):
+    """A bare Excel serial day number (1900 date system) -> ISO `YYYY-MM-DD`, else None.
+
+    MacroFactor's granular export writes `Date` as a serial ('46027.0'), in CSV as well as
+    XLSX (#5097). Only the 30000..80000 range is read as a serial (1982..2119) so no other
+    numeric cell is mistaken for a date. Serials from 61 on are 1899-12-30 + n days (the
+    epoch that absorbs Excel's phantom 1900-02-29). `dropbox_poll_lambda.excel_serial_to_iso`
+    is the same conversion for its XLSX join; a test pins the two together (that module
+    deploys alone, so the helper is duplicated rather than imported)."""
+    text = str(cell or "").strip()
+    try:
+        n = float(text)
+    except ValueError:
+        return None
+    if not 30000 < n < 80000:
+        return None
+    return (datetime(1899, 12, 30) + timedelta(days=int(n))).strftime("%Y-%m-%d")
+
+
 def normalize_date(raw):
     """A CSV date cell → ISO `YYYY-MM-DD`, or None when no known format matches.
 
@@ -168,6 +191,9 @@ def normalize_date(raw):
     s = str(raw or "").strip()
     if not s:
         return None
+    serial = excel_serial_to_iso(s)
+    if serial is not None:
+        return serial
     stem = s.split("T", 1)[0].split(" ", 1)[0]
     for fmt in _DATE_FORMATS:
         try:
@@ -590,6 +616,11 @@ def detect_csv_type(headers):
     # why MacroFactor data was 22-day stale. Detect by Expenditure + Date columns.
     if "Expenditure" in headers and "Date" in headers and "Calories (kcal)" in headers:
         return "daily_summary"
+    # #5097: MacroFactor's granular export can write ONE FILE PER TICKED METRIC. A file with a
+    # Date and at least one known summary/nutrient column — and, by the checks above, no
+    # Food Name and no Exercise/Set Type — is a PARTIAL daily summary.
+    if "Date" in headers and set(headers) & _PARTIAL_SUMMARY_COLUMNS:
+        return "summary_partial"
     return "unknown"
 
 
@@ -621,6 +652,8 @@ SUMMARY_INGESTED_FIELD = "summary_ingested_at"
 #: Every field the summary owns on a DATE# row. A diary re-write carries these forward.
 SUMMARY_OWNED_FIELDS = frozenset(set(SUMMARY_SCALAR_COLUMNS.values()) | {"tdee_kcal", SUMMARY_UNMAPPED_FIELD, SUMMARY_INGESTED_FIELD})
 _SUMMARY_KNOWN_COLUMNS = frozenset({"Date"} | set(SUMMARY_SCALAR_COLUMNS) | set(NUTRIENT_COLUMNS))
+#: Columns that make a Date-keyed file without a Food Name a (partial) daily summary (#5097).
+_PARTIAL_SUMMARY_COLUMNS = frozenset(_SUMMARY_KNOWN_COLUMNS - {"Date"})
 _TOMBSTONE_FIELDS = ("tombstone", "tombstoned_at", "tombstoned_reason")
 
 
@@ -630,20 +663,9 @@ def is_summary_owned(field):
 
 
 def _summary_date(raw):
-    """ISO date from a summary `Date` cell: an Excel serial (the XLSX export, converted
-    to CSV by dropbox-poll, keeps the raw serial — 46110 = 2026-03-29) or any form
-    `normalize_date` reads. None when unreadable."""
-    from datetime import timedelta as _td
-
-    date_str = (raw or "").strip()
-    try:
-        n = float(date_str)
-        if 30000 < n < 80000:  # Excel serial range covering 1982 → 2119
-            excel_epoch = datetime(1899, 12, 30, tzinfo=timezone.utc)  # Excel-1900 system, accounting for 1900 leap-year bug
-            date_str = (excel_epoch + _td(days=int(n))).strftime("%Y-%m-%d")
-    except (ValueError, TypeError):
-        pass
-    return normalize_date(date_str) if date_str else None
+    """ISO date from a summary `Date` cell — an Excel serial or any form `normalize_date`
+    reads (that one contract now owns the serial case). None when unreadable."""
+    return normalize_date(raw)
 
 
 def build_summary_day_items(rows):
@@ -767,6 +789,99 @@ def write_summary_day(tbl, item):
     return "merged"
 
 
+def build_partial_summary_items(rows):
+    """Parse a PER-METRIC MacroFactor summary CSV -> one partial item per day (#5097).
+
+    The granular export can write one file per ticked metric (Calories & Macros, Weight
+    Trend, Expenditure, Steps ...). Each file carries `Date` plus only its own columns, and
+    this builds an item holding ONLY what the file carries — never a default, never a
+    zero for a column the file lacks — so that merging it cannot clobber the other files'
+    fields:
+
+      * nutrient columns -> `summary_total_X` (the vendor's own figure) and `total_X` (what
+        readers consume when no diary owns the day), plus the `entries_count`/`food_log`
+        placeholders the DATA-2 validator needs. A row with no logged macros is skipped
+        (the food-less-row rule of `build_summary_day_items`);
+      * scalar columns (Expenditure, weights, targets, Steps) -> `SUMMARY_SCALAR_COLUMNS`
+        fields; a 0 is "not set", never a reading;
+      * unknown columns verbatim in `summary_unmapped_columns`.
+
+    How the item reaches the table is `partial_summary_requests`.
+    """
+    ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    day_items = {}
+    skipped = 0
+    for row in rows:
+        date_str = _summary_date(row.get("Date"))
+        if date_str is None:
+            skipped += 1
+            continue
+        nutrients = {f: safe_float(row.get(col)) for col, f in NUTRIENT_COLUMNS.items() if col in row}
+        nutrients = {f: v for f, v in nutrients.items() if v is not None}
+        if nutrients and all(not v for v in nutrients.values()):
+            nutrients = {}  # no logged food that day — never write zeros for it
+        item = {"pk": PK, "sk": f"DATE#{date_str}", "date": date_str, "source": "macrofactor", SUMMARY_INGESTED_FIELD: ingested_at}
+        for f, v in nutrients.items():
+            item[f"total_{f}"] = round(v, 2)
+            item[f"{SUMMARY_TOTAL_PREFIX}{f}"] = round(v, 2)
+        if nutrients:
+            item.update({"entries_count": 0, "food_log": [], "_format": "daily_summary", "schema_version": 2, "ingested_at": ingested_at})
+        for col, f in SUMMARY_SCALAR_COLUMNS.items():
+            v = safe_float(row.get(col))
+            if v is not None and v > 0:
+                item[f] = round(v, 2)
+        if "expenditure_kcal" in item:
+            item["tdee_kcal"] = item["expenditure_kcal"]
+        unmapped = {k: str(v).strip() for k, v in row.items() if k and k not in _SUMMARY_KNOWN_COLUMNS and str(v or "").strip()}
+        if unmapped:
+            item[SUMMARY_UNMAPPED_FIELD] = unmapped
+        if not any(k not in ("pk", "sk", "date", "source", SUMMARY_INGESTED_FIELD) for k in item):
+            skipped += 1  # the file carries nothing usable for this day
+            continue
+        day_items[date_str] = item
+    print(f"Partial-summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows")
+    return day_items
+
+
+def partial_summary_requests(item):
+    """`(own, merge)` UpdateItem requests for one partial-summary day; `merge` is None for a
+    file that carries no nutrients (#5097).
+
+    Nutrient-carrying (`entries_count` present): OWN the day when no diary does (SET the
+    carried fields, lift a tombstone — and REMOVE nothing else, unlike the full summary: a
+    per-metric file does not speak for the fields other files wrote), else MERGE only the
+    summary-owned fields onto the diary's row.
+
+    Scalar-only: SET the summary-owned fields on a day that ALREADY has a row
+    (`attribute_exists`). A day with no row stays absent — a food-less row would read as a
+    logged day on every presence surface — and the writer reports it as 'absent'."""
+    key = {"pk": item["pk"], "sk": item["sk"]}
+    owned = {k: v for k, v in item.items() if is_summary_owned(k)}
+    if "entries_count" in item:
+        own_set = {k: v for k, v in item.items() if k not in key}
+        return _update_request(key, own_set, remove=list(_TOMBSTONE_FIELDS), owner_condition=True), _update_request(key, owned)
+    req = _update_request(key, owned)
+    req["ExpressionAttributeNames"]["#pk"] = "pk"
+    req["ConditionExpression"] = "attribute_exists(#pk)"
+    return req, None
+
+
+def write_partial_summary_day(tbl, item):
+    """Apply `partial_summary_requests`. Returns 'owned', 'merged' or 'absent'."""
+    first, merge = partial_summary_requests(item)
+    try:
+        tbl.update_item(**first)
+        return "owned" if merge is not None else "merged"
+    except Exception as exc:  # noqa: BLE001 — only a failed condition is expected
+        code = (getattr(exc, "response", None) or {}).get("Error", {}).get("Code")
+        if code != "ConditionalCheckFailedException":
+            raise
+    if merge is None:
+        return "absent"
+    tbl.update_item(**merge)
+    return "merged"
+
+
 def carry_summary_fields(day_items, stored_items):
     """#5097: a diary PutItem replaces the whole row, so copy the summary-owned fields
     of each stored day onto the diary's (or the empty record's) replacement item. A
@@ -855,6 +970,9 @@ def lambda_handler(event, context):
     elif csv_type == "daily_summary":
         archive_raw(bucket, source_key, content_bytes, subfolder="daily_summary")
         day_items = build_summary_day_items(rows)
+    elif csv_type == "summary_partial":
+        archive_raw(bucket, source_key, content_bytes, subfolder="daily_summary")
+        day_items = build_partial_summary_items(rows)
     else:
         # #469 (B-5): NEVER a silent 200. By the time this Lambda runs, dropbox_poll
         # has already hash-marked the file processed and moved it — a silent skip
@@ -893,13 +1011,15 @@ def lambda_handler(event, context):
         _pfd = None
 
     written = 0
+    absent_days = 0
     for date_str_key, item in day_items.items():
         source_label = item.get("source", csv_type)
         if _pfd and "phase" not in item:
             item["phase"] = _pfd(date_str_key)
         _mf_item = floats_to_decimal(item)
-        # ── DATA-2: Validate before write ──
-        if _use_validator:
+        # ── DATA-2: Validate before write ── (a scalar-only partial has no entries_count: it is
+        # a merge onto an existing day, not a record, and the schema's day-record rules don't apply)
+        if _use_validator and not (csv_type == "summary_partial" and "entries_count" not in _mf_item):
             _vr = _validate_item(source_label, _mf_item, date_str_key)
             if _vr.should_skip_ddb:
                 print(f"[DATA-2] CRITICAL: Skipping {source_label} DDB write for {date_str_key}: {_vr.errors}")
@@ -911,12 +1031,23 @@ def lambda_handler(event, context):
         if csv_type == "daily_summary":
             print(f"[#5097] {date_str_key}: summary {write_summary_day(table, _mf_item)}")
         # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
+        elif csv_type == "summary_partial":
+            outcome = write_partial_summary_day(table, _mf_item)
+            print(f"[#5097] {date_str_key}: partial summary {outcome}")
+            if outcome == "absent":
+                absent_days += 1
+                continue
         elif _use_safe_put:
             _safe_put(table, _mf_item, source=source_label, date_str=date_str_key)
         else:
             table.put_item(Item=_mf_item)
         written += 1
 
+    if absent_days:
+        print(
+            f"[#5097] {absent_days} day(s) in this per-metric file have no stored MacroFactor day and were NOT written "
+            "(a food-less row would read as a logged day). Upload the Calories & Macros / diary file for them first, then re-upload this one."
+        )
     print(f"Written {written} DynamoDB items ({csv_type})")
     return {
         "statusCode": 200,
@@ -927,6 +1058,7 @@ def lambda_handler(event, context):
                 "rows_parsed": len(rows),
                 "days_written": written,
                 "days_emptied": days_emptied,
+                "days_absent": absent_days,
             }
         ),
     }
