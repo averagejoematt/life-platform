@@ -1138,7 +1138,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     must stay a malformed work order, not silently become a check-in.
     """
     if (event or {}).get("kind") == "morning_checkin":
-        return _morning_checkin()
+        return coach_outbound.run_morning_stamped(_morning_checkin, _table(), _pacific_now())
     if (event or {}).get("kind") == "event_outbound":
         return _event_outbound()
     if (event or {}).get("kind") == "progress_photo":
