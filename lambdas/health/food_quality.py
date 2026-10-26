@@ -95,7 +95,8 @@ def tags(row: Mapping[str, Any]) -> dict[str, Any]:
 
 def day_rows(days: Iterable[Mapping[str, Any]], by_id: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
     """The fitted menu days reduced to what the quality check reads: `{date, fibre_g, fatty_fish_servings,
-    tag_servings}` — ids and grams only, no food label (the food panel's plan carries these rows)."""
+    tag_servings}` (+ `fixed_meals` on a day with a fixed feeding, #5103) — ids and grams only, no food label (the food
+    panel's plan carries these rows)."""
     out = []
     for d in days:
         if not d.get("feedings"):
@@ -110,15 +111,29 @@ def day_rows(days: Iterable[Mapping[str, Any]], by_id: Mapping[str, Mapping[str,
                     fish += n
                 for t in a.get("nutrient_tags") or []:
                     tagged[t] = tagged.get(t, 0.0) + n
-        out.append(
-            {
-                "date": d.get("date"),
-                "fibre_g": _num((d.get("totals") or {}).get("fibre_g")),
-                "fatty_fish_servings": fish,
-                "tag_servings": dict(sorted(tagged.items())),
-            }
-        )
+        row = {
+            "date": d.get("date"),
+            "fibre_g": _num((d.get("totals") or {}).get("fibre_g")),
+            "fatty_fish_servings": fish,
+            "tag_servings": dict(sorted(tagged.items())),
+        }
+        fixed = [_fixed_row(f) for f in d["feedings"] if isinstance(f.get("fixed"), dict)]
+        if fixed:
+            row["fixed_meals"] = fixed  # #5103: the day's fixed feedings, in the day's fibre above (an unknown fibre as none)
+        out.append(row)
     return out
+
+
+def _fixed_row(f: Mapping[str, Any]) -> dict[str, Any]:
+    """A fixed feeding (the meal-service dinner, #5103) as the quality row carries it: its id, slot and label values;
+    `fibre_g` None when its label table carries no fibre."""
+    fx = f["fixed"]
+    return {
+        "id": fx.get("id"),
+        "slot": f.get("slot"),
+        **{m: _num(f.get(m)) for m in ("kcal", "protein_g", "carb_g", "fat_g")},
+        "fibre_g": _num(f.get("fibre_g")) if fx.get("fibre_known") else None,
+    }
 
 
 def _priorities(priorities: Optional[Mapping[str, Any]], rows: list[Mapping[str, Any]]) -> dict[str, Any]:
