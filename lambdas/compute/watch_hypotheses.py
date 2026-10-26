@@ -58,6 +58,32 @@ TRAILING_METRICS = frozenset({ZONE2_7D, CARDIO_7D})
 #: Metrics no public artifact may carry: kept out of the LLM generator's vocabulary and prompt rows.
 OWNER_CHANNEL_METRICS = frozenset({CARDIO_RECOVERY})
 
+#: #5388 (ADR-105 box 3) — THE DATED CUT-OVER. The VO2 max hypothesis (registered 2026-10-24) is graded on
+#: `cardio_7d_min`, and the Zone 2 / cardio-recovery one on `zone2_7d_min`. Until this date both were resolved
+#: WITHOUT the Hevy rows, so Hevy's own Strava push stood for a whole gym visit and the watch's ride and the
+#: pliability mobility block inside it were counted again as their own parts (a 160-minute visit read 240).
+#: From this Pacific day the trailing week is resolved WITH Hevy and counts the visit once. It is a CONSTANT, not
+#: a clock read: a re-run recomputes every date under the definition that date belongs to, whenever the engine runs.
+#: Deploy date of #5388 (set to the first full Pacific day after the merge; moving it later is a new amendment).
+HEVY_CUTOVER_DATE = "2026-10-27"
+
+#: Written onto each open watch hypothesis whose CONDITION metric is affected (`series_amendments`, beside the
+#: frozen `test_spec`, which is never touched), so a grader reading the record sees the series changed definition.
+SERIES_AMENDMENTS: tuple[dict[str, Any], ...] = (
+    {
+        "amendment_id": "hevy_input_5388",
+        "effective_from": HEVY_CUTOVER_DATE,
+        "metrics": [CARDIO_7D, ZONE2_7D],
+        "issue": "#5388",
+        "change": (
+            "Trailing 7-day volumes are resolved WITH the Hevy routine rows from this date (a gym visit's lift, cycling block "
+            "and mobility block count once); before it they were resolved without them, which double-counted the visit's "
+            "parts. The series changed definition on this day: a grader must not read the days either side as one series. "
+            "The registered test_spec is unchanged."
+        ),
+    },
+)
+
 logger = logging.getLogger(__name__)
 
 _APPLE = "apple_health"
@@ -91,20 +117,26 @@ def _day(items: Iterable[Mapping[str, Any]], date: str) -> Mapping[str, Any]:
 
 def _trailing_volumes(data: Mapping[str, list], dates: list[str]) -> dict[str, dict[str, float]]:
     """{date: {zone2_7d_min, cardio_7d_min}} for every date whose FULL trailing week lies inside the
-    fetched window (a partial week is not a 7-day volume, so it stays absent — ADR-104)."""
+    fetched window (a partial week is not a 7-day volume, so it stays absent — ADR-104).
+
+    #5388 — the series changed definition on HEVY_CUTOVER_DATE. From that date the week is resolved WITH the
+    Hevy rows (the routine source: a gym visit's lift, cycling block and mobility block count once); before it,
+    as registered, without them. The choice is per output DATE and applies to that date's whole trailing week,
+    so a single value is never a mixture of the two definitions."""
     if not dates:
         return {}
-    # #5369: Hevy anchors a gym visit's parts when the caller fetched it (the hypothesis engine's
-    # input manifest does not list hevy today, so the wearables resolve among themselves).
-    sessions = z2.counted_sessions(
-        strava_read_seam("strava", data.get("strava") or []), data.get("whoop") or [], data.get(_APPLE) or [], hevy_rows=data.get("hevy")
-    )
+    strava = strava_read_seam("strava", data.get("strava") or [])
+    whoop, apple, hevy = data.get("whoop") or [], data.get(_APPLE) or [], data.get("hevy")
+    as_registered = z2.counted_sessions(strava, whoop, apple)
+    # #5369: Hevy anchors a gym visit's parts (the engine's input manifest lists hevy since #5388).
+    with_hevy = z2.counted_sessions(strava, whoop, apple, hevy_rows=hevy) if hevy else as_registered
     first = dates[0]
     out: dict[str, dict[str, float]] = {}
     for d in dates:
         start, end = z2.trailing_window(d, _TRAILING)
         if start < first:
             continue
+        sessions = with_hevy if d >= HEVY_CUTOVER_DATE else as_registered
         week = [s for s in sessions if start <= s["date"] <= end]
         out[d] = {
             ZONE2_7D: round(sum(s["zone_2_minutes"] or 0.0 for s in week if s["source"]), 1),
@@ -222,11 +254,14 @@ def seed_watch_hypotheses(
     validate: Callable[..., tuple],
     store: Callable[..., None],
     kind: str = experiment_gates.POPULATION_CONSTANT,
+    table: Any = None,
 ) -> dict[str, Any]:
     """Register each WATCH_HYPOTHESES id once (any existing status blocks it), through the engine's own
-    validator and store. Never fatal: a failure is reported per id and the run continues."""
+    validator and store. Never fatal: a failure is reported per id and the run continues. With `table`
+    (#5388) the open records are also stamped with SERIES_AMENDMENTS."""
+    all_hypotheses = list(all_hypotheses)
     seen = {h.get("hypothesis_id") for h in all_hypotheses}
-    out: dict[str, Any] = {"registered": [], "skipped": {}}
+    out: dict[str, Any] = {"registered": [], "skipped": {}, "amended": []}
     for hyp in WATCH_HYPOTHESES:
         hid = hyp["hypothesis_id"]
         if hid in seen:
@@ -242,4 +277,35 @@ def seed_watch_hypotheses(
         except Exception as e:  # noqa: BLE001 — one seed never blocks the weekly run
             out["skipped"][hid] = f"error: {type(e).__name__}"
             logger.warning(f"[#4979] seeding {hid} failed (non-fatal): {e}")
+    if table is not None:
+        out["amended"] = amend_open_watch_hypotheses(all_hypotheses, table)
     return out
+
+
+#: Statuses in which a watch record is still being graded (a resolved one was graded under its own definition).
+_OPEN = frozenset({"pending", "confirming"})
+
+
+def amend_open_watch_hypotheses(all_hypotheses: Iterable[Mapping[str, Any]], table: Any) -> list[str]:
+    """#5388: append each SERIES_AMENDMENT to every OPEN watch record whose condition metric it names and that
+    does not carry it yet (idempotent by `amendment_id`). Only `series_amendments` is written; the frozen
+    `test_spec` and `pre_registered_at` are never touched. Never fatal. Returns "hypothesis_id:amendment_id"."""
+    done: list[str] = []
+    for h in all_hypotheses:
+        if h.get("source") != "watch_prereg_4979" or h.get("status") not in _OPEN or not (h.get("pk") and h.get("sk")):
+            continue
+        metric = (h.get("test_spec") or {}).get("condition_metric")
+        have = {a.get("amendment_id") for a in h.get("series_amendments") or [] if isinstance(a, Mapping)}
+        todo = [a for a in SERIES_AMENDMENTS if metric in a["metrics"] and a["amendment_id"] not in have]
+        if not todo:
+            continue
+        try:
+            table.update_item(
+                Key={"pk": h["pk"], "sk": h["sk"]},
+                UpdateExpression="SET series_amendments = list_append(if_not_exists(series_amendments, :empty), :new)",
+                ExpressionAttributeValues={":empty": [], ":new": [dict(a) for a in todo]},
+            )
+            done.extend(f"{h.get('hypothesis_id')}:{a['amendment_id']}" for a in todo)
+        except Exception as e:  # noqa: BLE001 — an amendment never blocks the weekly run
+            logger.warning(f"[#5388] amending {h.get('hypothesis_id')} failed (non-fatal): {e}")
+    return done

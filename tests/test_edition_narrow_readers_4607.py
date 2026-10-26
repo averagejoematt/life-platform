@@ -87,20 +87,44 @@ def _macrofactor_rows():
     return rows
 
 
+def _act(sid, day, hhmm, sport, device, **fields):
+    """A Strava activity in the wire's shape: its vendor id and its start (#5387: the session count
+    places every activity in time; the read seam folds same-sport copies by their starts)."""
+    return {"strava_id": sid, "start_date": f"{day}T{hhmm}:00Z", "sport_type": sport, "device_name": device, **fields}
+
+
 def _strava_rows():
     """WHOOP duplicates of a Garmin walk (dropped), a WHOOP-only workout (kept), a row with
-    no activity list standing in as one activity, a superseded row, and heavy fields."""
+    no activity list standing in as one activity, a superseded row, heavy fields, and (#5387) a gym
+    visit: Hevy's push of the whole session plus WHOOP's ride inside it — the Hevy row anchors it."""
     polyline = "x" * 4000
     rows = [
         {
             "sk": f"DATE#{_day(6)}",
             "date": _day(6),
             "activities": [
-                {"sport_type": "Walk", "device_name": "Garmin Forerunner", "moving_time_seconds": 2700, "polyline": polyline},
-                {"sport_type": "Walk", "device_name": "WHOOP", "moving_time_seconds": 2650},
-                {"sport_type": "WeightTraining", "device_name": "WHOOP", "duration_minutes": 52.4},
+                _act(
+                    "7001",
+                    _day(6),
+                    "15:00",
+                    "Walk",
+                    "Garmin Forerunner",
+                    moving_time_seconds=2700,
+                    elapsed_time_seconds=2700,
+                    polyline=polyline,
+                ),
+                _act("7002", _day(6), "15:02", "Walk", "WHOOP", moving_time_seconds=2650, elapsed_time_seconds=2650),
+                _act("7003", _day(6), "17:00", "WeightTraining", "WHOOP", duration_minutes=52.4),
             ],
             "total_distance_miles": 2.1,
+        },
+        {
+            "sk": f"DATE#{_day(5)}",
+            "date": _day(5),
+            "activities": [
+                _act("7101", _day(5), "16:40", "WeightTraining", "Hevy", moving_time_seconds=9600, elapsed_time_seconds=9600),
+                _act("7102", _day(5), "18:00", "Ride", "WHOOP", moving_time_seconds=3600, elapsed_time_seconds=3600),
+            ],
         },
         {"sk": f"DATE#{_day(4)}", "date": _day(4), "activities": [], "sport_type": "Ride", "moving_time_minutes": 41, "splits": polyline},
         {"sk": f"DATE#{_day(2)}", "date": _day(2), "activities": [{"type": "Yoga", "moving_time_seconds": 1500}], "tombstone": True},
@@ -110,6 +134,25 @@ def _strava_rows():
     for r in rows:
         r.update(pk=f"{_PREFIX}strava", phase="experiment")
     return rows
+
+
+def _hevy_rows():
+    """The gym visit's Hevy session: a lift and a 60-minute Cycling block (the routine source)."""
+    return [
+        {
+            "pk": f"{_PREFIX}hevy",
+            "sk": f"DATE#{_day(5)}#WORKOUT#hv-4607",
+            "date": _day(5),
+            "phase": "experiment",
+            "start_time": f"{_day(5)}T16:40:00+00:00",
+            "end_time": f"{_day(5)}T19:20:00+00:00",
+            "exercises": [
+                {"name": "Shoulder Press (Dumbbell)", "sets": [{"reps": 10, "weight_kg": 10.0}]},
+                {"name": "Cycling", "sets": [{"duration_sec": 3600}]},
+            ],
+            "set_count": 2,
+        }
+    ]
 
 
 def _apple_health_rows():
@@ -155,7 +198,7 @@ def _table(rows, queries):
 @pytest.fixture
 def fake_table(monkeypatch):
     queries: list = []
-    table = _table(_macrofactor_rows() + _strava_rows() + _apple_health_rows(), queries)
+    table = _table(_macrofactor_rows() + _strava_rows() + _hevy_rows() + _apple_health_rows(), queries)
     for mod in (common, obs):
         monkeypatch.setattr(mod, "table", table)
     return queries
@@ -237,6 +280,9 @@ def test_the_narrow_training_reader_serves_the_routes_own_modality_minutes(fake_
     # tombstoned yoga day is gone, and Apple Health breathwork lands on its day.
     assert rows[_day(6)]["walking_min"] == 45 and rows[_day(6)]["strength_min"] == 52 and rows[_day(6)]["breathwork_min"] == 13
     assert rows[_day(4)]["cycling_min"] == 41 and rows[_day(2)]["total_min"] == 0 and rows[_day(0)]["breathwork_min"] == 5
+    # #5387: one gym visit, its minutes once — the lift (Hevy's 160-minute session less its ride) and the
+    # ride, never Hevy's whole-session push (160) plus the ride (60) = 220.
+    assert (rows[_day(5)]["strength_min"], rows[_day(5)]["cycling_min"], rows[_day(5)]["total_min"]) == (100, 60, 160)
 
     del fake_table[:]
     narrow = obs.edition_training()
@@ -245,6 +291,7 @@ def test_the_narrow_training_reader_serves_the_routes_own_modality_minutes(fake_
         [
             (f"{_PREFIX}strava", ("sk", "tombstone", *training_mod._EDITION_STRAVA_FIELDS)),
             (f"{_PREFIX}apple_health", ("sk", "tombstone", *training_mod._EDITION_AH_FIELDS)),
+            (f"{_PREFIX}hevy", ("sk", "tombstone", *training_mod._EDITION_HEVY_FIELDS)),
         ]
     ), fake_table
     assert json.dumps(narrow["training"]["daily_modality_minutes_30d"]) == json.dumps(whole["daily_modality_minutes_30d"])
@@ -263,6 +310,8 @@ def test_MUST_FAIL_a_training_projection_one_field_too_narrow_is_caught(fake_tab
         ("_EDITION_STRAVA_FIELDS", "sport_type"),
         ("_EDITION_STRAVA_FIELDS", "moving_time_minutes"),
         ("_EDITION_AH_FIELDS", "breathwork_minutes"),
+        ("_EDITION_HEVY_FIELDS", "exercises"),  # #5387: the session's blocks partition its minutes
+        ("_EDITION_HEVY_FIELDS", "start_time"),  # #5387: the span that makes Hevy's push its echo
     ):
         fields = getattr(training_mod, attr)
         monkeypatch.setattr(training_mod, attr, tuple(f for f in fields if f != field))

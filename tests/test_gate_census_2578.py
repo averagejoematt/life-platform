@@ -1193,7 +1193,9 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # STRUCTURAL_PROOFS (ARMED 1/1: baseline 3 passed | mutated 1 failed | reverted 3 passed). Stacked, never max'd.
         # 298 -> 299 (2026-10-26, #5384): guard::scripts/reconcile_child_guard.py, PROVEN via GUARD_PROOFS (M1 2 failed, M2 1 failed,
         # M3 5 failed; reverted 11 passed). Stacked, never max'd.
-        <= 299
+        # 299 -> 300 (2026-10-26, #5387 stacked on #5384): structural::test_strava_counters_read_the_one_count_5387.py, PROVEN via MutationSpec +
+        # STRUCTURAL_PROOFS (ARMED 1/1: baseline 5 passed | mutated 1 failed | reverted 5 passed). Stacked, never max'd.
+        <= 300
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

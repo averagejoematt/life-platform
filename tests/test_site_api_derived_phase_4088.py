@@ -124,6 +124,7 @@ SITE_RULINGS = {
     ("edition_nutrition", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
     ("edition_training", "_query_source", "'strava'", "site_api_training.py"): CLAMPED,  # _experiment_date(30)
     ("edition_training", "_query_source", "'apple_health'", "site_api_training.py"): CLAMPED,
+    ("edition_training", "_query_source", "'hevy'", "site_api_training.py"): CLAMPED,  # #5387: the same _experiment_date(30)
     ("deficit_sustainability", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
     ("deficit_sustainability", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,
     # deficit_sustainability's per-channel reads (whoop/habitify/strava/hevy over `start`) go through its

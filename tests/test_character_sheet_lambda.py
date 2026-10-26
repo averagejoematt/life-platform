@@ -695,6 +695,33 @@ class TestAssembleData:
         assert data["date"] == DATE
         assert data["sleep"] is data["whoop"]  # whoop is SOT for sleep
 
+    def test_zone2_inputs_cover_whoop_workouts_apple_and_hevy_one_utc_day_past(self, monkeypatch, frozen_clock):
+        """#5389: THE Zone 2 computation's inputs. Whoop workout sub-rows and Apple day rows are keyed by
+        UTC day, so the read runs one day past the window; the Hevy rows (per-workout sort keys) ride too."""
+        nxt = "2026-08-06"
+        _install(
+            monkeypatch,
+            _PkTable(
+                [
+                    _row("whoop", f"DATE#{DATE}#WORKOUT#w1", workout_id="w1"),
+                    _row("whoop", f"DATE#{nxt}#WORKOUT#w2", workout_id="w2"),
+                    _row("whoop", "DATE#2026-07-29#WORKOUT#old", workout_id="old"),  # before the window
+                    _row("apple_health", f"DATE#{nxt}", apple_workouts={}),
+                    _row("hevy", f"DATE#{DATE}#WORKOUT#h1"),
+                ]
+            ),
+        )
+
+        data = csl.assemble_data(DATE)
+
+        assert [r["workout_id"] for r in data["whoop_7d"]] == ["w1", "w2"]
+        assert [r["sk"] for r in data["apple_7d"]] == [f"DATE#{nxt}"]
+        assert [r["sk"] for r in data["hevy_7d"]] == [f"DATE#{DATE}#WORKOUT#h1"]
+        # and the receipt names every row that fed the Zone 2 read (keys only)
+        by_pk = {r["pk"]: r["sks"] for r in csl.collect_input_rows(data, []) if "pk" in r}
+        assert f"DATE#{nxt}#WORKOUT#w2" in by_pk[PREFIX + "whoop"]
+        assert by_pk[PREFIX + "hevy"] == [f"DATE#{DATE}#WORKOUT#h1"]
+
     def test_partial_day_reports_a_partial_percentage(self, monkeypatch, frozen_clock):
         _install(monkeypatch, _PkTable([_row("whoop", "DATE#" + DATE, date=DATE), _row("apple_health", "DATE#" + DATE, date=DATE)]))
         assert csl.assemble_data(DATE)["data_completeness_pct"] == 40.0

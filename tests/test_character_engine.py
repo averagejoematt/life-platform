@@ -20,6 +20,7 @@ Run with:   python3 -m pytest tests/test_character_engine.py -v
 import math
 import os
 import sys
+from datetime import datetime, timedelta
 
 # ── Add lambdas/ to import path ──
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
@@ -861,15 +862,41 @@ def _scenario_config():
     }
 
 
+def _shift_date(d, days):
+    return (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d")
+
+
+def _strava_day(date, sid, zone2_seconds, hour=14, minutes=60):
+    """A Strava day row as `ingestion/strava_lambda.py` writes it: per-activity `zone2_seconds`
+    (and `total_zone2_seconds` per day) - never a `zone2_minutes` key."""
+    return {
+        "sk": f"DATE#{date}",
+        "date": date,
+        "total_zone2_seconds": zone2_seconds,
+        "activities": [
+            {
+                "strava_id": sid,
+                "sport_type": "Ride",
+                "start_date": f"{date}T{hour:02d}:00:00Z",
+                "elapsed_time_seconds": minutes * 60,
+                "moving_time_seconds": minutes * 60,
+                "zone2_seconds": zone2_seconds,
+            }
+        ],
+    }
+
+
 def _scenario_day(day_index):
     """Data for day N of the scenario (0-based). Good sleep every day; workouts
     and nutrition logging stop at day 13; journaling/habits never happen."""
     trained = day_index < 13
+    date = f"2026-06-{14 + day_index:02d}" if day_index < 17 else f"2026-07-{day_index - 16:02d}"
     data = {
-        "date": f"2026-06-{14 + day_index:02d}" if day_index < 17 else f"2026-07-{day_index - 16:02d}",
+        "date": date,
         "sleep": {"sleep_duration_hours": 7.4, "sleep_performance": 88},
         "whoop": {"recovery_score": 62, "resting_heart_rate": 58},
-        "strava_7d": ([{"activities": [{"sport_type": "ride", "zone2_minutes": 35}]}] * 4) if trained else [],
+        # #5389: the WRITER's fields (`zone2_seconds` per activity), dated inside the sheet's trailing 7 days
+        "strava_7d": [_strava_day(_shift_date(date, -(i + 1)), f"s{i}", 2100) for i in range(4)] if trained else [],
         "macrofactor": ({"calories": 2400, "calorie_target": 2500, "protein": 185} if trained else None),
         "habit_scores": None,
         "journal_14d_count": 0,
@@ -983,3 +1010,104 @@ def test_character_level_up_event_persists_drivers():
         key=lambda t: -t[1],
     )[:3]
     assert [(d["pillar"], d["raw_score"]) for d in drivers] == [(n, round(float(s), 1)) for n, s in expected]
+
+
+# ── #5389: movement zone2_adequacy reads THE Zone 2 computation, off the WRITER's fields ──
+
+
+def _z2_cfg(target=150):
+    return {"pillars": {"movement": {"components": {"zone2_adequacy": {"weight": 1.0, "target_minutes": target, "behavioral": True}}}}}
+
+
+def _z2_score(data, target=150):
+    from health.character_engine import compute_movement_raw
+
+    _raw, details = compute_movement_raw(data, _z2_cfg(target))
+    return details["zone2_adequacy"]["score"]
+
+
+def _whoop_workout(date, wid, zone2_min, start_hour=15, minutes=60):
+    """A Whoop workout sub-row as `ingestion/whoop_lambda.py` writes it (`zone_{i}_minutes`)."""
+    end_hour = start_hour + minutes // 60
+    return {
+        "sk": f"DATE#{date}#WORKOUT#{wid}",
+        "workout_id": wid,
+        "start_time": f"{date}T{start_hour:02d}:00:00Z",
+        "end_time": f"{date}T{end_hour:02d}:00:00Z",
+        "zone_1_minutes": 10,
+        "zone_2_minutes": zone2_min,
+        "zone_3_minutes": 5,
+    }
+
+
+def test_zone2_adequacy_reads_the_strava_writers_zone2_seconds():
+    # 50 min of Zone 2 as Strava stores it (3000 s) -> 50/150 of target at the 1.3 perfect ratio
+    data = {"date": "2026-10-20", "strava_7d": [_strava_day("2026-10-19", "a1", 3000)]}
+    assert _z2_score(data) == round((50 / 150) / 1.3 * 100, 1)
+
+
+def test_zone2_adequacy_reads_whoop_workout_sub_rows():
+    data = {"date": "2026-10-20", "strava_7d": [], "whoop_7d": [_whoop_workout("2026-10-19", "w1", 45)]}
+    assert _z2_score(data) == round((45 / 150) / 1.3 * 100, 1)
+
+
+def test_zone2_adequacy_equals_the_trailing_7d_the_api_serves():
+    """The sheet and /api/zone2 are one number: `_compute_zone2_breakdown`'s `trailing_7d`."""
+    from web.site_api_autonomic import _compute_zone2_breakdown
+
+    strava = [_strava_day("2026-10-14", "a1", 1800), _strava_day("2026-10-18", "a2", 2400)]
+    whoop = [_whoop_workout("2026-10-19", "w1", 30)]
+    today = "2026-10-20"
+    served = _compute_zone2_breakdown(strava, whoop, [], today=today, start_date="2026-10-01")["trailing_7d"]["zone_2_minutes"]
+    assert served == 100.0
+    data = {"date": today, "strava_7d": strava, "whoop_7d": whoop, "hevy_7d": []}
+    assert _z2_score(data) == round((served / 150) / 1.3 * 100, 1)
+
+
+def test_zone2_adequacy_window_is_the_trailing_seven_dates():
+    # the 8th date back is out; [today-6, today] is in (the API's window, inclusive both ends)
+    old = _strava_day("2026-10-13", "old", 6000)  # 7 dates back from 10-20 is 10-14 -> 10-13 is out
+    edge = _strava_day("2026-10-14", "edge", 1500)
+    data = {"date": "2026-10-20", "strava_7d": [old, edge]}
+    assert _z2_score(data) == round((25 / 150) / 1.3 * 100, 1)
+
+
+def test_zone2_adequacy_counts_one_session_once_across_whoop_and_strava():
+    # the same ride recorded by both: one session, the source that measured more of it - never 2 x
+    strava = [_strava_day("2026-10-19", "a1", 2400, hour=15, minutes=60)]
+    whoop = [_whoop_workout("2026-10-19", "w1", 40, start_hour=15, minutes=60)]
+    data = {"date": "2026-10-20", "strava_7d": strava, "whoop_7d": whoop}
+    assert _z2_score(data) == round((40 / 150) / 1.3 * 100, 1)
+
+
+def test_zone2_adequacy_reads_zero_when_nothing_was_measured():
+    assert _z2_score({"date": "2026-10-20", "strava_7d": []}) == 0.0
+    assert _z2_score({"date": "2026-10-20"}) == 0.0
+
+
+def test_mutation_control_the_retired_keys_read_zero():
+    """Fixture-must-be-the-wire control (#5389): the keys the old sum read were never stored by any
+    writer. Planted on the rows they read 0 - and a mutation that restores the old read would score
+    them, which `test_zone2_adequacy_reads_the_strava_writers_zone2_seconds` would not survive."""
+    planted = {
+        "date": "2026-10-20",
+        "strava_7d": [
+            {
+                "sk": "DATE#2026-10-19",
+                "date": "2026-10-19",
+                "zone2_minutes": 60,
+                "time_in_zone_2_minutes": 60,
+                "activities": [{"sport_type": "Ride", "zone2_minutes": 35}],
+            }
+        ],
+    }
+    assert _z2_score(planted) == 0.0
+    # and the writer's real field on the very same row shape scores
+    planted["strava_7d"][0]["activities"][0].update({"strava_id": "x", "start_date": "2026-10-19T14:00:00Z", "zone2_seconds": 2100})
+    assert _z2_score(planted) == round((35 / 150) / 1.3 * 100, 1)
+
+
+def test_zone2_adequacy_drops_tombstoned_rows_as_the_api_does():
+    dead = _whoop_workout("2026-10-19", "w1", 45)
+    dead["tombstone"] = True
+    assert _z2_score({"date": "2026-10-20", "strava_7d": [], "whoop_7d": [dead]}) == 0.0

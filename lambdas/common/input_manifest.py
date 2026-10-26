@@ -180,6 +180,7 @@ COMPUTE_INPUTS: Dict[str, Tuple[str, ...]] = {
         "eightsleep",
         "garmin",
         "habitify",
+        "hevy",  # #5388: the routine source — counts a gym visit once in cardio_7d_min / zone2_7d_min
         "macrofactor",
         "notion",
         "strava",

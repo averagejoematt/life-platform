@@ -268,15 +268,16 @@ class TestScoreNutrition:
 class TestScoreMovement:
     def test_an_hour_of_logged_exercise_scores_full_marks_on_that_half(self):
         """Base 70 for showing up, +0.5/min → 60 min reaches 100."""
-        data = {"strava": {"activity_count": 1, "total_moving_time_seconds": 3600}}
+        data = {"strava": _ride_day(3600)}
         assert se.score_movement(data, {})[1]["exercise_score"] == 100
 
     def test_a_short_session_still_earns_the_showing_up_base(self):
-        data = {"strava": {"activity_count": 1, "total_moving_time_seconds": 600}}
+        data = {"strava": _ride_day(600)}
         assert se.score_movement(data, {})[1]["exercise_score"] == 75  # 70 + 10*0.5
 
     def test_a_strava_record_with_no_activities_scores_zero_exercise(self):
-        data = {"strava": {"activity_count": 0, "total_moving_time_seconds": 0}}
+        # #5387: THE session count reads the activities, never the row's stored activity_count
+        data = {"strava": {"activity_count": 1, "total_moving_time_seconds": 600, "activities": []}}
         assert se.score_movement(data, {})[1]["exercise_score"] == 0
 
     def test_walking_minutes_are_scored_against_the_profile_target(self):
@@ -316,6 +317,18 @@ class TestScoreMovement:
         day = {"strava": _walk_day(0)}
         with_steps = dict(day, apple={"steps": 20000}, whoop={"step_count": 20000})
         assert se.score_movement(with_steps, {}) == se.score_movement(day, {})
+
+
+def _ride_day(seconds):
+    """A Strava day row in the wire's shape: one timed Ride of `seconds`."""
+    ride = {
+        "strava_id": "r1",
+        "sport_type": "Ride",
+        "start_date": "2026-08-01T16:00:00Z",
+        "elapsed_time_seconds": seconds,
+        "moving_time_seconds": seconds,
+    }
+    return {"activity_count": 1, "total_moving_time_seconds": seconds, "activities": [ride]}
 
 
 def _walk_day(walk_seconds):

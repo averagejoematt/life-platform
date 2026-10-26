@@ -87,7 +87,6 @@ from common.digest_utils import (
     avg,
     compute_banister_from_list,
     d2f,
-    dedup_activities,
     ex_whoop_from_list as ex_whoop,
     ex_whoop_sleep_from_list as ex_whoop_sleep,
     ex_withings_from_list as ex_withings,
@@ -95,6 +94,7 @@ from common.digest_utils import (
 )
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from training import session_count  # #5387: THE session count; its zone2_total reads THE Zone 2 computation
 
 # ── The letter RENDERER (#1654) ───────────────────────────────────────────────
 # build_html + its section-header classifier live in the sibling
@@ -109,7 +109,7 @@ from emails.monthly_digest_render import (  # noqa: E402,F401
     _is_section_header,
     build_html,
 )
-from emails.weekly_digest_extractors import ex_hevy_workouts  # #4636: the ONE per-workout Hevy extractor
+from emails.weekly_digest_extractors import ZONE2_BAND, ex_hevy_workouts  # #4636: the ONE per-workout Hevy extractor
 
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
@@ -220,52 +220,35 @@ def get_date_windows():
 # _normalize_whoop_sleep imported from digest_utils
 
 
-def ex_strava(recs, profile=None):
-    """Extract Strava summary from a list of records.
+def ex_strava(recs, profile=None, hevy=None):
+    """Extract the month's Strava summary from a list of records.
 
-    Uses profile max_heart_rate for Zone 2 bounds when available;
-    falls back to module-level ZONE2_HR_LOW/HIGH constants.
-    Activities are deduped before processing.
+    #5387: `activity_count` and `total_minutes` are THE session count (`training.session_count`) over the
+    Strava rows and the month's Hevy sessions — one gym visit is one session, its minutes once (the day
+    rows' `total_moving_time_seconds` summed Hevy's whole-session push with the ride inside it).
+    `zone2_minutes` is THE Zone 2 computation (#4627: devices' own zones, minutes in zone), never the
+    average-HR band this replaced; `profile` is kept for the call shape.
     """
     if not recs:
         return None
-    max_hr = (profile or {}).get("max_heart_rate", None)
-    z2_low = max_hr * 0.60 if max_hr else ZONE2_HR_LOW
-    z2_high = max_hr * 0.70 if max_hr else ZONE2_HR_HIGH
-    acts = []
-    zone2_mins = 0
-    for r in recs:
-        day_acts = dedup_activities(r.get("activities", []))
-        for a in day_acts:
-            hr = float(a.get("average_heartrate") or 0)
-            secs = float(a.get("moving_time_seconds") or 0)
-            obj = {
-                "name": a.get("enriched_name") or a.get("name", ""),
-                "sport": a.get("sport_type", ""),
-                "miles": round(float(a.get("distance_miles") or 0), 1),
-                "mins": round(secs / 60),
-                "hr": round(hr) if hr else None,
-            }
-            acts.append(obj)
-            if hr and z2_low <= hr <= z2_high:
-                zone2_mins += obj["mins"]
-    total_miles = round(sum(float(r.get("total_distance_miles", 0)) for r in recs), 1)
-    total_mins = round(sum(float(r.get("total_moving_time_seconds", 0)) for r in recs) / 60)
-    # Both sides of the Zone-2 ratio come from the DEDUPED activity list (#1658).
-    # The numerator always did; the denominator used to be the day record's
-    # `total_moving_time_seconds`, which double-counts a Garmin→Strava auto-sync
-    # duplicate — halving the published zone2_pct on exactly the days that carry one.
-    dedup_mins = sum(a["mins"] for a in acts)
-    z2_pct = round(zone2_mins / dedup_mins * 100) if dedup_mins else 0
+    counted = session_count.count(strava=recs, hevy=_live_hevy(hevy))
+    total_mins = round(counted["minutes"])
+    zone2_mins = session_count.zone2_total(recs, hevy=_live_hevy(hevy))
     return {
-        "total_miles": total_miles,
+        "total_miles": round(sum(float(r.get("total_distance_miles", 0)) for r in recs), 1),
         "total_minutes": total_mins,
-        "activity_count": len(acts),
+        "activity_count": counted["sessions"],
         "zone2_minutes": round(zone2_mins),
-        "zone2_pct": z2_pct,
-        "zone2_hr_range": f"{round(z2_low)}-{round(z2_high)}",
+        "zone2_pct": round(zone2_mins / total_mins * 100) if total_mins else 0,
+        "zone2_band": ZONE2_BAND,
         "total_elevation_feet": round(sum(float(r.get("total_elevation_gain_feet", 0)) for r in recs)),
     }
+
+
+def _live_hevy(recs):
+    """Live per-workout Hevy rows (the `ex_hevy` filter below): a tombstoned per-day aggregate is the
+    same sessions again."""
+    return [r for r in (recs or []) if r.get("source_workout_id") and not r.get("tombstone")]
 
 
 def ex_hevy(recs):
@@ -280,8 +263,7 @@ def ex_hevy(recs):
     Only live per-workout rows are counted: a tombstoned per-day aggregate (superseded in
     place on 2026-05-26) is the same sessions again, and `fetch_range` does not drop it.
     """
-    live = [r for r in (recs or []) if r.get("source_workout_id") and not r.get("tombstone")]
-    summary = ex_hevy_workouts(live)
+    summary = ex_hevy_workouts(_live_hevy(recs))
     if not summary:
         return None
     count = summary["workout_count"]
@@ -452,7 +434,7 @@ def compute_annual_goals(cur, windows, profile=None):
     # Training consistency: activity count per 30 days
     st = cur.get("strava")
     if st:
-        goals["training_activities_30d"] = st.get("activity_count", 0)
+        goals["training_activities_30d"] = st.get("activity_count", 0)  # session-count: ex_strava's own count (THE count)
         goals["zone2_minutes_30d"] = st.get("zone2_minutes", 0)
 
     # Habit adherence monthly avg
@@ -718,7 +700,7 @@ def gather_all():
         return {
             "whoop": ex_whoop(raw["whoop"]),
             "withings": ex_withings(raw["withings"]),
-            "strava": ex_strava(raw["strava"], profile),
+            "strava": ex_strava(raw["strava"], profile, raw["hevy"]),  # #5387: Hevy anchors a gym visit
             "hevy": ex_hevy(raw["hevy"]),
             "macrofactor": ex_macrofactor(raw["macrofactor"], profile),
             "chronicling": ex_chronicling(raw["chronicling"]),

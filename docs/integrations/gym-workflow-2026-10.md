@@ -111,7 +111,7 @@ The other proofs:
 - **R2** `…::test_a_treadmill_walk_is_not_an_outdoor_walk`
 - **S1** `tests/test_steps_resolver_5081.py::test_strava_walk_outside_a_session_is_a_derived_estimate_never_merged` + `…::test_walk_inside_a_hevy_session_and_two_devices_on_one_walk_count_once`
 - **S2** `…::test_watch_slot_reported_and_still_true`
-- **P1** the audit's probe (§6): each reader run over the shared fixture, pre- and post-2026-10-26 wire. It is not a test; #5387 and #5388 each make their row a test.
+- **P1** the audit's probe (§6): each reader run over the shared fixture, pre- and post-2026-10-26 wire. It is not a test; #5387 and #5388 each make their row a test. Done in Session CI (2026-10-26): rows 3a and 12 are pinned by `tests/test_strava_session_count_set_5387.py` (every member on both wires reads 1 visit / 160 min) and the AST guard `tests/test_strava_counters_read_the_one_count_5387.py`; row 2 by `tests/test_hypothesis_hevy_input_5388.py`; row 13 by `tests/test_character_engine.py` (#5389).
 - **P2** a code read: `git grep` finds no writer of `zone2_minutes` on a Strava row. The live `/api/character` lists `zone2_adequacy` among the movement pillar's dragging drivers (read 2026-10-26T05:00Z).
 
 ## 5. What counts twice, or never: the issues

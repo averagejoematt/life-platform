@@ -679,7 +679,8 @@ class TestWeightProjection:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def act(name="Morning Walk", sport="Walk", miles=2.0, elev=100.0, hr=None, secs=3600.0, kj=0.0, start="2026-08-02T08:00:00"):
+def act(name="Morning Walk", sport="Walk", miles=2.0, elev=100.0, hr=None, secs=3600.0, kj=0.0, start="2026-08-02T08:00:00", z2=None):
+    """A Strava activity; `z2` = its device's own Zone 2 seconds (`zone2_seconds`, the field Zone 2 reads, #4627)."""
     a = {
         "name": name,
         "sport_type": sport,
@@ -692,6 +693,8 @@ def act(name="Morning Walk", sport="Walk", miles=2.0, elev=100.0, hr=None, secs=
     }
     if hr is not None:
         a["average_heartrate"] = Decimal(str(hr))
+    if z2 is not None:
+        a.update(zone1_seconds=Decimal(str(max(0.0, secs - z2))), zone2_seconds=Decimal(str(z2)))
     return a
 
 
@@ -711,21 +714,19 @@ class TestExStrava:
         assert out["total_minutes"] == 90
         assert out["activity_count"] == 2
 
-    def test_the_zone_two_band_is_derived_from_the_profile_max_heart_rate(self):
+    def test_zone_two_is_the_devices_own_zone_minutes_never_an_average_hr_band(self):
+        """#5387/#4627: THE Zone 2 computation — the activity's own zone seconds. The retired band
+        counted the whole hour as Zone 2 because its AVERAGE (120) sat in 120–140 for max HR 200."""
+        recs = {"2026-08-02": rec("strava", "2026-08-02", activities=[act(hr=120.0, z2=1500.0)])}
+        out = wd.ex_strava(recs, profile_row(max_heart_rate=200))
+        assert out["zone2_minutes"] == 25 and out["zone2_band"] == "devices' own zones"
+        assert wd.ex_strava(recs, profile_row(max_heart_rate=186))["zone2_minutes"] == 25, "the profile maximum no longer moves it"
+
+    def test_an_activity_with_no_zones_earns_no_zone_two_minutes_whatever_its_average(self):
         out = wd.ex_strava(
             {"2026-08-02": rec("strava", "2026-08-02", activities=[act(hr=120.0)])},
             profile_row(max_heart_rate=200),
         )
-        # 200 × 0.60 = 120 ; 200 × 0.70 = 140
-        assert out["zone2_hr_range"] == "120-140"
-        assert out["zone2_minutes"] == 60  # 120 bpm sits on the band's floor
-
-    def test_a_heart_rate_outside_the_band_earns_no_zone_two_minutes(self):
-        out = wd.ex_strava(
-            {"2026-08-02": rec("strava", "2026-08-02", activities=[act(hr=150.0)])},
-            profile_row(max_heart_rate=186),
-        )
-        # band is 111.6–130.2 bpm; 150 is above it
         assert out["zone2_minutes"] == 0
         assert out["zone2_pct"] == 0
 
@@ -734,7 +735,7 @@ class TestExStrava:
         but the denominator is total moving time across ALL sports, strength
         sessions logged to Strava included."""
         recs = {
-            "2026-08-02": rec("strava", "2026-08-02", activities=[act(hr=120.0, secs=3600.0)]),
+            "2026-08-02": rec("strava", "2026-08-02", activities=[act(hr=120.0, secs=3600.0, z2=3600.0)]),
             "2026-08-03": rec(
                 "strava",
                 "2026-08-03",
@@ -2113,7 +2114,7 @@ class TestBuildHtmlSections:
             "zone2_minutes": 60,
             "zone2_target": 150,
             "zone2_pct": 100,
-            "zone2_hr_range": "112-130",
+            "zone2_band": "devices' own zones",
             "training_monotony": 2.4,
             "activities": [{"date": "2026-08-02", "name": "Morning Walk", "miles": 3.0, "elev": 120, "hr": 120, "mins": 60, "kj": 0}],
         }
@@ -2192,12 +2193,12 @@ class TestBuildHtmlNumbers:
             "zone2_minutes": 120,
             "zone2_target": 150,
             "zone2_pct": 67,
-            "zone2_hr_range": "112-130",
+            "zone2_band": "devices' own zones",
             "training_monotony": None,
             "activities": [],
         }
         html = wd.build_html(digest_data(this={"strava": strava}), BOARD_TEXT, profile_row())
-        assert "Zone 2 (112-130 bpm)" in html
+        assert "Zone 2 (devices' own zones)" in html or "Zone 2 (devices&#x27; own zones)" in html
         assert "120 / 150 min (67% of cardio)" in html
 
     def test_the_strength_section_reports_volume_and_set_count(self):

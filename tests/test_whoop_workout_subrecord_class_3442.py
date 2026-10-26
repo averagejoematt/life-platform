@@ -280,10 +280,13 @@ _WHOOP_CONSUMER_REGISTRY = {
     "lambdas/coach/coach_domain_facts.py": (2, "non-member", "verified clean 2026-09-02 — field-absent-safe extraction over the list"),
     "lambdas/coach/coach_event_triggers.py": (1, "non-member", "verified clean 2026-09-02 — field-absent-safe extraction"),
     "lambdas/coach/spiral_breaker.py": (1, "non-member", "explicit local #WORKOUT# skip — a pre-existing local instance of the guard"),
+    # #5389: 2 -> 3 - `whoop_7d` is the Zone 2 computation's input. It WANTS the `#WORKOUT#` sub-rows:
+    # `training.zone2_minutes.whoop_recordings` keeps only `#WORKOUT#` rows and ignores the day rows, and
+    # `health.character_zone2` drops tombstones as `/api/zone2` does - a consumer of the sub-rows, not a day-row reader.
     "lambdas/compute/character_sheet_lambda.py": (
-        2,
+        3,
         "non-member",
-        "fetch_date = exact-key day read; fetch_range field-absent-safe (calc-proof non-member)",
+        "fetch_date = exact-key day read; fetch_range field-absent-safe; whoop_7d = the workout sub-rows by design (#5389)",
     ),
     "lambdas/compute/circadian_compliance_lambda.py": (1, "non-member", "calc-proof verified non-member (explicit handling)"),
     "lambdas/compute/daily_insight_compute_lambda.py": (3, "non-member", "daily_* verified field-absent-safe (calc-proof non-member)"),

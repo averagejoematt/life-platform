@@ -83,6 +83,7 @@ from experiment.phase_filter import source_reads_cross_phase, with_phase_filter 
 from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibration ledger carries no provenance
 from health import eating_window  # #5099: THE eating window (charter nutrition.eating_window)
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
+from training import session_count  # #5387: THE session count + THE Zone 2 computation, per day
 
 from compute import watch_hypotheses  # #4979: the watch-enabled metrics + their three pre-registered hypotheses
 from compute.compute_json_schemas import hypotheses_schema  # #4276: the generation output schema (module at its size ceiling)
@@ -391,6 +392,11 @@ def build_data_narrative(data):
             if d and len(d) == 10:
                 all_dates.add(d)
 
+    # #5387: the day's workout flag is THE session count; its Zone 2 is THE Zone 2 computation (#4627) —
+    # Strava's day `total_zone2_seconds` summed the ride's minutes under Hevy's push of the visit too.
+    # The engine reads no Hevy rows (the compute-input census, #5388's), so a visit resolves among the
+    # Strava records: Hevy's push is its lift part, the ride's time claimed once inside it.
+    _by_day = session_count.day_table(strava=data.get("strava"))
     rows = []
     for date in sorted(all_dates):
         row = {"date": date}
@@ -440,12 +446,12 @@ def build_data_narrative(data):
             row["glucose_avg"] = safe_float(ah, "blood_glucose_avg")
             row["walking_speed"] = safe_float(ah, "walking_speed_mph")
 
-        # Strava — #2221: the writer stores total_zone2_seconds; the vocabulary metric is minutes, so convert (absent stays absent).
+        # Strava — the vocabulary metric is minutes; a day with no measured session stays absent (#2221).
         st = next((i for i in data.get("strava", []) if i.get("date") == date), {})
         if st:
-            row["workout"] = bool(safe_float(st, "activity_count", 0))
+            row["workout"] = bool(_by_day.get(date, {}).get("sessions"))
             row["training_load"] = safe_float(st, "total_kilojoules")
-            row["zone2_min"] = round(safe_float(st, "total_zone2_seconds", 0.0) / 60.0, 1) if "total_zone2_seconds" in st else None
+            row["zone2_min"] = _by_day.get(date, {}).get("zone2_minutes")
 
         # Notion journal
         nj = next((i for i in data.get("notion", []) if i.get("date") == date), {})
@@ -1564,7 +1570,7 @@ def lambda_handler(event, context):
         if diary_hypothesis_result.get("registered"):
             pending_count += 1  # newly-seeded hypothesis starts "pending" — counts against the cap below
         # 3.6. #4979: the three watch-enabled hypotheses, pre-registered in code (same contract as 3.5).
-        watch_seed = watch_hypotheses.seed_watch_hypotheses(all_hypotheses, daily_rows, validate_hypothesis, store_hypothesis)
+        watch_seed = watch_hypotheses.seed_watch_hypotheses(all_hypotheses, daily_rows, validate_hypothesis, store_hypothesis, table=table)
         pending_count += len(watch_seed["registered"])
 
         # 4. Generate new hypotheses if room exists AND data is sufficient

@@ -81,10 +81,14 @@ def strava_day(date: str, *avg_hrs: float) -> dict:
 
 def hevy_workout(date: str, *, sets: int = 20, reps: int = 8) -> dict:
     """ONE Hevy per-workout row with a set log the way `training.hevy_common` stores it:
-    rep sets carry `duration_sec: None` (every one of 327 rep sets 2026-09-03 → 09-23)."""
+    rep sets carry `duration_sec: None` (every one of 327 rep sets 2026-09-03 → 09-23). Its
+    workout id and its span are the wire's (#5387: the session count keys and places it by them)."""
     return row(
         "hevy",
         date,
+        workout_id=f"hv-{date}",
+        start_time=f"{date}T17:00:00+00:00",
+        end_time=f"{date}T18:30:00+00:00",
         duration_sec=90 * 60,
         exercises=[{"name": "Squat", "sets": [{"type": "normal", "reps": reps, "weight_kg": 100, "duration_sec": None}] * sets}],
     )
@@ -176,11 +180,20 @@ def test_sessions_counts_what_the_load_model_scored_not_the_raw_strava_activitie
     model scored, not the raw record count. One Strava day holding Hevy's own echo of a lift
     (`WeightTraining`, skipped because Hevy carries the session) plus the SAME Zone-1 walk
     twice (two devices, one start — `strava_read_seam.dedup_activities` keeps one), and one
-    Hevy workout row: four raw records, TWO sessions (the lift once, the walk once)."""
+    Hevy workout row: four raw records, TWO sessions (the lift once, the walk once). #5387: `total`
+    is THE session count (one visit per occasion), the echo Hevy's own push (device `Hevy`) over
+    the Hevy session's span."""
     day = _SUST_DAYS[0]
-    walk = {**Z1_WALK, "start_date": f"{day}T15:00:00Z", "device_name": "WHOOP"}
+    walk = {**Z1_WALK, "start_date": f"{day}T15:00:00Z", "elapsed_time_seconds": 3600, "device_name": "WHOOP"}
     walk_again = {**walk, "device_name": "Garmin"}  # the second device's copy of the same minutes
-    echo = {**HR_ACTIVITY, "sport_type": "WeightTraining", "average_heartrate": 120, "start_date": f"{day}T17:00:00Z"}
+    echo = {
+        **HR_ACTIVITY,
+        "sport_type": "WeightTraining",
+        "average_heartrate": 120,
+        "start_date": f"{day}T17:00:00Z",
+        "elapsed_time_seconds": 5400,
+        "device_name": "Hevy",
+    }
     strava = [row("strava", day, activities=[echo, walk, walk_again])]
     hevy = [hevy_workout(day)]
     assert sum(len(r["activities"]) for r in strava) + len(hevy) == 4, "the raw count the old field reported"
@@ -189,14 +202,14 @@ def test_sessions_counts_what_the_load_model_scored_not_the_raw_strava_activitie
     assert out["input"]["sessions"] == 2, out["input"]
     # The model's own ledger of what it scored and what it set aside, carried on its basis.
     _, basis = tl.daily_training_load(strava, hevy)
-    assert basis["sessions"] == {"total": 2, "strava": 1, "hevy": 1, "strava_echoes_skipped": 1, "strava_duplicates_dropped": 1}
+    assert basis["sessions"] == {"total": 2, "parts": 2, "strava": 1, "hevy": 1, "strava_echoes_skipped": 1, "strava_duplicates_dropped": 1}
     assert out["input"]["sessions"] == basis["sessions"]["total"]
     # And the load itself is the lift's worked-set points alone: the walk is Zone-1 rest at 0,
     # the echo contributes nothing (Hevy carries it), the duplicate walk nothing twice.
     assert out["values"] == [round(tl.hevy_session_load(hevy[0])["points"], 1)]
     # Without a Hevy row that day the lift is NOT an echo — the Strava record is the session.
     _, alone = tl.daily_training_load(strava, [])
-    assert alone["sessions"] == {"total": 2, "strava": 2, "hevy": 0, "strava_echoes_skipped": 0, "strava_duplicates_dropped": 1}
+    assert alone["sessions"] == {"total": 2, "parts": 2, "strava": 2, "hevy": 0, "strava_echoes_skipped": 0, "strava_duplicates_dropped": 1}
 
 
 # ── 2. the MCP tool, end to end ───────────────────────────────────────────────────────

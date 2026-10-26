@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Any, Iterable, Optional, Union
 
 from common.habit_pause import is_paused_on  # #5007: a paused habit is not scheduled
+from training import session_count  # #5387: THE session count (the exercise half)
 from training.owner_redlines import REDLINES  # ADR-163: the walking floor the movement target defaults from
 from training.walking_volume import WALKING_VOLUME_VERSION, walking_minutes_for_day  # ADR-163: the ONE walking definition
 
@@ -212,7 +213,7 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
 
 
 def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
-    """Exercise half (Strava activity + moving time) + walking-time half (ADR-163, #4644 Q5 "b").
+    """Exercise half (THE session count's sessions + minutes, #5387) + walking-time half (ADR-163, #4644 Q5 "b").
 
     The second half was steps until ADR-163: a phone-carried count that read the phone's partial
     delivery on the days it was not carried (#4628/#4630). It is now the day's WALKING minutes from
@@ -225,20 +226,15 @@ def score_movement(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple:
     details: dict[str, Any] = {}
     parts, weights = [], []
     strava = data.get("strava")
-    if strava:
-        act_count = safe_float(strava, "activity_count") or 0
-        total_time = safe_float(strava, "total_moving_time_seconds") or 0
-        if act_count > 0:
-            # Base 70 for showing up; +0.5/min means 60 min = 100. No exercise = 0
-            exercise_score = min(100, 70 + (total_time / 60) * 0.5)
-        else:
-            exercise_score = 0
-    else:
-        exercise_score = 0
-    exercise_score = clamp(round(exercise_score))
+    # #5387: THE session count over the day's Strava row and Hevy sessions — a gym visit once, its minutes
+    # once (the row's `total_moving_time_seconds` summed Hevy's whole-session push with the ride inside it).
+    day = session_count.count(strava=[strava] if strava else [], hevy=data.get("hevy"))
+    # Base 70 for showing up; +0.5/min means 60 min = 100. No exercise = 0
+    exercise_score = clamp(round(min(100, 70 + day["minutes"] * 0.5))) if day["sessions"] else 0
     parts.append(exercise_score * 0.50)
     weights.append(0.50)
     details["exercise_score"] = exercise_score
+    details["exercise_sessions"], details["exercise_minutes"] = day["sessions"], day["minutes"]
     walk = walking_minutes_for_day(
         day=str(data.get("date") or ""), strava_items=[strava] if strava else [], hevy_workouts=data.get("hevy") or []
     )

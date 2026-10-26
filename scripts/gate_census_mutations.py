@@ -597,6 +597,11 @@ _HEVY_CARDIO_SUMMED_PY = (
     "def weekly_total(w):\n"
     '    return {"total_exercise_min": w["session_minutes"] + w["hevy_cardio_minutes"]}\n'
 )
+_STRAVA_COUNTED_DIRECTLY_PY = (
+    '"""census probe — a reader counting Strava activities on its own, which must never exist (#5387)."""\n\n\n'
+    "def workouts_30d(rows):\n"
+    '    return sum(len(r.get("activities") or []) for r in rows)\n'
+)
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer that must never exist."""\n\n'
     "from training import may_tracker\n\n\n"
@@ -1534,6 +1539,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/web/_census_probe_5369.py", _HEVY_CARDIO_SUMMED_PY),),
         track=False,  # the guard os.walks lambdas/ mcp/ on disk
     ),
+    # #5387: no module counts or sums Strava activities across a day without THE session count.
+    "structural::test_strava_counters_read_the_one_count_5387.py": MutationSpec(
+        gate_id="structural::test_strava_counters_read_the_one_count_5387.py",
+        target="tests/test_strava_counters_read_the_one_count_5387.py",
+        detects=(
+            "a module (lambdas/web) counting a day's Strava activities with `len(activities)` — Hevy's whole-session "
+            "push and the ride inside it read as two workouts again, outside `training.session_count`"
+        ),
+        plants=(("lambdas/web/_census_probe_5387.py", _STRAVA_COUNTED_DIRECTLY_PY),),
+        track=False,  # the guard os.walks lambdas/ mcp/ on disk
+    ),
 }
 
 
@@ -1650,6 +1666,19 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "names the file and line. STILL INVISIBLE, stated: the sum done through intermediate variables under other names "
         "(`a = hevy_cardio_min; total = a + other`), a sum computed in the front end (site/ JS), and a sum performed by a "
         "reader of the served JSON outside the repo.",
+        proved_on="2026-10-26",
+    ),
+    "structural::test_strava_counters_read_the_one_count_5387.py": _proof(
+        "structural::test_strava_counters_read_the_one_count_5387.py",
+        "ARMED 1/1 — baseline: 5 passed in 3.61s | mutated: 1 failed, 4 passed in 3.74s :: "
+        "test_no_module_counts_strava_activities_on_its_own | reverted: 5 passed in 3.55s",
+        "lambdas/ and mcp/ on disk (os.walk, every .py parsed, the Strava writers and the four shared rules exempt): a read "
+        "of a Strava day total (`activity_count`, `total_moving_time_seconds`, `total_zone2_seconds`) as a subscript, "
+        "`.get`, call argument or `in` test; a `sum`, `+` or `+=` over per-activity `moving_time_seconds` / "
+        "`zone2_seconds`; a `len()` of anything named for activities; or a `+= 1` in a loop over activities — fails and "
+        "names the file and line, unless the module is in the stated residual or the line carries `# session-count:`. "
+        "STILL INVISIBLE, stated: a count through variables named for nothing activity-like (`n = len(xs)` where `xs` "
+        "came from a day row), a count in the front end (site/ JS), and the six residual modules named on #5387's PR.",
         proved_on="2026-10-26",
     ),
     "structural::test_repo_walk_5273.py": _proof(

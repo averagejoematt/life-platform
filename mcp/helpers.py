@@ -5,6 +5,7 @@ Shared computation helpers: aggregation, training load, statistics, classificati
 from collections import defaultdict
 
 from common import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
+from training import session_count  # #5387: THE session count (the day-intensity fallback's time)
 
 from mcp.core import get_sot, query_source
 
@@ -284,12 +285,13 @@ def classify_day_type(whoop_strain=None, strava_activities=None, daily_load=None
         else:
             return "hard"
 
-    # Tertiary: Strava activity presence
+    # Tertiary: Strava activity presence. #5387: the day's time is THE session count's minutes — one gym
+    # visit once (the rows' `total_moving_time_seconds` summed Hevy's push with the ride inside it).
     if strava_activities:
         acts = strava_activities if isinstance(strava_activities, list) else [strava_activities]
         if isinstance(acts[0], dict):
             total_dist = sum(float(a.get("total_distance_miles", 0) or 0) for a in acts)
-            total_time = sum(float(a.get("total_moving_time_seconds", 0) or 0) for a in acts)
+            total_time = session_count.count(strava=acts)["minutes"] * 60.0
             if total_dist > 10 or total_time > 5400:
                 return "hard"
             elif total_dist > 3 or total_time > 2700:
