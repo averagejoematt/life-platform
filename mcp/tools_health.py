@@ -18,7 +18,7 @@ from health.watch_views import (
     watch_daily_view as _watch_daily_view,
     whoop_vs_apple_agreement as _whoop_vs_apple_agreement,
 )
-from training import rate_band, training_load  # #4075: the ONE load-provenance predicate for the TSB label
+from training import rate_band, session_count, training_load  # #4075: the ONE load-provenance predicate for the TSB label
 
 from mcp import core as _mcp_core
 from mcp.config import logger
@@ -1128,17 +1128,18 @@ def _get_hydration_score(args):
     daily_target_oz = round(daily_target_ml / 29.5735, 1)
 
     # Pull exercise intensity for correlation
-    strava_items = query_source("strava", start, end)
+    # #5398: THE session count — a day's minutes are its visits' minutes claimed once (Hevy's whole-session push and
+    # the ride inside it are one gym visit), not the sum of the day's Strava activity times.
+    strava_items = query_source("strava", start, end) or []  # query_source already floats Decimals
+    visit_min = session_count.count(strava=strava_items, hevy=query_source("hevy", start, end) or [])["by_date"]
     exercise_by_date = {}
-    for item in strava_items or []:
+    for item in strava_items:
         d = item.get("date", "")
-        item = decimal_to_float(item)
         acts = item.get("activities", [])
         if acts:
-            total_min = sum(float(a.get("moving_time_seconds", 0)) / 60 for a in acts)
             hr_list = [float(a.get("average_heartrate") or 0) for a in acts if a.get("average_heartrate")]
             avg_hr = sum(hr_list) / len(hr_list) if hr_list else 0
-            exercise_by_date[d] = {"total_min": round(total_min, 1), "avg_hr": round(avg_hr, 1)}
+            exercise_by_date[d] = {"total_min": round(visit_min.get(d, {}).get("minutes", 0.0), 1), "avg_hr": round(avg_hr, 1)}
 
     # Build daily rows
     daily_rows = []

@@ -22,10 +22,10 @@ from datetime import datetime, timedelta, timezone
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.journal_silence import public_body  # #5131: the one public-surface guard
-from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.metric_truth import steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import PACIFIC
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target — masked like the intake
+from training import session_count  # #5398: THE session count + THE Zone 2 (a gym visit once)
 
 from content import brief_hr_regime, labs_scope  # #3728 — the /api/labs scope block; #5029 the HR regime reading
 
@@ -70,6 +70,15 @@ def init(s3_client, table_client, bucket, user_id, user_prefix, fetch_range_fn, 
 # ==============================================================================
 # INLINE UTILITIES
 # ==============================================================================
+
+
+def _hevy_rows(start, end):
+    """Hevy rows over [start, end] for THE session count (#5398); fail-soft — without them the count still
+    reads a gym visit once (Hevy's push and the ride inside it overlap)."""
+    try:
+        return _fetch_range("hevy", start, end) or []
+    except Exception:
+        return []
 
 
 def _safe_float(rec, field, default=None):
@@ -521,18 +530,9 @@ def write_dashboard_json(
         zone2_min = None
         try:
             week_start = today - timedelta(days=today.weekday())
+            # #5398: THE Zone 2 computation (devices' own zones, each session once), not an average-HR band
             strava_week = _fetch_range("strava", week_start.isoformat(), yesterday)
-            max_hr = max_hr_from_profile(profile)
-            z2_lo = max_hr * 0.60
-            z2_hi = max_hr * 0.70
-            z2_total = 0.0
-            for day_rec in strava_week:
-                for act in day_rec.get("activities") or []:
-                    avg_hr = _safe_float(act, "average_heartrate")
-                    dur_s = _safe_float(act, "moving_time_seconds") or 0
-                    if avg_hr and z2_lo <= avg_hr <= z2_hi:
-                        z2_total += dur_s / 60
-            zone2_min = round(z2_total)
+            zone2_min = round(session_count.zone2_total(strava_week, hevy=_hevy_rows(week_start.isoformat(), yesterday)))
         except Exception:
             pass
 
@@ -760,21 +760,13 @@ def write_clinical_json(data, profile, yesterday):
         strava_28d = _fetch_range("strava", (today - timedelta(days=28)).isoformat(), yesterday)
         apple_28d = _fetch_range("apple_health", (today - timedelta(days=28)).isoformat(), yesterday)
 
-        max_hr = max_hr_from_profile(profile)
-        z2_lo = max_hr * 0.60
-        z2_hi = max_hr * 0.70
-        total_sessions = 0
-        total_z2_min = 0.0
-        sport_counts = {}
-        for day_rec in strava_28d:
-            for act in day_rec.get("activities") or []:
-                total_sessions += 1
-                sport = act.get("sport_type", "Unknown")
-                sport_counts[sport] = sport_counts.get(sport, 0) + 1
-                avg_hr_v = _safe_float(act, "average_heartrate")
-                dur_s = _safe_float(act, "moving_time_seconds") or 0
-                if avg_hr_v and z2_lo <= avg_hr_v <= z2_hi:
-                    total_z2_min += dur_s / 60
+        # #5398: THE session count + THE Zone 2 computation — a gym visit (Hevy's push + the ride inside it) is one
+        # session, and Zone 2 is the devices' own zones, not an average-HR band.
+        hevy_28d = _hevy_rows((today - timedelta(days=28)).isoformat(), yesterday)
+        count28 = session_count.count(strava=strava_28d, hevy=hevy_28d)
+        total_sessions = count28["sessions"]
+        total_z2_min = session_count.zone2_total(strava_28d, hevy=hevy_28d)
+        sport_counts = {sport: v["parts"] for sport, v in count28["by_sport"].items()}
 
         step_vals = _steps_28d(whoop_30d, apple_28d, today)
         top_sports = sorted(sport_counts.items(), key=lambda x: -x[1])[:3]
@@ -972,7 +964,6 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
         day_of_week = today_dt.strftime("%A")
 
         activities = []
-        week_activities = []
         latest_activity_date = None
         for item in strava_days:
             date_str = (item.get("sk") or "").replace("DATE#", "")
@@ -997,12 +988,12 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
                         "sort_date": date_str,
                     }
                     activities.append(entry)
-                    if date_str >= monday_str:
-                        week_activities.append(entry)
                     if not latest_activity_date or date_str > latest_activity_date:
                         latest_activity_date = date_str
 
-        week_count = len(week_activities)
+        week_count = session_count.count(strava=strava_days, hevy=_hevy_rows(lookback_start, lookback_end), start_date=monday_str)[
+            "sessions"
+        ]
         days_since_exercise = _buddy_days_since(latest_activity_date, today_dt)
         days_into_week = today_dt.weekday() + 1
 

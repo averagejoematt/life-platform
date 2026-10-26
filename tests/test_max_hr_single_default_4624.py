@@ -36,7 +36,7 @@ def test_load_model_pins_the_same_value():
 # enter the gate census (a concurrent-lane pin), and this row's residual is stated on the PR — a NEW
 # reader's own default is not caught here, only a regression in these.
 READERS = (
-    "lambdas/content/output_writers.py",
+    # output_writers left this list at #5398: its Zone 2 is THE computation now, not an average-HR band, so it holds no max HR
     "lambdas/compute/dashboard_refresh_lambda.py",
     "mcp/tools_training.py",
 )
