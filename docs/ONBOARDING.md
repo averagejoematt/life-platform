@@ -46,7 +46,7 @@ Raw JSON in S3 (layouts VARY by source — read the `raw_layout` facet in
 compute Lambdas (pre-compute; the full set is `compute_stack` in the model):
   character-sheet · adaptive-mode · daily-metrics-compute · daily-insight-compute
   (daily 16:30–16:45 UTC ≈ 9:30–9:45 AM PDT, all BEFORE the 17:00 UTC brief)
-  · hypothesis-engine (weekly, Sun 19:00 UTC)
+  · hypothesis-engine (weekly, Sun 12:00 PT)
     │
     ▼
 Coach Intelligence pipeline (deterministic math → parallel LLM coach generations, one per

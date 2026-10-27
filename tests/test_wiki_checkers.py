@@ -426,9 +426,9 @@ def test_cdk_cron_map_whoop_multi_schedule():
     whoop = cmap.get("whoop-data-ingestion")
     assert whoop is not None, "whoop-data-ingestion missing from the derived cron map"
     assert set(whoop) == {
-        "cron(0 0,4,12,16,20 * * ? *)",  # primary cadence — f-string via WHOOP_HOURS
-        "cron(30 17 * * ? *)",  # recovery refresh (events.Rule + add_target)
-        "cron(20 18 * * ? *)",  # DI-2 reconcile (Schedule.cron(hour=, minute=))
+        "cron(0 5,9,13,17,21 * * ? *)",  # primary cadence (Pacific wall clock since #4284, ADR-165)
+        "cron(30 10 * * ? *)",  # recovery refresh (add_table_schedule)
+        "cron(20 11 * * ? *)",  # DI-2 reconcile (add_table_schedule, constant input)
     }, f"whoop-data-ingestion schedule set is wrong: {whoop}"
 
 

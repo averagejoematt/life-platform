@@ -87,14 +87,14 @@ PROFILE_PK = f"USER#{USER_ID}"
 GENESIS_ALARM_WINDOW_PK = "SYSTEM#alarm-windows"
 GENESIS_ALARM_WINDOW_SK = "GENESIS#compute-pipeline-stale"
 
-# #3430: daily-metrics-compute's OWN EventBridge cron, in UTC — `cron(40 16 * * ? *)`
-# in cdk/stacks/compute_stack.py. It is restated here because the staleness ops metric
+# #3430: daily-metrics-compute's OWN schedule — `cron(40 9 * * ? *)`, Pacific wall clock in
+# config/schedules.json (the platform_timezone, #4284 / ADR-165). It is restated here because the staleness ops metric
 # below is only ANSWERABLE after that cron has had its chance, and it is pinned against
 # the CDK source by tests/test_compute_staleness_offschedule_3430.py so the two cannot
 # drift (#2003's "read the registry, never hand-state a schedule" rule applied to the one
 # place a Lambda has to know a sibling's clock).
-COMPUTE_DEADLINE_UTC_HOUR = 16
-COMPUTE_DEADLINE_UTC_MINUTE = 40
+COMPUTE_DEADLINE_PT_HOUR = 9
+COMPUTE_DEADLINE_PT_MINUTE = 40
 
 # -- AWS clients ---------------------------------------------------------------
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
@@ -253,15 +253,18 @@ def _compute_staleness_metric_value(compute_stale, today_str):
 def _compute_staleness_observation_deadline(yesterday_str):
     """#3430: the earliest instant at which `yesterday`'s computed_metrics row can exist.
 
-    `daily-metrics-compute` runs at COMPUTE_DEADLINE_UTC_HOUR:MINUTE UTC and writes the
+    `daily-metrics-compute` runs at COMPUTE_DEADLINE_PT_HOUR:MINUTE Pacific and writes the
     row for ITS yesterday. So the row for date D is written by the cron that fires on
     D+1 — before that instant the row is absent BY CONSTRUCTION, not by failure.
 
     Derived from the date being read rather than from "today" on purpose: a late/backfill
     run reading an old date is still entitled to report that date's row missing.
     """
-    read_date = datetime.strptime(yesterday_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    return (read_date + timedelta(days=1)).replace(hour=COMPUTE_DEADLINE_UTC_HOUR, minute=COMPUTE_DEADLINE_UTC_MINUTE)
+    from common.pacific_time import PACIFIC
+
+    run_day = datetime.strptime(yesterday_str, "%Y-%m-%d").date() + timedelta(days=1)
+    local = datetime(run_day.year, run_day.month, run_day.day, COMPUTE_DEADLINE_PT_HOUR, COMPUTE_DEADLINE_PT_MINUTE, tzinfo=PACIFIC)
+    return local.astimezone(timezone.utc)
 
 
 def _compute_staleness_observation_authoritative(yesterday_str, event=None, now_utc=None):
@@ -1738,7 +1741,7 @@ def lambda_handler(event, context):
         logger.info(
             "#3430: not emitting ComputePipelineStaleness — this run cannot speak for the "
             "pipeline (dry run, or earlier than daily-metrics-compute's own "
-            f"{COMPUTE_DEADLINE_UTC_HOUR:02d}:{COMPUTE_DEADLINE_UTC_MINUTE:02d}Z cron for {yesterday}); "
+            f"{COMPUTE_DEADLINE_PT_HOUR:02d}:{COMPUTE_DEADLINE_PT_MINUTE:02d} PT schedule for {yesterday}); "
             "compute_stale=" + str(_compute_stale) + " (" + _compute_age_msg + ")"
         )
     if _staleness_authoritative:

@@ -170,19 +170,19 @@ def test_the_annassign_form_is_not_invisible(facts, tmp_path):
 
 
 def test_cron_parser_reads_minute_then_hour():
-    assert qco._cron_utc_hhmm("cron(40 16 * * ? *)") == (16, 40)
-    assert qco._cron_utc_hhmm("cron(30 18 ? * * *)") == (18, 30)
+    assert qco._cron_local_hhmm("cron(40 9 * * ? *)") == (9, 40)
+    assert qco._cron_local_hhmm("cron(30 11 ? * * *)") == (11, 30)
 
 
 def test_cron_parser_fails_loudly_on_a_non_fixed_schedule():
-    """A mirror that stops being a daily fixed-UTC cron must not quietly become a
+    """A mirror that stops being a daily fixed-time cron must not quietly become a
     garbage window."""
     with pytest.raises(ValueError):
-        qco._cron_utc_hhmm("cron(0 {WHOOP_HOURS} * * ? *)")
+        qco._cron_local_hhmm("cron(0 {WHOOP_HOURS} * * ? *)")
 
 
 def test_the_derived_window_preserves_the_2670_behavior_under_pdt(monkeypatch):
-    """The #2670 boundary, now derived: 16:40Z + 50m = 10:30 PDT. 08:45 (the live
+    """The #2670 boundary, now derived: 09:40 PT + 50m = 10:30 PDT. 08:45 (the live
     false-FAIL time) is inside the honest window; 11:30 (the old scheduled sweep
     hour) is not."""
     _freeze_pacific(monkeypatch, datetime(2026, 8, 16, 8, 45, tzinfo=PACIFIC))
@@ -199,16 +199,16 @@ def test_a_moved_cron_moves_the_window(monkeypatch):
     _freeze_pacific(monkeypatch, frozen)
     assert qco._before_compute_window() is False, "10:45 PDT is past the real 10:30 PDT cutoff"
 
-    monkeypatch.setattr(qco, "PRODUCER_CRON_MIRRORS", {_PRODUCER: "cron(15 18 * * ? *)"})
+    monkeypatch.setattr(qco, "PRODUCER_CRON_MIRRORS", {_PRODUCER: "cron(15 11 * * ? *)"})
     cutoff = qco._compute_cutoff_pt()
-    assert (cutoff.hour, cutoff.minute) == (12, 5), "18:15Z + 50m = 19:05Z = 12:05 PDT"
+    assert (cutoff.hour, cutoff.minute) == (12, 5), "11:15 PT + 50m = 12:05 PT"
     assert qco._before_compute_window() is True, "the window did not follow the moved cron — the #2818 defect is back"
 
 
-def test_dst_boundary_one_utc_instant_two_wall_clocks(monkeypatch):
-    """The producer fires at a fixed UTC instant; the honest window must close at
-    that instant in BOTH seasons. Under PST the derived cutoff is 09:30 — the
-    hand-typed 10:30 stayed lax for an extra hour all winter."""
+def test_dst_boundary_one_wall_clock_two_utc_instants(monkeypatch):
+    """#4284 (ADR-165): the producer fires at a fixed PACIFIC wall-clock time (EventBridge
+    Scheduler in the platform zone), so the honest window closes at 10:30 PT in BOTH
+    seasons — 17:30Z under PDT, 18:30Z under PST."""
     _freeze_pacific(monkeypatch, datetime(2026, 7, 15, 9, 0, tzinfo=PACIFIC))
     pdt = qco._compute_cutoff_pt()
     assert (pdt.hour, pdt.minute) == (10, 30)
@@ -216,21 +216,18 @@ def test_dst_boundary_one_utc_instant_two_wall_clocks(monkeypatch):
 
     _freeze_pacific(monkeypatch, datetime(2026, 1, 15, 9, 0, tzinfo=PACIFIC))
     pst = qco._compute_cutoff_pt()
-    assert (pst.hour, pst.minute) == (9, 30)
+    assert (pst.hour, pst.minute) == (10, 30)
     assert pst.utcoffset() == timedelta(hours=-8)
 
-    for cutoff in (pdt, pst):
-        as_utc = cutoff.astimezone(timezone.utc)
-        assert (as_utc.hour, as_utc.minute) == (17, 30), "the cutoff drifted off the producer's fixed-UTC fire time + slack"
+    assert [(c.astimezone(timezone.utc).hour, c.astimezone(timezone.utc).minute) for c in (pdt, pst)] == [(17, 30), (18, 30)]
 
 
-def test_dst_boundary_window_verdicts_follow_the_seasonal_cutoff(monkeypatch):
-    """Either side of the derived PST cutoff (09:30 PST = 17:30Z). The hand-typed
-    10:30 would have called BOTH of these 'inside the window' all winter."""
-    _freeze_pacific(monkeypatch, datetime(2026, 1, 15, 9, 15, tzinfo=PACIFIC))
-    assert qco._before_compute_window() is True, "09:15 PST is 17:15Z — still inside the producer's runtime+slack window"
-    _freeze_pacific(monkeypatch, datetime(2026, 1, 15, 9, 45, tzinfo=PACIFIC))
-    assert qco._before_compute_window() is False, "09:45 PST is 17:45Z — past the derived cutoff; D-2 is now real staleness"
+def test_dst_boundary_window_verdicts_follow_the_wall_clock_cutoff(monkeypatch):
+    """Either side of the derived PST cutoff (10:30 PST = 18:30Z)."""
+    _freeze_pacific(monkeypatch, datetime(2026, 1, 15, 10, 15, tzinfo=PACIFIC))
+    assert qco._before_compute_window() is True, "10:15 PST — still inside the producer's runtime+slack window"
+    _freeze_pacific(monkeypatch, datetime(2026, 1, 15, 10, 45, tzinfo=PACIFIC))
+    assert qco._before_compute_window() is False, "10:45 PST — past the derived cutoff; D-2 is now real staleness"
 
 
 def test_evening_pt_d2_stays_strict(monkeypatch):
@@ -243,17 +240,17 @@ def test_evening_pt_d2_stays_strict(monkeypatch):
 
 def test_the_derived_cutoff_stays_before_the_scheduled_sweep(cdk_map):
     """Ordering invariant, from the CDK truth on BOTH sides: the honest-D-2 window
-    closes before the scheduled qa-smoke sweep fires (fixed UTC, so this holds in
-    both seasons) — otherwise the sweep loses its ability to catch a genuinely
+    closes before the scheduled qa-smoke sweep fires (both Pacific wall clock in the one
+    platform zone since #4284, so this holds in both seasons) — otherwise the sweep loses its ability to catch a genuinely
     dead compute the same day."""
-    ph, pm = qco._cron_utc_hhmm(qco.PRODUCER_CRON_MIRRORS[_PRODUCER])
+    ph, pm = qco._cron_local_hhmm(qco.PRODUCER_CRON_MIRRORS[_PRODUCER])
     cutoff_minutes = ph * 60 + pm + qco._COMPUTE_SLACK_MINUTES
     sweep_crons = cdk_map.get("life-platform-qa-smoke")
     assert sweep_crons, "the qa-smoke sweep has no resolvable CDK cron — the ordering invariant has nothing to hold against"
     for cron in sweep_crons:
-        sh, sm = qco._cron_utc_hhmm(cron)
+        sh, sm = qco._cron_local_hhmm(cron)
         assert cutoff_minutes < sh * 60 + sm, (
-            f"derived cutoff ({cutoff_minutes}m UTC) is not before the scheduled sweep ({cron}) — "
+            f"derived cutoff ({cutoff_minutes}m PT) is not before the scheduled sweep ({cron}) — "
             "either the producer moved later or the sweep moved earlier; re-derive _COMPUTE_SLACK_MINUTES"
         )
 

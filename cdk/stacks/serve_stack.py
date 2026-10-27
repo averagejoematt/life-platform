@@ -31,8 +31,6 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
-    aws_events as events,
-    aws_events_targets as targets,
     aws_lambda as _lambda,
     aws_s3 as s3,
     aws_sns as sns,
@@ -40,7 +38,7 @@ from aws_cdk import (
 
 from stacks import role_policies as rp
 from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
-from stacks.lambda_helpers import create_platform_lambda, table_schedule
+from stacks.lambda_helpers import add_table_schedule, create_platform_lambda, table_schedule
 from stacks.reader_audience import URGENT_TOPIC_NAME, route_reader_audience  # #3499
 from stacks.secrets_helpers import site_api_origin_secret_value
 
@@ -588,18 +586,14 @@ class ServeStack(Stack):
         # is independently dark until Eli's bot exists in the telegram secret with a
         # chat id on it. Both halves have to be true, which is the property that
         # lets this ship before the owner's BotFather run.
-        morning_checkin_rule = events.Rule(
+        add_table_schedule(
             self,
             "TelegramMorningCheckin",
-            rule_name="telegram-coach-morning-checkin",
-            description="Weekday morning check-in from the program lead (dark until his Telegram bot is registered)",
+            target=telegram_worker_fn,
             schedule=table_schedule("telegram-coach-worker#TelegramMorningCheckin"),
-        )
-        morning_checkin_rule.add_target(
-            targets.LambdaFunction(
-                telegram_worker_fn,
-                event=events.RuleTargetInput.from_object({"kind": "morning_checkin"}),
-            )
+            schedule_input={"kind": "morning_checkin"},
+            description="Weekday morning check-in from the program lead (dark until his Telegram bot is registered)",
+            name="telegram-coach-morning-checkin",
         )
 
         # #5106: the owner's 20-second evening check-in (hunger, stress, cravings, one word). Its
@@ -607,15 +601,14 @@ class ServeStack(Stack):
         # quiet hours. Deterministic (no model); same constant-input shape as the morning check-in.
         # Dead-man: the run stamps COACH#evening_checkin/EVAL#<day> every evening and qa-smoke's
         # `evening_checkin_nudge:eval_liveness` reds a completed day with no stamp.
-        evening_checkin_rule = events.Rule(
+        add_table_schedule(
             self,
             "TelegramEveningCheckin",
-            rule_name="telegram-coach-evening-checkin",
-            description="Owner evening check-in prompt (#5106; dark until a coach Telegram bot is registered)",
+            target=telegram_worker_fn,
             schedule=table_schedule("telegram-coach-worker#TelegramEveningCheckin"),
-        )
-        evening_checkin_rule.add_target(
-            targets.LambdaFunction(telegram_worker_fn, event=events.RuleTargetInput.from_object({"kind": "evening_checkin"}))
+            schedule_input={"kind": "evening_checkin"},
+            description="Owner evening check-in prompt (#5106; dark until a coach Telegram bot is registered)",
+            name="telegram-coach-evening-checkin",
         )
 
         # The event-triggered outbound sweep (#2490) — the data's chance to start a
@@ -632,18 +625,14 @@ class ServeStack(Stack):
         # the rule firing is not the same thing as a text being sent — the handler is
         # dark until the owning coach's bot is registered, needs a real detected event,
         # and the message still has to pass the grounding gate.
-        event_outbound_rule = events.Rule(
+        add_table_schedule(
             self,
             "TelegramEventOutbound",
-            rule_name="telegram-coach-event-outbound",
-            description="Daily event-triggered coach outbound sweep (celebration + soft concern; dark until the coaches' bots are registered)",
+            target=telegram_worker_fn,
             schedule=table_schedule("telegram-coach-worker#TelegramEventOutbound"),
-        )
-        event_outbound_rule.add_target(
-            targets.LambdaFunction(
-                telegram_worker_fn,
-                event=events.RuleTargetInput.from_object({"kind": "event_outbound"}),
-            )
+            schedule_input={"kind": "event_outbound"},
+            description="Daily event-triggered coach outbound sweep (celebration + soft concern; dark until the coaches' bots are registered)",
+            name="telegram-coach-event-outbound",
         )
 
         # The sweep's LIVENESS signal — the absence-is-failure shape monitoring_stack's

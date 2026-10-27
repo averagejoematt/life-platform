@@ -107,17 +107,13 @@ def _chronicle_send_label() -> str:
     row — derived from #3564's `common.subscriber_cadence` sender registry (the
     live `ChronicleEmailSender` cron), never hand-typed (#3619, the fourth of the
     #3564 family of hand-typed cadence literals: /subscribe/, the confirmation
-    email, and the welcome email were the first three). DST-aware: the cron is a
-    fixed UTC instant, so the PT clock time is computed against "now", exactly
-    like every other relative timestamp on this endpoint."""
+    email, and the welcome email were the first three). The cron is Pacific wall
+    clock (config/schedules.json platform_timezone, #4284 / ADR-165), so its PT
+    clock time is the same in both halves of the year — no "now" is needed."""
     chronicle = sender("chronicle-email-sender")
     weekday = weekday_name(required_weekday(chronicle.cron))
-    utc_hour, utc_minute = cron_hour(chronicle.cron), cron_minute(chronicle.cron)
-    now_utc = datetime.now(timezone.utc)
-    days_ahead = (required_weekday(chronicle.cron) - now_utc.weekday()) % 7
-    anchor_utc = (now_utc + timedelta(days=days_ahead)).replace(hour=utc_hour, minute=utc_minute, second=0, microsecond=0)
-    anchor_pt = anchor_utc.astimezone(PT)
-    time_str = anchor_pt.strftime("%I:%M %p").lstrip("0")
+    clock = datetime(2000, 1, 1, cron_hour(chronicle.cron), cron_minute(chronicle.cron))
+    time_str = clock.strftime("%I:%M %p").lstrip("0")
     return f"{weekday} {time_str} · Elena Voss"
 
 

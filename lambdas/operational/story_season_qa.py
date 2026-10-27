@@ -73,11 +73,12 @@ HOLD_ESCALATE_DAYS = 7
 # (the other marker) is not a hold: a PUBLISHED week has its material by definition.
 HOLD_REASON = "held_for_review"
 
-# (d) `StoryQuestionsMonday` — cdk/stacks/email_stack.py. Pinned to the rule's own cron by
-# tests/test_heartbeat_completeness.py, so moving the rule moves the dead-man or reds.
+# (d) `StoryQuestionsMonday` — its config/schedules.json row, Pacific wall clock (the table's
+# platform_timezone, #4284 / ADR-165). Pinned to the row by tests/test_heartbeat_completeness.py,
+# so moving the schedule moves the dead-man or reds.
 QUESTIONS_WEEKDAY = "MON"
-QUESTIONS_HOUR_UTC = 16
-QUESTIONS_MINUTE_UTC = 0
+QUESTIONS_HOUR_PT = 9
+QUESTIONS_MINUTE_PT = 0
 QUESTIONS_GRACE_HOURS = 1
 # The rule's first live send. A Monday before it was never owed a send.
 QUESTIONS_FIRST_SEND = "2026-10-05"
@@ -211,11 +212,17 @@ def ledger_gaps(weeks: dict[int, dict], ledger_rows: list[dict]) -> list[str]:
 
 
 def last_questions_send(now: datetime) -> datetime:
-    """The newest scheduled `StoryQuestionsMonday` instant whose grace has elapsed."""
-    ref = now.astimezone(timezone.utc) - timedelta(hours=QUESTIONS_GRACE_HOURS)
-    slot = ref.replace(hour=QUESTIONS_HOUR_UTC, minute=QUESTIONS_MINUTE_UTC, second=0, microsecond=0)
+    """The newest scheduled `StoryQuestionsMonday` instant whose grace has elapsed, as a UTC instant.
+    The schedule is Pacific wall clock (#4284), so the slot is built on the Pacific calendar — aware
+    arithmetic on one ZoneInfo is wall-clock arithmetic, so 09:00 PT stays 09:00 PT across a DST change."""
+    from common.pacific_time import PACIFIC
+
+    ref = (now.astimezone(timezone.utc) - timedelta(hours=QUESTIONS_GRACE_HOURS)).astimezone(PACIFIC)
+    slot = ref.replace(hour=QUESTIONS_HOUR_PT, minute=QUESTIONS_MINUTE_PT, second=0, microsecond=0)
     slot -= timedelta(days=(slot.weekday() - _WEEKDAYS.index(QUESTIONS_WEEKDAY)) % 7)
-    return slot if slot <= ref else slot - timedelta(days=7)
+    if slot > ref:
+        slot -= timedelta(days=7)
+    return slot.astimezone(timezone.utc)
 
 
 def check_story_season(

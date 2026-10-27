@@ -55,10 +55,10 @@ THE SEAM (#4110 coordination)
   generator, which reads the same calendar through its own seam — #4110 moves both.
 
 SCHEDULE AND DEAD-MAN (the registry — `JOB` below is the one declaration)
-  EventBridge `cron(0 2 * * ? *)` on the `life-platform-mcp-warmer` Lambda with the constant
-  input `{"job": "nightly_predraft"}` (cdk/stacks/mcp_stack.py). EventBridge crons are fixed
-  UTC, so 02:00Z is 19:00 PDT (mid-March → early November) and 18:00 PST in winter; the
-  Pacific day is the same in both, so "tomorrow" is always the next PT day.
+  An EventBridge Scheduler schedule at 19:00 Pacific wall clock (config/schedules.json, the
+  platform_timezone — #4284, ADR-165) on the `life-platform-mcp-warmer` Lambda with the constant
+  input `{"job": "nightly_predraft"}` (cdk/stacks/mcp_stack.py): 02:00Z under PDT, 03:00Z under
+  PST; "tomorrow" is always the next PT day.
   Every run that reaches an HONEST terminal outcome (drafted, exists, no_session, skipped,
   blocked) emits `LifePlatform/HevyRoutine::PredraftOutcome{Job=nightly_predraft}` = 1 via EMF
   (stdout — no IAM). A run that FAILS emits the same series at 0 with `Outcome: failed` (#4568);
@@ -105,8 +105,8 @@ JOB: dict[str, Any] = {
     "name": "nightly_predraft",
     # the rule's constant input — mcp.handler dispatches on event["job"] == JOB["event"]["job"]
     "event": {"job": "nightly_predraft"},
-    # fixed UTC (CLAUDE.md): 19:00 PDT / 18:00 PST — both on the same Pacific day
-    "schedule_utc": "cron(0 2 * * ? *)",
+    # Pacific wall clock (config/schedules.json platform_timezone, ADR-165): 19:00 PT all year
+    "schedule_pt": "cron(0 19 * * ? *)",
     "function": "life-platform-mcp-warmer",
     "target_offset_days": 1,
     "metric_namespace": METRIC_NAMESPACE,
