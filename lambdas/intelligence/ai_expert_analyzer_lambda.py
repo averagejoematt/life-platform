@@ -153,8 +153,10 @@ def _latest_item(source):
     pk = f"{USER_PREFIX}{source}"
     kce = Key("pk").eq(pk)
     floor = _phase_taxonomy.cycle_read_floor(pk)  # #2113: None unless EXPERIMENT_SCOPED
-    if floor:
-        kce = kce & Key("sk").between(f"DATE#{floor}", "DATE#9999-12-31")
+    # #5431: the newest MacroFactor row is the newest day that HAPPENED — never a projected future day
+    ceiling = f"DATE#{pacific_today()}~" if source == "macrofactor" else "DATE#9999-12-31"
+    if floor or source == "macrofactor":
+        kce = kce & Key("sk").between(f"DATE#{floor or ''}", ceiling)
     resp = table.query(KeyConditionExpression=kce, ScanIndexForward=False, Limit=1)
     items = _decimal_to_float(resp.get("Items", []))
     return strava_read_seam(source, items[0] if items else None)
@@ -1540,7 +1542,7 @@ def _week_behavioral_presence(iso_week):
         lift_days = len(_item_dates(_query_source("hevy", monday, sunday)))
         weigh_ins = len(_item_dates(_query_source("withings", monday, sunday)))
         habit_days = len(_item_dates([i for i in _query_source("habitify", monday, sunday) if _cal("habitify", i)]))
-        food_days = len(_item_dates(_query_source("macrofactor", monday, sunday)))
+        food_days = len(_item_dates(_query_source("macrofactor", monday, min(sunday, pacific_today()))))  # #5431: never a future day
     except Exception as e:  # noqa: BLE001 — presence is additive, never breaks the arc
         logger.warning("arc week-presence query failed for %s: %s", iso_week, e)
         return None
