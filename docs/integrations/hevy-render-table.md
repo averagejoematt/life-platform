@@ -14,7 +14,7 @@ A field can pass the Hevy API and still never reach the gym floor. #3938 is the 
 | `session_note` | #3938 #5069 | `routine_title.format_why_note` | note | `routine.exercises[0].notes (head)` | first exercise's Pinned Routine Note, first line | routine.notes never reads back (#3938), so the session line heads exercise 0's note; kept under the window |
 | `progression_reason` | #5052 | `load_progression.next_prescription` | note | `routine.exercises[].notes` | that exercise's Pinned Routine Note, first line | no reason field on the routine wire; leads the exercise's own note |
 | `stall_step` | #5057 | `load_progression.stall_step` | note | `routine.exercises[].notes` | that exercise's Pinned Routine Note, first line | no reason field on the routine wire; leads the exercise's own note (chat drafts: 'Step due:') |
-| `rotation_note` | #5075 | `none yet (#5075 deferred)` | deferred | `routine.exercises[].notes (planned)` | that exercise's Pinned Routine Note (planned) | when built: leads the note after the progression reason |
+| `rotation_note` | #5075 #5428 | `lift_note.rotation_line (from variant_rotation.swaps)` | note | `routine.exercises[].notes` | the rotated-in exercise's Pinned Routine Note, line 2 ('New: replaces X.') | no rotation field on the routine wire; the reason line after the effort line (slot id and week stay in the rationale) |
 | `cardio_level` | #5048 #5076 | `cardio_note.compose (line 1)` | note | `routine.exercises[].notes` | the cardio exercise's Pinned Routine Note, line 1 ('level N') | no level field on a routine set; line 1 of the note |
 | `cardio_speed` | #5048 #5076 | `cardio_note.compose (line 1)` | note | `routine.exercises[].notes` | the cardio exercise's Pinned Routine Note, line 1 ('at S mph') | no speed field on a routine set; line 1 of the note |
 | `cardio_rpe` | #5048 #5076 | `cardio_note.compose (line 1)` | note | `routine.exercises[].notes` | the cardio exercise's Pinned Routine Note, line 1 ('RPE a-b') | RPE is logged on performed sets only; line 1 of the note |
@@ -24,7 +24,7 @@ A field can pass the Hevy API and still never reach the gym floor. #3938 is the 
 | `rep_range` | #5052 | `the slot's rep scheme` | native | `routine.exercises[].sets[].rep_range` | the set row's reps column ('6-10') | - |
 | `rest_seconds` | - | `the block's rest` | native | `routine.exercises[].rest_seconds` | the exercise's rest timer | - |
 | `superset_id` | - | `the block's superset` | native | `routine.exercises[].superset_id` | the exercises grouped as a superset | - |
-| `minimum_session` | #5088 | `disruption.to_routine` | note | `routine.exercises[0].notes (head) + routine.exercises[].notes` | the session line and each exercise's 'Minimum:' cue | the title is the convention's at commit (Phase - Type - N - Y); the label rides the session line |
+| `minimum_session` | #5088 #5428 | `disruption.to_routine` | note | `routine.exercises[0].notes (head) + routine.exercises[].notes` | the session block's 'Minimum · ' / 'Travel · ' session line on exercise 1 | the title is the convention's at commit (Phase - Type - N - Y); the label rides the session line |
 | `charter_version` | #5068 #5085 | `training_charter.charter_version` | not_shown | `none (inputs_snapshot.charter_version + inputs_snapshot.nightly_predraft.charter_version)` | not shown in any Hevy note or footer; the IR and the pre-draft's draft mark carry it | - |
 
 ## 2. The ordering rule (so a reason line is never the part a cut lands on)
@@ -42,7 +42,7 @@ One path keeps its block ahead of the reason on purpose: the standing-constraint
 
 ## 3. The visible window (retired by #5428)
 
-`VISIBLE_NOTE_CHARS = 150` was the #4070 observation (`mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS`; the test still holds the two equal until both go together). The owner's in-app screenshots of 2026-10-26 settled it: **Hevy renders an exercise note in full**, and each set row already shows the load × reps and PREVIOUS. So length costs scroll, not visibility. `render_check` raises no window problem any more (`beyond_window` is retired). Length is the note linter's phone-line budget instead (rule L7 of `docs/coaching/HEVY_NOTE_STANDARD.md` §8), and what a note may say is that standard: effort, one reason, one cue. The rows and PREVIOUS carry the rest.
+`VISIBLE_NOTE_CHARS = 150` was the #4070 observation (with its must-agree twin `mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS`); both are removed (#5428). The owner's in-app screenshots of 2026-10-26 settled it: **Hevy renders an exercise note in full**, and each set row already shows the load × reps and PREVIOUS. So length costs scroll, not visibility. `render_check` raises no window problem any more (`beyond_window` is retired). Length is the note linter's phone-line budget instead (rule L7 of `docs/coaching/HEVY_NOTE_STANDARD.md` §8), and what a note may say is that standard: effort, one reason, one cue. The rows and PREVIOUS carry the rest.
 
 ## 4. The check: `manage_hevy_routine action=dry_run` → `render_check`
 

@@ -24,11 +24,10 @@ THE ORDERING RULE (so a reason line is never the part a cut lands on):
   3. Anything else comes after: the branch menu (`hevy_compiler._place_routine_note`). Since #5428
      the wake-recovery band block and the critics' block no longer reach the wire.
 
-VISIBLE_NOTE_CHARS is RETIRED as a window (#5428): the owner's in-app screenshots (2026-10-26) show
-Hevy renders an exercise note IN FULL, so length costs scroll, not visibility. No problem is raised
-on it any more; `in_window` stays on each hit as information only. Length is now the note linter's
-phone-line budget (`hevy_note_lint` rule L7). The constant stays until its must-agree twin
-`mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS` is removed with it (#5428 lane A).
+The #4070 visible window (150 characters) is GONE (#5428): the owner's in-app screenshots (2026-10-26) show
+Hevy renders an exercise note IN FULL, so length costs scroll, not visibility. Length is the note linter's
+phone-line budget (`hevy_note_lint` rule L7). The constant and its must-agree twin in `mcp/tools_plan` were
+removed together.
 
 THE NOTE LINT (#5428): `render_check` also runs `hevy_note_lint` over the body and reports it as
 `note_lint` (mode, problems, not-checked rules), and each lint problem joins `problems` prefixed
@@ -48,8 +47,6 @@ from training.warmup_sets import is_warmup
 
 RENDER_TABLE_VERSION = "hevy-render@1.2.0"  # 1.2.0 = the window retired, the note lint joined (#5428)
 
-# The owner-observed visible window of a Hevy note (#4070), retired as a window by #5428 (notes render in full).
-VISIBLE_NOTE_CHARS = 150
 NOTE_LINT_PREFIX = "note lint: "
 
 # Where a row lands. `native` = a Hevy field built for it; `note` = the Pinned Routine Note
@@ -86,12 +83,12 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
     },
     {
         "field": "rotation_note",
-        "issue": "#5075",
-        "producer": "none yet (#5075 deferred)",
-        "home": DEFERRED,
-        "wire": "routine.exercises[].notes (planned)",
-        "shows": "that exercise's Pinned Routine Note (planned)",
-        "fallback": "when built: leads the note after the progression reason",
+        "issue": "#5075 #5428",
+        "producer": "lift_note.rotation_line (from variant_rotation.swaps)",
+        "home": NOTE,
+        "wire": "routine.exercises[].notes",
+        "shows": "the rotated-in exercise's Pinned Routine Note, line 2 ('New: replaces X.')",
+        "fallback": "no rotation field on the routine wire; the reason line after the effort line (slot id and week stay in the rationale)",
     },
     {
         "field": "cardio_level",
@@ -176,11 +173,11 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
     },
     {
         "field": "minimum_session",
-        "issue": "#5088",
+        "issue": "#5088 #5428",
         "producer": "disruption.to_routine",
         "home": NOTE,
         "wire": "routine.exercises[0].notes (head) + routine.exercises[].notes",
-        "shows": "the session line and each exercise's 'Minimum:' cue",
+        "shows": "the session block's 'Minimum · ' / 'Travel · ' session line on exercise 1",
         "fallback": "the title is the convention's at commit (Phase - Type - N - Y); the label rides the session line",
     },
     {
@@ -198,12 +195,19 @@ FIELDS = tuple(r["field"] for r in RENDER_TABLE)
 
 # The producers' own grammars (their lead words), so a field is found by what wrote it. A reason
 # starts a line or a sentence, and it is SEARCHED for anywhere in the note: a reason buried behind
-# another block is reported `not_leading` / `beyond_window`, never `absent` (#5083 review).
+# another block is reported `not_leading`, never `absent` (#5083 review).
 _LEAD = r"(?:^|(?<=\. ))"
 _PROGRESSION_RE = re.compile(_LEAD + r"(?:\+\d+(?:\.\d+)? lb to \d|\+\d+ reps? to \d|hold(?::| \d)|floor \d|re-entry:)", re.M)
 _STALL_RE = re.compile(_LEAD + r"(?:Step due: )?\+\d+(?:\.\d+)? (?:lb|reps?) to [^\n]*self-reported RPE", re.M)
 _RPE_RE = re.compile(r"\bRPE \d")
-_MINIMUM_PREFIX = "Minimum:"  # disruption._cue's lead word
+_MINIMUM_PREFIX = "Minimum:"  # disruption._cue's lead word before #5428 (kept readable for an older draft)
+# #5428: the disruption routine's session line (`disruption.POOL_DAY` as the session block's ‹Day›)
+_MINIMUM_LINE_RE = re.compile(r"^(?:Minimum|Travel) · ", re.M)
+# #5083/#5428: a rotated accessory's reason line (`lift_note.rotation_line`)
+_ROTATION_RE = re.compile(r"^New: replaces ", re.M)
+# #5428: the standard's reason grammar (`lift_note.reason_line`, the chat path's step line) — line 2, after the effort line
+_STANDARD_REASON_RE = re.compile(r"^(?:Heavier|Lighter|Volume day|Now aiming \d+–\d+|No jumps(?: today)?|Step due): ", re.M)
+_EFFORT_LINE_RE = re.compile(r"^RPE \d")
 
 
 def _routine(body: dict[str, Any]) -> dict[str, Any]:
@@ -211,20 +215,33 @@ def _routine(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def _own_note(i: int, note: str, session: str) -> tuple[str, int]:
-    """(exercise i's OWN note, its offset in the wire note) — exercise 0's starts after the session line."""
+    """(exercise i's OWN note, its offset in the wire note) — exercise 0's starts after the session line, or after the
+    three-line session block (#5428) when the block heads it and the compiler was handed no separate WHY line."""
     if i == 0 and session and note.startswith(session):
         rest = note[len(session) :]
         stripped = rest.lstrip("\n")
         return stripped, len(note) - len(stripped)
+    if i == 0 and not session:
+        from training import session_block
+
+        block, own = session_block.split(note)
+        if block:
+            return own, len(note) - len(own)
     return note, 0
 
 
 def _hit(where: str, offset: int, leads: bool = True) -> dict[str, Any]:
-    return {"where": where, "offset": offset, "in_window": offset < VISIBLE_NOTE_CHARS, "leads": leads}
+    return {"where": where, "offset": offset, "leads": leads}
 
 
 def _reason_field(text: str) -> str:
-    return "stall_step" if _STALL_RE.match(text) else "progression_reason"
+    return "stall_step" if (_STALL_RE.match(text) or text.startswith(("Now aiming ", "Step due: "))) else "progression_reason"
+
+
+def _leads_after_effort(own: str, start: int) -> bool:
+    """#5428: the standard puts the effort on line 1 and the one reason on line 2 — a reason there LEADS its note."""
+    before = own[:start].rstrip("\n").split("\n")
+    return len(before) == 1 and bool(_EFFORT_LINE_RE.match(before[0]))
 
 
 def expected_reasons(ir: Any) -> list[dict[str, str]]:
@@ -233,15 +250,28 @@ def expected_reasons(ir: Any) -> list[dict[str, str]]:
     every chat-draft step authored below the stall step (`inputs_snapshot.step_due`, #5057)."""
     snap = getattr(ir, "inputs_snapshot", None) or {}
     out: list[dict[str, str]] = []
+    # #5428: once the note composer ran, the wire carries ITS reason line (the standard's grammar), not the engine's audit text
+    composed = snap.get("lift_notes") if isinstance(snap.get("lift_notes"), dict) else None
     for key, mv in ((snap.get("load_floors") or {}).get("movements") or {}).items():
         prog = (mv or {}).get("progression") or {}
         if prog.get("changes") and prog.get("reason"):
+            if composed is not None and key in composed:
+                line = (composed[key] or {}).get("reason_line")
+                if line and (composed[key] or {}).get("reason") != "rotation":
+                    out.append({"field": _reason_field(line), "movement_key": key, "text": line})
+                continue
             out.append({"field": _reason_field(prog["reason"]), "movement_key": key, "text": prog["reason"]})
+    for key, rec in (composed or {}).items():
+        if (rec or {}).get("reason") == "rotation" and rec.get("reason_line"):
+            out.append({"field": "rotation_note", "movement_key": key, "text": rec["reason_line"]})
     step_due = snap.get("step_due")
     rows: list[Any] = step_due if isinstance(step_due, list) else []
     for row in rows:
         if not row.get("carried") and row.get("reason"):
-            out.append({"field": "stall_step", "movement_key": str(row.get("movement_key")), "text": f"Step due: {row['reason']}"})
+            # #5428: on the chat path the note composer writes the step (`wire_line`; None = the author's own reason won)
+            text = row.get("wire_line") if "wire_line" in row else f"Step due: {row['reason']}"
+            if text:
+                out.append({"field": "stall_step", "movement_key": str(row.get("movement_key")), "text": text})
     return out
 
 
@@ -256,6 +286,16 @@ def _reason_hits(where: str, own: str, base: int) -> dict[str, list[dict[str, An
             taken.add(m.start())
             at = ", first line" if m.start() == 0 else f", char {m.start()}"
             out.setdefault(field, []).append(_hit(where + at, base + m.start(), leads=m.start() == 0))
+    for m in _STANDARD_REASON_RE.finditer(own):
+        if m.start() in taken:
+            continue
+        taken.add(m.start())
+        field = _reason_field(own[m.start() :])
+        out.setdefault(field, []).append(_hit(where + f", char {m.start()}", base + m.start(), leads=_leads_after_effort(own, m.start())))
+    for m in _ROTATION_RE.finditer(own):
+        out.setdefault("rotation_note", []).append(
+            _hit(where + f", char {m.start()}", base + m.start(), leads=_leads_after_effort(own, m.start()))
+        )
     return out
 
 
@@ -287,15 +327,15 @@ def _set_hits(i: int, ex: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     out: dict[str, list[dict[str, Any]]] = {}
     warm = [s for s in sets if is_warmup(s)]
     if warm:
-        out["warmup_sets"] = [{"where": f"{where} set rows ({len(warm)} W)", "offset": None, "in_window": True}]
+        out["warmup_sets"] = [{"where": f"{where} set rows ({len(warm)} W)", "offset": None}]
     if any(s.get("duration_seconds") for s in sets):
-        out["cardio_duration"] = [{"where": f"{where} set rows (time)", "offset": None, "in_window": True}]
+        out["cardio_duration"] = [{"where": f"{where} set rows (time)", "offset": None}]
     if any(s.get("rep_range") for s in sets):
-        out["rep_range"] = [{"where": f"{where} set rows (reps)", "offset": None, "in_window": True}]
+        out["rep_range"] = [{"where": f"{where} set rows (reps)", "offset": None}]
     if ex.get("rest_seconds"):
-        out["rest_seconds"] = [{"where": f"{where} rest timer", "offset": None, "in_window": True}]
+        out["rest_seconds"] = [{"where": f"{where} rest timer", "offset": None}]
     if ex.get("superset_id") is not None:
-        out["superset_id"] = [{"where": f"{where} superset", "offset": None, "in_window": True}]
+        out["superset_id"] = [{"where": f"{where} superset", "offset": None}]
     return out
 
 
@@ -320,7 +360,7 @@ def _missing(expected: list[dict[str, str]], notes: list[str]) -> dict[str, list
 
 def _status(r: dict[str, str], hits: list[dict[str, Any]], missing: list[str]) -> tuple[str, list[str]]:
     """(the row's status, its problems) — missing > not_leading > lands. (#5428: `beyond_window` is retired — Hevy
-    shows a note in full — so a hit past VISIBLE_NOTE_CHARS is no longer a problem.)"""
+    shows a note in full.)"""
     f = r["field"]
     if r["home"] in (DEFERRED, NOT_SHOWN):
         return r["home"], []
@@ -357,6 +397,8 @@ def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any 
             problems.append("the session line does not head exercise 1's note")
     for i, ex in enumerate(exercises):
         own, base = _own_note(i, str(ex.get(PINNED_ROUTINE_NOTE_FIELD) or ""), session)
+        if i == 0 and _MINIMUM_LINE_RE.match(str(ex.get(PINNED_ROUTINE_NOTE_FIELD) or "")):  # #5428: the block's ‹Day›
+            found.setdefault("minimum_session", []).append(_hit("exercise 1 note, session line", 0))
         for by_field in (_note_hits(i, own, base), _set_hits(i, ex)):
             for k, v in by_field.items():
                 found.setdefault(k, []).extend(v)
@@ -374,8 +416,7 @@ def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any 
     return {
         "version": RENDER_TABLE_VERSION,
         "title": routine.get("title", ""),
-        "visible_note_chars": VISIBLE_NOTE_CHARS,
-        "session_note": {"text": session, "chars": len(session), "under_window": len(session) <= VISIBLE_NOTE_CHARS},
+        "session_note": {"text": session, "chars": len(session)},
         "expected_reasons": expected,
         "fields": rows,
         "note_lint": note_lint,

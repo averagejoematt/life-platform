@@ -26,6 +26,7 @@ Pure: every input is a value the generator already holds. No reads, no clock.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from training import hevy_note_grammar, movement_cues
@@ -39,6 +40,8 @@ chest-fly anchor at another bodyweight); the note becomes the pick-load form. 28
 
 PICK_LOAD_W_REPS = hevy_note_grammar.PICK_LOAD_W_REPS
 PICK_LOAD_LINE = hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS)
+ROTATION_HEAD = hevy_note_grammar.ROTATION_HEAD
+rotation_line = hevy_note_grammar.rotation_line  # #5083: the rotated accessory's one reason line, from the grammar
 
 _TIMES = {2: "twice", 3: "three times", 4: "four times", 5: "five times"}
 
@@ -172,6 +175,110 @@ def _skip(block: Any) -> bool:
     return any(getattr(s, "duration_seconds", None) for s in block.sets or [])
 
 
+AUTHORED_LINE_MAX_CHARS = 120
+_AUTHORED_EFFORT_RE = re.compile(r"^RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?(?:, last set RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?)?$")
+# what a kept line may not carry beyond the grammar's banned vocabulary (`hevy_note_grammar.BANNED`, linter L1) and its
+# restated-row shapes (L2): a load x reps, a set count, `@`, the tier words of the retired branch menus, and the
+# pick-load form's own subject (that W line is the composer's)
+_AUTHORED_DIRTY_RE = re.compile(
+    r"\d\s*(?:x|×)\s*\d|\b\d+\s*(?:x|×)\b|\bsets? of\b|\d+ sets?\b|Last:|@|\bfloor\b|subtract|"
+    r"GREEN|YELLOW|RED\b|\d+(?:\.\d+)?\s*(?:lb|lbs)\b|\bno (?:load|history)\b|\blog it\b|pick (?:it|a load|the load)",
+    re.I,
+)
+
+
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+_COUNTED_RE = re.compile(r"RPE \d+(?:\.5)?(?:[–-]\d+(?:\.5)?)?|\b\d+ (?:reps?|min|weeks?|days?|steps?)\b|\b\d+s\b")
+
+
+def _stray_number(line: str) -> bool:
+    """A digit outside an effort (`RPE 9`), a rep / minute / week count or a rep-target plural (`8s`) — a load, a date or
+    a set row restated, which the rows and PREVIOUS already show (standard §1.1)."""
+    return any(ch.isdigit() for ch in _COUNTED_RE.sub("", line))
+
+
+def authored_lines(note: str | None) -> dict[str, str]:
+    """The chat author's sentences that already read as the standard (#5428), for `compose_blocks(authored=...)`:
+    `effort` — a sentence that IS an effort line (`RPE 7`), kept as line 1; `line` — the first other sentence of at most
+    AUTHORED_LINE_MAX_CHARS with no restated row, no load or date, no banned word — the coach's own cue ("Elbows to
+    hips, no lean-back."), which the standard counts as the exercise's cue (§4). Everything else is left to the composer
+    and kept on the record as `detail`. Empty when nothing qualifies."""
+    out: dict[str, str] = {}
+    for raw in str(note or "").split("\n"):
+        for part in _SENTENCE_RE.split(raw):
+            line = " ".join(part.split())
+            if not line:
+                continue
+            if _AUTHORED_EFFORT_RE.match(line.rstrip(".")):
+                out.setdefault("effort", line.rstrip("."))
+            elif "line" not in out and line not in hevy_note_grammar.PREP_CUES.values() and _clean_authored(line):
+                out["line"] = line
+    return out
+
+
+def _clean_authored(line: str) -> bool:
+    """A sentence fit for the cue slot: short, nothing banned, no number, and no second effort (line 1 is the only RPE)."""
+    if any(re.search(pat, line, flags=0 if case else re.I) for pat, _label, case in hevy_note_grammar.BANNED):
+        return False
+    return (
+        len(line) <= AUTHORED_LINE_MAX_CHARS
+        and not hevy_note_grammar.TRUNCATION_RE.search(line)
+        and not hevy_note_grammar.RESTATED_ROWS_RE.search(line)
+        and not _AUTHORED_DIRTY_RE.search(line)
+        and not _stray_number(line)
+        and not re.search(r"\bRPE\b", line)
+    )
+
+
+def _step_due_line(prog: dict[str, Any], history: list[dict[str, Any]] | None) -> str:
+    """The chat path's not-carried LOAD step (#5057, #5428): the rows hold the author's load, so the note names the step
+    as a delta (never a load the rows would contradict) and the run that earned it: `Step due: +5 lb, 10s were RPE 8 twice.`"""
+    inc_lb = (float(prog.get("next_load_kg") or 0) - float(prog.get("from_load_kg") or 0)) / LB_IN_KG
+    return f"{hevy_note_grammar.STEP_DUE_HEAD}{round(inc_lb * 2) / 2:g} lb, {_stall_why(prog, history)}."
+
+
+def _engine_reason(
+    block: Any, entry: dict[str, Any], row: dict[str, Any], previous: dict[str, Any] | None, history: list | None, intensity: str
+) -> str:
+    """The computed reason for a block with a fresh PREVIOUS (`reason_line`), or the chat path's step-due line."""
+    prog = row.get("progression") or {}
+    if prog.get("authored_below") and prog.get("step_kind") == "load":
+        return _step_due_line(prog, history)
+    working = _working(block.sets)
+    row_lb = _top_lb(block.sets)
+    rep_lo = min((int(getattr(s, "rep_range_start", 0) or 0) for s in working), default=0) or None
+    return reason_line(
+        prog=prog,
+        intensity=intensity,
+        row_lb=row_lb,
+        previous=previous,
+        step_lb=implement_step_lb(entry.get("equipment"), row_lb),
+        rep_lo=rep_lo,
+        rep_hi=_rep_hi(block.sets),
+        history=history,
+        re_entry=bool(row.get("layoff_reason")),
+    )
+
+
+def _has_load(block: Any) -> bool:
+    return any(getattr(s, "weight_kg", None) for s in _working(block.sets))
+
+
+_LOADED_EQUIPMENT = ("barbell", "dumbbell", "machine", "cable", "kettlebell", "plate")
+_UNLOADED_HEVY_TYPES = ("reps_only", "duration", "distance_duration")
+
+
+def _feeler_fits(block: Any, entry: dict[str, Any], chat: bool) -> bool:
+    """Is the pick-load form right for this block? Never for a bodyweight / band / timed movement (there is no load to
+    find). On the chat path also never when the author put a load on the rows (the load is chosen), and only for a
+    catalog implement that takes one (a `tmpl:` block the catalog does not know, e.g. a burpee, gets no feeler)."""
+    if entry.get("hevy_type") in _UNLOADED_HEVY_TYPES or entry.get("equipment") in ("none", "resistance_band"):
+        return False
+    if chat:
+        return not _has_load(block) and entry.get("equipment") in _LOADED_EQUIPMENT
+    return True
+
+
 def compose_blocks(
     blocks: list[Any],
     catalog_movements: dict[str, Any],
@@ -179,10 +286,22 @@ def compose_blocks(
     load_floors: dict[str, Any] | None,
     history_index: dict[str, list] | None,
     target_date: str,
+    rotations: dict[str, str] | None = None,
+    authored: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Rewrite every lift block's note to the standard, IN PLACE, after every load and warm-up pass. Returns the
     `inputs_snapshot` record: `previous_loads` (Hevy's PREVIOUS, for the linter) and `lift_notes` (per movement: the
-    note, the reason kind, whether the pick-load form fired, and the replaced text as `detail`)."""
+    note, the reason kind and its line, whether the pick-load form fired, and the replaced text as `detail`).
+
+    `rotations` (`variant_rotation.swaps`: served key -> the title it replaces) gives a rotated accessory its ONE reason
+    line, `New: replaces …` (#5083). It outranks a PREVIOUS delta reason (the swap is why the row is new) but
+    never a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line is the instruction
+    for the feeler W row, not a second reason.
+
+    `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own sentences that already read as
+    the standard (`authored_lines`) — `effort` replaces line 1, `line` takes the cue slot (a chat-era technique cue counts
+    as the cue, standard §4, so the family cue is not added beside it). On that path a block whose rows carry the
+    author's load never gets the pick-load feeler (the load is chosen)."""
     from training.exercise_history import previous_load
 
     movements = (load_floors or {}).get("movements") or {}
@@ -194,7 +313,7 @@ def compose_blocks(
             continue
         key = str(block.movement_key)
         entry = (catalog_movements or {}).get(key) or {}
-        tid = entry.get("hevy_template_id_hint")
+        tid = entry.get("hevy_template_id_hint") or (key[len("tmpl:") :] if key.startswith("tmpl:") else None)
         previous = previous_load(history_index, tid, target_date)
         if previous is not None:
             previous_loads[key] = previous
@@ -204,47 +323,44 @@ def compose_blocks(
         if intensity == "carry" or family == "carry":
             block.notes = exposure_cue("carry", [])
             seen_families.add("carry")
-            notes[key] = {"note": block.notes, "reason": None, "pick_load": False, "detail": detail}
+            notes[key] = {"note": block.notes, "reason": None, "reason_line": None, "pick_load": False, "detail": detail}
             continue
-        working = _working(block.sets)
+        own = (authored or {}).get(key) or {}
         row = movements.get(key) or {}
-        ramp = row.get("ramp") or {}
-        caps = ramp.get("exposure_caps")
-        line1 = exposure_cue(intensity, [{}] * max(1, len(working)))
-        line2 = ""
-        pick = False
-        reason_kind = None
+        caps = (row.get("ramp") or {}).get("exposure_caps")
+        line1 = own.get("effort") or exposure_cue(intensity, [{}] * max(1, len(_working(block.sets))))
+        line2, pick, reason_kind = "", False, None
         if caps:
             # OD1: a capped exposure after a long gap opts out of the session's load rule, by name
             line1 = effort_line(caps.get("rpe_max"))
-            line2 = f"No jumps today: session {int(caps.get('exposure') or 1)} back after a break."
-            reason_kind = "no_jumps"
+            line2, reason_kind = f"No jumps today: session {int(caps.get('exposure') or 1)} back after a break.", "no_jumps"
         elif is_stale(previous, target_date):
-            pick = _add_feeler(block)
-            line2 = PICK_LOAD_LINE if pick else ""
-            reason_kind = "pick_load" if pick else None
+            pick = _feeler_fits(block, entry, authored is not None) and _add_feeler(block)
+            line2, reason_kind = (PICK_LOAD_LINE, "pick_load") if pick else ("", None)
         else:
-            row_lb = _top_lb(block.sets)
-            step = implement_step_lb(entry.get("equipment"), row_lb)
-            rep_lo = min((int(getattr(s, "rep_range_start", 0) or 0) for s in working), default=0) or None
-            line2 = reason_line(
-                prog=row.get("progression"),
-                intensity=intensity,
-                row_lb=row_lb,
-                previous=previous,
-                step_lb=step,
-                rep_lo=rep_lo,
-                rep_hi=_rep_hi(block.sets),
-                history=(history_index or {}).get(tid) if tid else None,
-                re_entry=bool(row.get("layoff_reason")),
-            )
+            line2 = _engine_reason(block, entry, row, previous, (history_index or {}).get(tid) if tid else None, intensity)
             reason_kind = line2.split(":")[0] if line2 else None
-        cue = ""
+        lead = ""  # the swap's reason line, ahead of a pick-load line
+        swapped = (rotations or {}).get(key)
+        if reason_kind != "no_jumps" and swapped:
+            lead = rotation_line(swapped)
+            if reason_kind != "pick_load":
+                line2 = ""  # one reason: the swap replaces the computed one
+            reason_kind = "rotation"
+        reason_text = lead or (line2 if line2 and line2 != PICK_LOAD_LINE else "")
+        cue = own.get("line") or ""
         if family and family not in seen_families:
-            cue = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=not line2)
+            cue = cue or movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=not (line2 or lead))
             seen_families.add(family)
-        block.notes = "\n".join(x for x in (line1, line2, cue) if x)
-        notes[key] = {"note": block.notes, "reason": reason_kind, "pick_load": pick, "detail": detail}
+        block.notes = "\n".join(x for x in (line1, lead, line2, cue) if x)
+        notes[key] = {
+            "note": block.notes,
+            "reason": reason_kind,
+            "reason_line": reason_text or None,
+            "authored_line": own.get("line"),
+            "pick_load": pick,
+            "detail": detail,
+        }
     return {"previous_loads": previous_loads, "lift_notes": notes}
 
 

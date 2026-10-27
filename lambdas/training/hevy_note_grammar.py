@@ -152,9 +152,25 @@ LIGHTER = "Lighter"
 VOLUME_DAY = "Volume day"
 NOW_AIMING = "Now aiming"
 NO_JUMPS = "No jumps"
+# #5083/#5075: a rotated accessory's one reason — the exercise it stands in for, by its Hevy title
+ROTATION_HEAD = "New: replaces "
+# #5057 on the chat path: a stall-rule load step the author's rows did not take, named as a delta
+STEP_DUE_HEAD = "Step due: +"
 REASON_RE = re.compile(
-    r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |No jumps(?: today)?: |Set \d over RPE \d+(?:\.5)? → |\d+ sets today: )"
+    r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |No jumps(?: today)?: |Set \d over RPE \d+(?:\.5)? → |\d+ sets today: "
+    r"|New: replaces |Step due: \+)"
 )
+
+
+def back_off_line(pct: int) -> str:
+    """A minimum / travel lift's one instruction (§3.8): the session carries no loads, so the rows cannot show that the
+    back-off is lighter than the top set. `Top set, then one back-off 10% lighter.`"""
+    return f"Top set, then one back-off {int(pct)}% lighter."
+
+
+def rotation_line(replaced_title: str) -> str:
+    """`New: replaces Calf Press.` — never a slot id, a week count or an issue number (those stay in the rationale)."""
+    return f"{ROTATION_HEAD}{str(replaced_title).strip().rstrip('.')}."
 
 
 def reason_line(word: str, why: str) -> str:

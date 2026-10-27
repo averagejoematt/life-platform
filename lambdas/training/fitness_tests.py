@@ -553,6 +553,16 @@ def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]]
     return isinstance(week, int) and week >= 1 and week % n == 0  # the week that closes a block (block_model's week_in_block == n)
 
 
+def test_note(row: Mapping[str, Any]) -> str:
+    """A test block's Hevy note (#5428, HEVY_NOTE_STANDARD §3.8): line 1 `Test · ‹the test›`, then the charter's protocol —
+    no issue number, no version id (those stay on the rationale tag and the stored battery record)."""
+    from training.hevy_note_grammar import fitness_test_line
+
+    head = fitness_test_line(str(row.get("label")))
+    proto = str(row.get("protocol") or "").strip()
+    return f"{head}\n{proto}" if proto else head
+
+
 def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, Any]) -> Any:
     from training.routine_ir import ExerciseBlock, Set
 
@@ -568,7 +578,7 @@ def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, An
         movement_key=key,
         sets=sets,
         rest_seconds=120,
-        notes=f"TEST ({row.get('label')}): {row.get('protocol')}",
+        notes=test_note(row),
         joint_friendly_score=int(m.get("joint_friendly_score", 3)),
         skill_tier=int(m.get("skill_tier", 1)),
         rationale_tag=f"fitness_test:{test_id}",
@@ -588,9 +598,12 @@ def minimum_shape() -> tuple[int, int]:
     return sets, most
 
 
+MINIMUM_CUT_REASON = "the tests are the session"
+
+
 def _minimum_blocks(blocks: list[Any], per_movement: int, max_movements: int) -> list[Any]:
     """The ideal's anchors cut to the minimum shape: warm-ups kept, the first `per_movement` working sets."""
-    from training import warmup_sets
+    from training import session_block, warmup_sets
 
     out: list[Any] = []
     for b in blocks:
@@ -604,7 +617,8 @@ def _minimum_blocks(blocks: list[Any], per_movement: int, max_movements: int) ->
                 kept.append(s)
                 n += 1
         b.sets = kept
-        b.notes = f"{b.notes} Today: {n} working set(s) only, the tests are the session (#5078).".strip()
+        # #5428: the cut is the lift's one reason line (standard §3.8), after its effort line; the why stays in the rationale
+        b.notes = session_block.add_reason(b.notes, session_block.applied_clause("set_count", working_sets=n, reason=MINIMUM_CUT_REASON))
         out.append(b)
     return out
 

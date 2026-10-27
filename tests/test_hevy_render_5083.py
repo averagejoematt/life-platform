@@ -18,6 +18,7 @@ from unittest.mock import patch
 from training import hevy_render, warmup_sets
 from training.cardio_note import compose
 from training.hevy_compiler import to_create_body
+from training.lift_note import rotation_line
 from training.routine_generator import _progress_block
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 from training.routine_title import _ROLE_WHY, format_why_note
@@ -82,7 +83,14 @@ def _fixture() -> tuple[RoutineSpec, str]:
             bench,
             row,
             ExerciseBlock(movement_key="lateral_raise", sets=_working(25 * LB, 12, 15, 2), rest_seconds=60, superset_id=0),
-            ExerciseBlock(movement_key="rear_delt_fly", sets=_working(20 * LB, 12, 15, 2), rest_seconds=60, superset_id=0),
+            # #5083/#5428: the rotated-in accessory carries its one reason line, by its real producer
+            ExerciseBlock(
+                movement_key="rear_delt_fly",
+                sets=_working(20 * LB, 12, 15, 2),
+                rest_seconds=60,
+                superset_id=0,
+                notes="RPE 8–9, last set RPE 9–10\n" + rotation_line("Face Pull"),
+            ),
             ExerciseBlock(movement_key="treadmill", sets=[Set(type="normal", duration_seconds=1800)], notes=treadmill_note),
             ExerciseBlock(movement_key="cycling", sets=[Set(type="normal", duration_seconds=1800)], notes=cycling_note),
         ],
@@ -230,7 +238,7 @@ def test_a_long_session_note_is_the_lint_budget_not_a_window():
     """#5428: Hevy shows notes in full (owner screenshots 2026-10-26), so a session note past the old 150-char window
     is no render problem; its length is the note lint's phone-line budget (L7) instead."""
     ir, why = _fixture()
-    long_why = "x" * (hevy_render.VISIBLE_NOTE_CHARS + 1)
+    long_why = "x" * 151  # past the retired #4070 window (150 characters)
     rc = hevy_render.render_check(_compile(ir, long_why), session_note=long_why, ir=ir)
     assert _status(rc)["progression_reason"] == "lands"
     assert not any("window" in p for p in rc["problems"]), rc["problems"]
@@ -245,26 +253,29 @@ def test_a_warmup_after_a_working_set_is_a_problem():
 
 
 def test_the_minimum_session_label_falls_back_to_the_session_line():
-    """#5088: the title is the convention's at commit, so the label rides the session line + each cue."""
-    from training import disruption
+    """#5088: the title is the convention's at commit, so the label rides the session line. #5428: that line is the
+    session block's ‹Day› (`Minimum · RPE 8–9 on big lifts`), and each lift's note is the standard's — no issue number."""
+    from training import disruption, session_block
+    from training.routine_generator import _load_json
 
-    cue = disruption._cue({"sets": [{"reps": [4, 6], "rpe": [8, 9]}, {"pct_of_top": 90}]})
-    ir = RoutineSpec(
-        routine_id="r-min",
+    catalog = _load_json("movement_catalog.json")
+    ir = disruption.to_routine(
+        disruption.session("upper_heavy", "gym_minimum", catalog["movements"]),
         target_date="2026-12-22",
-        archetype="upper",
         variant=disruption.PRIMARY_VARIANT,
-        source_action="disruption",
-        notes="Minimum session, travel mode: habits held, not targets. Step back up on return.",
-        exercises=[ExerciseBlock(movement_key="bench", sets=_working(60, 4, 6, 1), rest_seconds=90, notes=cue)],
+        mode={"template": "travel"},
+        catalog=catalog,
     )
-    why = format_why_note(ir)
-    assert why == ir.notes
+    why = session_block.why_note_for(ir, format_why_note(ir))
+    assert why == ""  # the block's first line IS the session line; no second WHY line
     body = to_create_body(ir, lambda k: "X", title_context={"phase": "Phase", "type_count_in_phase": 1, "all_time_count": 1}, why_note=why)
     assert "MINIMUM" not in body["routine"]["title"].upper()  # the convention owns the title — hence the fallback
     rc = hevy_render.render_check(body, session_note=why)
-    assert _status(rc)["minimum_session"] == "lands" and _render_problems(rc) == []
-    assert body["routine"]["exercises"][0]["notes"].startswith(why + "\n\nMinimum: top set 4-6 @ RPE 8-9")
+    assert _status(rc)["minimum_session"] == "lands" and _render_problems(rc) == [], rc["problems"]
+    notes = [e["notes"] for e in body["routine"]["exercises"]]
+    assert notes[0].split("\n")[:2] == ["Minimum · RPE 8–9 on big lifts", session_block.LOW_ENERGY_LINE]
+    assert all(n.split("\n\n")[-1].split("\n")[:2] == ["RPE 8–9", "Top set, then one back-off 10% lighter."] for n in notes)
+    assert not any(re.search(r"#\d|Minimum:", n) for n in notes), notes
 
 
 def test_every_role_session_block_is_the_grammar():
@@ -275,13 +286,6 @@ def test_every_role_session_block_is_the_grammar():
         lines = block.split("\n")
         assert g.SESSION_LINE_RE.match(lines[0]) and len(lines[0]) <= g.SESSION_LINE_MAX_CHARS, block
         assert lines[1:] == [g.LOW_ENERGY_LINE, g.LOAD_RULE_LINE], block
-
-
-def test_the_window_agrees_with_the_owner_observation_4070():
-    """Read off the source (importing mcp.tools_plan needs the MCP env): the two numbers are one observation."""
-    with open(os.path.join(_REPO, "mcp", "tools_plan.py"), encoding="utf-8") as fh:
-        m = re.search(r"^HEVY_NOTE_OBSERVED_VISIBLE_CHARS = (\d+)$", fh.read(), re.M)
-    assert m and hevy_render.VISIBLE_NOTE_CHARS == int(m.group(1))
 
 
 def test_the_doc_table_is_the_machine_table():

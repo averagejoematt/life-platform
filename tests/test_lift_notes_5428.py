@@ -49,8 +49,10 @@ def note_problems(note: str) -> list[str]:
     lines = note.split("\n")
     if not LINE1.match(lines[0]):
         out.append(f"line 1 is not the effort line: {lines[0]!r}")
-    if len(lines) > 3:
-        out.append(f"{len(lines)} lines (max 3: effort, one reason, one cue)")
+    # standard §3.2/§7: effort, one reason, one cue — plus the pick-load W line when a rotated accessory (#5083) is also new
+    # to him; the budget is 4 lines
+    if len(lines) > 4:
+        out.append(f"{len(lines)} lines (max 4: effort, one reason, the W line, one cue)")
     hit = BANNED.search(note)
     if hit:
         out.append(f"banned token {hit.group(0)!r}")
