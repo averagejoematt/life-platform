@@ -366,22 +366,30 @@ def test_ledger_lost_reset_race_falls_back_to_add(env, monkeypatch):
     assert calls[-1] == "last_seen >= :cutoff"
 
 
-def test_date_bound_jobs_escalate_instead_of_auto_retrying_4284():
-    """#4284 review: a zoned schedule's envelope names the function; daily-brief and hevy-restamp
-    still resolve to None (escalate, as before the migration), any other function resolves."""
+def test_a_scheduled_run_whose_pacific_day_is_over_escalates_instead_of_retrying_4284():
+    """#4284 review: a Scheduler envelope names its function in `resources`; a retry is allowed only while the
+    run's scheduled Pacific day is still today — a later retry would run the wrong day (e.g. the brief)."""
+    from datetime import datetime, timezone
+
     from operational import dlq_consumer_lambda as dlq
 
-    def envelope(fn):
+    def envelope(scheduled_utc):
         return {
             "source": "aws.events",
             "detail-type": "Scheduled Event",
+            "time": scheduled_utc,
             "detail": {},
             "resources": [
                 "arn:aws:scheduler:us-west-2:123456789012:schedule/default/x",
-                f"arn:aws:lambda:us-west-2:123456789012:function:{fn}",
+                "arn:aws:lambda:us-west-2:123456789012:function:daily-brief",
             ],
         }
 
-    assert dlq._function_from_eventbridge(envelope("daily-brief")) is None
-    assert dlq._function_from_eventbridge(envelope("hevy-restamp")) is None
-    assert dlq._function_from_eventbridge(envelope("whoop-data-ingestion")).endswith(":function:whoop-data-ingestion")
+    # 10:00 PDT on 10-27 is 17:00Z; checked at 22:00 PDT the same Pacific day (05:00Z 10-28) -> still retried
+    same_day = datetime(2026, 10, 28, 5, 0, tzinfo=timezone.utc)
+    assert not dlq._scheduled_day_has_passed(envelope("2026-10-27T17:00:00Z"), now=same_day)
+    # checked at 00:30 PDT on 10-28 (07:30Z) -> the scheduled day is over -> escalate
+    next_day = datetime(2026, 10, 28, 7, 30, tzinfo=timezone.utc)
+    assert dlq._scheduled_day_has_passed(envelope("2026-10-27T17:00:00Z"), now=next_day)
+    # an envelope without a usable time keeps the old behaviour (retry)
+    assert not dlq._scheduled_day_has_passed({"resources": []}, now=next_day)

@@ -72,6 +72,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
+from common import pacific_time
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -395,14 +396,6 @@ NON_CDK_RULE_TARGETS: dict[str, str] = {
 }
 
 
-#: #4284 review (2026-10-27): jobs that recompute "yesterday"/"today" from the clock on every run. A
-#: re-invoke hours late (the consumer runs every 6 h) could send the just-ended day's brief after Pacific
-#: midnight and then the send ledger blocks the next morning's real one. Before the Scheduler migration
-#: these two were unresolvable here (daily-brief's schedule sent no input; hevy-restamp's rule sits outside
-#: the `rule/LifePlatform*` lookup), so they escalated without a retry; this keeps that behaviour.
-DATE_BOUND_NO_RETRY = frozenset({"daily-brief", "hevy-restamp"})
-
-
 def rule_names(body_obj: dict) -> list[str]:
     """The EventBridge rule names an event body names in `resources`."""
     out = []
@@ -410,6 +403,22 @@ def rule_names(body_obj: dict) -> list[str]:
         if isinstance(arn, str) and ":rule/" in arn:
             out.append(arn.split(":rule/", 1)[1])
     return out
+
+
+def _scheduled_day_has_passed(body_obj: dict, now: datetime | None = None) -> bool:
+    """#4284 review (2026-10-27): a Scheduler-envelope run whose scheduled Pacific day is over is not retried.
+
+    A scheduled job reads "today"/"yesterday" from its clock on every run, so a re-invoke from this consumer
+    (every 6 h) after Pacific midnight would run the WRONG day — e.g. send the just-ended day's brief, after
+    which the send ledger blocks the next morning's real one. Before the Scheduler migration such envelopes
+    carried no function ARN and escalated without a retry; this keeps that for every run whose day has ended,
+    derived from the envelope's own scheduled time, never from a hand-typed function list. Same-day failures
+    still retry. An unparseable or absent time keeps today's behaviour (retry)."""
+    scheduled = pacific_time.pacific_date_of(str(body_obj.get("time") or ""))
+    if not scheduled:
+        return False
+    today = (now or datetime.now(timezone.utc)).astimezone(pacific_time.PACIFIC).date().isoformat()
+    return scheduled < today
 
 
 def _function_from_eventbridge(body_obj: dict) -> str | None:
@@ -428,7 +437,7 @@ def _function_from_eventbridge(body_obj: dict) -> str | None:
     the target function's ARN in `resources`, so the function resolves with no API call."""
     for arn in body_obj.get("resources") or []:
         if isinstance(arn, str) and ":function:" in arn:
-            if arn.rsplit(":function:", 1)[1].split(":", 1)[0] in DATE_BOUND_NO_RETRY:
+            if _scheduled_day_has_passed(body_obj):
                 return None
             return arn
     for rule_name in rule_names(body_obj):
