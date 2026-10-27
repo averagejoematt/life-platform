@@ -458,6 +458,19 @@ def parse_walk(note: str | None, total_min: int | None = None, *, treadmill: boo
     return out
 
 
+def walk_signal(text: str | None) -> dict[str, Any]:
+    """The treadmill shorthand in one bout as the notes layer's `progression` value fields (`training_notes`): {speed_mph,
+    incline_pct} of the first segment, plus `segments` when he changed the setting; {} when the bout is not one."""
+    walk = parse_walk(text)
+    if walk["status"] == "none":
+        return {}
+    first = walk["segments"][0]
+    out: dict[str, Any] = {"speed_mph": first["speed_mph"], "incline_pct": first["incline_pct"]}
+    if len(walk["segments"]) > 1:
+        out["segments"] = walk["segments"]
+    return out
+
+
 def parse_rule(rule: str | None) -> dict[str, Any] | None:
     """A rendered rule line, held to the STRICT grammar (`RULE_RE`): its shape, or None when it is off the grammar."""
     if not rule or not RULE_RE.match(rule):
