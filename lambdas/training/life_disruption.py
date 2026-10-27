@@ -234,6 +234,7 @@ def mode(
         "until": st.get("until"),
         "resumes_on": _resumes_on(st) if scope != SCOPE_OFF else None,
         "lapse": bool(whole and tmpl.get("lapse")),
+        "owes_step_back_up": bool(st.get("owes_step_back_up")),
         "held_habits": list(pb.get("held_habits") or []) if whole else None,
         "paused_habits": list(pb.get("paused_habits") or []) if whole else None,
         "paused_targets": list(pb.get("paused_targets") or []) if whole else None,
@@ -259,9 +260,9 @@ def lines(m: dict[str, Any]) -> list[str]:
             f"Whole-day disruption mode is ON ({m.get('template')}: {kind}), {m.get('start_date')} through {m.get('until')}, "
             f"on his own word; the day's targets and grading resume {m.get('resumes_on')}"
             + (
-                " with the full plan (no step-back-up week)."
-                if m.get("lapse")
-                else ", the training stepping back up first (disruption.step_back_up)."
+                ", the training stepping back up first (disruption.step_back_up)."
+                if m.get("owes_step_back_up")
+                else " with the full plan (no step-back-up week)."
             )
         )
         out.append(

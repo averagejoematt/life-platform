@@ -7,6 +7,12 @@ Runs daily at 11:30am PT (19:30 UTC) after the daily brief updates stats.
 Images:  og-home.png, og-sleep.png, og-glucose.png,
          og-training.png, og-character.png, og-nutrition.png
 Output:  s3://matthew-life-platform/site/assets/images/
+
+#5421 — two halves, separately invocable: ``render_cards`` (the page cards, ~15 s flat) and
+``sweep`` (the moments + coach cards, now incremental and time-boxed — web.og_moments.SweepPlan).
+``event["mode"]`` = render | sweep | all picks; the EventBridge event carries none and runs
+``all``, render first. Splitting the SCHEDULE (a second target) is a CDK change; the code is
+ready for it.
 """
 
 import io
@@ -560,16 +566,34 @@ PAGES = [
 ]
 
 
-def lambda_handler(event, context):
-    # Read public_stats.json
+MODE_RENDER = "render"  # the daily page cards + the CloudFront invalidation, nothing else
+MODE_SWEEP = "sweep"  # the moments sweep (#404) + the coach cards (#593), nothing else
+MODE_ALL = "all"  # both, render first — what the EventBridge schedule runs today
+MODES = (MODE_RENDER, MODE_SWEEP, MODE_ALL)
+
+
+def resolve_mode(event):
+    """#5421: which half of the job this invocation does. An absent or unrecognised ``mode``
+    (the scheduled EventBridge event carries none) is ``all``, so a malformed event can never
+    silently skip the daily cards; the schedule can be split later by giving a second target
+    the constant event ``{"mode": "sweep"}`` and the first ``{"mode": "render"}``."""
+    mode = str((event or {}).get("mode") or MODE_ALL).strip().lower()
+    return mode if mode in MODES else MODE_ALL
+
+
+def read_stats():
     try:
         resp = s3.get_object(Bucket=S3_BUCKET, Key="generated/public_stats.json")
-        stats = json.loads(resp["Body"].read())
+        return json.loads(resp["Body"].read())
     except Exception as e:
         print(f"[ERROR] Failed to read public_stats.json: {e}")
         # Use empty stats — images will show placeholder dashes
-        stats = {}
+        return {}
 
+
+def render_cards(stats):
+    """The daily page cards (PNG + WebP) and the CloudFront invalidation. Returns the names
+    written. ~15 s of wall clock, flat — independent of how many moments exist."""
     generated = []
     for name, builder in PAGES:
         try:
@@ -631,7 +655,12 @@ def lambda_handler(event, context):
             print(f"[OK] CloudFront invalidation created for {len(generated)} images")
         except Exception as e:
             print(f"[WARN] CloudFront invalidation failed (non-fatal): {e}")
+    return generated
 
+
+def sweep(stats, time_left=None, force=False):
+    """The moments sweep + the coach cards — fail-soft, each independent of the page cards.
+    ``time_left`` is ``context.get_remaining_time_in_millis`` (``None`` = unbounded)."""
     # #404: permalinked shareable moments (weekly recap · board answers · graded
     # predictions) — shells + per-moment cards under generated/moments/. Fail-soft:
     # a moments error never blocks the daily page cards.
@@ -639,7 +668,7 @@ def lambda_handler(event, context):
     try:
         from web.og_moments import sweep_moments
 
-        idx = sweep_moments(s3, stats)
+        idx = sweep_moments(s3, stats, time_left=time_left, force=force)
         moments_n = (
             (1 if idx.get("week") else 0) + len(idx.get("qa") or {}) + len(idx.get("predictions") or []) + len(idx.get("chronicles") or {})
         )
@@ -655,8 +684,26 @@ def lambda_handler(event, context):
         coach_n = len(sweep_coach_cards(s3, S3_BUCKET))
     except Exception as e:
         print(f"[WARN] coach card sweep failed (non-fatal): {e}")
+    return moments_n, coach_n
 
+
+def lambda_handler(event, context):
+    """``event["mode"]`` selects ``render`` | ``sweep`` | ``all`` (default); ``event["force"]``
+    makes the sweep re-render every moment instead of only the changed ones (#5421)."""
+    event = event if isinstance(event, dict) else {}
+    mode = resolve_mode(event)
+    stats = read_stats()
+    t0 = time.monotonic()
+    generated, moments_n, coach_n = [], 0, 0
+    if mode in (MODE_RENDER, MODE_ALL):
+        generated = render_cards(stats)
+    t1 = time.monotonic()
+    if mode in (MODE_SWEEP, MODE_ALL):
+        time_left = getattr(context, "get_remaining_time_in_millis", None)
+        moments_n, coach_n = sweep(stats, time_left=time_left, force=bool(event.get("force")))
+    t2 = time.monotonic()
+    print(f"[og] mode={mode} render={t1 - t0:.1f}s sweep={t2 - t1:.1f}s")
     return {
         "statusCode": 200,
-        "body": f"Generated {len(generated)}/{len(PAGES)} OG images + {moments_n} moment(s) + {coach_n} coach card(s)",
+        "body": f"[{mode}] Generated {len(generated)}/{len(PAGES)} OG images + {moments_n} moment(s) + {coach_n} coach card(s)",
     }
