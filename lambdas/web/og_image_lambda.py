@@ -690,20 +690,24 @@ def sweep(stats, time_left=None, force=False):
 def lambda_handler(event, context):
     """``event["mode"]`` selects ``render`` | ``sweep`` | ``all`` (default); ``event["force"]``
     makes the sweep re-render every moment instead of only the changed ones (#5421)."""
-    event = event if isinstance(event, dict) else {}
-    mode = resolve_mode(event)
-    stats = read_stats()
-    t0 = time.monotonic()
-    generated, moments_n, coach_n = [], 0, 0
-    if mode in (MODE_RENDER, MODE_ALL):
-        generated = render_cards(stats)
-    t1 = time.monotonic()
-    if mode in (MODE_SWEEP, MODE_ALL):
-        time_left = getattr(context, "get_remaining_time_in_millis", None)
-        moments_n, coach_n = sweep(stats, time_left=time_left, force=bool(event.get("force")))
-    t2 = time.monotonic()
-    print(f"[og] mode={mode} render={t1 - t0:.1f}s sweep={t2 - t1:.1f}s")
-    return {
-        "statusCode": 200,
-        "body": f"[{mode}] Generated {len(generated)}/{len(PAGES)} OG images + {moments_n} moment(s) + {coach_n} coach card(s)",
-    }
+    try:
+        event = event if isinstance(event, dict) else {}
+        mode = resolve_mode(event)
+        stats = read_stats()
+        t0 = time.monotonic()
+        generated, moments_n, coach_n = [], 0, 0
+        if mode in (MODE_RENDER, MODE_ALL):
+            generated = render_cards(stats)
+        t1 = time.monotonic()
+        if mode in (MODE_SWEEP, MODE_ALL):
+            time_left = getattr(context, "get_remaining_time_in_millis", None)
+            moments_n, coach_n = sweep(stats, time_left=time_left, force=bool(event.get("force")))
+        t2 = time.monotonic()
+        print(f"[og] mode={mode} render={t1 - t0:.1f}s sweep={t2 - t1:.1f}s")
+        return {
+            "statusCode": 200,
+            "body": f"[{mode}] Generated {len(generated)}/{len(PAGES)} OG images + {moments_n} moment(s) + {coach_n} coach card(s)",
+        }
+    except Exception as e:
+        print(f"[og] handler failed: {type(e).__name__}: {e}")
+        raise
