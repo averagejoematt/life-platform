@@ -530,19 +530,7 @@ for _extracted in (CI_PROOFS, GUARD_PROOFS, QA_PROOFS, REGISTRY_PROOFS, STRUCTUR
 # "I could not make it fail" recorded with the reason is a lead; skipping it silently
 # is how the assumption survives. Nothing here is a claim that the gate is dark.
 # ─────────────────────────────────────────────────────────────────────────────
-_EB_RULES_4284_REASON = (
-    "#4284 (ADR-165) — NOT PROVED. A REQUIRED_EB_RULES entry is a live-AWS DescribeRule probe (tests/test_integration_aws.py "
-    "I6, post-deploy only); proving it can fail means deleting or disabling the live rule, an AWS mutation no lane may make. "
-    "The entry replaced the Whoop/Todoist/FreshnessChecker rules, which moved to EventBridge Scheduler with every other zoned "
-    "row (checked in the same test by GetSchedule); what stays an Events rule is the fixed-UTC set: the utc_reason opt-outs "
-    "and the rate rows."
-)
-_EB_RULE_4284 = "registry::tests/test_integration_aws.py::REQUIRED_EB_RULES::"
-
 ATTEMPTED_UNPROVEN: dict[str, str] = {
-    _EB_RULE_4284 + "LifePlatformIngestion-HabitifyIngestionSchedule8F58-20xjBrPYKtC8": _EB_RULES_4284_REASON,
-    _EB_RULE_4284 + "LifePlatformIngestion-HevyBackfillSchedule97BF5DD5-bBl2eglWL6ag": _EB_RULES_4284_REASON,
-    _EB_RULE_4284 + "LifePlatformOperational-DlqConsumerScheduleEC15B7F4-jl4JyU2rFaNS": _EB_RULES_4284_REASON,
     "ci::panel-rubric-gate.yml::gate::5": (
         "#5072 Live judge — NOT PROVED in CI. The role it assumes (github-actions-golden-eval-role) exists but its trust "
         "admits refs/heads/main only (a pull_request is refused at the OIDC step, a visible ::warning:: step) and its "
@@ -607,6 +595,9 @@ ATTEMPTED_UNPROVEN: dict[str, str] = {
         "tests/test_verify_citations_3621.py."
     ),
 }
+from gate_census_proofs import ATTEMPTED_UNPROVEN_EXTRACTED  # noqa: E402 — #1665: records extracted, never a raise
+
+ATTEMPTED_UNPROVEN.update(ATTEMPTED_UNPROVEN_EXTRACTED)
 
 
 def log(msg: str) -> None:
