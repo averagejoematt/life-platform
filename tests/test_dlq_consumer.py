@@ -364,3 +364,24 @@ def test_ledger_lost_reset_race_falls_back_to_add(env, monkeypatch):
     mod._table.update_item.side_effect = upd
     assert mod.record_failure("sid", "fn", 1, "{}") == 2
     assert calls[-1] == "last_seen >= :cutoff"
+
+
+def test_date_bound_jobs_escalate_instead_of_auto_retrying_4284():
+    """#4284 review: a zoned schedule's envelope names the function; daily-brief and hevy-restamp
+    still resolve to None (escalate, as before the migration), any other function resolves."""
+    from operational import dlq_consumer_lambda as dlq
+
+    def envelope(fn):
+        return {
+            "source": "aws.events",
+            "detail-type": "Scheduled Event",
+            "detail": {},
+            "resources": [
+                "arn:aws:scheduler:us-west-2:123456789012:schedule/default/x",
+                f"arn:aws:lambda:us-west-2:123456789012:function:{fn}",
+            ],
+        }
+
+    assert dlq._function_from_eventbridge(envelope("daily-brief")) is None
+    assert dlq._function_from_eventbridge(envelope("hevy-restamp")) is None
+    assert dlq._function_from_eventbridge(envelope("whoop-data-ingestion")).endswith(":function:whoop-data-ingestion")

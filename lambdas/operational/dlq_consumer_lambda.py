@@ -395,6 +395,14 @@ NON_CDK_RULE_TARGETS: dict[str, str] = {
 }
 
 
+#: #4284 review (2026-10-27): jobs that recompute "yesterday"/"today" from the clock on every run. A
+#: re-invoke hours late (the consumer runs every 6 h) could send the just-ended day's brief after Pacific
+#: midnight and then the send ledger blocks the next morning's real one. Before the Scheduler migration
+#: these two were unresolvable here (daily-brief's schedule sent no input; hevy-restamp's rule sits outside
+#: the `rule/LifePlatform*` lookup), so they escalated without a retry; this keeps that behaviour.
+DATE_BOUND_NO_RETRY = frozenset({"daily-brief", "hevy-restamp"})
+
+
 def rule_names(body_obj: dict) -> list[str]:
     """The EventBridge rule names an event body names in `resources`."""
     out = []
@@ -420,6 +428,8 @@ def _function_from_eventbridge(body_obj: dict) -> str | None:
     the target function's ARN in `resources`, so the function resolves with no API call."""
     for arn in body_obj.get("resources") or []:
         if isinstance(arn, str) and ":function:" in arn:
+            if arn.rsplit(":function:", 1)[1].split(":", 1)[0] in DATE_BOUND_NO_RETRY:
+                return None
             return arn
     for rule_name in rule_names(body_obj):
         if rule_name in NON_CDK_RULE_TARGETS:
