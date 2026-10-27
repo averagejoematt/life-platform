@@ -157,21 +157,28 @@ def publish_dev_session_month(cw, dimension: str, month_start: datetime, now: da
 
     It lives beside the premise check because it is the same class's measurement, and it
     changes no arithmetic: dev-session stays out of the projection and never moves a tier.
-    Published even when the sum is 0, so the alarm returns to OK at rollover. No new IAM (the
+    Published even when the sum is 0, so the alarm returns to OK at rollover. Before
+    `dev_session_cap.MONTH_CAP_EFFECTIVE_FROM` (2026-11-01, owner ruling on #5406) the value
+    is 0 whatever was spent, so October reads as un-capped and the alarm clears. No new IAM (the
     governor holds cloudwatch:GetMetricStatistics and PutMetricData on `*`). Never raises;
     returns what it published, or None on any failure.
     """
     try:
-        resp = cw.get_metric_statistics(
-            Namespace="LifePlatform/AI",
-            MetricName="EstimatedCostUSD",
-            Dimensions=[{"Name": dimension, "Value": "dev-session"}],
-            StartTime=month_start,
-            EndTime=now,
-            Period=2678400,
-            Statistics=["Sum"],
-        )
-        mtd = float(sum(float(d.get("Sum") or 0.0) for d in resp.get("Datapoints", [])))
+        from ai import dev_session_cap
+
+        if dev_session_cap.month_cap_in_force(now):
+            resp = cw.get_metric_statistics(
+                Namespace="LifePlatform/AI",
+                MetricName="EstimatedCostUSD",
+                Dimensions=[{"Name": dimension, "Value": "dev-session"}],
+                StartTime=month_start,
+                EndTime=now,
+                Period=2678400,
+                Statistics=["Sum"],
+            )
+            mtd = float(sum(float(d.get("Sum") or 0.0) for d in resp.get("Datapoints", [])))
+        else:
+            mtd = 0.0  # #5406: the envelope starts 2026-11-01; a month before it reads un-capped, so the alarm is OK
         cw.put_metric_data(
             Namespace="LifePlatform/Budget",
             MetricData=[{"MetricName": "DevSessionSpendMTD", "Value": mtd, "Unit": "None"}],
