@@ -45,7 +45,15 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from training import effort_ceilings, owner_redlines, program_structure, program_v03, program_v04, routine_generator  # noqa: E402
+from training import (
+    effort_ceilings,
+    owner_redlines,
+    program_structure,
+    program_v03,
+    program_v04,
+    rep_scheme,
+    routine_generator,
+)  # noqa: E402
 from training.training_charter import charter_value  # noqa: E402
 
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
@@ -448,8 +456,9 @@ def test_generator_builds_the_committed_lower_heavy_as_the_first_v04_session():
     ideal, floor = _generate("2026-09-25")
     assert ideal.archetype == "lower" and ideal.variant == "ideal"
     assert ideal.title.startswith("LOWER-HEAVY — W1")
-    assert [(b.movement_key, len(b.sets)) for b in ideal.exercises] == COMMITTED_LOWER_HEAVY
-    assert ideal.exercises[0].sets[0].rep_range_start == 4 and ideal.exercises[0].sets[0].rep_range_end == 6
+    # #5428: a lift with no history opens on the pick-load feeler W row — the committed shape is the WORKING sets
+    assert [(b.movement_key, len(_ws(b))) for b in ideal.exercises] == COMMITTED_LOWER_HEAVY
+    assert _ws(ideal.exercises[0])[0].rep_range_start == 4 and _ws(ideal.exercises[0])[0].rep_range_end == 6
     assert ideal.inputs_snapshot["calendar"]["week"] == 1 and ideal.inputs_snapshot["calendar"]["session_role"] == LH
     assert ideal.inputs_snapshot["session_prescription"]["hevy_folder"] == "Lower"
     # the Minimum Viable Session: anchors only, top set + one back-off, machine-only (no bar on a
@@ -528,10 +537,11 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     # floor — nothing to re-enter from, so the achieved load is HELD and the ramp never goes under it
     assert top == pytest.approx(200 * 0.45359237)
     assert ideal.inputs_snapshot["load_floors"]["movements"]["squat_barbell"]["ramp"]["hold"]["applies"] is True
-    assert [s.weight_kg for s in _ws(squat)[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
+    # #5428: the back-offs are rounded to the barbell's 5-lb step (180 lb), not floored to 0.5 kg
+    assert [s.weight_kg for s in _ws(squat)[1:]] == [rep_scheme.round_to_implement_kg(top * 0.9, "barbell")] * 2
     assert any("back-offs at 90%" in r for r in ideal.rationale)
     lo, hi = effort_ceilings.class_bands()[effort_ceilings.COMPOUNDS]
-    assert f"HEAVY: 1 top set of 4–6 @ RPE {lo:g}–{hi:g}" in squat.notes  # #5058: the charter's band in the cue
+    assert squat.notes.splitlines()[0] == f"RPE {lo:g}–{hi:g}"  # #5058: the charter's band; #5428: the note's line 1
 
 
 def test_generator_deload_week_holds_loads_and_cuts_sets():
@@ -540,12 +550,12 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
     word = [{"start_date": "2026-11-04", "days": 7, "sets_pct": -40, "words": "deload this week"}]
     with patch("training.deload_word.load_records_failsoft", return_value=[]):
         whole = _generate("2026-11-07", block_workouts=_done(44))[0]
-    assert "DELOAD" not in whole.title and sum(len(b.sets) for b in whole.exercises) == 14
+    assert "DELOAD" not in whole.title and sum(len(_ws(b)) for b in whole.exercises) == 14
     with patch("training.deload_word.load_records_failsoft", return_value=word):
         ideal = _generate("2026-11-07", block_workouts=_done(44))[0]
     assert "DELOAD" in ideal.title and ideal.title.startswith("LOWER-HEAVY — W7")
     assert any("deload: sets 14 -> 8" in r for r in ideal.rationale)
-    assert sum(len(b.sets) for b in ideal.exercises) == 8
+    assert sum(len(_ws(b)) for b in ideal.exercises) == 8
 
 
 def test_red_recovery_drops_accessories_not_anchors():
@@ -780,8 +790,8 @@ def test_4409_the_generator_draft_keeps_the_db_row_and_press_with_a_current_load
     blocks = {b.movement_key: b for b in ideal.exercises}
     assert "machine_row" not in blocks and "machine_shoulder_press" not in blocks
     lb = 0.45359237
-    assert blocks["one_arm_db_row"].sets[0].weight_kg == pytest.approx(90 * lb, abs=0.01)
-    assert blocks["db_shoulder_press"].sets[0].weight_kg == pytest.approx(52.5 * lb, abs=0.01)
+    assert _ws(blocks["one_arm_db_row"])[0].weight_kg == pytest.approx(90 * lb, abs=0.01)
+    assert _ws(blocks["db_shoulder_press"])[0].weight_kg == pytest.approx(52.5 * lb, abs=0.01)
     floors = ideal.inputs_snapshot["load_floors"]["movements"]
     assert floors["db_shoulder_press"]["template_id"] == "878CD1D0" and floors["db_shoulder_press"]["fallback"] is None
     # the snapshot's catalog hash is the catalog's own — the wire id is an overlay, not an edit

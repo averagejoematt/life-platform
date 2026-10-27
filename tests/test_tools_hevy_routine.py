@@ -218,12 +218,13 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
     bench = ir.exercises[0]
     first_working = next(st for st in bench.sets if st.type != "warmup")  # #5049 prepends the climb
     assert first_working.weight_kg == round(155 * 0.45359237, 4)
-    assert out["warmup_sets"] == 3 and [st.type for st in bench.sets[:3]] == ["warmup"] * 3
+    # #5049's barbell climb (3) + #5428 R4's one row on the first dumbbell compound (the incline, >= 50 lb per hand)
+    assert out["warmup_sets"] == 4 and [st.type for st in bench.sets[:3]] == ["warmup"] * 3
     assert bench.rest_seconds == 165
 
-    # count expansion: incline authored as one set x3 -> 3 Set objects
+    # count expansion: incline authored as one set x3 -> 3 working Set objects (after its one W row)
     incline = next(b for b in ir.exercises if b.movement_key == "incline_db_press")
-    assert len(incline.sets) == 3
+    assert [st.type for st in incline.sets] == ["warmup", "normal", "normal", "normal"]
 
     # superset id preserved across the tri-set
     triset = [b for b in ir.exercises if b.superset_id == 1]

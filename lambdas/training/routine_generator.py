@@ -39,6 +39,7 @@ from common.repo_config import config_dir
 from training import program_conflicts, program_structure  # #3755 the program as data; #4080 its catalog_gaps() audit
 from training.band_reference import band_key  # #3927: ONE definition of a bodyweight band
 from training.cardio_cues import attach_cardio_cues  # #3700/#5048: the cardio note pass, re-exported for its callers
+from training.lift_note import compose_blocks, render_floor_cue  # noqa: F401 — #5428: the note composer; the floor line moved (chat only)
 from training.movement_catalog import generator_eligible  # #4108: the ONE auto-programming rule
 from training.program_seam import resolve_week_grid  # #3755: ONE source for the week grid
 from training.routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
@@ -385,29 +386,6 @@ def prescription_floor(
     return out
 
 
-def render_floor_cue(floor: dict[str, Any]) -> str:
-    """The reader-facing line. Factual only — a load, a date, a bodyweight band.
-
-    Never a conditional: the whole defect is a cue that makes the athlete decide
-    whether to 'go for' a number the platform already watched him hit.
-    """
-    if not floor or floor.get("status") != "ok" or not floor.get("floor_kg"):
-        return ""
-    if floor.get("ramp"):  # #4090: a v0.3 entry-ramp load names the ramp, not a best-load floor
-        from training.load_ramp import render_ramp_cue
-
-        return render_ramp_cue(floor)
-    basis = floor.get("basis") or {}
-    reps = "/".join(str(r) for r in (basis.get("reps") or []))
-    got = f"{_fmt_load(float(basis.get('weight_kg') or 0))}"
-    if reps:
-        got += f" x {reps}"
-    cue = f"Floor {_fmt_load(float(floor['floor_kg']))} — you did {got} on {basis.get('date')} at {basis.get('bodyweight_lb')} lb."
-    if floor.get("layoff_reason"):
-        cue += f" Discounted {floor['discount_pct']}% for the layoff."
-    return cue + " Down on the day if you must, never up."
-
-
 def _set_field(s: Any, name: str, value: Any) -> None:
     if isinstance(s, dict):
         s[name] = value
@@ -427,6 +405,10 @@ def floor_rule_label(floor: dict[str, Any]) -> str:
     basis = (floor or {}).get("basis") or {}
     date = basis.get("date")
     hold = r.get("hold") or {}
+    achieved = r.get("achieved_floor") or {}
+    if achieved.get("applies"):
+        a = achieved.get("achieved") or {}
+        return f"held from the {a.get('date') or date} performance (a load moved in the last 14 days is never undercut, #5428)"
     if hold.get("applies"):
         a = hold.get("achieved") or {}
         return f"held from the {a.get('date') or date} performance (the achieved load is never undercut)"
@@ -979,6 +961,14 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     from training import warmup_sets
 
     warmups = warmup_sets.attach_and_note(exercises, catalog.get("movements") or {}, rationale)
+    # #5428: the Hevy note is composed LAST, from what the passes decided (effort, one reason, one cue)
+    note_record = (
+        {}
+        if notes_mode == "off"
+        else compose_blocks(
+            exercises, catalog.get("movements") or {}, load_floors=load_floors, history_index=history_index, target_date=inputs.target_date
+        )
+    )
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
@@ -1004,7 +994,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
         status="draft",
         exercises=exercises,
         budget_used=budget_used,
-        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog) | {"load_floors": load_floors, "warmups": warmups},
+        inputs_snapshot=_build_inputs_snapshot(inputs, landmarks, catalog) | {"load_floors": load_floors, "warmups": warmups} | note_record,
         rationale=rationale,
         caps=caps,
     )

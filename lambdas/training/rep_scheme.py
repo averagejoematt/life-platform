@@ -193,3 +193,49 @@ def is_below_floor(weight_kg: float, floor_kg: float) -> bool:
     `audit_prescription` (the commit gate) and `critics_apply._hold_at_floors` (stage 2's clamp)
     both judge with this, so a clamped draft is, by construction, one the gate accepts."""
     return steps_under_floor(weight_kg, floor_kg) >= 1
+
+
+# ── implement rounding (#5428, standard §5) ─────────────────────────────────────────────────────────────────────────
+IMPLEMENT_STEP_LB: dict[str, float] = {"barbell": 5.0, "plate": 5.0, "machine": 5.0}
+"""platform-proposed (#5428, standard §5 'Row rounding'): a barbell, a plate-loaded implement and a machine step in 5 lb.
+The catalog does not tell a plate machine from a stack machine, so `machine` takes the plate step; a cable stack takes a
+value he has logged on it (below)."""
+
+DUMBBELL_KINDS = ("dumbbell", "kettlebell")
+DUMBBELL_BIG_STEP_FROM_LB = 50.0
+"""A dumbbell rack steps 5 lb from 50 lb a hand and 2.5 lb below it (standard §5)."""
+
+
+def implement_step_lb(equipment: str | None, lb: float | None = None) -> float | None:
+    """The loadable step of one implement, in lb, or None when it has no fixed step (cable stack, bodyweight, band)."""
+    eq = str(equipment or "").strip().lower()
+    if eq in DUMBBELL_KINDS:
+        return 5.0 if float(lb or 0) >= DUMBBELL_BIG_STEP_FROM_LB - 1e-9 else 2.5
+    return IMPLEMENT_STEP_LB.get(eq)
+
+
+def _nearest_down(x: float, step: float) -> float:
+    """`x` to the nearest multiple of `step`; an exact tie goes DOWN (standard §5: 'ties go down')."""
+    return math.ceil(x / step - 0.5 - 1e-9) * step
+
+
+def round_to_implement(lb: float, equipment: str | None, logged_values: list[float] | None = None) -> float:
+    """A load in lb rounded to what the implement can carry (#5428): barbell / plate / machine 5 lb; dumbbell 5 lb at
+    >= 50 and 2.5 lb below; a cable stack the nearest value he has LOGGED on it (`logged_values`, lb), unchanged with
+    none on file. Ties go down. 192.9 -> 195, 210.5 -> 210, 89.3 lb on a dumbbell -> 90; a 27.5 dumbbell stays."""
+    x = float(lb)
+    eq = str(equipment or "").strip().lower()
+    if eq == "cable":
+        vals = sorted({float(v) for v in logged_values or [] if v})
+        if not vals:
+            return x
+        return min(vals, key=lambda v: (abs(v - x), v))  # nearest logged; a tie takes the lighter
+    step = implement_step_lb(eq, x)
+    if step is None:
+        return x
+    return _nearest_down(x, step)
+
+
+def round_to_implement_kg(kg: float, equipment: str | None, logged_values_lb: list[float] | None = None) -> float:
+    """`round_to_implement` for a load held in kg (the IR's unit): the implement-rounded pound, back in kg."""
+    return round_to_implement(float(kg) / LB_IN_KG, equipment, logged_values_lb) * LB_IN_KG
