@@ -46,7 +46,7 @@ from typing import Any, Iterable, Optional
 
 from training.logging_conventions import CONVENTIONS_LINE  # #5373: the one line both conventions are stated in
 
-CONTEXT_VERSION = "coach-context@1.8.0"  # 1.8.0 #5373: logging_conventions (steps on a carry, per-hand vs total load); 1.7.0 #5122: day_mode (the whole-day disruption mode + the lapse offer, owner channel); 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.8.1"  # 1.8.1 #5373: the conventions line states the one-hand carry rule (owner 2026-10-27) and the dated read of the older totals; 1.8.0 #5373: logging_conventions (steps on a carry, per-hand vs total load); 1.7.0 #5122: day_mode (the whole-day disruption mode + the lapse offer, owner channel); 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")

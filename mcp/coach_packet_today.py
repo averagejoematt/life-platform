@@ -100,12 +100,15 @@ def read_stride_day(day: str) -> dict[str, Any] | None:
 
 def _carries(w: dict[str, Any], stride: dict[str, Any] | None) -> list[dict[str, Any]]:
     """#5373: the session's carries, each set rendered "N steps (~X yd, est. from unloaded stride)" (steps only with no measured
-    stride) with the load as logged and its convention (`total_carried`) — `training.carry_line`, the detail tool's line."""
+    stride) with the load as logged and its convention on the session's date (`per_hand` from 2026-10-27, `total_carried` before)
+    — `training.carry_line`, the detail tool's line. The date is the workout row's own `date` (Pacific)."""
     from training.carry_line import carry_line
 
     out = []
     for ex in w.get("exercises") or []:
-        line = carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets"), template_id=ex.get("template_id"), stride=stride)
+        line = carry_line(
+            ex.get("name") or ex.get("title") or "", ex.get("sets"), template_id=ex.get("template_id"), stride=stride, day=w.get("date")
+        )
         if line:
             keep = ("load_lb", "load_convention", "steps", "estimated_yd", "rendered")
             out.append({"name": ex.get("name") or ex.get("title"), "template_id": ex.get("template_id"), **{k: line[k] for k in keep}})

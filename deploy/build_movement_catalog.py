@@ -34,7 +34,7 @@ WHAT IT DOES
          `reviewed: false` entry, rebuilt from scratch on each run.
      Every entry gets `anchor_family` from `training.movement_catalog.anchor_family`, and the owner's
      logging conventions (#5373 — `distance_unit_convention: steps`, `load_convention: total_carried |
-     per_hand`) from `training.logging_conventions.derive_conventions`, written only where the field
+     per_hand` + the dated `load_convention_history`) from `training.logging_conventions.derive_conventions`, written only where the field
      is absent, so a value a human writes on a kept entry wins.
 
 THE DERIVATION RULES (each stated with its reason)
@@ -464,8 +464,10 @@ def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: di
             "training/movement_catalog.py.",
             "logging_conventions": "training/logging_conventions.derive_conventions (#5373, the owner's rules): "
             "distance_unit_convention=steps on every Hevy short_distance_weight entry (he counts steps and types the count in "
-            "the yards field; no gym markings); load_convention=total_carried on a carry by title (carry/farmer/suitcase), "
-            "per_hand on a bilateral dumbbell exercise (one dumbbell's weight logged); absent = as logged. Written only where "
+            "the yards field; no gym markings); load_convention (the CURRENT one) = per_hand on a bilateral dumbbell exercise AND on a "
+            "two-implement carry (farmers walk; the owner's one-hand rule from 2026-10-27), total_carried on a one-object carry "
+            "(sandbag, suitcase); load_convention_history = [{until: 2026-10-26, convention: total_carried}] on a two-implement "
+            "carry (a session on or before `until` reads the total it was logged as); absent = as logged. Written only where "
             "absent, so a hand-written value wins.",
         },
         "movements": movements,

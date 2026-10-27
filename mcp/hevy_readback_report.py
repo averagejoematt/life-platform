@@ -30,6 +30,7 @@ import logging
 from typing import Any
 
 from common.pacific_time import pacific_date_of  # #2798: a Hevy start_time is a UTC instant; its DAY is Pacific
+from training import logging_conventions  # #5373: the dated per-hand / total-carried load convention
 
 from mcp.utils import mcp_error
 
@@ -205,6 +206,23 @@ def stall_check(args: dict[str, Any], *, get_workouts: Any = None) -> dict[str, 
                     "prescribed_load_kg": None,
                     "prescribed_reps": None,
                     "match": "unreadable",
+                }
+            # #5373: a stall is read across sessions, so every load is put in the movement's CURRENT unit — a two-dumbbell
+            # carry logged as the TOTAL before 2026-10-27 is halved to the per-hand number logged now (a drop 140 -> 70 is no
+            # drop). `when` is the session's Pacific date; the prescription and the performance of one session share a unit.
+            title = next(
+                (
+                    e.get("title") or e.get("name") or ""
+                    for e in w.get("exercises") or []
+                    if str(e.get("exercise_template_id") or e.get("template_id") or "") == template_id
+                ),
+                "",
+            )
+            scale = logging_conventions.current_unit_scale(title, template_id, performed_sets, day=when)
+            if scale != 1.0:
+                row = {
+                    **row,
+                    **{k: row[k] * scale for k in ("performed_load_kg", "prescribed_load_kg") if isinstance(row.get(k), (int, float))},
                 }
             points.append(session_point_from_diff(when, row))
             provenance.append({"date": when, "prescription": method or "none", "match": row.get("match")})
