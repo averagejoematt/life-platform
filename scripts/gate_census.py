@@ -595,6 +595,9 @@ ATTEMPTED_UNPROVEN: dict[str, str] = {
         "tests/test_verify_citations_3621.py."
     ),
 }
+from gate_census_proofs import ATTEMPTED_UNPROVEN_EXTRACTED  # noqa: E402 — #1665: records extracted, never a raise
+
+ATTEMPTED_UNPROVEN.update(ATTEMPTED_UNPROVEN_EXTRACTED)
 
 
 def log(msg: str) -> None:

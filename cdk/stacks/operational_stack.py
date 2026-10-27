@@ -18,8 +18,6 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
-    aws_events as events,
-    aws_events_targets as targets,
     aws_iam as iam,
     aws_lambda as _lambda,
     aws_s3 as s3,
@@ -35,7 +33,7 @@ from stacks import (
     role_policies_permanence as rpp,  # #1400 — sibling module; role_policies.py is at its size ceiling
 )
 from stacks.constants import PILLOW_LAYER_ARN, TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
-from stacks.lambda_helpers import create_platform_lambda, table_enabled, table_schedule
+from stacks.lambda_helpers import add_table_schedule, create_platform_lambda, table_schedule
 
 # ── #793 (2026-07-08): the public serving path moved OUT of this stack ───────
 # site-api + site-api-ai (functions, Function URLs, roles, alarms, outputs) now
@@ -590,17 +588,13 @@ class OperationalStack(Stack):
         # the delete-user-data role (Scan + PutItem + DeleteItem already granted) — NO
         # new IAM. Monday 08:00 UTC (after the 07:30 UTC reconciliation job), UTC-fixed
         # (no DST drift). {"apply": True} enacts; flip to False to make it observe-only.
-        subscriber_retention_rule = events.Rule(
+        add_table_schedule(
             self,
             "SubscriberRetentionSweep",
+            target=delete_user_data_fn,
             schedule=table_schedule("life-platform-delete-user-data#SubscriberRetentionSweep"),
+            schedule_input={"subscriber_retention_sweep": True, "apply": True},
             description="#1350: anonymize unsubscribed subscriber emails past the signed 18-month retention window",
-        )
-        subscriber_retention_rule.add_target(
-            targets.LambdaFunction(
-                delete_user_data_fn,
-                event=events.RuleTargetInput.from_object({"subscriber_retention_sweep": True, "apply": True}),
-            )
         )
 
         # ── 8. Data Reconciliation — Monday 12:30 AM PT
@@ -1016,12 +1010,12 @@ class OperationalStack(Stack):
         # Four EventBridge cron rules — UTC equivalents of 8am/12pm/4pm/8pm Pacific (no DST drift)
         # (the four rows site-stats-refresh#SiteStatsRefresh<label> in config/schedules.json, #4284)
         for label in ("8amPT", "12pmPT", "4pmPT", "8pmPT"):
-            rule = events.Rule(
+            add_table_schedule(
                 self,
                 f"SiteStatsRefresh{label}",
+                target=site_stats_fn,
                 schedule=table_schedule(f"site-stats-refresh#SiteStatsRefresh{label}"),
             )
-            rule.add_target(targets.LambdaFunction(site_stats_fn))
 
         # ── 12. OG Image Generator — daily at 19:30 UTC (11:30 AM PT, after daily brief)
         # Adopted into CDK 2026-06-08 (ADR-081): the last CLI orphan. Its source was
@@ -1242,17 +1236,13 @@ class OperationalStack(Stack):
         # cascade ending at 9:55 and the daily-brief at 10:00. Invokes with
         # {check_compute_outputs: true} so the Lambda runs the DDB freshness
         # check instead of the default Lambda-probe path.
-        compute_check_rule = events.Rule(
+        add_table_schedule(
             self,
             "PipelineHealthComputeCheck",
+            target=pipeline_health,
             schedule=table_schedule("pipeline-health-check#PipelineHealthComputeCheck"),
+            schedule_input={"check_compute_outputs": True},
             description="Phase 3.2: verify today's compute records exist before daily-brief",
-        )
-        compute_check_rule.add_target(
-            targets.LambdaFunction(
-                pipeline_health,
-                event=events.RuleTargetInput.from_object({"check_compute_outputs": True}),
-            )
         )
 
         # ER-01 (2026-06-09): infra-liveness heartbeat. Fires once daily at 17:10
@@ -1261,17 +1251,13 @@ class OperationalStack(Stack):
         # Invokes with {check_ingest_liveness: true} so the Lambda asserts each
         # active source ran + 200'd (vs. behavioral freshness), emitting
         # UnhealthySourceCount for the ingest-liveness-unhealthy alarm.
-        liveness_check_rule = events.Rule(
+        add_table_schedule(
             self,
             "PipelineHealthIngestLiveness",
+            target=pipeline_health,
             schedule=table_schedule("pipeline-health-check#PipelineHealthIngestLiveness"),
+            schedule_input={"check_ingest_liveness": True},
             description="ER-01: assert each active source's ingestion Lambda ran + 200'd (infra-liveness)",
-        )
-        liveness_check_rule.add_target(
-            targets.LambdaFunction(
-                pipeline_health,
-                event=events.RuleTargetInput.from_object({"check_ingest_liveness": True}),
-            )
         )
 
         # ── 14. Hevy Routine Cron (ADR-066) — Phase 3 scheduled generator ──
@@ -1309,15 +1295,14 @@ class OperationalStack(Stack):
         )
         # Manual events.Rule escape hatch — create_platform_lambda's schedule= shortcut
         # auto-enables the rule. ADR-066 ships disabled. Do NOT collapse this back.
-        hevy_routine_cron_rule = events.Rule(
+        add_table_schedule(
             self,
             "HevyRoutineCronRule",
-            rule_name="hevy-routine-cron-weekly",
-            description="ADR-066 ships disabled; operator enables after Phase 1 use justifies it.",
+            target=hevy_routine_cron,
             schedule=table_schedule("hevy-routine-cron#HevyRoutineCronRule"),
-            enabled=table_enabled("hevy-routine-cron#HevyRoutineCronRule"),
+            description="ADR-066 ships disabled; operator enables after Phase 1 use justifies it.",
+            name="hevy-routine-cron-weekly",
         )
-        hevy_routine_cron_rule.add_target(targets.LambdaFunction(hevy_routine_cron))
 
         # ── 14b. Hevy Overnight Branch Re-stamp (#417 / TR-05) ──
         # Runs AFTER the overnight wearable sync and RE-ORDERS / re-highlights
@@ -1360,15 +1345,14 @@ class OperationalStack(Stack):
             digest=True,
             alarm_name="hevy-restamp-errors",
         )
-        hevy_restamp_rule = events.Rule(
+        add_table_schedule(
             self,
             "HevyRestampRule",
-            rule_name="hevy-restamp-daily",
-            description="#417 TR-05: re-stamps on fresh Whoop recovery (~17:30 UTC refresh); enabled post PR #711 decision 2a.",
+            target=hevy_restamp,
             schedule=table_schedule("hevy-restamp#HevyRestampRule"),
-            enabled=True,
+            description="#417 TR-05: re-stamps on fresh Whoop recovery (~17:30 UTC refresh); enabled post PR #711 decision 2a.",
+            name="hevy-restamp-daily",
         )
-        hevy_restamp_rule.add_target(targets.LambdaFunction(hevy_restamp))
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")

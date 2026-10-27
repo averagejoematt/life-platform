@@ -286,7 +286,7 @@ def load_existing_hypotheses(status_filter=None):
         return []
 
 
-def store_hypothesis(hypothesis: dict, daily_rows=None, *, kind=None, citation=None):
+def store_hypothesis(hypothesis: dict, daily_rows=None, *, kind=None, citation=None, registered_at=None):
     """Write a new hypothesis to DynamoDB."""
     # #3552 — THE chokepoint. Every hypothesis this engine writes leaves here with its
     # `min_effect` labelled by the shared `{value, kind, source}` facet and the checker's
@@ -307,9 +307,11 @@ def store_hypothesis(hypothesis: dict, daily_rows=None, *, kind=None, citation=N
         "pk": HYPOTHESES_PK,
         "sk": sk,
         "status": "pending",
-        "created_at": now.isoformat(),
-        # #530: the spec is FROZEN as of this write — checks read it, never revise it
-        "pre_registered_at": now.isoformat(),
+        "created_at": registered_at or now.isoformat(),
+        # #530: the spec is FROZEN as of this write — checks read it, never revise it. #5388: `registered_at` (a successor
+        # registered as of the owner's ruling day, passed by watch_hypotheses only — never a model field) is the stamp the
+        # check's since_date and the monitoring window read; the real write time stays beside it as the record's own `written_at`.
+        "pre_registered_at": registered_at or now.isoformat(),
         "engine_version": 2,
         "check_count": 0,
     }
@@ -1529,7 +1531,8 @@ def lambda_handler(event, context):
         logger.info(f"[AI-4] Data completeness: {completeness_msg}")
 
         # 2. Load existing hypotheses
-        all_hypotheses = load_existing_hypotheses()
+        # #5388: a superseded watch record is closed (reason + successor id on it) BEFORE any check can grade it.
+        all_hypotheses, superseded = watch_hypotheses.supersede(load_existing_hypotheses(), table, validate_hypothesis, store_hypothesis)
         pending_hypotheses = [h for h in all_hypotheses if h.get("status") in ("pending", "confirming")]
         pending_count = len(pending_hypotheses)
         logger.info(f"Existing: {len(all_hypotheses)} total, {pending_count} pending/confirming")
@@ -1651,7 +1654,7 @@ def lambda_handler(event, context):
             "effect_refit": effect_refit,  # #1411 quarterly fit outcome
             "time_affluence": time_affluence,  # #1408 weekly proxy + edge outcome
             "diary_intervention_hypothesis": diary_hypothesis_result,  # #1843 AC3
-            "watch_hypotheses": watch_seed,  # #4979
+            "watch_hypotheses": {**watch_seed, "superseded": superseded},  # #4979, #5388
         }
         logger.info(f"Complete: {summary}")
         return {"statusCode": 200, "body": json.dumps(summary)}

@@ -63,8 +63,9 @@ def _two_days_ago_str():
 # lane). Neither imports aws_cdk: both read compute_stack.py by AST through the
 # #2845 model generator (`generate_platform_model.extract_lambdas`).
 PRODUCER_CRON_MIRRORS = {
-    # producer function name -> its EventBridge cron, verbatim from cdk/stacks/.
-    "daily-metrics-compute": "cron(40 16 * * ? *)",
+    # producer function name -> its config/schedules.json expression, verbatim — Pacific
+    # wall-clock since #4284 (ADR-165: every cron row follows the table's platform_timezone).
+    "daily-metrics-compute": "cron(40 9 * * ? *)",
 }
 
 # Producer runtime + slack: the honest-D-2 window closes this many minutes after
@@ -76,12 +77,13 @@ PRODUCER_CRON_MIRRORS = {
 _COMPUTE_SLACK_MINUTES = 50
 
 
-def _cron_utc_hhmm(cron_expr: str) -> tuple[int, int]:
-    """(hour, minute) at which a fixed-UTC daily EventBridge cron fires — `cron(M H * * ? *)`.
+def _cron_local_hhmm(cron_expr: str) -> tuple[int, int]:
+    """(hour, minute) of Pacific wall clock at which a daily cron fires — `cron(M H * * ? *)`.
 
-    Deliberately strict: platform crons are UTC-fixed by convention (CLAUDE.md), so a
-    non-numeric minute/hour field means the mirror no longer describes a daily
-    fixed-time producer and the derivation must fail loudly, not guess a window.
+    Deliberately strict: a non-numeric minute/hour field means the mirror no longer
+    describes a daily fixed-time producer and the derivation must fail loudly, not
+    guess a window. Pacific since #4284 (ADR-165): the row is wall-clock in the
+    schedule table's platform_timezone, so the cutoff is the same PT time all year.
     """
     fields = cron_expr.strip()[len("cron(") : -1].split()
     return int(fields[1]), int(fields[0])
@@ -90,16 +92,16 @@ def _cron_utc_hhmm(cron_expr: str) -> tuple[int, int]:
 def _compute_cutoff_pt() -> datetime:
     """Today's D-2→D-1 honesty cutoff as a Pacific datetime, derived from the mirror.
 
-    Anchors on the Pacific calendar date (pacific_now — the one #1964 frame) and
-    converts the producer's fixed-UTC fire time for that date, so the cutoff is
-    correct under both PST and PDT without either wall-clock literal appearing here.
+    Anchors on the Pacific calendar date (pacific_now — the one #1964 frame) at the
+    producer's Pacific wall-clock fire time (#4284), so the cutoff is correct under
+    both PST and PDT without either wall-clock literal appearing here.
     """
     from common.pacific_time import PACIFIC, pacific_now
 
-    hour, minute = _cron_utc_hhmm(PRODUCER_CRON_MIRRORS["daily-metrics-compute"])
+    hour, minute = _cron_local_hhmm(PRODUCER_CRON_MIRRORS["daily-metrics-compute"])
     ref = pacific_now().date()
-    fire_utc = datetime(ref.year, ref.month, ref.day, hour, minute, tzinfo=timezone.utc)
-    return (fire_utc + timedelta(minutes=_COMPUTE_SLACK_MINUTES)).astimezone(PACIFIC)
+    fire_local = datetime(ref.year, ref.month, ref.day, hour, minute, tzinfo=PACIFIC)
+    return fire_local + timedelta(minutes=_COMPUTE_SLACK_MINUTES)
 
 
 def _before_compute_window() -> bool:

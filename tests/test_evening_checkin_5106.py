@@ -316,11 +316,12 @@ def test_dead_man_is_registered_in_the_nightly_run():
 def test_the_schedule_row_lands_before_quiet_hours_in_both_offsets():
     from coach.coach_outbound import QUIET_START_HOUR
 
-    rows = json.load(open(os.path.join(REPO, "config", "schedules.json"), encoding="utf-8"))["schedules"]
-    row = rows["telegram-coach-worker#TelegramEveningCheckin"]
-    assert row["stack"] == "LifePlatformServe" and row["expression"] == "cron(0 3 * * ? *)" and "timezone" not in row
-    for offset in (7, 8):  # PDT, PST
-        assert (3 - offset) % 24 < QUIET_START_HOUR
+    table = json.load(open(os.path.join(REPO, "config", "schedules.json"), encoding="utf-8"))
+    row = table["schedules"]["telegram-coach-worker#TelegramEveningCheckin"]
+    # #4284 (ADR-165): Pacific wall clock in the table's platform_timezone — 20:00 PT in both offsets.
+    assert row["stack"] == "LifePlatformServe" and row["expression"] == "cron(0 20 * * ? *)" and "timezone" not in row
+    assert table["platform_timezone"] == "America/Los_Angeles"
+    assert 20 < QUIET_START_HOUR
     stack = open(os.path.join(REPO, "cdk", "stacks", "serve_stack.py"), encoding="utf-8").read()
     assert '"TelegramEveningCheckin"' in stack and '{"kind": "evening_checkin"}' in stack
     grants = open(os.path.join(REPO, "cdk", "stacks", "role_policies_serve.py"), encoding="utf-8").read()

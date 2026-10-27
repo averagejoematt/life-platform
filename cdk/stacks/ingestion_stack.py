@@ -20,8 +20,6 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
-    aws_events as events,
-    aws_events_targets as targets,
     aws_iam as iam,
     aws_logs as logs,
     aws_s3 as s3,
@@ -32,7 +30,7 @@ from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
-from stacks.lambda_helpers import create_platform_lambda, table_schedule
+from stacks.lambda_helpers import add_table_schedule, create_platform_lambda, table_schedule
 
 # ── #2806/#2807/#2808: the social-enrichment channel set, derived at synth time ──
 # from lambdas/ingestion/source_registry.py — the ONE registry vocabulary for
@@ -150,13 +148,13 @@ class IngestionStack(Stack):
         # (case 177921309700709) — reserving 1 here is now safe (unreserved stays ≥ minimum).
         whoop.node.default_child.add_property_override("ReservedConcurrentExecutions", 1)
 
-        whoop_recovery = events.Rule(
+        add_table_schedule(
             self,
             "WhoopRecoverySchedule",
+            target=whoop,
             schedule=table_schedule("whoop-data-ingestion#WhoopRecoverySchedule"),
             description="Whoop recovery refresh — 9:30 AM PT",
         )
-        whoop_recovery.add_target(targets.LambdaFunction(whoop))
 
         # ── 1a. Whoop reconciliation (DI-2 / TR-07 #415) — daily source-of-truth
         # diff, the Strava pattern generalized. Every other Whoop freshness check
@@ -171,17 +169,13 @@ class IngestionStack(Stack):
         # clear of Whoop's own :00 hourly + :30 recovery slots (reserved
         # concurrency=1). UTC-fixed, no DST drift. Opt-in via the whoop
         # `provider_reconcile` facet in source_registry (garmin excluded, ADR-123).
-        whoop_reconcile_rule = events.Rule(
+        add_table_schedule(
             self,
             "WhoopReconciliation",
+            target=whoop,
             schedule=table_schedule("whoop-data-ingestion#WhoopReconciliation"),
+            schedule_input={"reconcile": True},
             description="DI-2/TR-07: diff stored Whoop sleeps+workouts vs the Whoop API (trailing 14d) — emits MissingActivityCount{whoop}",
-        )
-        whoop_reconcile_rule.add_target(
-            targets.LambdaFunction(
-                whoop,
-                event=events.RuleTargetInput.from_object({"reconcile": True}),
-            )
         )
 
         # ── 2. Garmin direct-API function — RETIRED (#4640, owner ruling 2026-10-11).
@@ -324,17 +318,13 @@ class IngestionStack(Stack):
         # (alarmed in monitoring_stack). 17:20 UTC = 10:20 AM PT — after the
         # morning ingestion crons have run, so the comparison is against a settled
         # store. UTC-fixed, no DST drift.
-        strava_reconcile_rule = events.Rule(
+        add_table_schedule(
             self,
             "StravaReconciliation",
+            target=strava,
             schedule=table_schedule("strava-data-ingestion#StravaReconciliation"),
+            schedule_input={"reconcile": True},
             description="DI-2: diff stored Strava activities vs the Strava API (trailing 14d) — emits MissingActivityCount",
-        )
-        strava_reconcile_rule.add_target(
-            targets.LambdaFunction(
-                strava,
-                event=events.RuleTargetInput.from_object({"reconcile": True}),
-            )
         )
 
         # ── 6b. Hevy events-feed poller (PRIMARY ingestion path — hourly).
@@ -382,17 +372,13 @@ class IngestionStack(Stack):
         # 789 indexed vs 828 live, and every one of the 39 missing titles cost a walk of
         # the live catalogue on each draft that named it. Same Lambda, constant input —
         # the whoop_reconcile_rule idiom — so the fleet gains a schedule, not a function.
-        hevy_index_rule = events.Rule(
+        add_table_schedule(
             self,
             "HevyTemplateIndexRebuild",
+            target=hevy_backfill,
             schedule=table_schedule("hevy-backfill#HevyTemplateIndexRebuild"),
+            schedule_input={"rebuild_template_index": True},
             description="#3764: republish config/hevy_template_index.json from the live Hevy catalogue",
-        )
-        hevy_index_rule.add_target(
-            targets.LambdaFunction(
-                hevy_backfill,
-                event=events.RuleTargetInput.from_object({"rebuild_template_index": True}),
-            )
         )
 
         # ── 6b-ii. Hevy reconciliation (#4643) — the strava/whoop source-of-truth diff,
@@ -403,17 +389,13 @@ class IngestionStack(Stack):
         # READ-ONLY. 18:30 UTC = 11:30 AM PT: half-way between two hourly polls, after the
         # morning crons settle and clear of the 17:20/18:20 strava/whoop reconciles.
         # Opt-in via the hevy `provider_reconcile` facet in source_registry.
-        hevy_reconcile_rule = events.Rule(
+        add_table_schedule(
             self,
             "HevyReconciliation",
+            target=hevy_backfill,
             schedule=table_schedule("hevy-backfill#HevyReconciliation"),
+            schedule_input={"reconcile": True},
             description="#4643: compare the Hevy workout count with stored rows — emits MissingActivityCount{hevy}",
-        )
-        hevy_reconcile_rule.add_target(
-            targets.LambdaFunction(
-                hevy_backfill,
-                event=events.RuleTargetInput.from_object({"reconcile": True}),
-            )
         )
 
         # ── #3764: the rebuild's dead-man ────────────────────────────────────────

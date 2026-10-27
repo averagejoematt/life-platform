@@ -475,6 +475,15 @@ ARTIFACTS: dict[str, dict] = {
             "READS config/user_goals.json. Discovery sees the read because the module also writes."
         ),
     ),
+    "scripts/schedule_tz_convert.py": _excluded(
+        "scripts/schedule_tz_convert.py",
+        reason=(
+            "The ONE-TIME #4284 platform-timezone migration (ADR-165): `--apply` rewrote config/schedules.json's "
+            "UTC expressions to Pacific wall clock once and refuses to run twice (it exits 1 once the table carries "
+            "`platform_timezone`). The table is hand-owned from then on; the migration's output is re-derived by "
+            "tests/test_platform_timezone_4284.py from a frozen snapshot, not regenerated."
+        ),
+    ),
     "scripts/raw_kms_readability_inventory.py": _excluded(
         "scripts/raw_kms_readability_inventory.py",
         reason=(

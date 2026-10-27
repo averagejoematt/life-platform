@@ -16,6 +16,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from ingestion.health_auto_export_echo import reconverted
+
 try:
     from common.platform_logger import get_logger
 
@@ -117,6 +119,6 @@ def wrist_temp_to_celsius(fields: dict[str, Any], day_stamps: dict[str, Any] | N
     if u in ("degf", "f", "fahrenheit"):
         fields[_WRIST] = _f_to_c(float(fields[_WRIST]))
         if day_stamps and _WRIST in day_stamps:
-            day_stamps[_WRIST] = {ts: _f_to_c(float(q)) for ts, q in day_stamps[_WRIST].items()}
+            day_stamps[_WRIST] = reconverted(day_stamps[_WRIST], {ts: _f_to_c(float(q)) for ts, q in day_stamps[_WRIST].items()})
     elif u and u not in ("degc", "c", "celsius"):
         logger.warning(f"[HAE] unexpected wrist-temperature units {u!r} for {date}; assuming Celsius")

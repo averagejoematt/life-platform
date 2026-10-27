@@ -1,8 +1,9 @@
 """tests/test_morning_brief_pacific_schedule_4284.py — the morning brief runs at 10:00
-America/Los_Angeles through EventBridge Scheduler (#4284, owner ruling Q42 of docket #4644).
+America/Los_Angeles through EventBridge Scheduler (#4284, owner ruling Q42 of docket #4644; since
+the 2026-10-27 ruling every schedule follows the one platform zone, ADR-165).
 
-Static (source) proofs, no AWS and no synth: the carrier swap for exactly ONE function, the
-zone, the least-privilege shape, and the producer-before-brief ordering across the DST change.
+Static (source) proofs, no AWS and no synth: the zone, the least-privilege shape of the stack's
+ONE scheduler role, and the producer-before-brief ordering across the DST change.
 """
 
 import os
@@ -20,10 +21,12 @@ def _read(rel):
         return f.read()
 
 
-def test_only_the_daily_brief_uses_a_zoned_schedule():
-    # #4284: the zone is a column of config/schedules.json, never a stack kwarg.
-    users = sorted((k, r["stack"], r["timezone"]) for k, r in schedule_rows.rows().items() if r.get("timezone"))
-    assert users == [("daily-brief", "LifePlatformEmail", "America/Los_Angeles")], users
+def test_the_zone_is_the_tables_one_platform_parameter_never_a_stack_kwarg():
+    # #4284 (ADR-165): the zone is the table's `platform_timezone`, resolved per row; never a stack kwarg.
+    rows = schedule_rows.rows()
+    zones = {r["timezone"] for r in rows.values() if r.get("timezone")}
+    assert zones == {"America/Los_Angeles"}, zones
+    assert rows["daily-brief"]["timezone"] == "America/Los_Angeles"
     for fname in sorted(os.listdir(os.path.join(_ROOT, "cdk", "stacks"))):
         if fname.endswith("_stack.py"):
             assert "schedule_timezone=" not in _read(f"cdk/stacks/{fname}"), fname
@@ -38,7 +41,8 @@ def test_brief_block_is_pacific_ten_am():
 
 def test_scheduler_role_is_invoke_only_and_account_scoped():
     src = _read("cdk/stacks/lambda_helpers.py")
-    body = src[src.index("def _add_zoned_schedule") : src.index("def create_platform_lambda")]
+    # #4284 (ADR-165): ONE scheduler role per stack, each zoned schedule adds its target's ARN.
+    body = src[src.index("def _scheduler_role") : src.index("def create_platform_lambda")]
     assert body.count('"lambda:InvokeFunction"') == 1 and "resources=[fn.function_arn]" in body
     # The trust is the exact ServicePrincipal literal, matched whole (not a hostname substring — CodeQL
     # py/incomplete-url-substring-sanitization), conditioned on this account.
@@ -59,15 +63,19 @@ def test_brief_instant_is_unchanged_before_and_one_hour_later_after_the_change()
 
 
 def test_every_producer_runs_before_the_brief_on_both_sides_of_the_change():
-    """The brief reads results written by the compute chain (16:30-16:55 UTC). After
-    2026-11-01 the brief moves LATER (18:00 UTC), so no producer can be overtaken."""
+    """The brief reads results written by the compute chain (09:30-09:55 PT). Every row is Pacific
+    wall clock in the one platform zone since ADR-165, so producers and the brief move together and
+    the 30-minute lead holds in both halves of the year."""
     producers = {
-        "character-sheet-compute": "cron(30 16 * * ? *)",
-        "adaptive-mode-compute": "cron(35 16 * * ? *)",
-        "daily-metrics-compute": "cron(40 16 * * ? *)",
-        "daily-insight-compute": "cron(45 16 * * ? *)",
+        "character-sheet-compute": "cron(30 9 * * ? *)",
+        "adaptive-mode-compute": "cron(35 9 * * ? *)",
+        "daily-metrics-compute": "cron(40 9 * * ? *)",
+        "daily-insight-compute": "cron(45 9 * * ? *)",
     }
+    brief = schedule_rows.rows()["daily-brief"]
     for name, cron in producers.items():
-        assert schedule_rows.expr(name) == cron, name
-        hh, mm = re.search(r"cron\((\d+) (\d+)", cron).groups()
-        assert (int(mm), int(hh)) < (17, 0)  # before the earliest brief instant
+        row = schedule_rows.rows()[name]
+        assert row["expression"] == cron, name
+        assert row.get("timezone") == brief["timezone"], f"{name} left the brief's zone — the order no longer holds across DST"
+        hh, mm = re.search(r"cron\((\d+) (\d+)", cron).groups()[::-1]
+        assert (int(hh), int(mm)) < (10, 0), name  # before the brief's 10:00 wall-clock instant

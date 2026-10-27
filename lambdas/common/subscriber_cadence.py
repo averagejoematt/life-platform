@@ -18,24 +18,25 @@ moves and `tests/test_subscriber_cadence_promise_3564.py` reds until every
 surface carries the new one.
 
 WHAT A SUBSCRIBER ACTUALLY RECEIVES (derived below, verified against the live
-CloudWatch delivery record in #3564):
+CloudWatch delivery record in #3564). Every cron here is Pacific wall clock since
+#4284 (ADR-165 — config/schedules.json's platform_timezone):
 
-  * `weekly-signal`        Sunday 16:30 UTC (9:30 AM PT) — the week's numbers.
+  * `weekly-signal`        Sunday 9:30 AM PT — the week's numbers.
                            The one unconditional weekly send.
-  * `between-chronicle`    Sunday 17:00 UTC (10:00 AM PT) — only when there is
+  * `between-chronicle`    Sunday 10:00 AM PT — only when there is
                            genuinely new, previously-unsent content (#398's
                            content-hash dedup). Often silent.
-  * `chronicle-email-sender` Wednesday 15:10 UTC (8:10 AM PT) — a clean no-op
+  * `chronicle-email-sender` Wednesday 8:10 AM PT — a clean no-op
                            unless an installment actually PUBLISHED. The
                            Wednesday draft (`wednesday-chronicle`,
-                           `cron(0 15 ? * WED *)`) defaults to PREVIEW_MODE and
+                           `cron(0 8 ? * WED *)`) defaults to PREVIEW_MODE and
                            waits for the owner's approval click; the
-                           `chronicle-approve` sweep (`cron(0 18 * * ? *)`)
+                           `chronicle-approve` sweep (`cron(0 11 * * ? *)`)
                            auto-publishes any draft older than
                            CHRONICLE_AUTOPUBLISH_HOURS=48 and invokes the sender
-                           inline. 48h after Wednesday 15:00 UTC is Friday 15:00
-                           UTC, and the first sweep at/after that is Friday 18:00
-                           UTC — which is exactly where the trailing 35 days of
+                           inline. 48h after Wednesday 08:00 PT is Friday 08:00
+                           PT, and the first sweep at/after that is Friday 11:00
+                           PT — which is exactly where the trailing 35 days of
                            "Sent 1/1" datapoints landed. So the honest phrasing
                            is "Wednesday, or Friday when a draft auto-publishes",
                            and `chronicle_autopublish_weekday()` DERIVES that
@@ -88,21 +89,21 @@ SUBSCRIBER_SENDERS = (
     SubscriberSender(
         function_name="weekly-signal",
         construct_id="WeeklySignal",
-        cron="cron(30 16 ? * SUN *)",
+        cron="cron(30 9 ? * SUN *)",
         blurb="the Weekly Signal every {weekday}",
         conditional=False,
     ),
     SubscriberSender(
         function_name="chronicle-email-sender",
         construct_id="ChronicleEmailSender",
-        cron="cron(10 15 ? * WED *)",
+        cron="cron(10 8 ? * WED *)",
         blurb="the Chronicle installment on {weekday} (or {fallback_weekday}, when an unapproved draft auto-publishes)",
         conditional=True,
     ),
     SubscriberSender(
         function_name="between-chronicle",
         construct_id="BetweenChronicle",
-        cron="cron(0 17 ? * SUN *)",
+        cron="cron(0 10 ? * SUN *)",
         blurb="and an occasional between-chronicle note on {weekday} when there is something new",
         conditional=True,
     ),
@@ -112,9 +113,9 @@ SUBSCRIBER_SENDERS = (
 # together decide the weekday a subscriber ACTUALLY receives an unapproved
 # installment on — the artifact the 35-day CloudWatch record shows.
 CHRONICLE_DRAFT_CONSTRUCT = "WednesdayChronicle"
-CHRONICLE_DRAFT_CRON = "cron(0 15 ? * WED *)"
+CHRONICLE_DRAFT_CRON = "cron(0 8 ? * WED *)"
 CHRONICLE_APPROVE_CONSTRUCT = "ChronicleApprove"
-CHRONICLE_APPROVE_SWEEP_CRON = "cron(0 18 * * ? *)"
+CHRONICLE_APPROVE_SWEEP_CRON = "cron(0 11 * * ? *)"
 CHRONICLE_AUTOPUBLISH_HOURS = 48
 
 
@@ -201,7 +202,8 @@ def chronicle_autopublish_dt(draft_dt: datetime) -> datetime:
     Derived, not asserted: the draft becomes sweep-eligible
     CHRONICLE_AUTOPUBLISH_HOURS after it is written, and the daily
     `chronicle-approve` sweep publishes it (and invokes the sender inline) at the
-    first sweep hour at or after that. Naive/aware agnostic — both crons are UTC.
+    first sweep hour at or after that. Naive/aware agnostic — both crons are in the
+    one platform zone (Pacific wall clock, #4284).
     """
     eligible = draft_dt + timedelta(hours=CHRONICLE_AUTOPUBLISH_HOURS)
     sweep_hour = cron_hour(CHRONICLE_APPROVE_SWEEP_CRON)

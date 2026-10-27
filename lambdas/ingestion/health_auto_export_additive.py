@@ -25,6 +25,11 @@ Capture-all (owner rule 2026-10-04): every device source's readings are kept in 
 object; the day value sums them all rather than picking a winner. On the archive
 measured for #4628 every additive reading carries the one phone source tag.
 
+Untagged echoes (#4969, owner ruling 2026-10-27): an untagged reading in a UTC minute that also
+holds a watch-tagged reading is the same minute exported twice (the 2026-10-25 automation
+reconfiguration re-sent the day tagged). The object keeps both; `day_value` counts the tagged
+one — health_auto_export_echo.py.
+
 Revisions (#4628, the writer row recorded 2026-10-18): the phone sometimes re-delivers a
 reading's timestamp with a CHANGED quantity — 17 of 20,833 readings delivered
 2026-10-10..23, both directions (a later delivery replaces the flat placeholder minutes of an earlier
@@ -48,6 +53,7 @@ import json
 import logging
 from datetime import timezone
 
+from ingestion import health_auto_export_echo as _echo
 from ingestion.source_registry import raw_date_key
 
 try:
@@ -141,8 +147,9 @@ def merge_readings(stored, new, revisions=None, received_at=""):
 
 
 def day_value(field, readings, units):
-    """The stored day value: the sum over every source of the sum over unique timestamps."""
-    total = round(sum(q for tsq in readings.values() for q in tsq.values()), 2)
+    """The stored day value: the sum over every source of the sum over unique timestamps, less the
+    untagged echoes of a watch-tagged minute (#4969 — the archive keeps them; the total counts each minute once)."""
+    total = round(sum(q for tsq in _echo.counted_by_source(readings).values() for q in tsq.values()), 2)
     return to_miles(total, units) if field.endswith("_miles") else total
 
 

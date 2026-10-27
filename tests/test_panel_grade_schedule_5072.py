@@ -20,7 +20,7 @@ import json
 import os
 import pathlib
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -65,29 +65,26 @@ def test_cdk_rule_and_deadman_match_the_job_declaration():
     }
     problems = []
 
-    rules = [c for c in _calls(tree, "Rule") if c.args[1:] and _literal(c.args[1]) == CONSTRUCT_ID]
-    assert len(rules) == 1, f"exactly one {CONSTRUCT_ID} rule in mcp_stack.py, found {len(rules)}"
-    sched = _kw(rules[0], "schedule")
-    key = _literal(sched.args[0])
+    # #4284 (ADR-165): the schedule is an `add_table_schedule(...)` carrier reading its row by key.
+    rules = [c for c in schedule_rows.table_schedule_calls(STACK.read_text(encoding="utf-8")) if c["id"] == CONSTRUCT_ID]
+    assert len(rules) == 1, f"exactly one {CONSTRUCT_ID} schedule in mcp_stack.py, found {len(rules)}"
+    key = rules[0]["key"]
     if key != pwg.JOB["schedule_key"]:
-        problems.append(f"rule reads schedule row {key!r}, JOB declares {pwg.JOB['schedule_key']!r}")
+        problems.append(f"schedule reads row {key!r}, JOB declares {pwg.JOB['schedule_key']!r}")
     row = schedule_rows.rows().get(pwg.JOB["schedule_key"]) or {}
-    if row.get("expression") != pwg.JOB["schedule_utc"]:
-        problems.append(f"config/schedules.json expression {row.get('expression')!r} != JOB {pwg.JOB['schedule_utc']!r}")
+    if row.get("expression") != pwg.JOB["schedule_pt"]:
+        problems.append(f"config/schedules.json expression {row.get('expression')!r} != JOB {pwg.JOB['schedule_pt']!r}")
     if row.get("function") != pwg.JOB["function"] or row.get("stack") != "LifePlatformMcp":
         problems.append(f"schedule row targets {row.get('function')!r} in {row.get('stack')!r}")
-    if "timezone" in row:
-        problems.append("the row must stay fixed UTC (CONVENTIONS 1b) — the Monday-Pacific proof below assumes it")
-    if _kw(rules[0], "enabled") is not None:
-        problems.append("the rule must ship enabled — a disabled rule is not a schedule")
-
-    inputs = [c for c in _calls(tree, "from_object") if _literal(c.args[0]) == pwg.JOB["event"]]
-    assert len(inputs) == 1, f"the rule's constant input must be exactly {pwg.JOB['event']}"
-    target = next(c for c in _calls(tree, "LambdaFunction") if any(s is inputs[0] for s in ast.walk(c)))
+    if row.get("timezone") != "America/Los_Angeles":
+        problems.append("the row must follow the platform zone (CONVENTIONS 1b) — the Monday-Pacific proof below assumes it")
+    if not row.get("enabled", True):
+        problems.append("the schedule must ship enabled — a disabled schedule is not a schedule")
+    if rules[0]["input"] != pwg.JOB["event"]:
+        problems.append(f"the schedule's constant input must be exactly {pwg.JOB['event']}")
+    target_var = rules[0]["target"]
     fn_assign = next(
-        n
-        for n in ast.walk(tree)
-        if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == target.args[0].id for t in n.targets)
+        n for n in ast.walk(tree) if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == target_var for t in n.targets)
     )
     if consts.get(getattr(_kw(fn_assign.value, "function_name"), "id", None)) != pwg.JOB["function"]:
         problems.append(f"the rule's target is not {pwg.JOB['function']}")
@@ -130,16 +127,16 @@ def test_emf_line_carries_the_alarms_metric_identity():
 
 # ── 2. the schedule <-> the week graded ────────────────────────────────────────────────
 def test_the_cron_fires_on_a_pacific_monday_in_both_offsets_so_the_week_is_mon_to_sun():
-    """`cron(M H ? * MON *)` fixed UTC: the firing instant, read in America/Los_Angeles in a PDT week and a PST
+    """`cron(M H ? * MON *)` Pacific wall clock (#4284, ADR-165): the firing instant, in a PDT week and a PST
     week, must be a Monday — then `run()`'s default week_end (yesterday, Pacific) is the Sunday just finished."""
-    fields = pwg.JOB["schedule_utc"][len("cron(") : -1].split()
+    fields = pwg.JOB["schedule_pt"][len("cron(") : -1].split()
     minute, hour, dom, _month, dow, _year = fields
-    assert (dom, dow) == ("?", "MON"), f"a weekly Monday rule is expected, got {pwg.JOB['schedule_utc']}"
+    assert (dom, dow) == ("?", "MON"), f"a weekly Monday rule is expected, got {pwg.JOB['schedule_pt']}"
     pt = ZoneInfo("America/Los_Angeles")
     for monday in ("2026-10-19", "2026-11-16"):  # PDT, PST
         y, m, d = map(int, monday.split("-"))
-        fire = datetime(y, m, d, int(hour), int(minute), tzinfo=timezone.utc).astimezone(pt)
-        assert fire.strftime("%a") == "Mon", f"{monday} {hour}:{minute}Z is {fire:%a %H:%M} Pacific"
+        fire = datetime(y, m, d, int(hour), int(minute), tzinfo=pt)
+        assert fire.strftime("%a") == "Mon", f"{monday} {hour}:{minute} PT is {fire:%a %H:%M} Pacific"
 
 
 def test_the_default_week_ends_yesterday_pacific(monkeypatch):

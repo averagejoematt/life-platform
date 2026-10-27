@@ -17,8 +17,6 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
-    aws_events as events,
-    aws_events_targets as targets,
     aws_s3 as s3,
     aws_sns as sns,
     aws_sqs as sqs,
@@ -27,7 +25,7 @@ from constructs import Construct
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, AI_MODEL_HAIKU, REGION, S3_BUCKET, TABLE_NAME  # CONF-01, CONF-04
-from stacks.lambda_helpers import create_platform_lambda, table_schedule
+from stacks.lambda_helpers import add_table_schedule, create_platform_lambda, table_schedule
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 LIFE_PLATFORM_TABLE = TABLE_NAME
@@ -281,11 +279,12 @@ class ComputeStack(Stack):
         # the same day instead of waiting for tomorrow's run. Event-driven
         # recompute is the proper fix (Option A), but this twice-daily
         # schedule covers ~90% of late-arrival cases at a single CDK line.
-        events.Rule(
+        add_table_schedule(
             self,
             "DailyMetricsComputeEvening",
+            target=daily_metrics_fn,
             schedule=table_schedule("daily-metrics-compute#DailyMetricsComputeEvening"),
-        ).add_target(targets.LambdaFunction(daily_metrics_fn))
+        )
 
         # BENCH-1.2: episode-detect — weekly cut/regain benchmarking (Viktor's
         # weekly-not-nightly cadence). Reads full withings/strava/hevy history, writes
@@ -426,18 +425,15 @@ class ComputeStack(Stack):
             **shared,
         )
 
-        evening_rule = events.Rule(
+        add_table_schedule(
             self,
             "DashboardRefreshEveningRule",
+            target=dashboard,
             schedule=table_schedule("dashboard-refresh#DashboardRefreshEveningRule"),
-            # #1781: was "6:00 PM PDT" — the fixed-UTC cron only reads 6:00 PM during
-            # PDT (summer); it reads 5:00 PM once the clocks fall back to PST. An
-            # out-of-band console edit already corrected this live (caught by the
-            # drift sentinel as an AWS::Events::Rule MODIFIED); codifying the same
-            # DST-agnostic wording here so CDK matches live and the drift clears.
+            # #1781: the fixed-UTC rule only read 6:00 PM during PDT; since #4284 (ADR-165) the
+            # row is Pacific wall-clock, so the description is true in both halves of the year.
             description="Dashboard refresh — 6:00 PM PT",
         )
-        evening_rule.add_target(targets.LambdaFunction(dashboard))
 
         # ══════════════════════════════════════════════════════════════
         # 8. failure-pattern-compute — Sunday 9:50 AM PT (previously unmanaged)

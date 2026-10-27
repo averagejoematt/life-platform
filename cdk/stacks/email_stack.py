@@ -25,8 +25,6 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
-    aws_events as events,
-    aws_events_targets as targets,
     aws_lambda as _lambda,
     aws_s3 as s3,
     aws_sns as sns,
@@ -36,7 +34,7 @@ from constructs import Construct
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, CF_DIST_ID, LAMEENC_LAYER_ARN, REGION, TABLE_NAME
-from stacks.lambda_helpers import create_platform_lambda, table_schedule
+from stacks.lambda_helpers import add_table_schedule, create_platform_lambda, table_schedule
 
 # ── #3568: the reader-facing From addresses, read at synth time from the ONE
 # registry (lambdas/common/email_identity.py) rather than hand-typed here.
@@ -239,17 +237,13 @@ class EmailStack(Stack):
         # window has lapsed — so a fixable flag can't permanently silence the show.
         # Safety/sensitivity holds are NEVER auto-retried (fail-closed in the handler).
         # Twice-weekly (not daily) keeps the regeneration spend low; the retry cap bounds it.
-        panel_hold_sweep = events.Rule(
+        add_table_schedule(
             self,
             "PanelHoldSweep",
+            target=coach_panel_podcast,
             schedule=table_schedule("coach-panel-podcast#PanelHoldSweep"),
+            schedule_input={"sweep_holds": True},
             description="SS-02: retry a soft (quality) Panel HOLD on the current week after the review window",
-        )
-        panel_hold_sweep.add_target(
-            targets.LambdaFunction(
-                coach_panel_podcast,
-                event=events.RuleTargetInput.from_object({"sweep_holds": True}),
-            )
         )
 
         wednesday_chronicle = create_platform_lambda(
@@ -276,30 +270,27 @@ class EmailStack(Stack):
 
         # #4546 the reply desk: Monday 16:00 UTC (09:00 PT), the week's 3-5 gap questions go to Matthew with Reply-To the
         # SES inbound address; his reply lands as owner voice for Wednesday's chronicle and episode. Never blocks a week.
-        story_questions_rule = events.Rule(
+        add_table_schedule(
             self,
             "StoryQuestionsMonday",
+            target=wednesday_chronicle,
             schedule=table_schedule("wednesday-chronicle#StoryQuestionsMonday"),
+            schedule_input={"story_questions": True},
             description="#4546: the Story Desk's weekly reply-by-email questions (optional; no reply is a normal week)",
-        )
-        story_questions_rule.add_target(
-            targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"story_questions": True}))
         )
 
         # #4584 the Tuesday question: ONE fixed question on the same channel and routing token, so his reply lands
         # verbatim in the owner-words store and leads Wednesday's edition. Same target function, same role: no new
         # IAM (it already sends SES and writes the STORYQ# marker for Monday).
-        # Clock: its config/schedules.json row = Wednesday 01:00 UTC = Tuesday 18:00 PDT (UTC-7, mid-March → early November) and
-        # Tuesday 17:00 PST (UTC-8) in winter. EventBridge crons here are fixed UTC, so the send drifts one hour
-        # earlier across the November DST change; both are Tuesday evening Pacific, and the sender reads the PT day.
-        tuesday_question_rule = events.Rule(
+        # Clock: its config/schedules.json row = Tuesday 18:00 Pacific wall clock, all year (the platform_timezone,
+        # #4284 / ADR-165): 01:00 UTC Wednesday under PDT, 02:00 UTC Wednesday under PST; the sender reads the PT day.
+        add_table_schedule(
             self,
             "OwnerWordsQuestionTuesday",
+            target=wednesday_chronicle,
             schedule=table_schedule("wednesday-chronicle#OwnerWordsQuestionTuesday"),
+            schedule_input={"tuesday_question": True},
             description="#4584: the Tuesday-evening-PT question whose verbatim reply leads Wednesday's edition (optional)",
-        )
-        tuesday_question_rule.add_target(
-            targets.LambdaFunction(wednesday_chronicle, event=events.RuleTargetInput.from_object({"tuesday_question": True}))
         )
 
         create_platform_lambda(

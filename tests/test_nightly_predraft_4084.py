@@ -145,17 +145,15 @@ def test_cdk_rule_and_deadman_match_the_job_declaration():
         if isinstance(t, ast.Name)
     }
 
-    rules = [c for c in _calls(tree, "Rule") if c.args[1:] and _literal(c.args[1]) == "NightlyPredraft"]
-    assert len(rules) == 1, "exactly one NightlyPredraft rule in mcp_stack.py"
-    sched = _kw(rules[0], "schedule")
-    # #4284: the rule reads its expression from config/schedules.json by key.
-    assert schedule_rows.expr(_literal(sched.args[0])) == npd.JOB["schedule_utc"]
-    assert _kw(rules[0], "enabled") is None, "the rule must ship enabled — a disabled rule is not a schedule"
-
-    inputs = [c for c in _calls(tree, "from_object") if _literal(c.args[0]) == npd.JOB["event"]]
-    assert len(inputs) == 1, f"the rule's constant input must be exactly {npd.JOB['event']}"
-    target = next(c for c in _calls(tree, "LambdaFunction") if any(s is inputs[0] for s in ast.walk(c)))
-    target_var = target.args[0].id
+    # #4284 (ADR-165): the schedule is an `add_table_schedule(...)` carrier reading its row by key.
+    rules = [c for c in schedule_rows.table_schedule_calls(STACK.read_text(encoding="utf-8")) if c["id"] == "NightlyPredraft"]
+    assert len(rules) == 1, "exactly one NightlyPredraft schedule in mcp_stack.py"
+    row = schedule_rows.rows()[rules[0]["key"]]
+    assert row["expression"] == npd.JOB["schedule_pt"]
+    assert row.get("timezone") == "America/Los_Angeles", "the pre-draft row must follow the platform zone (19:00 PT all year)"
+    assert row.get("enabled", True), "the schedule must ship enabled — a disabled schedule is not a schedule"
+    assert rules[0]["input"] == npd.JOB["event"], f"the schedule's constant input must be exactly {npd.JOB['event']}"
+    target_var = rules[0]["target"]
     fn_assign = next(
         n for n in ast.walk(tree) if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == target_var for t in n.targets)
     )
@@ -175,7 +173,7 @@ def test_cdk_rule_and_deadman_match_the_job_declaration():
     assert _literal(_kw(alarm, "evaluation_periods")) == npd.JOB["deadman_periods"]
     assert _literal(_kw(alarm, "datapoints_to_alarm")) == npd.JOB["deadman_periods"]
     assert _kw(alarm, "treat_missing_data").attr == "BREACHING", "absence must be the failure (missing = BREACHING)"
-    # the window must close on the 02:00-03:00Z bucket: 24 hourly buckets == one day
+    # 24 hourly buckets == one day (the run lands 02:00Z under PDT, 03:00Z under PST — #4284)
     assert npd.JOB["deadman_period_s"] * npd.JOB["deadman_periods"] == 86400
 
 

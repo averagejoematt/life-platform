@@ -371,9 +371,12 @@ REQUIRED_EB_RULES = [
     # to a zoned EventBridge Scheduler schedule (#4284, CONVENTIONS §1b). A Scheduler schedule
     # is not an Events rule (`DescribeRule` never sees it); it is checked below through
     # `scheduler:GetSchedule`, derived from the schedule table rather than a hashed name.
-    "LifePlatformIngestion-WhoopIngestionScheduleC6CE3A0-DjUDUDY4XrFs",
-    "LifePlatformIngestion-TodoistIngestionSchedule03D61-XqriAparCo0n",
-    "LifePlatformOperational-FreshnessCheckerScheduleD9E-xZki3XA2x0bb",
+    # #4284 (ADR-165): every cron row now follows the table's platform_timezone on an EventBridge
+    # Scheduler schedule (checked below). What stays an Events rule is fixed-UTC by declaration:
+    # the `utc_reason` opt-outs and the `rate(...)` rows — names read live 2026-10-27.
+    "LifePlatformIngestion-HabitifyIngestionSchedule8F58-20xjBrPYKtC8",
+    "LifePlatformIngestion-HevyBackfillSchedule97BF5DD5-bBl2eglWL6ag",
+    "LifePlatformOperational-DlqConsumerScheduleEC15B7F4-jl4JyU2rFaNS",
 ]
 
 #: The role the CI post-deploy job assumes for I6 (.github/workflows/ci-cd.yml post-deploy-checks).
@@ -394,33 +397,32 @@ def _zoned_schedule_rows():
 def _check_zoned_schedules(scheduler, zoned_rows):
     """Resolve each zoned row to its live Scheduler schedule and read it with GetSchedule.
 
-    The physical name is CloudFormation-generated (`<Stack>-<LogicalId>-<hash>`), so the
-    identity comes from the declaration instead: the row's `stack` is the name prefix and its
-    `function` is the target. Returns the list of issues found."""
-    issues = []
-    for key, row in sorted(zoned_rows.items()):
-        prefix = f"{row['stack']}-"
-        fn_suffix = f":function:{row['function']}"
-        matches = []
-        for page in scheduler.get_paginator("list_schedules").paginate(NamePrefix=prefix):
-            for summary in page.get("Schedules", []):
-                if summary.get("Target", {}).get("Arn", "").endswith(fn_suffix):
-                    matches.append(summary)
-        if not matches:
-            issues.append(f"{key}: no Scheduler schedule named {prefix}* targets {row['function']} — SCHEDULE DOES NOT EXIST")
-            continue
-        if len(matches) > 1:
-            issues.append(f"{key}: {len(matches)} Scheduler schedules target {row['function']}: {[m['Name'] for m in matches]}")
-        for summary in matches:
+    #4284 (ADR-165): every cron row is zoned now, a function can carry several (whoop: the
+    ingestion, the recovery refresh, the reconciliation), and a few are named. So the identity is
+    the TARGET: per function, the multiset of declared (expression, zone, state) must equal the
+    live one over every schedule in the default group. Returns the list of issues found."""
+    live: dict[str, list] = {}
+    for page in scheduler.get_paginator("list_schedules").paginate():
+        for summary in page.get("Schedules", []):
+            arn = summary.get("Target", {}).get("Arn", "")
+            if ":function:" not in arn:
+                continue
             sched = scheduler.get_schedule(Name=summary["Name"], GroupName=summary.get("GroupName", "default"))
-            state = sched.get("State", "UNKNOWN")
-            if state != "ENABLED":
-                issues.append(f"{key} ({summary['Name']}): state is '{state}'")
-            live = (sched.get("ScheduleExpression"), sched.get("ScheduleExpressionTimezone"))
-            if live != (row["expression"], row["timezone"]):
-                issues.append(
-                    f"{key} ({summary['Name']}): live {live} != declared {(row['expression'], row['timezone'])} (config/schedules.json)"
-                )
+            live.setdefault(arn.rsplit(":", 1)[-1], []).append(
+                (sched.get("ScheduleExpression"), sched.get("ScheduleExpressionTimezone"), sched.get("State"))
+            )
+    declared: dict[str, list] = {}
+    for _key, row in sorted(zoned_rows.items()):
+        declared.setdefault(row["function"], []).append(
+            (row["expression"], row["timezone"], "ENABLED" if row.get("enabled", True) else "DISABLED")
+        )
+    issues = []
+    for fn, want in sorted(declared.items()):
+        got = live.get(fn, [])
+        if not got:
+            issues.append(f"{fn}: no Scheduler schedule targets it — SCHEDULE DOES NOT EXIST (declared {sorted(want)})")
+        elif sorted(got) != sorted(want):
+            issues.append(f"{fn}: live {sorted(got)} != declared {sorted(want)} (config/schedules.json)")
     return issues
 
 
@@ -1744,6 +1746,12 @@ def _cdk_scheduled_lambda_names(stacks_dir=None):
                         var_name = arg.args[0].id
                         if var_name in var_to_function_name:
                             scheduled.add(var_to_function_name[var_name])
+            # #4284 (ADR-165): a schedule built beside the factory is
+            # `add_table_schedule(self, "<Id>", target=<var>, schedule=table_schedule("<key>"))`.
+            if isinstance(node, _ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == "add_table_schedule":
+                for kw in node.keywords:
+                    if kw.arg == "target" and isinstance(kw.value, _ast.Name) and kw.value.id in var_to_function_name:
+                        scheduled.add(var_to_function_name[kw.value.id])
 
     return scheduled
 

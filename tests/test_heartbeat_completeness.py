@@ -1313,7 +1313,7 @@ def _story_season_qa():
                 consts[node.targets[0].id] = ast.literal_eval(node.value)
             except ValueError:
                 continue
-    needed = ("EPISODE_CHECK", "LEDGER_CHECK", "QUESTIONS_CHECK", "QUESTIONS_WEEKDAY", "QUESTIONS_HOUR_UTC", "QUESTIONS_MINUTE_UTC")
+    needed = ("EPISODE_CHECK", "LEDGER_CHECK", "QUESTIONS_CHECK", "QUESTIONS_WEEKDAY", "QUESTIONS_HOUR_PT", "QUESTIONS_MINUTE_PT")
     missing = [k for k in needed if k not in consts]
     assert not missing, f"story_season_qa no longer declares {missing} as module-level literals — this enrolment reads nothing"
     return type("StorySeasonConstants", (), consts)
@@ -1341,23 +1341,19 @@ def test_story_questions_rule_and_its_deadman_keep_one_clock():
     ssq = _story_season_qa()
     with open(os.path.join(CDK_STACKS_DIR, "email_stack.py"), encoding="utf-8") as f:
         tree = ast.parse(f.read())
-    rules = [
-        n
-        for n in ast.walk(tree)
-        if isinstance(n, ast.Call)
-        and _is_call_to(n, "Rule")
-        and len(n.args) > 1
-        and isinstance(n.args[1], ast.Constant)
-        and n.args[1].value == "StoryQuestionsMonday"
-    ]
-    assert len(rules) == 1, f"expected exactly one StoryQuestionsMonday rule in email_stack.py, found {len(rules)}"
-    assert not (isinstance(_kw(rules[0], "enabled"), ast.Constant) and _kw(rules[0], "enabled").value is False)
-    # #4284: the rule's clock is its config/schedules.json row, which the stack reads by key.
+    # #4284 (ADR-165): the schedule is an `add_table_schedule(...)` carrier; its clock is its
+    # config/schedules.json row (Pacific wall clock), which the stack reads by key.
+    import schedule_rows
+
+    rules = [c for c in schedule_rows.table_schedule_calls(ast.unparse(tree)) if c["id"] == "StoryQuestionsMonday"]
+    assert len(rules) == 1, f"expected exactly one StoryQuestionsMonday schedule in email_stack.py, found {len(rules)}"
+    assert rules[0]["key"] == "wednesday-chronicle#StoryQuestionsMonday"
     row = _schedule_rows()["wednesday-chronicle#StoryQuestionsMonday"]
+    assert row.get("timezone") == "America/Los_Angeles", "the row left the platform zone the dead-man's PT constants assume"
     assert row.get("enabled", True), "the StoryQuestionsMonday row is disabled in config/schedules.json"
     fields = row["expression"][len("cron(") : -1].split()
     got = {"minute": fields[0], "hour": fields[1], "week_day": fields[4]}
-    want = {"minute": str(ssq.QUESTIONS_MINUTE_UTC), "hour": str(ssq.QUESTIONS_HOUR_UTC), "week_day": ssq.QUESTIONS_WEEKDAY}
+    want = {"minute": str(ssq.QUESTIONS_MINUTE_PT), "hour": str(ssq.QUESTIONS_HOUR_PT), "week_day": ssq.QUESTIONS_WEEKDAY}
     assert got == want, f"StoryQuestionsMonday fires at {got}; story_season_qa expects a send at {want}"
     payloads = [
         n

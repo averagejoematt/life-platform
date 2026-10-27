@@ -150,6 +150,7 @@ except ImportError:
 from ingestion import (
     health_auto_export_additive as _additive,  # #4628: the archived day sum
     health_auto_export_archive as _archive,
+    health_auto_export_echo as _echo,  # #4969: an untagged copy of a watch-tagged minute counts once
     health_auto_export_protein as _protein,  # #5187: the same-day protein feed for the breakfast nudge
     health_auto_export_sleep as _sleep,  # #4971: Apple's own night, sleep_*_apple fields
     health_auto_export_units as _units,  # #4970: day-field units + derived totals
@@ -877,12 +878,10 @@ def process_generic_metrics(metrics):
 
             # Carry forward timestamp-level dedup data for water/caffeine/gait.
             # When multiple sources are combined (no-priority case), merge ts dicts —
-            # entries at identical timestamps will dedupe naturally.
+            # entries at identical timestamps will dedupe naturally. #4969: the merged map
+            # also carries each reading's class (untagged / watch) for the echo guard.
             if field in _DEDUP_FIELDS or field in _AVG_DEDUP_FIELDS:
-                merged_ts = {}
-                for src in sources_to_use:
-                    if src in src_data and src_data[src]["ts"]:
-                        merged_ts.update(src_data[src]["ts"])
+                merged_ts = _echo.reading_map({src: src_data[src]["ts"] for src in sources_to_use if src in src_data})
                 if merged_ts:
                     daily_timestamps[date][field] = merged_ts
 
@@ -979,20 +978,18 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
         try:
             ts_fields = list(reading_timestamps.keys())
             proj_names = {f"#rd{i}": f"_rd_{k}" for i, k in enumerate(ts_fields)}
+            proj_names.update({f"#rc{i}": f"{_echo.CLASS_MAP_PREFIX}{k}" for i, k in enumerate(ts_fields)})
             existing = table.get_item(
                 Key={"pk": PK, "sk": f"DATE#{date_str}"},
                 ProjectionExpression=", ".join(proj_names.keys()),
                 ExpressionAttributeNames=proj_names,
             ).get("Item", {})
             for field_name, new_readings in reading_timestamps.items():
-                stored_map = existing.get(f"_rd_{field_name}", {})
-                # Convert Decimal values from DynamoDB to float
-                stored = {k: float(str(v)) for k, v in stored_map.items()} if stored_map else {}
-                # Merge: new readings added, existing keys NOT overwritten (stored wins a collision)
-                merged = {**new_readings, **stored}
-                # Recompute the day value from the full deduplicated map: a sum for
-                # the additive dedup fields, the mean of every reading for gait (#4628).
-                fields[field_name] = round(sum(merged.values()) / (len(merged) if field_name in _AVG_DEDUP_FIELDS else 1), 2)
+                # Merge: new readings added, existing keys NOT overwritten (stored wins a collision).
+                # Recompute the day value from the full deduplicated map: a sum for the additive
+                # dedup fields, the mean of every reading for gait (#4628) — less the untagged
+                # echoes of a watch-tagged minute, which the map still keeps (#4969).
+                merged, fields[field_name] = _echo.merge_field(new_readings, existing, field_name, field_name in _AVG_DEDUP_FIELDS)
                 # Store merged map back (handled in write section below)
                 reading_timestamps[field_name] = merged
                 _dedup_ok_fields.add(field_name)
@@ -1036,6 +1033,9 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
             set_parts.append(f"{rd_attr} = {rd_val}")
             names[rd_attr] = rd_key
             values[rd_val] = {ts: floats_to_decimal(qty) for ts, qty in merged_readings.items()}
+            if getattr(merged_readings, "classes", None):  # #4969: the companion {ts: untagged|watch}
+                set_parts.append(f"#rc{j} = :rc{j}")
+                names[f"#rc{j}"], values[f":rc{j}"] = f"{_echo.CLASS_MAP_PREFIX}{field_name}", merged_readings.classes
 
     if not set_parts:
         return

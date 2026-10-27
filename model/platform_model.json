@@ -6651,9 +6651,10 @@
       "module": "lambdas/ingestion/enrichment_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 15 * * ? *)",
+          "expr": "cron(30 8 * * ? *)",
           "key": "activity-enrichment",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -6666,9 +6667,10 @@
       "module": "lambdas/compute/acwr_compute_lambda.py",
       "schedules": [
         {
-          "expr": "cron(55 16 * * ? *)",
+          "expr": "cron(55 9 * * ? *)",
           "key": "acwr-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6681,9 +6683,10 @@
       "module": "lambdas/compute/adaptive_mode_lambda.py",
       "schedules": [
         {
-          "expr": "cron(35 16 * * ? *)",
+          "expr": "cron(35 9 * * ? *)",
           "key": "adaptive-mode-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6696,9 +6699,10 @@
       "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 14 ? * MON *)",
+          "expr": "cron(0 7 ? * MON *)",
           "key": "ai-expert-analyzer",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6711,9 +6715,10 @@
       "module": "lambdas/emails/ai_review_pack_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 18 ? * SUN *)",
+          "expr": "cron(0 11 ? * SUN *)",
           "key": "ai-review-pack",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -6726,9 +6731,10 @@
       "module": "lambdas/emails/anomaly_detector_lambda.py",
       "schedules": [
         {
-          "expr": "cron(5 15 * * ? *)",
+          "expr": "cron(5 8 * * ? *)",
           "key": "anomaly-detector",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6741,9 +6747,10 @@
       "module": "lambdas/emails/between_chronicle_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 17 ? * SUN *)",
+          "expr": "cron(0 10 ? * SUN *)",
           "key": "between-chronicle",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -6765,9 +6772,10 @@
       "module": "lambdas/intelligence/challenge_generator_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 22 ? * SUN *)",
+          "expr": "cron(0 15 ? * SUN *)",
           "key": "challenge-generator",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6780,9 +6788,10 @@
       "module": "lambdas/compute/character_sheet_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 16 * * ? *)",
+          "expr": "cron(30 9 * * ? *)",
           "key": "character-sheet-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6795,9 +6804,10 @@
       "module": "lambdas/emails/chronicle_approve_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 18 * * ? *)",
+          "expr": "cron(0 11 * * ? *)",
           "key": "chronicle-approve",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -6810,9 +6820,10 @@
       "module": "lambdas/emails/chronicle_email_sender_lambda.py",
       "schedules": [
         {
-          "expr": "cron(10 15 ? * WED *)",
+          "expr": "cron(10 8 ? * WED *)",
           "key": "chronicle-email-sender",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -6834,9 +6845,10 @@
       "module": "lambdas/compute/circadian_compliance_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 2 * * ? *)",
+          "expr": "cron(0 19 * * ? *)",
           "key": "circadian-compliance",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6858,9 +6870,10 @@
       "module": "lambdas/compute/coach_daily_reflection_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 19 * * ? *)",
+          "expr": "cron(0 12 * * ? *)",
           "key": "coach-daily-reflection",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6882,9 +6895,10 @@
       "module": "lambdas/coach/coach_history_summarizer.py",
       "schedules": [
         {
-          "expr": "cron(0 17 ? * SUN *)",
+          "expr": "cron(0 10 ? * SUN *)",
           "key": "coach-history-summarizer",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6897,9 +6911,10 @@
       "module": "lambdas/compute/coach_memoir_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 15 1 1,4,7,10 ? *)",
+          "expr": "cron(0 8 1 1,4,7,10 ? *)",
           "key": "coach-memoir",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6921,9 +6936,10 @@
       "module": "lambdas/emails/coach_nudge_lambda.py",
       "schedules": [
         {
-          "expr": "cron(10 0-5,15-23 * * ? *)",
+          "expr": "cron(10 8-22 * * ? *)",
           "key": "coach-nudge",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -6945,9 +6961,10 @@
       "module": "lambdas/emails/coach_panel_podcast_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 18 ? * MON,WED *)",
+          "expr": "cron(0 11 ? * MON,WED *)",
           "key": "coach-panel-podcast#PanelHoldSweep",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -6960,9 +6977,10 @@
       "module": "lambdas/coach/coach_prediction_evaluator.py",
       "schedules": [
         {
-          "expr": "cron(0 16 * * ? *)",
+          "expr": "cron(0 9 * * ? *)",
           "key": "coach-prediction-evaluator",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -6993,9 +7011,10 @@
       "module": "lambdas/coach/coach_vision_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 17 ? * MON *)",
+          "expr": "cron(0 10 ? * MON *)",
           "key": "coach-vision",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7024,9 +7043,10 @@
       "module": "lambdas/emails/daily_debrief_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 19 * * ? *)",
+          "expr": "cron(0 12 * * ? *)",
           "key": "daily-debrief",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7039,9 +7059,10 @@
       "module": "lambdas/compute/daily_insight_compute_lambda.py",
       "schedules": [
         {
-          "expr": "cron(45 16 * * ? *)",
+          "expr": "cron(45 9 * * ? *)",
           "key": "daily-insight-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7054,14 +7075,16 @@
       "module": "lambdas/compute/daily_metrics_compute_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 0 * * ? *)",
+          "expr": "cron(0 17 * * ? *)",
           "key": "daily-metrics-compute#DailyMetricsComputeEvening",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(40 16 * * ? *)",
+          "expr": "cron(40 9 * * ? *)",
           "key": "daily-metrics-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7074,14 +7097,16 @@
       "module": "lambdas/compute/dashboard_refresh_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 1 * * ? *)",
-          "key": "dashboard-refresh#DashboardRefreshEveningRule",
-          "resolution": "table"
+          "expr": "cron(0 14 * * ? *)",
+          "key": "dashboard-refresh",
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(0 21 * * ? *)",
-          "key": "dashboard-refresh",
-          "resolution": "table"
+          "expr": "cron(0 18 * * ? *)",
+          "key": "dashboard-refresh#DashboardRefreshEveningRule",
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7109,9 +7134,10 @@
       "module": "lambdas/ingestion/eightsleep_lambda.py",
       "schedules": [
         {
-          "expr": "cron(15 14,16,18,20 * * ? *)",
+          "expr": "cron(15 7,9,11,13 * * ? *)",
           "key": "eightsleep-data-ingestion",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -7142,9 +7168,10 @@
       "module": "lambdas/compute/episode_detect_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 17 ? * SUN *)",
+          "expr": "cron(0 10 ? * SUN *)",
           "key": "episode-detect",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7157,9 +7184,10 @@
       "module": "lambdas/emails/evening_nudge_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 3 * * ? *)",
+          "expr": "cron(0 20 * * ? *)",
           "key": "evening-nudge",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7172,9 +7200,10 @@
       "module": "lambdas/compute/failure_pattern_compute_lambda.py",
       "schedules": [
         {
-          "expr": "cron(50 17 ? * SUN *)",
+          "expr": "cron(50 10 ? * SUN *)",
           "key": "failure-pattern-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7187,9 +7216,10 @@
       "module": "lambdas/intelligence/field_notes_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 18 ? * SUN *)",
+          "expr": "cron(0 11 ? * SUN *)",
           "key": "field-notes-generate",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7211,9 +7241,10 @@
       "module": "lambdas/compute/forecast_engine_lambda.py",
       "schedules": [
         {
-          "expr": "cron(50 16 * * ? *)",
+          "expr": "cron(50 9 * * ? *)",
           "key": "forecast-engine",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7226,9 +7257,10 @@
       "module": "lambdas/emails/habit_skip_review_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 16 ? * SAT *)",
+          "expr": "cron(0 9 ? * SAT *)",
           "key": "habit-skip-review",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7270,14 +7302,16 @@
           "resolution": "table"
         },
         {
-          "expr": "cron(30 18 * * ? *)",
+          "expr": "cron(30 11 * * ? *)",
           "key": "hevy-backfill#HevyReconciliation",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(40 13 * * ? *)",
+          "expr": "cron(40 6 * * ? *)",
           "key": "hevy-backfill#HevyTemplateIndexRebuild",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -7290,9 +7324,10 @@
       "module": "lambdas/operational/hevy_restamp_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 18 * * ? *)",
+          "expr": "cron(0 11 * * ? *)",
           "key": "hevy-restamp#HevyRestampRule",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7306,9 +7341,10 @@
       "schedules": [
         {
           "enabled": false,
-          "expr": "cron(30 13 ? * SUN *)",
+          "expr": "cron(30 6 ? * SUN *)",
           "key": "hevy-routine-cron#HevyRoutineCronRule",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7321,9 +7357,10 @@
       "module": "lambdas/compute/hypothesis_engine_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 19 ? * SUN *)",
+          "expr": "cron(0 12 ? * SUN *)",
           "key": "hypothesis-engine",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7354,9 +7391,10 @@
       "module": "lambdas/coach/inter_coach_dialogue_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 18 ? * SUN *)",
+          "expr": "cron(0 11 ? * SUN *)",
           "key": "inter-coach-dialogue",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7369,9 +7407,10 @@
       "module": "lambdas/intelligence/journal_analyzer_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 10 * * ? *)",
+          "expr": "cron(0 3 * * ? *)",
           "key": "journal-analyzer",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7384,9 +7423,10 @@
       "module": "lambdas/ingestion/journal_enrichment_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 14 * * ? *)",
+          "expr": "cron(30 7 * * ? *)",
           "key": "journal-enrichment",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -7399,9 +7439,10 @@
       "module": "lambdas/operational/ai_quality_canary_lambda.py",
       "schedules": [
         {
-          "expr": "cron(20 16 ? * MON,WED,FRI *)",
+          "expr": "cron(20 9 ? * MON,WED,FRI *)",
           "key": "life-platform-ai-quality-canary",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7414,9 +7455,10 @@
       "module": "lambdas/operational/alert_digest_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 15 * * ? *)",
+          "expr": "cron(0 8 * * ? *)",
           "key": "life-platform-alert-digest",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7444,9 +7486,10 @@
       "module": "lambdas/operational/coherence_sentinel_lambda.py",
       "schedules": [
         {
-          "expr": "cron(45 18 ? * * *)",
+          "expr": "cron(45 11 ? * * *)",
           "key": "life-platform-coherence-sentinel",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7459,9 +7502,10 @@
       "module": "lambdas/operational/cost_governor_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 0/8 * * ? *)",
+          "expr": "cron(0 1/8 * * ? *)",
           "key": "life-platform-cost-governor",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7483,9 +7527,10 @@
       "module": "lambdas/operational/data_reconciliation_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 7 ? * MON *)",
+          "expr": "cron(30 0 ? * MON *)",
           "key": "life-platform-data-reconciliation",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7498,9 +7543,10 @@
       "module": "lambdas/operational/delete_user_data_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 8 ? * MON *)",
+          "expr": "cron(0 1 ? * MON *)",
           "key": "life-platform-delete-user-data#SubscriberRetentionSweep",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7528,9 +7574,10 @@
       "module": "lambdas/emails/freshness_checker_lambda.py",
       "schedules": [
         {
-          "expr": "cron(45 16 * * ? *)",
+          "expr": "cron(45 9 * * ? *)",
           "key": "life-platform-freshness-checker",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7561,9 +7608,10 @@
       "module": "lambdas/operational/permanence_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 6 * * ? *)",
+          "expr": "cron(0 23 * * ? *)",
           "key": "life-platform-permanence",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7576,9 +7624,10 @@
       "module": "lambdas/operational/pip_audit_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 15 ? * MON *)",
+          "expr": "cron(0 8 ? * MON *)",
           "key": "life-platform-pip-audit",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7591,9 +7640,10 @@
       "module": "lambdas/operational/qa_smoke_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 18 ? * * *)",
+          "expr": "cron(30 11 ? * * *)",
           "key": "life-platform-qa-smoke",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7633,9 +7683,10 @@
       "module": "lambdas/operational/traffic_digest_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 16 ? * MON *)",
+          "expr": "cron(0 9 ? * MON *)",
           "key": "life-platform-traffic-digest",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7675,9 +7726,10 @@
       "module": "lambdas/emails/milestone_digest_lambda.py",
       "schedules": [
         {
-          "expr": "cron(15 17 * * ? *)",
+          "expr": "cron(15 10 * * ? *)",
           "key": "milestone-digest",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7690,9 +7742,10 @@
       "module": "lambdas/emails/monday_compass_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 15 ? * MON *)",
+          "expr": "cron(0 8 ? * MON *)",
           "key": "monday-compass",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7705,9 +7758,10 @@
       "module": "lambdas/emails/monthly_digest_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 16 ? * 1#1 *)",
+          "expr": "cron(0 9 ? * 1#1 *)",
           "key": "monthly-digest",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7720,9 +7774,10 @@
       "module": "lambdas/ingestion/notion_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 14,21,3 * * ? *)",
+          "expr": "cron(0 7,14,20 * * ? *)",
           "key": "notion-journal-ingestion",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -7735,9 +7790,10 @@
       "module": "lambdas/emails/nutrition_review_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 17 ? * SAT *)",
+          "expr": "cron(0 10 ? * SAT *)",
           "key": "nutrition-review",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7750,9 +7806,10 @@
       "module": "lambdas/web/og_image_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 19 * * ? *)",
+          "expr": "cron(30 12 * * ? *)",
           "key": "og-image-generator",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7765,9 +7822,10 @@
       "module": "lambdas/emails/partner_email_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 17 ? * 1 *)",
+          "expr": "cron(30 10 ? * 1 *)",
           "key": "partner-weekly-email",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7780,9 +7838,10 @@
       "module": "lambdas/compute/personal_baselines_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 8 1 * ? *)",
+          "expr": "cron(0 1 1 * ? *)",
           "key": "personal-baselines-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7795,19 +7854,22 @@
       "module": "lambdas/operational/pipeline_health_check_lambda.py",
       "schedules": [
         {
-          "expr": "cron(10 17 * * ? *)",
+          "expr": "cron(10 10 * * ? *)",
           "key": "pipeline-health-check#PipelineHealthIngestLiveness",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(30 2,6,14,18,22 * * ? *)",
+          "expr": "cron(30 7,11,15,19,23 * * ? *)",
           "key": "pipeline-health-check",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(58 16 * * ? *)",
+          "expr": "cron(58 9 * * ? *)",
           "key": "pipeline-health-check#PipelineHealthComputeCheck",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7838,9 +7900,10 @@
       "module": "lambdas/reading/reading_recall_sweep_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 16 * * ? *)",
+          "expr": "cron(0 9 * * ? *)",
           "key": "reading-recall-sweep",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7853,9 +7916,10 @@
       "module": "lambdas/web/recap_card_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 19 * * ? *)",
+          "expr": "cron(30 12 * * ? *)",
           "key": "recap-card-generator",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7868,9 +7932,10 @@
       "module": "lambdas/compute/scenario_explorer_lambda.py",
       "schedules": [
         {
-          "expr": "cron(10 12 * * ? *)",
+          "expr": "cron(10 5 * * ? *)",
           "key": "scenario-explorer",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7883,24 +7948,28 @@
       "module": "lambdas/web/site_stats_refresh_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 15 * * ? *)",
-          "key": "site-stats-refresh#SiteStatsRefresh8amPT",
-          "resolution": "table"
-        },
-        {
-          "expr": "cron(0 19 * * ? *)",
+          "expr": "cron(0 12 * * ? *)",
           "key": "site-stats-refresh#SiteStatsRefresh12pmPT",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(0 23 * * ? *)",
+          "expr": "cron(0 16 * * ? *)",
           "key": "site-stats-refresh#SiteStatsRefresh4pmPT",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(0 3 * * ? *)",
+          "expr": "cron(0 20 * * ? *)",
           "key": "site-stats-refresh#SiteStatsRefresh8pmPT",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
+        },
+        {
+          "expr": "cron(0 8 * * ? *)",
+          "key": "site-stats-refresh#SiteStatsRefresh8amPT",
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "operational_stack",
@@ -7913,9 +7982,10 @@
       "module": "lambdas/ingestion/social_enrichment_lambda.py",
       "schedules": [
         {
-          "expr": "cron(45 14 * * ? *)",
+          "expr": "cron(45 7 * * ? *)",
           "key": "social-enrichment",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -7928,9 +7998,10 @@
       "module": "lambdas/compute/state_of_matthew_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 19 ? * SUN *)",
+          "expr": "cron(30 12 ? * SUN *)",
           "key": "state-of-matthew",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -7943,14 +8014,16 @@
       "module": "lambdas/ingestion/strava_lambda.py",
       "schedules": [
         {
-          "expr": "cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "expr": "cron(10 5-22 * * ? *)",
           "key": "strava-data-ingestion",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(20 17 * * ? *)",
+          "expr": "cron(20 10 * * ? *)",
           "key": "strava-data-ingestion#StravaReconciliation",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -7963,9 +8036,10 @@
       "module": "lambdas/web/subscriber_onboarding_lambda.py",
       "schedules": [
         {
-          "expr": "cron(5 17 * * ? *)",
+          "expr": "cron(5 10 * * ? *)",
           "key": "subscriber-onboarding",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -7978,19 +8052,22 @@
       "module": "lambdas/coach/telegram_worker_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 16 * * ? *)",
-          "key": "telegram-coach-worker#TelegramEventOutbound",
-          "resolution": "table"
-        },
-        {
-          "expr": "cron(0 3 * * ? *)",
+          "expr": "cron(0 20 * * ? *)",
           "key": "telegram-coach-worker#TelegramEveningCheckin",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(15 17 ? * MON-FRI *)",
+          "expr": "cron(0 9 * * ? *)",
+          "key": "telegram-coach-worker#TelegramEventOutbound",
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
+        },
+        {
+          "expr": "cron(15 10 ? * MON-FRI *)",
           "key": "telegram-coach-worker#TelegramMorningCheckin",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "serve_stack",
@@ -8012,9 +8089,10 @@
       "module": "lambdas/ingestion/todoist_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 14 * * ? *)",
+          "expr": "cron(0 7 * * ? *)",
           "key": "todoist-data-ingestion",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -8027,9 +8105,10 @@
       "module": "lambdas/coach/voice_fidelity_harness.py",
       "schedules": [
         {
-          "expr": "cron(0 15 1 * ? *)",
+          "expr": "cron(0 8 1 * ? *)",
           "key": "voice-fidelity-harness",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -8042,9 +8121,10 @@
       "module": "lambdas/ingestion/weather_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 14,2 * * ? *)",
+          "expr": "cron(0 7,19 * * ? *)",
           "key": "weather-data-ingestion",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -8057,19 +8137,22 @@
       "module": "lambdas/emails/wednesday_chronicle_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 1 ? * WED *)",
+          "expr": "cron(0 18 ? * TUE *)",
           "key": "wednesday-chronicle#OwnerWordsQuestionTuesday",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(0 15 ? * WED *)",
+          "expr": "cron(0 8 ? * WED *)",
           "key": "wednesday-chronicle",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(0 16 ? * MON *)",
+          "expr": "cron(0 9 ? * MON *)",
           "key": "wednesday-chronicle#StoryQuestionsMonday",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -8082,9 +8165,10 @@
       "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 18 ? * SUN *)",
+          "expr": "cron(30 11 ? * SUN *)",
           "key": "weekly-correlation-compute",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -8097,9 +8181,10 @@
       "module": "lambdas/emails/weekly_digest_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 16 ? * SUN *)",
+          "expr": "cron(0 9 ? * SUN *)",
           "key": "weekly-digest",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -8112,9 +8197,10 @@
       "module": "lambdas/emails/weekly_plate_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 2 ? * SAT *)",
+          "expr": "cron(0 19 ? * FRI *)",
           "key": "weekly-plate",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -8127,9 +8213,10 @@
       "module": "lambdas/compute/weekly_signal_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 16 ? * SUN *)",
+          "expr": "cron(30 9 ? * SUN *)",
           "key": "weekly-signal",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "email_stack",
@@ -8142,19 +8229,22 @@
       "module": "lambdas/ingestion/whoop_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 0,4,12,16,20 * * ? *)",
+          "expr": "cron(0 5,9,13,17,21 * * ? *)",
           "key": "whoop-data-ingestion",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(20 18 * * ? *)",
+          "expr": "cron(20 11 * * ? *)",
           "key": "whoop-data-ingestion#WhoopReconciliation",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         },
         {
-          "expr": "cron(30 17 * * ? *)",
+          "expr": "cron(30 10 * * ? *)",
           "key": "whoop-data-ingestion#WhoopRecoverySchedule",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -8167,9 +8257,10 @@
       "module": "lambdas/ingestion/withings_lambda.py",
       "schedules": [
         {
-          "expr": "cron(5 14,17,21,0 * * ? *)",
+          "expr": "cron(5 7,10,14,17 * * ? *)",
           "key": "withings-data-ingestion",
-          "resolution": "table"
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "ingestion_stack",
@@ -9165,584 +9256,174 @@
   },
   "schedules": [
     {
-      "expr": "cron(0 0 * * ? *)",
-      "lambda": "daily-metrics-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "00:00"
-    },
-    {
-      "expr": "cron(0 1 * * ? *)",
-      "lambda": "dashboard-refresh",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "01:00"
-    },
-    {
-      "expr": "cron(0 1 ? * WED *)",
-      "lambda": "wednesday-chronicle",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "01:00"
-    },
-    {
-      "expr": "cron(0 2 * * ? *)",
-      "lambda": "circadian-compliance",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "02:00"
-    },
-    {
-      "expr": "cron(0 2 ? * SAT *)",
-      "lambda": "weekly-plate",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "02:00"
-    },
-    {
-      "expr": "cron(0 3 * * ? *)",
-      "lambda": "evening-nudge",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "03:00"
-    },
-    {
-      "expr": "cron(0 3 * * ? *)",
-      "lambda": "site-stats-refresh",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "03:00"
-    },
-    {
-      "expr": "cron(0 3 * * ? *)",
-      "lambda": "telegram-coach-worker",
-      "resolution": "table",
-      "stack": "serve_stack",
-      "utc": "03:00"
-    },
-    {
-      "expr": "cron(0 6 * * ? *)",
-      "lambda": "life-platform-permanence",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "06:00"
-    },
-    {
-      "expr": "cron(30 7 ? * MON *)",
-      "lambda": "life-platform-data-reconciliation",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "07:30"
-    },
-    {
-      "expr": "cron(0 8 ? * MON *)",
-      "lambda": "life-platform-delete-user-data",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "08:00"
-    },
-    {
-      "expr": "cron(0 8 1 * ? *)",
-      "lambda": "personal-baselines-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "08:00"
-    },
-    {
-      "expr": "cron(0 10 * * ? *)",
-      "lambda": "journal-analyzer",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "10:00"
-    },
-    {
-      "expr": "cron(10 12 * * ? *)",
-      "lambda": "scenario-explorer",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "12:10"
-    },
-    {
-      "expr": "cron(30 13 ? * SUN *)",
-      "lambda": "hevy-routine-cron",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "13:30"
-    },
-    {
-      "expr": "cron(40 13 * * ? *)",
-      "lambda": "hevy-backfill",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "13:40"
-    },
-    {
-      "expr": "cron(0 14 ? * MON *)",
-      "lambda": "ai-expert-analyzer",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "14:00"
-    },
-    {
-      "expr": "cron(0 14 * * ? *)",
-      "lambda": "todoist-data-ingestion",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "14:00"
-    },
-    {
-      "expr": "cron(30 14 * * ? *)",
-      "lambda": "journal-enrichment",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "14:30"
-    },
-    {
-      "expr": "cron(45 14 * * ? *)",
-      "lambda": "social-enrichment",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "14:45"
-    },
-    {
-      "expr": "cron(0 15 1 1,4,7,10 ? *)",
-      "lambda": "coach-memoir",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "15:00"
-    },
-    {
-      "expr": "cron(0 15 * * ? *)",
-      "lambda": "life-platform-alert-digest",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "15:00"
-    },
-    {
-      "expr": "cron(0 15 ? * MON *)",
-      "lambda": "life-platform-pip-audit",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "15:00"
-    },
-    {
-      "expr": "cron(0 15 ? * MON *)",
-      "lambda": "monday-compass",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "15:00"
-    },
-    {
-      "expr": "cron(0 15 * * ? *)",
-      "lambda": "site-stats-refresh",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "15:00"
-    },
-    {
-      "expr": "cron(0 15 1 * ? *)",
-      "lambda": "voice-fidelity-harness",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "15:00"
-    },
-    {
-      "expr": "cron(0 15 ? * WED *)",
-      "lambda": "wednesday-chronicle",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "15:00"
-    },
-    {
-      "expr": "cron(5 15 * * ? *)",
-      "lambda": "anomaly-detector",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "15:05"
-    },
-    {
-      "expr": "cron(10 15 ? * WED *)",
-      "lambda": "chronicle-email-sender",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "15:10"
-    },
-    {
-      "expr": "cron(30 15 * * ? *)",
+      "expr": "cron(30 8 * * ? *)",
       "lambda": "activity-enrichment",
+      "local": "08:30",
       "resolution": "table",
       "stack": "ingestion_stack",
-      "utc": "15:30"
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(0 16 * * ? *)",
-      "lambda": "coach-prediction-evaluator",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(0 16 ? * SAT *)",
-      "lambda": "habit-skip-review",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(0 16 ? * MON *)",
-      "lambda": "life-platform-traffic-digest",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(0 16 ? * 1#1 *)",
-      "lambda": "monthly-digest",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(0 16 * * ? *)",
-      "lambda": "reading-recall-sweep",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(0 16 * * ? *)",
-      "lambda": "telegram-coach-worker",
-      "resolution": "table",
-      "stack": "serve_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(0 16 ? * MON *)",
-      "lambda": "wednesday-chronicle",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(0 16 ? * SUN *)",
-      "lambda": "weekly-digest",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "16:00"
-    },
-    {
-      "expr": "cron(20 16 ? * MON,WED,FRI *)",
-      "lambda": "life-platform-ai-quality-canary",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "16:20"
-    },
-    {
-      "expr": "cron(30 16 * * ? *)",
-      "lambda": "character-sheet-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "16:30"
-    },
-    {
-      "expr": "cron(30 16 ? * SUN *)",
-      "lambda": "weekly-signal",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "16:30"
-    },
-    {
-      "expr": "cron(35 16 * * ? *)",
-      "lambda": "adaptive-mode-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "16:35"
-    },
-    {
-      "expr": "cron(40 16 * * ? *)",
-      "lambda": "daily-metrics-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "16:40"
-    },
-    {
-      "expr": "cron(45 16 * * ? *)",
-      "lambda": "daily-insight-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "16:45"
-    },
-    {
-      "expr": "cron(45 16 * * ? *)",
-      "lambda": "life-platform-freshness-checker",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "16:45"
-    },
-    {
-      "expr": "cron(50 16 * * ? *)",
-      "lambda": "forecast-engine",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "16:50"
-    },
-    {
-      "expr": "cron(55 16 * * ? *)",
+      "expr": "cron(55 9 * * ? *)",
       "lambda": "acwr-compute",
+      "local": "09:55",
       "resolution": "table",
       "stack": "compute_stack",
-      "utc": "16:55"
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(58 16 * * ? *)",
-      "lambda": "pipeline-health-check",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "16:58"
-    },
-    {
-      "expr": "cron(0 17 ? * SUN *)",
-      "lambda": "between-chronicle",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "17:00"
-    },
-    {
-      "expr": "cron(0 17 ? * SUN *)",
-      "lambda": "coach-history-summarizer",
+      "expr": "cron(35 9 * * ? *)",
+      "lambda": "adaptive-mode-compute",
+      "local": "09:35",
       "resolution": "table",
       "stack": "compute_stack",
-      "utc": "17:00"
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(0 17 ? * MON *)",
-      "lambda": "coach-vision",
+      "expr": "cron(0 7 ? * MON *)",
+      "lambda": "ai-expert-analyzer",
+      "local": "07:00",
       "resolution": "table",
       "stack": "compute_stack",
-      "utc": "17:00"
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(0 17 ? * SUN *)",
-      "lambda": "episode-detect",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "17:00"
-    },
-    {
-      "expr": "cron(0 17 ? * SAT *)",
-      "lambda": "nutrition-review",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "17:00"
-    },
-    {
-      "expr": "cron(5 17 * * ? *)",
-      "lambda": "subscriber-onboarding",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "17:05"
-    },
-    {
-      "expr": "cron(10 17 * * ? *)",
-      "lambda": "pipeline-health-check",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "17:10"
-    },
-    {
-      "expr": "cron(15 17 * * ? *)",
-      "lambda": "milestone-digest",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "17:15"
-    },
-    {
-      "expr": "cron(15 17 ? * MON-FRI *)",
-      "lambda": "telegram-coach-worker",
-      "resolution": "table",
-      "stack": "serve_stack",
-      "utc": "17:15"
-    },
-    {
-      "expr": "cron(20 17 * * ? *)",
-      "lambda": "strava-data-ingestion",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "17:20"
-    },
-    {
-      "expr": "cron(30 17 ? * 1 *)",
-      "lambda": "partner-weekly-email",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "17:30"
-    },
-    {
-      "expr": "cron(30 17 * * ? *)",
-      "lambda": "whoop-data-ingestion",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "17:30"
-    },
-    {
-      "expr": "cron(50 17 ? * SUN *)",
-      "lambda": "failure-pattern-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "17:50"
-    },
-    {
-      "expr": "cron(0 18 ? * SUN *)",
+      "expr": "cron(0 11 ? * SUN *)",
       "lambda": "ai-review-pack",
+      "local": "11:00",
       "resolution": "table",
       "stack": "email_stack",
-      "utc": "18:00"
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(0 18 * * ? *)",
-      "lambda": "chronicle-approve",
+      "expr": "cron(5 8 * * ? *)",
+      "lambda": "anomaly-detector",
+      "local": "08:05",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 10 ? * SUN *)",
+      "lambda": "between-chronicle",
+      "local": "10:00",
       "resolution": "table",
       "stack": "email_stack",
-      "utc": "18:00"
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(0 18 ? * MON,WED *)",
-      "lambda": "coach-panel-podcast",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "18:00"
-    },
-    {
-      "expr": "cron(0 18 ? * SUN *)",
-      "lambda": "field-notes-generate",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "18:00"
-    },
-    {
-      "expr": "cron(0 18 * * ? *)",
-      "lambda": "hevy-restamp",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "18:00"
-    },
-    {
-      "expr": "cron(0 18 ? * SUN *)",
-      "lambda": "inter-coach-dialogue",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "18:00"
-    },
-    {
-      "expr": "cron(20 18 * * ? *)",
-      "lambda": "whoop-data-ingestion",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "18:20"
-    },
-    {
-      "expr": "cron(30 18 * * ? *)",
-      "lambda": "hevy-backfill",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": "18:30"
-    },
-    {
-      "expr": "cron(30 18 ? * * *)",
-      "lambda": "life-platform-qa-smoke",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "18:30"
-    },
-    {
-      "expr": "cron(30 18 ? * SUN *)",
-      "lambda": "weekly-correlation-compute",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "18:30"
-    },
-    {
-      "expr": "cron(45 18 ? * * *)",
-      "lambda": "life-platform-coherence-sentinel",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "18:45"
-    },
-    {
-      "expr": "cron(0 19 * * ? *)",
-      "lambda": "coach-daily-reflection",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "19:00"
-    },
-    {
-      "expr": "cron(0 19 * * ? *)",
-      "lambda": "daily-debrief",
-      "resolution": "table",
-      "stack": "email_stack",
-      "utc": "19:00"
-    },
-    {
-      "expr": "cron(0 19 ? * SUN *)",
-      "lambda": "hypothesis-engine",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "19:00"
-    },
-    {
-      "expr": "cron(0 19 * * ? *)",
-      "lambda": "site-stats-refresh",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "19:00"
-    },
-    {
-      "expr": "cron(30 19 * * ? *)",
-      "lambda": "og-image-generator",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "19:30"
-    },
-    {
-      "expr": "cron(30 19 * * ? *)",
-      "lambda": "recap-card-generator",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "19:30"
-    },
-    {
-      "expr": "cron(30 19 ? * SUN *)",
-      "lambda": "state-of-matthew",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "19:30"
-    },
-    {
-      "expr": "cron(0 21 * * ? *)",
-      "lambda": "dashboard-refresh",
-      "resolution": "table",
-      "stack": "compute_stack",
-      "utc": "21:00"
-    },
-    {
-      "expr": "cron(0 22 ? * SUN *)",
+      "expr": "cron(0 15 ? * SUN *)",
       "lambda": "challenge-generator",
+      "local": "15:00",
       "resolution": "table",
       "stack": "compute_stack",
-      "utc": "22:00"
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(0 23 * * ? *)",
-      "lambda": "site-stats-refresh",
+      "expr": "cron(30 9 * * ? *)",
+      "lambda": "character-sheet-compute",
+      "local": "09:30",
       "resolution": "table",
-      "stack": "operational_stack",
-      "utc": "23:00"
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
     },
     {
-      "expr": "cron(10 0-5,15-23 * * ? *)",
-      "lambda": "coach-nudge",
+      "expr": "cron(0 11 * * ? *)",
+      "lambda": "chronicle-approve",
+      "local": "11:00",
       "resolution": "table",
       "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(10 8 ? * WED *)",
+      "lambda": "chronicle-email-sender",
+      "local": "08:10",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 19 * * ? *)",
+      "lambda": "circadian-compliance",
+      "local": "19:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 12 * * ? *)",
+      "lambda": "coach-daily-reflection",
+      "local": "12:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 10 ? * SUN *)",
+      "lambda": "coach-history-summarizer",
+      "local": "10:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 8 1 1,4,7,10 ? *)",
+      "lambda": "coach-memoir",
+      "local": "08:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(10 8-22 * * ? *)",
+      "lambda": "coach-nudge",
+      "local": null,
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 11 ? * MON,WED *)",
+      "lambda": "coach-panel-podcast",
+      "local": "11:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 * * ? *)",
+      "lambda": "coach-prediction-evaluator",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 10 ? * MON *)",
+      "lambda": "coach-vision",
+      "local": "10:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
@@ -9755,6 +9436,60 @@
       "utc": null
     },
     {
+      "expr": "cron(0 12 * * ? *)",
+      "lambda": "daily-debrief",
+      "local": "12:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(45 9 * * ? *)",
+      "lambda": "daily-insight-compute",
+      "local": "09:45",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 17 * * ? *)",
+      "lambda": "daily-metrics-compute",
+      "local": "17:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(40 9 * * ? *)",
+      "lambda": "daily-metrics-compute",
+      "local": "09:40",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 14 * * ? *)",
+      "lambda": "dashboard-refresh",
+      "local": "14:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 18 * * ? *)",
+      "lambda": "dashboard-refresh",
+      "local": "18:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
       "expr": "rate(2 hours)",
       "lambda": "dropbox-poll",
       "resolution": "table",
@@ -9762,10 +9497,66 @@
       "utc": null
     },
     {
-      "expr": "cron(15 14,16,18,20 * * ? *)",
+      "expr": "cron(15 7,9,11,13 * * ? *)",
       "lambda": "eightsleep-data-ingestion",
+      "local": null,
       "resolution": "table",
       "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 10 ? * SUN *)",
+      "lambda": "episode-detect",
+      "local": "10:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 20 * * ? *)",
+      "lambda": "evening-nudge",
+      "local": "20:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(50 10 ? * SUN *)",
+      "lambda": "failure-pattern-compute",
+      "local": "10:50",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 11 ? * SUN *)",
+      "lambda": "field-notes-generate",
+      "local": "11:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(50 9 * * ? *)",
+      "lambda": "forecast-engine",
+      "local": "09:50",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 ? * SAT *)",
+      "lambda": "habit-skip-review",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
@@ -9783,6 +9574,96 @@
       "utc": null
     },
     {
+      "expr": "cron(30 11 * * ? *)",
+      "lambda": "hevy-backfill",
+      "local": "11:30",
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(40 6 * * ? *)",
+      "lambda": "hevy-backfill",
+      "local": "06:40",
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 11 * * ? *)",
+      "lambda": "hevy-restamp",
+      "local": "11:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 6 ? * SUN *)",
+      "lambda": "hevy-routine-cron",
+      "local": "06:30",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 12 ? * SUN *)",
+      "lambda": "hypothesis-engine",
+      "local": "12:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 11 ? * SUN *)",
+      "lambda": "inter-coach-dialogue",
+      "local": "11:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 3 * * ? *)",
+      "lambda": "journal-analyzer",
+      "local": "03:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 7 * * ? *)",
+      "lambda": "journal-enrichment",
+      "local": "07:30",
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(20 9 ? * MON,WED,FRI *)",
+      "lambda": "life-platform-ai-quality-canary",
+      "local": "09:20",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 8 * * ? *)",
+      "lambda": "life-platform-alert-digest",
+      "local": "08:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
       "expr": "rate(4 hours)",
       "lambda": "life-platform-canary",
       "resolution": "table",
@@ -9790,10 +9671,39 @@
       "utc": null
     },
     {
-      "expr": "cron(0 0/8 * * ? *)",
-      "lambda": "life-platform-cost-governor",
+      "expr": "cron(45 11 ? * * *)",
+      "lambda": "life-platform-coherence-sentinel",
+      "local": "11:45",
       "resolution": "table",
       "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 1/8 * * ? *)",
+      "lambda": "life-platform-cost-governor",
+      "local": null,
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 0 ? * MON *)",
+      "lambda": "life-platform-data-reconciliation",
+      "local": "00:30",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 1 ? * MON *)",
+      "lambda": "life-platform-delete-user-data",
+      "local": "01:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
@@ -9804,45 +9714,408 @@
       "utc": null
     },
     {
-      "expr": "cron(0 14,21,3 * * ? *)",
-      "lambda": "notion-journal-ingestion",
-      "resolution": "table",
-      "stack": "ingestion_stack",
-      "utc": null
-    },
-    {
-      "expr": "cron(30 2,6,14,18,22 * * ? *)",
-      "lambda": "pipeline-health-check",
+      "expr": "cron(45 9 * * ? *)",
+      "lambda": "life-platform-freshness-checker",
+      "local": "09:45",
       "resolution": "table",
       "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
-      "expr": "cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "expr": "cron(0 23 * * ? *)",
+      "lambda": "life-platform-permanence",
+      "local": "23:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 8 ? * MON *)",
+      "lambda": "life-platform-pip-audit",
+      "local": "08:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 11 ? * * *)",
+      "lambda": "life-platform-qa-smoke",
+      "local": "11:30",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 ? * MON *)",
+      "lambda": "life-platform-traffic-digest",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(15 10 * * ? *)",
+      "lambda": "milestone-digest",
+      "local": "10:15",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 8 ? * MON *)",
+      "lambda": "monday-compass",
+      "local": "08:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 ? * 1#1 *)",
+      "lambda": "monthly-digest",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 7,14,20 * * ? *)",
+      "lambda": "notion-journal-ingestion",
+      "local": null,
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 10 ? * SAT *)",
+      "lambda": "nutrition-review",
+      "local": "10:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 12 * * ? *)",
+      "lambda": "og-image-generator",
+      "local": "12:30",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 10 ? * 1 *)",
+      "lambda": "partner-weekly-email",
+      "local": "10:30",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 1 1 * ? *)",
+      "lambda": "personal-baselines-compute",
+      "local": "01:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(10 10 * * ? *)",
+      "lambda": "pipeline-health-check",
+      "local": "10:10",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 7,11,15,19,23 * * ? *)",
+      "lambda": "pipeline-health-check",
+      "local": null,
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(58 9 * * ? *)",
+      "lambda": "pipeline-health-check",
+      "local": "09:58",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 * * ? *)",
+      "lambda": "reading-recall-sweep",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 12 * * ? *)",
+      "lambda": "recap-card-generator",
+      "local": "12:30",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(10 5 * * ? *)",
+      "lambda": "scenario-explorer",
+      "local": "05:10",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 12 * * ? *)",
+      "lambda": "site-stats-refresh",
+      "local": "12:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 16 * * ? *)",
+      "lambda": "site-stats-refresh",
+      "local": "16:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 20 * * ? *)",
+      "lambda": "site-stats-refresh",
+      "local": "20:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 8 * * ? *)",
+      "lambda": "site-stats-refresh",
+      "local": "08:00",
+      "resolution": "table",
+      "stack": "operational_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(45 7 * * ? *)",
+      "lambda": "social-enrichment",
+      "local": "07:45",
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 12 ? * SUN *)",
+      "lambda": "state-of-matthew",
+      "local": "12:30",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(10 5-22 * * ? *)",
       "lambda": "strava-data-ingestion",
+      "local": null,
       "resolution": "table",
       "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
-      "expr": "cron(0 14,2 * * ? *)",
+      "expr": "cron(20 10 * * ? *)",
+      "lambda": "strava-data-ingestion",
+      "local": "10:20",
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(5 10 * * ? *)",
+      "lambda": "subscriber-onboarding",
+      "local": "10:05",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 20 * * ? *)",
+      "lambda": "telegram-coach-worker",
+      "local": "20:00",
+      "resolution": "table",
+      "stack": "serve_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 * * ? *)",
+      "lambda": "telegram-coach-worker",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "serve_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(15 10 ? * MON-FRI *)",
+      "lambda": "telegram-coach-worker",
+      "local": "10:15",
+      "resolution": "table",
+      "stack": "serve_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 7 * * ? *)",
+      "lambda": "todoist-data-ingestion",
+      "local": "07:00",
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 8 1 * ? *)",
+      "lambda": "voice-fidelity-harness",
+      "local": "08:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 7,19 * * ? *)",
       "lambda": "weather-data-ingestion",
+      "local": null,
       "resolution": "table",
       "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
-      "expr": "cron(0 0,4,12,16,20 * * ? *)",
+      "expr": "cron(0 18 ? * TUE *)",
+      "lambda": "wednesday-chronicle",
+      "local": "18:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 8 ? * WED *)",
+      "lambda": "wednesday-chronicle",
+      "local": "08:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 ? * MON *)",
+      "lambda": "wednesday-chronicle",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 11 ? * SUN *)",
+      "lambda": "weekly-correlation-compute",
+      "local": "11:30",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 ? * SUN *)",
+      "lambda": "weekly-digest",
+      "local": "09:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 19 ? * FRI *)",
+      "lambda": "weekly-plate",
+      "local": "19:00",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 9 ? * SUN *)",
+      "lambda": "weekly-signal",
+      "local": "09:30",
+      "resolution": "table",
+      "stack": "email_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 5,9,13,17,21 * * ? *)",
       "lambda": "whoop-data-ingestion",
+      "local": null,
       "resolution": "table",
       "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     },
     {
-      "expr": "cron(5 14,17,21,0 * * ? *)",
-      "lambda": "withings-data-ingestion",
+      "expr": "cron(20 11 * * ? *)",
+      "lambda": "whoop-data-ingestion",
+      "local": "11:20",
       "resolution": "table",
       "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 10 * * ? *)",
+      "lambda": "whoop-data-ingestion",
+      "local": "10:30",
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(5 7,10,14,17 * * ? *)",
+      "lambda": "withings-data-ingestion",
+      "local": null,
+      "resolution": "table",
+      "stack": "ingestion_stack",
+      "tz": "America/Los_Angeles",
       "utc": null
     }
   ]
