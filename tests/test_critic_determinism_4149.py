@@ -294,15 +294,16 @@ def test_a_load_change_the_floor_swallows_is_surfaced_as_a_conflict_not_applied(
 
 def test_a_partial_cut_is_clamped_to_each_sets_own_floor_and_named():
     """Top set drafted ABOVE the floor: a cut to 45 kg lands the top on its 48 floor and leaves
-    the 43 back-offs where the back-off floor holds them — the same per-set split the gate uses."""
+    the 43 back-offs where the back-off floor holds them — the same per-set split the gate uses.
+    #5428: the critic's 99.2 lb (45 kg) lands as a load he can put on the bar, 100 lb (45.36 kg)."""
     ir = _squat_ir(top=52.0, back=46.0)
     [rec] = c.apply_changes(
         ir,
         [{"critic": "blueprint_historian", "verdict": "change", "field": "exercises[0].weight_lbs", "to": 45 * c._LBS_PER_KG}],
         set_floors=_gate_floors,
     )
-    assert rec["applied"] is True and "set 1 45.0kg < floor 48.0kg" in rec["conflict"]
-    assert [round(s.weight_kg, 2) for s in ir.exercises[0].sets] == [48.0, 45.0, 45.0]
+    assert rec["applied"] is True and "set 1 45.4kg < floor 48.0kg" in rec["conflict"]
+    assert [round(s.weight_kg, 2) for s in ir.exercises[0].sets] == [48.0, 45.36, 45.36]
     assert ra.audit_prescription(ir.exercises, floors={"squat_barbell": SQUAT_FLOOR}, scheme=BACK_OFF_SCHEME)["ok"] is True
 
 
@@ -528,10 +529,11 @@ def test_the_clamp_records_the_conflict_as_data_beside_the_sentence():
     )
     assert rec["clamped_to_floor"] is True and rec["floor_kg"] == 48.0
     assert rec["requested_kg"] == pytest.approx(36.0, abs=0.01)
+    # #5428: the set rows carry the critic's load rounded to a 5 lb step (79.35 lb -> 80 lb = 36.29 kg)
     assert [(r["set"], r["requested_kg"], r["floor_kg"]) for r in rec["clamped_sets"]] == [
-        (1, 35.99, 48.0),
-        (2, 35.99, 43.0),
-        (3, 35.99, 43.0),
+        (1, 36.29, 48.0),
+        (2, 36.29, 43.0),
+        (3, 36.29, 43.0),
     ]
     assert all(r["exercise"] == "squat_barbell" for r in rec["clamped_sets"])
     assert rec["conflict"].startswith("joints_tendons vs the subtract-only floor") and rec["applied"] is False
@@ -542,7 +544,7 @@ def test_the_clamp_records_the_conflict_as_data_beside_the_sentence():
         set_floors=_gate_floors,
     )
     assert (rec["clamped_to_floor"], rec["requested_kg"], rec["floor_kg"]) == (True, 45.0, 48.0)
-    assert rec["clamped_sets"] == [{"exercise": "squat_barbell", "set": 1, "requested_kg": 45.0, "floor_kg": 48.0}]
+    assert rec["clamped_sets"] == [{"exercise": "squat_barbell", "set": 1, "requested_kg": 45.36, "floor_kg": 48.0}]
     assert rec["applied"] is True
 
 

@@ -38,7 +38,7 @@
     "generator_eligibility": "training/movement_catalog.generator_eligible: skill_tier <= ceiling AND (reviewed OR a default_rep_range) AND not plyometric, bar the charter's lower-leg prep carve-out while the prep is on (#5090). No frequency gate (owner ruling C, #4108).",
     "anchor_family": "training/movement_catalog.anchor_family: program_structure.classify_movement(title) AND primary muscle in the anchor's primary_muscles AND loaded (Hevy weight_reps; any rep-based type for vertical_pull).",
     "coach_added": "A never-trained exercise may be added as {title, hevy_template_id_hint, provenance: coach_added}; the builder fills absent fields from Hevy metadata and keeps every written field. See training/movement_catalog.py.",
-    "logging_conventions": "training/logging_conventions.derive_conventions (#5373, the owner's rules): distance_unit_convention=steps on every Hevy short_distance_weight entry (he counts steps and types the count in the yards field; no gym markings); load_convention=total_carried on a carry by title (carry/farmer/suitcase), per_hand on a bilateral dumbbell exercise (one dumbbell's weight logged); absent = as logged. Written only where absent, so a hand-written value wins."
+    "logging_conventions": "training/logging_conventions.derive_conventions (#5373, the owner's rules): distance_unit_convention=steps on every Hevy short_distance_weight entry (he counts steps and types the count in the yards field; no gym markings); load_convention (the CURRENT one) = per_hand on a bilateral dumbbell exercise AND on a two-implement carry (farmers walk; the owner's one-hand rule from 2026-10-27), total_carried on a one-object carry (sandbag, suitcase); load_convention_history = [{until: 2026-10-26, convention: total_carried}] on a two-implement carry (a session on or before `until` reads the total it was logged as); absent = as logged. Written only where absent, so a hand-written value wins."
   },
   "movements": {
     "db_bench_press_flat": {
@@ -1969,7 +1969,13 @@
       "last_done": "2026-06-20",
       "anchor_family": null,
       "distance_unit_convention": "steps",
-      "load_convention": "total_carried"
+      "load_convention": "per_hand",
+      "load_convention_history": [
+        {
+          "until": "2026-10-26",
+          "convention": "total_carried"
+        }
+      ]
     },
     "jump_rope": {
       "title": "Jump Rope",
@@ -3229,7 +3235,13 @@
       "first_done": "2024-11-25",
       "last_done": "2025-09-14",
       "anchor_family": null,
-      "load_convention": "total_carried"
+      "load_convention": "per_hand",
+      "load_convention_history": [
+        {
+          "until": "2026-10-26",
+          "convention": "total_carried"
+        }
+      ]
     },
     "db_high_pulls": {
       "title": "DB High Pulls",
@@ -4893,7 +4905,13 @@
       "first_done": "2023-01-03",
       "last_done": "2025-04-13",
       "anchor_family": null,
-      "load_convention": "total_carried"
+      "load_convention": "per_hand",
+      "load_convention_history": [
+        {
+          "until": "2026-10-26",
+          "convention": "total_carried"
+        }
+      ]
     },
     "floor_press_dumbbell": {
       "title": "Floor Press (Dumbbell)",
@@ -9383,7 +9401,13 @@
       "first_done": "2025-04-13",
       "last_done": "2025-04-13",
       "anchor_family": null,
-      "load_convention": "total_carried"
+      "load_convention": "per_hand",
+      "load_convention_history": [
+        {
+          "until": "2026-10-26",
+          "convention": "total_carried"
+        }
+      ]
     },
     "db_reach_across_single_leg_rdl": {
       "title": "DB Reach Across Single Leg RDL",

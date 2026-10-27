@@ -238,15 +238,17 @@ def test_every_note_with_a_readable_streak_carries_the_loaded_count_and_only_fiv
         assert warned is (n >= ra.LATE_WEEK_STREAK), (n, block)
         assert ra.find_conditional_up(block) == []  # emitted prose is held to the subtract-only bar
     assert ra.render_loaded_streak_line(None) is None and ra.render_loaded_streak_line({"reasons": []}) is None
-    # the draft path writes it onto the routine: exercises[0].notes is where Hevy shows the block
+    # #5428 (bookkeeping and provenance off Hevy, HEVY_NOTE_STANDARD §2): the draft path STORES the count on the
+    # routine (`inputs_snapshot`, read by the dry-run and the chat) and the Hevy note carries no streak line
     from types import SimpleNamespace
 
     from mcp import tools_hevy_routine as thr
 
     ir = SimpleNamespace(exercises=[SimpleNamespace(notes="why line", skill_tier=1, movement_key="squat")], inputs_snapshot={})
     thr._apply_recovery_adaptation(ir, ra.derive_training_context(2, "deep", TARGET), "2026-09-22")
-    assert "Loaded lifting: 2 days in a row before this session" in ir.exercises[0].notes
+    assert "Loaded lifting" not in ir.exercises[0].notes and "inputs_current_through" not in ir.exercises[0].notes
     assert ir.inputs_snapshot["recovery_branches"]["session"]["loaded_lifting_streak"] == 2
+    assert ir.inputs_snapshot["inputs_current_through"] == "2026-09-22"
 
 
 def test_no_critic_packet_and_no_note_carries_the_active_day_streak():

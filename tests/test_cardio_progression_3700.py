@@ -483,7 +483,8 @@ def test_the_cue_lands_on_the_cycling_block_of_the_live_stored_routine():
     assert stamped == 1
     cycling = [b for b in spec.exercises if b.movement_key == "cycling"][0]
     # #5048: the level is derived from the template's history (level 15), the coach's prose is replaced
-    assert cycling.notes.startswith("Recumbent bike · 40 min · level 15 at 14.3 mph flat · ")  # #5076: + his speed at the level
+    assert cycling.notes.startswith("Recumbent · L15 · RPE 4–5 (full sentences)")  # #5428: level + effort, no minutes or speed
+    assert spec.inputs_snapshot["cardio_notes"][0]["mph"] == 14.3  # his speed at the level stays on the record
     assert spec.inputs_snapshot["cardio_notes_replaced"][0]["notes"].startswith("Level 10 flat, 40 min")
     # and a re-draft never stacks a second cue: it recomposes the same note
     first = cycling.notes

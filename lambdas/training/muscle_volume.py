@@ -60,8 +60,9 @@ NON_WORKING_SET_TYPES = frozenset({"warmup", "warm_up", "warm-up"})
 
 #: What `volume_lbs` sums (#5373), echoed on every result so no reader takes it for the logged per-hand number.
 VOLUME_BASIS = (
-    "load x reps over working sets, as the TOTAL moved: a per-hand dumbbell load counts both hands (x 2); a carry's load is the "
-    "total carried and it has no reps, so it adds nothing (training.logging_conventions)"
+    "load x reps over working sets, as the TOTAL moved: a per-hand dumbbell load counts both hands (x 2), a two-dumbbell carry "
+    "included from 2026-10-27 (before it a carry was logged as the total, as logged); a distance-typed carry has no reps, so it "
+    "adds nothing (training.logging_conventions, dated by the session)"
 )
 
 #: The muscle vocabulary (matches `_VOLUME_LANDMARKS` in mcp/strength_helpers.py and the
@@ -346,15 +347,18 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
             out["duration_sec"] = float(dur)
         return out
 
-    def _exercise(ex: dict) -> dict:
+    def _exercise(ex: dict, day: str) -> dict:
         from training.carry_line import carry_line
 
         name = ex.get("name") or ex.get("exercise_name") or ""
         tid = ex.get("template_id")
-        line = carry_line(name, ex.get("sets"), template_id=tid)  # #5372: a carry's own line — load and steps, outside the rep tonnage
-        # #5373: how the load was logged — `per_hand` (one dumbbell of two) or `total_carried` (a carry's sum) — so a reader
+        line = carry_line(
+            name, ex.get("sets"), template_id=tid, day=day
+        )  # #5372: a carry's own line — load and steps, outside the rep tonnage
+        # #5373: how the load was logged ON THIS SESSION'S DATE (the convention is dated: `load_convention_history`) — `per_hand` (one
+        # dumbbell of two) or `total_carried` (a carry's sum, before the owner's one-hand rule of 2026-10-27) — so a reader
         # never reads a per-hand 50 as a 50-lb total; absent when the logged load is the whole load (`as_logged`)
-        convention = load_convention_for(name, tid, ex.get("sets"))
+        convention = load_convention_for(name, tid, ex.get("sets"), day=day)  # the SESSION's date: the convention is dated
         return {
             **({"carry": line} if line else {}),
             **({"load_convention": convention} if convention != AS_LOGGED else {}),
@@ -377,7 +381,7 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
                 {
                     "date": date_str,
                     "workout_name": item.get("workout_name") or item.get("title") or "",
-                    "exercises": [_exercise(ex) for ex in item.get("exercises", [])],
+                    "exercises": [_exercise(ex, date_str) for ex in item.get("exercises", [])],
                 }
             )
             continue
@@ -388,7 +392,7 @@ def normalize_hevy_items(hevy_items: list) -> list[dict]:
                 {
                     "date": date_str,
                     "workout_name": w.get("name") or w.get("workout_name") or "",
-                    "exercises": [_exercise(ex) for ex in (w.get("exercises") or [])],
+                    "exercises": [_exercise(ex, date_str) for ex in (w.get("exercises") or [])],
                 }
             )
     return out
@@ -466,7 +470,7 @@ def working_sets_by_muscle(
             primary["direct_sets"] += n
             # #5373: tonnage is a TOTAL — a per-hand dumbbell load counts both hands (x 2), a carry's total as logged (it has no
             # reps, so it adds 0 here by construction)
-            convention = load_convention_for(ex.get("name") or "", ex.get("template_id"), sets)
+            convention = load_convention_for(ex.get("name") or "", ex.get("template_id"), sets, day=day)
             primary["volume_lbs"] += sum(total_load(s.get("weight_lbs"), convention) * int(s.get("reps") or 0) for s in working)
             for m, frac in attr["secondary"].items():
                 _row(m)["secondary_sets"] += n * frac

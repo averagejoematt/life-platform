@@ -64,7 +64,9 @@ def _stored() -> dict:
 def test_the_farmers_walk_carries_both_conventions():
     walk = CATALOG["farmers_walk"]
     assert walk["hevy_template_id_hint"] == WALK_TID
-    assert walk[lc.DISTANCE_UNIT_FIELD] == lc.STEPS and walk[lc.LOAD_CONVENTION_FIELD] == lc.TOTAL_CARRIED
+    # #5373 (owner, 2026-10-27): the CURRENT convention is one hand; the two sessions logged as a total read through the history
+    assert walk[lc.DISTANCE_UNIT_FIELD] == lc.STEPS and walk[lc.LOAD_CONVENTION_FIELD] == lc.PER_HAND
+    assert walk[lc.LOAD_HISTORY_FIELD] == [{"until": "2026-10-26", "convention": lc.TOTAL_CARRIED}]
 
 
 def test_every_loaded_distance_entry_is_steps_and_nothing_else_is():
@@ -80,7 +82,7 @@ def test_every_stored_convention_is_what_the_derivation_computes():
     offenders = []
     for key, entry in CATALOG.items():
         want = lc.derive_conventions(entry)
-        got = {f: entry[f] for f in (lc.DISTANCE_UNIT_FIELD, lc.LOAD_CONVENTION_FIELD) if f in entry}
+        got = {f: entry[f] for f in (lc.DISTANCE_UNIT_FIELD, lc.LOAD_CONVENTION_FIELD, lc.LOAD_HISTORY_FIELD) if f in entry}
         if got != want:
             offenders.append((key, got, want))
     assert offenders == []
@@ -88,17 +90,18 @@ def test_every_stored_convention_is_what_the_derivation_computes():
 
 def test_bilateral_dumbbells_are_per_hand_and_one_implement_is_as_logged():
     by_title = {v["title"]: v for v in CATALOG.values()}
-    assert lc.load_convention_of(by_title["Bench Press (Dumbbell)"]) == lc.PER_HAND
-    assert lc.load_convention_of(by_title["Lateral Raise (Dumbbell)"]) == lc.PER_HAND
+    assert lc.load_convention_of(by_title["Bench Press (Dumbbell)"], day=DAY) == lc.PER_HAND
+    assert lc.load_convention_of(by_title["Lateral Raise (Dumbbell)"], day=DAY) == lc.PER_HAND
     for one in ("Goblet Squat", "Dumbbell Row", "Pullover (Dumbbell)", "Concentration Curl"):
-        assert lc.load_convention_of(by_title[one]) == lc.AS_LOGGED, one
-    assert lc.load_convention_of(by_title["Squat (Barbell)"]) == lc.AS_LOGGED
-    assert lc.load_convention_of(by_title["Suitcase Carry"]) == lc.TOTAL_CARRIED
+        assert lc.load_convention_of(by_title[one], day=DAY) == lc.AS_LOGGED, one
+    assert lc.load_convention_of(by_title["Squat (Barbell)"], day=DAY) == lc.AS_LOGGED
+    assert lc.load_convention_of(by_title["Suitcase Carry"], day=DAY) == lc.TOTAL_CARRIED  # one dumbbell: total = one hand
 
 
 def test_a_written_value_wins_over_the_derivation():
     assert (
-        lc.load_convention_of({"title": "Bench Press (Dumbbell)", "equipment": "dumbbell", lc.LOAD_CONVENTION_FIELD: None}) == lc.AS_LOGGED
+        lc.load_convention_of({"title": "Bench Press (Dumbbell)", "equipment": "dumbbell", lc.LOAD_CONVENTION_FIELD: None}, day=DAY)
+        == lc.AS_LOGGED
     )
     assert lc.distance_unit_of({"hevy_type": "short_distance_weight", lc.DISTANCE_UNIT_FIELD: None}) is None
 
@@ -138,7 +141,8 @@ def test_the_builder_writes_the_conventions_and_keeps_a_hand_written_one():
     }
     out = bmc.build_catalog(current, hist, meta)
     walk = next(v for v in out["movements"].values() if v["hevy_template_id_hint"] == "50C613D0")
-    assert walk[lc.DISTANCE_UNIT_FIELD] == lc.STEPS and walk[lc.LOAD_CONVENTION_FIELD] == lc.TOTAL_CARRIED
+    assert walk[lc.DISTANCE_UNIT_FIELD] == lc.STEPS and walk[lc.LOAD_CONVENTION_FIELD] == lc.PER_HAND
+    assert walk[lc.LOAD_HISTORY_FIELD] == [{"until": lc.CARRY_TOTAL_UNTIL, "convention": lc.TOTAL_CARRIED}]
     assert out["movements"]["curl_kept"][lc.LOAD_CONVENTION_FIELD] == "total_carried"  # written by a human: kept
     assert json.dumps(bmc.build_catalog(out, hist, meta)) == json.dumps(out)  # idempotent
     assert "logging_conventions" in out["_rules"]
@@ -147,8 +151,8 @@ def test_the_builder_writes_the_conventions_and_keeps_a_hand_written_one():
 # ── the runtime resolver ──────────────────────────────────────────────────────────────────────────────────────────────
 def test_the_resolver_reads_the_catalog_by_template_id_then_title_then_the_set_shape():
     carry_sets = [{"type": "normal", "weight_kg": 30.0, "reps": None, "distance_m": 40}]
-    assert lc.is_step_count("anything", WALK_TID) and lc.load_convention_for("anything", WALK_TID) == lc.TOTAL_CARRIED
-    assert lc.is_step_count("Farmers Walk") and lc.load_convention_for("Lateral Raise (Dumbbell)") == lc.PER_HAND
+    assert lc.is_step_count("anything", WALK_TID) and lc.load_convention_for("anything", WALK_TID, day=DAY) == lc.TOTAL_CARRIED
+    assert lc.is_step_count("Farmers Walk") and lc.load_convention_for("Lateral Raise (Dumbbell)", day=DAY) == lc.PER_HAND
     # not catalogued: a loaded, reps-less distance set IS the step-count type
     assert lc.is_step_count("Sled Drag (synthetic)", "ZZZZ0000", carry_sets)
     assert not lc.is_step_count("Treadmill (synthetic)", "ZZZZ0001", [{"type": "normal", "distance_m": 2400, "duration_sec": 1200}])
@@ -168,7 +172,7 @@ def test_a_failed_catalog_read_falls_back_to_the_derivation(monkeypatch):
     lc.set_catalog(None)
     try:
         assert lc.catalog_movements() == {}
-        assert lc.load_convention_for("Bench Press (Dumbbell)") == lc.PER_HAND  # the title still answers
+        assert lc.load_convention_for("Bench Press (Dumbbell)", day=DAY) == lc.PER_HAND  # the title still answers
         assert lc.is_step_count("Farmers Walk", WALK_TID, [{"type": "normal", "weight_kg": 30.0, "distance_m": 40}])
     finally:
         lc.set_catalog(None)
@@ -200,14 +204,14 @@ def test_the_rendered_line_names_the_estimate():
 
 def test_the_carry_line_carries_the_conventions_and_the_rendered_sets():
     ex = next(e for e in _stored()["exercises"] if e["name"] == "Farmers Walk")
-    line = cl.carry_line(ex["name"], ex["sets"], template_id=ex["template_id"], stride=lc.trailing_stride(STRIDE_ROWS, DAY))
+    line = cl.carry_line(ex["name"], ex["sets"], template_id=ex["template_id"], stride=lc.trailing_stride(STRIDE_ROWS, DAY), day=DAY)
     assert line["load_convention"] == lc.TOTAL_CARRIED and line["distance_unit"] == lc.STEPS
     assert line["rendered"] == [
         "60 steps (~50 yd, est. from unloaded stride)",
         "62 steps (~52 yd, est. from unloaded stride)",
         "58 steps (~48 yd, est. from unloaded stride)",
     ]
-    assert cl.carry_line(ex["name"], ex["sets"])["rendered"] == ["60 steps", "62 steps", "58 steps"]  # no stride: steps only
+    assert cl.carry_line(ex["name"], ex["sets"], day=DAY)["rendered"] == ["60 steps", "62 steps", "58 steps"]  # no stride: steps only
 
 
 def test_get_workout_detail_renders_steps_plus_the_estimated_distance(monkeypatch):
@@ -258,10 +262,11 @@ def test_the_routine_note_renders_the_estimate_and_his_rule():
 
     sets = [{"kind": "working", "distance_meters": 60}, {"kind": "working", "distance_meters": 60}]
     cue = session_cues.exposure_cue("carry", sets, stride=lc.trailing_stride(STRIDE_ROWS, DAY))
-    assert "2 carries of 60 steps (~50 yd, est. from unloaded stride)" in cue
-    assert "count steps, type the count in yards" in cue and "TOTAL carried (both hands)" in cue
-    bare = session_cues.exposure_cue("carry", sets)
-    assert "2 carries of 60 steps @" in bare and "est. from unloaded stride" not in bare  # no stride: steps only
+    # #5428 (standard §3.5): the carry note is the effort + per hand, the carry cue and his steps rule — the step count is
+    # the row's own distance field, and the stride estimate is the chat's, never the set's
+    assert cue == "RPE 8–9 · pick the load per hand\nTall, ribs down, bells off your legs.\nSteps go in the yards box."
+    assert "est. from unloaded stride" not in cue and "60 steps" not in cue
+    assert session_cues.exposure_cue("carry", sets) == cue  # the stride no longer changes the note
 
 
 def test_the_generator_renders_the_stride_into_the_carry_block_note():
@@ -282,7 +287,8 @@ def test_the_generator_renders_the_stride_into_the_carry_block_note():
     blocks, used, _ = full_body_session._blocks_from_prescription(
         rx, {"movements": CATALOG}, None, "off", stride=lc.trailing_stride(STRIDE_ROWS, DAY)
     )
-    assert "60 steps (~50 yd, est. from unloaded stride)" in blocks[0].notes and "type the count in yards" in blocks[0].notes
+    # #5428: the step dose is the row (distance field = his steps); the note says where the steps go and that the load is per hand
+    assert "Steps go in the yards box." in blocks[0].notes and "per hand" in blocks[0].notes
     assert blocks[0].sets[0].distance_meters == 60 and used[0]["cue"] in blocks[0].notes
     assert "est. from unloaded stride" not in program_structure.exposure_cue("carry", rx["exposures"][0]["sets"])  # the static spec cue
 
@@ -416,6 +422,7 @@ def test_the_coach_context_states_both_conventions_in_the_one_line():
 def test_the_line_says_steps_total_and_per_hand():
     line = lc.CONVENTIONS_LINE.lower()
     assert "step count" in line and "total carried" in line and "per hand" in line and "each hand" in line
+    assert "2026-10-27" in line  # the dated rule
 
 
 # premerge-gate: 5373: reads `config/movement_catalog.json`, which `deploy/build_movement_catalog.py` regenerates — a PR landing a rebuilt catalog must red on itself if a carry loses `distance_unit_convention: steps` or a stored convention drifts from `logging_conventions.derive_conventions`.

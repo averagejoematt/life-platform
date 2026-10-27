@@ -256,18 +256,28 @@ def test_stage_2_applies_a_change_before_storing_and_the_dry_run_shows_the_revis
     out, stored, _ = _run(ir, _evidence())
     h = next(v for v in out["critics"]["verdicts"] if v["critic"] == "blueprint_historian")
     assert h["verdict"] == "change" and h["field"] == "exercises[0].weight_lbs"
+    # #5428: the applied change names the one plain clause it wrote on the exercise it changed
     assert out["critics"]["changes"] == [
-        {"critic": "blueprint_historian", "field": "exercises[0].weight_lbs", "to": h["to"], "applied": True, "why": None}
+        {
+            "critic": "blueprint_historian",
+            "field": "exercises[0].weight_lbs",
+            "to": h["to"],
+            "applied": True,
+            "why": None,
+            "clauses": [{"movement_key": ir.exercises[0].movement_key, "clause": "Lighter today."}],
+        }
     ]
-    assert ir.exercises[0].sets[0].weight_kg == pytest.approx(h["to"] * KG, abs=0.01)
+    # #5428: the critic's load lands on a 5 lb step (rep_scheme.load_step_kg), never an unrounded kg
+    assert ir.exercises[0].sets[0].weight_kg == pytest.approx(round(h["to"] / 5) * 5 * KG, abs=0.01)
     with ExitStack() as st:
         for cm in _commit_patches(ir, []):
             st.enter_context(cm)
         preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
     notes = preview["wire_body"]["routine"]["exercises"][0]["notes"]
-    assert notes.startswith(f"Legs — quality day.\n\nRED TEAM ({critics.CRITICS_VERSION}, 4 critics,")
-    assert f"applied: exercises[0].weight_lbs -> {h['to']}" in notes
-    assert preview["wire_body"]["routine"]["exercises"][0]["sets"][0]["weight_kg"] == pytest.approx(h["to"] * KG, abs=0.01)
+    # #5428: no verdict block and no `applied:` line on the wire — the one plain clause the change wrote
+    assert notes == "Legs — quality day.\n\nLighter today."
+    assert "RED TEAM" not in notes and "applied:" not in notes
+    assert preview["wire_body"]["routine"]["exercises"][0]["sets"][0]["weight_kg"] == pytest.approx(round(h["to"] / 5) * 5 * KG, abs=0.01)
 
 
 def test_a_paused_budget_tier_runs_the_deterministic_layer_and_says_the_model_did_not():
@@ -365,10 +375,10 @@ def test_commit_without_stage_2_refuses_and_only_an_owner_override_pushes_it():
 
 
 def test_commit_carries_the_verdicts_and_their_numbers_into_the_hevy_notes():
-    """Box 4 (#3752): the routine's notes carry the four verdicts and the numbers they argued
-    from. Mutation control (re-based 2026-09-20, #3938): drop the `_place_block_on_first_exercise(ir)`
-    call in the plan engine → the wire notes (exercises[0], the channel Hevy returns) lose the block
-    and this reds."""
+    """Box 4 (#3752), as #5428 re-homed it: the four verdicts and the numbers they argued from are STORED on the
+    routine (`inputs_snapshot["critics"]`) and shown by stage 2's `notes_preview` — never the Hevy note. The wire
+    carries only the plain clause the APPLIED change wrote on the exercise it changed. Mutation control: restore the
+    old append of `critics.notes_block` in `_place_block_on_first_exercise` -> RED TEAM reaches the wire and this reds."""
     ir = _ir(squat_lbs=200.0)
     out, _, _ = _run(ir, _evidence())
     created = []
@@ -382,16 +392,20 @@ def test_commit_carries_the_verdicts_and_their_numbers_into_the_hevy_notes():
         == f"{critics.CRITICS_VERSION}: muscle-defense approve, joints/tendons approve, rate-advocate approve, historian change"
     )
     notes = created[0]["routine"]["exercises"][0]["notes"]
-    assert f"RED TEAM ({critics.CRITICS_VERSION}, 4 critics," in notes
+    assert "RED TEAM" not in notes and "APPROVE" not in notes and "applied:" not in notes and "band_top_lbs" not in notes
+    assert notes.startswith("Legs — quality day.") and "Lighter today." in notes.split("\n")
+    preview = out["critics"]["notes_preview"]
+    assert f"RED TEAM ({critics.CRITICS_VERSION}, 4 critics," in preview
     for line in (
         "- muscle-defense APPROVE",
         "- joints/tendons APPROVE",
         "- rate-advocate APPROVE",
         "- historian CHANGE: band_top_lbs[0]=198.4 [owner]",
     ):
-        assert line in notes, notes
-    assert "detraining discount" in notes
-    assert notes.startswith("Legs — quality day.")
+        assert line in preview, preview
+    assert "detraining discount" in preview
+    stored = ir.inputs_snapshot["critics"]
+    assert {v["critic"] for v in stored["verdicts"]} == {"muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian"}
 
 
 def test_a_veto_stored_on_an_already_pushed_routine_blocks_the_update_branch_too():
@@ -505,74 +519,37 @@ def test_stage_1_block_is_populated_from_the_live_shapes_not_unknown():
     assert out["protein_days_measured_7d"] == 6
 
 
-def test_the_verdicts_ride_on_the_first_exercise_notes_the_channel_hevy_actually_returns():
-    """LIVE FINDING 2026-09-20: Hevy's API routine object has no `notes` field; twelve September
-    routines read back with 0-char routine notes while exercise notes landed. The block therefore
-    goes on exercise[0].notes too, and a re-run replaces it rather than stacking.
-    #4070: the block now lands AFTER whatever cue was already on exercise[0] — a long verdict
-    block used to sit ahead of the owner's own cues, and any downstream truncation (the owner
-    reported the Hevy app cutting notes at ~150 chars) ate the cues, not the verdict boilerplate.
-    Mutation control: drop the `_place_block_on_first_exercise(ir)` call → this reds."""
+def test_the_verdicts_stay_stored_and_a_rerun_never_stacks_a_clause():
+    """#5428 (HEVY_NOTE_STANDARD §2/§3.8) supersedes the 09-20 / #4070 placement: the verdict block no longer rides
+    exercise[0].notes at all. The full record stays on `inputs_snapshot["critics"]`; the wire carries the owner's
+    cue and, when a change moved a row, one plain clause on that exercise — once, even across a re-run.
+    Mutation control: restore the old append of `critics.notes_block(ir)` in `_place_block_on_first_exercise` -> reds."""
     ir = _ir(squat_lbs=200.0)
     ir.exercises[0].notes = "Anchor cue."
     out, _, _ = _run(ir, _evidence())
-    assert ir.exercises[0].notes.startswith("Anchor cue.")
-    assert f"RED TEAM ({critics.CRITICS_VERSION}, 4 critics," in ir.exercises[0].notes
-    assert "- historian CHANGE" in ir.exercises[0].notes
-    # re-run: one block, not two
+    assert ir.exercises[0].notes == "Anchor cue.\nLighter today."
+    assert "- historian CHANGE" in critics.notes_block(ir) and ir.inputs_snapshot["critics"]["verdicts"]
+    # re-run: the coach's draft is re-evaluated, so the clause is written once, never twice
     ir.version = 1
     _run(ir, _evidence())
-    assert ir.exercises[0].notes.count("RED TEAM (") == 1 and ir.exercises[0].notes.startswith("Anchor cue.")
-    # and the compiled body carries it where the app shows it
+    assert ir.exercises[0].notes.split("\n").count("Lighter today.") == 1 and "RED TEAM" not in ir.exercises[0].notes
     with ExitStack() as st:
         for cm in _commit_patches(ir, []):
             st.enter_context(cm)
         preview = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": ir.routine_id})
     wire_notes = preview["wire_body"]["routine"]["exercises"][0]["notes"]
-    assert "RED TEAM (" in wire_notes and wire_notes.count("RED TEAM (") == 1  # #3938: WHY line first, block once
-    assert wire_notes.index("Anchor cue.") < wire_notes.index("RED TEAM (")  # #4070: cue before verdict
+    assert "RED TEAM" not in wire_notes and "Anchor cue." in wire_notes
 
 
-def test_owner_tier_cues_survive_a_maximal_red_team_block_4070():
-    """#4070: the verdict block used to PREPEND ahead of the owner's session-adaptive tier
-    cues on exercises[0].notes, so any downstream truncation (owner-observed ~150 chars in
-    the Hevy app across 8 chat sessions, 09-16..09-22 — not a documented API limit, and not
-    re-verified with a live write per the issue's own instruction) ate the cues and left only
-    verdict-header text. The block must land after the cues regardless of how long it grows.
-    Mutation control: revert `_place_block_on_first_exercise` to prepend order → this reds."""
+def test_a_legacy_red_team_block_is_stripped_off_the_wire():
+    """A draft an earlier engine left with a RED TEAM block on exercise 1 loses it at the next stage 2 (#5428);
+    the owner's cue ahead of it stays byte for byte. Mutation control: make `_place_block_on_first_exercise` a no-op
+    -> the block survives and this reds."""
     ir = _ir()
-    cues = (
-        "— ADAPT BY WAKE RECOVERY —\n"
-        "🟢 67-100: take the ceiling (top-set bonus, optional work ON, intervals if conditioning)\n"
-        "🟡 34-66: the plan as written (DEFAULT — hold to plan)\n"
-        "🔴 1-33: floor — cut top sets, optional work OFF, Z2/mobility, or rest\n"
-        "Rule: lower of band/feel wins — feel can downgrade a branch, never upgrade it.\n"
-        "Load: subtract-only — never add beyond the plan."
-    )
-    ir.exercises[0].notes = cues
-    # A maximal verdict block: four critics, each near the notes_block per-line cap, plus an
-    # applied change and an owner override — the longest shape the block realistically takes.
-    long_reason = "the packet crossed a stated threshold and here is the full argument. " * 4
-    ir.inputs_snapshot = {
-        "critics": {
-            "engine": critics.CRITICS_VERSION,
-            "ran_at": "2026-09-22T00:00:00+00:00",
-            "verdicts": [
-                {"critic": c, "verdict": "change", "metric": "m", "value": 1.0, "provenance": "p", "reason": long_reason}
-                for c in ("muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian")
-            ],
-            "changes": [{"field": "sets", "to": 10, "applied": True}],
-            "owner_overrides": [{"critic": "joints_tendons", "applied": True, "owner_words": "y" * 100, "at": "2026-09-22"}],
-        }
-    }
+    cues = "Anchor cue.\nBreathe out on the press."
+    ir.exercises[0].notes = cues + "\n\nRED TEAM (critics@1.4.0, 4 critics, 2026-10-26):\n- historian APPROVE: fine"
     tp._place_block_on_first_exercise(ir)
-    notes = ir.exercises[0].notes
-    assert len(notes) - len(cues) > 500, "the block must actually be maximal for this test to mean anything"
-    assert notes.startswith(cues), notes[:200]
-    visible = notes[: tp.HEVY_NOTE_OBSERVED_VISIBLE_CHARS]
-    assert tp._BLOCK_MARK not in visible, "the owner-observed visible window must be all cue, no verdict"
-    assert visible == cues[: tp.HEVY_NOTE_OBSERVED_VISIBLE_CHARS], "the visible window is cue text, byte for byte — no verdict mixed in"
-    assert "🟢" in cues[: tp.HEVY_NOTE_OBSERVED_VISIBLE_CHARS], "this fixture's own GREEN cue is inside the observed window"
+    assert ir.exercises[0].notes == cues
 
 
 def test_a_second_stage_2_run_re_evaluates_the_coachs_draft_not_its_own_cut():

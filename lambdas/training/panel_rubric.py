@@ -573,7 +573,7 @@ def _set_line(sets: list[Any], entry: dict[str, Any] | None = None) -> str:
         dose = f"{int(s0.duration_seconds)} s"
     else:
         dose = "?"
-    label = lc.load_label(lc.load_convention_of(entry)) if entry else ""
+    label = lc.load_label(lc.current_load_convention_of(entry)) if entry else ""  # a plan is written in the current convention
     load = f" @ {round(float(s0.weight_kg) / LB_IN_KG)} lb{label}" if s0.weight_kg else ""
     return f"{len(work)} x {dose}{load}" + (f" (+{warm} warm-up)" if warm else "")
 

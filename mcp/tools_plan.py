@@ -1095,12 +1095,8 @@ def _run_stage_2(
     if late:
         return {**record, "routine_id": ir.routine_id, "written": False, "verdict_state": "not_written", "next": late}
     ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "critics": record}
-    # LIVE FINDING 2026-09-20: Hevy's routine object carries NO `notes` field on the API (GET keys
-    # are created_at/exercises/folder_id/id/title/updated_at; a PUT with notes reads back without
-    # them). Every routine-level WHY note the compiler has ever sent is invisible there. EXERCISE
-    # notes do land, verifiably — the recovery session block already lives there for that reason
-    # (`_apply_recovery_adaptation`). So the verdicts ride on the FIRST exercise's notes, where he
-    # will actually read them at the gym, as well as the routine-level field.
+    # #5428: the verdicts are STORED (`record` above, on inputs_snapshot) and never ride a Hevy note; an applied
+    # change already wrote its one plain clause on the exercise it changed. This strips a legacy RED TEAM block.
     _place_block_on_first_exercise(ir)
     ir.parent_version = ir.version
     ir.version = int(ir.version) + 1
@@ -1143,47 +1139,29 @@ def _record_override_correction(item_ref: dict[str, Any], owner_words: str, erro
 
 _BLOCK_MARK = "RED TEAM ("
 
-# #4070: the owner reported the Hevy app cutting exercise notes at ~150 characters,
-# flagged across 8 chat sessions (09-16, 09-17, 09-19, 09-21, 09-22). Nothing in this repo
-# enforces that cut, and it is not a documented server-side limit — the mirrored OpenAPI
-# contract (docs/specs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31_PREREQS.md §A.3) carries
-# `notes (string, nullable)` with no maxLength, and per the issue's own instruction this
-# was NOT re-verified with a live write (owner ruling: do not probe live Hevy to find the
-# true cut). So the number below is evidence, not a contract: it is used only to size the
-# regression test's "visible window", never as a truncation trigger in code. The actual
-# fix is structural and holds at ANY cut point Hevy turns out to apply: the block this
-# function writes must land AFTER whatever cues are already on exercises[0].notes — the
-# session-adaptive tier cues (`_apply_recovery_adaptation`) and the WHY line the compiler
-# prepends at wire time (`hevy_compiler._place_routine_note`) — never ahead of them.
+# #4070: the owner reported the Hevy app cutting exercise notes at ~150 characters. The 2026-10-27 in-app
+# screenshots (#5428) show notes in full, so this window no longer sizes anything here; it is kept only as the
+# must-agree twin of `hevy_render.VISIBLE_NOTE_CHARS` (tests/test_hevy_render_5083.py) until #5428's Lane D
+# retires both in one change.
 HEVY_NOTE_OBSERVED_VISIBLE_CHARS = 150
 
 
 def _place_block_on_first_exercise(ir: Any) -> None:
-    """Append the critics' verdict block to exercise[0].notes, AFTER whatever cues are
-    already there, replacing any earlier block (a re-run must not stack two).
+    """#5428 (HEVY_NOTE_STANDARD §2, §3.8): the critics' verdict block NO LONGER reaches the wire.
 
-    #4070: this used to PREPEND the block, so the owner's own tier cues (the recovery
-    session block + per-lift branch lines `_apply_recovery_adaptation` writes at draft
-    time) sat behind a RED TEAM header that can run to 1000+ characters across four
-    critics. Whatever cuts a long Hevy note — the app's display, or the API itself, the
-    owner has observed ~150 chars but neither is documented or safe to probe live (see
-    HEVY_NOTE_OBSERVED_VISIBLE_CHARS above) — a cut there removed the cues he reads at
-    the gym and kept only verdict boilerplate. The full verdict record is never at risk:
-    it is stored in full on `ir.inputs_snapshot["critics"]` regardless of what reaches
-    the wire. Only the block placed here is allowed to be the part a cut lands on.
-    """
-    from coach import critics
-
-    block = critics.notes_block(ir)
-    if not block or not getattr(ir, "exercises", None):
+    The full record — every verdict, its numbers and provenance, the applied/unapplied changes, the
+    conflicts and the owner's overrides — is stored on `ir.inputs_snapshot["critics"]` (and shown by
+    the stage-2 response's `notes_preview` and the dry-run); a change that moved a row already carries
+    its one plain clause on that exercise (`critics_apply.apply_changes` → `session_block.add_reason`).
+    This only strips a RED TEAM block an earlier engine left on exercise 1, so a re-run of an old draft
+    cannot carry one forward. (#4070's history: the block used to be appended here, after the session
+    cues, and before that prepended — both put ~1,000 characters of verdicts on the gym-floor note.)"""
+    if not getattr(ir, "exercises", None):
         return
     first = ir.exercises[0]
     existing = first.notes or ""
     if _BLOCK_MARK in existing:
-        # drop the old block — it is always the LAST thing this function appended, so
-        # everything from the mark onward is the block; nothing trails it.
-        existing = existing.split(_BLOCK_MARK, 1)[0].rstrip()
-    first.notes = (existing + ("\n\n" + block if block else "")).strip()
+        first.notes = existing.split(_BLOCK_MARK, 1)[0].rstrip()
 
 
 def _model_allowed() -> tuple[bool, str | None]:

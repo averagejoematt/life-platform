@@ -58,6 +58,13 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
         # after the rulings (the five-day cut-over's own day, `program_structure.SESSION_SEQUENCE.cutover.on`), so the
         # owner's own hand-built 2026-10-18 routine — the pinned regression fixture — keeps its caps as he wrote them.
         "lifting_caps_retired_from": "2026-10-19",
+        # #5428 (owner rulings 2026-10-27 ~04:50Z, R1 + R2): no daily gate and no AF / ECG / medication text in the
+        # routine. From this day `gate_draft` writes the three-line session block (`training.session_block`) instead of
+        # `gate_lines`; a draft dated before it is byte-identical. The record itself stays — it is history, and its
+        # HR half (`invalidates_hr_tiers`, `hr_prescriptions_allowed: False`) still keeps an HR target off every
+        # cardio note until his zones are re-derived (HEVY_NOTE_STANDARD §10 Q1): ending the whole entry with
+        # `active_until` would hand the composer the 2026-09-30 walking HR ceiling again.
+        "daily_gate_retired_from": "2026-10-27",
         "gate": {
             "kind": "ecg_and_feel",
             "sinus_rpe_cap": 8,
@@ -74,6 +81,7 @@ STANDING_CONSTRAINTS: list[dict[str, Any]] = [
             "cardio_minutes": "owner-history — the hand-built 2026-10-18 routine (014e1142…): recumbent, 20 min",
             "intensity_gate_retired_from": "owner — ruling 7 of 2026-10-18 (#5067): intervals and conditioning open, by RPE / talk test",
             "lifting_caps_retired_from": "owner — ruling of 2026-10-23 on #5167 (the date split: no caps from the retirement day, older drafts byte-identical)",
+            "daily_gate_retired_from": "owner — rulings of 2026-10-27 on #5428 (R1: no AF / ECG / medication text; R2: no daily gate)",
         },
     },
 ]
@@ -133,6 +141,17 @@ def lifting_caps_active(constraint: dict[str, Any] | None, target_date: str | No
     if not constraint:
         return False
     retired = constraint.get("lifting_caps_retired_from")
+    return not (retired and target_date and str(target_date)[:10] >= str(retired))
+
+
+def daily_gate_active(constraint: dict[str, Any] | None, target_date: str | None) -> bool:
+    """True when the ECG + feel gate (`gate_lines`, `gate_cue`) still heads a draft dated `target_date` (#5428).
+
+    False from the entry's `daily_gate_retired_from` day on (owner rulings 2026-10-27). `target_date` None keeps
+    the gate — the pre-#5428 output for a caller that names no day, never a silently dropped one."""
+    if not constraint:
+        return False
+    retired = constraint.get("daily_gate_retired_from")
     return not (retired and target_date and str(target_date)[:10] >= str(retired))
 
 

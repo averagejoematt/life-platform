@@ -216,35 +216,39 @@ def _gather_training_context(target_date: str) -> dict[str, Any]:
 def _apply_recovery_adaptation(
     ir: Any, ctx: dict[str, Any], inputs_current_through: str | None, constraint: dict | None = None, green_withheld: str | None = None
 ) -> dict[str, Any]:
-    """Write the always-present session block + per-lift top-set branches into the IR.
+    """Write the session block into exercise 1's note and stash the structured top-set branches.
 
-    Tier-agnostic (brief §2.1): the routine carries GREEN/YELLOW/RED in its notes; the
-    morning selects one. Renders into EXERCISE notes (#3938: Hevy has no routine-level notes
-    field — the WHY line leads, then exercise 0's prescription line, then this block, #5083).
-    Stashes structured branches in the existing inputs_snapshot (no IR schema bump for v1).
+    #5428: the note carries the three-line session block (`training.session_block`, HEVY_NOTE_STANDARD
+    §3.1) at the head of exercise 1 (#3938: Hevy has no routine-level notes field). The GREEN/YELLOW/RED
+    branches are STORED in `inputs_snapshot["recovery_branches"]` (adherence and the dry-run read them),
+    never written into a note.
     """
-    # #5000: an active standing constraint (`constraint`) replaces the band block with the ECG + feel
+    # #5000: an active standing constraint (`constraint`) replaced the band block with the ECG + feel
     # gate (`mcp.draft_standing_constraint.apply_gate`); `green_withheld` (a tripped `protein_floor_missed`)
     # omits the 🟢 branch on either path.
-    from mcp.recovery_authoring import RPE_BASE_YELLOW, build_top_set_branches, render_branch_block, render_session_block
+    # #5428 (owner rulings 2026-10-27): from the gate's retirement day the wire carries ONE thing here — the
+    # three-line session block at the head of exercise 1 (`training.session_block`). The branches, the streak,
+    # `inputs_current_through` and the 🟢 withheld state stay STORED (`inputs_snapshot`) and in the dry-run,
+    # never in a note. A gated draft dated before the gate's retirement keeps its pre-#5428 output byte-identical.
+    from training import session_block, standing_constraints
+
+    from mcp.recovery_authoring import RPE_BASE_YELLOW, build_top_set_branches
 
     if not getattr(ir, "exercises", None):
         return {}
 
-    if constraint:
+    day = str(getattr(ir, "target_date", "") or "")[:10] or None
+    if constraint and standing_constraints.daily_gate_active(constraint, day):
         from mcp.draft_standing_constraint import apply_gate
 
         structured = apply_gate(ir, ctx, inputs_current_through, constraint, green_withheld)
     else:
-        from training.hevy_render import place_after_prescription  # #5083: the block goes after exercise 0's reason line
-
-        first = ir.exercises[0]
-        first.notes = place_after_prescription(first.notes, render_session_block(ctx, inputs_current_through, green_withheld))
-        structured = {"session": ctx, "exercises": {}}
+        session_block.place_on_first(ir)
+        structured = {"session": ctx, "exercises": {}, "session_block": session_block.block_of(ir)}
+        if green_withheld:
+            structured["green_withheld"] = green_withheld
         for ex in [ex for ex in ir.exercises if getattr(ex, "skill_tier", 1) >= 2][:2]:
-            branches = build_top_set_branches(RPE_BASE_YELLOW, ctx, green_withheld)
-            ex.notes = ((ex.notes + "\n") if ex.notes else "") + render_branch_block(branches)
-            structured["exercises"][ex.movement_key] = branches
+            structured["exercises"][ex.movement_key] = build_top_set_branches(RPE_BASE_YELLOW, ctx, green_withheld)
 
     ir.inputs_snapshot = {
         **(getattr(ir, "inputs_snapshot", None) or {}),
@@ -817,6 +821,11 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     ir.inputs_snapshot["cardio_cues"] = cardio_cues
     # #5005 slot tags (the commit gate checks the engine's floors), #5049 the warm-up climb, #5057 the stall rule's step
     finished = finish_custom_draft(ir, catalog, args)
+    # #5428: the chat path gets the SAME three-line session block as `draft` (the 10-25 routine shipped with none);
+    # after the program slot, so the session line reads the slot's role
+    from training import session_block
+
+    session_block.place_on_first(ir)
     draft_versioned(ir)
     resp = {
         "status": "drafted_custom",
@@ -858,9 +867,10 @@ def _resolve_title_inputs(ir: Any) -> tuple[dict[str, Any] | None, str]:
     (stored on the IR at draft time) — when set, we return a None context so the
     compiler keeps the caller's literal title, and we log a warning. force_title
     is off by default; the rendered convention is always the normal path."""
+    from training import session_block
     from training.routine_title import build_title_context, format_why_note
 
-    why = format_why_note(ir)
+    why = session_block.why_note_for(ir, format_why_note(ir))  # #5428: the block's first line IS the session line
     if (getattr(ir, "inputs_snapshot", None) or {}).get("force_title"):
         print(
             f"[WARN] force_title set on routine {getattr(ir, 'routine_id', '?')} — "
@@ -906,7 +916,7 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
     routine_id = args.get("routine_id")
     if not routine_id:
         return mcp_error("dry_run requires routine_id", error_code="MISSING_ARG")
-    from training import hevy_compiler, hevy_render, routine_repo
+    from training import hevy_compiler, hevy_render, routine_repo, session_block
 
     ir = routine_repo.get_current(routine_id)
     if not ir:
@@ -928,7 +938,8 @@ def _action_dry_run(args: dict[str, Any]) -> dict[str, Any]:
         # #3971 box 1 — dry_run REPORTS what commit will refuse on: the derived load
         # floors and every find_conditional_up hit, before anything reaches Hevy.
         "prescription_audit": prescription_gate(ir),
-        "render_check": hevy_render.render_check(body, session_note=why, ir=ir),  # #5083: each charter field and where it shows
+        # #5083: each charter field and where it shows; #5428: the session block heads exercise 1 when there is no WHY line
+        "render_check": hevy_render.render_check(body, session_note=why or session_block.block_of(ir), ir=ir),
     }
     # Recovery-adaptive preflight (brief §6.5): show the inputs_current_through line +
     # the per-lift branch blocks Matthew eyeballs in 30s, so he sleeps trusting it.

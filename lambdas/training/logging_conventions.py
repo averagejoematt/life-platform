@@ -6,11 +6,26 @@ THE TWO CONVENTIONS (owner, 2026-10-25, attended — verbatim on #5373)
     count into Hevy's yards field. Hevy passes the number through unconverted as `distance_meters`; the platform stores it
     as `distance_m`. On an exercise whose catalog entry says `distance_unit_convention: steps` that number is a step
     count — never metres, never yards — so no reader may sum it into miles or call it a distance.
-  * LOAD: TOTAL ON A CARRY, PER HAND ON EVERY OTHER DUMBBELL EXERCISE. On a carry he logs the TOTAL carried (one
-    dumbbell in each hand: the sum). On every other dumbbell exercise he logs ONE dumbbell's weight ("2x [n] lb shoulder
-    press, I log [n] lb"). `load_convention: total_carried | per_hand` on the catalog entry says which; an entry with no
-    field is `as_logged` — the logged number is the whole load moved (a barbell, a machine, one dumbbell held in both
-    hands).
+  * LOAD: ONE HAND, ON EVERY DUMBBELL MOVEMENT, CARRIES INCLUDED (owner, 2026-10-27, attended — verbatim on #5373). He
+    logs the weight of the dumbbell he picks up — "2x 80 lb incline bench, I log 80" — and from 2026-10-27 the same on a
+    two-dumbbell carry (the farmers walk). Volume and tonnage count both hands everywhere. BEFORE 2026-10-27 a carry was
+    logged as the TOTAL carried (both dumbbells summed): 2 Farmers Walk sessions (2026-06-20, 2026-10-25) carry totals, and
+    he does not edit them in Hevy — so the platform reads them through a DATED convention (below), never a hand edit.
+    `load_convention: total_carried | per_hand` on the catalog entry is the CURRENT convention; an entry with no field is
+    `as_logged` — the logged number is the whole load moved (a barbell, a machine, one dumbbell held in both hands).
+    One-object carries stay `total_carried` (a sandbag; a suitcase carry is ONE dumbbell, so total = one hand).
+
+THE DATED CONVENTION (#5373, owner ruling 2026-10-27)
+  `load_convention_history: [{"until": "2026-10-26", "convention": "total_carried"}]` on an entry: a session whose PACIFIC
+  date is on or before `until` reads that convention; a later session reads the entry's current `load_convention`. It is
+  data in the catalog — no reader hard-codes the date. The four two-dumbbell carries (`farmers_walk`,
+  `farmers_walk_8d414b80`, `db_gun_carries`, `db_overhead_farmers_carry`) carry `per_hand` + that history.
+  EVERY READER OF A LOGGED LOAD PASSES THE SESSION'S DATE: `load_convention_of(entry, day=...)` /
+  `load_convention_for(name, tid, sets, day=...)` take `day` as a REQUIRED keyword (omitting it is a TypeError), and an entry
+  that carries a history with `day` empty or malformed RAISES `MissingSessionDate` — a quiet "current" there would read a
+  140-lb total as a 140-lb per-hand load, doubling the tonnage and the next prescription. A PRESCRIPTION is written for
+  now, in the current convention: it calls `current_load_convention_of(entry)` / `current_load_convention_for(...)`, and the
+  history a prescription reads is first put in that unit (`in_current_unit`: a 140 total from 2026-10-25 reads as 70 per hand).
 
 WHERE THE FIELDS LIVE
   `config/movement_catalog.json`, per entry. `deploy/build_movement_catalog.py` writes them from `derive_conventions`
@@ -21,16 +36,18 @@ WHERE THE FIELDS LIVE
     * `distance_unit_convention: steps` on every Hevy `short_distance_weight` entry (a loaded distance: the farmers walk,
       the suitcase carry, the dumbbell walking lunge). That type is the one where he types a distance under a load, and
       with no markings in the gym every one of those numbers is counted steps.
-    * `load_convention: total_carried` on a carry by title (carry / farmer / suitcase).
+    * `load_convention: per_hand` + `load_convention_history` (`total_carried` until 2026-10-26) on a TWO-implement carry by
+      title (carry / farmer — the farmers walk and its dumbbell variants); `load_convention: total_carried` on a one-object
+      carry (`_ONE_OBJECT_CARRY`: sandbag; suitcase — one dumbbell), with no history.
     * `load_convention: per_hand` on a BILATERAL dumbbell exercise — Hevy equipment `dumbbell` or a dumbbell word in the
       title — unless the title names one implement (`_ONE_IMPLEMENT`: goblet, pullover, single-arm, concentration, ...),
       whose logged weight is already the whole load.
 
 HOW A READER RESOLVES LOAD
   `total_load(weight, convention)`: per_hand x 2 (both dumbbells) when a TOTAL is needed — tonnage, volume; a
-  total_carried or as_logged load as it is. A load the engine compares or progresses within ONE exercise stays in the
-  logged unit (Hevy takes the per-hand number back) and is LABELLED with `load_label` so no coach reads a per-hand 50 as a
-  50-lb total.
+  total_carried or as_logged load as it is. A load the engine compares or progresses within ONE exercise is put in the
+  movement's CURRENT unit (`in_current_unit`: a historical total on a now-per-hand carry is halved; Hevy takes the per-hand
+  number back) and is LABELLED with `load_label` so no coach reads a per-hand 50 as a 50-lb total.
 
 THE ESTIMATED DISTANCE (an estimate, labelled as one)
   steps x his stride: the MEDIAN of the apple_health `walking_step_length_in` day values over the 14 completed days before
@@ -60,6 +77,7 @@ logger = logging.getLogger("logging_conventions")
 
 DISTANCE_UNIT_FIELD = "distance_unit_convention"
 LOAD_CONVENTION_FIELD = "load_convention"
+LOAD_HISTORY_FIELD = "load_convention_history"
 
 STEPS = "steps"
 TOTAL_CARRIED = "total_carried"
@@ -70,6 +88,14 @@ LOAD_CONVENTIONS = (TOTAL_CARRIED, PER_HAND)
 written into the catalog."""
 
 _CARRY_TITLE = re.compile(r"carry|carries|farmer|suitcase", re.IGNORECASE)
+_ONE_OBJECT_CARRY = re.compile(r"suitcase|sandbag", re.IGNORECASE)
+"""A carry of ONE object: a sandbag, or a suitcase carry (one dumbbell in one hand). Its logged number is the whole load
+whichever the day, so it stays `total_carried` with no history (owner, 2026-10-27)."""
+
+CARRY_TOTAL_UNTIL = "2026-10-26"
+"""The last Pacific date a two-dumbbell carry was logged as the TOTAL carried. The owner's one-hand rule starts 2026-10-27
+(#5373); this is the catalog's `load_convention_history` `until` for those movements — the date lives in the catalog data,
+this constant is only the builder's derivation of it."""
 _DUMBBELL_TITLE = re.compile(r"\b(?:dumbbells?|db)\b", re.IGNORECASE)
 _ONE_IMPLEMENT = re.compile(
     r"\b(?:single[- ]arm|one[- ]arm|single[- ]hand(?:ed)?|one[- ]hand(?:ed)?|single db|single dumbbell|goblet|pullovers?|"
@@ -81,13 +107,19 @@ _ONE_IMPLEMENT_TITLES = frozenset({"dumbbell row"})
 
 CONVENTIONS_LINE = (
     "Logging conventions (owner): on a carry (the farmers walk) the Hevy 'yards' number is his STEP COUNT (no distance "
-    "markings in the gym) and the weight is the TOTAL carried, both hands; every other dumbbell exercise is logged PER HAND "
-    "(one dumbbell's weight) — never ask what is in each hand."
+    "markings in the gym); the weight on every dumbbell exercise, a two-dumbbell carry included, is ONE dumbbell (PER HAND) "
+    "from 2026-10-27, and volume counts both hands; a carry logged before then is a total carried (both hands), read as half "
+    "per hand — never ask what is in each hand."
 )
 """The one line the coach-session skill and the coach context state (#5373 box 4)."""
 
 ROUTINE_NOTE_RULE = "count steps, type the count in yards"
 """The owner's own rule, written back into the carry block's Hevy note (#5373 box 5)."""
+
+CARRY_STEPS_LINE = "Steps go in the yards box."
+"""#5428 (HEVY_NOTE_STANDARD §3.5): the same rule as the carry note's own line, in the standard's voice."""
+CARRY_LOAD_CLAUSE = "pick the load per hand"
+"""#5428 (§3.5): the carry note's load clause — per hand from 2026-10-27 (`CARRY_TOTAL_UNTIL`), never "total carried"."""
 
 STRIDE_FIELD = "walking_step_length_in"
 STRIDE_WINDOW_DAYS = 14
@@ -112,25 +144,40 @@ def derive_distance_unit(entry: dict[str, Any]) -> Optional[str]:
     return STEPS if entry.get("hevy_type") in STEP_COUNT_HEVY_TYPES else None
 
 
+def _two_implement_carry(title: str) -> bool:
+    return bool(_CARRY_TITLE.search(title)) and not _ONE_OBJECT_CARRY.search(title)
+
+
 def derive_load_convention(entry: dict[str, Any]) -> Optional[str]:
-    """`total_carried` for a carry, `per_hand` for a bilateral dumbbell exercise, else None (as logged)."""
+    """The CURRENT convention: `per_hand` for a two-implement carry (since 2026-10-27) and a bilateral dumbbell exercise,
+    `total_carried` for a one-object carry (sandbag, suitcase), else None (as logged)."""
     title = str(entry.get("title") or "")
     if _CARRY_TITLE.search(title):
-        return TOTAL_CARRIED
+        return PER_HAND if _two_implement_carry(title) else TOTAL_CARRIED
     if (entry.get("equipment") == "dumbbell" or _DUMBBELL_TITLE.search(title)) and not _one_implement(title):
         return PER_HAND
     return None
 
 
-def derive_conventions(entry: dict[str, Any]) -> dict[str, str]:
+def derive_load_history(entry: dict[str, Any]) -> Optional[list[dict[str, str]]]:
+    """The dated convention a two-implement carry reads before the one-hand rule: `total_carried` through CARRY_TOTAL_UNTIL."""
+    if _two_implement_carry(str(entry.get("title") or "")):
+        return [{"until": CARRY_TOTAL_UNTIL, "convention": TOTAL_CARRIED}]
+    return None
+
+
+def derive_conventions(entry: dict[str, Any]) -> dict[str, Any]:
     """The convention fields an entry carries — only the ones that apply (an absent field is the default)."""
-    out: dict[str, str] = {}
+    out: dict[str, Any] = {}
     unit = derive_distance_unit(entry)
     if unit:
         out[DISTANCE_UNIT_FIELD] = unit
     load = derive_load_convention(entry)
     if load:
         out[LOAD_CONVENTION_FIELD] = load
+    history = derive_load_history(entry)
+    if history:
+        out[LOAD_HISTORY_FIELD] = history
     return out
 
 
@@ -139,10 +186,52 @@ def distance_unit_of(entry: dict[str, Any]) -> Optional[str]:
     return entry[DISTANCE_UNIT_FIELD] if DISTANCE_UNIT_FIELD in entry else derive_distance_unit(entry)
 
 
-def load_convention_of(entry: dict[str, Any]) -> str:
-    """The entry's stated load convention, else the derivation's, else `as_logged`."""
+class MissingSessionDate(ValueError):
+    """A load convention that changed on a date was asked for a session with no usable date (#5373). Reading it as the
+    current convention would take a historical TOTAL for a per-hand load — a doubled tonnage, a doubled next prescription —
+    so the reader is told, loudly, to pass the session's Pacific date."""
+
+
+def _is_day(day: Any) -> bool:
+    return isinstance(day, str) and bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", day[:10])) and len(day) >= 10
+
+
+def current_load_convention_of(entry: dict[str, Any]) -> str:
+    """The entry's CURRENT load convention (stated, else the derivation's, else `as_logged`) — what a PRESCRIPTION written
+    now is in, and the unit a progression is compared in."""
     stated = entry.get(LOAD_CONVENTION_FIELD) if LOAD_CONVENTION_FIELD in entry else derive_load_convention(entry)
     return stated if stated in LOAD_CONVENTIONS else AS_LOGGED
+
+
+def load_history_of(entry: dict[str, Any]) -> list[dict[str, str]]:
+    """The entry's dated conventions, oldest `until` first: `[{until, convention}]` (stated, else the derivation's)."""
+    raw = entry.get(LOAD_HISTORY_FIELD) if LOAD_HISTORY_FIELD in entry else derive_load_history(entry)
+    rows = [
+        {"until": str(h["until"])[:10], "convention": h["convention"]}
+        for h in (raw if isinstance(raw, list) else [])
+        if isinstance(h, dict) and _is_day(h.get("until")) and h.get("convention") in LOAD_CONVENTIONS
+    ]
+    return sorted(rows, key=lambda h: h["until"])
+
+
+def load_convention_of(entry: dict[str, Any], *, day: Any) -> str:
+    """How a load was LOGGED in a session on Pacific date `day`: the entry's dated history first (the earliest `until` on or
+    after `day`), else its current convention, else `as_logged`.
+
+    `day` is a REQUIRED keyword — a reader of a logged load has the session's date in hand, and omitting it is a TypeError.
+    An entry WITH a history and a `day` that is not a YYYY-MM-DD date raises `MissingSessionDate` (it never silently reads
+    as current); an entry with no history needs no date and ignores it."""
+    history = load_history_of(entry)
+    if history:
+        if not _is_day(day):
+            raise MissingSessionDate(
+                f"{entry.get('title') or 'this movement'}: the load convention changed on a date (load_convention_history) — "
+                f"pass the session's Pacific date (got {day!r})"
+            )
+        for h in history:
+            if str(day)[:10] <= h["until"]:
+                return h["convention"]
+    return current_load_convention_of(entry)
 
 
 # ── the runtime resolver (a stored workout names an exercise by title + template id) ─────────────────────────────────────
@@ -230,9 +319,14 @@ def is_step_count(name: Any, template_id: Any = None, sets: Any = None) -> bool:
     return distance_unit_for(name, template_id, sets) == STEPS
 
 
-def load_convention_for(name: Any, template_id: Any = None, sets: Any = None) -> str:
-    """`total_carried`, `per_hand` or `as_logged` for this logged exercise."""
-    return load_convention_of(_resolved_entry(name, template_id, sets))
+def load_convention_for(name: Any, template_id: Any = None, sets: Any = None, *, day: Any) -> str:
+    """`total_carried`, `per_hand` or `as_logged` for this exercise as logged in the session on Pacific date `day` (required)."""
+    return load_convention_of(_resolved_entry(name, template_id, sets), day=day)
+
+
+def current_load_convention_for(name: Any, template_id: Any = None, sets: Any = None) -> str:
+    """The exercise's CURRENT convention — the unit a prescription written now is in."""
+    return current_load_convention_of(_resolved_entry(name, template_id, sets))
 
 
 def total_load(weight: Any, convention: str) -> float:
@@ -240,6 +334,25 @@ def total_load(weight: Any, convention: str) -> float:
     as-logged weight is already the total."""
     w = _num(weight) or 0.0
     return w * 2.0 if convention == PER_HAND else w
+
+
+def in_current_unit(weight: Any, logged: str, current: str) -> float:
+    """A logged weight expressed in the movement's CURRENT convention, for comparing or progressing one exercise across the
+    date its convention changed: a TOTAL on a movement now logged per hand is halved (a 140 total from 2026-10-25 reads as
+    70 per hand); a per-hand weight on a movement now logged as a total is doubled; everything else is as logged."""
+    w = _num(weight) or 0.0
+    if logged == TOTAL_CARRIED and current == PER_HAND:
+        return w / 2.0
+    if logged == PER_HAND and current == TOTAL_CARRIED:
+        return w * 2.0
+    return w
+
+
+def current_unit_scale(name: Any, template_id: Any = None, sets: Any = None, *, day: Any) -> float:
+    """The factor that puts a weight logged for this exercise on Pacific date `day` into the movement's CURRENT unit (see
+    `in_current_unit`): 0.5 for a pre-2026-10-27 two-dumbbell carry total, else 1.0. `day` is required, as in `load_convention_for`."""
+    entry = _resolved_entry(name, template_id, sets)
+    return in_current_unit(1.0, load_convention_of(entry, day=day), current_load_convention_of(entry))
 
 
 def load_label(convention: str) -> str:

@@ -90,21 +90,19 @@ def test_each_class_cue_names_its_charter_band_and_reads_back_as_its_ceiling():
     e = program_structure.EXPOSURES
     lo, hi = effort_ceilings.class_bands()[effort_ceilings.COMPOUNDS]
     llo, lhi = effort_ceilings.class_bands()[effort_ceilings.LAST_ISOLATION_SET]
-    # compound top set 8-9; back-offs by % of the top set ONLY — no back-off RPE (review round 1: none was ruled)
-    assert f"top set of 4–6 @ RPE {lo:g}–{hi:g}" in e["heavy"]["cue"] and e["heavy"]["cue"].count("RPE") == 1
-    assert "back-offs at −10 % of the top set" in e["heavy"]["cue"]
+    # #5428: the cue is the note's line 1 — the charter's band and nothing the set rows show (no set count, no rep range,
+    # no back-off %); the back-offs are their own rows. It still reads back as the ceiling the grader judges against.
+    assert e["heavy"]["cue"] == f"RPE {lo:g}–{hi:g}"
     assert resolve_ceiling("squat_barbell", e["heavy"]["cue"]) == {"rpe": COMPOUND, "basis": "exercise_notes:rpe"}
     for intensity in ("moderate", "volume"):
-        assert f"@ RPE {lo:g}–{hi:g}" in e[intensity]["cue"]
+        assert e[intensity]["cue"] == f"RPE {lo:g}–{hi:g}"
         assert resolve_ceiling("x", e[intensity]["cue"])["rpe"] == COMPOUND
     # an isolation movement: earlier sets at the compounds band, the LAST set at the isolation band
     acc = resolve_ceiling("db_curl", e["accessory"]["cue"])
-    assert f"last set RPE {llo:g}–{lhi:g}" in e["accessory"]["cue"]
+    assert e["accessory"]["cue"] == f"RPE {lo:g}–{hi:g}, last set RPE {llo:g}–{lhi:g}"
     assert acc == {"rpe": COMPOUND, "basis": "exercise_notes:rpe", "last_set_rpe": LAST_ISO}
     for spec in e.values():
-        assert len(spec["cue"]) <= 150 and "charter" in spec["cue"] and "tier" not in spec["cue"], spec[
-            "cue"
-        ]  # short, and it says where the number came from
+        assert len(spec["cue"]) <= 40 and "charter" not in spec["cue"] and "tier" not in spec["cue"], spec["cue"]  # one phone line
     # the heavy top set's own `rpe` field is the band too
     rx = program_structure.session_prescription_for_role("upper_heavy")
     top = next(x for x in rx["exposures"] if x["intensity"] == "heavy")["sets"][0]
