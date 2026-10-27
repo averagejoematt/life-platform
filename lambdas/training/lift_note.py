@@ -196,11 +196,13 @@ _AUTHORED_DIRTY_RE = re.compile(
     r"\d\s*(?:x|×)\s*\d|\b\d+\s*(?:x|×)\b|\bsets? of\b|\d+ sets?\b|Last:|@|\bkg\b|\d\s*kg|\bRIR\b|in the tank|\bleave \d|"
     r"#\d|\bv\d+\.\d|§|critic|red team|charter|engine|platform|tripwire|\bfloor\b|\bramp\b|e1RM|\banchor\b|\bband\b|"
     r"subtract|never up|ECG|\bAF\b|[Ss]inus|cardiolog|beta-blocker|metoprolol|protein|calorie|badge|weigh|Optional if|as written|…|"
-    r"🟢|🟡|🔴|GREEN|YELLOW|RED\b|Whoop|\bhis\b|\bhe\b|\bhim\b|\d+(?:\.\d+)?\s*(?:lb|lbs)\b",
+    r"🟢|🟡|🔴|GREEN|YELLOW|RED\b|Whoop|\bhis\b|\bhe\b|\bhim\b|\d+(?:\.\d+)?\s*(?:lb|lbs)\b|"
+    r"\bno (?:load|history)\b|\blog it\b|pick (?:it|a load|the load)",  # the pick-load form owns the 'find the load' line
     re.I,
 )
 
 
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 _COUNTED_RE = re.compile(r"RPE \d+(?:\.5)?(?:[–-]\d+(?:\.5)?)?|\b\d+ (?:reps?|min|weeks?|days?|steps?)\b|\b\d+s\b")
 
 
@@ -211,22 +213,26 @@ def _stray_number(line: str) -> bool:
 
 
 def authored_lines(note: str | None) -> dict[str, str]:
-    """The chat author's lines that already read as the standard (#5428), for `compose_blocks(authored=...)`:
-    `effort` — an author line that IS an effort line (`RPE 7`), kept as line 1; `reason` — the first other line of at most
-    AUTHORED_LINE_MAX_CHARS with no restated row, no load, no banned word — his coach's own one reason or cue. Everything
-    else is left to the composer (and kept on the record as `detail`). Empty when nothing qualifies."""
+    """The chat author's sentences that already read as the standard (#5428), for `compose_blocks(authored=...)`:
+    `effort` — a sentence that IS an effort line (`RPE 7`), kept as line 1; `line` — the first other sentence of at most
+    AUTHORED_LINE_MAX_CHARS with no restated row, no load or date, no banned word — the coach's own cue ("Elbows to
+    hips, no lean-back."), which the standard counts as the exercise's cue (§4). Everything else is left to the composer
+    and kept on the record as `detail`. Empty when nothing qualifies."""
     out: dict[str, str] = {}
     for raw in str(note or "").split("\n"):
-        line = " ".join(raw.split())
-        if not line:
-            continue
-        if _AUTHORED_EFFORT_RE.match(line):
-            out.setdefault("effort", line)
-        elif (
-            "reason" not in out and len(line) <= AUTHORED_LINE_MAX_CHARS and not _AUTHORED_DIRTY_RE.search(line) and not _stray_number(line)
-        ):
-            out["reason"] = line
+        for part in _SENTENCE_RE.split(raw):
+            line = " ".join(part.split())
+            if not line:
+                continue
+            if _AUTHORED_EFFORT_RE.match(line.rstrip(".")):
+                out.setdefault("effort", line.rstrip("."))
+            elif "line" not in out and _clean_authored(line):
+                out["line"] = line
     return out
+
+
+def _clean_authored(line: str) -> bool:
+    return len(line) <= AUTHORED_LINE_MAX_CHARS and not _AUTHORED_DIRTY_RE.search(line) and not _stray_number(line)
 
 
 def _step_due_line(prog: dict[str, Any], history: list[dict[str, Any]] | None) -> str:
@@ -297,9 +303,10 @@ def compose_blocks(
     never a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line is the instruction
     for the feeler W row, not a second reason.
 
-    `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own lines that already read as the
-    standard (`authored_lines`) — `effort` replaces line 1, `reason` takes the one reason slot over a computed one. On
-    that path a block whose rows carry the author's load never gets the pick-load feeler (the load is chosen)."""
+    `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own sentences that already read as
+    the standard (`authored_lines`) — `effort` replaces line 1, `line` takes the cue slot (a chat-era technique cue counts
+    as the cue, standard §4, so the family cue is not added beside it). On that path a block whose rows carry the
+    author's load never gets the pick-load feeler (the load is chosen)."""
     from training.exercise_history import previous_load
 
     movements = (load_floors or {}).get("movements") or {}
@@ -338,23 +345,24 @@ def compose_blocks(
         else:
             line2 = _engine_reason(block, entry, row, previous, (history_index or {}).get(tid) if tid else None, intensity)
             reason_kind = line2.split(":")[0] if line2 else None
-        lead = ""  # the one reason that sits ahead of a pick-load line: the swap, or the author's own
+        lead = ""  # the swap's reason line, ahead of a pick-load line
         swapped = (rotations or {}).get(key)
-        if reason_kind != "no_jumps" and (own.get("reason") or swapped):
-            lead = own.get("reason") or rotation_line(swapped or "")
+        if reason_kind != "no_jumps" and swapped:
+            lead = rotation_line(swapped)
             if reason_kind != "pick_load":
-                line2 = ""  # one reason: it replaces the computed one
-            reason_kind = "authored" if own.get("reason") else "rotation"
+                line2 = ""  # one reason: the swap replaces the computed one
+            reason_kind = "rotation"
         reason_text = lead or (line2 if line2 and line2 != PICK_LOAD_LINE else "")
-        cue = ""
+        cue = own.get("line") or ""
         if family and family not in seen_families:
-            cue = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=not (line2 or lead))
+            cue = cue or movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=not (line2 or lead))
             seen_families.add(family)
         block.notes = "\n".join(x for x in (line1, lead, line2, cue) if x)
         notes[key] = {
             "note": block.notes,
             "reason": reason_kind,
             "reason_line": reason_text or None,
+            "authored_line": own.get("line"),
             "pick_load": pick,
             "detail": detail,
         }

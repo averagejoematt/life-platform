@@ -213,11 +213,18 @@ def _routine(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def _own_note(i: int, note: str, session: str) -> tuple[str, int]:
-    """(exercise i's OWN note, its offset in the wire note) — exercise 0's starts after the session line."""
+    """(exercise i's OWN note, its offset in the wire note) — exercise 0's starts after the session line, or after the
+    three-line session block (#5428) when the block heads it and the compiler was handed no separate WHY line."""
     if i == 0 and session and note.startswith(session):
         rest = note[len(session) :]
         stripped = rest.lstrip("\n")
         return stripped, len(note) - len(stripped)
+    if i == 0 and not session:
+        from training import session_block
+
+        block, own = session_block.split(note)
+        if block:
+            return own, len(note) - len(own)
     return note, 0
 
 
@@ -323,8 +330,6 @@ def _note_hits(i: int, own: str, base: int) -> dict[str, list[dict[str, Any]]]:
         out.update(_reason_hits(where, own, base))
     if own.startswith(_MINIMUM_PREFIX):
         out["minimum_session"] = [_hit(where + ", first line", base)]
-    elif i == 0 and (mm := _MINIMUM_LINE_RE.match(own)):
-        out["minimum_session"] = [_hit(where + ", session line", base + mm.start())]
     if not m and (rpe := _RPE_RE.search(own)):
         out["effort_ceiling"] = [_hit(where, base + rpe.start())]
     return out
@@ -409,6 +414,8 @@ def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any 
             problems.append(f"the session line is {len(session)} chars, over the {VISIBLE_NOTE_CHARS}-char visible window")
     for i, ex in enumerate(exercises):
         own, base = _own_note(i, str(ex.get(PINNED_ROUTINE_NOTE_FIELD) or ""), session)
+        if i == 0 and _MINIMUM_LINE_RE.match(str(ex.get(PINNED_ROUTINE_NOTE_FIELD) or "")):  # #5428: the block's ‹Day›
+            found.setdefault("minimum_session", []).append(_hit("exercise 1 note, session line", 0))
         for by_field in (_note_hits(i, own, base), _set_hits(i, ex)):
             for k, v in by_field.items():
                 found.setdefault(k, []).extend(v)
