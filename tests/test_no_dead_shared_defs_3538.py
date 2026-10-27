@@ -93,10 +93,6 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
-    "lambdas/training/hevy_note_grammar.py:fitness_test_line": (
-        "#5428 note grammar builder, fixture-tested in tests/test_hevy_note_lint_5428.py; no producer writes a fitness-test day's `Test · ‹protocol›` session line yet (`fitness_tests`). "
-        "Point that producer at this builder (the #5428 notes follow-up lane), then delete this entry."
-    ),
     "lambdas/training/hevy_note_grammar.py:sets_today_clause": (
         "#5428 note grammar builder, fixture-tested in tests/test_hevy_note_lint_5428.py; lane A landed its own clause builder, `session_block.applied_clause` (the same `N sets today: …` text). "
         "Point that producer at this builder (the #5428 notes follow-up lane), then delete this entry."

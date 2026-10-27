@@ -211,7 +211,7 @@ def authored_lines(note: str | None) -> dict[str, str]:
                 continue
             if _AUTHORED_EFFORT_RE.match(line.rstrip(".")):
                 out.setdefault("effort", line.rstrip("."))
-            elif "line" not in out and _clean_authored(line):
+            elif "line" not in out and line not in hevy_note_grammar.PREP_CUES.values() and _clean_authored(line):
                 out["line"] = line
     return out
 
