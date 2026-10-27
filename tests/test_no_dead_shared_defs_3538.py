@@ -93,6 +93,12 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/training/hevy_render.py:place_after_prescription": (
+        "#5083's placement of the wake-recovery block after exercise 1's reason line. Its one live caller, "
+        "`tools_hevy_routine._apply_recovery_adaptation`, writes the three-line session block at the HEAD of exercise 1 "
+        "since #5428 Lane A (owner rulings 2026-10-27). `hevy_render.py` is #5428 Lane D's file and D rewrites its "
+        "ordering rule; delete the function, its unit test and this entry there."
+    ),
     "lambdas/training/training_charter.py:load_charter": (
         "The loader's documented merged-charter read (ADR-164, the module docstring), held by the charter tests "
         "(test_training_charter_derivation_5068, test_training_charter_privacy_5087, test_disruption_mode_5088). Its "

@@ -216,9 +216,10 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     assert "Last:" not in bike.notes
     # the strength block is untouched by the cardio arm — it never reaches a barbell; the only clause on
     # the bench is #5049's warm-up movement cue (a 155 lb bench gets the climb), never on the cardio block
+    from training import session_block  # #5428: the bench is exercise 1, so the session block heads its note
     from training.warmup_sets import CUE_MARKER, cue_clause
 
-    assert next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes == cue_clause("bench")
+    assert session_block.split(next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes)[1] == cue_clause("bench")
     assert CUE_MARKER not in bike.notes
     assert out["cardio_cues"] == 1
 
@@ -306,7 +307,10 @@ def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count(
     # warmups=False: #5049's warm-up cue would otherwise be the bench's one clause; this test is the cardio arm's
     out, ir = _draft_custom([{"movement_key": "barbell_bench_press", "sets": [{"weight_lbs": 155, "reps": 8}]}], warmups=False)
     assert out["cardio_cues"] == 0
-    assert all(b.notes == "" for b in ir.exercises)
+    # #5428: exercise 1 carries the three-line session block and nothing else — no cardio cue on a strength block
+    from training import session_block
+
+    assert all(session_block.split(b.notes) == (session_block.block_of(ir), "") for b in ir.exercises)
 
 
 def test_a_history_load_failure_never_costs_the_chat_draft():

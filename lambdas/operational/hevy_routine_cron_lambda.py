@@ -194,7 +194,7 @@ def lambda_handler(event, context):
         target_date = _target_date_for_event(event or {})
         inputs = _gather_inputs(target_date, gates["add_load_enabled"])
 
-        from training import hevy_write_client as wc, routine_repo as repo
+        from training import hevy_write_client as wc, routine_repo as repo, session_block
         from training.hevy_compiler import to_create_body
         from training.hevy_template_cache import resolve_movement
         from training.routine_generator import emit_branch_model, generate_routines
@@ -228,7 +228,7 @@ def lambda_handler(event, context):
                 continue
             try:
                 title_ctx = build_title_context(ir)
-                why = format_why_note(ir)
+                why = session_block.why_note_for(ir, format_why_note(ir))  # #5428: no second session line over the block
                 body = to_create_body(ir, resolve_movement, title_context=title_ctx, why_note=why)
                 resp = wc.create_routine(body)
                 from training.hevy_compiler import from_hevy_response

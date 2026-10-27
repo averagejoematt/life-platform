@@ -420,7 +420,9 @@ def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_tre
     (rec,) = critics.apply_changes(ir, [{**verdict, "critic": "joints_tendons"}])
     assert rec["applied"] is True
     assert ir.exercises[5].movement_key == "cycling" and ir.exercises[5].sets[0].duration_seconds == 3600
-    assert "HR avg ≤ 120 bpm (target 105)" in ir.exercises[5].notes
+    # #5428: the swapped block's note is the cardio composer's — no HR target, no critic name, no issue number
+    assert ir.exercises[5].notes.startswith("Recumbent bike · 60 min")
+    assert "bpm" not in ir.exercises[5].notes and "#" not in ir.exercises[5].notes and "joints_tendons" not in ir.exercises[5].notes
     # re-evaluated, the revised draft carries nothing left to swap
     assert critics.deterministic_verdict(_joints(critics.draft_summary(ir), block))["verdict"] == "approve"
 

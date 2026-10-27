@@ -9,7 +9,7 @@ The override is the narrow door instead:
   * every other critic's change is applied exactly as without the override (the joints cap);
   * the words go to the corrections ledger through the `log_coach_correction` write path,
     naming the vetoing critic and signal — and if that write fails, the veto stands;
-  * the override is visible on the committed routine's record, in the Hevy notes and in the
+  * the override is visible on the committed routine's record (#5428: not the Hevy notes) and in the
     commit result line.
 
 The fixture is the 09-22 shape: the historian vetoes (a model escalation on a flagged
@@ -186,8 +186,13 @@ def test_veto_plus_override_keeps_the_joints_cap_and_records_the_override_on_the
     body = created[0]["routine"]
     assert sum(len(e["sets"]) for e in body["exercises"]) == 20, "no fatigue cut reached Hevy (#5070)"
     notes = body["exercises"][0]["notes"]
-    assert "- historian VETO OVERRIDDEN BY OWNER" in notes
-    assert "owner override of historian (" in notes and "I benched and squatted this load on Friday" in notes
+    # #5428: the verdicts and the override stay on the stored record and in the stage-2 preview, never the Hevy note
+    assert "RED TEAM" not in notes and "OVERRIDDEN BY OWNER" not in notes and "owner override" not in notes
+    from coach import critics as _critics
+
+    preview = _critics.notes_block(ir)
+    assert "- historian VETO OVERRIDDEN BY OWNER" in preview
+    assert "owner override of historian (" in preview and "I benched and squatted this load on Friday" in preview
     # the committed routine's own record carries the override, words verbatim
     stored = ir.inputs_snapshot["critics"]
     assert stored["owner_overrides"][0]["owner_words"] == WORDS and stored["veto"] is False
