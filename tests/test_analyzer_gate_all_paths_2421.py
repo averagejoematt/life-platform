@@ -40,6 +40,20 @@ for _p in (os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "lambdas", "intel
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+
+@pytest.fixture(autouse=True)
+def _fresh_outage_breaker():
+    """#5412's breaker is module state: a test elsewhere (e.g. #5442's tripped-breaker cases) can leave it tripped
+    in this worker, and every gate path here would then raise VendorOutageSkipped. Each test starts a fresh run."""
+    try:
+        from intelligence import vendor_outage_breaker
+
+        vendor_outage_breaker.begin_run()
+    except ImportError:  # pragma: no cover
+        pass
+    yield
+
+
 _import_err = None
 try:
     import ai_expert_analyzer_lambda as az

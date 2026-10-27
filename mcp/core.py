@@ -284,6 +284,8 @@ def session_token_revoke(token: str) -> bool:
 import re
 
 _SAFE_SOURCE = re.compile(r"^[a-zA-Z0-9_]+$")
+#: #5431: sources whose DATE# rows are observations of a day that has happened — never read past today.
+_NO_FUTURE_SOURCES = frozenset({"macrofactor"})
 
 # ADR-058: phase filter — hides phase=pilot records. Applied to an EXPERIMENT_SCOPED
 # source by default (the decision is derived per source since #4061 — see query_source)
@@ -360,6 +362,12 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=None):
     if not source or not _SAFE_SOURCE.match(source):
         logger.warning(f"query_source: rejected invalid source name: {source!r}")
         return []
+    if source in _NO_FUTURE_SOURCES:
+        # #5431: intake is never read from a day after the Pacific today, whatever end the caller
+        # passed — MacroFactor's export carries projected values for days that have not happened.
+        end_date = min(end_date, pacific_today())
+        if start_date > end_date:
+            return []  # DynamoDB rejects a BETWEEN whose lower bound exceeds the upper
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
     kwargs = _apply_phase_filter(

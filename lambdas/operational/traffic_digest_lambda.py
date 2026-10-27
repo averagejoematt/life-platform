@@ -54,8 +54,10 @@ import io
 import json
 import logging
 import os
+import time
 import urllib.parse
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -917,27 +919,45 @@ def ops_subject_suffix(recon_artifact, pip_artifact):
     return "".join(f" · {b}" for b in bits)
 
 
+# #5433: the log read used to be ONE serial GetObject per CloudFront log file
+# (~1,570 files / ~9 MB a week at ~73 ms each = ~115 s of the 120 s timeout; the
+# first attempt timed out on 10-19 and 10-26 and only the async retry finished).
+# The reads are independent network waits, so they fan out. 10 == botocore's
+# default max_pool_connections, so no client Config is needed and no "connection
+# pool is full" discards; boto3 clients are thread-safe per client.
+LOAD_LOG_WORKERS = 10
+
+
+def _read_log_object(s3, key):
+    """GetObject + gunzip one log file -> text, or None if the body is not valid gzip."""
+    body = s3.get_object(Bucket=LOG_BUCKET, Key=key)["Body"].read()
+    try:
+        return gzip.GzipFile(fileobj=io.BytesIO(body)).read().decode("utf-8", "ignore")
+    except Exception as e:
+        logger.warning("skip unreadable log %s: %s", key, e)
+        return None
+
+
 def _load_logs(s3, start_dt):
     """List + read CF log objects modified within the window.
 
     Returns (texts, object_count) — object_count is the number of log files
     found in the window so the caller can distinguish "no objects" (logging is
     broken/disabled) from "objects found but 0 human views" (genuine quiet week).
+
+    The reads run LOAD_LOG_WORKERS-wide (#5433); `map` keeps listing order, and a
+    GetObject failure still propagates (it raised in the serial loop too).
     """
-    texts = []
-    object_count = 0
+    keys = []
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=LOG_BUCKET, Prefix=LOG_PREFIX):
         for obj in page.get("Contents", []):
             if obj["LastModified"] < start_dt:
                 continue
-            object_count += 1
-            body = s3.get_object(Bucket=LOG_BUCKET, Key=obj["Key"])["Body"].read()
-            try:
-                texts.append(gzip.GzipFile(fileobj=io.BytesIO(body)).read().decode("utf-8", "ignore"))
-            except Exception as e:
-                logger.warning("skip unreadable log %s: %s", obj["Key"], e)
-    return texts, object_count
+            keys.append(obj["Key"])
+    with ThreadPoolExecutor(max_workers=LOAD_LOG_WORKERS) as pool:
+        results = list(pool.map(lambda k: _read_log_object(s3, k), keys))
+    return [t for t in results if t is not None], len(keys)
 
 
 def _emit_no_logs_alert(s3, cw, start_dt, now, green_html="", dry_run: bool = False, ops_html=""):
@@ -989,7 +1009,9 @@ def lambda_handler(event, context):
         s3 = boto3.client("s3", region_name=REGION)
         cw = boto3.client("cloudwatch", region_name=REGION)
 
+        t0 = time.monotonic()
         texts, object_count = _load_logs(s3, start_dt)
+        t_load = time.monotonic() - t0
 
         # #1446: the weekly green report rides this email in ALL branches — a
         # green week must produce positive signal, so the rollup is built
@@ -1058,10 +1080,18 @@ def lambda_handler(event, context):
             _emit_no_logs_alert(s3, cw, start_dt, now, green_html, dry_run=dry_run, ops_html=ops_html)
             return {"statusCode": 200, "body": "no log objects — alert sent"}
 
+        t_parse = time.monotonic()
         records = []
         for text in texts:
             records.extend(parse_cf_log(text))
         agg = aggregate(records)
+        logger.info(
+            "traffic digest timing (#5433): load_logs=%.1fs (%s files) parse_aggregate=%.1fs total_so_far=%.1fs",
+            t_load,
+            object_count,
+            time.monotonic() - t_parse,
+            time.monotonic() - t0,
+        )
         logger.info(
             "traffic digest: %s views, %s unique, %s returning (from %s log files)",
             agg["page_views"],

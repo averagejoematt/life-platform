@@ -2135,6 +2135,30 @@ QA_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-09-17",
     },
+    "qa::lambdas/operational/qa_check_coach_cards.py::check_coach_cards": {
+        "gate_name": "check_coach_cards",
+        "command": "python3 -m pytest tests/test_portrait_bundle_5434.py -q",
+        "mutation": (
+            "web.portrait_bundle._read_export reverted to the pre-#5434 reader — json.loads of the text up to the "
+            "FIRST ';' after the marker. That cut lands inside a string value of the real bundle (offset 165, the "
+            "'Unterminated string starting at: line 1 column 55' specimen), so the assessor's bundle-parse leg and "
+            "the shared reader both lose their ability to see a valid bundle."
+        ),
+        "observed": (
+            "ARMED 2026-10-27: mutated run 5 failed, 11 passed (test_reader_parses_semicolons_in_strings_and_trailing_exports, "
+            "test_real_generated_bundle_parses, the empty-payload malformed-bundle case, test_qa_ok_when_every_card_is_fresh, "
+            "test_qa_warns_on_missing_and_stale_cards_naming_the_persona); reverted 16 passed. The fail leg (an unparseable "
+            "bundle -> level 'fail', named) is test_qa_fails_on_an_unparseable_bundle; missing/stale cards -> 'warn' naming "
+            "the persona; a fetch error fail-softs to a warn."
+        ),
+        "scope": (
+            "Reads the PUBLIC site (the qa-smoke role has no S3 grant on site/* or generated/*), so its green needs the "
+            "edge reachable. Missing/stale cards WARN rather than FAIL on purpose: the first nightly after the producer fix "
+            "runs before the next og sweep has written the cards, and a FAIL is the CI-smoke rollback shape. What the green "
+            "does NOT cover: that a card contains a drawn portrait (it checks the card exists and is fresh)."
+        ),
+        "proved_on": "2026-10-27",
+    },
 }
 
 

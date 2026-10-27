@@ -64,6 +64,21 @@ def _dates_in(sentence):
     return dates_in_text(sentence)
 
 
+def _windowed_average(sentence, pos):
+    """#5442: an average whose sentence names its window ("HRV averaged 52 ms over the last
+    30 nights") is a WINDOW claim, owned by `coach.reader_checks.unlabeled_window_figure`, not
+    a single night's reading. This gate held the analyzer's sleep read on every Monday from
+    2026-10-12 to 2026-10-18 on exactly this shape. The sleep expert's data pack is window
+    averages, and the only correction this gate offered ("name the night") cannot apply to
+    an average. Lazy import, same reason as `_dates_in`: grounded_generation imports this
+    module, and reader_checks imports grounded_generation."""
+    try:
+        from coach.reader_checks import windowed_average_at
+    except ImportError:  # pragma: no cover — flat/layer bundle layout
+        return False
+    return windowed_average_at(sentence, pos)
+
+
 NIGHT_OF_OFFSET_DAYS = 1
 
 
@@ -251,7 +266,7 @@ def night_scoped_vitals_findings(text: str, *, nightly_vitals, generation_date_i
                 snippet = sent if len(sent) <= 140 else sent[:137].rstrip() + "…"
                 if night is None:
                     key = ("unlabeled", metric, claimed)
-                    if key in seen or _ANY_TEMPORAL_TOKEN_RE.search(sent):
+                    if key in seen or _ANY_TEMPORAL_TOKEN_RE.search(sent) or _windowed_average(sent, m.start("n")):
                         break
                     seen.add(key)
                     findings.append(
@@ -434,7 +449,9 @@ def night_label_line(facts) -> str:
         f"the readings from the night of {night} (recorded against the morning of {facts.get('as_of')}). "
         f'When you cite ANY of them, name that night — "on the night of {night}" — never a bare '
         f'"your recovery" or "last night" with no date. A figure that does not say which night it '
-        f"belongs to cannot be checked by a reader or by the grounding gate."
+        f"belongs to cannot be checked by a reader or by the grounding gate. An AVERAGE over several "
+        f'nights is not one night\'s reading: say "averaged" and name its window in the same sentence '
+        f'("averaged <value> ms over the last <N> nights").'
     )
 
 
@@ -446,7 +463,8 @@ def correction_line(finding) -> str:
             f"describe it qualitatively — never carry a figure the stored record has since revised."
         )
     return (
-        f"{finding['detail']}. Name the night explicitly (\"the night of <date>\") or drop the figure — "
-        f"a sleep, recovery, HRV or resting-HR number that does not say which night it belongs to "
+        f"{finding['detail']}. Name the night explicitly (\"the night of <date>\"); if it is an average, say so and name "
+        f'its window in the same sentence ("averaged <value> ms over the last <N> nights"); otherwise drop the figure — '
+        f"a sleep, recovery, HRV or resting-HR number that says neither which night nor which window it covers "
         f"cannot be checked by anyone."
     )
