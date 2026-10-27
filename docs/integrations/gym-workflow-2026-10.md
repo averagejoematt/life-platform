@@ -20,6 +20,23 @@ Every Hevy-origin or pliability-origin echo, whether in HealthKit or Strava, fol
 
 The coach-session skill carries the same protocol in one line (`.claude/skills/coach-session/SKILL.md`, "Constraints to carry").
 
+## 1b. How he logs a set: one hand, carries included (owner rulings 2026-10-25 and 2026-10-27, #5373)
+
+Two logging rules, both read from `config/movement_catalog.json` through `lambdas/training/logging_conventions.py`:
+
+| Field on the set | Rule | Read as |
+|---|---|---|
+| **Distance on a carry** (Hevy's "yards" field) | his STEP COUNT: the gym has no distance markings, so he counts steps and types the count in yards | `distance_unit_convention: steps`; rendered "N steps (~X yd, est. from unloaded stride)", never a measured distance, never summed into miles |
+| **Load on a dumbbell exercise** | ONE dumbbell, the one he picks up ("2x 80 lb incline bench, I log 80"), **a two-dumbbell carry included from 2026-10-27** | `load_convention: per_hand`; volume and tonnage count both hands (x 2) |
+| **Load on a one-object carry** | a sandbag is one object and a suitcase carry is one dumbbell, so the logged number is the whole load | `load_convention: total_carried` (no history) |
+| **Load on a two-dumbbell carry logged before 2026-10-27** | the TOTAL carried (both dumbbells summed): 2 Farmers Walk sessions, 2026-06-20 and 2026-10-25, 3 sets each. He does not edit them in Hevy, so the Hevy app keeps showing the totals | `load_convention_history: [{"until": "2026-10-26", "convention": "total_carried"}]`: a session whose Pacific date is on or before `until` reads the total; the tonnage counts it as logged, and a progression reads it halved (a 140 total reads as 70 per hand) |
+
+**Which movements.** `farmers_walk`, `farmers_walk_8d414b80`, `db_gun_carries` and `db_overhead_farmers_carry` carry `load_convention: per_hand` plus the history above. `sandbag_carry` and `suitcase_carry` stay `total_carried` with no history. The history is catalog data, never a date in a reader.
+
+**Every reader of a logged load passes the session's Pacific date.** `load_convention_of(entry, day=...)` and `load_convention_for(name, template_id, sets, day=...)` take `day` as a required keyword (omitting it is a `TypeError`), and an entry with a history given an empty or malformed date raises `MissingSessionDate`. It never reads as "current": that would take a historical total for a per-hand load and double a tonnage or a next prescription. The readers: `muscle_volume.normalize_hevy_items` (tags each exercise with its dated convention; `session_tonnage_lbs` reads that tag), `muscle_volume.working_sets_by_muscle`, `carry_line.carry_line` (the detail tool's `carries`, the coach packet's `today` block), `strength_helpers.extract_hevy_sessions` (`best_weight` as logged, `best_weight_current` in the movement's current unit, which the PR in `get_exercise_history` compares), `exercise_history.load_history_indexes` (the history a prescription is progressed from is put in the current unit at the read), and `hevy_readback_report.stall_check`.
+
+**A prescription is written for now, in the current convention** (`current_load_convention_of`): the routine generator's progression reasons, the load ramp, the panel judge's set line and the carry block's Hevy note all say "per hand" ("Farmers Walk 70 lb per hand", the way a dumbbell press is worded). Not dated, and not read from a session.
+
 ## 2. The record types
 
 | Key | Record type | Where it lands | How a reader tells it apart |

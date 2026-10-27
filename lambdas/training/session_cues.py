@@ -53,7 +53,7 @@ def exposure_cue(intensity: str, sets: list[dict[str, Any]], stride: dict[str, A
 
     #5373: a carry's dose reads "N steps (~X yd, est. from unloaded stride)" when `stride` (his measured stride,
     `logging_conventions.trailing_stride`) is given — steps only without it — and the cue writes back his own rule ("count
-    steps, type the count in yards") and the load convention (the TOTAL carried, both hands)."""
+    steps, type the count in yards") and the load convention (PER HAND: one dumbbell's weight, owner's one-hand rule from 2026-10-27)."""
     label = _CUE_LABEL.get(intensity, str(intensity).upper())
     if intensity == "heavy":
         tops = [st for st in sets if st.get("kind") == "top"]
@@ -71,7 +71,7 @@ def exposure_cue(intensity: str, sets: list[dict[str, Any]], stride: dict[str, A
         dose = f" of {render_steps(steps[0], stride)}" if len(steps) == 1 and steps[0] else ""
         return (
             f"{label}: {len(sets)} {'carry' if len(sets) == 1 else 'carries'}{dose} @ RPE {_C}, tall and braced; {ROUTINE_NOTE_RULE}; "
-            "load: the TOTAL carried (both hands), his own pick on the first exposure, logged — the engine anchors from that log "
+            "load: per hand (one dumbbell's weight), his own pick on the first exposure, logged — the engine anchors from that log "
             "(charter compound ceiling)."
         )
     if intensity == "accessory":

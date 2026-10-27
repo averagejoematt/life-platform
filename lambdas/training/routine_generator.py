@@ -716,7 +716,7 @@ def _progress_block(
         exposure=str(block.rationale_tag).split(":")[-1] if ":" in str(block.rationale_tag or "") else None,
         re_entry_reason=floor.get("layoff_reason"),
         hold_reason=hold_reason,
-        load_convention=lc.load_convention_of(entry),  # #5373: the reason names a per-hand / total-carried load as such
+        load_convention=lc.current_load_convention_of(entry),  # #5373: a prescription is in the CURRENT convention (history is read in it)
     )
     prog["changes"] = lp.apply_to_sets(block.sets, prog)
     if prog["reason"] and (prog["changes"] or prog["basis"] != lp.BASIS_HOLD or current):

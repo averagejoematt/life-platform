@@ -348,7 +348,7 @@ def test_the_coach_context_carries_the_day_mode_owner_only():
     ctx = cc.assemble("2026-11-02", packet=None, constraint_block=None, response_protocol=RESPONSE, day_mode=m)
     assert ctx["day_mode"] is m and "DAY MODE (owner-only)" in ctx["text"] and ld.SOURCE in ctx["text"]
     assert cc.summary(ctx)["day_mode"] == ld.SCOPE_WHOLE_DAY
-    assert ctx["context_version"] == "coach-context@1.8.0"  # 1.8.0: #5373 logging_conventions
+    assert ctx["context_version"] == "coach-context@1.8.1"  # 1.8.1: #5373 the one-hand carry rule in logging_conventions
     pub = cc.assemble("2026-11-02", packet=None, constraint_block=None, day_mode=m, published=True)
     assert pub["day_mode"] is None and "DAY MODE" not in pub["text"]
     off = cc.assemble("2026-11-05", packet=None, constraint_block=None, day_mode=ld.mode([], "2026-11-05"))

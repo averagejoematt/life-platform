@@ -10,8 +10,9 @@ load and a distance, no reps. Two facts make the usual arithmetic wrong, both th
 So a carry stays OUT of the rep-tonnage sum (`weight x reps` is 0 for it by construction) and is reported on its own line as the
 load as logged and the step count from the distance field.
 
-#5373 (the definition layer, `training.logging_conventions`): the line names the exercise's `load_convention` (`total_carried` on
-the farmers walk — the load is the sum of both hands) and `distance_unit: steps`, and — given his stride (`trailing_stride`) —
+#5373 (the definition layer, `training.logging_conventions`): the line names the exercise's `load_convention` ON THE SESSION'S DATE
+(`per_hand` from the owner's one-hand rule of 2026-10-27 — the load is one dumbbell; `total_carried` before it — the sum of both
+hands; the date is why `day` is a required argument) and `distance_unit: steps`, and — given his stride (`trailing_stride`) —
 renders each set as "N steps (~X yd, est. from unloaded stride)"; with no measured stride, "N steps". The yards are an estimate
 from his UNLOADED walking stride and are never compared to a true distance.
 
@@ -28,9 +29,13 @@ _KG_TO_LB = 2.20462
 _CARRY_TITLE = re.compile(r"carry|farmer|suitcase", re.I)
 
 STEPS_BASIS = (
-    "the distance field on a carry is his step count (owner, 2026-10-25), not a distance; the load is the TOTAL carried (both "
-    "hands). Carries are outside the rep-tonnage sum; no weight x distance is computed."
+    "the distance field on a carry is his step count (owner, 2026-10-25), not a distance. Carries are outside the rep-tonnage "
+    "sum; no weight x distance is computed."
 )
+LOAD_BASIS = {
+    "per_hand": "the load is ONE dumbbell's weight (per hand; owner's one-hand rule from 2026-10-27) — both hands carry it.",
+    "total_carried": "the load is the TOTAL carried (the sum of both hands; a carry logged before 2026-10-27, or a one-object carry).",
+}
 
 
 def _num(v: Any) -> float | None:
@@ -67,26 +72,29 @@ def is_carry(name: str, sets: Any) -> bool:
     return any(_load_lb(s) for s in work) or bool(_CARRY_TITLE.search(name or ""))
 
 
-def carry_line(name: str, sets: Any, *, template_id: Any = None, stride: dict[str, Any] | None = None) -> dict[str, Any] | None:
+def carry_line(name: str, sets: Any, *, day: Any, template_id: Any = None, stride: dict[str, Any] | None = None) -> dict[str, Any] | None:
     """`{sets, load_lb, load_convention, distance_unit, steps, steps_total, estimated_yd, rendered, stride, steps_basis,
     excluded_from_rep_tonnage}` for a carry exercise, else None. `load_lb`, `steps`, `estimated_yd` and `rendered` are per working
-    set, in set order; a set with no load logged reads None, never 0. `estimated_yd` is None without a measured `stride`."""
+    set, in set order; a set with no load logged reads None, never 0. `estimated_yd` is None without a measured `stride`.
+    `day` (required, keyword) is the session's Pacific date — the load convention is dated (#5373); a carry whose catalog entry
+    carries a history raises `MissingSessionDate` without one."""
     from training import logging_conventions as lc  # noqa: PLC0415 — lazy: the catalog read stays off the import path
 
     if not is_carry(name, sets):
         return None
     work = _working(sets)
     steps = [int(round(_distance(s))) if _distance(s) else None for s in work]
+    convention = lc.load_convention_for(name, template_id, sets, day=day)
     return {
         "sets": len(work),
         "load_lb": [_load_lb(s) for s in work],
-        "load_convention": lc.load_convention_for(name, template_id, sets),
+        "load_convention": convention,
         "distance_unit": lc.STEPS,
         "steps": steps,
         "steps_total": sum(n for n in steps if n),
         "estimated_yd": [lc.estimated_yards(n, stride) if n else None for n in steps],
         "rendered": [lc.render_steps(n, stride) if n else None for n in steps],
         "stride": stride,
-        "steps_basis": STEPS_BASIS,
+        "steps_basis": f"{STEPS_BASIS} {LOAD_BASIS.get(convention, '')}".strip(),
         "excluded_from_rep_tonnage": True,
     }

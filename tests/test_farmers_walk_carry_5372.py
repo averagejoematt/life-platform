@@ -114,17 +114,22 @@ def _stored() -> dict:
 def test_the_carry_has_its_own_line_of_load_and_steps_and_no_weight_times_distance():
     row = _stored()
     ex = next(e for e in row["exercises"] if e["name"] == "Farmers Walk")
-    line = carry_line(ex["name"], ex["sets"])
+    line = carry_line(ex["name"], ex["sets"], day="2026-10-25")
     assert line["sets"] == 3 and line["steps"] == [60, 62, 58] and line["steps_total"] == 180
     assert line["load_lb"] == [88.2, 88.2, 88.2]  # 40 kg as logged, in lb
     assert line["excluded_from_rep_tonnage"] is True and "step count" in line["steps_basis"]
     assert not any("tonnage" in k and "carry" in k for k in line) and "load_x_distance" not in line
-    assert carry_line("Lateral Raise (Dumbbell)", next(e for e in row["exercises"] if e["name"].startswith("Lateral"))["sets"]) is None
+    assert (
+        carry_line(
+            "Lateral Raise (Dumbbell)", next(e for e in row["exercises"] if e["name"].startswith("Lateral"))["sets"], day="2026-10-25"
+        )
+        is None
+    )
 
 
 def test_a_timed_cardio_block_is_not_a_carry():
     treadmill = [{"type": "normal", "reps": None, "weight_kg": None, "distance_m": 2400, "duration_sec": 1200}]
-    assert carry_line("Treadmill", treadmill) is None
+    assert carry_line("Treadmill", treadmill, day="2026-10-25") is None
 
 
 def test_the_stored_total_volume_excludes_the_carry():

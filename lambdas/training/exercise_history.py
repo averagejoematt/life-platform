@@ -36,6 +36,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_today  # #2798: hevy DATE# keys name Pacific days
 
+from training import logging_conventions  # #5373: the dated per-hand / total-carried load convention
 from training.pinned_setup import split_setup  # #5010: owner-marked setup lines
 
 logger = logging.getLogger("exercise_history")
@@ -210,9 +211,15 @@ def load_history_indexes(
                             "sibling_block_seconds": [v for k, v in block_secs_by_pos.items() if k != pos and v > 0],
                         }
                     )
+                # #5373: a load is compared and progressed in the movement's CURRENT unit — a two-dumbbell carry logged as the
+                # TOTAL before 2026-10-27 is halved to the per-hand number the owner logs now, so a 140 total never reads as a
+                # 140-lb per-hand floor. `day` is the session's Pacific date (the DATE# key of the row).
+                unit_scale = logging_conventions.current_unit_scale(
+                    ex.get("name"), tid, sets_raw, day=workout_date or str(item.get("sk") or "")[5:15]
+                )
                 sets: list[dict[str, Any]] = [
                     {
-                        "weight_kg": _to_float(s.get("weight_kg")),
+                        "weight_kg": _to_float(s.get("weight_kg")) * unit_scale,
                         "reps": _to_int(s.get("reps")),
                         # #4408 review: the logged RPE (None when he logged none) — the v0.3 hold is RPE-aware
                         "rpe": _to_float(s.get("rpe")) if s.get("rpe") is not None else None,
