@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import sys
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
@@ -62,8 +63,10 @@ def test_every_menu_entry_has_one_prescription_the_pick_and_the_note_share():
         note, audit = cardio_note.compose(movement_key=machine, minutes=rx["minutes"], target_date=DAY, kind=kind)
         line1 = note.split("\n")[0]
         assert line1.startswith(cardio_note.machine_for(machine)), (kind, machine, line1)
-        assert rx["intensity"].split(",")[0] in line1, (kind, machine, line1)  # the RPE words
-        assert audit["kind"] == kind and f"{rx['minutes']} min" in line1
+        rpe = re.search(r"RPE \d(?:–\d)?", rx["intensity"]).group(0)
+        assert rpe in line1, (kind, machine, line1)  # the pick's RPE is the note's
+        # #5428: the minutes are the set row's, never restated on line 1
+        assert audit["kind"] == kind and audit["minutes"] == rx["minutes"] and " min" not in line1
     agreeing = {"movement_key": "cycling", "intensity": cardio_menu.effort_words("easy")}
     assert cardio_menu.align_pick(agreeing, "easy", "cycling") is agreeing
 
@@ -74,7 +77,8 @@ def test_the_block_duration_is_clamped_to_the_charter_cap(monkeypatch):
     assert all(cardio_menu.block_minutes(k) <= cap for k in cardio_menu.KINDS)
     block, pick = _tempo_on_bike(monkeypatch)
     assert [s.duration_seconds for s in block.sets] == [cap * 60]
-    assert f"{cap} min" in block.notes.split("\n")[0] and "hard flat 40" not in block.notes  # the label would claim 40
+    # the block's minutes are the set row's (#5428: line 1 never restates them), and no label claims 40
+    assert " min ·" not in block.notes.split("\n")[0] and "hard flat 40" not in block.notes and "40 min" not in block.notes
     assert pick["menu"]["minutes"] == cap
 
 

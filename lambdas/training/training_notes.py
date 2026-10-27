@@ -485,6 +485,14 @@ def recovery_discordance(note_text: str, date=None, user: str = "matthew"):
     )
 
 
+def _walk_of(block_text: str):
+    """His treadmill speed / incline shorthand in one bout (`wrist_clock.parse_walk`), or None when the bout is not one."""
+    from training import wrist_clock
+
+    walk = wrist_clock.parse_walk(block_text)
+    return walk if walk["status"] != "none" else None
+
+
 def deterministic_pass(note_text: str, date=None, user: str = "matthew") -> list:
     """Rule-pass signals — no model. High-confidence pattern classes only; the semantic
     tail (nuanced form/limiter) is the Haiku pass's job.
@@ -511,6 +519,13 @@ def deterministic_pass(note_text: str, date=None, user: str = "matthew") -> list
         dur = block_duration_min(block)
         if dur is not None:
             prog_val["duration_min"] = dur
+        # #5374 box 3 / #5428: his treadmill shorthand, "3.3 / 1.5 incline" = 3.3 mph at 1.5% (a change: "4.0 / 3 from 20")
+        walk = _walk_of(block) if not prog_val.get("level") else None
+        if walk is not None:
+            first = walk["segments"][0]
+            prog_val["speed_mph"], prog_val["incline_pct"] = first["speed_mph"], first["incline_pct"]
+            if len(walk["segments"]) > 1:
+                prog_val["segments"] = walk["segments"]
         if any(k in bt for k in _INTERVAL_KW):
             prog_val["character"] = "intervals"
         elif any(k in bt for k in _FLAT_KW):

@@ -96,6 +96,12 @@ _P_SPRINT_WORD = re.compile(
 )
 _P_SPRINT = re.compile(rf"^{_v('w')}\s+for\s+(?P<work>\d{{1,2}}){_M}\s+every\s+(?P<every>\d{{1,2}}){_M}(?:\s+{_T})?$")
 _P_HOLD = re.compile(rf"^{_v('h')}\s+{_T}$")
+# #5428 / #5374 box 3: his bare bike log, "Level 11 flat" / "L12" / "Level 11 ramp" (a level held the whole block, the
+# block's own duration closes it). The LEVEL WORD is required, so a bare number is never read as a level; a trailing
+# " - <words>" comment ("Level 10 flat - big toe throbbing …") is kept, never parsed.
+_P_BARE_LEVEL = re.compile(
+    r"^(?:level|lvl|l)\s*(?P<n>\d{1,3})(?:\s+(?P<terrain>flat|ramp|hills?|hilly|manual))?(?:\s+[-–—]\s+(?P<comment>\D.*))?$"
+)
 _P_CHECKIN = re.compile(r"^check\s+in\s+every\s+(\d{1,2})\s*min$")
 _SPLIT = re.compile(r"\s*(?:·\s*then\b|·|\n|;|\s/\s|,\s*then\b|\band\s+then\b|\bthen\b|,)\s*", re.IGNORECASE)
 
@@ -174,6 +180,15 @@ def parse_clause(segment: str) -> dict[str, Any] | None:
     if m:
         value, unit = _value(m, "h")
         return {"type": "hold", "value": value, "unit": unit, **_time(m)}
+    m = _P_BARE_LEVEL.match(s)
+    if m:
+        terrain = m.group("terrain")
+        out: dict[str, Any] = {"type": "hold", "value": int(m.group("n")), "unit": "level"}
+        if terrain:
+            out["terrain"] = "hills" if terrain.startswith("hill") else terrain
+        if m.group("comment"):
+            out["comment"] = m.group("comment").strip()
+        return out
     return None
 
 
@@ -318,6 +333,128 @@ def parse_note(note: str | None, total_min: int | None = None) -> dict[str, Any]
         return out
     out.update(resolve(clauses, total_min))
     out["status"] = "shaped" if any(c["type"] != "hold" for c in out["clauses"]) else "steady"
+    return out
+
+
+# ── his treadmill grammar (#5374 box 3, owner 2026-10-27: "a note on what i do on the machine … to feedback loop") ──
+# "<speed> / <incline>[ incline|%]" is a steady block at that speed (mph) and incline (%); a change is the same pair with
+# "from <min>" or "at <min>" ("3.3 / 1.5, 4.0 / 3 from 20"). His older forms read too: "3.3 mph 1.5 incline",
+# "1.5 incline at 3mph", "3.1 mph and 1.0 incline", "0.5 incline 3mph". Segments split on "," ";" "then" or a new line —
+# never on " / ", which is his speed/incline separator here (on the bike it separates clauses, `parse_note`).
+_WALK_SPLIT = re.compile(r"\s*(?:,|;|\n|\bthen\b)\s*", re.IGNORECASE)
+_W_NUM = r"\d{1,2}(?:\.\d{1,2})?"
+_W_TIME = re.compile(
+    r"\s+(?:(?:from|at)\s+(?:min\s*)?(?P<t1>\d{1,3})(?:\s*min)?(?:\s+to\s+(?:min\s*)?(?P<t2>\d{1,3})(?:\s*min)?)?"
+    r"|for\s+(?P<dur>\d{1,3})(?:\s*min)?)$"
+)
+_W_SPEED = re.compile(rf"(?P<v>{_W_NUM})\s*mph\b")
+_W_INCLINE = re.compile(rf"(?P<v>{_W_NUM})\s*(?:%|incline\b)(?:\s*incline\b)?|incline\s+(?:of\s+|at\s+)?(?P<w>{_W_NUM})\s*%?")
+_W_SLASH = re.compile(rf"^(?P<s>{_W_NUM})\s*/\s*(?P<i>{_W_NUM})$")
+_W_FILLER = re.compile(r"^(?:[/,@&]|and|at|with|mph|incline|%|\s)*$")
+WALK_SPEED_MPH = (0.5, 12.0)  # a treadmill belt's plausible walking-to-running range; outside it the pair is not a speed
+WALK_INCLINE_PCT = (-3.0, 30.0)
+
+
+def _walk_segment(segment: str, treadmill: bool) -> dict[str, Any] | None:
+    """One "<speed> / <incline>" segment as {speed_mph, incline_pct, start?, end?, duration?}, or None when it is not one.
+    A bare "3 / 1" needs the machine to be a treadmill (or a decimal) — on a bike "8/12" is his level alternation."""
+    s = _normalise(segment)
+    time: dict[str, int] = {}
+    tm = _W_TIME.search(s)
+    if tm:
+        if tm.group("t1") is not None:
+            time["start"] = int(tm.group("t1"))
+            if tm.group("t2") is not None:
+                time["end"] = int(tm.group("t2"))
+        else:
+            time["duration"] = int(tm.group("dur"))
+        s = s[: tm.start()].strip()
+    speed = incline = None
+    rest = s
+    sm = _W_SPEED.search(rest)
+    if sm:
+        speed = float(sm.group("v"))
+        rest = rest[: sm.start()] + " " + rest[sm.end() :]  # noqa: E203
+    im = _W_INCLINE.search(rest)
+    if im:
+        incline = float(im.group("v") or im.group("w"))
+        rest = rest[: im.start()] + " " + rest[im.end() :]  # noqa: E203
+    rest = rest.strip()
+    if speed is None and incline is None:
+        m = _W_SLASH.match(rest)
+        if not m or not (treadmill or "." in rest):
+            return None
+        speed, incline, rest = float(m.group("s")), float(m.group("i")), ""
+    elif speed is None or incline is None:
+        # one side named its unit; the other is the bare number left over ("3.3 / 1.5 incline" -> 3.3 is the speed)
+        m = re.fullmatch(rf"(?:[/,@&]|and|at|with|\s)*(?P<v>{_W_NUM})(?:[/,@&]|and|at|with|\s)*", rest)
+        if not m:
+            return None
+        if speed is None:
+            speed = float(m.group("v"))
+        else:
+            incline = float(m.group("v"))
+        rest = ""
+    if not _W_FILLER.match(rest):
+        return None
+    if not (WALK_SPEED_MPH[0] <= speed <= WALK_SPEED_MPH[1]) or not (WALK_INCLINE_PCT[0] <= incline <= WALK_INCLINE_PCT[1]):
+        return None
+    return {"speed_mph": num(f"{speed:g}"), "incline_pct": num(f"{incline:g}"), **time}
+
+
+def parse_walk(note: str | None, total_min: int | None = None, *, treadmill: bool = False) -> dict[str, Any]:
+    """His treadmill note as a structured shape on the session clock (#5374 box 3).
+
+    The same keys as `parse_note` (unit ``%``: the levels are inclines, so `grade` compares a performed walk with a
+    prescribed one), plus `segments` — each `{start, end, speed_mph, incline_pct}` — and `speed_mph` (the time-weighted
+    mean when every segment's minutes are known, else the first segment's). A segment that is not a speed/incline pair
+    is kept verbatim in `unparsed`; a note with none reads `status: none`. Deterministic, no model."""
+    text = (note or "").strip()
+    out: dict[str, Any] = {"version": WRIST_CLOCK_VERSION, "status": "none", "raw": text, "unparsed": [], "grammar": "walk"}
+    if not text:
+        return out
+    segs: list[dict[str, Any]] = []
+    for seg in _WALK_SPLIT.split(text):
+        if not seg or not seg.strip():
+            continue
+        parsed = _walk_segment(seg, treadmill)
+        if parsed is None:
+            out["unparsed"].append(seg.strip())
+        else:
+            segs.append(parsed)
+    if not segs:
+        return out
+    # lay the segments on the clock: a segment with no start begins where the last one ended (minute 0 for the first);
+    # a segment with no end runs to the next one's start, or to the block's own minutes
+    cursor = 0
+    for i, sg in enumerate(segs):
+        sg["start"] = sg.get("start", cursor)
+        if "end" not in sg:
+            if "duration" in sg:
+                sg["end"] = sg["start"] + int(sg.pop("duration"))
+            else:
+                nxt = next((x.get("start") for x in segs[i + 1 :] if x.get("start") is not None), None)
+                sg["end"] = nxt if nxt is not None else (int(total_min) if total_min else None)
+        sg.pop("duration", None)
+        cursor = sg["end"] if sg["end"] is not None else sg["start"]
+    clauses = [{"type": "hold", "value": sg["incline_pct"], "unit": "%", "start": sg["start"], "end": sg["end"]} for sg in segs]
+    out.update(resolve(clauses, total_min))
+    timed = [sg for sg in segs if sg["end"] is not None and sg["end"] > sg["start"]]
+    if len(timed) == len(segs) and timed:
+        mins = sum(sg["end"] - sg["start"] for sg in timed)
+        out["speed_mph"] = round(sum(sg["speed_mph"] * (sg["end"] - sg["start"]) for sg in timed) / mins, 1)
+    else:
+        out["speed_mph"] = segs[0]["speed_mph"]
+    inclines = sorted({sg["incline_pct"] for sg in segs})
+    out["levels"] = out.get("levels") or inclines
+    out["base_level"], out["top_level"] = out["levels"][0], out["levels"][-1]
+    if out.get("mean_level") is None:
+        out["mean_level"] = round(sum(inclines) / len(inclines), 1)
+    out["segments"] = [{k: sg[k] for k in ("start", "end", "speed_mph", "incline_pct")} for sg in segs]
+    out["speeds"] = sorted({sg["speed_mph"] for sg in segs})
+    out["unit"] = "%"
+    pairs = {(sg["speed_mph"], sg["incline_pct"]) for sg in segs}
+    out["status"] = "shaped" if len(pairs) > 1 else "steady"
     return out
 
 

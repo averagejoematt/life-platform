@@ -353,12 +353,11 @@ def served_levels(routines: list[Any] | None) -> dict[str, dict[str, dict[str, A
             if key not in cardio_note.MACHINES or key == TREADMILL:
                 continue
             note = str(getattr(ex, "notes", "") or "")
-            m = cardio_note.LINE1_RE.match(note.strip().split("\n", 1)[0])
-            kind = cardio_note.composed_kind(note)
-            if not m or not m.group("level") or kind not in KINDS:
+            facts = cardio_note.read_line1(note)
+            kind = (facts or {}).get("kind")
+            if not facts or facts.get("level") is None or facts.get("base_level") is None or kind not in KINDS:
                 continue
-            level = int(m.group("level"))
-            base = level - TEMPO_LEVEL_STEP if kind == "tempo" else level
+            level, base = int(facts["level"]), int(facts["base_level"])
             if base < 1:
                 continue
             out.setdefault(hid, {})[key] = {"machine": key, "kind": kind, "level": level, "base_level": base}
@@ -616,16 +615,33 @@ def history_context(
 
 # ── the dose ──────────────────────────────────────────────────────────────────────────
 def walk_dose_of(session: dict[str, Any]) -> dict[str, Any] | None:
-    """(incline %, mph) of one performed treadmill walk: incline from his note, speed from distance/time
-    (falls back to none when either is missing)."""
-    m = _INCLINE_RE.search(session.get("note") or "")
+    """(incline %, mph) of one performed treadmill walk, or None when neither his note nor the log gives both.
+
+    #5428 / #5374 box 3: his own grammar is read first (`wrist_clock.parse_walk`: "3.3 / 1.5 incline", "3.3 mph 1.5
+    incline", "1.5 incline at 3mph", a change "4.0 / 3 from 20"): the first segment's grade and speed are the walk's,
+    and `from_note` is True. Failing that, the grade from his note and the speed from distance / time, as before."""
+    from training import wrist_clock
+
+    note = session.get("note") or ""
+    date = str(session.get("date") or "")[:10]
+    walk = wrist_clock.parse_walk(note, treadmill=True) if note else None
+    if walk and walk["status"] != "none":
+        seg = walk["segments"][0]
+        return {
+            "date": date,
+            "incline_pct": float(seg["incline_pct"]),
+            "mph": round(float(seg["speed_mph"]), 1),
+            "from_note": True,
+            "segments": walk["segments"],
+        }
+    m = _INCLINE_RE.search(note)
     try:
         mph = round(float(session["distance_m"]) / _M_PER_MI / (float(session["duration_sec"]) / 3600.0), 1)
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         mph = None
     if not m or mph is None:
         return None
-    return {"date": str(session.get("date") or "")[:10], "incline_pct": float(m.group(1) or m.group(2)), "mph": mph}
+    return {"date": date, "incline_pct": float(m.group(1) or m.group(2)), "mph": mph, "from_note": False}
 
 
 def _clip(v: float, lo: float, hi: float) -> float:
@@ -702,13 +718,14 @@ def speed_at_level(facts: dict[str, Any] | None, level: int | None) -> float | N
 
 
 def bike_dose(kind: str, facts: dict[str, Any] | None, verdict: dict[str, Any] | None, *, constrained: bool = False) -> dict[str, Any]:
-    """{level, hold_level, mph, reason} for a bike-type block. Progression is the verdict's: same RPE at a
+    """{level, hold_level, steady, mph, reason} for a bike-type block. Progression is the verdict's: same RPE at a
     higher level only on a `raise` (his speed at the level cleared his own within-level spread).
 
-    One step per block, never two. A `raise` verdict moves the EASY block only (baseline + 1). A tempo
-    block's step IS its dose: tempo = baseline + `TEMPO_LEVEL_STEP`, where the baseline is the held
-    level (the last ride's), so a tempo day after a raise is still one level above the last ride
-    (last_level 11 + raise -> easy 12, tempo 12, never 13). Intervals and hills ride the baseline."""
+    One step per block, never two. A `raise` verdict moves the EASY block only (baseline + 1). #5428: a hard block is
+    built on his LOGGED steady level (`cardio_note.steady_level`, the median of his last single-level rides; the held
+    level when none is on record), never on one ride's level and never on the top of a ramp: tempo = steady +
+    `TEMPO_LEVEL_STEP` (his 10-23 "tempo" at L11 was his easy), intervals and hills ride the steady level (the interval's
+    easy and hard levels are `cardio_note`'s, around it). `mph` stays in the audit only: a bike's speed is an output."""
     from training import cardio_note
 
     level, hold = cardio_note.prescribed_level(facts, verdict, constrained=constrained)
@@ -716,21 +733,24 @@ def bike_dose(kind: str, facts: dict[str, Any] | None, verdict: dict[str, Any] |
         return {
             "level": None,
             "hold_level": None,
+            "steady": None,
             "mph": None,
             "reason": "no level on the record: pick the level that gives the RPE, and log it",
         }
+    steady = cardio_note.steady_level(facts)
+    steady = hold if steady is None else steady
     mph = speed_at_level(facts, hold)
     if level != hold:
         reason = f"+1 level: {(verdict or {}).get('basis')} — same RPE, one level up"
     else:
         reason = ""
     if kind == "tempo":
-        level = hold + TEMPO_LEVEL_STEP  # the tempo step is the dose; a raise never stacks on it
-        reason = f"tempo rides {TEMPO_LEVEL_STEP} level above your last ride (platform-chosen)"
+        level = steady + TEMPO_LEVEL_STEP  # the tempo step is the dose; a raise never stacks on it
+        reason = f"tempo = your steady L{steady} + {TEMPO_LEVEL_STEP}"
     elif kind in ("intervals", "hills"):
-        level = hold  # a harder shape never rides a raised level: the raise and the shape are one step each
+        level = steady  # a harder shape never rides a raised level: the raise and the shape are one step each
         reason = ""
-    return {"level": level, "hold_level": hold, "mph": mph, "reason": reason}
+    return {"level": level, "hold_level": hold, "steady": steady, "mph": mph, "reason": reason}
 
 
 # ── movement minutes ──────────────────────────────────────────────────────────────────

@@ -78,8 +78,8 @@ def test_the_menu_covers_every_charter_block_and_names_the_incline_walk_the_defa
 
 
 def test_every_block_carries_a_dose_and_an_rpe_or_talk_test_target():
-    """Every kind on every machine it lists: line 1 matches the grammar, carries level + mph (bike) or
-    incline + mph (treadmill), and an RPE number; never a bare modality."""
+    """Every kind on every machine it lists: line 1 matches the grammar, carries a level (a bike, rower, elliptical — #5428:
+    never its speed, an output under the iPad) or incline + mph (treadmill), and an RPE number; never a bare modality."""
     tread = _live_cardio_index()[TREADMILL_TID]
     offenders = []
     for kind in cm.KINDS:
@@ -94,19 +94,18 @@ def test_every_block_carries_a_dose_and_an_rpe_or_talk_test_target():
             )
             line1 = note.split("\n")[0]
             m = cn.LINE1_RE.match(line1)
-            dosed = m and ((m.group("level") and m.group("mph")) or (m.group("incline") and m.group("walk_mph")))
-            if not (dosed and re.search(r"\bRPE \d", line1) and audit["kind"] == kind and len(note.split("\n")) <= 2):
+            walk = machine == cm.TREADMILL
+            dosed = m and ((m.group("level") and not walk and "mph" not in note) or (walk and m.group("incline") and m.group("walk_mph")))
+            if not (dosed and re.search(r"\bRPE \d", line1) and audit["kind"] == kind and len(note.split("\n")) <= 3):
                 offenders.append(f"{kind}/{machine}: {line1!r}")
     assert not offenders, "\n".join(offenders)
 
 
-def test_the_bike_carries_level_speed_and_rpe():
-    note = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts())[0]
+def test_the_bike_carries_level_and_rpe_and_keeps_its_speed_in_the_audit():
+    note, audit = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts())
     lo, hi = tc.charter_value("cardio_menu.blocks.easy.rpe")
-    assert (
-        note.split("\n")[0]
-        == f"Recumbent bike · 30 min · level 11 at 13.4 mph flat · level 11 for 30 · check in every 10 min · RPE {lo}–{hi}, full sentences"
-    )
+    assert note == f"Recumbent · L11 · RPE {lo}–{hi} (full sentences)"
+    assert audit["mph"] == 13.4  # his speed at the level: on the record, never on the wire (#5428)
 
 
 def test_the_numbers_are_read_from_the_charter_not_restated(monkeypatch):
@@ -159,10 +158,10 @@ def test_a_raise_verdict_moves_the_bike_one_level_and_writes_why():
     note, audit = cn.compose(
         movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts(), verdict=verdict
     )
-    assert note.split("\n")[0].startswith(
-        "Recumbent bike · 30 min · level 12 at 13.4 mph flat · level 12 for 30 · check in every 10 min · RPE "
-    )
-    assert f"+1 level: {verdict['basis']} — same RPE, one level up." in note.split("\n")[1]
+    assert note.split("\n")[0].startswith("Recumbent · L12 · RPE ")
+    # #5428: the reason is the audit's (the chat tells the story), never a tail on the wire
+    assert audit["dose_reason"] == f"+1 level: {verdict['basis']} — same RPE, one level up"
+    assert "\n" not in note
     assert audit["level"] == 12 and audit["hold_level"] == 11
 
 
@@ -282,7 +281,7 @@ def test_the_no_push_gate_is_retired_from_the_ruling_day_and_the_hr_half_stays()
             hr_ceiling_bpm=120,
         )
         assert audit["kind"] == kind and audit["no_push_gate"] is False
-        assert "No push" not in note and "bpm" not in note and "no HR target" in note
+        assert "No push" not in note and "bpm" not in note and "HR" not in note  # #5428: RPE + talk test lead
 
 
 def test_the_retirement_names_nothing_medical():
@@ -327,9 +326,9 @@ def test_the_draft_path_appends_the_menus_block_with_its_dose_and_movement_minut
     assert cardio.movement_key == "treadmill" and cardio.rationale_tag == "cardio:treadmill:menu:incline_treadmill_walk"
     minutes = tc.charter_value("split.session_minutes.cardio_block_max")
     assert [s.duration_seconds for s in cardio.sets] == [minutes * 60]
-    assert cardio.notes.split("\n")[0].startswith(
-        f"Treadmill · {minutes} min · incline 8% at 2.8 mph walk · 8% for {minutes} · check in every 10 min · RPE "
-    )
+    # #5428: the speed and grade are settings, so they are prescribed — `today`, because his own logged walks (his
+    # usual, 0.5-1.5 % at 3.0 mph) differ from the menu's band; no minutes on line 1 (the set row shows them)
+    assert cardio.notes.split("\n")[0].startswith("Treadmill · today 2.8 mph, 8% · RPE ")
     assert out["cardio_block"]["pick"]["menu"]["kind"] == "incline_treadmill_walk"
     plan = ideal.inputs_snapshot["cardio_plan"]
     assert plan["movement_minutes"] == minutes == out["cardio_block"]["movement_minutes"]
@@ -346,7 +345,7 @@ def test_the_draft_path_with_no_history_starts_the_week_on_conditioning(monkeypa
     # #5201: the menu names 40, the split caps one cardio block at 30 — the block is the capped one and its note
     # drops the label that would claim 40
     assert [s.duration_seconds for s in block.sets] == [tc.charter_value("split.session_minutes.cardio_block_max") * 60]
-    assert "tempo: RPE" in block.notes and "hard flat 40" not in block.notes
+    assert "RPE 6–7 (short phrases)" in block.notes and "hard flat 40" not in block.notes and " min ·" not in block.notes
 
 
 # ── movement minutes ──────────────────────────────────────────────────────────────────

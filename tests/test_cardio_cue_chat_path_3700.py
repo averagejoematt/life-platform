@@ -212,7 +212,8 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     assert bike.notes == want
     # the level is still DERIVED from the last ride (level 15, 19 Sep) — the "Last: …" sentence is not printed
     # (#5076: line 1's level is the placed kind's — a tempo rides one above — so the HELD level is the derivation)
-    assert bike.notes.startswith("Recumbent bike · 45 min · level ") and "hold level 15" in bike.notes
+    # #5428: line 1 is "Recumbent · L<n> · RPE …" (no minutes, no speed, no recovery answer); the held level is the audit's
+    assert bike.notes.startswith("Recumbent · L") and ir.inputs_snapshot["cardio_notes"][0]["hold_level"] == 15
     assert "Last:" not in bike.notes
     # the strength block is untouched by the cardio arm — it never reaches a barbell; the only clause on
     # the bench is #5049's warm-up movement cue (a 155 lb bench gets the climb), never on the cardio block
@@ -236,9 +237,9 @@ def test_a_chat_drafted_treadmill_block_gets_its_OWN_shape_not_the_bikes():
     tread = next(b for b in ir.exercises if b.movement_key == "treadmill")
     # #5076: the incline walk's dose — his steepest walk on record (6 % at 2.8 mph, 23 Jun) sits under the
     # menu's band, so the walk starts at the band's floor incline at that speed
-    assert tread.notes.split("\n")[0] == (
-        "Treadmill · 60 min · incline 8% at 2.8 mph walk · 8% for 60 · check in every 10 min · RPE 4–6, full sentences, average HR ≤ 120 bpm"
-    )
+    # #5428: speed and grade prescribed (settings), `today` because his own logged walks differ; no HR on the wire
+    assert tread.notes.split("\n")[0] == "Treadmill · today 2.8 mph, 8% · RPE 4–6 (full sentences)"
+    assert "bpm" not in tread.notes and "HR" not in tread.notes
     assert cn.LINE1_RE.match(tread.notes.split("\n")[0])
     assert "level" not in tread.notes.lower()  # no level exists in his treadmill notes; none may be implied
     assert out["cardio_cues"] == 1
@@ -256,7 +257,7 @@ def test_the_authors_own_note_is_replaced_by_the_prescription_and_kept_on_the_sn
         [{"movement_key": "cycling", "notes": "Level 10 flat, 40 min, hold 115-120 bpm", "sets": [{"duration_seconds": 2400}]}]
     )
     bike = ir.exercises[0]
-    assert bike.notes.startswith("Recumbent bike · 40 min · level 15 ")  # the author's "flat" stands: an easy block
+    assert bike.notes.startswith("Recumbent · L15 · RPE 4–5 (full sentences)")  # the author's "flat" stands: an easy block
     assert "hold 115-120 bpm" not in bike.notes
     rep = ir.inputs_snapshot["cardio_notes_replaced"]
     assert [(r["movement_key"], r["notes"]) for r in rep] == [("cycling", "Level 10 flat, 40 min, hold 115-120 bpm")]
@@ -293,7 +294,7 @@ def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():
                 "exercises": [{"movement_key": "cycling", "sets": [{"duration_seconds": 2700}]}],
             }
         )
-    assert persisted["notes"][0].startswith("Recumbent bike · 45 min · level ") and "hold level 15" in persisted["notes"][0]
+    assert persisted["notes"][0].startswith("Recumbent · L") and cn.LINE1_RE.match(persisted["notes"][0].split("\n")[0])
 
 
 def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count():
@@ -424,8 +425,8 @@ def test_the_chat_path_inherits_the_refusal_rather_than_re_deciding_it():
     indexes = _indexes([_ride("2026-09-07", "Level 9 - 5.6 miles", 1800.0, 9012.0)])
     _, ir = _draft_custom([{"movement_key": "cycling", "sets": [{"duration_seconds": 1800}]}], indexes=indexes)
     note = ir.exercises[0].notes
-    assert "hold level 9" in note  # held at the ride's level, never raised at n=1
+    assert ir.inputs_snapshot["cardio_notes"][0]["hold_level"] == 9  # held at the ride's level, never raised at n=1
     assert ir.inputs_snapshot["cardio_notes"][0]["verdict"] == "insufficient_n"
-    # "hold level 9" is now the recovery instruction (#5048), not a progress claim — every other claim word stays banned
-    for banned in [w for w in CLAIM_WORDS if w != "hold level"]:
+    # #5428: no recovery answer on the wire any more, so no claim word at all reaches it
+    for banned in CLAIM_WORDS:
         assert banned not in note.lower(), (banned, note)

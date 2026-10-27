@@ -191,7 +191,7 @@ def test_the_nightly_draft_doses_from_the_prescribed_level(monkeypatch):
     block, audit = _cardio(ideal)
     assert block.movement_key == "cycling", block.notes
     assert audit["hold_level"] == 12 and audit["level_basis"] == PRESCRIBED_BASIS
-    assert f" level {audit['level']} " in block.notes.split("\n")[0]
+    assert f" L{audit['level']} " in block.notes.split("\n")[0]  # #5428 line 1: "Recumbent · L12 · RPE …"
 
 
 def test_the_live_tempo_ride_is_read_at_its_base(monkeypatch):
@@ -204,8 +204,11 @@ def test_the_live_tempo_ride_is_read_at_its_base(monkeypatch):
 
 def test_MUTATION_CONTROL_with_the_routine_read_failing_the_calibration_comes_back(monkeypatch):
     """Executed: the same 10-24 draft with the routine read failing (fail-soft). The ride is read from its empty note
-    alone and the dose falls through to the June calibration span — the live defect, byte for byte."""
+    alone, so the prescription's 12 is lost. Before #5428 the dose fell through to the June calibration span (10) — the
+    live defect; since #5428 it falls to his logged steady level (the median of his last single-level rides) first, and
+    reaches the calibration only when no single-level ride is on record (`test_steady_level_*` in
+    test_cardio_steady_level_5428.py)."""
     ideal, _out = _predraft(monkeypatch, archetype="upper", role="shoulders_arms", layer=FRESH, routines_fail=True)
     _block_, audit = _cardio(ideal)
-    assert audit["level_basis"] == "his calibration note's easy span" and audit["hold_level"] == 10
+    assert audit["level_basis"].startswith("his logged steady level") and audit["hold_level"] == 10  # not the prescription's 12
     assert len(LIVE_ITEMS) == 6  # the harness's live week, unchanged
