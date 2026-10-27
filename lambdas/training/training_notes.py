@@ -189,6 +189,9 @@ _EQUIPMENT_KW = [
 ]
 _LOGGING_QUIRK_KW = ["equals", "= ", " steps", "yards", "easier to count", "to count", "logged as", "log it as"]
 _FORM_KW = ["balance", "form", "technique", "depth", "range of motion", "rom", "clicked", "felt off", "tempo", "cadence"]
+# #5428: whole words only — a bare substring "rom" fired on every "from" (his "4.0 / 3 from 20" treadmill change read as
+# a form note) and "form" on "platform"/"perform"; ROM is the abbreviation only when it stands alone
+_FORM_RE = re.compile(r"\b(?:" + "|".join(re.escape(k) for k in _FORM_KW) + r")\b")
 _LIMITER_KW = ["gave out", "gave way", "failed", "couldn't", "couldnt", "before strength", "limited by", "ran out of", "grip gave"]
 _SENTIMENT_POS = ["enjoyed", "loved", "fun", "felt strong", "felt great", "great session", "liked it", "good session"]
 _SENTIMENT_NEG = ["hated", "miserable", "felt weak", "rough", "awful", "disliked"]
@@ -544,7 +547,7 @@ def deterministic_pass(note_text: str, date=None, user: str = "matthew") -> list
         out.append(_signal("equipment_setup", "equipment/setup change", 0.85, {"detail": detail}))
 
     # form_technique
-    if any(k in t for k in _FORM_KW):
+    if _FORM_RE.search(t):
         out.append(_signal("form_technique", "technique/cue state", 0.7, {"cue": "balance" if "balance" in t else "form"}))
 
     # limiter

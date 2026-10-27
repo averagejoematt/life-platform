@@ -181,19 +181,24 @@ def _authored_top(sets: list[Any] | None, rep_range: tuple[int, int] | None) -> 
     return (max(loads) if loads else 0.0), (rep_range[0] if rep_range else 0)
 
 
-def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> list[dict[str, Any]]:
+def attach_step_due(
+    ir: Any, catalog: dict[str, Any], history_reader=None, *, write_notes: bool = True, index: dict[str, list] | None = None
+) -> list[dict[str, Any]]:
     """#5057: the chat draft names the stall rule's step on every block where it is due.
 
     The generator APPLIES the step (`routine_generator._progress_block` → `load_progression`);
     draft_custom's loads are the caller's, verbatim (ADR-069), so here the step is reported, not
     written: a block authored below it gets the reason in its exercise note, and every due step
     is returned for the response and recorded in `inputs_snapshot.step_due`. Same rule, same
-    numbers (`load_progression.stall_step`). Fail-soft: a failed read is named, never a lost draft."""
+    numbers (`load_progression.stall_step`). Fail-soft: a failed read is named, never a lost draft.
+
+    #5428: `finish_custom_draft` passes `write_notes=False` and its one history read (`index`) — the note composer
+    (`compose_custom_notes`) then writes the step in the standard's grammar, and records the line it wrote as `wire_line`."""
     try:
         from training import load_progression as lp
         from training.load_ramp import _rep_range_of
 
-        index = (history_reader or _history_index)()
+        index = index if index is not None else (history_reader or _history_index)()
         rows: list[dict[str, Any]] = []
         for b in ir.exercises or []:
             key = str(getattr(b, "movement_key", "") or "")
@@ -205,7 +210,7 @@ def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> li
                 continue
             load_kg, reps = _authored_top(b.sets, _rep_range_of(b.sets))
             carried = load_kg >= step["next_load_kg"] - lp.LOAD_TOLERANCE_KG and reps >= int(step["next_reps"] or 0)
-            if not carried:
+            if not carried and write_notes:
                 b.notes = f"Step due: {step['reason']}. {b.notes}".strip()  # #5083: the step LEADS the note
             rows.append({"movement_key": key, "carried": carried, **step})
         ir.inputs_snapshot["step_due"] = rows
@@ -216,14 +221,90 @@ def attach_step_due(ir: Any, catalog: dict[str, Any], history_reader=None) -> li
         return []
 
 
-def finish_custom_draft(ir: Any, catalog: dict[str, Any], args: dict[str, Any]) -> dict[str, Any]:
+def _history_failsoft(history_reader=None) -> tuple[dict[str, list] | None, str | None]:
+    try:
+        return (history_reader or _history_index)(), None
+    except Exception as e:  # noqa: BLE001 — named on the draft, never a lost draft
+        return None, f"{type(e).__name__}: {e}"[:200]
+
+
+def _step_floors(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """The step rows as the composer's `load_floors` shape: a carried load step is the gain rule's change (`Heavier: …`);
+    one authored below it is `authored_below` (`Step due: +5 lb, …`); a rep step reads `Now aiming …` either way."""
+    out: dict[str, Any] = {}
+    for r in rows:
+        prog = {k: v for k, v in r.items() if k not in ("movement_key", "carried")}
+        prog["changes"] = bool(r.get("carried")) and r.get("step_kind") == "load"
+        prog["authored_below"] = not r.get("carried")
+        out[str(r.get("movement_key"))] = {"progression": prog}
+    return {"movements": out}
+
+
+def compose_custom_notes(
+    ir: Any, catalog: dict[str, Any], index: dict[str, list] | None, step_rows: list[dict[str, Any]] | None
+) -> dict[str, Any]:
+    """#5428: the chat draft's lift notes, composed to the Hevy note standard by the SAME composer the generator runs
+    (`lift_note.compose_blocks`) — effort first, one reason, one cue. The author's own lines that already read as the
+    standard are kept (`lift_note.authored_lines`: an effort line, one clean reason or cue); everything else the author
+    wrote is kept on `inputs_snapshot.lift_notes[...].detail`, and each rewritten note is listed in
+    `inputs_snapshot.lift_notes_replaced` for the response's warnings. Cardio, mobility and timed blocks are untouched
+    (the cardio composer owns them). Fail-soft: a composer error leaves the authored notes and says so."""
+    try:
+        from training import lift_note
+
+        lifts = [b for b in ir.exercises or [] if not lift_note._skip(b)]
+        before = {id(b): str(b.notes or "") for b in lifts}
+        authored = {str(b.movement_key): lift_note.authored_lines(b.notes) for b in lifts}
+        record = lift_note.compose_blocks(
+            list(ir.exercises or []),
+            catalog,
+            load_floors=_step_floors([r for r in step_rows or [] if isinstance(r, dict)]),
+            history_index=index or {},
+            target_date=ir.target_date,
+            authored=authored,
+        )
+        ir.inputs_snapshot.update(record)
+        ir.inputs_snapshot["lift_notes_replaced"] = [
+            {"movement_key": str(b.movement_key), "notes": before[id(b)]}
+            for b in lifts
+            if before[id(b)].strip() and before[id(b)].strip() not in str(b.notes or "").split("\n")
+        ]
+        for r in step_rows or []:
+            line = ((record["lift_notes"].get(str(r.get("movement_key"))) or {}).get("reason_line")) or ""
+            r["wire_line"] = line if line.startswith(("Now aiming", "Step due", "Heavier")) else None
+        return record
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"draft_custom: note composer failed ({e}); authored notes untouched")
+        ir.inputs_snapshot["lift_notes"] = {"status": "failed", "error": str(e)[:200]}
+        return {}
+
+
+def lift_note_warnings(ir: Any) -> list[str]:
+    """One warning per authored lift note the composer rewrote (`inputs_snapshot.lift_notes_replaced`)."""
+    return [
+        f"Rewrote your {r.get('movement_key')} note to the Hevy note standard ({str(r.get('notes') or '')[:80]!r}); "
+        "the original is kept on the draft's inputs_snapshot.lift_notes."
+        for r in (getattr(ir, "inputs_snapshot", None) or {}).get("lift_notes_replaced") or []
+    ]
+
+
+def finish_custom_draft(ir: Any, catalog: dict[str, Any], args: dict[str, Any], history_reader=None) -> dict[str, Any]:
     """The draft_custom passes that run after the content-derived id and before `draft_versioned`,
-    in order — the slot tags (#5005), the warm-up climb (#5049), the stall rule's step (#5057) —
-    returned as the response's `warmup_sets` / `program_slot` / `step_due` fields."""
+    in order — the slot tags (#5005), the warm-up climb (#5049), the stall rule's step (#5057), and the
+    lift-note composer (#5428) — returned as the response's `warmup_sets` / `program_slot` / `step_due` fields.
+    One history read serves the step and the composer."""
     ir.inputs_snapshot["departure_reason"] = departure_reason(args)  # #5055: on the IR, so the spec-ledger row carries it
     program_slot = stamp_program_slot(ir)
     warmups = attach_draft_warmups(ir, catalog, args)
-    return {"warmup_sets": (warmups or {}).get("warmup_sets", 0), "program_slot": program_slot, "step_due": attach_step_due(ir, catalog)}
+    index, failed = _history_failsoft(history_reader)
+    if failed:
+        logger.warning(f"draft_custom: history read failed ({failed}); step and note composer read no PREVIOUS")
+        ir.inputs_snapshot["step_due"] = {"status": "failed", "error": failed}
+        steps: list[dict[str, Any]] = []
+    else:
+        steps = attach_step_due(ir, catalog, write_notes=False, index=index)
+    compose_custom_notes(ir, catalog, index, steps)
+    return {"warmup_sets": (warmups or {}).get("warmup_sets", 0), "program_slot": program_slot, "step_due": steps}
 
 
 MIN_REASON_CHARS = 12

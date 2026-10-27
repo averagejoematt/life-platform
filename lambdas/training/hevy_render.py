@@ -81,12 +81,12 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
     },
     {
         "field": "rotation_note",
-        "issue": "#5075",
-        "producer": "none yet (#5075 deferred)",
-        "home": DEFERRED,
-        "wire": "routine.exercises[].notes (planned)",
-        "shows": "that exercise's Pinned Routine Note (planned)",
-        "fallback": "when built: leads the note after the progression reason",
+        "issue": "#5075 #5428",
+        "producer": "lift_note.rotation_line (from variant_rotation.swaps)",
+        "home": NOTE,
+        "wire": "routine.exercises[].notes",
+        "shows": "the rotated-in exercise's Pinned Routine Note, line 2 ('New: replaces X.')",
+        "fallback": "no rotation field on the routine wire; the reason line after the effort line (slot id and week stay in the rationale)",
     },
     {
         "field": "cardio_level",
@@ -171,11 +171,11 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
     },
     {
         "field": "minimum_session",
-        "issue": "#5088",
+        "issue": "#5088 #5428",
         "producer": "disruption.to_routine",
         "home": NOTE,
         "wire": "routine.exercises[0].notes (head) + routine.exercises[].notes",
-        "shows": "the session line and each exercise's 'Minimum:' cue",
+        "shows": "the session block's 'Minimum · ' / 'Travel · ' session line on exercise 1",
         "fallback": "the title is the convention's at commit (Phase - Type - N - Y); the label rides the session line",
     },
     {
@@ -198,7 +198,14 @@ _LEAD = r"(?:^|(?<=\. ))"
 _PROGRESSION_RE = re.compile(_LEAD + r"(?:\+\d+(?:\.\d+)? lb to \d|\+\d+ reps? to \d|hold(?::| \d)|floor \d|re-entry:)", re.M)
 _STALL_RE = re.compile(_LEAD + r"(?:Step due: )?\+\d+(?:\.\d+)? (?:lb|reps?) to [^\n]*self-reported RPE", re.M)
 _RPE_RE = re.compile(r"\bRPE \d")
-_MINIMUM_PREFIX = "Minimum:"  # disruption._cue's lead word
+_MINIMUM_PREFIX = "Minimum:"  # disruption._cue's lead word before #5428 (kept readable for an older draft)
+# #5428: the disruption routine's session line (`disruption.POOL_DAY` as the session block's ‹Day›)
+_MINIMUM_LINE_RE = re.compile(r"^(?:Minimum|Travel) · ", re.M)
+# #5083/#5428: a rotated accessory's reason line (`lift_note.rotation_line`)
+_ROTATION_RE = re.compile(r"^New: replaces ", re.M)
+# #5428: the standard's reason grammar (`lift_note.reason_line`, the chat path's step line) — line 2, after the effort line
+_STANDARD_REASON_RE = re.compile(r"^(?:Heavier|Lighter|Volume day|Now aiming \d+–\d+|No jumps(?: today)?|Step due): ", re.M)
+_EFFORT_LINE_RE = re.compile(r"^RPE \d")
 
 
 def _routine(body: dict[str, Any]) -> dict[str, Any]:
@@ -219,7 +226,13 @@ def _hit(where: str, offset: int, leads: bool = True) -> dict[str, Any]:
 
 
 def _reason_field(text: str) -> str:
-    return "stall_step" if _STALL_RE.match(text) else "progression_reason"
+    return "stall_step" if (_STALL_RE.match(text) or text.startswith(("Now aiming ", "Step due: "))) else "progression_reason"
+
+
+def _leads_after_effort(own: str, start: int) -> bool:
+    """#5428: the standard puts the effort on line 1 and the one reason on line 2 — a reason there LEADS its note."""
+    before = own[:start].rstrip("\n").split("\n")
+    return len(before) == 1 and bool(_EFFORT_LINE_RE.match(before[0]))
 
 
 def _leads_with_prescription(line: str) -> bool:
@@ -244,15 +257,28 @@ def expected_reasons(ir: Any) -> list[dict[str, str]]:
     every chat-draft step authored below the stall step (`inputs_snapshot.step_due`, #5057)."""
     snap = getattr(ir, "inputs_snapshot", None) or {}
     out: list[dict[str, str]] = []
+    # #5428: once the note composer ran, the wire carries ITS reason line (the standard's grammar), not the engine's audit text
+    composed = snap.get("lift_notes") if isinstance(snap.get("lift_notes"), dict) else None
     for key, mv in ((snap.get("load_floors") or {}).get("movements") or {}).items():
         prog = (mv or {}).get("progression") or {}
         if prog.get("changes") and prog.get("reason"):
+            if composed is not None and key in composed:
+                line = (composed[key] or {}).get("reason_line")
+                if line and (composed[key] or {}).get("reason") != "rotation":
+                    out.append({"field": _reason_field(line), "movement_key": key, "text": line})
+                continue
             out.append({"field": _reason_field(prog["reason"]), "movement_key": key, "text": prog["reason"]})
+    for key, rec in (composed or {}).items():
+        if (rec or {}).get("reason") == "rotation" and rec.get("reason_line"):
+            out.append({"field": "rotation_note", "movement_key": key, "text": rec["reason_line"]})
     step_due = snap.get("step_due")
     rows: list[Any] = step_due if isinstance(step_due, list) else []
     for row in rows:
         if not row.get("carried") and row.get("reason"):
-            out.append({"field": "stall_step", "movement_key": str(row.get("movement_key")), "text": f"Step due: {row['reason']}"})
+            # #5428: on the chat path the note composer writes the step (`wire_line`; None = the author's own reason won)
+            text = row.get("wire_line") if "wire_line" in row else f"Step due: {row['reason']}"
+            if text:
+                out.append({"field": "stall_step", "movement_key": str(row.get("movement_key")), "text": text})
     return out
 
 
@@ -267,6 +293,16 @@ def _reason_hits(where: str, own: str, base: int) -> dict[str, list[dict[str, An
             taken.add(m.start())
             at = ", first line" if m.start() == 0 else f", char {m.start()}"
             out.setdefault(field, []).append(_hit(where + at, base + m.start(), leads=m.start() == 0))
+    for m in _STANDARD_REASON_RE.finditer(own):
+        if m.start() in taken:
+            continue
+        taken.add(m.start())
+        field = _reason_field(own[m.start() :])
+        out.setdefault(field, []).append(_hit(where + f", char {m.start()}", base + m.start(), leads=_leads_after_effort(own, m.start())))
+    for m in _ROTATION_RE.finditer(own):
+        out.setdefault("rotation_note", []).append(
+            _hit(where + f", char {m.start()}", base + m.start(), leads=_leads_after_effort(own, m.start()))
+        )
     return out
 
 
@@ -287,6 +323,8 @@ def _note_hits(i: int, own: str, base: int) -> dict[str, list[dict[str, Any]]]:
         out.update(_reason_hits(where, own, base))
     if own.startswith(_MINIMUM_PREFIX):
         out["minimum_session"] = [_hit(where + ", first line", base)]
+    elif i == 0 and (mm := _MINIMUM_LINE_RE.match(own)):
+        out["minimum_session"] = [_hit(where + ", session line", base + mm.start())]
     if not m and (rpe := _RPE_RE.search(own)):
         out["effort_ceiling"] = [_hit(where, base + rpe.start())]
     return out

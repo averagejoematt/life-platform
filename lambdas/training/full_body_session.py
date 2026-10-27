@@ -176,11 +176,24 @@ def _back_offs_then_warmups(
 
 
 def _compose_notes(
-    blocks: list[ExerciseBlock], load_catalog: dict[str, Any], load_floors: dict[str, Any], history_index: dict[str, list], target_date: str
+    blocks: list[ExerciseBlock],
+    load_catalog: dict[str, Any],
+    load_floors: dict[str, Any],
+    history_index: dict[str, list],
+    target_date: str,
+    rotation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record."""
+    """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record.
+    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`)."""
     movements = load_catalog.get("movements") or {}
-    return lift_note.compose_blocks(blocks, movements, load_floors=load_floors, history_index=history_index, target_date=target_date)
+    return lift_note.compose_blocks(
+        blocks,
+        movements,
+        load_floors=load_floors,
+        history_index=history_index,
+        target_date=target_date,
+        rotations=variant_rotation.swaps(rotation, movements),
+    )
 
 
 def _sequence_line(day_entry: dict[str, Any]) -> str:
@@ -343,7 +356,7 @@ def full_body_routines(
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date)
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],

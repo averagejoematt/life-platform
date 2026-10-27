@@ -986,6 +986,7 @@ def _run_stage_2(
     overrides: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     from coach import critic_overrides, critics
+    from training.cardio_note import apply_after_lines
     from training.routine_repo import put_versioned
 
     from mcp.hevy_prescription_gate import critic_set_floors
@@ -1068,6 +1069,7 @@ def _run_stage_2(
         record_correction=_record_override_correction,
     )
     changes = critics.apply_changes(ir, verdicts, set_floors=critic_set_floors(ir))  # #4149: held to the commit gate's floor
+    apply_after_lines(ir.exercises)  # #5428: a swap or drop moves what follows the cardio — re-stamp `After:` on the final order
     overridden = {v["critic"] for v in verdicts if critics.is_overridden(v)}
     rc = critics.recheck(ir, build, overridden=overridden)
     precheck = _validate_ir_for_hevy(ir)
