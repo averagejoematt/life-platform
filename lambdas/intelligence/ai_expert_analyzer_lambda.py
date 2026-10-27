@@ -1872,10 +1872,6 @@ def lambda_handler(event, context):
                 if _outage.tripped():  # #5412: vendor outage — the prior record keeps serving (renewed like a hold, #4703)
                     _held.renew_held(table, CACHE_PK, f"EXPERT#{expert_key}", _held.WEEKLY_TTL_DAYS)
 
-        # #4703: too many held reads to synthesize — the board-level records are held with them, so renew them.
-        if target == "all" and len(all_outputs) < 3 and any(r.get("status") == "skipped_empty" for r in results.values()):
-            for _sk, _d in _held.BOARD_RECORDS:
-                _held.renew_held(table, CACHE_PK, _sk, _d)
         # Synthesis pass — only when running all experts (never into a tripped vendor outage, #5412)
         if target == "all" and len(all_outputs) >= 3 and not _outage.tripped():
             try:
@@ -1908,6 +1904,15 @@ def lambda_handler(event, context):
             except Exception as e:
                 logger.error(f"Month-rollup failed: {e}")
                 results["month_rollup"] = {"status": "error", "error": str(e)}
+
+        # #4703: too many held reads to synthesize — the board-level records are held with them, so renew them.
+        # #5442: a vendor outage (#5412) skips or breaks the board stages too, before OR during them, so it renews
+        # the board records this run did not write — an outage used to renew every EXPERT#<domain> and let these expire.
+        _held_below_floor = len(all_outputs) < 3 and any(r.get("status") == "skipped_empty" for r in results.values())
+        if target == "all" and (_held_below_floor or _outage.tripped()):
+            for _sk, _d in _held.BOARD_RECORDS:
+                if results.get(_held.BOARD_RESULT_KEYS[_sk], {}).get("status") != "ok":
+                    _held.renew_held(table, CACHE_PK, _sk, _d)
 
         return _response(results)
     except Exception as e:
