@@ -15,7 +15,7 @@ Holds (each test iterates its whole set and reports every offender):
      elsewhere — N9 — gets the same list); THE KIT is the `pack` items over the trip plus spare days.
   4. THE PLAYBOOK states the charter's numbers, and every protein sum it claims is true arithmetic over the items.
   5. THE REMINDER: `calibration_row` is ok before the window, due (one prompt, a fixed key) inside it, the dead-man from
-     `ready_by` while the trip dates are unset, ok once they are set or the trip is past, unknown without a ready-by —
+     `ready_by` while the trip dates are unset, ok once they are set and ready_by has passed (a prompt before it) or the trip is past, unknown without a ready-by —
      every date derived from the charter's own values, no clock. Wired into `calibration_cadence.read`.
   6. DISRUPTION MODE reads the playbook on a travel template (active, or a travel window it offers), never on busy.
   7. THE MCP READ (`get_exercise_notes action='travel_kit'`) serves the kit and refuses a bad argument.
@@ -259,6 +259,7 @@ def test_the_reminder_is_due_before_mid_december_with_a_dead_man_and_no_clock():
     assert rows["before"]["prompt"] is None and rows["past"]["prompt"] is None
     dated = _reader(**{"travel.windows": [{"label": pol["window_label"], "start": "2026-12-20", "end": "2026-12-27"}]})
     assert tf.calibration_row(ready.isoformat(), read=dated)["state"] == cc.OK, "dates set: the kit is sized, no dead-man"
+    assert tf.calibration_row(due.isoformat(), read=dated)["state"] == cc.DUE, "dates set: the prompt still points at the kit (#5104)"
     assert tf.calibration_row(due.isoformat(), read=_reader(**{"nutrition.travel_food": {}}))["state"] == cc.UNKNOWN
     assert tf.calibration_row("not-a-day")["state"] == cc.UNKNOWN
     assert tf.calibration_row(ready.isoformat())["state"] == cc.OK, "the live charter's trip is dated (2026-10-25 ruling): no dead-man"
