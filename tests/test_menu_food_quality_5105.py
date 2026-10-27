@@ -86,9 +86,18 @@ def test_the_quality_block_reads_the_one_fibre_floor_and_labels_the_fish_default
         problems.append(f"the reader's fibre floor {pol['fibre_floor_g']} / problems {pol['problems']}")
     if pol["fish_range"] != tuple(block["fatty_fish"]["servings_per_week"]):
         problems.append(f"the reader's fish range {pol['fish_range']}")
-    log = _cv("change_log")[-1]
-    if log["version"] != _cv("version") or "#5105" not in log["what"]:
-        problems.append(f"the last change_log line is not #5105's at the charter version: {log['version']}")
+    # Any later charter bump (#5122's 1.36.0 landed after #5105's 1.35.0) makes #5105's line not the LAST one, so the
+    # contract is: #5105 has its own change_log line, at or below the charter version, and the log still ends at it.
+    log = _cv("change_log")
+    own = [e for e in log if "#5105" in str(e.get("what"))]
+
+    def _v(text):
+        return tuple(int(x) for x in str(text).split("."))
+
+    if not own or _v(own[-1]["version"]) > _v(_cv("version")):
+        problems.append("no change_log line for the version that added nutrition.food_quality (#5105)")
+    if log[-1]["version"] != _cv("version"):
+        problems.append(f"the change_log does not end at the charter version: {log[-1]['version']} vs {_cv('version')}")
     assert not problems, "\n".join(problems)
 
 
