@@ -23,6 +23,7 @@ import os
 import sys
 
 import pytest
+import schedule_rows  # tests/ is on sys.path (#4284 carrier parser)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -256,8 +257,9 @@ def _read(name):
 
 
 def _reconcile_rule_targets(src):
-    """Lambda variable names that an events rule targets with the input {"reconcile": True}."""
-    found = set()
+    """Lambda variable names that a schedule targets with the input {"reconcile": True} — an
+    `add_table_schedule(..., schedule_input=...)` (#4284) or a legacy events rule target."""
+    found = {c["target"] for c in schedule_rows.table_schedule_calls(src) if c["input"] == {"reconcile": True} and c["target"]}
     for node in ast.walk(ast.parse(src)):
         if not (isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "LambdaFunction" and node.args):
             continue

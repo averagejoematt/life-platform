@@ -2,9 +2,9 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-26 (v8.6.0 — 89 tools, 83-module MCP package, 20 data sources, 108 Lambdas, 26 secrets, 140 alarms, 10 CDK stacks deployed).
+Last updated: 2026-10-27 (v8.6.0 — 89 tools, 83-module MCP package, 20 data sources, 108 Lambdas, 26 secrets, 140 alarms, 10 CDK stacks deployed).
 
-> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **162 ADRs** (ADR-001 → ADR-164 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
+> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **163 ADRs** (ADR-001 → ADR-165 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
 ---
 
@@ -134,24 +134,24 @@ Each source has its own dedicated Lambda and IAM role. Cadence is per source (it
 
 The headline set; the full inventory (every function, handler, schedule, alarm) is `model/platform_model.json` / `docs/DEPENDENCY_GRAPH.md`.
 
-| Function | Lambda | Cron (UTC) | PT (PDT) |
+| Function | Lambda | Cron (Pacific wall clock, ADR-165) | PT |
 |---|---|---|---|
-| Daily Insight Compute (IC-8) | `daily-insight-compute` | `cron(45 16 * * ? *)` | 09:45 AM |
-| Daily Metrics Compute | `daily-metrics-compute` | `cron(40 16 * * ? *)` | 09:40 AM |
-| Adaptive Mode Compute | `adaptive-mode-compute` | `cron(35 16 * * ? *)` | 09:35 AM |
-| Character Sheet Compute | `character-sheet-compute` | `cron(30 16 * * ? *)` | 09:30 AM |
-| Anomaly Detector | `anomaly-detector` | `cron(5 15 * * ? *)` | 08:05 AM |
-| Daily Brief | `daily-brief` | `cron(0 10 * * ? *)` America/Los_Angeles (zoned, #4284) | 10:00 AM |
-| Monday Compass | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 08:00 AM |
-| Wednesday Chronicle | `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 08:00 AM |
-| The Weekly Plate | `weekly-plate` | `cron(0 2 ? * SAT *)` | Fri 07:00 PM |
-| Weekly Digest | `weekly-digest` | `cron(0 16 ? * SUN *)` | Sun 09:00 AM |
-| Nutrition Review | `nutrition-review` | `cron(0 17 ? * SAT *)` | Sat 10:00 AM |
-| Monthly Digest | `monthly-digest` | `cron(0 16 ? * 1#1 *)` | 1st Mon 9:00 AM |
-| Hypothesis Engine (IC-18) | `hypothesis-engine` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM |
-| Weekly Correlation Compute | `weekly-correlation-compute` | `cron(30 18 ? * SUN *)` | Sun 11:30 AM |
-| Weekly Signal (PB-06) | `weekly-signal` | `cron(30 16 ? * SUN *)` | Sun 09:30 AM |
-| Hevy Routine Cron (ADR-066) | `hevy-routine-cron` | `cron(30 13 ? * SUN *)` *(rule starts disabled)* | Sun 06:30 AM |
+| Daily Insight Compute (IC-8) | `daily-insight-compute` | `cron(45 9 * * ? *)` | 09:45 AM |
+| Daily Metrics Compute | `daily-metrics-compute` | `cron(40 9 * * ? *)` | 09:40 AM |
+| Adaptive Mode Compute | `adaptive-mode-compute` | `cron(35 9 * * ? *)` | 09:35 AM |
+| Character Sheet Compute | `character-sheet-compute` | `cron(30 9 * * ? *)` | 09:30 AM |
+| Anomaly Detector | `anomaly-detector` | `cron(5 8 * * ? *)` | 08:05 AM |
+| Daily Brief | `daily-brief` | `cron(0 10 * * ? *)` | 10:00 AM |
+| Monday Compass | `monday-compass` | `cron(0 8 ? * MON *)` | Mon 08:00 AM |
+| Wednesday Chronicle | `wednesday-chronicle` | `cron(0 8 ? * WED *)` | Wed 08:00 AM |
+| The Weekly Plate | `weekly-plate` | `cron(0 19 ? * FRI *)` | Fri 07:00 PM |
+| Weekly Digest | `weekly-digest` | `cron(0 9 ? * SUN *)` | Sun 09:00 AM |
+| Nutrition Review | `nutrition-review` | `cron(0 10 ? * SAT *)` | Sat 10:00 AM |
+| Monthly Digest | `monthly-digest` | `cron(0 9 ? * 1#1 *)` | 1st Mon 9:00 AM |
+| Hypothesis Engine (IC-18) | `hypothesis-engine` | `cron(0 12 ? * SUN *)` | Sun 12:00 PM |
+| Weekly Correlation Compute | `weekly-correlation-compute` | `cron(30 11 ? * SUN *)` | Sun 11:30 AM |
+| Weekly Signal (PB-06) | `weekly-signal` | `cron(30 9 ? * SUN *)` | Sun 09:30 AM |
+| Hevy Routine Cron (ADR-066) | `hevy-routine-cron` | `cron(30 6 ? * SUN *)` *(rule starts disabled)* | Sun 06:30 AM |
 
 ### Hevy Routine Write-Loop (ADR-066, 2026-05-31)
 
@@ -215,7 +215,7 @@ Additional safeguards — one per line so each cadence is a checkable claim (`sc
 - `life-platform-canary` — synthetic DDB+S3+MCP round-trip on `rate(4 hours)`, i.e. every 4 hours
 - item size guard — `item_size_guard.py`, the 400KB DynamoDB write ceiling
 
-Two OTHER canaries exist and are not the one above: `life-platform-ai-quality-canary` runs `cron(20 16 ? * MON,WED,FRI *)`,
+Two OTHER canaries exist and are not the one above: `life-platform-ai-quality-canary` runs `cron(20 9 ? * MON,WED,FRI *)`,
 and `life-platform-mcp-canary-15min` is a hand-made EventBridge rule (not a CDK-declared schedule) firing every 15 minutes.
 
 ---
@@ -286,20 +286,20 @@ All of these ship together via the standard `Code.from_asset("../lambdas")` zip.
 
 ### Email / Intelligence cadence
 
-Schedules are fixed UTC (no DST drift) except `daily-brief`, which is zoned to America/Los_Angeles (#4284); the PDT column is the UTC-7 rendering. The cron
-column is diffed against `cdk/stacks/*.py` by `scripts/check_doc_facts.py` (#1205), so a
+Every schedule is Pacific wall clock in `config/schedules.json`'s `platform_timezone` (#4284, ADR-165 — an EventBridge Scheduler schedule that follows DST; a fixed-UTC row needs a `utc_reason`). The cron
+column is diffed against `config/schedules.json` by `scripts/check_doc_facts.py` (#1205), so a
 schedule change that skips this table reds CI.
 
-| Lambda | Schedule (UTC) | Time (PDT) | Purpose |
+| Lambda | Schedule (Pacific wall clock) | Time (PT) | Purpose |
 |---|---|---|---|
-| `anomaly-detector` | `cron(5 15 * * ? *)` | 8:05 AM daily | 15 metrics, CV-based Z thresholds |
-| `daily-brief` | `cron(0 10 * * ? *)` America/Los_Angeles (zoned, #4284) | 10:00 AM daily | 18-section brief, 4 Haiku calls |
-| `monday-compass` | `cron(0 15 ? * MON *)` | Mon 8:00 AM | Forward-looking planning + Todoist |
-| `wednesday-chronicle` | `cron(0 15 ? * WED *)` | Wed 8:00 AM | Elena Voss narrative, blog + email |
-| `weekly-plate` | `cron(0 2 ? * SAT *)` | Fri 7:00 PM | Food magazine column |
-| `weekly-digest` | `cron(0 16 ? * SUN *)` | Sun 9:00 AM | 7-day summary, Board commentary |
-| `nutrition-review` | `cron(0 17 ? * SAT *)` | Sat 10:00 AM | Deep Sonnet nutrition analysis |
-| `hypothesis-engine` | `cron(0 19 ? * SUN *)` | Sun 12:00 PM | IC-18 hypothesis generation |
+| `anomaly-detector` | `cron(5 8 * * ? *)` | 8:05 AM daily | 15 metrics, CV-based Z thresholds |
+| `daily-brief` | `cron(0 10 * * ? *)` | 10:00 AM daily | 18-section brief, 4 Haiku calls |
+| `monday-compass` | `cron(0 8 ? * MON *)` | Mon 8:00 AM | Forward-looking planning + Todoist |
+| `wednesday-chronicle` | `cron(0 8 ? * WED *)` | Wed 8:00 AM | Elena Voss narrative, blog + email |
+| `weekly-plate` | `cron(0 19 ? * FRI *)` | Fri 7:00 PM | Food magazine column |
+| `weekly-digest` | `cron(0 9 ? * SUN *)` | Sun 9:00 AM | 7-day summary, Board commentary |
+| `nutrition-review` | `cron(0 10 ? * SAT *)` | Sat 10:00 AM | Deep Sonnet nutrition analysis |
+| `hypothesis-engine` | `cron(0 12 ? * SUN *)` | Sun 12:00 PM | IC-18 hypothesis generation |
 
 ### Coach Intelligence Layer (v6.0.0)
 

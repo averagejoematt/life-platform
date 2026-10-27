@@ -456,12 +456,12 @@ def test_restart_url_counts_none_on_non_literal_lists(tmp_path, monkeypatch):
 
 
 def test_hypothesis_cadence_from_real_cdk():
-    """Against the real compute_stack.py: a weekly 'Day HH:MM UTC' phrase comes back."""
+    """Against the real table: a weekly 'Day HH:MM PT' phrase comes back (Pacific wall clock, #4284)."""
     import re as _re
 
     cadence = sync._auto_discover_hypothesis_cadence()
     assert cadence is not None
-    assert _re.fullmatch(r"(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{2}:\d{2} UTC", cadence)
+    assert _re.fullmatch(r"(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{2}:\d{2} PT", cadence)
 
 
 def _write_schedule_table(root, expression):

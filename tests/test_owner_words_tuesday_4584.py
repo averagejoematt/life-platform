@@ -68,49 +68,40 @@ RULE_ID = "OwnerWordsQuestionTuesday"
 # ── BOX 1: the rule's clock ──────────────────────────────────────────────────────────────────────────────────────
 
 
-def _rules(tree, rule_id):
-    return [
-        n
-        for n in ast.walk(tree)
-        if isinstance(n, ast.Call)
-        and getattr(n.func, "attr", None) == "Rule"
-        and len(n.args) > 1
-        and isinstance(n.args[1], ast.Constant)
-        and n.args[1].value == rule_id
-    ]
+def _rules(src, rule_id):
+    """The `add_table_schedule(self, "<rule_id>", ...)` carriers in a stack source (#4284, ADR-165)."""
+    return [c for c in schedule_rows.table_schedule_calls(src) if c["id"] == rule_id]
 
 
 def _cron_of(rule):
-    # #4284: the rule reads `table_schedule("<key>")`; the clock is that config/schedules.json row.
-    sched = next(kw.value for kw in rule.keywords if kw.arg == "schedule")
-    assert getattr(sched.func, "id", None) == "table_schedule", "the Tuesday rule no longer reads the schedule table"
-    fields = schedule_rows.expr(sched.args[0].value)[len("cron(") : -1].split()
+    # #4284: the schedule reads `table_schedule("<key>")`; the clock is that config/schedules.json row,
+    # Pacific wall clock in the table's platform_timezone.
+    assert rule["key"], "the Tuesday schedule no longer reads the schedule table"
+    assert schedule_rows.rows()[rule["key"]].get("timezone") == "America/Los_Angeles", "the Tuesday row left the platform zone"
+    fields = schedule_rows.expr(rule["key"])[len("cron(") : -1].split()
     return {"minute": fields[0], "hour": fields[1], "week_day": fields[4]}
 
 
 _DAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
 
-def _fires_in_pt(cron, utc_week_of):
-    """The Pacific weekday + hour of the cron's instant in the UTC week containing ``utc_week_of`` (a Monday)."""
+def _fires_in_pt(cron, week_of):
+    """The Pacific weekday + hour the zoned cron fires at in the week containing ``week_of`` (a Monday):
+    the expression IS Pacific wall clock, so the instant is built in PT and read back in PT."""
     day = _DAYS.index(cron["week_day"])
-    instant = datetime(
-        utc_week_of.year, utc_week_of.month, utc_week_of.day + day, int(cron["hour"]), int(cron["minute"]), tzinfo=timezone.utc
-    )
-    local = instant.astimezone(PT)
+    local = datetime(week_of.year, week_of.month, week_of.day + day, int(cron["hour"]), int(cron["minute"]), tzinfo=PT)
     return _DAYS[local.weekday()], local.hour
 
 
 def test_the_tuesday_rule_fires_tuesday_evening_pacific_in_both_halves_of_the_year():
-    tree = ast.parse(open(EMAIL_STACK, encoding="utf-8").read())
-    rules = _rules(tree, RULE_ID)
-    assert len(rules) == 1, f"expected exactly one {RULE_ID} rule in email_stack.py, found {len(rules)}"
+    rules = _rules(open(EMAIL_STACK, encoding="utf-8").read(), RULE_ID)
+    assert len(rules) == 1, f"expected exactly one {RULE_ID} schedule in email_stack.py, found {len(rules)}"
     cron = _cron_of(rules[0])
     summer = _fires_in_pt(cron, datetime(2026, 10, 12))  # PDT
     winter = _fires_in_pt(cron, datetime(2026, 11, 9))  # PST
     for label, (weekday, hour) in (("PDT", summer), ("PST", winter)):
         assert weekday == "TUE" and 17 <= hour <= 21, f"{RULE_ID} lands {weekday} {hour}:00 Pacific ({label}) — not Tuesday evening"
-    assert summer == ("TUE", 18), "the stated clock is Tuesday 18:00 PDT"
+    assert summer == winter == ("TUE", 18), "the stated clock is Tuesday 18:00 Pacific, all year"
 
 
 def test_the_tuesday_rule_targets_the_chronicle_sender_with_its_own_payload():
@@ -122,13 +113,13 @@ def test_the_tuesday_rule_targets_the_chronicle_sender_with_its_own_payload():
         if isinstance(n, ast.Dict) and any(isinstance(k, ast.Constant) and k.value == "tuesday_question" for k in n.keys)
     ]
     assert len(payloads) == 1, "the rule no longer sends the {tuesday_question: true} event the sender keys on"
-    seg = src[src.index(f'"{RULE_ID}"') :]
-    assert "targets.LambdaFunction(wednesday_chronicle" in seg.split("create_platform_lambda(")[0]
-    # The comment the triage required: the UTC cron and the DST caveat are stated beside the rule.
+    (rule,) = _rules(src, RULE_ID)
+    assert rule["target"] == "wednesday_chronicle" and rule["input"] == {"tuesday_question": True}
+    # The comment the triage required: the clock and the DST behaviour are stated beside the rule.
     head = src[: src.index(f'"{RULE_ID}"')]
     comment = head[head.rindex("# #4584") :]
-    assert "Wednesday 01:00 UTC" in comment and "PDT" in comment and "PST" in comment
-    assert schedule_rows.expr(f"wednesday-chronicle#{RULE_ID}") == "cron(0 1 ? * WED *)"
+    assert "Tuesday 18:00 Pacific" in comment and "PDT" in comment and "PST" in comment
+    assert schedule_rows.expr(f"wednesday-chronicle#{RULE_ID}") == "cron(0 18 ? * TUE *)"
 
 
 def test_the_tuesday_question_is_fixed_rotates_and_passes_the_desks_own_screens():

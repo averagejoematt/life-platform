@@ -413,7 +413,14 @@ def _function_from_eventbridge(body_obj: dict) -> str | None:
     rule has exactly one Lambda target. A known non-CDK rule resolves from
     NON_CDK_RULE_TARGETS (the role cannot list its targets); every CDK rule is
     looked up dynamically rather than hard-coded (that map would rot as stacks
-    change)."""
+    change).
+
+    #4284 (ADR-165): a zoned EventBridge Scheduler schedule is not a rule — its envelope
+    (cdk/stacks/lambda_helpers.py `_scheduled_event_envelope`) carries the schedule ARN AND
+    the target function's ARN in `resources`, so the function resolves with no API call."""
+    for arn in body_obj.get("resources") or []:
+        if isinstance(arn, str) and ":function:" in arn:
+            return arn
     for rule_name in rule_names(body_obj):
         if rule_name in NON_CDK_RULE_TARGETS:
             return NON_CDK_RULE_TARGETS[rule_name]
