@@ -19,34 +19,15 @@ from __future__ import annotations
 
 from typing import Any
 
-FAMILY_CUES: dict[str, str] = {
-    "press": "Breathe out on the press.",
-    "squat": "Brace each rep, breathe between reps.",
-    "hinge": "Brace; breathe out on the way up.",
-    "leg_press": "As deep as your hips stay on the pad.",
-    "calf_press": "Full stretch at the bottom; knees soft.",
-    "pull": "Breathe out on the pull.",
-    "lying_extension": "Elbows still.",
-    "crunch": "Breathe out on the crunch.",
-    "carry": "Tall, ribs down, bells off your legs.",
-}
+from training import hevy_note_grammar
+
+FAMILY_CUES: dict[str, str] = dict(hevy_note_grammar.FAMILY_CUES)
 """Standard §4: one cue per family, applied to the first exercise of that family in a session."""
 
-PREP_CUES: dict[str, str] = {
-    "bench": "Band pull-aparts first.",
-    "hinge": "Hip hinges first.",
-    "squat": "Ankles + hips first.",
-}
+PREP_CUES: dict[str, str] = dict(hevy_note_grammar.PREP_CUES)
 """#5049's one prep movement per compound anchor family (owner ruling 2026-10-27: one clause, no warm-up block)."""
 
-ANCHOR_TO_FAMILY: dict[str, str] = {
-    "bench": "press",
-    "overhead_press": "press",
-    "squat": "squat",
-    "hinge": "hinge",
-    "row": "pull",
-    "vertical_pull": "pull",
-}
+ANCHOR_TO_FAMILY: dict[str, str] = dict(hevy_note_grammar.ANCHOR_TO_CUE_FAMILY)
 
 # (substring of the movement key or title, family) — checked BEFORE the anchor family, so a leg press (catalogued in the
 # squat anchor family) reads its own cue, not the squat's brace cue

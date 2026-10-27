@@ -203,12 +203,11 @@ session BUILDS; legs get a periodized progression slot, not perpetual recovery.
 Matthew authors at night and trains the next morning with zero chance to adjust. So:
 
 - **Author tier-agnostic.** Never hard-stamp one night's recovery tier into the
-  prescription. Write recovery BRANCHES into the cues (see
-  `docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md`):
-  🟢 GREEN (Whoop 67-100) = the authored ceiling (intervals / +1 RPE cap / optional work
-  on); 🟡 YELLOW (34-66) = the baseline plan (the safe default with no signal); 🔴 RED
-  (1-33) = subtract to the floor (Z2/mobility, cut top sets, or rest). Plus: use the
-  LOWER of (wrist band, how Matthew feels) — feel only downgrades.
+  prescription, and never write tier branches (GREEN / YELLOW / RED, Whoop bands, emoji)
+  into a Hevy note (#5428, `docs/coaching/HEVY_NOTE_STANDARD.md`): the one branch on the
+  wire is the session block's `Low energy → first 2 lifts + easy cardio.` (owner ruling
+  2026-10-27). A note never restates the set rows (Hevy shows load × reps and PREVIOUS);
+  dry-run until `render_check.note_lint.problems == []`.
 - **Autoregulation is subtract-only, and it has a FLOOR (#3927 — owner ruling
   2026-09-19, §7 of TRAINING_CALIBRATION.md).** Carried verbatim from
   `training.routine_generator.SUBTRACT_ONLY_RULE`, which is the same sentence the cron

@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import movement_cues
+from training import hevy_note_grammar, movement_cues
 from training.rep_scheme import LB_IN_KG, implement_step_lb
 from training.session_cues import effort_line, exposure_cue
 
@@ -37,8 +37,8 @@ STALE_AFTER_DAYS = 28
 chest-fly anchor at another bodyweight); the note becomes the pick-load form. 28 days is the module's detraining line
 (`load_ramp.DETRAINING_ANCHOR_AGE_DAYS`): past it, the engine's own anchor is discounted as detrained."""
 
-PICK_LOAD_W_REPS = 8
-PICK_LOAD_LINE = f"W set: up to {PICK_LOAD_W_REPS} easy reps, find the load."
+PICK_LOAD_W_REPS = hevy_note_grammar.PICK_LOAD_W_REPS
+PICK_LOAD_LINE = hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS)
 
 _TIMES = {2: "twice", 3: "three times", 4: "four times", 5: "five times"}
 
@@ -79,15 +79,8 @@ def _rep_hi(sets: list[Any]) -> int | None:
 
 def delta_word(row_lb: float | None, previous_lb: float | None, step_lb: float | None) -> str | None:
     """'Heavier' / 'Lighter' when the row is more than one implement step from PREVIOUS, else None (no reason needed).
-    The same rule as `hevy_note_grammar.delta_word` (Lane D's linter); a stack with no fixed step is never judged."""
-    if row_lb is None or previous_lb is None or not step_lb:
-        return None
-    diff = float(row_lb) - float(previous_lb)
-    if diff > step_lb + 1e-6:
-        return "Heavier"
-    if -diff > step_lb + 1e-6:
-        return "Lighter"
-    return None
+    Lane D's `hevy_note_grammar.delta_word` (the linter's own rule); a stack with no fixed step is never judged."""
+    return hevy_note_grammar.delta_word(row_lb, previous_lb, step_lb)
 
 
 def _rpe_text(rpe: Any) -> str:

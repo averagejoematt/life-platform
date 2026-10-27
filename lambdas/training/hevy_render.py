@@ -15,22 +15,26 @@ on PERFORMED sets only), so those ride in the exercise's Pinned Routine Note
 rest and supersets have native homes.
 
 THE ORDERING RULE (so a reason line is never the part a cut lands on):
-  1. Exercise 0's note opens with the session WHY line (`routine_title.format_why_note`), which
-     stays under VISIBLE_NOTE_CHARS.
+  1. Exercise 0's note opens with the session block (#5428: the session line, the low-energy line
+     and the load rule), written ONCE — by `session_block.place_on_first` on the draft paths, and the
+     compiler's WHY (`routine_title.format_why_note`) only when no block is there.
   2. Each exercise's OWN note opens with its prescription line: the progression / stall-step
      reason (`routine_generator._progress_block`, `draft_custom_session.attach_step_due`), the
      cardio dose line (`cardio_note` line 1), the minimum-session cue (`disruption._cue`).
-  3. History cues, the warm-up clause, the wake-recovery session block (`place_after_prescription`,
-     called by `tools_hevy_routine._apply_recovery_adaptation`), the branch menu
-     (`hevy_compiler._place_routine_note`) and the critics' block
-     (`tools_plan._place_block_on_first_exercise`) come after.
+  3. Anything else comes after: the branch menu (`hevy_compiler._place_routine_note`). Since #5428
+     the wake-recovery band block and the critics' block no longer reach the wire.
 
-VISIBLE_NOTE_CHARS is evidence, not a contract: the owner observed Hevy showing ~150 characters
-of an exercise note (#4070, `mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS`, a must-agree
-pair pinned by tests/test_hevy_render_5083.py). It sizes this report's window; nothing truncates
-on it. The live proof (a committed routine opened in the app) is what settles it.
+VISIBLE_NOTE_CHARS is RETIRED as a window (#5428): the owner's in-app screenshots (2026-10-26) show
+Hevy renders an exercise note IN FULL, so length costs scroll, not visibility. No problem is raised
+on it any more; `in_window` stays on each hit as information only. Length is now the note linter's
+phone-line budget (`hevy_note_lint` rule L7). The constant stays until its must-agree twin
+`mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS` is removed with it (#5428 lane A).
 
-Pure: no I/O, no clock.
+THE NOTE LINT (#5428): `render_check` also runs `hevy_note_lint` over the body and reports it as
+`note_lint` (mode, problems, not-checked rules), and each lint problem joins `problems` prefixed
+NOTE_LINT_PREFIX, so dry_run shows them. Warn mode: nothing here refuses a write.
+
+Pure apart from the note lint's one cached movement-catalog read; no clock.
 """
 
 from __future__ import annotations
@@ -42,10 +46,11 @@ from training.cardio_note import LINE1_RE
 from training.hevy_note_types import PINNED_ROUTINE_NOTE_FIELD
 from training.warmup_sets import is_warmup
 
-RENDER_TABLE_VERSION = "hevy-render@1.1.1"
+RENDER_TABLE_VERSION = "hevy-render@1.2.0"  # 1.2.0 = the window retired, the note lint joined (#5428)
 
-# The owner-observed visible window of a Hevy note (#4070). Sizes the report; never a truncation.
+# The owner-observed visible window of a Hevy note (#4070), retired as a window by #5428 (notes render in full).
 VISIBLE_NOTE_CHARS = 150
+NOTE_LINT_PREFIX = "note lint: "
 
 # Where a row lands. `native` = a Hevy field built for it; `note` = the Pinned Routine Note
 # fallback; `not_shown` = carried in the IR only, by design; `deferred` = no producer yet.
@@ -222,22 +227,6 @@ def _reason_field(text: str) -> str:
     return "stall_step" if _STALL_RE.match(text) else "progression_reason"
 
 
-def _leads_with_prescription(line: str) -> bool:
-    """Does this line open with a prescription line (a progression / stall reason, a cardio dose, a minimum cue)?"""
-    return bool(_STALL_RE.match(line) or _PROGRESSION_RE.match(line) or LINE1_RE.match(line) or line.startswith(_MINIMUM_PREFIX))
-
-
-def place_after_prescription(note: str | None, block: str) -> str:
-    """The ordering rule for a session block a draft pass adds to exercise 0 (the recovery menu, #3938):
-    it goes AFTER the exercise's own prescription line, never ahead of it, so the reason stays in the
-    visible window. A note that opens with no prescription line takes the block at its head, as before."""
-    note = (note or "").strip()
-    first, _, rest = note.partition("\n")
-    if _leads_with_prescription(first):
-        return "\n\n".join(p for p in (first, block, rest.strip()) if p)
-    return "\n\n".join(p for p in (block, note) if p).strip()
-
-
 def expected_reasons(ir: Any) -> list[dict[str, str]]:
     """The reason lines the IR says MUST reach the wire, so 'expected but not found' is a problem, not
     `absent`: every generator progression that changed a set (`inputs_snapshot.load_floors`, #5052) and
@@ -330,7 +319,8 @@ def _missing(expected: list[dict[str, str]], notes: list[str]) -> dict[str, list
 
 
 def _status(r: dict[str, str], hits: list[dict[str, Any]], missing: list[str]) -> tuple[str, list[str]]:
-    """(the row's status, its problems) — missing > beyond_window > not_leading > lands."""
+    """(the row's status, its problems) — missing > not_leading > lands. (#5428: `beyond_window` is retired — Hevy
+    shows a note in full — so a hit past VISIBLE_NOTE_CHARS is no longer a problem.)"""
     f = r["field"]
     if r["home"] in (DEFERRED, NOT_SHOWN):
         return r["home"], []
@@ -338,8 +328,6 @@ def _status(r: dict[str, str], hits: list[dict[str, Any]], missing: list[str]) -
         return "missing", [f"{f}: expected on the wire for {', '.join(missing)} (the IR records it) but not found in any note"]
     if not hits:
         return "absent", []
-    if late := [h for h in hits if not h["in_window"]]:
-        return "beyond_window", [f"{f}: starts past the {VISIBLE_NOTE_CHARS}-char visible window at {late[0]['where']}"]
     if buried := [h for h in hits if not h.get("leads", True)]:
         return "not_leading", [f"{f}: does not lead its note ({buried[0]['where']}); the ordering rule puts the reason first"]
     return "lands", []
@@ -352,10 +340,10 @@ def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any 
     tell exercise 0's own note from the session line ahead of it. `ir` (the RoutineSpec that was
     compiled) names the reason lines that MUST be on the wire (`expected_reasons`), so a reason the
     IR recorded but the wire lacks is a problem, never `absent`. Returns `fields` (one row per
-    RENDER_TABLE field: `status` lands | not_leading | beyond_window | missing | absent | deferred |
-    not_shown, and `found`), the session line's length against the window, and `problems` (a reason
-    line that does not lead its note or starts beyond the window, an expected reason not on the
-    wire, a session line over the window, a warm-up set after a working set)."""
+    RENDER_TABLE field: `status` lands | not_leading | missing | absent | deferred | not_shown, and
+    `found`), the session note's length, `note_lint` (#5428: the note linter's result in its mode), and
+    `problems` (a reason line that does not lead its note, an expected reason not on the wire, a
+    warm-up set after a working set, and every note-lint problem prefixed NOTE_LINT_PREFIX)."""
     routine = _routine(body)
     exercises = routine.get("exercises") or []
     session = (session_note or "").strip()
@@ -367,8 +355,6 @@ def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any 
             found.setdefault("effort_ceiling", []).append(_hit("session line", rpe.start()))
         if exercises and not str(exercises[0].get(PINNED_ROUTINE_NOTE_FIELD) or "").startswith(session):
             problems.append("the session line does not head exercise 1's note")
-        if len(session) > VISIBLE_NOTE_CHARS:
-            problems.append(f"the session line is {len(session)} chars, over the {VISIBLE_NOTE_CHARS}-char visible window")
     for i, ex in enumerate(exercises):
         own, base = _own_note(i, str(ex.get(PINNED_ROUTINE_NOTE_FIELD) or ""), session)
         for by_field in (_note_hits(i, own, base), _set_hits(i, ex)):
@@ -383,6 +369,8 @@ def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any 
         status, row_problems = _status(r, hits, missing.get(r["field"], []))
         problems += row_problems
         rows.append({"field": r["field"], "status": status, "wire": r["wire"], "shows": r["shows"], "found": hits})
+    note_lint = _note_lint(body, ir)
+    problems += [NOTE_LINT_PREFIX + p for p in note_lint.get("problems", [])]
     return {
         "version": RENDER_TABLE_VERSION,
         "title": routine.get("title", ""),
@@ -390,5 +378,17 @@ def render_check(body: dict[str, Any], session_note: str | None = None, ir: Any 
         "session_note": {"text": session, "chars": len(session), "under_window": len(session) <= VISIBLE_NOTE_CHARS},
         "expected_reasons": expected,
         "fields": rows,
+        "note_lint": note_lint,
         "problems": problems,
     }
+
+
+def _note_lint(body: dict[str, Any], ir: Any) -> dict[str, Any]:
+    """The note linter's verdict on the body (#5428), with its mode. Fail-soft: a linter error is reported, never raised."""
+    from training import hevy_note_lint
+
+    try:
+        res = hevy_note_lint.lint_wire(body, ir)
+    except Exception as e:  # noqa: BLE001 — the dry-run report must not die on a linter bug
+        return {"mode": hevy_note_lint.lint_mode(), "error": f"{type(e).__name__}: {e}", "problems": [], "not_checked": ["every rule"]}
+    return {"mode": hevy_note_lint.lint_mode(), **res.to_dict()}
