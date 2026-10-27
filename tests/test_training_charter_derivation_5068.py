@@ -447,6 +447,8 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
 # #5175: the charter numeric leaves NO pattern here owns, each with its reason. A dotted PREFIX covers every leaf under
 # it. The coverage test below fails on a leaf that is neither patterned nor listed, and on a row that covers nothing.
 NOT_APPLICABLE: Dict[str, str] = {
+    "disruption.step_back_up.min_days": "the shortest mode that owes a step-back-up week (#5122): read only by "
+    "training.disruption.owes_step_back_up; pinned (3, and the boundary either side) by tests/test_step_back_up_min_days_5122.py",
     "gated_movements.running.walking_weeks": "the run gate's walking condition: read only by training.run_onramp; held equal to "
     "the owner_redlines run_gate_lb tissue clause by tests/test_run_onramp_5090.py",
     "gated_movements.running.walking_hours_per_wk": "as walking_weeks (training.run_onramp; tests/test_run_onramp_5090.py)",
