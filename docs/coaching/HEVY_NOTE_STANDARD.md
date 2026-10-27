@@ -258,7 +258,7 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 **Modes:**
 - `warn` (the default): log the problems; never change or block a write.
 - `off`: skip.
-- `enforce` (lane D2 of #5428, after lanes A–C): the commit gate refuses on L1–L8 and L12 (`hevy_note_lint.ENFORCE_RULES`). The compiler itself only ever logs.
+- `enforce` (lane D2 of #5428, after lanes A–C): the commit gate refuses on L1–L8 and L12. The compiler itself only ever logs.
 
 | ID | Rule |
 |---|---|

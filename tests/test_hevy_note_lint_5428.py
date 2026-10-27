@@ -40,8 +40,27 @@ def _by_date(routines: list[dict[str, Any]], date: str) -> dict[str, Any]:
     return copy.deepcopy(next(r for r in routines if r["date"] == date))
 
 
+def routine_from_dict(d: dict[str, Any]) -> lint.LintRoutine:
+    """The fixture shape (tests/fixtures/hevy_notes_2026_10/*.json): {"exercises": [{"name", "kind", "rows":
+    [[type, lb, reps]], "note", "compound", "family", "anchor_family", "previous_lb"}], "previous_supplied"}."""
+    exs = [
+        lint.LintExercise(
+            name=str(e["name"]),
+            kind=str(e["kind"]),
+            rows=[(str(r[0]), None if r[1] is None else float(r[1]), None if r[2] is None else str(r[2])) for r in e.get("rows") or []],
+            note=str(e.get("note") or ""),
+            compound=bool(e.get("compound")),
+            family=e.get("family"),
+            anchor_family=e.get("anchor_family"),
+            previous_lb=e.get("previous_lb"),
+        )
+        for e in d.get("exercises") or []
+    ]
+    return lint.LintRoutine(exercises=exs, previous_supplied=bool(d.get("previous_supplied")), title=str(d.get("title") or ""))
+
+
 def _lint(rt: dict[str, Any]) -> lint.LintResult:
-    return lint.lint_routine(lint.routine_from_dict(rt))
+    return lint.lint_routine(routine_from_dict(rt))
 
 
 # ── the golden corpus passes; the originals fail ───────────────────────────────────────────────────────────────────
@@ -104,6 +123,9 @@ def test_the_warm_up_text_is_one_prep_cue_per_family():
     from training.warmup_sets import WARMUP_MOVEMENT_CUES
 
     assert set(g.PREP_CUES) == set(WARMUP_MOVEMENT_CUES)
+    rt = _by_date(GOLDEN, "2026-10-18")  # bench first: its prep cue is a movement, not the load model's "band"
+    rt["exercises"][0]["note"] = rt["exercises"][0]["note"].replace("\n\nRPE 8–9\n", "\n\nRPE 8–9\n" + g.PREP_CUES["bench"] + "\n", 1)
+    assert g.PREP_CUES["bench"] in rt["exercises"][0]["note"] and _lint(rt).problems == [], _lint(rt).lines()
     rt = _by_date(GOLDEN, "2026-10-23")
     rt["exercises"][1]["note"] += "\nWarm up: hip hinges, then the ramp sets."
     assert "L1" in _lint(rt).rules()
@@ -181,6 +203,7 @@ MUTATIONS: list[tuple[str, str, Mut, str]] = [
     ("@ before RPE", "2026-10-26", _append(1, "Stop @ RPE 9."), "L1"),
     ("a bookkeeping emoji", "2026-10-26", _append(2, "No 🟢 this week."), "L1"),
     ("the RED TEAM block", "2026-10-26", _append(2, "RED TEAM (4 voices): all approve"), "L1"),
+    ("load-model jargon (a band)", "2026-10-26", _append(2, "Top of your band."), "L1"),
     # L2 — restated rows
     ("restated rows", "2026-10-26", _append(1, "3 × 8–12 @ 90 lb per hand"), "L2"),
     ("a Last: line", "2026-10-26", _append(2, "Last: 160 lb × 8/8 (Oct 21)."), "L2"),
@@ -394,7 +417,7 @@ def test_enforce_mode_still_only_logs_at_the_compiler(monkeypatch, caplog):
     assert body["routine"]["exercises"][0]["notes"] == "Last: 36kg 8/8/8"
     assert any("hevy note lint (enforce)" in r.getMessage() for r in caplog.records)
     res = lint.lint_wire(body, _bad_ir())
-    assert lint.refusing(res) and {p.rule for p in lint.refusing(res)} <= set(lint.ENFORCE_RULES)
+    assert {"L1", "L12"} <= res.rules()  # rules D2's commit gate will refuse on; the compiler only logged them
 
 
 def test_a_linter_crash_never_blocks_a_write(monkeypatch, caplog):

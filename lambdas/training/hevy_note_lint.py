@@ -12,8 +12,8 @@ Where it runs:
   * `hevy_compiler.to_create_body` / `to_update_body` — every writer (the MCP tool, the nightly
     cron, the restamp) passes there. Mode `HEVY_NOTE_LINT_MODE`: `warn` (the default) logs the
     problems and never changes or blocks a write; `off` skips. `enforce` is reserved for the
-    commit gate (`mcp/hevy_prescription_gate.py`, lane D2 of #5428), which refuses on
-    ENFORCE_RULES; the compiler only ever logs.
+    commit gate (`mcp/hevy_prescription_gate.py`, lane D2 of #5428), which will refuse on rules
+    L1–L8 and L12; the compiler only ever logs.
   * `hevy_render.render_check` — dry_run shows the problems.
   * CI — tests/test_hevy_note_lint_5428.py over the golden corpus (clean) and the archived
     originals (every one fails).
@@ -40,8 +40,6 @@ LINT_VERSION = "hevy-note-lint@1.0.0"
 MODE_ENV = "HEVY_NOTE_LINT_MODE"
 MODES = ("off", "warn", "enforce")
 DEFAULT_MODE = "warn"
-# the rules the commit gate refuses on in enforce mode (code plan, lane D2)
-ENFORCE_RULES = ("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L12")
 PREVIOUS_LOADS_KEY = "previous_loads"
 RULES = {
     "L1": "no banned token",
@@ -154,10 +152,7 @@ def _lint_session(session: str, note: str, out: list[Problem]) -> None:
 
 def _banned(note: str, where: str, out: list[Problem]) -> None:
     for pat, label, case_sensitive in g.BANNED:
-        text = note
-        for exempt in g.BANNED_EXEMPT.get(label, ()):
-            text = text.replace(exempt, "")
-        hit = re.search(pat, text, flags=0 if case_sensitive else re.I)
+        hit = re.search(pat, note, flags=0 if case_sensitive else re.I)
         if hit:
             out.append(Problem("L1", where, f"banned ({label}): {hit.group(0)!r}"))
     if g.TRUNCATION_RE.search(note):
@@ -365,25 +360,6 @@ def lint_routine(rt: LintRoutine) -> LintResult:
 # ── fixtures and the wire ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-def routine_from_dict(d: dict[str, Any]) -> LintRoutine:
-    """The fixture shape (tests/fixtures/hevy_notes_2026_10/*.json): {"exercises": [{"name", "kind", "rows":
-    [[type, lb, reps]], "note", "compound", "family", "anchor_family", "previous_lb"}], "previous_supplied"}."""
-    exs = [
-        LintExercise(
-            name=str(e["name"]),
-            kind=str(e["kind"]),
-            rows=[(str(r[0]), None if r[1] is None else float(r[1]), None if r[2] is None else str(r[2])) for r in e.get("rows") or []],
-            note=str(e.get("note") or ""),
-            compound=bool(e.get("compound")),
-            family=e.get("family"),
-            anchor_family=e.get("anchor_family"),
-            previous_lb=e.get("previous_lb"),
-        )
-        for e in d.get("exercises") or []
-    ]
-    return LintRoutine(exercises=exs, previous_supplied=bool(d.get("previous_supplied")), title=str(d.get("title") or ""))
-
-
 _CARRY_RE = re.compile(r"carry|carries|farmer|suitcase", re.I)
 _MOBILITY_RE = re.compile(r"stretch|mobility|yoga|foam roll", re.I)
 
@@ -536,11 +512,6 @@ def lint_mode() -> str:
     """HEVY_NOTE_LINT_MODE: off | warn (default) | enforce. An unknown value reads as warn."""
     v = (os.environ.get(MODE_ENV) or DEFAULT_MODE).strip().lower()
     return v if v in MODES else DEFAULT_MODE
-
-
-def refusing(result: LintResult) -> list[Problem]:
-    """The problems the commit gate refuses on in enforce mode."""
-    return [p for p in result.problems if p.rule in ENFORCE_RULES]
 
 
 def check_compiled(body: dict[str, Any], ir: Any = None) -> Optional[LintResult]:

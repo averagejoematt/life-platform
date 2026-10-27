@@ -93,6 +93,46 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/training/hevy_note_grammar.py:effort_line": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane B's "
+        "`session_cues.exposure_cue` and `program_structure`'s effort stamping (lift note line 1). Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
+    "lambdas/training/hevy_note_grammar.py:pick_load_line": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane B's "
+        "`load_ramp.render_ramp_cue`'s pick-load form (the feeler W row's line). Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
+    "lambdas/training/hevy_note_grammar.py:reason_line": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane B's "
+        "`routine_generator._progress_block` and `load_progression`'s Heavier / Lighter / Volume-day reasons. Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
+    "lambdas/training/hevy_note_grammar.py:carry_line1": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane B's "
+        "`session_cues`' carry branch (the Farmers Walk note's line 1). Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
+    "lambdas/training/hevy_note_grammar.py:fitness_test_line": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane B's "
+        "`fitness_tests`' test-day session line. Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
+    "lambdas/training/hevy_note_grammar.py:sets_today_clause": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane A's "
+        "`critics.applied_clause` (a critic's changed set count, written after `apply_changes`). Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
+    "lambdas/training/hevy_note_grammar.py:cardio_line1": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane C's "
+        "`cardio_note.compose` (cardio line 1: machine, levels, RPE, talk words). Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
+    "lambdas/training/hevy_note_grammar.py:clock_line": (
+        "#5428 lane D1 landed the note grammar ahead of its producers; the first live caller is lane C's "
+        "`wrist_clock.render` (the `⌚ ride clock:` line). Fixture-tested in tests/test_hevy_note_lint_5428.py. Delete this entry when "
+        "that lane lands."
+    ),
     "lambdas/training/training_charter.py:load_charter": (
         "The loader's documented merged-charter read (ADR-164, the module docstring), held by the charter tests "
         "(test_training_charter_derivation_5068, test_training_charter_privacy_5087, test_disruption_mode_5088). Its "

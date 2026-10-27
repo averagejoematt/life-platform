@@ -6,10 +6,10 @@ them. It runs today's real producers — the session line (`routine_title.format
 (`routine_generator._progress_block`), the warm-up rows and cue (`warmup_sets.attach_warmups`), the cardio composer
 (`cardio_note.compose`) — through the one compiler, then lints the wire body.
 
-It is EXPECTED TO FAIL until lanes A, B and C of #5428 land (the producers still write the old grammar: "+5 lb to 190
-lb: …", "Last: …", "Warm up: …, then the ramp sets.", "level 11 at 13.8 mph"). It is xfail, not skipped, so it keeps
-running; the lane that makes it pass removes the marker. D2 then widens it to the real draft path for the five program
-roles plus one draft_custom session, through `_run_stage_2` with the recorded 10-26 critic verdicts, with
+It is EXPECTED TO FAIL (strict xfail) until lanes A, B and C of #5428 land (the producers still write the old
+grammar: "+5 lb to 190 lb: …", "Last: …", "Warm up: …, then the ramp sets.", "level 11 at 13.8 mph"). It is xfail,
+not skipped, so it keeps running, and strict, so the merge that makes it pass reds until that lane removes the
+marker. D2 then widens it to the real draft path for the five program roles plus one draft_custom session, through `_run_stage_2` with the recorded 10-26 critic verdicts, with
 `inputs_snapshot["previous_loads"]` supplied, and flips HEVY_NOTE_LINT_MODE to enforce.
 """
 
@@ -69,7 +69,8 @@ def _rendered_upper_heavy() -> tuple[RoutineSpec, str]:
 
 
 @pytest.mark.xfail(
-    reason="#5428: the producers still write the old note grammar until lanes A/B/C land; D2 removes this marker", strict=False
+    reason="#5428: the producers still write the old note grammar until lanes A/B/C land; the lane that makes it pass removes this marker",
+    strict=True,
 )
 def test_a_freshly_rendered_routine_lints_clean():
     ir, why = _rendered_upper_heavy()
@@ -86,6 +87,5 @@ def test_the_e2e_fixture_reaches_the_linter():
     routine = hevy_note_lint.from_wire(body, ir, catalog=CATALOG)
     assert [e.kind for e in routine.exercises] == ["barbell", "dumbbell", "cardio"] and routine.previous_supplied
     res = hevy_note_lint.lint_routine(routine)
-    assert res.problems, "the producers already write the standard: remove the xfail marker above (#5428 D2)"
     assert not any(p.where in ("session line", "session block") for p in res.problems), res.lines()
     assert not any(p.rule == "L12" for p in res.problems), res.lines()

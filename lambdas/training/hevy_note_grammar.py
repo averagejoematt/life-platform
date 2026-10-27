@@ -290,7 +290,8 @@ BANNED: tuple[tuple[str, str, bool], ...] = (
     (r"\bplatform\b", "platform", False),
     (r"\bfloor \d|\bfloor:|IS the floor|load floor|rep floor", "floor jargon", False),
     (r"\bramp\b|ramp sets", "ramp jargon", False),
-    (r"e1RM|\banchor\b|\bband\b", "load-model jargon", False),
+    # the prep cue's band pull-aparts is a movement (owner ruling 2026-10-27, R8), not the load model's band
+    (r"e1RM|\banchor\b|\bband\b(?! pull-aparts)", "load-model jargon", False),
     (r"inputs_current_through|_\w+_|\w+_\w+\(", "code identifier", False),
     (r"standing-constraint|subtract-only|never up|is a bug", "rule jargon", False),
     (r"\bRIR\b|in the tank|\bleave \d", "non-RPE effort", False),
@@ -312,11 +313,6 @@ BANNED: tuple[tuple[str, str, bool], ...] = (
         False,
     ),
 )
-# allowed inside BANNED's "band" match: the prep cue's band pull-aparts is a movement, not the load model's band
-BANNED_EXEMPT: dict[str, tuple[str, ...]] = {
-    "load-model jargon": ("Band pull-aparts", "band pull-aparts"),
-    "floor jargon": ("from the floor",),
-}
 TRUNCATION_RE = re.compile(r"…|\.\.\.")
 
 # ── line grammars (linter L2/L3) ────────────────────────────────────────────────────────────────────────────────────
