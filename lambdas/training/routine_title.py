@@ -312,28 +312,52 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
     return title[:MAX_TITLE_CHARS]
 
 
-def _compound_band() -> str:
-    """'8-9' — the charter's ruled compounds band (#5058), or 'the charter ceiling'."""
+def _compound_band() -> tuple[float, float] | None:
+    """(8, 9) — the charter's ruled compounds band (#5058), or None when the charter names none."""
     from training import effort_ceilings
 
     band = effort_ceilings.class_bands().get(effort_ceilings.COMPOUNDS)
-    return f"{band[0]:g}-{band[1]:g}" if band else "the charter ceiling"
+    return (float(band[0]), float(band[1])) if band else None
+
+
+def _session_block(day: str, band: tuple[float, float] | None) -> str:
+    """#5428: the session block that heads exercise 1's note (hevy_note_grammar.session_block): the session line
+    `‹Day› · RPE a–b on big lifts`, the low-energy line and the load rule. The compiler places it, then a blank line,
+    then exercise 1's own note. With no charter band there is no RPE to state, so the block is the day alone (the note
+    linter reports it)."""
+    from training import hevy_note_grammar
+
+    return hevy_note_grammar.session_block(day, band) if band else day
 
 
 _CB = _compound_band()
-_ROLE_WHY = {
+_V03_BAND = (7.0, 8.0)  # v0.3's heavy/moderate days (superseded 2026-09-24): one top set at RPE 7-8
+_ROLE_DAY: dict[str, tuple[str, tuple[float, float] | None]] = {
     # the five-day split (#5069; v0.4's four roles #4147 unchanged), in the charter's order; #5058: the RPE is the charter's
-    "upper_heavy": f"Upper heavy: one top set at RPE {_CB} on bench and row, back-offs 10% lighter. Loads hold.",
-    "lower_heavy": f"Lower heavy: one top set at RPE {_CB} on the squat, back-offs 10% lighter. Loads hold.",
-    "shoulders_arms": "Shoulders and arms: press, side and rear delts, biceps, triceps, traps. Loads hold.",
-    "upper_volume": f"Upper volume: steady sets of 8-12 at RPE {_CB}. Loads hold.",
-    "lower_volume": f"Lower volume: steady sets of 8-12 at RPE {_CB}. Loads hold.",
+    "upper_heavy": ("Upper heavy", _CB),
+    "lower_heavy": ("Lower heavy", _CB),
+    "shoulders_arms": ("Shoulders + arms", _CB),
+    "upper_volume": ("Upper volume", _CB),
+    "lower_volume": ("Lower volume", _CB),
     # v0.3 (superseded 2026-09-24) — kept so a v0.3 routine still reads right
-    "heavy": "Full-body heavy: one top set at RPE 7-8, back-offs 10% lighter. Loads hold.",
-    "moderate": "Full-body moderate: steady working sets, 2-3 left in the tank. Loads hold.",
-    "heavy_moderate": "Full-body heavy-moderate: two anchors heavy, two moderate. Loads hold.",
-    "optional_fourth": "Optional session: only after two green recovery days. Skipping it costs nothing.",
+    "heavy": ("Full body", _V03_BAND),
+    "moderate": ("Full body", _V03_BAND),
+    "heavy_moderate": ("Full body", _V03_BAND),
+    "optional_fourth": ("Full body", _V03_BAND),
 }
+# #5428: no "Loads hold." (it was wrong whenever a step fired) and no rep scheme (the set rows show it).
+_ROLE_WHY = {role: _session_block(day, band) for role, (day, band) in _ROLE_DAY.items()}
+
+
+def _chat_session_block(first_line: str) -> str | None:
+    """A chat-drafted session whose first note line IS a session line (`Shoulders + arms · RPE 8–9 on big lifts`) gets
+    the whole session block, so the chat path heads exercise 1 the way the generator does (#5428)."""
+    from training import hevy_note_grammar as g
+
+    m = g.SESSION_LINE_RE.match(first_line)
+    if not m or not m.group("day"):
+        return None
+    return "\n".join((first_line, g.LOW_ENERGY_LINE, g.LOAD_RULE_LINE))
 
 
 def format_why_note(ir: RoutineSpec) -> str:
@@ -342,6 +366,9 @@ def format_why_note(ir: RoutineSpec) -> str:
         # Custom-authored session (ADR-069): surface the user's own first note
         # line rather than a generator-flavored rationale that doesn't apply.
         lines = [ln for ln in (ir.notes or "").splitlines() if ln.strip()]
+        block = _chat_session_block(lines[0].strip()) if lines else None
+        if block:
+            return block
         return lines[0].strip()[:140] if lines else "Custom session — manually programmed."
     if getattr(ir, "source_action", "") == "disruption" and (ir.notes or "").strip():
         # #5083: the title is the convention's at commit, so the minimum/travel label rides the session note

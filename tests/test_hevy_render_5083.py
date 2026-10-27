@@ -102,6 +102,12 @@ def _compile(ir: RoutineSpec, why: str) -> dict:
     return to_create_body(ir, lambda k: TEMPLATES.get(k, "X"), why_note=why)
 
 
+def _render_problems(rc: dict) -> list[str]:
+    """The render table's own problems — without the #5428 note lint, which these fixtures (today's producers, the old
+    note grammar) are not built to pass; tests/test_hevy_note_lint_5428.py owns the lint."""
+    return [p for p in rc["problems"] if not p.startswith(hevy_render.NOTE_LINT_PREFIX)]
+
+
 def _status(rc: dict) -> dict[str, str]:
     return {r["field"]: r["status"] for r in rc["fields"]}
 
@@ -115,7 +121,7 @@ def test_every_charter_field_lands_where_the_table_says():
     body = _compile(ir, why)
     rc = hevy_render.render_check(body, session_note=why, ir=ir)
     assert [e["field"] for e in rc["expected_reasons"]] == ["progression_reason", "stall_step"]
-    assert rc["problems"] == [], rc["problems"]
+    assert _render_problems(rc) == [], rc["problems"]
     status = _status(rc)
     expected_absent = {"minimum_session"}  # its own fixture below
     for row in hevy_render.RENDER_TABLE:
@@ -153,9 +159,9 @@ def test_the_wire_carries_each_field_on_its_declared_field():
     assert row["notes"].startswith("Step due: +2 reps to 10 at 160 lb")
     assert exs[4]["notes"].split("\n")[0].startswith("Treadmill · 30 min · incline ")
     assert exs[5]["notes"].split("\n")[0].startswith("Recumbent bike · 30 min · level 11 ")
-    # the session line is under the visible window, and so is exercise 1's reason line's start
-    assert len(why) <= hevy_render.VISIBLE_NOTE_CHARS
-    assert note.index("+5 lb to") < hevy_render.VISIBLE_NOTE_CHARS
+    # #5428: the session block heads the note and exercise 1's own note follows it directly (no window: notes show in full)
+    assert why.split("\n")[0] == "Upper heavy · RPE 8–9 on big lifts"
+    assert note.index("+5 lb to") == len(why) + 2
 
 
 def test_the_daily_draft_path_keeps_the_reason_in_the_window():
@@ -168,23 +174,23 @@ def test_the_daily_draft_path_keeps_the_reason_in_the_window():
     body = _compile(ir, why)
     note = body["routine"]["exercises"][0]["notes"]
     assert note.startswith(why + "\n\n+5 lb to ")
-    assert note.index("+5 lb to") < hevy_render.VISIBLE_NOTE_CHARS
     assert note.index("+5 lb to") < note.index("ADAPT BY WAKE RECOVERY") < note.index("CHOOSE YOUR BRANCH")
     rc = hevy_render.render_check(body, session_note=why, ir=ir)
-    assert rc["problems"] == [], rc["problems"]
+    assert _render_problems(rc) == [], rc["problems"]
     assert _status(rc)["progression_reason"] == "lands" and _status(rc)["stall_step"] == "lands"
 
 
 def test_the_pre_fix_recovery_order_is_a_problem():
-    """The order the review found on the daily path (the recovery block AHEAD of the reason) must fail the check."""
+    """The order the review found on the daily path (the recovery block AHEAD of the reason) must fail the check.
+    #5428: no longer as `beyond_window` (the window is retired) — the reason does not lead exercise 1's own note."""
     from mcp.recovery_authoring import render_session_block
 
     ir, why = _fixture()
     bench = ir.exercises[0]
     bench.notes = render_session_block({}, "2026-10-19", None) + "\n\n" + bench.notes
     rc = hevy_render.render_check(_compile(ir, why), session_note=why, ir=ir)
-    assert _status(rc)["progression_reason"] == "beyond_window", rc["fields"]
-    assert any(p.startswith("progression_reason: starts past") for p in rc["problems"]), rc["problems"]
+    assert _status(rc)["progression_reason"] == "not_leading", rc["fields"]
+    assert any(p.startswith("progression_reason: does not lead") for p in rc["problems"]), rc["problems"]
 
 
 def test_a_reason_behind_a_history_cue_is_reported_not_leading():
@@ -209,13 +215,15 @@ def test_a_reason_the_ir_records_but_the_wire_lacks_is_missing():
     assert any(p.startswith("progression_reason: expected on the wire for bench") for p in rc["problems"]), rc["problems"]
 
 
-def test_a_session_line_over_the_window_pushes_the_reason_beyond_it():
+def test_a_long_session_note_is_the_lint_budget_not_a_window():
+    """#5428: Hevy shows notes in full (owner screenshots 2026-10-26), so a session note past the old 150-char window
+    is no render problem; its length is the note lint's phone-line budget (L7) instead."""
     ir, why = _fixture()
     long_why = "x" * (hevy_render.VISIBLE_NOTE_CHARS + 1)
     rc = hevy_render.render_check(_compile(ir, long_why), session_note=long_why, ir=ir)
-    assert _status(rc)["progression_reason"] == "beyond_window"
-    assert any("over the 150-char visible window" in p for p in rc["problems"]), rc["problems"]
-    assert any(p.startswith("progression_reason: starts past") for p in rc["problems"]), rc["problems"]
+    assert _status(rc)["progression_reason"] == "lands"
+    assert not any("window" in p for p in rc["problems"]), rc["problems"]
+    assert any(p.startswith(hevy_render.NOTE_LINT_PREFIX + "L12 ") for p in rc["problems"]), rc["problems"]
 
 
 def test_place_after_prescription():
@@ -254,13 +262,18 @@ def test_the_minimum_session_label_falls_back_to_the_session_line():
     body = to_create_body(ir, lambda k: "X", title_context={"phase": "Phase", "type_count_in_phase": 1, "all_time_count": 1}, why_note=why)
     assert "MINIMUM" not in body["routine"]["title"].upper()  # the convention owns the title — hence the fallback
     rc = hevy_render.render_check(body, session_note=why)
-    assert _status(rc)["minimum_session"] == "lands" and rc["problems"] == []
+    assert _status(rc)["minimum_session"] == "lands" and _render_problems(rc) == []
     assert body["routine"]["exercises"][0]["notes"].startswith(why + "\n\nMinimum: top set 4-6 @ RPE 8-9")
 
 
-def test_every_session_line_fits_the_window():
-    for line in _ROLE_WHY.values():
-        assert len(line) <= hevy_render.VISIBLE_NOTE_CHARS, line
+def test_every_role_session_block_is_the_grammar():
+    """#5428: each program role's WHY is the standard's three-line session block, line 1 within its 60 chars."""
+    from training import hevy_note_grammar as g
+
+    for block in _ROLE_WHY.values():
+        lines = block.split("\n")
+        assert g.SESSION_LINE_RE.match(lines[0]) and len(lines[0]) <= g.SESSION_LINE_MAX_CHARS, block
+        assert lines[1:] == [g.LOW_ENERGY_LINE, g.LOAD_RULE_LINE], block
 
 
 def test_the_window_agrees_with_the_owner_observation_4070():
@@ -292,6 +305,11 @@ def test_dry_run_returns_the_render_check():
         out = t.tool_manage_hevy_routine({"action": "dry_run", "routine_id": "r-5083"})
     create_mock.assert_not_called()
     rc = out["render_check"]
-    assert rc["version"] == hevy_render.RENDER_TABLE_VERSION and rc["problems"] == []
+    assert rc["version"] == hevy_render.RENDER_TABLE_VERSION and _render_problems(rc) == []
+    # #5428: dry_run shows the note lint (warn mode), and its problems ride in `problems`; nothing was refused
+    assert rc["note_lint"]["mode"] == "warn" and rc["note_lint"]["problems"]
+    assert [p for p in rc["problems"] if p.startswith(hevy_render.NOTE_LINT_PREFIX)] == [
+        hevy_render.NOTE_LINT_PREFIX + p for p in rc["note_lint"]["problems"]
+    ]
     assert {r["field"] for r in rc["fields"]} == set(hevy_render.FIELDS)
     assert _status(rc)["progression_reason"] == "lands" and _status(rc)["warmup_sets"] == "lands"
