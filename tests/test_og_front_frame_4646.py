@@ -279,7 +279,7 @@ def test_the_columns_are_neutral_ink_never_the_accent():
 
 
 def test_handler_writes_nothing_when_a_builder_returns_none():
-    handler = _fn(_lambda_tree(), "lambda_handler")
+    handler = _fn(_lambda_tree(), "render_cards")  # #5421: the PAGES loop moved out of lambda_handler into render_cards
     loop = next(n for n in ast.walk(handler) if isinstance(n, ast.For) and ast.unparse(n.iter) == "PAGES")
     src = ast.unparse(loop)
     skip = src.index("if img is None:")
