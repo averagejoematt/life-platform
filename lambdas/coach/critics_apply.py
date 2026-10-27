@@ -14,7 +14,8 @@ working set a change touched at that floor, naming the clash on the change recor
 stored record never has to parse the sentence). A load change the floor swallows whole is
 `applied: False` — surfaced, never an uncommittable draft.
 
-PURE: no I/O, and no import of `coach.critics` (which imports this module).
+PURE but for one read: no I/O, and no import of `coach.critics` (which imports this module). The cardio swap
+(#5428) composes its note through `cardio_note.compose`, which reads the training charter.
 """
 
 from __future__ import annotations
@@ -80,13 +81,65 @@ def apply_changes(ir: Any, verdicts: list[dict[str, Any]], *, set_floors: Callab
             continue
         try:
             before = _loads(ir)
+            working_before = _working_counts(ir)
             rec["applied"], rec["why"] = _apply_one(ir, m, v.get("to"))
             if set_floors is not None and rec["applied"]:
                 _hold_at_floors(ir, m, set_floors, rec, before, v["critic"])
+            if rec["applied"]:
+                _write_clauses(ir, m, v, before, working_before, rec)
         except Exception as e:  # noqa: BLE001
             rec["why"] = f"{type(e).__name__}: {e}"
         records.append(rec)
     return records
+
+
+def _working_counts(ir: Any) -> dict[int, int]:
+    from training.warmup_sets import working_set_count
+
+    return {id(ex): working_set_count(getattr(ex, "sets", None)) for ex in getattr(ir, "exercises", None) or []}
+
+
+def _write_clauses(
+    ir: Any, m: "re.Match[str]", v: dict[str, Any], before: list, working_before: dict[int, int], rec: dict[str, Any]
+) -> None:
+    """#5428 (HEVY_NOTE_STANDARD §3.8): an APPLIED change writes one plain clause on the exercise it changed —
+    `2 sets today: first time in 5 weeks.` — and nothing else reaches the wire (the verdict is stored). The set
+    count in the clause is the exercise's WORKING rows after the change, so text and rows agree. A swap carries its
+    composed cardio note instead; a drop leaves no exercise to write on. The exercises written are named on the
+    record (`clauses`)."""
+    from training import session_block
+    from training.warmup_sets import working_set_count
+
+    field = m.group(3) or "total_sets"
+    if field in ("drop", "movement_key"):
+        return
+    prior = dict(before)
+    reason = session_block.change_reason(v)
+    written: list[dict[str, Any]] = []
+    for ex in getattr(ir, "exercises", None) or []:
+        working = working_set_count(getattr(ex, "sets", None))
+        if field in ("set_count", "total_sets"):
+            if working == working_before.get(id(ex)):
+                continue
+            clause = session_block.applied_clause(field, working_sets=working, reason=reason)
+        else:
+            idx = int(m.group(2))
+            exercises = getattr(ir, "exercises", None) or []
+            if idx >= len(exercises) or exercises[idx] is not ex:
+                continue
+            lighter = None
+            if field == "weight_lbs":
+                was = [w for w in prior.get(id(ex), []) if w is not None]
+                now = [w for s in ex.sets if (w := getattr(s, "weight_kg", None)) is not None]
+                if was and now and was == now:
+                    continue  # the floor held every set: nothing moved, nothing to say
+                lighter = not (was and now and max(now) > max(was))
+            clause = session_block.applied_clause(field, lighter=lighter, reason=reason)
+        if clause:
+            ex.notes = session_block.add_reason(getattr(ex, "notes", "") or "", clause)
+            written.append({"movement_key": getattr(ex, "movement_key", None), "clause": clause})
+    if written:
+        rec["clauses"] = written
 
 
 def _expanded(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -182,17 +235,18 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
     if attr == "movement_key":
         if to not in SWAPPABLE_CARDIO or not any(getattr(s, "duration_seconds", None) for s in ex.sets):
             return False, f"refused: exercises[{idx}] is not a timed cardio block, or {to!r} is not a swap target (#4387)"
-        from training.recent_aerobic import HR_CEILING_BPM, HR_TARGET_BPM
-
-        was = _label(ex)
         ex.movement_key, ex.rationale_tag = str(to), "custom"
-        ex.notes = f"Cycling (recumbent), same duration, HR avg ≤ {HR_CEILING_BPM} bpm (target {HR_TARGET_BPM}) — swapped from {was} by joints_tendons (#4387)"
+        # #5428: the swapped block's note is the cardio composer's (level, RPE + talk words, its why) — never an HR
+        # target (the 120/105 bpm walking numbers predate two HR regime changes) and never an engine name or issue id
+        ex.notes = _swapped_cardio_note(ir, ex)
         return True, None
     if attr == "weight_lbs":
-        kg = float(to) / _LBS_PER_KG
+        from training.rep_scheme import load_step_kg
+
+        kg = load_step_kg(float(to) / _LBS_PER_KG)  # #5428: a load he can put on the bar, never an unrounded kg
         for s in ex.sets:
             if (getattr(s, "type", "normal") or "normal") != "warmup" and getattr(s, "weight_kg", None) is not None:
-                s.weight_kg = round(kg, 2)
+                s.weight_kg = kg
         return True, None
     if attr == "reps":
         for s in ex.sets:
@@ -200,13 +254,36 @@ def _apply_one(ir: Any, m: "re.Match[str]", to: Any) -> tuple[bool, str | None]:
                 s.reps = int(to)
         return True, None
     if attr == "set_count":
-        n = int(to)
+        # #5428: the count is of WORKING sets (the critic's own "3 -> 2 working sets"); a programmed warm-up row is
+        # never popped. The old `len(ex.sets)` pop took a 3 W + 3 N block to 2 W + 0 N.
+        from training.warmup_sets import is_warmup, working_set_count
+
+        n = int(float(to))
         if n < 1:
             return False, "set_count below 1"
-        if n > len(ex.sets):
+        current = working_set_count(ex.sets)
+        if n > current:
             # #4161: MAX_ADDED_SETS = 0 is structural — a set_count ABOVE the draft is an addition, refused by name
-            return False, f"refused: no critic adds sets (set_count {len(ex.sets)} -> {n}; MAX_ADDED_SETS={MAX_ADDED_SETS}, #4161)"
-        while len(ex.sets) > n:
-            ex.sets.pop()
-        return len(ex.sets) == n, None
+            return False, f"refused: no critic adds sets (set_count {current} -> {n}; MAX_ADDED_SETS={MAX_ADDED_SETS}, #4161)"
+        while working_set_count(ex.sets) > n:
+            last = max(i for i, st in enumerate(ex.sets) if not is_warmup(st))
+            ex.sets.pop(last)
+        return working_set_count(ex.sets) == n, None
     return False, "unreachable"
+
+
+def _swapped_cardio_note(ir: Any, ex: Any) -> str:
+    """The cardio composer's note for the swapped block (`cardio_note.compose`, its signature unchanged), at the
+    block's own minutes. The HR half of an active standing constraint rides through, so no HR target is printed."""
+    from training import cardio_note, standing_constraints
+
+    target_date = str(getattr(ir, "target_date", "") or "")[:10]
+    minutes = round(sum(int(getattr(s, "duration_seconds", None) or 0) for s in ex.sets) / 60) or 1
+    note, _audit = cardio_note.compose(
+        movement_key=str(ex.movement_key),
+        minutes=minutes,
+        target_date=target_date,
+        archetype=getattr(ir, "archetype", "") or "",
+        constraint=standing_constraints.active_constraint(target_date) if target_date else None,
+    )
+    return note
