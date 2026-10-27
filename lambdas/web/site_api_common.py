@@ -35,6 +35,7 @@ from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, 
     PACIFIC,
     pacific_date_of,
     pacific_day_n,
+    pacific_today as _pacific_today_5431,
     parse_iso_utc,
 )
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
@@ -689,6 +690,8 @@ def _query_source(source: str, start_date: str, end_date: str, include_pilot: bo
     `tombstone` are always projected, so the derived read's tombstone drop and every
     `date or sk` fallback behave exactly as on a whole read.
     """
+    if source == "macrofactor":
+        end_date = min(end_date, _pacific_today_5431())  # #5431: intake is never read from a day that has not happened
     if start_date > end_date:
         return []  # EXPERIMENT_START is in the future — no data yet
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)

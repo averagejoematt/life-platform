@@ -601,6 +601,24 @@ def _append_derived_layer_findings(table, now, stale_sources, source_status):
         stale_sources.append(("Apple Watch dead-man", f"The check itself failed ({type(e).__name__}: {e}) — status unknown, not fresh."))
 
 
+def _recent_macrofactor_rows(table):
+    """The newest five macrofactor day rows AT OR BEFORE the Pacific today (#5431).
+
+    Bounded at today: a future-dated summary row (`entries_count == 0`, from an export that carries
+    projected days) must not read as a starved meal layer or as the newest record."""
+    return table.query(
+        KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+        ExpressionAttributeValues={
+            ":pk": f"USER#{USER_ID}#SOURCE#macrofactor",
+            ":lo": "DATE#",
+            ":hi": f"DATE#{pacific_now().date().isoformat()}~",
+        },
+        ScanIndexForward=False,
+        Limit=5,
+        ProjectionExpression="entries_count",
+    ).get("Items", [])
+
+
 def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
     # #2817: the PACIFIC frame. Every `now.date()` below is compared against a
@@ -834,14 +852,7 @@ def lambda_handler(event, context):
     # Alert when the last N records all have entries_count == 0, and emit a metric.
     macro_drift = False
     try:
-        drift_resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-            ExpressionAttributeValues={":pk": f"USER#{USER_ID}#SOURCE#macrofactor", ":pfx": "DATE#"},
-            ScanIndexForward=False,
-            Limit=5,
-            ProjectionExpression="entries_count",
-        )
-        drift_recs = drift_resp.get("Items", [])
+        drift_recs = _recent_macrofactor_rows(table)
         empties = [r for r in drift_recs if int(r.get("entries_count", 0) or 0) == 0]
         macro_drift = bool(drift_recs) and len(empties) == len(drift_recs)
         if macro_drift and not _sick_suppress:

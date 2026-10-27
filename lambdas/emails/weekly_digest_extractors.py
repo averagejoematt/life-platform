@@ -656,8 +656,9 @@ def ex_nutrition_last_log_absence(table, user_id, genesis, today, logger):
     """
     try:
         resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-            ExpressionAttributeValues={":pk": f"USER#{user_id}#SOURCE#macrofactor", ":pfx": "DATE#"},
+            # #5431: bounded at `today` — a projected future-dated row is not a log
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+            ExpressionAttributeValues={":pk": f"USER#{user_id}#SOURCE#macrofactor", ":lo": "DATE#", ":hi": f"DATE#{today.isoformat()}~"},
             ScanIndexForward=False,
             Limit=1,
             ProjectionExpression="sk, #d",

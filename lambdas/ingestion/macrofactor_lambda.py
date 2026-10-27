@@ -668,7 +668,16 @@ def _summary_date(raw):
     return normalize_date(raw)
 
 
-def build_summary_day_items(rows):
+def _is_future(date_str, today):
+    """#5431: True when `date_str` is strictly after `today` (the Pacific date of the ingest run).
+
+    MacroFactor's export carries projected values (targets, expenditure, even calories) for days that
+    have not happened; those rows must never be stored, since a stored row reads as intake. Today is
+    NOT future: it may be logged in progress. ISO dates compare lexically."""
+    return date_str > today
+
+
+def build_summary_day_items(rows, today=None):
     """Parse MacroFactor daily-summary CSV → one logical DDB item per day.
 
     Every column lands under its own field (#5097 capture-all): the nutrient columns as
@@ -681,14 +690,21 @@ def build_summary_day_items(rows):
     A row with no logged macros is skipped even when it carries an expenditure: a
     food-less row would read as a logged day on every presence surface (macrofactor is
     the primary engagement anchor). Such rows are counted in the log line.
+
+    #5431: a row dated after `today` (default: the Pacific date of this run) is never written,
+    whatever it carries — a future day must not hold intake. Counted in the log line, no values.
     """
+    today = today or pacific_today()
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     day_items = {}
-    skipped = expenditure_only = 0
+    skipped = expenditure_only = future = 0
     for row in rows:
         date_str = _summary_date(row.get("Date"))
         if date_str is None:
             skipped += 1
+            continue
+        if _is_future(date_str, today):
+            future += 1
             continue
         nutrients = {f: safe_float(row.get(col)) for col, f in NUTRIENT_COLUMNS.items() if col in row}
         nutrients = {f: v for f, v in nutrients.items() if v is not None}
@@ -730,7 +746,8 @@ def build_summary_day_items(rows):
         day_items[date_str] = item
     print(
         f"Summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows "
-        f"({expenditure_only} carried an expenditure but no logged food — not written)"
+        f"({expenditure_only} carried an expenditure but no logged food — not written); "
+        f"[#5431] skipped {future} row(s) dated after {today} (future days are never written)"
     )
     return day_items
 
@@ -789,7 +806,7 @@ def write_summary_day(tbl, item):
     return "merged"
 
 
-def build_partial_summary_items(rows):
+def build_partial_summary_items(rows, today=None):
     """Parse a PER-METRIC MacroFactor summary CSV -> one partial item per day (#5097).
 
     The granular export can write one file per ticked metric (Calories & Macros, Weight
@@ -807,14 +824,21 @@ def build_partial_summary_items(rows):
       * unknown columns verbatim in `summary_unmapped_columns`.
 
     How the item reaches the table is `partial_summary_requests`.
+
+    #5431: a row dated after `today` (default: the Pacific date of this run) is never written —
+    not even its scalar columns. Counted in the log line, no values.
     """
+    today = today or pacific_today()
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     day_items = {}
-    skipped = 0
+    skipped = future = 0
     for row in rows:
         date_str = _summary_date(row.get("Date"))
         if date_str is None:
             skipped += 1
+            continue
+        if _is_future(date_str, today):
+            future += 1
             continue
         nutrients = {f: safe_float(row.get(col)) for col, f in NUTRIENT_COLUMNS.items() if col in row}
         nutrients = {f: v for f, v in nutrients.items() if v is not None}
@@ -839,7 +863,10 @@ def build_partial_summary_items(rows):
             skipped += 1  # the file carries nothing usable for this day
             continue
         day_items[date_str] = item
-    print(f"Partial-summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows")
+    print(
+        f"Partial-summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows; "
+        f"[#5431] skipped {future} row(s) dated after {today} (future days are never written)"
+    )
     return day_items
 
 
