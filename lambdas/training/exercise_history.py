@@ -509,6 +509,42 @@ def pick_note(
     return ai_comment or history_cue
 
 
+def previous_load(history_index: dict[str, list] | None, template_id: str | None, before_date: str) -> dict[str, Any] | None:
+    """#5428: what Hevy's PREVIOUS column shows for one template — his last performed session before `before_date`:
+    its date, its top working load in lb (`lb`), the reps and the logged RPE of that top set. None when he has no
+    session on file. Pure: reads the history index the generator already loaded."""
+    if not template_id:
+        return None
+    for s in (history_index or {}).get(template_id) or []:  # most recent first
+        d = str(s.get("date") or "")
+        if not d or d >= before_date:
+            continue
+        sets = [x for x in s.get("sets") or [] if _to_float(x.get("weight_kg")) > 0]
+        if not sets:
+            continue
+        top = max(sets, key=lambda x: (_to_float(x.get("weight_kg")), _to_int(x.get("reps"))))
+        rpe = top.get("rpe")
+        return {
+            "date": d,
+            "template_id": template_id,
+            "lb": round(_to_float(top.get("weight_kg")) / 0.45359237, 1),
+            "reps": _to_int(top.get("reps")),
+            "rpe": _to_float(rpe) if rpe is not None else None,
+        }
+    return None
+
+
+def previous_loads(movement_templates: dict[str, str | None], history_index: dict[str, list] | None, before_date: str) -> dict[str, Any]:
+    """#5428: `previous_load` for every movement of a routine, keyed by movement key — the `inputs_snapshot["previous_loads"]`
+    record the note linter reads Hevy's PREVIOUS from. A movement with no session on file is absent (never a 0)."""
+    out: dict[str, Any] = {}
+    for key, tid in (movement_templates or {}).items():
+        prev = previous_load(history_index, tid, before_date)
+        if prev is not None:
+            out[key] = prev
+    return out
+
+
 def _reset_for_tests() -> None:
     global _ddb_table
     _ddb_table = None

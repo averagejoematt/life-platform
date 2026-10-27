@@ -165,7 +165,7 @@ def read_ceiling(text: str | None) -> tuple[float | None, str | None]:
 
 # #5058: a clause naming the LAST set ("last set RPE 9–10") — split on ';', a newline or a
 # sentence-ending '.', never on the decimal point of "RPE 8.5".
-_LAST_SET_SPLIT_RE = re.compile(r";|\n|\.(?=\s|$)")
+_LAST_SET_SPLIT_RE = re.compile(r";|,|\n|\.(?=\s|$)")  # #5428: the note grammar is "RPE 8–9, last set RPE 9–10"
 _LAST_SET_RE = re.compile(r"\blast\s+(?:working\s+)?set\b", re.IGNORECASE)
 
 

@@ -61,22 +61,33 @@ WARMUP_PRESCRIPTION: dict[str, Any] = {
     # the anchor families (`movement_catalog.anchor_family`) that are the big lifts the issue names:
     # bench / squat / deadlift (hinge) / overhead press / row. The vertical pull is not one of them.
     "compound_families": ("bench", "squat", "hinge", "overhead_press", "row"),
+    # #5428 R4 (owner ruling 2026-10-27, "one dumbbell warm-up row"): the FIRST dumbbell compound of the session whose
+    # working load is >= 50 lb per hand gets ONE warm-up row at ~60 %, x 8 (x 5 ahead of a 4–6 top set). A dumbbell lift
+    # never takes the barbell climb above — `weight_kg` on a dumbbell is one dumbbell, and the rack is the climb.
+    "dumbbell_first_compound": ((0.60, 8),),
+    "dumbbell_reps_low_top": 5,
+    "floor_lb_per_hand": 50.0,
+    "dumbbell_equipment": ("dumbbell", "kettlebell"),
     "provenance": "owner-ruled",
     "provenance_detail": (
         "#5049 gate:owner — the recommended numbers (50/70/85 % x 8/5/3 first compound, "
-        "1 set at 70 % later, floor 95 lb), owner-ruled 2026-10-23: warm-ups as they are (ADR-105)"
+        "1 set at 70 % later, floor 95 lb), owner-ruled 2026-10-23: warm-ups as they are (ADR-105); "
+        "#5428 R4 owner-ruled 2026-10-27: one dumbbell warm-up row (~60 % x 8, first dumbbell compound >= 50 lb per hand)"
     ),
 }
 
 WARMUP_MOVEMENT_CUES: dict[str, str] = {
-    "bench": "band pull-aparts",
-    "hinge": "hip hinges",
-    "squat": "ankle/hip mobility",
+    "bench": "Band pull-aparts first.",
+    "hinge": "Hip hinges first.",
+    "squat": "Ankles + hips first.",
 }
-"""One warm-up movement per anchor family (#5049); a family not listed gets none. Owner-pending
-with the table above — the issue's own examples."""
+"""One prep movement per anchor family (#5049); a family not listed gets none. #5428 (owner ruling 2026-10-27: "if it
+would recommend resistance band or body stretch before warm up, but if overkill skip"): ONE short clause, never a
+warm-up block, and never the word "ramp" — the W rows are the climb and the note does not restate them. The same
+literals as `movement_cues.PREP_CUES`, which the generator's lift-note composer writes."""
 
-CUE_MARKER = "Warm up:"
+CUE_MARKER = "first."
+"""The clause's own ending — a note that already carries a prep clause is never given a second one."""
 
 
 def is_warmup(s: Any) -> bool:
@@ -134,25 +145,66 @@ def warmup_ramp(working_kg: float, first: bool) -> list[Any]:
 
 
 def cue_clause(family: str | None) -> str:
-    """The note's one warm-up movement clause, or "" when the family has none."""
-    move = WARMUP_MOVEMENT_CUES.get(family or "")
-    return f"{CUE_MARKER} {move}, then the ramp sets." if move else ""
+    """The note's one prep-movement clause ('Hip hinges first.'), or "" when the family has none."""
+    return WARMUP_MOVEMENT_CUES.get(family or "", "")
+
+
+def _entry_of(movement_key: str, catalog_movements: dict[str, Any]) -> dict[str, Any]:
+    key = str(movement_key or "")
+    entry = (catalog_movements or {}).get(key)
+    if entry is None and key.startswith("tmpl:"):
+        tid = key[5:].upper()
+        entry = next(
+            (e for e in (catalog_movements or {}).values() if str((e or {}).get("hevy_template_id_hint") or "").upper() == tid),
+            None,
+        )
+    return entry or {}
+
+
+def is_dumbbell(movement_key: str, catalog_movements: dict[str, Any]) -> bool:
+    """True when the catalog says the movement is loaded with dumbbells (or a kettlebell): its load is per hand."""
+    eq = str(_entry_of(movement_key, catalog_movements).get("equipment") or "").lower()
+    return eq in WARMUP_PRESCRIPTION["dumbbell_equipment"]
+
+
+def dumbbell_warmup(working_kg: float, top_rep_hi: int | None) -> list[Any]:
+    """#5428 R4: the ONE dumbbell warm-up row — ~60 % of the working dumbbell, on the 5-lb rack, x 8 (x 5 ahead of a top
+    set of 6 or fewer reps); [] when it would round onto the working dumbbell."""
+    from training.routine_ir import Set
+
+    frac, reps = WARMUP_PRESCRIPTION["dumbbell_first_compound"][0]
+    if top_rep_hi is not None and int(top_rep_hi) <= 6:
+        reps = int(WARMUP_PRESCRIPTION["dumbbell_reps_low_top"])
+    kg = load_step_kg(float(working_kg) * frac)
+    if kg <= 0 or kg >= float(working_kg) - 2.5 * LB_IN_KG:
+        return []
+    return [Set(type=WARMUP_SET_TYPE, weight_kg=kg, reps=int(reps))]
+
+
+def _top_rep_hi(sets: Any) -> int | None:
+    his = [int(getattr(s, "rep_range_end", None) or getattr(s, "reps", None) or 0) for s in sets or [] if not is_warmup(s)]
+    his = [h for h in his if h > 0]
+    return min(his) if his else None
 
 
 def attach_warmups(blocks: list[Any], catalog_movements: dict[str, Any]) -> dict[str, Any]:
-    """Prepend warm-up sets (and the cue clause) to every qualifying compound block, IN PLACE.
+    """Prepend warm-up sets (and the prep clause) to every qualifying compound block, IN PLACE (a dumbbell compound:
+    #5428 R4's one row on the first one at >= 50 lb per hand).
 
     Returns the audit: the rule table and one row per compound block — what it got, or why it
     got none. Runs AFTER every load pass (floor, ramp, back-offs), so the climb is to the load the
     block actually carries."""
     floor_kg = float(WARMUP_PRESCRIPTION["floor_lb"]) * LB_IN_KG
+    db_floor_kg = float(WARMUP_PRESCRIPTION["floor_lb_per_hand"]) * LB_IN_KG
     rows: list[dict[str, Any]] = []
     warmed = 0
+    db_warmed = 0
     for block in blocks or []:
         family = compound_family(getattr(block, "movement_key", ""), catalog_movements)
         if family is None:
             continue
-        row: dict[str, Any] = {"movement_key": block.movement_key, "family": family}
+        dumbbell = is_dumbbell(block.movement_key, catalog_movements)
+        row: dict[str, Any] = {"movement_key": block.movement_key, "family": family, "implement": "dumbbell" if dumbbell else "barbell"}
         rows.append(row)
         if any(is_warmup(s) for s in block.sets or []):
             row["status"] = "authored"  # the author wrote warm-ups — never stacked, never rewritten
@@ -162,27 +214,41 @@ def attach_warmups(blocks: list[Any], catalog_movements: dict[str, Any]) -> dict
             row["status"] = "no_working_load"
             continue
         row["working_kg"] = round(top, 2)
-        if top < floor_kg - 1e-6:
-            row["status"] = "below_floor"
-            continue
-        ramp = warmup_ramp(top, first=warmed == 0)
+        if dumbbell:
+            # #5428 R4: one row, on the first dumbbell compound at >= 50 lb per hand only
+            if db_warmed:
+                row["status"] = "later_dumbbell"
+                continue
+            if top < db_floor_kg - 1e-6:
+                row["status"] = "below_floor"
+                continue
+            ramp = dumbbell_warmup(top, _top_rep_hi(block.sets))
+        else:
+            if top < floor_kg - 1e-6:
+                row["status"] = "below_floor"
+                continue
+            ramp = warmup_ramp(top, first=warmed == 0)
         if not ramp:
             row["status"] = "no_distinct_load"
             continue
         block.sets = ramp + list(block.sets)
-        warmed += 1
+        if dumbbell:
+            db_warmed += 1
+            row["position"] = "first_dumbbell"
+        else:
+            warmed += 1
+            row["position"] = "first" if warmed == 1 else "later"
         row["status"] = "warmed"
-        row["position"] = "first" if warmed == 1 else "later"
         row["warmups"] = [{"weight_kg": round(s.weight_kg, 2), "reps": s.reps} for s in ramp]
         clause = cue_clause(family)
         notes = getattr(block, "notes", "") or ""
-        if clause and CUE_MARKER not in notes:
-            block.notes = f"{notes} {clause}".strip()
+        if clause and clause not in notes:
+            block.notes = f"{notes}\n{clause}".strip()
         row["cue"] = clause or None
     return {
         "rule": json.loads(json.dumps(WARMUP_PRESCRIPTION)),  # tuples -> lists, so the audit is DDB-serialisable
         "cues": dict(WARMUP_MOVEMENT_CUES),
-        "warmed": warmed,
+        "warmed": warmed + db_warmed,
         "warmup_sets": sum(len(r.get("warmups") or []) for r in rows),
         "movements": rows,
     }

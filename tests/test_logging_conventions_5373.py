@@ -262,10 +262,11 @@ def test_the_routine_note_renders_the_estimate_and_his_rule():
 
     sets = [{"kind": "working", "distance_meters": 60}, {"kind": "working", "distance_meters": 60}]
     cue = session_cues.exposure_cue("carry", sets, stride=lc.trailing_stride(STRIDE_ROWS, DAY))
-    assert "2 carries of 60 steps (~50 yd, est. from unloaded stride)" in cue
-    assert "count steps, type the count in yards" in cue and "load: per hand (one dumbbell's weight)" in cue
-    bare = session_cues.exposure_cue("carry", sets)
-    assert "2 carries of 60 steps @" in bare and "est. from unloaded stride" not in bare  # no stride: steps only
+    # #5428 (standard §3.5): the carry note is the effort + per hand, the carry cue and his steps rule — the step count is
+    # the row's own distance field, and the stride estimate is the chat's, never the set's
+    assert cue == "RPE 8–9 · pick the load per hand\nTall, ribs down, bells off your legs.\nSteps go in the yards box."
+    assert "est. from unloaded stride" not in cue and "60 steps" not in cue
+    assert session_cues.exposure_cue("carry", sets) == cue  # the stride no longer changes the note
 
 
 def test_the_generator_renders_the_stride_into_the_carry_block_note():
@@ -286,7 +287,8 @@ def test_the_generator_renders_the_stride_into_the_carry_block_note():
     blocks, used, _ = full_body_session._blocks_from_prescription(
         rx, {"movements": CATALOG}, None, "off", stride=lc.trailing_stride(STRIDE_ROWS, DAY)
     )
-    assert "60 steps (~50 yd, est. from unloaded stride)" in blocks[0].notes and "type the count in yards" in blocks[0].notes
+    # #5428: the step dose is the row (distance field = his steps); the note says where the steps go and that the load is per hand
+    assert "Steps go in the yards box." in blocks[0].notes and "per hand" in blocks[0].notes
     assert blocks[0].sets[0].distance_meters == 60 and used[0]["cue"] in blocks[0].notes
     assert "est. from unloaded stride" not in program_structure.exposure_cue("carry", rx["exposures"][0]["sets"])  # the static spec cue
 
