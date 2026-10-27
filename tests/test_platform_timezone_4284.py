@@ -264,9 +264,14 @@ def _synth_template(tmp_path, rows):
     """Synthesize one scratch stack that builds `f` through the factory and `f#Second` beside it,
     against a scratch table — in a FRESH interpreter, so no other test's import of the `stacks`
     package (or its caches) can reach it under xdist. Skips where aws_cdk is not installed."""
-    pytest.importorskip("aws_cdk")
     import subprocess
     import sys
+
+    # importorskip in THIS process is not enough: under xdist another test may have stubbed `aws_cdk` in
+    # sys.modules (CI's unit runner has no CDK toolkit), so ask a fresh interpreter, the one that synthesizes.
+    probe = subprocess.run([sys.executable, "-c", "import aws_cdk"], capture_output=True, text=True, timeout=120)
+    if probe.returncode != 0:
+        pytest.skip("aws_cdk is not importable in a fresh interpreter (the CDK job synthesizes for real)")
 
     script = tmp_path / "synth_4284.py"
     script.write_text(_SYNTH_SCRIPT, encoding="utf-8")
@@ -289,7 +294,16 @@ def test_zoned_rows_become_scheduler_schedules_on_one_role(tmp_path):
     assert "AWS::Events::Rule" not in by_type and "AWS::Lambda::Permission" not in by_type
     schedules = by_type["AWS::Scheduler::Schedule"]
     assert len(schedules) == 2
-    roles = [lg for lg, r in by_type["AWS::IAM::Role"] if "scheduler.amazonaws.com" in json.dumps(r)]
+
+    def _assumed_by(role):
+        stmts = role.get("Properties", {}).get("AssumeRolePolicyDocument", {}).get("Statement", [])
+        services = []
+        for st in stmts:
+            svc = (st.get("Principal") or {}).get("Service")
+            services += svc if isinstance(svc, list) else [svc]
+        return services
+
+    roles = [lg for lg, r in by_type["AWS::IAM::Role"] if "scheduler.amazonaws.com" in _assumed_by(r)]
     assert len(roles) == 1, f"one scheduler role per stack, got {roles}"
     for _lg, r in schedules:
         props = r["Properties"]
