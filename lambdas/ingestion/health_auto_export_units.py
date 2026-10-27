@@ -10,6 +10,7 @@ lbs, distances to miles and the watch's wrist temperature to Celsius (#4970).
 import logging
 
 from ingestion.health_auto_export_additive import to_miles
+from ingestion.health_auto_export_echo import reconverted
 from ingestion.health_auto_export_watch import wrist_temp_to_celsius
 
 try:
@@ -53,7 +54,7 @@ def derive_day_fields(daily_data, daily_timestamps, field_units):
             # Carry dedup timestamps from water_intake_raw → water_intake_ml
             if date in daily_timestamps and "water_intake_raw" in daily_timestamps[date]:
                 raw_ts = daily_timestamps[date].pop("water_intake_raw")
-                daily_timestamps[date]["water_intake_ml"] = {ts: round(qty * factor) for ts, qty in raw_ts.items()}
+                daily_timestamps[date]["water_intake_ml"] = reconverted(raw_ts, {ts: round(qty * factor) for ts, qty in raw_ts.items()})
 
         # Weight is stored as lbs (HAE is a Withings fallback). Convert kg if so tagged (#483/D-9).
         w = fields.get("weight_lbs")

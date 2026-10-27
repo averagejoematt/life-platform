@@ -90,10 +90,11 @@ def test_the_registry_covers_exactly_the_qa_checks_subscriber_facing_senders():
 
 def test_unapproved_draft_reaches_subscribers_on_friday_derived_not_asserted():
     """The 35-day CloudWatch record shows chronicle-email-sender delivering Friday
-    18:00 UTC, not Wednesday. That is not a schedule defect — it is the 48h sweep
-    doing exactly what it says. Derived here from the three facts that cause it."""
-    draft = datetime(2026, 8, 12, 15, 0)  # a Wednesday, the draft cron's hour
-    assert sc.chronicle_autopublish_dt(draft) == datetime(2026, 8, 14, 18, 0)  # Friday 18:00 UTC
+    18:00 UTC (11:00 PDT), not Wednesday. That is not a schedule defect — it is the 48h
+    sweep doing exactly what it says. Derived here from the three facts that cause it;
+    every cron is Pacific wall clock since #4284 (ADR-165)."""
+    draft = datetime(2026, 8, 12, 8, 0)  # a Wednesday, the draft cron's Pacific hour
+    assert sc.chronicle_autopublish_dt(draft) == datetime(2026, 8, 14, 11, 0)  # Friday 11:00 PT
     assert sc.weekday_name(sc.chronicle_autopublish_weekday()) == "Friday"
 
 

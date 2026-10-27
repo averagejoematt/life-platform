@@ -199,7 +199,7 @@ def declared_cadence(repo="."):
                     continue
                 func = node.func
                 fname = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-                if fname != "Rule":
+                if fname not in ("Rule", "add_table_schedule"):  # #4284: the carrier builder beside the factory
                     continue
                 kwargs = {k.arg: k.value for k in node.keywords}
                 desc = kwargs.get("description")

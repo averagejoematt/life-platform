@@ -47,7 +47,10 @@ WHAT IT DOES
     PER MONTH  dev-session spend in the current UTC calendar month, this run included.
                Past `PER_MONTH_USD` the next call is refused, named number or not.
                The owner set it on 2026-10-26: $60 a month, separate from the
-               production ceiling (ADR-063/133 unchanged). `MONTH_ALARM_FRACTION` of it
+               production ceiling (ADR-063/133 unchanged). It takes effect on
+               `MONTH_CAP_EFFECTIVE_FROM` (2026-11-01, owner ruling on #5406): before
+               that date the month rule does not refuse and the gauge reads 0.
+               `MONTH_ALARM_FRACTION` of it
                is the `ai-dev-session-month-high` alarm, fed by the cost governor's
                `LifePlatform/Budget` `DevSessionSpendMTD` gauge.
 
@@ -84,7 +87,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Mapping, Optional
 
 from ai.budget_guard import BudgetExceeded
@@ -95,6 +98,11 @@ PER_DAY_USD = 10.0
 # scripts/budget_ceilings.py for the alarm, so it stays a bare literal.
 PER_MONTH_USD = 60.0
 MONTH_ALARM_FRACTION = 0.8
+# Owner ruling 2026-10-27 on #5406 ("B"): the monthly envelope starts on 2026-11-01, so October
+# reads as un-capped. Before this UTC calendar date the month rule does not refuse and the
+# cost governor's `DevSessionSpendMTD` gauge reads 0; the per-run and rolling-24h caps that
+# predate the envelope are unchanged. A bare literal, like the two above, so tooling can parse it.
+MONTH_CAP_EFFECTIVE_FROM = date(2026, 11, 1)
 DAY_WINDOW_HOURS = 24
 REFRESH_SECONDS = 300
 OVERRIDE_ENV = "DEV_AI_BUDGET_USD"
@@ -149,15 +157,29 @@ def run_override(env: Optional[Mapping[str, str]] = None) -> Optional[float]:
     return value
 
 
-def decide(run_spent: float, day_before_run: float, override: Optional[float], month_before_run: float = 0.0) -> Optional[str]:
+def month_cap_in_force(now: Optional[datetime] = None) -> bool:
+    """True from 00:00 UTC on `MONTH_CAP_EFFECTIVE_FROM` (#5406). The one clock read for
+    "does the monthly envelope exist yet", shared by the refusal and the governor's gauge."""
+    now = now or datetime.now(timezone.utc)
+    return now.astimezone(timezone.utc).date() >= MONTH_CAP_EFFECTIVE_FROM
+
+
+def decide(
+    run_spent: float,
+    day_before_run: float,
+    override: Optional[float],
+    month_before_run: float = 0.0,
+    month_in_force: bool = True,
+) -> Optional[str]:
     """Pure. The refusal sentence, or None when the next call may go.
 
     `day_before_run` / `month_before_run` are what OTHER dev-session spend the window
     holds; this run's own `run_spent` is added here. The month is checked first and no
-    override reaches it (#5135).
+    override reaches it (#5135). `month_in_force` is False before `MONTH_CAP_EFFECTIVE_FROM`
+    (#5406): the month rule is skipped, the per-run and 24-hour rules below are not.
     """
     month = month_before_run + run_spent
-    if month >= PER_MONTH_USD:
+    if month_in_force and month >= PER_MONTH_USD:
         return (
             f"dev sessions have spent about ${month:.2f} {_MONTH_MARK} (UTC; ${run_spent:.2f} of it in this run); "
             f"the monthly envelope is ${PER_MONTH_USD:.2f} and {OVERRIDE_ENV} does not raise it."
@@ -258,7 +280,7 @@ def check(caller_class: str, cloudwatch_factory: Callable[[], Any]) -> None:
     with _lock:
         _refresh(cloudwatch_factory)
         day_others, month_others = _others()
-        reason = decide(_run_spent, day_others, override, month_others)
+        reason = decide(_run_spent, day_others, override, month_others, month_cap_in_force())
         if reason is None:
             return
         first = not _announced
@@ -284,7 +306,7 @@ def check_projected(caller_class: str, projected_usd: float, cloudwatch_factory:
     override = run_override()
     with _lock:
         day_others, month_others = _others()
-        reason = decide(_run_spent + max(0.0, float(projected_usd)), day_others, override, month_others)
+        reason = decide(_run_spent + max(0.0, float(projected_usd)), day_others, override, month_others, month_cap_in_force())
     if reason is None:
         return
     message = f"batch job refused — its projected cost (about ${projected_usd:.2f}) would cross the cap: {reason} {_advice(reason)} Nothing was sent or billed."

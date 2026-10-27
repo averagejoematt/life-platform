@@ -227,7 +227,7 @@ digest also carries the folded data-reconciliation and pip-audit artifacts.
 1. **CDK** — `bash deploy/cdk_deploy.sh LifePlatformOperational` (the drift-guarded path, `docs/CONVENTIONS.md` §6). This creates:
    - the log bucket `matthew-life-platform-cf-logs` (BUCKET_OWNER_PREFERRED ACL so
      CloudFront can write; 90-day lifecycle; `RETAIN` on stack delete), and
-   - the `life-platform-traffic-digest` Lambda on `cron(0 16 ? * MON *)` (9 AM PT Mondays),
+   - the `life-platform-traffic-digest` Lambda on `cron(0 9 ? * MON *)` (9 AM PT Mondays),
      env `LOG_BUCKET`/`LOG_PREFIX=cf/`. No error alarm by design (a weekly digest
      failing is low-stakes — same as the other `alerts_topic=None` operational Lambdas).
    Run `npx cdk diff LifePlatformOperational` first — expect **no IAM changes to existing

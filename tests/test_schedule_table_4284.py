@@ -172,9 +172,13 @@ def test_every_row_is_read_by_the_stack_that_builds_its_function():
 
 
 def test_rows_record_the_split_and_the_one_zone():
-    """Box 2's split is a column: every row says reader or internal; only the brief is zoned today."""
-    raw = json.loads((ROOT / "config" / "schedules.json").read_text(encoding="utf-8"))["schedules"]
+    """Box 2's split is a column: every row says reader or internal. The zone is ONE table-level
+    parameter (ADR-165): no row restates it; the only explicit zone is a UTC opt-out with a reason."""
+    table = json.loads((ROOT / "config" / "schedules.json").read_text(encoding="utf-8"))
+    raw = table["schedules"]
+    assert table["platform_timezone"] == "America/Los_Angeles"
     assert {r["facing"] for r in raw.values()} == {"reader", "internal"}
-    zoned = sorted(k for k, r in raw.items() if r.get("timezone"))
-    assert zoned == ["daily-brief"], f"zoned rows changed — update CONVENTIONS §1b with them: {zoned}"
+    explicit = sorted(k for k, r in raw.items() if r.get("timezone"))
+    assert all(raw[k]["timezone"] == "UTC" and raw[k].get("utc_reason", "").strip() for k in explicit), explicit
+    assert explicit == ["habitify-data-ingestion", "hevy-backfill"], f"UTC opt-outs changed — update CONVENTIONS §1b with them: {explicit}"
     assert all(r["purpose"].strip() for r in raw.values()), "every row carries a one-line purpose"

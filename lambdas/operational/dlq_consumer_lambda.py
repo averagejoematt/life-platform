@@ -72,6 +72,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
+from common import pacific_time
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -404,6 +405,22 @@ def rule_names(body_obj: dict) -> list[str]:
     return out
 
 
+def _scheduled_day_has_passed(body_obj: dict, now: datetime | None = None) -> bool:
+    """#4284 review (2026-10-27): a Scheduler-envelope run whose scheduled Pacific day is over is not retried.
+
+    A scheduled job reads "today"/"yesterday" from its clock on every run, so a re-invoke from this consumer
+    (every 6 h) after Pacific midnight would run the WRONG day — e.g. send the just-ended day's brief, after
+    which the send ledger blocks the next morning's real one. Before the Scheduler migration such envelopes
+    carried no function ARN and escalated without a retry; this keeps that for every run whose day has ended,
+    derived from the envelope's own scheduled time, never from a hand-typed function list. Same-day failures
+    still retry. An unparseable or absent time keeps today's behaviour (retry)."""
+    scheduled = pacific_time.pacific_date_of(str(body_obj.get("time") or ""))
+    if not scheduled:
+        return False
+    today = (now or datetime.now(timezone.utc)).astimezone(pacific_time.PACIFIC).date().isoformat()
+    return scheduled < today
+
+
 def _function_from_eventbridge(body_obj: dict) -> str | None:
     """Resolve the target Lambda for an EventBridge-triggered async failure.
 
@@ -413,7 +430,16 @@ def _function_from_eventbridge(body_obj: dict) -> str | None:
     rule has exactly one Lambda target. A known non-CDK rule resolves from
     NON_CDK_RULE_TARGETS (the role cannot list its targets); every CDK rule is
     looked up dynamically rather than hard-coded (that map would rot as stacks
-    change)."""
+    change).
+
+    #4284 (ADR-165): a zoned EventBridge Scheduler schedule is not a rule — its envelope
+    (cdk/stacks/lambda_helpers.py `_scheduled_event_envelope`) carries the schedule ARN AND
+    the target function's ARN in `resources`, so the function resolves with no API call."""
+    for arn in body_obj.get("resources") or []:
+        if isinstance(arn, str) and ":function:" in arn:
+            if _scheduled_day_has_passed(body_obj):
+                return None
+            return arn
     for rule_name in rule_names(body_obj):
         if rule_name in NON_CDK_RULE_TARGETS:
             return NON_CDK_RULE_TARGETS[rule_name]

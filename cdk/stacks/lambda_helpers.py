@@ -37,10 +37,14 @@ Usage in a stack:
     )
 
 Schedules (#4284): the factory takes NO schedule argument. It reads the function's row from
-config/schedules.json (cdk/stacks/schedule_table.py) by `function_name`; a rule built beside
-the factory takes its expression from `table_schedule("<function>#<ConstructId>")`.
+config/schedules.json (cdk/stacks/schedule_table.py) by `function_name`; a schedule built beside
+the factory is `add_table_schedule(..., schedule=table_schedule("<function>#<ConstructId>"))`.
+Every cron row is wall-clock time in the table's `platform_timezone` (ADR-165) and becomes an
+EventBridge Scheduler schedule on the stack's ONE scheduler role; a rate or a UTC opt-out stays
+a fixed-UTC `events.Rule`.
 """
 
+import dataclasses
 import json
 import os
 import sys
@@ -104,51 +108,159 @@ def staged_tree_asset():
     return _lambda.Code.from_asset(_TREE_STAGE)
 
 
-def table_schedule(key: str) -> events.Schedule:
-    """The `events.Schedule` for a rule built beside the factory, from config/schedules.json (#4284).
-    The key is `<function-name>#<ConstructId>`; a missing row fails the synth naming the file."""
-    return events.Schedule.expression(schedule_table.entry(key)["expression"])
+@dataclasses.dataclass(frozen=True)
+class TableSchedule:
+    """One config/schedules.json row, resolved (#4284): the expression, the zone it runs in (None =
+    fixed UTC: a `rate(...)` or a UTC opt-out with its `utc_reason`), and the enabled state."""
+
+    key: str
+    expression: str
+    timezone: str | None
+    enabled: bool
+
+
+def table_schedule(key: str) -> TableSchedule:
+    """The row for a schedule built beside the factory, from config/schedules.json (#4284). The key
+    is `<function-name>#<ConstructId>`; a missing row fails the synth naming the file. Pass it to
+    `add_table_schedule(..., schedule=table_schedule("<key>"))` — the one carrier builder."""
+    row = schedule_table.entry(key)
+    return TableSchedule(key, row["expression"], schedule_table.zone(row), bool(row.get("enabled", True)))
 
 
 def table_enabled(key: str) -> bool:
-    """The `enabled` state the table records for a rule built beside the factory (default True)."""
-    return bool(schedule_table.entry(key).get("enabled", True))
+    """The `enabled` state the table records for a schedule built beside the factory (default True)."""
+    return table_schedule(key).enabled
 
 
-def _add_zoned_schedule(scope, id, fn, schedule, timezone, schedule_input=None):
-    """EventBridge Scheduler carrier for ONE zoned schedule (#4284). Additive IAM: one
-    role, assumable only by scheduler.amazonaws.com from this account, holding exactly one
-    `lambda:InvokeFunction` on this function's ARN. Two async attempts inside a one-hour
-    event age (Scheduler's default is 185 attempts over 24 h — a brief delivered a day late
-    is worse than a missed one, and the send ledger is the dedup for the retry)."""
+#: Logical-id suffix of a zoned schedule. A string, not a zone claim: `DailyBriefPacificSchedule`
+#: has been live since 2026-10-18, and a renamed logical id is a CloudFormation REPLACEMENT.
+ZONED_SCHEDULE_SUFFIX = "PacificSchedule"
+SCHEDULER_ROLE_ID = "PlatformSchedulerRole"
+
+
+def _scheduler_role(scope) -> iam.Role:
+    """The ONE EventBridge Scheduler role of `scope`'s stack (#4284, ADR-165): assumable only by
+    scheduler.amazonaws.com from this account, holding only `lambda:InvokeFunction`, scoped to the
+    ARNs of the functions this stack schedules (each zoned schedule adds its target's ARN; CDK's
+    `minimizePolicies` folds them into one statement). Replaces the per-schedule role of 10-18."""
     stack = Stack.of(scope)
-    role = iam.Role(
-        scope,
-        f"{id}SchedulerRole",
-        assumed_by=iam.PrincipalWithConditions(
-            iam.ServicePrincipal("scheduler.amazonaws.com"),
-            {"StringEquals": {"aws:SourceAccount": stack.account}},
-        ),
-        description=f"EventBridge Scheduler -> {fn.function_name} (#4284); invoke only",
+    role = stack.node.try_find_child(SCHEDULER_ROLE_ID)
+    if role is None:
+        role = iam.Role(
+            stack,
+            SCHEDULER_ROLE_ID,
+            assumed_by=iam.PrincipalWithConditions(
+                iam.ServicePrincipal("scheduler.amazonaws.com"),
+                {"StringEquals": {"aws:SourceAccount": stack.account}},
+            ),
+            description=f"EventBridge Scheduler -> {stack.stack_name} scheduled functions (#4284); invoke only",
+        )
+        role._lp_invoke_targets = set()  # type: ignore[attr-defined]
+    if not hasattr(role, "_lp_invoke_targets"):
+        raise TypeError(f"{SCHEDULER_ROLE_ID} in {stack.stack_name} is not the platform scheduler role")
+    return role
+
+
+def _grant_scheduler_invoke(scope, fn) -> iam.Role:
+    role = _scheduler_role(scope)
+    if fn.node.path not in role._lp_invoke_targets:
+        role.add_to_policy(iam.PolicyStatement(actions=["lambda:InvokeFunction"], resources=[fn.function_arn]))
+        role._lp_invoke_targets.add(fn.node.path)
+    return role
+
+
+def _scheduled_event_envelope(stack: Stack, fn) -> str:
+    """The input a zoned schedule with no constant input delivers: EventBridge's scheduled-event
+    envelope, field for field, with Scheduler's context attributes in place of the rule's values.
+    Without it Scheduler sends its own default notification, and every handler that branches on
+    the rule's shape reads a manual invoke — mcp/handler.py runs the nightly warmer only on
+    `source == "aws.events"` / `detail-type == "Scheduled Event"`; chronicle-approve and
+    closure_probe_qa key their scheduled mode on `source`; the DLQ consumer resolves the failed
+    function from `resources` (the function ARN rides there, since a schedule ARN is not a rule)."""
+    return stack.to_json_string(
+        {
+            "version": "0",
+            "id": "<aws.scheduler.execution-id>",
+            "detail-type": "Scheduled Event",
+            "source": "aws.events",
+            "account": stack.account,
+            "time": "<aws.scheduler.scheduled-time>",
+            "region": stack.region,
+            "resources": ["<aws.scheduler.schedule-arn>", fn.function_arn],
+            "detail": {},
+        }
     )
-    role.add_to_policy(iam.PolicyStatement(actions=["lambda:InvokeFunction"], resources=[fn.function_arn]))
+
+
+def _add_zoned_schedule(scope, id, fn, schedule, timezone, schedule_input=None, *, enabled=True, description=None, name=None):
+    """EventBridge Scheduler carrier for ONE zoned schedule (#4284): wall-clock `schedule` in
+    `timezone`, invoked through the stack's ONE scheduler role. Two async attempts inside a one-hour
+    event age (Scheduler's default is 185 attempts over 24 h — a run delivered a day late is worse
+    than a missed one, and each job's own ledger is the dedup for the retry)."""
+    stack = Stack.of(scope)
+    role = _grant_scheduler_invoke(scope, fn)
+    payload = json.dumps(schedule_input) if schedule_input is not None else _scheduled_event_envelope(stack, fn)
     target = scheduler.CfnSchedule.TargetProperty(
         arn=fn.function_arn,
         role_arn=role.role_arn,
         retry_policy=scheduler.CfnSchedule.RetryPolicyProperty(maximum_retry_attempts=2, maximum_event_age_in_seconds=3600),
-        **({"input": json.dumps(schedule_input)} if schedule_input is not None else {}),
+        input=payload,
     )
     sched = scheduler.CfnSchedule(
         scope,
-        f"{id}PacificSchedule",
+        f"{id}{ZONED_SCHEDULE_SUFFIX}",
         flexible_time_window=scheduler.CfnSchedule.FlexibleTimeWindowProperty(mode="OFF"),
         schedule_expression=schedule,
         schedule_expression_timezone=timezone,
-        state="ENABLED",
+        state="ENABLED" if enabled else "DISABLED",
         target=target,
-        description=f"{fn.function_name} at {schedule} {timezone} (#4284)",
+        description=(description or f"{fn.function_name} at {schedule} {timezone} (#4284)")[:500],
+        **({"name": name} if name else {}),
     )
     sched.node.add_dependency(role)
+    return sched
+
+
+def add_table_schedule(
+    scope,
+    id: str,
+    *,
+    target: _lambda.IFunction,
+    schedule: TableSchedule,
+    schedule_input: dict = None,
+    description: str = None,
+    name: str = None,
+):
+    """A schedule built BESIDE the factory (#4284): a second schedule on a function, a constant
+    input, a disabled or a named one. `schedule` is `table_schedule("<function>#<ConstructId>")`.
+    A zoned row becomes an EventBridge Scheduler schedule on the stack's one scheduler role; a
+    fixed-UTC row (a rate, or a UTC opt-out) stays an `events.Rule` with a Lambda target."""
+    if schedule.timezone:
+        return _add_zoned_schedule(
+            scope,
+            id,
+            target,
+            schedule.expression,
+            schedule.timezone,
+            schedule_input,
+            enabled=schedule.enabled,
+            description=description,
+            name=name,
+        )
+    rule = events.Rule(
+        scope,
+        id,
+        schedule=events.Schedule.expression(schedule.expression),
+        description=description,
+        rule_name=name,
+        enabled=schedule.enabled,
+    )
+    rule.add_target(
+        targets.LambdaFunction(target, event=events.RuleTargetInput.from_object(schedule_input))
+        if schedule_input is not None
+        else targets.LambdaFunction(target)
+    )
+    return rule
 
 
 def create_platform_lambda(
@@ -166,9 +278,9 @@ def create_platform_lambda(
     alarm_name: str = None,
     secrets: list[str] = None,
     # #4284: NO `schedule=` / `schedule_timezone=` here — the schedule is this function's row in
-    # config/schedules.json, read below by function_name. A row with a `timezone` moves it off the
-    # fixed-UTC `events.Rule` carrier onto an EventBridge Scheduler schedule (wall-clock time in
-    # that zone, follows the DST change); every other row is the fixed-UTC rule.
+    # config/schedules.json, read below by function_name. A zoned row (every cron row follows the
+    # table's `platform_timezone`, ADR-165) is an EventBridge Scheduler schedule — wall-clock time,
+    # follows the DST change; a rate or a UTC opt-out (`utc_reason`) is the fixed-UTC rule.
     schedule_input: dict = None,  # constant event for the scheduled target; None = EventBridge's own event
     timeout_seconds: int = 120,
     memory_mb: int = 256,
@@ -217,7 +329,7 @@ def create_platform_lambda(
     # ── The schedule, from the ONE table (#4284) ──
     _sched_row = schedule_table.factory_entry(function_name) if isinstance(function_name, str) else None
     schedule = _sched_row["expression"] if _sched_row else None
-    schedule_timezone = _sched_row.get("timezone") if _sched_row else None
+    schedule_timezone = schedule_table.zone(_sched_row) if _sched_row else None
     if _sched_row:
         _stack_name = Stack.of(scope).stack_name
         if _sched_row["stack"] != _stack_name:

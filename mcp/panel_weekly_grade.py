@@ -50,9 +50,9 @@ logger = logging.getLogger(__name__)
 JOB: dict[str, Any] = {
     "name": "panel_weekly_grade",
     "event": {"job": "panel_weekly_grade"},
-    # fixed UTC (CLAUDE.md): Monday 08:30 PDT / 07:30 PST — Monday Pacific either way, so "yesterday" is Sunday
+    # Pacific wall clock (config/schedules.json platform_timezone, ADR-165): Monday 08:30 PT, so "yesterday" is Sunday
     "schedule_key": "life-platform-mcp-warmer#PanelWeeklyGrade",
-    "schedule_utc": "cron(30 15 ? * MON *)",
+    "schedule_pt": "cron(30 8 ? * MON *)",
     "function": "life-platform-mcp-warmer",
     "metric_namespace": METRIC_NAMESPACE,
     "metric_name": "PanelGradeOutcome",

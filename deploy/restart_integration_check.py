@@ -600,6 +600,14 @@ def leg_ops(report, args):
         token = page.get("NextToken")
         if not token:
             break
+    # #4284 (ADR-165): every zoned schedule is an EventBridge Scheduler schedule, which
+    # list_rules never sees — sweep those too (ListSchedules carries the target ARN + state).
+    sched = boto3.client("scheduler", region_name=REGION)
+    for page in sched.get_paginator("list_schedules").paginate(State="ENABLED"):
+        for summary in page.get("Schedules", []):
+            arn = summary.get("Target", {}).get("Arn", "")
+            if ":function:" in arn:
+                fn_rules.setdefault(arn.rsplit(":", 1)[-1], []).append(summary["Name"])
 
     plan = build_ingestion_plan(sr.SOURCE_REGISTRY)
     missing, wrongly_armed = [], []
