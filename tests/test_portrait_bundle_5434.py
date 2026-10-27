@@ -55,7 +55,6 @@ def test_reader_parses_semicolons_in_strings_and_trailing_exports():
     recipes = pb.load_signed_recipes_from_bundle(FIXTURE)
     assert sorted(recipes) == ["a_coach", "b_coach"]
     assert recipes["a_coach"]["notes"] == "ink; wash; hatch"
-    assert pb.load_aliases_from_bundle(FIXTURE) == {"b": "b_coach"}
 
 
 def test_real_generated_bundle_parses():
@@ -64,7 +63,6 @@ def test_real_generated_bundle_parses():
     content, _skipped = vbp.build()
     recipes = pb.load_signed_recipes_from_bundle(content)
     assert recipes and all(r.get("persona_id") == pid for pid, r in recipes.items())
-    assert isinstance(pb.load_aliases_from_bundle(content), dict)
 
 
 @pytest.mark.parametrize(

@@ -42,10 +42,3 @@ def load_signed_recipes_from_bundle(text):
     """The signed recipe map ``{persona_id: recipe}`` from a portrait_data.js body (already
     signed-only, ADR-106 §3 — the bundle the site renders is the one source of truth)."""
     return _read_export(text, PORTRAITS_MARKER)
-
-
-def load_aliases_from_bundle(text):
-    """The ``{runtime_id: persona_id}`` alias map; empty when the bundle predates it."""
-    if ALIASES_MARKER not in text:
-        return {}
-    return _read_export(text, ALIASES_MARKER)
