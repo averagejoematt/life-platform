@@ -151,8 +151,8 @@ def test_the_wire_carries_each_field_on_its_declared_field():
     assert note.startswith(why + "\n\n+5 lb to ")
     assert note.index("+5 lb to") < note.index("Last: 185 lb") < note.index(warmup_sets.CUE_MARKER) < note.index("CHOOSE YOUR BRANCH")
     assert row["notes"].startswith("Step due: +2 reps to 10 at 160 lb")
-    assert exs[4]["notes"].split("\n")[0].startswith("Treadmill · 30 min · incline ")
-    assert exs[5]["notes"].split("\n")[0].startswith("Recumbent bike · 30 min · level 11 ")
+    assert exs[4]["notes"].split("\n")[0].startswith("Treadmill · ")  # #5428 line 1: "Treadmill · <mph> mph, <grade>% · RPE …"
+    assert exs[5]["notes"].split("\n")[0].startswith("Recumbent · L11 ")  # #5428 line 1
     # the session line is under the visible window, and so is exercise 1's reason line's start
     assert len(why) <= hevy_render.VISIBLE_NOTE_CHARS
     assert note.index("+5 lb to") < hevy_render.VISIBLE_NOTE_CHARS

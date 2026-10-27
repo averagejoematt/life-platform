@@ -183,7 +183,8 @@ def test_the_cardio_pick_is_appended_with_the_talk_test_and_no_hr_fields(monkeyp
         cardio_menu.block_minutes(kind) * 60
     ]
     assert cardio.rationale_tag == f"cardio:cycling:menu:{kind}"
-    assert "Recumbent" in cardio.notes and cardio_menu.block(kind)["talk_test"] in cardio.notes and "no HR target" in cardio.notes
+    # #5428: RPE + the talk test lead and no HR reaches the wire at all (no "no HR target" tag either)
+    assert "Recumbent" in cardio.notes and cardio_menu.block(kind)["talk_test"] in cardio.notes and "HR" not in cardio.notes
     assert "bpm" not in cardio.notes
     assert not set(sc.HR_PICK_FIELDS) & set(pick) and pick["hr_fields_dropped_by"] == "hr_regime_change_2026_10_10"
     # the served stage-1 pick is the same constrained pick

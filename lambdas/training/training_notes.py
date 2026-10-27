@@ -65,6 +65,7 @@ from training.training_notes_keys import (  # noqa: F401
     workout_id_from_uid,
     workout_id_of_raw_row,
 )
+from training.wrist_clock import walk_signal  # #5374 box 3 / #5428: his treadmill speed / incline shorthand
 
 # pk SOURCE partition is `training_notes`; the projection's `source` label is the
 # locked `training_feedback_loop` (§13). Two names, deliberately (see brief §5 vs §13).
@@ -511,6 +512,7 @@ def deterministic_pass(note_text: str, date=None, user: str = "matthew") -> list
         dur = block_duration_min(block)
         if dur is not None:
             prog_val["duration_min"] = dur
+        prog_val.update({} if prog_val.get("level") else walk_signal(block))  # #5374 box 3: "3.3 / 1.5 incline"
         if any(k in bt for k in _INTERVAL_KW):
             prog_val["character"] = "intervals"
         elif any(k in bt for k in _FLAT_KW):
