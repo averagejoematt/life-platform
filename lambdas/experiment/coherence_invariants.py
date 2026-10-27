@@ -28,6 +28,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from ai.ai_output_validator import hrv_cited_in_bpm  # #5442: one HRV-in-bpm predicate (stdlib-only module)
+
 OK = "ok"
 PRE_START = "pre_start"  # #942: sanctioned countdown window (#931) — OK-severity, but distinct so the digest can say why
 WARN = "warn"
@@ -263,7 +265,9 @@ def check_facts_agreement(narratives, facts, *, surfaces=None, facts_overrides=N
         # HRV-unit error: an HRV value directly carried in bpm (HRV is milliseconds).
         # Require number-then-bpm right after HRV so "HRV 25 ms and RHR 64 bpm" — two
         # different metrics in one sentence — does NOT false-fire (the live-run trap).
-        if re.search(r"hrv[^.\d]{0,12}\d{1,3}(?:\.\d+)?\s*bpm", low):
+        # #5442: the ONE shared predicate, which also skips the value-before-label form
+        # "NN ms HRV, NN bpm resting heart rate" (the 2026-10-26 mind-coach false ALARM).
+        if hrv_cited_in_bpm(low):
             offenders.append(f"{label}: HRV cited in bpm (HRV is milliseconds)")
         for key, (patterns, tol) in _FACT_PATTERNS.items():
             true_val = surface_facts.get(key)
