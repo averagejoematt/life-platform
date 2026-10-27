@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-10-26 (v8.6.0 — 89 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-10-27 (v8.6.0 — 89 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2654,6 +2654,8 @@ Generated weekly by `hypothesis-engine` Lambda (Sunday 11 AM PT). Engine v2 (202
 | `monitoring_window_days` | number | 7-30; confirmation requires the full window observed |
 | `confidence` | string | LLM-stated `low`/`medium`/`high` — graded by the calibration ledger |
 | `created_at` | string | ISO timestamp |
+| `resolution` / `superseded_by` / `superseded_reason` / `superseded_effective_from` / `superseded_issue` / `superseded_at` | string | #5388: written on a record closed as superseded by a re-registration (`status: archived`, `resolution: superseded`): the successor's `hypothesis_id`, the reason in words (also `last_evidence`), the day the successor's registration starts, the issue and the write instant. Written once, conditional on the record still being open; no calibration-ledger row |
+| `supersedes` / `re_registered_on` / `written_at` | string | #5388: on a successor record — the superseded `hypothesis_id`, the day it was registered as of, and the real write instant (its `created_at` / `pre_registered_at` carry the as-of day, so the check's `since_date` and the monitoring window anchor there) |
 
 Access via `get_hypotheses`, `update_hypothesis_outcome` MCP tools; public at `/api/hypotheses`.
 
