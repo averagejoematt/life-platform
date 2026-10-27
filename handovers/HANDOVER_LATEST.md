@@ -1,4 +1,4 @@
-# Handover — Session CJ (final, 16:40Z): waves 7–9 deployed (one platform timezone, the Hevy notes to the A-grade standard), 20 owner items walked, 10 closures (2026-10-27)
+# Handover — Session CJ (final, 16:40Z): waves 7–10 deployed (one platform timezone, the Hevy notes to the A-grade standard, eight backlog fixes), 20 owner items walked, 10 closures (2026-10-27)
 
 ## Driving instruction
 - Owner, Mon 2026-10-26 ~19:45Z: autonomous backlog paydown to a 13:00Z stop, unattended. Owner then attended ~01:30–05:00Z for a 20-item owner-gated walk-through and extended the run (verbatim): "you are good to do autonomous work for the next 12 hours now, paying down as many issues as you can, getting more if you have time, more parallel work" — new stop ~16:45Z 10-27.
@@ -11,9 +11,10 @@
 - **PR #5444 (335cd22d8) — wave 9**: #5428 lanes A/B/C — **Hevy notes to the A-grade standard** (three-line session block; lift notes `RPE` + ≤1 reason + ≤1 cue, nothing the set rows show; loads rounded to implement steps; achieved-load floor; pick-load feeler rows; one DB warm-up row; cardio line 1 + watch-clock line + `After:` restart line, levels from his log; his `3.3 / 1.5 incline` shorthand parsed, Refs #5374) · #5373 per-hand carries dated from 10-27. CI/CD 40458629029: Plan clean after the stacks, Deploy 06:12–06:18Z, Smoke + I1/I2/I5 green. **Verified in bundles**: `session_block.py` / `lift_note.compose_blocks` / `cardio_note 4.0.0` in mcp + warmer + hevy-routine-cron; echo guard in health-auto-export-webhook; `SUPERSESSIONS` in hypothesis-engine; `_scheduled_day_has_passed` in dlq-consumer.
 - **The 10-27 routine re-drafted through the new code** (15:26Z, `nightly_predraft` target 2026-10-27 → cc9665db…): exercise 1 opens with the three-line block; dry-run read back. (The 06:27Z archive of the old 10-27 drafts and the 15:21Z re-run straddled the laptop pause, so 10-27 had no active draft for those hours; no workout was logged in that window.) 10-28 drafted 15:21Z.
 
+- **PR #5455 (e19b3855e) — wave 10**, merged 16:06Z, CI/CD 40537557258: Plan clean, Deploy success ~16:26Z (smoke running at the amend): #5122 step-back only after ≥3-day modes · #5104 grocery list + travel kit · #5421 og-image headroom · #5433 traffic-digest 10-wide reads · #5434 portrait bundle parse (no coach card had ever been written) · #5431 MacroFactor future rows · #5440 HAE additive S3 compare-and-swap · #5442 coherence (stale sleep expert, HRV-in-bpm false positive, 15-day renewal cap). First CI run red on a test-order leak (the #5412 breaker's module state tripped by #5442's tests) — fixed with reset fixtures (0e59ba3ea), then 10/10 green. **Verified in bundles**: `SweepPlan` + `raw_decode` in og-image-generator, `LOAD_LOG_WORKERS` in traffic-digest, the `#5431` guard in macrofactor-data-ingestion, `IfMatch` in health-auto-export-webhook, the renewal cap in ai-expert-analyzer, `owes_step_back_up` + `grocery_lines` in life-platform-mcp.
+
 ## Built, not yet on main
-- **PR #5455 — wave 10** (CI running at wrap): #5122 step-back only after ≥3-day modes · #5104 grocery list + travel kit · #5421 og-image headroom · #5433 traffic-digest 10-wide reads · #5434 portrait bundle parse (no coach card had ever been written) · #5431 MacroFactor future rows · #5440 HAE additive S3 compare-and-swap · #5442 coherence (stale sleep expert, HRV-in-bpm false positive, 15-day renewal cap). Lanes' tip fixes in (I4 handler guard, change_log assertion, dead def, dated fixture). Merge → CI deploys; code-only, no IAM.
-- **integration/session-cj-w11** — #5428 lane D (grammar + style linter, warn mode, PR #5447) and lane E follow-ups (PR #5448: rotation reason line `New: replaces X.` (#5083), composer on chat/minimum/travel paths, ids off the wire, `_FORM_KW` "rom" bug). #5447 was being reconciled onto w11 (block placed once); #5448 merges after it. Next session: land #5447 → merge w11 into #5448 → integrate → PR.
+- **integration/session-cj-w11 (e4f66c274)** — #5428 lane D (grammar + style linter in warn mode, PR #5447) and lane E follow-ups (PR #5448: rotation reason line `New: replaces X.` (#5083), the composer on chat/minimum/travel paths, ids off the wire, the `_FORM_KW` "rom" bug), both merged INTO w11 (E's conflicts with D's squash resolved to E's side; the 132 notes/lint/golden/render tests pass). **Merging main into w11 conflicts in 11 files** (main carries wave 9 as one squash; w11 carries the same lanes unsquashed plus D/E): resolve toward w11's side for the `lambdas/training/*`, `mcp/tools_plan.py` and the notes tests, then run the full suite + the e2e golden test, then PR. Next session's first build task.
 
 ## Closed (ADR-099 verdict + live proof)
 #5413 (served-coach-facts green 21:42Z; #5411 auto-closed) · #5049 (02:00Z predraft warm-ups) · #4250 (30-day re-measure: reconcile 31%→14%, 0 test_count reconciles, 0 parked leases) · #5402 (dry-run qa-smoke 04:51Z dropped the UTC-vs-Pacific findings) · #5097 (MacroFactor export → `expenditure_kcal` 10-15..10-26, 04:14Z) · #5376 (Creatine 10 g on 10-26) · #4633 (four synthetic receipts through the live gate) · #5318 (committed routines carry the 10-24 rulings) · #5420 (standalone visual QA green) · #5411 (auto).
@@ -32,7 +33,7 @@
 - **Disruption-mode end owed a 7-day step-back-up even for a same-day test** (fixed in #5455).
 
 ## Residual / next picks
-- Land PR #5455 (wave 10) and verify by content; then integrate w11 (#5447 then #5448) — #5428.
+- Integrate w11 with main (11-file conflict, resolve toward w11) and land it — #5428.
 - #5428 live proof: the next nightly predraft lints clean + a blind re-grade of three real drafted routines reads A.
 - #4284 proof: the 2026-11-01 clock change — every job keeps its Pacific time, no double-fire or gap.
 - #5412 / #5442: the Mon 2026-11-02 14:00Z analyzer run (breaker lines; EXPERT# rows repopulate; sentinel no "HRV in bpm").
@@ -43,9 +44,9 @@
 
 ## For Matthew (the only things waiting on you)
 1. **AWS support case for Claude 5.5** (#4772): agreements are accepted and AVAILABLE, runtime still "not available for this account". Account-and-billing case, text drafted in session (account 205930651321; Haiku/Sonnet 5.5; Converse AccessDenied).
-2. **Re-run the weekly expert analyzer once after wave 10 deploys** (#5442): every expert/weekly-priority record lapsed ~10-26 23:15Z, so those surfaces are empty until Mon 11-02 14:00Z — an earlier run spends production AI budget; your call.
-3. **MacroFactor future-row cleanup** (#5431, after wave 10 deploys): `python3 scripts/macrofactor_future_rows_cleanup.py` (dry run: six rows 2026-10-27..11-01), then `--apply --backup <path>`. The classifier blocked the session from deleting them.
-4. **Apple Health additive repair** (#5440, after wave 10 deploys): `AWS_MAX_ATTEMPTS=1 python3 scripts/hae_additive_backfill_4628.py --since 2026-10-21 --until 2026-10-26` dry run, then `--apply` for 10-21, 10-22, 10-26 only — never 10-25 (its pre-guard echo double count would lower).
+2. **Re-run the weekly expert analyzer once, now that wave 10 is deployed** (#5442): every expert/weekly-priority record lapsed ~10-26 23:15Z, so those surfaces are empty until Mon 11-02 14:00Z — an earlier run spends production AI budget; your call.
+3. **MacroFactor future-row cleanup** (#5431, ready now — wave 10 is deployed): `python3 scripts/macrofactor_future_rows_cleanup.py` (dry run: six rows 2026-10-27..11-01), then `--apply --backup <path>`. The classifier blocked the session from deleting them.
+4. **Apple Health additive repair** (#5440, ready now — wave 10 is deployed): `AWS_MAX_ATTEMPTS=1 python3 scripts/hae_additive_backfill_4628.py --since 2026-10-21 --until 2026-10-26` dry run, then `--apply` for 10-21, 10-22, 10-26 only — never 10-25 (its pre-guard echo double count would lower).
 5. **Pin `📌 Setup: seat 7` on Cycling and log one ride** (#5010 one-session test).
 6. Deferred by you: #4887 GH_POSTURE_TOKEN · #5061/#3759 tape + photos (`calibration-deadman` red until then) · #5123 one evening check-in reply (also unblocks #5106/#5211) · #4968 watch health settings · the 136-box epic tick-sweep (`epic_box_sweep_diff.md` in the session scratchpad) · a second watch hypothesis (Zone 2 → recovery) still on the dated cut-over — re-register too?
 7. Carried: #5390 protocol now ruled (A) — box 1 waits on your next gym day; #4638 vendor rename test (deferred 10-26).
@@ -53,7 +54,7 @@
 **Build beat:** none — the shipped work is owner-facing (schedules, coaching notes, ingestion); nothing reader-visible
 **Docs:** `docs/CONVENTIONS.md` §1b + ADR-165 + CLAUDE.md schedule line (wave 8); `docs/integrations/hevy-changes-2026-10.md` re-verified (wave 7); `docs/integrations/gym-workflow-2026-10.md` §1b logging; `docs/engines/HYPOTHESIS.md`; `docs/SCHEMA.md` rows; `docs/alarm_citations.json` re-cited (this wrap)
 **Decisions:** ADR-165 filed (one platform timezone, reversing fixed-UTC crons) in PR #5427
-**Main:** green (335cd22d) — HEAD minted no CI/CD run of its own: bot-push-no-dispatch (expected, not a swallow); PR #5455 in CI at wrap
+**Main:** wave 10 (e19b3855e) deployed ~16:26Z, smoke running at the amend; the prior full run (335cd22d) green
 **Incidents:** 1 row added — the 9-hour laptop pause that split the 10-27 archive/re-draft (10-27 had no active draft ~06:27–15:26Z)
 **Stash/hooks:** clean — the reaper removed 22 released/merged lanes; 1 dirty pre-existing (`fix/walk-completeness`) left untouched
 **Closures:** #5413, #5049, #4250, #5402, #5097, #5376, #4633, #5318 commented with outcome verdicts + live proof (#5411, #5420 auto) · DoD: scanned=7, hits 1 — #4633's post-close residual disposition (informational, not blocking)
