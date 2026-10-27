@@ -175,6 +175,14 @@ def _back_offs_then_warmups(
     return warmup_sets.attach_and_note(blocks, movements, rationale)
 
 
+def _compose_notes(
+    blocks: list[ExerciseBlock], load_catalog: dict[str, Any], load_floors: dict[str, Any], history_index: dict[str, list], target_date: str
+) -> dict[str, Any]:
+    """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record."""
+    movements = load_catalog.get("movements") or {}
+    return lift_note.compose_blocks(blocks, movements, load_floors=load_floors, history_index=history_index, target_date=target_date)
+
+
 def _sequence_line(day_entry: dict[str, Any]) -> str:
     """The rationale line naming where the session came from: the sequence position (and what advanced it), or the weekday grid."""
     if day_entry.get("source") != "session_sequence":
@@ -335,9 +343,7 @@ def full_body_routines(
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = lift_note.compose_blocks(
-        blocks, load_catalog.get("movements") or {}, load_floors=load_floors, history_index=history_index, target_date=inputs.target_date
-    )
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
