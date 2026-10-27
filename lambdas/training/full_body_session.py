@@ -24,7 +24,8 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import in_block_variant, load_ramp, program_structure, routine_generator as _rg, variant_rotation, warmup_sets
+from training import in_block_variant, lift_note, load_ramp, program_structure, routine_generator as _rg, variant_rotation, warmup_sets
+from training.rep_scheme import round_to_implement_kg
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
     GeneratorInputs,
@@ -126,9 +127,14 @@ def _blocks_from_prescription(
 
 
 def _apply_back_offs(
-    blocks: list[ExerciseBlock], used: list[dict[str, Any]], rationale: list[str], floors: dict[str, Any] | None = None
+    blocks: list[ExerciseBlock],
+    used: list[dict[str, Any]],
+    rationale: list[str],
+    floors: dict[str, Any] | None = None,
+    catalog_movements: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Set every back-off to −10 % of its top set (rounded DOWN to 0.5 kg). Runs AFTER the
+    """Set every back-off to −10 % of its top set, rounded to the implement (#5428: `rep_scheme.round_to_implement` —
+    a barbell back-off off 215 is 195, never the 192.9 the old 0.5 kg floor wrote). Runs AFTER the
     floor, which stamps the top set; a top set with no load leaves its back-offs unloaded.
 
     #4090: the back-off load is recorded as `back_off_floor_kg` on the movement's audit row,
@@ -144,7 +150,8 @@ def _apply_back_offs(
         top = block.sets[kinds.index("top")].weight_kg
         if not top or pct is None:
             continue
-        back_off_kg = _floor_half_kg(float(top) * pct / 100.0)
+        equipment = ((catalog_movements or {}).get(block.movement_key) or {}).get("equipment")
+        back_off_kg = round_to_implement_kg(float(top) * pct / 100.0, equipment) if equipment else _floor_half_kg(float(top) * pct / 100.0)
         for s_obj, sp in zip(block.sets, e["sets"]):
             if sp["kind"] == "back_off":
                 s_obj.weight_kg = back_off_kg
@@ -164,8 +171,16 @@ def _back_offs_then_warmups(
 ) -> dict[str, Any]:
     """The last two passes over a block's sets, in this order: §3's back-offs, then #5049's warm-up
     climb — prepended after every load pass, so it climbs to the load the block finally carries."""
-    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors)
+    load_floors["back_offs"] = _apply_back_offs(blocks, used, rationale, load_floors, movements)
     return warmup_sets.attach_and_note(blocks, movements, rationale)
+
+
+def _compose_notes(
+    blocks: list[ExerciseBlock], load_catalog: dict[str, Any], load_floors: dict[str, Any], history_index: dict[str, list], target_date: str
+) -> dict[str, Any]:
+    """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record."""
+    movements = load_catalog.get("movements") or {}
+    return lift_note.compose_blocks(blocks, movements, load_floors=load_floors, history_index=history_index, target_date=target_date)
 
 
 def _sequence_line(day_entry: dict[str, Any]) -> str:
@@ -325,6 +340,10 @@ def full_body_routines(
     )
     load_floors = _session_loads(blocks, load_catalog, history_index, weight_index, inputs, week_cfg, rationale, ramp_week, ramp_p, deload)
     warmups = _back_offs_then_warmups(blocks, used, rationale, load_floors, load_catalog.get("movements") or {})
+    # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
+    # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
+    # on inputs_snapshot["lift_notes"], never on the wire
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
@@ -374,7 +393,8 @@ def full_body_routines(
             "warmups": warmups,
             "session_shape": shape,
             "rotation": rotation,  # #5075: routine_repo.draft_versioned records its ledger_writes
-        },
+        }
+        | note_record,
         rationale=rationale,
         caps=caps,
     )

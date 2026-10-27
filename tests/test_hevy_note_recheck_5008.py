@@ -68,20 +68,28 @@ def _ir(critics_rec: dict) -> RoutineSpec:
     return ir
 
 
+# #5428: the verdict block is the stored record's preview (`critics.notes_block`, shown by stage 2 and the chat);
+# it no longer rides a Hevy note, so C1's verdict word is checked on the preview and the note is left as it was.
 def test_c1_the_hevy_note_prints_flag_for_every_change_that_applied_nothing():
+    from coach import critics
+
     ir = _ir(_live_10_24_critics(applied=False))
+    before = ir.exercises[0].notes
     tp._place_block_on_first_exercise(ir)
-    note = ir.exercises[0].notes
-    assert note.startswith("GATE: ECG + feel.")  # the owner's cue stays ahead of the block
-    assert "- muscle-defense FLAG:" in note and "- rate-advocate FLAG:" in note
-    assert "CHANGE" not in note
+    assert ir.exercises[0].notes == before and "RED TEAM" not in ir.exercises[0].notes
+    preview = critics.notes_block(ir)
+    assert "- muscle-defense FLAG:" in preview and "- rate-advocate FLAG:" in preview
+    assert "CHANGE" not in preview
 
 
 def test_c1_mutation_control_an_applied_change_still_prints_change_on_the_note():
+    from coach import critics
+
     ir = _ir(_live_10_24_critics(applied=True))
     tp._place_block_on_first_exercise(ir)
-    note = ir.exercises[0].notes
-    assert "- muscle-defense CHANGE:" in note and "- rate-advocate FLAG:" in note
+    preview = critics.notes_block(ir)
+    assert "- muscle-defense CHANGE:" in preview and "- rate-advocate FLAG:" in preview
+    assert "RED TEAM" not in ir.exercises[0].notes
 
 
 # ── C2 ────────────────────────────────────────────────────────────────────────────────

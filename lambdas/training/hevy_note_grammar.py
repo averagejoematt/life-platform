@@ -29,7 +29,7 @@ from typing import Optional, Union
 
 GRAMMAR_VERSION = "hevy-note-grammar@1.0.0"
 
-Rpe = Union[float, int, tuple[float, float]]
+Rpe = Union[float, int, tuple[float, float], list[float]]
 
 # ── budgets (standard §7), in phone lines ───────────────────────────────────────────────────────────────────────────
 # PHONE_CHARS is an INFERENCE (a conservative ~6.1-inch phone line); one screenshot of the next committed routine
@@ -97,9 +97,9 @@ def fmt_num(v: float) -> str:
 
 
 def fmt_rpe(rpe: Rpe) -> str:
-    """8 -> '8'; (8, 9) -> '8–9' (en dash, the standard's range mark)."""
-    if isinstance(rpe, tuple):
-        lo, hi = rpe
+    """8 -> '8'; (8, 9) or [8, 9] -> '8–9' (en dash, the standard's range mark)."""
+    if isinstance(rpe, (tuple, list)):
+        lo, hi = rpe[0], rpe[-1]
         return fmt_num(lo) if float(lo) == float(hi) else f"{fmt_num(lo)}–{fmt_num(hi)}"
     return fmt_num(rpe)
 
@@ -164,9 +164,10 @@ def reason_line(word: str, why: str) -> str:
 
 
 # Hevy's PREVIOUS column vs the prescribed row: more than one implement step away needs a reason.
-def delta_word(row_lb: Optional[float], previous_lb: Optional[float], step_lb: float) -> Optional[str]:
-    """'Heavier' / 'Lighter' when the row is more than one step from PREVIOUS, else None (no reason needed)."""
-    if row_lb is None or previous_lb is None or step_lb <= 0:
+def delta_word(row_lb: Optional[float], previous_lb: Optional[float], step_lb: Optional[float]) -> Optional[str]:
+    """'Heavier' / 'Lighter' when the row is more than one step from PREVIOUS, else None (no reason needed). A load with
+    no fixed step (a stack) is never judged."""
+    if row_lb is None or previous_lb is None or not step_lb or step_lb <= 0:
         return None
     diff = float(row_lb) - float(previous_lb)
     if diff > step_lb + 1e-6:
@@ -223,7 +224,7 @@ AFTER_LINE = "After: end watch cardio, restart Hevy."
 
 def talk_words_for(rpe: Rpe) -> str:
     """The fixed talk-test words for an RPE (the top of a range decides)."""
-    hi = float(rpe[1] if isinstance(rpe, tuple) else rpe)
+    hi = float(rpe[-1] if isinstance(rpe, (tuple, list)) else rpe)
     if hi <= 5:
         return "full sentences"
     if hi <= 7:

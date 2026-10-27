@@ -175,8 +175,9 @@ def _lint_previous(ex: LintExercise, lines: list[str], where: str, out: list[Pro
     reasons = [ln for ln in lines[1:] if g.REASON_RE.match(ln) or ln.startswith("W set: up to")]
     for i, r in enumerate(_working(ex.rows)):
         prev = _previous_for(ex.previous_lb, i)
-        step = g.implement_step_lb(ex.kind, prev) or 5.0
-        word = g.delta_word(r[1], prev, step)
+        # a stack or cable load has no fixed step (standard §5: "a value he has logged on that machine"), so it is
+        # never judged — the same rule as the producer (`lift_note.delta_word`)
+        word = g.delta_word(r[1], prev, g.implement_step_lb(ex.kind, prev))
         if not word:
             continue
         if not reasons:
@@ -317,7 +318,8 @@ def lint_routine(rt: LintRoutine) -> LintResult:
         body = note
         if i == 0:
             session, body = _split_session(note)
-            if session is None:
+            if session is None and any(e.kind not in ("cardio", "mobility") for e in exs):
+                # a cardio-only session has no big lifts and no load rule: no block (session_block.place_on_first)
                 out.append(Problem("L12", where, "exercise 1 does not open with the session block"))
             else:
                 _lint_session(session, note, out)

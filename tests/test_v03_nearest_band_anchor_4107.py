@@ -56,7 +56,7 @@ os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from training import load_ramp, program_structure, routine_generator  # noqa: E402
+from training import load_ramp, program_structure, rep_scheme, routine_generator  # noqa: E402
 
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
 MOVEMENTS = CATALOG["movements"]
@@ -185,7 +185,9 @@ def test_the_heavy_squat_with_no_in_band_history_gets_a_week_1_load_from_the_nea
     discounted = 265 * LB * 0.90
     assert top == load_ramp.load_step_kg(discounted * 0.60), top / discounted  # nearest 5 lb (#4388)
     assert row["ramp"]["discount_pct"] == 10 and row["ramp"]["ramp_pct"] == 60
-    assert "nearest band you have lifted in: 270-279" in _block(ideal, "squat_barbell").notes
+    # #5428: the nearest-band provenance is the stored record (the dry-run, the chat), never the Hevy note
+    assert "nearest band you have lifted in: 270-279" in ideal.inputs_snapshot["lift_notes"]["squat_barbell"]["detail"]
+    assert "band" not in _block(ideal, "squat_barbell").notes
 
 
 def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_band():
@@ -196,7 +198,8 @@ def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_ban
         assert (rows[key]["anchor_band"], rows[key]["anchor_date"], rows[key]["fallback"]) == (band, day, "nearest_band"), key
         top = _ws(_block(ideal, key))[0].weight_kg
         assert top and top == load_ramp.load_step_kg(lb * LB * 0.90 * 0.60), key  # nearest 5 lb (#4388)
-        assert [s.weight_kg for s in _ws(_block(ideal, key))[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
+        equipment = (routine_generator._load_json("movement_catalog.json")["movements"].get(key) or {}).get("equipment")
+        assert [s.weight_kg for s in _ws(_block(ideal, key))[1:]] == [rep_scheme.round_to_implement_kg(top * 0.9, equipment)] * 2  # #5428
 
 
 def test_mutation_control_without_the_fallback_the_heavy_anchors_come_out_unloaded():
@@ -274,7 +277,8 @@ def test_a_this_cycle_anchor_ramps_from_the_undiscounted_load():
     # the 140 lb x 10 he moved; the fixture logs no RPE, so the hold is the load itself (rpe_basis absent)
     assert row["ramp"]["hold"]["applies"] is True and row["ramp"]["hold"]["rpe_basis"] == "absent"
     assert _ws(_block(ideal, "lat_pulldown"))[0].weight_kg == pytest.approx(140 * LB)
-    assert "no RPE logged" in _block(ideal, "lat_pulldown").notes
+    assert "no RPE logged" in ideal.inputs_snapshot["lift_notes"]["lat_pulldown"]["detail"]  # #5428: the record, not the note
+    assert "no RPE logged" not in _block(ideal, "lat_pulldown").notes
 
 
 def test_the_discount_decision_is_fixed_for_the_program_not_re_aged_each_session():

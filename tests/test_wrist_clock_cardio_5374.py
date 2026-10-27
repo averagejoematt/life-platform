@@ -54,17 +54,21 @@ def _cases():
 
 
 # ── box 1: one rule line per KIND x machine pair, under the grammar ────────────────────
-def test_every_kind_machine_pair_renders_one_clock_rule_line_on_the_grid_with_at_most_three_numbers():
+def test_every_kind_machine_pair_renders_one_clock_on_the_grid_with_at_most_three_numbers():
+    """#5428: line 1 is the level and the effort; the clock lives on the ⌚ line (tempo / hills / intervals) and reads
+    back (`clock_of`) as the same structure — on the 2/5/10 grid, ≤ 3 numbers, adding up to the block's minutes, the ⌚
+    line within its phone budget, and no minutes on line 1 (the set row shows them)."""
     offenders = []
     for kind, machine, facts, minutes in _cases():
         note, audit = _compose(kind, machine, minutes, facts)
         line1 = note.split("\n")[0]
-        m = cn.LINE1_RE.match(line1)
-        clock = m.group("clock") if m else None
-        shape = wc.parse_rule(clock)
-        why = f"{kind}/{machine}/{minutes}/{facts}: {line1!r}"
+        why = f"{kind}/{machine}/{minutes}/{facts}: {note!r}"
+        if not cn.LINE1_RE.match(line1) or re.search(r"\b\d+ min\b", line1):
+            offenders.append(f"line 1 off the grammar or restating minutes — {why}")
+            continue
+        shape = cn.clock_of(note, minutes)
         if shape is None:
-            offenders.append(f"no clock rule under RULE_RE — {why}")
+            offenders.append(f"no clock reads back — {why}")
             continue
         if wc.off_grid(shape):
             offenders.append(f"change points off the 2/5/10 grid {wc.off_grid(shape)} — {why}")
@@ -72,10 +76,15 @@ def test_every_kind_machine_pair_renders_one_clock_rule_line_on_the_grid_with_at
             offenders.append(f"a change point is not a whole minute — {why}")
         if len(wc.numbers_to_remember(shape)) > wc.MAX_NUMBERS:
             offenders.append(f"{wc.numbers_to_remember(shape)} to remember — {why}")
-        if shape["total_min"] != minutes or int(m.group("minutes")) != minutes:
+        if shape["total_min"] != minutes or audit["clock"]["total_min"] != minutes:
             offenders.append(f"the clock adds up to {shape['total_min']}, not {minutes} — {why}")
-        if audit["clock_rule"] != clock or audit["clock_off_grid"] != []:
+        clock_lines = [ln for ln in note.split("\n") if ln.startswith(cn.CLOCK_PREFIX)]
+        if any(len(ln) > cn.CLOCK_LINE_MAX for ln in clock_lines):
+            offenders.append(f"a ⌚ line over {cn.CLOCK_LINE_MAX} characters — {why}")
+        if (audit["clock_rule"] is None) != (not clock_lines) or audit["clock_off_grid"] != []:
             offenders.append(f"the audit does not carry the rule — {why}")
+        if audit["kind"] in ("tempo", "hills", "intervals") and not clock_lines and shape["levels"]:
+            offenders.append(f"a hard kind with no ⌚ line — {why}")
     assert offenders == [], "\n".join(offenders)
 
 
@@ -117,14 +126,15 @@ def test_no_note_says_program_or_preset():
 
 def _shape(kind, machine="cycling", minutes=30, facts=None):
     note, audit = _compose(kind, machine, minutes, {"last_level": 10} if facts is None else facts)
-    return cn.clock_of(note), note.split("\n")[0], audit
+    return cn.clock_of(note, minutes), note.split("\n")[0], audit
 
 
-def test_easy_and_the_incline_walk_hold_one_level_with_a_check_in():
+def test_easy_and_the_incline_walk_hold_one_level_and_carry_no_clock_line():
+    """#5428: an easy ride is one level — nothing to watch, so no ⌚ line (the corpus's 10-26 ride is one line)."""
     for kind, machine in (("easy", "cycling"), ("incline_treadmill_walk", "treadmill")):
-        shape, line1, _ = _shape(kind, machine)
+        shape, line1, audit = _shape(kind, machine)
         assert [c["type"] for c in shape["clauses"]] == ["hold"] and len(shape["levels"]) == 1, line1
-        assert shape["check_in_every"] == cn.EASY_CHECK_IN_MINUTES and shape["change_points"] == []
+        assert shape["change_points"] == [] and audit["clock_rule"] is None
 
 
 def test_tempo_holds_the_menus_tempo_level_with_its_talk_test():
@@ -132,7 +142,10 @@ def test_tempo_holds_the_menus_tempo_level_with_its_talk_test():
     assert [c["type"] for c in shape["clauses"]] == ["hold"]
     assert shape["levels"] == [10 + cm.TEMPO_LEVEL_STEP] == [audit["level"]]
     lo, hi = tc.charter_value("cardio_menu.blocks.tempo.rpe")
-    assert f"RPE {lo}–{hi}, {tc.charter_value('cardio_menu.blocks.tempo.talk_test')}" in line1
+    assert f"RPE {lo}–{hi} ({tc.charter_value('cardio_menu.blocks.tempo.talk_test')})" in line1
+    assert line1 == f"Recumbent · L{10 + cm.TEMPO_LEVEL_STEP} · RPE {lo}–{hi} (short phrases)"
+    assert audit["clock_rule"] == "at min 5 and 15, full sentences → one level up, a few words → one down"
+    assert shape["check_in_every"] == cn.TEMPO_CHECK_EVERY_MIN
 
 
 def test_hills_climb_and_descend_on_the_step_minutes_and_the_treadmill_climbs_the_menus_band():
@@ -143,13 +156,14 @@ def test_hills_climb_and_descend_on_the_step_minutes_and_the_treadmill_climbs_th
     assert up["every"] == down["every"] == cm.HILL_STEP_MINUTES
     assert shape["top_level"] == 10 + cn.HILL_CLIMB_STEPS * cn.HILL_LEVEL_STEP and shape["base_level"] == 10
     assert "the hill program" not in line1
-    # the treadmill: from the walk's dose to the top of the menu's starting band, one charter step at a time
+    assert line1 == "Recumbent · L10 → L14 · RPE 5–7 (short phrases)"
+    # the treadmill: from the walk's dose, `HILL_CLIMB_STEPS` charter steps up and back
     t_shape, t_line, audit = _shape("hills", "treadmill", facts={})
-    band_top = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.starting_dose.incline_pct")[1]
     step = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.step.incline_pct")
-    assert t_shape["unit"] == "%" and t_shape["top_level"] == band_top and t_shape["base_level"] == audit["incline_pct"]
+    top = audit["incline_pct"] + cn.HILL_CLIMB_STEPS * step
+    assert t_shape["unit"] == "%" and t_shape["top_level"] == top and t_shape["base_level"] == audit["incline_pct"]
     assert t_shape["clauses"][1]["step"] == step
-    assert f"–{band_top:g}% at" in t_line  # the dose words name the band the rule climbs
+    assert f"% → {top:g}% · " in t_line  # line 1 names the grades the clock climbs
 
 
 def test_intervals_are_the_menus_set_sprinted_on_the_clock():
@@ -163,22 +177,28 @@ def test_intervals_are_the_menus_set_sprinted_on_the_clock():
     assert sprint["value"] == 10 + cn.INTERVAL_LEVEL_STEP
     hard = [b for b in shape["blocks"] if b[2] == 10 + cn.INTERVAL_LEVEL_STEP]
     assert len(hard) == efforts and all(b[1] - b[0] == work for b in hard), line1
-    assert f"RPE {tc.charter_value('cardio_menu.blocks.intervals.rpe_hard_minutes')} on the hard minutes" in line1
+    assert f"hard RPE {tc.charter_value('cardio_menu.blocks.intervals.rpe_hard_minutes')} (a few words)" in line1
 
 
 def test_with_no_level_on_record_the_rule_rides_his_own_base():
-    shape, line1, _ = _shape("intervals", facts={})
-    assert line1.split(" · ")[3].startswith("base for ") and "base+2 for" in line1
+    note, _ = _compose("intervals", "cycling", 30, {})
+    shape = cn.clock_of(note, 30)
+    assert note.split("\n")[0] == "Recumbent · your level · hard RPE 8 (a few words)"
+    assert note.split("\n")[1] == "⌚ ride clock: hard 2 min at min 6, 10, 14, 18, 22; easy between."
     assert shape["levels"] == []  # no level is invented
 
 
 # ── box 3: the rule line first, then the why; the coach skill says so ──────────────────
-def test_the_rule_line_comes_first_and_the_why_second():
+def test_the_level_line_comes_first_and_the_clock_second():
+    """#5428: line 1 the level and effort, line 2 the ⌚ clock on a hard kind; the generated why stays on the audit."""
     for kind in ("easy", "tempo", "hills", "intervals"):
-        note, _ = _compose(kind, "cycling", 30, {"last_level": 10})
+        note, audit = _compose(kind, "cycling", 30, {"last_level": 10})
         lines = note.split("\n")
-        assert len(lines) == 2 and cn.LINE1_RE.match(lines[0]).group("clock"), note
-        assert cn.LINE1_RE.match(lines[1]) is None and not wc.RULE_RE.search(lines[1]), note
+        assert cn.LINE1_RE.match(lines[0]), note
+        if kind == "easy":
+            assert lines == [lines[0]], note
+        else:
+            assert len(lines) == 2 and lines[1].startswith(cn.CLOCK_PREFIX), note
 
 
 def test_the_coach_session_skill_says_a_cardio_prescription_is_a_clock_rule():
@@ -278,8 +298,9 @@ def test_the_clock_leaves_the_blocks_minutes_and_movement_minutes_unchanged():
             before = cm.movement_minutes(spec.exercises)
             assert rg.attach_cardio_cues(spec, cardio_index={}, whoop_index={}, aerobic_block=None) == 1
             after = cm.movement_minutes(spec.exercises)
-            shape = cn.clock_of(spec.exercises[0].notes)
-            assert before == after == minutes == shape["total_min"] == spec.inputs_snapshot["cardio_plan"]["movement_minutes"], (
+            shape = cn.clock_of(spec.exercises[0].notes, minutes)
+            total = spec.inputs_snapshot["cardio_notes"][0]["clock"]["total_min"]
+            assert before == after == minutes == shape["total_min"] == total == spec.inputs_snapshot["cardio_plan"]["movement_minutes"], (
                 kind,
                 machine,
             )

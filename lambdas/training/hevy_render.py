@@ -15,15 +15,14 @@ on PERFORMED sets only), so those ride in the exercise's Pinned Routine Note
 rest and supersets have native homes.
 
 THE ORDERING RULE (so a reason line is never the part a cut lands on):
-  1. Exercise 0's note opens with the session block (`routine_title.format_why_note`; #5428:
-     the session line, the low-energy line and the load rule).
+  1. Exercise 0's note opens with the session block (#5428: the session line, the low-energy line
+     and the load rule), written ONCE — by `session_block.place_on_first` on the draft paths, and the
+     compiler's WHY (`routine_title.format_why_note`) only when no block is there.
   2. Each exercise's OWN note opens with its prescription line: the progression / stall-step
      reason (`routine_generator._progress_block`, `draft_custom_session.attach_step_due`), the
      cardio dose line (`cardio_note` line 1), the minimum-session cue (`disruption._cue`).
-  3. History cues, the warm-up clause, the wake-recovery session block (`place_after_prescription`,
-     called by `tools_hevy_routine._apply_recovery_adaptation`), the branch menu
-     (`hevy_compiler._place_routine_note`) and the critics' block
-     (`tools_plan._place_block_on_first_exercise`) come after.
+  3. Anything else comes after: the branch menu (`hevy_compiler._place_routine_note`). Since #5428
+     the wake-recovery band block and the critics' block no longer reach the wire.
 
 VISIBLE_NOTE_CHARS is RETIRED as a window (#5428): the owner's in-app screenshots (2026-10-26) show
 Hevy renders an exercise note IN FULL, so length costs scroll, not visibility. No problem is raised
@@ -226,22 +225,6 @@ def _hit(where: str, offset: int, leads: bool = True) -> dict[str, Any]:
 
 def _reason_field(text: str) -> str:
     return "stall_step" if _STALL_RE.match(text) else "progression_reason"
-
-
-def _leads_with_prescription(line: str) -> bool:
-    """Does this line open with a prescription line (a progression / stall reason, a cardio dose, a minimum cue)?"""
-    return bool(_STALL_RE.match(line) or _PROGRESSION_RE.match(line) or LINE1_RE.match(line) or line.startswith(_MINIMUM_PREFIX))
-
-
-def place_after_prescription(note: str | None, block: str) -> str:
-    """The ordering rule for a session block a draft pass adds to exercise 0 (the recovery menu, #3938):
-    it goes AFTER the exercise's own prescription line, never ahead of it, so the reason stays in the
-    visible window. A note that opens with no prescription line takes the block at its head, as before."""
-    note = (note or "").strip()
-    first, _, rest = note.partition("\n")
-    if _leads_with_prescription(first):
-        return "\n\n".join(p for p in (first, block, rest.strip()) if p)
-    return "\n\n".join(p for p in (block, note) if p).strip()
 
 
 def expected_reasons(ir: Any) -> list[dict[str, str]]:

@@ -265,7 +265,7 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 | L1 | No banned token (§5). |
 | L2 | No restated rows: `N × reps`, `Top 4–6 @`, `@ ‹n› lb`, `Last:` or `‹n› min ·` on cardio line 1. |
 | L3 | Line-1 grammar by type: effort, carry, cardio or session. The session block is exactly its three lines. |
-| L4 | Text agrees with the rows: `‹n› sets today` (and the old `‹n› sets of`) = working rows; `W set: up to ‹n›` = W reps; a row more than one step from PREVIOUS carries a reason in the right direction. PREVIOUS comes from `inputs_snapshot["previous_loads"]` (keyed by movement key: one load in lb, or one per working row), and the check reports itself "not checked" when that is absent. |
+| L4 | Text agrees with the rows: `‹n› sets today` (and the old `‹n› sets of`) = working rows; `W set: up to ‹n›` = W reps; a row more than one step from PREVIOUS carries a reason in the right direction (a stack or cable load has no fixed step, so it is not judged — the producer's rule too). PREVIOUS comes from `inputs_snapshot["previous_loads"]` (keyed by movement key: one load in lb, or one per working row), and the check reports itself "not checked" when that is absent. |
 | L5 | Loadable steps on every working and W row of a barbell or dumbbell. W rows ascend below the work. |
 | L6 | One effort expression on a lift's line 1. |
 | L7 | Budgets (§7). |

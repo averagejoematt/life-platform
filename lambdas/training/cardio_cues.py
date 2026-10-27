@@ -163,6 +163,7 @@ def attach_cardio_cues(
     stamped = 0
     for ex in targets:
         key = str(getattr(ex, "movement_key", "") or "")
+        index = next(i for i, e in enumerate(exercises) if e is ex)
         tid = _tid(key)
         sessions = (cardio_index or {}).get(tid or "") or []
         facts = cardio_facts(tid, cardio_index, whoop_index) if sessions else {}
@@ -201,6 +202,9 @@ def attach_cardio_cues(
             hr_ceiling_bpm=None if constraint else recent_aerobic.HR_CEILING_BPM,
             placement_why=why,
             previous=previous,
+            # #5428: the watch step when a Hevy block follows (owner protocol 2026-10-27), and an author's route why
+            followed=cardio_note.after_line_needed(exercises, index),
+            route_why=cardio_note.route_why_of(existing),
         )
         placed.append(audit["kind"])
         if existing and not cardio_note.is_composed(existing) and existing != note:
@@ -209,6 +213,8 @@ def attach_cardio_cues(
         ex.notes = note
         audits.append({"movement_key": key, **audit})
         stamped += 1
+    # #5428: the After line follows the list's order as it stands now (a block placed after the cardio one adds it)
+    cardio_note.apply_after_lines(exercises)
     plan = {
         "version": cardio_menu.CARDIO_MENU_VERSION,
         "charter_version": audits[0].get("charter_version") if audits else None,

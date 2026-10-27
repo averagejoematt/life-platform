@@ -25,7 +25,7 @@ hand-authored weight-band ladder as the public "read of him"; the ladder
 
 ## How a stance derives from evidence
 
-Weekly (Sunday 17:00 UTC — `schedule="cron(0 17 ? * SUN *)"` on `coach-history-summarizer` in `cdk/stacks/compute_stack.py`, 10 AM Pacific in daylight time — with the history compression) + event-triggered mid-week refreshes
+Weekly (Sunday 10:00 AM Pacific wall clock, all year — `cron(0 10 ? * SUN *)`, `coach-history-summarizer`'s row in `config/schedules.json`, #4284 / ADR-165 — with the history compression) + event-triggered mid-week refreshes
 (#534, deterministic event context only). Grounding is **only the coach's own already-validated
 artifacts, never raw physiological values** (`RAW_VITAL_RE`, coach/stance_lint.py:26-31, moved out by #4217):
 

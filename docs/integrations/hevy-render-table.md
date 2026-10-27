@@ -29,14 +29,14 @@ A field can pass the Hevy API and still never reach the gym floor. #3938 is the 
 
 ## 2. The ordering rule (so a reason line is never the part a cut lands on)
 
-1. **Exercise 1's note opens with the session block** (`routine_title.format_why_note`; #5428, `docs/coaching/HEVY_NOTE_STANDARD.md` §3.1): the session line "Upper heavy · RPE 8–9 on big lifts", the low-energy line and the load rule, then a blank line. A minimum or travel session's label rides here, because the title is the `Phase - Type - N - Y` convention at commit.
+1. **Exercise 1's note opens with the session block, once** (#5428, `docs/coaching/HEVY_NOTE_STANDARD.md` §3.1): the session line "Upper heavy · RPE 8–9 on big lifts", the low-energy line and the load rule, then a blank line. The draft paths write it (`session_block.place_on_first`); every compile site passes `session_block.why_note_for(ir, routine_title.format_why_note(ir))`, which is empty when the block is already on exercise 1, so the compiler adds it only for a routine drafted before #5428. A minimum or travel session's label rides here, because the title is the `Phase - Type - N - Y` convention at commit.
 2. **Each exercise's own note opens with its prescription line:**
    - the progression or stall-step reason (`routine_generator._progress_block` and `draft_custom_session.attach_step_due` put it first), for example "+5 lb to 184.9 lb: 2 top sets at the top of 6-10, RPE <= 9, 10-14 and 10-16; reps back to 6."
    - the cardio dose line (`cardio_note` line 1), for example "Treadmill · 30 min · incline 8% at 2.5 mph walk · RPE 4–6, full sentences"
    - the minimum-session cue (`disruption._cue`)
-3. **Everything else comes after:** the history cue, the warm-up clause ("Warm up: band pull-aparts, then the ramp sets."), the wake-recovery session block (`hevy_render.place_after_prescription`, called by `tools_hevy_routine._apply_recovery_adaptation` on the daily draft path, puts it after exercise 1's prescription line), the branch menu (`hevy_compiler._place_routine_note` puts it after exercise 1's own note), and the critics' block (`tools_plan._place_block_on_first_exercise` appends it).
+3. **Everything else comes after:** the branch menu (`hevy_compiler._place_routine_note` puts it after exercise 1's own note). Since #5428 the wake-recovery band block, the history cue, the warm-up clause and the critics' block no longer reach the wire (a changed row gets one plain clause instead).
 
-On exercise 1 the result is: the session line, then exercise 1's prescription line, then the recovery block, then the menus. A cut lands on a menu, never on a reason. `tests/test_hevy_render_5083.py` runs the daily path's own pass (`_apply_recovery_adaptation`) over the fixture, so the test reads the real wire.
+On exercise 1 the result is: the session block, then exercise 1's own note (effort first), then the menus. `tests/test_hevy_render_5083.py` runs the daily path's own pass (`_apply_recovery_adaptation`) over the fixture, so the test reads the real wire.
 
 One path keeps its block ahead of the reason on purpose: the standing-constraint gate (`draft_standing_constraint.apply_gate`, #5000) still heads exercise 1's note, because it is the check made before the first set. When that path runs, `render_check` reports the reason as `not_leading`. That is the honest result, not a false alarm.
 

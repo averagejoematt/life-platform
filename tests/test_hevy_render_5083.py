@@ -157,26 +157,37 @@ def test_the_wire_carries_each_field_on_its_declared_field():
     assert note.startswith(why + "\n\n+5 lb to ")
     assert note.index("+5 lb to") < note.index("Last: 185 lb") < note.index(warmup_sets.CUE_MARKER) < note.index("CHOOSE YOUR BRANCH")
     assert row["notes"].startswith("Step due: +2 reps to 10 at 160 lb")
-    assert exs[4]["notes"].split("\n")[0].startswith("Treadmill · 30 min · incline ")
-    assert exs[5]["notes"].split("\n")[0].startswith("Recumbent bike · 30 min · level 11 ")
+    assert exs[4]["notes"].split("\n")[0].startswith("Treadmill · ")  # #5428 line 1: "Treadmill · <mph> mph, <grade>% · RPE …"
+    assert exs[5]["notes"].split("\n")[0].startswith("Recumbent · L11 ")  # #5428 line 1
     # #5428: the session block heads the note and exercise 1's own note follows it directly (no window: notes show in full)
     assert why.split("\n")[0] == "Upper heavy · RPE 8–9 on big lifts"
     assert note.index("+5 lb to") == len(why) + 2
 
 
 def test_the_daily_draft_path_keeps_the_reason_in_the_window():
-    """The real wire (#5083 review): `_action_draft` runs `_apply_recovery_adaptation`, which adds the
-    multi-line wake-recovery block to exercise 0. It must follow the reason line, never precede it."""
+    """The real wire (#5083 review), as #5428 changed it: `_action_draft` runs `_apply_recovery_adaptation`, which
+    heads exercise 0 with the three-line session block (`training.session_block`); the compiler's separate WHY line
+    is then suppressed (`why_note_for` — the block's first line IS the session line), and exercise 0's own note —
+    its reason line first — follows the block after one blank line. No wake-recovery band block reaches the wire."""
+    from training import session_block
+
     from mcp.tools_hevy_routine import _apply_recovery_adaptation
 
     ir, why = _fixture()
     _apply_recovery_adaptation(ir, {}, "2026-10-19")
-    body = _compile(ir, why)
+    wire_why = session_block.why_note_for(ir, why)
+    assert wire_why == ""
+    body = _compile(ir, wire_why)
     note = body["routine"]["exercises"][0]["notes"]
-    assert note.startswith(why + "\n\n+5 lb to ")
-    assert note.index("+5 lb to") < note.index("ADAPT BY WAKE RECOVERY") < note.index("CHOOSE YOUR BRANCH")
-    rc = hevy_render.render_check(body, session_note=why, ir=ir)
+    block = session_block.block_of(ir)
+    assert note.startswith(block + "\n\n+5 lb to ")
+    assert note.count(session_block.LOW_ENERGY_LINE) == 1  # ONE session block: the compiler's WHY was suppressed
+    assert "ADAPT BY WAKE RECOVERY" not in note and note.index("+5 lb to") < note.index("CHOOSE YOUR BRANCH")
+    rc = hevy_render.render_check(body, session_note=block, ir=ir)
+    # Hevy shows notes in full (the 2026-10-27 screenshots): the ~150-char window is retired (#5428 Lane D), so the
+    # render table's own problems are none and the reason LEADS exercise 0's own note
     assert _render_problems(rc) == [], rc["problems"]
+    assert session_block.split(note)[1].startswith("+5 lb to ")
     assert _status(rc)["progression_reason"] == "lands" and _status(rc)["stall_step"] == "lands"
 
 
@@ -224,16 +235,6 @@ def test_a_long_session_note_is_the_lint_budget_not_a_window():
     assert _status(rc)["progression_reason"] == "lands"
     assert not any("window" in p for p in rc["problems"]), rc["problems"]
     assert any(p.startswith(hevy_render.NOTE_LINT_PREFIX + "L12 ") for p in rc["problems"]), rc["problems"]
-
-
-def test_place_after_prescription():
-    assert (
-        hevy_render.place_after_prescription("+5 lb to 190 lb: why. Last: x.\nmore", "BLOCK")
-        == "+5 lb to 190 lb: why. Last: x.\n\nBLOCK\n\nmore"
-    )
-    assert hevy_render.place_after_prescription("Last: 185 lb x 10.", "BLOCK") == "BLOCK\n\nLast: 185 lb x 10."
-    assert hevy_render.place_after_prescription(None, "BLOCK") == "BLOCK"
-    assert hevy_render.place_after_prescription("Minimum: top set 4-6", "B") == "Minimum: top set 4-6\n\nB"
 
 
 def test_a_warmup_after_a_working_set_is_a_problem():

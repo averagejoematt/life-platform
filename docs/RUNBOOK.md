@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-10-25 (v8.6.0 — 89 MCP tools, 83-module package, 108 Lambdas, 20 data sources)
+Last updated: 2026-10-27 (v8.6.0 — 89 MCP tools, 83-module package, 108 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 108 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -1633,7 +1633,7 @@ See ADR-058/077 in `docs/DECISIONS.md` for the design rationale.
 
 The monthly AWS budget — **$215 base** (ADR-133 amendment 2026-08-28, #2801; was $75, then $85, then $150), floating to **$252 in reader-traffic surge mode** (ADR-133) — is enforced by a two-component system. For August 2026 only, a dated `_TEMP_CEILING_WINDOW` raised that pair to $200/$235; it auto-reverts 2026-09-01 with no deploy or manual step.
 
-- **`life-platform-cost-governor`** Lambda (every 8h — `cron(0 0/8 * * ? *)`, `cdk/stacks/operational_stack.py`) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
+- **`life-platform-cost-governor`** Lambda (every 8h — `cron(0 1/8 * * ? *)` Pacific wall clock, its `config/schedules.json` row) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
 - **`lambdas/ai/budget_guard.py`** (bundled module, #781) — calling code uses `allow(feature)` to gate AI by tier.
 
 **Tier behavior** (priority: protect daily brief longest):
@@ -1914,7 +1914,7 @@ aws lambda get-function-configuration --function-name hevy-routine-cron \
   --query 'Layers[*].Arn' --output text   # → empty
 
 # Cron rule is disabled?
-aws events describe-rule --name hevy-routine-cron-weekly --query 'State' --output text   # → DISABLED
+aws scheduler get-schedule --name hevy-routine-cron-weekly --query 'State' --output text   # → DISABLED (EventBridge Scheduler since #4284)
 
 # Both SSM gates default false?
 aws ssm get-parameter --name /life-platform/hevy/cron_enabled --query 'Parameter.Value' --output text   # → false
@@ -1925,7 +1925,8 @@ aws ssm get-parameter --name /life-platform/hevy/autoreg_add_load_enabled --quer
 
 ```bash
 aws ssm put-parameter --name /life-platform/hevy/cron_enabled --value true --overwrite
-aws events enable-rule --name hevy-routine-cron-weekly
+# the schedule is CDK-owned (#4284, ADR-165): set "enabled": true on config/schedules.json's
+# hevy-routine-cron#HevyRoutineCronRule row, merge, then: bash deploy/cdk_deploy.sh LifePlatformOperational
 ```
 
 To turn it back off — flip either gate to false. The Lambda no-ops on the next fire.
@@ -1973,7 +1974,7 @@ The cron emits a `RoutineConflict` CloudWatch metric and returns `pushed=false` 
 1. Check Hevy status (`https://status.hevyapp.com/`).
 2. Inspect failed payloads in the DLQ (CloudWatch logs for `hevy-routine-cron` log the throw).
 3. If transient: redrive via the existing DLQ consumer (`life-platform-dlq-consumer`, every 6h).
-4. If persistent: disable the cron (`aws events disable-rule --name hevy-routine-cron-weekly`) until Hevy recovers.
+4. If persistent: set the SSM gate `/life-platform/hevy/cron_enabled` to `false` (the handler no-ops) until Hevy recovers; the schedule itself (`hevy-routine-cron-weekly`, EventBridge Scheduler since #4284) is CDK-owned — disable it through its config/schedules.json row, never the console.
 
 ### Nightly pre-draft plan source — the v0.4 revert (#5080)
 

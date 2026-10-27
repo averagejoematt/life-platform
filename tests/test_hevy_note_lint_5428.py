@@ -304,7 +304,7 @@ def test_previous_is_reported_not_checked_when_absent_and_passes_with_a_reason()
     assert any(n.startswith("L4 PREVIOUS") for n in res.not_checked)
     rt["previous_supplied"] = True
     rt["exercises"][1]["previous_lb"] = 80.0  # 90 lb rows, two steps up: "Volume day: chase 12." is the reason
-    rt["exercises"][2]["previous_lb"] = [160.0, 160.0]  # per-row PREVIOUS, no move
+    rt["exercises"][2]["previous_lb"] = [100.0, 100.0]  # a cable stack has no fixed step: never judged (lift_note's rule too)
     res = _lint(rt)
     assert res.problems == [] and not any(n.startswith("L4 PREVIOUS") for n in res.not_checked), res.lines()
 

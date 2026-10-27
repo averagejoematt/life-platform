@@ -71,7 +71,7 @@ python3 mcp_bridge.py
 
 **Site API is primarily read-only** — limited writes exist only for interactive features (votes, follows, checkins, suggestions, user-submitted findings). Core data queries must never write. Rate limiting is DynamoDB-backed per-IP atomic counters (`rate_limiter.py`; the in-memory dict is fail-open fallback only).
 
-**Crons are fixed UTC** — bar zoned `daily-brief` (CONVENTIONS §1b).
+**Crons follow `platform_timezone`** (CONVENTIONS §1b).
 
 **Shared code — ONE bundle, no layer (#781)** — `docs/CONVENTIONS.md` §1.
 

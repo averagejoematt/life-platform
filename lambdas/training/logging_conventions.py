@@ -116,6 +116,11 @@ CONVENTIONS_LINE = (
 ROUTINE_NOTE_RULE = "count steps, type the count in yards"
 """The owner's own rule, written back into the carry block's Hevy note (#5373 box 5)."""
 
+CARRY_STEPS_LINE = "Steps go in the yards box."
+"""#5428 (HEVY_NOTE_STANDARD §3.5): the same rule as the carry note's own line, in the standard's voice."""
+CARRY_LOAD_CLAUSE = "pick the load per hand"
+"""#5428 (§3.5): the carry note's load clause — per hand from 2026-10-27 (`CARRY_TOTAL_UNTIL`), never "total carried"."""
+
 STRIDE_FIELD = "walking_step_length_in"
 STRIDE_WINDOW_DAYS = 14
 STRIDE_MIN_DAYS = 5

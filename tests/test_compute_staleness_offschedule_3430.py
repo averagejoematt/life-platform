@@ -190,32 +190,28 @@ class TestTheComputeCronConstantCannotDrift:
 
     def test_the_deadline_constants_match_daily_metrics_computes_cdk_cron(self):
         m = re.match(r"cron\((\d+) (\d+) ", schedule_rows.expr("daily-metrics-compute"))  # #4284: the table row
-        assert m, "could not read daily-metrics-compute's schedule= from cdk/stacks/compute_stack.py"
+        assert m, "could not read daily-metrics-compute's row from config/schedules.json"
+        assert schedule_rows.rows()["daily-metrics-compute"].get("timezone") == "America/Los_Angeles", "the row left the platform zone"
         minute, hour = int(m.group(1)), int(m.group(2))
         assert (hour, minute) == (
-            brief.COMPUTE_DEADLINE_UTC_HOUR,
-            brief.COMPUTE_DEADLINE_UTC_MINUTE,
+            brief.COMPUTE_DEADLINE_PT_HOUR,
+            brief.COMPUTE_DEADLINE_PT_MINUTE,
         ), (
-            "daily-metrics-compute's cron moved to "
-            f"{hour:02d}:{minute:02d}Z but daily_brief_lambda still assumes "
-            f"{brief.COMPUTE_DEADLINE_UTC_HOUR:02d}:{brief.COMPUTE_DEADLINE_UTC_MINUTE:02d}Z (#3430)"
+            "daily-metrics-compute's schedule moved to "
+            f"{hour:02d}:{minute:02d} PT but daily_brief_lambda still assumes "
+            f"{brief.COMPUTE_DEADLINE_PT_HOUR:02d}:{brief.COMPUTE_DEADLINE_PT_MINUTE:02d} PT (#3430)"
         )
 
     def test_the_deadline_is_earlier_than_the_daily_briefs_own_schedule(self):
         # If it were not, the scheduled brief itself would stop emitting and the
         # alarm would go dark — the failure mode this gate must never cause.
+        # #4284 (ADR-165): both rows are Pacific wall clock in the one platform zone.
         row = schedule_rows.rows()["daily-brief"]  # #4284: the table row
         m = re.match(r"cron\((\d+) (\d+) ", row["expression"])
-        assert m, "could not read daily-brief's schedule= from cdk/stacks/email_stack.py"
+        assert m, "could not read daily-brief's row from config/schedules.json"
+        assert row.get("timezone") == schedule_rows.rows()["daily-metrics-compute"].get("timezone")
         brief_minute, brief_hour = int(m.group(1)), int(m.group(2))
-        tz = row.get("timezone")
-        if tz:  # #4284: a zoned schedule — the EARLIEST UTC instant it can fire at (PDT) is the strict bound
-            from datetime import datetime, timezone
-            from zoneinfo import ZoneInfo
-
-            zone = ZoneInfo(tz)
-            brief_hour = min(datetime(2026, mo, 15, brief_hour, brief_minute, tzinfo=zone).astimezone(timezone.utc).hour for mo in (7, 12))
         assert (brief_hour, brief_minute) > (
-            brief.COMPUTE_DEADLINE_UTC_HOUR,
-            brief.COMPUTE_DEADLINE_UTC_MINUTE,
+            brief.COMPUTE_DEADLINE_PT_HOUR,
+            brief.COMPUTE_DEADLINE_PT_MINUTE,
         ), "the daily brief now runs at or before the compute deadline — every scheduled run would go silent (#3430)"

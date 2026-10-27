@@ -20,65 +20,38 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import effort_ceilings
+from training import effort_ceilings, hevy_note_grammar
 
 _EFFORT = effort_ceilings.class_bands()
-_C, _L = (f"{_EFFORT[k][0]:g}–{_EFFORT[k][1]:g}" for k in (effort_ceilings.COMPOUNDS, effort_ceilings.LAST_ISOLATION_SET))
 
-_CUE_LABEL = {"heavy": "HEAVY", "moderate": "MODERATE", "volume": "VOLUME", "accessory": "ACCESSORY", "carry": "CARRY"}
-
-
-def _n(count: int, noun: str) -> str:
-    return f"{count} {noun}" + ("" if count == 1 else "s")
+CARRY_CUE = hevy_note_grammar.CARRY_CUE
+CARRY_STEPS_LINE = hevy_note_grammar.CARRY_STEPS_LINE
 
 
-def _rep_groups(sets: list[dict[str, Any]]) -> str:
-    """'3 sets of 8–12' from the sets themselves; consecutive sets with one rep range read as one group."""
-    groups: list[list[Any]] = []
-    for st in sets:
-        reps = list(st.get("reps") or [])
-        if groups and groups[-1][1] == reps:
-            groups[-1][0] += 1
-        else:
-            groups.append([1, reps])
-    return ", then ".join(f"{_n(c, 'set')} of {r[0]}–{r[-1]}" if r else _n(c, "set") for c, r in groups)
+def effort_line(rpe: tuple[Any, Any] | Any, last_set_rpe: tuple[Any, Any] | Any | None = None) -> str:
+    """#5428 (standard §3.2): line 1 of every lift note — `RPE a–b[, last set RPE c–d]`. Lane D's
+    `hevy_note_grammar.effort_line`, so the producer and the linter read one grammar."""
+    return hevy_note_grammar.effort_line(rpe, last_set_rpe)
 
 
 def exposure_cue(intensity: str, sets: list[dict[str, Any]], stride: dict[str, Any] | None = None) -> str:
-    """#5317: the cue text, GENERATED from the exposure's own sets array (count, rep range, effort band) — never a literal.
+    """The exposure's note text — #5428 (the Hevy note standard): the EFFORT, never the sets.
 
-    The press anchor's cue said '3 sets of 6–10' while the anchor prescribed ONE set (#5266); a coach chat read the cue and
-    drafted 3 sets. Every exposure's `cue` is stamped from this function after every trim (time, deload), and
-    `full_body_session` re-derives it for the sets a block actually carries (the Minimum Viable Session's top set + one).
-
-    #5373: a carry's dose reads "N steps (~X yd, est. from unloaded stride)" when `stride` (his measured stride,
-    `logging_conventions.trailing_stride`) is given — steps only without it — and the cue writes back his own rule ("count
-    steps, type the count in yards") and the load convention (PER HAND: one dumbbell's weight, owner's one-hand rule from 2026-10-27)."""
-    label = _CUE_LABEL.get(intensity, str(intensity).upper())
-    if intensity == "heavy":
-        tops = [st for st in sets if st.get("kind") == "top"]
-        backs = [st for st in sets if st.get("kind") == "back_off"]
-        top_reps = list((tops[0] if tops else {}).get("reps") or [])
-        line = f"{label}: {_n(len(tops), 'top set')}" + (f" of {top_reps[0]}–{top_reps[-1]}" if top_reps else "") + f" @ RPE {_C}"
-        if backs:
-            pct = int(backs[0].get("pct_of_top") or 100) - 100
-            line += f", then {_n(len(backs), 'back-off')} at {'−' if pct < 0 else '+'}{abs(pct)} % of the top set"
-        return line + " (charter ceilings)."
+    #5317 made the cue a function of the sets because a literal '3 sets of 6–10' sat beside a one-set prescription and a
+    coach chat drafted 3 sets from it. #5428 retires the class: Hevy shows every set row (load x reps, W rows, PREVIOUS),
+    so the note never restates a count, a rep range or a load — line 1 is the charter's effort band, the one thing a row
+    cannot carry. A compound exposure reads the compounds band; an accessory reads it with the last isolation set's band
+    (a one-set accessory IS its last set); a carry is the standard's §3.5 block (per hand from 2026-10-27, steps in the
+    yards box). `stride` is accepted for the callers' signature (#5373) and no longer printed: the estimated distance is
+    the chat's, not the set's."""
+    del stride
     if intensity == "carry":
-        from training.logging_conventions import ROUTINE_NOTE_RULE, render_steps  # noqa: PLC0415
-
-        steps = sorted({int(st.get("distance_meters") or 0) for st in sets})
-        dose = f" of {render_steps(steps[0], stride)}" if len(steps) == 1 and steps[0] else ""
-        return (
-            f"{label}: {len(sets)} {'carry' if len(sets) == 1 else 'carries'}{dose} @ RPE {_C}, tall and braced; {ROUTINE_NOTE_RULE}; "
-            "load: per hand (one dumbbell's weight), his own pick on the first exposure, logged — the engine anchors from that log "
-            "(charter compound ceiling)."
-        )
+        return "\n".join((hevy_note_grammar.carry_line1(_EFFORT[effort_ceilings.COMPOUNDS]), CARRY_CUE, CARRY_STEPS_LINE))
     if intensity == "accessory":
         if len(sets) == 1:
-            return f"{label}: {_rep_groups(sets)} @ RPE {_L} (charter last-set ceiling)."
-        return f"{label}: {_rep_groups(sets)} @ RPE {_C}; last set RPE {_L} (charter ceilings)."
-    return f"{label}: {_rep_groups(sets)} @ RPE {_C} (charter compound ceiling)."
+            return effort_line(_EFFORT[effort_ceilings.LAST_ISOLATION_SET])
+        return effort_line(_EFFORT[effort_ceilings.COMPOUNDS], _EFFORT[effort_ceilings.LAST_ISOLATION_SET])
+    return effort_line(_EFFORT[effort_ceilings.COMPOUNDS])
 
 
 def _default_sets(spec: dict[str, Any], intensity: str) -> list[dict[str, Any]]:

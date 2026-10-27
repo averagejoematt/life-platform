@@ -173,10 +173,14 @@ def test_back_offs_stay_10_percent_under_the_ramped_top_set_and_the_cue_names_th
     for key in HEAVY_ANCHORS:
         block = next(b for b in ideal.exercises if b.movement_key == key)
         top = _ws(block)[0].weight_kg
-        assert [s.weight_kg for s in _ws(block)[1:]] == [routine_generator._floor_half_kg(top * 0.9)] * 2
+        equipment = MOVEMENTS[key].get("equipment")
+        # #5428: the back-off is rounded to the implement (a 5-lb barbell step), not floored to 0.5 kg
+        assert [s.weight_kg for s in _ws(block)[1:]] == [rep_scheme.round_to_implement_kg(top * 0.9, equipment)] * 2
         assert ideal.inputs_snapshot["load_floors"]["movements"][key]["back_off_floor_kg"] == _ws(block)[1].weight_kg
-        assert "Week 1 load" in block.notes and "60% of your band anchor" in block.notes
-        assert "never up" in block.notes
+        # #5428: the ramp's provenance is the stored record, never the Hevy note
+        detail = ideal.inputs_snapshot["lift_notes"][key]["detail"]
+        assert "Week 1 load" in detail and "60% of your band anchor" in detail
+        assert "Week 1 load" not in block.notes and "never up" not in block.notes and "band anchor" not in block.notes
 
 
 def test_moderate_anchors_ride_the_same_ramp():
@@ -311,7 +315,8 @@ def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
         if e["movement_key"] in HEAVY_ANCHORS:
             assert e["load"]["top_kg"] == _top(ideal, e["movement_key"]), "planner and draft disagree"
             assert 60.0 <= e["load"]["ramp"]["pct_of_discounted_base"] <= 65.0
-            assert e["load"]["back_off_kg"] == routine_generator._floor_half_kg(e["load"]["top_kg"] * 0.9)
+            equipment = MOVEMENTS[e["movement_key"]].get("equipment")
+            assert e["load"]["back_off_kg"] == rep_scheme.round_to_implement_kg(e["load"]["top_kg"] * 0.9, equipment)
 
 
 def test_plan_next_session_reports_an_unreadable_anchor_by_name():

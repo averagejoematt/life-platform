@@ -74,48 +74,27 @@ def _norm(title: str) -> str:
     return re.sub(r"\s+", " ", (title or "").strip().lower())
 
 
-# ── #5317: the cue is the sets' own ──────────────────────────────────────────────────────────
-_HEAVY = re.compile(r"^HEAVY: (\d+) top sets? of (\d+)–(\d+) @ RPE [\d.]+–[\d.]+(?:, then (\d+) back-offs? at −(\d+) % of the top set)?")
-_GROUP = re.compile(r"(\d+) sets? of (\d+)–(\d+)")
-_CARRY_CUE = re.compile(r"^CARRY: (\d+) carr(?:y|ies) of (\d+) steps @ RPE")
-_LABEL = {"heavy": "HEAVY", "moderate": "MODERATE", "volume": "VOLUME", "accessory": "ACCESSORY", "carry": "CARRY"}
+# ── #5317: the cue is the sets' own — #5428: it no longer restates them at all ───────────────────────────────────────
+# #5317 generated the cue's set count and rep range from the sets array so the two could not disagree. #5428 (the Hevy note
+# standard) retires the class: Hevy shows every row, so the cue states the effort band only and CANNOT name a count, a rep
+# range or a load. The walk now fails on any cue that restates the rows, or whose line 1 is not the effort grammar.
+_EFFORT_LINE = re.compile(
+    r"^RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?(?:, last set RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?)?(?: · pick the load per hand)?$"
+)
+_RESTATES = re.compile(
+    r"\d+\s*sets?\b|\bsets? of\b|\btop sets?\b|back-offs?|\d+\s*(?:carr(?:y|ies)|steps)\b|\d+\s*(?:kg|lb)\b|@", re.IGNORECASE
+)
 
 
 def cue_mismatches(intensity: str, cue: str, sets: list[dict]) -> list[str]:
-    """Every way `cue` disagrees with `sets`: the label, the set count, the rep range (or the carry's step dose)."""
+    """Every way `cue` breaks the note standard: line 1 not the effort grammar, or any restatement of the set rows."""
     out: list[str] = []
-    if not cue.startswith(_LABEL[intensity] + ":"):
-        out.append(f"label: {cue[:20]!r} for a {intensity} exposure")
-    if intensity == "heavy":
-        m = _HEAVY.match(cue)
-        tops = [s for s in sets if s["kind"] == "top"]
-        backs = [s for s in sets if s["kind"] == "back_off"]
-        if not m:
-            return out + [f"unparseable heavy cue {cue!r}"]
-        if int(m.group(1)) != len(tops) or [int(m.group(2)), int(m.group(3))] != list(tops[0]["reps"]):
-            out.append(f"top set: cue {m.group(1)} x {m.group(2)}–{m.group(3)} vs sets {len(tops)} x {tops[0]['reps']}")
-        if int(m.group(4) or 0) != len(backs):
-            out.append(f"back-offs: cue {m.group(4) or 0} vs sets {len(backs)}")
-        if backs and int(m.group(5)) != 100 - int(backs[0]["pct_of_top"]):
-            out.append(f"back-off %: cue −{m.group(5)} vs sets {backs[0]['pct_of_top']} % of top")
-        return out
-    if intensity == "carry":
-        m = _CARRY_CUE.match(cue)
-        if not m:
-            return out + [f"unparseable carry cue {cue!r}"]
-        if int(m.group(1)) != len(sets) or {int(m.group(2))} != {int(s["distance_meters"]) for s in sets}:
-            out.append(f"carry: cue {m.group(1)} x {m.group(2)} steps vs sets {[s.get('distance_meters') for s in sets]}")
-        return out
-    head = cue.split("@", 1)[0]
-    said = [(int(n), [int(lo), int(hi)]) for n, lo, hi in _GROUP.findall(head)]
-    groups: list[list] = []
-    for s in sets:
-        if groups and groups[-1][1] == list(s["reps"]):
-            groups[-1][0] += 1
-        else:
-            groups.append([1, list(s["reps"])])
-    if said != [(n, r) for n, r in groups]:
-        out.append(f"sets: cue says {said} vs sets {groups}")
+    line1 = cue.split("\n", 1)[0]
+    if not _EFFORT_LINE.match(line1):
+        out.append(f"line 1: {line1[:40]!r} is not the effort line for a {intensity} exposure")
+    hit = _RESTATES.search(cue)
+    if hit:
+        out.append(f"restates the rows ({hit.group(0)!r}) beside {len(sets)} set(s): {cue[:60]!r}")
     return out
 
 
@@ -159,14 +138,21 @@ def test_5317_the_press_cue_reads_one_set_of_6_to_10():
     """Acceptance (the live line's specimen): the shoulders+arms press anchor prescribes 1 set; its cue says 1 set of 6–10."""
     press = next(e for e in _rx(SA)["exposures"] if e["pattern"] == "overhead_press")
     assert len(press["sets"]) == 1 and press["sets"][0]["reps"] == [6, 10]
-    assert press["cue"].startswith("MODERATE: 1 set of 6–10 @ RPE ") and "3 sets" not in press["cue"]
+    # #5428: the one-set press's cue names no set count at all, so a chat cannot read '3 sets' off it (the #5266 specimen)
+    assert press["cue"].startswith("RPE ") and "set" not in press["cue"]
 
 
 def test_5317_mutation_control_the_literal_cue_reds_the_walk():
     """Mutation-proven: put the pre-#5317 literal back (each intensity's cue a fixed string, the 3-set moderate among them)
     and the walk names the 1-set press, the 2-set pulldowns and the 3- and 4-set accessories."""
-    literal = {i: program_structure.EXPOSURES[i]["cue"] for i in program_structure.EXPOSURES}
-    literal["carry"] = "CARRY: 2 carries of 40 s @ RPE 8–9"
+    # the pre-#5428 cues, which restated the rows (#5428: the walk reds on any restatement, not only a wrong count)
+    literal = {
+        "heavy": "HEAVY: 1 top set of 4–6 @ RPE 8–9, then 2 back-offs at −10 % of the top set (charter ceilings).",
+        "moderate": "MODERATE: 3 sets of 6–10 @ RPE 8–9 (charter compound ceiling).",
+        "volume": "VOLUME: 3 sets of 8–12 @ RPE 8–9 (charter compound ceiling).",
+        "accessory": "ACCESSORY: 3 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings).",
+        "carry": "CARRY: 2 carries of 40 s @ RPE 8–9",
+    }
     with patch.object(
         program_structure, "exposure_cue", lambda intensity, sets, **_kw: literal[intensity]
     ):  # #5373: a carry passes stride=
@@ -397,7 +383,7 @@ def test_b3_no_load_is_inferred_from_the_shrug():
         ]
     blocks = [b for b in ideal.exercises if b.movement_key == CARRY]
     assert len(blocks) == 1 and all(s.weight_kg is None and s.distance_meters and not s.duration_seconds for s in blocks[0].sets)
-    assert "his own pick on the first exposure" in blocks[0].notes
+    assert "pick the load per hand" in blocks[0].notes  # #5428 (standard §3.5): his pick, per hand
     rx = _rx(SA)
     load_ramp.annotate_prescription(rx, MOVEMENTS, shrug_hist, weights, target_date="2026-10-30", week=5)
     carry = next(e for e in rx["exposures"] if e["movement_key"] == CARRY)

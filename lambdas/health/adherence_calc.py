@@ -521,16 +521,21 @@ def _as_prescribed_by_kind(movements: list[dict[str, Any]], muscle_of: dict[str,
     return out
 
 
-def _cardio_shape(prescribed_note: str, performed_exs: list[dict[str, Any]]) -> dict[str, Any]:
+def _cardio_shape(
+    prescribed_note: str, performed_exs: list[dict[str, Any]], prescribed_minutes: int | None = None, movement_key: str | None = None
+) -> dict[str, Any]:
     """#5374: `wrist_clock.grade` of the performed block's own note (`training_notes.performed_shape`) against the clock
-    rule the routine's note prescribed (`cardio_note.clock_of`). Pure over its inputs; every absence is a named status."""
+    rule the routine's note prescribed (`cardio_note.clock_of`). Pure over its inputs; every absence is a named status.
+    #5428: the prescribed note no longer states its minutes, so the block's own (`prescribed_minutes`) close its clock,
+    and the movement key lets his treadmill shorthand ("3.3 / 1.5 incline") read as speed / incline."""
     from training import cardio_note, wrist_clock
     from training.training_notes import performed_shape
 
     note = " / ".join(str(ex.get("notes") or "").strip() for ex in performed_exs if str(ex.get("notes") or "").strip())
     secs = sum(int(st.get("duration_seconds") or 0) for ex in performed_exs for st in ex.get("sets") or [])
-    performed = performed_shape(note, round(secs / 60) if secs else None) if note else None
-    return wrist_clock.grade(cardio_note.clock_of(prescribed_note), performed)
+    machine = movement_key or " ".join(str(ex.get("title") or "") for ex in performed_exs)
+    performed = performed_shape(note, round(secs / 60) if secs else None, machine=machine) if note else None
+    return wrist_clock.grade(cardio_note.clock_of(prescribed_note, prescribed_minutes), performed)
 
 
 def _session_verdict(by_kind: dict[str, Any], whole: dict[str, Any]) -> dict[str, Any]:
@@ -593,6 +598,8 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "sets": sets,
                 "working_sets": _working(ex.sets),
                 "notes": getattr(ex, "notes", "") or "",
+                # #5428: the block's minutes (its set rows) — a composed cardio note no longer states them
+                "minutes": round(sum(int(getattr(st, "duration_seconds", 0) or 0) for st in ex.sets or []) / 60) or None,
                 "ceiling": ceiling,
                 "progression": _progression_for(ex.movement_key, ex.sets, catalog, alias_titles, limits),
             }
@@ -644,7 +651,15 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "pct": pct,
                 "intensity": intensity,
                 "kind": kind,  # #5058: lifting and cardio are graded apart
-                **({"shape": _cardio_shape(p["notes"], performed_exs_by_tid.get(p["template_id"], []))} if kind == KIND_CARDIO else {}),
+                **(
+                    {
+                        "shape": _cardio_shape(
+                            p["notes"], performed_exs_by_tid.get(p["template_id"], []), p.get("minutes"), p["movement_key"]
+                        )
+                    }
+                    if kind == KIND_CARDIO
+                    else {}
+                ),
             }
         )
         muscle = _catalog_entry_for(p["movement_key"], catalog).get("primary_muscle", "unknown")

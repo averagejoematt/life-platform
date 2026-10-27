@@ -321,10 +321,11 @@ def _compound_band() -> tuple[float, float] | None:
 
 
 def _session_block(day: str, band: tuple[float, float] | None) -> str:
-    """#5428: the session block that heads exercise 1's note (hevy_note_grammar.session_block): the session line
-    `‹Day› · RPE a–b on big lifts`, the low-energy line and the load rule. The compiler places it, then a blank line,
-    then exercise 1's own note. With no charter band there is no RPE to state, so the block is the day alone (the note
-    linter reports it)."""
+    """#5428: the session block (hevy_note_grammar.session_block): the session line `‹Day› · RPE a–b on big lifts`, the
+    low-energy line and the load rule. ONE placement: the draft paths write the block on exercise 1 themselves
+    (`session_block.place_on_first`) and every compile site passes `session_block.why_note_for(ir, format_why_note(ir))`,
+    which suppresses this WHY whenever the block is already there. So this text reaches the wire only for a routine
+    drafted before #5428 (a restamp), as the same three lines. With no charter band the block is the day alone."""
     from training import hevy_note_grammar
 
     return hevy_note_grammar.session_block(day, band) if band else day
@@ -349,26 +350,12 @@ _ROLE_DAY: dict[str, tuple[str, tuple[float, float] | None]] = {
 _ROLE_WHY = {role: _session_block(day, band) for role, (day, band) in _ROLE_DAY.items()}
 
 
-def _chat_session_block(first_line: str) -> str | None:
-    """A chat-drafted session whose first note line IS a session line (`Shoulders + arms · RPE 8–9 on big lifts`) gets
-    the whole session block, so the chat path heads exercise 1 the way the generator does (#5428)."""
-    from training import hevy_note_grammar as g
-
-    m = g.SESSION_LINE_RE.match(first_line)
-    if not m or not m.group("day"):
-        return None
-    return "\n".join((first_line, g.LOW_ENERGY_LINE, g.LOAD_RULE_LINE))
-
-
 def format_why_note(ir: RoutineSpec) -> str:
     """One short plain-language line. No raw metrics, no guilt framing."""
     if getattr(ir, "source_action", "") == "draft_custom":
         # Custom-authored session (ADR-069): surface the user's own first note
         # line rather than a generator-flavored rationale that doesn't apply.
         lines = [ln for ln in (ir.notes or "").splitlines() if ln.strip()]
-        block = _chat_session_block(lines[0].strip()) if lines else None
-        if block:
-            return block
         return lines[0].strip()[:140] if lines else "Custom session — manually programmed."
     if getattr(ir, "source_action", "") == "disruption" and (ir.notes or "").strip():
         # #5083: the title is the convention's at commit, so the minimum/travel label rides the session note

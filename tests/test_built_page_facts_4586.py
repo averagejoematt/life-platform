@@ -86,7 +86,7 @@ def built_page_findings(page: str, module: str) -> list[str]:
     gov_expr = json.loads((ROOT / "config" / "schedules.json").read_text(encoding="utf-8"))["schedules"]["life-platform-cost-governor"][
         "expression"
     ]
-    cadence = re.fullmatch(r"cron\(0 0/(\d+) \* \* \? \*\)", gov_expr)
+    cadence = re.fullmatch(r"cron\(0 \d+/(\d+) \* \* \? \*\)", gov_expr)  # #4284: Pacific wall clock, 1/8
     if not cadence or f"every {cadence.group(1)} hours" not in text:
         out.append(
             f"the page's forecast cadence does not match the cost governor's schedule ({cadence.group(1) if cadence else 'not found'}h)"

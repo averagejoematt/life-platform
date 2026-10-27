@@ -1,91 +1,89 @@
-"""tests/test_hevy_notes_golden_e2e_5428.py — #5428 D2: freshly RENDERED routines lint clean.
+"""tests/test_hevy_notes_golden_e2e_5428.py — #5428: freshly RENDERED routines lint clean, with ONE session block.
 
 The acceptance box is "a style linter runs in the suite over freshly rendered golden routines". The corpus test
 (test_hevy_note_lint_5428.py) proves the linter on hand-written A-grade notes; THIS test proves the producers write
-them. It runs today's real producers — the session line (`routine_title.format_why_note`), the progression reason
-(`routine_generator._progress_block`), the warm-up rows and cue (`warmup_sets.attach_warmups`), the cardio composer
-(`cardio_note.compose`) — through the one compiler, then lints the wire body.
+them. It runs the REAL generator (lane B's lift notes, warm-ups and loads) over two offline renders — the 10-18 upper
+re-draft (`test_warmup_sets_5049._redraft`) and the first v0.4 lower-heavy (`test_program_session_4064_4147._generate`)
+— adds lane C's composed cardio block and a stretching block, places lane A's session block the way the draft paths do
+(`session_block.place_on_first`), compiles through the one compiler with the WHY every compile site passes
+(`session_block.why_note_for`), and lints the wire body.
 
-It is EXPECTED TO FAIL (strict xfail) until lanes A, B and C of #5428 land (the producers still write the old
-grammar: "+5 lb to 190 lb: …", "Last: …", "Warm up: …, then the ramp sets.", "level 11 at 13.8 mph"). It is xfail,
-not skipped, so it keeps running, and strict, so the merge that makes it pass reds until that lane removes the
-marker. D2 then widens it to the real draft path for the five program roles plus one draft_custom session, through `_run_stage_2` with the recorded 10-26 critic verdicts, with
-`inputs_snapshot["previous_loads"]` supplied, and flips HEVY_NOTE_LINT_MODE to enforce.
+ONE session block on exercise 1, on every path: the draft paths (the MCP draft the nightly predraft calls, and the chat's
+draft_custom) place it on the IR; the cron and the restamp compile the stored IR, and `why_note_for` suppresses the
+compiler's WHY when the block is already there; a routine drafted before #5428 gets the block from the WHY instead
+(`routine_title.format_why_note`). Exactly once either way.
+
+Still open for D2: the full five-role draft path through `_run_stage_2` with the recorded critic verdicts, and enforce
+mode at the commit gate.
 """
 
 from __future__ import annotations
 
-import pytest
-from training import hevy_note_lint, warmup_sets
-from training.cardio_note import compose
+from training import hevy_note_lint, routine_title, session_block
+from training.cardio_note import apply_after_lines, compose
 from training.hevy_compiler import to_create_body
-from training.routine_generator import _progress_block
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
-from training.routine_title import format_why_note
-
-LB = 0.45359237
-CATALOG = {
-    "barbell_bench_press": {
-        "hevy_template_id_hint": "79D0BB3A",
-        "anchor_family": "bench",
-        "equipment": "barbell",
-        "title": "Bench Press (Barbell)",
-    },
-    "one_arm_db_row": {"hevy_template_id_hint": "F1E57334", "anchor_family": "row", "equipment": "dumbbell", "title": "Dumbbell Row"},
-    "cycling": {"hevy_template_id_hint": "D8F7F851", "equipment": "machine", "primary_muscle": "cardio", "title": "Cycling"},
-}
 
 
-def _sess(date: str, kg: float, reps: int, rpe: float, n: int = 2) -> dict:
-    return {"date": date, "sets": [{"weight_kg": kg, "reps": reps, "rpe": rpe} for _ in range(n)]}
-
-
-def _working(kg: float, lo: int, hi: int, n: int = 3) -> list[Set]:
-    return [Set(type="normal", weight_kg=kg, reps=lo, rep_range_start=lo, rep_range_end=hi) for _ in range(n)]
-
-
-def _rendered_upper_heavy() -> tuple[RoutineSpec, str]:
-    bench_kg = 185 * LB
-    bench = ExerciseBlock(movement_key="barbell_bench_press", sets=_working(bench_kg, 6, 10), rest_seconds=180)
-    hist = {"79D0BB3A": [_sess("2026-10-16", bench_kg, 10, 8), _sess("2026-10-14", bench_kg, 10, 8)]}
-    _progress_block(bench, {"movements": CATALOG}, hist, {}, None, [])
-    row = ExerciseBlock(movement_key="one_arm_db_row", sets=_working(90 * LB, 8, 12), rest_seconds=120)
+def _with_cardio(ir: RoutineSpec) -> RoutineSpec:
+    """Lane C's composed easy ride (the real composer), a stretching block after it, and its After line."""
     ride, _ = compose(
-        movement_key="cycling", minutes=30, target_date="2026-10-28", kind="easy", facts={"last_level": 11}, verdict={"verdict": "hold"}
+        movement_key="cycling", minutes=30, target_date=ir.target_date, kind="easy", facts={"last_level": 11}, verdict={"verdict": "hold"}
     )
-    ir = RoutineSpec(
-        routine_id="e2e-upper-heavy",
-        target_date="2026-10-28",
-        archetype="upper",
-        source_action="draft",
-        inputs_snapshot={
-            "calendar": {"session_role": "upper_heavy"},
-            hevy_note_lint.PREVIOUS_LOADS_KEY: {"barbell_bench_press": 185, "one_arm_db_row": 90},
-        },
-        exercises=[bench, row, ExerciseBlock(movement_key="cycling", sets=[Set(type="normal", duration_seconds=1800)], notes=ride)],
-    )
-    warmup_sets.attach_warmups(ir.exercises, CATALOG)
-    return ir, format_why_note(ir)
+    ir.exercises.append(ExerciseBlock(movement_key="cycling", sets=[Set(type="normal", duration_seconds=1800)], notes=ride))
+    ir.exercises.append(ExerciseBlock(movement_key="stretching", sets=[Set(type="normal", duration_seconds=900)], notes=""))
+    apply_after_lines(ir.exercises)
+    return ir
 
 
-@pytest.mark.xfail(
-    reason="#5428: the producers still write the old note grammar until lanes A/B/C land; the lane that makes it pass removes this marker",
-    strict=True,
-)
-def test_a_freshly_rendered_routine_lints_clean():
-    ir, why = _rendered_upper_heavy()
-    body = to_create_body(ir, lambda k: CATALOG.get(k, {}).get("hevy_template_id_hint", "X"), why_note=why)
-    res = hevy_note_lint.lint_wire(body, ir, catalog=CATALOG)
-    assert res.problems == [], res.lines()
+def _renders() -> dict[str, RoutineSpec]:
+    from test_program_session_4064_4147 import _generate
+    from test_warmup_sets_5049 import _redraft
+
+    return {"10-18 upper volume re-draft": _redraft(), "09-25 v0.4 lower heavy": _generate("2026-09-25")[0]}
 
 
-def test_the_e2e_fixture_reaches_the_linter():
-    """The xfail above must fail for the RIGHT reason: the fixture compiles, the linter runs on it with every kind
-    resolved and PREVIOUS supplied, and the session block — routine_title's, D1's — is already clean."""
-    ir, why = _rendered_upper_heavy()
-    body = to_create_body(ir, lambda k: CATALOG.get(k, {}).get("hevy_template_id_hint", "X"), why_note=why)
-    routine = hevy_note_lint.from_wire(body, ir, catalog=CATALOG)
-    assert [e.kind for e in routine.exercises] == ["barbell", "dumbbell", "cardio"] and routine.previous_supplied
-    res = hevy_note_lint.lint_routine(routine)
-    assert not any(p.where in ("session line", "session block") for p in res.problems), res.lines()
-    assert not any(p.rule == "L12" for p in res.problems), res.lines()
+def _compile(ir: RoutineSpec) -> dict:
+    why = session_block.why_note_for(ir, routine_title.format_why_note(ir))
+    return to_create_body(ir, lambda k: "T-" + k, why_note=why)
+
+
+def test_freshly_rendered_routines_lint_clean():
+    offenders = {}
+    for name, ir in _renders().items():
+        _with_cardio(ir)
+        session_block.place_on_first(ir)  # what `_action_draft` / `_action_draft_custom` do before the draft is stored
+        body = _compile(ir)
+        res = hevy_note_lint.lint_wire(body, ir)
+        if res.problems:
+            offenders[name] = res.lines()
+        # the linter read every kind and PREVIOUS (lane B writes it); nothing was skipped silently
+        assert not [n for n in res.not_checked if n.startswith(("kinds", "L4 PREVIOUS"))], (name, res.not_checked)
+        assert [e.kind for e in hevy_note_lint.from_wire(body, ir).exercises][-2:] == ["cardio", "mobility"]
+    assert offenders == {}, offenders
+
+
+def _block_count(body: dict) -> int:
+    first = body["routine"]["exercises"][0]["notes"]
+    return first.count(session_block.LOW_ENERGY_LINE)
+
+
+def test_exercise_1_carries_the_session_block_exactly_once_on_every_path():
+    ir = _renders()["10-18 upper volume re-draft"]
+    legacy = _compile(ir)  # a routine drafted before #5428 (no block on the IR): the restamp/cron WHY carries it
+    assert _block_count(legacy) == 1 and legacy["routine"]["exercises"][0]["notes"].startswith("Upper volume · RPE 8–9 on big lifts\n")
+    session_block.place_on_first(ir)  # the draft path (predraft + MCP draft) and the chat's draft_custom
+    session_block.place_on_first(ir)  # idempotent: a re-draft replaces, never stacks
+    drafted = _compile(ir)  # the cron and the restamp compile the stored IR the same way
+    assert _block_count(drafted) == 1, drafted["routine"]["exercises"][0]["notes"]
+    # mutation control: a compile site that passed the raw WHY would put the block on twice
+    doubled = to_create_body(ir, lambda k: "T-" + k, why_note=routine_title.format_why_note(ir))
+    assert _block_count(doubled) == 2
+    res = hevy_note_lint.lint_wire(doubled, ir)
+    assert "L7" in res.rules() or "L3" in res.rules(), res.lines()
+
+
+def test_routine_title_and_session_block_render_the_same_three_lines():
+    for role in ("upper_heavy", "lower_heavy", "shoulders_arms", "upper_volume", "lower_volume"):
+        ir = RoutineSpec(routine_id="r", target_date="2026-10-28", archetype="upper", inputs_snapshot={"calendar": {"session_role": role}})
+        assert routine_title.format_why_note(ir) == session_block.render_for(ir), role
