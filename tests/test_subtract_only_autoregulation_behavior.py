@@ -427,7 +427,9 @@ def test_a_generated_block_with_band_matched_history_is_prescribed_at_the_floor(
         assert m["floor_kg"] == PUSHDOWN_FLOOR_KG
         assert m["basis"]["date"] == "2026-09-11"
         assert all(s.weight_kg == PUSHDOWN_FLOOR_KG for s in block.sets)
-        assert "Floor 72.5 lb" in block.notes
+        # #5428: the floor's provenance is the stored record (the dry-run, the chat) — the Hevy note is the effort line
+        assert "Floor 72.5 lb" in ideal.inputs_snapshot["lift_notes"][key]["detail"]
+        assert "Floor" not in block.notes and block.notes.startswith("RPE ")
 
 
 def test_a_block_with_no_band_matched_history_is_left_unloaded_not_guessed(_generated):
