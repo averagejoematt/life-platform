@@ -44,11 +44,7 @@ from common.pacific_time import pacific_today  # #2798: target_date is a Pacific
 from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
 from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
-from mcp.draft_custom_session import (  # #5005 slots; #5049 warm-ups; #5057 step; #5055 reason; #5428 notes
-    custom_args_refusal,
-    finish_custom_draft,
-    lift_note_warnings,
-)
+from mcp.draft_custom_session import custom_args_refusal, finish_custom_draft, lift_note_warnings  # #5005 #5049 #5057 #5055 #5428
 from mcp.hevy_prescription_gate import prescription_gate, refusal as _gate_refusal, summary as _gate_summary
 
 # #3670: everything the commit result must report honestly lives in its own module
