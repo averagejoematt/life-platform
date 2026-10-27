@@ -25,6 +25,7 @@ Every clock here is a fixed instant — nothing reads `now()`.
 import datetime as dt
 import importlib.util
 import json
+import os
 import pathlib
 
 import pytest
@@ -235,44 +236,53 @@ def test_the_other_malformed_zone_shapes_fail_the_load(tmp_path):
 # ── 5. the factory ────────────────────────────────────────────────────────────────────────────
 
 
-def _synth_template(monkeypatch, tmp_path, rows):
+_SYNTH_SCRIPT = """
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import aws_cdk as cdk
+from aws_cdk import aws_dynamodb as ddb, aws_lambda as _lambda, aws_s3 as s3
+from aws_cdk.assertions import Template
+from stacks import lambda_helpers, schedule_table
+
+schedule_table.table_path = lambda: sys.argv[2]
+lambda_helpers.record = lambda **_kw: None  # keep the scratch "f" out of the enrollment registry
+app = cdk.App()
+stack = cdk.Stack(app, "S", env=cdk.Environment(account="123456789012", region="us-west-2"))
+fn = lambda_helpers.create_platform_lambda(
+    stack, "F", function_name="f", source_file="lambdas/operational/canary_lambda.py",
+    handler="operational.canary_lambda.lambda_handler",
+    table=ddb.Table.from_table_name(stack, "T", "scratch-table"),
+    bucket=s3.Bucket.from_bucket_name(stack, "B", "scratch-bucket"),
+    code=_lambda.Code.from_inline("def h(e, c): pass"), custom_policies=[],
+)
+lambda_helpers.add_table_schedule(stack, "Second", target=fn, schedule=lambda_helpers.table_schedule("f#Second"), schedule_input={"k": 1})
+print(json.dumps(Template.from_stack(stack).to_json()["Resources"]))
+"""
+
+
+def _synth_template(tmp_path, rows):
     """Synthesize one scratch stack that builds `f` through the factory and `f#Second` beside it,
-    against a scratch table. Skips where aws_cdk is not installed (the lean CI test lane)."""
+    against a scratch table — in a FRESH interpreter, so no other test's import of the `stacks`
+    package (or its caches) can reach it under xdist. Skips where aws_cdk is not installed."""
     pytest.importorskip("aws_cdk")
+    import subprocess
     import sys
 
-    cdk_dir = str(ROOT / "cdk")
-    if cdk_dir not in sys.path:
-        sys.path.insert(0, cdk_dir)
-    import aws_cdk as cdk
-    from aws_cdk import aws_dynamodb as ddb, aws_lambda as _lambda, aws_s3 as s3
-    from aws_cdk.assertions import Template
-    from stacks import lambda_helpers, schedule_table
-
-    path = _scratch(tmp_path, rows)
-    monkeypatch.setattr(schedule_table, "table_path", lambda: path)
-    monkeypatch.setattr(lambda_helpers, "record", lambda **_kw: None)  # keep scratch "f" out of the enrollment registry
-    app = cdk.App()
-    stack = cdk.Stack(app, "S", env=cdk.Environment(account="123456789012", region="us-west-2"))
-    fn = lambda_helpers.create_platform_lambda(
-        stack,
-        "F",
-        function_name="f",
-        source_file="lambdas/operational/canary_lambda.py",
-        handler="operational.canary_lambda.lambda_handler",
-        table=ddb.Table.from_table_name(stack, "T", "scratch-table"),
-        bucket=s3.Bucket.from_bucket_name(stack, "B", "scratch-bucket"),
-        code=_lambda.Code.from_inline("def h(e, c): pass"),
-        custom_policies=[],
+    script = tmp_path / "synth_4284.py"
+    script.write_text(_SYNTH_SCRIPT, encoding="utf-8")
+    proc = subprocess.run(
+        [sys.executable, str(script), str(ROOT / "cdk"), _scratch(tmp_path, rows)],
+        capture_output=True,
+        text=True,
+        timeout=240,
+        env={**os.environ, "JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION": "1"},
     )
-    lambda_helpers.add_table_schedule(
-        stack, "Second", target=fn, schedule=lambda_helpers.table_schedule("f#Second"), schedule_input={"k": 1}
-    )
-    return Template.from_stack(stack).to_json()["Resources"]
+    assert proc.returncode == 0, proc.stderr[-3000:]
+    return json.loads(proc.stdout.strip().splitlines()[-1])
 
 
-def test_zoned_rows_become_scheduler_schedules_on_one_role(monkeypatch, tmp_path):
-    res = _synth_template(monkeypatch, tmp_path, {"f": _row("cron(0 10 * * ? *)"), "f#Second": _row("cron(30 19 ? * FRI *)")})
+def test_zoned_rows_become_scheduler_schedules_on_one_role(tmp_path):
+    res = _synth_template(tmp_path, {"f": _row("cron(0 10 * * ? *)"), "f#Second": _row("cron(30 19 ? * FRI *)")})
     by_type = {}
     for logical, r in res.items():
         by_type.setdefault(r["Type"], []).append((logical, r))
@@ -294,9 +304,8 @@ def test_zoned_rows_become_scheduler_schedules_on_one_role(monkeypatch, tmp_path
     assert {s["Action"] for s in stmts} == {"lambda:InvokeFunction"}, "the scheduler role is invoke-only"
 
 
-def test_a_utc_opt_out_stays_a_fixed_utc_events_rule(monkeypatch, tmp_path):
+def test_a_utc_opt_out_stays_a_fixed_utc_events_rule(tmp_path):
     res = _synth_template(
-        monkeypatch,
         tmp_path,
         {"f": _row("cron(5 * * * ? *)", timezone="UTC", utc_reason="a cadence"), "f#Second": _row("rate(1 hour)")},
     )

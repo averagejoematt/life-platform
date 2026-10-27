@@ -5484,4 +5484,4 @@ The after-window is short (n = 81 commits), so read it as a direction, not a rat
 - A job that keys a day must read the Pacific day: a 16:xx PT run is the same UTC date under PDT and the next UTC date under PST.
 - A 24-hour dead-man alarm on a daily job sees one 25-hour gap on the fall-back day (and a 23-hour one in March).
 
-**Demote trigger.** Revisit if the platform's day stops being Pacific (the owner moves), or if AWS Scheduler's DST semantics change. Rejected: (C) keep fixed UTC — the owner's ruling; per-row zones without a platform default — every new row would restate the zone and one forgetful row is UTC again.
+**Demote trigger.** Carrier: #4284 (box 3, the week-of-2026-11-01 rehearsal). Revisit if the platform's day stops being Pacific (the owner moves), or if AWS Scheduler's DST semantics change. Rejected: (C) keep fixed UTC — the owner's ruling; per-row zones without a platform default — every new row would restate the zone and one forgetful row is UTC again.
