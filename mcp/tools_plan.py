@@ -1141,12 +1141,6 @@ def _record_override_correction(item_ref: dict[str, Any], owner_words: str, erro
 
 _BLOCK_MARK = "RED TEAM ("
 
-# #4070: the owner reported the Hevy app cutting exercise notes at ~150 characters. The 2026-10-27 in-app
-# screenshots (#5428) show notes in full, so this window no longer sizes anything here; it is kept only as the
-# must-agree twin of `hevy_render.VISIBLE_NOTE_CHARS` (tests/test_hevy_render_5083.py) until #5428's Lane D
-# retires both in one change.
-HEVY_NOTE_OBSERVED_VISIBLE_CHARS = 150
-
 
 def _place_block_on_first_exercise(ir: Any) -> None:
     """#5428 (HEVY_NOTE_STANDARD §2, §3.8): the critics' verdict block NO LONGER reaches the wire.

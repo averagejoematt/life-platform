@@ -492,14 +492,14 @@ def _cue(e: dict[str, Any], entry: dict[str, Any] | None = None, seen_families: 
     """One exercise's Hevy note, to the standard (#5428, §3.2 / §3.8): the effort, then the one thing the rows cannot
     show on a session with no loads — the back-off is lighter than the top set — then the family cue on the first
     exercise of a family. No issue number (`ISSUE` stays on the rationale), no rep range (the rows show it)."""
-    from training import movement_cues
+    from training import hevy_note_grammar, movement_cues
     from training.session_cues import effort_line
 
     top, back = e["sets"][0], (e["sets"][1] if len(e["sets"]) > 1 else None)
     rpe = top.get("rpe") or []
     lines = [effort_line(tuple(rpe)) if rpe else effort_line(_compounds_band())]
     if back and int(back.get("pct_of_top") or 100) < 100:
-        lines.append(f"Top set, then one back-off {100 - int(back['pct_of_top'])}% lighter.")
+        lines.append(hevy_note_grammar.back_off_line(100 - int(back["pct_of_top"])))
     family = movement_cues.family_of(str(e["movement_key"]), entry or {})
     if family and (seen_families is None or family not in seen_families):
         cue = movement_cues.cue_line(family, (entry or {}).get("anchor_family"), with_prep=False)

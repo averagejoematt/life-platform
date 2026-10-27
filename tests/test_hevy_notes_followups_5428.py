@@ -214,14 +214,20 @@ CHAT_HISTORY = {
 }
 
 
-def _draft_custom(exercises, target_date="2026-10-25", archetype="upper", composer=None):
+def _slot(role):
+    """The program slot the chat draft inherits (`draft_custom_session.inherit_program_session`), offline: the 10-25 chat
+    routine was the shoulders + arms slot, the 10-26 one the upper-volume slot (their rationale lines)."""
+    return {"status": "inherited", "calendar": {"session_role": role, "position_label": "fixture"}, "movements": [], "rule": "fixture"}
+
+
+def _draft_custom(exercises, target_date="2026-10-25", archetype="upper", composer=None, role="shoulders_arms"):
     from mcp import tools_hevy_routine as t
 
     captured = {}
     with ExitStack() as st:
         st.enter_context(patch("training.routine_repo.draft_versioned", side_effect=lambda ir: captured.setdefault("ir", ir)))
         st.enter_context(patch("mcp.draft_custom_session._history_index", return_value=CHAT_HISTORY))
-        st.enter_context(patch("mcp.draft_custom_session.inherit_program_session", return_value={"status": "not_a_program_session"}))
+        st.enter_context(patch("mcp.draft_custom_session.inherit_program_session", return_value=_slot(role)))
         if composer is not None:
             st.enter_context(patch("mcp.draft_custom_session.compose_custom_notes", side_effect=composer))
         out = t.tool_manage_hevy_routine(
@@ -252,7 +258,7 @@ def test_the_chat_draft_notes_are_composed_to_the_standard():
         "triceps_rope_pushdown": "RPE 8–9, last set RPE 9–10",
     }
     head = notes["db_shoulder_press"].split("\n")[:2]  # exercise 1 opens with the one session block (lane A)
-    assert head == ["Upper · RPE 8–9 on big lifts", session_block.LOW_ENERGY_LINE], head
+    assert head == ["Shoulders + arms · RPE 8–9 on big lifts", session_block.LOW_ENERGY_LINE], head
     assert banned_hits(_wire_notes(ir)) == []
     # the authored text is not lost: it is on the stored record, and the response says each rewrite
     assert ir.inputs_snapshot["lift_notes"]["db_lateral_raise"]["detail"].startswith("3 sets of 8-15")
@@ -279,7 +285,7 @@ def test_the_chat_path_step_is_the_standards_reason_and_the_render_check_finds_i
     step due. Its note says so in the standard's grammar (no `160 lb x 8`, no `<=`, no dates), and the render check reads
     the step as landed — the IR records it, the wire carries it, nothing `missing`."""
     exercises = [{"movement_key": "lat_pulldown", "sets": [{"weight_lbs": 160, "rep_range_start": 8, "rep_range_end": 12, "count": 2}]}]
-    ir, out = _draft_custom(exercises, target_date="2026-10-26", archetype="upper")
+    ir, out = _draft_custom(exercises, target_date="2026-10-26", archetype="upper", role="upper_volume")
     note = ir.exercises[0].notes.split("\n\n")[-1]
     assert note == "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.\nBreathe out on the pull."
     [step] = out["step_due"]
@@ -428,3 +434,31 @@ def test_mutation_control_the_substring_rule_fired_on_from():
     """The pre-fix rule, `any(k in t for k in _FORM_KW)`, reads his "from" as ROM — the bug this fixes."""
     t = "4.0 / 3 from 20"
     assert any(k in t for k in training_notes._FORM_KW) and not training_notes._FORM_RE.search(t)
+
+
+# ── 5. the note linter (lane D's rules, L1-L13) over every path's compiled wire ────────────────────────────────────
+def _lint(ir: RoutineSpec) -> list[str]:
+    from training import hevy_note_lint
+
+    why = session_block.why_note_for(ir, format_why_note(ir))
+    return hevy_note_lint.lint_wire(to_create_body(ir, lambda k: "T-" + k, why_note=why), ir).to_dict()["problems"]
+
+
+def test_every_path_lints_clean_and_the_lint_fires_on_the_old_copy():
+    step = [{"movement_key": "lat_pulldown", "sets": [{"weight_lbs": 160, "rep_range_start": 8, "rep_range_end": 12, "count": 2}]}]
+    paths = {
+        "generator, 10-26 rotated": _generate_10_26(),
+        "chat, 10-25": _draft_custom(CHAT_10_25)[0],
+        "chat, 10-26 step": _draft_custom(step, target_date="2026-10-26", role="upper_volume")[0],
+    }
+    for pool in disruption.POOL_NAMES:
+        rx = disruption.session("upper_heavy", pool, CATALOG["movements"])
+        paths[f"disruption, {pool}"] = disruption.to_routine(
+            rx, target_date="2026-12-22", variant="ideal", mode={"template": "travel"}, catalog=CATALOG
+        )
+    assert {k: v for k, v in ((k, _lint(ir)) for k, ir in paths.items()) if v} == {}
+    # mutation control: the engine's own rotation line (its slot id and week arithmetic) on the wire reds the lint
+    ir = _generate_10_26()
+    fly = next(b for b in ir.exercises if b.movement_key == "chest_fly_machine")
+    fly.notes = fly.notes.replace("New: replaces Cable Fly Crossovers.", next(ln for ln in ir.rationale if "Chest Fly" in ln))
+    assert [p for p in _lint(ir) if p.startswith("L1 ")], "the rationale's rotation line must fail L1"

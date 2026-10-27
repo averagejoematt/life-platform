@@ -224,12 +224,14 @@ def test_his_logged_notes_are_read_for_level_rpe_and_a_lower_leg_pain_word():
 def test_every_level_renders_a_short_reasoned_block_whose_minutes_count_toward_movement():
     from training.routine_ir import ExerciseBlock, Set
 
-    from mcp.tools_plan import HEVY_NOTE_OBSERVED_VISIBLE_CHARS
+    # #5428 retired the #4070 150-char window constant (Hevy shows notes in full); this block's own length bound stays
+    # at that number until the run on-ramp note is rewritten to the note standard (its line 1 runs to 127 characters)
+    line1_max = 150
 
     for lv in run_onramp.levels():
         b = run_onramp.run_walk_block(lv["level"])
         line1, line2 = b["note"].split("\n")
-        assert len(line1) <= HEVY_NOTE_OBSERVED_VISIBLE_CHARS and f"RPE <= {EASY_TOP}" in line1 and line2.startswith("Why: ")
+        assert len(line1) <= line1_max and f"RPE <= {EASY_TOP}" in line1 and line2.startswith("Why: ")
         assert b["total_min"] == (lv["run_min"] + lv["walk_min"]) * lv["rounds"] == b["movement_minutes"]
         block = ExerciseBlock(movement_key="treadmill", sets=[Set(type="normal", duration_seconds=b["total_min"] * 60)], rest_seconds=0)
         assert cardio_menu.movement_minutes([block]) == b["total_min"]

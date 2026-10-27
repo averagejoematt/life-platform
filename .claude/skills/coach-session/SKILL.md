@@ -190,16 +190,22 @@ program serves; argue with it out loud, never silently replace it.
 
 He authors at night and trains the next morning with **zero chance to adjust.**
 
-- **Tier-agnostic.** Never stamp one night's recovery tier into the prescription. Write the
-  branches into the cues: GREEN (Whoop 67-100) take the ceiling; YELLOW (34-66) the baseline,
-  the safe default with no signal; RED (1-33) subtract to the floor. "Use the LOWER of the
-  band and how you feel"; feel only downgrades.
-- **Hevy render rules.** The session note is cut at about 150 characters and the red-team
-  verdicts are prepended to it: keep it to one short line. Put the tier cues in the first
-  exercise's notes (exercise notes render in full). Every cue carries its reason, for example
-  "+<the step the engine wrote>: the gain rule's trigger met at the top of the range, RPE inside
-  the ceiling"; quote the load and step the engine wrote, never a number from memory. Hevy stores kg;
-  convert for display.
+- **Tier-agnostic.** Never stamp one night's recovery tier into the prescription, and never
+  write recovery tiers (GREEN / YELLOW / RED, Whoop bands) into a Hevy note. The one branch the
+  note carries is the session block's fixed line `Low energy → first 2 lifts + easy cardio.`
+  (owner ruling 2026-10-27).
+- **Hevy note rules (#5428, `docs/coaching/HEVY_NOTE_STANDARD.md`).** Hevy shows every note in
+  full and already shows, per set row, the load × reps and the PREVIOUS column. So **never
+  restate the rows**: no set counts, loads, rep ranges, `Last:` lines or cardio minutes in a note.
+  Exercise 1 opens with the three-line session block (`‹Day› · RPE a–b on big lifts`, the
+  low-energy line, the load rule) and a blank line; a chat draft gets it by making its first note
+  line the session line. A lift note is `RPE a–b[, last set RPE c–d]`, then at most one reason
+  (`Heavier: …`, `Lighter: …`, `Volume day: …`, `2 sets today: …`) and one cue (the family's,
+  first exercise of that family only). Effort is RPE only (no RIR, no "in the tank"); loads are lb,
+  `per hand` on a dumbbell or carry. No medical, ECG or safety text, no critic verdicts, issue
+  numbers or bookkeeping (protein, rate, streaks): those stay in this chat. **Dry-run until
+  `render_check.note_lint.problems == []`** (the linter is in warn mode today: it reports, it does
+  not refuse yet).
 - **How he logs (#5373).** Logging conventions (owner): on a carry (the farmers walk) the Hevy
   'yards' number is his STEP COUNT (no distance markings in the gym); the weight on every dumbbell
   exercise, a two-dumbbell carry included, is ONE dumbbell (PER HAND) from 2026-10-27, and volume

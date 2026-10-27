@@ -29,7 +29,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from training import movement_cues
+from training import hevy_note_grammar, movement_cues
 from training.rep_scheme import LB_IN_KG, implement_step_lb
 from training.session_cues import effort_line, exposure_cue
 
@@ -38,16 +38,10 @@ STALE_AFTER_DAYS = 28
 chest-fly anchor at another bodyweight); the note becomes the pick-load form. 28 days is the module's detraining line
 (`load_ramp.DETRAINING_ANCHOR_AGE_DAYS`): past it, the engine's own anchor is discounted as detrained."""
 
-PICK_LOAD_W_REPS = 8
-PICK_LOAD_LINE = f"W set: up to {PICK_LOAD_W_REPS} easy reps, find the load."
-ROTATION_HEAD = "New: replaces "
-
-
-def rotation_line(replaced_title: str) -> str:
-    """The rotated accessory's one reason line (#5083 / #5075, standard §3.2 voice): `New: replaces Calf Press.`
-    — the exercise it stands in for, by the title he knows from Hevy. Never a slot id, a week count or an issue number."""
-    return f"{ROTATION_HEAD}{str(replaced_title).strip().rstrip('.')}."
-
+PICK_LOAD_W_REPS = hevy_note_grammar.PICK_LOAD_W_REPS
+PICK_LOAD_LINE = hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS)
+ROTATION_HEAD = hevy_note_grammar.ROTATION_HEAD
+rotation_line = hevy_note_grammar.rotation_line  # #5083: the rotated accessory's one reason line, from the grammar
 
 _TIMES = {2: "twice", 3: "three times", 4: "four times", 5: "five times"}
 
@@ -88,15 +82,8 @@ def _rep_hi(sets: list[Any]) -> int | None:
 
 def delta_word(row_lb: float | None, previous_lb: float | None, step_lb: float | None) -> str | None:
     """'Heavier' / 'Lighter' when the row is more than one implement step from PREVIOUS, else None (no reason needed).
-    The same rule as `hevy_note_grammar.delta_word` (Lane D's linter); a stack with no fixed step is never judged."""
-    if row_lb is None or previous_lb is None or not step_lb:
-        return None
-    diff = float(row_lb) - float(previous_lb)
-    if diff > step_lb + 1e-6:
-        return "Heavier"
-    if -diff > step_lb + 1e-6:
-        return "Lighter"
-    return None
+    Lane D's `hevy_note_grammar.delta_word` (the linter's own rule); a stack with no fixed step is never judged."""
+    return hevy_note_grammar.delta_word(row_lb, previous_lb, step_lb)
 
 
 def _rpe_text(rpe: Any) -> str:
@@ -190,14 +177,12 @@ def _skip(block: Any) -> bool:
 
 AUTHORED_LINE_MAX_CHARS = 120
 _AUTHORED_EFFORT_RE = re.compile(r"^RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?(?:, last set RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?)?$")
-# what a kept line may not carry: a restated row (a load x reps, a set count, `Last:`, `@ load`), an effort word other
-# than RPE, kg, and the engine/medical/bookkeeping vocabulary the standard bans (§5)
+# what a kept line may not carry beyond the grammar's banned vocabulary (`hevy_note_grammar.BANNED`, linter L1) and its
+# restated-row shapes (L2): a load x reps, a set count, `@`, the tier words of the retired branch menus, and the
+# pick-load form's own subject (that W line is the composer's)
 _AUTHORED_DIRTY_RE = re.compile(
-    r"\d\s*(?:x|×)\s*\d|\b\d+\s*(?:x|×)\b|\bsets? of\b|\d+ sets?\b|Last:|@|\bkg\b|\d\s*kg|\bRIR\b|in the tank|\bleave \d|"
-    r"#\d|\bv\d+\.\d|§|critic|red team|charter|engine|platform|tripwire|\bfloor\b|\bramp\b|e1RM|\banchor\b|\bband\b|"
-    r"subtract|never up|ECG|\bAF\b|[Ss]inus|cardiolog|beta-blocker|metoprolol|protein|calorie|badge|weigh|Optional if|as written|…|"
-    r"🟢|🟡|🔴|GREEN|YELLOW|RED\b|Whoop|\bhis\b|\bhe\b|\bhim\b|\d+(?:\.\d+)?\s*(?:lb|lbs)\b|"
-    r"\bno (?:load|history)\b|\blog it\b|pick (?:it|a load|the load)",  # the pick-load form owns the 'find the load' line
+    r"\d\s*(?:x|×)\s*\d|\b\d+\s*(?:x|×)\b|\bsets? of\b|\d+ sets?\b|Last:|@|\bfloor\b|subtract|"
+    r"GREEN|YELLOW|RED\b|\d+(?:\.\d+)?\s*(?:lb|lbs)\b|\bno (?:load|history)\b|\blog it\b|pick (?:it|a load|the load)",
     re.I,
 )
 
@@ -233,8 +218,12 @@ def authored_lines(note: str | None) -> dict[str, str]:
 
 def _clean_authored(line: str) -> bool:
     """A sentence fit for the cue slot: short, nothing banned, no number, and no second effort (line 1 is the only RPE)."""
+    if any(re.search(pat, line, flags=0 if case else re.I) for pat, _label, case in hevy_note_grammar.BANNED):
+        return False
     return (
         len(line) <= AUTHORED_LINE_MAX_CHARS
+        and not hevy_note_grammar.TRUNCATION_RE.search(line)
+        and not hevy_note_grammar.RESTATED_ROWS_RE.search(line)
         and not _AUTHORED_DIRTY_RE.search(line)
         and not _stray_number(line)
         and not re.search(r"\bRPE\b", line)
@@ -245,7 +234,7 @@ def _step_due_line(prog: dict[str, Any], history: list[dict[str, Any]] | None) -
     """The chat path's not-carried LOAD step (#5057, #5428): the rows hold the author's load, so the note names the step
     as a delta (never a load the rows would contradict) and the run that earned it: `Step due: +5 lb, 10s were RPE 8 twice.`"""
     inc_lb = (float(prog.get("next_load_kg") or 0) - float(prog.get("from_load_kg") or 0)) / LB_IN_KG
-    return f"Step due: +{round(inc_lb * 2) / 2:g} lb, {_stall_why(prog, history)}."
+    return f"{hevy_note_grammar.STEP_DUE_HEAD}{round(inc_lb * 2) / 2:g} lb, {_stall_why(prog, history)}."
 
 
 def _engine_reason(

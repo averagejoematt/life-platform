@@ -556,7 +556,9 @@ def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]]
 def test_note(row: Mapping[str, Any]) -> str:
     """A test block's Hevy note (#5428, HEVY_NOTE_STANDARD §3.8): line 1 `Test · ‹the test›`, then the charter's protocol —
     no issue number, no version id (those stay on the rationale tag and the stored battery record)."""
-    head = f"Test · {row.get('label')}"
+    from training.hevy_note_grammar import fitness_test_line
+
+    head = fitness_test_line(str(row.get("label")))
     proto = str(row.get("protocol") or "").strip()
     return f"{head}\n{proto}" if proto else head
 

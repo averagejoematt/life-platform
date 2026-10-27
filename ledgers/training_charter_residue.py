@@ -61,7 +61,8 @@ Retired since the seed: program_structure.py anchor_block_weeks (3 lines: `ROTAT
 `rotation.anchors_fixed_weeks` through `block_model.block_weeks()`. #5058 retired effort_ceiling_rpe in
 owner_redlines.py (1: the rep-scheme prose names the charter ceilings), program_structure.py (2: `EXPOSURES.heavy.top_rpe`
 and the HEAVY cue — the cues read `effort_ceilings.by_movement_class` through `training.effort_ceilings`) and two of
-routine_title.py's three (the v0.4/v1 heavy WHY lines); the one left is the superseded v0.3 full-body WHY line, history.
+routine_title.py's three (the v0.4/v1 heavy WHY lines); #5428 retired the third (the superseded v0.3 full-body WHY line
+now renders the session block from a named v0.3 band, `_V03_BAND`), so its row is deleted.
 The guard's key moved with the charter rename (`by_experience_tier` -> `by_movement_class`).
 Already retired at the seed: mcp/tools_health.py's 2.5 lb/wk line (3 rows on the first
 census) — #5115 (charter-w0) replaced it with a bodyweight-relative flag carrying a
@@ -96,5 +97,4 @@ TRAINING_CHARTER_RESIDUE = {
     "lambdas/training/program_structure.py::volume_band_sets": 2,
     "lambdas/training/program_v03.py::anchor_block_weeks": 1,
     "lambdas/training/routine_generator.py::session_minutes": 2,
-    "lambdas/training/routine_title.py::effort_ceiling_rpe": 1,
 }

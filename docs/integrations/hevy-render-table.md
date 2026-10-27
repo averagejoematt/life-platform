@@ -1,6 +1,6 @@
 # Hevy render table: where every charter prescription field shows in the app
 
-**Issue:** #5083 (epic #5050) · **Verified:** 2026-10-19 · **Machine twin:** `lambdas/training/hevy_render.py` (`RENDER_TABLE`), pinned to this table by `tests/test_hevy_render_5083.py`
+**Issue:** #5083, #5428 (epic #5050) · **Verified:** 2026-10-27 · **Machine twin:** `lambdas/training/hevy_render.py` (`RENDER_TABLE`), pinned to this table by `tests/test_hevy_render_5083.py`
 **Status:** the table, the ordering rule and the `render_check` are built; the live proof (a committed routine opened in the app) is the owner's (§5)
 
 A field can pass the Hevy API and still never reach the gym floor. #3938 is the precedent: `routine.notes` was accepted on every write and never read back. Hevy's routine wire has **no field** for a reason, an RPE, a bike level or a treadmill speed (RPE is logged on *performed* sets only). So those fields ride in the exercise's **Pinned Routine Note** (`routine.exercises[].notes`, `hevy_note_types.PINNED_ROUTINE_NOTE_FIELD`). Only warm-up sets, the rep range, rest and supersets have native homes. `lambdas/training/hevy_compiler.py` stays the only module that writes the wire.
@@ -29,34 +29,35 @@ A field can pass the Hevy API and still never reach the gym floor. #3938 is the 
 
 ## 2. The ordering rule (so a reason line is never the part a cut lands on)
 
-1. **Exercise 1's note opens with the session line** (`routine_title.format_why_note`, for example "Upper heavy: one top set at RPE 8-9 on bench and row, back-offs 10% lighter. Loads hold."). It stays under the visible window (§3). A minimum or travel session's label rides here, because the title is the `Phase - Type - N - Y` convention at commit.
+1. **Exercise 1's note opens with the session block, once** (#5428, `docs/coaching/HEVY_NOTE_STANDARD.md` §3.1): the session line "Upper heavy · RPE 8–9 on big lifts", the low-energy line and the load rule, then a blank line. The draft paths write it (`session_block.place_on_first`); every compile site passes `session_block.why_note_for(ir, routine_title.format_why_note(ir))`, which is empty when the block is already on exercise 1, so the compiler adds it only for a routine drafted before #5428. A minimum or travel session's label rides here, because the title is the `Phase - Type - N - Y` convention at commit.
 2. **Each exercise's own note opens with its prescription line:**
    - the progression or stall-step reason (`routine_generator._progress_block` and `draft_custom_session.attach_step_due` put it first), for example "+5 lb to 184.9 lb: 2 top sets at the top of 6-10, RPE <= 9, 10-14 and 10-16; reps back to 6."
    - the cardio dose line (`cardio_note` line 1), for example "Treadmill · 30 min · incline 8% at 2.5 mph walk · RPE 4–6, full sentences"
    - the minimum-session cue (`disruption._cue`)
-3. **Everything else comes after:** the history cue, the warm-up clause ("Warm up: band pull-aparts, then the ramp sets."), the wake-recovery session block (`hevy_render.place_after_prescription`, called by `tools_hevy_routine._apply_recovery_adaptation` on the daily draft path, puts it after exercise 1's prescription line), the branch menu (`hevy_compiler._place_routine_note` puts it after exercise 1's own note), and the critics' block (`tools_plan._place_block_on_first_exercise` appends it).
+3. **Everything else comes after:** the branch menu (`hevy_compiler._place_routine_note` puts it after exercise 1's own note). Since #5428 the wake-recovery band block, the history cue, the warm-up clause and the critics' block no longer reach the wire (a changed row gets one plain clause instead).
 
-On exercise 1 the result is: the session line, then exercise 1's prescription line, then the recovery block, then the menus. A cut lands on a menu, never on a reason. `tests/test_hevy_render_5083.py` runs the daily path's own pass (`_apply_recovery_adaptation`) over the fixture, so the test reads the real wire.
+On exercise 1 the result is: the session block, then exercise 1's own note (effort first), then the menus. `tests/test_hevy_render_5083.py` runs the daily path's own pass (`_apply_recovery_adaptation`) over the fixture, so the test reads the real wire.
 
-One path keeps its block ahead of the reason on purpose: the standing-constraint gate (`draft_standing_constraint.apply_gate`, #5000) still heads exercise 1's note, because it is the check made before the first set. When that path runs, `render_check` reports the reason as `beyond_window` or `not_leading`. That is the honest result, not a false alarm.
+One path keeps its block ahead of the reason on purpose: the standing-constraint gate (`draft_standing_constraint.apply_gate`, #5000) still heads exercise 1's note, because it is the check made before the first set. When that path runs, `render_check` reports the reason as `not_leading`. That is the honest result, not a false alarm.
 
-## 3. The visible window
+## 3. The visible window (retired by #5428)
 
-`VISIBLE_NOTE_CHARS = 150`. This is evidence, not a contract. In #4070 the owner saw Hevy show about 150 characters of an exercise note (`mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS`; the test holds the two equal). The 2026-10-18 brief says exercise notes render in full on Hevy 3.2. The live proof settles which is true. The rule above holds either way. The window only sizes the report, and nothing truncates on it.
+`VISIBLE_NOTE_CHARS = 150` was the #4070 observation (with its must-agree twin `mcp/tools_plan.HEVY_NOTE_OBSERVED_VISIBLE_CHARS`); both are removed (#5428). The owner's in-app screenshots of 2026-10-26 settled it: **Hevy renders an exercise note in full**, and each set row already shows the load × reps and PREVIOUS. So length costs scroll, not visibility. `render_check` raises no window problem any more (`beyond_window` is retired). Length is the note linter's phone-line budget instead (rule L7 of `docs/coaching/HEVY_NOTE_STANDARD.md` §8), and what a note may say is that standard: effort, one reason, one cue. The rows and PREVIOUS carry the rest.
 
 ## 4. The check: `manage_hevy_routine action=dry_run` → `render_check`
 
 `hevy_render.render_check(body, session_note=why, ir=ir)` reads the compiled body and returns one row per field. A reason is searched for anywhere in the note (by its producer's grammar), not only at the start, so a reason buried behind another block is reported, never read as `absent`. The IR names the reasons that must be on the wire (`expected_reasons`: every generator progression that changed a set, from `inputs_snapshot.load_floors`, and every chat-draft step authored below the stall step, from `inputs_snapshot.step_due`).
 
-- `status`: `lands`, `not_leading` (in the note but not first), `beyond_window`, `missing` (the IR records it, the wire lacks it), `absent` (not in this routine), `deferred` or `not_shown`
+- `status`: `lands`, `not_leading` (in the note but not first), `missing` (the IR records it, the wire lacks it), `absent` (not in this routine), `deferred` or `not_shown`
 - `found`: where each hit sits (for example "exercise 2 note, line 1" or "exercise 1 set rows (3 W)"), its offset and whether it leads its note
-- `session_note` with its length against the window, and `expected_reasons`
-- `problems`: one line for every `not_leading`, `beyond_window` or `missing` row, a session line over the window or not heading exercise 1, or a warm-up set after a working set
+- `session_note` with its length, and `expected_reasons`
+- `note_lint` (#5428): the note linter's result over the body — its mode (`HEVY_NOTE_LINT_MODE`, `warn` today), its problems by rule (L1–L13) and the rules it could not check
+- `problems`: one line for every `not_leading` or `missing` row, a session block not heading exercise 1, a warm-up set after a working set, and every note-lint problem (prefixed `note lint: `). In warn mode none of them refuses a commit.
 
 ## 5. The live proof (owner or driver; never from a lane)
 
 1. Draft a routine that carries a progression step, a cardio block and warm-up sets. The generator's Upper-heavy day qualifies if its bench has two top sets at the top of the range on file. Otherwise use `draft_custom` with a bench block, plus a `cycling` or `treadmill` block.
-2. Run `manage_hevy_routine action=dry_run` and keep `render_check`. `problems` should be `[]`, `progression_reason` should be `lands` (the bench step is in `expected_reasons`), and no row should be `not_leading`, `beyond_window` or `missing`.
+2. Run `manage_hevy_routine action=dry_run` and keep `render_check`. `problems` should be `[]`, `progression_reason` should be `lands` (the bench step is in `expected_reasons`), and no row should be `not_leading` or `missing`.
 3. Run `manage_hevy_routine action=commit`, open the routine in the Hevy app, and take one screenshot per item:
    - exercise 1's note shows the session line first
    - the bench note shows the progression reason ("+5 lb to …") first

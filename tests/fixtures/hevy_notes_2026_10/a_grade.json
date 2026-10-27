@@ -1,0 +1,1905 @@
+{
+ "_source": "issue 5428 review corpus (a_grade_corpus.txt, round 7) with the owner's 2026-10-27 ~04:50Z session block: no safety line, the low-energy line back. The §4 calf-press cue added where the corpus omitted it (10-13, 10-16, 10-23). Rows in lb; no body measurements.",
+ "routines": [
+  {
+   "date": "2026-10-11",
+   "title": "Upper volume",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "W",
+       90,
+       "8"
+      ],
+      [
+       "W",
+       125,
+       "5"
+      ],
+      [
+       "W",
+       150,
+       "3"
+      ],
+      [
+       "N",
+       175,
+       "8–12"
+      ],
+      [
+       "N",
+       175,
+       "8–12"
+      ],
+      [
+       "N",
+       175,
+       "8–12"
+      ]
+     ],
+     "note": "Upper volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nVolume day: chase 12.\nBreathe out on the press."
+    },
+    {
+     "name": "Dumbbell Row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "W",
+       50,
+       "8"
+      ],
+      [
+       "N",
+       85,
+       "8–12"
+      ],
+      [
+       "N",
+       85,
+       "8–12"
+      ],
+      [
+       "N",
+       85,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nLighter: chase 12.\nBreathe out on the pull."
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       60,
+       "8–12"
+      ],
+      [
+       "N",
+       60,
+       "8–12"
+      ],
+      [
+       "N",
+       60,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nBreathe out on the press."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       155,
+       "8–12"
+      ],
+      [
+       "N",
+       155,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nLighter: chase 12."
+    },
+    {
+     "name": "Cable Fly Crossovers",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       15,
+       "8–15"
+      ],
+      [
+       "N",
+       15,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       90,
+       "8–15"
+      ],
+      [
+       "N",
+       90,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       25,
+       "8–15"
+      ],
+      [
+       "N",
+       25,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9\nLighter: chase 15."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "45 min"
+      ]
+     ],
+     "note": "Recumbent · L11 · RPE 4–5 (full sentences)\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "15 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-13",
+   "title": "Lower volume",
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "W",
+       110,
+       "8"
+      ],
+      [
+       "W",
+       150,
+       "5"
+      ],
+      [
+       "W",
+       185,
+       "3"
+      ],
+      [
+       "N",
+       215,
+       "8"
+      ],
+      [
+       "N",
+       215,
+       "8"
+      ],
+      [
+       "N",
+       215,
+       "8"
+      ]
+     ],
+     "note": "Lower volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 7\nNo jumps today: 3rd trap-bar session.\nBrace; breathe out on the way up."
+    },
+    {
+     "name": "Squat (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       135,
+       "5"
+      ],
+      [
+       "N",
+       180,
+       "8–10"
+      ],
+      [
+       "N",
+       180,
+       "8–10"
+      ],
+      [
+       "N",
+       180,
+       "8–10"
+      ]
+     ],
+     "note": "RPE 8–9\nLighter: chase 10.\nBrace each rep, breathe between reps."
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110,
+       "8–12"
+      ],
+      [
+       "N",
+       110,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       380,
+       "10–15"
+      ],
+      [
+       "N",
+       380,
+       "10–15"
+      ]
+     ],
+     "note": "RPE 8–9\nHeavier: 15 reps was RPE 7.\nFull stretch at the bottom; knees soft."
+    },
+    {
+     "name": "Machine Crunch",
+     "kind": "machine",
+     "compound": false,
+     "family": "crunch",
+     "anchor_family": null,
+     "rows": [
+      [
+       "W",
+       null,
+       "8"
+      ],
+      [
+       "N",
+       null,
+       "10–15"
+      ],
+      [
+       "N",
+       null,
+       "10–15"
+      ]
+     ],
+     "note": "RPE 7\nNo jumps: first time on it.\nW set: up to 8 easy reps, find the load.\nBreathe out on the crunch."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "45 min"
+      ]
+     ],
+     "note": "Recumbent · L11 · RPE 4–5 (full sentences)\nBike, not treadmill: rest the feet.\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "20 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-15",
+   "title": "Upper heavy",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "W",
+       95,
+       "8"
+      ],
+      [
+       "W",
+       135,
+       "5"
+      ],
+      [
+       "W",
+       165,
+       "3"
+      ],
+      [
+       "N",
+       195,
+       "4–6"
+      ],
+      [
+       "N",
+       175,
+       "4–6"
+      ],
+      [
+       "N",
+       175,
+       "4–6"
+      ]
+     ],
+     "note": "Upper heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nLast W set feels heavy → top set 185.\nBreathe out on the press."
+    },
+    {
+     "name": "Dumbbell Row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "W",
+       60,
+       "5"
+      ],
+      [
+       "N",
+       100,
+       "4–6"
+      ],
+      [
+       "N",
+       90,
+       "4–6"
+      ],
+      [
+       "N",
+       90,
+       "4–6"
+      ]
+     ],
+     "note": "RPE 8–9\nBreathe out on the pull."
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       60,
+       "6–10"
+      ],
+      [
+       "N",
+       60,
+       "6–10"
+      ],
+      [
+       "N",
+       60,
+       "6–10"
+      ]
+     ],
+     "note": "RPE 8–9\nBreathe out on the press."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       160,
+       "6–10"
+      ],
+      [
+       "N",
+       160,
+       "6–10"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       95,
+       "8–15"
+      ],
+      [
+       "N",
+       95,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       25,
+       "8–15"
+      ],
+      [
+       "N",
+       25,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent · L10 · RPE 4–5 (full sentences)\nL10 and the bike: an easy day after the long walk.\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "20 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-16",
+   "title": "Lower heavy",
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       45,
+       "10"
+      ],
+      [
+       "W",
+       135,
+       "5"
+      ],
+      [
+       "W",
+       185,
+       "3"
+      ],
+      [
+       "W",
+       215,
+       "2"
+      ],
+      [
+       "N",
+       235,
+       "4–6"
+      ],
+      [
+       "N",
+       210,
+       "4–6"
+      ],
+      [
+       "N",
+       210,
+       "4–6"
+      ]
+     ],
+     "note": "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nBrace each rep, breathe between reps."
+    },
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "W",
+       135,
+       "5"
+      ],
+      [
+       "N",
+       210,
+       "6–10"
+      ],
+      [
+       "N",
+       210,
+       "6–10"
+      ],
+      [
+       "N",
+       210,
+       "6–10"
+      ]
+     ],
+     "note": "RPE 8–9\nBrace; breathe out on the way up."
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "kind": "machine",
+     "compound": true,
+     "family": "leg_press",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "N",
+       360,
+       "8–15"
+      ],
+      [
+       "N",
+       360,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9\nAs deep as your hips stay on the pad."
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110,
+       "8–15"
+      ],
+      [
+       "N",
+       110,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9\nHeavier: 12s were RPE 7–8.5."
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       385,
+       "8–15"
+      ],
+      [
+       "N",
+       385,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9\nHeavier: 15 reps was RPE 7.\nFull stretch at the bottom; knees soft."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent · L11 · RPE 4–5 (full sentences)\nBike, not treadmill: rest the feet.\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "10 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-18",
+   "title": "Upper volume",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "W",
+       90,
+       "8"
+      ],
+      [
+       "W",
+       130,
+       "5"
+      ],
+      [
+       "W",
+       155,
+       "3"
+      ],
+      [
+       "N",
+       185,
+       "8–12"
+      ],
+      [
+       "N",
+       185,
+       "8–12"
+      ],
+      [
+       "N",
+       185,
+       "8–12"
+      ]
+     ],
+     "note": "Upper volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nBreathe out on the press."
+    },
+    {
+     "name": "Dumbbell Row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "W",
+       50,
+       "8"
+      ],
+      [
+       "N",
+       85,
+       "8–12"
+      ],
+      [
+       "N",
+       85,
+       "8–12"
+      ],
+      [
+       "N",
+       85,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull."
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       70,
+       "8–12"
+      ],
+      [
+       "N",
+       70,
+       "8–12"
+      ],
+      [
+       "N",
+       70,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nLighter: last time ended at RPE 10.\nBreathe out on the press."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       155,
+       "8–12"
+      ],
+      [
+       "N",
+       155,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nLighter: chase 12, no jump to 180."
+    },
+    {
+     "name": "Cable Fly Crossovers",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       33,
+       "8–15"
+      ],
+      [
+       "N",
+       33,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       95,
+       "8–15"
+      ],
+      [
+       "N",
+       95,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       25,
+       "8–15"
+      ],
+      [
+       "N",
+       25,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9\nLighter: chase 15."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "20 min"
+      ]
+     ],
+     "note": "Recumbent · L11 · RPE 4–5 (full sentences)\nBike, not treadmill: rest the feet after the long walk.\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "10 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-19",
+   "title": "Lower volume",
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "W",
+       110,
+       "8"
+      ],
+      [
+       "W",
+       150,
+       "5"
+      ],
+      [
+       "W",
+       185,
+       "3"
+      ],
+      [
+       "N",
+       215,
+       "8–12"
+      ],
+      [
+       "N",
+       215,
+       "8–12"
+      ],
+      [
+       "N",
+       215,
+       "8–12"
+      ]
+     ],
+     "note": "Lower volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nLighter: chase 12.\nBrace; breathe out on the way up."
+    },
+    {
+     "name": "Squat (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       145,
+       "5"
+      ],
+      [
+       "N",
+       205,
+       "8–12"
+      ],
+      [
+       "N",
+       205,
+       "8–12"
+      ],
+      [
+       "N",
+       205,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nSet 1 over RPE 9 → sets 2–3 at 195 lb.\nBrace each rep, breathe between reps."
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110,
+       "8–15"
+      ],
+      [
+       "N",
+       110,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       385,
+       "8–15"
+      ],
+      [
+       "N",
+       385,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9\nHeavier: 15 reps was RPE 7.\nFull stretch at the bottom; knees soft."
+    },
+    {
+     "name": "Machine Crunch",
+     "kind": "machine",
+     "compound": false,
+     "family": "crunch",
+     "anchor_family": null,
+     "rows": [
+      [
+       "W",
+       null,
+       "8"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 7\nNo jumps: first time on it.\nW set: up to 8 easy reps, find the load.\nBreathe out on the crunch."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "45 min"
+      ]
+     ],
+     "note": "Recumbent · L11 · RPE 4–5 (full sentences)\nBike, not treadmill: rest the feet.\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "15 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-20",
+   "title": "Upper heavy",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "W",
+       105,
+       "8"
+      ],
+      [
+       "W",
+       145,
+       "5"
+      ],
+      [
+       "W",
+       175,
+       "3"
+      ],
+      [
+       "N",
+       205,
+       "4–6"
+      ],
+      [
+       "N",
+       185,
+       "4–6"
+      ],
+      [
+       "N",
+       185,
+       "4–6"
+      ]
+     ],
+     "note": "Upper heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nBreathe out on the press."
+    },
+    {
+     "name": "Dumbbell Row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "W",
+       70,
+       "5"
+      ],
+      [
+       "N",
+       100,
+       "4–6"
+      ],
+      [
+       "N",
+       90,
+       "4–6"
+      ],
+      [
+       "N",
+       90,
+       "4–6"
+      ]
+     ],
+     "note": "RPE 8–9\nBreathe out on the pull."
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       75,
+       "6–10"
+      ],
+      [
+       "N",
+       75,
+       "6–10"
+      ],
+      [
+       "N",
+       75,
+       "6–10"
+      ]
+     ],
+     "note": "RPE 8–9\nHeavier: 6 reps is a pass.\nBreathe out on the press."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       160,
+       "6–10"
+      ],
+      [
+       "N",
+       160,
+       "6–10"
+      ]
+     ],
+     "note": "RPE 8–9"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       100,
+       "8–15"
+      ],
+      [
+       "N",
+       100,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       27.5,
+       "8–15"
+      ],
+      [
+       "N",
+       27.5,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10"
+    },
+    {
+     "name": "Face Pull",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       57.5,
+       "12–15"
+      ],
+      [
+       "N",
+       57.5,
+       "12–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10"
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent · L11 · RPE 4–5 (full sentences)\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "10 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-23",
+   "title": "Lower heavy",
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       110,
+       "8"
+      ],
+      [
+       "W",
+       150,
+       "5"
+      ],
+      [
+       "W",
+       185,
+       "3"
+      ],
+      [
+       "N",
+       215,
+       "4–6"
+      ],
+      [
+       "N",
+       195,
+       "4–6"
+      ],
+      [
+       "N",
+       195,
+       "4–6"
+      ]
+     ],
+     "note": "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nBrace each rep, breathe between reps."
+    },
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "W",
+       160,
+       "5"
+      ],
+      [
+       "N",
+       225,
+       "6–10"
+      ],
+      [
+       "N",
+       225,
+       "6–10"
+      ],
+      [
+       "N",
+       225,
+       "6–10"
+      ]
+     ],
+     "note": "RPE 8–9\nHip hinges first. Brace; breathe out on the way up."
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "kind": "machine",
+     "compound": true,
+     "family": "leg_press",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       250,
+       "5"
+      ],
+      [
+       "N",
+       360,
+       "10–15"
+      ],
+      [
+       "N",
+       360,
+       "10–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10\nNow aiming 10–15: 8s were RPE 8 three times.\nAs deep as your hips stay on the pad."
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110,
+       "8–15"
+      ],
+      [
+       "N",
+       110,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       435,
+       "8–15"
+      ],
+      [
+       "N",
+       435,
+       "8–15"
+      ],
+      [
+       "N",
+       435,
+       "8–15"
+      ],
+      [
+       "N",
+       435,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10\nHeavier: 21 reps was RPE 8.\nFull stretch at the bottom; knees soft."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent · L12 · RPE 6–7 (short phrases)\n⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "15 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-25",
+   "title": "Shoulders + arms",
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "W",
+       45,
+       "8"
+      ],
+      [
+       "N",
+       75,
+       "6–10"
+      ]
+     ],
+     "note": "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nOne hard set: aim for 8.\nBreathe out on the press."
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       15,
+       "8–15"
+      ],
+      [
+       "N",
+       15,
+       "8–15"
+      ],
+      [
+       "N",
+       15,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10"
+    },
+    {
+     "name": "Reverse Pec Deck",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "W",
+       null,
+       "8"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load."
+    },
+    {
+     "name": "Seated Incline Curl (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       20,
+       "8–15"
+      ],
+      [
+       "N",
+       20,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10"
+    },
+    {
+     "name": "Triceps Rope Pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       40,
+       "8–15"
+      ],
+      [
+       "N",
+       40,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10"
+    },
+    {
+     "name": "Farmers Walk",
+     "kind": "carry",
+     "compound": false,
+     "family": "carry",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "50 steps"
+      ],
+      [
+       "N",
+       null,
+       "50 steps"
+      ]
+     ],
+     "note": "RPE 8–9 · pick the load per hand\nTall, ribs down, bells off your legs.\nSteps go in the yards box."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent · L10/L12 · hard RPE 8 (a few words)\n⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; L10 between. Full sentences at min 8 → L14 from min 10.\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "20 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-26",
+   "title": "Upper volume",
+   "exercises": [
+    {
+     "name": "Incline Bench Press (Dumbbell)",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "W",
+       50,
+       "8"
+      ],
+      [
+       "N",
+       80,
+       "8–12"
+      ],
+      [
+       "N",
+       80,
+       "8–12"
+      ]
+     ],
+     "note": "Upper volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\n2 sets today: first incline in 5 weeks.\nBreathe out on the press."
+    },
+    {
+     "name": "Dumbbell Row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "N",
+       90,
+       "8–12"
+      ],
+      [
+       "N",
+       90,
+       "8–12"
+      ],
+      [
+       "N",
+       90,
+       "8–12"
+      ]
+     ],
+     "note": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       160,
+       "10–12"
+      ],
+      [
+       "N",
+       160,
+       "10–12"
+      ]
+     ],
+     "note": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times."
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "W",
+       null,
+       "8"
+      ],
+      [
+       "N",
+       30,
+       "8–15"
+      ],
+      [
+       "N",
+       30,
+       "8–15"
+      ],
+      [
+       "N",
+       30,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load."
+    },
+    {
+     "name": "Chest Fly (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "W",
+       null,
+       "8"
+      ],
+      [
+       "N",
+       60,
+       "8–15"
+      ],
+      [
+       "N",
+       60,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load."
+    },
+    {
+     "name": "Lying DB Tricep Extension",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": "lying_extension",
+     "anchor_family": null,
+     "rows": [
+      [
+       "W",
+       null,
+       "8"
+      ],
+      [
+       "N",
+       20,
+       "8–15"
+      ],
+      [
+       "N",
+       20,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load.\nElbows still."
+    },
+    {
+     "name": "Preacher Curl (Machine)",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "W",
+       null,
+       "8"
+      ],
+      [
+       "N",
+       80,
+       "8–15"
+      ],
+      [
+       "N",
+       80,
+       "8–15"
+      ]
+     ],
+     "note": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load."
+    },
+    {
+     "name": "Cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent · L11 · RPE 4–5 (full sentences)\nAfter: end watch cardio, restart Hevy."
+    },
+    {
+     "name": "Stretching",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "12 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  }
+ ]
+}

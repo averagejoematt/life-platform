@@ -30,10 +30,14 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
-LOW_ENERGY_LINE = "Low energy → first 2 lifts + easy cardio."
+from training import hevy_note_grammar
+
+# Lines 2 and 3 are Lane D's grammar (`hevy_note_grammar`), so the block, routine_title's fallback and the linter read
+# one text.
+LOW_ENERGY_LINE = hevy_note_grammar.LOW_ENERGY_LINE
 # The load rule (R3). One pin is the charter's plate step (`progression.gain_rule.step_lb`), read, never typed here.
 LOAD_RULE_HEAD = "Top reps at RPE 7 or less → "
-LIGHT_LOAD_LB = 40  # R3's panel safeguard: under this load a 2-pin jump is too large a share of the lift (+10 on 15 lb is +67 %)
+LIGHT_LOAD_LB = hevy_note_grammar.SMALL_LOAD_LB  # R3's panel safeguard: under this load a 2-pin jump is too large a share
 
 
 def step_lb(read: Callable[..., Any] | None = None) -> Any:
@@ -48,14 +52,7 @@ def step_lb(read: Callable[..., Any] | None = None) -> Any:
 
 def load_rule_line(step: Any) -> str:
     """`Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.`"""
-    if not step:
-        return LOAD_RULE_HEAD + "2 pins on later sets; at RPE 8 → 1 pin. Under 40 lb: 1 pin max. Once per lift."
-    one = f"{float(step):g}"
-    two = f"{2 * float(step):g}"
-    return (
-        LOAD_RULE_HEAD
-        + f"+{two} lb (2 pins) on later sets; at RPE 8 → +{one} lb (1 pin). Under {LIGHT_LOAD_LB} lb: +{one} max. Once per lift."
-    )
+    return hevy_note_grammar.load_rule_line(float(step) if step else None)
 
 
 # ‹Day› by the program's session role first (`inputs_snapshot.calendar.session_role`), then the archetype.
