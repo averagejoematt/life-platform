@@ -769,7 +769,7 @@ HOURLY_CLAIM_RE = re.compile(r"\bhourly\b|\bevery\s+hour\b", re.I)
 # 4h→8h cron change). Same shape as the hourly rule: a governor-naming line claiming
 # a specific every-N-hours cadence that disagrees with the CDK cron is stale.
 EVERY_NH_CLAIM_RE = re.compile(r"\bevery\s+(\d{1,2})\s*h(?:ours?|rs?)?\b", re.I)
-_GOVERNOR_CRON_STEP_RE = re.compile(r"cron\(\d+\s+0/(\d+)")
+_GOVERNOR_CRON_STEP_RE = re.compile(r"cron\(\d+\s+\d+/(\d+)")  # #4284: Pacific wall clock moved the start hour (0/8 UTC -> 1/8 PT)
 # #2898: `cdk/stacks` joined this surface too, for the same reason it joined SRC_ROOTS
 # above (see that comment for the `cdk/stacks`-not-`cdk` staging-artifact caveat) — a CDK
 # docstring claiming the governor's cadence was as unscanned as one claiming its ceiling.

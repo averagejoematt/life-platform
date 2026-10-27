@@ -108,8 +108,8 @@ def test_podcast_display_never_claims_an_independent_schedule():
 def test_module_constants_match_the_live_cdk_cron_literal():
     src = schedule_rows.expr("wednesday-chronicle")  # #4284: the table row
     assert content_cadence.CHRONICLE_CRON_LITERAL == src, (
-        "common/content_cadence.py's CHRONICLE_CRON_LITERAL no longer matches any literal "
-        "in cdk/stacks/email_stack.py — the WednesdayChronicle schedule moved; update both."
+        "common/content_cadence.py's CHRONICLE_CRON_LITERAL no longer matches config/schedules.json's "
+        "wednesday-chronicle row — the schedule moved; update both."
     )
     # Sanity-decode the literal itself so the constants can never silently drift
     # from the string they claim to mirror.
@@ -117,7 +117,7 @@ def test_module_constants_match_the_live_cdk_cron_literal():
     assert m, "CHRONICLE_CRON_LITERAL isn't a recognizable AWS cron expression"
     minute, hour, weekday_name = m.group(1), m.group(2), m.group(3)
     assert minute == "0"
-    assert int(hour) == content_cadence.CHRONICLE_CRON_HOUR_UTC
+    assert int(hour) == content_cadence.CHRONICLE_CRON_HOUR_PT
     assert weekday_name == "WED"
     assert content_cadence.CHRONICLE_CRON_WEEKDAY == 2  # Monday=0 .. Wednesday=2
 

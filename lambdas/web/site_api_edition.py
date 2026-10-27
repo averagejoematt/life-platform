@@ -273,16 +273,20 @@ def bet_question(criterion: dict, settle_date: str, metric_words: Callable[[Any]
 
 
 def next_send_date(cron: str, now: datetime) -> str | None:
-    """The Pacific date of a weekly sender's next fire at or after ``now`` (UTC-aware)."""
+    """The Pacific date of a weekly sender's next fire at or after ``now`` (UTC-aware). The cron is
+    Pacific wall clock (config/schedules.json platform_timezone, #4284 / ADR-165), so the fire time is
+    built on the Pacific calendar; aware arithmetic on one ZoneInfo is wall-clock arithmetic."""
+    from common.pacific_time import PACIFIC
+
     weekday = sc.cron_weekday(cron)
     if weekday is None:
         return None
-    now_utc = now.astimezone(timezone.utc)
-    fire = now_utc.replace(hour=sc.cron_hour(cron), minute=sc.cron_minute(cron), second=0, microsecond=0)
-    fire += timedelta(days=(weekday - now_utc.weekday()) % 7)
-    if fire < now_utc:
+    now_pt = now.astimezone(PACIFIC)
+    fire = now_pt.replace(hour=sc.cron_hour(cron), minute=sc.cron_minute(cron), second=0, microsecond=0)
+    fire += timedelta(days=(weekday - now_pt.weekday()) % 7)
+    if fire < now_pt:
         fire += timedelta(days=7)
-    return pacific_date_of(fire.isoformat())
+    return fire.date().isoformat()
 
 
 # ── the blocks ──────────────────────────────────────────────────────────────────

@@ -29,11 +29,18 @@ REFRESH = os.path.join(ROOT, "lambdas", "web", "site_stats_refresh_lambda.py")
 
 
 def _count_field(field: str, hi: int) -> int:
+    """Values a minute/hour field selects: `*`, `*/n`, `a/n`, lists and `a-b` ranges (#4284: the
+    Pacific-wall-clock migration closed comma lists into ranges, e.g. strava's `5-22`)."""
     if field in ("*", "?"):
         return hi
-    if field.startswith("*/"):
-        return len(range(0, hi, int(field[2:])))
-    return len([p for p in field.split(",") if p])
+    values: set[int] = set()
+    for part in (p for p in field.split(",") if p):
+        base, _, step = part.partition("/")
+        start, _, end = base.partition("-")
+        lo = 0 if start == "*" else int(start)
+        top = int(end) if end else (hi - 1 if step or start == "*" else lo)
+        values.update(range(lo, top + 1, int(step) if step else 1))
+    return len(values)
 
 
 def runs_per_day_expr(expr: str) -> int | None:

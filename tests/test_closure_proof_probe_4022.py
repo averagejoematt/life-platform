@@ -530,6 +530,10 @@ def test_the_nightly_rule_delivers_eventbridges_own_event():
     src = (REPO / "cdk" / "stacks" / "operational_stack.py").read_text()
     start = src.index('function_name="life-platform-qa-smoke"')
     block = src[start : src.index("create_platform_lambda(", start)]
-    assert schedule_rows.expr("life-platform-qa-smoke") == "cron(30 18 ? * * *)"  # #4284: the table row
+    assert schedule_rows.expr("life-platform-qa-smoke") == "cron(30 11 ? * * *)"  # #4284: the table row, Pacific wall clock
     assert "schedule_input" not in block
     assert leg.is_scheduled({"source": "aws.events", "detail-type": "Scheduled Event"})
+    # #4284 (ADR-165): the row is zoned, so its carrier is an EventBridge Scheduler schedule — which delivers
+    # the scheduled-event envelope (source aws.events) when the schedule has no constant input.
+    helpers = (REPO / "cdk" / "stacks" / "lambda_helpers.py").read_text()
+    assert '"source": "aws.events"' in helpers[helpers.index("def _scheduled_event_envelope") :]

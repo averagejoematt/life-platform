@@ -15,87 +15,87 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 | Lambda | Stack | Schedule (UTC) | Resolution |
 |--------|-------|----------------|------------|
-| `activity-enrichment` | ingestion_stack | `cron(30 15 * * ? *)` | table |
-| `acwr-compute` | compute_stack | `cron(55 16 * * ? *)` | table |
-| `adaptive-mode-compute` | compute_stack | `cron(35 16 * * ? *)` | table |
-| `ai-expert-analyzer` | compute_stack | `cron(0 14 ? * MON *)` | table |
-| `ai-review-pack` | email_stack | `cron(0 18 ? * SUN *)` | table |
-| `anomaly-detector` | compute_stack | `cron(5 15 * * ? *)` | table |
-| `between-chronicle` | email_stack | `cron(0 17 ? * SUN *)` | table |
-| `challenge-generator` | compute_stack | `cron(0 22 ? * SUN *)` | table |
-| `character-sheet-compute` | compute_stack | `cron(30 16 * * ? *)` | table |
-| `chronicle-approve` | email_stack | `cron(0 18 * * ? *)` | table |
-| `chronicle-email-sender` | email_stack | `cron(10 15 ? * WED *)` | table |
-| `circadian-compliance` | compute_stack | `cron(0 2 * * ? *)` | table |
-| `coach-daily-reflection` | compute_stack | `cron(0 19 * * ? *)` | table |
-| `coach-history-summarizer` | compute_stack | `cron(0 17 ? * SUN *)` | table |
-| `coach-memoir` | compute_stack | `cron(0 15 1 1,4,7,10 ? *)` | table |
-| `coach-nudge` | email_stack | `cron(10 0-5,15-23 * * ? *)` | table |
-| `coach-panel-podcast` | email_stack | `cron(0 18 ? * MON,WED *)` | table |
-| `coach-prediction-evaluator` | compute_stack | `cron(0 16 * * ? *)` | table |
-| `coach-vision` | compute_stack | `cron(0 17 ? * MON *)` | table |
+| `activity-enrichment` | ingestion_stack | `cron(30 8 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `acwr-compute` | compute_stack | `cron(55 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `adaptive-mode-compute` | compute_stack | `cron(35 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `ai-expert-analyzer` | compute_stack | `cron(0 7 ? * MON *)` (America/Los_Angeles, not UTC) | table |
+| `ai-review-pack` | email_stack | `cron(0 11 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `anomaly-detector` | compute_stack | `cron(5 8 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `between-chronicle` | email_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `challenge-generator` | compute_stack | `cron(0 15 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `character-sheet-compute` | compute_stack | `cron(30 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `chronicle-approve` | email_stack | `cron(0 11 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `chronicle-email-sender` | email_stack | `cron(10 8 ? * WED *)` (America/Los_Angeles, not UTC) | table |
+| `circadian-compliance` | compute_stack | `cron(0 19 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `coach-daily-reflection` | compute_stack | `cron(0 12 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `coach-history-summarizer` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `coach-memoir` | compute_stack | `cron(0 8 1 1,4,7,10 ? *)` (America/Los_Angeles, not UTC) | table |
+| `coach-nudge` | email_stack | `cron(10 8-22 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `coach-panel-podcast` | email_stack | `cron(0 11 ? * MON,WED *)` (America/Los_Angeles, not UTC) | table |
+| `coach-prediction-evaluator` | compute_stack | `cron(0 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `coach-vision` | compute_stack | `cron(0 10 ? * MON *)` (America/Los_Angeles, not UTC) | table |
 | `daily-brief` | email_stack | `cron(0 10 * * ? *)` (America/Los_Angeles, not UTC) | table |
-| `daily-debrief` | email_stack | `cron(0 19 * * ? *)` | table |
-| `daily-insight-compute` | compute_stack | `cron(45 16 * * ? *)` | table |
-| `daily-metrics-compute` | compute_stack | `cron(0 0 * * ? *)` + `cron(40 16 * * ? *)` | table, table |
-| `dashboard-refresh` | compute_stack | `cron(0 1 * * ? *)` + `cron(0 21 * * ? *)` | table, table |
+| `daily-debrief` | email_stack | `cron(0 12 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `daily-insight-compute` | compute_stack | `cron(45 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `daily-metrics-compute` | compute_stack | `cron(0 17 * * ? *)` (America/Los_Angeles, not UTC) + `cron(40 9 * * ? *)` (America/Los_Angeles, not UTC) | table, table |
+| `dashboard-refresh` | compute_stack | `cron(0 14 * * ? *)` (America/Los_Angeles, not UTC) + `cron(0 18 * * ? *)` (America/Los_Angeles, not UTC) | table, table |
 | `dropbox-poll` | ingestion_stack | `rate(2 hours)` | table |
-| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 14,16,18,20 * * ? *)` | table |
-| `episode-detect` | compute_stack | `cron(0 17 ? * SUN *)` | table |
-| `evening-nudge` | email_stack | `cron(0 3 * * ? *)` | table |
-| `failure-pattern-compute` | compute_stack | `cron(50 17 ? * SUN *)` | table |
-| `field-notes-generate` | compute_stack | `cron(0 18 ? * SUN *)` | table |
-| `forecast-engine` | compute_stack | `cron(50 16 * * ? *)` | table |
-| `habit-skip-review` | email_stack | `cron(0 16 ? * SAT *)` | table |
+| `eightsleep-data-ingestion` | ingestion_stack | `cron(15 7,9,11,13 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `episode-detect` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `evening-nudge` | email_stack | `cron(0 20 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `failure-pattern-compute` | compute_stack | `cron(50 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `field-notes-generate` | compute_stack | `cron(0 11 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `forecast-engine` | compute_stack | `cron(50 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `habit-skip-review` | email_stack | `cron(0 9 ? * SAT *)` (America/Los_Angeles, not UTC) | table |
 | `habitify-data-ingestion` | ingestion_stack | `cron(5 * * * ? *)` | table |
-| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` + `cron(30 18 * * ? *)` + `cron(40 13 * * ? *)` | table, table, table |
-| `hevy-restamp` | operational_stack | `cron(0 18 * * ? *)` | table |
-| `hevy-routine-cron` | operational_stack | `cron(30 13 ? * SUN *)` | table |
-| `hypothesis-engine` | compute_stack | `cron(0 19 ? * SUN *)` | table |
-| `inter-coach-dialogue` | compute_stack | `cron(0 18 ? * SUN *)` | table |
-| `journal-analyzer` | compute_stack | `cron(0 10 * * ? *)` | table |
-| `journal-enrichment` | ingestion_stack | `cron(30 14 * * ? *)` | table |
-| `life-platform-ai-quality-canary` | operational_stack | `cron(20 16 ? * MON,WED,FRI *)` | table |
-| `life-platform-alert-digest` | operational_stack | `cron(0 15 * * ? *)` | table |
+| `hevy-backfill` | ingestion_stack | `cron(0 * * * ? *)` + `cron(30 11 * * ? *)` (America/Los_Angeles, not UTC) + `cron(40 6 * * ? *)` (America/Los_Angeles, not UTC) | table, table, table |
+| `hevy-restamp` | operational_stack | `cron(0 11 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `hevy-routine-cron` | operational_stack | `cron(30 6 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `hypothesis-engine` | compute_stack | `cron(0 12 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `inter-coach-dialogue` | compute_stack | `cron(0 11 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `journal-analyzer` | compute_stack | `cron(0 3 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `journal-enrichment` | ingestion_stack | `cron(30 7 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-ai-quality-canary` | operational_stack | `cron(20 9 ? * MON,WED,FRI *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-alert-digest` | operational_stack | `cron(0 8 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `life-platform-canary` | operational_stack | `rate(4 hours)` | table |
-| `life-platform-coherence-sentinel` | operational_stack | `cron(45 18 ? * * *)` | table |
-| `life-platform-cost-governor` | operational_stack | `cron(0 0/8 * * ? *)` | table |
-| `life-platform-data-reconciliation` | operational_stack | `cron(30 7 ? * MON *)` | table |
-| `life-platform-delete-user-data` | operational_stack | `cron(0 8 ? * MON *)` | table |
+| `life-platform-coherence-sentinel` | operational_stack | `cron(45 11 ? * * *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-cost-governor` | operational_stack | `cron(0 1/8 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-data-reconciliation` | operational_stack | `cron(30 0 ? * MON *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-delete-user-data` | operational_stack | `cron(0 1 ? * MON *)` (America/Los_Angeles, not UTC) | table |
 | `life-platform-dlq-consumer` | operational_stack | `rate(6 hours)` | table |
-| `life-platform-freshness-checker` | operational_stack | `cron(45 16 * * ? *)` | table |
-| `life-platform-permanence` | operational_stack | `cron(0 6 * * ? *)` | table |
-| `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | table |
-| `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | table |
-| `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | table |
-| `milestone-digest` | email_stack | `cron(15 17 * * ? *)` | table |
-| `monday-compass` | email_stack | `cron(0 15 ? * MON *)` | table |
-| `monthly-digest` | email_stack | `cron(0 16 ? * 1#1 *)` | table |
-| `notion-journal-ingestion` | ingestion_stack | `cron(0 14,21,3 * * ? *)` | table |
-| `nutrition-review` | email_stack | `cron(0 17 ? * SAT *)` | table |
-| `og-image-generator` | operational_stack | `cron(30 19 * * ? *)` | table |
-| `partner-weekly-email` | email_stack | `cron(30 17 ? * 1 *)` | table |
-| `personal-baselines-compute` | compute_stack | `cron(0 8 1 * ? *)` | table |
-| `pipeline-health-check` | operational_stack | `cron(10 17 * * ? *)` + `cron(30 2,6,14,18,22 * * ? *)` + `cron(58 16 * * ? *)` | table, table, table |
-| `reading-recall-sweep` | operational_stack | `cron(0 16 * * ? *)` | table |
-| `recap-card-generator` | operational_stack | `cron(30 19 * * ? *)` | table |
-| `scenario-explorer` | compute_stack | `cron(10 12 * * ? *)` | table |
-| `site-stats-refresh` | operational_stack | `cron(0 15 * * ? *)` + `cron(0 19 * * ? *)` + `cron(0 23 * * ? *)` + `cron(0 3 * * ? *)` | table, table, table, table |
-| `social-enrichment` | ingestion_stack | `cron(45 14 * * ? *)` | table |
-| `state-of-matthew` | compute_stack | `cron(30 19 ? * SUN *)` | table |
-| `strava-data-ingestion` | ingestion_stack | `cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` + `cron(20 17 * * ? *)` | table, table |
-| `subscriber-onboarding` | email_stack | `cron(5 17 * * ? *)` | table |
-| `telegram-coach-worker` | serve_stack | `cron(0 16 * * ? *)` + `cron(0 3 * * ? *)` + `cron(15 17 ? * MON-FRI *)` | table, table, table |
-| `todoist-data-ingestion` | ingestion_stack | `cron(0 14 * * ? *)` | table |
-| `voice-fidelity-harness` | compute_stack | `cron(0 15 1 * ? *)` | table |
-| `weather-data-ingestion` | ingestion_stack | `cron(0 14,2 * * ? *)` | table |
-| `wednesday-chronicle` | email_stack | `cron(0 1 ? * WED *)` + `cron(0 15 ? * WED *)` + `cron(0 16 ? * MON *)` | table, table, table |
-| `weekly-correlation-compute` | compute_stack | `cron(30 18 ? * SUN *)` | table |
-| `weekly-digest` | email_stack | `cron(0 16 ? * SUN *)` | table |
-| `weekly-plate` | email_stack | `cron(0 2 ? * SAT *)` | table |
-| `weekly-signal` | email_stack | `cron(30 16 ? * SUN *)` | table |
-| `whoop-data-ingestion` | ingestion_stack | `cron(0 0,4,12,16,20 * * ? *)` + `cron(20 18 * * ? *)` + `cron(30 17 * * ? *)` | table, table, table |
-| `withings-data-ingestion` | ingestion_stack | `cron(5 14,17,21,0 * * ? *)` | table |
+| `life-platform-freshness-checker` | operational_stack | `cron(45 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-permanence` | operational_stack | `cron(0 23 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-pip-audit` | operational_stack | `cron(0 8 ? * MON *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-qa-smoke` | operational_stack | `cron(30 11 ? * * *)` (America/Los_Angeles, not UTC) | table |
+| `life-platform-traffic-digest` | operational_stack | `cron(0 9 ? * MON *)` (America/Los_Angeles, not UTC) | table |
+| `milestone-digest` | email_stack | `cron(15 10 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `monday-compass` | email_stack | `cron(0 8 ? * MON *)` (America/Los_Angeles, not UTC) | table |
+| `monthly-digest` | email_stack | `cron(0 9 ? * 1#1 *)` (America/Los_Angeles, not UTC) | table |
+| `notion-journal-ingestion` | ingestion_stack | `cron(0 7,14,20 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `nutrition-review` | email_stack | `cron(0 10 ? * SAT *)` (America/Los_Angeles, not UTC) | table |
+| `og-image-generator` | operational_stack | `cron(30 12 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `partner-weekly-email` | email_stack | `cron(30 10 ? * 1 *)` (America/Los_Angeles, not UTC) | table |
+| `personal-baselines-compute` | compute_stack | `cron(0 1 1 * ? *)` (America/Los_Angeles, not UTC) | table |
+| `pipeline-health-check` | operational_stack | `cron(10 10 * * ? *)` (America/Los_Angeles, not UTC) + `cron(30 7,11,15,19,23 * * ? *)` (America/Los_Angeles, not UTC) + `cron(58 9 * * ? *)` (America/Los_Angeles, not UTC) | table, table, table |
+| `reading-recall-sweep` | operational_stack | `cron(0 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `recap-card-generator` | operational_stack | `cron(30 12 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `scenario-explorer` | compute_stack | `cron(10 5 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `site-stats-refresh` | operational_stack | `cron(0 12 * * ? *)` (America/Los_Angeles, not UTC) + `cron(0 16 * * ? *)` (America/Los_Angeles, not UTC) + `cron(0 20 * * ? *)` (America/Los_Angeles, not UTC) + `cron(0 8 * * ? *)` (America/Los_Angeles, not UTC) | table, table, table, table |
+| `social-enrichment` | ingestion_stack | `cron(45 7 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `state-of-matthew` | compute_stack | `cron(30 12 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `strava-data-ingestion` | ingestion_stack | `cron(10 5-22 * * ? *)` (America/Los_Angeles, not UTC) + `cron(20 10 * * ? *)` (America/Los_Angeles, not UTC) | table, table |
+| `subscriber-onboarding` | email_stack | `cron(5 10 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `telegram-coach-worker` | serve_stack | `cron(0 20 * * ? *)` (America/Los_Angeles, not UTC) + `cron(0 9 * * ? *)` (America/Los_Angeles, not UTC) + `cron(15 10 ? * MON-FRI *)` (America/Los_Angeles, not UTC) | table, table, table |
+| `todoist-data-ingestion` | ingestion_stack | `cron(0 7 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `voice-fidelity-harness` | compute_stack | `cron(0 8 1 * ? *)` (America/Los_Angeles, not UTC) | table |
+| `weather-data-ingestion` | ingestion_stack | `cron(0 7,19 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `wednesday-chronicle` | email_stack | `cron(0 18 ? * TUE *)` (America/Los_Angeles, not UTC) + `cron(0 8 ? * WED *)` (America/Los_Angeles, not UTC) + `cron(0 9 ? * MON *)` (America/Los_Angeles, not UTC) | table, table, table |
+| `weekly-correlation-compute` | compute_stack | `cron(30 11 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `weekly-digest` | email_stack | `cron(0 9 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `weekly-plate` | email_stack | `cron(0 19 ? * FRI *)` (America/Los_Angeles, not UTC) | table |
+| `weekly-signal` | email_stack | `cron(30 9 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `whoop-data-ingestion` | ingestion_stack | `cron(0 5,9,13,17,21 * * ? *)` (America/Los_Angeles, not UTC) + `cron(20 11 * * ? *)` (America/Los_Angeles, not UTC) + `cron(30 10 * * ? *)` (America/Los_Angeles, not UTC) | table, table, table |
+| `withings-data-ingestion` | ingestion_stack | `cron(5 7,10,14,17 * * ? *)` (America/Los_Angeles, not UTC) | table |
 
 **Unscheduled lambdas (27)** — webhook/S3-trigger/invoked-on-demand: `bluesky-social-ingestion`, `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `mastodon-social-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`, `youtube-social-ingestion`
 

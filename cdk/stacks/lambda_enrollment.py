@@ -146,8 +146,9 @@ def validate_enrollment(
         if isinstance(schedule, str) and _TZ_HINT_RE.search(schedule):
             raise EnrollmentError(
                 f"{function_name}{site}: schedule={schedule!r} carries a timezone. "
-                "EventBridge crons on this platform are fixed UTC so they do not drift across DST "
-                "(CLAUDE.md, 'EventBridge crons use fixed UTC'); convert the offset by hand."
+                "The zone is not part of the expression on this platform: a config/schedules.json row is "
+                "wall-clock time in the table's `platform_timezone` (ADR-165, CONVENTIONS 1b), or fixed UTC "
+                "with a `utc_reason`."
             )
         if not isinstance(schedule, str) or not _SCHEDULE_RE.match(schedule.strip()):
             raise EnrollmentError(

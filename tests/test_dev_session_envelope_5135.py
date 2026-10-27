@@ -30,7 +30,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -228,6 +228,10 @@ def laptop(monkeypatch):
     for var in ("AWS_LAMBDA_FUNCTION_NAME", "GITHUB_ACTIONS", "CI", "INVOCATION_CONTEXT", "BEDROCK_SHADOW_MODE", cap.OVERRIDE_ENV):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("DEV_AI_CAP_UNDER_TEST", "1")
+    # The envelope starts 2026-11-01 (#5406); these tests are about the envelope once it exists,
+    # so they must not depend on the wall clock. tests/test_dev_session_effective_from_5406.py
+    # holds the dated edge itself.
+    monkeypatch.setattr(cap, "MONTH_CAP_EFFECTIVE_FROM", date(2026, 10, 1))
     cap._reset_for_tests()
     bedrock = MagicMock()
     bedrock.invoke_model.side_effect = lambda **_k: {
@@ -323,7 +327,7 @@ def test_the_governor_publishes_the_month_as_its_own_gauge():
 
     cw = MagicMock()
     cw.get_metric_statistics.return_value = {"Datapoints": [{"Sum": 63.42}]}
-    start, now = datetime(2026, 10, 1, tzinfo=timezone.utc), datetime(2026, 10, 25, 22, tzinfo=timezone.utc)
+    start, now = datetime(2026, 11, 1, tzinfo=timezone.utc), datetime(2026, 11, 25, 22, tzinfo=timezone.utc)  # in force (#5406)
     assert episodic_premise.publish_dev_session_month(cw, "CallerClass", start, now) == pytest.approx(63.42)
     kw = cw.get_metric_statistics.call_args.kwargs
     assert kw["Dimensions"] == [{"Name": "CallerClass", "Value": "dev-session"}] and kw["StartTime"] == start

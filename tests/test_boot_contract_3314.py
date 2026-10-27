@@ -96,8 +96,11 @@ def test_next_runs_are_clock_ordered_after_now():
     assert all(r["utc"] > "15:30" for r in runs), runs
     assert runs == sorted(runs, key=lambda r: (r["utc"], r["lambda"]))
     # wraps past midnight: at 23:59 the next run is the earliest of the day
-    late = bb.next_runs(MODEL, NOW.replace(hour=23, minute=59), n=1)[0]
-    assert late["utc"] == min(r["utc"] for r in MODEL["schedules"] if r.get("utc"))
+    # #4284 (ADR-165): nearly every row is zoned (utc None in the model, resolved under `now`),
+    # so the earliest run is read from the same resolution, not from the model's fixed-UTC rows.
+    everything = bb.next_runs(MODEL, NOW.replace(hour=23, minute=59), n=10_000)
+    late = everything[0]
+    assert late["utc"] == min(r["utc"] for r in everything)
 
 
 # ── the boot is a consumer ───────────────────────────────────────────────────

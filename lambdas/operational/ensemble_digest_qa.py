@@ -64,15 +64,16 @@ from common.constants import EXPERIMENT_START_DATE
 PK = "ENSEMBLE#digest"
 SK_PREFIX = "CYCLE#"
 
-# daily-brief's EventBridge cron, fixed UTC (cdk/stacks/email_stack.py). The digest is
-# an async fan-out from the END of that run, observed starting ~17:09Z.
-DUE_HOUR_UTC = 17
+# daily-brief's schedule: 10:00 Pacific wall clock (config/schedules.json platform_timezone,
+# #4284 / ADR-165) — 17:00Z under PDT, 18:00Z under PST. The digest is an async fan-out
+# from the END of that run, observed starting ~17:09Z (PDT).
+DUE_HOUR_PT = 10
 
 # How long after the cron a missing row stops being "still in flight". Measured:
 # the 3-attempt async retry chain on the worst observed day (2026-09-15) ran
 # 17:14:17Z -> 17:15:47Z at a 90s ceiling; at the current 300s ceiling the same
 # chain is bounded by 3 x 300s + 2 backoff gaps ~= 20 min. 60 min is that bound
-# plus the same margin again, and still lands 30 min before qa-smoke's 18:30Z run.
+# plus the same margin again, and still lands 30 min before qa-smoke's 11:30 PT run.
 GRACE_MINUTES = 60
 
 # See "WHY THE WINDOW IS THREE DAYS" above: detection horizon, not an audit horizon.
@@ -92,13 +93,15 @@ def window_days() -> int:
 def _due_dates(now_utc):
     """The NARRATIVE-day cycle dates whose write window has CLOSED, newest first (#4589).
 
-    `cycle_date` is `pacific_today()` at invoke time; the cron fires at 17:00 UTC,
-    which is 10:00 PT on the SAME calendar date, so the cycle date equals the UTC
-    date of the run. Nothing here needs a PT conversion, and not doing one is
-    deliberate — a tz round-trip is how an off-by-one enters.
+    `cycle_date` is `pacific_today()` at invoke time and the brief fires at 10:00 PT
+    (#4284: Pacific wall clock in both halves of the year), so the window is read on
+    the Pacific calendar: before 10:00 PT + the grace, today's cycle is still in flight.
     """
-    cutoff = now_utc.replace(hour=DUE_HOUR_UTC, minute=0, second=0, microsecond=0) + timedelta(minutes=GRACE_MINUTES)
-    latest = now_utc.date() if now_utc >= cutoff else now_utc.date() - timedelta(days=1)
+    from common.pacific_time import PACIFIC
+
+    now_pt = now_utc.astimezone(PACIFIC)
+    cutoff = now_pt.replace(hour=DUE_HOUR_PT, minute=0, second=0, microsecond=0) + timedelta(minutes=GRACE_MINUTES)
+    latest = now_pt.date() if now_pt >= cutoff else now_pt.date() - timedelta(days=1)
     dates = [d for d in (latest - timedelta(days=i) for i in range(window_days())) if narrative_cadence.is_narrative_day(d)]
     # Pre-genesis cycles are not expected: the reset tombstones the previous cycle's
     # rows and no digest is written before Day 1 (a future genesis runs a countdown).

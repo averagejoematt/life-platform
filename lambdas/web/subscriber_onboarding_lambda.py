@@ -5,11 +5,12 @@ Sends curated Chronicle installments to new subscribers who confirmed
 
 #3564: that window used to be measured to the next WEDNESDAY — a day no
 subscriber-facing sender delivers on. The one unconditional weekly send is
-weekly-signal, `cron(30 16 ? * SUN *)`, so the gap this email exists to bridge
+weekly-signal, `cron(30 9 ? * SUN *)` (Pacific wall clock, #4284), so the gap this email exists to bridge
 is the gap to SUNDAY. The weekday is derived from that cron
 (`common.subscriber_cadence.signal_weekday`), never re-typed here.
 
-Schedule: EventBridge cron(5 17 * * ? *) — 10:05 AM PT daily (CDK SubscriberOnboarding,
+Schedule: cron(5 10 * * ? *) Pacific wall clock — 10:05 AM PT daily, all year (EventBridge Scheduler,
+config/schedules.json platform_timezone, #4284 / ADR-165; CDK SubscriberOnboarding,
 staggered from the daily brief; the old cron(0 16) hand-created rule was an orphan, #1257).
 
 Dry-run posture (#2291): this module is SCHEDULE-triggered, so it is NOT exempt

@@ -3985,3 +3985,21 @@ GUARD_PROOFS["guard::scripts/reconcile_child_guard.py"] = {
     ),
     "proved_on": "2026-10-26",
 }
+
+# ── ATTEMPTED and NOT proved, extracted from scripts/gate_census.py for its #1665 ceiling ──
+# #4284 (ADR-165): the REQUIRED_EB_RULES entries re-pointed at the rules that stay fixed-UTC.
+_EB_RULES_4284_REASON = (
+    "#4284 (ADR-165) — NOT PROVED. A REQUIRED_EB_RULES entry is a live-AWS DescribeRule probe (tests/test_integration_aws.py "
+    "I6, post-deploy only); proving it can fail means deleting or disabling the live rule, an AWS mutation no lane may make. "
+    "The entry replaced the Whoop/Todoist/FreshnessChecker rules, which moved to EventBridge Scheduler with every other zoned "
+    "row (checked in the same test by GetSchedule); what stays an Events rule is the fixed-UTC set: the utc_reason opt-outs "
+    "and the rate rows."
+)
+ATTEMPTED_UNPROVEN_EXTRACTED: dict[str, str] = {
+    f"registry::tests/test_integration_aws.py::REQUIRED_EB_RULES::{rule}": _EB_RULES_4284_REASON
+    for rule in (
+        "LifePlatformIngestion-HabitifyIngestionSchedule8F58-20xjBrPYKtC8",
+        "LifePlatformIngestion-HevyBackfillSchedule97BF5DD5-bBl2eglWL6ag",
+        "LifePlatformOperational-DlqConsumerScheduleEC15B7F4-jl4JyU2rFaNS",
+    )
+}

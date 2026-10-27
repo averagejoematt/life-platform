@@ -383,11 +383,12 @@ _WEEKLY_CRON_RE = re.compile(r"cron\((\d{1,2}) (\d{1,2}) \? \* (SUN|MON|TUE|WED|
 
 
 def _auto_discover_hypothesis_cadence() -> str | None:
-    """The doc phrase for hypothesis-engine's weekly cadence, e.g. "Sun 19:00 UTC" (#973).
+    """The doc phrase for hypothesis-engine's weekly cadence, e.g. "Sun 12:00 PT" (#973).
 
     Resolves hypothesis-engine's row in config/schedules.json (#4284) and renders
-    the weekly EventBridge cron as the phrase CLAUDE.md's Compute-Lambdas line
-    quotes (crons are fixed UTC by convention, so the render is exact). A missing,
+    the weekly cron as the phrase docs quote, in the row's zone: since ADR-165 a
+    row is wall clock in the table's `platform_timezone` (rendered "PT"), unless it
+    opts out to "UTC" (a table with no platform zone is the legacy fixed-UTC one). A missing,
     non-literal, or non-weekly expression returns None (manual fallback) rather
     than guessing — if the schedule ever stops being weekly, the doc sentence
     shape itself needs a human edit, not a literal sync.
@@ -395,14 +396,18 @@ def _auto_discover_hypothesis_cadence() -> str | None:
     # #4284: the schedule is hypothesis-engine's row of config/schedules.json, THE schedule table.
     path = ROOT / "config" / "schedules.json"
     try:
-        expr = json.loads(path.read_text(encoding="utf-8"))["schedules"]["hypothesis-engine"]["expression"]
+        table = json.loads(path.read_text(encoding="utf-8"))
+        row = table["schedules"]["hypothesis-engine"]
+        expr = row["expression"]
     except Exception:
         return None
     m = _WEEKLY_CRON_RE.fullmatch(expr)
     if not m:
         return None
     minute, hour, day = int(m.group(1)), int(m.group(2)), m.group(3)
-    return f"{day.title()} {hour:02d}:{minute:02d} UTC"
+    zone = row.get("timezone") or table.get("platform_timezone") or "UTC"
+    label = {"America/Los_Angeles": "PT", "UTC": "UTC"}.get(zone, zone)
+    return f"{day.title()} {hour:02d}:{minute:02d} {label}"
 
 
 def _auto_discover_module_count() -> int | None:
@@ -680,7 +685,7 @@ PLATFORM_FACTS = {
     "restart_page_count": 33,  # fallback: len(PAGES) in deploy/restart_verify_rendered.py (#973, _auto_discover_restart_url_counts)
     "restart_endpoint_count": 7,  # fallback: len(JSON_ENDPOINTS) in deploy/restart_verify_rendered.py (#973)
     "restart_url_count": 40,  # derived: restart_page_count + restart_endpoint_count (always recomputed)
-    "hypothesis_cadence": "Sun 19:00 UTC",  # fallback: hypothesis-engine schedule cron in cdk/stacks/compute_stack.py (#973)
+    "hypothesis_cadence": "Sun 12:00 PT",  # fallback: hypothesis-engine's config/schedules.json row, Pacific wall clock (#973, #4284)
     "experiment_genesis": "2026-07-13",  # fallback: EXPERIMENT_START_DATE in lambdas/common/constants.py (#1235)
     "experiment_cycle": 6,  # fallback: max key of CYCLE_GENESES in lambdas/web/site_api_data.py (#1235)
     # Secret state

@@ -1524,10 +1524,10 @@ def test_wednesday_chronicle_description_is_cadence_derived_not_hand_typed(monke
     desc = by_id(Harness(monkeypatch, healthy_platform().build()).body(), "email", "wednesday_chronicle")["description"]
     assert desc.endswith("Elena Voss")
     assert desc.startswith("Wednesday")
-    # The exact PT clock time for the sender's real UTC cron, not a rounded guess.
-    utc_hour, utc_minute = cron_hour(chronicle.cron), cron_minute(chronicle.cron)
-    assert (utc_hour, utc_minute) == (15, 10), "sender cron changed — update this test's expected PT time too"
-    assert "8:10 AM" in desc  # 15:10 UTC - 7h PDT
+    # The exact PT clock time of the sender's cron (Pacific wall clock since #4284), not a rounded guess.
+    pt_hour, pt_minute = cron_hour(chronicle.cron), cron_minute(chronicle.cron)
+    assert (pt_hour, pt_minute) == (8, 10), "sender cron changed — update this test's expected PT time too"
+    assert "8:10 AM" in desc
     assert required_weekday(chronicle.cron) == 2  # Wednesday — must still match the _EMAIL_LAMBDAS exp_dow literal
 
 

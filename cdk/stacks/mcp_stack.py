@@ -21,8 +21,6 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
-    aws_events as events,
-    aws_events_targets as targets,
     aws_iam as iam,
     aws_lambda as _lambda,
     aws_s3 as s3,
@@ -31,7 +29,7 @@ from aws_cdk import (
 
 from stacks import role_policies as rp
 from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
-from stacks.lambda_helpers import create_platform_lambda, table_schedule
+from stacks.lambda_helpers import add_table_schedule, create_platform_lambda, table_schedule
 
 REGION = "us-west-2"
 ACCT = "205930651321"
@@ -243,13 +241,14 @@ class McpStack(Stack):
         # mcp/nightly_predraft.py, whose JOB dict is the one declaration these literals must
         # match (tests/test_nightly_predraft_4084.py reads this file and compares).
         # Fixed UTC: 02:00Z = 19:00 PDT / 18:00 PST — the same Pacific day either way.
-        predraft_rule = events.Rule(
+        add_table_schedule(
             self,
             "NightlyPredraft",
+            target=warmer,
             schedule=table_schedule("life-platform-mcp-warmer#NightlyPredraft"),
+            schedule_input={"job": "nightly_predraft"},
             description="#4084: draft + red-team tomorrow's session (never commits to Hevy)",
         )
-        predraft_rule.add_target(targets.LambdaFunction(warmer, event=events.RuleTargetInput.from_object({"job": "nightly_predraft"})))
 
         # ── #4084: the pre-draft's dead-man ──────────────────────────────────────
         # mcp-warmer-no-invocations-24h CANNOT see this rule die — the 17:10Z warmer run keeps
@@ -293,13 +292,14 @@ class McpStack(Stack):
         # the job's default week ("yesterday, Pacific" back 7 days) is always the Mon-Sun week
         # just finished. The judge spends under `charter_judge` (budget_guard band 1): at
         # tier >= 1 the run still lands, code scores only, `degraded` with the pause named.
-        panel_grade_rule = events.Rule(
+        add_table_schedule(
             self,
             "PanelWeeklyGrade",
+            target=warmer,
             schedule=table_schedule("life-platform-mcp-warmer#PanelWeeklyGrade"),
+            schedule_input={"job": "panel_weekly_grade"},
             description="#5072: weekly panel-rubric grade of the committed week (owner-only PANEL# row)",
         )
-        panel_grade_rule.add_target(targets.LambdaFunction(warmer, event=events.RuleTargetInput.from_object({"job": "panel_weekly_grade"})))
 
         # ── #5072: the weekly grade's dead-man ────────────────────────────────────────
         # Same reasoning as the pre-draft's: the warmer's own Invocations are kept green by its

@@ -376,7 +376,18 @@ def _canary_cron() -> tuple[int, frozenset[int]]:
         expr = schedule_rows.expr(fn)  # #4284: the factory's schedule is the function's table row
         assert expr.startswith("cron(") and expr.endswith(")"), f"unexpected schedule form {expr!r}"
         minute, hour, _dom, _mon, dow, *_ = expr[5:-1].split()
-        return int(hour) * 60 + int(minute), _dow_set(dow)
+        tz = schedule_rows.rows()[fn].get("timezone")
+        if not tz:
+            return int(hour) * 60 + int(minute), _dow_set(dow)
+        # #4284 (ADR-165): the row is wall clock in the platform zone, so its UTC instant moves with DST.
+        # The sweep is a fixed-UTC GitHub cron; the binding case is the LATEST UTC instant the canary
+        # can fire at (PST), on the same weekday (the canary's Pacific morning is that UTC day too).
+        from datetime import datetime, timezone
+        from zoneinfo import ZoneInfo
+
+        utc = [datetime(2026, mo, 15, int(hour), int(minute), tzinfo=ZoneInfo(tz)).astimezone(timezone.utc) for mo in (1, 7)]
+        assert all(u.day == 15 for u in utc), "the canary's Pacific run crosses a UTC midnight — re-derive the weekday set"
+        return max(u.hour * 60 + u.minute for u in utc), _dow_set(dow)
     raise AssertionError("AiQualityCanary construction not found in operational_stack.py — the canary was renamed or moved")
 
 
@@ -422,8 +433,9 @@ def test_the_ordering_assertion_can_fail():
     canary_minute, canary_days = _canary_cron()
     assert pre_3499_days & canary_days, "sanity: the pre-#3499 schedule shared days with the canary"
     assert pre_3499_minute < canary_minute, "the pre-#3499 cron was NOT before the canary — the mutation is stale, re-derive it"
-    assert canary_minute - pre_3499_minute == 95, (
-        "the pre-#3499 inversion was 95 minutes (14:45Z vs 16:20Z); it is now "
+    assert canary_minute - pre_3499_minute == 155, (
+        "the pre-#3499 inversion was 95 minutes (14:45Z vs 16:20Z PDT) — 155 against the canary's PST bound "
+        "(17:20Z, #4284 Pacific wall clock); it is now "
         f"{canary_minute - pre_3499_minute} — the canary's schedule moved, re-check the fix still holds"
     )
 
@@ -435,4 +447,5 @@ def test_todays_two_schedules_are_the_ones_this_file_was_written_against():
         17 * 60 + 35,
         frozenset({1, 3, 5}),
     ), "the remediation sweep's schedule moved — confirm it is still after the canary"
-    assert _canary_cron() == (16 * 60 + 20, frozenset({1, 3, 5})), "the AI canary's schedule moved — confirm the sweep is still after it"
+    # #4284: the canary is 09:20 Pacific wall clock; its latest UTC instant (PST) is 17:20Z.
+    assert _canary_cron() == (17 * 60 + 20, frozenset({1, 3, 5})), "the AI canary's schedule moved — confirm the sweep is still after it"

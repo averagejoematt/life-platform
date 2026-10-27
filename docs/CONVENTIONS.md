@@ -84,19 +84,38 @@ requires already knowing which symbol to look for.
 
 **The bundle is byte-reproducible (#3625, 2026-09-20):** `build_bundle.zip_dir` writes a sorted walk with a fixed entry timestamp (1980-01-01) and mode, and no `__pycache__`/`.pyc` — the same staged tree zips to the same SHA-256, so a post-deploy `cdk diff` on an unchanged tree shows zero `Code.S3Key` changes. `tests/test_bundle_zip_reproducible_3625.py` builds twice and asserts identical bytes, with a one-byte-change positive control. **And the CDK asset is content-addressed because `build_info.json`'s `built_at` is the COMMIT's timestamp, not the clock's** (`built_at_source: commit`; the wall clock only on a dirty local tree, labelled `clock`) — CDK hashes the staged *directory*, and a per-synth timestamp in one file minted a new asset hash every synth (32 `S3Key` lines on an unchanged tree, measured 2026-09-20) which made the zip invariant inert on the CDK path. `tests/test_bundle_fingerprint_2377.py` pins two fingerprints of one commit byte-equal.
 
-### 1b. Schedules are fixed UTC — with ONE zoned exception (#4284)
+### 1b. Schedules follow ONE platform timezone (#4284, ADR-165)
 
 Every schedule is a row of **`config/schedules.json`, the one schedule table** (#4284): function name (or
-`<function>#<ConstructId>` for a rule built beside the factory) → expression, zone where zoned, the
-reader/internal split, a one-line purpose and the stack. `create_platform_lambda` reads its function's row by
-`function_name`; no stack carries a `cron(`/`rate(` literal (`tests/test_schedule_table_4284.py`). A row is an
-`events.Rule` cron in fixed UTC. The one exception is
-`daily-brief`: its row carries `"timezone": "America/Los_Angeles"` on `cron(0 10 * * ? *)`, so the factory
-creates an EventBridge **Scheduler** schedule (`AWS::Scheduler::Schedule` + one invoke-only role) instead of a
-rule, so the brief keeps its Pacific wall-clock time across the DST change (owner ruling, docket #4644 Q42):
-17:00 UTC until 2026-11-01, 18:00 UTC after. A zoned `schedule=` reads as wall-clock in that zone, NOT UTC
-(`docs/DEPENDENCY_GRAPH.md` marks it). Moving another `facing: reader` row onto a zone is a CDK change with additive IAM (one Scheduler role each) — owner-applied, a follow-up row on #4284.
-Producers the brief reads must stay at or before 16:55 UTC; consumers that follow it run at 19:00 UTC or later.
+`<function>#<ConstructId>` for a schedule built beside the factory) → expression, the reader/internal split, a
+one-line purpose and the stack. `create_platform_lambda` reads its function's row by `function_name`; a schedule
+beside the factory is `add_table_schedule(..., schedule=table_schedule("<key>"))`; no stack carries a
+`cron(`/`rate(` literal (`tests/test_schedule_table_4284.py`).
+
+**The zone is a system-level parameter** (owner ruling on #4284, 2026-10-27, "B" — reverses the fixed-UTC rule):
+the table's top-level `platform_timezone` (`America/Los_Angeles`) is the zone EVERY row follows. A `cron(...)`
+expression is **Pacific wall-clock time**, carried by an EventBridge **Scheduler** schedule
+(`AWS::Scheduler::Schedule`, `ScheduleExpressionTimezone` = the platform zone) on the stack's ONE invoke-only
+scheduler role (`PlatformSchedulerRole`), so a 09:40 job is 09:40 PT in July and in December. Write new rows in
+Pacific time. A zoned schedule with no constant input delivers EventBridge's scheduled-event envelope
+(`source: aws.events`, `detail-type: Scheduled Event`, the function ARN in `resources`), so handlers that branch
+on the rule's shape keep working.
+
+- **Opting out to UTC** needs `"timezone": "UTC"` AND a non-empty `"utc_reason"` (the loader fails the synth
+  otherwise, `tests/test_platform_timezone_4284.py`); the row stays a fixed-UTC `events.Rule`. Today: the two
+  every-hour cadences (`habitify-data-ingestion`, `hevy-backfill`) — a zoned schedule runs once in the repeated
+  fall-back hour and not at all in the skipped spring-forward hour.
+- **A `rate(...)` row** has no wall clock and stays an `events.Rule`; it may carry no zone.
+- **DST, per the AWS Scheduler docs:** spring-forward skips an invocation whose local time does not exist
+  (02:00–02:59 on the March change day); fall-back runs a schedule in the repeated hour ONCE. No row sits in
+  02:00–02:59; the 01:00 rows (`life-platform-cost-governor`, `personal-baselines-compute` on the 1st, the Monday
+  `SubscriberRetentionSweep`) run once on the fall-back night.
+- **Order is wall-clock order.** Producers the brief reads run 09:30–09:58 PT, the brief at 10:00 PT, followers at
+  12:00 PT or later — all shift together, so the order holds in both halves of the year. A job that must key a
+  day reads the Pacific day (`common.pacific_time`), never `utcnow().date()`: a 16:xx PT run is the same UTC date
+  in PDT and the NEXT UTC date in PST.
+- The model (`generate_platform_model.py`), the boot brief's next-runs and `docs/DEPENDENCY_GRAPH.md` render a zoned
+  row as local time with its zone, never as UTC.
 
 ## 2. Deploy from `main`, not the worktree branch
 
