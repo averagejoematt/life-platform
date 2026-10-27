@@ -50,7 +50,7 @@ _GENOME_SCAN_MAX_DEPTH = 12
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from common.pacific_time import PACIFIC, pacific_now  # #2817: the Pacific frame
+from common.pacific_time import PACIFIC, pacific_now, pacific_today  # #2817: the Pacific frame
 
 from mcp.config import logger, table
 from mcp.helpers import _linear_regression
@@ -1000,7 +1000,9 @@ def tool_get_freshness_status(args):
 
         try:
             _resp = table.query(
-                KeyConditionExpression=_DDBKey("pk").eq("USER#matthew#SOURCE#macrofactor") & _DDBKey("sk").begins_with("DATE#"),
+                # #5431: bounded at the Pacific today — a projected future-dated row is not the latest record
+                KeyConditionExpression=_DDBKey("pk").eq("USER#matthew#SOURCE#macrofactor")
+                & _DDBKey("sk").between("DATE#", f"DATE#{pacific_today()}~"),
                 ScanIndexForward=False,
                 Limit=5,
                 ProjectionExpression="#d, entries_count",

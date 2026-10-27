@@ -49,7 +49,9 @@ feeding (it moves with the session; the window offset is where it sits when the 
 
 NO MODEL CALL. The issue's box is "AI writes prose only; numbers come from code"; this module writes no prose a model
 would add value to, so there is no Bedrock call and no budget class — the menu's lines are templates over the code's
-numbers (`lines`). The grocery list (#5104 box 1, "generated from the menu") reads the cook days of this menu.
+numbers (`lines`). The grocery list (#5104 box 1, "generated from the menu") reads the cook days of this menu, skips the trip's travel
+days (their food is the travel kit's) and is rendered beside the menu in `lines` (grouped by the anchor's optional
+`section` column).
 
 THE FIXED MEALS (owner ruling 2026-10-26, Session CH: "Plan around the Fuller dinner"): from the week of 2026-10-25
 the owner eats a prepared meal-service dinner every day, one container whose printed label is the truth. The
@@ -82,7 +84,7 @@ from health import food_quality, travel_food
 
 logger = logging.getLogger(__name__)
 
-VERSION = "weekly-menu@1.2.0"  # 1.2.0 #5103: the fixed meals (a fixed dinner planned around); 1.1.0 #5105: food quality
+VERSION = "weekly-menu@1.3.0"  # 1.3.0 #5104: the grocery list skips travel days and is rendered in `lines`; 1.2.0 #5103: the fixed meals (a fixed dinner planned around); 1.1.0 #5105: food quality
 ISSUE = "#5103"
 POLICY_PATH = "nutrition.weekly_menu"
 ANCHORS_PATH = "anchor_foods"  # the owner-only twin's key (training_charter.PRIVATE_KEYS)
@@ -101,6 +103,7 @@ MAX_MOVES = 400
 POST_SESSION = "post_session"
 WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 SERVICE_COOK, SERVICE_MEAL = "cook", "meal_service"
+TRAVEL_DAY = "travel"  # the plan's `day_type` on a travel-window / travel-disruption date (health.calorie_target.resolve)
 
 # The named reasons a menu is not built (built=False) or a day does not fit. A caller states the reason; it never
 # substitutes a remembered menu.
@@ -190,6 +193,7 @@ def parse_anchors(raw: Any, cap: int) -> tuple[list[dict[str, Any]], list[str]]:
                 **{m: float(v or 0.0) for m, v in vals.items()},
                 "cap": own or cap,
                 "package": {"label": pkg.get("label"), "servings": _num(pkg.get("servings"))},
+                "section": str(row.get("section") or "").strip() or None,  # #5104: the store section (optional column)
                 **food_quality.tags(row),  # #5105: fatty_fish, nutrient_tags (optional columns)
             }
         )
@@ -798,6 +802,7 @@ def build(
     if fixed_meals:
         menu["fixed_meals"] = fixed_meals  # the fixed feedings planned around (owner data, owner-only menu)
     menu["grocery_list"] = grocery_list(menu, anchors)
+    menu["grocery_travel_days"] = travel_days(menu)  # #5104: dates the home shop skips (the travel kit's)
     menu["lines"] = lines(menu)
     return menu
 
@@ -835,12 +840,20 @@ def _days(menu: Mapping[str, Any], which: str) -> list[Mapping[str, Any]]:
     return days if which == "all" else [d for d in days if d.get("service") == SERVICE_COOK]
 
 
+def travel_days(menu: Mapping[str, Any]) -> list[str]:
+    """The menu's dates that fall on a travel day (the plan's day type): the food for those is the travel kit's, shopped
+    at the destination (`health.travel_food.grocery_list`), so the home grocery list does not buy it."""
+    return [str(d.get("date")) for d in menu.get("days") or [] if d.get("day_type") == TRAVEL_DAY]
+
+
 def grocery_list(menu: Mapping[str, Any], anchors: Iterable[Mapping[str, Any]], which: str = SERVICE_COOK) -> list[dict[str, Any]]:
     """The shop for the menu's cook days (`which='all'` for every day): servings per anchor summed over the days
-    (`travel_food.menu_counts`, the same day shape), packages rounded up from the anchor's own package size."""
+    (`travel_food.menu_counts`, the same day shape), packages rounded up from the anchor's own package size. A travel
+    day (#5104: the trip's dates) is not shopped here — its food is the travel kit's."""
     by_id = {a["id"]: a for a in anchors}
+    days = [d for d in _days(menu, which) if d.get("day_type") != TRAVEL_DAY]
     out = []
-    for k, n in sorted(travel_food.menu_counts(_days(menu, which)).items()):
+    for k, n in sorted(travel_food.menu_counts(days).items()):
         a = by_id.get(k)
         if a is None or n <= 0:
             continue
@@ -853,7 +866,29 @@ def grocery_list(menu: Mapping[str, Any], anchors: Iterable[Mapping[str, Any]], 
                 "serving": a["serving"],
                 "packages": math.ceil(round(n / float(per), 6)),
                 "package": (a.get("package") or {}).get("label"),
+                "section": a.get("section"),
             }
+        )
+    return out
+
+
+def grocery_lines(menu: Mapping[str, Any]) -> list[str]:
+    """The grocery list in words (a template over `menu['grocery_list']`, no model): one line per store section
+    (`other` for an anchor with no section), each item as servings and the packages to buy, plus a line that names the
+    travel days left off the shop and points at the travel kit. Empty when the menu has neither."""
+    out: list[str] = []
+    by_section: dict[str, list[str]] = {}
+    for g in menu.get("grocery_list") or []:
+        pkg = f" = {g['packages']} x {g['package']}" if g.get("package") else f" = {g['packages']} package(s)"
+        by_section.setdefault(g.get("section") or "other", []).append(f"{g['label']}: {g['servings']:g} x {g['serving']}{pkg}")
+    cook = ", ".join(sorted({d["weekday"] for d in menu.get("days") or [] if d.get("service") == SERVICE_COOK and d.get("feedings")}))
+    for section in sorted(by_section, key=lambda x: (x == "other", x)):
+        out.append(f"Grocery list, {section} (cook days {cook}): " + "; ".join(by_section[section]))
+    skipped = menu.get("grocery_travel_days") or []
+    if skipped:
+        out.append(
+            f"Travel days not shopped here ({', '.join(skipped)}): that food is the travel kit "
+            "(get_exercise_notes action='travel_kit': packing list, destination grocery list, playbook)."
         )
     return out
 
@@ -887,6 +922,7 @@ def lines(menu: Mapping[str, Any]) -> list[str]:
             f"menu {tot.get('kcal'):g} kcal, protein {tot.get('protein_g'):g} g, fat {tot.get('fat_g'):g} g, "
             f"carbohydrate {tot.get('carb_g'):g} g, fibre {tot.get('fibre_g'):g} g — {verdict}. {fed}"
         )
+    out.extend(grocery_lines(menu))  # before the quality line, which stays the last (the callers read lines[-1])
     q = menu.get("quality")
     if isinstance(q, dict):
         fish = q.get(food_quality.FISH) or {}

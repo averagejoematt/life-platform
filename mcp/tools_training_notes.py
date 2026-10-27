@@ -737,4 +737,11 @@ def _end_disruption(args):
         return {"error": f"refused: {e}", "wrote": False}
     record.pop("pk", None)
     _put_disruption(record)
-    return {"status": "ended", "wrote": True, "sk": record["sk"], "record": record, "step_back_up": disruption.policy().get("step_back_up")}
+    return {
+        "status": "ended",
+        "wrote": True,
+        "sk": record["sk"],
+        "record": record,
+        "step_back_up": disruption.policy().get("step_back_up"),
+        "owes_step_back_up": disruption.owes_step_back_up(record),
+    }

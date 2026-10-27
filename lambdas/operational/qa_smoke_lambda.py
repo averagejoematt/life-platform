@@ -677,6 +677,7 @@ def check_hero_weight_arithmetic():
 # #1665/#1944); re-exported here so qa_smoke_lambda.check_as_of_agreement stays
 # a valid public entrypoint for tests and callers.
 from operational.qa_check_as_of import check_as_of_agreement  # noqa: F401,E402
+from operational.qa_check_coach_cards import check_coach_cards  # noqa: E402,F401 — CHECK 10g (#5434, see module)
 
 # ---------------------------------------------------------------------------
 # CHECK 10b — Coach labs truth (#1993)
@@ -1199,6 +1200,7 @@ def check_steps():
         ("score_sanity", check_score_sanity),
         ("lambda_secrets", check_lambda_secrets),
         ("avatar_assets", check_avatar_assets),  # character avatar visuals — kept (real check)
+        ("coach_cards", check_coach_cards),  # #5434: the og sweep can parse the portrait bundle and refreshes every coach card
         ("mcp_tool_calls", check_mcp_tool_calls),
         ("reader_truth", check_reader_truth),  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         ("predict_week_freshness", check_predict_week_freshness),  # #1198: predict-the-week never live on a stale ISO week
