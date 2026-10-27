@@ -232,7 +232,13 @@ def authored_lines(note: str | None) -> dict[str, str]:
 
 
 def _clean_authored(line: str) -> bool:
-    return len(line) <= AUTHORED_LINE_MAX_CHARS and not _AUTHORED_DIRTY_RE.search(line) and not _stray_number(line)
+    """A sentence fit for the cue slot: short, nothing banned, no number, and no second effort (line 1 is the only RPE)."""
+    return (
+        len(line) <= AUTHORED_LINE_MAX_CHARS
+        and not _AUTHORED_DIRTY_RE.search(line)
+        and not _stray_number(line)
+        and not re.search(r"\bRPE\b", line)
+    )
 
 
 def _step_due_line(prog: dict[str, Any], history: list[dict[str, Any]] | None) -> str:
