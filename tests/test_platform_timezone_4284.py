@@ -303,7 +303,8 @@ def test_zoned_rows_become_scheduler_schedules_on_one_role(tmp_path):
             services += svc if isinstance(svc, list) else [svc]
         return services
 
-    roles = [lg for lg, r in by_type["AWS::IAM::Role"] if "scheduler.amazonaws.com" in _assumed_by(r)]
+    scheduler_principal = "scheduler.amazonaws.com"
+    roles = [lg for lg, r in by_type["AWS::IAM::Role"] if any(svc == scheduler_principal for svc in _assumed_by(r))]
     assert len(roles) == 1, f"one scheduler role per stack, got {roles}"
     for _lg, r in schedules:
         props = r["Properties"]
