@@ -122,11 +122,17 @@ def test_the_redraft_writes_the_ecg_and_feel_gate_and_no_band_cues(monkeypatch):
     assert {b["green"]["rpe_cap"] for b in structured["exercises"].values()} == {gate["sinus_rpe_cap"]}
 
 
-def test_mutation_control_without_the_constraint_the_band_block_is_written(monkeypatch):
-    """Before 2026-10-10 nothing is active: the band block is exactly what the draft wrote before #5000."""
-    ir, _, pick, constraint = _redraft(monkeypatch, day="2026-10-05", protein_missed=0)
+def test_mutation_control_without_the_constraint_no_gate_is_written(monkeypatch):
+    """Before 2026-10-10 nothing is active, so no gate is written. #5428: the no-constraint path writes the
+    three-line session block — the Whoop-band block (and its branch lines) no longer reaches the note."""
+    from training import session_block
+
+    ir, structured, pick, constraint = _redraft(monkeypatch, day="2026-10-05", protein_missed=0)
     assert constraint is None
-    assert "ADAPT BY WAKE RECOVERY" in ir.exercises[0].notes and "🟢 67-100" in ir.exercises[0].notes
+    first = ir.exercises[0].notes
+    assert session_block.split(first)[0] and "Take an ECG" not in first
+    assert not [m for m in BAND_MARKERS if m in "\n".join(e.notes for e in ir.exercises)]
+    assert structured["exercises"], "the branches are still stored for adherence"
     assert pick["hr_ceiling_bpm"] == recent_aerobic.HR_CEILING_BPM
 
 
@@ -139,15 +145,16 @@ def test_a_tripped_protein_tripwire_omits_the_green_branch_under_the_gate(monkey
 
 
 def test_a_tripped_protein_tripwire_omits_the_green_branch_without_the_constraint(monkeypatch):
-    """Mutation control for the tripwire alone: on a pre-constraint day the band block keeps 🟡/🔴 and
-    loses 🟢; with the tripwire clear the 🟢 branch is back."""
+    """Mutation control for the tripwire alone: on a pre-constraint day the STORED branches lose 🟢 (#5428: the
+    note carries no 🟢/🟡/🔴 line and no bookkeeping either way); with the tripwire clear the 🟢 branch is back."""
     ir, structured, _, _ = _redraft(monkeypatch, day="2026-10-05", protein_missed=6)
     notes = "\n".join(e.notes for e in ir.exercises)
-    assert "🟢 67-100" not in notes and "no 🟢 this week (protein floor missed 6 of 7)" in notes
-    assert not [ln for ln in notes.splitlines() if ln.startswith("🟢")]
+    assert "🟢" not in notes and "protein" not in notes
+    assert structured["green_withheld"] == "protein floor missed 6 of 7"
+    assert all(b["green"].get("withheld") for b in structured["exercises"].values())
     assert all(b["green"]["rpe_cap"] == b["yellow"]["rpe_cap"] for b in structured["exercises"].values())
-    clear, _, _, _ = _redraft(monkeypatch, day="2026-10-05", protein_missed=2)
-    assert "🟢 67-100" in clear.exercises[0].notes
+    _, clear, _, _ = _redraft(monkeypatch, day="2026-10-05", protein_missed=2)
+    assert "green_withheld" not in clear and not any(b["green"].get("withheld") for b in clear["exercises"].values())
 
 
 def test_an_unread_protein_window_is_unknown_never_clear_and_never_withholds():
@@ -176,7 +183,8 @@ def test_the_cardio_pick_is_appended_with_the_talk_test_and_no_hr_fields(monkeyp
         cardio_menu.block_minutes(kind) * 60
     ]
     assert cardio.rationale_tag == f"cardio:cycling:menu:{kind}"
-    assert "Recumbent" in cardio.notes and cardio_menu.block(kind)["talk_test"] in cardio.notes and "no HR target" in cardio.notes
+    # #5428: RPE + the talk test lead and no HR reaches the wire at all (no "no HR target" tag either)
+    assert "Recumbent" in cardio.notes and cardio_menu.block(kind)["talk_test"] in cardio.notes and "HR" not in cardio.notes
     assert "bpm" not in cardio.notes
     assert not set(sc.HR_PICK_FIELDS) & set(pick) and pick["hr_fields_dropped_by"] == "hr_regime_change_2026_10_10"
     # the served stage-1 pick is the same constrained pick

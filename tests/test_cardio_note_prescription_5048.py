@@ -38,21 +38,21 @@ READ_WEEK = {
     "totals": {"weight_bearing_hr_48h": 1.0, "week_to_date": {"over_ramp": False, "hours": 5.0, "ramp_ceiling_hr": 7.0}},
 }
 
-# The issue's grammar, written out again here rather than imported, so the module's own regex is held to it.
-# #5076 widened the dose: a bike's "level N at S mph", a treadmill's "incline I% at S mph" and its "walk" shape.
+# The #5428 standard's line 1 (HEVY_NOTE_STANDARD.md §3.7), written out again here rather than imported, so the module's
+# own regex is held to it: machine · levels · [hard ]RPE a[–b] (talk words). No minutes, no bike speed.
 GRAMMAR = re.compile(
-    r"^[A-Z][A-Za-z ]+ · \d+ min · (?:level \d+(?: at \d+(?:\.\d)? mph)? |incline \d+(?:\.\d)?(?:–\d+(?:\.\d)?)?% at \d+(?:\.\d)? mph )"
-    r"(?:flat|intervals \d+×\d+|hill|walk) · \S.*$"
+    r"^(?:Recumbent|Upright bike|Treadmill|Elliptical|Rower|Air bike) · [^·]+ · (?:hard )?RPE \d(?:–\d)? "
+    r"\((?:full sentences|short phrases|a few words)\)$"
 )
 
 
 def reader_offences(note: str) -> list[str]:
-    """What a reader test refuses on a cardio note: > 2 lines, a first line off the grammar, "Last:" on
+    """What a reader test refuses on a cardio note: > 4 lines, a first line off the grammar, "Last:" on
     line 1, a sentence starting with "Not", "Optional" on the block (it is the gate's line)."""
     lines = note.split("\n")
     out = []
-    if len(lines) > 2:
-        out.append("more than two lines")
+    if len(lines) > 4:
+        out.append("more than four lines")
     if not GRAMMAR.match(lines[0]):
         out.append("line 1 is not the prescription grammar")
     if "Last:" in lines[0]:
@@ -92,25 +92,19 @@ def test_the_live_note_fails_the_reader_on_every_count_it_was_filed_for():
 
 
 # ── box 1 + 4: the rewritten live note ────────────────────────────────────────────────
-def test_the_rewritten_2026_10_18_note_is_two_lines_with_the_prescription_first():
+def test_the_rewritten_2026_10_18_note_is_one_line_with_the_prescription_first():
+    """#5428: the easy ride is ONE line — the level from his log, the RPE and the talk test. No minutes (the set row), no
+    speed (an output under the iPad), no recovery answer, no why tail (the audit keeps it); nothing follows the block,
+    so no After line."""
     spec = _redraft()
     note = spec.exercises[0].notes
     assert reader_offences(note) == [], note
-    line1, line2 = note.split("\n")
-    # #5076: the dose (level + his speed at it) and the menu's RPE band + talk test; his "flat" stands as easy
-    assert (
-        line1 == "Recumbent bike · 20 min · level 11 at 13.4 mph flat · level 11 for 20 · check in every 10 min · RPE 4–5, full sentences"
-    )  # #5374: the clock rule
-    assert cn.LINE1_RE.match(line1)
-    # the recovery question, answered under the constraint's HR half: by feel, no HR number at all.
-    # The "no push" half is retired from 2026-10-18 (owner ruling 7), so it is not on this day's note.
-    assert line2.startswith("By feel, no HR target: hold level 11.")
-    assert "No push" not in note
-    assert not re.search(r"\d+\s*bpm", note)
-    # the why: one sentence, positive, from the day's walking load
-    why = line2.split("level 11. ", 1)[1]
-    assert why == "Seated, so the feet rest after 2.8 h on them in 48 h; the week is already 1.7 h over the walking ramp."
-    assert len(re.findall(r"[.!?](?:\s|$)", why)) == 1
+    assert note == "Recumbent · L11 · RPE 4–5 (full sentences)"
+    assert cn.LINE1_RE.match(note)
+    assert "No push" not in note and "mph" not in note and " min" not in note
+    assert not re.search(r"\d+\s*bpm|\bHR\b", note)
+    audit = spec.inputs_snapshot["cardio_notes"][0]
+    assert audit["why"] and audit["mph"] == 13.4  # the speed and the why stay on the record, off the wire
     # the author's prose is replaced, never silently lost
     rep = spec.inputs_snapshot["cardio_notes_replaced"]
     assert [(r["movement_key"], r["notes"]) for r in rep] == [("cycling", FIX["live_note"])]
@@ -138,63 +132,60 @@ def test_MUTATION_CONTROL_the_day_before_the_ruling_the_no_push_gate_still_holds
     spec = _live_spec()
     spec.target_date = "2026-10-17"
     rg.attach_cardio_cues(spec, cardio_index=_cardio_index(), whoop_index={}, aerobic_block=FIX["recent_aerobic"])
-    assert "No push — talk test only, no HR target (standing constraint since 2026-10-10)." in spec.exercises[0].notes
     assert spec.inputs_snapshot["cardio_notes"][0]["no_push_gate"] is True
-    assert "No push" not in _redraft().exercises[0].notes
+    assert _redraft().inputs_snapshot["cardio_notes"][0]["no_push_gate"] is False
+    # the gate's effect on the wire is the KIND: a tempo asked for on 10-17 is written easy, on 10-18 as itself
+    held = cn.compose(
+        movement_key="cycling", minutes=30, target_date="2026-10-17", kind="tempo", facts={"last_level": 11}, constraint=CONSTRAINT
+    )
+    free = cn.compose(
+        movement_key="cycling", minutes=30, target_date="2026-10-18", kind="tempo", facts={"last_level": 11}, constraint=CONSTRAINT
+    )
+    assert cn.composed_kind(held[0]) == "easy" and "⌚" not in held[0]
+    assert cn.composed_kind(free[0]) == "tempo" and "⌚ ride clock:" in free[0]
 
 
-# ── box 2: the recovery question ──────────────────────────────────────────────────────
+# ── box 2: the recovery question leaves the wire (#5428 standard §3.7: the chat carries it) ─────────
 def _flat(**kw):
     base = dict(movement_key="cycling", minutes=20, target_date="2026-09-30", facts={"last_level": 11}, aerobic_block=READ_WEEK)
     base.update(kw)
     return cn.compose(**base)[0]
 
 
-def test_green_holds_and_offers_the_platform_chosen_five_minutes():
-    line2 = _flat(recovery_band="green").split("\n")[1]
-    assert line2.startswith("Green: hold level 11; add 5 min if it feels easy (the 5-min step is platform-chosen).")
+def test_the_note_is_the_same_whatever_the_recovery_band_and_the_audit_keeps_the_band():
+    notes = {band: _flat(recovery_band=band) for band in (None, "green", "yellow", "red")}
+    assert set(notes.values()) == {"Recumbent · L11 · RPE 4–5 (full sentences)"}
+    audit = cn.compose(movement_key="cycling", minutes=20, target_date="2026-09-30", facts={"last_level": 11}, recovery_band="yellow")[1]
+    assert audit["recovery_band"] == "yellow"
 
 
-def test_yellow_and_red_hold():
-    for band in ("yellow", "red"):
-        line2 = _flat(recovery_band=band).split("\n")[1]
-        assert line2.startswith(f"{band.capitalize()}: hold level 11.")
-        assert "add" not in line2
+def test_no_hr_reaches_the_wire_with_or_without_a_constraint():
+    """Standard §3.7: no HR target until his zones are re-derived — even a caller passing the redline cap prints none."""
+    for constraint in (None, CONSTRAINT):
+        for day in ("2026-10-17", "2026-10-28"):
+            note = _flat(constraint=constraint, hr_ceiling_bpm=120, target_date=day)
+            assert "bpm" not in note and "HR" not in note and "No push" not in note, note
 
 
-def test_an_unknown_band_answers_both_branches_in_one_sentence():
-    line2 = _flat().split("\n")[1]
-    assert line2.startswith(
-        "Green: hold level 11, add 5 min if it feels easy (the 5-min step is platform-chosen); yellow or red: hold level 11."
-    )
-
-
-def test_the_constraint_answers_no_push_whatever_the_band_while_its_gate_holds():
-    for band in (None, "green", "yellow"):
-        note = _flat(constraint=CONSTRAINT, recovery_band=band, hr_ceiling_bpm=120, target_date="2026-10-17")
-        assert "No push — talk test only" in note and "add 5 min" not in note and "bpm" not in note
-
-
-def test_every_number_the_note_acts_on_is_labelled():
-    """ADR-105: the +5 min step and the interval set are platform-chosen, and the note says so."""
+def test_every_number_the_note_acts_on_is_labelled_and_the_label_stays_off_the_wire():
+    """ADR-105: the interval steps, the hill climb and the tempo check-ins are platform-chosen; the audit says so, the
+    note does not (#5428: engine words never reach Hevy)."""
     assert set(cn.LABELS.values()) == {"platform-chosen"}
-    assert "platform-chosen" in _flat(recovery_band="green")
-    assert "platform-chosen" in _flat(kind="tempo")  # the tempo's +1 level
+    for kind in ("easy", "tempo", "intervals", "hills"):
+        note, audit = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-28", kind=kind, facts={"last_level": 11})
+        assert "platform-chosen" not in note and audit["labels"]["interval_level_step"] == "platform-chosen"
 
 
 # ── box 3: the default is easy; the harder kinds are the menu's placement (#5076) ─────────
 def test_the_default_kind_is_easy_flat_and_the_treadmills_is_the_incline_walk():
     assert cn.compose(movement_key="cycling", minutes=20, target_date="2026-09-30")[1]["kind"] == "easy"
-    assert (
-        _flat().split("\n")[0]
-        == "Recumbent bike · 20 min · level 11 flat · level 11 for 20 · check in every 10 min · RPE 4–5, full sentences"
-    )
+    assert _flat() == "Recumbent · L11 · RPE 4–5 (full sentences)"
     assert cn.compose(movement_key="treadmill", minutes=30, target_date="2026-09-30")[1]["kind"] == "incline_treadmill_walk"
 
 
 def test_the_gate_holds_a_hard_kind_easy_only_before_its_retirement():
     for kind in ("tempo", "intervals", "hills"):
-        assert " flat · " in _flat(kind=kind, constraint=CONSTRAINT, target_date="2026-10-17").split("\n")[0], kind
+        assert cn.composed_kind(_flat(kind=kind, constraint=CONSTRAINT, target_date="2026-10-17")) == "easy", kind
         assert _flat(kind=kind, constraint=CONSTRAINT, target_date="2026-10-18") != _flat(
             kind="easy", constraint=CONSTRAINT, target_date="2026-10-18"
         )

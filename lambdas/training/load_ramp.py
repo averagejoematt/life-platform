@@ -369,10 +369,12 @@ def achieved_hold(
     tolerance_days: int | None = None,
     p: dict[str, Any] | None = None,
     since: str | None = None,
+    any_band: bool = False,
 ) -> dict[str, Any] | None:
     """The best RPE-adjusted hold over the sets moved for >= the slot's rep floor at the current band
     this cycle, before `as_of` — or None (#4408; module docstring for the arithmetic). `since` (#4503
-    OD1) reads "this cycle" as on/after that date instead of the block-1 line."""
+    OD1) reads "this cycle" as on/after that date instead of the block-1 line. `any_band` (#5428, the
+    achieved-load floor) reads every weighed set, whatever band its bodyweight fell in."""
     from training.band_reference import band_key
     from training.exercise_history import BODYWEIGHT_TOLERANCE_DAYS, nearest_bodyweight
 
@@ -388,7 +390,7 @@ def achieved_hold(
         if (as_of and d >= as_of) or (d < since if since else anchor_discount(d, p)[1]["applies"]):
             continue
         lbs = nearest_bodyweight(d, weight_index, tol)
-        if lbs is None or band_key(lbs) != band:
+        if lbs is None or (band_key(lbs) != band and not any_band):
             continue
         for st in s.get("sets") or []:
             w, r = float(st.get("weight_kg") or 0), int(st.get("reps") or 0)
@@ -412,7 +414,7 @@ def achieved_hold(
                     "rpe": float(rpe) if rpe is not None else None,
                     "date": d,
                     "bodyweight_lb": round(float(lbs), 1),
-                    "band": band,
+                    "band": band_key(lbs),
                     "held_kg": held,
                     "rpe_basis": basis,
                     "e1rm_rpe_adjusted": round(e1, 3) if e1 is not None else None,
@@ -654,6 +656,7 @@ def v03_floor(
         tolerance_days,
         slot,
     )
+    _apply_achieved_floor(ramped, template_id, history_index, weight_index, current_weight_lb, as_of, tolerance_days, slot)
     basis = ramped.get("basis") or {}
     ramped["anchor_band"] = (ramped.get("fallback_detail") or {}).get("anchor_band") or (ramped.get("band") if basis else None)
     ramped["anchor_date"] = basis.get("date")
@@ -821,6 +824,60 @@ def _apply_hold(
             r["rep_cap"]["governed_by"] = "hold"
 
 
+ACHIEVED_FLOOR_DAYS = 14
+"""#5428 (the 2026-10-23 squat): a top set is never prescribed under a load he moved in the last 14 days for at least the
+slot's rep floor, inside the slot's RPE ceiling — whatever bodyweight band that session fell in. platform-proposed: two
+weeks is inside every detraining window the module cites (< ~4 weeks largely preserves maximal strength), so a load he
+moved that recently is not one to re-enter from."""
+
+
+def _apply_achieved_floor(
+    ramped: dict[str, Any],
+    template_id: str | None,
+    history_index: dict[str, list],
+    weight_index: dict[str, float] | None,
+    current_weight_lb: float | None,
+    as_of: str | None,
+    tolerance_days: int | None,
+    slot: dict[str, Any] | None,
+) -> None:
+    """#5428, IN PLACE: the achieved-load floor — the ramped load never sits under the RPE-adjusted hold of a set moved in
+    the last `ACHIEVED_FLOOR_DAYS` days, at ANY bodyweight band.
+
+    THE DEFECT (2026-10-23): a week after 245 x 5 @ RPE 8, the bodyweight crossed a 10-lb band line, the band anchor fell back
+    to the nearest band, `_apply_hold` skips a nearest-band anchor ('nothing lifted at this band'), and the ramp's week-4 75 %
+    prescribed a 215 top set. A band is a way to pick a historical anchor; it is not evidence he got weaker in a week.
+    Recorded on `ramp.achieved_floor` on every ramped row (applies or not, and why)."""
+    r = ramped.get("ramp")
+    if not r or not as_of:
+        return
+    from common.pacific_time import shift_day_key
+
+    a = achieved_hold(
+        template_id,
+        history_index,
+        weight_index,
+        current_weight_lb,
+        slot=slot,
+        as_of=as_of,
+        tolerance_days=tolerance_days,
+        since=shift_day_key(as_of, -ACHIEVED_FLOOR_DAYS),
+        any_band=True,
+    )
+    current = float(ramped.get("floor_kg") or 0)
+    applies = a is not None and float(a["held_kg"]) > current + 1e-9
+    r["achieved_floor"] = {
+        "applies": applies,
+        "window_days": ACHIEVED_FLOOR_DAYS,
+        "achieved": a,
+        "before_kg": current,
+        "rule": "a top set is never under a load moved in the last 14 days for the slot's rep floor inside its RPE ceiling, any band (#5428)",
+    }
+    if applies and a:
+        ramped["floor_kg"] = float(a["held_kg"])
+        r["top_kg"] = ramped["floor_kg"]
+
+
 def render_ramp_cue(floor: dict[str, Any]) -> str:
     """The reader-facing line for a ramped load. Factual: the load, the share, the anchor, the date."""
     from training.routine_generator import _fmt_load
@@ -893,7 +950,7 @@ def _exposure_progression(e: dict[str, Any], entry: dict[str, Any], sessions: li
     """`load_progression.next_prescription` for one planner exposure (#5052) — the same inputs the
     generator's `_progress_block` hands it, so the plan and the draft cannot disagree on the load."""
     from training import load_progression as lp
-    from training.logging_conventions import load_convention_of
+    from training.logging_conventions import current_load_convention_of
 
     return lp.next_prescription(
         list(sessions),
@@ -902,7 +959,7 @@ def _exposure_progression(e: dict[str, Any], entry: dict[str, Any], sessions: li
         cls=lp.movement_class(entry),
         exposure=e.get("intensity"),
         re_entry_reason=ramped.get("layoff_reason"),
-        load_convention=load_convention_of(entry or {}),  # #5373: the same label the generator's note carries
+        load_convention=current_load_convention_of(entry or {}),  # #5373: the CURRENT convention, as the note carries
     )
 
 
@@ -944,6 +1001,12 @@ def annotate_prescription(
             load.update({"top_kg": top, "ramp": ramped["ramp"], "basis": ramped.get("basis"), "progression": prog})
             pct = next((s.get("pct_of_top") for s in e.get("sets") or [] if s.get("kind") == "back_off"), None)
             if pct is not None:
-                load["back_off_kg"] = _floor_half_kg(top * pct / 100.0)
+                # #5428: the back-off the planner quotes is the generator's — rounded to the implement
+                from training.rep_scheme import round_to_implement_kg
+
+                equipment = ((catalog_movements or {}).get(key) or {}).get("equipment")
+                load["back_off_kg"] = (
+                    round_to_implement_kg(top * pct / 100.0, equipment) if equipment else _floor_half_kg(top * pct / 100.0)
+                )
         e["load"] = load
     return summary

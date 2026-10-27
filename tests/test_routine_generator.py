@@ -146,10 +146,12 @@ def test_exercise_notes_populated_from_history_index(monkeypatch):
     ideal = next(r for r in routines if r.variant == "ideal")
     notes = [(ex.movement_key, ex.notes) for ex in ideal.exercises]
     bench = [n for k, n in notes if k == "machine_chest_press"]
-    assert bench and bench[0].startswith("Last: 60kg 8/8/7"), notes
-    # Other exercises have no history → notes should be empty strings.
+    # #5428: the Hevy note is the effort line (+ a cue); the history line is the stored record (Hevy's PREVIOUS column shows it)
+    assert bench and bench[0].splitlines()[0] == "RPE 8–9" and "Last:" not in bench[0], notes
+    assert ideal.inputs_snapshot["lift_notes"]["machine_chest_press"]["detail"].startswith("Last: 60kg 8/8/7")
+    # Other exercises have no history → no history text anywhere on the wire
     others = [n for k, n in notes if k != "machine_chest_press"]
-    assert all(n == "" for n in others), notes
+    assert all("Last:" not in n and n.splitlines()[0].startswith("RPE ") for n in others), notes
 
 
 def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):

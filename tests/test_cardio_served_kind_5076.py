@@ -22,6 +22,7 @@ import datetime
 import json
 import os
 import pathlib
+import re
 import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -195,10 +196,14 @@ def test_the_performed_tempo_counts_and_the_week_moves_to_its_intervals(monkeypa
     assert "cycling" in tc.charter_value("cardio_menu.blocks.intervals.machines")
     assert "treadmill" not in tc.charter_value("cardio_menu.blocks.intervals.machines")
     assert audit["off_default"]["charter"] == "cardio_menu.blocks.intervals.machines"
-    line1, line2 = block.notes.split("\n")
-    assert " level " in line1 and " mph " in line1 and "RPE " in line1  # the dose
-    assert "Intervals is conditioning, which the menu runs on the bike, air bike, rower or elliptical" in line2
-    assert "the incline walk is the easy-day default." in line2
+    line1, line2 = block.notes.split("\n")[:2]
+    # #5428: the dose is the easy/hard levels and the hard RPE (no bike speed); line 2 is the ride clock with every start
+    assert re.match(r"^Recumbent · L\d+/L\d+ · hard RPE 8 \(a few words\)$", line1) and "mph" not in block.notes
+    assert line2.startswith("⌚ ride clock: L") and " min at min " in line2
+    # the route's why leaves the wire (the corpus dropped it) and stays on the audit, with its charter key
+    assert "Intervals is conditioning" not in block.notes
+    assert "Intervals is conditioning, which the menu runs on the bike, air bike, rower or elliptical" in audit["why"]
+    assert "the incline walk is the easy-day default." in audit["why"]
 
 
 def test_MUTATION_CONTROL_without_the_served_routines_the_live_defect_comes_back(monkeypatch):
@@ -234,11 +239,9 @@ def test_a_shoulders_arms_day_on_fresh_legs_serves_the_incline_walk_with_its_dos
     lo_i = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.starting_dose.incline_pct")[0]
     lo_s = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.starting_dose.mph")[0]
     lo, hi = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.rpe")
-    assert (
-        block.notes.split("\n")[0]
-        == f"Treadmill · {minutes} min · incline {lo_i:g}% at {float(lo_s)} mph walk · {lo_i:g}% for {minutes} · check in every 10 min · "
-        f"RPE {lo}–{hi}, full sentences"
-    )
+    # #5428: speed + grade (settings), no minutes on line 1; `today` only when his own logged walks differ
+    line1 = block.notes.split("\n")[0]
+    assert line1.removeprefix("Treadmill · ").removeprefix("today ") == f"{float(lo_s):.1f} mph, {lo_i:g}% · RPE {lo}–{hi} (full sentences)"
     assert [s.duration_seconds for s in block.sets] == [minutes * 60]
     assert audit["incline_pct"] == lo_i and audit["mph"] == lo_s
 

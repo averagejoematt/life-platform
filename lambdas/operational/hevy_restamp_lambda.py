@@ -261,14 +261,14 @@ def lambda_handler(event, context):
 
         # Re-compile + re-push. A conflict (in-app edit) fails open: leave the
         # last routine, do not clobber.
-        from training import hevy_write_client as wc, routine_repo as repo
+        from training import hevy_write_client as wc, routine_repo as repo, session_block
         from training.hevy_compiler import from_hevy_response, to_update_body
         from training.hevy_template_cache import resolve_movement
         from training.routine_title import build_title_context, format_why_note
 
         try:
             title_ctx = build_title_context(ir)
-            why = format_why_note(ir)
+            why = session_block.why_note_for(ir, format_why_note(ir))  # #5428: no second session line over the block
             body = to_update_body(ir, resolve_movement, title_context=title_ctx, why_note=why)
             resp = wc.update_routine_with_guard(ir.hevy_routine_id, body, ir.hevy_updated_at)
             parsed = from_hevy_response(resp)

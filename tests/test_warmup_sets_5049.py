@@ -120,7 +120,9 @@ def test_the_redrafted_10_18_bench_climbs_50_70_85_then_its_unchanged_working_se
     assert [(_lb(s.weight_kg), s.reps) for s in warm] == [(95.0, 8), (130.0, 5), (155.0, 3)]
     assert [s.type for s in bench.sets[3:]] == ["normal"] * 3
     assert all(s.weight_kg == pytest.approx(BENCH_KG) for s in bench.sets[3:])
-    assert "band pull-aparts" in bench.notes and bench.notes.count(warmup_sets.CUE_MARKER) == 1
+    # #5428: the note never restates the climb; the warm-up text is at most one prep clause (dropped behind a reason line)
+    assert bench.notes.splitlines()[0] == "RPE 8–9" and "Breathe out on the press." in bench.notes
+    assert "ramp" not in bench.notes and "Warm up" not in bench.notes
     row = next(r for r in ideal.inputs_snapshot["warmups"]["movements"] if r["movement_key"] == BENCH)
     assert row["status"] == "warmed" and row["position"] == "first"
 
@@ -135,16 +137,31 @@ def test_working_sets_loads_and_the_exercise_order_are_byte_identical_to_the_pas
     assert first.type == "normal" and first.weight_kg == pytest.approx(BENCH_KG)
 
 
-def test_sub_floor_dumbbell_lifts_and_the_vertical_pull_get_no_warmups():
+def test_only_the_first_dumbbell_compound_gets_one_row_and_the_vertical_pull_gets_none():
+    """#5428 R4 (owner ruling 2026-10-27, one dumbbell warm-up row): the FIRST dumbbell compound at >= 50 lb per hand gets ONE
+    W row at ~60 % (90 lb -> 55 on the 5-lb rack, x 8); the later dumbbell press gets none; a dumbbell never takes the
+    barbell climb."""
     ideal = _redraft()
     rows = {r["movement_key"]: r for r in ideal.inputs_snapshot["warmups"]["movements"]}
-    assert rows["one_arm_db_row"]["status"] == "below_floor"  # 85 lb dumbbell
-    assert rows["db_shoulder_press"]["status"] == "below_floor"  # 70 lb dumbbell
+    assert rows["one_arm_db_row"]["status"] == "warmed" and rows["one_arm_db_row"]["position"] == "first_dumbbell"
+    assert [(_lb(s.weight_kg), s.reps) for s in _block(ideal, "one_arm_db_row").sets if s.type == "warmup"] == [(55.0, 8)]
+    assert rows["db_shoulder_press"]["status"] == "later_dumbbell"
     assert "lat_pulldown" not in rows  # vertical pull is not in the compound families
-    for key in ("one_arm_db_row", "db_shoulder_press", "lat_pulldown", "cable_chest_fly"):
+    for key in ("db_shoulder_press", "lat_pulldown"):
         assert not any(s.type == "warmup" for s in _block(ideal, key).sets)
-        assert warmup_sets.CUE_MARKER not in (_block(ideal, key).notes or "")
-    assert ideal.inputs_snapshot["warmups"]["warmup_sets"] == 3
+    assert ideal.inputs_snapshot["warmups"]["warmup_sets"] == 4  # the bench's 3 + the row's 1
+
+
+def test_a_dumbbell_compound_under_50_lb_per_hand_gets_no_row():
+    """Mutation control for the floor: a 45 lb dumbbell press is below the 50-lb-per-hand line."""
+    light = ExerciseBlock(
+        movement_key="db_shoulder_press", sets=[Set(weight_kg=45 * LB, rep_range_start=8, rep_range_end=12) for _ in range(2)]
+    )
+    audit = warmup_sets.attach_warmups([light], MOVEMENTS)
+    assert audit["movements"][0]["status"] == "below_floor" and not any(s.type == "warmup" for s in light.sets)
+    heavy_top = ExerciseBlock(movement_key="db_shoulder_press", sets=[Set(weight_kg=80 * LB, rep_range_start=4, rep_range_end=6)])
+    warmup_sets.attach_warmups([heavy_top], MOVEMENTS)
+    assert [(_lb(s.weight_kg), s.reps) for s in heavy_top.sets if s.type == "warmup"] == [(50.0, 5)]  # x 5 ahead of a 4–6 top set
 
 
 # ── 2. the wire ──────────────────────────────────────────────────────────────
@@ -231,7 +248,7 @@ def test_a_later_compound_gets_one_set_at_70_percent_x_5():
     assert len([s for s in bench.sets if s.type == "warmup"]) == 3
     warm = [s for s in squat.sets if s.type == "warmup"]
     assert [(_lb(s.weight_kg), s.reps) for s in warm] == [(160.0, 5)]  # 157.5 -> nearest 5 lb, half up
-    assert "ankle/hip mobility" in squat.notes
+    assert squat.notes == "Ankles + hips first."
 
 
 def test_the_floor_is_inclusive_at_95_lb_and_a_block_below_it_gets_nothing():
@@ -244,9 +261,10 @@ def test_the_floor_is_inclusive_at_95_lb_and_a_block_below_it_gets_nothing():
 
 
 def test_the_cue_table_names_one_movement_per_family_and_none_otherwise():
-    assert warmup_sets.cue_clause("bench").endswith("band pull-aparts, then the ramp sets.")
-    assert "hip hinges" in warmup_sets.cue_clause("hinge")
-    assert "ankle/hip mobility" in warmup_sets.cue_clause("squat")
+    # #5428 (owner ruling 2026-10-27): one short prep clause, never the word "ramp" (the W rows are the climb)
+    assert warmup_sets.cue_clause("bench") == "Band pull-aparts first."
+    assert warmup_sets.cue_clause("hinge") == "Hip hinges first."
+    assert warmup_sets.cue_clause("squat") == "Ankles + hips first."
     assert warmup_sets.cue_clause("row") == "" and warmup_sets.cue_clause("overhead_press") == ""
     row = _loaded("machine_row", 200)
     warmup_sets.attach_warmups([row], MOVEMENTS)
@@ -310,7 +328,7 @@ def test_draft_custom_gives_the_committed_10_18_bench_the_same_climb_and_opts_ou
     audit = _attach_draft_warmups(ir, MOVEMENTS, {})
     bench = _block(ir, BENCH)
     assert [(_lb(s.weight_kg), s.reps, s.type) for s in bench.sets[:3]] == [(95.0, 8, "warmup"), (130.0, 5, "warmup"), (155.0, 3, "warmup")]
-    assert audit["warmup_sets"] == 3 and ir.inputs_snapshot["warmups"] is audit
+    assert audit["warmup_sets"] == 4 and ir.inputs_snapshot["warmups"] is audit  # #5428: the bench's 3 + the first dumbbell compound's 1
     off = _custom_ir()
     assert _attach_draft_warmups(off, MOVEMENTS, {"warmups": False}) is None
     assert not any(s.type == "warmup" for b in off.exercises for s in b.sets)

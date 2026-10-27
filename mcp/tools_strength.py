@@ -308,9 +308,11 @@ def _summarize_exercise_sessions(template_id: str, sessions: list) -> dict:
     pr_log_weight = []
     pr_log_1rm = []
     for s in sessions:
-        if s["best_weight"] > pr_weight:
-            pr_weight = s["best_weight"]
-            pr_log_weight.append({"date": s["date"], "weight_lbs": s["best_weight"]})
+        # #5373: a PR compares in the movement's CURRENT unit — a carry's pre-2026-10-27 total never outranks a per-hand weight
+        best = s.get("best_weight_current", s["best_weight"])
+        if best > pr_weight:
+            pr_weight = best
+            pr_log_weight.append({"date": s["date"], "weight_lbs": best})
         if s["best_1rm"] and s["best_1rm"] > pr_1rm:
             pr_1rm = s["best_1rm"]
             pr_log_1rm.append({"date": s["date"], "estimated_1rm": s["best_1rm"]})

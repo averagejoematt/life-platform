@@ -36,6 +36,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_today  # #2798: hevy DATE# keys name Pacific days
 
+from training import logging_conventions  # #5373: the dated per-hand / total-carried load convention
 from training.pinned_setup import split_setup  # #5010: owner-marked setup lines
 
 logger = logging.getLogger("exercise_history")
@@ -210,9 +211,15 @@ def load_history_indexes(
                             "sibling_block_seconds": [v for k, v in block_secs_by_pos.items() if k != pos and v > 0],
                         }
                     )
+                # #5373: a load is compared and progressed in the movement's CURRENT unit — a two-dumbbell carry logged as the
+                # TOTAL before 2026-10-27 is halved to the per-hand number the owner logs now, so a 140 total never reads as a
+                # 140-lb per-hand floor. `day` is the session's Pacific date (the DATE# key of the row).
+                unit_scale = logging_conventions.current_unit_scale(
+                    ex.get("name"), tid, sets_raw, day=workout_date or str(item.get("sk") or "")[5:15]
+                )
                 sets: list[dict[str, Any]] = [
                     {
-                        "weight_kg": _to_float(s.get("weight_kg")),
+                        "weight_kg": _to_float(s.get("weight_kg")) * unit_scale,
                         "reps": _to_int(s.get("reps")),
                         # #4408 review: the logged RPE (None when he logged none) — the v0.3 hold is RPE-aware
                         "rpe": _to_float(s.get("rpe")) if s.get("rpe") is not None else None,
@@ -500,6 +507,42 @@ def pick_note(
         return " — ".join(parts)
     # one_best_line
     return ai_comment or history_cue
+
+
+def previous_load(history_index: dict[str, list] | None, template_id: str | None, before_date: str) -> dict[str, Any] | None:
+    """#5428: what Hevy's PREVIOUS column shows for one template — his last performed session before `before_date`:
+    its date, its top working load in lb (`lb`), the reps and the logged RPE of that top set. None when he has no
+    session on file. Pure: reads the history index the generator already loaded."""
+    if not template_id:
+        return None
+    for s in (history_index or {}).get(template_id) or []:  # most recent first
+        d = str(s.get("date") or "")
+        if not d or d >= before_date:
+            continue
+        sets = [x for x in s.get("sets") or [] if _to_float(x.get("weight_kg")) > 0]
+        if not sets:
+            continue
+        top = max(sets, key=lambda x: (_to_float(x.get("weight_kg")), _to_int(x.get("reps"))))
+        rpe = top.get("rpe")
+        return {
+            "date": d,
+            "template_id": template_id,
+            "lb": round(_to_float(top.get("weight_kg")) / 0.45359237, 1),
+            "reps": _to_int(top.get("reps")),
+            "rpe": _to_float(rpe) if rpe is not None else None,
+        }
+    return None
+
+
+def previous_loads(movement_templates: dict[str, str | None], history_index: dict[str, list] | None, before_date: str) -> dict[str, Any]:
+    """#5428: `previous_load` for every movement of a routine, keyed by movement key — the `inputs_snapshot["previous_loads"]`
+    record the note linter reads Hevy's PREVIOUS from. A movement with no session on file is absent (never a 0)."""
+    out: dict[str, Any] = {}
+    for key, tid in (movement_templates or {}).items():
+        prev = previous_load(history_index, tid, before_date)
+        if prev is not None:
+            out[key] = prev
+    return out
 
 
 def _reset_for_tests() -> None:

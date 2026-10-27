@@ -171,10 +171,17 @@ def _slim_workout(item: dict, include_sets: bool = False, stride: dict | None = 
         # #5372: a carry (the farmers walk) is reported on its own line — load as logged and the step count from the distance
         # field — and stays out of `total_volume_kg` (weight x reps; a carry has no reps). Never weight x distance.
         # #5373: each carry set also renders as "N steps (~X yd, est. from unloaded stride)" (steps only with no measured stride),
-        # and the load is named `total_carried`; `logging_conventions.CONVENTIONS_LINE` states both conventions once.
+        # and the load is named by its convention ON THE SESSION'S DATE (`per_hand` from 2026-10-27, `total_carried` before);
+        # `logging_conventions.CONVENTIONS_LINE` states both conventions once.
         carries = []
         for ex in item.get("exercises") or []:
-            line = carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets"), template_id=ex.get("template_id"), stride=stride)
+            line = carry_line(
+                ex.get("name") or ex.get("title") or "",
+                ex.get("sets"),
+                template_id=ex.get("template_id"),
+                stride=stride,
+                day=item.get("date"),
+            )
             if line:
                 carries.append({"name": ex.get("name") or ex.get("title"), "template_id": ex.get("template_id"), **line})
         out["carries"] = carries
@@ -311,5 +318,8 @@ def tool_get_workout_detail(args: dict) -> dict:
 
 def _stride_if_carry(item: dict) -> dict | None:
     """The stride read only when the workout has a carry (#5373) — one apple_health read, never for a session without one."""
-    has_carry = any(carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets")) for ex in item.get("exercises") or [])
+    has_carry = any(
+        carry_line(ex.get("name") or ex.get("title") or "", ex.get("sets"), template_id=ex.get("template_id"), day=item.get("date"))
+        for ex in item.get("exercises") or []
+    )
     return _carry_stride(item.get("date")) if has_carry else None
