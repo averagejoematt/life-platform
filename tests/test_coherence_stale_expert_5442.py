@@ -64,6 +64,18 @@ SENTINEL_FACTS = {"recovery_pct": 70, "hrv_ms": 50.0, "rhr_bpm": 60, "latest_wei
 _LONG = " and the recovery trend held steady through the week with no concerning signals at all."
 
 
+@pytest.fixture(autouse=True)
+def _reset_outage_breaker_after():
+    """Leave #5412's module-level breaker un-tripped for whatever test runs next in this worker."""
+    yield
+    try:
+        from intelligence import vendor_outage_breaker
+
+        vendor_outage_breaker.begin_run()
+    except ImportError:  # pragma: no cover
+        pass
+
+
 def _validator_warns(text):
     r = v.validate_ai_output(text + _LONG, v.AIOutputType.CHRONICLE, min_length=10)
     return [w for w in r.warnings if "HRV" in w and "bpm" in w]
