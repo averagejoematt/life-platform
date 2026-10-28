@@ -143,7 +143,7 @@ def labs_prompt_block(data: Dict[str, Any]) -> str:
 IMPORTANT: Lab data spans Matthew's full history, not just the current experiment.
 The data shows {data.get('total_draws', 0)} total blood draws, with the most recent
 on {draw_date}{draw_age}. Do NOT describe this as "draws during the
-experiment" — these are periodic lab draws over time.
+experiment" — these are periodic lab draws over time.{pre_experiment_draw_line(draw_date)}
 EVERY draw named above is in the PAST. Never write about a past draw as if it were
 scheduled, upcoming, or still to be booked, and never tell Matthew to prepare for a
 date that has already gone by. If you want to talk about the NEXT panel, say so
@@ -156,6 +156,34 @@ extraction_incomplete appears, name it as a platform extraction gap on real draw
 not as missing labs.
 """
     return frame + owner_draw_plan_block()
+
+
+def pre_experiment_draw_line(draw_date: Any, genesis: Optional[str] = None) -> str:
+    """The sentence that places a draw BEFORE the experiment, or "" when it is not (#5456).
+
+    The labs read of 2026-10-27 called "April 3rd creatinine and BUN ... our only recent
+    markers" with nothing saying the panel predates the experiment by five months; the frame
+    above named the date and age but never the boundary. Derived from the live
+    `EXPERIMENT_START_DATE` (read at call time), never typed. The citation form it asks for
+    names the genesis by its date, not "Day 1": on any later day a bare "Day 1" is a
+    stale-phase finding (`ai.baseline_freshness`), and the draw is simply older than the run.
+    """
+    try:
+        if genesis is None:
+            from common import constants
+
+            genesis = str(constants.EXPERIMENT_START_DATE)
+        drawn = datetime.strptime(str(draw_date)[:10], "%Y-%m-%d").date()
+        start = datetime.strptime(str(genesis)[:10], "%Y-%m-%d").date()
+    except (ImportError, ValueError, TypeError):
+        return ""
+    if drawn >= start:
+        return ""
+    when, began = f"{drawn:%B} {drawn.day}", f"{start:%B} {start.day}, {start.year}"
+    return f"""
+That draw was taken BEFORE this experiment began on {began}: every marker in it is a
+pre-experiment reading, not a recent or current one. When you cite one, say so in the same
+sentence ("from the {when} draw, taken before the experiment began")."""
 
 
 def owner_draw_plan_block() -> str:

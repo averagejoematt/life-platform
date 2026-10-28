@@ -70,6 +70,61 @@ def _phase_context_block():
         return ""
 
 
+def _prose_date(iso):
+    """'2026-09-06' -> 'September 6' (a calendar-day label, never an instant); None when unparseable."""
+    from datetime import datetime
+
+    try:
+        d = datetime.strptime(str(iso)[:10], "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None
+    return f"{d:%B} {d.day}"
+
+
+def rollup_facts_block(facts, *, baseline_lbs=None, start_date_iso=None):
+    """The AUTHORITATIVE FACTS line of the month rollup and the experiment arc (#5458).
+
+    Both prompts say "judge against where Matthew STARTED" and, before #5458, neither said
+    where that was. On 2026-10-28 the arc invented a start ("341.1" next to baseline
+    framing, while the cycle baseline is 327.34) and then did its own subtraction ("28.24",
+    which the allow-list gate refuses because no input carries it). The start is this
+    cycle's constant (`EXPERIMENT_BASELINE_WEIGHT_LBS` on `EXPERIMENT_START_DATE`, ADR-058),
+    never an earlier cycle's, and the change since then is computed HERE from the same
+    current weight the line already cites, so the model never has to.
+
+    The start is written in the one form the weight checks accept, a starting-weight
+    phrase with the genesis date in the same sentence. "Day 1" is not offered: on Day 52
+    a bare "Day 1" is a stale-phase finding.
+    """
+    bits = []
+    latest = facts.get("latest_weight")
+    if latest is not None:
+        bits.append(f"current weight {latest:g} lb")
+    if facts.get("recovery_pct") is not None:
+        bits.append(f"recovery {facts['recovery_pct']:g}%")
+    start = _prose_date(start_date_iso) if start_date_iso else None
+    if baseline_lbs is not None and start:
+        bits.append(f"a starting weight of {baseline_lbs:g} lb on {start} (this experiment's start; no other start weight exists)")
+        if latest is not None:
+            delta = round(float(latest) - float(baseline_lbs), 2)
+            bits.append(f"{abs(delta):g} lb {'lost' if delta < 0 else 'gained'} since {start}")
+    if not bits:
+        return ""
+    return "\nAUTHORITATIVE FACTS (cite these exact numbers; invent no others): " + "; ".join(bits) + "\n"
+
+
+# #5458: the week notes' sleep / HRV / training figures are each THAT WEEK's average, and the
+# night-scope gate holds a vitals figure that names neither a night nor a window. A named week is
+# a window (`coach.reader_checks._WINDOW_RE`), so this line asks for exactly that form, and for
+# figures as given: "nearly 900 minutes" for 896 and "20 points" for a delta are both refused.
+ROLLUP_FIGURE_GUIDANCE = (
+    "- A sleep, HRV or recovery figure in a week's note is THAT WEEK's average, not one night's reading. Cite it as an average and name "
+    'its week in the same clause ("sleep averaged <hours> hours in Week <N>"), and only for the week whose note states it.\n'
+    "- Quote figures exactly as the notes and facts give them. Never round one to a round number, never compute a new "
+    "one (a difference, a total, a change in points), and refer to the start by its date, never by a day number."
+)
+
+
 def build_synthesis_prompt(coach_sections, goals_json, facts_block, presence_block):
     """The integrator (weekly-priority) prompt — extracted pure so the #1086
     phase-context coverage suite can drive it offline (#1115)."""
@@ -138,6 +193,7 @@ HOW TO READ THE MONTH (read before writing):
 - Judge against where Matthew STARTED, not the end goal. Lagging outcomes are expected to lag; a slow-moving number is not a behavioral failure.
 - Only {n_weeks} weeks of notes exist in this window; do not pretend to more history than the notes contain.
 - BEHAVIORAL PRESENCE lines are deterministic counts from the raw logs — AUTHORITATIVE, and they override any rosier read in a week's notes. Absence weeks are narrated AS absence, never as progress; rest-inflated recovery during an absence week is never credited.
+{ROLLUP_FIGURE_GUIDANCE}
 
 Produce EXACTLY this JSON (no markdown, no preamble):
 {{
@@ -167,6 +223,7 @@ HOW TO JUDGE THE ARC (read before writing):
 - Credit the throughline of effort and consistency. If the weeks rhymed (the same pattern recurring), say so plainly — that's the signal.
 - Only {n_weeks} weeks exist; do not pretend to more history than the notes contain.
 - BEHAVIORAL PRESENCE lines are deterministic counts from the raw logs — they are AUTHORITATIVE and override any rosier read in that week's notes. A week whose counts are zero (or near-zero) is an ABSENCE week: narrate it AS absence — the logging stopped, and that is the week's story — never as progress or triumph. Recovery/HRV that looks good during an absence week is REST-INFLATED (no training, no logged deficit behind it) and must NOT be credited as progress or "the best of the arc". Never call a fully-dark week's missing data "a minor logging problem".
+{ROLLUP_FIGURE_GUIDANCE}
 
 Produce EXACTLY this JSON (no markdown, no preamble):
 {{

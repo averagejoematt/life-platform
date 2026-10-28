@@ -202,3 +202,86 @@ def week_ago_weight(withings_window, target_date, weight_field="weight_lbs"):
         if best_date is None or d >= best_date:
             best_date, best_value = d, value
     return best_value
+
+
+# ── #5458: a DXA figure is a DATED, pre-cycle scan, never his weight ─────────
+#
+# The 2026-10-28 01:32Z analyzer run held the physical read on "cites 170.6 lb as his
+# weight; the latest served weigh-in is 299.1 lb". 170.6 is the DXA lean mass the
+# context handed the model as a bare `lean_mass_lb` beside `current_weight_lb`, and the
+# served-fact weight check (`coach_input_facts.weight_findings`) reads every undated
+# pound figure at bodyweight scale as a claim about today's weight. The regen made it
+# worse (1 -> 2): "against the 155 lb floor" is the same shape. The check is right to
+# refuse an undated pound figure. What it accepts is the dated sentence the shared
+# extractor already skips ("the March 30 DXA measured 170.6 lb of lean mass"), so the
+# fix is where the fact is assembled: the figure travels labelled, with its scan date
+# and its place against the cycle, and the prompt says how to cite it.
+_DEXA_FIELDS = ("body_fat_pct", "lean_mass_lb", "visceral_fat_lb")
+_LEAN_MASS_LABEL = "fat-free (lean) mass measured by the DXA on dexa_scan_date, NOT his body weight (his weight is current_weight_lb)"
+
+
+def _prose_date(d):
+    return f"{d:%B} {d.day}, {d.year}"
+
+
+def dexa_facts(dexa, today_date, genesis=None):
+    """The physical expert's DXA facts from one `dexa` record. `{}` when there is no scan.
+
+    An unknown or unparseable scan date is published as "unknown" and carries no age:
+    it is never "scanned today" (#1894/#2221). `today_date` is the caller's clock (a
+    `date`), so a frozen test clock reaches the age.
+    """
+    if not dexa:
+        return {}
+    bc = dexa.get("body_composition") or {}
+    out = {}
+    for k in _DEXA_FIELDS:
+        out[k] = float(bc[k]) if bc.get(k) is not None else None
+        if k == "lean_mass_lb" and out[k] is not None:
+            out["lean_mass_lb_is"] = _LEAN_MASS_LABEL  # the label sits beside the figure in the JSON the model reads
+    out["dexa_scan_date"] = str(dexa.get("scan_date") or "unknown")
+    scan = _iso_to_date(out["dexa_scan_date"])
+    if scan is not None:
+        out["days_since_dexa"] = (today_date - scan).days
+        genesis = _resolve_genesis(genesis)
+        if genesis:
+            out["dexa_before_cycle"] = out["dexa_scan_date"] < genesis
+    return out
+
+
+def dexa_prompt_block(data, genesis=None):
+    """The prompt rider for a DXA in the physical context; "" when there is no scan.
+
+    Tells the model the one citation form the weight check accepts: the scan's date
+    in the same sentence as the figure. Nothing here relaxes the check; an undated
+    pound figure is still held.
+    """
+    if not data.get("dexa_scan_date"):
+        return ""
+    scan = _iso_to_date(data["dexa_scan_date"])
+    if scan is None:
+        return """
+DXA FIGURES — READ BEFORE CITING ANY:
+body_fat_pct, lean_mass_lb and visceral_fat_lb come from one DXA scan whose date is unknown.
+lean_mass_lb is fat-free mass, NOT his body weight. With no date to name, do not cite a DXA
+pound figure at all: describe body composition in words, or cite body_fat_pct as "the most
+recent DXA".
+"""
+    when = _prose_date(scan)
+    start = _iso_to_date(_resolve_genesis(genesis))
+    before = f", before this experiment began on {_prose_date(start)}" if data.get("dexa_before_cycle") and start else ""
+    lean = data.get("lean_mass_lb")
+    example = f'"the {scan:%B} {scan.day} DXA measured {lean:g} lb of lean mass"' if lean is not None else f'"the {scan:%B} {scan.day} DXA"'
+    return f"""
+DXA FIGURES ARE ONE DATED SCAN — READ BEFORE CITING ANY:
+body_fat_pct, lean_mass_lb and visceral_fat_lb come from a single DXA scan on {when}{before}.
+lean_mass_lb is fat-free mass, NOT his body weight; his weight is current_weight_lb. Any
+sentence that cites a DXA figure, or compares one with the lean mass floor, names the scan
+date in that same sentence ({example}). A pound figure with no date beside it reads as his
+weight today and is refused.
+"""
+
+
+def physical_prompt_blocks(data):
+    """The physical expert's two weight riders, in order: the weigh-in's recency, then the DXA's date."""
+    return weight_recency_prompt_block(data) + dexa_prompt_block(data)
