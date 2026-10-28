@@ -64,6 +64,8 @@ What closes #5371's box 4 (`**Live proof:** <UTC instant> — <where>`), read af
 | The seam's fold count: `duplicate_activity_count` summed over the window's day rows through `common.strava_read_seam.dedup_strava_day` | **lower, ideally 0** | 3 |
 | `LifePlatform/IngestReconciliation::MissingActivityCount{Source=strava}` | **0** on every daily datapoint | 3.0 on 10-21 and 10-22, from the #5257 copies (deleted 10-25) |
 
+**One command** (#5371, `scripts/strava_uploader_proof.py`): `python3 scripts/strava_uploader_proof.py --since 2026-10-26 --until 2026-11-02` prints every row below for the window and for the equal window before it, counts only. The steps below are what it does, for reading it or doing it by hand.
+
 How to read it, read-only (no Strava API, no write):
 
 - **Rows and the fold count.** For each date `D`, `aws s3 cp s3://matthew-life-platform/raw/matthew/strava/activities/YYYY/MM/D.json`. Count distinct `strava_id` by `device_name`, `sport_type` and `trainer`. Then hand each day's `{"activities": raw["activities"]}` to `dedup_strava_day` and sum `duplicate_activity_count`. The raw file carries a few numeric fields as strings, so cast them to float first; the DynamoDB writer normalises them. Report counts only, never a heart rate, distance or GPS field.
