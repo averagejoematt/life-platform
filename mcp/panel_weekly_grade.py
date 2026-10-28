@@ -14,7 +14,8 @@ routine repo already live:
   * the food    `training.food_panel.build_food_plan(week_start)` (#5110): the week's resolved calorie targets
                 (`health.calorie_target.resolve`, titration over charter, each day typed lifting/rest by the
                 per-date calendar `training.training_calendar` (#5191) — the committed routines' dates when the Hevy
-                record is unreadable) + the intended feedings + the week's titration record. Fail-soft: an
+                record is unreadable) + the intended feedings + the week's titration record, with the menu built by code laid over it
+                (#5105: `_menu_plan_or_plain`, so the row shows the food-quality targets' hit or miss). Fail-soft: an
                 unreadable food plan is named on the grade (`degraded`), the training grade still stands.
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
                 scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
@@ -113,7 +114,7 @@ def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str,
         from mcp.config import table
 
         week_end = shift_day_key(week_start, JOB["week_days"] - 1)
-        return food_panel.build_food_plan(
+        plan = food_panel.build_food_plan(
             week_start,
             planned_dates=[str(r.get("target_date") or "")[:10] for r in routines],
             disruption_records=disruption.load_records_failsoft(),  # #5215: no record = the full-day rubric
@@ -122,9 +123,28 @@ def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str,
             block_workouts=_block_workouts_or_none(week_end),
             today=pacific_today(),
         )
+        return _menu_plan_or_plain(plan)
     except Exception as e:  # noqa: BLE001 — the grade names the missing food plan; it never invents one
         logger.warning("panel weekly grade: food plan unreadable (%s: %s)", type(e).__name__, str(e)[:200])
         return None
+
+
+def _menu_plan_or_plain(plan: dict[str, Any]) -> dict[str, Any]:
+    """The week's plan with the menu built by code laid over it (#5105: the weekly report shows the food-quality targets'
+    hit or miss, and only a menu has foods to check). The menu is `health.weekly_menu.build` over this same plan —
+    `weekly_menu.food_plan` swaps in the grams the anchors actually carry and the rows the quality check reads. Fail-soft
+    and named: an unbuildable menu (no owner-only anchor table, a fixed meal that cannot be read) or a menu that raises
+    leaves the plain plan, which the food panel then reports as `not checked` — never a fabricated pass."""
+    try:
+        from health import weekly_menu
+
+        menu = weekly_menu.build(plan)
+        if menu.get("built"):
+            return weekly_menu.food_plan(plan, menu)
+        logger.warning("panel weekly grade: no menu for the quality check (%s: %s)", menu.get("reason_code"), str(menu.get("reason"))[:200])
+    except Exception as e:  # noqa: BLE001 — the plain plan is the named fallback
+        logger.warning("panel weekly grade: menu unbuildable for the quality check (%s: %s)", type(e).__name__, str(e)[:200])
+    return plan
 
 
 def read_history() -> list[dict[str, Any]]:

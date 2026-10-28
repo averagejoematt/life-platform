@@ -424,6 +424,31 @@ def _food_quality(f: dict[str, Any]) -> tuple[float, str, dict[str, str]]:
     return share, "; food quality: " + ("met" if q["met"] else "; ".join(q["misses"])), under
 
 
+NOT_CHECKED = "no menu on the plan (intended feedings only) — the food-quality targets were not checked"
+
+
+def quality_report(plan: dict[str, Any] | None) -> dict[str, Any]:
+    """The weekly report's food-quality HIT or MISS (#5105): the SAME `health.food_quality.check_week` the menu reports
+    with, over the plan's `quality_days`, reduced to what the owner-only PANEL# row stores — each target met or missed
+    with its numbers, the misses and problems by name. No day rows, no tag words, no priorities text (the row is scores
+    and reasons only). A plan with no menu is `checked: False` with its reason; never a pass by absence."""
+    from health import food_quality  # noqa: PLC0415 — lazy: the health engines only when grading
+
+    rows = (plan or {}).get("quality_days")
+    if not rows:
+        return {"checked": False, "met": None, "reason": NOT_CHECKED}
+    q = food_quality.check_week(rows, food_quality.policy(charter_value))
+    fib, fish = q.get(food_quality.FIBRE) or {}, q.get(food_quality.FISH) or {}
+    return {
+        "checked": True,
+        "met": q["met"],
+        "fibre_daily": {k: fib.get(k) for k in ("floor_g", "days", "met", "under_dates")} if fib else None,
+        "fatty_fish_per_week": {k: fish.get(k) for k in ("servings", "range", "met", "days")} if fish else None,
+        "misses": q["misses"],
+        "problems": q["problems"],
+    }
+
+
 def check_macro_floors(f: dict[str, Any]) -> tuple[float, str]:
     """The fat and carbohydrate floors every day (the plan must carry the fibre floor); on a menu-built plan also the
     menu's fibre every day and the week's fatty-fish count (#5105, `_food_quality`) — the lower of the two shares."""
@@ -719,7 +744,12 @@ def grade_week(
     leaky = [c["control"] for c in controls if c["missed"]]
     if leaky:
         real["degraded_reasons"].append(f"food negative control(s) passed what they must fail: {leaky}")
-    real.update(controls=controls, degraded=bool(real["degraded_reasons"]) or real["degraded"], week_start=plan.get("week_start"))
+    real.update(
+        controls=controls,
+        degraded=bool(real["degraded_reasons"]) or real["degraded"],
+        week_start=plan.get("week_start"),
+        quality=quality_report(plan),
+    )
     return real
 
 
@@ -740,4 +770,5 @@ def row_summary(grade: dict[str, Any] | None) -> dict[str, Any] | None:
         "controls": grade.get("controls"),
         "judge": grade.get("judge"),
         "calibration": grade.get("calibration"),
+        "quality": grade.get("quality"),  # #5105: the food-quality targets' hit or miss (fibre, fatty fish)
     }
