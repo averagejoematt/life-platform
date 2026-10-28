@@ -230,5 +230,8 @@ He authors at night and trains the next morning with **zero chance to adjust.**
   alert in that siloed context.
 - How he records the gym (owner ruling 2026-10-26, #5370): lift = Hevy, with Hevy's watch app for HR; cardio = the
   Hevy block as the plan + the watch Workout app for HR; mobility = the Hevy block + the pliability app. Echoes fold in code.
+  After a cardio block that a Hevy block follows, he ends the watch cardio workout and restarts Hevy's watch workout
+  (owner ruling A, #5390): the cardio note's `After:` line says so. A Hevy push carrying its own heart rate is kept
+  as the lift's heart-rate member (`workout_identity`), so the lift is counted once.
 - Never congratulate him on the 100 lb milestone: it is a goal, not an achievement.
 - Nothing medical leaves this chat: not in an issue, a commit, a routine title or site copy.
