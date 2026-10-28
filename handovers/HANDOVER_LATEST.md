@@ -49,6 +49,7 @@
 
 ## Next session plan: open 77 → 50 or fewer, autonomous
 Envelope as this session's (merge only on code-only green tips, additive-only CDK, synthetic proofs only, no messages to the owner, no Hevy commits, no dev-cap override); the week-of-10-26 grant runs through 11-01. Start `caffeinate` in the background first (the 9-hour pause, incident row 10-27).
+0. **First lane: Dependabot triage** — the 10-28 push reported 42 alerts on main (6 critical, 23 high, 13 moderate; the ledger's last read, 08-23, was 0). Read `gh api repos/averagejoematt/life-platform/dependabot/alerts`, map each to its manifest, and land the open bump PRs (#5450 #5452 #5453 #5454) on green, plus any bump they don't cover; file an issue only for what can't be fixed.
 1. **Boot checks (read-only):** main green; `qa-smoke-warnings` cleared by the og sweep writing the 10 coach cards (#5434); the 10-28 02:00Z predraft lints clean, with no gate, ECG or RED TEAM text (#5428).
 2. **Land wave 11** (w11 above): one PR, deploy, verify by content → #5428 and #5083 close on the next predraft plus a blind re-grade.
 3. **Harvest the due proofs** (about −13): #5220 #5132 #5421 #5433 #5434 #5122 #5104 #5388 #5373 #4969 #5431 #5440 #5412 #5076 #5374 (#5431 and #5440 close cleanly once the owner's repairs have run).
