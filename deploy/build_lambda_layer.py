@@ -156,11 +156,12 @@ LAYERS: dict[str, LayerSpec] = {
         layer_name="pillow-layer",
         version_constant="PILLOW_LAYER_VERSION",
         manifest="pillow.txt",
-        # TARGET: Pillow 12.3.0 is the first release that is pip-audit clean — it clears
-        # all 25 advisories open against the deployed 11.3.0 (the highest `Fix Versions`
-        # across that set is 12.3.0). Pillow has no runtime dependencies, so the layer is
-        # exactly one wheel.
-        requirements=("Pillow==12.3.0",),
+        # TARGET: Pillow 13.0.0 is the first release that is pip-audit clean against the
+        # October 2026 disclosure batch — it clears all 41 advisories Dependabot opened on
+        # the deployed 12.3.0 (GHSA-8g5g-8vmr-9782 et al., 2026-10-21..24; every
+        # `first_patched_version` is 13.0.0). Pillow has no runtime dependencies, so the
+        # layer is exactly one wheel.
+        requirements=("Pillow==13.0.0",),
         attached_to=("og-image-generator", "reading-cover-pipeline", "recap-card-generator"),
         purpose="Pillow — PNG/WebP share-card rendering and book-cover processing.",
         notes=(

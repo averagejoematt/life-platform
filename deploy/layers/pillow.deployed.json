@@ -1,10 +1,10 @@
 {
   "architecture": "x86_64",
   "layer_name": "pillow-layer",
-  "layer_version": 2,
-  "measured": "2026-08-08",
+  "layer_version": 3,
+  "measured": "2026-10-28",
   "packages": {
-    "pillow": "12.3.0"
+    "pillow": "13.0.0"
   },
   "platforms": [
     "manylinux2014_x86_64",
@@ -12,7 +12,7 @@
   ],
   "runtime": "python3.12",
   "target_pins": [
-    "Pillow==12.3.0"
+    "Pillow==13.0.0"
   ],
-  "zip_sha256": "e1f52b11c59d1f8d7afbef9cb0ac3b26c187cd1a778c69527e1777fb7c55f7ff"
+  "zip_sha256": "b8e47416eab9e842909b36c501da4e58b34d80b6100f9b5b3e8944f3f1cda761"
 }
