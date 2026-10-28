@@ -43,17 +43,17 @@ class _CW:
         }
 
 
-def test_secret_name_handles_names_and_arns():
-    assert rm.secret_name(_event("life-platform/whoop")["CloudTrailEvent"]) == "whoop"
+def test_store_entry_name_handles_names_and_arns():
+    assert rm.store_entry_name(_event("life-platform/whoop")["CloudTrailEvent"]) == "whoop"
     arn = "arn:aws:secretsmanager:us-west-2:123456789012:secret:life-platform/withings-AbCdEf"
-    assert rm.secret_name(_event(arn)["CloudTrailEvent"]) == "withings"
-    assert rm.secret_name("not json") is None and rm.secret_name(json.dumps({})) is None
+    assert rm.store_entry_name(_event(arn)["CloudTrailEvent"]) == "withings"
+    assert rm.store_entry_name("not json") is None and rm.store_entry_name(json.dumps({})) is None
 
 
 def test_secret_writes_paginates_counts_and_only_asks_for_update_secret():
     ct = _CT([[_event("life-platform/whoop")] * 2, [_event("life-platform/whoop"), _event("life-platform/strava")]])
     waits = []
-    counts = rm.secret_writes(ct, date(2026, 10, 19), date(2026, 10, 21), sleep=waits.append)
+    counts = rm.rotation_writes(ct, date(2026, 10, 19), date(2026, 10, 21), sleep=waits.append)
     assert counts == {"whoop": 3, "strava": 1}
     assert len(ct.kwargs) == 2 and waits == [0.6], "two pages, one rate-limit pause between them"
     assert ct.kwargs[0]["LookupAttributes"][0]["AttributeValue"] == "UpdateSecret"
@@ -84,7 +84,7 @@ def test_report_counts_boot_probes_and_extra_rules_so_the_schedule_reconciles():
 
     rep = rm.build_report(_Exact([]), _CT([[]]), date(2026, 10, 19), date(2026, 10, 21), sleep=lambda *_: None)
     assert [r["function"] for r in rep["runs"] if r["off_schedule"]] == []
-    assert rep["secret_writes_total"] == 0
+    assert rep["rotation_writes_total"] == 0
     assert "OFF-SCHEDULE" not in rm.render(rep)
 
     class _Surplus(_Exact):

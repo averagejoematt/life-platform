@@ -60,7 +60,7 @@ BASELINE_RUNS_PER_DAY = {
     "eightsleep-data-ingestion": 18,
     "habitify-data-ingestion": 28,
 }
-BASELINE_SECRET_WRITES_14D = 1106  # across four sources: 308, 280, 266, 252 (Withings 308)
+BASELINE_ROTATION_WRITES_14D = 1106  # across four sources: 308, 280, 266, 252 (Withings 308)
 BASELINE_HABITIFY_MEAN_SECONDS = 36.5
 SECRET_PREFIX = "life-platform/"  # noqa: S105 - a Secrets Manager name prefix, not a credential
 
@@ -104,7 +104,7 @@ def mean_duration_seconds(cloudwatch, function: str, since: date, until: date) -
     return round(points[0]["Average"] / 1000.0, 2) if points else None
 
 
-def secret_name(event_json: str) -> str | None:
+def store_entry_name(event_json: str) -> str | None:
     """The secret an `UpdateSecret` CloudTrail event wrote, without the `life-platform/` prefix."""
     try:
         sid = (json.loads(event_json).get("requestParameters") or {}).get("secretId")
@@ -118,7 +118,7 @@ def secret_name(event_json: str) -> str | None:
     return sid[len(SECRET_PREFIX) :] if sid.startswith(SECRET_PREFIX) else sid
 
 
-def secret_writes(cloudtrail, since: date, until: date, sleep=time.sleep) -> Counter:
+def rotation_writes(cloudtrail, since: date, until: date, sleep=time.sleep) -> Counter:
     """Counter of `UpdateSecret` events per secret over the window. Paginates; two calls a second at most."""
     counts: Counter = Counter()
     kwargs = {
@@ -130,7 +130,7 @@ def secret_writes(cloudtrail, since: date, until: date, sleep=time.sleep) -> Cou
     while True:
         resp = cloudtrail.lookup_events(**kwargs)
         for ev in resp.get("Events", []):
-            name = secret_name(ev.get("CloudTrailEvent", ""))
+            name = store_entry_name(ev.get("CloudTrailEvent", ""))
             if name:
                 counts[name] += 1
         token = resp.get("NextToken")
@@ -205,13 +205,13 @@ def build_report(cloudwatch, cloudtrail, since: date, until: date, sleep=time.sl
                     "invocations": total,
                 }
             )
-    writes = secret_writes(cloudtrail, since, until, sleep)
+    writes = rotation_writes(cloudtrail, since, until, sleep)
     return {
         "window": {"since": since.isoformat(), "until_exclusive": until.isoformat(), "days": len(days)},
         "runs": sorted(rows, key=lambda x: x["function"]),
-        "secret_writes": dict(sorted(writes.items())),
-        "secret_writes_total": sum(writes.values()),
-        "secret_writes_baseline_14d": BASELINE_SECRET_WRITES_14D,
+        "rotation_writes": dict(sorted(writes.items())),
+        "rotation_writes_total": sum(writes.values()),
+        "rotation_writes_baseline_14d": BASELINE_ROTATION_WRITES_14D,
         "habitify_mean_seconds": mean_duration_seconds(cloudwatch, "habitify-data-ingestion", since, until),
         "habitify_baseline_mean_seconds": BASELINE_HABITIFY_MEAN_SECONDS,
     }
@@ -228,10 +228,10 @@ def render(report: dict) -> str:
             f"{r['measured_per_day']:>8} {base:>10}  {'OFF-SCHEDULE' if r['off_schedule'] else ''}"
         )
     out.append("")
-    out.append(f"secret writes (CloudTrail UpdateSecret): {report['secret_writes_total']} in {w['days']} days")
-    for name, n in report["secret_writes"].items():
+    out.append(f"secret writes (CloudTrail UpdateSecret): {report['rotation_writes_total']} in {w['days']} days")
+    for name, n in report["rotation_writes"].items():
         out.append(f"  {name:24} {n:>5}  ({n / w['days']:.1f}/day)")
-    out.append(f"  2026-10-04 baseline: {report['secret_writes_baseline_14d']} in 14 days across four sources")
+    out.append(f"  2026-10-04 baseline: {report['rotation_writes_baseline_14d']} in 14 days across four sources")
     out.append(f"habitify mean run: {report['habitify_mean_seconds']} s (2026-10-04: {report['habitify_baseline_mean_seconds']} s)")
     return "\n".join(out)
 
