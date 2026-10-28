@@ -26,3 +26,30 @@ def met_floor(grams: Optional[float], floor: float, tolerance_g: float = 0.0) ->
     if grams is None:
         return None
     return float(grams) >= float(floor) - float(tolerance_g)
+
+
+def floor_gap(floor: float, *averages: Optional[float]) -> Optional[dict]:
+    """The distance from an intake average to the floor, as the nutrition context serves it (#5458).
+
+    The 2026-10-28 analyzer run held the nutrition read on "the number 32 appears in the narrative
+    but nowhere in the data provided": 32 is the 170 g floor minus the served 138.3 g average,
+    rounded. The coach did the subtraction because the context carried both figures and not the gap,
+    and the allow-list gate refuses a computed number by design. So the gap travels as a fact.
+
+    `averages` are candidates in order of authority (the served logging record's average first);
+    the first measured one wins. None when no average is measured (ADR-104: absence, not a gap of 0).
+    """
+    avg = next((float(a) for a in averages if a is not None), None)
+    if avg is None:
+        return None
+    delta = round(avg - float(floor), 1)
+    return {
+        "grams": abs(delta),
+        "direction": "below" if delta < 0 else ("above" if delta > 0 else "at"),
+        "average_g": avg,
+        "floor_g": float(floor),
+        "note": (
+            "the authoritative average minus the plan's floor. When you cite a gap to the floor, cite THIS figure, never your own "
+            'arithmetic, in its own clause: "<grams> g a day below the floor".'
+        ),
+    }

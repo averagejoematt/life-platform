@@ -424,6 +424,31 @@ def _food_quality(f: dict[str, Any]) -> tuple[float, str, dict[str, str]]:
     return share, "; food quality: " + ("met" if q["met"] else "; ".join(q["misses"])), under
 
 
+NOT_CHECKED = "no menu on the plan (intended feedings only) — the food-quality targets were not checked"
+
+
+def quality_report(plan: dict[str, Any] | None) -> dict[str, Any]:
+    """The weekly report's food-quality HIT or MISS (#5105): the SAME `health.food_quality.check_week` the menu reports
+    with, over the plan's `quality_days`, reduced to what the owner-only PANEL# row stores — each target met or missed
+    with its numbers, the misses and problems by name. No day rows, no tag words, no priorities text (the row is scores
+    and reasons only). A plan with no menu is `checked: False` with its reason; never a pass by absence."""
+    from health import food_quality  # noqa: PLC0415 — lazy: the health engines only when grading
+
+    rows = (plan or {}).get("quality_days")
+    if not rows:
+        return {"checked": False, "met": None, "reason": NOT_CHECKED}
+    q = food_quality.check_week(rows, food_quality.policy(charter_value))
+    fib, fish = q.get(food_quality.FIBRE) or {}, q.get(food_quality.FISH) or {}
+    return {
+        "checked": True,
+        "met": q["met"],
+        "fibre_daily": {k: fib.get(k) for k in ("floor_g", "days", "met", "under_dates")} if fib else None,
+        "fatty_fish_per_week": {k: fish.get(k) for k in ("servings", "range", "met", "days")} if fish else None,
+        "misses": q["misses"],
+        "problems": q["problems"],
+    }
+
+
 def check_macro_floors(f: dict[str, Any]) -> tuple[float, str]:
     """The fat and carbohydrate floors every day (the plan must carry the fibre floor); on a menu-built plan also the
     menu's fibre every day and the week's fatty-fish count (#5105, `_food_quality`) — the lower of the two shares."""
@@ -695,6 +720,53 @@ def negative_controls(case: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+# ── the plan the weekly grade reads: the week's menu (#5110 box 4) ──────────────────────────
+# The owner ruling of 2026-10-26 (Session CH, "Hold for the first built menu"): the weekly grade is on the COMMITTED MENU,
+# the week's food as `health.weekly_menu.build` fits it to the resolved days — the same deterministic build the owner's
+# `get_exercise_notes action='weekly_menu'` read serves for that Monday — not on the intended feedings alone. `basis`
+# names which one a grade read; a week whose menu was not built is graded on the intended feedings and SAYS so.
+BASIS_MENU = "menu"
+BASIS_INTENDED = "intended_feedings"
+MENU_SUMMARY_KEYS = ("built", "reason_code", "fits_all", "quality_met")
+
+
+def menu_summary(menu: dict[str, Any] | None) -> dict[str, Any]:
+    """What a grade records of the menu it read: built or not, the menu's own reason code, its fit and quality verdicts
+    and how many days the anchors could not fit — codes and counts only, never a food (the anchors are owner data)."""
+    m = menu if isinstance(menu, dict) else {}
+    out = {k: m.get(k) for k in MENU_SUMMARY_KEYS}
+    out["built"] = bool(m.get("built"))
+    if not m:
+        out["reason_code"] = "no_menu"
+    out["unfit_days"] = len(m.get("unfit_days") or [])
+    return out
+
+
+def on_menu(plan: dict[str, Any], menu: dict[str, Any] | None) -> dict[str, Any]:
+    """The plan the weekly grade reads (#5110 box 4): with a BUILT menu, `health.weekly_menu.food_plan(plan, menu)` — each
+    day's feedings the menu's own grams, the week's food-quality rows on it — stamped `basis: menu`; with no built menu,
+    the plan's intended feedings, stamped `basis: intended_feedings` with the menu's reason code. A copy either way."""
+    summary = menu_summary(menu)
+    if summary["built"]:
+        from health import weekly_menu  # noqa: PLC0415 — lazy: the menu fitter only on the weekly path
+
+        out = weekly_menu.food_plan(plan, menu or {})
+        out.update(basis=BASIS_MENU, menu=summary)
+        return out
+    out = copy.deepcopy(dict(plan))
+    out.update(basis=BASIS_INTENDED, menu=summary)
+    return out
+
+
+def basis_reason(plan: dict[str, Any]) -> str | None:
+    """The degraded reason a grade carries when it did not read the week's menu; None when it did (or when the plan
+    states no basis at all: a golden fixture is graded as itself)."""
+    if plan.get("basis") != BASIS_INTENDED:
+        return None
+    code = (plan.get("menu") or {}).get("reason_code") or "not built"
+    return f"the food panel graded the intended feedings, not the week's menu (menu {code})"
+
+
 def grade_week(
     plan: dict[str, Any],
     rubric: dict[str, Any],
@@ -702,7 +774,8 @@ def grade_week(
     call: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     route: str | None = None,
 ) -> dict[str, Any]:
-    """The weekly food grade: the real plan, then each negative control, back-to-back on the same route."""
+    """The weekly food grade: the real plan, then each negative control, back-to-back on the same route. The grade
+    carries the plan's `basis` (#5110 box 4: the week's menu, or the intended feedings with the reason no menu was read)."""
     from training import panel_judge  # noqa: PLC0415
 
     real = grade_case(plan, rubric, route=route, call=call)
@@ -719,7 +792,17 @@ def grade_week(
     leaky = [c["control"] for c in controls if c["missed"]]
     if leaky:
         real["degraded_reasons"].append(f"food negative control(s) passed what they must fail: {leaky}")
-    real.update(controls=controls, degraded=bool(real["degraded_reasons"]) or real["degraded"], week_start=plan.get("week_start"))
+    off_menu = basis_reason(plan)
+    if off_menu:
+        real["degraded_reasons"].append(off_menu)
+    real.update(
+        controls=controls,
+        degraded=bool(real["degraded_reasons"]) or real["degraded"],
+        week_start=plan.get("week_start"),
+        quality=quality_report(plan),
+        basis=plan.get("basis"),
+        menu=plan.get("menu"),
+    )
     return real
 
 
@@ -740,4 +823,7 @@ def row_summary(grade: dict[str, Any] | None) -> dict[str, Any] | None:
         "controls": grade.get("controls"),
         "judge": grade.get("judge"),
         "calibration": grade.get("calibration"),
+        "quality": grade.get("quality"),  # #5105: the food-quality targets' hit or miss (fibre, fatty fish)
+        "basis": grade.get("basis"),  # #5110 box 4: the week's menu, or the intended feedings (and why)
+        "menu": grade.get("menu"),
     }

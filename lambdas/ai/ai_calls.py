@@ -388,6 +388,20 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources, available_log
     return output
 
 
+LEGACY_NUTRITION_ABSENT = "- the nutrition charter context could not be read: state no calorie, protein, fat, carbohydrate or fibre target"
+
+
+def legacy_nutrition_charter_block(data: Optional[dict[str, Any]]) -> str:
+    """#5109: the nutrition targets of the legacy training + nutrition call (`call_training_nutrition_coach`, the daily
+    brief's fallback nutritionist), as the text of `training.coach_context.nutrition_context` — the SAME assembly the v2
+    nutrition coach receives (`coach.coach_input_facts.nutrition_charter_context`, published: the brief's text can
+    reach a reader). It replaced a typed TARGETS line whose fat and carbohydrate figures were profile defaults the
+    charter never set. An unreadable assembly is stated, never a remembered number."""
+    ctx = _ci.nutrition_charter_context(data, pacific_today())
+    text = (ctx or {}).get("text")
+    return text if isinstance(text, str) and text.strip() else LEGACY_NUTRITION_ABSENT
+
+
 def call_training_nutrition_coach(
     data: dict[str, Any], profile: dict[str, Any], api_key: str = "", shared_system: Optional[str] = None
 ) -> dict[str, Any]:
@@ -414,10 +428,9 @@ def call_training_nutrition_coach(
     # IC-24: Data quality (critical for nutrition coaching)
     data_quality_block, _quality_scores = _compute_data_quality(data, profile)
 
-    cal_target = target_phrase(data.get("date"))  # #5095: "<n> kcal", or the absence stated
-    protein_target = PLAN_DAILY_PROTEIN_MIN_G
-    fat_target = profile.get("fat_target_g", 60)
-    carb_target = profile.get("carb_target_g", 125)
+    # #5109: the targets are the shared nutrition assembly's (the charter, the redlines' rules, the ONE calorie
+    # target and the engines' grade of the day) — the same block the v2 nutrition coach reads, never typed here.
+    nutrition_block = legacy_nutrition_charter_block(data)
 
     prompt = f"""You are two coaches speaking to Matthew ({pctx['stage_label']}).
 
@@ -442,7 +455,8 @@ FOOD LOG YESTERDAY (with timestamps):
 {food_summary}
 
 MACRO TOTALS: {json.dumps({k: data_summary[k] for k in ["calories", "protein_g", "fat_g", "carbs_g", "fiber_g"] if k in data_summary}, default=str)}
-TARGETS: {cal_target}, P{protein_target}g, F{fat_target}g, C{carb_target}g
+NUTRITION TARGETS AND RULES (the charter, the redlines and the ONE calorie target; state no other target):
+{nutrition_block}
 
 TRAINING COACHING RULES (READ CAREFULLY):
 - You are coaching someone at Week {pctx['week_num']} of transformation, starting weight {pctx['start_weight']} lbs.

@@ -34,7 +34,6 @@ Can also be invoked manually with {"expert": "mind"} for a single expert.
 v3.0.0 — 2026-04-07 (Intelligence Layer V2.1)
 """
 
-import contextlib
 import json
 import logging
 import os
@@ -364,6 +363,7 @@ def gather_data_for_expert(expert_key):
             "avg_fiber_g": avg_fiber,
             "protein_target_g": protein_target,
             "protein_adherence_pct": adherence,
+            "protein_floor_gap": _pf.floor_gap(protein_target, (_lr or {}).get("protein_avg_g"), avg_pro),  # #5458: served, not computed
             "days_tracked": _lr["days_logged"] if _lr else len(items),
             "zero_calorie_days": zero_cal_days,
             "recency_note": _recency_note,
@@ -478,16 +478,8 @@ def gather_data_for_expert(expert_key):
             # stale weigh-in can't be narrated as today's. See intelligence/weight_recency.
             **weight_recency.summarize_weight_readings(weight_items, today),
         }
-        if dexa:
-            bc = dexa.get("body_composition") or {}
-            for _bc_key in ("body_fat_pct", "lean_mass_lb", "visceral_fat_lb"):
-                data[_bc_key] = float(bc[_bc_key]) if bc.get(_bc_key) is not None else None
-            # #1894/#2221: an unknown/unparseable scan date is NEVER "scanned today" — the old default put a
-            # fabricated clinical date in the coach's prose (and raised out of the whole snapshot when malformed).
-            data["dexa_scan_date"] = str(dexa.get("scan_date") or "unknown")
-            with contextlib.suppress(ValueError):
-                _scan_dt = datetime.strptime(data["dexa_scan_date"], "%Y-%m-%d").date()
-                data["days_since_dexa"] = (pacific_now().date() - _scan_dt).days
+        # #1894/#2221: an unknown scan date is never "scanned today"; #5458: lean mass is labelled, dated, cycle-placed.
+        data.update(weight_recency.dexa_facts(dexa, pacific_now().date()))
         if meas and meas.get("waist_height_ratio") is not None:
             data["waist_height_ratio"] = float(meas["waist_height_ratio"])
         return data
@@ -651,8 +643,8 @@ training load from Hevy first, then note the confirmed-empty aerobic/NEAT pictur
     # block it frames — this module is at its #1665 ceiling and the two belong together.
     labs_context = labs_facts.labs_prompt_block(data) if expert_key == "labs" else ""
 
-    # #1894: forbid day-labelling a stale weigh-in (silent when fresh).
-    weight_context = weight_recency.weight_recency_prompt_block(data) if expert_key == "physical" else ""
+    # #1894: forbid day-labelling a stale weigh-in (silent when fresh); #5458: a DXA figure is cited with its scan date.
+    weight_context = weight_recency.physical_prompt_blocks(data) if expert_key == "physical" else ""
 
     # Build intelligence preamble (goals, data inventory, data maturity, first-person voice)
     preamble_block = ""
@@ -853,6 +845,7 @@ try:
         build_month_rollup_prompt,
         build_synthesis_prompt,
         gate_json_record as _integrator_gate_json_record,
+        rollup_facts_block,  # #5458
     )
 except ImportError:  # pragma: no cover — flat-staged runtime layout
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
@@ -861,6 +854,7 @@ except ImportError:  # pragma: no cover — flat-staged runtime layout
             build_month_rollup_prompt,
             build_synthesis_prompt,
             gate_json_record as _integrator_gate_json_record,
+            rollup_facts_block,  # #5458
         )
 
 
@@ -1624,15 +1618,8 @@ def generate_experiment_arc():
         indent=2,
         default=str,
     )
-    _f = _load_canonical_facts()
-    _fact_bits = []
-    if _f.get("latest_weight") is not None:
-        _fact_bits.append(f"current weight {_f['latest_weight']:g} lb")
-    if _f.get("recovery_pct") is not None:
-        _fact_bits.append(f"recovery {_f['recovery_pct']:g}%")
-    facts_block = (
-        ("\nAUTHORITATIVE FACTS (cite these exact numbers; invent no others): " + "; ".join(_fact_bits) + "\n") if _fact_bits else ""
-    )
+    # #5458: the cycle's start (ADR-058 constants) and the change since it travel as facts, never as the model's arithmetic
+    facts_block = rollup_facts_block(_load_canonical_facts(), baseline_lbs=EXPERIMENT_BASELINE_WEIGHT_LBS, start_date_iso=EXPERIMENT_START)
 
     prompt = build_arc_prompt(weeks_text, goals_json, facts_block, len(weeks))
 
@@ -1746,15 +1733,8 @@ def generate_month_rollup():
         indent=2,
         default=str,
     )
-    _f = _load_canonical_facts()
-    _fact_bits = []
-    if _f.get("latest_weight") is not None:
-        _fact_bits.append(f"current weight {_f['latest_weight']:g} lb")
-    if _f.get("recovery_pct") is not None:
-        _fact_bits.append(f"recovery {_f['recovery_pct']:g}%")
-    facts_block = (
-        ("\nAUTHORITATIVE FACTS (cite these exact numbers; invent no others): " + "; ".join(_fact_bits) + "\n") if _fact_bits else ""
-    )
+    # #5458: the cycle's start (ADR-058 constants) and the change since it travel as facts, never as the model's arithmetic
+    facts_block = rollup_facts_block(_load_canonical_facts(), baseline_lbs=EXPERIMENT_BASELINE_WEIGHT_LBS, start_date_iso=EXPERIMENT_START)
 
     prompt = build_month_rollup_prompt(weeks_text, goals_json, facts_block, len(weeks), window_label)
 

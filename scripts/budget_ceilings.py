@@ -323,6 +323,94 @@ def dearest_output_usd_per_mtok(src: Path | None = None) -> float:
     return max(rates)
 
 
+# ── #4517 (2026-10-27): the ROUTED output rate — what the fleet's traffic is actually billed at ──
+#
+# The token bar was priced at `dearest_output_usd_per_mtok()`, the Fable row ($50/1M), which no
+# route sends a token to. That makes the token page the TIGHTER of the two on every real day: on
+# 2026-10-26 it paged urgent for 23.5 h on 637,388 rolling-24 h output tokens that cost $11.54,
+# half the dollar bar. The rate that matches the traffic is the dearest output rate among the
+# models `ai.model_routing` routes to (every tier's model + every per-route pin), each priced the
+# way the chokepoint prices it (`bedrock_client.price_key_for`: longest PRICES key contained in the
+# id, else the `_DEFAULT_PRICE` row, which is the dearest). Embed-only rows (output $0) carry no
+# output token and are skipped. Parsed, never imported, for the reason at the top of this section.
+
+ROUTING_SRC = ROOT / "lambdas" / "ai" / "model_routing.py"
+MODEL_DEFAULTS_SRC = ROOT / "lambdas" / "ai" / "model_defaults.py"
+TIER_MODELS_NAME = "TIER_MODELS"
+ROUTES_NAME = "ROUTES"
+
+
+def _module_strings(src: Path) -> dict[str, str]:
+    """Every module-level `NAME = "literal"` (or annotated) string constant in `src`."""
+    out: dict[str, str] = {}
+    for node in ast.parse(src.read_text(encoding="utf-8")).body:
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        value = getattr(node, "value", None)
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            for t in targets:
+                if isinstance(t, ast.Name):
+                    out[t.id] = value.value
+    return out
+
+
+def _module_value_node(src: Path, name: str):
+    """The AST of the module-level `name = …` / `name: T = …` value in `src`, or None."""
+    for node in ast.parse(src.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            return node.value
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            return node.value
+    return None
+
+
+def routed_models(routing_src: Path | None = None, defaults_src: Path | None = None) -> set[str]:
+    """The model ids `ai.model_routing` can send a call to by default: every `TIER_MODELS` value
+    plus every `ROUTES` row's pinned `model=`. Raises on any name it cannot resolve."""
+    routing_src = routing_src or ROUTING_SRC
+    defaults_src = defaults_src or MODEL_DEFAULTS_SRC
+    names = {**_module_strings(defaults_src), **_module_strings(routing_src)}
+
+    def _resolve(node) -> str:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.Name) and node.id in names:
+            return names[node.id]
+        raise RuntimeError(f"routed model {ast.unparse(node)!r} not resolvable from {routing_src} — refusing to guess (#4517)")
+
+    tiers = _module_value_node(routing_src, TIER_MODELS_NAME)
+    if not isinstance(tiers, ast.Dict) or not tiers.values:
+        raise RuntimeError(f"{TIER_MODELS_NAME} not derivable from {routing_src} — refusing to guess (#4517)")
+    models = {_resolve(v) for v in tiers.values}
+    routes = _module_value_node(routing_src, ROUTES_NAME)
+    if not isinstance(routes, ast.Dict):
+        raise RuntimeError(f"{ROUTES_NAME} not derivable from {routing_src} — refusing to guess (#4517)")
+    for call in routes.values:
+        for kw in getattr(call, "keywords", []):
+            if kw.arg == "model" and not (isinstance(kw.value, ast.Constant) and kw.value.value is None):
+                models.add(_resolve(kw.value))
+    return models
+
+
+def routed_output_usd_per_mtok(routing_src: Path | None = None, defaults_src: Path | None = None, prices_src: Path | None = None) -> float:
+    """The dearest output-token rate (USD per 1M) over `routed_models()`, each priced as the
+    chokepoint prices it. Raises if the price table or the routing table cannot be read."""
+    prices_src = prices_src or BEDROCK_SRC
+    prices = _module_literal(prices_src, PRICES_NAME)
+    if not isinstance(prices, dict) or not prices:
+        raise RuntimeError(f"output price table not derivable from {prices_src} — refusing to guess (#4517)")
+    dearest = dearest_output_usd_per_mtok(prices_src)  # the `_DEFAULT_PRICE` row an unmatched id is billed at
+    rates = []
+    for model in routed_models(routing_src, defaults_src):
+        mid = model.lower()
+        key = next((k for k in sorted(prices, key=len, reverse=True) if k in mid), None)
+        rate = float(prices[key]["out"]) if key is not None and "out" in prices[key] else dearest
+        if rate > 0:
+            rates.append(rate)
+    if not rates:
+        raise RuntimeError(f"no routed model with an output rate in {prices_src} — refusing to guess (#4517)")
+    return max(rates)
+
+
 # ── #5135: the dev-session envelope (owner ruling 2026-10-26: "$60/month, alarm at 80%") ──
 #
 # Not part of the ADR-063/133 ceiling family: a separate monthly cap on laptop + agent AI,

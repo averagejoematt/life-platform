@@ -241,7 +241,13 @@ _WINDOW_RE = re.compile(
     # 30th. The 10-01 dry run held physical on exactly that sentence (judge 87). A RUNNING
     # average on a date still hides its span, so the lookbehind keeps that one held.
     r"|(?<!running\s)\baverage\s+(?:on|for)\s+(?:the\s+)?(?:" + _DAY + r")"
-    r"|\baveraged\s+[\d.,]+\s*(?:[a-z%/]+\s+)?on\s+(?:" + _DAY + r")",
+    r"|\baveraged\s+[\d.,]+\s*(?:[a-z%/]+\s+)?on\s+(?:" + _DAY + r")"
+    # #5458: a NAMED week is a labelled window, as "this week" already is. The experiment arc and the
+    # month rollup read the weekly lab notes, whose every sleep/HRV figure is that week's average, and
+    # the arc labels its chapters "Week 5" ("2026-W40" / "W40" in the notes). 2026-10-28 held the arc on
+    # "consistent sleep (averaging 8.6 hours in W5)", which is Week 5's own stated average. Only an
+    # AVERAGE clause is cleared (`windowed_average_at`), so "Week 5 ... (33.9 ms HRV)" stays held.
+    r"|\bweek\s+\d{1,2}\b|\b(?:\d{4}-)?W\d{1,2}\b",
     re.IGNORECASE,
 )
 
