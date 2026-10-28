@@ -122,3 +122,45 @@ def test_public_zone2_payload_carries_minutes_only_never_bins():
     assert payload["available"] and payload["trailing_7d"]["by_source"]["apple_health"] == 40.0
     for banned in ("hr_seconds_by_bpm5", "apple_workouts", "A1", "115"):
         assert banned not in blob
+
+
+# ── the fixture is the wire: the writer's own output, as DynamoDB stores it ──────────────────────────────
+
+
+def _stored_rows_from_the_writer():
+    """The apple_health day rows exactly as `write_apple_workouts` stores them: HAE's own payload (the #4973
+    fixture, key names checked against a live raw-archive payload) -> `summaries_by_day` -> `to_ddb`
+    (every float a Decimal) -> one row per UTC-day DATE#. No hand-written `derived` block."""
+    import json
+    from pathlib import Path
+
+    from ingestion import health_auto_export_workouts as hw
+
+    fixture = Path(__file__).parent / "fixtures" / "hae_workouts_mixed_4973.json"
+    workouts = json.loads(fixture.read_text(encoding="utf-8"))["payload"]["data"]["workouts"]
+    from health_auto_export_lambda import parse_date_str
+
+    return [
+        {"pk": "USER#matthew#SOURCE#apple_health", "sk": f"DATE#{day}", "date": day, hw.WORKOUTS_FIELD: hw.to_ddb(summ)}
+        for day, summ in sorted(hw.summaries_by_day(workouts, parse_date_str).items())
+    ]
+
+
+def test_the_writers_stored_rows_feed_the_reader_decimals_and_all():
+    from decimal import Decimal
+
+    rows = _stored_rows_from_the_writer()
+    assert {r["sk"] for r in rows} == {"DATE#2026-10-14", "DATE#2026-10-15"}  # the 18:00 PDT run is on the next UTC day
+    walk = rows[0]["apple_workouts"]["FX-WLK-0002"]["derived"]["hr_seconds_by_bpm5"]
+    assert all(isinstance(v, Decimal) for v in walk.values())  # the wire, not the float fixture the tests above build
+
+    out = z2.counted_sessions([], [], rows)
+    walk_s = next(s for s in out if s["sport"] == "Indoor Walk")
+    # bins 100..140 at 300 s each; Zone 2 = [109.8, 128.1) at max 183: bins 110/115/120 whole (900 s),
+    # 125 is 3.1/5 of 300 s (186 s), 105 is 0.2/5 of 300 s (12 s)  -> 1098 s = 18.3 min
+    assert walk_s["source"] == "apple_health" and walk_s["zone_2_minutes"] == 18.3
+    # a session recorded on the 14th (PT) but stored on the 15th's row is read on the 14th
+    assert {s["date"] for s in out} == {"2026-10-14"}
+    win = z2.zone2_window([], [], [], "2026-10-14", "2026-10-14", sessions=out)
+    assert win["by_source"]["apple_health"] > 18.3  # the walk, the lift and the run
+    assert win["zone_2_minutes"] == win["by_source"]["apple_health"]

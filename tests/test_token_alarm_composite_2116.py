@@ -550,25 +550,86 @@ def _governor_and_prices():
     return gov, PRICES
 
 
+def _routed_output_rate() -> float:
+    """The dearest output rate over every model `ai.model_routing` routes to (each tier's model +
+    each per-route pin), priced by the chokepoint's OWN `_price_for` — imported, not parsed, so the
+    module under test (which parses) is checked against the wire."""
+    _governor_and_prices()  # puts lambdas/ on sys.path with the env the imports need
+    from ai import bedrock_client, model_routing
+
+    models = set(model_routing.TIER_MODELS.values()) | {r.model for r in model_routing.ROUTES.values() if r.model}
+    # Every route's default resolves inside that set, so the set cannot under-state what is routed.
+    assert {model_routing.default_model_for(name) for name in model_routing.ROUTES} <= models
+    rates = [bedrock_client._price_for(m)["out"] for m in models]
+    return max(r for r in rates if r > 0)
+
+
 def test_the_daily_sum_thresholds_take_the_budget_bar_from_the_governor_4517():
     """Spend bar = the narrowest rung of the governor's tier ladder × the PERMANENT base ceiling;
-    token bar = that dollar bar in output tokens at the dearest output rate the chokepoint bills.
-    Each alarm's threshold is the higher of its budget bar and its variance bar. Recomputed here
-    from the imported governor and price table, never from a hand-typed dollar figure."""
+    token bar = that dollar bar in output tokens at the dearest output rate among the ROUTED models
+    (2026-10-27: not the dearest PRICES row, which no route uses). Each alarm's threshold is the
+    higher of its budget bar and its variance bar. Recomputed here from the imported governor,
+    routing table and price table, never from a hand-typed dollar figure."""
     gov, prices = _governor_and_prices()
     ns = _derivation_namespace()
     bands = [0.0] + sorted(t / gov._THRESHOLD_REFERENCE_CEILING for t, _ in gov._TIER_THRESHOLDS)
     rung = min(hi - lo for lo, hi in zip(bands, bands[1:]))
     spend_bar = round(gov.MONTHLY_CEILING * rung, 2)
-    dearest = max(row["out"] for row in prices.values() if "out" in row)
-    token_bar = int(round(spend_bar / dearest * 1_000_000, -3))
+    routed = _routed_output_rate()
+    token_bar = int(round(spend_bar / routed * 1_000_000, -3))
     assert ns["AI_SPEND_BUDGET_BAR_USD"] == spend_bar, (ns["AI_SPEND_BUDGET_BAR_USD"], spend_bar)
     assert ns["AI_TOKENS_BUDGET_BAR"] == token_bar, (ns["AI_TOKENS_BUDGET_BAR"], token_bar)
     assert ns["AI_DAILY_SPEND_THRESHOLD_USD"] == max(ns["AI_SPEND_VARIANCE_BAR_USD"], spend_bar)
     assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] == max(ns["AI_TOKENS_VARIANCE_BAR"], token_bar)
-    # Every output token billed at the dearest rate costs exactly the bar: the token page can
-    # never fire before the dollar page would on correctly-priced traffic.
-    assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] * dearest / 1_000_000 >= ns["AI_DAILY_SPEND_THRESHOLD_USD"] * 0.99
+    # Output tokens billed at the routed rate cost the bar: on traffic at that rate or dearer the
+    # token page cannot fire before the dollar page would.
+    assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] * routed / 1_000_000 >= ns["AI_DAILY_SPEND_THRESHOLD_USD"] * 0.99
+    # The parser's fallback for an unmatched id is the dearest row; the chokepoint's is _DEFAULT_PRICE.
+    from ai import bedrock_client
+
+    assert bedrock_client._DEFAULT_PRICE["out"] == max(row["out"] for row in prices.values() if "out" in row)
+
+
+# The live specimens the token bar is replayed against (5-minute LifePlatform/AI Sums, read-only
+# get-metric-statistics 2026-10-27, validated against describe-alarm-history to within 5 minutes):
+# (rolling-24 h output tokens, rolling-24 h USD) at each episode's token peak.
+_UNDER_THE_DOLLAR_BAR_2026_10_26 = (637_388, 11.54)  # paged urgent 23.5 h at 459,000; half the dollar bar
+_RUNAWAY_2026_10_02 = (940_414, 36.59)
+_RUNAWAY_2026_10_18 = (602_639, 31.39)
+
+
+def test_the_token_page_clears_a_day_under_the_dollar_bar_and_the_dollar_page_keeps_the_runaways_4517():
+    """The 10-26 recurrence: a day spent at half the dollar bar paged urgent through the token bar.
+    The token threshold must sit above that day; the dollar threshold must still sit under both
+    runaway peaks, so the urgent catch is kept. Positive control: the retired dearest-row pricing
+    puts the token bar UNDER that day, so this check can fail."""
+    gov, prices = _governor_and_prices()
+    ns = _derivation_namespace()
+    day_tokens, day_usd = _UNDER_THE_DOLLAR_BAR_2026_10_26
+    assert day_usd < ns["AI_DAILY_SPEND_THRESHOLD_USD"], "the specimen is no longer under the dollar bar — re-read"
+    assert ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"] > day_tokens, (ns["AI_TOKENS_PLATFORM_DAILY_THRESHOLD"], day_tokens)
+    for tokens, usd in (_RUNAWAY_2026_10_02, _RUNAWAY_2026_10_18):
+        assert ns["AI_DAILY_SPEND_THRESHOLD_USD"] <= usd, (ns["AI_DAILY_SPEND_THRESHOLD_USD"], usd)
+    dearest = max(row["out"] for row in prices.values() if "out" in row)
+    dearest_bar = max(ns["AI_TOKENS_VARIANCE_BAR"], int(round(ns["AI_SPEND_BUDGET_BAR_USD"] / dearest * 1_000_000, -3)))
+    assert not dearest_bar > day_tokens, "dearest-row pricing now clears the specimen day — this control is vacuous"
+
+
+def test_the_budget_ceilings_routed_rate_matches_the_chokepoint_4517():
+    """`scripts/budget_ceilings.routed_output_usd_per_mtok` (parsed, what cdk synth reads) agrees with
+    the imported routing + price tables, and refuses to guess when the routing table is unreadable."""
+    import sys
+
+    import pytest
+
+    sys.path.insert(0, os.path.join(_REPO, "scripts"))
+    import budget_ceilings
+
+    assert budget_ceilings.routed_output_usd_per_mtok() == _routed_output_rate()
+    from pathlib import Path
+
+    with pytest.raises(RuntimeError, match="refusing to guess"):
+        budget_ceilings.routed_models(routing_src=Path(_REPO) / "lambdas" / "ai" / "model_defaults.py")
 
 
 def test_the_spend_page_sits_above_every_ceilings_daily_pace_4517():

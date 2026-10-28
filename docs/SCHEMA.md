@@ -78,6 +78,48 @@ Where multiple sources measure the same thing:
 
 ---
 
+## Upstream Edits and Deletes — What Reaches the Store (#4638)
+
+**The rule: the store keeps what it first saw, unless a named re-fetch window or reconcile reaches back.** An edit or delete Matthew makes in a vendor's app propagates only through the paths below. Nothing else re-reads the vendor, and no source writes a vendor-side delete into the store except where a row says so. Verified 2026-10-27 against the code and each registry entry's `upstream_changes` facet (`lambdas/ingestion/source_registry.py`; the `UPSTREAM_CHANGES_REQUIRED` set). Owner ruling 2026-10-28 (#4638, option B): document, then fold into the epic row on #4625; reopen it if a stale vendor edit ever produces a wrong served number.
+
+**Polled and uploaded sources (the facet is stated on the registry entry; `tests/test_upstream_changes_4638.py` pins it, and `tests/test_schema_upstream_changes_4638.py` pins this table to it).**
+
+| Source | Edit in the app | Delete in the app | Window | Standing |
+|--------|-----------------|-------------------|--------|----------|
+| `hevy` | `any_age` | `any_age` | none (events feed) | stated_default |
+| `strava` | `inside_window` | `inside_window` | 3 days | stated_default |
+| `whoop` | `inside_window` | `inside_window` | 2 days | stated_default |
+| `macrofactor` | `inside_window` | `inside_window` | 7 days | stated_default |
+| `withings` | `inside_window` | `not_propagated` | 1 day | stated_default |
+| `apple_health` | `not_propagated` | `not_propagated` | none | accepted |
+
+`any_age` = reaches the store however old. `inside_window` = reaches the store only while the day is inside the source's re-fetch window of that many days. `not_propagated` = the store keeps what it first saw. `accepted` = ruled by the owner; `stated_default` = the current behaviour, written down so it is never unstated.
+
+- **Hevy** — the only source that propagates at any age. Its events feed reports updated and deleted workouts whenever they happen; a delete is tombstoned (#475), not removed.
+- **Strava** — the daily ingest re-fetches the trailing 3 days (`refresh_trailing_days=3`) as a full replace of each day, so an edit, a rename or a partial delete inside 3 days lands. An edit or a partial delete **older than 3 days is never written**. The daily store-to-vendor reconcile (#4638) compares the vendor's trailing 14 days with the store (10:20 Pacific) and **reports** the difference as `StoreOnlyActivityCount` / `ChangedActivityCount{Source=strava}`; it writes only one case: a day whose activities are **all** gone from Strava becomes an explicit empty, tombstoned day (anywhere inside the 14-day window except its first and last day, at most 3 days per run, and never when the vendor list comes back wholly empty). Live proof: the 2026-10-21 reconcile logged "every stored activity is gone from Strava — wrote the empty day", `EmptiedDayCount` 1. An old rename or sport-type edit has no live proof: the owner deferred the vendor-side test (2026-10-26), so that leg is code-only.
+- **Whoop** — the ingest re-fetches the trailing 2 days (`refresh_trailing_days=2`); an edit inside it overwrites the stored record by id, an older one is never re-fetched. The daily reconcile (11:20 Pacific) reports stored workout ids Whoop no longer lists and changed sport or start/end (`StoreOnlyActivityCount` / `ChangedActivityCount{Source=whoop}`). A day whose workouts are **all** gone is replaced by tombstones (the day's recovery and sleep row is never touched; today is never emptied). A **partial** delete is reported but the stored row stays (stated here as the current behaviour; Whoop's own webhooks for update and delete exist and are unused). Live: the 2026-10-23 reconcile reported one stored workout gone and three changed.
+- **MacroFactor** — arrives through the Dropbox CSV export, so propagation is whatever a diary upload carries: every upload re-writes each day it holds, which makes an edit land while the day is in the rolling 7-day export. On a diary import the file's date range is authoritative: a stored day strictly inside it with no rows becomes an explicit empty, tombstoned record. A day older than the export window never changes. Proof is the unit test plus one read-only run against a real export (2026-10-10); no live emptied day has been observed.
+- **Withings** — today is re-fetched on every run, so a same-day weigh-in edit lands; past days are fetched only to fill a gap. A measurement deleted in the app is never removed from the store.
+- **Apple Health** (Health Auto Export push) — **accepted by the owner 2026-10-11**: the export is push-only and a rebuild cannot fetch what was never re-sent. A corrected amount is ignored and a deleted reading stays counted: per-reading maps never overwrite an existing timestamp, workouts dedup on id (id-less ones are dropped) and additive totals can only rise. The rebuild-a-day hook (`merge_day_to_dynamo(monotonic_guard=False)`) has no caller outside tests, and a test fails the moment one appears.
+
+**The other registry sources** (owned elsewhere or without a vendor-side copy to drift from).
+
+| Source | What an upstream change does |
+|--------|------------------------------|
+| `habitify` | Today and the trailing 1 day are re-fetched every run with an upgrade-only merge, so a tick made late reaches the store but an **un-tick does not withdraw a stored completion**; only an explicit correction run (`{"date_override": "YYYY-MM-DD", "correction": true}`) may, and it leaves a `corrections` audit trail (#4632; the rule is #4644 Q27, held for the owner). The supplement bridge then follows the stored day. |
+| `supplements` | Follows the stored `habitify` day, not the vendor: the bridge re-derives its own entries from that day each run and retracts one no longer on it (#4632), so it inherits the `habitify` row. Entries logged by hand (`log_supplement`) have no upstream and are kept. |
+| `notion` | A page edited inside the 2-day window re-ingests (the query ORs the `last_edited_time` window). A stored row is removed only on proof: the date was re-queried whole and Notion no longer returns its page (#4631). A page deleted outside the window is not looked for, so its row stays. |
+| `eightsleep` | Today is re-fetched each run and gaps inside the 7-day lookback are filled; a past night is never re-fetched and a deleted session is never removed. |
+| `todoist` | Gap fill only (7-day lookback, no refresh of a day already stored): a task changed after its day was first stored is not re-read. |
+| `weather` | Today is re-fetched until its aggregates settle; a past day keeps its first-stored values. |
+| `dropbox` | Transport for the MacroFactor CSV, not a store of its own: what it delivers is governed by the `macrofactor` row above. |
+| `labs`, `dexa`, `measurements`, `progress_photos`, `food_delivery`, `x`, `instagram`, `tiktok` | No upstream to follow. The store holds the only copy, entered or uploaded by hand; a correction is a new write through the same path. |
+| `garmin`, `youtube`, `bluesky`, `mastodon` | Paused. Nothing is polled, so nothing propagates; history is kept as stored. |
+
+**Forcing a stale day to refresh.** The framework sources (`strava`, `whoop`, `withings`, `eightsleep`, `todoist`, `weather`, `habitify`) accept `{"date_override": "YYYY-MM-DD"}` and re-fetch that one day through their normal write path; for Strava this is a full replace of the day. It is an AWS invoke, so only the owner or the driver runs it, and Strava's token refresh rotates the stored secret. It was **not exercised** for #4638. It does not make a stored Hevy, Apple Health or MacroFactor day any more current than the table above says.
+
+---
+
 ## Key Structure
 
 | Attribute | Description |
