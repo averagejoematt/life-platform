@@ -528,7 +528,7 @@ def _compute_sleep_consistency(date_str: str, current_onset: int) -> float | Non
 _secret_cache: dict[str, Any] = {"access_token": None}
 # Per-invocation rotation state (#2196). Reserved concurrency is 1, so a module
 # global is a per-invocation scratchpad; `authenticate` resets it every run.
-_rotation_state: dict[str, Any] = {"rotated_at": None}
+_rotation_state: dict[str, Any] = {"rotated_at": None, "persisted": False}
 
 
 class WhoopTransientAuthGlitch(RuntimeError):
@@ -578,6 +578,7 @@ def authenticate(secret_data: dict) -> dict:
     """
     secret = dict(secret_data)
     _rotation_state["rotated_at"] = None
+    _rotation_state["persisted"] = False
 
     stored_token = secret.get("access_token")
     remaining = _seconds_until_expiry(secret)
@@ -587,7 +588,16 @@ def authenticate(secret_data: dict) -> dict:
         return secret
 
     logger.info("whoop_token_exchange reason=%s", "no_stored_expiry" if remaining is None else f"expires_in_{int(remaining)}s")
-    return _rotate(secret)
+    rotated = _rotate(secret)
+    if _rotation_state["persisted"]:
+        # #4641: the store already holds exactly `rotated` (written inside _rotate). The framework's
+        # writeback only writes when its credentials differ from the dict it READ, so bring that
+        # baseline up to what is stored — otherwise every rotation was written twice (10 rotations
+        # a day measured as 20 UpdateSecret calls, 2026-10-27). A failed persist leaves the baseline
+        # alone, so the framework's own retried writeback still runs.
+        secret_data.clear()
+        secret_data.update(rotated)
+    return rotated
 
 
 def _rotate(secret: dict) -> dict:
@@ -652,7 +662,7 @@ def _rotate(secret: dict) -> dict:
     # #2069: persist BEFORE returning — see _persist_refreshed_secret's docstring
     # for why this closes the crash window instead of relying solely on the
     # framework's post-authenticate() writeback.
-    _persist_refreshed_secret(secret)
+    _rotation_state["persisted"] = bool(_persist_refreshed_secret(secret))
     return secret
 
 
