@@ -19,9 +19,10 @@ routine repo already live:
   * the menu    `health.weekly_menu.build(plan)` (#5110 box 4, owner ruling 2026-10-26 "Hold for the first built
                 menu"): the food panel grades the COMMITTED MENU — the same deterministic fit of his anchor foods to
                 the week's resolved days that `get_exercise_notes action='weekly_menu'` serves for that Monday —
-                through `training.food_panel.on_menu` (`basis: menu`). A week whose menu is not built (no anchor
-                table, a day refused, an unreadable fixed meal) is graded on the intended feedings and the food grade
-                is `degraded` with the menu's reason code, never silently.
+                through `training.food_panel.on_menu` (`basis: menu`; `read_menu_plan`), so the row also shows the
+                food-quality targets' hit or miss (#5105). A week whose menu is not built (no anchor table, a day
+                refused, an unreadable fixed meal) is graded on the intended feedings and the food grade is `degraded`
+                with the menu's reason code, never silently.
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
                 scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
 
@@ -119,7 +120,7 @@ def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str,
         from mcp.config import table
 
         week_end = shift_day_key(week_start, JOB["week_days"] - 1)
-        return food_panel.build_food_plan(
+        plan = food_panel.build_food_plan(
             week_start,
             planned_dates=[str(r.get("target_date") or "")[:10] for r in routines],
             disruption_records=disruption.load_records_failsoft(),  # #5215: no record = the full-day rubric
@@ -128,27 +129,20 @@ def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str,
             block_workouts=_block_workouts_or_none(week_end),
             today=pacific_today(),
         )
+        return plan  # the plain plan: the MCP menu read builds its menu over it; `run` lays the menu on (read_menu_plan)
     except Exception as e:  # noqa: BLE001 — the grade names the missing food plan; it never invents one
         logger.warning("panel weekly grade: food plan unreadable (%s: %s)", type(e).__name__, str(e)[:200])
         return None
 
 
-def _priorities_or_none() -> dict[str, Any] | None:
-    try:
-        from training import lab_priorities
-
-        from mcp.config import table
-
-        return lab_priorities.read_priorities(table)
-    except Exception as e:  # noqa: BLE001 — no priorities row weights nothing; the menu still builds
-        logger.warning("panel weekly grade: lab priorities unreadable (%s: %s)", type(e).__name__, str(e)[:200])
-        return None
-
-
 def read_menu_plan(plan: dict[str, Any] | None, *, build: Any = None) -> dict[str, Any] | None:
-    """#5110 box 4: the plan the food panel grades — the week's menu over `plan` (`food_panel.on_menu`), or the plan on
-    its intended feedings with the menu's reason code. `build(plan)` defaults to `health.weekly_menu.build` with the
-    owner-only lab-priorities row, the call the MCP menu read makes. None in, None out (the food plan was not read)."""
+    """#5110 box 4 + #5105: the plan the food panel grades — the week's menu built by code over `plan`
+    (`health.weekly_menu.build`, laid over it by `food_panel.on_menu` -> `weekly_menu.food_plan`: the grams the anchors
+    actually carry and the rows the food-quality check reads), stamped `basis: menu`; or, when no menu builds (no
+    owner-only anchor table, a refused day, an unreadable fixed meal) or the build raises, the plan on its intended
+    feedings stamped `basis: intended_feedings` with the menu's reason code — the food grade then says so (degraded) and
+    the quality report says `not checked`, never a fabricated pass. `build(plan)` is injected in tests. None in, None out
+    (the food plan was not read)."""
     if plan is None:
         return None
     from training import food_panel
@@ -157,13 +151,25 @@ def read_menu_plan(plan: dict[str, Any] | None, *, build: Any = None) -> dict[st
         if build is None:
             from health import weekly_menu
 
-            menu = weekly_menu.build(plan, priorities=_priorities_or_none())
-        else:
-            menu = build(plan)
+            build = weekly_menu.build
+        menu = build(plan)
+        if not (menu or {}).get("built"):
+            logger.warning(
+                "panel weekly grade: no menu built (%s: %s)", (menu or {}).get("reason_code"), str((menu or {}).get("reason"))[:200]
+            )
     except Exception as e:  # noqa: BLE001 — named on the grade (menu_unreadable); the intended feedings are graded
         logger.warning("panel weekly grade: menu unbuildable (%s: %s)", type(e).__name__, str(e)[:200])
         menu = {"built": False, "reason_code": "menu_unreadable"}
     return food_panel.on_menu(plan, menu)
+
+
+def _menu_plan_or_plain(plan: dict[str, Any]) -> dict[str, Any]:
+    """#5105's reader, on the ONE menu path (`read_menu_plan`): the menu-built plan when the menu builds, else the plain
+    plan, untouched (the food panel then reports the food-quality targets as `not checked`)."""
+    from training import food_panel
+
+    out = read_menu_plan(plan)
+    return out if (out or {}).get("basis") == food_panel.BASIS_MENU else plan
 
 
 def read_history() -> list[dict[str, Any]]:

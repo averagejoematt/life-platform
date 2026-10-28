@@ -188,6 +188,25 @@ export function labName(raw) {
     .replace(/\bOmega (3|6)\b/g, "Omega-$1");
 }
 
+// #5456 — the panel is ONE draw, and the page's own fold says it predates the experiment, but the
+// table below the fold read as current-cycle data (reader-truth: "temporal_contradiction"). Name
+// the draw date and its relation to Day 1 at the table itself — both DERIVED from the served
+// payload (latest_draw_date + the server's latest_draw_archival block), never a hard-coded date.
+// Absent on an artifact written before #3728: degrade to the date alone, or to nothing.
+export function labsDrawFrame(L, now = new Date()) {
+  const when = dayInWords((L || {}).latest_draw_date, { weekday: false, yearIfNotCurrent: true, now });
+  if (!when) return "";
+  const arch = (L || {}).latest_draw_archival || {};
+  const n = Number(arch.days_before);
+  const before = arch.pre_cycle ? ` — ${Number.isFinite(n) && n > 0 ? `${n} day${n === 1 ? "" : "s"} before Day 1` : "before Day 1"}, not a result from this experiment` : "";
+  return `From the ${when} draw${before}.`;
+}
+
+export function labsDrawShort(L, now = new Date()) {
+  const when = dayInWords((L || {}).latest_draw_date, { weekday: false, yearIfNotCurrent: true, now });
+  return when ? `${when} draw${((L || {}).latest_draw_archival || {}).pre_cycle ? ", before Day 1" : ""}` : "";
+}
+
 const _labFlagged = (b) => !!b.flag && String(b.flag).toLowerCase() !== "null";
 const _labFlagWord = (f) => ({ H: "high", L: "low" })[String(f).toUpperCase()] || String(f);
 const _labRow = (b) => {
@@ -213,14 +232,17 @@ export function labsFold(d) {
 // #4182 — flagged rows FIRST (the reader's question is "what's wrong?"), the full panel
 // collapsed under its served row count. The flag rides in the result cell as a word
 // ("high"/"low"), so there is no narrow FLAG column left to clip at 390px.
-export function renderLabs(d) {
+export function renderLabs(d, clock) {
+  const now = clock instanceof Date ? clock : new Date(); // evidence.js passes the topic as arg 2
   const L = d.labs || d; const bm = L.biomarkers || [];
   if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added.");
   const flagged = bm.filter(_labFlagged);
   const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b);
   const panel = Object.entries(by).map(([cat, rows]) => `<h3 class="hb-group label">${esc(cat)}</h3>${_labTable(rows)}`).join("");
-  return (flagged.length ? sec(`Outside the reference range — ${flagged.length} of ${bm.length}`, _labTable(flagged)) : "") +
-    `<section class="rd-sec"><details class="lab-full"><summary class="pa-sum label">The full panel — ${bm.length} rows</summary><div class="lab-full-body">${panel}</div></details></section>` +
+  const frame = labsDrawFrame(L, now);
+  const frameP = frame ? `<p class="rd-meta label" data-labs-frame>${esc(frame)}</p>` : "";
+  return (flagged.length ? sec(`Outside the reference range — ${flagged.length} of ${bm.length}`, frameP + _labTable(flagged)) : frameP) +
+    `<section class="rd-sec"><details class="lab-full"><summary class="pa-sum label">The full panel — ${bm.length} rows${frame ? ` · ${esc(labsDrawShort(L, now))}` : ""}</summary><div class="lab-full-body">${panel}</div></details></section>` +
     figs([fig(L.total_draws ?? "—", "draws", drawsScope(L))]) +
     note("Reference ranges are the lab's own; a flag marks a result outside them. Nothing here is medical advice.");
 }

@@ -253,6 +253,8 @@ def test_the_weekly_run_grades_the_food_plan_or_says_it_did_not():
     assert g["food"]["target_met"] and not g["food"]["degraded"], (g["food"]["degraded_reasons"], g["food"]["overall"])
     assert [c["control"] for c in g["food"]["controls"]] == list(food_panel.CONTROL_MUTATIONS)
     assert not any(c["missed"] for c in g["food"]["controls"]) and not any(c["target_met"] for c in g["food"]["controls"])
+    # #5105: the weekly report carries the food-quality hit/miss; a golden week has no menu, so it says "not checked"
+    assert g["food"]["quality"]["checked"] is False and panel_judge.panel_item(g, "USER#matthew")["food"]["quality"] == g["food"]["quality"]
     none = panel_judge.grade_committed_week("2026-10-18", food_plan=None, **kw)
     assert none["food"] is None and none["degraded"] and any("food plan was not read" in r for r in none["degraded_reasons"])
     assert panel_judge.panel_item(none, "USER#matthew")["food"] is None
