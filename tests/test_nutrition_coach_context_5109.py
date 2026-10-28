@@ -12,6 +12,9 @@
   (4) PRIVACY: the published context carries none of the titration record's owner-only fields
       (`privacy.field_tiers`: nutrition_titration is TIER_OWNER_ONLY), no feeding clock times, no May target.
   (5) LEGACY: the ingest's 30 g protein-distribution score has no reader in coach or panel text.
+  (6) THE LEGACY CALL: the daily brief's fallback nutritionist (`ai_calls.call_training_nutrition_coach`) states its
+      targets from the SAME assembly (the published `nutrition_context` text), never the typed TARGETS line whose fat
+      and carbohydrate figures were profile defaults the charter never set; an unreadable assembly is stated.
 
 Offline: no AWS, no model, no clock (every day is passed in).
 """
@@ -283,3 +286,46 @@ def test_the_legacy_30g_score_has_no_reader_in_coach_or_panel_text():
     assert len(producers) > 20
     readers = [os.path.relpath(p, _REPO) for p in producers if any(f in open(p, encoding="utf-8").read() for f in LEGACY_FIELDS)]
     assert readers == [], f"coach/panel text reads the legacy 30 g score — read health.protein_engine instead: {readers}"
+
+
+# ── (6) the legacy training + nutrition call ─────────────────────────────────────────────
+_LEGACY_PROFILE = {"journey_start_date": "2026-09-06", "journey_start_weight_lbs": 300, "goal_weight_lbs": 185}
+
+
+def _legacy_prompt(monkeypatch, data, profile=None):
+    from ai import ai_calls  # noqa: PLC0415
+
+    calls = []
+
+    def fake(prompt, api_key, **kw):
+        calls.append(prompt)
+        return '{"training": "t", "nutrition": "n"}'
+
+    monkeypatch.setattr(ai_calls, "call_anthropic", fake)  # no Bedrock
+    monkeypatch.setattr(ai_calls, "_ground_legacy_output", lambda label, output, regen_fn, *allow, **kw: output)
+    monkeypatch.setattr(ai_calls, "pacific_today", lambda: DAY)  # the run's day, frozen (#4848)
+    ai_calls.call_training_nutrition_coach(data, profile or _LEGACY_PROFILE, "key")
+    assert calls, "the legacy call never reached the model stub"
+    return calls[-1]
+
+
+def test_the_legacy_nutrition_call_states_the_shared_assemblys_targets_not_typed_ones(monkeypatch):
+    profile = {**_LEGACY_PROFILE, "fat_target_g": 60, "carb_target_g": 125}  # the retired defaults, held in a profile
+    prompt = _legacy_prompt(monkeypatch, {"date": ROW["date"], "macrofactor": ROW}, profile)
+    want = cc.nutrition_context(DAY, day_row=ROW, published=True)["text"]
+    assert want in prompt, "the legacy call does not carry the shared nutrition context's text"
+    assert "TARGETS: " not in prompt and "F60g" not in prompt and "C125g" not in prompt
+    for path in ("nutrition.floors.fat.floor_g", "nutrition.floors.carb.floor_g", "nutrition.protein.range_g.low"):
+        assert f"- {path}: {tc.charter_value(path)}" in prompt, path
+    assert "REDLINES v" in prompt and cc.NUTRITION_CITE_RULE in prompt
+    for path in cc.NUTRITION_OWNER_PATHS:  # the published form: the brief's text can reach a reader
+        assert path not in prompt, path
+
+
+def test_mutation_control_an_unreadable_assembly_is_stated_never_a_remembered_target(monkeypatch):
+    from ai import ai_calls  # noqa: PLC0415
+
+    monkeypatch.setattr(ci, "nutrition_charter_context", lambda data, today: None)
+    prompt = _legacy_prompt(monkeypatch, {"date": ROW["date"], "macrofactor": ROW})
+    assert ai_calls.LEGACY_NUTRITION_ABSENT in prompt
+    assert "NUTRITION CHARTER v" not in prompt and "F60g" not in prompt

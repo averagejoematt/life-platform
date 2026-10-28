@@ -14,9 +14,15 @@ routine repo already live:
   * the food    `training.food_panel.build_food_plan(week_start)` (#5110): the week's resolved calorie targets
                 (`health.calorie_target.resolve`, titration over charter, each day typed lifting/rest by the
                 per-date calendar `training.training_calendar` (#5191) — the committed routines' dates when the Hevy
-                record is unreadable) + the intended feedings + the week's titration record, with the menu built by code laid over it
-                (#5105: `_menu_plan_or_plain`, so the row shows the food-quality targets' hit or miss). Fail-soft: an
+                record is unreadable) + the intended feedings + the week's titration record. Fail-soft: an
                 unreadable food plan is named on the grade (`degraded`), the training grade still stands.
+  * the menu    `health.weekly_menu.build(plan)` (#5110 box 4, owner ruling 2026-10-26 "Hold for the first built
+                menu"): the food panel grades the COMMITTED MENU — the same deterministic fit of his anchor foods to
+                the week's resolved days that `get_exercise_notes action='weekly_menu'` serves for that Monday —
+                through `training.food_panel.on_menu` (`basis: menu`; `read_menu_plan`), so the row also shows the
+                food-quality targets' hit or miss (#5105). A week whose menu is not built (no anchor table, a day
+                refused, an unreadable fixed meal) is graded on the intended feedings and the food grade is `degraded`
+                with the menu's reason code, never silently.
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
                 scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
 
@@ -123,28 +129,47 @@ def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str,
             block_workouts=_block_workouts_or_none(week_end),
             today=pacific_today(),
         )
-        return _menu_plan_or_plain(plan)
+        return plan  # the plain plan: the MCP menu read builds its menu over it; `run` lays the menu on (read_menu_plan)
     except Exception as e:  # noqa: BLE001 — the grade names the missing food plan; it never invents one
         logger.warning("panel weekly grade: food plan unreadable (%s: %s)", type(e).__name__, str(e)[:200])
         return None
 
 
-def _menu_plan_or_plain(plan: dict[str, Any]) -> dict[str, Any]:
-    """The week's plan with the menu built by code laid over it (#5105: the weekly report shows the food-quality targets'
-    hit or miss, and only a menu has foods to check). The menu is `health.weekly_menu.build` over this same plan —
-    `weekly_menu.food_plan` swaps in the grams the anchors actually carry and the rows the quality check reads. Fail-soft
-    and named: an unbuildable menu (no owner-only anchor table, a fixed meal that cannot be read) or a menu that raises
-    leaves the plain plan, which the food panel then reports as `not checked` — never a fabricated pass."""
-    try:
-        from health import weekly_menu
+def read_menu_plan(plan: dict[str, Any] | None, *, build: Any = None) -> dict[str, Any] | None:
+    """#5110 box 4 + #5105: the plan the food panel grades — the week's menu built by code over `plan`
+    (`health.weekly_menu.build`, laid over it by `food_panel.on_menu` -> `weekly_menu.food_plan`: the grams the anchors
+    actually carry and the rows the food-quality check reads), stamped `basis: menu`; or, when no menu builds (no
+    owner-only anchor table, a refused day, an unreadable fixed meal) or the build raises, the plan on its intended
+    feedings stamped `basis: intended_feedings` with the menu's reason code — the food grade then says so (degraded) and
+    the quality report says `not checked`, never a fabricated pass. `build(plan)` is injected in tests. None in, None out
+    (the food plan was not read)."""
+    if plan is None:
+        return None
+    from training import food_panel
 
-        menu = weekly_menu.build(plan)
-        if menu.get("built"):
-            return weekly_menu.food_plan(plan, menu)
-        logger.warning("panel weekly grade: no menu for the quality check (%s: %s)", menu.get("reason_code"), str(menu.get("reason"))[:200])
-    except Exception as e:  # noqa: BLE001 — the plain plan is the named fallback
-        logger.warning("panel weekly grade: menu unbuildable for the quality check (%s: %s)", type(e).__name__, str(e)[:200])
-    return plan
+    try:
+        if build is None:
+            from health import weekly_menu
+
+            build = weekly_menu.build
+        menu = build(plan)
+        if not (menu or {}).get("built"):
+            logger.warning(
+                "panel weekly grade: no menu built (%s: %s)", (menu or {}).get("reason_code"), str((menu or {}).get("reason"))[:200]
+            )
+    except Exception as e:  # noqa: BLE001 — named on the grade (menu_unreadable); the intended feedings are graded
+        logger.warning("panel weekly grade: menu unbuildable (%s: %s)", type(e).__name__, str(e)[:200])
+        menu = {"built": False, "reason_code": "menu_unreadable"}
+    return food_panel.on_menu(plan, menu)
+
+
+def _menu_plan_or_plain(plan: dict[str, Any]) -> dict[str, Any]:
+    """#5105's reader, on the ONE menu path (`read_menu_plan`): the menu-built plan when the menu builds, else the plain
+    plan, untouched (the food panel then reports the food-quality targets as `not checked`)."""
+    from training import food_panel
+
+    out = read_menu_plan(plan) or plan
+    return out if out.get("basis") == food_panel.BASIS_MENU else plan
 
 
 def read_history() -> list[dict[str, Any]]:
@@ -188,7 +213,7 @@ def run(week_end: str | None = None) -> dict[str, Any]:
         routines=routines,
         constraint_block=read_constraint_block(end),
         history=read_history(),
-        food_plan=read_food_plan(start, routines),
+        food_plan=read_menu_plan(read_food_plan(start, routines)),  # #5110 box 4: graded on the week's menu
     )
     grade["stored"] = store(grade) if grade.get("status") == "graded" else {"written": False, "reason": grade.get("status")}
     return grade
@@ -224,5 +249,7 @@ def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
         result = {"job": JOB["name"], "status": "failed", "error": f"{type(e).__name__}: {e}"[:300]}
     print(emf_line(result.get("status") or "failed"))
     summary = {k: result.get(k) for k in ("week_end", "status", "overall", "target_met", "degraded", "degraded_reasons", "stored")}
+    food = result.get("food") or {}
+    summary["food"] = {k: food.get(k) for k in ("overall", "target_met", "degraded_reasons", "basis", "menu")} if food else None
     logger.info("PANEL_WEEKLY_GRADE %s", json.dumps(summary, default=str)[:4000])
     return {"statusCode": 200, "body": json.dumps(summary, default=str), "headers": {"Content-Type": "application/json"}}
