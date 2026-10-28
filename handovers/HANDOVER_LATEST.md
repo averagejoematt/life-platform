@@ -42,13 +42,30 @@
 - #5220 closes with its citation prune at/after 2026-10-28 05:47Z; #4914 #4533 #4536 on the Wed 10-28 15:00Z chronicle; #5109 on a qa-smoke comparing ≥1 claim.
 - not-work — the Hevy-notes review artifacts (standard, corpus, linter reference) live in the session scratchpad; the standard is committed as `docs/coaching/HEVY_NOTE_STANDARD.md` in #5447.
 
+## Post-wrap (owner attended, 2026-10-28 ~01:30Z)
+- **Fold applied: 12 stories closed as folded** into their epics' existing rows, with a reopen trigger on each row: #4533 #4536 #4537 #4545 #4546 #4564 #4914 → #4531, #4583 #4584 → #4580 (reopen when the Story Desk hold lifts), #4974 #4975 #4980 → #4967 (reopen at 30 nights of dual wear, about 11-16). Epic bodies backed up first. Open 88 → **77** (the +1 is #5456, auto-filed by the standalone visual QA run at 20:42Z). Backlog hygiene: 0 violations.
+- **The expert analyzer was re-run once** (owner yes, 01:32Z, 151 s): sleep, mind, labs and explorer wrote, plus the synthesis. **Nutrition and physical were held by the grounding gate** (the drafts quoted figures not in the data, one a weight far from the latest weigh-in), and with no record inside the 15-day window there was nothing to renew, so those two surfaces stay empty. experiment_arc and integrator_month were held the same way; glucose was skipped (no sensor). #5442 is half-proven; why the model invents those figures is a next-session item.
+- **Six owner-gated stories ruled** (each ruling on its issue): #4076 B and #4189 B (close on a synthetic proof), #4638 B (document per source in `docs/SCHEMA.md`, then fold into #4625), #3759 A (photos and tape this week, with #5061), #4968 A (the settings checklist), #4887 A (the token).
+
+## Next session plan: open 77 → 50 or fewer, autonomous
+Envelope as this session's (merge only on code-only green tips, additive-only CDK, synthetic proofs only, no messages to the owner, no Hevy commits, no dev-cap override); the week-of-10-26 grant runs through 11-01. Start `caffeinate` in the background first (the 9-hour pause, incident row 10-27).
+1. **Boot checks (read-only):** main green; `qa-smoke-warnings` cleared by the og sweep writing the 10 coach cards (#5434); the 10-28 02:00Z predraft lints clean, with no gate, ECG or RED TEAM text (#5428).
+2. **Land wave 11** (w11 above): one PR, deploy, verify by content → #5428 and #5083 close on the next predraft plus a blind re-grade.
+3. **Harvest the due proofs** (about −13): #5220 #5132 #5421 #5433 #5434 #5122 #5104 #5388 #5373 #4969 #5431 #5440 #5412 #5076 #5374 (#5431 and #5440 close cleanly once the owner's repairs have run).
+4. **The ruled closes** (−3): the #4076 and #4189 synthetic proofs; #4638 docs plus fold.
+5. **Wave 12, about six parallel lanes** (about −8 after deploy and first output): #5297 + #5324 (one bug class) · #5372 · #5353 · #5105 · #5109 + #5110 · #4517 · #5221 · #5371 · #4641 · #5390 · #5456 (diagnose the standalone visual QA red; it auto-closes on a green run) · why the analyzer's nutrition and physical drafts invent figures (file it first).
+6. **Epics whose last children close** (about −2): #5134 (#5412; #5406 is ruled and starts 11-01), #5094 (#5109 #5110 #5324); #5120 and #5093 only if the owner's evening check-in reply arrives.
+7. **Owner acts, if done before the session** (−4 to −9): #3759 + #5061, #4968, #4887, #5010, and the evening check-in reply (#5106 #5123 #5211).
+8. Refill only what the lanes find; wrap. **Estimate: about 45–52 open, 50 or fewer with the owner acts.** Dated proofs that cannot be pulled earlier: #4284 (11-01 clock change), #5075 (about 11-05).
+
 ## For Matthew (the only things waiting on you)
 1. **AWS support case for Claude 5.5** (#4772): agreements are accepted and AVAILABLE, runtime still "not available for this account". Account-and-billing case, text drafted in session (account 205930651321; Haiku/Sonnet 5.5; Converse AccessDenied).
-2. **Re-run the weekly expert analyzer once, now that wave 10 is deployed** (#5442): every expert/weekly-priority record lapsed ~10-26 23:15Z, so those surfaces are empty until Mon 11-02 14:00Z — an earlier run spends production AI budget; your call.
+2. ~~Re-run the expert analyzer~~ — done 10-28 01:32Z (owner yes); see Post-wrap.
+2a. **This week: the photo set and the tape** (#3759 + #5061; clears `calibration-deadman`) · **the watch/HAE settings checklist** (#4968: the metrics not yet seen, listed in its 2026-10-18 comment) · **the posture token** (#4887: fine-grained, this repo, Administration + Actions + Contents read-only, then `gh secret set GH_POSTURE_TOKEN`) · **one evening check-in reply** (unblocks #5106 #5123 #5211 and two epics).
 3. **MacroFactor future-row cleanup** (#5431, ready now — wave 10 is deployed): `python3 scripts/macrofactor_future_rows_cleanup.py` (dry run: six rows 2026-10-27..11-01), then `--apply --backup <path>`. The classifier blocked the session from deleting them.
 4. **Apple Health additive repair** (#5440, ready now — wave 10 is deployed): `AWS_MAX_ATTEMPTS=1 python3 scripts/hae_additive_backfill_4628.py --since 2026-10-21 --until 2026-10-26` dry run, then `--apply` for 10-21, 10-22, 10-26 only — never 10-25 (its pre-guard echo double count would lower).
 5. **Pin `📌 Setup: seat 7` on Cycling and log one ride** (#5010 one-session test).
-6. Deferred by you: #4887 GH_POSTURE_TOKEN · #5061/#3759 tape + photos (`calibration-deadman` red until then) · #5123 one evening check-in reply (also unblocks #5106/#5211) · #4968 watch health settings · the 136-box epic tick-sweep (`epic_box_sweep_diff.md` in the session scratchpad) · a second watch hypothesis (Zone 2 → recovery) still on the dated cut-over — re-register too?
+6. Deferred by you: the 136-box epic tick-sweep (`epic_box_sweep_diff.md` in the session scratchpad) · a second watch hypothesis (Zone 2 → recovery) still on the dated cut-over — re-register too?
 7. Carried: #5390 protocol now ruled (A) — box 1 waits on your next gym day; #4638 vendor rename test (deferred 10-26).
 
 **Build beat:** none — the shipped work is owner-facing (schedules, coaching notes, ingestion); nothing reader-visible
