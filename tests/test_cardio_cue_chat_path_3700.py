@@ -220,7 +220,11 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     from training import session_block  # #5428: the bench is exercise 1, so the session block heads its note
     from training.warmup_sets import CUE_MARKER, cue_clause
 
-    assert session_block.split(next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes)[1] == cue_clause("bench")
+    # #5428: the chat path composes the bench's own note to the standard — effort first, then the press family's cue;
+    # the cardio arm wrote nothing on it
+    own = session_block.split(next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes)[1].split("\n")
+    assert own[0] == "RPE 8–9" and own[-1] in ("Breathe out on the press.", cue_clause("bench") + " Breathe out on the press."), own
+    assert not [ln for ln in own if cn.LINE1_RE.match(ln)]
     assert CUE_MARKER not in bike.notes
     assert out["cardio_cues"] == 1
 
@@ -308,10 +312,14 @@ def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count(
     # warmups=False: #5049's warm-up cue would otherwise be the bench's one clause; this test is the cardio arm's
     out, ir = _draft_custom([{"movement_key": "barbell_bench_press", "sets": [{"weight_lbs": 155, "reps": 8}]}], warmups=False)
     assert out["cardio_cues"] == 0
-    # #5428: exercise 1 carries the three-line session block and nothing else — no cardio cue on a strength block
+    # #5428: exercise 1 carries the three-line session block, then its own lift note (the chat path's composer: effort
+    # first) — no cardio cue on a strength block
     from training import session_block
 
-    assert all(session_block.split(b.notes) == (session_block.block_of(ir), "") for b in ir.exercises)
+    for b in ir.exercises:
+        block, own = session_block.split(b.notes)
+        assert block == session_block.block_of(ir) and own.split("\n")[0].startswith("RPE "), b.notes
+        assert not [ln for ln in own.split("\n") if cn.LINE1_RE.match(ln)]
 
 
 def test_a_history_load_failure_never_costs_the_chat_draft():

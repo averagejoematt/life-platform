@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from decimal import Decimal
 from typing import Any, Callable
@@ -201,8 +202,15 @@ def v04_plan(
 
 
 # ── the persist path when the switch says v04 ────────────────────────────────────────────
+_VERSION_ID_RE = re.compile(r"\bv\d+(?:\.\d+)+\s*")
+
+
 def _v04_note(ex: dict[str, Any]) -> str:
-    return f"v0.4 revert: {ex['load_basis']}; {ex['intensity']} {ex['sets'][0]['reps'][0]}-{ex['sets'][0]['reps'][1]} reps."
+    """The reverted plan's per-exercise provenance, handed to draft_custom as the authored note. #5428: no version id in
+    it (the plan source is `plan_source` on the result and the switch's own record); draft_custom's note composer keeps
+    this text on the stored record (`inputs_snapshot.lift_notes[...].detail`) and writes the standard's note on the wire."""
+    basis = _VERSION_ID_RE.sub("", str(ex["load_basis"])).strip()
+    return f"Reverted plan: {basis}; {ex['intensity']} {ex['sets'][0]['reps'][0]}-{ex['sets'][0]['reps'][1]} reps."
 
 
 def draft_v04(target_date: str, plan: dict[str, Any]) -> dict[str, Any]:

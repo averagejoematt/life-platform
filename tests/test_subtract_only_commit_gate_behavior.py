@@ -276,21 +276,34 @@ def test_the_sanctioned_down_branch_stays_clean():
     assert "clean" in out["prescription_gate"]
 
 
+_GO_UP = [
+    {
+        "movement_key": "db_shoulder_press",
+        "notes": "Ceiling RPE 8.5. If set 1 feels good, go up to 85.",
+        "sets": [{"weight_lbs": 75, "reps": 8, "count": 3}],
+    }
+]
+
+
 def test_go_up_to_85_refuses():
-    """The sentence class #3971 was filed on, authored the way chat authors it."""
-    ir = _drafted_custom(
-        [
-            {
-                "movement_key": "db_shoulder_press",
-                "notes": "Ceiling RPE 8.5. If set 1 feels good, go up to 85.",
-                "sets": [{"weight_lbs": 75, "reps": 8, "count": 3}],
-            }
-        ]
-    )
+    """The sentence class #3971 was filed on, authored the way chat authors it — the gate still refuses it when it is
+    on the wire. (#5428: draft_custom's note composer is held off here, so this is the gate's own proof.)"""
+    with patch("mcp.draft_custom_session.compose_custom_notes", return_value={}):
+        ir = _drafted_custom(_GO_UP)
     out = _commit(ir)
     assert out["error_code"] == "SUBTRACT_ONLY_VIOLATION", out
     assert "go up to 85" in str(out) or "go up" in str(out)
     assert out["_create_called"] is False
+
+
+def test_the_chat_composer_keeps_an_authored_load_jump_off_the_wire():
+    """#5428: through the full chat path the sentence never reaches a Hevy note — the composer writes the standard's
+    note (a load named in the text is the rows' job, and the session's load rule is the one way up) and keeps the
+    authored text on the stored record."""
+    ir = _drafted_custom(_GO_UP)
+    note = ir.exercises[0].notes
+    assert "go up" not in note and "85" not in note.split("\n\n")[-1]
+    assert ir.inputs_snapshot["lift_notes"]["db_shoulder_press"]["detail"] == _GO_UP[0]["notes"]
 
 
 def test_a_draft_custom_set_below_the_floor_refuses():

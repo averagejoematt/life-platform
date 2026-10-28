@@ -1,0 +1,1792 @@
+{
+ "_source": "issue 5428: the 10 routines pushed to Hevy 2026-10-11..10-26 (exercises[].notes as pushed, rows from the stored IR in lb). Every line carrying clinical, bodyweight, nutrition or rate text is replaced by '[scrubbed: private]' and owner quotes by '[quote scrubbed]' (public repo); loads and reps are ruled public.",
+ "routines": [
+  {
+   "date": "2026-10-11",
+   "title": "Upper — 2026-10-11",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "movement_key": "barbell_bench_press",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "N",
+       175.0,
+       "8–12"
+      ],
+      [
+       "N",
+       175.0,
+       "8–12"
+      ],
+      [
+       "N",
+       175.0,
+       "8–12"
+      ]
+     ],
+     "note": "[scrubbed: private]\n\nUPPER VOLUME · loads hold · 3x8-12, RPE 8 cap. Honour it: on 10/07 you went over the ceiling on 18 of 22 sets.\n\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\nFeel can only downgrade.\n\n[scrubbed: private]\nLast: 225x3 @9.5, back-offs 185x5/8 (7 Oct). Today 175 lb.\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-11):\n[scrubbed: private]\n- joints/tendons APPROVE: nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Dumbbell Row",
+     "movement_key": "one_arm_db_row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "N",
+       85.0,
+       "8–12"
+      ],
+      [
+       "N",
+       85.0,
+       "8–12"
+      ],
+      [
+       "N",
+       85.0,
+       "8–12"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "movement_key": "db_shoulder_press",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       60.0,
+       "8–12"
+      ],
+      [
+       "N",
+       60.0,
+       "8–12"
+      ],
+      [
+       "N",
+       60.0,
+       "8–12"
+      ]
+     ],
+     "note": "Last: 60 lb x 10 x4 @8-8.5 (7 Oct). Hold 60. Exhale on the press, no breath-holding."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "movement_key": "lat_pulldown",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       155.0,
+       "8–12"
+      ],
+      [
+       "N",
+       155.0,
+       "8–12"
+      ]
+     ],
+     "note": "Last: 160 x 8/8 @8.5/8 (7 Oct). Today 155, 8-12."
+    },
+    {
+     "name": "Cable Fly Crossovers",
+     "movement_key": "cable_chest_fly",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       15.0,
+       "8–15"
+      ],
+      [
+       "N",
+       15.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "movement_key": "cable_tricep_pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       90.0,
+       "8–15"
+      ],
+      [
+       "N",
+       90.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "movement_key": "db_curl",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       25.0,
+       "8–15"
+      ],
+      [
+       "N",
+       25.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "45 min"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Stretching",
+     "movement_key": "tmpl:527DA061",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "15 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-13",
+   "title": "Lower — 2026-10-13",
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "movement_key": "deadlift_trap_bar",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "N",
+       215.0,
+       "8"
+      ],
+      [
+       "N",
+       215.0,
+       "8"
+      ],
+      [
+       "N",
+       215.0,
+       "8"
+      ]
+     ],
+     "note": "[scrubbed: private]\n\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\nNo extra sets. No grinding. Exhale on the way up, no long breath-holds. Stand up slowly between sets.\n215 lb x 8, RPE ≤7 either way (exposure 3 of 3 cap). Last: 225 x 8 @8 (6 Oct).\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-13):\n[scrubbed: private]\n- joints/tendons APPROVE: nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Squat (Barbell)",
+     "movement_key": "squat_barbell",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "N",
+       200.0,
+       "8–10"
+      ],
+      [
+       "N",
+       200.0,
+       "8–10"
+      ],
+      [
+       "N",
+       200.0,
+       "8–10"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "movement_key": "leg_curl",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110.0,
+       "8–12"
+      ],
+      [
+       "N",
+       110.0,
+       "8–12"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "movement_key": "calf_raise_machine",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       380.0,
+       "10–15"
+      ],
+      [
+       "N",
+       380.0,
+       "10–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Crunch (Machine)",
+     "movement_key": "machine_crunch",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "10–15"
+      ],
+      [
+       "N",
+       null,
+       "10–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "45 min"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Stretching",
+     "movement_key": "tmpl:527DA061",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "20 min"
+      ]
+     ],
+     "note": "20 min."
+    }
+   ]
+  },
+  {
+   "date": "2026-10-15",
+   "title": "Upper — 2026-10-15",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "movement_key": "barbell_bench_press",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "N",
+       195.0,
+       "4–6"
+      ],
+      [
+       "N",
+       175.3,
+       "4–6"
+      ],
+      [
+       "N",
+       175.3,
+       "4–6"
+      ]
+     ],
+     "note": "[scrubbed: private]\n\n[scrubbed: private]\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-15):\n[scrubbed: private]\n- joints/tendons APPROVE: nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Dumbbell Row",
+     "movement_key": "one_arm_db_row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "N",
+       100.0,
+       "4–6"
+      ],
+      [
+       "N",
+       89.3,
+       "4–6"
+      ],
+      [
+       "N",
+       89.3,
+       "4–6"
+      ]
+     ],
+     "note": "Top set RPE 7-8, then back-offs. Exhale on the pull."
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "movement_key": "db_shoulder_press",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       60.0,
+       "6–10"
+      ],
+      [
+       "N",
+       60.0,
+       "6–10"
+      ],
+      [
+       "N",
+       60.0,
+       "6–10"
+      ]
+     ],
+     "note": "Leave 2-3 in the tank. Exhale up."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "movement_key": "lat_pulldown",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       160.0,
+       "6–10"
+      ],
+      [
+       "N",
+       160.0,
+       "6–10"
+      ]
+     ],
+     "note": "Leave 2-3 in the tank."
+    },
+    {
+     "name": "Triceps Pushdown",
+     "movement_key": "cable_tricep_pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       95.0,
+       "8–15"
+      ],
+      [
+       "N",
+       95.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "movement_key": "db_curl",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       25.0,
+       "8–15"
+      ],
+      [
+       "N",
+       25.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Stretching",
+     "movement_key": "tmpl:527DA061",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "20 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-16",
+   "title": "Lower — 2026-10-16",
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "movement_key": "tmpl:D04AC939",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       45.0,
+       "10"
+      ],
+      [
+       "W",
+       135.0,
+       "5"
+      ],
+      [
+       "W",
+       185.0,
+       "3"
+      ],
+      [
+       "W",
+       215.0,
+       "2"
+      ],
+      [
+       "N",
+       235.0,
+       "4–6"
+      ],
+      [
+       "N",
+       210.5,
+       "4–6"
+      ],
+      [
+       "N",
+       210.5,
+       "4–6"
+      ]
+     ],
+     "note": "[scrubbed: private]\n\n[scrubbed: private]\n[scrubbed: private]\nTop 235 lb x4–6 @ RPE 7–8, then 2 back-offs 210 lb. No extra top sets. Brace per rep, breathe between reps — no multi-rep breath-hold. Rack and stand still a beat before walking off.\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-16):\n[scrubbed: private]\n- joints/tendons APPROVE: nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "movement_key": "tmpl:2B4B7310",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "W",
+       135.0,
+       "5"
+      ],
+      [
+       "N",
+       210.0,
+       "6–10"
+      ],
+      [
+       "N",
+       210.0,
+       "6–10"
+      ],
+      [
+       "N",
+       210.0,
+       "6–10"
+      ]
+     ],
+     "note": "210 lb, 3 x 6–10, 2–3 in the tank (RPE ≤8). Exhale on the way up."
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "movement_key": "leg_press",
+     "kind": "machine",
+     "compound": true,
+     "family": "leg_press",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "N",
+       360.0,
+       "8–15"
+      ],
+      [
+       "N",
+       360.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "movement_key": "leg_curl",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110.0,
+       "8–15"
+      ],
+      [
+       "N",
+       110.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "movement_key": "calf_raise_machine",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       385.0,
+       "8–15"
+      ],
+      [
+       "N",
+       385.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Stretching",
+     "movement_key": "tmpl:527DA061",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "10 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-18",
+   "title": "Upper — 2026-10-18",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "movement_key": "barbell_bench_press",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "N",
+       185.0,
+       "8–12"
+      ],
+      [
+       "N",
+       185.0,
+       "8–12"
+      ],
+      [
+       "N",
+       185.0,
+       "8–12"
+      ]
+     ],
+     "note": "[scrubbed: private]\n\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\nExhale through every press, no breath-hold. Sit up slowly off the bench.\nBench: 3×8–12 @ 185. Stop at RPE 8 even if under 12. Volume slot — no ramps to 225, no back-off at 135.\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-18):\n[scrubbed: private]\n- joints/tendons APPROVE: nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Dumbbell Row",
+     "movement_key": "one_arm_db_row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "N",
+       85.0,
+       "8–12"
+      ],
+      [
+       "N",
+       85.0,
+       "8–12"
+      ],
+      [
+       "N",
+       85.0,
+       "8–12"
+      ]
+     ],
+     "note": "3×8–12 @ 85. ≤ RPE 8. Three sets, not four."
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "movement_key": "db_shoulder_press",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       70.0,
+       "8–12"
+      ],
+      [
+       "N",
+       70.0,
+       "8–12"
+      ],
+      [
+       "N",
+       70.0,
+       "8–12"
+      ]
+     ],
+     "note": "3×8–12 @ 70. 10/15 ended 6 reps @ RPE 10 twice — not today. Stop at RPE 8, exhale on the drive."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "movement_key": "lat_pulldown",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       155.0,
+       "8–12"
+      ],
+      [
+       "N",
+       155.0,
+       "8–12"
+      ]
+     ],
+     "note": "2×8–12 @ 155. ≤ RPE 8. No jump to 180."
+    },
+    {
+     "name": "Cable Fly Crossovers",
+     "movement_key": "cable_chest_fly",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       33.0,
+       "8–15"
+      ],
+      [
+       "N",
+       33.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "movement_key": "cable_tricep_pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       95.0,
+       "8–15"
+      ],
+      [
+       "N",
+       95.0,
+       "8–15"
+      ]
+     ],
+     "note": "2×8–15 @ 95. RIR 2."
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "movement_key": "db_curl",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       25.0,
+       "8–15"
+      ],
+      [
+       "N",
+       25.0,
+       "8–15"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "20 min"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Stretching",
+     "movement_key": "tmpl:527DA061",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "10 min"
+      ]
+     ],
+     "note": "10 min. Get up from the floor slowly."
+    }
+   ]
+  },
+  {
+   "date": "2026-10-19",
+   "title": "Lower — 2026-10-19",
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "movement_key": "deadlift_trap_bar",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "N",
+       215.0,
+       "8–12"
+      ],
+      [
+       "N",
+       215.0,
+       "8–12"
+      ],
+      [
+       "N",
+       215.0,
+       "8–12"
+      ]
+     ],
+     "note": "Lower-volume W4·S3. The prescription is the ceiling: no added sets. Anchors RPE ≤8. Exhale on the drive.\n\n[scrubbed: private]\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-18):\n[scrubbed: private]\n- joints/tendons APPROVE: nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Squat (Barbell)",
+     "movement_key": "squat_barbell",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "N",
+       205.0,
+       "8–12"
+      ],
+      [
+       "N",
+       205.0,
+       "8–12"
+      ],
+      [
+       "N",
+       205.0,
+       "8–12"
+      ]
+     ],
+     "note": "205x8 read RPE 8.5 on 10/13. If set 1 is above 8, sets 2-3 at 195 lb. Subtract only."
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "movement_key": "leg_curl",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110.0,
+       "8–15"
+      ],
+      [
+       "N",
+       110.0,
+       "8–15"
+      ]
+     ],
+     "note": "110 lb, 2 sets. 10/16: 110x10x3 @8."
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "movement_key": "calf_raise_machine",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       385.0,
+       "8–15"
+      ],
+      [
+       "N",
+       385.0,
+       "8–15"
+      ]
+     ],
+     "note": "385 lb, 2 sets. 360x15 @7 twice — heavier, fewer reps."
+    },
+    {
+     "name": "Crunch (Machine)",
+     "movement_key": "machine_crunch",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "8–15"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ]
+     ],
+     "note": "No history. Pick a load for RPE 7 and log it — that becomes the anchor. Exhale on the crunch."
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "45 min"
+      ]
+     ],
+     "note": "[scrubbed: private]"
+    },
+    {
+     "name": "Stretching",
+     "movement_key": "tmpl:527DA061",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "15 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-20",
+   "title": "Upper — 2026-10-20",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "movement_key": "barbell_bench_press",
+     "kind": "barbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "W",
+       105.0,
+       "8"
+      ],
+      [
+       "W",
+       145.0,
+       "5"
+      ],
+      [
+       "W",
+       175.0,
+       "3"
+      ],
+      [
+       "N",
+       205.0,
+       "4–6"
+      ],
+      [
+       "N",
+       185.0,
+       "4–6"
+      ],
+      [
+       "N",
+       185.0,
+       "4–6"
+      ]
+     ],
+     "note": "Upper-heavy W4. Prescribed sets only: 3 weeks running at +23 to +29 sets over plan. RPE 9 is the ceiling.\n\n[scrubbed: private]\n• Feel normal → as written. Top set RPE 8–9, nothing past 9.\n• Slept badly / feel off → top sets ≤ RPE 7, one back-off only, accessories + bike optional.\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\nTop 205 x 4–6 (10/15: 205x5 @9). Back-offs 185. No 225 singles/triples: that's a different session.\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-20):\n[scrubbed: private]\n- joints/tendons APPROVE (model paused): nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE (model paused): nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Dumbbell Row",
+     "movement_key": "one_arm_db_row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "W",
+       70.0,
+       "5"
+      ],
+      [
+       "N",
+       100.0,
+       "4–6"
+      ],
+      [
+       "N",
+       90.0,
+       "4–6"
+      ],
+      [
+       "N",
+       90.0,
+       "4–6"
+      ]
+     ],
+     "note": "Top 100 x 4–6 (10/15: 100x5 @8.5). Back-offs 90. 10/18 ended at RPE 10. Leave one in the tank."
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "movement_key": "db_shoulder_press",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       75.0,
+       "6–10"
+      ],
+      [
+       "N",
+       75.0,
+       "6–10"
+      ],
+      [
+       "N",
+       75.0,
+       "6–10"
+      ]
+     ],
+     "note": "Hold 75 (10/15: 8,8,6,6, last two RPE 10). Stop each set at RPE 9; 6 reps is a pass."
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "movement_key": "lat_pulldown",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       160.0,
+       "6–10"
+      ],
+      [
+       "N",
+       160.0,
+       "6–10"
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "name": "Triceps Pushdown",
+     "movement_key": "cable_tricep_pushdown",
+     "kind": "cable",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       100.0,
+       "8–15"
+      ],
+      [
+       "N",
+       100.0,
+       "8–15"
+      ]
+     ],
+     "note": "Up from 95. Last set may go to RPE 9–10."
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "movement_key": "db_curl",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       27.5,
+       "8–15"
+      ],
+      [
+       "N",
+       27.5,
+       "8–15"
+      ]
+     ],
+     "note": ""
+    },
+    {
+     "name": "Face Pull",
+     "movement_key": "tmpl:BE640BA0",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       57.5,
+       "12–15"
+      ],
+      [
+       "N",
+       57.5,
+       "12–15"
+      ]
+     ],
+     "note": "Replaces reverse pec deck (no history, no load). 10/04: 57.5x12 @7.5–8."
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent bike · 30 min · level 10 at 12.3 mph flat · RPE 4–5, full sentences\n[scrubbed: private]"
+    },
+    {
+     "name": "Stretching",
+     "movement_key": "tmpl:527DA061",
+     "kind": "mobility",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "10 min"
+      ]
+     ],
+     "note": ""
+    }
+   ]
+  },
+  {
+   "date": "2026-10-23",
+   "title": "LOWER-HEAVY — W4 — 2026-10-23",
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "movement_key": "squat_barbell",
+     "kind": "barbell",
+     "compound": true,
+     "family": "squat",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       110.0,
+       "8"
+      ],
+      [
+       "W",
+       150.0,
+       "5"
+      ],
+      [
+       "W",
+       185.0,
+       "3"
+      ],
+      [
+       "N",
+       215.0,
+       "4–6"
+      ],
+      [
+       "N",
+       192.9,
+       "4–6"
+      ],
+      [
+       "N",
+       192.9,
+       "4–6"
+      ]
+     ],
+     "note": "Lower heavy: one top set at RPE 8-9 on the squat, back-offs 10% lighter. Loads hold.\n\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\nExhale through every press, no breath-hold. Get up slowly from the bench.\n[scrubbed: private]\n[scrubbed: private]\ninputs_current_through: 2026-10-21\n\nhold 215 lb: 1 of 2 top sets at the top of 4-6 at or under the ceiling. Last: 93kg 8/8/8 (19 Oct) HEAVY: 1 top set of 4–6 @ RPE 8–9, then 2 back-offs at −10 % of the top set (charter ceilings). Week 4 load 215 lb — 75% of your band e1RM 285.8 lb no detraining discount (a this-cycle anchor) (anchor 245 lb x 5/5 on 2026-10-16 at [bw scrubbed], [bw band scrubbed]; v0.3 §3). Down on the day if you must, never up. Warm up: ankle/hip mobility, then the ramp sets.\n[scrubbed: private]\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-23):\n[scrubbed: private]\n- joints/tendons APPROVE (model paused): nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE (model paused): nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "movement_key": "romanian_deadlift_barbell",
+     "kind": "barbell",
+     "compound": true,
+     "family": "hinge",
+     "anchor_family": "hinge",
+     "rows": [
+      [
+       "W",
+       160.0,
+       "5"
+      ],
+      [
+       "N",
+       225.0,
+       "6–10"
+      ],
+      [
+       "N",
+       225.0,
+       "6–10"
+      ],
+      [
+       "N",
+       225.0,
+       "6–10"
+      ]
+     ],
+     "note": "floor 225 lb: you carried it on 10-09 at RPE <= 8.5, within the compound ceiling. Last: 102kg 5/5/5/5 (16 Oct) MODERATE: 3 sets of 6–10 @ RPE 8–9 (charter compound ceiling). Warm up: hip hinges, then the ramp sets.\n[scrubbed: private]"
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "movement_key": "leg_press",
+     "kind": "machine",
+     "compound": true,
+     "family": "leg_press",
+     "anchor_family": "squat",
+     "rows": [
+      [
+       "W",
+       250.0,
+       "5"
+      ],
+      [
+       "N",
+       360.0,
+       "10–15"
+      ],
+      [
+       "N",
+       360.0,
+       "10–15"
+      ]
+     ],
+     "note": "+2 reps to 10 at 360 lb: 360 lb x 8 3 times at self-reported RPE <= 8 (10-13, 10-16 and 10-19). Last: 163.5kg 8/8/8 (19 Oct) ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings). Warm up: ankle/hip mobility, then the ramp sets.\n[scrubbed: private]"
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "movement_key": "leg_curl",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       110.0,
+       "8–15"
+      ],
+      [
+       "N",
+       110.0,
+       "8–15"
+      ]
+     ],
+     "note": "floor 110 lb: you carried it on 10-19 at RPE <= 8, within the isolation ceiling. Last: 50kg 8/8 (19 Oct) ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings).\n[scrubbed: private]"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "movement_key": "calf_raise_machine",
+     "kind": "machine",
+     "compound": false,
+     "family": "calf_press",
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       435.0,
+       "8–15"
+      ],
+      [
+       "N",
+       435.0,
+       "8–15"
+      ],
+      [
+       "N",
+       435.0,
+       "8–15"
+      ],
+      [
+       "N",
+       435.0,
+       "8–15"
+      ]
+     ],
+     "note": "hold 435 lb: 2 of 2 top sets at the top of 8-15 at or under the ceiling. Last: 163.5kg 21/21/21 (19 Oct) ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings). Week 4 load 435 lb — capped at 71.4% of your band e1RM 612 lb — the most 11 reps at RPE <= 9 allow (this week's ramp is 75%) no detraining discount (a this-cycle anchor) (anchor 360 lb x 21/21/21 on 2026-10-19 at [bw scrubbed], [bw band scrubbed]; v0.3 §3). Down on the day if you must, never up.\n[scrubbed: private]"
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent bike · 30 min · level 11 at 12.3 mph flat · tempo: RPE 6–7, short phrases\n[scrubbed: private]"
+    }
+   ]
+  },
+  {
+   "date": "2026-10-25",
+   "title": "Upper — 2026-10-25",
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "movement_key": "db_shoulder_press",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "overhead_press",
+     "rows": [
+      [
+       "N",
+       75.0,
+       "6–10"
+      ]
+     ],
+     "note": "Option B: DB laterals x3 for delt priority; press at 75 lb chasing 8.\n\n[scrubbed: private]\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-25):\n[scrubbed: private]\n- joints/tendons APPROVE: nothing in this packet crosses a stated threshold\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold"
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "movement_key": "db_lateral_raise",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       15.0,
+       "8–15"
+      ],
+      [
+       "N",
+       15.0,
+       "8–15"
+      ],
+      [
+       "N",
+       15.0,
+       "8–15"
+      ]
+     ],
+     "note": "3 sets of 8-15 @ RPE 8-9; last set RPE 9-10. Last: 15 lb x 15/15/15 (4 Oct)."
+    },
+    {
+     "name": "Rear Delt Reverse Fly (Machine)",
+     "movement_key": "reverse_pec_deck",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "8–15"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ],
+      [
+       "N",
+       null,
+       "8–15"
+      ]
+     ],
+     "note": "3 sets of 8-15 @ RPE 8-9; last set RPE 9-10. No load on file: pick it, log it."
+    },
+    {
+     "name": "Seated Incline Curl (Dumbbell)",
+     "movement_key": "seated_incline_curl_dumbbell",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       20.0,
+       "8–15"
+      ],
+      [
+       "N",
+       20.0,
+       "8–15"
+      ]
+     ],
+     "note": "2 sets of 8-15 @ RPE 8-9; last set RPE 9-10."
+    },
+    {
+     "name": "Triceps Rope Pushdown",
+     "movement_key": "triceps_rope_pushdown",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       40.0,
+       "8–15"
+      ],
+      [
+       "N",
+       40.0,
+       "8–15"
+      ]
+     ],
+     "note": "2 sets of 8-15 @ RPE 8-9; last set RPE 9-10."
+    },
+    {
+     "name": "farmers_carry",
+     "movement_key": "farmers_carry",
+     "kind": "carry",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "1 min"
+      ],
+      [
+       "N",
+       null,
+       "1 min"
+      ]
+     ],
+     "note": "2 carries of 40 s @ RPE 8-9, tall and braced. Your pick of load; log it."
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent bike · 30 min · level 10 at 12.3 mph intervals 5×2 · 2 min at level 12, 2 min easy between, RPE 8 on the hard minutes\n[scrubbed: private]"
+    }
+   ]
+  },
+  {
+   "date": "2026-10-26",
+   "title": "UPPER-VOLUME — W5 — 2026-10-26",
+   "exercises": [
+    {
+     "name": "Incline Bench Press (Dumbbell)",
+     "movement_key": "incline_db_press",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "press",
+     "anchor_family": "bench",
+     "rows": [
+      [
+       "N",
+       80.0,
+       "8–12"
+      ],
+      [
+       "N",
+       80.0,
+       "8–12"
+      ]
+     ],
+     "note": "Upper volume: steady sets of 8-12 at RPE 8-9. Loads hold.\n\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\n[scrubbed: private]\nExhale through every press, no breath-hold. Get up slowly from the bench.\n[scrubbed: private]\n[scrubbed: private]\ninputs_current_through: 2026-10-25\n\nfloor 80 lb: you carried it on 09-19 at RPE <= 10, within the compound ceiling. Last: 36.5kg 8/8/8 (19 Sep) VOLUME: 3 sets of 8–12 @ RPE 8–9 (charter compound ceiling).\nRPE 8–9 (charter compound ceiling) · no standing-constraint cap\n\nRED TEAM (critics@1.5.0, 4 critics, 2026-10-25):\n[scrubbed: private]\n- joints/tendons CHANGE: days_since_movement[0]=37 [owner-history] anchor:bench:volume: exposure 1 back after 37 days — cap 2 working sets (short gap; Nosaka 2001, Chen 2012): 3 -> 2 working sets (load stays the entry ramp's, never cut here)\n[scrubbed: private]\n- historian APPROVE: nothing in this packet crosses a stated threshold\napplied: exercises[0].set_count -> 2"
+    },
+    {
+     "name": "Dumbbell Row",
+     "movement_key": "one_arm_db_row",
+     "kind": "dumbbell",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "row",
+     "rows": [
+      [
+       "N",
+       90.0,
+       "8–12"
+      ],
+      [
+       "N",
+       90.0,
+       "8–12"
+      ],
+      [
+       "N",
+       90.0,
+       "8–12"
+      ]
+     ],
+     "note": "hold 90 lb: 0 of 2 top sets at the top of 8-12 at or under the ceiling. Last: 50kg 5 (21 Oct) VOLUME: 3 sets of 8–12 @ RPE 8–9 (charter compound ceiling). Week 5 load 90 lb — held from what you already moved: 90 lb x 10 @ RPE 9 on 2026-10-18 at [bw scrubbed], this band, no layoff; what that allows for 10 reps at RPE <= 9 (RPE-adjusted e1RM 123 lb). The entry ramp (80% = 85 lb) is for re-entry and never goes under an achieved load. Down on the day if you must, never up.\nRPE 8–9 (charter compound ceiling) · no standing-constraint cap"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "movement_key": "lat_pulldown",
+     "kind": "cable",
+     "compound": true,
+     "family": "pull",
+     "anchor_family": "vertical_pull",
+     "rows": [
+      [
+       "N",
+       160.0,
+       "10–12"
+      ],
+      [
+       "N",
+       160.0,
+       "10–12"
+      ]
+     ],
+     "note": "+2 reps to 10 at 160 lb: 160 lb x 8 3 times at self-reported RPE <= 8 (10-11, 10-18 and 10-21). Last: 72.5kg 8/8 (21 Oct) VOLUME: 2 sets of 8–12 @ RPE 8–9 (charter compound ceiling)."
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "movement_key": "db_rear_delt_rows",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       30.0,
+       "8–15"
+      ],
+      [
+       "N",
+       30.0,
+       "8–15"
+      ],
+      [
+       "N",
+       30.0,
+       "8–15"
+      ]
+     ],
+     "note": "hold: 40 lb on 03-19 has a set with no RPE logged — not evidence it sat under the ceiling. Last: 18kg 12/12/10 (Mar 2025, at [bw scrubbed]) ACCESSORY: 3 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings). Week 5 load 30 lb — 80% of your band anchor after the 10% detraining discount (anchor 40 lb x 10/10/10 on 2024-10-18 at [bw scrubbed], [bw band scrubbed]; v0.3 §3). Down on the day if you must, never up.\n[scrubbed: private]"
+    },
+    {
+     "name": "Chest Fly (Machine)",
+     "movement_key": "chest_fly_machine",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       60.0,
+       "8–15"
+      ],
+      [
+       "N",
+       60.0,
+       "8–15"
+      ]
+     ],
+     "note": "hold: 100 lb on 11-30 has a set with no RPE logged — not evidence it sat under the ceiling. Last: 45.5kg 10/10/10/10 (Nov 2024, at [bw scrubbed]) ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings). Week 5 load 60 lb — 80% of your band anchor after the 10% detraining discount (anchor 85 lb x 10/10/10/10 on 2022-01-17 at [bw scrubbed], [bw band scrubbed]; v0.3 §3). Down on the day if you must, never up.\n[scrubbed: private]"
+    },
+    {
+     "name": "Lying Db Tricep Extension",
+     "movement_key": "lying_db_tricep_extension",
+     "kind": "dumbbell",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       20.0,
+       "8–15"
+      ],
+      [
+       "N",
+       20.0,
+       "8–15"
+      ]
+     ],
+     "note": "hold: 25 lb on 09-15 has a set with no RPE logged — not evidence it sat under the ceiling. Last: 11.5kg 10/10/10/10 (Sep 2025, at [bw scrubbed]) ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings). Week 5 load 20 lb — 80% of your band anchor after the 10% detraining discount (anchor 25 lb x 10/10/10/10 on 2024-09-25 at [bw scrubbed], [bw band scrubbed]; v0.3 §3). Down on the day if you must, never up.\n[scrubbed: private]"
+    },
+    {
+     "name": "Preacher Curl (Machine)",
+     "movement_key": "preacher_curl_machine",
+     "kind": "machine",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       80.0,
+       "8–15"
+      ],
+      [
+       "N",
+       80.0,
+       "8–15"
+      ]
+     ],
+     "note": "hold 80 lb: 0 of 2 top sets at the top of 8-15 at or under the ceiling. Last: 36.5kg 8/8 (May 2025, at [bw scrubbed]) ACCESSORY: 2 sets of 8–15 @ RPE 8–9; last set RPE 9–10 (charter ceilings). Week 5 load 80 lb — 80% of your band anchor after the 10% detraining discount (anchor 110 lb x 8 on 2024-02-09 at [bw scrubbed], [bw band scrubbed]; v0.3 §3). Down on the day if you must, never up.\n[scrubbed: private]"
+    },
+    {
+     "name": "Cycling",
+     "movement_key": "cycling",
+     "kind": "cardio",
+     "compound": false,
+     "family": null,
+     "anchor_family": null,
+     "rows": [
+      [
+       "N",
+       null,
+       "30 min"
+      ]
+     ],
+     "note": "Recumbent bike · 30 min · level 18 at 13.8 mph flat · RPE 4–5, full sentences\n[scrubbed: private]"
+    }
+   ]
+  }
+ ]
+}

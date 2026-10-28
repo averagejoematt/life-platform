@@ -506,14 +506,36 @@ def templates_preview(movements: dict[str, Any], skill_ceiling: int = 2) -> dict
     return out
 
 
-def _cue(e: dict[str, Any]) -> str:
-    """A short exercise note that carries its reason (Hevy renders exercise notes in full)."""
+POOL_DAY = {"gym_minimum": "Minimum", "hotel": "Travel", "bodyweight": "Travel"}
+"""The session line's ‹Day› per pool (HEVY_NOTE_STANDARD §3.1/§3.8: Minimum · Travel)."""
+
+
+def _cue(e: dict[str, Any], entry: dict[str, Any] | None = None, seen_families: set[str] | None = None) -> str:
+    """One exercise's Hevy note, to the standard (#5428, §3.2 / §3.8): the effort, then the one thing the rows cannot
+    show on a session with no loads — the back-off is lighter than the top set — then the family cue on the first
+    exercise of a family. No issue number (`ISSUE` stays on the rationale), no rep range (the rows show it)."""
+    from training import hevy_note_grammar, movement_cues
+    from training.session_cues import effort_line
+
     top, back = e["sets"][0], (e["sets"][1] if len(e["sets"]) > 1 else None)
-    rpe = "-".join(str(x) for x in top.get("rpe") or [])
-    line = f"Minimum: top set {top['reps'][0]}-{top['reps'][1]}" + (f" @ RPE {rpe}" if rpe else "")
-    if back:
-        line += f", then one back-off at {back['pct_of_top'] - 100}%"
-    return line + " — keeps the habit on a short day (#5088)."
+    rpe = top.get("rpe") or []
+    lines = [effort_line(tuple(rpe)) if rpe else effort_line(_compounds_band())]
+    if back and int(back.get("pct_of_top") or 100) < 100:
+        lines.append(hevy_note_grammar.back_off_line(100 - int(back["pct_of_top"])))
+    family = movement_cues.family_of(str(e["movement_key"]), entry or {})
+    if family and (seen_families is None or family not in seen_families):
+        cue = movement_cues.cue_line(family, (entry or {}).get("anchor_family"), with_prep=False)
+        if cue:
+            lines.append(cue)
+        if seen_families is not None:
+            seen_families.add(family)
+    return "\n".join(lines)
+
+
+def _compounds_band() -> Any:
+    from training import effort_ceilings
+
+    return tuple(effort_ceilings.class_bands(_charter).get(effort_ceilings.COMPOUNDS) or (8, 9))
 
 
 def to_routine(rx: dict[str, Any], *, target_date: str, variant: str, mode: dict[str, Any], catalog: dict[str, Any]) -> Any:
@@ -522,12 +544,13 @@ def to_routine(rx: dict[str, Any], *, target_date: str, variant: str, mode: dict
     from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
     movements = catalog.get("movements") or {}
+    seen: set[str] = set()
     blocks = [
         ExerciseBlock(
             movement_key=e["movement_key"],
             sets=[Set(type="normal", rep_range_start=s["reps"][0], rep_range_end=s["reps"][1]) for s in e["sets"]],
             rest_seconds=90,
-            notes=_cue(e),
+            notes=_cue(e, movements.get(e["movement_key"]), seen),
             joint_friendly_score=int(movements.get(e["movement_key"], {}).get("joint_friendly_score", 3)),
             skill_tier=int(movements.get(e["movement_key"], {}).get("skill_tier", 1)),
             rationale_tag=f"{e['kind']}:{e['pattern']}:{rx['pool']}",
@@ -540,7 +563,7 @@ def to_routine(rx: dict[str, Any], *, target_date: str, variant: str, mode: dict
         f"disruption ({why}, {ISSUE}): {rx['role']} as the {label} session — anchors only, top set + one back-off",
         f"{rx['total_sets']} sets, ~{rx['est_minutes']:.0f} of {rx['minutes']} min; habits held, not targets",
     ] + [f"UNRESOLVED — {u}" for u in rx["unresolved"]]
-    return RoutineSpec(
+    ir = RoutineSpec(
         routine_id=_new_routine_id(target_date, rx["archetype"], variant),
         target_date=target_date,
         archetype=rx["archetype"],
@@ -564,6 +587,14 @@ def to_routine(rx: dict[str, Any], *, target_date: str, variant: str, mode: dict
         rationale=rationale,
         caps={"total_sets": max(1, rx["total_sets"]), "session_minutes": int(rx["minutes"] or 0)},
     )
+    # #5428: the same three-line session block every other path heads exercise 1 with (Lane A's `session_block`), its
+    # ‹Day› the minimum / travel label — so the label still rides the session line, and the compiler's WHY line steps aside
+    if blocks:
+        from training import session_block
+
+        block = session_block.render(POOL_DAY.get(rx["pool"], "Minimum"), session_block.compounds_band(), session_block.step_lb())
+        blocks[0].notes = session_block.place(blocks[0].notes, block)
+    return ir
 
 
 def _charter_version() -> str | None:

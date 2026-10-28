@@ -264,7 +264,7 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # Build: `python3 deploy/build_lambda_layer.py build pillow`. Consumers: og-image-generator,
 # reading-cover-pipeline (both in LifePlatformOperational, which reads PILLOW_LAYER_ARN —
 # it used to hardcode `pillow-layer:1`, so this constant was inert until #2099).
-PILLOW_LAYER_VERSION = 2
+PILLOW_LAYER_VERSION = 3
 PILLOW_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_LAYER_VERSION}"
 
 # Garth + garminconnect layer — RETIRED (#4640): its only consumer, garmin-data-ingestion,

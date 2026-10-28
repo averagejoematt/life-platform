@@ -16,7 +16,7 @@
 #   PILLOW_LAYER_VERSION -> cdk deploy LifePlatformOperational -> --promote back to here.
 #
 # ── BUILD TARGET — top-level pins the next build installs (spec, hand-edited there)
-#   layer-build-target: Pillow==12.3.0
+#   layer-build-target: Pillow==13.0.0
 #   layer-build-platform: manylinux2014_x86_64 manylinux_2_28_x86_64 · cp312
 #
 # Pillow 12.x publishes manylinux_2_27/_2_28 wheels only — a manylinux2014-only
@@ -24,9 +24,9 @@
 # python3.12 runtime satisfies manylinux_2_28.
 #
 # ── DEPLOYED — the full resolved contents of the LIVE layer version below.
-#   pillow-layer:2, measured 2026-08-08 read-only via
+#   pillow-layer:3, measured 2026-10-28 read-only via
 #   `aws lambda get-layer-version-by-arn` + inspection of the returned zip's
 #   *.dist-info. Ground truth, not an estimate. Transitive packages are listed
 #   explicitly so pip-audit sees the WHOLE layer, not just its top-level pins.
 
-pillow==12.3.0
+pillow==13.0.0

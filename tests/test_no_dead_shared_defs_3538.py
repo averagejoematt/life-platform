@@ -93,11 +93,13 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
-    "lambdas/training/hevy_render.py:place_after_prescription": (
-        "#5083's placement of the wake-recovery block after exercise 1's reason line. Its one live caller, "
-        "`tools_hevy_routine._apply_recovery_adaptation`, writes the three-line session block at the HEAD of exercise 1 "
-        "since #5428 Lane A (owner rulings 2026-10-27). `hevy_render.py` is #5428 Lane D's file and D rewrites its "
-        "ordering rule; delete the function, its unit test and this entry there."
+    "lambdas/training/hevy_note_grammar.py:sets_today_clause": (
+        "#5428 note grammar builder, fixture-tested in tests/test_hevy_note_lint_5428.py; lane A landed its own clause builder, `session_block.applied_clause` (the same `N sets today: …` text). "
+        "Point that producer at this builder (the #5428 notes follow-up lane), then delete this entry."
+    ),
+    "lambdas/training/hevy_note_grammar.py:cardio_line1": (
+        "#5428 note grammar builder, fixture-tested in tests/test_hevy_note_lint_5428.py; lane C landed its own line-1 composer in `cardio_note` (it shares the grammar's TALK_WORDS, CLOCK_PREFIX and AFTER_LINE). "
+        "Point that producer at this builder (the #5428 notes follow-up lane), then delete this entry."
     ),
     "lambdas/training/training_charter.py:load_charter": (
         "The loader's documented merged-charter read (ADR-164, the module docstring), held by the charter tests "

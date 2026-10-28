@@ -230,9 +230,12 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
     triset = [b for b in ir.exercises if b.superset_id == 1]
     assert {b.movement_key for b in triset} == {"db_lateral_raise", "reverse_pec_deck", "cable_tricep_pushdown"}
 
-    # reverse_pec_deck has no weight, just reps
+    # reverse_pec_deck has no weight, just reps — #5428: and no load on file, so the chat path's note composer gives it the
+    # pick-load form (the 10-25 A-grade shape): one no-load W row of 8 ahead of the authored rows, and its W line
     rpd = next(b for b in ir.exercises if b.movement_key == "reverse_pec_deck")
-    assert rpd.sets[0].weight_kg is None and rpd.sets[0].reps == 15
+    assert (rpd.sets[0].type, rpd.sets[0].weight_kg, rpd.sets[0].reps) == ("warmup", None, 8)
+    assert [(st.weight_kg, st.reps) for st in rpd.sets[1:]] == [(None, 15)] * 3
+    assert "W set: up to 8 easy reps, find the load." in rpd.notes.split("\n")
 
 
 def test_draft_custom_resolves_arbitrary_exercise_via_index():

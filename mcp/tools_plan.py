@@ -986,6 +986,7 @@ def _run_stage_2(
     overrides: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     from coach import critic_overrides, critics
+    from training.cardio_note import apply_after_lines
     from training.routine_repo import put_versioned
 
     from mcp.hevy_prescription_gate import critic_set_floors
@@ -1068,6 +1069,7 @@ def _run_stage_2(
         record_correction=_record_override_correction,
     )
     changes = critics.apply_changes(ir, verdicts, set_floors=critic_set_floors(ir))  # #4149: held to the commit gate's floor
+    apply_after_lines(ir.exercises)  # #5428: a swap or drop moves what follows the cardio — re-stamp `After:` on the final order
     overridden = {v["critic"] for v in verdicts if critics.is_overridden(v)}
     rc = critics.recheck(ir, build, overridden=overridden)
     precheck = _validate_ir_for_hevy(ir)
@@ -1138,12 +1140,6 @@ def _record_override_correction(item_ref: dict[str, Any], owner_words: str, erro
 
 
 _BLOCK_MARK = "RED TEAM ("
-
-# #4070: the owner reported the Hevy app cutting exercise notes at ~150 characters. The 2026-10-27 in-app
-# screenshots (#5428) show notes in full, so this window no longer sizes anything here; it is kept only as the
-# must-agree twin of `hevy_render.VISIBLE_NOTE_CHARS` (tests/test_hevy_render_5083.py) until #5428's Lane D
-# retires both in one change.
-HEVY_NOTE_OBSERVED_VISIBLE_CHARS = 150
 
 
 def _place_block_on_first_exercise(ir: Any) -> None:
