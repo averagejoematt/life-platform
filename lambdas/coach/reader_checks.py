@@ -279,6 +279,28 @@ def _average_figure_clause(sentence: str) -> bool:
     return any(_AVERAGE_RE.search(_NEGATED_TREND_RE.sub("", c)) and _FIGURE_RE.search(c) for c in _CLAUSE_JOIN_RE.split(sentence))
 
 
+def windowed_average_at(sentence: str, pos: int) -> bool:
+    """True when the figure at `pos` sits in an average/trend clause AND the sentence names a
+    labelled window — the form `unlabeled_window_figure` accepts (#5442).
+
+    `ai.night_scope` asks this before calling a vitals figure "unlabeled": "HRV averaged 52 ms
+    over the last 30 nights" is a window claim, not a single night's reading, and the night
+    gate must not hold the very sentence this module's rule asks a writer to produce. The
+    clause is the one containing `pos`, split on the same coordinating joins as #4343, so
+    "the running average held over 30 nights, and HRV was 41 ms" still leaves the 41 a
+    single reading."""
+    if not _WINDOW_RE.search(sentence or ""):
+        return False
+    start = 0
+    for m in _CLAUSE_JOIN_RE.finditer(sentence):
+        if m.start() >= pos:
+            break
+        start = m.end()
+    nxt = _CLAUSE_JOIN_RE.search(sentence, pos)
+    clause = sentence[start : nxt.start() if nxt else len(sentence)]
+    return bool(_AVERAGE_RE.search(_NEGATED_TREND_RE.sub("", clause)) and _FIGURE_RE.search(clause))
+
+
 def unlabeled_window_figure(text: str, **_: Any) -> list:
     """An average/trend figure whose sentence names no window (the #1968 shape, generalised).
 

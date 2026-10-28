@@ -640,9 +640,11 @@ def _day(v: Any) -> Optional[_dt.date]:
 def calibration_row(today: str, read: Optional[CharterReader] = None) -> dict[str, Any]:
     """The travel_food_kit row for `today` (#5104). Never raises.
 
-    ok        before the prompt window; the trip dates are set (the kit is sized and the mode can offer); or after
-              `retire_after` (the trip is behind him)
-    due       from `prompt_days_before_ready` days before `ready_by`: one prompt (the key is the window's start)
+    ok        before the prompt window; the trip dates are set and `ready_by` has passed (the kit was sized to them and
+              the mode can offer); or after `retire_after` (the trip is behind him)
+    due       from `prompt_days_before_ready` days before `ready_by` until `ready_by`: one prompt (a fixed key) — with the
+              trip dates set it names them and asks for the kit to be packed and shopped by `ready_by`; with them unset
+              it asks for the dates too
     missed_2  from `ready_by` with the trip dates still unset: the dead-man, fixed text
     unknown   the charter carries no ready-by date or no prompt days (nothing is guessed)
     """
@@ -669,7 +671,19 @@ def calibration_row(today: str, read: Optional[CharterReader] = None) -> dict[st
     if retire is not None and t > retire:
         return {**row, "state": cc.OK, "detail": f"{label} is past (retire_after {retire.isoformat()})"}
     if _day(w.get("start")) and _day(w.get("end")):
-        return {**row, "state": cc.OK, "detail": f"the trip dates are set ({w.get('start')}..{w.get('end')}): the kit is sized to them"}
+        dates = f"{w.get('start')}..{w.get('end')}"
+        if due <= t < ready:
+            # The dates are set, so there is no dead-man (nothing is missing), but the kit still has to be got and packed by
+            # ready_by: one prompt, from the same fixed key, points at it (the issue's "ready by mid-December").
+            row["state"] = cc.DUE
+            row["prompt"] = (
+                f"The travel food kit for {label} ({dates}) is ready, sized to those dates: ask your coach for it "
+                f"(get_exercise_notes action='travel_kit') for the packing list, the destination grocery list and the "
+                f"hotel/restaurant playbook, and have it packed and shopped by {ready.isoformat()}. Disruption mode carries the "
+                "playbook on its travel template."
+            )
+            return row
+        return {**row, "state": cc.OK, "detail": f"the trip dates are set ({dates}): the kit is sized to them"}
     if t < due:
         return {**row, "state": cc.OK}
     lead_days = read("disruption.offer.travel_lead_days")

@@ -21,6 +21,8 @@ Everything is idempotent — re-sweeping overwrites with identical content.
 import hashlib
 import html
 import json
+import os
+import sys
 import urllib.request
 from datetime import datetime, timezone
 
@@ -32,6 +34,102 @@ from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #32
 S3_BUCKET = "matthew-life-platform"
 SITE_BASE = "https://averagejoematt.com"
 MOMENTS_PREFIX = "generated/moments/"
+
+
+# ── #5421: the incremental, time-boxed sweep ────────────────────────────────
+#
+# Every sweep used to re-render and re-PUT every moment on every run — ~60 obituary cards,
+# ~20 graded predictions, the chronicle cards and ~90 retirement redirects, ~40 s of a
+# 60 s Lambda whose page-card render needs ~15 s. Nearly all of it wrote bytes identical
+# to the day before. The plan below makes a moment's card + shell a pure function of a
+# DIGEST of its inputs: a moment whose digest matches the previous run's (carried in the
+# index, read back over the public viewer path — the role holds no GetObject or ListBucket
+# on this prefix) is not re-rendered, and the sweep stops starting new work once the
+# invocation is within ``SWEEP_RESERVE_MS`` of its timeout, leaving the rest for the next
+# run (their digests are simply not recorded, so they are retried). Without a readable
+# previous index every digest is "new" and the sweep does exactly what it did before.
+
+SWEEP_RESERVE_MS = 8000  # left for the fingerprint, the index put and the coach-card sweep
+
+RENDER, SKIP, DEFER = "render", "skip", "defer"
+
+
+def _source_salt():
+    """A digest of the code that DRAWS a moment — a change to any of these re-renders
+    every moment once; a moment never keeps bytes the current code would not write."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    paths = [os.path.abspath(__file__), os.path.join(here, "card_engine.py"), os.path.join(here, "og_image_lambda.py")]
+    guard = sys.modules.get("common.journal_silence")
+    if guard is not None and getattr(guard, "__file__", None):
+        paths.append(guard.__file__)  # the public-surface guard shapes every shell body (#5131)
+    h = hashlib.sha256()
+    for src in paths:
+        try:
+            with open(src, "rb") as fh:
+                h.update(fh.read())
+        except OSError:
+            return None  # cannot prove what drew the bytes -> never claim a moment is current
+    return h.hexdigest()[:16]
+
+
+class SweepPlan:
+    """What the previous run already published, and how long this one has left.
+
+    ``previous_index`` is the parsed ``generated/moments/index.json`` of the last run (or
+    ``None``); ``time_left`` is a callable returning the invocation's remaining
+    milliseconds (``context.get_remaining_time_in_millis``) or ``None`` for unbounded;
+    ``force`` ignores the previous digests and re-renders everything."""
+
+    def __init__(self, previous_index=None, time_left=None, force=False, reserve_ms=SWEEP_RESERVE_MS):
+        self.previous_index = previous_index
+        self.time_left = time_left
+        self.reserve_ms = reserve_ms
+        self.force = bool(force)
+        usable = previous_index if (previous_index and not self.force) else {}
+        self.prior = {str(k): str(v) for k, v in (usable.get("digests") or {}).items()}
+        self.prior_retired = {str(i) for i in (usable.get("wrong_retired") or [])}
+        self.salt = _source_salt()
+        self.digests = {}  # key -> digest of every moment known current after this run
+        self.counts = {RENDER: 0, SKIP: 0, DEFER: 0}
+
+    def out_of_time(self):
+        if self.time_left is None:
+            return False
+        try:
+            return self.time_left() < self.reserve_ms
+        except Exception:
+            return False
+
+    def digest(self, payload):
+        blob = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(f"{self.salt}|{blob}".encode("utf-8")).hexdigest()[:20]
+
+    def decide(self, key, payload):
+        """``(status, digest)`` for one moment: SKIP when the last run published exactly this,
+        DEFER when the invocation is out of time (and the moment is not already current),
+        RENDER otherwise. A SKIP/DEFER'd moment keeps its digest so the next run still knows."""
+        digest = self.digest(payload)
+        if self.salt is not None and self.prior.get(key) == digest:
+            self.digests[key] = digest
+            self.counts[SKIP] += 1
+            return SKIP, digest
+        if self.out_of_time():
+            if key in self.prior:
+                self.digests[key] = self.prior[key]  # the older render still serves; retried next run
+            self.counts[DEFER] += 1
+            return DEFER, digest
+        return RENDER, digest
+
+    def rendered(self, key, digest):
+        self.digests[key] = digest
+        self.counts[RENDER] += 1
+
+    def exists(self, key):
+        """True when a previous run published this moment (so a DEFER'd one is still served)."""
+        return key in self.prior
+
+    def summary(self):
+        return f"rendered={self.counts[RENDER]} unchanged={self.counts[SKIP]} deferred={self.counts[DEFER]}"
 
 
 # ── The card (Pillow, reusing the daily generator's design system) ──────────
@@ -206,7 +304,7 @@ def _sweep_week_recap(s3, stats):
     return {"current": url, "id": wid}
 
 
-def _sweep_board_answers(s3):
+def _sweep_board_answers(s3, plan=None):
     """Every published (moderated) reader Q&A gets its own permalink."""
     try:
         feed = json.loads(s3.get_object(Bucket=S3_BUCKET, Key="generated/board_answers/answers.json")["Body"].read())
@@ -223,6 +321,12 @@ def _sweep_board_answers(s3):
         if not responses:
             continue  # a question without an answer is not a moment yet
         meta = f"asked {a.get('asked_at', '?')} · answered {answered} · {len(responses)} voice{'s' if len(responses) != 1 else ''}"
+        plan_key = f"qa/{mid}"
+        verdict, digest = plan.decide(plan_key, [question, meta, answered, responses]) if plan else (RENDER, None)
+        if verdict != RENDER:
+            if verdict == SKIP or plan.exists(plan_key):
+                out[mid] = f"/moments/qa/{mid}/"
+            continue
         card = build_moment_card("a reader asked — the board answered", question, meta, f"answered {answered}")
         body = "".join(
             f"<span class='who'>{html.escape(str(r.get('name', 'The board')))}</span><p>{html.escape(str(r.get('text', '')))}</p>"
@@ -239,6 +343,8 @@ def _sweep_board_answers(s3):
             f"{SITE_BASE}/coaching/qa/#{mid}",
         )
         out[mid] = _put_moment(s3, "qa", mid, card, shell)
+        if plan:
+            plan.rendered(plan_key, digest)
     return out
 
 
@@ -247,7 +353,7 @@ def _prediction_key(p):
     return f"{p.get('coach_id', '')}|{p.get('date', '')}|{str(p.get('text', ''))[:60]}"
 
 
-def _sweep_predictions(s3):
+def _sweep_predictions(s3, plan=None):
     """Graded calls (confirmed/refuted) — fetched from the PUBLIC scorecard API
     so the moment can never say more than the site already publishes."""
     try:
@@ -270,8 +376,14 @@ def _sweep_predictions(s3):
         verdict = "CALLED IT" if p["status"] == "confirmed" else "GOT IT WRONG"
         coach = p.get("coach_name", "A coach")
         meta = f"{coach} · {p.get('date', '')} · {verdict}"
-        card = build_moment_card(f"a graded prediction — {verdict.lower()}", text, meta, "every call is graded in public")
         notes = (p.get("outcome_notes") or "").strip()
+        plan_key = f"prediction/{mid}"
+        action, digest = plan.decide(plan_key, [text, meta, p["status"], notes]) if plan else (RENDER, None)
+        if action != RENDER:
+            if action == SKIP or plan.exists(plan_key):
+                out.append({"key": _prediction_key(p), "status": p["status"], "url": f"/moments/prediction/{mid}/"})
+            continue
+        card = build_moment_card(f"a graded prediction — {verdict.lower()}", text, meta, "every call is graded in public")
         body = (
             f"<p><strong>{html.escape(verdict)}</strong> — {html.escape(coach)}'s call, made {html.escape(str(p.get('date', '')))}.</p>"
             + (f"<p>{html.escape(notes)}</p>" if notes else "")
@@ -287,6 +399,8 @@ def _sweep_predictions(s3):
             f"{SITE_BASE}/coaching/scorecard/",
         )
         url = _put_moment(s3, "prediction", mid, card, shell)
+        if plan:
+            plan.rendered(plan_key, digest)
         out.append({"key": _prediction_key(p), "status": p["status"], "url": url})
     return out
 
@@ -348,18 +462,31 @@ RETIRED_WRONG_SHELL_TARGET = "/method/wrong/"  # the live feed the obituary belo
 RETIRED_WRONG_CARD_TARGET = "/assets/images/og-home.png"  # the feed page's own og:image
 
 
-def _previous_wrong_ledger():
-    """The ids the previous run published, read from the index it wrote.
-
-    Read over the PUBLIC viewer path (the role holds no GetObject on
-    ``generated/moments/index.json``). Returns ``None`` when the index cannot be read,
-    so the caller can say so rather than silently treating "unknown" as "none"."""
+def fetch_previous_index():
+    """The index the previous run wrote, read over the PUBLIC viewer path (the role holds
+    no GetObject on ``generated/moments/index.json``); ``None`` when it cannot be read."""
     try:
         req = urllib.request.Request(f"{SITE_BASE}/moments/index.json", headers={"accept": "application/json"})
         with urllib.request.urlopen(req, timeout=8) as resp:
             index = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         print(f"[moments] previous moments index unreadable ({e}); retirement uses the seed ledger only")
+        return None
+    return index if isinstance(index, dict) else None
+
+
+_UNREAD = object()  # "fetch it yourself" — distinct from None, which means "already tried, unreadable"
+
+
+def _previous_wrong_ledger(index=_UNREAD):
+    """The ids the previous run published, read from the index it wrote.
+
+    ``index`` is the already-fetched previous index (the sweep reads it once); omitted, it
+    is fetched here (``None`` = already tried, unreadable). Returns ``None`` when the index cannot be read, so the caller can say
+    so rather than silently treating "unknown" as "none"."""
+    if index is _UNREAD:
+        index = fetch_previous_index()
+    if index is None:
         return None
     ids = {str(i) for i in (index.get("wrong_published") or []) if str(i).strip()}
     ids |= {str(i) for i in (index.get("wrong") or {}) if str(i).strip()}
@@ -377,7 +504,7 @@ def _put_redirect(s3, key, target):
     )
 
 
-def _retire_wrong(s3, live_ids, previous_ids):
+def _retire_wrong(s3, live_ids, previous_ids, already_retired=frozenset()):
     """#4404: redirect every published obituary shell + card whose id left /api/wrong.
 
     ``live_ids`` is EVERY id the feed served this run (``None`` when the fetch failed).
@@ -390,10 +517,13 @@ def _retire_wrong(s3, live_ids, previous_ids):
         print(f"[moments] wrong-feed retirement held: {why}; retired 0 page(s)")
         return sorted(known | set(live_ids or ())), []
     retired = sorted(known - set(live_ids))
-    for oid in retired:
+    # #5421: an id the previous run already retired and that is still not live keeps the
+    # redirect it was given; re-writing ~90 identical pairs every day cost ~5 s of the budget.
+    for oid in (i for i in retired if i not in already_retired):
         _put_redirect(s3, f"{MOMENTS_PREFIX}wrong/{oid}/index.html", RETIRED_WRONG_SHELL_TARGET)
         _put_redirect(s3, f"{MOMENTS_PREFIX}assets/wrong-{oid}.png", RETIRED_WRONG_CARD_TARGET)
-    print(f"[moments] retired {len(retired)} wrong-feed page(s) + card(s) whose record left /api/wrong")
+    fresh = len([i for i in retired if i not in already_retired])
+    print(f"[moments] retired {len(retired)} wrong-feed page(s) + card(s) whose record left /api/wrong ({fresh} written this run)")
     return sorted(known | set(live_ids)), retired
 
 
@@ -411,7 +541,7 @@ def _fetch_wrong_feed():
     return data
 
 
-def _sweep_wrong(s3):
+def _sweep_wrong(s3, plan=None):
     """#1377 (The Wrong Feed): one shareable obituary per GRADED failure — fetched from
     the PUBLIC /api/wrong payload so a card can never say more than the site publishes.
 
@@ -423,10 +553,11 @@ def _sweep_wrong(s3):
     #4404: returns ``(out, ledger)`` — ``ledger`` is ``{"published": [...], "retired":
     [...]}`` from ``_retire_wrong``, which the index carries so the next run knows every
     id it ever published."""
-    previous = _previous_wrong_ledger()
+    already_retired = plan.prior_retired if plan else frozenset()
+    previous = _previous_wrong_ledger(plan.previous_index) if plan else _previous_wrong_ledger()
     data = _fetch_wrong_feed()
     if data is None:
-        published, retired = _retire_wrong(s3, None, previous)
+        published, retired = _retire_wrong(s3, None, previous, already_retired)
         return {}, {"published": published, "retired": retired}
     obituaries = data.get("obituaries") or []
     live_ids = {str(o.get("id", "")).strip() for o in obituaries} - {""}
@@ -439,9 +570,15 @@ def _sweep_wrong(s3):
         date = str(o.get("date") or "").strip()
         coach = str(o.get("coach") or "the board").strip()
         meta = f"{coach} · {date} · REFUTED"
-        card = build_moment_card("a graded failure — the AI was wrong", believed, meta, "graded by the evaluator, not asserted")
         number = (o.get("number") or "").strip()
         changed = (o.get("what_changed") or "").strip()
+        plan_key = f"wrong/{oid}"
+        action, digest = plan.decide(plan_key, [believed, meta, number, changed]) if plan else (RENDER, None)
+        if action != RENDER:
+            if action == SKIP or plan.exists(plan_key):
+                out[oid] = f"/moments/wrong/{oid}/"
+            continue
+        card = build_moment_card("a graded failure — the AI was wrong", believed, meta, "graded by the evaluator, not asserted")
         body = (
             f"<p><strong>We believed:</strong> {html.escape(believed)}</p>"
             + (f"<p><strong>The number that killed it:</strong> {html.escape(number)}</p>" if number else "")
@@ -458,8 +595,10 @@ def _sweep_wrong(s3):
             f"{SITE_BASE}/method/wrong/#obit-{oid}",
         )
         out[oid] = _put_moment(s3, "wrong", oid, card, shell)
+        if plan:
+            plan.rendered(plan_key, digest)
     print(f"[moments] swept {len(out)} wrong-feed obituary card(s)")
-    published, retired = _retire_wrong(s3, live_ids, previous)
+    published, retired = _retire_wrong(s3, live_ids, previous, already_retired)
     return out, {"published": published, "retired": retired}
 
 
@@ -468,7 +607,7 @@ def _post_slug(url):
     return (str(url or "").strip("/").split("/") or ["post"])[-1] or "post"
 
 
-def _sweep_chronicles(s3):
+def _sweep_chronicles(s3, plan=None):
     """#405 (via the #595 engine): a per-chronicle honest-stats share card, drawn from
     generated/journal/posts.json — already-published values only (title, series label,
     the honest stats line). One 1200×630 card per post at /moments/assets/chronicle-*.png.
@@ -494,6 +633,16 @@ def _sweep_chronicles(s3):
         if not url or not title:
             continue
         slug = _post_slug(url)
+        plan_key = f"chronicle/{slug}"
+        action, digest = (
+            plan.decide(plan_key, [title, p.get("label") or "", (p.get("stats_line") or "").strip(), p.get("date") or ""])
+            if plan
+            else (RENDER, None)
+        )
+        if action != RENDER:
+            if action == SKIP or plan.exists(plan_key):
+                out[url] = f"/moments/assets/chronicle-{slug}.png"
+            continue
         card = card_engine.render(
             "chronicle",
             {
@@ -510,6 +659,8 @@ def _sweep_chronicles(s3):
         card.save(buf, format="PNG", optimize=True)
         buf.seek(0)
         _put(s3, img_key, buf.read(), "image/png", cache="max-age=86400")
+        if plan:
+            plan.rendered(plan_key, digest)
         out[url] = f"/moments/assets/chronicle-{slug}.png"
     print(f"[moments] swept {len(out)} chronicle card(s)")
     return out
@@ -602,20 +753,27 @@ def _sweep_fingerprint(s3, stats):
         return None
 
 
-def sweep_moments(s3, stats):
-    """Run all moment classes; write the index the share buttons read."""
-    wrong, wrong_ledger = _sweep_wrong(s3)  # #1377 — the graded-failure obituary feed (+ #4404 retirement)
+def sweep_moments(s3, stats, time_left=None, force=False):
+    """Run all moment classes; write the index the share buttons read.
+
+    #5421: incremental and time-boxed — see ``SweepPlan``. ``time_left`` is the invocation's
+    ``context.get_remaining_time_in_millis`` (``None`` = unbounded), ``force`` re-renders
+    every moment regardless of the previous run's digests."""
+    plan = SweepPlan(fetch_previous_index(), time_left=time_left, force=force)
+    wrong, wrong_ledger = _sweep_wrong(s3, plan)  # #1377 — the graded-failure obituary feed (+ #4404 retirement)
     index = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "week": _sweep_week_recap(s3, stats),
-        "qa": _sweep_board_answers(s3),
-        "predictions": _sweep_predictions(s3),
-        "chronicles": _sweep_chronicles(s3),
+        "qa": _sweep_board_answers(s3, plan),
+        "predictions": _sweep_predictions(s3, plan),
+        "chronicles": _sweep_chronicles(s3, plan),
         "wrong": wrong,
         "wrong_published": wrong_ledger["published"],  # #4404 — every id ever published; the next run's retirement input
         "wrong_retired": wrong_ledger["retired"],  # #4404 — ids whose shell + card now redirect
         "fingerprint": _sweep_fingerprint(s3, stats),  # #1402 — the day's dated mark + caption
+        "digests": plan.digests,  # #5421 — moment key -> digest of what was last published; the next run's skip input
     }
+    print(f"[moments] incremental sweep: {plan.summary()}")
     _put(s3, f"{MOMENTS_PREFIX}index.json", json.dumps(index).encode("utf-8"), "application/json", cache="max-age=300")
     n = (1 if index["week"] else 0) + len(index["qa"]) + len(index["predictions"]) + len(index["chronicles"]) + len(index["wrong"])
     n += 1 if index["fingerprint"] else 0

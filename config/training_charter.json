@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.35.0",
+  "version": "1.36.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -238,6 +238,13 @@
       "date": "2026-10-25",
       "by": "issue #5105 N11 (epic #5092, the nutrition panel review 2026-10-18, filed on the owner's word); no new owner ruling: the fatty-fish frequency is a platform default named as one, pending his ruling",
       "what": "#5105: nutrition.food_quality, the menu's food-quality targets, enforced by health.weekly_menu and checked the same way by training.food_panel (health.food_quality). fibre_daily reads the ONE fibre floor through floor_path (nutrition.floors.fibre.floor_g; no second fibre number); fatty_fish.servings_per_week [2, 3] counts servings of anchors his table tags fatty_fish (the menu places the low end, spread across the week; under or over is a named miss); micronutrient_priorities reads the lab-driven priorities row the coach context already has (training.lab_priorities, owner-only) where one exists, and reports the week's servings of anchors whose nutrient_tags the row names (no number: there is no ruled micronutrient target). A week that misses a quality target names it (quality.misses), never silently.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.36.0",
+      "date": "2026-10-27",
+      "by": "issue #5122 (epic #5120), the owner's live on/off test of disruption mode on 2026-10-26 that put the plan into a step-back-up week for a mode that covered one day; no new owner ruling: min_days 3 is an owner-default named as one (ADR-105), pending his ruling",
+      "what": "disruption.step_back_up.min_days 3 (#5122). A mode that covered fewer than min_days days, or that he ended the day it started, owes no step-back-up week (the plan returns to the full split the next morning); a mode that covered min_days or more is unchanged (step_back_up.days 7 of the minimum session, then the full split). The lapse template still has no step-back-up. Read by training.disruption.owes_step_back_up.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -935,6 +942,8 @@
     },
     "step_back_up": {
       "days": 7,
+      "min_days": 3,
+      "min_days_basis": "owner-default (ADR-105), pending his ruling (#5122): a mode that covered fewer days than this, or that was ended the day it started, owes no step-back-up week",
       "serves": "the minimum session at the club",
       "then": "the full split"
     },

@@ -199,12 +199,13 @@ def check_hae_additive_integrity(table, s3, bucket, check_cls, partition, now_ut
         return [c.warn(f"no delivered additive readings to check ({span}) — not evaluable (#4628).")]
     if counts["short"]:
         per = ", ".join(f"{f} {n}" for f, n in counts["by_field"].items() if n)
-        # A FAIL since the writer fix is live (#4962): a shortfall now means a delivery fell back to the
-        # guarded legacy write (its additive archive read or write failed) or a concurrent merge was lost.
+        # A FAIL since the writer fix is live (#4962): a shortfall now means a concurrent delivery overwrote
+        # another's readings (the lost update #5440 closed with a conditional write) or a delivery fell back to
+        # the guarded legacy write (its additive archive read or write failed).
         return [
             c.fail(
                 f"{counts['short']} of {counts['checked']} Apple Health field-days stored BELOW the delivered readings "
-                f"({per}; {span}) — a delivery skipped the additive archive or a merge was lost ({_SHORT_ISSUE})."
+                f"({per}; {span}) — a concurrent delivery's readings were overwritten (#5440) or a delivery skipped the additive archive ({_SHORT_ISSUE})."
             )
         ]
     return [c.ok(f"0 of {counts['checked']} Apple Health field-days below the delivered readings ({span}) ({_SHORT_ISSUE}).")]

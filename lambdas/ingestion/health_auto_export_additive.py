@@ -43,6 +43,9 @@ metadata (`received-at`, health_auto_export_archive.save_raw_payload) so a repla
 archive orders deliveries the way the writer saw them — LastModified is whole seconds and two
 deliveries of 2026-10-15 00:47:23Z tie on it. Equal stamps resolve to processing order.
 
+Concurrent deliveries (#5440): the object is read-merge-written as a compare-and-swap on its ETag, so two
+deliveries received milliseconds apart cannot overwrite each other's readings.
+
 Fail-safe ordering: if the archive cannot be read (anything but a missing object)
 or written, the field keeps TODAY's path for that delivery — the payload value under
 the GREATEST guard — so a deploy that lands before the IAM grant (or an S3 blip)
@@ -153,38 +156,64 @@ def day_value(field, readings, units):
     return to_miles(total, units) if field.endswith("_miles") else total
 
 
+# Concurrent deliveries (#5440): the phone POSTs its metrics in parallel — two deliveries 57 ms apart read the same
+# object, and an unconditional PUT let the later one drop the earlier one's readings (9 of 245 on 2026-10-26).
+# The write is conditional on the ETag that was read, and a lost race re-reads and re-merges.
+_MAX_ATTEMPTS = 6
+_CONFLICT_CODES = ("PreconditionFailed", "ConditionalRequestConflict")
+
+
 def _read(s3_client, bucket, key):
-    """The stored object, {} when it does not exist yet, None when it cannot be read."""
+    """(stored object, ETag) — ({}, None) when it does not exist yet, (None, None) when it cannot be read."""
     try:
-        return json.loads(s3_client.get_object(Bucket=bucket, Key=key)["Body"].read())
+        resp = s3_client.get_object(Bucket=bucket, Key=key)
+        return json.loads(resp["Body"].read()), resp.get("ETag")
     except s3_client.exceptions.NoSuchKey:
-        return {}
+        return {}, None
     except Exception as e:
         logger.warning(f"[ADDITIVE] archive read failed {key} — legacy guarded write for this delivery: {e}")
-        return None
+        return None, None
+
+
+def _is_write_conflict(exc):
+    """A conditional PUT that lost the race (HTTP 412 / 409), as opposed to an S3 failure."""
+    return str(((getattr(exc, "response", None) or {}).get("Error") or {}).get("Code")) in _CONFLICT_CODES
 
 
 def archive_and_sum(s3_client, bucket, date_str, field, entry, received_at=""):
     """Merge one delivery's readings for (field, day) into the S3 archive; return the day value,
-    or None when the archive is unavailable (the caller keeps the legacy guarded value)."""
+    or None when the archive is unavailable (the caller keeps the legacy guarded value).
+
+    Read-merge-write is a compare-and-swap on the object's ETag (If-Match; If-None-Match `*` for a new
+    object): a concurrent delivery that wrote first makes this PUT fail, and the loop re-reads the object
+    that now holds its readings and merges onto it, so no delivery's readings are overwritten (#5440)."""
     key = raw_date_key(_SOURCE, date_str, sub=f"additive_{field}")
-    stored = _read(s3_client, bucket, key)
-    if stored is None:
-        return None
-    merged, changes, revisions = merge_readings(stored.get("readings"), entry["readings"], stored.get("revisions"), received_at)
-    units = stored.get("units") or entry["units"]
-    if changes:
-        body = {"field": field, "date": date_str, "units": units, "readings": merged}
-        if revisions:
-            body["revisions"] = revisions
-        try:
-            s3_client.put_object(Bucket=bucket, Key=key, Body=json.dumps(body, sort_keys=True), ContentType="application/json")
-        except Exception as e:
-            logger.warning(f"[ADDITIVE] archive write failed {key} — legacy guarded write for this delivery: {e}")
+    for _attempt in range(_MAX_ATTEMPTS):
+        stored, etag = _read(s3_client, bucket, key)
+        if stored is None:
             return None
-    if len(merged) > 1:
-        logger.warning(f"[ADDITIVE] {date_str} {field}: {len(merged)} device sources delivered — summed, none picked: {sorted(merged)}")
-    return day_value(field, merged, units)
+        merged, changes, revisions = merge_readings(stored.get("readings"), entry["readings"], stored.get("revisions"), received_at)
+        units = stored.get("units") or entry["units"]
+        if changes:
+            body = {"field": field, "date": date_str, "units": units, "readings": merged}
+            if revisions:
+                body["revisions"] = revisions
+            condition = {"IfMatch": etag} if etag else ({} if stored else {"IfNoneMatch": "*"})
+            try:
+                s3_client.put_object(
+                    Bucket=bucket, Key=key, Body=json.dumps(body, sort_keys=True), ContentType="application/json", **condition
+                )
+            except Exception as e:
+                if _is_write_conflict(e):
+                    logger.warning(f"[ADDITIVE] {key}: a concurrent delivery wrote first — re-reading and re-merging")
+                    continue
+                logger.warning(f"[ADDITIVE] archive write failed {key} — legacy guarded write for this delivery: {e}")
+                return None
+        if len(merged) > 1:
+            logger.warning(f"[ADDITIVE] {date_str} {field}: {len(merged)} device sources delivered — summed, none picked: {sorted(merged)}")
+        return day_value(field, merged, units)
+    logger.warning(f"[ADDITIVE] {key}: {_MAX_ATTEMPTS} concurrent-write conflicts — legacy guarded write for this delivery")
+    return None
 
 
 def apply_archived_sums(daily_data, metrics, metric_map, parse_date_str, s3_client, bucket, received=None):

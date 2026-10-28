@@ -43,12 +43,11 @@
     "note": "New alarm (2026-08-23, DIL-036 slice of #2824): fires when budget_guard logs BUDGET_TIER_UNREADABLE on the public site-api-ai path — the SSM budget-tier read failed (ParameterNotFound / AccessDenied / outage), website_ai is failing CLOSED (readers get the honest 'paused' output), and the rest of the fleet is running fail-open with NO ceiling enforcement. Never a routine state: if lit, restore the SSM param/grant (/life-platform/budget-tier) — the guard recovers within one 5-min cache TTL. Prune this entry only if the alarm is retired; while #2824 is open it is the named owner."
   },
   "coherence-overall": {
-    "added": "2026-10-13",
-    "cause": "facts_agreement:expert_sleep_stale,facts_agreement:coach_physical_coach_stale",
-    "cause_observed": "2026-10-18",
-    "citation": "self-clearing, dated (no open issue owns it — the two stories that did, the stale expert:sleep and physical-coach surfaces, closed 2026-10-18 on the live proof): the analyzer run forced 2026-10-18 04:36Z (request 94204290) passed the gate for weekly_priority (served non-null 04:41Z) while expert:sleep / experiment_arc / integrator_month were HELD with their prior records preserved by design; the facts_agreement reads clear at the next ai-expert-analyzer run that passes those surfaces (Mon 2026-10-19 14:00Z). Expiry: if still ALARM after 2026-10-19 15:00Z, file a story under epic 4580 for the stale-surface class (write it as a new issue, not a re-cite); prune this entry 72 h after OK.",
-    "note": "Prior entry (2026-08-24): one OK->ALARM->OK cycle during a 26-PR merge/deploy churn, cleared without intervention — a different, transient shape.",
-    "updated": "2026-10-18"
+    "added": "2026-10-27",
+    "cause_observed": "2026-10-26",
+    "cause": "facts_agreement: expert:sleep served stale from 2026-10-05 (the grounding gate held every sleep draft since; renew_held extended the old record with no age cap), coach:mind_coach 'HRV cited in bpm' (a sentinel regex false positive on 'NN ms HRV, NN bpm resting'), then every EXPERT# record lapsed ~2026-10-26 23:15Z after two Monday 503 bursts",
+    "citation": "#5442 — the four code causes are fixed in PR #5455 (one HRV-in-bpm check, windowed averages pass night-scope, a 15-day renewal cap, board records renew on a hold/tripped breaker); the expert surfaces repopulate at the next analyzer run (Mon 2026-11-02 14:00Z) or an owner-approved earlier run. Expiry: if still ALARM after 2026-11-02 16:00Z, re-derive on #5442.",
+    "note": "Re-cited by Session CJ wrap 2026-10-27; prior entry (2026-10-13/10-18) explained the 10-18 episode."
   },
   "compute-pipeline-stale": {
     "added": "2026-10-10",
@@ -255,15 +254,23 @@
     "updated": "2026-10-26"
   },
   "qa-smoke-failures": {
-    "added": "2026-10-26",
-    "cause_observed": "2026-10-26",
-    "cause": "one recurring reader-truth false positive on /api/coaches (finding e8f2c1, temporal_contradiction): the judge reads _meta.generated_at (UTC) as after Pacific today on every Pacific-evening run",
-    "citation": "#5402 — ALARM 2026-10-25T05:31Z (the finding confirmed high on a second pass) → OK 2026-10-26T05:30Z; the same finding recurs nightly at WARN. The deterministic ruling + prompt line ship in PR #5404 (wave 5); this entry is pruned when #5402 closes on a Pacific-evening run with no e8f2c1-class finding."
+    "added": "2026-10-27",
+    "cause_observed": "2026-10-27",
+    "cause": "RAW:macrofactor,data:hae_additive_integrity",
+    "citation": "#5431 (six future-dated MacroFactor summary rows 2026-10-27..11-01 from the 04:14Z import put the writer ahead of the raw archive; the parser fix + a backup-first cleanup script are in PR #5455, the deletion is a parked owner act) and #5440 (an Apple Health distance field-day stored below its delivered readings by a concurrent-delivery overwrite; the S3 compare-and-swap fix is in PR #5455, the 10-21/10-22/10-26 repair is a parked owner act). The earlier reader-truth cause is closed: its ruling dropped the finding live at 2026-10-27 04:51Z.",
+    "note": "Re-cited by Session CJ wrap 2026-10-27 after the closed-owner and contradicted-cause gates flagged the #5402 entry."
   },
   "ingest-reconciliation-whoop": {
     "added": "2026-10-26",
     "cause": "same-day timing race, store vs vendor",
     "cause_observed": "ALARM 2026-10-25 18:21Z (MissingActivityCount 1), OK 2026-10-26 18:21Z (0). Workout 6086653e was stored at 04:00Z on 10-26, after the 10-25 reconcile read the vendor.",
     "citation": "self-cleared flap: a workout the reconcile saw at the vendor before the next ingest stored it; cleared at the following day's 18:21Z reconcile with no change. Prune 72 h after 2026-10-26 18:21Z."
+  },
+  "calibration-deadman": {
+    "added": "2026-10-27",
+    "cause_observed": "2026-10-27",
+    "cause": "no tape measurement or progress-photo set logged this cycle (the biweekly calibration prompt's dead-man)",
+    "citation": "#5061 — the owner deferred the tape + photo sitting in session on 2026-10-26 (\"defer later in week\") and again 2026-10-27 (\"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect.",
+    "note": "Cited by Session CJ wrap 2026-10-27."
   }
 }

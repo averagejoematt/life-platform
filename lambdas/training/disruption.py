@@ -223,13 +223,34 @@ def active_record(records: list[dict[str, Any]] | None, day: str) -> dict[str, A
     return None
 
 
+def covered_days(r: dict[str, Any]) -> int:
+    """How many days the record actually covered: `start_date` through its last day (0 when ended the day it started)."""
+    s, last = _day(r.get("start_date")), _last_day(r)
+    if s is None or last is None or last < s:
+        return 0
+    return (last - s).days + 1
+
+
+def owes_step_back_up(r: dict[str, Any]) -> bool:
+    """#5122: whether ending this record puts the plan into the step-back-up week.
+
+    No when the template says so (lapse), when he ended it the day it started, or when it covered fewer than
+    `disruption.step_back_up.min_days` days (an owner-default, ADR-105): a one-day mode does not owe a week of the minimum.
+    """
+    if ((policy().get("templates") or {}).get(r.get("template")) or {}).get("step_back_up") is False:
+        return False  # the lapse protocol resumes the full plan the next morning
+    s, e = _day(r.get("start_date")), _day(r.get("ended_on"))
+    if s is not None and e is not None and e <= s:
+        return False
+    return covered_days(r) >= int((policy().get("step_back_up") or {}).get("min_days") or 0)
+
+
 def _stepping_back_from(records: list[dict[str, Any]] | None, day: str) -> dict[str, Any] | None:
     d = _day(day)
     days = int((policy().get("step_back_up") or {}).get("days") or 0)
-    templates = policy().get("templates") or {}
     for r in sorted(records or [], key=lambda x: str(x.get("start_date")), reverse=True):
-        if (templates.get(r.get("template")) or {}).get("step_back_up") is False:
-            continue  # #5122: the lapse protocol resumes the full plan the next morning
+        if not owes_step_back_up(r):
+            continue  # #5122: lapse, a same-day on/off, or a mode shorter than step_back_up.min_days
         last = _last_day(r)
         if d is not None and last is not None and 0 < (d - last).days <= days:
             return r
@@ -251,6 +272,7 @@ def state(records: list[dict[str, Any]] | None, day: str) -> dict[str, Any]:
             "words": rec.get("words"),
             "pools": list(tmpl.get("pools") or []),
             "sessions_per_wk": tmpl.get("sessions_per_wk"),
+            "owes_step_back_up": owes_step_back_up(rec),
         }
     back = _stepping_back_from(records, day)
     if back is not None:

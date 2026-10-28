@@ -30,6 +30,7 @@ import json
 from PIL import Image
 
 from web import og_image_lambda as _og, portrait_raster
+from web.portrait_bundle import load_signed_recipes_from_bundle  # noqa: F401 — re-export (#5434)
 
 
 class _Engine:
@@ -156,16 +157,6 @@ def _is_signed(recipe):
     return isinstance(sign, dict) and all(sign.get(k) for k in ("by", "date", "sheet"))
 
 
-def load_signed_recipes_from_bundle(text):
-    """Extract the signed recipe map from a generated portrait_data.js body. This is the
-    exact bundle the site renders (already signed-only, ADR-106) — the lambda's one source
-    of truth. Returns {persona_id: recipe}."""
-    marker = "export const PORTRAITS = "
-    start = text.index(marker) + len(marker)
-    end = text.index(";", start)
-    return json.loads(text[start:end])
-
-
 def build_all_coach_cards(recipes, members):
     """Return {output_name: PIL.Image} for every signed recipe. output_name has no suffix
     (caller adds .png/.webp). Skips recipes the renderer can't handle, fail-soft."""
@@ -193,7 +184,7 @@ def sweep_coach_cards(s3, bucket):
     try:
         recipes = load_signed_recipes_from_bundle(_s3_text(s3, bucket, "site/assets/js/portrait_data.js"))
     except Exception as e:
-        print(f"[WARN] coach cards: could not load portrait bundle: {e}")
+        print(f"[WARN] coach cards: PORTRAIT_BUNDLE_UNREADABLE — no coach cards rendered this run ({type(e).__name__}: {e})")
         return []
     try:
         members = json.loads(_s3_text(s3, bucket, "config/board_of_directors.json")).get("members", {})

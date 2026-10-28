@@ -1,65 +1,82 @@
-# Handover — Session CI (final, 19:00Z): wave 2 and five build waves deployed, the open-model trial closed, 16 proofs harvested (2026-10-26)
+# Handover — Session CJ (final, 16:40Z): waves 7–10 deployed (one platform timezone, the Hevy notes to the A-grade standard, eight backlog fixes), 20 owner items walked, 10 closures (2026-10-27)
 
 ## Driving instruction
-- Owner, Sun 2026-10-25 ~22:00 PT: a 15-hour autonomous backlog paydown (05:00Z → 20:00Z Mon 10-26), unattended. Never ask inline; park every question or owner act in ONE "For Matthew" list here. Priority: his daily training, nutrition and use first; the site is parked in Later.
-- The week's envelope (memory `feedback_autonomy_envelope_week_of_2026_10_26`) still binds the next session: merge + approve the production gate on code-only green tips (full suite + CI-pinned mypy on the integration tip, empty `closingIssuesReferences`, IAM gate NO-IAM-CHANGE / ALLOW-ADDITIVE); additive-only CDK myself; synthetic proofs only (nothing that messages him, no Hevy commit). The #4776 eval exception is spent.
+- Owner, Mon 2026-10-26 ~19:45Z: autonomous backlog paydown to a 13:00Z stop, unattended. Owner then attended ~01:30–05:00Z for a 20-item owner-gated walk-through and extended the run (verbatim): "you are good to do autonomous work for the next 12 hours now, paying down as many issues as you can, getting more if you have time, more parallel work" — new stop ~16:45Z 10-27.
+- Envelope (memory `feedback_autonomy_envelope_week_of_2026_10_26`, extension recorded): merge + approve the gate on code-only green tips; additive-only CDK myself; synthetic proofs only. One OWNER-REQUIRED exception granted in session: the #4284 timezone deploy ("yes on timezone deploy").
+- **Laptop paused ~06:27Z → 15:21Z** (no activity for ~9 h): the checkpoint wrap never ran and waves 10/11 waited.
 
-## Shipped (all merged, deployed by CI/CD, verified by content)
-- **PR #5394 (544825e51) — Session CH wave 2**, deployed 06:12Z: #5373 carry steps × the watch stride and the per-hand load convention · #5370 + #5371 the gym-workflow audit and the Strava best-practices doc · #5135 the dev-session AI envelope ($60 a calendar month, alarm at $48; `cdk_deploy.sh LifePlatformMonitoring` added `ai-dev-session-month-high`, additive) · #5384 `reject_deployment.sh` refuses to reject the run that owns the deploy.
-- **#4776 open-model trial — closed not-planned.** 12 feature × candidate pairs for $4.37 of the $15 cap; no candidate met the kill criterion. The table is on the issue.
-- **PR #5399 (26d8f1ebe) — wave 3**, deployed 07:51Z: #5387 one gym visit counted once everywhere (`training/session_count.py`) · #5076 bike level progresses from the prescription · #5389 the character sheet's Zone 2 reads the real minutes · #5388 the hypothesis engine reads Hevy from 2026-10-27.
-- **PR #5401 (8e1e4e9d5) — wave 4**: #5398 the last six Strava-activity counters read the one session count (`TRAINING_MINS_CUTOVER_DATE` 2026-10-28).
-- **PR #5404 (8693d2da2) — wave 5**, deployed 09:45Z: #5402 the reader-truth judge drops a temporal finding that reads a UTC instant as after the Pacific today.
-- **PR #5409 (e1b66eef3) — wave 6**, deployed + smoke green 14:27Z:
-  - #5390 a Hevy push that carries heart rate stays with the lift (`workout_identity.carries_own_hr` / `lift_hr_member_of` / `strava_identity_source`, version 1.2.0; `zone2_minutes` stamps `identity_source`). Verified by content in life-platform-mcp, site-api, hypothesis-engine and character-sheet-compute. A live read of 10-25 shows total activities 3 and the lift's minutes now measured from the push.
-  - #5405 the wrap's `--verify` gains a `staged-secrets` leg (`scripts/check_staged_secrets.py`). With no gitleaks binary it prints UNVERIFIED and passes; `--require` or `WRAP_REQUIRE_GITLEAKS=1` makes it fail.
-  - Removed before merge: `scripts/gym_day_hr_coverage.py` + its test, after CodeQL raised 3 high `py/clear-text-logging-sensitive-data` alerts on its print lines. Parked on `park/5390-gym-day-hr-coverage` (3905c9569). Dismissing CodeQL alerts is the owner's call.
+## Shipped (merged, deployed, verified by content)
+- **PR #5419 (4bd0d4368) — wave 7**, CI/CD 40402115588 (Deploy 21:18–21:28Z, Visual + AI-vision QA green): #5413 milestone-framed protein figures · #5412 analyzer vendor-outage breaker · #5132 box 3 morning check-in dead-man · #4969 watch source-tag test · #5010 Hevy doc re-verify.
+- **PR #5427 (f98506596) — wave 8**: #4284 **every schedule on one `platform_timezone` (America/Los_Angeles)** via EventBridge Scheduler (ADR-165; CONVENTIONS §1b; CLAUDE.md line) · #5406 dev cap from 11-01 · #5388 VO2 max re-registered from 10-27 · #4969 HAE same-minute echo guard · DLQ retries a scheduled run only within its Pacific day. **Six stacks applied by hand from main** (Mcp, Serve, Compute, Email, Ingestion, Operational; 04:56–06:05Z, away from fire minutes): live = **95 Scheduler schedules + 5 rules** (3 rate, 2 UTC opt-outs). Independent review re-derived all 97 conversions (BAD 0).
+- **PR #5444 (335cd22d8) — wave 9**: #5428 lanes A/B/C — **Hevy notes to the A-grade standard** (three-line session block; lift notes `RPE` + ≤1 reason + ≤1 cue, nothing the set rows show; loads rounded to implement steps; achieved-load floor; pick-load feeler rows; one DB warm-up row; cardio line 1 + watch-clock line + `After:` restart line, levels from his log; his `3.3 / 1.5 incline` shorthand parsed, Refs #5374) · #5373 per-hand carries dated from 10-27. CI/CD 40458629029: Plan clean after the stacks, Deploy 06:12–06:18Z, Smoke + I1/I2/I5 green. **Verified in bundles**: `session_block.py` / `lift_note.compose_blocks` / `cardio_note 4.0.0` in mcp + warmer + hevy-routine-cron; echo guard in health-auto-export-webhook; `SUPERSESSIONS` in hypothesis-engine; `_scheduled_day_has_passed` in dlq-consumer.
+- **The 10-27 routine re-drafted through the new code** (15:26Z, `nightly_predraft` target 2026-10-27 → cc9665db…): exercise 1 opens with the three-line block; dry-run read back. (The 06:27Z archive of the old 10-27 drafts and the 15:21Z re-run straddled the laptop pause, so 10-27 had no active draft for those hours; no workout was logged in that window.) 10-28 drafted 15:21Z.
 
-## Closed (each with an outcome verdict + live proof)
-- #5314 · #4814 · #4777 · #5029 · #4776 (not-realized, trial table) · #5384 · #5370 · #5387 · #5398 · #5135 · #5369 · #4973 · #4970 · #5389 (16:30Z character run) · #5405 (this wrap's `--verify` ran the gitleaks leg on its own diff) · #5257 (Strava reconcile 0 missing, alarm OK 17:21Z). #5410 (the nightly hygiene tracker) auto-closed after the 34 violations were fixed.
-- Proof-pending comments (still open): #5132 box 2 sent at 17:15:16Z (box 3, a dead-man on the skip log, is unbuilt) · #5109 (18:31Z qa-smoke compared 0 of 2 claims) · #5390 box 1 (first gym day on the 10-26 protocol) · #5373 · #5371 · #5076 · #5388 · #5402.
+- **PR #5455 (e19b3855e) — wave 10**, merged 16:06Z, CI/CD 40537557258: Plan clean, Deploy success ~16:26Z (smoke running at the amend): #5122 step-back only after ≥3-day modes · #5104 grocery list + travel kit · #5421 og-image headroom · #5433 traffic-digest 10-wide reads · #5434 portrait bundle parse (no coach card had ever been written) · #5431 MacroFactor future rows · #5440 HAE additive S3 compare-and-swap · #5442 coherence (stale sleep expert, HRV-in-bpm false positive, 15-day renewal cap). First CI run red on a test-order leak (the #5412 breaker's module state tripped by #5442's tests) — fixed with reset fixtures (0e59ba3ea), then 10/10 green. **Verified in bundles**: `SweepPlan` + `raw_decode` in og-image-generator, `LOAD_LOG_WORKERS` in traffic-digest, the `#5431` guard in macrofactor-data-ingestion, `IfMatch` in health-auto-export-webhook, the renewal cap in ai-expert-analyzer, `owes_step_back_up` + `grocery_lines` in life-platform-mcp.
+
+## Built, not yet on main
+- **integration/session-cj-w11 (e4f66c274)** — #5428 lane D (grammar + style linter in warn mode, PR #5447) and lane E follow-ups (PR #5448: rotation reason line `New: replaces X.` (#5083), the composer on chat/minimum/travel paths, ids off the wire, the `_FORM_KW` "rom" bug), both merged INTO w11 (E's conflicts with D's squash resolved to E's side; the 132 notes/lint/golden/render tests pass). **Merging main into w11 conflicts in 11 files** (main carries wave 9 as one squash; w11 carries the same lanes unsquashed plus D/E): resolve toward w11's side for the `lambdas/training/*`, `mcp/tools_plan.py` and the notes tests, then run the full suite + the e2e golden test, then PR. Next session's first build task.
+
+## Closed (ADR-099 verdict + live proof)
+#5413 (served-coach-facts green 21:42Z; #5411 auto-closed) · #5049 (02:00Z predraft warm-ups) · #4250 (30-day re-measure: reconcile 31%→14%, 0 test_count reconciles, 0 parked leases) · #5402 (dry-run qa-smoke 04:51Z dropped the UTC-vs-Pacific findings) · #5097 (MacroFactor export → `expenditure_kcal` 10-15..10-26, 04:14Z) · #5376 (Creatine 10 g on 10-26) · #4633 (four synthetic receipts through the live gate) · #5318 (committed routines carry the 10-24 rulings) · #5420 (standalone visual QA green) · #5411 (auto).
+
+## Owner rulings recorded this session (on their issues)
+#4284 B (all schedules Pacific) · #5406 B (cap from 11-01) · epic fold C (none) · #5390 A (restart Hevy watch workout after cardio; script stays parked) · #4969 C (general echo guard) · #5388 B (re-register) · #5373 A + no Hevy edits (dated convention) · #5010 allow-with-approval / marker yes / test next gym visit · #5103 B (no Fiber Gummies anchor) · #4772 yes → agreements accepted (runtime still denied) · #5122 toggle tested + record deleted · #5428 standard rulings (no AF/ECG/medication — **not on metoprolol**; no gate; no safety line; low-energy line; 2 steps at RPE ≤ 7; one DB warm-up row; bookkeeping off Hevy; pinned notes setup-only; one prep cue).
 
 ## Gotchas learned
-- **CodeQL blocks a script that prints health-adjacent values.** `py/clear-text-logging-sensitive-data` fires on any print of a value derived from a secret-named or health field; a diagnostic script belongs on a park branch or behind a summary that prints counts only.
-- **A lane branch is deleted when its PR is absorbed.** Park anything you mean to keep on `park/*` before the integration merge.
-- **A vendor outage fails the visual gate, not the deploy.** Visual QA counts an UNEVALUATED page as FAIL and rollback fires only on smoke; on a Bedrock 503 episode prod stays on the verified code and main reads red. Re-run at most 2–3 times, then decode.
-- **Two lanes, one fetch** (#5387 + #5389), **test-module constants mint phantom gates** (`*_RULES` names), **the closure sweep wants a real instant**, **gitleaks reads handover prose**: see the checkpoint handover on `session-archive`.
-- **Time labels:** boto prints CloudWatch timestamps in PDT. Convert with `.astimezone(dt.timezone.utc)`; one Live proof was first written an hour off.
+- **A Bedrock "NOT_AVAILABLE" Claude is an unaccepted Marketplace agreement first** (`list-foundation-model-agreement-offers` + `create-foundation-model-agreement`) — but runtime can stay AccessDenied after AVAILABLE (account-level; support case). Memory corrected.
+- **Hevy renders the routine note in full** (owner screenshots): length costs scroll at 5 am, not visibility; the set rows already show PREVIOUS and the load × reps.
+- **CodeQL flags `"x.amazonaws.com" in <anything>`** (even a list) — match the principal by equality.
+- **Under xdist, `importorskip("aws_cdk")` passes on a stub** another test put in `sys.modules`; probe a fresh interpreter before a subprocess synth.
+- **An OWNER-REQUIRED merge reds Plan until every stack is applied by hand**; the next run's Plan (diffing from the last successful deploy) then deploys the accumulated code.
+- **Never split an archive-then-redraft across a possible pause**: do both in one command.
+- **The dry-run qa-smoke still publishes FailCount** (it lit `qa-smoke-failures`).
+- **Disruption-mode end owed a 7-day step-back-up even for a same-day test** (fixed in #5455).
 
 ## Residual / next picks
-- **Proofs on dated events:** #5076 + #5374 (Tue 10-27 02:00Z predraft) · #5402 (10-27 00–07Z qa-smoke) · #4250 (after 10-27 23:50Z) · #4969 (re-diff after 10-27) · #5211 + #4914 (10-28, #4914 at 15:00Z) · #5220 (prune the `swallowed-permission-denial` citation and close, on/after 10-28) · #5103/#5105/#5110 (Sat 10-31 menu) · #5388 (Sun 11-01) · #4641 (11-01) · #5371 (after 11-02) · #4974 (~11-16) · #5221 (11-20) · #5078 + #5079 (~12-06) · #5104 (12-15).
-- **Proofs on owner events:** #5376 (first creatine day ticked at 10 g; not yet ticked 10-26) · #5123 (first 4-number mood reply row; none yet) · #5390 box 1 (next gym day) · #5372 + #5373 (next carry session) · #5369 box 4 + #5353 box 5 · #5099 (first band move) · #4972 (first ECG payload) · #4639 (next draw) · #4968 (HAE automations).
-- **#5109** closes on the first qa-smoke whose `coach_vs_engine` compares at least one claim.
-- **#5132 box 3**: the morning check-in's skip reasons are logged but no QA check reads them; a small build story.
-- **#5412** (sonnet, filed this wrap): one weekly analyzer run's Bedrock 503 burst lights `slo-ai-coaching-success` for a day, two Mondays running.
-- **#5413** (sonnet, filed this wrap): the served-fact gate reads a protein target named as a future milestone ("after hitting N", beside an N-day lag) as his intake. That is the one finding behind the auto-filed #5411 (`served-coach-facts` red since 17:48Z), which auto-closes on the next green run.
-- **Next build wave:** the Now board (13 opus-startable, 5 sonnet), coaching/routines/nutrition first, then #5220 #5221 #5211 #4517 #4250.
-- not-work — main red on e1b66eef3: the visual gate's Bedrock 503s (incident row). The wrap commit b0f9ceaf3's run 40380970969 is green, but it was docs-only, so Visual QA was skipped, not re-evaluated. The next code merge's run is the first to re-check it; re-run that gate once if Bedrock image calls are still 503ing.
-- not-work — `fix/walk-completeness` is a dirty pre-existing worktree, and `.claude/worktrees/agent-a42658e0db0d0302d` belongs to another session; both reported by the reaper and left untouched.
+- Integrate w11 with main (11-file conflict, resolve toward w11) and land it — #5428.
+- #5428 live proof: the next nightly predraft lints clean + a blind re-grade of three real drafted routines reads A.
+- #4284 proof: the 2026-11-01 clock change — every job keeps its Pacific time, no double-fire or gap.
+- #5412 / #5442: the Mon 2026-11-02 14:00Z analyzer run (breaker lines; EXPERT# rows repopulate; sentinel no "HRV in bpm").
+- #5132: the 10-27 17:15Z morning stamp → 10-28 qa-smoke read; #5374 performed half (his next logged cardio note parses); #5075 box 4 at block-1 end (~11-05); #5076 bike half on the next bike draft.
+- #5388 / #5122 / #5104 / #5421 / #5433 / #5434 / #5431 / #5440 proofs after the wave-10 deploy (each names its first live output on its lane PR).
+- #5220 closes with its citation prune at/after 2026-10-28 05:47Z; #4914 #4533 #4536 on the Wed 10-28 15:00Z chronicle; #5109 on a qa-smoke comparing ≥1 claim.
+- not-work — the Hevy-notes review artifacts (standard, corpus, linter reference) live in the session scratchpad; the standard is committed as `docs/coaching/HEVY_NOTE_STANDARD.md` in #5447.
+
+## Post-wrap (owner attended, 2026-10-28 ~01:30Z)
+- **Fold applied: 12 stories closed as folded** into their epics' existing rows, with a reopen trigger on each row: #4533 #4536 #4537 #4545 #4546 #4564 #4914 → #4531, #4583 #4584 → #4580 (reopen when the Story Desk hold lifts), #4974 #4975 #4980 → #4967 (reopen at 30 nights of dual wear, about 11-16). Epic bodies backed up first. Open 88 → **77** (the +1 is #5456, auto-filed by the standalone visual QA run at 20:42Z). Backlog hygiene: 0 violations.
+- **The expert analyzer was re-run once** (owner yes, 01:32Z, 151 s): sleep, mind, labs and explorer wrote, plus the synthesis. **Nutrition and physical were held by the grounding gate** (the drafts quoted figures not in the data, one a weight far from the latest weigh-in), and with no record inside the 15-day window there was nothing to renew, so those two surfaces stay empty. experiment_arc and integrator_month were held the same way; glucose was skipped (no sensor). #5442 is half-proven; why the model invents those figures is a next-session item.
+- **Six owner-gated stories ruled** (each ruling on its issue): #4076 B and #4189 B (close on a synthetic proof), #4638 B (document per source in `docs/SCHEMA.md`, then fold into #4625), #3759 A (photos and tape this week, with #5061), #4968 A (the settings checklist), #4887 A (the token).
+
+## Next session plan: open 77 → 50 or fewer, autonomous
+Envelope as this session's (merge only on code-only green tips, additive-only CDK, synthetic proofs only, no messages to the owner, no Hevy commits, no dev-cap override); the week-of-10-26 grant runs through 11-01. Start `caffeinate` in the background first (the 9-hour pause, incident row 10-27).
+0. **First lane: Dependabot triage** — the 10-28 push reported 42 alerts on main (6 critical, 23 high, 13 moderate; the ledger's last read, 08-23, was 0). Read `gh api repos/averagejoematt/life-platform/dependabot/alerts`, map each to its manifest, and land the open bump PRs (#5450 #5452 #5453 #5454) on green, plus any bump they don't cover; file an issue only for what can't be fixed.
+1. **Boot checks (read-only):** main green; `qa-smoke-warnings` cleared by the og sweep writing the 10 coach cards (#5434); the 10-28 02:00Z predraft lints clean, with no gate, ECG or RED TEAM text (#5428).
+2. **Land wave 11** (w11 above): one PR, deploy, verify by content → #5428 and #5083 close on the next predraft plus a blind re-grade.
+3. **Harvest the due proofs** (about −13): #5220 #5132 #5421 #5433 #5434 #5122 #5104 #5388 #5373 #4969 #5431 #5440 #5412 #5076 #5374 (#5431 and #5440 close cleanly once the owner's repairs have run).
+4. **The ruled closes** (−3): the #4076 and #4189 synthetic proofs; #4638 docs plus fold.
+5. **Wave 12, about six parallel lanes** (about −8 after deploy and first output): #5297 + #5324 (one bug class) · #5372 · #5353 · #5105 · #5109 + #5110 · #4517 · #5221 · #5371 · #4641 · #5390 · #5456 (diagnose the standalone visual QA red; it auto-closes on a green run) · why the analyzer's nutrition and physical drafts invent figures (file it first).
+6. **Epics whose last children close** (about −2): #5134 (#5412; #5406 is ruled and starts 11-01), #5094 (#5109 #5110 #5324); #5120 and #5093 only if the owner's evening check-in reply arrives.
+7. **Owner acts, if done before the session** (−4 to −9): #3759 + #5061, #4968, #4887, #5010, and the evening check-in reply (#5106 #5123 #5211).
+8. Refill only what the lanes find; wrap. **Estimate: about 45–52 open, 50 or fewer with the owner acts.** Dated proofs that cannot be pulled earlier: #4284 (11-01 clock change), #5075 (about 11-05).
 
 ## For Matthew (the only things waiting on you)
-1. **#5406**: the $60 dev-session cap went live over an October already past it, so laptop dev AI is refused until 11-01 (a one-command `DEV_AI_BUDGET_USD` override still works). Keep it for October, or start it 11-01?
-2. **#5388**: the hypothesis engine cuts over to Hevy from 2026-10-27. The alternative is re-registering the open hypotheses on the new series; say if you prefer that.
-3. **#5373**: by design, dumbbell-carry volume roughly doubles, because the load is now the total carried, not per hand. Flag it if that reads wrong.
-4. **#5390 protocol**: for the lift's heart rate to stay with the lift, pick one: restart the Hevy watch workout after cardio, do cardio last, or keep the current order if the push already carries enough HR.
-5. **#5390 CodeQL**: dismiss the 3 alerts on the parked coverage script (it prints counts and spans, no values), or leave it parked.
-6. **#4887**: set the `GH_POSTURE_TOKEN` repo secret.
-7. Walk me through the disruption-mode on/off toggle, one step at a time (#5122).
-8. One committed-routine Hevy screenshot (#5083).
-9. Tape + photos midweek (#5061, #3759).
-10. The repeat MacroFactor export, calories file first (#5097).
-11. The end-of-week coach-session skill re-upload (#5086).
-12. Whether to add your logged Fiber Gummies as a menu anchor (#5103).
-13. Tonight's four mood numbers (#5123), and tick Creatine when you take it (#5376).
+1. **AWS support case for Claude 5.5** (#4772): agreements are accepted and AVAILABLE, runtime still "not available for this account". Account-and-billing case, text drafted in session (account 205930651321; Haiku/Sonnet 5.5; Converse AccessDenied).
+2. ~~Re-run the expert analyzer~~ — done 10-28 01:32Z (owner yes); see Post-wrap.
+2a. **This week: the photo set and the tape** (#3759 + #5061; clears `calibration-deadman`) · **the watch/HAE settings checklist** (#4968: the metrics not yet seen, listed in its 2026-10-18 comment) · **the posture token** (#4887: fine-grained, this repo, Administration + Actions + Contents read-only, then `gh secret set GH_POSTURE_TOKEN`) · **one evening check-in reply** (unblocks #5106 #5123 #5211 and two epics).
+3. **MacroFactor future-row cleanup** (#5431, ready now — wave 10 is deployed): `python3 scripts/macrofactor_future_rows_cleanup.py` (dry run: six rows 2026-10-27..11-01), then `--apply --backup <path>`. The classifier blocked the session from deleting them.
+4. **Apple Health additive repair** (#5440, ready now — wave 10 is deployed): `AWS_MAX_ATTEMPTS=1 python3 scripts/hae_additive_backfill_4628.py --since 2026-10-21 --until 2026-10-26` dry run, then `--apply` for 10-21, 10-22, 10-26 only — never 10-25 (its pre-guard echo double count would lower).
+5. **Pin `📌 Setup: seat 7` on Cycling and log one ride** (#5010 one-session test).
+6. Deferred by you: the 136-box epic tick-sweep (`epic_box_sweep_diff.md` in the session scratchpad) · a second watch hypothesis (Zone 2 → recovery) still on the dated cut-over — re-register too?
+7. Carried: #5390 protocol now ruled (A) — box 1 waits on your next gym day; #4638 vendor rename test (deferred 10-26).
 
-**Build beat:** none — every change is owner-facing (training engine, coach context, ops); nothing reader-visible shipped
-**Docs:** `docs/integrations/gym-workflow-2026-10.md`, the Strava best-practices doc, `docs/engines/CHARACTER.md` + `HYPOTHESIS.md`, the wrap skill's staged-secrets line, all in the wave PRs; `docs/INCIDENT_LOG.md` (3 rows today) + `docs/alarm_citations.json` in the wraps
-**Decisions:** none needed — the cut-over dates and the cap are product/ops calls recorded on their issues (#5388, #5398, #5135); #5406 is parked for the owner
-**Main:** red — CI/CD run 40336684204 on e1b66eef3: Deploy + Smoke green, the Visual + AI-vision QA gate UNEVALUATED 0/6 on Bedrock Haiku 4.5 ServiceUnavailableException (external, 4 attempts)
-**Incidents:** 1 row added this wrap — the Bedrock Haiku 503 episode (visual gate red, `slo-ai-coaching-success` 14:02Z, `ai-canary-overall` 16:21Z; #5412); 2 at the checkpoint (gitleaks #5405, AI-spend alarms #4517 #5406)
-**Stash/hooks:** clean — the reaper removed the released 5390 and 5405 lanes; `fix/walk-completeness` dirty and untouched (pre-existing)
-**Closures:** #5314, #4814, #4777, #5029, #4776, #5384, #5370, #5387, #5398, #5135, #5369, #4973, #4970, #5389, #5405, #5257 commented with outcome verdicts + live proof · DoD: scanned=23, hits 1 — #5111's post-close comment is Session CH's own wrap disposition (informational, not-work)
-**Backlog:** Now live at 13 opus-startable (floor 3), no refill needed; open 94 → 90 (filed #5387–#5390 #5398 #5402 #5405 #5406 #5412 #5413; auto-filed #5410 (closed) and #5411; 16 closed by this session)
-**Alarms:** every red >72h cited — calibration-deadman (#5061), qa-smoke-warnings (#5402); <72h re-cited: `slo-ai-coaching-success` (#5412), `ai-canary-overall` (vendor window, clears ~10-27 16:21Z), ai-tokens pair (#4517), `ai-dev-session-month-high` (#5406); flaps cited: whoop reconcile (timing race, OK 18:21Z), strava reconcile (#5257, OK 17:21Z)
-**CI warnings:** none to triage — the latest main run is red (above); the last green run (8e92239) carried only the 5 playwright-not-installed skips (#3640, by design)
-**Ledger:** none — no standing machinery shipped (the #5405 staged-secrets wrap leg is one more verify leg; gate census 821 → 822 in PR #5409)
+**Build beat:** none — the shipped work is owner-facing (schedules, coaching notes, ingestion); nothing reader-visible
+**Docs:** `docs/CONVENTIONS.md` §1b + ADR-165 + CLAUDE.md schedule line (wave 8); `docs/integrations/hevy-changes-2026-10.md` re-verified (wave 7); `docs/integrations/gym-workflow-2026-10.md` §1b logging; `docs/engines/HYPOTHESIS.md`; `docs/SCHEMA.md` rows; `docs/alarm_citations.json` re-cited (this wrap)
+**Decisions:** ADR-165 filed (one platform timezone, reversing fixed-UTC crons) in PR #5427
+**Main:** wave 10 (e19b3855e) deployed ~16:26Z, smoke running at the amend; the prior full run (335cd22d) green
+**Incidents:** 1 row added — the 9-hour laptop pause that split the 10-27 archive/re-draft (10-27 had no active draft ~06:27–15:26Z)
+**Stash/hooks:** clean — the reaper removed 22 released/merged lanes; 1 dirty pre-existing (`fix/walk-completeness`) left untouched
+**Closures:** #5413, #5049, #4250, #5402, #5097, #5376, #4633, #5318 commented with outcome verdicts + live proof (#5411, #5420 auto) · DoD: scanned=7, hits 1 — #4633's post-close residual disposition (informational, not blocking)
+**Backlog:** Now live (13 opus-startable, refilled #5075); open 90 → 88 (filed #5421 #5428 #5431 #5433 #5434 #5440 #5442; closed 10); Later sweep — no calls this wrap (owner deferred the epic fold)
+**Alarms:** all red >72h cited — calibration-deadman (#5061, owner-deferred), qa-smoke-failures re-cited (#5431 #5440), coherence-overall re-cited (#5442)
+**CI warnings:** 6 — 1 smoke content-truth (the two qa-smoke failures above, #5431 #5440); 5 playwright-not-installed skips (#3640, by design)
+**Ledger:** none — the morning check-in dead-man and the coach-cards qa check ride existing QA functions; no new standing subsystem row (gate census 822 → 823 via #5434's QA check, in PR #5455)

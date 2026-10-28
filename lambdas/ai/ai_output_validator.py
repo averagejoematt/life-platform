@@ -263,7 +263,29 @@ _GENERIC_USELESS_PHRASES = [
 # Each tuple: (health_context_key, regex_extracting_the_number, display_label)
 # Tolerance: 25% deviation between number mentioned in text and actual context value.
 # HRV stated in bpm (a heart-rate unit) — HRV is milliseconds. Category error.
-_HRV_WRONG_UNIT_RE = re.compile(r"\bHRV\b[^.]{0,20}?\b\d+(?:\.\d+)?\s*bpm\b", re.IGNORECASE)
+# #5442: the number must follow HRV with NO other number between them (the old `[^.]{0,20}?`
+# reached past "HRV 25 ms and RHR" to the 64 bpm), and two value-order forms are not HRV
+# claims at all: an HRV whose own ms value sits right BEFORE the label ("NN ms HRV, NN bpm
+# resting heart rate", the 2026-10-26 daily-brief mind text, which is correct), and a bpm
+# number followed by the label it belongs to ("HRV, 52 bpm resting heart rate").
+_HRV_WRONG_UNIT_RE = re.compile(r"\bHRV\b[^.\d]{0,20}\d{1,3}(?:\.\d+)?\s*bpm\b", re.IGNORECASE)
+_HRV_OWN_MS_BEFORE_RE = re.compile(r"\d(?:\.\d+)?\s*ms\s*$", re.IGNORECASE)
+_BPM_BELONGS_TO_NEXT_RE = re.compile(r"\s*(?:resting|rhr\b|heart\s*rate|hr\b|pulse|average\s+heart|max(?:imum)?\b|peak\b)", re.IGNORECASE)
+
+
+def hrv_cited_in_bpm(text: str) -> bool:
+    """True when the text states an HRV value in bpm. The ONE predicate behind this
+    validator's Check 13 and the coherence sentinel's unit check (#5442). They had drifted
+    into two regexes, and both read "NN ms HRV, NN bpm resting heart rate" as an error."""
+    t = text or ""
+    for m in _HRV_WRONG_UNIT_RE.finditer(t):
+        if _HRV_OWN_MS_BEFORE_RE.search(t[max(0, m.start() - 16) : m.start()]):
+            continue  # "NN ms HRV, …": HRV already carries its ms value; the bpm number is another metric's
+        if _BPM_BELONGS_TO_NEXT_RE.match(t, m.end()):
+            continue  # "…, 52 bpm resting heart rate": the bpm number is labelled as a heart rate
+        return True
+    return False
+
 
 # WARN tier only — hallucinated claims are suspicious but not always wrong (rounding, etc.).
 _METRIC_PATTERNS = [
@@ -503,7 +525,7 @@ def validate_ai_output(
     # HRV (RMSSD) is milliseconds; "HRV 44.7 bpm" is a category error the health-
     # literate audience catches. Deterministic — the prompt is the first line, this
     # is the backstop.
-    if _HRV_WRONG_UNIT_RE.search(stripped):
+    if hrv_cited_in_bpm(stripped):
         result.warnings.append("HRV labeled in bpm — HRV is milliseconds (ms), not bpm")
 
     if result.blocked:
