@@ -20,26 +20,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import effort_ceilings
+from training import effort_ceilings, hevy_note_grammar
 
 _EFFORT = effort_ceilings.class_bands()
 
-CARRY_CUE = "Tall, ribs down, bells off your legs."
-CARRY_STEPS_LINE = "Steps go in the yards box."
+CARRY_CUE = hevy_note_grammar.CARRY_CUE
+CARRY_STEPS_LINE = hevy_note_grammar.CARRY_STEPS_LINE
 
 
 def effort_line(rpe: tuple[Any, Any] | Any, last_set_rpe: tuple[Any, Any] | Any | None = None) -> str:
-    """#5428 (standard §3.2): line 1 of every lift note — `RPE a–b[, last set RPE c–d]`. The same text as
-    `hevy_note_grammar.effort_line` (Lane D), so the linter reads one grammar."""
-
-    def fmt(v: Any) -> str:
-        if isinstance(v, (tuple, list)):
-            lo, hi = float(v[0]), float(v[-1])
-            return f"{lo:g}" if lo == hi else f"{lo:g}–{hi:g}"
-        return f"{float(v):g}"
-
-    out = f"RPE {fmt(rpe)}"
-    return f"{out}, last set RPE {fmt(last_set_rpe)}" if last_set_rpe is not None else out
+    """#5428 (standard §3.2): line 1 of every lift note — `RPE a–b[, last set RPE c–d]`. Lane D's
+    `hevy_note_grammar.effort_line`, so the producer and the linter read one grammar."""
+    return hevy_note_grammar.effort_line(rpe, last_set_rpe)
 
 
 def exposure_cue(intensity: str, sets: list[dict[str, Any]], stride: dict[str, Any] | None = None) -> str:
@@ -54,7 +46,7 @@ def exposure_cue(intensity: str, sets: list[dict[str, Any]], stride: dict[str, A
     the chat's, not the set's."""
     del stride
     if intensity == "carry":
-        return "\n".join((f"{effort_line(_EFFORT[effort_ceilings.COMPOUNDS])} · pick the load per hand", CARRY_CUE, CARRY_STEPS_LINE))
+        return "\n".join((hevy_note_grammar.carry_line1(_EFFORT[effort_ceilings.COMPOUNDS]), CARRY_CUE, CARRY_STEPS_LINE))
     if intensity == "accessory":
         if len(sets) == 1:
             return effort_line(_EFFORT[effort_ceilings.LAST_ISOLATION_SET])

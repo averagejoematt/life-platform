@@ -211,6 +211,18 @@ def _resolve_title(ir: RoutineSpec, title_context: dict[str, Any] | None) -> str
     return format_title(ir, title_context)
 
 
+def _lint_notes(body: dict[str, Any], ir: RoutineSpec) -> None:
+    """#5428: every writer (the MCP tool, the nightly cron, the restamp) compiles here, so the note linter sees every
+    routine here. HEVY_NOTE_LINT_MODE warn (default): log the problems; off: skip. It never raises and never changes the
+    body in any mode — enforce refuses at the commit gate, not in the compiler. No note is rewritten at compile time."""
+    try:
+        from training.hevy_note_lint import check_compiled
+
+        check_compiled(body, ir)
+    except Exception:  # noqa: BLE001 — a lint import or run failure must never block a routine write
+        return
+
+
 def to_create_body(
     ir: RoutineSpec,
     template_resolver: Callable[[str], str],
@@ -229,13 +241,15 @@ def to_create_body(
     exercises = _place_routine_note(
         [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], *_compose_notes(ir, why_note)
     )
-    return {
+    body = {
         "routine": {
             "title": _resolve_title(ir, title_context),
             "folder_id": ir.hevy_folder_id,
             "exercises": exercises,
         },
     }
+    _lint_notes(body, ir)
+    return body
 
 
 def to_update_body(
@@ -250,12 +264,14 @@ def to_update_body(
     exercises = _place_routine_note(
         [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)], *_compose_notes(ir, why_note)
     )
-    return {
+    body = {
         "routine": {
             "title": _resolve_title(ir, title_context),
             "exercises": exercises,
         },
     }
+    _lint_notes(body, ir)
+    return body
 
 
 def from_hevy_response(raw: dict[str, Any]) -> dict[str, Any]:

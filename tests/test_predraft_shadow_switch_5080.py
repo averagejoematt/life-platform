@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
@@ -239,7 +240,12 @@ def test_the_v04_draft_honours_the_stale_refusal_and_authors_through_draft_custo
     assert sent["archetype"] == plan["archetype"] and [e["movement_key"] for e in sent["exercises"]] == [
         e["movement_key"] for e in plan["exercises"]
     ]
-    assert all(len(e["notes"]) <= 150 and "v0.4" in e["notes"] for e in sent["exercises"]), "a short note that carries its reason"
+    # #5428: the reason is carried (the reverted plan's load basis), with no version id — draft_custom's note composer keeps
+    # it on the stored record and writes the standard's note on the wire
+    assert all(
+        len(e["notes"]) <= 150 and e["notes"].startswith("Reverted plan: ") for e in sent["exercises"]
+    ), "a short note with its reason"
+    assert not any(re.search(r"\bv\d+\.\d", e["notes"]) for e in sent["exercises"]), "no version id in an authored note"
 
 
 def test_the_shadow_modules_cannot_reach_a_commit():

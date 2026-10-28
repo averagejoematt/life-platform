@@ -312,28 +312,42 @@ def format_title(ir: RoutineSpec, ctx: dict[str, Any]) -> str:
     return title[:MAX_TITLE_CHARS]
 
 
-def _compound_band() -> str:
-    """'8-9' — the charter's ruled compounds band (#5058), or 'the charter ceiling'."""
+def _compound_band() -> tuple[float, float] | None:
+    """(8, 9) — the charter's ruled compounds band (#5058), or None when the charter names none."""
     from training import effort_ceilings
 
     band = effort_ceilings.class_bands().get(effort_ceilings.COMPOUNDS)
-    return f"{band[0]:g}-{band[1]:g}" if band else "the charter ceiling"
+    return (float(band[0]), float(band[1])) if band else None
+
+
+def _session_block(day: str, band: tuple[float, float] | None) -> str:
+    """#5428: the session block (hevy_note_grammar.session_block): the session line `‹Day› · RPE a–b on big lifts`, the
+    low-energy line and the load rule. ONE placement: the draft paths write the block on exercise 1 themselves
+    (`session_block.place_on_first`) and every compile site passes `session_block.why_note_for(ir, format_why_note(ir))`,
+    which suppresses this WHY whenever the block is already there. So this text reaches the wire only for a routine
+    drafted before #5428 (a restamp), as the same three lines. With no charter band the block is the day alone."""
+    from training import hevy_note_grammar
+
+    return hevy_note_grammar.session_block(day, band) if band else day
 
 
 _CB = _compound_band()
-_ROLE_WHY = {
+_V03_BAND = (7.0, 8.0)  # v0.3's heavy/moderate days (superseded 2026-09-24): one top set at RPE 7-8
+_ROLE_DAY: dict[str, tuple[str, tuple[float, float] | None]] = {
     # the five-day split (#5069; v0.4's four roles #4147 unchanged), in the charter's order; #5058: the RPE is the charter's
-    "upper_heavy": f"Upper heavy: one top set at RPE {_CB} on bench and row, back-offs 10% lighter. Loads hold.",
-    "lower_heavy": f"Lower heavy: one top set at RPE {_CB} on the squat, back-offs 10% lighter. Loads hold.",
-    "shoulders_arms": "Shoulders and arms: press, side and rear delts, biceps, triceps, traps. Loads hold.",
-    "upper_volume": f"Upper volume: steady sets of 8-12 at RPE {_CB}. Loads hold.",
-    "lower_volume": f"Lower volume: steady sets of 8-12 at RPE {_CB}. Loads hold.",
+    "upper_heavy": ("Upper heavy", _CB),
+    "lower_heavy": ("Lower heavy", _CB),
+    "shoulders_arms": ("Shoulders + arms", _CB),
+    "upper_volume": ("Upper volume", _CB),
+    "lower_volume": ("Lower volume", _CB),
     # v0.3 (superseded 2026-09-24) — kept so a v0.3 routine still reads right
-    "heavy": "Full-body heavy: one top set at RPE 7-8, back-offs 10% lighter. Loads hold.",
-    "moderate": "Full-body moderate: steady working sets, 2-3 left in the tank. Loads hold.",
-    "heavy_moderate": "Full-body heavy-moderate: two anchors heavy, two moderate. Loads hold.",
-    "optional_fourth": "Optional session: only after two green recovery days. Skipping it costs nothing.",
+    "heavy": ("Full body", _V03_BAND),
+    "moderate": ("Full body", _V03_BAND),
+    "heavy_moderate": ("Full body", _V03_BAND),
+    "optional_fourth": ("Full body", _V03_BAND),
 }
+# #5428: no "Loads hold." (it was wrong whenever a step fired) and no rep scheme (the set rows show it).
+_ROLE_WHY = {role: _session_block(day, band) for role, (day, band) in _ROLE_DAY.items()}
 
 
 def format_why_note(ir: RoutineSpec) -> str:

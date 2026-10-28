@@ -514,6 +514,28 @@ def plan(
     return base
 
 
+def swaps(rotation: dict[str, Any] | None, catalog_movements: dict[str, Any] | None = None) -> dict[str, str]:
+    """The served session's rotated accessories, for the Hevy note (#5083 / #5428): `{served movement key: the title of
+    the exercise it replaces}` — exactly the slots the rationale names `rotated: X → Y`. A pinned slot, block 1's first
+    phase (the template as written), a held variant (the pool cycled back or has one member) and a REFUSED rotation (the
+    template serves) are not swaps. The slot id, the week arithmetic and the issue stay on the rationale and the stored
+    `inputs_snapshot.rotation`; the note gets the one fact he needs at the rack."""
+    rot = rotation or {}
+    pos = rot.get("position") or {}
+    served = rot.get("variants") or {}
+    if not served or int(pos.get("step") or 0) <= 0:
+        return {}
+    catalog = catalog_movements or {}
+    out: dict[str, str] = {}
+    for s in rot.get("slots") or []:
+        if s.get("source") == "pinned" or s.get("variant") == s.get("previous") or not s.get("previous"):
+            continue
+        if served.get(s.get("incumbent")) != s.get("variant"):
+            continue
+        out[str(s["variant"])] = _title(s["previous"], catalog)
+    return out
+
+
 def volume_check(catalog_movements: dict[str, Any], variants_by_role: dict[str, dict[str, str]], skill_ceiling: int = 2) -> dict[str, Any]:
     """The rotated week (`week_volume` with every role's variants) against the template week: `unchanged`, and what `moved`."""
     rotated = week_volume(catalog_movements, variants_by_role, skill_ceiling)

@@ -43,7 +43,7 @@ import re
 import statistics
 from typing import Any
 
-from training import wrist_clock
+from training import hevy_note_grammar, wrist_clock
 
 CARDIO_NOTE_VERSION = "cardio-note@4.0.0"  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
 
@@ -90,9 +90,9 @@ LABELS = {
 }
 
 # the fixed talk-test words per effort (standard §3.7): full sentences = RPE 4–5, short phrases = 6–7, a few words = 8
-TALK_WORDS = ("full sentences", "short phrases", "a few words")
-CLOCK_PREFIX = "⌚ ride clock: "
-AFTER_LINE = "After: end watch cardio, restart Hevy."
+TALK_WORDS = tuple(hevy_note_grammar.TALK_WORDS)  # Lane D's grammar: the linter reads the same words
+CLOCK_PREFIX = hevy_note_grammar.CLOCK_PREFIX
+AFTER_LINE = hevy_note_grammar.AFTER_LINE
 CARDIO_KINDS_SHAPE = {"easy": "flat", "tempo": "flat", "intervals": "intervals", "hills": "hill", "incline_treadmill_walk": "walk"}
 KIND_SHAPE = CARDIO_KINDS_SHAPE
 
