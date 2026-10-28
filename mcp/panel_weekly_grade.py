@@ -16,6 +16,12 @@ routine repo already live:
                 per-date calendar `training.training_calendar` (#5191) — the committed routines' dates when the Hevy
                 record is unreadable) + the intended feedings + the week's titration record. Fail-soft: an
                 unreadable food plan is named on the grade (`degraded`), the training grade still stands.
+  * the menu    `health.weekly_menu.build(plan)` (#5110 box 4, owner ruling 2026-10-26 "Hold for the first built
+                menu"): the food panel grades the COMMITTED MENU — the same deterministic fit of his anchor foods to
+                the week's resolved days that `get_exercise_notes action='weekly_menu'` serves for that Monday —
+                through `training.food_panel.on_menu` (`basis: menu`). A week whose menu is not built (no anchor
+                table, a day refused, an unreadable fixed meal) is graded on the intended feedings and the food grade
+                is `degraded` with the menu's reason code, never silently.
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
                 scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
 
@@ -127,6 +133,39 @@ def read_food_plan(week_start: str, routines: list[dict[str, Any]]) -> dict[str,
         return None
 
 
+def _priorities_or_none() -> dict[str, Any] | None:
+    try:
+        from training import lab_priorities
+
+        from mcp.config import table
+
+        return lab_priorities.read_priorities(table)
+    except Exception as e:  # noqa: BLE001 — no priorities row weights nothing; the menu still builds
+        logger.warning("panel weekly grade: lab priorities unreadable (%s: %s)", type(e).__name__, str(e)[:200])
+        return None
+
+
+def read_menu_plan(plan: dict[str, Any] | None, *, build: Any = None) -> dict[str, Any] | None:
+    """#5110 box 4: the plan the food panel grades — the week's menu over `plan` (`food_panel.on_menu`), or the plan on
+    its intended feedings with the menu's reason code. `build(plan)` defaults to `health.weekly_menu.build` with the
+    owner-only lab-priorities row, the call the MCP menu read makes. None in, None out (the food plan was not read)."""
+    if plan is None:
+        return None
+    from training import food_panel
+
+    try:
+        if build is None:
+            from health import weekly_menu
+
+            menu = weekly_menu.build(plan, priorities=_priorities_or_none())
+        else:
+            menu = build(plan)
+    except Exception as e:  # noqa: BLE001 — named on the grade (menu_unreadable); the intended feedings are graded
+        logger.warning("panel weekly grade: menu unbuildable (%s: %s)", type(e).__name__, str(e)[:200])
+        menu = {"built": False, "reason_code": "menu_unreadable"}
+    return food_panel.on_menu(plan, menu)
+
+
 def read_history() -> list[dict[str, Any]]:
     from boto3.dynamodb.conditions import Key
     from training.panel_judge import PANEL_SK_PREFIX
@@ -168,7 +207,7 @@ def run(week_end: str | None = None) -> dict[str, Any]:
         routines=routines,
         constraint_block=read_constraint_block(end),
         history=read_history(),
-        food_plan=read_food_plan(start, routines),
+        food_plan=read_menu_plan(read_food_plan(start, routines)),  # #5110 box 4: graded on the week's menu
     )
     grade["stored"] = store(grade) if grade.get("status") == "graded" else {"written": False, "reason": grade.get("status")}
     return grade
@@ -204,5 +243,7 @@ def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
         result = {"job": JOB["name"], "status": "failed", "error": f"{type(e).__name__}: {e}"[:300]}
     print(emf_line(result.get("status") or "failed"))
     summary = {k: result.get(k) for k in ("week_end", "status", "overall", "target_met", "degraded", "degraded_reasons", "stored")}
+    food = result.get("food") or {}
+    summary["food"] = {k: food.get(k) for k in ("overall", "target_met", "degraded_reasons", "basis", "menu")} if food else None
     logger.info("PANEL_WEEKLY_GRADE %s", json.dumps(summary, default=str)[:4000])
     return {"statusCode": 200, "body": json.dumps(summary, default=str), "headers": {"Content-Type": "application/json"}}

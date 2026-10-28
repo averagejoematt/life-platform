@@ -14,6 +14,10 @@ What each test holds (each iterates its whole set and reports every offender):
   6. A PAUSED JUDGE: the code criteria stand, the judge criteria report unscored, nothing is fabricated.
   7. THE GATE CAN FAIL (mutation): a food check that stops discriminating reds the gate, naming the control.
   8. THE WEEKLY RUN without a food plan says so (degraded), never a silent training-only grade.
+  9. THE WEEKLY RUN GRADES THE COMMITTED MENU (box 4, owner ruling 2026-10-26 "Hold for the first built menu"): the
+     plan the weekly job hands the food panel is the week's code-built menu (`basis: menu`, each day's feedings the
+     menu's grams), the controls still fail on it; a week with no built menu is graded on the intended feedings and
+     the food grade is degraded naming the menu's reason code — the row carries codes, never a food.
 
 No live AI call and no AWS: the judge is a replay of `recorded_judge.json`; the charter is the bundled file.
 """
@@ -252,3 +256,88 @@ def test_the_weekly_run_grades_the_food_plan_or_says_it_did_not():
     none = panel_judge.grade_committed_week("2026-10-18", food_plan=None, **kw)
     assert none["food"] is None and none["degraded"] and any("food plan was not read" in r for r in none["degraded_reasons"])
     assert panel_judge.panel_item(none, "USER#matthew")["food"] is None
+
+
+# ── 9. the weekly run grades the committed menu (#5110 box 4) ────────────────────────────
+def _menu_fixture(monkeypatch):
+    """The #5103 test's invented placeholder anchors and its plan (a fixed Monday, no clock), built offline."""
+    import test_weekly_menu_5103 as wm_t  # noqa: PLC0415 — the one copy of the placeholder anchor table
+    from health import weekly_menu as wm  # noqa: PLC0415
+
+    monkeypatch.setattr(tc, "_load_private", lambda: None)  # never a local twin on a laptop
+    tc.reset_cache()
+    plan = wm_t._plan()
+    return wm, plan, (lambda p: wm.build(p, anchors_raw=copy.deepcopy(wm_t.ANCHORS), fixed_meals_raw=[]))
+
+
+def _food_reply_call():
+    rec = json.loads((FIX / gate.RECORDED).read_text(encoding="utf-8"))["responses"]
+
+    def call(body):
+        return {"content": [{"type": "text", "text": json.dumps(rec["food_good_week"])}], "stop_reason": "end_turn", "usage": {}}
+
+    return call
+
+
+def test_the_weekly_food_grade_reads_the_weeks_menu_and_says_when_it_could_not(monkeypatch):
+    from mcp import panel_weekly_grade as pwg  # noqa: PLC0415
+
+    wm, plan, build = _menu_fixture(monkeypatch)
+    rubric = _rubric()
+    on = pwg.read_menu_plan(plan, build=build)
+    menu = build(plan)
+    assert menu["built"], menu.get("reason")
+    problems = []
+    if on["basis"] != food_panel.BASIS_MENU or not on["menu"]["built"]:
+        problems.append(f"a built menu was not the graded basis: {on.get('basis')} {on.get('menu')}")
+    by_date = {d["date"]: [f["protein_g"] for f in d["feedings"]] for d in menu["days"]}
+    off = [d["date"] for d in on["days"] if [f["protein_g"] for f in d["feedings"]] != by_date.get(d["date"])]
+    if off or not on.get("quality_days"):
+        problems.append(f"the graded days are not the menu's feedings / quality rows: {off}")
+    g = food_panel.grade_week(on, rubric, call=_food_reply_call())
+    if g["basis"] != food_panel.BASIS_MENU or any("intended feedings" in r for r in g["degraded_reasons"]):
+        problems.append(f"the menu-basis grade names an off-menu reason: {g['degraded_reasons']}")
+    if any(c["missed"] or c["target_met"] for c in g["controls"]):
+        problems.append(f"a negative control passed on the menu plan: {g['controls']}")
+    row = food_panel.row_summary(g)
+    if row["basis"] != food_panel.BASIS_MENU or row["menu"] != food_panel.menu_summary(menu):
+        problems.append(f"the PANEL# food row does not carry the basis: {row.get('basis')} {row.get('menu')}")
+    labels = [a["label"] for a in menu["days"][0]["feedings"][0].get("items") or []] + ["placeholder t_"]
+    if any(lab in json.dumps(row, default=str) for lab in labels):
+        problems.append("the PANEL# food row names a food")
+    # no built menu: the intended feedings are graded and the grade SAYS so, with the menu's own reason code
+    for menu_out, code in (({"built": False, "reason_code": "no_anchor_table", "reason": "x"}, "no_anchor_table"), (None, "no_menu")):
+        off_menu = food_panel.on_menu(plan, menu_out)
+        gd = food_panel.grade_week(off_menu, rubric, call=_food_reply_call())
+        if off_menu["basis"] != food_panel.BASIS_INTENDED or off_menu["days"] != plan["days"]:
+            problems.append(f"{code}: the off-menu plan is not the intended feedings")
+        if not gd["degraded"] or not any(f"menu {code}" in r for r in gd["degraded_reasons"]):
+            problems.append(f"{code}: the off-menu grade is not degraded with the menu's reason: {gd['degraded_reasons']}")
+    raised = pwg.read_menu_plan(plan, build=lambda p: 1 / 0)
+    if raised["basis"] != food_panel.BASIS_INTENDED or raised["menu"]["reason_code"] != "menu_unreadable":
+        problems.append(f"a menu build that raises is not named menu_unreadable: {raised.get('menu')}")
+    if pwg.read_menu_plan(None) is not None:
+        problems.append("no food plan must stay None (the food plan was not read)")
+    assert not problems, "\n".join(problems)
+
+
+def test_the_weekly_job_hands_the_food_panel_the_menu_plan(monkeypatch):
+    from mcp import panel_weekly_grade as pwg  # noqa: PLC0415
+
+    _wm, plan, build = _menu_fixture(monkeypatch)
+    seen = {}
+    monkeypatch.setattr(pwg, "read_routines", lambda start, end: [{"target_date": start}])
+    monkeypatch.setattr(pwg, "read_constraint_block", lambda end: None)
+    monkeypatch.setattr(pwg, "read_history", lambda: [])
+    monkeypatch.setattr(pwg, "read_food_plan", lambda start, routines: plan)
+    monkeypatch.setattr(pwg, "store", lambda grade: {"written": False, "reason": "test"})
+    real_read_menu_plan = pwg.read_menu_plan
+    monkeypatch.setattr(pwg, "read_menu_plan", lambda p: real_read_menu_plan(p, build=build))
+
+    def fake_grade(end, **kw):
+        seen.update(kw)
+        return {"status": "no_plan", "week_end": end}
+
+    monkeypatch.setattr(panel_judge, "grade_committed_week", fake_grade)
+    pwg.run("2026-11-01")
+    assert seen["food_plan"]["basis"] == food_panel.BASIS_MENU and seen["food_plan"]["menu"]["built"], seen.get("food_plan", {}).get("menu")
