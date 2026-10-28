@@ -116,13 +116,27 @@ AI_TOKENS_VARIANCE_BAR = int(round(lognormal_upper_bound(AI_TOKENS_DAILY_MAX_ROL
 # is the number the AWS Budgets backstop (core_stack.py) already reads for the same reason. A base
 # change moves this bar on the next `cdk_deploy.sh LifePlatformMonitoring` (the drift guard shows it).
 #
-# The token bar is the SAME dollar bar in output tokens, priced at the dearest output rate the
-# chokepoint bills (ai.bedrock_client.PRICES). Output tokens alone at that rate reach the bar, so it
-# never pages before the dollar bar would on correctly-priced traffic. It stays as an independent meter:
-# tokens are counted even where EstimatedCostUSD under-prices a call (#2883's drift class).
+# The token bar is the SAME dollar bar in output tokens, priced at the dearest output rate among the
+# models the fleet is ROUTED to (ai.model_routing's tiers + per-route pins, priced through
+# ai.bedrock_client.PRICES — scripts/budget_ceilings.routed_output_usd_per_mtok). Today that is the
+# narrative tier, Sonnet 4.6, $15/1M. On traffic billed at that rate or dearer, output tokens alone
+# reach the dollar bar first, so the token page cannot fire before the dollar page would. On cheaper
+# (Haiku) traffic it fires only at a volume no day on record has come near (below). It stays as an
+# independent meter: tokens are counted even where EstimatedCostUSD under-prices a call (#2883's class).
 #
-# Replay (5-minute LifePlatform/AI Sums, 2026-09-02..10-24, read-only get-metric-statistics, validated
-# against describe-alarm-history to within 5 minutes): both bars page on the same two episodes as the
+# 2026-10-27 (#4517, a recurrence of the issue's own defect): the 10-24 token bar was priced at the
+# DEAREST row in PRICES (Fable, $50/1M), which no route sends a token to — so it was the tighter of the
+# two bars on every real day. It paged urgent 2026-10-26T05:41Z -> 10-27T05:20Z (describe-alarm-history)
+# on 637,388 rolling-24 h output tokens that cost $11.54, half the dollar bar. Most of the excess was an
+# owner-ruled laptop eval (gpt-oss reasoning tokens at $0.60/1M + a Sonnet judge, docs/alarm_citations.json),
+# i.e. tokens far cheaper than the $50 they were priced at. Re-priced at the routed rate: 459,000 ->
+# 1,529,000. Replay of the same 5-minute Sums, 09-01..10-27: 0 token crossings at the new bar (3 at
+# 459,000: 10-01, 10-18, 10-26); the dollar bar alone still pages both runaway episodes (10-01, peak
+# $36.59 / 940,414 tokens; 10-18, $31.39 / 602,639). The new bar is 1.6x the largest rolling-24 h token
+# peak on record (10-02's runaway) and 2.4x the largest day that stayed under the dollar bar (10-26).
+#
+# Replay at the 10-24 bars (5-minute LifePlatform/AI Sums, 2026-09-02..10-24, read-only get-metric-statistics,
+# validated against describe-alarm-history to within 5 minutes): both bars page on the same two episodes as the
 # variance bars did — the 10-01 day ($36.59 rolling peak, 940,414 tokens) and the 10-18 dev-session day
 # ($31.39, 602,639) — and on nothing else; the spend page on 10-18 lasts 11.0 h instead of 37.1 h.
 
@@ -143,7 +157,7 @@ def _budget_ceilings():
 
 _BUDGET = _budget_ceilings()
 AI_SPEND_BUDGET_BAR_USD = round(_BUDGET.base_ceiling_usd() * _BUDGET.narrowest_rung_fraction(), 2)  # 22.93
-AI_TOKENS_BUDGET_BAR = int(round(AI_SPEND_BUDGET_BAR_USD / _BUDGET.dearest_output_usd_per_mtok() * 1_000_000, -3))  # 459,000
+AI_TOKENS_BUDGET_BAR = int(round(AI_SPEND_BUDGET_BAR_USD / _BUDGET.routed_output_usd_per_mtok() * 1_000_000, -3))  # 1,529,000
 
 AI_DAILY_SPEND_THRESHOLD_USD = max(AI_SPEND_VARIANCE_BAR_USD, AI_SPEND_BUDGET_BAR_USD)
 AI_TOKENS_PLATFORM_DAILY_THRESHOLD = max(AI_TOKENS_VARIANCE_BAR, AI_TOKENS_BUDGET_BAR)
@@ -230,8 +244,9 @@ def add_token_alarms(scope, topic, digest) -> None:
         to_digest=True,
     )
 
-    # Platform-level total (no dims). 2026-10-24 (#4517): 337,000 → 459,000, the budget bar in output
-    # tokens (top of this module); the variance bar stays as its floor. 2026-10-01 (#4517): 250000 →
+    # Platform-level total (no dims). 2026-10-27 (#4517): 459,000 → 1,529,000, the budget bar re-priced
+    # at the ROUTED output rate, not the dearest PRICES row (top of this module). 2026-10-24 (#4517):
+    # 337,000 → 459,000, the budget bar in output tokens; the variance bar stays as its floor. 2026-10-01 (#4517): 250000 →
     # 337,000, derived on the ROLLING-24h statistic. It fired twice on 09-30, and the calendar-day
     # estimators below never saw the rolling peak.
     # 2026-09-04 (#3474): 150000 → 250000, re-derived (ADR-105). Set in 2026-06
