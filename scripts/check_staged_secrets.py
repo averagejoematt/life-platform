@@ -74,9 +74,14 @@ def pinned_version(workflow: Path = CI_WORKFLOW) -> str:
     return m.group(1)
 
 
-def find_gitleaks(env=None, which=shutil.which, isfile=os.path.isfile):
-    """(path|None, why-not). `GITLEAKS_BIN` wins; a value pointing at nothing is reported, not skipped."""
+def find_gitleaks(env=None, which=None, isfile=os.path.isfile):
+    """(path|None, why-not). `GITLEAKS_BIN` wins; a value pointing at nothing is reported, not skipped.
+
+    `which` resolves at CALL time: a `shutil.which` default argument is bound when the def runs, so a
+    test patching `shutil.which` never reached it and the absent-binary tests found a real gitleaks
+    on any machine that has one installed (they pass in CI only because CI has none)."""
     env = os.environ if env is None else env
+    which = which or shutil.which
     override = env.get("GITLEAKS_BIN")
     if override:
         if isfile(override) and os.access(override, os.X_OK):
