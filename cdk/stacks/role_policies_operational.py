@@ -999,12 +999,22 @@ def operational_recap_card_generator() -> list[iam.PolicyStatement]:
 
 def operational_og_image_generator() -> list[iam.PolicyStatement]:
     """OG image generator: reads public_stats.json (+ the published Q&A feed for
-    #404 moment permalinks), writes PNG cards + moment shells, invalidates CloudFront."""
+    #404 moment permalinks), writes PNG cards + moment shells, invalidates CloudFront.
+
+    The coach-card sweep (`og_coach_cards.sweep_coach_cards`) also reads the board roster
+    for each card's name and accent — object-scoped, never `config/*`. Without it every card
+    fell back to "AI Coach" + the default accent and `swallowed-permission-denial` fired
+    daily (#5434's first live run, 2026-10-27 19:30Z). The portrait bundle under `site/`
+    needs no grant (the bucket policy's PublicReadSite)."""
     return [
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
-            resources=_s3("generated/public_stats.json", "generated/board_answers/answers.json"),
+            resources=_s3(
+                "generated/public_stats.json",
+                "generated/board_answers/answers.json",
+                "config/board_of_directors.json",
+            ),
         ),
         iam.PolicyStatement(
             sid="S3Write",
