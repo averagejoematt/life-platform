@@ -168,8 +168,8 @@ def _menu_plan_or_plain(plan: dict[str, Any]) -> dict[str, Any]:
     plan, untouched (the food panel then reports the food-quality targets as `not checked`)."""
     from training import food_panel
 
-    out = read_menu_plan(plan)
-    return out if (out or {}).get("basis") == food_panel.BASIS_MENU else plan
+    out = read_menu_plan(plan) or plan
+    return out if out.get("basis") == food_panel.BASIS_MENU else plan
 
 
 def read_history() -> list[dict[str, Any]]:
