@@ -18,7 +18,9 @@ split as `assess_hero_weight` and the `reader_truth_qa` helper.
 import re
 from datetime import date as _date, timedelta as _timedelta
 
+from operational.protein_target_refs import protein_target_starts
 from operational.protein_window_claims import protein_window_tags, served_protein_windows
+from operational.rate_claims import _rate_claims, _rate_tolerance, _rate_value
 
 # Rounding and a same-day reweigh, not a cycle-old figure. The live gap was 3.5 lb.
 CROSS_SURFACE_WEIGHT_TOL_LBS = 1.5
@@ -339,10 +341,14 @@ _QUANTITY_KEYWORD = {
 }
 
 
-def _quantity_matches(sentence: str, patterns, lo: float, hi: float) -> list[float]:
+def _quantity_matches(sentence: str, patterns, lo: float, hi: float, target_spans=None, target_hits=None) -> list[float]:
     """Every value `patterns` (one quantity's forward/backward regex pair, same
     shape as `_VITALS_PATTERNS`) finds in `sentence`, domain- and anchor-filtered.
-    The one number-extraction seam `classify_claims`'s two branches share."""
+    The one number-extraction seam `classify_claims`'s two branches share.
+
+    #5471: a match whose number starts at a `target_spans` offset (`_protein_target_starts`)
+    is a TARGET REFERENCE, not a claim — it is left out and its offset added to `target_hits`
+    (a set, so two patterns finding the same figure count it once)."""
     out = []
     for pat in patterns:
         for m in pat.finditer(sentence):
@@ -354,6 +360,10 @@ def _quantity_matches(sentence: str, patterns, lo: float, hi: float) -> list[flo
                 continue
             if _HISTORICAL_ANCHOR.match(sentence[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
                 continue  # dated / prior-cycle framing — not a claim about now
+            if target_spans and m.start(1) in target_spans:
+                if target_hits is not None:
+                    target_hits.add(m.start(1))
+                continue
             out.append(v)
     return out
 
@@ -384,7 +394,7 @@ def _from_to_owners(sentence: str, quantities) -> dict:
 
 
 def classify_claims(prose: str, patterns: dict, domain: dict):
-    """The ONE seam #4180 and #4186 share: every quantity a blob of prose states,
+    """The ONE seam #4180 and #4186 share (the 3-tuple contract; `classify_claims_counted` adds #5471's fourth count): every quantity a blob of prose states,
     split three ways so a caller can never mis-compare a figure that was never a
     claim about the present:
 
@@ -409,13 +419,28 @@ def classify_claims(prose: str, patterns: dict, domain: dict):
     ``patterns``/``domain`` are keyed the same way `_VITALS_PATTERNS`/
     `_VITALS_DOMAIN` are, so `vitals_cited_in` below is a thin, contract-frozen
     wrapper over this — every existing caller/test is unaffected.
+
+    #5471: a protein gram figure a floor/target/goal/minimum word binds to is a target reference — in no bucket
+    at all; `classify_claims_counted` returns how many there were so a caller can name them as skipped.
     """
+    return classify_claims_counted(prose, patterns, domain)[:3]
+
+
+def classify_claims_counted(prose: str, patterns: dict, domain: dict):
+    """`classify_claims` plus a 4th element: the count of protein target references (#5471) left out."""
     current: dict[str, list[float]] = {}
     trend_end: dict[str, list[float]] = {}
     trend_start: list[tuple[str, float]] = []
+    target_refs = 0
 
     for sentence in _sentences(prose):
+        target_spans = protein_target_starts(sentence) if "protein" in patterns else set()
         if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
+            if target_spans and not _DATED_SENTENCE.search(sentence):
+                lo, hi = domain["protein"]
+                hits: set = set()
+                _quantity_matches(sentence, patterns["protein"], lo, hi, target_spans, hits)
+                target_refs += len(hits)
             continue
         is_trend = bool(_TREND_SENTENCE.search(sentence))
         owned = _from_to_owners(sentence, _QUANTITY_KEYWORD) if is_trend else {}
@@ -430,11 +455,13 @@ def classify_claims(prose: str, patterns: dict, domain: dict):
                     if lo <= end <= hi:
                         trend_end.setdefault(quantity, []).append(end)
                 continue  # its from-to pairs consumed this quantity for this sentence — never double-count
-            vals = _quantity_matches(sentence, pats, lo, hi)
+            hits = set()
+            vals = _quantity_matches(sentence, pats, lo, hi, target_spans if quantity == "protein" else None, hits)
+            target_refs += len(hits)
             if not vals:
                 continue
             (trend_end if is_trend else current).setdefault(quantity, []).extend(vals)
-    return current, trend_end, trend_start
+    return current, trend_end, trend_start, target_refs
 
 
 def vitals_cited_in(prose: str) -> dict:
@@ -844,37 +871,6 @@ _CLAIM_UNIT = {
     "log_gap_days": "d",
 }
 
-# "3.7 pounds per week", "−4.4 lb/week" — the loss-rate figure a coach states in
-# plain prose. Unicode minus (−, U+2212) travels through some renderers instead
-# of an ASCII hyphen, so both are accepted (see `_parse_signed`).
-_RATE_PATTERNS = (re.compile(r"([−-]?\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)\s*(?:per|/)\s*(?:week|wk)\b", re.IGNORECASE),)
-_RATE_DOMAIN = (-20.0, 20.0)
-
-
-def _parse_signed(token: str) -> float:
-    """A number that may carry a Unicode minus (−) instead of a hyphen."""
-    return float(token.replace("−", "-"))
-
-
-def _rate_claims(prose: str) -> list[float]:
-    """Every loss-rate figure (lb/week, signed or not) `prose` states as current.
-    Dated/target-framed sentences are excluded — the same rule every other
-    extractor here uses (`_sentences`/`_DATED_SENTENCE`/`_VITALS_TARGET_SENTENCE`)."""
-    out = []
-    for sentence in _sentences(prose):
-        if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
-            continue
-        for pat in _RATE_PATTERNS:
-            for m in pat.finditer(sentence):
-                try:
-                    v = _parse_signed(m.group(1))
-                except ValueError:
-                    continue
-                if _RATE_DOMAIN[0] <= v <= _RATE_DOMAIN[1]:
-                    out.append(v)
-    return out
-
-
 # "14 logged days", "from 19 logged days" (a POSITIVE claim: this many days carry a
 # log) vs "six days without logs", "the log went dark ... six days" (a GAP claim:
 # this many days carry NO log — the engine's own `lag_days`, not its `days_logged`).
@@ -904,6 +900,8 @@ def _num_token(token: str) -> float:
 def _days_and_gap_claims(prose: str) -> list[tuple[str, float]]:
     """``[("days_logged"|"log_gap_days", value)]`` — see the module comment above
     for why these are two quantities, never one."""
+    from operational.weight_truth_qa import _DATED_SENTENCE, _VITALS_TARGET_SENTENCE, _sentences
+
     out = []
     for sentence in _sentences(prose):
         if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
@@ -982,39 +980,16 @@ COACH_CONSISTENCY_TOL: dict = {
 }
 
 
-def _rate_tolerance(rate_ci: tuple | None) -> float:
-    """The loss-rate tolerance: half the engine's own CI width when the engine
-    serves one (`journey.weekly_rate_ci_low/high`), per #4186's acceptance
-    ("tolerance derived from the engine's own CI... where one is served").
-    Falls back to a documented default when no CI is available: a coach's own
-    rounding of the rate to one decimal place is the only source of disagreement
-    the fallback needs to absorb.
-    """
-    if rate_ci and rate_ci[0] is not None and rate_ci[1] is not None:
-        return abs(float(rate_ci[1]) - float(rate_ci[0])) / 2.0
-    return 1.0
-
-
-# #4186's chosen rule for `rate`, stated once here rather than at each call site:
-# coach prose states the loss rate in plain, usually-unsigned terms ("3.7 pounds
-# per week"), while the engine's `weekly_rate_lbs` is SIGNED negative-for-loss.
-# Requiring sign agreement would fail ordinary correct writing ("losing 3.7
-# lb/week") — the exact #1985 anti-pattern this whole file exists to avoid — so
-# every rate comparison here is by MAGNITUDE. The documented limit: a coach who
-# reports a rate of GAIN using the same unsigned phrasing a loss would use is
-# invisible to this rule; nothing here reads direction, only size.
-def _rate_value(v: float) -> float:
-    return abs(v)
-
-
-def _claims_by_quantity(coaches, served_protein: dict | None = None) -> tuple[dict, int]:
-    """``({quantity: [(value, cls, coach_name)]}, skipped_count)`` across every
+def _claims_by_quantity(coaches, served_protein: dict | None = None) -> tuple[dict, int, int]:
+    """``({quantity: [(value, cls, coach_name)]}, skipped_count, target_refs)`` across every
     served coach — `skipped_count` is `classify_claims`'s `trend_start` figures,
     which never reach `coach_quantity_claims`'s return at all (they are never a
     claim about anything comparable — see `classify_claims`) and so would
-    otherwise vanish from both legs' emitted counts."""
+    otherwise vanish from both legs' emitted counts; `target_refs` (#5471) is the
+    protein floor/target figures, likewise in no claim bucket."""
     out: dict = {}
     skipped = 0
+    target_refs = 0
     for c in coaches or []:
         if not isinstance(c, dict):
             continue
@@ -1023,9 +998,10 @@ def _claims_by_quantity(coaches, served_protein: dict | None = None) -> tuple[di
             for value, cls in entries:
                 out.setdefault(quantity, []).append((value, cls, name))
         prose = " ".join(str(c.get(k) or "") for k in _PROSE_FIELDS)
-        _cur, _te, trend_start = classify_claims(prose, _CLAIM_PATTERNS, _CLAIM_DOMAIN)
+        _cur, _te, trend_start, refs = classify_claims_counted(prose, _CLAIM_PATTERNS, _CLAIM_DOMAIN)
         skipped += len(trend_start)
-    return out, skipped
+        target_refs += refs
+    return out, skipped, target_refs
 
 
 # #4186 (the wire gap): the page's LEAD coach does not live in `coaches[]`. On
@@ -1082,8 +1058,8 @@ def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None
     Returns (ok, message) — the message ALWAYS carries the claim count (extracted
     / compared / skipped), pass or fail, per #4186's dead-man requirement.
     """
-    claims, trend_start_skipped = _claims_by_quantity(coaches, served_protein)
-    extracted = sum(len(v) for v in claims.values()) + trend_start_skipped
+    claims, trend_start_skipped, target_skipped = _claims_by_quantity(coaches, served_protein)
+    extracted = sum(len(v) for v in claims.values()) + trend_start_skipped + target_skipped
     own_window = sum(1 for entries in claims.values() for _v, cls, _n in entries if _own_window(cls))
     disagreements = []
     compared = 0
@@ -1106,6 +1082,7 @@ def assess_cross_surface_coach_consistency(coaches, rate_ci: tuple | None = None
 
     note = (
         f" (claims: {extracted} extracted, {compared} compared, {trend_start_skipped} skipped as trend-start, "
+        f"{target_skipped} skipped as a protein floor/target reference, "
         f"{own_window} left to the engine leg — a named day or recent window)"
     )
     if disagreements:
@@ -1144,8 +1121,8 @@ def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None, 
     Returns (ok, message) — always carries the claim count, per #4186's
     dead-man requirement.
     """
-    claims, trend_start_skipped = _claims_by_quantity(coaches, served_protein)
-    extracted = sum(len(v) for v in claims.values()) + trend_start_skipped
+    claims, trend_start_skipped, target_skipped = _claims_by_quantity(coaches, served_protein)
+    extracted = sum(len(v) for v in claims.values()) + trend_start_skipped + target_skipped
 
     engine_facts: dict = {}
     if isinstance(nutrition, dict):
@@ -1187,10 +1164,10 @@ def assess_cross_surface_coach_vs_engine(coaches, nutrition=None, journey=None, 
                 unit = _CLAIM_UNIT.get(quantity, "")
                 disagreements.append(f"{quantity}: {name} cites {value:g}{unit} vs engine {fact:g}{unit}{window}")
 
-    no_field = extracted - compared - trend_start_skipped
+    no_field = extracted - compared - trend_start_skipped - target_skipped
     note = (
         f" (claims: {extracted} extracted, {compared} compared, "
-        f"{trend_start_skipped} skipped as trend-start, {no_field} skipped — no served engine field for that quantity, "
+        f"{trend_start_skipped} skipped as trend-start, {target_skipped} skipped as a protein floor/target reference, {no_field} skipped — no served engine field for that quantity, "
         f"{named_day} matched the engine's value for a day the coach named)"
     )
     if disagreements:
