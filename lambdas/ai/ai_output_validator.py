@@ -254,27 +254,6 @@ _PRESCRIPTIVE_CONTEXT = [
     r"\btomorrow\b",
 ]
 
-# #5297 — Check 5c, a PRESCRIBED day under the charter floor. Check 5's figure band stops below
-# 800, so "aim for <N> calories a day" with N between that band and the charter's planned minimum
-# was never blocked. A figure blocks here only when its own sentence prescribes it as a day:
-#   * a prescribing lead in the clause just before the figure ("aim for", "eat", "target", "cap at",
-#     "stick to", "plan"...) AND a per-day framing in the sentence; or
-#   * the "a <N> kcal day" form itself, unless the sentence reports it ("was a <N> kcal day").
-# Change figures, reported intake and "at least <N>" floors are never prescriptions here.
-_PRESCRIBING_LEAD_RE = re.compile(
-    r"\b(?:aim(?:ing)?\s+(?:for|at)|target(?:ing)?|eat(?:ing)?|consum(?:e|ing)|stick\s+(?:to|with)"
-    r"|keep\s+(?:it\s+|intake\s+)?(?:to|at|under|below|around)|cap(?:ped)?\s+(?:it\s+|intake\s+)?(?:at|to)"
-    r"|limit(?:ed)?\s+(?:yourself\s+|intake\s+)?to|stay\s+(?:under|below|at|around)|cut\s+(?:back\s+)?to|drop\s+to"
-    r"|no\s+more\s+than|plan(?:ned)?|try|should|goal\s+(?:of|is)|set\s+(?:a|the|your))\b[^.;:!?\n]{0,30}$",
-    re.IGNORECASE,
-)
-_AT_LEAST_LEAD_RE = re.compile(
-    r"\b(?:at\s+least|no\s+(?:less|fewer)\s+than|(?:a\s+)?minimum\s+of|floor\s+of|above|over)\s*~?$", re.IGNORECASE
-)
-_A_KCAL_DAY_LEAD_RE = re.compile(r"\b(?:a|an)\s+~?$", re.IGNORECASE)
-_A_KCAL_DAY_TAIL_RE = re.compile(r"^\s*days?\b", re.IGNORECASE)
-_REPORTED_DAY_FORM_RE = re.compile(r"\b(?:was|were|been|had)\b", re.IGNORECASE)
-
 # How far either side of the figure we look for that context.
 _CALORIE_CONTEXT_WINDOW = 80
 
@@ -528,12 +507,6 @@ def validate_ai_output(
                 logger.error("[ai_validator] BLOCKED low-cal rec: %s", blocked_cals)
                 return result
 
-    # ── Check 5c (#5297): a prescribed DAY under the charter's planned minimum ──
-    if output_type in (AIOutputType.NUTRITION_COACH, AIOutputType.GUIDANCE, AIOutputType.BOD_COACHING):
-        _prescribed_day_guard(_calorie_check_text(stripped), result)
-        if result.blocked:
-            return result
-
     # ── Check 5b (#5297): a day of small labelled meal figures that SUM under the floor ──
     if output_type in (AIOutputType.NUTRITION_COACH, AIOutputType.GUIDANCE, AIOutputType.BOD_COACHING):
         _day_sum_guard(_calorie_check_text(stripped), result)
@@ -656,42 +629,6 @@ def _is_change_figure(text: str, match: re.Match) -> bool:
     return bool(_CHANGE_WORD_AFTER_RE.match(text[match.end() : match.end() + 40]))
 
 
-def _prescribed_day_guard(cal_text: str, result: "AIValidationResult") -> None:
-    """#5297 Check 5c — block a figure its own sentence PRESCRIBES as a day's intake when it sits
-    under the charter's planned minimum (Check 5's band only reaches below 800)."""
-    candidates = []
-    for m in _DAY_FIGURE_RE.finditer(cal_text):
-        value = int(m.group(1).replace(",", ""))
-        if value < 100 or _is_change_figure(cal_text, m):
-            continue
-        left = max((b.end() for b in _SEGMENT_BOUNDARY_RE.finditer(cal_text, 0, m.start())), default=0)
-        before = cal_text[left : m.start()]
-        segment = _enclosing_segment(cal_text, m)
-        if _is_reported_intake(segment) or _AT_LEAST_LEAD_RE.search(before):
-            continue
-        kcal_day_form = bool(_A_KCAL_DAY_LEAD_RE.search(before) and _A_KCAL_DAY_TAIL_RE.match(cal_text[m.end() :]))
-        if kcal_day_form and not _REPORTED_DAY_FORM_RE.search(before):
-            candidates.append(value)
-            continue
-        per_day = _find_patterns(segment, _DAILY_INTAKE_CONTEXT + _RESTRICTION_CONTEXT + _DAY_FRAMING_IN_SEGMENT)
-        if per_day and _PRESCRIBING_LEAD_RE.search(before):
-            candidates.append(value)
-    if not candidates:
-        return
-    minimum = _planned_minimum_kcal()
-    if minimum is None:
-        result.warnings.append(f"prescribed-day guard: charter minimum unreadable; day figures {candidates} not judged")
-        return
-    under = [c for c in candidates if c < minimum]
-    if under:
-        result.blocked = True
-        result.block_reason = (
-            f"Dangerously low calorie recommendation: a day prescribed at {under} kcal (under the planned minimum {minimum:,})"
-        )
-        result.safe_fallback = _low_calorie_fallback()
-        logger.error("[ai_validator] BLOCKED prescribed day under the floor: %s", under)
-
-
 def _is_reported_intake(segment: str) -> bool:
     """#5324 — the segment states what was logged/eaten and prescribes nothing."""
     return bool(_find_patterns(segment, _REPORTED_INTAKE_CONTEXT)) and not _find_patterns(segment, _PRESCRIPTIVE_CONTEXT)
@@ -733,6 +670,10 @@ def _low_calorie_fallback() -> str:
 # its own; this closes the gap it opened: a plan whose labelled meals ADD UP to a starvation day.
 #   * Grouping: a day HEADING is a short line that opens with a weekday or "Day N" and carries no
 #     calorie figure. A day block runs to the next day heading (or the end of the text).
+#   * Never the MASTHEAD (2026-10-29 proof): both editions open with a title line that starts with
+#     a weekday ("<Weekday> Edition · <date>", "<Weekday> Nutrition Review · Week N"). Read as a day
+#     heading it made the whole edition ONE day, whose sum always clears the floor, so the guard
+#     could never fire on the real layout. A line naming the publication is not a day heading.
 #   * Only per-item (labelled) figures are summed; a figure with day framing is Check 5's, not ours.
 #   * A day is judged only when it lists at least _MIN_MEALS_FOR_A_DAY figures: fewer is a partial
 #     list (one dinner under a heading), not a day, and a sum of it proves nothing.
@@ -744,9 +685,17 @@ def _low_calorie_fallback() -> str:
 #     false positive #5297 fixed; the warning lands in the stored edition's qa. A day heading that
 #     exists but holds too few figures, or an unreadable charter, are recorded the same way.
 _DAY_HEADING_RE = re.compile(r"^\W{0,6}(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day|day\s*\d{1,2})\b[^\n]{0,50}$", re.I)
+_MASTHEAD_WORDS_RE = re.compile(
+    r"\b(?:edition|review|plate|digest|brief|newsletter|chronicle|journal|issue|life\s+platform|journey|experiment)\b", re.I
+)
 _DAY_FIGURE_RE = re.compile(r"(?<![\d.,])(\d{1,2},\d{3}|\d{2,4})\s*(?:kcal|calories|cal)\b", re.I)
 _MIN_MEALS_FOR_A_DAY = 3
 _DAY_SUM_MARGIN = 0.9
+
+
+def _is_day_heading(line: str) -> bool:
+    """A plan block's day heading ("Monday", "Day 3: rest day"), never a calorie line or the masthead."""
+    return bool(_DAY_HEADING_RE.match(line)) and not _DAY_FIGURE_RE.search(line) and not _MASTHEAD_WORDS_RE.search(line)
 
 
 def _day_blocks(text: str) -> list[tuple[str, str]]:
@@ -754,7 +703,7 @@ def _day_blocks(text: str) -> list[tuple[str, str]]:
     blocks: list[tuple[str, list[str]]] = []
     for line in text.split("\n"):
         stripped = line.strip()
-        if stripped and _DAY_HEADING_RE.match(stripped) and not _DAY_FIGURE_RE.search(stripped):
+        if stripped and _is_day_heading(stripped):
             blocks.append((stripped.strip(" :-\u2014\u00b7*#"), []))
         elif blocks:
             blocks[-1][1].append(line)

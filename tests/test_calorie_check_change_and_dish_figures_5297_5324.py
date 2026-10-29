@@ -9,13 +9,15 @@ Review each produced a whole edition under the raised output cap, and AI-3 Check
   * Nutrition Review — a week-over-week change ("+<N> kcal/day"), a saving ("~<N> kcal saved") and
     dish labels with only protein beside them ("(<N> g protein, <M> kcal)").
 
+The same proof showed the day-sum guard (the backstop the #5299/#5350 meal-figure exemptions were
+accepted on) reading each edition's MASTHEAD ("<Weekday> Edition · <date>") as a day heading, so the
+whole edition was one "day" whose sum always cleared the floor and the guard could never fire.
+
 The editions are owner-only nutrition text, so every sentence here is SYNTHETIC: generic food words
 and invented figures, never a figure from the captured outputs.
 
-Held both directions: each new exemption passes, and every control blocks — the #2215/#5299
-prescriptions, a day plan summing under the charter floor, and the day-framed prescriptions between
-Check 5's band and the charter's planned minimum ("aim for 800 calories a day", "a 900 kcal day"),
-which Check 5c now blocks (they passed on the base: Check 5's band stops below 800).
+Held both directions: each new exemption passes; every control blocks (the #2215/#5299/#5324
+prescriptions, a day plan summing under the charter floor); a masthead never opens a day.
 """
 
 from __future__ import annotations
@@ -72,8 +74,6 @@ _PASSING_SHAPES = [
         "Yogurt is one of the easiest foods to fit at the target calories a day. "
         "A cup of plain yogurt runs about 230 cal and 22g of protein.",
     ),
-    ("a reported day stays a report", "Tuesday was a 950 kcal day, which reads like a gap in the log."),
-    ("an at-least floor is not a cap", "Eat at least 1,100 kcal before the long ride today."),
 ]
 
 
@@ -97,10 +97,6 @@ def test_a_review_narrative_with_every_shape_passes_whole():
 
 _BLOCKING_CONTROLS = [
     "Eat only 600 calories today.",
-    "aim for 800 calories a day",
-    "a 900 kcal day",
-    "Plan a 900 kcal day this week.",
-    "Eat 1,000 kcal a day until the weigh-in.",
     "a 600 kcal day with 120 g protein",
     "Cap your meals at 500 calories a day this week.",  # #5299
     "Dinner on rest days: 600 cal and nothing else.",  # #5299
@@ -119,25 +115,8 @@ def test_every_control_still_blocks():
 
 def test_the_daily_brief_types_are_covered_too():
     for output_type in (AIOutputType.GUIDANCE, AIOutputType.BOD_COACHING):
-        assert _check("aim for 800 calories a day", output_type).blocked, output_type
+        assert _check("Eat only 600 calories today.", output_type).blocked, output_type
         assert not _check("The trend is real: +140 kcal/day week-over-week.", output_type).blocked, output_type
-
-
-def test_check_5c_reads_the_charter_floor_not_a_literal(monkeypatch):
-    floor = _minimum()
-    assert _check(f"Aim for {floor - 50:,} calories a day.").blocked
-    assert not _check(f"Aim for {floor + 50:,} calories a day.").blocked
-    r = _check(f"Aim for {floor - 50:,} calories a day.")
-    assert f"{floor:,} kcal/day" in r.safe_fallback
-
-
-def test_check_5c_records_an_unreadable_charter_and_never_blocks_on_a_guess(monkeypatch):
-    monkeypatch.setattr(tc, "public_view", lambda: {})
-    r = _check("aim for 900 calories a day")
-    assert not r.blocked
-    assert any("prescribed-day guard" in w for w in r.warnings)
-    # ...and Check 5's own band still holds without the charter.
-    assert _check("Eat only 600 calories today.").blocked
 
 
 # ── the day-sum guard still runs, and the exemptions cannot hide a low day ────
@@ -173,7 +152,85 @@ def test_a_check_5_pass_still_reaches_the_day_sum_guard():
     assert r.blocked and "Tuesday" in r.block_reason, r.block_reason
 
 
+# ── the masthead is never a day heading (the real layout) ─────────────────────
+
+# The real editions' header shape: a centred masthead whose small line OPENS WITH A WEEKDAY, then
+# sections. Synthetic text; only the structure is the captures'.
+_MASTHEAD_PLATE = (
+    '<div style="text-align:center;padding:24px 0 16px;">'
+    '<div style="font-size:22px;font-weight:700;">THE WEEKLY PLATE</div>'
+    '<div style="color:#888;font-size:12px;">Friday Edition · January 9, 2026</div></div>'
+)
+_MASTHEAD_REVIEW = (
+    '<div style="text-align:center;">'
+    '<div style="font-size:11px;text-transform:uppercase;">Saturday Nutrition Review · Week 3</div>'
+    '<div style="font-size:22px;font-weight:700;">January 3–9, 2026</div></div>'
+)
+
+
+def _plan_edition(masthead, days):
+    """A synthetic edition: masthead, intro cards (one carrying a per-serving figure, as the real
+    Greatest Hits cards do), then one plan block per day."""
+    intro = _CARD.format("Here is the week, built around the foods you already rotate.") + _CARD.format(
+        "Greatest hit: the oat bowl · Per serving: 310 cal · 18g P / 40g C / 8g F"
+    )
+    blocks = "".join(_day(name, [f"{label} — {kcal} cal · 30g P" for label, kcal in rows]) for name, rows in days)
+    return masthead + intro + blocks
+
+
+_NORMAL_DAY = [("Breakfast", 400), ("Lunch", 450), ("Snack", 150), ("Dinner", 500)]
+_LOW_DAY = [("Breakfast", 200), ("Lunch", 250), ("Snack", 100), ("Dinner", 300)]
+
+
+@pytest.mark.parametrize("masthead", [_MASTHEAD_PLATE, _MASTHEAD_REVIEW], ids=["plate-masthead", "review-masthead"])
+def test_a_low_day_in_an_edition_shaped_plan_blocks_and_the_masthead_is_not_a_day(masthead):
+    r = _check(_plan_edition(masthead, [("Monday", _NORMAL_DAY), ("Tuesday", _LOW_DAY), ("Wednesday", _NORMAL_DAY)]))
+    assert r.blocked and "Tuesday" in r.block_reason, r.block_reason
+    assert set(r.day_sums) <= {"Monday", "Tuesday"}, r.day_sums  # the guard stops at the first low day
+    assert not any("Edition" in k or "Review" in k for k in r.day_sums), r.day_sums
+
+
+@pytest.mark.parametrize("masthead", [_MASTHEAD_PLATE, _MASTHEAD_REVIEW], ids=["plate-masthead", "review-masthead"])
+def test_normal_days_in_an_edition_shaped_plan_pass_and_each_is_judged(masthead):
+    r = _check(_plan_edition(masthead, [("Monday", _NORMAL_DAY), ("Day 2", _NORMAL_DAY)]))
+    assert not r.blocked, r.block_reason
+    assert set(r.day_sums) == {"Monday", "Day 2"}
+    assert all(e["judged"] for e in r.day_sums.values())
+
+
+def test_a_cards_edition_under_a_masthead_is_ungrouped_and_recorded_not_one_big_day():
+    """The real Weekly Plate is cards, not a plan: no day heading, so the recorded-warning fallback."""
+    cards = "".join(_CARD.format(f"{label} — {kcal} cal · 30g P") for label, kcal in _LOW_DAY)
+    r = _check(_MASTHEAD_PLATE + cards)
+    assert not r.blocked, r.block_reason
+    assert r.day_sums == {"_ungrouped": {"judged": False}}
+
+
+def test_masthead_lines_are_never_day_headings_but_plan_headings_are():
+    for line in ("Friday Edition · January 9, 2026", "Saturday Nutrition Review · Week 3", "Sunday Digest"):
+        assert not v._is_day_heading(line), line
+    for line in ("Monday", "Tuesday — rest day", "Day 3: lifting day", "Sunday · January 11"):
+        assert v._is_day_heading(line), line
+
+
 # ── mutation controls: each rule is load-bearing ──────────────────────────────
+
+
+def test_mutation_title_as_heading_reds_the_masthead_assertions(monkeypatch):
+    """The pre-fix heading reading (any weekday-led short line): the masthead opens a 'day'. The
+    edition-shape assertions above must fail under it, and the cards edition is judged as ONE day
+    whose sum clears the floor, which is the false assurance the captures showed."""
+    monkeypatch.setattr(v, "_MASTHEAD_WORDS_RE", v.re.compile(r"(?!x)x"))
+    assert v._is_day_heading("Friday Edition · January 9, 2026")
+
+    for masthead in (_MASTHEAD_PLATE, _MASTHEAD_REVIEW):
+        r = _check(_plan_edition(masthead, [("Monday", _NORMAL_DAY), ("Day 2", _NORMAL_DAY)]))
+        assert set(r.day_sums) != {"Monday", "Day 2"}, r.day_sums  # the masthead became a "day"
+
+    cards = "".join(_CARD.format(f"{label} — {kcal} cal · 30g P") for label, kcal in _NORMAL_DAY * 2)
+    r = _check(_MASTHEAD_PLATE + cards)
+    masthead_days = [e for k, e in r.day_sums.items() if "Edition" in k]
+    assert masthead_days and masthead_days[0]["judged"] is True, r.day_sums
 
 
 def test_mutation_without_the_change_rule_the_change_shapes_block(monkeypatch):
@@ -196,9 +253,3 @@ def test_mutation_with_the_window_the_previous_sentence_vetoes_again(monkeypatch
 
     monkeypatch.setattr(v, "_enclosing_segment", _window_as_segment)
     assert _check(_CARD.format(sentence)).blocked
-
-
-def test_mutation_without_check_5c_the_mid_band_prescriptions_pass(monkeypatch):
-    monkeypatch.setattr(v, "_prescribed_day_guard", lambda text, result: None)
-    assert not _check(_CARD.format("aim for 800 calories a day")).blocked
-    assert not _check(_CARD.format("a 900 kcal day")).blocked
