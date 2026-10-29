@@ -106,11 +106,12 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import boto3
-from common.pacific_time import parse_iso_utc  # bundled shared module: THE ISO-8601 parser (#1964)
+from common.pacific_time import PACIFIC, parse_iso_utc  # bundled shared module: THE Pacific frame + ISO-8601 parser (#1964)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -155,38 +156,24 @@ def _get_es_client_creds():
     return _es_client_cache
 
 
-# ── Timezone offset map ────────────────────────────────────────────────────────
-# No pytz in Lambda. DST offset is ±1h — acceptable for circadian analysis
-# where we care about consistency rather than exact precision.
-_TZ_OFFSETS = {
-    "America/Los_Angeles": -8,
-    "America/Vancouver": -8,
-    "America/Denver": -7,
-    "America/Chicago": -6,
-    "America/New_York": -5,
-    "Europe/London": 0,
-    "Europe/Paris": 1,
-    "Europe/Berlin": 1,
-    "Asia/Tokyo": 9,
-    "Australia/Sydney": 10,
-}
-_DEFAULT_TZ_OFFSET = -8  # PST (Seattle) — static-map fallback only
+# ── Night timezone ─────────────────────────────────────────────────────────────
+def _night_zone(tz_name: str) -> tzinfo:
+    """The IANA zone a night is read in — a ZONE, never one offset for the whole night.
 
-
-def _tz_offset_hours(tz_name: str) -> float:
-    """Current UTC offset for an IANA zone, DST-aware. The static _TZ_OFFSETS
-    map pinned standard time, so every stored sleep hour landed 1h off from
-    March to November (found 2026-06-12). Ingestion runs near-real-time, so
-    today's offset matches the night being parsed."""
+    #4284 (found 2026-10-29): this used to return the zone's offset at INGEST time
+    (`datetime.now(...).utcoffset()`) and every instant of the night was shifted by it.
+    The 2026-11-01 07:15 PT run is PST (UTC-8) but the 10-31 bedtime it parses was PDT
+    (UTC-7), so that night's onset and midpoint landed an hour early — and any night
+    re-read across a DST boundary (the gap-aware lookback, a backfill) carried the
+    same skew. Handing `_hour_of_day` the zone lets each instant convert at the offset
+    in force at THAT instant, so a bedtime and a wake time either side of the boundary
+    each get their own. An unknown zone name falls back to the platform's Pacific
+    frame (DST-aware), never to a fixed offset.
+    """
     try:
-        from zoneinfo import ZoneInfo
-
-        off = datetime.now(timezone.utc).astimezone(ZoneInfo(tz_name)).utcoffset()
-        if off is None:  # a tz-aware datetime always has one; be explicit rather than assume
-            return _TZ_OFFSETS.get(tz_name, _DEFAULT_TZ_OFFSET)
-        return off.total_seconds() / 3600
+        return ZoneInfo(tz_name)
     except Exception:
-        return _TZ_OFFSETS.get(tz_name, _DEFAULT_TZ_OFFSET)
+        return PACIFIC
 
 
 # ── AWS clients (module-level — reused across Lambda warm invocations) ─────────
@@ -344,9 +331,13 @@ def _vendor_number(val):
     return val
 
 
-def _hour_of_day(iso_ts: str, tz_offset: int = _DEFAULT_TZ_OFFSET) -> float | None:
+def _hour_of_day(iso_ts: str, tz_offset: float | tzinfo = PACIFIC) -> float | None:
     """
     Extract local fractional hour (0.0–24.0) from an ISO UTC timestamp.
+
+    `tz_offset` is a ZONE (`tzinfo`, the default and what `transform` passes — the
+    instant converts at the offset in force at that instant, #4284) or a number of
+    hours, which is a FIXED offset applied as given (explicit callers only).
 
     Examples:
       "2026-02-20T06:54:00.000Z"      with tz_offset=-8 → 22.9 (10:54 pm PST prev evening)
@@ -370,7 +361,8 @@ def _hour_of_day(iso_ts: str, tz_offset: int = _DEFAULT_TZ_OFFSET) -> float | No
     if dt is None:
         return None
     try:
-        local = dt.astimezone(timezone(timedelta(hours=tz_offset)))
+        zone = tz_offset if isinstance(tz_offset, tzinfo) else timezone(timedelta(hours=tz_offset))
+        local = dt.astimezone(zone)
         return round(local.hour + local.minute / 60.0 + local.second / 3600.0, 2)
     except Exception:
         return None
@@ -386,7 +378,7 @@ def _sleep_midpoint(onset_hour: float, wake_hour: float) -> float:
     return round(((onset_hour + wake_hour) / 2.0) % 24, 2)
 
 
-def compute_derived_fields(record: dict, tz_offset: int = _DEFAULT_TZ_OFFSET) -> dict:
+def compute_derived_fields(record: dict, tz_offset: float | tzinfo = PACIFIC) -> dict:
     """
     Compute all derived clinical fields from a parsed record dict.
     Safe to call on freshly-parsed records AND existing DynamoDB items
@@ -525,7 +517,7 @@ def parse_trends_for_date(
     trends_data: dict,
     wake_date: str,
     bed_side: str,
-    tz_offset: int = _DEFAULT_TZ_OFFSET,
+    tz_offset: float | tzinfo = PACIFIC,
 ) -> dict | None:
     """
     Extract one night matching wake_date from the Eight Sleep trends API response.
@@ -697,8 +689,9 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     """Parse sleep. Bed-temperature merge retired (ADR-118, #489)."""
     if not raw:
         return []
-    tz_offset = _tz_offset_hours(raw["tz"])
-    parsed = parse_trends_for_date(raw["trends"], date_str, raw["bed_side"], tz_offset=tz_offset)
+    # #4284: the ZONE, not an offset read off the clock now — each instant of the night
+    # converts at its own offset, so a run on the far side of a DST boundary reads it right.
+    parsed = parse_trends_for_date(raw["trends"], date_str, raw["bed_side"], tz_offset=_night_zone(raw["tz"]))
     if not parsed:
         return []
     return [
