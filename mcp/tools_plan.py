@@ -39,17 +39,18 @@ never reported as red-teamed by a model that was not consulted.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any, Optional
 
 from common.pacific_time import pacific_today
 from training.commit_binding import binding_for  # #4066
 
-from mcp import plan_call_scope  # #5313: one read per plan call, the call clock, stage 2's write deadline
+from mcp import (
+    plan_call_scope,  # #5313: one read per plan call, the call clock, stage 2's write deadline
+    plan_stage2_writes,  # #4076: stage 2's writes and its dry run
+)
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
 from mcp.plan_helpers import (  # noqa: F401 (#4149)
@@ -65,6 +66,10 @@ from mcp.plan_helpers import (  # noqa: F401 (#4149)
     critics_with_charter,  # #5071
 )
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
+from mcp.plan_stage2_writes import (
+    record_override_correction as _record_override_correction,  # noqa: F401 (#4076)
+    write_thread as _write_thread,  # noqa: F401 (#4076)
+)
 from mcp.utils import mcp_error
 
 logger = logging.getLogger("tools_plan")
@@ -600,6 +605,16 @@ def _pain_scope_of(
     return pain_scope
 
 
+_STAGE_2_HOW_TO_USE = (
+    "Stage 2 ran. FIRST read `critics.written`: false means the verdicts were NOT stored (#5313, `critics.next` says why) "
+    "— run stage 2 again; `critics.verdict_state == 'dry_run'` means dry_run=true was asked and every write is listed under "
+    "`critics.would_write` instead (#4076). Read `critics.verdicts` — each names its metric and number. A `veto` blocks commit: "
+    "redraft and run stage 2 again, or — if Matthew overrules that one critic — run stage 2 again with veto_override={critic, "
+    "owner_words} carrying his words verbatim (#4076); every other critic's changes still apply. `change` verdicts are "
+    "applied to the draft (see `critics.changes`); dry_run shows the revised body. Then commit — verdicts ride in the Hevy notes."
+)
+
+
 @plan_call_scope.plan_call  # #5313
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
@@ -918,14 +933,9 @@ def tool_plan_next_session(args):
             target_date,
             dismissals,
             overrides=overrides,
+            dry_run=bool(args.get("dry_run")),
         )
-        out["how_to_use"] = (
-            "Stage 2 ran. FIRST read `critics.written`: false means the verdicts were NOT stored (#5313, `critics.next` says why) "
-            "— run stage 2 again. Read `critics.verdicts` — each names its metric and number. A `veto` blocks commit: redraft and "
-            "run stage 2 again, or — if Matthew overrules that one critic — run stage 2 again with veto_override={critic, "
-            "owner_words} carrying his words verbatim (#4076); every other critic's changes still apply. `change` verdicts are "
-            "applied to the draft (see `critics.changes`); dry_run shows the revised body. Then commit — verdicts ride in the Hevy notes."
-        )
+        out["how_to_use"] = _STAGE_2_HOW_TO_USE
     return out
 
 
@@ -969,6 +979,8 @@ from mcp.plan_draft_evidence import (  # noqa: E402,F401
 
 
 # ── stage 2: the red team ────────────────────────────────────────────────────────────
+# #4076: every stage-2 write (version + index, thread row, override ledger row) and its dry run live in
+# `mcp.plan_stage2_writes`; re-exported under the old private names (imported at the top), which the tests patch HERE.
 def _block_rate(block: dict[str, Any]) -> dict[str, Any] | None:
     """The constraint block's stated loss rate (#5001), or None on a block built without one."""
     return (block.get("shared_quantities") or {}).get("loss_rate_lb_wk")
@@ -984,7 +996,11 @@ def _run_stage_2(
     target_date: str,
     dismissals: list[dict[str, Any]] | None = None,
     overrides: list[dict[str, Any]] | None = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
+    """The red team. `dry_run` (#4076) runs every step — critics, the owner override, the changes — and
+    WRITES NOTHING: no version, no index row, no thread row, no ledger row; each is returned under
+    `would_write` (`mcp.plan_stage2_writes`)."""
     from coach import critic_overrides, critics
     from training.cardio_note import apply_after_lines
     from training.routine_repo import put_versioned
@@ -1057,6 +1073,7 @@ def _run_stage_2(
     wait = plan_call_scope.model_budget_secs()
     verdicts = critics.run_critics(packets, draft, invoke=invoke, model_allowed=allowed, model_paused_reason=paused, model_timeout_s=wait)
     ran_at = datetime.now(timezone.utc).isoformat()
+    would: list[dict[str, Any]] = []  # #4076 dry run: the ledger rows the override WOULD write
     # #4076: the owner's override marks ONLY the named critic's veto; it runs before the
     # changes so the record is complete, and it moves no change — `apply_changes` below sees
     # every other critic's verdict exactly as the critics returned it.
@@ -1066,7 +1083,7 @@ def _run_stage_2(
         at=ran_at,
         routine_id=getattr(ir, "routine_id", None),
         target_date=target_date,
-        record_correction=_record_override_correction,
+        record_correction=plan_stage2_writes.dry_ledger(would) if dry_run else _record_override_correction,
     )
     changes = critics.apply_changes(ir, verdicts, set_floors=critic_set_floors(ir))  # #4149: held to the commit gate's floor
     apply_after_lines(ir.exercises)  # #5428: a swap or drop moves what follows the cardio — re-stamp `After:` on the final order
@@ -1093,7 +1110,8 @@ def _run_stage_2(
         # the coach's draft as critiqued, so a re-run re-evaluates THIS, not its own output
         "draft_exercises": draft_exercises,
     }
-    late = plan_call_scope.past_write_deadline()  # #5313: past it, store NOTHING and say so — never race the MCP cap
+    # #5313: past the deadline, store NOTHING and say so — never race the MCP cap. A dry run (#4076) stores nothing anyway.
+    late = None if dry_run else plan_call_scope.past_write_deadline()
     if late:
         return {**record, "routine_id": ir.routine_id, "written": False, "verdict_state": "not_written", "next": late}
     ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "critics": record}
@@ -1106,6 +1124,8 @@ def _run_stage_2(
     # the notes block are applied (`record` IS inputs_snapshot["critics"]) — commit refuses any
     # other routine_id or any later edit.
     record["binding"] = binding_for(ir)
+    if dry_run:
+        return plan_stage2_writes.dry_run_result(record, ir, would, pacific_today(), critics.notes_block(ir))
     put_versioned(ir)
     out = dict(record)
     out["routine_id"] = ir.routine_id
@@ -1125,18 +1145,6 @@ def _run_stage_2(
     else:
         out["next"] = "no veto — manage_hevy_routine dry_run shows the revised body, then commit."
     return out
-
-
-def _record_override_correction(item_ref: dict[str, Any], owner_words: str, error_class: str) -> str:
-    """#4076: the owner's override words into the corrections ledger — the SAME write the
-    `log_coach_correction` tool makes (`coach_corrections.write_correction`, cycle-stamped
-    via `coach_checkin.read_cycle`), naming the vetoing critic and signal in `item_ref`.
-    Raises on a DDB error: `critics.apply_overrides` then refuses the override."""
-    from coach import coach_checkin, coach_corrections
-
-    from mcp.config import table
-
-    return coach_corrections.write_correction(table, item_ref, owner_words, error_class, cycle=coach_checkin.read_cycle())
 
 
 _BLOCK_MARK = "RED TEAM ("
@@ -1171,27 +1179,6 @@ def _model_allowed() -> tuple[bool, str | None]:
         return False, f"budget tier {budget_guard.current_tier()} — {BUDGET_FEATURE} paused; deterministic layer only"
     except Exception as e:  # noqa: BLE001
         return False, f"budget guard unreadable ({type(e).__name__}) — deterministic layer only"
-
-
-def _write_thread(ir: Any, today: str) -> dict[str, Any]:
-    """Tonight's verdicts as a training coach thread row — keyed with a `#critics` suffix so it
-    sits beside the analyzer's weekly entry and never overwrites it; class-gated phase stamp
-    at write time (#3514/#3900)."""
-    from coach import critics
-    from experiment.phase_taxonomy import experiment_stamp_for
-
-    from mcp.config import table
-
-    item = critics.thread_entry(ir, today=today)
-    try:
-        item.update(experiment_stamp_for(item["pk"], item["sk"]))
-        item["created_at"] = datetime.now(timezone.utc).isoformat()
-        clean = json.loads(json.dumps(item, default=str), parse_float=Decimal)
-        table.put_item(Item=clean)
-        return {"written": True, "sk": item["sk"]}
-    except Exception as e:  # noqa: BLE001 — reported in the result, never swallowed (#3670 class)
-        logger.warning("critics thread write failed: %s", e)
-        return {"written": False, "sk": item["sk"], "error": f"{type(e).__name__}: {e}"[:200]}
 
 
 # #4072: the keys each reader is KNOWN to carry its answer under. A non-empty return with none

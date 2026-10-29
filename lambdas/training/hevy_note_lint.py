@@ -162,6 +162,19 @@ def _banned(note: str, where: str, out: list[Problem]) -> None:
             out.append(Problem("L7", where, f"line {len(ln)} chars > {g.LINE_MAX_CHARS}: {ln[:40]!r}"))
 
 
+def _top_load(work: list[Row]) -> Optional[float]:
+    loads = [r[1] for r in work if r[1] is not None]
+    return max(loads) if loads else None
+
+
+def _rep_value(v: Optional[str]) -> Union[float, str, None]:
+    """A row's or the text's rep count as a number when it is one ('8', '8.0' -> 8.0), else the text ('8–12', '30 min')."""
+    try:
+        return float(v) if v is not None else None
+    except ValueError:
+        return v
+
+
 def _previous_for(prev: Previous, i: int) -> Optional[float]:
     if isinstance(prev, list):
         return prev[i] if i < len(prev) else (prev[-1] if prev else None)
@@ -173,7 +186,13 @@ def _lint_previous(ex: LintExercise, lines: list[str], where: str, out: list[Pro
     if ex.previous_lb is None or ex.kind == "carry":
         return
     reasons = [ln for ln in lines[1:] if g.REASON_RE.match(ln) or ln.startswith("W set: up to")]
-    for i, r in enumerate(_working(ex.rows)):
+    work = _working(ex.rows)
+    for i, r in enumerate(work):
+        if not isinstance(ex.previous_lb, list) and r[1] != _top_load(work):
+            # one PREVIOUS load is the TOP working load of his last session (`exercise_history.previous_load`), so it is
+            # judged against the top row only: a top-set day's back-off sits under it by design (#5428 replay, bench
+            # 225 top / 205 back-offs vs PREVIOUS 225 read as an unexplained drop). A per-row list judges every row.
+            continue
         prev = _previous_for(ex.previous_lb, i)
         # a stack or cable load has no fixed step (standard §5: "a value he has logged on that machine"), so it is
         # never judged — the same rule as the producer (`lift_note.delta_word`)
@@ -338,7 +357,8 @@ def lint_routine(rt: LintRoutine) -> LintResult:
         if mw:
             wreps = {r[2] for r in ex.rows if r[0] == "W"}
             said = mw.group(2) or mw.group(1)
-            if wreps != {said}:
+            # compared as numbers: a wire rep count of 8.0 (a float off the stored IR) is the text's 8 (#5428 replay)
+            if {_rep_value(w) for w in wreps} != {_rep_value(said)}:
                 out.append(Problem("L4", where, f"the W text says {said} reps, the W rows hold {sorted(str(w) for w in wreps)}"))
         w = [r[1] for r in ex.rows if r[0] == "W" and r[1] is not None]
         work = [r[1] for r in _working(ex.rows) if r[1] is not None]
@@ -423,13 +443,21 @@ def entry_for(movement_key: str, catalog: Optional[dict[str, Any]]) -> Optional[
     return None
 
 
+def _count_text(v: Any) -> str:
+    """A rep count as Matthew reads it: 8.0 (a float off the stored IR) -> '8'; a non-number stays as written."""
+    try:
+        return g.fmt_num(float(v))
+    except (TypeError, ValueError):
+        return str(v)
+
+
 def _reps_of(s: dict[str, Any]) -> Optional[str]:
     rr = s.get("rep_range") or {}
     lo, hi = rr.get("start"), rr.get("end")
     if lo is not None and hi is not None:
-        return f"{lo}" if lo == hi else f"{lo}–{hi}"
+        return _count_text(lo) if lo == hi else f"{_count_text(lo)}–{_count_text(hi)}"
     if s.get("reps") is not None:
-        return str(s["reps"])
+        return _count_text(s["reps"])
     if s.get("duration_seconds"):
         return f"{int(round(float(s['duration_seconds']) / 60))} min"
     if s.get("distance_meters"):

@@ -210,6 +210,11 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
                 _secret_arn("life-platform/ingestion-keys"),
             ],
         ),
+        # #5220: the checker reaches training_charter through training_notes and read the private twin on every
+        # cold start with no grant -- `training_charter.private.json not read (AccessDenied)` flapped
+        # swallowed-permission-denial on 2026-10-27/28. Object-scoped read + the prefix list, the #5226 pair.
+        _charter_twin_read(),
+        _charter_twin_list(),
     ]
 
 

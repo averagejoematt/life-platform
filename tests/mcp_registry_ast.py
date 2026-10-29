@@ -146,13 +146,17 @@ def _has_ddb_write_call(node: ast.AST) -> bool:
     return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in _DDB_WRITE_METHODS for n in ast.walk(node))
 
 
-def _reaches_ddb_write(start: str, bodies: dict[str, ast.AST]) -> bool:
+def _reaches_ddb_write(start: str, bodies: dict[str, ast.AST], imported_writers: frozenset = frozenset()) -> bool:
     """BFS closure from `start` over same-module symbol references, stopping
-    the first time a reachable body contains a direct DDB write call."""
+    the first time a reachable body contains a direct DDB write call — or
+    references a name imported from another `mcp/` module whose own function
+    reaches one (`imported_writers`)."""
     seen = {start}
     frontier = [start]
     while frontier:
         name = frontier.pop()
+        if name in imported_writers:
+            return True
         body = bodies.get(name)
         if body is None:
             continue
@@ -166,7 +170,8 @@ def _reaches_ddb_write(start: str, bodies: dict[str, ast.AST]) -> bool:
 
 def ddb_write_tool_names() -> set[str]:
     """Registered tool names whose implementing function structurally reaches
-    a DynamoDB write call, directly or via a same-module dispatch target.
+    a DynamoDB write call, directly, via a same-module dispatch target, or via a
+    helper imported by name from a sibling `mcp/` module (#4076).
 
     Scoped to `mcp/*.py` only — a tool that delegates to a write in a
     different package (e.g. `lambdas/privacy/diary_claims.py`) is not traced
@@ -193,11 +198,28 @@ def ddb_write_tool_names() -> set[str]:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 fn_to_file.setdefault(name, fpath)
 
+    # #4076: a tool module may import its write helpers from a sibling `mcp/` module (stage 2's writes moved to
+    # `mcp/plan_stage2_writes.py` and `plan_next_session` silently left this set). `from mcp.<mod> import f as g`
+    # makes `g` a writer when `f` reaches a write in <mod>; one hop, which is the shape the package uses.
+    by_module = {os.path.splitext(os.path.basename(fp))[0]: bodies for fp, bodies in file_bodies.items()}
+    imported: dict[str, frozenset] = {}
+    for fpath in file_bodies:
+        with open(fpath, encoding="utf-8") as fh:
+            tree = ast.parse(fh.read(), filename=fpath)
+        names = set()
+        for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("mcp."):
+                target = by_module.get(node.module.split(".", 1)[1])
+                for a in node.names if target else []:
+                    if a.name in target and _reaches_ddb_write(a.name, target):
+                        names.add(a.asname or a.name)
+        imported[fpath] = frozenset(names)
+
     result: set[str] = set()
     for entry in entries:
         fpath = fn_to_file.get(entry.fn_name)
         if fpath is None:
             continue
-        if _reaches_ddb_write(entry.fn_name, file_bodies[fpath]):
+        if _reaches_ddb_write(entry.fn_name, file_bodies[fpath], imported[fpath]):
             result.add(entry.name)
     return result
