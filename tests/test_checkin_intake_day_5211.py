@@ -137,6 +137,21 @@ def test_dead_man_names_the_missing_day_and_arms_late():
     assert q.CHECKIN_PAIR_PK == cip.PK
 
 
+def test_yesterday_is_not_due_before_the_writers_morning_run():
+    """2026-10-29 00:11 PT: the post-deploy qa-smoke failed on 10-28, whose row scenario-explorer writes at 05:10 PT."""
+    from operational import nudge_ledger_qa as q
+
+    rows = _Table(["DATE#2026-10-28", "DATE#2026-10-27"])  # the 10-29 00:11 PT wire: no 10-28 row yet
+    early = q.check_checkin_pair_liveness(_Table(["DATE#2026-10-27"]), _Check, "t", lambda: datetime(2026, 10, 29, 0, 11))[0]
+    assert early.status == "ok"
+    # mutation controls: after the due hour the same missing day fails; an older missing day fails even early
+    late = q.check_checkin_pair_liveness(_Table(["DATE#2026-10-27"]), _Check, "t", lambda: datetime(2026, 10, 29, 11, 30))[0]
+    assert late.status == "fail" and "2026-10-28" in late.msg
+    old = q.check_checkin_pair_liveness(_Table([]), _Check, "t", lambda: datetime(2026, 10, 29, 0, 11))[0]
+    assert old.status == "fail" and "2026-10-27" in old.msg and "2026-10-28" not in old.msg
+    assert q.check_checkin_pair_liveness(rows, _Check, "t", lambda: datetime(2026, 10, 29, 11, 30))[0].status == "ok"
+
+
 def test_dead_man_is_wired_into_the_nightly_sweep():
     src = open(os.path.join(REPO, "lambdas", "operational", "qa_smoke_lambda.py")).read()
     assert "check_checkin_pair_liveness" in src
