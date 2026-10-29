@@ -43,7 +43,7 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "lambdas"))
 sys.path.insert(0, str(_REPO / "tests"))
 
-from health import food_quality as fq, weekly_menu as wm  # noqa: E402
+from health import food_quality as fq, weekly_menu as wm, weekly_menu_exact as wme  # noqa: E402
 from test_weekly_menu_5103 import ANCHORS, _food, _plan  # noqa: E402 — the sibling's placeholder week and foods
 from training import training_charter as tc  # noqa: E402
 
@@ -184,7 +184,7 @@ def test_the_exact_search_is_the_brute_force_optimum_on_small_tables():
             if any(counts.get(k, 0) < n for k, n in need.items()):
                 continue
             k = key(counts)
-            if (brute is None or k < brute) and wm._decompose(counts, pools) is not None:
+            if (brute is None or k < brute) and wme._decompose(counts, pools) is not None:
                 brute = k
         found, stats = wm._exact_day(pools, anchors, t, base, require=need)
         checked += 1
