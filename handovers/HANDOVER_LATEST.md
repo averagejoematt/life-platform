@@ -1,4 +1,4 @@
-# Handover — Session CK: Dependabot 42 → 0 (pillow-layer:3), waves 11 + 12 deployed, the og roster grant, the token bar at the routed rate; open 77 → 76 (2026-10-28)
+# Handover — Session CK: Dependabot 42 → 0 (pillow-layer:3), waves 11 + 12 deployed, the og roster grant, the token bar at the routed rate; open 77 → 77 (2026-10-28)
 
 ## Driving instruction
 - Owner, 2026-10-28 ~03:00Z: "run the next session plan in HANDOVER_LATEST" (the CJ plan: open 77 → ≤ 50, autonomous). Owner present at the start for two rulings, then unattended.
@@ -42,7 +42,15 @@ Pillow layer — "Yes, publish + deploy" · certifi — "Dismiss as not used".
 - **Code deploys on main are not gated; only the additive-IAM job waits at the production gate.**
 
 ## Built, not yet on main
-- **#5473 lane (in flight at wrap):** CI scans `lambdas/requirements/*.txt` on a schedule, with scan errors hard-failing. If its PR is green, merge on the envelope; it is an instrument, so it closes on its first live scan.
+- **PR #5475 (#5473), green and HELD for the owner (it touches security posture):**
+  - New `scripts/check_pip_audit.py`, one runner for both legs; a scan error exits 1, the same as a finding.
+  - New `.github/workflows/layer-pip-audit.yml`: weekly, on dispatch, and on PRs touching `lambdas/requirements/**`.
+  - ci-lint's BLOCKING dependency scan now calls the script. ci-lint runs only on push to main, so that step was proven locally, with a planted `pillow==12.3.0`, not in PR CI.
+  - The allowlist gains `scope=`, which narrows the certifi waiver to `garmin.txt`.
+  - The Lambda's scan errors now hard-fail, so its 11-02 15:00Z first-Monday run will raise and alarm, by design.
+  - The PR's own run scanned garmin 18, lameenc 1 and pillow 1 packages, all clean.
+  - Proof after merge: `gh workflow run layer-pip-audit.yml --ref main`, then grep the log for `SCANNED`.
+  - The lane filed **#5474**: retire the Lambda's scan leg (owner-gated CDK/IAM/schedule).
 
 ## Residual / next picks
 - #5428 + #5083: the 10-29 02:00Z predraft (the first routine drafted through the wave 11 linter) lints clean, then a blind re-grade of three drafted routines reads A.
@@ -79,7 +87,8 @@ Pillow layer — "Yes, publish + deploy" · certifi — "Dismiss as not used".
 6. **The posture token** (#4887): `gh secret set GH_POSTURE_TOKEN`.
 7. **One evening check-in reply** (#5106, #5123, #5211).
 8. **One ride with `📌 Setup: seat 7` pinned** (#5010).
-9. **Rulings:**
+9. **Merge PR #5475** (the #5473 layer-manifest pip-audit, a security-posture change to the blocking CI scan; diff summary under "Built, not yet on main"), then dispatch `layer-pip-audit.yml` once and close #5473 on its SCANNED lines. Decide #5474 (retire the Lambda's scan leg).
+10. **Rulings:**
    - #4182: close `partial`, re-scoped to #4580?
    - #4076: accept joints as the vetoing critic for its synthetic proof, or a driver-run plan?
    - #5105: fatty-fish anchors tagged `fatty_fish: true` in the private twin, and the 2–3 servings a week default.
@@ -91,7 +100,7 @@ Pillow layer — "Yes, publish + deploy" · certifi — "Dismiss as not used".
 **Incidents:** 1 row added — the silent 7-day Pillow CVE exposure and the never-working pip-audit layer scan (tracker #5473)
 **Stash/hooks:** clean — the reaper removed 3 merged lanes; 2 dirty pre-existing worktrees named above, untouched
 **Closures:** #4189, #5353, #4638, #5390 commented with verdicts · DoD: scanned 16, hits 0 after dispositions — #5353 and #5390 residual lines reworded to `not-work — <home>`; #4584 and #4914 (post-wrap folds) lost a stray `closure:live-proof` label
-**Backlog:** Now live at 11 opus-startable (no refill needed); no stale Later issues. Filed #5458, #5471, #5473 (hygiene 0 violations; #5458 and #5471 added to epic #5094's Stories)
+**Backlog:** Now live at 11 opus-startable (no refill needed); no stale Later issues. Filed #5458, #5471, #5473, #5474 (the last by the #5473 lane); open 77 → 77 (hygiene 0 violations; #5458 and #5471 added to epic #5094's Stories)
 **Alarms:** 4 red — calibration-deadman (#5061, owner act), qa-smoke-failures (re-cited: #5431, #5440, #5471), qa-smoke-warnings (re-cited: dated, self-clearing ~10-28 16:30Z), ai-canary-overall (cited, under 72 h); swallowed-permission-denial flap re-cited to the roster cause fixed by #5459
 **CI warnings:** 5 — all `SKIPPED in CI — no playwright/chromium installed` (#3640, by design; they run on any chromium machine)
-**Ledger:** none — no new standing machinery merged (the #4517 retune updated its existing row; if the #5473 lane's scheduled scan lands, it carries its own row)
+**Ledger:** none — no new standing machinery merged (the #4517 retune updated its existing row; PR #5475, held, carries its own `layer-pip-audit` row)
