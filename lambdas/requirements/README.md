@@ -52,7 +52,7 @@ and reds on a finding or on a scan that could not run. A scheduled red files one
 advisory issue (#1447). Waivers live in `.github/pip-audit-allowlist.txt`, `scope=`d to the
 manifest they apply to. The `life-platform-pip-audit` Lambda never managed this scan: the
 python3.12 runtime has no pip, and its report read 0 vulnerabilities while every manifest
-errored. Since #5473 those scan errors hard-fail it; retiring its scan leg is a follow-up.
+errored. Since #5473 those scan errors hard-fail it; retiring its scan leg is #5474.
 
 ## The three layer manifests are GENERATED (#2099)
 

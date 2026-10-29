@@ -41,7 +41,7 @@ KNOWN DEFECT, MADE LOUD (#5473): the python3.12 Lambda runtime ships no pip, so
 reason. A scan error is now a `hard_fail_reasons` entry and the invocation raises after
 the artifact is written. The layer manifests are scanned in CI instead
 (`scripts/check_pip_audit.py --layers`, weekly); retiring this Lambda's scan leg is the
-named follow-up.
+follow-up #5474.
 
 v1.0.0 — 2026-03-08 (SEC-5)
 """
