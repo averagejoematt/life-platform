@@ -141,11 +141,11 @@
   },
   "swallowed-permission-denial": {
     "added": "2026-10-20",
-    "cause": "charter-private-twin-absent-403 — RESOLVED by the charter-twin grant",
-    "cause_observed": "2026-10-25",
-    "updated": "2026-10-25",
-    "citation": "#5220 resolution — the cause (the loader's 'training_charter.private.json not read (AccessDenied)' line on every cold start of a charter-reading function: the owner-only twin is absent and the roles lacked s3:ListBucket on config/, so S3 answered absence with 403) was closed by the charter-twin grant (PR 5354), applied with LifePlatformOperational + LifePlatformServe at 2026-10-25 06:33Z. The last flap episodes (2026-10-25 03:02Z-03:18Z, 04:46Z-05:01Z, 05:31Z-05:46Z, read with describe-alarm-history) all PRECEDE the apply; the alarm has been OK since 05:46:55Z and get-metric-statistics LifePlatform/Lambda SwallowedPermissionDenied (Sum, 1 h) holds no datapoint after the 05:00Z hour (read 08:06Z). PRUNE this entry once the alarm has been OK past the 72h flap window (on or after 2026-10-28) and #5220 closes.",
-    "note": "Prior citation (2026-10-20, cause observed 2026-10-20T05:10:19Z): the open #5220 cause above — the nutrition charter waves made more filtered functions read the charter (coach-nudge at 05:10:19Z), so cold starts after the 2026-10-20 deploys lit it. The episode before that (2026-10-03, a qa-smoke share-kit read) was a different cause."
+    "cause": "og-image-generator board-roster read denied (s3:GetObject config/board_of_directors.json) — RESOLVED by PR #5459",
+    "cause_observed": "2026-10-27",
+    "updated": "2026-10-28",
+    "citation": "#5220 / #5434 — the 2026-10-27 19:32:55Z-19:49:55Z flap (Sum 2) was the og coach-card sweep's roster read: the role had no grant for config/board_of_directors.json, so every card fell back to 'AI Coach'. PR #5459 added the object-scoped read; CI's additive-IAM job applied it (run 40630556960, approved 04:15Z 2026-10-28) and the live S3Read statement lists the object (read 04:30Z). Proof: the 2026-10-28 ~19:31Z og sweep logs no 'could not load board roster' and the alarm stays OK. PRUNE once OK past the 72h flap window (on or after 2026-10-30T19:50Z) and #5220 closes.",
+    "note": "Prior cause (2026-10-20 → 2026-10-25): charter-private-twin-absent-403, resolved by the charter-twin grant (PR 5354, applied 2026-10-25 06:33Z)."
   },
   "nightly-predraft-missing": {
     "added": "2026-10-04",
@@ -237,9 +237,11 @@
     "note": "Read from describe-alarm-history and the CloudWatch metric LifePlatform/HevyRoutine PanelGradeOutcome, Session CE."
   },
   "qa-smoke-warnings": {
-    "added": "2026-10-25",
-    "citation": "Dated, self-clearing: the daily-period WarnCount alarm (Period 86400, Maximum) still holds the 2026-10-25 datapoint from runs before 16:52Z. Both causes in that window are fixed: SOURCE#field_notes_held was UNCLASSIFIED (PR 5364, clear from the 16:52Z run on) and the stale food-delivery check-in questions were retired at 03:15:53Z. The 16:52Z run reported 0 alarmed warnings and the CAUSE channel is empty. The alarm expires at the first daily evaluation with no alarmed warning, expected by 2026-10-26T17:00Z; if it is still red after 2026-10-27, re-cite against the live CAUSE line.",
-    "note": "Re-cited by Session CF 2026-10-25 ~19:40Z after the closed-owner and contradicted-cause gates flagged the old entry."
+    "added": "2026-10-28",
+    "cause_observed": "2026-10-27",
+    "updated": "2026-10-28",
+    "citation": "Dated, self-clearing: this episode began 2026-10-27 16:29Z on `CAUSE warn 77a4192d og:coach-cards` (16:28Z and 18:32Z runs) — the coach cards had never been written (#5434's portrait-bundle parse). The 19:30Z og sweep wrote all 10 cards (19:33Z), and every run since reads `CAUSE warn none -` (04:04Z, 04:43Z, 05:34Z 10-28). The daily-period WarnCount alarm (86400 s, Maximum) holds the 10-27 datapoint; it clears at the first daily evaluation with no alarmed warning, expected by ~2026-10-28T16:30Z. If still red after 2026-10-29, re-cite against the live CAUSE line. #5434 closes with that clear and the 10-28 18:30Z qa-smoke read.",
+    "note": "Re-cited by Session CK wrap 2026-10-28 (the 2026-10-25 entry predated this episode)."
   },
   "field-notes-missing": {
     "added": "2026-10-25",
@@ -255,10 +257,11 @@
   },
   "qa-smoke-failures": {
     "added": "2026-10-27",
-    "cause_observed": "2026-10-27",
-    "cause": "RAW:macrofactor,data:hae_additive_integrity",
-    "citation": "#5431 (six future-dated MacroFactor summary rows 2026-10-27..11-01 from the 04:14Z import put the writer ahead of the raw archive; the parser fix + a backup-first cleanup script are in PR #5455, the deletion is a parked owner act) and #5440 (an Apple Health distance field-day stored below its delivered readings by a concurrent-delivery overwrite; the S3 compare-and-swap fix is in PR #5455, the 10-21/10-22/10-26 repair is a parked owner act). The earlier reader-truth cause is closed: its ruling dropped the finding live at 2026-10-27 04:51Z.",
-    "note": "Re-cited by Session CJ wrap 2026-10-27 after the closed-owner and contradicted-cause gates flagged the #5402 entry."
+    "cause_observed": "2026-10-28",
+    "updated": "2026-10-28",
+    "cause": "RAW:macrofactor,cross_surface:coach_vs_engine,data:hae_additive_integrity",
+    "citation": "Three causes, each owned: #5431 (six future-dated MacroFactor summary rows 2026-10-28..11-01 still in DDB at 03:20Z 10-28; the parser guard is live since wave 10, the backup-first cleanup `scripts/macrofactor_future_rows_cleanup.py --apply` is a parked owner act); #5440 (Apple Health field-days below their delivered readings for 10-21/10-22/10-26; the compare-and-swap is live, the `hae_additive_backfill_4628.py --apply` repair is a parked owner act); #5471 (a QA false positive: coach_vs_engine reads the lead_daily sentence 'his floor is 170 grams daily' as an intake claim against the engine's 138.3 g; fix lane open). Live CAUSE line 2026-10-28 05:34Z: `fail 8f5fed57 RAW:macrofactor,cross_surface:coach_vs_engine,data:hae_additive_integrity`.",
+    "note": "Re-cited by Session CK wrap 2026-10-28 (the prior entry pointed at closed #5455 and missed the coach_vs_engine leg)."
   },
   "ingest-reconciliation-whoop": {
     "added": "2026-10-26",

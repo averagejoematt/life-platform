@@ -24,6 +24,7 @@ Last updated: 2026-10-17 Session BV Fable proofs-and-alarms run (#1332 gate; +1 
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-10-28 | **P2** (security; SILENT — six critical and 23 high CVEs sat in a live layer for ~7 days with no platform signal; no exploitation evidence) | **41 Pillow advisories (GHSA-8g5g-8vmr-9782 et al., heap overflows in the JPEG/TIFF/FPX decoders) were open on `pillow-layer:2` (Pillow 12.3.0) from 2026-10-21, read by og-image-generator, recap-card-generator and reading-cover-pipeline, which decodes cover images fetched from outside.** Found 2026-10-28 ~03:00Z from a `git push` banner ("GitHub found 42 vulnerabilities"), not by any platform check. Fixed the same session: pillow-layer:3 on Pillow 13.0.0 (owner yes), PR #5457, LifePlatformOperational hand-applied, recap dry-run render proved it, Dependabot 42 → 0 (certifi on the retired garth layer dismissed `not_used`, owner ruling). | The platform's CVE scanner for binary layers never worked: `life-platform-pip-audit` shells out to `python -m pip`, which the python3.12 runtime does not ship, so every layer manifest errored (`No module named pip`) while the report read `0 vulnerabilities` with no hard-fail; its GitHub-alerts leg skips without `GH_ALERTS_TOKEN`; and CI's enforced pip-audit step skips `lambdas/requirements/` on the assumption the Lambda covers it. A scanner whose error reads as green, guarding a set nothing else covers. Class tracker #5473 (CI scans the layer manifests; a scan that cannot run must red). | ~7 days (alerts 10-21..10-24 → found 10-28) | ~1 h | No |
 | 2026-10-27 | **P3** (the owner's 10-27 training day had no active routine draft for ~9 h overnight; no session was missed — none was logged in the window — and the routine was re-drafted before his training day; quiet: nothing alarmed) | **Session CJ archived the two 10-27 drafts at 06:27Z to re-draft them through the just-deployed Hevy-notes code, and the laptop then paused (~06:27Z → 15:21Z).** The re-draft ran at 15:21Z, after the Pacific day had rolled to 10-27, so the nightly predraft's default target was 10-28 and 10-27 stayed without a draft until an explicit `target_date` re-run at 15:26Z. | A two-step change to the owner's plan (archive, then re-draft) was split across tool calls with no guarantee the second ran; the predraft's target date is relative to the Pacific clock at run time. Fix: re-drafted 10-27 with an explicit `target_date` (15:26Z) and read the dry run back. Procedure: an archive-then-redraft of a routine runs as ONE command with an explicit `target_date`, and never across a likely laptop sleep (handover gotcha). No class tracker — not a code defect. | ~1 min after resume (the predraft printed target 2026-10-28) | ~9 h (15:26Z) | No |
 | 2026-10-26 | **P4** (main's CI/CD red from ~14:30Z on an external vendor outage; the deploy and smoke were green, nothing served regressed except two reader AI doors at the 16:20Z canary; loud: the visual gate failed and two AI alarms fired) | **Bedrock Haiku 4.5 returned `ServiceUnavailableException` (503) on most calls from ~13:00Z.** The wave-6 run (PR #5409, e1b66eef3) deployed and smoked green at 14:27Z, then its Visual + AI-vision QA gate read UNEVALUATED 0/6 on four attempts and failed main. `slo-ai-coaching-success` went ALARM at 14:02Z (6 `AnthropicAPIFailure` from the `ai-expert-analyzer` Monday 14:00Z run), and `ai-canary-overall` went ALARM at 16:21Z (`/api/ask` 500s and empty board coaches in the 16:20Z run). Text calls recovered after ~16:17Z; image calls were still failing at 16:49Z. | External: zero throttles, every failure a 503 from the vendor. The visual gate counts an UNEVALUATED page as FAIL by design (CONVENTIONS §4b), and auto-rollback fires only on smoke failure, so prod kept the verified wave-6 code. No code fix for the outage. The driver stopped re-running the gate after four attempts. Class tracker: #5412 (one weekly analyzer run's 503 burst lights the coaching SLO for a day; second Monday running). The canary and the SLO are cited in `docs/alarm_citations.json` as a dated vendor window. | ~5 min (the gate's failure) | open at the final wrap: main clears on the next run whose visual QA evaluates; the alarms on their 24 h windows | No |
 | 2026-10-26 | **P4** (main's CI/CD red ~71 min on a docs-only commit; nothing deployed or served changed; loud: the lint job failed on main) | **Session CH's wrap commit 4907f0a5a turned main red at 04:44Z.** The `lint / Lint + Syntax Check` gitleaks step flagged `generic-api-key` in `handovers/HANDOVER_LATEST.md`: a gotcha line quoted a Python assignment of a Secrets-Manager field-name constant as the example of what trips the scanner. Nothing secret leaked. | A wrap commit is the one commit class that goes to `main` without a PR, and the wrap's Phase 3 runs every Docs-CI gate except the secret scan. gitleaks is not on the laptop or in the pre-commit hook, so the quote reached the scanner only after it landed. Fix: the next merge (544825e51, 05:55Z) went green because a push scans only its own range, and Session CI's checkpoint wrap rewrote the line without the literal. Class tracker: #5405 (`wrap_gates.py --verify` runs gitleaks over the staged diff). Procedure: the wrap skill's Phase 3 names that leg once #5405 lands; until then the handover quotes field names, never an assignment. | ~15 min (the driver read the main badge at boot) | ~71 min (next merge) | No |
@@ -297,7 +298,7 @@ Last updated: 2026-10-17 Session BV Fable proofs-and-alarms run (#1332 gate; +1 
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 251 dated rows, 216 post-June** (newest row 2026-10-27):
+**Distribution — 252 dated rows, 217 post-June** (newest row 2026-10-28):
 
 | month | rows |
 |---|---|
@@ -309,9 +310,9 @@ Last updated: 2026-10-17 Session BV Fable proofs-and-alarms run (#1332 gate; +1 
 | 2026-07 | 36 |
 | 2026-08 | 126 |
 | 2026-09 | 41 |
-| 2026-10 | 13 |
+| 2026-10 | 14 |
 
-**By severity:** P1 6 · P2 35 · P3 96 · P4 109 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 36 · P3 96 · P4 109 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 31 match none):
@@ -324,7 +325,7 @@ than one, and 31 match none):
 | 44 | QA false positive — deploy-race (#2978) |
 | 37 | deploy-plane wedge / strand / race |
 | 36 | lane-subset / union-breach main red |
-| 31 | secret / credential |
+| 32 | secret / credential |
 | 27 | IAM / permission |
 | 23 | timezone / wallclock |
 | 19 | QA false positive — semantic oracle (#2959) |
@@ -355,17 +356,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**56 of 251 rows are silent.**
+**56 of 252 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 56 | 195 |
-| TTD parseable | 43 | 135 |
+| rows | 56 | 196 |
+| TTD parseable | 43 | 136 |
 | median TTD | **28 min** | 20 min |
-| mean TTD | 1,703 min | 1,372 min |
-| exceeded 1 day | 6 (14% of parsed) | 11 (8% of parsed) |
+| mean TTD | 1,703 min | 1,436 min |
+| exceeded 1 day | 6 (14% of parsed) | 12 (9% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~1.8× more likely to run past a day**. But the *means* are only 19% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 251 TTD cells (29%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.4× longer to detect at the median** and are **~1.6× more likely to run past a day**. But the *means* are only 16% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (5 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 252 TTD cells (29%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -376,7 +377,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 13 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 14 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)
