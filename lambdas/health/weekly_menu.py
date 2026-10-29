@@ -31,17 +31,28 @@ THE FIT (per day, deterministic — the same plan and table always give the same
      one or two others (or two for one), or one feeding's core replaced — minimising (the miss, the distance): the miss
      is the floor shortfall at the Atwater rate (a gram of protein, carbohydrate or fibre short costs 4 kcal, fat 9: the
      travel kit's exchange rate) plus the kcal outside the day's band; the distance from the day's kcal breaks ties.
-     A day whose own rotation ends unfit is searched again from the next rotations before it is called unfit; the
-     best of them is kept.
+     A day whose own rotation ends unfit is searched again from the next rotations; the first that fits is the day.
+  2b. THE EXACT SEARCH (`_exact_day`, #5103 search quality): when no rotation fits, a local optimum is not evidence
+     that no better set exists (the synthetic proof of 2026-10-29 found days on which a set missing by far less existed
+     than the one the local search stopped at). So the day is searched exactly: every assignment of one core per feeding, and for each a
+     branch-and-bound over every side serving count of every anchor, cut only where a bound proves no completion can
+     beat the best set found (a fractional-knapsack bound on the floors against the band). The result is the day's one
+     best set under a total order (the miss, the distance, the servings, the counts in id order): a fit when any set
+     fits, else the least miss any set of the anchors can reach — the same input always gives the same set. Its node
+     budget (per day and per build) bounds the time; a day that reaches it keeps the best found and says so.
   3. THE CHECK: kcal inside the day's band (the resolved kcal +/- half the prescribed band's width), protein at the
      range low, every feeding at its threshold, every floor met. `fits` is all of them; `misses` names each one short.
 
 THE FOOD-QUALITY TARGETS (#5105, `nutrition.food_quality`, read and checked by `health.food_quality`): the fibre floor is
 one of the day's floors above (the ONE fibre floor); the fatty-fish weekly range is enforced across the week — every day
 is fitted with the fatty-fish anchors (rows tagged `fatty_fish: true`) kept off it, then the range's low end is placed
-as one pinned serving on each of that many spread days (`_fit_week`); the owner-only lab-driven priorities row, when the
-caller holds it, rides the report. The menu's `quality` names every target the week misses (`quality.misses`) and every
-unreadable one (`quality.problems`) — never silently — and `food_plan` carries the rows the food panel checks the same way.
+as one pinned serving on each of that many days (`_fit_week`), ALWAYS (trading the target away for a day's fit is an
+owner ruling, not the fitter's), on the days where it costs least (`_fish_cost`: a day that still fits first, else the
+smallest miss it adds; the spread breaks ties); a day it leaves unfit names its misses like any unfit day, and only a
+serving no free day can take at all is left unplaced, with the reason on the report's short count. The owner-only
+lab-driven priorities row, when the caller holds it, rides the report. The menu's `quality` names every target the week
+misses (`quality.misses`) and every unreadable one (`quality.problems`) — never silently — and `food_plan` carries the
+rows the food panel checks the same way.
 
 The feedings are laid inside the one eating window (`nutrition.eating_window`): feeding i opens at i x (eating hours /
 feedings) hours after the window opens, so all of them sit inside it. On a lifting day one feeding is the post-session
@@ -73,8 +84,10 @@ and nowhere public.
 
 from __future__ import annotations
 
+import bisect
 import copy
 import itertools
+import json
 import logging
 import math
 from datetime import datetime
@@ -84,7 +97,7 @@ from health import food_quality, travel_food
 
 logger = logging.getLogger(__name__)
 
-VERSION = "weekly-menu@1.3.0"  # 1.3.0 #5104: the grocery list skips travel days and is rendered in `lines`; 1.2.0 #5103: the fixed meals (a fixed dinner planned around); 1.1.0 #5105: food quality
+VERSION = "weekly-menu@1.4.0"  # 1.4.0 #5103/#5105: the exact day search and fish on its least-cost days; 1.3.0 #5104: the grocery list skips travel days and is rendered in `lines`; 1.2.0 #5103: the fixed meals (a fixed dinner planned around); 1.1.0 #5105: food quality
 ISSUE = "#5103"
 POLICY_PATH = "nutrition.weekly_menu"
 ANCHORS_PATH = "anchor_foods"  # the owner-only twin's key (training_charter.PRIVATE_KEYS)
@@ -100,6 +113,12 @@ GRAMS = ("protein_g", "carb_g", "fat_g", "fibre_g")
 ATWATER = {"protein_g": 4.0, "carb_g": 4.0, "fat_g": 9.0, "fibre_g": 4.0}
 # Bound on the local search (moves taken per day); every move strictly lowers the cost, so it ends far sooner.
 MAX_MOVES = 400
+# Bounds on the exact search (`_exact_day`), in branch-and-bound nodes (~20 microseconds each): per day, and shared by
+# every exact search one menu build runs (the week's days and its fatty-fish trials), so a build's search time has a
+# ceiling whatever the table. A real day ends far below either (tests/test_weekly_menu_search_5103.py measures it); a
+# day that reaches one keeps the best set found so far and says the search stopped.
+EXACT_NODE_BUDGET = 60_000
+WEEK_NODE_BUDGET = 240_000
 POST_SESSION = "post_session"
 WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 SERVICE_COOK, SERVICE_MEAL = "cook", "meal_service"
@@ -475,6 +494,272 @@ def _search_day(
     return picked, sides
 
 
+def _knapsack_curves(items: Sequence[tuple[float, tuple[float, ...], int]]) -> list[tuple[list[float], list[float]]]:
+    """For each floor gram (protein, carbohydrate, fat, fibre, in GRAMS order), the most of it `items` can add for a
+    given added kcal when servings may be fractional: the fractional-knapsack curve (cumulative kcal, cumulative grams),
+    the items taken densest-first. Concave and non-decreasing, so it bounds what ANY whole-serving choice of the items
+    adds at that kcal."""
+    out = []
+    for gi in range(1, len(MACROS)):
+        order = sorted(items, key=lambda it: (-(it[1][gi] / it[1][0]), it[1][0]))
+        ks, gs = [0.0], [0.0]
+        for kcal, vec, cap in order:
+            ks.append(ks[-1] + vec[0] * cap)
+            gs.append(gs[-1] + vec[gi] * cap)
+        out.append((ks, gs))
+    return out
+
+
+def _curve_at(curve: tuple[list[float], list[float]], k: float) -> float:
+    ks, gs = curve
+    if k >= ks[-1]:
+        return gs[-1]
+    i = bisect.bisect_right(ks, k)
+    k0, k1 = ks[i - 1], ks[i]
+    return gs[i - 1] + (gs[i] - gs[i - 1]) * ((k - k0) / (k1 - k0) if k1 > k0 else 0.0)
+
+
+def _curve_inverse(curve: tuple[list[float], list[float]], g: float) -> Optional[float]:
+    """The least added kcal at which the curve reaches `g` grams (None when it never does)."""
+    ks, gs = curve
+    if g <= 0:
+        return 0.0
+    if g > gs[-1]:
+        return None
+    i = bisect.bisect_left(gs, g)
+    g0, g1 = gs[i - 1], gs[i]
+    return ks[i - 1] + (ks[i] - ks[i - 1]) * ((g - g0) / (g1 - g0) if g1 > g0 else 0.0)
+
+
+def _miss_bound(
+    cur: Sequence[float], curves: Sequence[tuple[list[float], list[float]]], kinks: Sequence[float], t: Mapping[str, Any]
+) -> float:
+    """A lower bound on the miss (`_cost`'s first term) of every completion of a partial day: the day's totals so far
+    are `cur`, and the foods still to choose can add at most `curves[g](K)` grams of each floor gram at added kcal K.
+    The bound is the least, over K, of h(K) = the floor shortfall at those grams plus the kcal outside the band at
+    cur + K. Valid because a real completion with added kcal K adds no more of any gram than its curve allows there.
+    h is convex and piecewise linear (each curve is concave), so its least value sits at a kink: the curves' own
+    breakpoints (`kinks`, sorted), the band's edges and each floor's crossing. The least over `kinks` is found by
+    bisection (a convex sequence), and the true least lies within one breakpoint of it — where only the band edges and
+    the crossings can add a kink — so those few are evaluated too."""
+    lo, hi = t["band"]
+    floors = [float(t["floors_g"].get(m) or 0.0) - cur[gi + 1] for gi, m in enumerate(GRAMS)]
+    weights = [ATWATER[m] for m in GRAMS]
+    top = kinks[-1] if kinks else 0.0
+
+    def h(k: float) -> float:
+        gap = sum(w * max(0.0, need - _curve_at(cv, k)) for cv, w, need in zip(curves, weights, floors) if need > 0)
+        kc = cur[0] + k
+        return gap + max(0.0, kc - hi) + max(0.0, lo - kc)
+
+    extra = [edge for edge in (lo - cur[0], hi - cur[0]) if 0.0 < edge < top]
+    for gi, need in enumerate(floors):
+        if need > 0:
+            k = _curve_inverse(curves[gi], need)
+            if k is not None and 0.0 < k < top:
+                extra.append(k)
+    if not kinks:
+        return h(0.0)
+    left, right = 0, len(kinks) - 1
+    while left < right:
+        mid = (left + right) // 2
+        if h(kinks[mid]) <= h(kinks[mid + 1]):
+            right = mid
+        else:
+            left = mid + 1
+    return min([h(kinks[left]), *(h(k) for k in extra)])
+
+
+def _decompose(counts: Mapping[str, int], pools: Sequence[Sequence[Counts]]) -> Optional[list[Counts]]:
+    """One core per feeding (feeding i's from `pools[i]`, in pool order) whose servings all sit inside `counts`, or
+    None when no assignment does. The first assignment in pool order is taken, so the split is deterministic."""
+    failed: set[tuple[int, tuple[tuple[str, int], ...]]] = set()
+
+    def walk(slot: int, left: dict[str, int]) -> Optional[list[Counts]]:
+        if slot == len(pools):
+            return []
+        memo = (slot, tuple(sorted((k, n) for k, n in left.items() if n)))
+        if memo in failed:
+            return None
+        for core in pools[slot]:
+            if all(left.get(k, 0) >= n for k, n in core.items()):
+                rest = walk(slot + 1, {k: n - core.get(k, 0) for k, n in left.items()})
+                if rest is not None:
+                    return [core, *rest]
+        failed.add(memo)
+        return None
+
+    return walk(0, dict(counts))
+
+
+def _core_sets(pools: Sequence[Sequence[Counts]], caps: Mapping[str, int]) -> list[tuple[Counts, ...]]:
+    """Every way to give each feeding one core from its pool inside the per-day caps, one entry per distinct serving
+    total (feedings that share a pool take its cores as a multiset: the order of two equal feedings is not a choice),
+    in a fixed order (pool order), so the search below walks them the same way every time."""
+    groups: dict[int, list[int]] = {}
+    for slot, pool in enumerate(pools):
+        groups.setdefault(id(pool), []).append(slot)
+    plans = [(slots, pools[slots[0]]) for slots in groups.values()]
+    choices = [list(itertools.combinations_with_replacement(range(len(pool)), len(slots))) for slots, pool in plans]
+    out: list[tuple[Counts, ...]] = []
+    seen: set[tuple[tuple[str, int], ...]] = set()
+    for pick in itertools.product(*choices):
+        by_slot: dict[int, Counts] = {}
+        for (slots, pool), idx in zip(plans, pick):
+            for slot, ci in zip(slots, idx):
+                by_slot[slot] = pool[ci]
+        total: Counts = {}
+        for c in by_slot.values():
+            for k, n in c.items():
+                total[k] = total.get(k, 0) + n
+        if any(n > caps.get(k, 0) for k, n in total.items()):
+            continue
+        sig = tuple(sorted(total.items()))
+        if sig in seen:
+            continue
+        seen.add(sig)
+        out.append(tuple(by_slot[slot] for slot in range(len(pools))))
+    return out
+
+
+def _exact_day(
+    pools: Sequence[Sequence[Counts]],
+    anchors: Sequence[Mapping[str, Any]],
+    t: Mapping[str, Any],
+    fixed_vec: Optional[Sequence[float]] = None,
+    incumbent: Optional[Mapping[str, int]] = None,
+    require: Optional[Mapping[str, int]] = None,
+    budget: int = EXACT_NODE_BUDGET,
+) -> tuple[Optional[tuple[list[Counts], Counts]], dict[str, Any]]:
+    """The day's BEST set, exactly. Every assignment of one core per feeding (`_core_sets`) is taken in turn, and for
+    each a branch-and-bound over every side serving count of every anchor (0 up to what its cap leaves) — together,
+    every set the local search could ever reach. It minimises one total order (the miss, the distance, the servings,
+    the counts in id order), so the answer is the one global optimum whatever the starting point, and the same input
+    always gives the same set (split into cores by `_decompose`, so the split is a function of the set alone). A branch
+    is cut only when no completion can beat the best set found: its miss bound (`_miss_bound`) is above the best miss,
+    or the best fits and no completion can land nearer the day's kcal. The `incumbent` (the local search's set) seeds
+    the bound. `require` names servings every set must hold (the day's pinned fatty fish: in a core or as a side).
+    Returns ((cores, sides), stats) — None when no assignment fits the caps — with stats {nodes, core_sets,
+    complete}: `complete` is False only when the `budget` of nodes ran out first (the best found so far is kept and the
+    day says so)."""
+    by_id = {a["id"]: a for a in anchors}
+    ids = sorted(by_id)
+    caps = {k: int(by_id[k]["cap"]) for k in ids}
+    base = tuple(fixed_vec) if fixed_vec is not None else (0.0,) * len(MACROS)
+    unit_of = {k: _vec({k: 1}, by_id) for k in ids}
+    target = float(t["kcal"])
+    stats: dict[str, Any] = {"nodes": 0, "core_sets": 0, "complete": True}
+
+    def key(total: Mapping[str, int], vec: Sequence[float]) -> tuple[Any, ...]:
+        return (*_cost_vec(vec, t), sum(total.values()), tuple(total.get(k, 0) for k in ids))
+
+    best: list[Any] = [None, None]  # key, total counts
+    need = {k: int(n) for k, n in (require or {}).items() if n}
+    if incumbent is not None:
+        inc = {k: int(n) for k, n in incumbent.items() if n}
+        if all(inc.get(k, 0) >= n for k, n in need.items()) and _decompose(inc, pools) is not None:
+            vec = tuple(b + sum(unit_of[k][i] * n for k, n in inc.items()) for i, b in enumerate(base))
+            best[:] = [key(inc, vec), inc]
+
+    def cut(cur: Sequence[float], miss_lb: float, reach: float) -> bool:
+        """True when no completion of this branch can beat the best set found."""
+        if best[0] is None:
+            return False
+        if miss_lb > best[0][0] + 1e-3:
+            return True
+        if best[0][0] == 0.0:  # the best fits: only a fit nearer the day's kcal can beat it
+            lo_k, hi_k = cur[0], cur[0] + reach
+            dist_lb = 0.0 if lo_k <= target <= hi_k else min(abs(lo_k - target), abs(hi_k - target))
+            return dist_lb > best[0][1] + 1e-3
+        return False
+
+    def sides_search(core_total: Counts) -> None:
+        must = {k: max(0, n - core_total.get(k, 0)) for k, n in need.items()}  # required servings no core holds
+        if any(core_total.get(k, 0) + n > caps.get(k, 0) for k, n in must.items()):
+            return
+        core_total = _merge(core_total, {k: n for k, n in must.items() if n})
+        left = {k: caps[k] - core_total.get(k, 0) for k in ids}
+        # The biggest foods first: deciding them early shrinks what the rest can add, which tightens every bound.
+        order = sorted((k for k in ids if left[k] > 0), key=lambda k: (-unit_of[k][0] * left[k], k))
+        unit = [unit_of[k] for k in order]
+        room = [left[k] for k in order]
+        curves, kinks, reach = [], [], []
+        for i in range(len(order) + 1):
+            cv = _knapsack_curves([(unit[j][0], unit[j], room[j]) for j in range(i, len(order))])
+            curves.append(cv)
+            kinks.append(sorted({k for ks, _gs in cv for k in ks}))
+            reach.append(sum(u[0] * r for u, r in zip(unit[i:], room[i:])))
+        counts = [0] * len(order)
+        start = tuple(b + sum(unit_of[k][i] * n for k, n in core_total.items()) for i, b in enumerate(base))
+
+        def dfs(i: int, cur: tuple[float, ...]) -> None:
+            stats["nodes"] += 1
+            if stats["nodes"] > budget:
+                stats["complete"] = False
+                return
+            if i == len(order):
+                total = dict(core_total)
+                for k, n in zip(order, counts):
+                    if n:
+                        total[k] = total.get(k, 0) + n
+                kk = key(total, cur)
+                if best[0] is None or kk < best[0]:
+                    best[:] = [kk, total]
+                return
+            children = []
+            for n in range(room[i] + 1):
+                nxt = tuple(c + x * n for c, x in zip(cur, unit[i]))
+                children.append((_miss_bound(nxt, curves[i + 1], kinks[i + 1], t), -n, nxt))
+            children.sort()  # the most promising branch first: a good set is found early, so more is cut
+            for miss_lb, neg_n, nxt in children:
+                if cut(nxt, miss_lb, reach[i + 1]):
+                    continue
+                counts[i] = -neg_n
+                dfs(i + 1, nxt)
+                if not stats["complete"]:
+                    return
+            counts[i] = 0
+
+        if not cut(start, _miss_bound(start, curves[0], kinks[0], t), reach[0]):
+            dfs(0, start)
+
+    # Every assignment's start is bounded first with what ALL the anchors could add (a looser bound than the one its own
+    # side search uses, so it cuts nothing a tighter bound would keep), and the assignments are walked best bound
+    # first: a good set early cuts the rest at a glance.
+    every = _knapsack_curves([(unit_of[k][0], unit_of[k], caps[k]) for k in ids])
+    every_kinks = sorted({k for ks, _gs in every for k in ks})
+    every_reach = sum(unit_of[k][0] * caps[k] for k in ids)
+    starts = []
+    for pos, assignment in enumerate(_core_sets(pools, caps)):
+        core_total: Counts = {}
+        for c in assignment:
+            for k, n in c.items():
+                core_total[k] = core_total.get(k, 0) + n
+        start = tuple(b + sum(unit_of[k][i] * n for k, n in core_total.items()) for i, b in enumerate(base))
+        starts.append((_miss_bound(start, every, every_kinks, t), pos, start, core_total))
+    starts.sort(key=lambda x: (x[0], x[1]))
+    for miss_lb, _pos, start, core_total in starts:
+        stats["core_sets"] += 1
+        stats["nodes"] += 1
+        if stats["nodes"] > budget:
+            stats["complete"] = False
+            break
+        if cut(start, miss_lb, every_reach):
+            continue
+        sides_search(core_total)
+        if not stats["complete"]:
+            break
+    if best[1] is None:
+        return None, stats
+    picked = _decompose(best[1], pools)
+    if picked is None:  # unreachable: every set above holds an assignment; kept so a bug is named, never served
+        return None, {**stats, "complete": False}
+    sides = dict(best[1])
+    for core in picked:  # one core at a time: two feedings' cores may share an anchor
+        sides = _merge(sides, {k: -n for k, n in core.items()})
+    return (list(picked), {k: n for k, n in sorted(sides.items()) if n}), stats
+
+
 # ── one day ───────────────────────────────────────────────────────────────────────────────────────────────────
 def _check(tot: Mapping[str, float], feedings: Sequence[Mapping[str, Any]], t: Mapping[str, Any]) -> tuple[dict[str, bool], list[str]]:
     lo, hi = t["band"]
@@ -594,12 +879,20 @@ def fit_day(
     exclude: Iterable[str] = (),
     fixed: Optional[Mapping[str, int]] = None,
     fixed_meals: Sequence[Mapping[str, Any]] = (),
+    search: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """One plan day fitted from the anchors. `index` is the day's position in the week (the core rotation). `exclude`
     keeps anchors off the day; `fixed` pins servings into it (counted, never moved) — the week's fatty-fish placement
     (#5105) uses both. `fixed_meals` are the parsed fixed feedings (`parse_fixed_meals`); the ones whose `days` name
     this weekday are subtracted first (`remainder`, reported as `targets.remaining`), counted as feedings and laid in
-    their slots."""
+    their slots. `search` is the build's shared exact-search state ({nodes_left, memo}: the week's node budget and the
+    completed searches, so an identical day is searched once); None gives this day its own.
+
+    The day is fitted in two steps. The local search (`_search_day`) runs from the day's core rotation (variety across
+    the week) and the next rotations; the first rotation that fits is the day. When none fits, the exact search
+    (`_exact_day`) finds the day's best set — a fit if any exists, else the least miss — so a day is never called unfit
+    while a fitting set exists, and an unfit day misses by the least any set of the anchors can. `search` on the day
+    names which step chose it (and, for the exact one, its nodes and whether it ran to completion)."""
     t = day_targets(day, read)
     weekday = WEEKDAY_NAMES[datetime.strptime(str(day.get("date"))[:10], "%Y-%m-%d").weekday()]  # a calendar-day key
     today = [m for m in fixed_meals if weekday in m["days"]]
@@ -631,16 +924,20 @@ def fit_day(
     # never a whole meal plan.
     share = (float(rem["kcal"]) if rem is not None else float(t["kcal"])) / n_anchor if n_anchor else 0.0
 
-    def _pool(need: float, capped: bool) -> list[Counts]:
-        return [c for c in feeding_cores(anchors, need, pol["core_max"]) if not capped or _totals(c, by_id)["kcal"] <= share]
+    def _pool(need: float, capped: bool, foods: Sequence[Mapping[str, Any]]) -> list[Counts]:
+        return [c for c in feeding_cores(foods, need, pol["core_max"]) if not capped or _totals(c, by_id)["kcal"] <= share]
 
-    cores = _pool(float(t["feeding_threshold_g"]), True)
-    post_cores = _pool(float(pps), True) if post_slot is not None else cores
+    def _pools(capped: bool, foods: Sequence[Mapping[str, Any]]) -> tuple[list[Counts], list[Counts]]:
+        main = _pool(float(t["feeding_threshold_g"]), capped, foods)
+        return main, (_pool(float(pps), capped, foods) if post_slot is not None else main)
+
+    capped = True
+    cores, post_cores = _pools(capped, anchors)
     if today and n_anchor and (not cores or not post_cores):
         # The fixed feedings leave less than any core: the day is still fitted (with the uncapped cores) and the check
         # names what the remainder cannot hold — the fixed meal is never shrunk or dropped to make room.
-        cores = _pool(float(t["feeding_threshold_g"]), False)
-        post_cores = _pool(float(pps), False) if post_slot is not None else cores
+        capped = False
+        cores, post_cores = _pools(capped, anchors)
     if n_anchor and (not cores or not post_cores):
         return {
             **base,
@@ -652,12 +949,11 @@ def fit_day(
     best: Optional[dict[str, Any]] = None
     span = n_anchor + len(WEEKDAY_NAMES)  # the rotation pool's size (see _pick_cores)
     fx = dict(zip(MACROS, _fixed_vec(today)))
-    for offset in [(index + j) % span for j in range(span)]:  # the day's own rotation first, then the next starts
-        start = _pick_cores(cores, post_cores, n_anchor, post_slot, offset, caps)
-        if start is None:
-            continue
-        picked, sides = _search_day(start, pools, anchors, t, fixed_vec)
-        sides = _merge(sides, pinned)
+
+    def _day(
+        picked: list[Counts], moved: Counts, rotation: Optional[int], search: dict[str, Any], add_pinned: bool = True
+    ) -> dict[str, Any]:
+        sides = _merge(moved, pinned) if add_pinned else dict(moved)
         feedings = _lay_out(picked, sides, t, post_slot, by_id, today)
         tot = _totals(_used(picked, sides), by_id)
         if today:
@@ -670,13 +966,60 @@ def fit_day(
                 f"{rem['fixed_g']['protein_g']:g} g protein) the anchors had {rem['band'][0]:g}-{rem['band'][1]:g} kcal "
                 f"for {n_anchor} feeding(s)",
             )
-        cand = {"feedings": feedings, "totals": tot, "checks": checks, "misses": misses, "fits": all(checks.values()), "rotation": offset}
-        if best is None or _cost(tot, t) < _cost(best["totals"], t):
+        if misses and search.get("method") == "exact" and not search.get("complete", True):
+            misses.append(f"the exact search stopped at its node budget ({search.get('nodes')} nodes): a better set may exist")
+        return {
+            "feedings": feedings,
+            "totals": tot,
+            "checks": checks,
+            "misses": misses,
+            "fits": all(checks.values()),
+            "rotation": rotation,
+            "search": search,
+            "_counts": _used(picked, sides),  # every anchor serving of the day (the pinned ones included)
+        }
+
+    for offset in [(index + j) % span for j in range(span)]:  # the day's own rotation first, then the next starts
+        start = _pick_cores(cores, post_cores, n_anchor, post_slot, offset, caps)
+        if start is None:
+            continue
+        picked, sides = _search_day(start, pools, anchors, t, fixed_vec)
+        cand = _day(picked, sides, offset, {"method": "local"})
+        if best is None or _cost(cand["totals"], t) < _cost(best["totals"], t):
             best = cand
         if cand["fits"]:
             break
     if best is None:
         return {**base, "fits": False, "reason_code": NO_FEEDING_CORE, "misses": ["the serving caps cannot hold one core per feeding"]}
+    if not best["fits"]:
+        # No rotation's local optimum fits: the exact search finds the day's best set (a fit when one exists, else the
+        # least miss), seeded with the local optimum so it only ever improves on it. A pinned serving is held exactly
+        # (its count is both its cap and its minimum) but may sit inside a feeding's core. The misses stay named.
+        foods = [*anchors, *({**by_id[k], "cap": n} for k, n in sorted(pinned.items()))]
+        ex_cores, ex_post = _pools(capped, foods) if pinned else (cores, post_cores)
+        ex_pools = [ex_post if slot == post_slot else ex_cores for slot in range(n_anchor)]
+        ex_vec = _fixed_vec(today) if today else None
+        sig = json.dumps(
+            [[sorted(c.items()) for c in pool] for pool in ex_pools]
+            + [[[a["id"], int(a["cap"]), *(a[m] for m in MACROS)] for a in foods], t["band"], t["kcal"], sorted(t["floors_g"].items())]
+            + [ex_vec, sorted(pinned.items())]
+        )
+        state = search if search is not None else {}
+        memo = state.setdefault("memo", {})
+        if sig in memo:  # the same day's search already ran to completion: its optimum is THE optimum (seed-free)
+            found, stats = memo[sig]
+        else:
+            left = int(state.get("nodes_left", EXACT_NODE_BUDGET))
+            found, stats = _exact_day(
+                ex_pools, foods, t, ex_vec, incumbent=best["_counts"], require=pinned, budget=max(0, min(EXACT_NODE_BUDGET, left))
+            )
+            if "nodes_left" in state:
+                state["nodes_left"] = left - stats["nodes"]
+            if stats["complete"]:
+                memo[sig] = (found, stats)
+        if found is not None:
+            best = _day(found[0], found[1], None, {"method": "exact", **stats}, add_pinned=False)
+    best.pop("_counts", None)
     return {**base, **best, "reason_code": None if best["fits"] else DAY_UNFIT}
 
 
@@ -690,6 +1033,21 @@ def _fish_ids(anchors: Sequence[Mapping[str, Any]]) -> list[str]:
     return sorted(a["id"] for a in anchors if a.get("fatty_fish"))
 
 
+def _miss(day: Mapping[str, Any]) -> float:
+    """A fitted day's miss (`_cost`'s first term; 0 for a day that fits), or infinity for a day with no feedings."""
+    return _cost(day["totals"], day["targets"])[0] if day.get("feedings") and day.get("totals") else math.inf
+
+
+def _fish_cost(before: Mapping[str, Any], cand: Mapping[str, Any]) -> Optional[tuple[int, float]]:
+    """What a fatty-fish serving costs a day, as the placement ranks it (lower is better): (0 when the day fits with
+    it, else 1; the miss it adds over the day's fish-free fit, negative when it helps). None when the day cannot take
+    one at all (no feedings with it). The charter's low end is placed whatever it costs (trading the target away is an
+    owner ruling, never the fitter's): this only decides WHERE it costs least."""
+    if not cand.get("feedings"):
+        return None
+    return (0 if cand.get("fits") else 1, round(_miss(cand) - _miss(before), 3))
+
+
 def _fit_week(
     days: Sequence[Mapping[str, Any]],
     anchors: Sequence[Mapping[str, Any]],
@@ -697,37 +1055,55 @@ def _fit_week(
     qpol: Mapping[str, Any],
     read: CharterReader,
     fixed_meals: Sequence[Mapping[str, Any]] = (),
-) -> list[dict[str, Any]]:
-    """Every day fitted, with the fatty-fish target enforced (#5105): every day is first fitted with the fatty-fish
-    anchors kept off it, then the low end of the charter's weekly range is placed — one pinned serving on each of that
-    many days, spread across the week (the day nearest each even slot first, the next nearest when a day cannot fit
-    it), the fish anchors taken in turn. A day the fish-free fit cannot build (fish was its only protein core) is
-    fitted with fish allowed; the quality report then names any count outside the range. With no readable range or no
-    tagged anchor the week is fitted as before. The fixed feedings (`fixed_meals`) ride every fit: the fish is placed
-    around them."""
+) -> tuple[list[dict[str, Any]], str]:
+    """Every day fitted, with the fatty-fish target enforced (#5105), and the reason any serving of the low end could
+    not be placed ('' when all were). Every day is first fitted with the fatty-fish anchors kept off it, then the low
+    end of the charter's weekly range is ALWAYS placed — one pinned serving on each of that many days, the fish anchors
+    taken in turn — on the days where it costs the least (`_fish_cost`): a day that fits with it first, else the
+    smallest miss it adds over the day's fish-free fit; the spread across the week (the day nearest each even slot)
+    only breaks ties. A day the fish leaves unfit names its misses exactly as any unfit day does. A serving is left
+    unplaced only when no free day can take one; the quality report then names the short count with that reason. A day
+    the fish-free fit cannot build (fish was its only protein core) is fitted with fish allowed; the quality report
+    names any count outside the range. With no readable range or no tagged anchor the week is fitted as before. The
+    fixed feedings (`fixed_meals`) ride every fit: the fish is placed around them."""
     fish = _fish_ids(anchors)
     rng = qpol.get("fish_range")
+    search: dict[str, Any] = {"nodes_left": WEEK_NODE_BUDGET, "memo": {}}  # one budget and memo for the whole build
     if not fish or rng is None:
-        return [fit_day(d, anchors, pol, i, read, fixed_meals=fixed_meals) for i, d in enumerate(days)]
+        return [fit_day(d, anchors, pol, i, read, fixed_meals=fixed_meals, search=search) for i, d in enumerate(days)], ""
     fitted = []
     for i, d in enumerate(days):
-        day = fit_day(d, anchors, pol, i, read, exclude=fish, fixed_meals=fixed_meals)
-        fitted.append(fit_day(d, anchors, pol, i, read, fixed_meals=fixed_meals) if day.get("reason_code") == NO_FEEDING_CORE else day)
+        day = fit_day(d, anchors, pol, i, read, exclude=fish, fixed_meals=fixed_meals, search=search)
+        fitted.append(
+            fit_day(d, anchors, pol, i, read, fixed_meals=fixed_meals, search=search) if day.get("reason_code") == NO_FEEDING_CORE else day
+        )
     placed = [sum(i_["servings"] for f in d.get("feedings") or [] for i_ in f["items"] if i_["item"] in fish) for d in fitted]
     free = [i for i, n in enumerate(placed) if not n]
     need = max(0, math.ceil(rng[0] - sum(placed)))
     chosen: set[int] = set()
-    for k in range(min(need, len(free))):
+    tried: dict[tuple[int, str], dict[str, Any]] = {}
+    for k in range(need):
         ideal = (k + 0.5) * len(days) / need
-        for i in sorted(free, key=lambda j: (abs(j + 0.5 - ideal), j)):
+        fid = fish[k % len(fish)]
+        ranked = []
+        for i in free:
             if i in chosen:
                 continue
-            cand = fit_day(days[i], anchors, pol, i, read, exclude=fish, fixed={fish[k % len(fish)]: 1}, fixed_meals=fixed_meals)
-            if cand.get("fits") or (not fitted[i].get("fits") and cand.get("feedings")):
-                fitted[i] = cand
-                chosen.add(i)
-                break
-    return fitted
+            if (i, fid) not in tried:
+                tried[(i, fid)] = fit_day(
+                    days[i], anchors, pol, i, read, exclude=fish, fixed={fid: 1}, fixed_meals=fixed_meals, search=search
+                )
+            cost = _fish_cost(fitted[i], tried[(i, fid)])
+            if cost is not None:
+                ranked.append((cost, abs(i + 0.5 - ideal), i))
+        if not ranked:
+            break
+        i = min(ranked)[2]
+        fitted[i] = tried[(i, fish[k % len(fish)])]
+        chosen.add(i)
+    short = need - len(chosen)
+    note = f"{short} serving(s) not placed: no free day could take a fatty-fish serving" if short > 0 else ""
+    return fitted, note
 
 
 def build(
@@ -771,7 +1147,7 @@ def build(
             anchor_problems=problems,
         )
     qpol = food_quality.policy(read)
-    fitted = _fit_week(days, anchors, pol, qpol, read, fixed_meals)
+    fitted, fish_held = _fit_week(days, anchors, pol, qpol, read, fixed_meals)
     refused = next((d for d in fitted if d.get("reason_code") in (NO_CALORIE_TARGET, NO_FEEDING_CORE)), None)
     if refused is not None:
         return _refused(str(refused["reason_code"]), f"{refused['date']}: {'; '.join(refused['misses'])}", anchor_problems=problems)
@@ -779,7 +1155,7 @@ def build(
     if unfit:
         logger.warning("weekly menu: %d day(s) the anchors cannot fit: %s", len(unfit), [(d["date"], d["misses"]) for d in unfit])
     by_id = {a["id"]: a for a in anchors}
-    note = "" if _fish_ids(anchors) else "no anchor in the table is tagged fatty_fish"
+    note = fish_held if _fish_ids(anchors) else "no anchor in the table is tagged fatty_fish"
     quality = food_quality.check_week(food_quality.day_rows(fitted, by_id), qpol, priorities, fish_note=note)
     if not quality["met"]:
         logger.warning("weekly menu: food-quality targets missed: %s %s", quality["misses"], quality["problems"])
