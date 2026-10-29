@@ -740,7 +740,12 @@ def lambda_handler(event, context):
         top_food_names = [f["name"] for f in patterns_store.get("top_foods", [])[:8]]
         plate_summary = extract_plate_summary(ai_content, top_food_names, dates["end"])
         plate_summary["qa"] = qa
-        store_plate_summary(plate_summary, today_str)
+        # #5297: a dry run writes nothing. Saturday's edition reads MEMORY#weekly_plate# back as
+        # anti-repeat history, so a dry run's summary would steer the real edition.
+        if dry_run:
+            logger.info(f"[dry_run] would store plate summary MEMORY#weekly_plate#{today_str} (qa={qa.get('validator')})")
+        else:
+            store_plate_summary(plate_summary, today_str)
     except Exception as e:
         logger.warning(f"Plate summary storage failed (non-fatal): {e}")
 
@@ -770,7 +775,10 @@ def lambda_handler(event, context):
     logger.info(f"Sent: {subject}")
 
     # IC-15: Persist plate insight (only when the edition is genuine AI writing, #2221)
-    if _HAS_INSIGHT_WRITER and ai_content and ai_written:
+    # #5297: never on a dry run — the insight is replayed into later meal-planning prompts.
+    if dry_run and _HAS_INSIGHT_WRITER and ai_content and ai_written:
+        logger.info("[dry_run] would persist IC-15 plate insight")
+    elif _HAS_INSIGHT_WRITER and ai_content and ai_written:
         try:
             insight_writer.write_insight(
                 digest_type="weekly_plate",
