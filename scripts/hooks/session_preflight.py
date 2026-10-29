@@ -40,11 +40,13 @@ from _hooklib import ROOT, gh, git, read_payload  # noqa: E402
 def _main_green() -> str:
     code, out = git("rev-parse", "--abbrev-ref", "HEAD")
     branch = out if code == 0 else "?"
+    # The workflow's own runs endpoint, not the repo-wide list filtered by name: the Deploy dead-man runs on main
+    # every ~15 min, so the newest 8 main runs held no CI/CD run and this line read UNVERIFIED at every boot (2026-10-29).
     code, out = gh(
         "api",
-        "repos/averagejoematt/life-platform/actions/runs?branch=main&per_page=8",
+        "repos/averagejoematt/life-platform/actions/workflows/ci-cd.yml/runs?branch=main&per_page=1",
         "--jq",
-        '[.workflow_runs[]|select(.name=="CI/CD")][0]|"\\(.conclusion // .status) \\(.head_sha[0:9])"',
+        '.workflow_runs[0]|"\\(.conclusion // .status) \\(.head_sha[0:9])"',
     )
     if code != 0 or not out or out.startswith("null"):
         state = "UNVERIFIED (could not query — this is not a pass)"
@@ -145,6 +147,33 @@ def _chronicle_queue() -> list[str]:
         return [f"  chronicle   UNVERIFIED ({type(exc).__name__}: {exc})"]
 
 
+SEVERITIES = ("critical", "high", "medium", "low")
+
+
+def dependabot_line(severities: list) -> str:
+    """#5473: the open Dependabot alert count by severity, so a recurrence is seen at boot — on 2026-10-28 41 Pillow
+    alerts sat open for 7 days, seen only from a push banner. Pure: takes the open alerts' severities."""
+    if not severities:
+        return "0 open"
+    counts = {s: severities.count(s) for s in SEVERITIES if s in severities}
+    other = len(severities) - sum(counts.values())
+    parts = [f"{n} {s}" for s, n in counts.items()] + ([f"{other} other"] if other else [])
+    return f"{len(severities)} open ({', '.join(parts)})  <- triage before lane work"
+
+
+def _dependabot() -> str:
+    code, out = gh(
+        "api",
+        "repos/averagejoematt/life-platform/dependabot/alerts?state=open&per_page=100",
+        "--paginate",
+        "--jq",
+        ".[].security_advisory.severity",
+    )
+    if code != 0:
+        return "UNVERIFIED (could not query — this is not a clean board)"
+    return dependabot_line([ln.strip() for ln in out.splitlines() if ln.strip()])
+
+
 def _waiting_lease() -> str:
     code, out = gh(
         "api",
@@ -225,6 +254,7 @@ def main() -> int:
     print(f"  site-deploy {_site_deploy()}")
     for line in _chronicle_queue():
         print(line)
+    print(f"  dependabot  {_dependabot()}")
     print(f"  deploy lease {_waiting_lease()}")
     print(f"  worktrees   {_worktrees()}")
     for line in _boot_brief():
