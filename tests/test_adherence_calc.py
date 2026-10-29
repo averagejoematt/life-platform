@@ -760,3 +760,144 @@ def test_5374_adherence_grades_the_performed_shape_against_the_prescribed_one():
     assert blank["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]["status"] == "performed_unread"
     prose = calculate_adherence(_ir_5374("Easy ride, RPE 6 max."), {"exercises": [_ride_5374(_OWNER_NOTE_5374)]})
     assert prose["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]["status"] == "prescribed_unread"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #5374 (10-26, 10-28): a cardio SWAP. The routine prescribed a cycling hills ride; he walked the treadmill instead and
+# noted "3.5 incline / 3.2 speed". The treadmill landed only as a template id in `extra` and the cycling block read
+# `performed_unread` — the note he wrote for the engine was never read. The treadmill row below is the 10-28 Hevy
+# /v1/workouts exercise item verbatim (raw/hevy, workout 0adcac0c); the lift row and the routine are synthetic.
+# ─────────────────────────────────────────────────────────────────────────────
+_TREADMILL_1028 = {
+    "index": 5,
+    "title": "Treadmill",
+    "notes": "3.5 incline / 3.2 speed",
+    "exercise_template_id": "243710DE",
+    "superset_id": None,
+    "sets": [
+        {
+            "index": 0,
+            "type": "normal",
+            "weight_kg": None,
+            "reps": None,
+            "distance_meters": 2527,
+            "duration_seconds": 1800,
+            "rpe": None,
+            "custom_metric": None,
+        }
+    ],
+}
+_LIFT_ROW_5374 = {
+    "index": 0,
+    "title": "Lat Pulldown (Cable)",
+    "notes": None,
+    "exercise_template_id": "6A6C31A5",
+    "sets": _sets(7.0, 7.5, 8.0),
+}
+
+
+def _hills_note_5374(minutes=30):
+    from training import cardio_note
+
+    note, _ = cardio_note.compose(movement_key="cycling", minutes=minutes, target_date="2026-10-28", kind="hills", facts={"last_level": 11})
+    return note
+
+
+def _swap_ir_5374(*cardio_keys):
+    return RoutineSpec(
+        routine_id="r-5374-swap",
+        target_date="2026-10-28",
+        archetype="lower",
+        exercises=[ExerciseBlock(movement_key="lat_pulldown", sets=[Set()] * 3, notes="RPE 8 cap.")]
+        + [ExerciseBlock(movement_key=k, sets=[Set(duration_seconds=1800)], notes=_hills_note_5374()) for k in cardio_keys],
+    )
+
+
+def _verdicts(out):
+    """Every verdict-bearing field of an adherence record — what the swap read must leave untouched."""
+    by = out["as_prescribed_by_kind"]
+    return {
+        "as_prescribed": out["as_prescribed"],
+        "by_kind": {
+            k: (None if v is None else {f: v[f] for f in ("verdict", "reasons", "sets_pct", "intensity_status", "movements")})
+            for k, v in by.items()
+        },
+        "overall_pct": out["overall_pct"],
+        "intensity_adherence": out["intensity_adherence"],
+        "missing": out["missing"],
+        "extra": out["extra"],
+    }
+
+
+def _without_extra_read(monkeypatch, ir, performed):
+    """The pre-fix record: the same session with the extra-cardio read switched off (the mutation control)."""
+    with monkeypatch.context() as m:
+        m.setattr(adherence_calc, "_extra_cardio_shapes", lambda *a, **k: {})
+        return calculate_adherence(ir, performed)
+
+
+def test_5374_a_machine_swap_reads_the_performed_note_against_the_prescribed_clock(monkeypatch):
+    ir = _swap_ir_5374("cycling")
+    performed = {"exercises": [_LIFT_ROW_5374, _TREADMILL_1028]}
+    out = calculate_adherence(ir, performed)
+    shape = out["as_prescribed_by_kind"]["cardio"]["shape"]
+    tread = shape["treadmill"]
+    assert tread["substituted_for"] == "cycling" and tread["template_id"] == "243710DE"
+    assert tread["performed"]["family"] == "steady" and tread["performed"]["speed_mph"] == 3.2
+    assert tread["performed"]["levels"] == [3.5] and tread["performed"]["unit"] == "%" and tread["performed"]["total_min"] == 30
+    assert tread["prescribed"]["family"] == "hills" and tread["prescribed"]["unit"] == "level"
+    assert tread["status"] == "different_shape" and tread["minutes_delta"] == 0
+    # a bike level minus a treadmill incline % is not a number: the pair is named, no level delta is emitted
+    assert tread["units_differ"] == ["level", "%"]
+    assert "mean_level_delta" not in tread and "top_level_delta" not in tread
+    assert shape["cycling"]["status"] == "performed_unread" and shape["cycling"]["substituted_by"] == "treadmill"
+    # mutation control: the pre-fix record never read the treadmill note, and every verdict is identical either way
+    before = _without_extra_read(monkeypatch, ir, performed)
+    assert "treadmill" not in before["as_prescribed_by_kind"]["cardio"]["shape"]
+    assert _verdicts(before) == _verdicts(out)
+    assert out["missing"] == ["cycling"] and out["extra"] == ["243710DE"]
+
+
+def test_5374_a_day_without_a_swap_reads_as_before(monkeypatch):
+    ir = _swap_ir_5374("cycling")
+    ride = {
+        "index": 1,
+        "title": "Cycling",
+        "notes": "Level 11 flat",
+        "exercise_template_id": "D8F7F851",
+        "sets": [{"type": "normal", "duration_seconds": 1800}],
+    }
+    for performed in ({"exercises": [_LIFT_ROW_5374, ride]}, {"exercises": [_LIFT_ROW_5374]}):
+        out = calculate_adherence(ir, performed)
+        before = _without_extra_read(monkeypatch, ir, performed)
+        assert out == before  # nothing extra performed on a cardio machine: the record is byte-identical to the pre-fix one
+        assert set(out["as_prescribed_by_kind"]["cardio"]["shape"]) == {"cycling"}
+        assert "substituted_by" not in out["as_prescribed_by_kind"]["cardio"]["shape"]["cycling"]
+
+
+def test_5374_an_ambiguous_swap_is_unprogrammed_never_a_guess(monkeypatch):
+    elliptical = {
+        "index": 6,
+        "title": "Elliptical Trainer",
+        "notes": "Level 6",
+        "exercise_template_id": "3303376C",
+        "sets": [{"type": "normal", "duration_seconds": 600}],
+    }
+    cases = (
+        ("two blocks missing", _swap_ir_5374("cycling", "rowing_machine"), {"exercises": [_LIFT_ROW_5374, _TREADMILL_1028]}),
+        ("two machines added", _swap_ir_5374("cycling"), {"exercises": [_LIFT_ROW_5374, _TREADMILL_1028, elliptical]}),
+    )
+    offenders = []
+    for name, ir, performed in cases:
+        out = calculate_adherence(ir, performed)
+        shape = out["as_prescribed_by_kind"]["cardio"]["shape"]
+        tread = shape.get("treadmill") or {}
+        if tread.get("status") != "unprogrammed" or "substituted_for" in tread or tread.get("prescribed") is not None:
+            offenders.append(f"{name}: treadmill read {tread}")
+        if (tread.get("performed") or {}).get("speed_mph") != 3.2:
+            offenders.append(f"{name}: his treadmill note was not read ({tread.get('performed')})")
+        if any("substituted_by" in (v or {}) for v in shape.values()):
+            offenders.append(f"{name}: a programmed block was named as replaced")
+        if _verdicts(out) != _verdicts(_without_extra_read(monkeypatch, ir, performed)):
+            offenders.append(f"{name}: a verdict moved")
+    assert not offenders, offenders

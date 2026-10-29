@@ -119,7 +119,8 @@ def rollup_facts_block(facts, *, baseline_lbs=None, start_date_iso=None):
 # figures as given: "nearly 900 minutes" for 896 and "20 points" for a delta are both refused.
 ROLLUP_FIGURE_GUIDANCE = (
     "- A sleep, HRV or recovery figure in a week's note is THAT WEEK's average, not one night's reading. Cite it as an average and name "
-    'its week in the same clause ("sleep averaged <hours> hours in Week <N>"), and only for the week whose note states it.\n'
+    'its week in the same clause ("sleep averaged <hours> hours in Week <N>", "HRV averaged <value> ms in Week <N>"; never a bare '
+    '"HRV climbed to <value> ms in Week <N>"), and only for the week whose note states it.\n'
     "- Quote figures exactly as the notes and facts give them. Never round one to a round number, never compute a new "
     "one (a difference, a total, a change in points), and refer to the start by its date, never by a day number."
 )
@@ -278,7 +279,9 @@ def gate_json_record(label, parsed, key, partial, prompt, api_key, *, gate_prose
         return [f for k in reader_keys for f in _lf.reader_surface_findings(str(rec.get(k) or ""))]
 
     _kw = {"reader": _reader} if reader_keys else {}
-    text = gate_prose(label, joined, prompt, api_key, extract=_extract, **_kw)
+    # #5458: a prompt that asked for a week's average named with its week gets that form offered in the
+    # rewrite too — derived from the prompt itself, so a new rollup carrying the guidance is covered.
+    text = gate_prose(label, joined, prompt, api_key, extract=_extract, week_window=ROLLUP_FIGURE_GUIDANCE in prompt, **_kw)
     if not text:
         logger.warning("%s HELD by the grounding gate (#2421/#2391) — prior cached record keeps serving", label)
         return None

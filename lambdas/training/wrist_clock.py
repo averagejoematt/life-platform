@@ -609,14 +609,19 @@ def grade(prescribed: dict[str, Any] | None, performed: dict[str, Any] | None) -
     `status`: ``prescribed_unread`` (the routine's note carries no clock rule) · ``performed_unread`` (his note names
     no clock clause) · ``same_shape`` (the same family: steady / hills / intervals) · ``different_shape``. Beside it
     the minutes, the levels and the time-weighted mean level of each side, so a reader can say how far apart they are
-    without this function deciding what counts as close."""
+    without this function deciding what counts as close. A treadmill side carries its `speed_mph` too. Two sides in
+    different units (a bike level against a treadmill incline %, a machine swap — #5374) carry no level delta: the
+    difference of a level and a percent is not a number, so `units_differ` names the pair instead."""
     pre = prescribed if prescribed and prescribed.get("status") in ("shaped", "steady") else None
     perf = performed if performed and performed.get("status") in ("shaped", "steady") else None
 
     def side(s: dict[str, Any] | None) -> dict[str, Any] | None:
         if not s:
             return None
-        return {k: s.get(k) for k in ("family", "total_min", "levels", "base_level", "top_level", "mean_level", "unit")}
+        out = {k: s.get(k) for k in ("family", "total_min", "levels", "base_level", "top_level", "mean_level", "unit")}
+        if s.get("speed_mph") is not None:
+            out["speed_mph"] = s["speed_mph"]
+        return out
 
     out: dict[str, Any] = {"version": WRIST_CLOCK_VERSION, "prescribed": side(pre), "performed": side(perf)}
     if pre is None:
@@ -627,10 +632,14 @@ def grade(prescribed: dict[str, Any] | None, performed: dict[str, Any] | None) -
         out["unparsed"] = (performed or {}).get("unparsed") or []
         return out
     out["status"] = "same_shape" if pre["family"] == perf["family"] else "different_shape"
-    if pre.get("mean_level") is not None and perf.get("mean_level") is not None:
-        out["mean_level_delta"] = round(float(perf["mean_level"]) - float(pre["mean_level"]), 1)
-    if pre.get("top_level") is not None and perf.get("top_level") is not None:
-        out["top_level_delta"] = round(float(perf["top_level"]) - float(pre["top_level"]), 1)
+    units = (pre.get("unit"), perf.get("unit"))
+    if None not in units and units[0] != units[1]:
+        out["units_differ"] = list(units)
+    else:
+        if pre.get("mean_level") is not None and perf.get("mean_level") is not None:
+            out["mean_level_delta"] = round(float(perf["mean_level"]) - float(pre["mean_level"]), 1)
+        if pre.get("top_level") is not None and perf.get("top_level") is not None:
+            out["top_level_delta"] = round(float(perf["top_level"]) - float(pre["top_level"]), 1)
     if pre.get("total_min") is not None and perf.get("total_min") is not None:
         out["minutes_delta"] = int(perf["total_min"]) - int(pre["total_min"])
     return out

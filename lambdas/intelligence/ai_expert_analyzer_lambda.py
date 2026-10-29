@@ -1014,7 +1014,18 @@ def _presence_logs(gen_date_iso):
 
 
 def _gate_prose(
-    label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, absence=None, extract=None, reader=None
+    label,
+    text,
+    prompt,
+    api_key,
+    *,
+    shared_system=None,
+    extra_sources=(),
+    available_logs=None,
+    absence=None,
+    extract=None,
+    reader=None,
+    week_window=False,  # #5458: the prompt asked for "averaged … in Week <N>"; the rewrite offers it
 ):
     """The module's ONE grounding chokepoint (#2421) — every model call routes here.
 
@@ -1078,7 +1089,7 @@ def _gate_prose(
     _pre = _findings_fn(text)
     if _pre:
         logger.warning("[grounding] %s finding(s): %s", label, [f["detail"] for f in _pre][:6])
-    _new_text, _left, _corrected = _gg.regen_once(text, _findings_fn, _regen, surface=label)
+    _new_text, _left, _corrected = _gg.regen_once(text, _findings_fn, _regen, surface=label, week_window=week_window)
     if _corrected:
         text = _new_text
         logger.info("[grounding] %s self-corrected: %d→%d finding(s)", label, len(_pre), len(_left))

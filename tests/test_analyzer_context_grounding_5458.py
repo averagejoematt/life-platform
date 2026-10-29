@@ -297,6 +297,111 @@ class TestRollupsCarryTheCycleStart:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# the rollups' rewrite — offered the week form the rollup prompt asks for
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# The 2026-10-29 synthetic proof (8 local runs, writes refused): every arc / month hold was a
+# weekly HRV average written "HRV climbed to X ms in Week N", with no "averaged". The rewrite was
+# offered only "averaged <value> ms over the last <N> nights", a window the week notes never give,
+# while the rollup prompt asks for "averaged … in Week <N>". The rewrite now offers both on a
+# surface whose prompt carries that guidance, and only there.
+
+BARE_WEEK = "In Week 2 your HRV climbed to 49.6 ms, the best stretch of the arc."
+NIGHTS_FORM = '"averaged <value> ms over the last <N> nights"'
+WEEK_FORM_RE = re.compile(r'"(averaged <value> ms in Week <N>)"')
+
+
+def _fill(form):
+    return form.replace("<value>", "49.6").replace("<N>", "2")
+
+
+class TestRollupRewriteOffersTheWeekForm:
+    @pytest.fixture(autouse=True)
+    def _env(self, table, monkeypatch):
+        _seed_weeks(table)
+        _canon(monkeypatch, latest_weight=LATEST, recovery_pct=55.0)
+        self.table = table
+
+    def test_the_gate_passes_the_week_form_and_holds_the_bare_form(self):
+        """The gate itself, unchanged (mutation control). The week form is lifted from the
+        rewrite instruction, so the instruction and the check cannot drift apart."""
+        from ai import grounded_generation as gg, night_scope
+
+        finding = night_scope.night_scoped_vitals_findings(BARE_WEEK, nightly_vitals={}, generation_date_iso=TODAY)
+        assert [f["type"] for f in finding] == ["unlabeled_night_figure"], "the bare week form must stay held"
+        offered = WEEK_FORM_RE.search(gg.correction_prompt(finding, week_window=True)).group(1)
+        fixed = f"In Week 2 your HRV {_fill(offered)}, the best stretch of the arc."
+        assert night_scope.night_scoped_vitals_findings(fixed, nightly_vitals={}, generation_date_iso=TODAY) == []
+
+    def test_the_per_night_instruction_is_unchanged_by_default(self):
+        from ai import grounded_generation as gg, night_scope
+
+        finding = night_scope.night_scoped_vitals_findings(BARE_WEEK, nightly_vitals={}, generation_date_iso=TODAY)
+        default = gg.correction_prompt(finding)
+        assert NIGHTS_FORM in default and "Week <N>" not in default
+        week = gg.correction_prompt(finding, week_window=True)
+        assert NIGHTS_FORM in week and WEEK_FORM_RE.search(week)
+
+    def test_a_bare_week_draft_is_rewritten_in_the_week_form_and_publishes(self, model):
+        """End to end on both rollups: the draft holds, the rewrite request carries the week form,
+        a rewrite in that form publishes, and a rewrite still bare holds. The rewrite text is built
+        from the form the request itself offered. One test, every offender reported."""
+        offenders = []
+        for surface, wrap, gen in (
+            ("experiment_arc", _arc, az.generate_experiment_arc),
+            ("integrator_month", _month, az.generate_month_rollup),
+        ):
+            sk = (az.CACHE_PK, f"EXPERT#{surface}")
+            m = model(wrap(BARE_WEEK), wrap("placeholder"))
+            gen()
+            offered = WEEK_FORM_RE.search(m.prompts[1]) if m.calls == 2 else None
+            if not offered or NIGHTS_FORM not in m.prompts[1]:
+                offenders.append(f"{surface}: rewrite not offered both forms ({m.calls} calls)")
+                continue
+
+            self.table.items.pop(sk, None)
+            fixed = f"In Week 2 your HRV {_fill(offered.group(1))}, the best stretch of the arc."
+            model(wrap(BARE_WEEK), wrap(fixed))
+            if gen() is None:
+                offenders.append(f"{surface}: the week-form rewrite was held")
+
+            self.table.items.pop(sk, None)
+            model(wrap(BARE_WEEK), wrap(BARE_WEEK))
+            gen()
+            if self.table.items.pop(sk, None) is not None:
+                offenders.append(f"{surface}: a rewrite still bare published (gate weakened)")
+        assert offenders == [], offenders
+
+    def test_the_week_form_is_offered_exactly_where_the_prompt_asks_for_it(self, model, monkeypatch):
+        """Derived from the prompt, never a label list: the two rollups carry the guidance and get
+        the flag; the weekly synthesis does not carry it and does not get it."""
+        from intelligence.integrator_prompts import ROLLUP_FIGURE_GUIDANCE
+
+        seen = {}
+
+        def _spy(label, text, prompt, api_key, **kw):
+            seen[label] = (kw.get("week_window"), ROLLUP_FIGURE_GUIDANCE in prompt)
+            return ""
+
+        monkeypatch.setattr(az, "_gate_prose", _spy)
+        model(_arc("x"), _month("x"), json.dumps({"weekly_priority": "Hold the line.", "public_summary": "Held."}))
+        az.generate_experiment_arc()
+        az.generate_month_rollup()
+        az.generate_synthesis({"sleep": "Sleep read.", "training": "Training read."})
+        assert seen.get("experiment_arc") == (True, True)
+        assert seen.get("integrator_month") == (True, True)
+        synth = [v for k, v in seen.items() if k not in ("experiment_arc", "integrator_month")]
+        assert synth == [(False, False)], f"the weekly synthesis must keep the nights-only rewrite: {seen}"
+
+    def test_a_per_night_expert_rewrite_is_offered_the_nights_form_only(self, model):
+        bare = "Your HRV sat at 41 ms, a number worth watching."
+        m = model(bare, bare)
+        az.generate_and_cache("sleep")
+        assert m.calls == 2, "the unlabeled figure must trigger the one rewrite"
+        assert NIGHTS_FORM in m.prompts[1] and "Week <N>" not in m.prompts[1]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # labs (#5456) — a pre-experiment draw is framed as one, derived from genesis
 # ═════════════════════════════════════════════════════════════════════════════
 

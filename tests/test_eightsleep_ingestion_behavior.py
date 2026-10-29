@@ -28,8 +28,9 @@ code happened to return. The contracts under test:
   * the field names this module writes vs. the field names its readers query.
 
 Time is frozen wherever `datetime.now` or the Pacific-day helpers are reachable,
-so no fixture date is ever combined with the real clock (the DST-sensitive
-`_tz_offset_hours` path is exercised on both sides of the transition).
+so no fixture date is ever combined with the real clock. Since #4284 the night's
+zone (`_night_zone`) is clock-free — each instant converts at its own offset — and
+§10 pins that on both sides of both 2026-27 DST transitions.
 """
 
 import copy
@@ -389,9 +390,10 @@ class TestHourOfDay:
         # indistinguishable from "we don't know", never from "onset at 00:00".
         assert es._hour_of_day(bad, -8) is None
 
-    def test_the_default_offset_is_pacific_standard_time(self):
-        assert es._hour_of_day("2026-05-10T08:00:00.000Z") == 0.0
-        assert es._DEFAULT_TZ_OFFSET == -8
+    def test_the_default_frame_is_the_dst_aware_pacific_zone_not_a_fixed_offset(self):
+        # #4284: the default used to be a fixed -8, an hour off every summer instant.
+        assert es._hour_of_day("2026-05-10T08:00:00.000Z") == 1.0  # 08:00Z − 7h (PDT) = 01:00
+        assert es._hour_of_day("2026-01-15T08:00:00.000Z") == 0.0  # 08:00Z − 8h (PST) = 00:00
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -427,38 +429,38 @@ class TestSleepMidpoint:
 
 
 class TestTimezoneOffset:
-    def test_a_summer_night_uses_the_daylight_offset(self, summer_clock):
-        # The 2026-06-12 defect: the static map pinned standard time, so every
-        # stored sleep hour landed 1h off from March to November.
-        assert es._tz_offset_hours("America/Los_Angeles") == -7.0
+    """`_night_zone` returns a ZONE, so the offset is chosen per instant (#4284)."""
 
-    def test_a_winter_night_uses_the_standard_offset(self, winter_clock):
-        assert es._tz_offset_hours("America/Los_Angeles") == -8.0
+    def test_a_summer_instant_converts_at_the_daylight_offset(self, winter_clock):
+        # The clock is frozen in WINTER on purpose: the offset belongs to the instant.
+        zone = es._night_zone("America/Los_Angeles")
+        assert datetime(2026, 5, 10, 12, tzinfo=timezone.utc).astimezone(zone).utcoffset() == timedelta(hours=-7)
 
-    def test_a_zone_without_dst_reports_the_same_offset_year_round(self, summer_clock):
-        assert es._tz_offset_hours("Asia/Tokyo") == 9.0
+    def test_a_winter_instant_converts_at_the_standard_offset(self, summer_clock):
+        zone = es._night_zone("America/Los_Angeles")
+        assert datetime(2026, 1, 15, 12, tzinfo=timezone.utc).astimezone(zone).utcoffset() == timedelta(hours=-8)
 
-    def test_an_unknown_zone_falls_back_to_the_pacific_default(self, summer_clock):
-        assert es._tz_offset_hours("Mars/Olympus_Mons") == es._DEFAULT_TZ_OFFSET
+    def test_a_zone_without_dst_reports_the_same_offset_year_round(self):
+        zone = es._night_zone("Asia/Tokyo")
+        for month in (1, 7):
+            assert datetime(2026, month, 15, 12, tzinfo=timezone.utc).astimezone(zone).utcoffset() == timedelta(hours=9)
 
-    def test_every_entry_in_the_static_fallback_map_is_that_zones_standard_offset(self):
-        """Guard the SET, not one instance: the fallback map is only honest if
-        each hardcoded value equals the zone's non-DST offset — a southern-
-        hemisphere zone (Sydney) is on DST in January, so a single-date check
-        would silently pass a wrong number."""
-        from zoneinfo import ZoneInfo
+    @pytest.mark.parametrize("bad", ["Mars/Olympus_Mons", "", None])
+    def test_an_unknown_zone_falls_back_to_the_dst_aware_pacific_frame(self, bad):
+        from common.pacific_time import PACIFIC
 
-        assert es._TZ_OFFSETS, "the fallback map must not be empty"
-        for zone, hardcoded in es._TZ_OFFSETS.items():
-            tz = ZoneInfo(zone)
-            standard = None
-            for month in range(1, 13):
-                probe = datetime(2026, month, 15, 12, 0, tzinfo=tz)
-                if probe.dst() == timedelta(0):
-                    standard = probe.utcoffset().total_seconds() / 3600
-                    break
-            assert standard is not None, f"{zone}: no standard-time month found"
-            assert hardcoded == standard, f"{zone}: map says {hardcoded}, standard offset is {standard}"
+        assert es._night_zone(bad) is PACIFIC
+
+    def test_the_zone_is_never_derived_from_the_clock(self):
+        """The defect's shape, guarded structurally: no `now()` inside the zone choice."""
+        import ast
+        import inspect
+        import textwrap
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(es._night_zone)))
+        clock_reads = [n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute) and n.attr in ("now", "utcnow", "today")]
+        assert clock_reads == [], f"_night_zone reads the clock: {clock_reads}"
+        assert not hasattr(es, "_tz_offset_hours"), "the now-offset helper is retired (#4284)"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -783,12 +785,15 @@ class TestTransform:
         raw = self._raw(days=[canonical_day(day="2026-05-07"), canonical_day(day="2026-05-08")])
         assert es.transform(raw, WAKE_DATE) == []
 
-    def test_the_secrets_timezone_drives_the_circadian_fields_through_dst(self, summer_clock, monkeypatch):
+    def test_the_secrets_timezone_drives_the_circadian_fields_and_the_clock_does_not(self, summer_clock, monkeypatch):
         summer = es.transform(self._raw(), WAKE_DATE)[0]
-        assert summer["sleep_onset_hour"] == 23.9  # PDT, UTC-7
+        assert summer["sleep_onset_hour"] == 23.9  # the May night is PDT, UTC-7
+        # #4284: the same May night ingested on a WINTER run is still PDT — it used to
+        # read 22.9, the run's PST offset applied to a summer instant.
         monkeypatch.setattr(es, "datetime", _frozen_datetime(WINTER_UTC))
-        winter = es.transform(self._raw(), WAKE_DATE)[0]
-        assert winter["sleep_onset_hour"] == 22.9  # PST, UTC-8
+        assert es.transform(self._raw(), WAKE_DATE)[0]["sleep_onset_hour"] == 23.9
+        # The secret's zone still moves it: 06:54Z + 9h = 15:54 JST → 15.9
+        assert es.transform(self._raw(tz="Asia/Tokyo"), WAKE_DATE)[0]["sleep_onset_hour"] == 15.9
 
     def test_every_stored_number_survives_the_decimal_conversion_dynamodb_requires(self, summer_clock):
         item = es.transform(self._raw(), WAKE_DATE)[0]
@@ -1467,3 +1472,96 @@ class TestModuleSurface:
         for banned in ("import requests", "import httpx", "from requests", "from httpx"):
             assert banned not in source
         assert "import urllib.request" in source
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 10. DST — each instant converts at ITS OWN offset, never at the run's (#4284)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# The defect (found 2026-10-29 while proving #4284): `transform` computed ONE UTC
+# offset from the clock at INGEST time and applied it to every instant of the night
+# being parsed. The 2026-11-01 07:15 PT run (PST, UTC-8) parses the 10-31 bedtime,
+# which was PDT (UTC-7), so onset and midpoint landed an hour early; any night re-read
+# across a boundary (the gap-aware lookback, a backfill) carried the same skew in the
+# other direction in March. The fixture is the archived wire envelope (#4635: trends +
+# bed_side + tz, as the framework hands it to `transform`); only `day` and the two
+# session instants are replaced with the DST nights under test. Every expected hour is
+# hand-derived beside it, and the clock is frozen at the real run instant so the test
+# reproduces the run, not the laptop's calendar.
+
+_ES_WIRE = json.load(open(os.path.join(ROOT, "tests", "fixtures", "eightsleep_wire_4635.json"), encoding="utf-8"))
+
+
+def _wire_raw_for_night(day, sleep_start, sleep_end):
+    """The archived fetch envelope with its first night re-dated to `day`."""
+    raw = copy.deepcopy(_ES_WIRE["flagged_fetch"]["raw"])
+    night = raw["trends"]["days"][0]
+    night.update({"day": day, "sleepStart": sleep_start, "sleepEnd": sleep_end})
+    raw["trends"]["days"] = [night]
+    return raw
+
+
+def _ingest_at(monkeypatch, run_utc, day, sleep_start, sleep_end):
+    monkeypatch.setattr(es, "datetime", _frozen_datetime(run_utc))
+    raw = _wire_raw_for_night(day, sleep_start, sleep_end)
+    assert raw["tz"] == "America/Los_Angeles", "the wire envelope's zone is the premise of every case below"
+    items = es.transform(raw, day)
+    assert len(items) == 1, items
+    return items[0]
+
+
+# The 2026-11-01 07:15 PT run — PST (UTC-8) at the moment it executes.
+FALL_BACK_RUN_UTC = datetime(2026, 11, 1, 15, 15, tzinfo=timezone.utc)
+# The 2027-03-14 07:15 PT run — PDT (UTC-7) at the moment it executes.
+SPRING_FORWARD_RUN_UTC = datetime(2027, 3, 14, 14, 15, tzinfo=timezone.utc)
+
+
+class TestDstNightOffset4284:
+    def test_fall_back_night_onset_keeps_its_pdt_wall_time_on_the_pst_run(self, monkeypatch):
+        # Bed 06:30Z on 11-01 = 23:30 PDT on 10-31 (DST ends 09:00Z) → onset 23.5.
+        # Wake 15:00Z = 07:00 PST → 7.0. The bug read the bedtime at -8 → 22.5.
+        rec = _ingest_at(monkeypatch, FALL_BACK_RUN_UTC, "2026-11-01", "2026-11-01T06:30:00.000Z", "2026-11-01T15:00:00.000Z")
+        assert rec["sleep_onset_hour"] == 23.5
+        assert rec["wake_hour"] == 7.0
+        # (23.5 + 31.0)/2 = 27.25 → 3.25; the bug's (22.5 + 31.0)/2 → 2.75
+        assert rec["sleep_midpoint_hour"] == 3.25
+
+    def test_the_night_before_fall_back_read_on_the_pst_run_is_all_pdt(self, monkeypatch):
+        # Wholly before the boundary: bed 06:30Z = 23:30 PDT, wake 14:00Z = 07:00 PDT.
+        # The bug read both at -8 → 22.5 / 6.0 / midpoint 2.25.
+        rec = _ingest_at(monkeypatch, FALL_BACK_RUN_UTC, "2026-10-31", "2026-10-31T06:30:00.000Z", "2026-10-31T14:00:00.000Z")
+        assert rec["sleep_onset_hour"] == 23.5
+        assert rec["wake_hour"] == 7.0
+        assert rec["sleep_midpoint_hour"] == 3.25  # (23.5 + 31.0)/2 = 27.25 → 3.25
+
+    def test_spring_forward_night_onset_keeps_its_pst_wall_time_on_the_pdt_run(self, monkeypatch):
+        # Bed 07:00Z on 03-14 = 23:00 PST on 03-13 (DST starts 10:00Z) → 23.0.
+        # Wake 14:00Z = 07:00 PDT → 7.0. The bug read the bedtime at -7 → 0.0.
+        rec = _ingest_at(monkeypatch, SPRING_FORWARD_RUN_UTC, "2027-03-14", "2027-03-14T07:00:00.000Z", "2027-03-14T14:00:00.000Z")
+        assert rec["sleep_onset_hour"] == 23.0
+        assert rec["wake_hour"] == 7.0
+        assert rec["sleep_midpoint_hour"] == 3.0  # (23.0 + 31.0)/2 = 27.0 → 3.0
+
+    def test_the_night_before_spring_forward_read_on_the_pdt_run_is_all_pst(self, monkeypatch):
+        # Bed 07:00Z = 23:00 PST, wake 15:00Z = 07:00 PST. The bug: 0.0 / 8.0 / 4.0.
+        rec = _ingest_at(monkeypatch, SPRING_FORWARD_RUN_UTC, "2027-03-13", "2027-03-13T07:00:00.000Z", "2027-03-13T15:00:00.000Z")
+        assert rec["sleep_onset_hour"] == 23.0
+        assert rec["wake_hour"] == 7.0
+        assert rec["sleep_midpoint_hour"] == 3.0
+
+    def test_a_night_far_from_any_boundary_is_unchanged_mutation_control(self, monkeypatch):
+        """Passes before AND after the fix: when the run and the night share an offset
+        the two derivations agree, so the four cases above fail on the DST mismatch
+        alone, not on some other change to the arithmetic. Uses the archived night as
+        sent (2026-09-09, PDT) and a winter night on a winter run (PST)."""
+        night = _ES_WIRE["flagged_fetch"]["raw"]["trends"]["days"][1]
+        assert night["day"] == "2026-09-09"
+        rec = _ingest_at(
+            monkeypatch, datetime(2026, 9, 9, 15, 15, tzinfo=timezone.utc), "2026-09-09", night["sleepStart"], night["sleepEnd"]
+        )
+        # 04:49:30Z − 7h = 21:49:30 → 21.825, stored at 2dp as 21.82 (binary 21.8249…)
+        assert rec["sleep_onset_hour"] == 21.82
+        # 11:42:30Z − 7h = 04:42:30 → 4.7083 → 4.71
+        assert rec["wake_hour"] == 4.71
+        winter = _ingest_at(monkeypatch, WINTER_UTC, "2026-01-15", "2026-01-15T07:00:00.000Z", "2026-01-15T15:00:00.000Z")
+        assert (winter["sleep_onset_hour"], winter["wake_hour"]) == (23.0, 7.0)  # 23:00 / 07:00 PST

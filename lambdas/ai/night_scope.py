@@ -455,8 +455,20 @@ def night_label_line(facts) -> str:
     )
 
 
-def correction_line(finding) -> str:
-    """The corrective instruction for one #1968 finding (used by `correction_prompt`)."""
+_AVERAGE_FORMS = {
+    False: '"averaged <value> ms over the last <N> nights"',
+    True: '"averaged <value> ms over the last <N> nights", or for a week\'s figure "averaged <value> ms in Week <N>"',
+}
+
+
+def correction_line(finding, week_window: bool = False) -> str:
+    """The corrective instruction for one #1968 finding (used by `correction_prompt`).
+
+    `week_window` (#5458): the caller's prompt asked for a week's average named with its week
+    (`intelligence.integrator_prompts.ROLLUP_FIGURE_GUIDANCE`), so the rewrite is offered that
+    form too. On 2026-10-29 the arc and month rewrites were offered only the nights form, for a
+    week's HRV whose notes give no night count, and all four still held. That mismatch is the
+    suspected cause, not a proven one. A named week is a labelled window either way."""
     if finding.get("type") == "night_value_mismatch":
         return (
             f"{finding['detail']}. Use {finding['stored']:g} for the night of {finding['night']}, or "
@@ -464,7 +476,7 @@ def correction_line(finding) -> str:
         )
     return (
         f"{finding['detail']}. Name the night explicitly (\"the night of <date>\"); if it is an average, say so and name "
-        f'its window in the same sentence ("averaged <value> ms over the last <N> nights"); otherwise drop the figure — '
+        f"its window in the same sentence ({_AVERAGE_FORMS[week_window]}); otherwise drop the figure — "
         f"a sleep, recovery, HRV or resting-HR number that says neither which night nor which window it covers "
         f"cannot be checked by anyone."
     )
