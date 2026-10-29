@@ -483,6 +483,36 @@ def next_prescription(
     return out
 
 
+FIXED_STEP_EQUIPMENT = ("barbell", "dumbbell")
+"""The implements whose loads sit on a fixed step (standard §5 'Row rounding': barbell 5 lb; dumbbell 5 lb at >= 50 a
+hand, 2.5 lb below) — the two the note linter's L5 checks. A machine, a cable stack and a kettlebell (kg-sized bells) are
+left as logged: the catalog cannot tell a plate machine from a stack, and a stack takes 'a value he has logged on it'."""
+
+
+def round_to_implement(prog: dict[str, Any], equipment: str | None) -> dict[str, Any]:
+    """A `step` / `floor_raise` load put on the implement's loadable step (`rep_scheme.round_to_implement`: nearest, ties
+    down), IN PLACE; returns `prog`. The rule computes in the load he logged, and a logged load need not be loadable on
+    the rack the standard names — #5428 replay, 2026-10-29: a side bend logged at 44 lb was raised to a 44 lb floor, a
+    dumbbell load off the 2.5 lb step (linter L5); it is 45. The unrounded load stays on the record as `rounded_from_kg`.
+    A rep step (`step_kind: "reps"`) keeps its load, and `apply_to_sets` still only raises, so a load rounded under the
+    current one changes nothing."""
+    kg = _num(prog.get("next_load_kg"))
+    if (
+        prog.get("basis") not in (BASIS_STEP, BASIS_FLOOR_RAISE)
+        or prog.get("step_kind") == STEP_KIND_REPS
+        or not kg
+        or str(equipment or "").strip().lower() not in FIXED_STEP_EQUIPMENT
+    ):
+        return prog
+    from training.rep_scheme import round_to_implement_kg
+
+    rounded = round_to_implement_kg(kg, equipment)
+    if abs(rounded - kg) > LOAD_TOLERANCE_KG:
+        prog["rounded_from_kg"] = kg
+    prog["next_load_kg"] = rounded
+    return prog
+
+
 def apply_to_sets(sets: list[Any], prog: dict[str, Any]) -> list[str]:
     """Write a `step` / `floor_raise` onto a block's working sets, IN PLACE — raise only, never lower.
 

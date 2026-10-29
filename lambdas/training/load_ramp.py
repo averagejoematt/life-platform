@@ -952,7 +952,7 @@ def _exposure_progression(e: dict[str, Any], entry: dict[str, Any], sessions: li
     from training import load_progression as lp
     from training.logging_conventions import current_load_convention_of
 
-    return lp.next_prescription(
+    prog = lp.next_prescription(
         list(sessions),
         current_kg=top,
         rep_range=_rep_range_of(e.get("sets")),
@@ -961,6 +961,7 @@ def _exposure_progression(e: dict[str, Any], entry: dict[str, Any], sessions: li
         re_entry_reason=ramped.get("layoff_reason"),
         load_convention=current_load_convention_of(entry or {}),  # #5373: the CURRENT convention, as the note carries
     )
+    return lp.round_to_implement(prog, (entry or {}).get("equipment"))  # #5428: the generator's rounding, so the plan agrees
 
 
 def annotate_prescription(

@@ -157,8 +157,10 @@ ROTATION_HEAD = "New: replaces "
 # #5057 on the chat path: a stall-rule load step the author's rows did not take, named as a delta
 STEP_DUE_HEAD = "Step due: +"
 REASON_RE = re.compile(
-    r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |No jumps(?: today)?: |Set \d over RPE \d+(?:\.5)? → |\d+ sets today: "
-    r"|New: replaces |Step due: \+)"
+    r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |No jumps(?: today)?: |Set \d over RPE \d+(?:\.5)? → |\d+ sets? today[:.]"
+    r"|New: replaces |Step due: \+"
+    # a critic's applied load / rep change (`session_block.applied_clause`) is a reason too (standard §3.2's list, §3.8)
+    r"|(?:Lighter|Heavier|Fewer reps) today[:.])"
 )
 
 

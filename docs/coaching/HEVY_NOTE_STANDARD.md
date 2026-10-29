@@ -178,6 +178,7 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
 ### 3.8 Critic changes, minimum / travel, tests
 
 - **A critic that changed a row** gets one plain clause, e.g. `2 sets today: first incline in 5 weeks.` Its set count is checked against the rows. Unchanged verdicts never reach the wire.
+  - The clause takes the lift's one reason slot (§3.2): a computed reason already there (`New: replaces …`, `Heavier: …`) gives way and stays on the stored record. A `No jumps` line and an earlier critic clause keep their lines.
 - **Minimum / travel:** the session line's `‹Day›`, then each lift as in §3.2.
 - **Fitness test:** line 1 is `Test · ‹protocol›`.
 
@@ -213,7 +214,7 @@ Chat-era technique cues ("Elbows to hips, no lean-back", "Pause at the top for o
   | Plate machine | 5 lb |
   | Stack / cable | a value he has logged on that machine |
 
-  Round to the nearest step; ties go down.
+  Round to the nearest step; ties go down. That includes a load carried forward from his log: a floor raise to a logged 44 lb dumbbell is 45 (`load_progression.round_to_implement`, barbell and dumbbell only).
 - **Banned on the wire** (linter L1, `hevy_note_grammar.BANNED`):
   - **Engine and process:** issue numbers, version ids, §, critic / red team / charter / engine / platform / tripwire.
   - **Load-model words:** floor, ramp, anchor, band, e1RM.
@@ -265,7 +266,7 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 | L1 | No banned token (§5). |
 | L2 | No restated rows: `N × reps`, `Top 4–6 @`, `@ ‹n› lb`, `Last:` or `‹n› min ·` on cardio line 1. |
 | L3 | Line-1 grammar by type: effort, carry, cardio or session. The session block is exactly its three lines. |
-| L4 | Text agrees with the rows: `‹n› sets today` (and the old `‹n› sets of`) = working rows; `W set: up to ‹n›` = W reps; a row more than one step from PREVIOUS carries a reason in the right direction (a stack or cable load has no fixed step, so it is not judged — the producer's rule too). PREVIOUS comes from `inputs_snapshot["previous_loads"]` (keyed by movement key: one load in lb, or one per working row), and the check reports itself "not checked" when that is absent. |
+| L4 | Text agrees with the rows: `‹n› sets today` (and the old `‹n› sets of`) = working rows; `W set: up to ‹n›` = W reps; a row more than one step from PREVIOUS carries a reason in the right direction (a stack or cable load has no fixed step, so it is not judged — the producer's rule too). PREVIOUS comes from `inputs_snapshot["previous_loads"]` (keyed by movement key: one load in lb, or one per working row), and the check reports itself "not checked" when that is absent. One load is his last session's TOP working load, so it is judged against the top row only (a top-set day's back-offs sit under it by design); a per-row list judges every row. Rep counts compare as numbers (a stored `8.0` is the text's `8`). |
 | L5 | Loadable steps on every working and W row of a barbell or dumbbell. W rows ascend below the work. |
 | L6 | One effort expression on a lift's line 1. |
 | L7 | Budgets (§7). |
