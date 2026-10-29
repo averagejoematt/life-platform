@@ -201,9 +201,10 @@
   },
   "slo-ai-coaching-success": {
     "added": "2026-10-26",
-    "cause": "vendor transient: Bedrock ServiceUnavailableException (503), second Monday running from the same run",
-    "cause_observed": "2026-10-26: 6 AnthropicAPIFailure at 14:00Z, all LambdaFunction=ai-expert-analyzer (Monday 14:00Z cron), the same shape as 2026-10-19. Alarm ALARM 14:02Z; Sum over 86400 s >= 3.",
-    "citation": "#5412 — one weekly analyzer run's Bedrock 503 burst lights the coaching SLO for 24 h. This episode: Bedrock Haiku 4.5 503 episode of 2026-10-26 (from ~13:00Z; text calls recovered ~16:17Z, image calls still failing 16:49Z; incident row 2026-10-26). Self-clears when the 14:00Z burst leaves the 24 h window (~2026-10-27 14:05Z). If still ALARM after 2026-10-27 15:00Z, a new AnthropicAPIFailure source exists; re-derive."
+    "cause": "the same 2026-10-26 14:00Z ai-expert-analyzer Bedrock 503 burst (6 AnthropicAPIFailure), re-lit with no new failure",
+    "cause_observed": "2026-10-29",
+    "citation": "#5412 — the alarm went OK→ALARM again at 2026-10-29T06:05:13Z with StateReason '1 datapoint [6.0 (26/10/26 06:05:00)]': the hourly AnthropicAPIFailure sums from 10-24 to 10-29 08:00Z hold only the 6 failures at 2026-10-26 14:00Z (LambdaFunction=ai-expert-analyzer), so no new source exists — a late re-evaluation of the same 86400 s window. Expected to clear on the next evaluation; if still ALARM after 2026-10-30 07:00Z, re-derive. The breaker (#5412) proves on the Mon 2026-11-02 15:00Z analyzer run (Pacific schedule).",
+    "updated": "2026-10-29"
   },
   "ingest-consecutive-failures-strava": {
     "added": "2026-10-23",
@@ -259,8 +260,8 @@
     "added": "2026-10-27",
     "cause_observed": "2026-10-29",
     "updated": "2026-10-29",
-    "cause": "data:hae_additive_integrity",
-    "citation": "#5440 — the one remaining cause on the 2026-10-29 00:53Z and later runs (`[QA] CAUSE fail b6e30c1a data:hae_additive_integrity`): Apple Health field-days 10-21/10-22/10-26 sit below their delivered readings; the compare-and-swap is live, the `scripts/hae_additive_backfill_4628.py --apply` repair (10-21, 10-22, 10-26 only, never 10-25) is a parked owner act. #5471's false positive is fixed and closed (PR #5472); RAW:macrofactor no longer appears on the line (#5431's remaining future rows 10-30..11-01 still need the owner's cleanup, which #5456's visual QA reads).",
+    "cause": "checkin_pair:day_row_liveness,data:hae_additive_integrity",
+    "citation": "#5440 — the one standing cause on every run since 2026-10-29 00:53Z (`[QA] CAUSE fail … data:hae_additive_integrity`): Apple Health field-days 10-21/10-22/10-26 sit below their delivered readings; the compare-and-swap is live, the `scripts/hae_additive_backfill_4628.py --apply` repair (10-21, 10-22, 10-26 only, never 10-25) is a parked owner act. The 07:11Z post-deploy run also failed `checkin_pair:day_row_liveness` on 10-28 — a QA timing false positive (#5211's dead-man judged yesterday five hours before scenario-explorer's 05:10 PT writer); the fix (yesterday due from 06:00 PT) is PR #5477. The protein-floor false positive is fixed and its issue closed; RAW:macrofactor no longer appears on the line.",
     "note": "Re-cited by Session CK wrap 2026-10-28 (the prior entry pointed at closed #5455 and missed the coach_vs_engine leg)."
   },
   "ingest-reconciliation-whoop": {
