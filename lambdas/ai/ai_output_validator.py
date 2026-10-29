@@ -176,18 +176,48 @@ _MEAL_LEVEL_CONTEXT = [
 
 # A per-DAY framing always wins over the labelling signals above: "500 cal a day
 # (40P/30C/10F)" is a starvation target no matter how it is annotated.
+# #5297/#5324 (2026-10-29 proof): read in the figure's own SENTENCE, not the +/-80-char
+# window. The window crossed sentence ends, so "... at the target calories a day." in one
+# sentence vetoed the food label in the next ("A cup of <food> runs about <N> cal and <M>g
+# of protein") and the edition was blocked on its own food figures.
 _DAILY_INTAKE_CONTEXT = [
     r"\b(?:per|a|each)\s+day\b",
     r"/\s*day\b",
     r"\bdaily\b",
     r"\btoday\b",
+    r"\bcalorie\s+target\b",
+    r"\btotal\s+(?:daily\s+)?(?:intake|calories)\b",
+]
+
+# The restriction imperatives stay on the window: "eat only" / "limit to" / "no more than" /
+# "stay under" within 80 chars of a small figure is a restriction however the sentences fall.
+_RESTRICTION_CONTEXT = [
     r"\beat\s+(?:only|just|no\s+more\s+than)\b",
     r"\blimit(?:ed)?\s+(?:yourself\s+)?to\b",
     r"\bno\s+more\s+than\b",
     r"\bstay\s+(?:under|below)\b",
-    r"\bcalorie\s+target\b",
-    r"\btotal\s+(?:daily\s+)?(?:intake|calories)\b",
 ]
+
+# #5297/#5324 — a CHANGE figure is a difference between two intakes, never an intake: "+N kcal/day
+# week-over-week", "~N kcal saved", "N calories more". Two shapes, both local to the figure:
+#   * a sign glued to the figure ("+N", "-N", "−N", "±N"), not preceded by a digit
+#     (so the range "N-M cal" is still a figure M) and with NO space after the sign (so a
+#     "Daily target - N kcal" dash is not a sign);
+#   * a change word straight after the unit (optionally "/day", "a day", "per day", "daily").
+_SIGNED_FIGURE_PREFIX_RE = re.compile(r"(?:^|[^\w.,])[+\-−±–]~?$")
+_CHANGE_WORD_AFTER_RE = re.compile(
+    r"^(?:\s*(?:/\s*day|a\s+day|per\s+day|daily))?\s+"
+    r"(?:saved|more|less|fewer|added|extra|cut|lower|higher|deficit|surplus|shortfall|difference|swing)\b",
+    re.IGNORECASE,
+)
+
+# #5324 — a single-food / dish label carries protein beside the figure, not a full macro line:
+# "(<N> g protein, <M> kcal)", "<N> grams of protein for <M> calories". One macro class was not
+# enough for the 2-class rule below, so a dish label in a review narrative was read as a day.
+# Trusted only in the figure's own sentence, and never when that sentence talks about a day or a
+# total ("a <M> kcal day with <N> g protein" stays blocked).
+_PROTEIN_LABEL_RE = re.compile(r"\b\d{1,3}(?:\.\d)?\s*(?:g|grams?)\s*(?:of\s+)?protein\b", re.IGNORECASE)
+_PROTEIN_LABEL_VETO_RE = re.compile(r"\b(?:days?|totals?|intake|target)\b", re.IGNORECASE)
 
 # #5297: the day framings a meal plan uses — "600 cal on rest days", "all day", "across
 # your meals", "in total". Read in the figure's own SEGMENT (not the window above, so a
@@ -199,6 +229,7 @@ _DAY_FRAMING_IN_SEGMENT = [
     r"\bacross\s+(?:the|your|all|every)\b",
     r"\bin\s+total\b",
     r"\bcombined\b",
+    r"\b(?:kcal|calories|cal)\s+days?\b",  # "a <N> kcal day"
 ]
 
 # #5324 — a REPORTED intake figure. The Nutrition Review quotes what the subject actually logged
@@ -461,6 +492,9 @@ def validate_ai_output(
                 # Only block if the number is under the regex's 100-799 band and not clearly about deficit/restriction context
                 if int(cal) >= 800 or re.search(rf"{cal}.*(?:deficit|below)", cal_text, re.IGNORECASE):
                     continue
+                # #5297/#5324: "+N kcal/day week-over-week", "~N kcal saved" — a difference, not an intake.
+                if _is_change_figure(cal_text, _cal_match):
+                    continue
                 # #2215: a per-serving recipe macro labels ONE dish, not a day's intake.
                 # #5297: so does a meal / snack label in the figure's own segment.
                 if _is_per_item_calorie_figure(cal_text, _cal_match):
@@ -561,16 +595,20 @@ def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
     card's per-serving macro line, which every Weekly Plate edition is required
     by its own system prompt to carry — so every compliant edition was blocked.
 
-    Two signals mark a figure as labelling: an explicit per-serving/per-item
-    qualifier, or a macro breakdown (>=2 distinct macro classes) beside it.
-    An explicit per-day framing in the same window overrides both — annotating
-    a starvation target with macros must not buy an exemption.
+    Signals that mark a figure as labelling: an explicit per-serving/per-item
+    qualifier, a meal/snack word (#5297), a protein label in the figure's own
+    sentence (#5324), or a macro breakdown (>=2 distinct macro classes) beside it.
+    A per-day framing in the figure's own sentence, or a restriction imperative in
+    the window, overrides all of them — annotating a starvation target with macros
+    must not buy an exemption.
     """
     window = text[max(0, match.start() - _CALORIE_CONTEXT_WINDOW) : match.end() + _CALORIE_CONTEXT_WINDOW]
     segment = _enclosing_segment(text, match)
     if _is_reported_intake(segment):  # #5324: a logged figure being reported back, not prescribed
         return True
-    if _find_patterns(window, _DAILY_INTAKE_CONTEXT):
+    if _find_patterns(segment, _DAILY_INTAKE_CONTEXT):  # #5297/#5324: the figure's own sentence only
+        return False
+    if _find_patterns(window, _RESTRICTION_CONTEXT):
         return False
     if _find_patterns(segment, _DAY_FRAMING_IN_SEGMENT):  # #5297
         return False
@@ -578,8 +616,17 @@ def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
         return True
     if _find_patterns(segment, _MEAL_LEVEL_CONTEXT):  # #5297: "Snack — 150 cal", "Dinner: 465 cal"
         return True
+    if _PROTEIN_LABEL_RE.search(segment) and not _PROTEIN_LABEL_VETO_RE.search(segment):  # #5324: a dish label
+        return True
     macro_classes = sum(1 for token in _MACRO_BREAKDOWN_TOKENS.values() if token.search(segment))
     return macro_classes >= 2
+
+
+def _is_change_figure(text: str, match: re.Match) -> bool:
+    """#5297/#5324 — the figure is a DIFFERENCE between two intakes ("+N kcal/day", "~N kcal saved")."""
+    if _SIGNED_FIGURE_PREFIX_RE.search(text[max(0, match.start() - 3) : match.start()]):
+        return True
+    return bool(_CHANGE_WORD_AFTER_RE.match(text[match.end() : match.end() + 40]))
 
 
 def _is_reported_intake(segment: str) -> bool:
@@ -623,6 +670,10 @@ def _low_calorie_fallback() -> str:
 # its own; this closes the gap it opened: a plan whose labelled meals ADD UP to a starvation day.
 #   * Grouping: a day HEADING is a short line that opens with a weekday or "Day N" and carries no
 #     calorie figure. A day block runs to the next day heading (or the end of the text).
+#   * Never the MASTHEAD (2026-10-29 proof): both editions open with a title line that starts with
+#     a weekday ("<Weekday> Edition · <date>", "<Weekday> Nutrition Review · Week N"). Read as a day
+#     heading it made the whole edition ONE day, whose sum always clears the floor, so the guard
+#     could never fire on the real layout. A line naming the publication is not a day heading.
 #   * Only per-item (labelled) figures are summed; a figure with day framing is Check 5's, not ours.
 #   * A day is judged only when it lists at least _MIN_MEALS_FOR_A_DAY figures: fewer is a partial
 #     list (one dinner under a heading), not a day, and a sum of it proves nothing.
@@ -634,9 +685,17 @@ def _low_calorie_fallback() -> str:
 #     false positive #5297 fixed; the warning lands in the stored edition's qa. A day heading that
 #     exists but holds too few figures, or an unreadable charter, are recorded the same way.
 _DAY_HEADING_RE = re.compile(r"^\W{0,6}(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day|day\s*\d{1,2})\b[^\n]{0,50}$", re.I)
+_MASTHEAD_WORDS_RE = re.compile(
+    r"\b(?:edition|review|plate|digest|brief|newsletter|chronicle|journal|issue|life\s+platform|journey|experiment)\b", re.I
+)
 _DAY_FIGURE_RE = re.compile(r"(?<![\d.,])(\d{1,2},\d{3}|\d{2,4})\s*(?:kcal|calories|cal)\b", re.I)
 _MIN_MEALS_FOR_A_DAY = 3
 _DAY_SUM_MARGIN = 0.9
+
+
+def _is_day_heading(line: str) -> bool:
+    """A plan block's day heading ("Monday", "Day 3: rest day"), never a calorie line or the masthead."""
+    return bool(_DAY_HEADING_RE.match(line)) and not _DAY_FIGURE_RE.search(line) and not _MASTHEAD_WORDS_RE.search(line)
 
 
 def _day_blocks(text: str) -> list[tuple[str, str]]:
@@ -644,7 +703,7 @@ def _day_blocks(text: str) -> list[tuple[str, str]]:
     blocks: list[tuple[str, list[str]]] = []
     for line in text.split("\n"):
         stripped = line.strip()
-        if stripped and _DAY_HEADING_RE.match(stripped) and not _DAY_FIGURE_RE.search(stripped):
+        if stripped and _is_day_heading(stripped):
             blocks.append((stripped.strip(" :-\u2014\u00b7*#"), []))
         elif blocks:
             blocks[-1][1].append(line)
@@ -664,6 +723,9 @@ def _day_sum_guard(cal_text: str, result: "AIValidationResult") -> None:
     for heading, block in blocks:
         figures = []
         for m in _DAY_FIGURE_RE.finditer(block):
+            # #5297: a change figure ("~N kcal saved") is no meal; summing it would hide a low day.
+            if _is_change_figure(block, m):
+                continue
             if _is_per_item_calorie_figure(block, m):
                 figures.append(int(m.group(1).replace(",", "")))
         if not figures:

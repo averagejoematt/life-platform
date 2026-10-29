@@ -1250,3 +1250,31 @@ class TestHandlerDryRun:
         assertion so it now protects the fix instead of describing the bug."""
         wp.lambda_handler({"dry_run": True}, None)
         assert wired["ses"].sent == []
+
+    def test_a_dry_run_writes_nothing_to_the_table(self, wired):
+        """#5297 (2026-10-29 synthetic proof): a dry run on the deployed bundle reached
+        dynamodb.PutItem — `store_plate_summary` wrote MEMORY#weekly_plate#<today>, which the
+        real edition reads back as anti-repeat history. A dry run puts no row at all."""
+        wp.lambda_handler({"dry_run": True}, None)
+        assert wired["table"].puts == []
+
+    def test_a_dry_run_files_no_insight(self, wired):
+        """#5297: the IC-15 insight write ran on a passing dry-run edition; the insight is
+        replayed into later meal-planning prompts, so a dry run must not file one."""
+        wp.lambda_handler({"dry_run": True}, None)
+        assert wired["writer"].written == []
+
+    def test_a_dry_run_still_builds_and_validates_the_edition(self, wired, monkeypatch):
+        """The gate is on the WRITES only: the summary is still extracted and AI-3 still runs,
+        so a dry run proves the same path a real run takes."""
+        seen = []
+        monkeypatch.setattr(wp, "extract_plate_summary", lambda *a: seen.append("summary") or {})
+        assert wp.lambda_handler({"dry_run": True}, None)["statusCode"] == 200
+        assert seen == ["summary"]
+
+    def test_mutation_control_the_same_wiring_does_write_without_dry_run(self, wired):
+        """The dry-run assertions above must be able to fail: the identical wiring, not a dry
+        run, writes the summary row and files the insight."""
+        wp.lambda_handler({}, None)
+        assert any(p["pk"] == wp.USER_PREFIX_MEMORY for p in wired["table"].puts)
+        assert len(wired["writer"].written) == 1
