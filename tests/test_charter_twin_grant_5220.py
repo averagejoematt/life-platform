@@ -31,6 +31,8 @@ LOGGED_DENIAL = {
     "life-platform-coherence-sentinel": "operational_coherence_sentinel",
     "life-platform-ai-quality-canary": "operational_ai_quality_canary",
     "life-platform-site-api": "site_api",
+    # 2026-10-28 (06:03:52Z, and the 10-27/28 swallowed-permission-denial flaps): the freshness checker
+    "life-platform-freshness-checker": "operational_freshness_checker",
 }
 
 MODS = {
