@@ -44,6 +44,9 @@ from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 DAY = "2026-10-28"
 CYCLING_TID = "D8F7F851"  # config/movement_catalog.json -> movements.cycling
 AFTER = "After: end watch cardio, restart Hevy."
+# his Treadmill note on the 2026-10-28 session (Hevy workout 0adcac0c…, one 1800 s set, 2527 m), verbatim from the stored
+# record — the labelled form the speed grammar did not read (status none, unparsed both halves) before #5374's follow-up
+TREADMILL_10_28 = "3.5 incline / 3.2 speed"
 RAMP_10_25 = "8/12 for 2 mins for 20 mins\n8/14 for 2 mins for 20 mins \n8 level up every 2 mins from 40 to 60 to level 18"
 
 
@@ -243,6 +246,13 @@ PARSE_TABLE = [
     ("3.1 mph and 1.0 incline", None, 40, "steady", "%", [(0, 40, 3.1, 1)]),
     ("3.3mph 1.0 incline", None, 54, "steady", "%", [(0, 54, 3.3, 1)]),
     ("3 / 1", "Treadmill", 30, "steady", "%", [(0, 30, 3, 1)]),
+    # a labelled pair in either order — "speed" names the speed as "mph" does (his 2026-10-28 note is the first row)
+    (TREADMILL_10_28, "Treadmill", 30, "steady", "%", [(0, 30, 3.2, 3.5)]),
+    ("3.2 speed / 3.5 incline", "Treadmill", 30, "steady", "%", [(0, 30, 3.2, 3.5)]),
+    ("3.5% / 3.2 speed", None, 30, "steady", "%", [(0, 30, 3.2, 3.5)]),
+    ("speed 3.2 / incline 3.5", None, 30, "steady", "%", [(0, 30, 3.2, 3.5)]),
+    ("incline 1.5 speed 3.3", "Treadmill", 30, "steady", "%", [(0, 30, 3.3, 1.5)]),
+    ("3.5 incline / 3.2 speed, 3.5 incline / 3.8 speed from 20", "Treadmill", 30, "shaped", "%", [(0, 20, 3.2, 3.5), (20, 30, 3.8, 3.5)]),
     ("Level 11 flat", "Cycling", 45, "steady", "level", [(0, 45, None, 11)]),
     ("Level 15 flat", None, 40, "steady", "level", [(0, 40, None, 15)]),
     ("L12", "Cycling", 30, "steady", "level", [(0, 30, None, 12)]),
@@ -274,6 +284,12 @@ def test_MUTATION_CONTROLS_what_is_not_his_shorthand_is_not_read_as_it():
     assert wc.parse_walk("3 / 1")["status"] == "none"  # no machine, no decimal, no unit: ambiguous, not read
     assert wc.parse_walk("3.3 / 1.5 incline and felt good")["status"] == "none"
     assert wc.parse_walk("40 / 3 incline")["status"] == "none"  # 40 mph is not a walking speed
+    # the labelled form is held to the same bar: trailing words, an out-of-range speed or a missing half stay unread
+    assert wc.parse_walk("3.5 incline / 3.2 speed and felt good")["status"] == "none"
+    assert wc.parse_walk("3.5 incline / 32 speed")["status"] == "none"
+    assert wc.parse_walk("3.2 speed")["status"] == "none"
+    assert wc.parse_walk("incline 1.5 speed")["status"] == "none"  # the "incline" label claims 1.5; no speed is left
+    assert wc.parse_walk("incline 13.2 speed")["status"] == "none"  # nor a speed read from inside the incline's number
     assert cp.structured_level("Level 9 - 5.6 miles")["level"] == 9  # the bike's single-level reader is unchanged
     assert cp.structured_level("Level 11 flat")["status"] == "ok"
 
@@ -285,6 +301,20 @@ def test_the_deterministic_extractor_reads_his_treadmill_note():
     two = [s for s in tn.deterministic_pass("3.3 / 1.5, 4.0 / 3 from 20") if s["class"] == "progression"][0]["value"]
     assert two["speed_mph"] == 3.3 and [x["incline_pct"] for x in two["segments"]] == [1.5, 3]
     assert "speed_mph" not in [s for s in tn.deterministic_pass("Level 11 flat") if s["class"] == "progression"][0]["value"]
+
+
+def test_his_10_28_labelled_note_reads_through_every_consumer():
+    """The 10-28 wire (`TREADMILL_10_28` on a Treadmill block, 1800 s): the same shape the unlabelled "3.3 / 1.5 incline"
+    gets, through the extractor, the calibration reader and adherence — before the fix all three read nothing."""
+    sig = [s for s in tn.deterministic_pass(TREADMILL_10_28) if s["class"] == "progression"]
+    assert [s["value"] for s in sig] == [{"speed_mph": 3.2, "incline_pct": 3.5}]
+    dose = cm.walk_dose_of({"date": "2026-10-28", "note": TREADMILL_10_28, "duration_sec": 1800.0, "distance_m": 2527.0})
+    assert dose["mph"] == 3.2 and dose["incline_pct"] == 3.5 and dose["from_note"] is True
+    from health import adherence_calc as ac
+
+    tread = "Treadmill · 3.2 mph, 3.5% · RPE 4–6 (full sentences)"
+    got = ac._cardio_shape(tread, [{"title": "Treadmill", "notes": TREADMILL_10_28, "sets": [{"duration_seconds": 1800}]}], 30)
+    assert got["status"] == "same_shape" and got["mean_level_delta"] == 0 and got["minutes_delta"] == 0
 
 
 def test_his_treadmill_note_feeds_the_next_drafts_dose_and_usual():

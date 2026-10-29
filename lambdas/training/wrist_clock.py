@@ -339,18 +339,20 @@ def parse_note(note: str | None, total_min: int | None = None) -> dict[str, Any]
 # ── his treadmill grammar (#5374 box 3, owner 2026-10-27: "a note on what i do on the machine … to feedback loop") ──
 # "<speed> / <incline>[ incline|%]" is a steady block at that speed (mph) and incline (%); a change is the same pair with
 # "from <min>" or "at <min>" ("3.3 / 1.5, 4.0 / 3 from 20"). His older forms read too: "3.3 mph 1.5 incline",
-# "1.5 incline at 3mph", "3.1 mph and 1.0 incline", "0.5 incline 3mph". Segments split on "," ";" "then" or a new line —
-# never on " / ", which is his speed/incline separator here (on the bike it separates clauses, `parse_note`).
+# "1.5 incline at 3mph", "3.1 mph and 1.0 incline", "0.5 incline 3mph". A labelled pair reads in either order — "speed"
+# names the speed as "mph" does (his 2026-10-28 note "3.5 incline / 3.2 speed", "3.2 speed / 3.5 incline",
+# "speed 3.2 / incline 3.5"). Segments split on "," ";" "then" or a new line — never on " / ", which is his
+# speed/incline separator here (on the bike it separates clauses, `parse_note`).
 _WALK_SPLIT = re.compile(r"\s*(?:,|;|\n|\bthen\b)\s*", re.IGNORECASE)
 _W_NUM = r"\d{1,2}(?:\.\d{1,2})?"
 _W_TIME = re.compile(
     r"\s+(?:(?:from|at)\s+(?:min\s*)?(?P<t1>\d{1,3})(?:\s*min)?(?:\s+to\s+(?:min\s*)?(?P<t2>\d{1,3})(?:\s*min)?)?"
     r"|for\s+(?P<dur>\d{1,3})(?:\s*min)?)$"
 )
-_W_SPEED = re.compile(rf"(?P<v>{_W_NUM})\s*mph\b")
+_W_SPEED = re.compile(rf"(?P<v>{_W_NUM})\s*(?:mph|speed)\b(?:\s*(?:mph|speed)\b)?|speed\s+(?:of\s+|at\s+)?(?P<w>{_W_NUM})(?:\s*mph\b)?")
 _W_INCLINE = re.compile(rf"(?P<v>{_W_NUM})\s*(?:%|incline\b)(?:\s*incline\b)?|incline\s+(?:of\s+|at\s+)?(?P<w>{_W_NUM})\s*%?")
 _W_SLASH = re.compile(rf"^(?P<s>{_W_NUM})\s*/\s*(?P<i>{_W_NUM})$")
-_W_FILLER = re.compile(r"^(?:[/,@&]|and|at|with|mph|incline|%|\s)*$")
+_W_FILLER = re.compile(r"^(?:[/,@&]|and|at|with|mph|speed|incline|%|\s)*$")
 WALK_SPEED_MPH = (0.5, 12.0)  # a treadmill belt's plausible walking-to-running range; outside it the pair is not a speed
 WALK_INCLINE_PCT = (-3.0, 30.0)
 
@@ -371,14 +373,15 @@ def _walk_segment(segment: str, treadmill: bool) -> dict[str, Any] | None:
         s = s[: tm.start()].strip()
     speed = incline = None
     rest = s
-    sm = _W_SPEED.search(rest)
-    if sm:
-        speed = float(sm.group("v"))
-        rest = rest[: sm.start()] + " " + rest[sm.end() :]  # noqa: E203
+    # the incline is claimed first, so a number its label owns ("incline 1.5 speed 3.3") is never read as the speed
     im = _W_INCLINE.search(rest)
     if im:
         incline = float(im.group("v") or im.group("w"))
         rest = rest[: im.start()] + " " + rest[im.end() :]  # noqa: E203
+    sm = _W_SPEED.search(rest)
+    if sm:
+        speed = float(sm.group("v") or sm.group("w"))
+        rest = rest[: sm.start()] + " " + rest[sm.end() :]  # noqa: E203
     rest = rest.strip()
     if speed is None and incline is None:
         m = _W_SLASH.match(rest)
