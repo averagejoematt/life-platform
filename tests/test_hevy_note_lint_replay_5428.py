@@ -54,8 +54,8 @@ def _problems(wire: str) -> list[str]:
     return wire.split("': ", 1)[1].split("; ")
 
 
-FALSE_POSITIVE_CLASSES = ("the W text says 8 reps, the W rows hold ['8.0']", "against PREVIOUS 225 lb with no reason line")
-COMPOSER_CLASSES = ("lift note 5 phone lines > 4", "dumbbell load 44 lb is not on a 2.5 lb step")
+FALSE_POSITIVE_WIRE = ("the W text says 8 reps, the W rows hold ['8.0']", "against PREVIOUS 225 lb with no reason line")
+COMPOSER_WIRE = ("lift note 5 phone lines > 4", "dumbbell load 44 lb is not on a 2.5 lb step")
 
 # ── the two stored drafts, as the compiler saw them (loads in kg off the stored IR; reps as floats, as stored) ────────
 
@@ -216,7 +216,7 @@ def test_the_stored_drafts_lint_to_exactly_the_wire_minus_the_false_positives(mo
     monkeypatch.setenv(lint.MODE_ENV, "off")
     for wire, ir in ((WIRE_LOWER, _lower()), (WIRE_UPPER, _upper())):
         got = _lint(ir).lines()
-        want = [p for p in _problems(wire) if any(c in p for c in COMPOSER_CLASSES)]
+        want = [p for p in _problems(wire) if any(c in p for c in COMPOSER_WIRE)]
         assert got == want, (wire[:60], got)
     assert len(_problems(WIRE_LOWER)) == 4 and len(_problems(WIRE_UPPER)) == 4
 
