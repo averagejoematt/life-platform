@@ -295,12 +295,17 @@ def _eval_liveness(table, Check, tier, pt_now, ledger_pk, name, what, lookback_d
 # completed day with no row means the writer stopped or failed. The QA run is 18:30Z, after the writer.
 CHECKIN_PAIR_PK = "USER#matthew#SOURCE#checkin_intake_pairs"  # = health.checkin_intake_pairs.PK (contract test)
 CHECKIN_PAIR_ARMED_ON = "2026-10-27"  # first Pacific day a row can exist for (the row lands the morning after the deploy)
+# Yesterday's row is not due until the writer's 05:10 PT run has had its chance. qa-smoke also runs after every deploy,
+# and the one at 2026-10-29 00:11 PT failed on 10-28 five hours before the writer could write it (false red).
+CHECKIN_PAIR_DUE_HOUR_PT = 6
 
 
 def check_checkin_pair_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=CHECKIN_PAIR_ARMED_ON):
     c = Check("checkin_pair:day_row_liveness", "Data Freshness", tier)
-    today = pt_now().date()
-    days = [d for d in ((today - timedelta(days=n)).isoformat() for n in range(1, lookback_days + 1)) if d >= armed_on]
+    now = pt_now()
+    today = now.date()
+    first = 1 if now.hour >= CHECKIN_PAIR_DUE_HOUR_PT else 2  # before the writer's run, yesterday is not yet due
+    days = [d for d in ((today - timedelta(days=n)).isoformat() for n in range(first, lookback_days + 1)) if d >= armed_on]
     if not days:
         c.ok(f"check-in pair writer pending: armed on {armed_on}, no completed day to judge yet")
         return [c]
