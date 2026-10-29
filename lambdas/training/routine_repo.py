@@ -63,23 +63,42 @@ def get_version(routine_id: str, version: int) -> RoutineSpec | None:
     return deserialize(item) if item else None
 
 
+def versioned_items(ir: RoutineSpec) -> list[dict]:
+    """The three items `put_versioned` writes, in write order: VERSION#<n>, VERSION#current and the
+    date-sorted `routine_index` row. Built ONCE here so stage 2's dry run (#4076) returns exactly the
+    items a real run would put — never a hand-copied lookalike. Coerces `version` as the writer does."""
+    # DDB round-trip may have turned version into a float; coerce.
+    ir.version = int(ir.version)
+    if ir.parent_version is not None:
+        ir.parent_version = int(ir.parent_version)
+    body = serialize(ir)
+    pk = _pk(ir.routine_id)
+    index_item = {
+        "pk": INDEX_PK,
+        "sk": f"DATE#{ir.target_date}#ROUTINE#{ir.routine_id}",
+        "routine_id": ir.routine_id,
+        "target_date": ir.target_date,
+        "archetype": ir.archetype,
+        "variant": ir.variant,
+        "status": ir.status,
+        # Hevy routine id (set once the routine is pushed) — lets routine_title
+        # resolve a performed workout's type by the EXACT routine it came from
+        # (workout.hevy_routine_id), not just nearest-date. Empty until commit.
+        "hevy_routine_id": ir.hevy_routine_id or "",
+    }
+    return [{**body, "pk": pk, "sk": _version_sk(ir.version)}, {**body, "pk": pk, "sk": "VERSION#current"}, index_item]
+
+
 def put_versioned(ir: RoutineSpec) -> RoutineSpec:
     """Write a new immutable VERSION#<n> item and update VERSION#current.
 
     On first write (version=1), parent_version is None. On subsequent writes
     the caller is responsible for setting ir.parent_version = previous version
     and bumping ir.version. Refuses to overwrite an existing VERSION#<n>.
+    The items are `versioned_items(ir)` (#4076).
     """
-    # DDB round-trip may have turned version into a float; coerce.
-    ir.version = int(ir.version)
-    if ir.parent_version is not None:
-        ir.parent_version = int(ir.parent_version)
+    history_item, pointer_item, index_item = versioned_items(ir)
     attempted_version = ir.version
-    body = serialize(ir)
-    pk = _pk(ir.routine_id)
-    history_sk = _version_sk(ir.version)
-
-    history_item = {**body, "pk": pk, "sk": history_sk}
     try:
         _table.put_item(
             Item=history_item,
@@ -95,25 +114,11 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
             ir.version = int(ir.parent_version)
         raise RoutineConflict(f"VERSION#{attempted_version:06d} for routine {ir.routine_id} already exists") from e
 
-    pointer_item = {**body, "pk": pk, "sk": "VERSION#current"}
     _table.put_item(Item=pointer_item)
     # Date-sorted index for list_by_date_range; idempotent put (same routine
     # writes the same index sk every time).
-    _table.put_item(
-        Item={
-            "pk": INDEX_PK,
-            "sk": f"DATE#{ir.target_date}#ROUTINE#{ir.routine_id}",
-            "routine_id": ir.routine_id,
-            "target_date": ir.target_date,
-            "archetype": ir.archetype,
-            "variant": ir.variant,
-            "status": ir.status,
-            # Hevy routine id (set once the routine is pushed) — lets routine_title
-            # resolve a performed workout's type by the EXACT routine it came from
-            # (workout.hevy_routine_id), not just nearest-date. Empty until commit.
-            "hevy_routine_id": ir.hevy_routine_id or "",
-        }
-    )
+    # `pk` restated as the literal partition so the platform model's AST sweep still sees this writer (#2805).
+    _table.put_item(Item={**index_item, "pk": INDEX_PK})
     return ir
 
 
