@@ -495,11 +495,17 @@ def _sets_pct(rows: list[tuple[str, int, int]]) -> float:
     return round((done / total) * 100, 1) if total else 0.0
 
 
-def _as_prescribed_by_kind(movements: list[dict[str, Any]], muscle_of: dict[str, str]) -> dict[str, Any]:
+def _as_prescribed_by_kind(
+    movements: list[dict[str, Any]], muscle_of: dict[str, str], extra_shapes: dict[str, dict[str, Any]] | None = None
+) -> dict[str, Any]:
     """#5058 (owner ruling 2026-10-23, "grade lifting and cardio separately"): one `_as_prescribed`
     verdict per kind, each over its own movements — its own set completion and its own intensity
     rollup. A kind the routine did not program is None (absent, never `yes`). An un-RPE'd cardio
-    block reads `unknown` on the cardio verdict and no longer touches the lifting one."""
+    block reads `unknown` on the cardio verdict and no longer touches the lifting one.
+
+    `extra_shapes` (#5374) are the performed shapes of cardio blocks the routine did not program
+    (`_extra_cardio_shapes`), keyed by their movement key beside the programmed ones — read, never graded
+    into the verdict. With no programmed cardio there is no cardio entry to carry them (None stays None)."""
     out: dict[str, Any] = {}
     for kind in KINDS:
         mine = [m for m in movements if m.get("kind") == kind]
@@ -518,6 +524,8 @@ def _as_prescribed_by_kind(movements: list[dict[str, Any]], muscle_of: dict[str,
             # #5374: the performed clock shape against the prescribed one, per block — named facts beside the verdict,
             # never folded into it (the verdict is still sets AND intensity)
             out[kind]["shape"] = {m["movement_key"]: m["shape"] for m in mine if m.get("shape")}
+            for key, shape in (extra_shapes or {}).items():
+                out[kind]["shape"][key if key not in out[kind]["shape"] else f"{key}:performed_extra"] = shape
     return out
 
 
@@ -529,13 +537,70 @@ def _cardio_shape(
     #5428: the prescribed note no longer states its minutes, so the block's own (`prescribed_minutes`) close its clock,
     and the movement key lets his treadmill shorthand ("3.3 / 1.5 incline") read as speed / incline."""
     from training import cardio_note, wrist_clock
+
+    performed = _performed_cardio_shape(performed_exs, movement_key)
+    return wrist_clock.grade(cardio_note.clock_of(prescribed_note, prescribed_minutes), performed)
+
+
+def _performed_cardio_shape(performed_exs: list[dict[str, Any]], movement_key: str | None = None) -> dict[str, Any] | None:
+    """#5374: the performed blocks' own note as a clock shape (`training_notes.performed_shape`) over their logged minutes,
+    read on the machine they were done on; None when he left no note."""
     from training.training_notes import performed_shape
 
     note = " / ".join(str(ex.get("notes") or "").strip() for ex in performed_exs if str(ex.get("notes") or "").strip())
     secs = sum(int(st.get("duration_seconds") or 0) for ex in performed_exs for st in ex.get("sets") or [])
     machine = movement_key or " ".join(str(ex.get("title") or "") for ex in performed_exs)
-    performed = performed_shape(note, round(secs / 60) if secs else None, machine=machine) if note else None
-    return wrist_clock.grade(cardio_note.clock_of(prescribed_note, prescribed_minutes), performed)
+    return performed_shape(note, round(secs / 60) if secs else None, machine=machine) if note else None
+
+
+def _extra_cardio_shapes(
+    movements: list[dict[str, Any]],
+    programmed: list[dict[str, Any]],
+    performed_exs_by_tid: dict[str, list[dict[str, Any]]],
+    extra: list[str],
+    catalog: dict[str, Any],
+    alias_titles: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    """#5374: the cardio blocks he performed that the routine did not program, read rather than dropped into `extra`.
+
+    The 10-26 and 10-28 sessions prescribed a cycling hills ride and he rode the treadmill instead — "3.5 incline / 3.2
+    speed" landed as a bare template id and the engine never read what he did. Each extra template that is a cardio
+    machine (`cardio_menu.machine_template_ids`, the catalog's own tid map) has its note read on its own machine.
+    Exactly one programmed cardio block missing (0 sets) and exactly one extra cardio machine performed is a SWAP: graded
+    against the missing block's clock (`wrist_clock.grade`), with `substituted_for` naming it, and the missing block's
+    own entry gains `substituted_by`. Anything else — two blocks missing, two machines added, nothing missing — is
+    `unprogrammed`: his performed shape only, no grade, never a guess at which block it replaced. Named facts beside the
+    verdict, never folded into it (the verdict is still sets AND intensity)."""
+    from training import cardio_menu, cardio_note, wrist_clock
+
+    by_tid = {tid.upper(): key for tid, key in cardio_menu.machine_template_ids(catalog).items()}
+    cardio_extra = [
+        (tid, by_tid[str(tid).upper()])
+        for tid in extra
+        if str(tid).upper() in by_tid and _kind_of(by_tid[str(tid).upper()], catalog, alias_titles) == KIND_CARDIO
+    ]
+    if not cardio_extra:
+        return {}
+    missing = [m for m in movements if m.get("kind") == KIND_CARDIO and m["performed_sets"] == 0]
+    out: dict[str, dict[str, Any]] = {}
+    if len(missing) == 1 and len(cardio_extra) == 1:
+        tid, key = cardio_extra[0]
+        gone = missing[0]
+        p = next(x for x in programmed if x["movement_key"] == gone["movement_key"])
+        performed = _performed_cardio_shape(performed_exs_by_tid.get(tid, []), key)
+        out[key] = {
+            **wrist_clock.grade(cardio_note.clock_of(p["notes"], p.get("minutes")), performed),
+            "substituted_for": gone["movement_key"],
+            "template_id": tid,
+        }
+        if isinstance(gone.get("shape"), dict):
+            gone["shape"]["substituted_by"] = key
+        return out
+    for tid, key in cardio_extra:
+        performed = _performed_cardio_shape(performed_exs_by_tid.get(tid, []), key)
+        read = {k: v for k, v in wrist_clock.grade(None, performed).items() if k != "status"}
+        out[key] = {**read, "status": "unprogrammed", "template_id": tid}
+    return out
 
 
 def _session_verdict(by_kind: dict[str, Any], whole: dict[str, Any]) -> dict[str, Any]:
@@ -680,7 +745,8 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     overall_pct = round((total_performed / total_programmed) * 100, 1) if total_programmed else 0.0
 
     intensity_adherence = _intensity_rollup(movements)
-    by_kind = _as_prescribed_by_kind(movements, muscle_of)
+    extra_cardio = _extra_cardio_shapes(movements, programmed, performed_exs_by_tid, extra, catalog, alias_titles)
+    by_kind = _as_prescribed_by_kind(movements, muscle_of, extra_cardio)
 
     return {
         "overall_pct": overall_pct,
