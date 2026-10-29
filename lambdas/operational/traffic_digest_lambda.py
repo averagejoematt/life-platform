@@ -960,12 +960,28 @@ def _load_logs(s3, start_dt):
     return [t for t in results if t is not None], len(keys)
 
 
+TRAFFIC_NAMESPACE = "LifePlatform/Traffic"
+
+
+def _describe_metrics(metric_data):
+    """One-line rendering of a PutMetricData payload, for the dry-run log (#5433)."""
+    bits = []
+    for m in metric_data:
+        dims = ",".join(f"{d['Name']}={d['Value']}" for d in m.get("Dimensions") or [])
+        bits.append(f"{m['MetricName']}{'[' + dims + ']' if dims else ''}={m['Value']}")
+    return " ".join(bits)
+
+
 def _emit_no_logs_alert(s3, cw, start_dt, now, green_html="", dry_run: bool = False, ops_html=""):
-    """Send a loud email + CloudWatch metric when the log source is empty."""
-    cw.put_metric_data(
-        Namespace="LifePlatform/Traffic",
-        MetricData=[{"MetricName": "LogSourceEmpty", "Value": 1, "Unit": "Count"}],
-    )
+    """Send a loud email + CloudWatch metric when the log source is empty.
+
+    A dry run (#5433) emits neither: the metric is logged as what would have gone out
+    and the email goes through guarded_send_email's suppressor."""
+    metric_data = [{"MetricName": "LogSourceEmpty", "Value": 1, "Unit": "Count"}]
+    if dry_run:
+        logger.info("dry run (#5433): would PutMetricData %s %s", TRAFFIC_NAMESPACE, _describe_metrics(metric_data))
+    else:
+        cw.put_metric_data(Namespace=TRAFFIC_NAMESPACE, MetricData=metric_data)
     subject = "⚠️ Traffic digest: NO log objects this week — CF logging may be off"
     body_html = f"""<html><body>
 <h2>Traffic digest: log source empty</h2>
@@ -1109,23 +1125,27 @@ def lambda_handler(event, context):
             # dimension takes only the six code-literal values in DOORS and
             # every door emits every run (zeros included) — a bounded, dense-by
             # -construction population the emf_namespace_ledger budget covers.
-            cw.put_metric_data(
-                Namespace="LifePlatform/Traffic",
-                MetricData=[
-                    {"MetricName": "UniqueVisitors7d", "Value": agg["unique_visitors"], "Unit": "Count"},
-                    {"MetricName": "PageViews7d", "Value": agg["page_views"], "Unit": "Count"},
-                    {"MetricName": "SyndicatedReferrals7d", "Value": agg["syndicated_referrals"], "Unit": "Count"},
-                ]
-                + [
-                    {
-                        "MetricName": "PageViews7d",
-                        "Dimensions": [{"Name": "Door", "Value": door}],
-                        "Value": agg["door_views"].get(door, 0),
-                        "Unit": "Count",
-                    }
-                    for door in DOORS
-                ],
-            )
+            metric_data = [
+                {"MetricName": "UniqueVisitors7d", "Value": agg["unique_visitors"], "Unit": "Count"},
+                {"MetricName": "PageViews7d", "Value": agg["page_views"], "Unit": "Count"},
+                {"MetricName": "SyndicatedReferrals7d", "Value": agg["syndicated_referrals"], "Unit": "Count"},
+            ] + [
+                {
+                    "MetricName": "PageViews7d",
+                    "Dimensions": [{"Name": "Door", "Value": door}],
+                    "Value": agg["door_views"].get(door, 0),
+                    "Unit": "Count",
+                }
+                for door in DOORS
+            ]
+            # #5433: a dry run must be side-effect free. UniqueVisitors7d is the
+            # datapoint cost_governor reads for the surge-ceiling decision (latest
+            # point wins, one point per week expected), so a dry-run put would
+            # silently move budget state.
+            if dry_run:
+                logger.info("dry run (#5433): would PutMetricData %s %s", TRAFFIC_NAMESPACE, _describe_metrics(metric_data))
+            else:
+                cw.put_metric_data(Namespace=TRAFFIC_NAMESPACE, MetricData=metric_data)
         except Exception as e:
             logger.warning("traffic digest: PutMetricData failed (non-fatal): %s", e)
 
