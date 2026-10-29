@@ -885,8 +885,11 @@ def grounding_findings(
     return findings
 
 
-def correction_prompt(findings: list) -> str:
-    """The correction addendum for the single rewrite (analyzer's proven shape)."""
+def correction_prompt(findings: list, week_window: bool = False) -> str:
+    """The correction addendum for the single rewrite (analyzer's proven shape).
+
+    `week_window` (#5458) is passed only by a caller whose prompt asked for a week's average named
+    with its week; it adds that form to the night-scope rewrite line (`night_scope.correction_line`)."""
     lines = ["CORRECTION REQUIRED — your draft states numbers that are not grounded in the data:\n"]
     for i, f in enumerate(findings, 1):
         if f.get("type") == "contradiction" and f.get("canonical") is not None:
@@ -922,7 +925,7 @@ def correction_prompt(findings: list) -> str:
                 f"actual log — never assert a completed behavior with no record behind it."
             )
         elif f.get("type") in _night_scope.FINDING_TYPES:  # #1968
-            lines.append(f"{i}. {_night_scope.correction_line(f)}")
+            lines.append(f"{i}. {_night_scope.correction_line(f, week_window)}")
         elif f.get("type") == "stale_reset_date":  # #3614
             lines.append(
                 f"{i}. {f['detail']}. Use {f['expected']} for the reset/genesis date, or drop the date — never a reset that did not happen."
@@ -940,7 +943,7 @@ def correction_prompt(findings: list) -> str:
     return "\n".join(lines)
 
 
-def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown"):
+def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown", week_window: bool = False):
     """One corrective rewrite, kept when it is better. Never regresses.
 
     findings_fn(text) -> list of findings (e.g. a grounding_findings closure).
@@ -948,6 +951,7 @@ def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown"):
     (model, tokens, prompt assembly all stay the caller's business).
     surface -- caller identity for discard telemetry (#3086); same convention
     as ai_calls._ground_legacy_output's `label` param.
+    week_window -- passed through to `correction_prompt` (#5458).
 
     "Better" is `regen_keep_predicate.keep_rewrite` — since #3217 that is two
     arms, not one: the original strictly-fewer-findings count, PLUS a dispositive
@@ -965,7 +969,7 @@ def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown"):
     if not findings:
         return text, [], False
     try:
-        fixed = regen_fn(correction_prompt(findings))
+        fixed = regen_fn(correction_prompt(findings, week_window))
     except (TimeoutError, ConnectionError, OSError) as e:  # #3059 precedent: named, not bare
         _regen_telemetry.log_discard("transport_error", surface, len(findings), reason=type(e).__name__)
         return text, findings, False
