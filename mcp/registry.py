@@ -574,6 +574,14 @@ TOOLS = {
                             "error_class": {"type": "string"},
                         },
                     },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": (
+                            "#4076, stage 2 only: run the critics, the override and the changes exactly as a real run, but WRITE "
+                            "NOTHING (no routine version or routine_index row, no coach thread row, no corrections-ledger row). "
+                            "Every put it would make is returned under critics.would_write. Default false."
+                        ),
+                    },
                 },
                 "required": [],
             },
