@@ -184,6 +184,17 @@ def open_threads(ledger: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [t for t in ledger.get("threads", []) if t.get("status") in ("open", "advanced")]
 
 
+def installments_since(ledger: Dict[str, Any], since_week: int, week: int) -> int:
+    """Installments from the one after ``since_week`` through ``week`` (this one included).
+
+    Counted from the ledger's ``leads`` (one entry per installment that published, backfilled legacy weeks
+    included), not from the week number: a held week (week 6) and a budget-paused week (week 7) are weeks
+    no installment told, so on 2026-10-28 the calendar count called all six live threads stale at week 8 and
+    the desk lost the installment."""
+    told = {int(e["week"]) for e in ledger.get("leads", []) if e.get("week") is not None}
+    return len([w for w in told if since_week < w < week]) + 1
+
+
 def stale_threads(ledger: Dict[str, Any], week: int) -> List[Dict[str, Any]]:
     """Open threads that have gone ``STALE_AFTER`` installments without moving."""
 
@@ -193,7 +204,30 @@ def stale_threads(ledger: Dict[str, Any], week: int) -> List[Dict[str, Any]]:
                 return int(t[k])
         return week
 
-    return [t for t in open_threads(ledger) if week - moved(t) >= STALE_AFTER]
+    return [t for t in open_threads(ledger) if installments_since(ledger, moved(t), week) >= STALE_AFTER]
+
+
+def retire_unmoved_stale(prev: Dict[str, Any], budget: Dict[str, Any], week: int) -> List[str]:
+    """Retire, in ``budget``, every stale thread the budget neither resolved nor retired; return their ids.
+
+    The desk's last resort: on 2026-10-28 (week 8) the corrective retry still left three stale threads
+    unretired, and an unmoved thread cost the whole installment its audit (legacy fallback, unapproved
+    draft, the delivery heartbeat red). The retirement is recorded in the ledger by name, with a note
+    saying the desk did it, so the promise is closed in the record, not dropped."""
+    actions = budget.setdefault("thread_actions", [])
+    by_id = {a.get("thread_id"): a for a in actions if a.get("thread_id")}
+    retired: List[str] = []
+    for t in stale_threads(prev, week):
+        act = by_id.get(t["id"])
+        if act and act.get("action") in ("resolve", "retire"):
+            continue
+        note = f"retired by the desk: not moved in {STALE_AFTER} installments"
+        if act:
+            act.update(action="retire", note=note)
+        else:
+            actions.append({"thread_id": t["id"], "action": "retire", "title": t.get("title") or "", "note": note})
+        retired.append(t["id"])
+    return retired
 
 
 def last_open_bet(ledger: Dict[str, Any]) -> Optional[Dict[str, Any]]:

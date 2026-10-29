@@ -329,6 +329,14 @@ def test_a_stale_thread_must_be_resolved_or_retired_by_name():
         date="d0",
         title="t",
     )
+    for w in (1, 2):  # two more installments told, the thread held in both
+        led = story_ledger.apply_budget(
+            led,
+            _budget(lead="x", actions=[{"thread_id": "prereg_scoring", "action": "hold", "title": "", "note": "n"}]),
+            week=w,
+            date=f"d{w}",
+            title="t",
+        )
     f = story_ledger.continuity_findings(
         led, _budget(lead="y", actions=[{"thread_id": "prereg_scoring", "action": "hold", "title": "", "note": ""}]), 3
     )
@@ -673,3 +681,87 @@ def test_an_elaborated_carried_outcome_still_carries(outcome):
 
 def test_the_rubric_limit_is_the_ledger_constant():
     assert f"after {['', 'one', 'two', 'three', 'four', 'five'][story_ledger.CARRIED_MAX_WEEKS]} carried weeks" in story_desk.RUBRIC
+
+
+# ── staleness counts installments told, not weeks (2026-10-28, week 8) ────────
+# Fixture is the wire: the live ledger row LEDGER#2026-10-13 (week 6, a backfilled legacy lead) after week 5's
+# installment, week 7 budget-paused (2026-10-21T15:00:34Z "Budget guard paused 'chronicle'"), and the three
+# thread ids/titles the week-8 corrective retry still left unretired (2026-10-28T15:03:06Z `wednesday-chronicle`,
+# "desk: week 8 attempt 2 rejected: [...]").
+WK8_STALE = (
+    ("weight_waypoints", "The Waypoint Ladder"),
+    ("the_streak", "The Streak"),
+    ("the_machines_scoreboard", "The Machines' Scoreboard"),
+)
+
+
+def _wk8_ledger(told_weeks=(5, 6)):
+    acts = [{"thread_id": tid, "action": "open", "title": title, "note": ""} for tid, title in WK8_STALE]
+    led = story_ledger.apply_budget(story_ledger.empty_ledger(), _budget(lead="x", actions=acts), week=told_weeks[0], date="d", title="t")
+    for w in told_weeks[1:]:
+        held = [{"thread_id": tid, "action": "hold", "title": "", "note": "n"} for tid, _ in WK8_STALE]
+        led = story_ledger.apply_budget(led, _budget(lead="x", actions=held), week=w, date=f"d{w}", title="t")
+    return led
+
+
+def _held_wk8_budget():
+    import json as _json
+
+    b = _json.loads(_json.dumps(_minimal_budget()))
+    b["thread_actions"] = [{"thread_id": tid, "action": "hold", "title": "", "note": "still open"} for tid, _ in WK8_STALE]
+    return b
+
+
+def _desk(led, budget, week):
+    import json as _json
+
+    calls = []
+
+    def invoke(body, model):
+        calls.append(body)
+        return {"stop_reason": "end_turn", "content": [{"type": "text", "text": _json.dumps(budget)}]}
+
+    logs = []
+    return story_desk.run_desk({"roster": []}, led, week=week, invoke=invoke, log=logs.append), calls, logs
+
+
+def _stale_findings(led, week):
+    return [x for x in story_ledger.continuity_findings(led, _held_wk8_budget(), week) if x.startswith("stale thread ")]
+
+
+def test_a_held_week_and_a_paused_week_do_not_make_a_thread_stale():
+    led = _wk8_ledger((5, 6))  # week 7 told nothing
+    assert story_ledger.installments_since(led, 5, 8) == 2
+    assert _stale_findings(led, 8) == []
+    # mutation control: the third installment told (week 9) without a move IS stale
+    after8 = story_ledger.apply_budget(led, _held_wk8_budget(), week=8, date="d8", title="t")
+    assert len(_stale_findings(after8, 9)) == len(WK8_STALE)
+    # and the calendar count is what fired on 10-28: a contiguous 5, 6, 7 makes week 8 stale
+    assert len(_stale_findings(_wk8_ledger((5, 6, 7)), 8)) == len(WK8_STALE)
+
+
+def test_a_retry_that_leaves_only_stale_threads_is_retired_by_the_desk_not_dropped_to_legacy():
+    led = _wk8_ledger((5, 6, 7))
+    budget = _held_wk8_budget()
+    budget["featured_coaches"] = ["sleep_coach"]
+    budget["throughline_advanced"] = "the_streak"
+    budget["cliffhanger"] = "By Sunday the scale says which way."
+    others = [x for x in story_desk.validate(budget, {"roster": []}, led, week=8) if not x.startswith("stale thread ")]
+    assert others == [], others
+    budget, calls, logs = _desk(led, budget, 8)
+    assert len(calls) == 2  # the model still gets its corrective retry first
+    retired = {a["thread_id"]: a for a in budget["thread_actions"] if a["action"] == "retire"}
+    assert set(retired) == {tid for tid, _ in WK8_STALE}
+    assert all("retired by the desk" in a["note"] for a in retired.values())
+    assert any("the desk retired them by name" in m for m in logs)
+    after = story_ledger.apply_budget(led, budget, week=8, date="d8", title="t")
+    assert {t["id"]: t["status"] for t in after["threads"]} == {tid: "retired" for tid, _ in WK8_STALE}
+
+
+def test_the_desk_does_not_retire_when_another_finding_remains():
+    led = _wk8_ledger((5, 6, 7))
+    b = _held_wk8_budget()
+    b["featured_coaches"] = []  # a non-stale finding ("no featured coach") rides along
+    with pytest.raises(RuntimeError, match="failed validation twice"):
+        _desk(led, b, 8)
+    assert story_ledger.retire_unmoved_stale(_wk8_ledger((5, 6)), _held_wk8_budget(), 8) == []  # nothing stale to retire
