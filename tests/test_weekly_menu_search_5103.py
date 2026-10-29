@@ -1,5 +1,5 @@
 """tests/test_weekly_menu_search_5103.py — the weekly menu's day search finds the day's BEST set, and the fatty fish
-goes only where the day keeps its fit (#5103 search quality, #5105 fish placement; synthetic proof of 2026-10-29).
+lands on the days it costs least (#5103 search quality, #5105 fish placement; synthetic proof of 2026-10-29).
 
 The proof found the local search (`_search_day`) stopping well short of the best set the anchors held for a day, and
 the fish placement accepting a day that was already unfit, so the fish landed on the unfit days and made them worse.
@@ -12,11 +12,12 @@ Holds (each test iterates its whole set and reports every offender):
   2. THE EXACT SEARCH IS THE OPTIMUM: on small seeded tables (with and without a fixed dinner and a required
      serving) `_exact_day` returns exactly the set a brute force over every serving count picks under the same total
      order — the least miss, then the distance, the servings and the ids.
-  3. THE FISH GOES ONLY WHERE THE DAY KEEPS ITS FIT: with one unfit day in the week the fish lands on fitting days,
-     still at the weekly low end; the old acceptance rule (patched back in) puts it on the unfit day — the mutation
-     control that this test can see the defect.
-  4. A SERVING NO DAY CAN TAKE IS HELD BACK AND NAMED: when every day the fish could go would fit worse with it, no day
-     carries it, every day is as fit as its fish-free fit, and the quality miss names the short count and the reason.
+  3. THE FISH GOES ON ITS LEAST-COST DAYS: with one unfit day in the week the charter's low end lands on days that
+     stay fit, never the unfit one; the old acceptance rule (patched back in) is caught.
+  4. THE LOW END IS ALWAYS PLACED: when no day stays fit with it, it still lands on the days it costs the least miss
+     (the lifting days, not the rest days), and each of those days names its misses as any unfit day does; holding it
+     back to zero and the old rest-day placement (both patched in) are caught. A serving is left unplaced only when
+     no free day exists, and the report names that reason.
   5. AN UNFIT DAY NAMES ITS MISSES and misses by no more than the local search alone; its search ran to completion.
   6. DETERMINISTIC: the same plan gives the same menu, and the exact set does not depend on the day's rotation.
   7. BOUNDED: a table the size of a real one builds a week inside a wall-clock bound and under the node budgets; a
@@ -193,63 +194,111 @@ def test_the_exact_search_is_the_brute_force_optimum_on_small_tables():
     assert checked >= 30 and not problems, f"{checked} checked\n" + "\n".join(problems)
 
 
-# ── 3. the fish goes only where the day keeps its fit ────────────────────────────────────────────────────────
-def _fish_offenders(menu, fish_free):
-    """Days the fish placement made worse than their fish-free fit (a fitting day that stopped fitting included)."""
+# ── 3. the fish goes on its least-cost days ──────────────────────────────────────────────────────────────────
+def _menu(fixed, read=None):
+    return wm.build(_plan(), anchors_raw=copy.deepcopy(ANCHORS), fixed_meals_raw=copy.deepcopy(fixed), **({"read": read} if read else {}))
+
+
+def _fish_costs(fixed):
+    """Each day's cost of one fatty-fish serving, fitted on its own (the fish-free fit against the fish-pinned one):
+    (0 when the day fits with it, else 1; the miss it adds)."""
+    pol = wm.policy(_read)
+    anchors, _ = wm.parse_anchors(copy.deepcopy(ANCHORS), pol["cap"])
+    meals, _ = wm.parse_fixed_meals(copy.deepcopy(fixed))
+    out = {}
+    for i, day in enumerate(_plan()["days"]):
+        free = wm.fit_day(day, anchors, pol, i, _read, exclude=[FISH_ID], fixed_meals=meals)
+        pinned = wm.fit_day(day, anchors, pol, i, _read, exclude=[FISH_ID], fixed={FISH_ID: 1}, fixed_meals=meals)
+        out[day["date"]] = (0 if pinned["fits"] else 1, round(_miss(pinned) - _miss(free), 3))
+    return out
+
+
+def _placement_offenders(menu, costs):
+    """The low end not placed, fish off its least-cost days, or a day the fish leaves unfit with its misses unnamed."""
+    lo = _read("nutrition.food_quality.fatty_fish.servings_per_week")[0]
+    fish_days = [d["date"] for d in menu["days"] if _fish_on(d)]
     bad = []
-    for d, f in zip(menu["days"], fish_free["days"]):
-        if f["fits"] and not d["fits"]:
-            bad.append(f"{d['date']}: fits without the fish placement, not with it ({d['misses']})")
-        if _miss(d) > _miss(f) + 1e-6:
-            bad.append(f"{d['date']}: misses by {_miss(d)} with the fish placement, {_miss(f)} without")
+    if len(fish_days) != lo or menu["quality"][fq.FISH]["servings"] != lo:
+        bad.append(f"the low end {lo} is not placed: fish on {fish_days}")
+    least = sorted(costs.values())[:lo]
+    if sorted(costs[d] for d in fish_days) != least:
+        bad.append(f"fish on {fish_days} at costs {[costs[d] for d in fish_days]}, the least cost days are {least}")
+    for d in menu["days"]:
+        if _fish_on(d) and not d["fits"]:
+            if d["reason_code"] != wm.DAY_UNFIT or not [x for x in d["misses"] if "kcal" in x or "_g " in x]:
+                bad.append(f"{d['date']}: the fish leaves the day unfit and its misses are not named: {d['misses']}")
+            if "DOES NOT FIT" not in next(x for x in menu["lines"] if d["date"] in x):
+                bad.append(f"{d['date']}: the words do not say the fish day does not fit")
     return bad
 
 
-def _menus(fixed):
-    no_fish = [a for a in ANCHORS if not a.get("fatty_fish")]
-    menu = wm.build(_plan(), anchors_raw=copy.deepcopy(ANCHORS), fixed_meals_raw=copy.deepcopy(fixed))
-    fish_free = wm.build(_plan(), anchors_raw=copy.deepcopy(no_fish), fixed_meals_raw=copy.deepcopy(fixed))
-    return menu, fish_free
+def _old_rule(before, cand):
+    """The old acceptance: a day that fits with the fish, or ANY day already unfit (whatever the fish costs it)."""
+    return (0, 0.0) if cand.get("fits") or (not before.get("fits") and cand.get("feedings")) else None
 
 
-def test_the_fish_goes_only_to_days_that_keep_their_fit(monkeypatch):
-    lo = _read("nutrition.food_quality.fatty_fish.servings_per_week")[0]
+def _hold_back_rule(before, cand):
+    """Hold back to zero: only a day the fish keeps as fit may take it."""
+    return (0, 0.0) if cand.get("fits") or (not before.get("fits") and _miss(cand) <= _miss(before)) else None
+
+
+def test_the_fish_goes_to_days_that_stay_fit_before_an_unfit_one(monkeypatch):
     fixed = [_dinner(900, 50, 100, 40, 5, days=["Tuesday"])]  # Tuesday alone cannot fit; the spread's first slot
-    menu, fish_free = _menus(fixed)
-    problems = _fish_offenders(menu, fish_free)
+    costs = _fish_costs(fixed)
+    menu = _menu(fixed)
+    problems = _placement_offenders(menu, costs)
     unfit = [d["date"] for d in menu["days"] if not d["fits"]]
     if len(unfit) != 1:
         problems.append(f"precondition: want exactly the Tuesday unfit, got {unfit}")
     on_unfit = [d["date"] for d in menu["days"] if _fish_on(d) and not d["fits"]]
     if on_unfit:
-        problems.append(f"fatty fish on an unfit day while fitting days were free: {on_unfit}")
-    q = menu["quality"][fq.FISH]
-    if q["servings"] != lo or len(q["days"]) != lo:
-        problems.append(f"the fish count {q['servings']} on {q['days']} is not the weekly low end {lo} on fitting days")
+        problems.append(f"fatty fish on an unfit day while days that stay fit were free: {on_unfit}")
     # Mutation control: the old acceptance (a day already unfit takes the fish whatever it costs) must be caught.
     with monkeypatch.context() as m:
-        m.setattr(wm, "_keeps_fit", lambda before, cand: bool(cand.get("fits")) or (not before.get("fits") and bool(cand.get("feedings"))))
-        old, _ = _menus(fixed)
-    if not _fish_offenders(old, fish_free):
-        problems.append("mutation control: the old placement rule was not caught by this test")
+        m.setattr(wm, "_fish_cost", _old_rule)
+        if not _placement_offenders(_menu(fixed), costs):
+            problems.append("mutation control: the old placement rule was not caught")
     assert not problems, "\n".join(problems)
 
 
-# ── 4. a serving no day can take is held back and named ──────────────────────────────────────────────────────
-def test_a_fish_serving_no_day_can_take_is_held_back_and_named():
-    lo = _read("nutrition.food_quality.fatty_fish.servings_per_week")[0]
-    fixed = [_dinner(800, 50, 100, 40, 5)]  # the weekdays fit only fish-free; the rest days miss
-    menu, fish_free = _menus(fixed)
-    problems = _fish_offenders(menu, fish_free)
+# ── 4. the low end is placed even when every day pays for it ────────────────────────────────────────────────
+def test_the_low_end_is_placed_on_the_least_cost_days_when_no_day_stays_fit(monkeypatch):
+    fixed = [_dinner(800, 50, 100, 40, 5)]  # the weekdays fit only fish-free; the rest days miss either way
+    costs = _fish_costs(fixed)
+    menu = _menu(fixed)
+    problems = _placement_offenders(menu, costs)
+    if any(c[0] == 0 for c in costs.values()):
+        problems.append(f"precondition: some day still fits with the fish: {costs}")
+    rest = {d["date"] for d in menu["days"] if d["day_type"] == "rest"}
+    if not rest or any(_fish_on(d) for d in menu["days"] if d["date"] in rest):
+        problems.append(f"fish on a rest day, which it costs the most: {costs}")
+    if fq.FISH in " ".join(menu["quality"]["misses"]):
+        problems.append(f"the low end is placed, yet the fish count is named a miss: {menu['quality']['misses']}")
+    # Mutation controls: holding the fish back to zero, and the old rule (it lands on the rest days), must be caught.
+    for name, rule in (("hold back to zero", _hold_back_rule), ("old rest-day placement", _old_rule)):
+        with monkeypatch.context() as m:
+            m.setattr(wm, "_fish_cost", rule)
+            if not _placement_offenders(_menu(fixed), costs):
+                problems.append(f"mutation control: {name} was not caught")
+    assert not problems, "\n".join(problems)
+
+
+def test_a_serving_is_left_unplaced_only_when_no_free_day_exists_and_the_reason_is_named():
+    def read(path):
+        if path == fq.POLICY_PATH:
+            block = copy.deepcopy(_read(path))
+            block["fatty_fish"]["servings_per_week"] = [8, 9]  # more than the week has days
+            return block
+        return _read(path)
+
+    menu = _menu([_dinner(800, 50, 100, 40, 5)], read=read)
     q = menu["quality"]
-    fish = q[fq.FISH]
-    if fish["servings"] >= lo:
-        problems.append(f"precondition: the fish found {fish['servings']} day(s) after all: {fish['days']}")
     line = next((x for x in q["misses"] if x.startswith(fq.FISH)), "")
-    if "held back" not in line or q["met"] or menu["quality_met"]:
-        problems.append(f"the short fish count is not named with its reason: {q['misses']}")
-    if "held back" not in menu["lines"][-1]:
-        problems.append(f"the words do not carry the held-back reason: {menu['lines'][-1]}")
+    problems = []
+    if q[fq.FISH]["servings"] != len(menu["days"]):
+        problems.append(f"{q[fq.FISH]['servings']} placed: every day should carry one before any is left unplaced")
+    if "1 serving(s) not placed: no free day" not in line or q["met"]:
+        problems.append(f"the unplaced serving is not named with its reason: {q['misses']}")
     assert not problems, "\n".join(problems)
 
 

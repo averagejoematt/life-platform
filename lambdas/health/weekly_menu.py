@@ -46,11 +46,13 @@ THE FIT (per day, deterministic — the same plan and table always give the same
 THE FOOD-QUALITY TARGETS (#5105, `nutrition.food_quality`, read and checked by `health.food_quality`): the fibre floor is
 one of the day's floors above (the ONE fibre floor); the fatty-fish weekly range is enforced across the week — every day
 is fitted with the fatty-fish anchors (rows tagged `fatty_fish: true`) kept off it, then the range's low end is placed
-as one pinned serving on each of that many spread days (`_fit_week`) — only on a day the serving keeps as fit as it was
-(a fitting day still fits, a missing day misses by no more: `_keeps_fit`); a serving no day can take that way is held
-back, and the report names the short count with that reason, never a day made worse to meet it. The owner-only
-lab-driven priorities row, when the caller holds it, rides the report. The menu's `quality` names every target the week misses (`quality.misses`) and every
-unreadable one (`quality.problems`) — never silently — and `food_plan` carries the rows the food panel checks the same way.
+as one pinned serving on each of that many days (`_fit_week`), ALWAYS (trading the target away for a day's fit is an
+owner ruling, not the fitter's), on the days where it costs least (`_fish_cost`: a day that still fits first, else the
+smallest miss it adds; the spread breaks ties); a day it leaves unfit names its misses like any unfit day, and only a
+serving no free day can take at all is left unplaced, with the reason on the report's short count. The owner-only
+lab-driven priorities row, when the caller holds it, rides the report. The menu's `quality` names every target the week
+misses (`quality.misses`) and every unreadable one (`quality.problems`) — never silently — and `food_plan` carries the
+rows the food panel checks the same way.
 
 The feedings are laid inside the one eating window (`nutrition.eating_window`): feeding i opens at i x (eating hours /
 feedings) hours after the window opens, so all of them sit inside it. On a lifting day one feeding is the post-session
@@ -95,7 +97,7 @@ from health import food_quality, travel_food
 
 logger = logging.getLogger(__name__)
 
-VERSION = "weekly-menu@1.4.0"  # 1.4.0 #5103/#5105: the exact day search and fish only where it keeps the fit; 1.3.0 #5104: the grocery list skips travel days and is rendered in `lines`; 1.2.0 #5103: the fixed meals (a fixed dinner planned around); 1.1.0 #5105: food quality
+VERSION = "weekly-menu@1.4.0"  # 1.4.0 #5103/#5105: the exact day search and fish on its least-cost days; 1.3.0 #5104: the grocery list skips travel days and is rendered in `lines`; 1.2.0 #5103: the fixed meals (a fixed dinner planned around); 1.1.0 #5105: food quality
 ISSUE = "#5103"
 POLICY_PATH = "nutrition.weekly_menu"
 ANCHORS_PATH = "anchor_foods"  # the owner-only twin's key (training_charter.PRIVATE_KEYS)
@@ -1036,14 +1038,14 @@ def _miss(day: Mapping[str, Any]) -> float:
     return _cost(day["totals"], day["targets"])[0] if day.get("feedings") and day.get("totals") else math.inf
 
 
-def _keeps_fit(before: Mapping[str, Any], cand: Mapping[str, Any]) -> bool:
-    """A fatty-fish serving may go on a day only when the day with it is no worse: a day that fits still fits, and a
-    day that already misses misses by no more (#5105: the fish never makes a day worse to meet the weekly count)."""
+def _fish_cost(before: Mapping[str, Any], cand: Mapping[str, Any]) -> Optional[tuple[int, float]]:
+    """What a fatty-fish serving costs a day, as the placement ranks it (lower is better): (0 when the day fits with
+    it, else 1; the miss it adds over the day's fish-free fit, negative when it helps). None when the day cannot take
+    one at all (no feedings with it). The charter's low end is placed whatever it costs (trading the target away is an
+    owner ruling, never the fitter's): this only decides WHERE it costs least."""
     if not cand.get("feedings"):
-        return False
-    if cand.get("fits"):
-        return True
-    return not before.get("fits") and _miss(cand) <= _miss(before)
+        return None
+    return (0 if cand.get("fits") else 1, round(_miss(cand) - _miss(before), 3))
 
 
 def _fit_week(
@@ -1054,15 +1056,16 @@ def _fit_week(
     read: CharterReader,
     fixed_meals: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[list[dict[str, Any]], str]:
-    """Every day fitted, with the fatty-fish target enforced (#5105), and the reason any fish serving was held back
-    ('' when none was). Every day is first fitted with the fatty-fish anchors kept off it, then the low end of the
-    charter's weekly range is placed — one pinned serving on each of that many days, spread across the week (the day
-    nearest each even slot first, then the next nearest), the fish anchors taken in turn — but only on a day the fish
-    keeps fitting (`_keeps_fit`: a fitting day still fits, a missing day misses by no more). A serving no remaining day
-    can take that way is held back and the quality report names the short count with that reason, never a day made
-    worse to meet it. A day the fish-free fit cannot build (fish was its only protein core) is fitted with fish
-    allowed; the quality report then names any count outside the range. With no readable range or no tagged anchor the
-    week is fitted as before. The fixed feedings (`fixed_meals`) ride every fit: the fish is placed around them."""
+    """Every day fitted, with the fatty-fish target enforced (#5105), and the reason any serving of the low end could
+    not be placed ('' when all were). Every day is first fitted with the fatty-fish anchors kept off it, then the low
+    end of the charter's weekly range is ALWAYS placed — one pinned serving on each of that many days, the fish anchors
+    taken in turn — on the days where it costs the least (`_fish_cost`): a day that fits with it first, else the
+    smallest miss it adds over the day's fish-free fit; the spread across the week (the day nearest each even slot)
+    only breaks ties. A day the fish leaves unfit names its misses exactly as any unfit day does. A serving is left
+    unplaced only when no free day can take one; the quality report then names the short count with that reason. A day
+    the fish-free fit cannot build (fish was its only protein core) is fitted with fish allowed; the quality report
+    names any count outside the range. With no readable range or no tagged anchor the week is fitted as before. The
+    fixed feedings (`fixed_meals`) ride every fit: the fish is placed around them."""
     fish = _fish_ids(anchors)
     rng = qpol.get("fish_range")
     search: dict[str, Any] = {"nodes_left": WEEK_NODE_BUDGET, "memo": {}}  # one budget and memo for the whole build
@@ -1079,28 +1082,27 @@ def _fit_week(
     need = max(0, math.ceil(rng[0] - sum(placed)))
     chosen: set[int] = set()
     tried: dict[tuple[int, str], dict[str, Any]] = {}
-    for k in range(min(need, len(free))):
+    for k in range(need):
         ideal = (k + 0.5) * len(days) / need
         fid = fish[k % len(fish)]
-        for i in sorted(free, key=lambda j: (abs(j + 0.5 - ideal), j)):
+        ranked = []
+        for i in free:
             if i in chosen:
                 continue
             if (i, fid) not in tried:
                 tried[(i, fid)] = fit_day(
                     days[i], anchors, pol, i, read, exclude=fish, fixed={fid: 1}, fixed_meals=fixed_meals, search=search
                 )
-            cand = tried[(i, fid)]
-            if _keeps_fit(fitted[i], cand):
-                fitted[i] = cand
-                chosen.add(i)
-                break
-    held = need - len(chosen)
-    note = (
-        f"{held} serving(s) held back: no other day keeps its fit with a fatty-fish serving (the fish goes only where the day "
-        "stays as fit)"
-        if held > 0
-        else ""
-    )
+            cost = _fish_cost(fitted[i], tried[(i, fid)])
+            if cost is not None:
+                ranked.append((cost, abs(i + 0.5 - ideal), i))
+        if not ranked:
+            break
+        i = min(ranked)[2]
+        fitted[i] = tried[(i, fish[k % len(fish)])]
+        chosen.add(i)
+    short = need - len(chosen)
+    note = f"{short} serving(s) not placed: no free day could take a fatty-fish serving" if short > 0 else ""
     return fitted, note
 
 
