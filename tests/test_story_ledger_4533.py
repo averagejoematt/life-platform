@@ -260,6 +260,8 @@ def test_a_thread_unmoved_for_three_installments_must_be_resolved_or_retired(mon
     t = _wire(monkeypatch)
     _publish(t, 1, "2026-09-08", "b")  # the_streak opened week 1
     prev = story_ledger.latest_visible(t, PK, "2026-09-29")
+    # weeks 2 and 3 told without moving it: staleness counts installments told, not weeks (2026-10-28, week 8)
+    prev["leads"] += [{"week": 2, "thread_id": "y"}, {"week": 3, "thread_id": "z"}]
     held = {
         "lead": {"thread_id": "x"},
         "thread_actions": [{"thread_id": "the_streak", "action": "hold"}],

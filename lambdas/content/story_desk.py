@@ -325,4 +325,10 @@ def run_desk(
         if not findings:
             return budget
         log(f"desk: week {week} attempt {attempt} rejected: {findings}")
+    if budget and findings and all(f.startswith("stale thread ") for f in findings):
+        retired = story_ledger.retire_unmoved_stale(ledger, budget, week)
+        findings = validate(budget, dossier, ledger, week=week)
+        if not findings:
+            log(f"desk: week {week} — the retry left {retired} stale; the desk retired them by name")
+            return budget
     raise RuntimeError(f"desk: week {week} budget failed validation twice: {findings}")
