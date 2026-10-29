@@ -181,10 +181,15 @@ jobs:
         # fed to pip-audit as `--ignore-vuln` IDs, so a single unfixable / inapplicable
         # transitive CVE can't red-wall main indefinitely; every allowlist entry needs
         # a rationale + removal path. Dependabot (.github/dependabot.yml) still opens
-        # the bump PRs. (Lambda *source* is stdlib-only, but three pinned binary *layers*
-        # ship pillow/garth/lameenc into running Lambdas — those are manifest-pinned in
-        # lambdas/requirements/ and scanned by the scheduled pip_audit_lambda, whose
-        # check_layer_manifest_coverage() reds if a layer ARN lacks a manifest (#1336).)
+        # the bump PRs.
+        # #5473: the allowlist parse + per-manifest verdict moved into
+        # scripts/check_pip_audit.py (one parser for this step AND the layer leg; an
+        # entry may now be `scope=`d to one manifest, and a scan that cannot run reds
+        # instead of reading clean). The three pinned binary-layer manifests in
+        # lambdas/requirements/ are NOT scanned here: pip_audit_lambda was meant to and
+        # never could (no pip on python3.12). layer-pip-audit.yml scans them weekly and
+        # on any PR that touches them, filing one advisory issue on a fresh CVE rather
+        # than reddening unrelated pushes.
         # Pinned like the other lint-gate tools: version resolved from
         # requirements-dev.txt via ci_pins.py (CQ-01/#2609, #2760) so Dependabot
         # bumps the only copy — a workflow literal here had no bump leg.
@@ -192,27 +197,7 @@ jobs:
         run: |
           PINS=$(python3 scripts/ci_pins.py pip-audit)
           pip install $PINS
-          ALLOWLIST=.github/pip-audit-allowlist.txt
-          IGNORE_ARGS=()
-          if [ -f "$ALLOWLIST" ]; then
-            while IFS= read -r line; do
-              line="${line%%#*}"                          # strip inline comment / rationale
-              id="$(echo "$line" | tr -d '[:space:]')"    # ID is the only remaining token
-              [ -n "$id" ] && IGNORE_ARGS+=(--ignore-vuln "$id")
-            done < "$ALLOWLIST"
-            echo "pip-audit allowlist (--ignore-vuln): ${IGNORE_ARGS[*]:-<none>}"
-          fi
-          RC=0
-          for req in requirements-dev.txt cdk/requirements.txt; do
-            echo "::group::pip-audit $req"
-            pip-audit -r "$req" --desc on "${IGNORE_ARGS[@]}" || RC=1
-            echo "::endgroup::"
-          done
-          if [ "$RC" != "0" ]; then
-            echo "::error title=Dependency vulnerability (blocking)::pip-audit found a known CVE not on the allowlist. Fix: bump the dependency (Dependabot may already have a PR), or — if unfixable/inapplicable — add the advisory ID to .github/pip-audit-allowlist.txt with a rationale + removal path."
-            exit 1
-          fi
-          echo "✅ Dependency scan clean (allowlisted IDs excluded) — blocking gate green."
+          python3 scripts/check_pip_audit.py --resolve requirements-dev.txt cdk/requirements.txt
 
       - name: Secret scan (gitleaks — ENFORCED, default ruleset, ~30s)
         # #1336: restores committed-credential detection lost when the repo went private

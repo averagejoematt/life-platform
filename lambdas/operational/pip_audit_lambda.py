@@ -35,6 +35,14 @@ ALTERNATIVES:
     bash deploy/run_pip_audit.sh
   which checks all lambdas/requirements/*.txt files locally and prints a report.
 
+KNOWN DEFECT, MADE LOUD (#5473): the python3.12 Lambda runtime ships no pip, so
+`pip_audit` cannot resolve a manifest here and every non-empty manifest errors
+(`No module named pip`). The report used to read "0 vulnerabilities" with no hard-fail
+reason. A scan error is now a `hard_fail_reasons` entry and the invocation raises after
+the artifact is written. The layer manifests are scanned in CI instead
+(`scripts/check_pip_audit.py --layers`, weekly); retiring this Lambda's scan leg is the
+named follow-up.
+
 v1.0.0 — 2026-03-08 (SEC-5)
 """
 
@@ -331,6 +339,16 @@ def audit_requirements_file(req_path: str, lambda_name: str) -> dict:
         return {"lambda": lambda_name, "vulnerabilities": [], "packages_checked": 0, "status": "error", "error_msg": str(e)}
 
 
+def scan_error_reasons(results: list[dict]) -> list[str]:
+    """#5473: one hard-fail reason per manifest whose scan ERRORED.
+
+    Before this, every non-empty manifest errored on python3.12 (`No module named pip`)
+    and the report still carried `has_vulnerabilities: False` and no hard-fail reason, so
+    nothing alarmed and the result read as 0 vulnerabilities. A scan that did not run is
+    not a clean scan."""
+    return [f"scan error on {r['lambda']}: {(r.get('error_msg') or 'unknown error')[:160]}" for r in results if r.get("status") == "error"]
+
+
 def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
     """Build the report as an EMBEDDABLE HTML fragment (#2835). Returns
     (html, has_vulnerabilities).
@@ -468,10 +486,12 @@ def lambda_handler(event, context):
 
     logger.info(f"[pip_audit] Monthly dependency scan starting: {scan_date}")
 
-    # Install pip-audit if needed
+    # Install pip-audit if needed. #5473: a scanner that cannot run must not return a
+    # quiet 500 dict (an async invoke reads that as success) — raise, so the invocation
+    # errors and the CloudWatch Errors alarm sees it.
     if not ensure_pip_audit():
         logger.error("[pip_audit] Cannot proceed — pip-audit not available")
-        return {"statusCode": 500, "body": "pip-audit installation failed"}
+        raise RuntimeError("SCA guard RED (#5473): pip-audit not available — no manifest was scanned")
 
     # Get requirements files from S3
     s3_keys = list_requirements_files()
@@ -586,7 +606,7 @@ def lambda_handler(event, context):
         # The pre-rendered section the ops pack embeds verbatim (#2835).
         "html": html,
     }
-    hard_fail_reasons = []
+    hard_fail_reasons = scan_error_reasons(results)
     if missing_layer_manifests:
         hard_fail_reasons.append(f"unscanned deployed layer(s) with no manifest: {missing_layer_manifests}")
     if alerts["status"] == "disabled":
@@ -606,10 +626,11 @@ def lambda_handler(event, context):
         logger.error(f"[pip_audit] Failed to deliver artifact: {e}")
         raise
 
-    # RED-on-missing-manifest / disabled-alerts: fail the invocation (non-zero → CloudWatch
-    # Errors alarm) AFTER the report artifact is written, so the operator sees the detail AND
-    # the scheduled run pages (#1336 AC2/AC5). Vulnerable-package findings intentionally stay
-    # report-only (unchanged prior behavior); only the CONFIG gaps that story closes hard-fail.
+    # RED-on-missing-manifest / disabled-alerts / scan-error: fail the invocation (non-zero →
+    # CloudWatch Errors alarm) AFTER the report artifact is written, so the operator sees the
+    # detail AND the scheduled run pages (#1336 AC2/AC5, #5473). Vulnerable-package findings
+    # intentionally stay report-only (the CI layer scan, layer-pip-audit.yml, owns those); a
+    # manifest that could not be scanned hard-fails, because it is a config gap, not a finding.
     if hard_fail_reasons:
         raise RuntimeError("SCA guard RED (#1336): " + "; ".join(hard_fail_reasons))
 

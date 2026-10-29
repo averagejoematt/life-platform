@@ -20,7 +20,7 @@ _WF = _REPO / ".github" / "workflows"
 # read as a gate registry by the census.
 WORKFLOW_SIZE_COUNTS: dict = {
     "ci-cd.yml": (1732, 744),  # #5316: the rollback loop moved to deploy/rollback_fleet.sh
-    "ci-lint.yml": (451, 168),
+    "ci-lint.yml": (436, 148),  # #5473: the pip-audit allowlist parse moved to scripts/check_pip_audit.py
     "ci-test.yml": (439, 124),
     "citation-network-check.yml": (78, 21),
     "codeql.yml": (137, 0),
@@ -37,6 +37,7 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "pii-endpoint-sweep.yml": (119, 17),
     "panel-rubric-gate.yml": (82, 4),  # #5072: the panel rubric gate (new on the wave-2 PR; the owner's review of it is named there)
     "iam-gate-pr.yml": (60, 4),  # #5221: the additive-IAM gate at PR time (new on the followups-a integration PR)
+    "layer-pip-audit.yml": (84, 3),  # #5473: the layer-manifest pip-audit (weekly + PRs on the manifests)
     "pr-checks.yml": (414, 44),
     "raw-kms-readability.yml": (112, 15),
     "remediation-agent.yml": (184, 33),
