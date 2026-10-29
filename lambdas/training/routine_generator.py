@@ -700,6 +700,7 @@ def _progress_block(
         hold_reason=hold_reason,
         load_convention=lc.current_load_convention_of(entry),  # #5373: a prescription is in the CURRENT convention (history is read in it)
     )
+    lp.round_to_implement(prog, entry.get("equipment"))  # #5428: a step / floor-raise load lands on the rack's step (standard §5)
     prog["changes"] = lp.apply_to_sets(block.sets, prog)
     if prog["reason"] and (prog["changes"] or prog["basis"] != lp.BASIS_HOLD or current):
         block.notes = f"{prog['reason']}. {block.notes}".strip()  # #5083: the reason LEADS the note (hevy-render-table.md)

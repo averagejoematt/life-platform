@@ -208,14 +208,32 @@ def applied_clause(kind: str, *, working_sets: int | None = None, lighter: bool 
     return clause if len(clause) <= CLAUSE_MAX_CHARS else head + "."
 
 
+# what a critic clause opens with (`applied_clause`): one is never displaced by another — each is a safety change (§6.3)
+CLAUSE_RE = re.compile(r"^(?:\d+ sets? today|Lighter today|Heavier today|Fewer reps today)[:.]")
+
+
+def _displaceable(line: str) -> bool:
+    """A computed reason that yields the one reason slot to a critic clause. A capped exposure's `No jumps` line opts the
+    lift out of the load rule (a safety cap after a break), so it keeps its line, as does an earlier critic clause."""
+    return bool(hevy_note_grammar.REASON_RE.match(line)) and not CLAUSE_RE.match(line) and not line.startswith(hevy_note_grammar.NO_JUMPS)
+
+
 def add_reason(note: str | None, clause: str | None) -> str:
-    """Insert `clause` as the reason line: after line 1 (the effort line) of the lift's OWN note, below any
-    session block. Idempotent — a clause already on the note is not written twice."""
+    """Write `clause` as THE reason line of the lift's OWN note, below any session block. Idempotent — a clause already
+    on the note is not written twice.
+
+    One reason per lift (standard §3.2, whose reason list includes the critic clause) and the clause is a safety change
+    that is never dropped (§6.3), so it takes the reason slot: a computed reason already there (`New: replaces …`,
+    `Heavier: …`, `Volume day: …`) gives way to it — the displaced line stays on the stored record
+    (`inputs_snapshot["lift_notes"]`). A capped exposure's `No jumps` line and an earlier critic clause keep their
+    lines, and the clause goes in after line 1 (the effort line). #5428 replay, 2026-10-29: the joints critic's
+    `3 sets today: …` stacked on a seated calf raise's rotation line, pick-load line and cue — 5 phone lines > 4."""
     text = note or ""
     if not clause or clause in text.split("\n"):
         return text
     block, own = split(text)
     lines = own.split("\n") if own.strip() else []
-    lines = lines[:1] + [clause] + lines[1:]
+    slot = next((i for i, ln in enumerate(lines[1:], start=1) if _displaceable(ln)), None)
+    lines = lines[:slot] + [clause] + lines[slot + 1 :] if slot is not None else lines[:1] + [clause] + lines[1:]
     own_out = "\n".join(lines)
     return block + "\n\n" + own_out if block else own_out
