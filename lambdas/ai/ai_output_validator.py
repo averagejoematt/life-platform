@@ -210,6 +210,20 @@ _CHANGE_WORD_AFTER_RE = re.compile(
     r"(?:saved|more|less|fewer|added|extra|cut|lower|higher|deficit|surplus|shortfall|difference|swing)\b",
     re.IGNORECASE,
 )
+# #5324 (2026-10-30 proof): a saving named BEFORE the figure ("Saves ~<N> kcal", "Net savings: ~<N> kcal").
+# Adjacent only, qualifiers allowed: "cut to <N> kcal" keeps its "to" and stays a target.
+_CHANGE_WORD_BEFORE_RE = re.compile(
+    r"\b(?:saves?|saved|savings?|trims?|shaves?|cuts?|frees?\s+up|(?:difference|shortfall|deficit|surplus)\s+of)"
+    r"[ \t]*:?[ \t]*(?:(?:~|≈|about|around|roughly|nearly|almost|another|an\s+extra|over)[ \t]*)?$",
+    re.IGNORECASE,
+)
+# #5324 (2026-10-30 proof): a food mass beside the figure ("cap <food> at <N> g (≈<M> kcal)") sizes ONE food's
+# portion; a day's intake is never stated in grams of food. Macro grams ("(<N> g protein)") are not a mass.
+_MASS_BEFORE_RE = re.compile(r"\b\d{1,4}\s*(?:g|grams?|oz|ounces?)\s*\(\s*(?:[≈~=]|about|approx\.?)?\s*$", re.IGNORECASE)
+_MASS_AFTER_RE = re.compile(
+    r"^\s*\(\s*(?:[≈~=]|about|approx\.?)?\s*\d{1,4}\s*(?:g|grams?|oz|ounces?)\b(?!\s*(?:of\s+)?(?:protein|carb|fat|fib|sugar))",
+    re.IGNORECASE,
+)
 
 # #5324 — a single-food / dish label carries protein beside the figure, not a full macro line:
 # "(<N> g protein, <M> kcal)", "<N> grams of protein for <M> calories". One macro class was not
@@ -616,6 +630,10 @@ def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
         return True
     if _find_patterns(segment, _MEAL_LEVEL_CONTEXT):  # #5297: "Snack — 150 cal", "Dinner: 465 cal"
         return True
+    if _MASS_BEFORE_RE.search(text[max(0, match.start() - 30) : match.start()]) or _MASS_AFTER_RE.match(
+        text[match.end() : match.end() + 30]
+    ):  # #5324: "<N> g (≈<M> kcal)" sizes one food's portion
+        return True
     if _PROTEIN_LABEL_RE.search(segment) and not _PROTEIN_LABEL_VETO_RE.search(segment):  # #5324: a dish label
         return True
     macro_classes = sum(1 for token in _MACRO_BREAKDOWN_TOKENS.values() if token.search(segment))
@@ -625,6 +643,8 @@ def _is_per_item_calorie_figure(text: str, match: re.Match) -> bool:
 def _is_change_figure(text: str, match: re.Match) -> bool:
     """#5297/#5324 — the figure is a DIFFERENCE between two intakes ("+N kcal/day", "~N kcal saved")."""
     if _SIGNED_FIGURE_PREFIX_RE.search(text[max(0, match.start() - 3) : match.start()]):
+        return True
+    if _CHANGE_WORD_BEFORE_RE.search(text[max(0, match.start() - 30) : match.start()]):  # "Saves ~<N> kcal"
         return True
     return bool(_CHANGE_WORD_AFTER_RE.match(text[match.end() : match.end() + 40]))
 

@@ -16,6 +16,10 @@ whole edition was one "day" whose sum always cleared the floor and the guard cou
 The editions are owner-only nutrition text, so every sentence here is SYNTHETIC: generic food words
 and invented figures, never a figure from the captured outputs.
 
+The 2026-10-30 re-proof on the deployed bundle (main e0e515920) blocked three more editions, each on
+one figure: a saving named BEFORE the figure ("Saves ~<N> kcal, ...", "Net savings: ~<N> kcal, ...")
+and a single food's portion cap given as a mass ("cap <food> at <N> g (≈<M> kcal)").
+
 Held both directions: each new exemption passes; every control blocks (the #2215/#5299/#5324
 prescriptions, a day plan summing under the charter floor); a masthead never opens a day.
 """
@@ -74,6 +78,10 @@ _PASSING_SHAPES = [
         "Yogurt is one of the easiest foods to fit at the target calories a day. "
         "A cup of plain yogurt runs about 230 cal and 22g of protein.",
     ),
+    ("saving before the figure", "Saves ~350 kcal, adds 6 g fiber, keeps the flavour intact."),
+    ("net savings before the figure", "Net savings: ~420 kcal, +3 g fiber, +200 mg potassium."),
+    ("food mass then figure", "Use the leaner cut, add a cup of greens, cap the rice at 150 g (≈200 kcal)."),
+    ("figure then food mass", "Keep the granola to 250 kcal (≈60 g) and add berries."),
 ]
 
 
@@ -105,6 +113,10 @@ _BLOCKING_CONTROLS = [
     "Eat 150-180 cal today",  # a range's upper figure is still a figure
     "Stay under 612 kcal. You logged a lot last week, so no more than 612 cal.",  # #5324
     "Total for the day: 650 kcal with 90 g protein.",  # a protein label cannot buy a day total
+    "Cut to 600 kcal today.",  # 2026-10-30: a change word must sit right before the figure
+    "Savings aside, eat 600 calories today.",
+    "Eat 300 g (≈600 kcal) of food today.",  # a day framing beats a food mass
+    "Limit yourself to 600 kcal (about 400 g of food).",  # so does a restriction
 ]
 
 
