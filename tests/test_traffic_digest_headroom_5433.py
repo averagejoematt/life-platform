@@ -5,6 +5,12 @@ attempt and the async retry finished in 112.6 / 115.8 s. The time was ONE serial
 GetObject per CloudFront log file (~1,570 files a week, ~73 ms each). `_load_logs`
 now reads them LOAD_LOG_WORKERS-wide; these tests pin the fan-out and the budget it
 buys, with a mutation control (workers=1 is the pre-fix behaviour and must fail).
+
+The latency model below UNDER-predicts the Lambda: the 10-30 dry run at 10 wide took
+62.8 s to load, not the ~11 s it models, because at 256 MB the function is CPU-bound
+(pure Python runs ~19x slower than a laptop core there). The work cuts that close the
+gap — a windowed listing and lazy-decoding parsers — are pinned in
+tests/test_traffic_digest_read_concurrency_5433.py; the live proof is the run's Duration.
 """
 
 import gzip
@@ -41,7 +47,7 @@ class _SlowS3:
         assert name == "list_objects_v2"
         return self
 
-    def paginate(self, Bucket, Prefix):
+    def paginate(self, Bucket, Prefix, **_kw):  # #5433: Delimiter/StartAfter ignored, one flat page
         now = datetime.now(timezone.utc)
         yield {"Contents": [{"Key": k, "LastModified": now} for k in self.keys]}
 

@@ -146,7 +146,7 @@ def test_report_is_deterministic():
 
 
 class _BrokenBoto3:
-    def client(self, name, region_name=None):
+    def client(self, name, region_name=None, **_kw):  # #5433: the log client passes config=
         raise RuntimeError(f"no {name} client in this test")
 
 
@@ -184,7 +184,7 @@ class _FakeS3:
     def get_paginator(self, name):
         return self
 
-    def paginate(self, Bucket, Prefix):
+    def paginate(self, Bucket, Prefix, **_kw):  # #5433: Delimiter/StartAfter ignored, one flat page
         yield {"Contents": [{"Key": "cf/log1.gz", "LastModified": datetime.now(timezone.utc)}]}
 
     def get_object(self, Bucket, Key):
@@ -212,7 +212,7 @@ class _FakeBoto3:
     def __init__(self, s3, cw, ses):
         self._clients = {"s3": s3, "cloudwatch": cw, "sesv2": ses}
 
-    def client(self, name, region_name=None):
+    def client(self, name, region_name=None, **_kw):  # #5433: the log client passes config=
         return self._clients[name]
 
 
