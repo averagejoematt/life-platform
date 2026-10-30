@@ -394,6 +394,42 @@ def _stage_2(target_date: str, routine_id: str) -> dict[str, Any]:
     return tool_plan_next_session({"target_date": target_date, "routine_id": routine_id})
 
 
+def _note_lint(target_date: str, routine_id: str) -> dict[str, Any]:
+    """#5428 (2026-10-30 live proof): the predraft never compiled a body, so `check_compiled` never ran on it and "no
+    `hevy note lint` problem line" was true by construction. After stage 2 the drafted routine is compiled the way the
+    commit path compiles it (`to_update_body` when it is already linked to Hevy, else `to_create_body`) — compile only:
+    the template resolver is offline (the movement key stands in for the id, which the linter never reads), so no Hevy
+    call and no template-cache write. The compiler's own hook (`check_compiled`) logs the verdict: its WARNING line on a
+    problem, one `hevy note lint (…): clean (…)` line when clean. The verdict rides on the result and in
+    NIGHTLY_PREDRAFT_SUMMARY. Never raises: a failure is named, never the outcome."""
+    try:
+        from training import hevy_compiler, hevy_note_lint
+
+        from mcp.tools_hevy_routine import _resolve_title_inputs
+
+        ir = next((r for r in _routines_for(target_date) if r.routine_id == routine_id), None)
+        if ir is None:
+            return {"state": "not_run", "reason": "the drafted routine is not readable back"}
+        if hevy_note_lint.lint_mode() == "off":
+            return {"state": "off"}
+        try:
+            title_ctx, why = _resolve_title_inputs(ir)
+        except Exception:  # noqa: BLE001 — the title is cosmetic to the lint; the WHY line falls back to none
+            title_ctx, why = None, ""
+        compile_body = hevy_compiler.to_update_body if getattr(ir, "hevy_routine_id", None) else hevy_compiler.to_create_body
+        body = compile_body(ir, lambda key: key[len("tmpl:") :] if key.startswith("tmpl:") else key, title_context=title_ctx, why_note=why)
+        res = hevy_note_lint.lint_wire(body, ir)  # the compiler's hook already logged this verdict; this is its record
+        return {
+            "state": "clean" if res.ok else "problems",
+            "problems": len(res.problems),
+            "rules": sorted(res.rules()),
+            "lines": res.lines()[:12],
+            "not_checked": len(res.not_checked),
+        }
+    except Exception as e:  # noqa: BLE001 — a lint failure never changes the pre-draft's outcome
+        return {"state": "not_run", "error": f"{type(e).__name__}: {e}"[:200]}
+
+
 def _critics_summary(rec: dict[str, Any]) -> dict[str, Any]:
     return {
         "model_ran": rec.get("model_ran"),
@@ -656,6 +692,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         routine_id=routine_id,
         routine_version=rec.get("routine_version"),
         critics=_critics_summary(rec),
+        note_lint=_note_lint(target, routine_id),  # #5428: the drafted body, compiled and linted (compile only)
         committed=False,
         coach_context=coach_context_brief(target),  # #5071: the charter version + May frame the evening chat explains it in
     )

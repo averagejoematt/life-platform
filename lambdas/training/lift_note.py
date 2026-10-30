@@ -33,10 +33,13 @@ from training import hevy_note_grammar, movement_cues
 from training.rep_scheme import LB_IN_KG, implement_step_lb
 from training.session_cues import effort_line, exposure_cue
 
-STALE_AFTER_DAYS = 28
-"""A PREVIOUS older than this is not a load to quote (the review's 'Last: 36.5kg … (19 Sep)' five weeks on, and a 2022
-chest-fly anchor at another bodyweight); the note becomes the pick-load form. 28 days is the module's detraining line
-(`load_ramp.DETRAINING_ANCHOR_AGE_DAYS`): past it, the engine's own anchor is discounted as detrained."""
+STALE_AFTER_DAYS = 180
+"""A PREVIOUS older than this is not a load to quote (a 2022 chest-fly anchor at another bodyweight); the note becomes
+the pick-load form. HEVY_NOTE_STANDARD §3.3: "the newest one is over 180 days old". It was 28 (the detraining line,
+`load_ramp.DETRAINING_ANCHOR_AGE_DAYS`) until the 2026-10-30 re-grade: a lift with a fresh PREVIOUS 33–131 days old read
+"find the load" beside a row that carried his own logged load. The detraining discount stays the engine's, in the load.
+§3.3's second test, a bodyweight more than 20 lb away, needs the weigh-in at PREVIOUS's date, which
+`exercise_history.previous_load` does not carry (§10.2 is still open on it)."""
 
 PICK_LOAD_W_REPS = hevy_note_grammar.PICK_LOAD_W_REPS
 PICK_LOAD_LINE = hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS)
@@ -279,6 +282,35 @@ def _feeler_fits(block: Any, entry: dict[str, Any], chat: bool) -> bool:
     return True
 
 
+def no_jumps_line(caps: dict[str, Any]) -> str:
+    """A capped exposure's reason (standard §3.2, R3 "opts out by name"): exposure 1 names the gap,
+    `No jumps: first time in 19 weeks.`; exposures 2–3 `No jumps today: session 2 back after a break.`"""
+    n = int(caps.get("exposure") or 1)
+    gap = hevy_note_grammar.gap_text(caps.get("gap_days"))
+    if n == 1:
+        return f"{hevy_note_grammar.NO_JUMPS}: first time in {gap}." if gap else f"{hevy_note_grammar.NO_JUMPS}: first time on it."
+    return f"{hevy_note_grammar.NO_JUMPS} today: session {n} back after a break."
+
+
+def _ex1_room() -> int:
+    """Phone lines exercise 1's own note may take under the session block (standard §7: exercise 1 total ≤ 11, the
+    block, then a blank line), measured on the longest ‹Day› the block can carry."""
+    from training import session_block
+
+    longest = max(hevy_note_grammar.SESSION_DAYS, key=len)
+    block = session_block.render(longest, session_block.compounds_band(), session_block.step_lb())
+    return min(hevy_note_grammar.LIFT_MAX_LINES, hevy_note_grammar.EX1_MAX_LINES - 1 - hevy_note_grammar.phone_lines(block))
+
+
+def _cue_for(family: str | None, entry: dict[str, Any], lines: list[str], room: int) -> str:
+    """The family cue, with the #5049 prep clause when the note still fits its budget with it (R8: one prep cue per
+    compound family, "if overkill skip"); a reason line no longer drops the prep by itself."""
+    with_prep = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=True)
+    if hevy_note_grammar.phone_lines("\n".join(lines + [with_prep])) <= room:
+        return with_prep
+    return movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=False)
+
+
 def compose_blocks(
     blocks: list[Any],
     catalog_movements: dict[str, Any],
@@ -294,9 +326,14 @@ def compose_blocks(
     note, the reason kind and its line, whether the pick-load form fired, and the replaced text as `detail`).
 
     `rotations` (`variant_rotation.swaps`: served key -> the title it replaces) gives a rotated accessory its ONE reason
-    line, `New: replaces …` (#5083). It outranks a PREVIOUS delta reason (the swap is why the row is new) but
-    never a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line is the instruction
-    for the feeler W row, not a second reason.
+    line, `New: replaces …` (#5083) — only when the movement is genuinely new to him: no PREVIOUS inside
+    `STALE_AFTER_DAYS` (the 2026-10-30 re-grade: a hammer curl and a face pull he had logged weeks before read "New").
+    A rotation onto a lift he has done recently keeps its computed reason; the swap stays on the record (`rotation_of`).
+    The line never outranks a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line
+    is the instruction for the feeler W row, not a second reason.
+
+    A capped exposure (OD1, the ramp's `exposure_caps`) reads `RPE 7` and opts out of the load rule by name
+    (`no_jumps_line`); a critic's layoff set cap gets the same treatment downstream (`session_block.add_capped_reason`).
 
     `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own sentences that already read as
     the standard (`authored_lines`) — `effort` replaces line 1, `line` takes the cue slot (a chat-era technique cue counts
@@ -308,7 +345,7 @@ def compose_blocks(
     previous_loads: dict[str, Any] = {}
     notes: dict[str, Any] = {}
     seen_families: set[str] = set()
-    for block in blocks or []:
+    for index, block in enumerate(blocks or []):
         if _skip(block):
             continue
         key = str(block.movement_key)
@@ -328,39 +365,39 @@ def compose_blocks(
         own = (authored or {}).get(key) or {}
         row = movements.get(key) or {}
         caps = (row.get("ramp") or {}).get("exposure_caps")
+        stale = is_stale(previous, target_date)
         line1 = own.get("effort") or exposure_cue(intensity, [{}] * max(1, len(_working(block.sets))))
         line2, pick, reason_kind = "", False, None
         if caps:
             # OD1: a capped exposure after a long gap opts out of the session's load rule, by name
             line1 = effort_line(caps.get("rpe_max"))
-            line2, reason_kind = f"No jumps today: session {int(caps.get('exposure') or 1)} back after a break.", "no_jumps"
-        elif is_stale(previous, target_date):
+            line2, reason_kind = no_jumps_line(caps), "no_jumps"
+        elif stale:
             pick = _feeler_fits(block, entry, authored is not None) and _add_feeler(block)
-            line2, reason_kind = (PICK_LOAD_LINE, "pick_load") if pick else ("", None)
+            reason_kind = "pick_load" if pick else None
         else:
             line2 = _engine_reason(block, entry, row, previous, (history_index or {}).get(tid) if tid else None, intensity)
             reason_kind = line2.split(":")[0] if line2 else None
-        lead = ""  # the swap's reason line, ahead of a pick-load line
         swapped = (rotations or {}).get(key)
-        if reason_kind != "no_jumps" and swapped:
-            lead = rotation_line(swapped)
-            if reason_kind != "pick_load":
-                line2 = ""  # one reason: the swap replaces the computed one
+        lead = rotation_line(swapped) if swapped and stale and reason_kind != "no_jumps" else ""
+        if lead:
             reason_kind = "rotation"
-        reason_text = lead or (line2 if line2 and line2 != PICK_LOAD_LINE else "")
+        body = [x for x in (line1, lead, line2, PICK_LOAD_LINE if pick else "") if x]
         cue = own.get("line") or ""
         if family and family not in seen_families:
-            cue = cue or movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=not (line2 or lead))
+            cue = cue or _cue_for(family, entry, body, _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES)
             seen_families.add(family)
-        block.notes = "\n".join(x for x in (line1, lead, line2, cue) if x)
+        block.notes = "\n".join(body + ([cue] if cue else []))
         notes[key] = {
             "note": block.notes,
             "reason": reason_kind,
-            "reason_line": reason_text or None,
+            "reason_line": (lead or line2) or None,
             "authored_line": own.get("line"),
             "pick_load": pick,
             "detail": detail,
         }
+        if swapped and not lead:
+            notes[key]["rotation_of"] = swapped  # #5428: a swap onto a lift he did recently is not "New" on the wire
     return {"previous_loads": previous_loads, "lift_notes": notes}
 
 

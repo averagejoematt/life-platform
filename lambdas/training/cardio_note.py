@@ -10,7 +10,7 @@ four-voice review graded the generated cardio notes D; `HEVY_NOTE_STANDARD.md` �
 THE NOTE (≤ 4 lines; `HEVY_NOTE_STANDARD.md` §3.7)
 
     line 1   <Machine> · <levels> · [hard ]RPE <a[–b]> (<talk words>)                  always (`LINE1_RE`)
-    line 2   ⌚ ride clock: <rule>                                                       tempo / hills / intervals
+    line 2   ⌚ ride clock: <rule>   (`⌚ walk clock:` on the treadmill)                  tempo / hills / intervals
     line 3   <one why>                                                                   optional, a route choice only
     line 4   After: end watch cardio, restart Hevy.                                       when a Hevy block follows
 
@@ -45,7 +45,8 @@ from typing import Any
 
 from training import hevy_note_grammar, wrist_clock
 
-CARDIO_NOTE_VERSION = "cardio-note@4.0.0"  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
+CARDIO_NOTE_VERSION = "cardio-note@4.1.0"  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
+# 4.1.0 = the 2026-10-30 re-grade: ≤ 3 levels on a bike hill, the talk words' band on line 1, `walk clock` on a treadmill
 
 # movement_key -> the machine as line 1 names it. `cycling` is the program's knee-sparing recumbent
 # (`recent_aerobic.cardio_pick`: "cycling (recumbent)").
@@ -66,8 +67,12 @@ WALKS = ("treadmill",)
 INTERVAL_LEVEL_STEP = 1
 INTERVAL_EASY_STEP = 1
 INTERVAL_ESCAPE_STEP = 2
-# PLATFORM-CHOSEN (#5374): a hill climbs this many steps of `HILL_LEVEL_STEP` levels (a treadmill: 1% each) and back down.
-HILL_CLIMB_STEPS = 4
+# PLATFORM-CHOSEN (#5374): a hill climbs this many steps of `HILL_LEVEL_STEP` levels and back down. #5428 re-grade
+# (2026-10-30): standard §3.7 caps a clock rule at 3 levels (`hevy_note_grammar.CLOCK_MAX_LEVELS`), so a bike hill is
+# steady + 2 — four steps were L11 → L15, five levels. A treadmill hill climbs GRADES, not levels (1% a step, the
+# standard's own `6% → 10%` example), so it keeps four.
+HILL_CLIMB_STEPS = hevy_note_grammar.CLOCK_MAX_LEVELS - 1
+HILL_WALK_CLIMB_STEPS = 4
 HILL_LEVEL_STEP = 1
 # PLATFORM-CHOSEN (#5428, the corpus's tempo ride): the tempo talk-test check-ins, at min 5 and then every 10, none in
 # the last 10 minutes.
@@ -83,6 +88,7 @@ LABELS = {
     "interval_easy_step": "platform-chosen",
     "interval_escape_step": "platform-chosen",
     "hill_climb_steps": "platform-chosen",
+    "hill_walk_climb_steps": "platform-chosen",
     "hill_level_step": "platform-chosen",
     "tempo_first_check_min": "platform-chosen",
     "tempo_check_every_min": "platform-chosen",
@@ -92,6 +98,7 @@ LABELS = {
 # the fixed talk-test words per effort (standard §3.7): full sentences = RPE 4–5, short phrases = 6–7, a few words = 8
 TALK_WORDS = tuple(hevy_note_grammar.TALK_WORDS)  # Lane D's grammar: the linter reads the same words
 CLOCK_PREFIX = hevy_note_grammar.CLOCK_PREFIX
+CLOCK_PREFIXES = hevy_note_grammar.CLOCK_PREFIXES  # `walk clock` on the treadmill (`hevy_note_grammar.clock_prefix_for`)
 AFTER_LINE = hevy_note_grammar.AFTER_LINE
 CARDIO_KINDS_SHAPE = {"easy": "flat", "tempo": "flat", "intervals": "intervals", "hills": "hill", "incline_treadmill_walk": "walk"}
 KIND_SHAPE = CARDIO_KINDS_SHAPE
@@ -132,8 +139,8 @@ def _first_line(note: str | None) -> str:
 
 def _clock_line(note: str | None) -> str | None:
     for ln in (note or "").strip().split("\n")[1:]:
-        if ln.startswith(CLOCK_PREFIX):
-            return ln[len(CLOCK_PREFIX) :]  # noqa: E203
+        if ln.startswith(CLOCK_PREFIXES):
+            return ln.split(": ", 1)[1]
     return None
 
 
@@ -427,23 +434,25 @@ def _fmt(v: float) -> str:
 
 
 def talk_words(kind: str) -> str:
-    """The fixed talk-test words for a kind's effort (`TALK_WORDS`), read from the menu's own talk test; failing that,
-    from its RPE band (4–5 full sentences, 6–7 short phrases, 8 a few words)."""
+    """The fixed talk-test words for a kind's effort (`TALK_WORDS`): `cardio_menu.talk_word` — the menu's own talk
+    test, failing that its RPE band by the standard's table (4–5 full sentences, 6–7 short phrases, 8 a few words)."""
     from training import cardio_menu
 
-    text = str(cardio_menu.block(kind).get("talk_test") or "").lower()
-    for w in TALK_WORDS:
-        if w in text:
-            return w
-    band = cardio_menu.rpe_band(kind) or (4, 5)
-    return TALK_WORDS[0] if band[1] <= 5 else (TALK_WORDS[1] if band[1] <= 7 else TALK_WORDS[2])
+    return cardio_menu.talk_word(kind)
+
+
+def wire_band(kind: str) -> tuple[int, int]:
+    """The RPE band line 1 prints (`cardio_menu.wire_band`: the menu's band clipped to its talk words' row), so the words
+    and the number agree — the 2026-10-30 re-grade read "RPE 5–7 (short phrases)" on a hill, where RPE 5 is full
+    sentences."""
+    from training import cardio_menu
+
+    return cardio_menu.wire_band(kind) or (4, 5)
 
 
 def effort_text(kind: str) -> str:
     """Line 1's effort: `RPE a–b (talk words)`; intervals `hard RPE n (a few words)`."""
-    from training import cardio_menu
-
-    band = cardio_menu.rpe_band(kind) or (4, 5)
+    band = wire_band(kind)
     rpe = f"RPE {band[0]}" if band[0] == band[1] else f"RPE {band[0]}–{band[1]}"
     return f"{'hard ' if kind == 'intervals' else ''}{rpe} ({talk_words(kind)})"
 
@@ -506,14 +515,15 @@ def clock_shape(kind: str, minutes: int, dose: dict[str, Any], *, walk: bool) ->
         if walk:
             walk_block = cardio_menu.block("incline_treadmill_walk")
             step = wrist_clock.num(f"{float((walk_block.get('step') or {}).get('incline_pct') or 1):g}")
-        clauses = wrist_clock.hill(base, step, HILL_CLIMB_STEPS, every, total)
+        clauses = wrist_clock.hill(base, step, HILL_WALK_CLIMB_STEPS if walk else HILL_CLIMB_STEPS, every, total)
         if len(clauses) < 3:
             return clauses, unit, None
         warm, top, down = clauses[0]["end"], clauses[1]["end"], clauses[2]["end"]
         start_txt = f"{_fmt(float(base))}%" if walk and not isinstance(base, str) else (_lv(base) if not walk else "your level")
         up = f"+{_fmt(float(step))}%" if walk else "up a level"
         line = f"{start_txt} to min {warm} · {up} every {every} min to min {top} · down the same to min {down}"
-        if down < total and len(CLOCK_PREFIX) + len(line) + len(f" · {start_txt} to the end") <= CLOCK_LINE_MAX:
+        prefix = hevy_note_grammar.WALK_CLOCK_PREFIX if walk else CLOCK_PREFIX
+        if down < total and len(prefix) + len(line) + len(f" · {start_txt} to the end") <= CLOCK_LINE_MAX:
             line += f" · {start_txt} to the end"  # left implicit only when it would break the phone budget
         return clauses, unit, line
     if kind == "intervals" and not walk:
@@ -644,7 +654,7 @@ def route_why_of(note: str | None) -> str | None:
     lines = (note or "").strip().split("\n")
     for ln in lines[1:] if is_composed(note) else lines:
         ln = ln.strip()
-        if not ln or ln.startswith(CLOCK_PREFIX) or ln == AFTER_LINE or len(ln) > ROUTE_WHY_MAX:
+        if not ln or ln.startswith(CLOCK_PREFIXES) or ln == AFTER_LINE or len(ln) > ROUTE_WHY_MAX:
             continue
         if _ROUTE_WHY_RE.match(ln) and _ROUTE_WORD.search(ln.split(":", 1)[0] + " " + ln.split(":", 1)[1]):
             return ln
@@ -727,7 +737,7 @@ def compose(
     first = f"{machine} · {levels_text(kind, dose, walk=is_walk, usual=usual, top=top)} · {effort_text(kind)}"
     lines = [first]
     if clock_line:
-        lines.append(CLOCK_PREFIX + clock_line)
+        lines.append(hevy_note_grammar.clock_line(clock_line, machine))
     why_wire = (route_why or "").strip()
     if why_wire and len(why_wire) <= ROUTE_WHY_MAX:
         lines.append(why_wire)
@@ -757,6 +767,7 @@ def compose(
         "level_basis": dose.get("basis") if is_walk else _base_level(facts)[1],
         "verdict": _verdict_word(verdict, dose, is_walk),
         "rpe": list(cardio_menu.rpe_band(kind) or ()),
+        "rpe_on_wire": list(wire_band(kind)),  # #5428: the menu band clipped to its talk words' row
         "minutes": int(minutes),
         "followed": bool(followed),
         # #5374: the clock as he runs it from his wrist, and its structure (adherence grades against it)
