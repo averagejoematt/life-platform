@@ -239,10 +239,11 @@
   },
   "qa-smoke-warnings": {
     "added": "2026-10-28",
-    "cause_observed": "2026-10-27",
-    "updated": "2026-10-28",
-    "citation": "Dated, self-clearing: this episode began 2026-10-27 16:29Z on `CAUSE warn 77a4192d og:coach-cards` (16:28Z and 18:32Z runs) — the coach cards had never been written (#5434's portrait-bundle parse). The 19:30Z og sweep wrote all 10 cards (19:33Z), and every run since reads `CAUSE warn none -` (04:04Z, 04:43Z, 05:34Z 10-28). The daily-period WarnCount alarm (86400 s, Maximum) holds the 10-27 datapoint; it clears at the first daily evaluation with no alarmed warning, expected by ~2026-10-28T16:30Z. If still red after 2026-10-29, re-cite against the live CAUSE line. #5434 closes with that clear and the 10-28 18:30Z qa-smoke read.",
-    "note": "Re-cited by Session CK wrap 2026-10-28 (the 2026-10-25 entry predated this episode)."
+    "cause_observed": "2026-10-30",
+    "updated": "2026-10-30",
+    "cause": "og:coach-cards",
+    "citation": "#5421 — PR #5488. Since 2026-10-30T03:46Z every run warns `og:coach-cards` (all 10 cards \"older than 30h\"). The origin cards are fresh (S3 LastModified 2026-10-29T19:30:58Z) but the edge serves the 10-28 copy (`X-Cache: Hit`, Age ~78k s, max-age 86400): og-image-generator fired its CloudFront invalidation inside the render step, BEFORE the sweep rewrote the coach cards, so the edge re-cached yesterday's card. #5488 invalidates once after every writer (path `/assets/images/og-*`, PNG + WebP). Clears after the first 19:30Z og run on the fix plus a daily WarnCount evaluation with no warning.",
+    "note": "Re-cited by the Session CM wrap 2026-10-30 (the 10-28 entry described the cured never-written episode and had no cause field)."
   },
   "field-notes-missing": {
     "added": "2026-10-25",
@@ -258,11 +259,10 @@
   },
   "qa-smoke-failures": {
     "added": "2026-10-27",
-    "cause_observed": "2026-10-29",
-    "updated": "2026-10-29",
-    "cause": "checkin_pair:day_row_liveness,data:hae_additive_integrity",
-    "citation": "#5440 — the one standing cause on every run since 2026-10-29 00:53Z (`[QA] CAUSE fail … data:hae_additive_integrity`): Apple Health field-days 10-21/10-22/10-26 sit below their delivered readings; the compare-and-swap is live, the `scripts/hae_additive_backfill_4628.py --apply` repair (10-21, 10-22, 10-26 only, never 10-25) is a parked owner act. The 07:11Z post-deploy run also failed `checkin_pair:day_row_liveness` on 10-28 — a QA timing false positive (#5211's dead-man judged yesterday five hours before scenario-explorer's 05:10 PT writer); the fix (yesterday due from 06:00 PT) is PR #5477. The protein-floor false positive is fixed and its issue closed; RAW:macrofactor no longer appears on the line.",
-    "note": "Re-cited by Session CK wrap 2026-10-28 (the prior entry pointed at closed #5455 and missed the coach_vs_engine leg)."
+    "cause_observed": "2026-10-30",
+    "updated": "2026-10-30",
+    "citation": "Dated, self-clearing: the live runs since 2026-10-30T03:46Z read `[QA] CAUSE fail none -`. The daily-period FailCount alarm (86400 s, Maximum) holds the 2026-10-29 UTC bucket, whose runs failed `data:hae_additive_integrity` until 18:32Z; it clears at the first daily evaluation with no failure, expected by ~2026-10-31T00:30Z. The cause did NOT get repaired, it aged out: `hae_additive_integrity_qa.WINDOW_DAYS = 3` stopped replaying 10-26 on 10-30. The damaged Apple Health field-days 10-21/10-22/10-26 stay owned by #5440 (owner act: `scripts/hae_additive_backfill_4628.py --apply`, never 10-25). The checkin_pair timing false positive was fixed on 10-29 (deployed, due-hour 06:00 PT). If still red after 2026-10-31T06:00Z, re-derive from the live CAUSE line.",
+    "note": "Re-cited by the Session CM wrap 2026-10-30 (the 10-29 entry named two causes the live run no longer shows)."
   },
   "ingest-reconciliation-whoop": {
     "added": "2026-10-26",
