@@ -54,14 +54,17 @@ import io
 import json
 import logging
 import os
+import re
 import time
 import urllib.parse
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from functools import partial
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from botocore.config import Config
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC)
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
@@ -160,13 +163,14 @@ def _is_bot(ua: str) -> bool:
     return any(b in u for b in _BOT_RE)
 
 
+_NON_PAGE_PREFIXES = ("/assets/", "/api/", "/legacy/")
+
+
 def _is_page(uri: str) -> bool:
+    # #5433: tuple startswith/endswith — the same tests as the old per-item any(),
+    # one C call each instead of a generator over 19 suffixes on every log line.
     u = uri.lower()
-    if u.startswith("/assets/") or u.startswith("/api/") or u.startswith("/legacy/"):
-        return False
-    if any(u.endswith(ext) for ext in _NON_PAGE):
-        return False
-    return True
+    return not (u.startswith(_NON_PAGE_PREFIXES) or u.endswith(_NON_PAGE))
 
 
 def _ref_domain(ref: str) -> str:
@@ -243,44 +247,78 @@ def _has_utm_source(query: str) -> bool:
         return False
 
 
+# ── CloudFront log columns (#5433) ───────────────────────────────────────────
+# Both parsers below used to build `dict(zip(fields, parts))` and percent-decode
+# the URI, User-Agent and Referer of EVERY line before filtering. At the 256 MB
+# Lambda's CPU share that was ~12 s per pass over a week's ~120k lines (two
+# passes), almost all of it in `urllib.parse.unquote` on User-Agents, while only
+# ~15 % of lines survive the cheap method/status/path filters. The parsers now
+# read columns by index and decode a field only once the line has survived
+# every filter that does not need it. The filters are a conjunction of pure
+# predicates, so the order is free: the output is identical
+# (tests/test_traffic_digest_read_concurrency_5433.py pins that against the
+# pre-#5433 parser).
+
+
+def _cf_columns(fields_line: str):
+    """`#Fields:` header -> (column count, {role: index or None}).
+
+    `{name: i for ...}` keeps the LAST of any duplicated name, as `dict(zip())` did;
+    the UA/Referer fallbacks mirror the old `row.get(a, row.get(b, ""))`."""
+    names = fields_line.split(":", 1)[1].strip().split()
+    idx = {n: i for i, n in enumerate(names)}
+    return len(names), {
+        "date": idx.get("date"),
+        "ip": idx.get("c-ip"),
+        "method": idx.get("cs-method"),
+        "status": idx.get("sc-status"),
+        "stem": idx.get("cs-uri-stem"),
+        "query": idx.get("cs-uri-query"),
+        "ua": idx.get("cs(User-Agent)", idx.get("cs-user-agent")),
+        "ref": idx.get("cs(Referer)", idx.get("cs-referer")),
+    }
+
+
+def _cell(parts, i) -> str:
+    return "" if i is None else parts[i]
+
+
 def parse_cf_log(text: str):
     """Parse one CloudFront standard log file's text → list of page-request dicts.
     Pure function (no I/O) so it's unit-testable. Header lines (#Version/#Fields)
     define the column order; we key by field name to survive format changes."""
+    unquote = urllib.parse.unquote
     out = []
-    fields = None
+    width, col = 0, {}  # col is read only once a #Fields: header set width
     for line in text.splitlines():
         if line.startswith("#Fields:"):
-            fields = line.split(":", 1)[1].strip().split()
+            width, col = _cf_columns(line)
             continue
         if line.startswith("#") or not line.strip():
             continue
-        if not fields:
+        if not width:
             continue
         parts = line.split("\t")
-        if len(parts) < len(fields):
+        if len(parts) < width:
             continue
-        row = dict(zip(fields, parts))
-        method = row.get("cs-method", "")
-        status = row.get("sc-status", "")
-        uri = urllib.parse.unquote(row.get("cs-uri-stem", ""))
-        ua = urllib.parse.unquote(row.get("cs(User-Agent)", row.get("cs-user-agent", "")))
-        ref = urllib.parse.unquote(row.get("cs(Referer)", row.get("cs-referer", "")))
-        ip = row.get("c-ip", "")
-        date = row.get("date", "")
-        if method != "GET" or status not in ("200", "304"):
+        if _cell(parts, col["method"]) != "GET" or _cell(parts, col["status"]) not in ("200", "304"):
             continue
-        if not _is_page(uri) or _is_bot(ua):
+        uri = unquote(_cell(parts, col["stem"]))
+        if not _is_page(uri):
             continue
+        ua = unquote(_cell(parts, col["ua"]))
+        if _is_bot(ua):
+            continue
+        ref = unquote(_cell(parts, col["ref"]))
         # #3376: only the utm_source BOOLEAN survives parsing — the query string
         # itself (visitor-controlled input) is discarded here, like raw IPs.
         out.append(
             {
-                "date": date,
+                "date": _cell(parts, col["date"]),
                 "uri": uri,
                 "ref": ref,
-                "vkey": _ipkey(ip, ua),
-                "utm": _has_utm_source(row.get("cs-uri-query", "")),
+                "vkey": _ipkey(_cell(parts, col["ip"]), ua),
+                "utm": _has_utm_source(_cell(parts, col["query"])),
             }
         )
     return out
@@ -301,33 +339,38 @@ _SUBSCRIBE_PAGE = "/subscribe/"
 def parse_subscribe_attempts(text: str) -> dict:
     """One CF log file's text -> {page_views, attempts, successes} for the
     subscribe funnel's attempt stage. Pure function, mirrors `parse_cf_log`'s
-    header-driven column parsing so it survives the same format changes."""
+    header-driven column parsing so it survives the same format changes.
+
+    #5433: the bot test (a User-Agent decode) runs only on the few lines that are
+    already a /subscribe/ view or a POST /api/subscribe — the same conjunction."""
+    unquote = urllib.parse.unquote
     page_views = attempts = successes = 0
-    fields = None
+    width, col = 0, {}  # col is read only once a #Fields: header set width
     for line in text.splitlines():
         if line.startswith("#Fields:"):
-            fields = line.split(":", 1)[1].strip().split()
+            width, col = _cf_columns(line)
             continue
         if line.startswith("#") or not line.strip():
             continue
-        if not fields:
+        if not width:
             continue
         parts = line.split("\t")
-        if len(parts) < len(fields):
+        if len(parts) < width:
             continue
-        row = dict(zip(fields, parts))
-        method = row.get("cs-method", "")
-        status = row.get("sc-status", "")
-        uri = urllib.parse.unquote(row.get("cs-uri-stem", ""))
-        ua = urllib.parse.unquote(row.get("cs(User-Agent)", row.get("cs-user-agent", "")))
-        if _is_bot(ua):
-            continue
-        if method == "GET" and status in ("200", "304") and _norm_page(uri) == _SUBSCRIBE_PAGE:
-            page_views += 1
-        elif method == "POST" and uri == "/api/subscribe":
-            attempts += 1
-            if status.startswith("2"):
-                successes += 1
+        method = _cell(parts, col["method"])
+        status = _cell(parts, col["status"])
+        if method == "GET":
+            if status not in ("200", "304") or _norm_page(unquote(_cell(parts, col["stem"]))) != _SUBSCRIBE_PAGE:
+                continue
+            if not _is_bot(unquote(_cell(parts, col["ua"]))):
+                page_views += 1
+        elif method == "POST":
+            if unquote(_cell(parts, col["stem"])) != "/api/subscribe":
+                continue
+            if not _is_bot(unquote(_cell(parts, col["ua"]))):
+                attempts += 1
+                if status.startswith("2"):
+                    successes += 1
     return {"page_views": page_views, "attempts": attempts, "successes": successes}
 
 
@@ -922,10 +965,35 @@ def ops_subject_suffix(recon_artifact, pip_artifact):
 # #5433: the log read used to be ONE serial GetObject per CloudFront log file
 # (~1,570 files / ~9 MB a week at ~73 ms each = ~115 s of the 120 s timeout; the
 # first attempt timed out on 10-19 and 10-26 and only the async retry finished).
-# The reads are independent network waits, so they fan out. 10 == botocore's
-# default max_pool_connections, so no client Config is needed and no "connection
-# pool is full" discards; boto3 clients are thread-safe per client.
-LOAD_LOG_WORKERS = 10
+# A 10-wide fan-out (botocore's default pool) only got the load to 62.8 s in the
+# Lambda (10-30 dry run) — not the ~11 s a latency model predicts — because at
+# 256 MB the function holds ~1/7 of a vCPU and every GetObject is ~1-2 ms of
+# botocore CPU on a laptop core (endpoint-ruleset resolution, signing, parsing),
+# ~19x that here. So the load is CPU-bound, and the fix is mostly LESS WORK:
+#   * the listing skips the ~90 days of expired-soon logs it used to page through
+#     (`_list_window_keys`, ~20 pages of XML -> ~3), and
+#   * the two parse passes stop decoding every line (`_cf_columns` above).
+# The fan-out is still widened, with the client's pool sized to match, so the
+# reads stop queueing on 10 sockets whenever CPU is not the bound (the laptop
+# read of the same week: 8.4 s at 10 wide, 2.6 s at 32). The pool and the worker
+# count come from ONE constant, so they cannot drift into "connection pool is
+# full" discards. Memory stays bounded: a worker holds one gzipped object
+# (~6 KB) only while it decompresses it.
+LOAD_LOG_WORKERS = 32
+
+# CloudFront standard logs are named `<prefix><DISTRIBUTION-ID>.<YYYY-MM-DD-HH>.<id>.gz`
+# with the hour the requests were SERVED, and are delivered after it (AWS: usually
+# within the hour, occasionally up to 24 h late). So under a distribution's prefix
+# every object modified inside the window has a key at or after the window start
+# minus the delivery delay, and S3's StartAfter can skip everything older. The
+# slack is 3x the documented worst case; the LastModified filter still decides.
+LOG_DELIVERY_SLACK_DAYS = 3
+_DISTRIBUTION_PREFIX_RE = re.compile(r"[A-Z0-9]+\.")
+
+
+def _log_s3_client():
+    """The S3 client for the log reads — its connection pool matches LOAD_LOG_WORKERS."""
+    return boto3.client("s3", region_name=REGION, config=Config(max_pool_connections=LOAD_LOG_WORKERS))
 
 
 def _read_log_object(s3, key):
@@ -938,6 +1006,37 @@ def _read_log_object(s3, key):
         return None
 
 
+def _list_window_keys(s3, start_dt):
+    """Keys under LOG_PREFIX whose LastModified is inside the window, in S3 listing order.
+
+    One delimited listing finds the distribution prefixes (`cf/E3S424OXQZ8NBE.`);
+    each is then listed from `StartAfter=<prefix><window start - slack>` instead of
+    from the bucket's first key. A prefix that is not distribution-shaped (or a
+    key with no '.' at all) is listed in full, exactly as before. Sorting the
+    union restores S3's order: S3 lists in UTF-8 byte order, which for str keys is
+    the code-point order `sorted` uses."""
+    paginator = s3.get_paginator("list_objects_v2")
+    keys = []
+
+    def take(page):
+        for obj in page.get("Contents", []):
+            if obj["LastModified"] >= start_dt:
+                keys.append(obj["Key"])
+
+    prefixes = []
+    for page in paginator.paginate(Bucket=LOG_BUCKET, Prefix=LOG_PREFIX, Delimiter="."):
+        take(page)
+        prefixes.extend(cp["Prefix"] for cp in page.get("CommonPrefixes", []))
+    after = (start_dt - timedelta(days=LOG_DELIVERY_SLACK_DAYS)).strftime("%Y-%m-%d")
+    for prefix in prefixes:
+        kwargs = {"Bucket": LOG_BUCKET, "Prefix": prefix}
+        if _DISTRIBUTION_PREFIX_RE.fullmatch(prefix[len(LOG_PREFIX) :]):
+            kwargs["StartAfter"] = prefix + after
+        for page in paginator.paginate(**kwargs):
+            take(page)
+    return sorted(keys)
+
+
 def _load_logs(s3, start_dt):
     """List + read CF log objects modified within the window.
 
@@ -948,15 +1047,9 @@ def _load_logs(s3, start_dt):
     The reads run LOAD_LOG_WORKERS-wide (#5433); `map` keeps listing order, and a
     GetObject failure still propagates (it raised in the serial loop too).
     """
-    keys = []
-    paginator = s3.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=LOG_BUCKET, Prefix=LOG_PREFIX):
-        for obj in page.get("Contents", []):
-            if obj["LastModified"] < start_dt:
-                continue
-            keys.append(obj["Key"])
+    keys = _list_window_keys(s3, start_dt)
     with ThreadPoolExecutor(max_workers=LOAD_LOG_WORKERS) as pool:
-        results = list(pool.map(lambda k: _read_log_object(s3, k), keys))
+        results = list(pool.map(partial(_read_log_object, s3), keys))
     return [t for t in results if t is not None], len(keys)
 
 
@@ -1022,7 +1115,7 @@ def lambda_handler(event, context):
             return {"statusCode": 200, "body": "no LOG_BUCKET"}
         now = datetime.now(timezone.utc)
         start_dt = now - timedelta(days=DAYS)
-        s3 = boto3.client("s3", region_name=REGION)
+        s3 = _log_s3_client()
         cw = boto3.client("cloudwatch", region_name=REGION)
 
         t0 = time.monotonic()
@@ -1055,12 +1148,14 @@ def lambda_handler(event, context):
         # after `_load_logs` returns them, merged into `funnel` so one HTML builder
         # renders the whole ladder. Fail-soft: an attempt-stage bug must not drop
         # the DDB-derived funnel section it's merged into.
+        t_attempts = time.monotonic()
         try:
             attempt_stage = aggregate_subscribe_attempts(texts)
             if isinstance(funnel, dict) and not funnel.get("error"):
                 funnel = {**funnel, **{f"subscribe_{k}_7d": v for k, v in attempt_stage.items()}}
         except Exception as e:
             logger.warning("subscribe attempt-stage aggregation failed (fail-soft, #3619): %s", e)
+        t_attempts = time.monotonic() - t_attempts
 
         # #2835: the folded ops-report sections — the reconciliation and
         # pip-audit reports now deliver as S3 artifacts this pack embeds
@@ -1102,9 +1197,10 @@ def lambda_handler(event, context):
             records.extend(parse_cf_log(text))
         agg = aggregate(records)
         logger.info(
-            "traffic digest timing (#5433): load_logs=%.1fs (%s files) parse_aggregate=%.1fs total_so_far=%.1fs",
+            "traffic digest timing (#5433): load_logs=%.1fs (%s files) subscribe_attempts=%.1fs parse_aggregate=%.1fs total_so_far=%.1fs",
             t_load,
             object_count,
+            t_attempts,
             time.monotonic() - t_parse,
             time.monotonic() - t0,
         )

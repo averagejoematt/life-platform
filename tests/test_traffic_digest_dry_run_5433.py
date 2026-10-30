@@ -36,7 +36,7 @@ class _FakeS3:
         assert name == "list_objects_v2"
         return self
 
-    def paginate(self, Bucket, Prefix):
+    def paginate(self, Bucket, Prefix, **_kw):  # #5433: Delimiter/StartAfter ignored, one flat page
         yield {"Contents": [{"Key": k, "LastModified": datetime.now(timezone.utc)} for k in self._keys]}
 
     def get_object(self, Bucket, Key):
@@ -71,7 +71,7 @@ class _FakeBoto3:
     def __init__(self, s3, cw, ses):
         self._clients = {"s3": s3, "cloudwatch": cw, "sesv2": ses}
 
-    def client(self, name, region_name=None):
+    def client(self, name, region_name=None, **_kw):  # #5433: the log client passes config=
         if name not in self._clients:
             raise RuntimeError(f"{name} not available in this fixture")  # ssm reads are fail-soft
         return self._clients[name]

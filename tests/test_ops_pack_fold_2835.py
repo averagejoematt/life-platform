@@ -250,7 +250,7 @@ class _PackS3:
     def get_paginator(self, name):
         return self
 
-    def paginate(self, Bucket, Prefix):
+    def paginate(self, Bucket, Prefix, **_kw):  # #5433: Delimiter/StartAfter ignored, one flat page
         yield {"Contents": [{"Key": "cf/log1.gz", "LastModified": datetime.now(timezone.utc)}]}
 
     def get_object(self, Bucket, Key):
@@ -279,7 +279,7 @@ class _Boto3:
     def __init__(self, clients):
         self._clients = clients
 
-    def client(self, name, region_name=None):
+    def client(self, name, region_name=None, **_kw):  # #5433: the log client passes config=
         return self._clients[name]
 
 
