@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.36.0",
+  "version": "1.37.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -245,6 +245,13 @@
       "date": "2026-10-27",
       "by": "issue #5122 (epic #5120), the owner's live on/off test of disruption mode on 2026-10-26 that put the plan into a step-back-up week for a mode that covered one day; no new owner ruling: min_days 3 is an owner-default named as one (ADR-105), pending his ruling",
       "what": "disruption.step_back_up.min_days 3 (#5122). A mode that covered fewer than min_days days, or that he ended the day it started, owes no step-back-up week (the plan returns to the full split the next morning); a mode that covered min_days or more is unchanged (step_back_up.days 7 of the minimum session, then the full split). The lapse template still has no step-back-up. Read by training.disruption.owes_step_back_up.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.37.0",
+      "date": "2026-10-30",
+      "by": "owner ruling 2026-10-30 (attended, Session CN): #5122 step_back_up.min_days 3 confirmed; #5428 the same-load-after-RPE-10 reason",
+      "what": "No value changes. disruption.step_back_up.min_days_basis drops 'pending his ruling' — 3 is now the owner's number, not a labelled default (ADR-105). The Hevy note standard §3.2 gains one in-step reason, `Same load: aim to leave one more rep.`, when PREVIOUS ran to RPE 10 at the prescribed load (lift_note._same_load_after_a_grind); a long layoff no critic capped keeps the band (owner declined a blanket cap).",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -943,7 +950,7 @@
     "step_back_up": {
       "days": 7,
       "min_days": 3,
-      "min_days_basis": "owner-default (ADR-105), pending his ruling (#5122): a mode that covered fewer days than this, or that was ended the day it started, owes no step-back-up week",
+      "min_days_basis": "owner ruling 2026-10-30 (#5122, confirmed the panel default of 3): a mode that covered fewer days than this, or that was ended the day it started, owes no step-back-up week",
       "serves": "the minimum session at the club",
       "then": "the full split"
     },

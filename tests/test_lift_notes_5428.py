@@ -206,6 +206,21 @@ def test_a_row_more_than_one_step_from_previous_carries_a_reason_and_one_within_
     assert row.notes.split("\n")[1] == "Heavier: 12 reps was RPE 7."
 
 
+def test_the_same_load_as_a_previous_that_ran_to_rpe_10_carries_the_one_more_rep_reason():
+    """Owner ruling 2026-10-30 (#5428): a bare same-load row after a grind reads as a copy of the grind, so the band's
+    lower effort is said out loud. Within one step but a different load, or a PREVIOUS under RPE 10, stays silent."""
+    blocks, floors = _upper_volume()
+    grind = dict(HISTORY, **{"T-ROW": [_sess("2026-10-21", 90, 12, 10)]})  # 90 vs 90 at RPE 10
+    lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=grind, target_date=TARGET)
+    row = next(b for b in blocks if b.movement_key == "one_arm_db_row")
+    assert row.notes == "RPE 8–9\nSame load: aim to leave one more rep.\nBreathe out on the pull."
+    assert lift_note.hevy_note_grammar.REASON_RE.match(row.notes.split("\n")[1])  # the linter reads it as a reason
+    for prev in (_sess("2026-10-21", 90, 12, 9), _sess("2026-10-21", 95, 12, 10), _sess("2026-10-21", 90, 12)):
+        blocks, floors = _upper_volume()
+        lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=dict(HISTORY, **{"T-ROW": [prev]}), target_date=TARGET)
+        assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nBreathe out on the pull."
+
+
 def test_one_cue_per_family_and_no_press_cue_on_a_squat_day():
     blocks = [
         ExerciseBlock(

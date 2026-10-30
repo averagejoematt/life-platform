@@ -101,6 +101,15 @@ def _heavier_why(previous: dict[str, Any] | None) -> str:
     return f"{int(previous['reps'])} reps was {_rpe_text(rpe)}" if rpe is not None else f"{int(previous['reps'])} reps last time"
 
 
+def _same_load_after_a_grind(row_lb: float | None, previous: dict[str, Any] | None, re_entry: bool) -> bool:
+    """The prescribed top load equals PREVIOUS and PREVIOUS ran to RPE 10 (#5428): the band asks for the same load at a
+    lower effort, so the note says so. A re-entry lift carries its layoff clause instead; a stack with no logged RPE is
+    not judged."""
+    if re_entry or row_lb is None or not previous or previous.get("lb") is None or previous.get("rpe") is None:
+        return False
+    return abs(float(row_lb) - float(previous["lb"])) < 1e-6 and float(previous["rpe"]) >= hevy_note_grammar.SAME_LOAD_FROM_RPE
+
+
 def _stall_why(prog: dict[str, Any], history: list[dict[str, Any]] | None) -> str:
     """'8s were RPE 8 three times' — the stall rule's run, in his words."""
     dates = set(prog.get("dates") or [])
@@ -130,13 +139,17 @@ def reason_line(
     re_entry: bool,
 ) -> str:
     """At most ONE reason (standard §3.2), or "": a scheme change (the stall rule's rep step), a heavier row the gain rule
-    earned, or any top row more than one step from PREVIOUS. A reason never repeats a number the rows already show."""
+    earned, any top row more than one step from PREVIOUS, or the same load as a PREVIOUS that ran to RPE 10 (#5428, owner
+    ruling 2026-10-30: without the reason, "same load" reads as a copy of the grind). A reason never repeats a number the
+    rows already show."""
     prog = prog or {}
     if prog.get("basis") == "step" and prog.get("step_kind") == "reps" and prog.get("next_reps") and rep_hi:
         return f"Now aiming {int(prog['next_reps'])}–{int(rep_hi)}: {_stall_why(prog, history)}."
     word = delta_word(row_lb, (previous or {}).get("lb"), step_lb)
     if prog.get("basis") == "step" and prog.get("changes"):
         word = word or "Heavier"
+    if word is None and _same_load_after_a_grind(row_lb, previous, re_entry):
+        return hevy_note_grammar.SAME_LOAD_LINE
     if word == "Heavier":
         return f"Heavier: {_heavier_why(previous)}."
     if word == "Lighter":

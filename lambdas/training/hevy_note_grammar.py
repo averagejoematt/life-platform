@@ -172,13 +172,17 @@ LIGHTER = "Lighter"
 VOLUME_DAY = "Volume day"
 NOW_AIMING = "Now aiming"
 NO_JUMPS = "No jumps"
+# #5428 (owner ruling 2026-10-30): the same load as a PREVIOUS that ran to RPE 10, prescribed inside the band, says why
+SAME_LOAD = "Same load"
+SAME_LOAD_LINE = f"{SAME_LOAD}: aim to leave one more rep."
+SAME_LOAD_FROM_RPE = 10.0
 # #5083/#5075: a rotated accessory's one reason — the exercise it stands in for, by its Hevy title
 ROTATION_HEAD = "New: replaces "
 # #5057 on the chat path: a stall-rule load step the author's rows did not take, named as a delta
 STEP_DUE_HEAD = "Step due: +"
 REASON_RE = re.compile(
     r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |No jumps(?: today)?: |Set \d over RPE \d+(?:\.5)? → |\d+ sets? today[:.]"
-    r"|New: replaces |Step due: \+"
+    r"|New: replaces |Step due: \+|Same load: "
     # a critic's applied load / rep change (`session_block.applied_clause`) is a reason too (standard §3.2's list, §3.8)
     r"|(?:Lighter|Heavier|Fewer reps) today[:.])"
 )
