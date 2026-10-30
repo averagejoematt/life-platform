@@ -108,18 +108,29 @@ def _write_clauses(
     composed cardio note instead; a drop leaves no exercise to write on. The exercises written are named on the
     record (`clauses`)."""
     from training import session_block
+    from training.hevy_note_grammar import NO_JUMPS
+    from training.layoff_tiers import EXPOSURE_CAPS
     from training.warmup_sets import working_set_count
 
     field = m.group(3) or "total_sets"
     if field in ("drop", "movement_key"):
         return
     prior = dict(before)
-    reason = session_block.change_reason(v)
     written: list[dict[str, Any]] = []
     for ex in getattr(ir, "exercises", None) or []:
         working = working_set_count(getattr(ex, "sets", None))
+        gap = session_block.layoff_gap(v, _previous_date(ir, ex), getattr(ir, "target_date", None))
+        reason = session_block.change_reason(v, gap)
         if field in ("set_count", "total_sets"):
             if working == working_before.get(id(ex)):
+                continue
+            if session_block.is_layoff(v) and session_block.layoff_capped(gap, getattr(ex, "notes", "")):
+                # #5428 re-grade: a layoff set cap gets the capped exposure's effort treatment (RPE 7, `No jumps`), the
+                # one `lift_note` gives a ramp-capped lift — never "last set RPE 9–10" under the +10 lb rule
+                existing = next((ln for ln in str(getattr(ex, "notes", "") or "").split("\n") if ln.startswith(NO_JUMPS)), None)
+                clause = session_block.capped_clause(working, gap, existing)
+                ex.notes = session_block.add_capped_reason(getattr(ex, "notes", "") or "", clause, EXPOSURE_CAPS["rpe_max"])
+                written.append({"movement_key": getattr(ex, "movement_key", None), "clause": clause, "effort_capped": True})
                 continue
             clause = session_block.applied_clause(field, working_sets=working, reason=reason)
         else:
@@ -140,6 +151,12 @@ def _write_clauses(
             written.append({"movement_key": getattr(ex, "movement_key", None), "clause": clause})
     if written:
         rec["clauses"] = written
+
+
+def _previous_date(ir: Any, ex: Any) -> Any:
+    """Hevy's PREVIOUS date for one exercise, off the draft's `inputs_snapshot["previous_loads"]` (None when absent)."""
+    prev = ((getattr(ir, "inputs_snapshot", None) or {}).get("previous_loads") or {}).get(str(getattr(ex, "movement_key", "") or ""))
+    return prev.get("date") if isinstance(prev, dict) else None
 
 
 def _expanded(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:

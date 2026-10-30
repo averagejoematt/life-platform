@@ -238,7 +238,9 @@ def test_a_shoulders_arms_day_on_fresh_legs_serves_the_incline_walk_with_its_dos
     minutes = cm.block_minutes("incline_treadmill_walk")
     lo_i = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.starting_dose.incline_pct")[0]
     lo_s = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.starting_dose.mph")[0]
-    lo, hi = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.rpe")
+    # #5428 re-grade: the charter's 4–6 clipped to its talk words' row (full sentences = RPE 4–5, standard §3.7)
+    lo, hi = cm.wire_band("incline_treadmill_walk")
+    assert (lo, hi) == (4, 5) and tuple(tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.rpe")) == (4, 6)
     # #5428: speed + grade (settings), no minutes on line 1; `today` only when his own logged walks differ
     line1 = block.notes.split("\n")[0]
     assert line1.removeprefix("Treadmill · ").removeprefix("today ") == f"{float(lo_s):.1f} mph, {lo_i:g}% · RPE {lo}–{hi} (full sentences)"

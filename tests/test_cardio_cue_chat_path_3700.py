@@ -243,7 +243,8 @@ def test_a_chat_drafted_treadmill_block_gets_its_OWN_shape_not_the_bikes():
     # #5076: the incline walk's dose — his steepest walk on record (6 % at 2.8 mph, 23 Jun) sits under the
     # menu's band, so the walk starts at the band's floor incline at that speed
     # #5428: speed and grade prescribed (settings), `today` because his own logged walks differ; no HR on the wire
-    assert tread.notes.split("\n")[0] == "Treadmill · today 2.8 mph, 8% · RPE 4–6 (full sentences)"
+    # #5428 re-grade: the walk's 4–6 band is clipped to its talk words' row (full sentences = RPE 4–5, standard §3.7)
+    assert tread.notes.split("\n")[0] == "Treadmill · today 2.8 mph, 8% · RPE 4–5 (full sentences)"
     assert "bpm" not in tread.notes and "HR" not in tread.notes
     assert cn.LINE1_RE.match(tread.notes.split("\n")[0])
     assert "level" not in tread.notes.lower()  # no level exists in his treadmill notes; none may be implied

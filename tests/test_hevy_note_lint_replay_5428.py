@@ -56,6 +56,9 @@ def _problems(wire: str) -> list[str]:
 
 FALSE_POSITIVE_WIRE = ("the W text says 8 reps, the W rows hold ['8.0']", "against PREVIOUS 225 lb with no reason line")
 COMPOSER_WIRE = ("lift note 5 phone lines > 4", "dumbbell load 44 lb is not on a 2.5 lb step")
+# the 2026-10-30 re-grade's cardio defects, which the linter now sees on the same stored ride (L3 talk words, L9 levels
+# counted through the ladder; tests/test_hevy_note_regrade_5428.py) — not on the 10-29 wire, which predates both checks
+REGRADE_CARDIO = ("Cycling: RPE 5–7 is not the talk table's row for 'short phrases'", "Cycling: 5 levels > 3")
 
 # ── the two stored drafts, as the compiler saw them (loads in kg off the stored IR; reps as floats, as stored) ────────
 
@@ -217,7 +220,8 @@ def test_the_stored_drafts_lint_to_exactly_the_wire_minus_the_false_positives(mo
     for wire, ir in ((WIRE_LOWER, _lower()), (WIRE_UPPER, _upper())):
         got = _lint(ir).lines()
         want = [p for p in _problems(wire) if any(c in p for c in COMPOSER_WIRE)]
-        assert got == want, (wire[:60], got)
+        assert [p for p in got if not p.endswith(REGRADE_CARDIO)] == want, (wire[:60], got)
+        assert [p.split(" ", 2)[2] for p in got if p.endswith(REGRADE_CARDIO)] == list(REGRADE_CARDIO), got
     assert len(_problems(WIRE_LOWER)) == 4 and len(_problems(WIRE_UPPER)) == 4
 
 
@@ -288,14 +292,18 @@ def test_a_no_jumps_line_and_an_earlier_critic_clause_keep_their_lines():
 
 def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_clean(monkeypatch):
     """End to end over the producers: `lift_note.compose_blocks` (rotation + stale history -> the pick-load form), then
-    the joints critic's applied set-count change (`critics_apply.apply_changes`), compiled and linted."""
+    the joints critic's applied set-count change (`critics_apply.apply_changes`), compiled and linted.
+
+    #5428 re-grade (2026-10-30): stale is now §3.3's 180 days, so the history sits 8 months back (the 10-29 draft's
+    06-20 session is fresh and is the re-grade test's case), and a set cap after more than 90 days takes the capped
+    treatment — `RPE 7` and one `No jumps` line in the reason slot (tests/test_hevy_note_regrade_5428.py)."""
     monkeypatch.setenv(lint.MODE_ENV, "off")
     ir = _lower()
     calf = ExerciseBlock(
         movement_key="seated_calf_raise", sets=[_n(90, 8, 15) for _ in range(4)], rationale_tag="accessory:seated_calf_raise:accessory"
     )
     ir.exercises[2] = calf
-    history = {"062AB91A": [{"date": "2026-06-20", "sets": [{"weight_kg": _kg(90), "reps": 15, "rpe": 9}] * 3}]}
+    history = {"062AB91A": [{"date": "2026-02-28", "sets": [{"weight_kg": _kg(90), "reps": 15, "rpe": 9}] * 3}]}
     lift_note.compose_blocks(
         [calf],
         CATALOG,
@@ -311,10 +319,13 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
         "field": "exercises[2].set_count",
         "to": 3,
         "metric": "days_since_last",
-        "value": 133,
+        "value": 243,
     }
     recs = critics_apply.apply_changes(ir, [verdict])
-    assert recs[0]["applied"] and recs[0]["clauses"][0]["clause"] == CLAUSE, recs
+    assert recs[0]["applied"] and recs[0]["clauses"][0]["clause"] == "No jumps: 3 sets today, 8 months off.", recs
+    assert ir.exercises[2].notes == (
+        "RPE 7\nNo jumps: 3 sets today, 8 months off.\nW set: up to 8 easy reps, find the load.\nFull stretch at the bottom; knees soft."
+    )
     res = _lint(ir)
     assert not [p for p in res.lines() if "[3]" in p], res.lines()
     assert g.phone_lines(ir.exercises[2].notes) == 4

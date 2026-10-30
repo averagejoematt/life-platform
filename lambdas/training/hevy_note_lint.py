@@ -246,6 +246,24 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
     _lint_previous(ex, lines, where, out)
 
 
+_LEVEL_SPAN = re.compile(r"\bL(\d+) → L(\d+)\b")
+_LEVEL_LADDER = re.compile(r"\bL(\d+) to min (\d+) · up (a level|(\d+) levels) every (\d+) min (?:from min \d+ )?to min (\d+)")
+
+
+def _levels(line1: str, clock: str) -> set[int]:
+    """Every level the ride uses (L9, standard §3.7 "≤ 3 levels"): the levels named, every level a line-1 span
+    `L11 → L15` passes through, and every rung of a clock ladder `L11 to min 6 · up a level every 2 min to min 14` — the
+    2026-10-30 re-grade's hill named two levels and climbed five, and the old check counted the two."""
+    levels = {int(x) for x in re.findall(r"\bL(\d+)", line1 + " " + clock)}
+    for a, b in _LEVEL_SPAN.findall(line1 + " " + clock):
+        levels |= set(range(min(int(a), int(b)), max(int(a), int(b)) + 1))
+    for base, start, _word, n, every, end in _LEVEL_LADDER.findall(clock):
+        step = int(n or 1)
+        rungs = max(0, (int(end) - int(start)) // max(1, int(every)))
+        levels |= {int(base) + step * i for i in range(rungs + 1)}
+    return levels
+
+
 _CLOCK_NUM = re.compile(r"(?<![\w.])(\d+)(?![\w.%])")
 _MIN_LIST_BEFORE = re.compile(r"min(?: [\d]+[,]?)*(?:,| and)? ?$")
 
@@ -257,6 +275,9 @@ def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> N
         out.append(Problem("L3", where, f"cardio line 1 grammar: {lines[0]!r}"))
     elif "mph" in body and m["machine"] not in g.SPEED_MACHINES:
         out.append(Problem("L11", where, f"speed on a {m['machine']} (an output, not a setting)"))
+    if m and not g.talk_agrees([float(x) for x in m["rpe"].split("–")], m["talk"]):
+        # the talk words are fixed per effort (standard §3.7's table): "RPE 5–7 (short phrases)" says RPE 5 is short phrases
+        out.append(Problem("L3", where, f"RPE {m['rpe']} is not the talk table's row for {m['talk']!r}"))
     if g.phone_lines(body) > g.CARDIO_MAX_LINES:
         out.append(Problem("L7", where, f"cardio note {g.phone_lines(body)} phone lines > {g.CARDIO_MAX_LINES}"))
     if g.CARDIO_MINUTES_ON_LINE1_RE.search(lines[0]):
@@ -265,7 +286,7 @@ def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> N
         out.append(Problem("L7", where, f"cardio line 1 {len(lines[0])} chars > {g.CARDIO_LINE1_MAX_CHARS}"))
     if len(body) > g.CARDIO_NOTE_MAX_CHARS:
         out.append(Problem("L7", where, f"cardio note {len(body)} chars > {g.CARDIO_NOTE_MAX_CHARS}"))
-    clock = [ln for ln in lines if ln.startswith(g.CLOCK_PREFIX)]
+    clock = [ln for ln in lines if g.is_clock_line(ln)]
     hard = bool(m and m["hard"])
     rpe_lo = float(m["rpe"].split("–")[0]) if m else 0.0
     if (hard or rpe_lo >= 6) and not clock:
@@ -280,7 +301,7 @@ def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> N
                 continue
             out.append(Problem("L9", where, f"clock number {mt.group(1)} has no 'min' unit"))
             break
-        levels = set(re.findall(r"L(\d+)", c)) | set(re.findall(r"L(\d+)", lines[0]))
+        levels = _levels(lines[0], c)
         if len(levels) > g.CLOCK_MAX_LEVELS:
             out.append(Problem("L9", where, f"{len(levels)} levels > {g.CLOCK_MAX_LEVELS}"))
     if hard and not any(re.search(r"at min \d+(?:, \d+)+", c) for c in clock):
@@ -555,9 +576,14 @@ def check_compiled(body: dict[str, Any], ir: Any = None) -> Optional[LintResult]
     except Exception as e:  # noqa: BLE001 — a linter bug must never block a routine write
         logger.warning(f"hevy note lint: not run ({type(e).__name__}: {e})")
         return None
+    title = str(((body or {}).get("routine") or {}).get("title") or "")
     if res.problems:
-        title = str(((body or {}).get("routine") or {}).get("title") or "")
         shown = "; ".join(res.lines()[:12])
         more = f" (+{len(res.problems) - 12} more)" if len(res.problems) > 12 else ""
         logger.warning(f"hevy note lint ({mode}): {len(res.problems)} problem(s) on {title!r}: {shown}{more}")
+    else:
+        # #5428 (2026-10-30): a clean lint logged nothing, so "no problem line" after a predraft proved nothing — the
+        # positive line is what a reader of the log looks for
+        n = len(((body or {}).get("routine") or {}).get("exercises") or [])
+        logger.info(f"hevy note lint ({mode}): clean ({title!r}, {n} exercises)")
     return res

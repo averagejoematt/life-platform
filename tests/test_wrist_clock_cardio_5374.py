@@ -26,6 +26,7 @@ from training import (
     cardio_menu as cm,  # noqa: E402
     cardio_note as cn,  # noqa: E402
     cardio_progression as cp,  # noqa: E402
+    hevy_note_grammar as g,  # noqa: E402
     routine_generator as rg,  # noqa: E402
     training_charter as tc,  # noqa: E402
     wrist_clock as wc,  # noqa: E402
@@ -78,7 +79,7 @@ def test_every_kind_machine_pair_renders_one_clock_on_the_grid_with_at_most_thre
             offenders.append(f"{wc.numbers_to_remember(shape)} to remember — {why}")
         if shape["total_min"] != minutes or audit["clock"]["total_min"] != minutes:
             offenders.append(f"the clock adds up to {shape['total_min']}, not {minutes} — {why}")
-        clock_lines = [ln for ln in note.split("\n") if ln.startswith(cn.CLOCK_PREFIX)]
+        clock_lines = [ln for ln in note.split("\n") if ln.startswith(cn.CLOCK_PREFIXES)]  # #5428: `walk clock` on a treadmill
         if any(len(ln) > cn.CLOCK_LINE_MAX for ln in clock_lines):
             offenders.append(f"a ⌚ line over {cn.CLOCK_LINE_MAX} characters — {why}")
         if (audit["clock_rule"] is None) != (not clock_lines) or audit["clock_off_grid"] != []:
@@ -156,11 +157,13 @@ def test_hills_climb_and_descend_on_the_step_minutes_and_the_treadmill_climbs_th
     assert up["every"] == down["every"] == cm.HILL_STEP_MINUTES
     assert shape["top_level"] == 10 + cn.HILL_CLIMB_STEPS * cn.HILL_LEVEL_STEP and shape["base_level"] == 10
     assert "the hill program" not in line1
-    assert line1 == "Recumbent · L10 → L14 · RPE 5–7 (short phrases)"
-    # the treadmill: from the walk's dose, `HILL_CLIMB_STEPS` charter steps up and back
+    # #5428 re-grade: steady + 2 (≤ 3 levels, standard §3.7) and the talk words' band (short phrases = RPE 6–7)
+    assert cn.HILL_CLIMB_STEPS == g.CLOCK_MAX_LEVELS - 1
+    assert line1 == "Recumbent · L10 → L12 · RPE 6–7 (short phrases)"
+    # the treadmill: from the walk's dose, `HILL_WALK_CLIMB_STEPS` charter steps up and back (grades, not levels)
     t_shape, t_line, audit = _shape("hills", "treadmill", facts={})
     step = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.step.incline_pct")
-    top = audit["incline_pct"] + cn.HILL_CLIMB_STEPS * step
+    top = audit["incline_pct"] + cn.HILL_WALK_CLIMB_STEPS * step
     assert t_shape["unit"] == "%" and t_shape["top_level"] == top and t_shape["base_level"] == audit["incline_pct"]
     assert t_shape["clauses"][1]["step"] == step
     assert f"% → {top:g}% · " in t_line  # line 1 names the grades the clock climbs
@@ -198,7 +201,7 @@ def test_the_level_line_comes_first_and_the_clock_second():
         if kind == "easy":
             assert lines == [lines[0]], note
         else:
-            assert len(lines) == 2 and lines[1].startswith(cn.CLOCK_PREFIX), note
+            assert len(lines) == 2 and lines[1].startswith(cn.CLOCK_PREFIXES), note
 
 
 def test_the_coach_session_skill_says_a_cardio_prescription_is_a_clock_rule():

@@ -140,6 +140,26 @@ def pick_load_line(w_reps: int = PICK_LOAD_W_REPS) -> str:
     return f"W set: up to {w_reps} easy reps, find the load."
 
 
+def gap_text(days: Union[int, float, str, None]) -> Optional[str]:
+    """A layoff in his words: `10 days` (7–13), `5 weeks` (to 26 weeks), `17 months` (to 2 years), `3 years`; None under
+    7 days or when the gap is unknown. Weeks past half a year read as months: "first time in 76 weeks" is a sum."""
+    if days is None:
+        return None
+    try:
+        d = int(float(days))
+    except (TypeError, ValueError):
+        return None
+    if d < 7:
+        return None
+    if d < 14:
+        return f"{d} days"
+    if d < 183:
+        return f"{round(d / 7)} weeks"
+    if d < 730:
+        return f"{round(d / 30.44)} months"
+    return f"{d // 365} years"
+
+
 def sets_today_clause(n: int, why: str) -> str:
     """A critic's changed set count, checked against the working rows: `2 sets today: first incline in 5 weeks.`"""
     why = why.strip().rstrip(".")
@@ -237,17 +257,67 @@ TALK_WORDS: dict[str, tuple[float, float]] = {
     "a few words": (8, 8),
 }
 CLOCK_PREFIX = "⌚ ride clock: "
+# #5428 re-grade (2026-10-30): "ride clock" on a treadmill walk. The clock is the same watch clock, read from 0; the
+# treadmill's line names the walk (standard §3.7, the clock rule).
+WALK_CLOCK_PREFIX = "⌚ walk clock: "
+CLOCK_PREFIXES = (CLOCK_PREFIX, WALK_CLOCK_PREFIX)
 AFTER_LINE = "After: end watch cardio, restart Hevy."
 
 
+def clock_prefix_for(machine: str) -> str:
+    """The ⌚ line's head for a cardio machine: `walk clock` on the treadmill, `ride clock` on every other machine."""
+    return WALK_CLOCK_PREFIX if machine in SPEED_MACHINES else CLOCK_PREFIX
+
+
+def is_clock_line(line: str) -> bool:
+    return line.startswith(CLOCK_PREFIXES)
+
+
+def _band_of(rpe: Rpe) -> tuple[float, float]:
+    if isinstance(rpe, (tuple, list)):
+        return float(rpe[0]), float(rpe[-1])
+    return float(rpe), float(rpe)
+
+
 def talk_words_for(rpe: Rpe) -> str:
-    """The fixed talk-test words for an RPE (the top of a range decides)."""
-    hi = float(rpe[-1] if isinstance(rpe, (tuple, list)) else rpe)
-    if hi <= 5:
-        return "full sentences"
-    if hi <= 7:
-        return "short phrases"
-    return "a few words"
+    """The fixed talk-test words for an RPE or a band (standard §3.7's table): the row the band sits inside; a band that
+    straddles two rows takes the row it overlaps most (ties: the easier row). Was "the top of a range decides", which
+    labelled an RPE 5–7 band "short phrases" though RPE 5 is full sentences (the 2026-10-30 re-grade)."""
+    lo, hi = _band_of(rpe)
+    best, best_overlap = None, -1.0
+    for words, (a, b) in TALK_WORDS.items():
+        overlap = min(hi, b) - max(lo, a) + 1  # whole RPE points shared with the row
+        if overlap > best_overlap:
+            best, best_overlap = words, overlap
+    if best_overlap <= 0:  # outside the table: under 4 is full sentences, over 8 a few words
+        return "full sentences" if hi < 4 else "a few words"
+    return str(best)
+
+
+def _talk_row(words: str) -> tuple[float, float]:
+    """The words' row of the table, open at the ends: full sentences is RPE 5 or less, a few words RPE 8 or more."""
+    a, b = TALK_WORDS[words]
+    words_order = list(TALK_WORDS)
+    return (0.0 if words == words_order[0] else float(a)), (10.0 if words == words_order[-1] else float(b))
+
+
+def talk_band(rpe: Rpe, words: str) -> tuple[float, float]:
+    """The band line 1 prints beside `words`: the menu's band clipped to the words' row of the table, so the talk test
+    and the RPE always agree (hills 5–7 with "short phrases on the climbs" -> 6–7; the incline walk 4–6 with "full
+    sentences" -> 4–5, the standard's own treadmill example). A band wholly outside the row keeps the row."""
+    lo, hi = _band_of(rpe)
+    a, b = _talk_row(words)
+    clipped = (max(lo, a), min(hi, b))
+    return clipped if clipped[0] <= clipped[1] else (float(TALK_WORDS[words][0]), float(TALK_WORDS[words][1]))
+
+
+def talk_agrees(rpe: Rpe, words: str) -> bool:
+    """True when the RPE (or band) sits inside the talk words' row (lint L3 on cardio line 1)."""
+    if words not in TALK_WORDS:
+        return False
+    lo, hi = _band_of(rpe)
+    a, b = _talk_row(words)
+    return a <= lo and hi <= b
 
 
 def cardio_line1(machine: str, levels: str, rpe: Rpe, talk: Optional[str] = None, *, hard: bool = False) -> str:
@@ -261,9 +331,9 @@ def cardio_line1(machine: str, levels: str, rpe: Rpe, talk: Optional[str] = None
     return f"{machine} · {levels} · {'hard ' if hard else ''}RPE {fmt_rpe(rpe)} ({words})"
 
 
-def clock_line(rule: str) -> str:
-    """`⌚ ride clock: ‹rule›` — times in whole minutes off the ride's own clock, `min` on every time."""
-    return CLOCK_PREFIX + rule
+def clock_line(rule: str, machine: str = "") -> str:
+    """`⌚ ride clock: ‹rule›` (`⌚ walk clock:` on the treadmill) — whole minutes off the watch clock, `min` on every time."""
+    return clock_prefix_for(machine) + rule
 
 
 # ── cues (standard §4): the first exercise of each family per session ───────────────────────────────────────────────
@@ -351,7 +421,7 @@ SESSION_LINE_RE = re.compile(
 RESTATED_ROWS_RE = re.compile(rf"^\d+ × \d|^Top \d+–\d+ @|^Last:|@ {LOAD} lb")
 CARDIO_MINUTES_ON_LINE1_RE = re.compile(r"\b\d+ min · ")
 # a set count the text states ("2 sets today: …" is the only one the standard writes; "3 sets of 8–12" is the old drift)
-SET_COUNT_RE = re.compile(r"\b(\d+) (?:working )?sets (?:today|of)\b")
+SET_COUNT_RE = re.compile(r"\b(\d+) (?:working )?sets? (?:today|of)\b")  # #5428: `1 set today` is a count too
 W_TEXT_RE = re.compile(r"W set: (?:up to )?(\d+)(?:–(\d+))?[ ,]")
 # a load the text names: not a delta after Up/Down, not a fragment of a bigger number
 NAMED_LOAD_RE = re.compile(rf"(?<!Up )(?<!Down )(?<![\d.]){LOAD} lb( per hand)?")

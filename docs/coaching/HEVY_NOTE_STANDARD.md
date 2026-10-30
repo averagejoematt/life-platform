@@ -1,6 +1,6 @@
 # Hevy routine notes: the standard
 
-**Status:** adopted 2026-10-27 (#5428), with the owner's rulings of 2026-10-27 applied (§0). **Verified 2026-10-27.**
+**Status:** adopted 2026-10-27 (#5428), with the owner's rulings of 2026-10-27 applied (§0). **Verified 2026-10-29.**
 
 **The machine half:**
 - `lambdas/training/hevy_note_grammar.py` — the words, line shapes and budgets every note producer builds from.
@@ -98,10 +98,12 @@ RPE ‹a–b›[, last set RPE ‹c–d›]        line 1, always
 - `Volume day: chase 12.`
 - `Now aiming 10–12: 8s were RPE 8 three times.`
 - `Set 1 over RPE 9 → sets 2–3 at 195 lb.` (the only place a load appears; a threshold follows its band)
-- `No jumps today: 3rd trap-bar session.` / `No jumps: first time on it.` (a capped lift opts out of the load rule)
+- `No jumps today: 3rd trap-bar session.` / `No jumps: first time on it.` / `No jumps: first time in 19 weeks.` (a capped lift opts out of the load rule, and its line 1 is the cap's `RPE 7`)
+- `New: replaces Calf Press (Machine).` (a rotated accessory, only when it is new to him: no PREVIOUS inside §3.3's 180 days)
 - a critic clause (§3.8)
 
 **Rules for reasons:**
+- **A capped exposure** is OD1's: exposures 1–3 after a gap of more than 90 days in his own log (`layoff_tiers.exposure_caps`), on any lift, not only a ramped anchor. Its note is `RPE 7`, then its `No jumps` line; on stale history (§3.3) the pick-load W line follows.
 - **Every working row more than one step from PREVIOUS gets a reason.** The engine derives the Heavier / Lighter / Volume-day word from PREVIOUS, his last performed load on that template (`hevy_note_grammar.delta_word`; the draft writes PREVIOUS to `inputs_snapshot["previous_loads"]`).
 - A reason never repeats a number the rows already show.
 
@@ -148,6 +150,7 @@ Optional: one cue at most, ≤ 2 phone lines. The default is no note, because th
 After: end watch cardio, restart Hevy.                        when a Hevy block follows
 ```
 
+- **The ⌚ line** reads `⌚ ride clock:` on a bike, elliptical or rower, and `⌚ walk clock:` on the treadmill. It is the same watch clock.
 - **No minutes** (the row shows them). **No speed on a bike, elliptical or rower** (an output under the iPad).
 - **Talk words:**
 
@@ -158,11 +161,12 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
   | a few words | 8 |
 
   - RPE and the talk test lead.
+  - **The RPE on line 1 sits inside its talk words' row.** A menu band that straddles two rows is clipped to the row its talk test names. Hills 5–7 with "short phrases on the climbs" print `RPE 6–7 (short phrases)`; the incline walk 4–6 with "full sentences" prints `RPE 4–5 (full sentences)`. Lint L3.
   - **No HR target** until his zones are re-baselined after the 10-10 episode and the medication change. The platform's 120 / 105 bpm walking numbers date from 2026-09-30, before both. Once re-baselined, an HR may appear as a **secondary** check, never the lead target.
 - **The clock rule:**
   - Read off the ride's own clock from 0, in whole minutes.
   - `min` on every time.
-  - ≤ 3 levels.
+  - ≤ 3 levels, counting every level a ladder climbs through (`L11 → L15` is five). A bike hill is steady + 2. A treadmill hill climbs grades, 1% a step, and grades are not levels.
   - The ⌚ line is ≤ 110 characters.
   - Examples:
     - tempo: `⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down`
@@ -178,6 +182,8 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
 ### 3.8 Critic changes, minimum / travel, tests
 
 - **A critic that changed a row** gets one plain clause, e.g. `2 sets today: first incline in 5 weeks.` Its set count is checked against the rows. Unchanged verdicts never reach the wire.
+  - **A layoff clause always carries its reason** (§6.3): the gap from the verdict, else from PREVIOUS's date, else `back after a break`. It is never a bare `3 sets today.`
+  - **A set cap on a capped exposure** (a gap over 90 days, or unknown) takes the capped treatment: line 1 becomes `RPE 7`, and the clause is the lift's one `No jumps` line, `No jumps: 3 sets today, 19 weeks off.` (one phone line, so the W line and the cue still fit).
   - The clause takes the lift's one reason slot (§3.2): a computed reason already there (`New: replaces …`, `Heavier: …`) gives way and stays on the stored record. A `No jumps` line and an earlier critic clause keep their lines.
 - **Minimum / travel:** the session line's `‹Day›`, then each lift as in §3.2.
 - **Fitness test:** line 1 is `Test · ‹protocol›`.
@@ -252,7 +258,8 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 ## 8. Validation rules (the linter's spec)
 
 `lambdas/training/hevy_note_lint.py`. It runs:
-- at every compile (`hevy_compiler.to_create_body` / `to_update_body`, the chokepoint the MCP tool, the nightly cron and the restamp share), in `HEVY_NOTE_LINT_MODE`;
+- at every compile (`hevy_compiler.to_create_body` / `to_update_body`, the chokepoint the MCP tool, the nightly cron and the restamp share), in `HEVY_NOTE_LINT_MODE`. A problem logs a WARNING line; a clean lint logs one `hevy note lint (…): clean (…)` line;
+- after the nightly predraft's stage 2, which compiles the drafted routine (compile only, no Hevy call) so the compiler's lint runs on it; the verdict is `note_lint` in `NIGHTLY_PREDRAFT_SUMMARY`;
 - at `dry_run`, in `render_check.note_lint` (its problems also join `render_check.problems`, prefixed `note lint: `);
 - in CI over the golden corpus and the archived originals.
 
@@ -265,13 +272,13 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 |---|---|
 | L1 | No banned token (§5). |
 | L2 | No restated rows: `N × reps`, `Top 4–6 @`, `@ ‹n› lb`, `Last:` or `‹n› min ·` on cardio line 1. |
-| L3 | Line-1 grammar by type: effort, carry, cardio or session. The session block is exactly its three lines. |
+| L3 | Line-1 grammar by type: effort, carry, cardio or session. The session block is exactly its three lines. A cardio line 1's RPE sits inside its talk words' row (§3.7). |
 | L4 | Text agrees with the rows: `‹n› sets today` (and the old `‹n› sets of`) = working rows; `W set: up to ‹n›` = W reps; a row more than one step from PREVIOUS carries a reason in the right direction (a stack or cable load has no fixed step, so it is not judged — the producer's rule too). PREVIOUS comes from `inputs_snapshot["previous_loads"]` (keyed by movement key: one load in lb, or one per working row), and the check reports itself "not checked" when that is absent. One load is his last session's TOP working load, so it is judged against the top row only (a top-set day's back-offs sit under it by design); a per-row list judges every row. Rep counts compare as numbers (a stored `8.0` is the text's `8`). |
 | L5 | Loadable steps on every working and W row of a barbell or dumbbell. W rows ascend below the work. |
 | L6 | One effort expression on a lift's line 1. |
 | L7 | Budgets (§7). |
 | L8 | Safety facts (§6): the first exercise of each family carries a cue and no cue comes from another family (the family comes from the catalog's anchor family, or a caller's classifier; an unknown family is reported "not checked"); a prep cue sits on its own family; no HR as the lead cardio target. |
-| L9 | Clock lines: every number is a level, a grade or carries `min`; ≤ 3 levels; a tempo, hill or interval ride has a clock line; intervals list their start minutes. |
+| L9 | Clock lines: every number is a level, a grade or carries `min`; ≤ 3 levels, counting the levels a span or a ladder climbs through; a tempo, hill or interval ride has a clock line; intervals list their start minutes. |
 | L10 | An `After:` line exactly when a Hevy block follows the cardio. |
 | L11 | `per hand` on dumbbell and carry loads only; no mph off the treadmill. |
 | L12 | Exercise 1 opens with the session block; nothing truncated (`…`). |
@@ -309,7 +316,7 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 ## 10. Still open
 
 1. **HR re-baseline.** When should HR return as a secondary cardio check? After about 2–3 weeks of watch data off the drug, the zones can be re-derived. Until then RPE and the talk test only.
-2. **The stale-anchor threshold** for the pick-load form: 180 days, or a 20 lb bodyweight gap?
+2. **The stale-anchor threshold** for the pick-load form: 180 days, or a 20 lb bodyweight gap? The code applies the 180 days (`lift_note.STALE_AFTER_DAYS`, since the 2026-10-30 re-grade). The bodyweight test waits on PREVIOUS carrying the weigh-in at its date.
 3. **Brief wiring (R5).** Should the critic flags get a home in the daily brief, or stay chat-only?
 
 (The low-energy minimum session, open in the review, was answered by R7.)

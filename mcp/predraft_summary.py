@@ -68,6 +68,16 @@ def _shadow(s: Any) -> dict[str, Any]:
     return {"status": _scalar(s.get("outcome")), "key": _scalar(s.get("sk"))}
 
 
+def _note_lint(n: Any) -> dict[str, Any]:
+    """#5428: the drafted body's note lint — `clean` / `problems` (with the count and the rule ids) / `off` / `not_run`."""
+    if not isinstance(n, dict) or not n:
+        return dict(ABSENT)
+    out = {"state": _scalar(n.get("state"))}
+    if n.get("state") == "problems":
+        out.update(problems=_scalar(n.get("problems")), rules=_scalar(n.get("rules")))
+    return out
+
+
 def summarise(result: dict[str, Any], charter_version: Any = None) -> dict[str, Any]:
     r = result if isinstance(result, dict) else {}
     out = {
@@ -77,6 +87,7 @@ def summarise(result: dict[str, Any], charter_version: Any = None) -> dict[str, 
         "routine_id": _scalar(r.get("routine_id")),
         "routine_version": _scalar(r.get("routine_version")),
         "critics": _critics(r.get("critics")),
+        "note_lint": _note_lint(r.get("note_lint")),
         "coach_context": _coach_context(r.get("coach_context")),
         "shadow": _shadow(r.get("shadow")),
         "may_tracker": _tracker(r.get("may_tracker")),

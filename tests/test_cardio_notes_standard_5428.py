@@ -115,22 +115,25 @@ def test_MUTATION_CONTROL_tempo_from_the_last_ride_alone_rides_a_level_too_high(
 
 
 def test_hills_on_the_bike_rower_and_elliptical_climb_from_his_steady_level():
+    """#5428 re-grade (2026-10-30): at most 3 levels (steady + 2, standard §3.7) and the talk words' band — the graded
+    `L11 → L15 · RPE 5–7 (short phrases)` climbed five levels and called RPE 5 short phrases."""
     for machine, name in (("cycling", "Recumbent"), ("rowing_machine", "Rower"), ("elliptical", "Elliptical")):
         note, _ = _compose("hills", machine, facts=_facts())
         assert note == (
-            f"{name} · L11 → L15 · RPE 5–7 (short phrases)\n"
-            "⌚ ride clock: L11 to min 6 · up a level every 2 min to min 14 · down the same to min 22 · L11 to the end"
+            f"{name} · L11 → L13 · RPE 6–7 (short phrases)\n"
+            "⌚ ride clock: L11 to min 10 · up a level every 2 min to min 14 · down the same to min 18 · L11 to the end"
         ), note
 
 
 def test_a_treadmill_hill_starts_no_steeper_than_his_steepest_logged_grade():
     """His steepest logged grade is 6% ("3.0 / 6"), under the menu's 8% floor: the hill starts at 6%, says `today`
-    (his usual is 3.3 mph at 1.5%), and climbs four 1% steps."""
+    (his usual is 3.3 mph at 1.5%), and climbs four 1% steps — grades, not levels. The clock line is the WALK's (#5428
+    re-grade: "ride clock" read on a treadmill)."""
     sessions = [{"date": "2026-10-20", "note": "3.0 / 6"}] + TREADMILL
     note, audit = _compose("hills", "treadmill", treadmill_sessions=sessions)
     line1, clock = note.split("\n")
-    assert line1.startswith("Treadmill · today ") and ", 6% → 10% · RPE 5–7 (short phrases)" in line1, line1
-    assert clock == "⌚ ride clock: 6% to min 6 · +1% every 2 min to min 14 · down the same to min 22 · 6% to the end"
+    assert line1.startswith("Treadmill · today ") and ", 6% → 10% · RPE 6–7 (short phrases)" in line1, line1
+    assert clock == "⌚ walk clock: 6% to min 6 · +1% every 2 min to min 14 · down the same to min 22 · 6% to the end"
     assert audit["hill_start_basis"].startswith("his steepest logged grade 6%")
 
 

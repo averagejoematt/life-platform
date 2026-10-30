@@ -197,10 +197,36 @@ def rpe_band(kind: str) -> tuple[int, int] | None:
     return None
 
 
-def effort_words(kind: str) -> str:
-    """'RPE lo–hi, <talk test>' from the menu. Intervals: 'RPE n on the hard minutes'."""
-    b = block(kind)
+def talk_word(kind: str) -> str:
+    """The standard's fixed talk-test words for a kind (§3.7's table): the menu's own talk test when it names one of
+    them, else the row its RPE band sits in (`hevy_note_grammar.talk_words_for`)."""
+    from training import hevy_note_grammar
+
+    text = str(block(kind).get("talk_test") or "").lower()
+    for w in hevy_note_grammar.TALK_WORDS:
+        if w in text:
+            return w
+    return hevy_note_grammar.talk_words_for(rpe_band(kind) or (4, 5))
+
+
+def wire_band(kind: str) -> tuple[int, int] | None:
+    """#5428 re-grade (2026-10-30): the band the plan and the note print — the menu's band clipped to its talk words'
+    row, so the number and the words agree ("RPE 5–7 (short phrases)" claimed RPE 5 is short phrases). Hills 5–7 ->
+    6–7, the incline walk 4–6 -> 4–5; a band already inside its row is unchanged. None when the menu names no band."""
+    from training import hevy_note_grammar
+
     band = rpe_band(kind)
+    if not band:
+        return None
+    lo, hi = hevy_note_grammar.talk_band(band, talk_word(kind))
+    return int(lo), int(hi)
+
+
+def effort_words(kind: str) -> str:
+    """'RPE lo–hi, <talk test>' from the menu (the band clipped to its talk words' row, `wire_band`). Intervals:
+    'RPE n on the hard minutes'."""
+    b = block(kind)
+    band = wire_band(kind)
     talk = b.get("talk_test")
     if kind == "intervals" and band:
         rpe = f"RPE {band[0]} on the hard minutes"
