@@ -638,24 +638,32 @@ def render_cards(stats):
         except Exception as e:
             print(f"[ERROR] Failed to generate {name}: {e}")
 
-    # Invalidate CloudFront for OG images
-    if generated:
-        try:
-            cf = boto3.client("cloudfront", region_name="us-east-1")
-            cf.create_invalidation(
-                DistributionId=CF_DIST_ID,
-                InvalidationBatch={
-                    "Paths": {
-                        "Quantity": 1,
-                        "Items": ["/assets/images/og-*.png"],
-                    },
-                    "CallerReference": str(int(time.time())),
-                },
-            )
-            print(f"[OK] CloudFront invalidation created for {len(generated)} images")
-        except Exception as e:
-            print(f"[WARN] CloudFront invalidation failed (non-fatal): {e}")
     return generated
+
+
+# One wildcard covers the page cards and the coach cards (og-coach-*), PNG and WebP alike.
+OG_INVALIDATION_PATH = "/assets/images/og-*"
+
+
+def invalidate_og_images(n_written):
+    """Invalidate the OG images at the edge once, AFTER every writer in the run (#5421).
+    The coach cards are written by the sweep, after the page cards: an invalidation fired
+    inside the render step let the edge re-cache yesterday's coach card for a full max-age
+    (qa-smoke `og:coach-cards`, 2026-10-30). Fail-soft, like every other step."""
+    if not n_written:
+        return
+    try:
+        cf = boto3.client("cloudfront", region_name="us-east-1")
+        cf.create_invalidation(
+            DistributionId=CF_DIST_ID,
+            InvalidationBatch={
+                "Paths": {"Quantity": 1, "Items": [OG_INVALIDATION_PATH]},
+                "CallerReference": str(int(time.time())),
+            },
+        )
+        print(f"[OK] CloudFront invalidation created for {n_written} images")
+    except Exception as e:
+        print(f"[WARN] CloudFront invalidation failed (non-fatal): {e}")
 
 
 def sweep(stats, time_left=None, force=False):
@@ -702,6 +710,7 @@ def lambda_handler(event, context):
         if mode in (MODE_SWEEP, MODE_ALL):
             time_left = getattr(context, "get_remaining_time_in_millis", None)
             moments_n, coach_n = sweep(stats, time_left=time_left, force=bool(event.get("force")))
+        invalidate_og_images(len(generated) + coach_n)
         t2 = time.monotonic()
         print(f"[og] mode={mode} render={t1 - t0:.1f}s sweep={t2 - t1:.1f}s")
         return {

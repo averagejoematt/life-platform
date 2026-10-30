@@ -51,7 +51,10 @@ def _handler_ns(calls):
         "read_stats": lambda: calls.append("read_stats") or {},
         "render_cards": lambda stats: calls.append("render") or ["og-home"],
         "sweep": lambda stats, time_left=None, force=False: calls.append(("sweep", force, time_left)) or (3, 1),
+        # #5421: recorded apart from `calls` (with how many steps ran before it), so the order tests above stay exact
+        "invalidated": [],
     }
+    ns["invalidate_og_images"] = lambda n: ns["invalidated"].append((n, len(calls)))
     exec(compile(ast.Module(body=keep, type_ignores=[]), _OG, "exec"), ns)  # noqa: S102 — our own module's handler lines, test-only
     return ns
 
@@ -329,3 +332,24 @@ def test_sweep_moments_hands_the_plan_to_every_bulk_class():
     for call in ("_sweep_wrong(s3, plan)", "_sweep_board_answers(s3, plan)", "_sweep_predictions(s3, plan)", "_sweep_chronicles(s3, plan)"):
         assert call in src, call
     assert "'digests': plan.digests" in src
+
+
+def test_the_edge_is_invalidated_once_after_the_sweep_writes_the_coach_cards():
+    """2026-10-30: the invalidation ran inside the render step, before the sweep rewrote the coach
+    cards, so the edge re-cached yesterday's card for a full max-age (qa-smoke og:coach-cards)."""
+    calls = []
+    ns = _handler_ns(calls)
+    ns["lambda_handler"]({"mode": "all"}, _Ctx())
+    assert ns["invalidated"] == [(2, len(calls))], (ns["invalidated"], calls)  # 1 page + 1 coach card, once, after every step
+
+
+def test_the_invalidation_path_covers_the_coach_cards_in_both_formats():
+    import ast as _ast
+
+    tree = _ast.parse(open(_OG).read())
+    path = next(
+        n.value.value for n in tree.body if isinstance(n, _ast.Assign) and getattr(n.targets[0], "id", "") == "OG_INVALIDATION_PATH"
+    )
+    assert path.endswith("og-*"), path  # og-coach-*.png and .webp, and the page cards, under one wildcard
+    render = next(n for n in tree.body if isinstance(n, _ast.FunctionDef) and n.name == "render_cards")
+    assert "create_invalidation" not in _ast.unparse(render)  # never again before the sweep's writes
