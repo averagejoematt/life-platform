@@ -36,7 +36,7 @@ from training import hevy_note_grammar as g
 
 logger = logging.getLogger(__name__)
 
-LINT_VERSION = "hevy-note-lint@1.0.0"
+LINT_VERSION = "hevy-note-lint@1.1.0"  # 1.1.0: the 2026-10-31 re-grade #2 classes (see each rule's comment)
 MODE_ENV = "HEVY_NOTE_LINT_MODE"
 MODES = ("off", "warn", "enforce")
 DEFAULT_MODE = "warn"
@@ -45,14 +45,17 @@ RULES = {
     "L1": "no banned token",
     "L2": "no restated rows",
     "L3": "line-1 grammar by note type",
-    "L4": "text agrees with the rows (set count, W reps, a reason when a row moves more than one step from PREVIOUS)",
+    "L4": "text agrees with the rows and PREVIOUS (set count, W reps, a reason for a move past one step or a held top-of-range, "
+    "New only with no PREVIOUS, find-the-load only over unloaded rows)",
     "L5": "loadable steps; W rows ascend below the work",
     "L6": "one effort expression on a lift's line 1",
     "L7": "phone-line budgets",
     "L8": "safety facts present (family cue, cardio effort leads, no HR lead target)",
-    "L9": "clock lines: minutes, at most 3 levels, interval start minutes",
+    "L9": "clock lines: minutes, at most 3 levels, interval start minutes; intervals: easy = hard − 1 before, between and after, "
+    "a one-level escape checked as rep 1 ends",
     "L10": "an After line exactly when a Hevy block follows the cardio",
-    "L11": "per hand on dumbbell and carry loads only; no speed off the treadmill",
+    "L11": "per hand on dumbbell and carry loads only; no pins on a dumbbell; no 'later sets' on a one-set lift; a carry row "
+    "is whole steps and its note names no metres; no speed off the treadmill",
     "L12": "exercise 1 opens with the session block; nothing truncated",
     "L13": "the first dumbbell compound at 50 lb per hand or more has a W row",
 }
@@ -72,6 +75,8 @@ class LintExercise:
     family: Optional[str] = None  # cue family (hevy_note_grammar.FAMILY_CUES); None = unknown, cue rules skip it
     anchor_family: Optional[str] = None  # catalog anchor family (prep cues)
     previous_lb: Previous = None  # Hevy's PREVIOUS: one load, or one per working row; None = never done / unknown
+    previous_reps: Optional[float] = None  # PREVIOUS's top-set reps and RPE (the held-at-top rule), when the snapshot has them
+    previous_rpe: Optional[float] = None
 
 
 @dataclass
@@ -128,13 +133,35 @@ def _split_session(note: str) -> tuple[Optional[str], str]:
     return head, rest if sep else ""
 
 
-def _lint_session(session: str, note: str, out: list[Problem]) -> None:
+def cardio_kinds(rt: "LintRoutine") -> list[str]:
+    """The menu kind of each cardio exercise, read off its composed line 1 (`cardio_note.read_line1`); `easy` when the
+    note is not composed (the low-energy rule then keeps the ruled line)."""
+    from training import cardio_note
+
+    out = []
+    for ex in rt.exercises:
+        if ex.kind == "cardio":
+            facts = cardio_note.read_line1(ex.note)
+            out.append(str((facts or {}).get("kind") or "easy"))
+    return out
+
+
+def _lint_session(session: str, note: str, out: list[Problem], rt: Optional["LintRoutine"] = None) -> None:
     lines = session.split("\n")
     if len(lines[0]) > g.SESSION_LINE_MAX_CHARS:
         out.append(Problem("L7", "session line", f"{len(lines[0])} chars > {g.SESSION_LINE_MAX_CHARS}"))
     is_test = lines[0].startswith(g.TEST_DAY + " · ")
-    want = [lines[0]] if is_test else [lines[0], g.LOW_ENERGY_LINE, g.LOAD_RULE_LINE]
-    if lines != want:
+    low = g.low_energy_line(cardio_kinds(rt) if rt is not None else None)
+    want = [lines[0]] if is_test else [lines[0], low, g.LOAD_RULE_LINE]
+    if lines != want and not is_test and len(lines) == 3 and lines[1] in g.LOW_ENERGY_LINES:
+        # #5428 re-grade #2: each line its own message, so a draft with both defects shows both
+        if lines[1] != low:
+            # "+ easy cardio" over a session whose only cardio is intervals promises a block it lacks
+            out.append(Problem("L3", "session block", f"the low-energy line for this session's cardio is {low!r}"))
+        if lines[2] != want[2]:
+            # the old R3 line: RPE 7.5 / 8.5 in neither branch, pins, "later sets"
+            out.append(Problem("L3", "session block", "line 3 is not the load rule (the session line, the low-energy line, the load rule)"))
+    elif lines != want:
         out.append(
             Problem("L3", "session block", f"is {len(lines)} line(s); the grammar is the session line, the low-energy line, the load rule")
         )
@@ -181,12 +208,50 @@ def _previous_for(prev: Previous, i: int) -> Optional[float]:
     return prev
 
 
+def _rep_top(reps: Optional[str]) -> Optional[float]:
+    """A row's rep target's top: '8–15' -> 15, '8' -> 8; None for a duration / distance row."""
+    if not reps:
+        return None
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)(?:–(\d+(?:\.\d+)?))?", str(reps))
+    return float(m.group(2) or m.group(1)) if m else None
+
+
 def _lint_previous(ex: LintExercise, lines: list[str], where: str, out: list[Problem]) -> None:
-    """L4: a working row more than one step from Hevy's PREVIOUS carries a reason, in the right direction."""
+    """L4: a working row more than one step from Hevy's PREVIOUS carries a reason, in the right direction.
+
+    #5428 re-grade #2 (2026-10-31): the pick-load W line is no longer read as that reason (it instructs the feeler row;
+    a stale PREVIOUS far from the row says why with its own `Lighter:` line); `New: replaces …` is wrong whenever a
+    PREVIOUS exists (Hevy shows it beside the row); and a held load whose PREVIOUS reached the top of the range at
+    RPE <= 8.5 says what moves it."""
     if ex.previous_lb is None or ex.kind == "carry":
         return
-    reasons = [ln for ln in lines[1:] if g.REASON_RE.match(ln) or ln.startswith("W set: up to")]
+    reasons = [ln for ln in lines[1:] if g.REASON_RE.match(ln)]
+    if any(ln.startswith(g.ROTATION_HEAD) for ln in reasons):
+        out.append(
+            Problem("L4", where, "'New: replaces …' over a PREVIOUS (Hevy shows it beside the row): New is only for a lift never logged")
+        )
     work = _working(ex.rows)
+    top = _top_load(work)
+    hi = max((t for t in (_rep_top(r[2]) for r in work) if t is not None), default=None)
+    if (
+        not reasons
+        and top is not None
+        and not isinstance(ex.previous_lb, list)
+        and abs(top - float(ex.previous_lb)) < 0.6
+        and hi is not None
+        and ex.previous_reps is not None
+        and ex.previous_rpe is not None
+        and float(ex.previous_reps) >= hi
+        and float(ex.previous_rpe) <= g.HELD_TOP_MAX_RPE
+    ):
+        out.append(
+            Problem(
+                "L4",
+                where,
+                f"held at PREVIOUS {g.fmt_num(top)} lb, which reached the top of {g.fmt_num(hi)} reps at RPE "
+                f"{g.fmt_num(ex.previous_rpe)}, with no reason (what moves it?)",
+            )
+        )
     for i, r in enumerate(work):
         if not isinstance(ex.previous_lb, list) and r[1] != _top_load(work):
             # one PREVIOUS load is the TOP working load of his last session (`exercise_history.previous_load`), so it is
@@ -232,6 +297,11 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
     loads = g.NAMED_LOAD_RE.findall(body)
     if ex.kind in g.PER_HAND_KINDS and any(not ph for ph in loads):
         out.append(Problem("L11", where, "a dumbbell load without 'per hand'"))
+    if ex.kind == "carry":
+        _lint_carry(ex, body, where, out)
+    if ex.kind != "carry" and any(r[1] is not None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
+        # #5428 re-grade #2: "find the load" over rows that carry the start load reads as "ignore the rows"
+        out.append(Problem("L4", where, f"the W line says {g.PICK_LOAD_OPEN_TAIL!r} but the working rows carry a load"))
     if ex.kind not in g.PER_HAND_KINDS and "per hand" in body:
         out.append(Problem("L11", where, f"'per hand' on a {ex.kind} lift"))
     for lb in sorted({r[1] for r in work if r[1] is not None}):
@@ -268,6 +338,52 @@ _CLOCK_NUM = re.compile(r"(?<![\w.])(\d+)(?![\w.%])")
 _MIN_LIST_BEFORE = re.compile(r"min(?: [\d]+[,]?)*(?:,| and)? ?$")
 
 
+def _lint_carry(ex: LintExercise, body: str, where: str, out: list[Problem]) -> None:
+    """L11 on a carry (#5428 re-grade #2): the distance box holds his STEP count (owner 2026-10-25, #5373) and Hevy passes
+    the number through unconverted, so a carry row is a whole number of steps, the note names no metres, and the note
+    says where the steps go."""
+    hit = g.CARRY_METRE_RE.search(body)
+    if hit:
+        out.append(Problem("L11", where, f"a carry note names metres ({hit.group(0)!r}); the row is a step count"))
+    steps = [r[2] for r in _working(ex.rows) if r[2] and str(r[2]).endswith(" steps")]
+    if any(not re.fullmatch(r"\d+ steps", s) for s in steps):
+        out.append(Problem("L11", where, f"a carry row is not a whole step count: {steps}"))
+    if steps and g.CARRY_STEPS_LINE not in body.split("\n"):
+        out.append(Problem("L11", where, f"a step-count carry without {g.CARRY_STEPS_LINE!r}"))
+
+
+_PIN_RE = re.compile(r"\bpins?\b", re.I)
+_LATER_SETS_RE = re.compile(r"\blater sets\b", re.I)
+
+
+def _lint_set_words(ex: LintExercise, note: str, where: str, out: list[Problem]) -> None:
+    """L11 (#5428 re-grade #2) over the WHOLE note, session block included (it sits on exercise 1 and is read with it):
+    a dumbbell has no pins, and a one-set lift has no later sets."""
+    if ex.kind == "dumbbell" and _PIN_RE.search(note):
+        out.append(Problem("L11", where, "'pins' on a dumbbell lift (a step is lb per hand)"))
+    if ex.kind not in ("cardio", "mobility") and len(_working(ex.rows)) <= 1 and _LATER_SETS_RE.search(note):
+        out.append(Problem("L11", where, "'later sets' on a lift with one working set"))
+
+
+def _lint_intervals(m: "re.Match[str]", lines: list[str], clock: list[str], where: str, out: list[Problem]) -> None:
+    """L9 on an interval ride (#5428 re-grade #2, standard §3.7): line 1's `La/Lb` is his steady level and the hard level
+    one over it; the clock names the easy level before, between and after the reps; the escape is one level, checked as
+    rep 1 ends, never at a bare minute (that minute is also where the easy minutes start)."""
+    pair = re.fullmatch(r"L(\d+)/L(\d+)", m["levels"].strip())
+    if pair and int(pair.group(2)) - int(pair.group(1)) != 1:
+        out.append(Problem("L9", where, f"interval levels {m['levels'].strip()}: between is his steady level, one under the hard level"))
+    for c in clock:
+        if " between" in c and "before" not in c:
+            out.append(Problem("L9", where, "interval clock names no level before and after the reps (warm-up, cool-down)"))
+        if re.search(r"Full sentences at min \d+", c):
+            out.append(Problem("L9", where, "interval talk check at a bare minute; it lands as a hard rep ends"))
+    hard = int(pair.group(2)) if pair else None
+    for ln in lines[1:]:
+        for esc in re.findall(r"→ L(\d+)", ln):
+            if hard is not None and int(esc) - hard > g.INTERVAL_ESCAPE_STEP:
+                out.append(Problem("L9", where, f"interval escape L{hard} → L{esc} is more than one level"))
+
+
 def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> None:
     lines = body.split("\n")
     m = g.CARDIO_LINE1_RE.match(lines[0])
@@ -301,11 +417,14 @@ def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> N
                 continue
             out.append(Problem("L9", where, f"clock number {mt.group(1)} has no 'min' unit"))
             break
-        levels = _levels(lines[0], c)
+        escape = " ".join(ln for ln in lines if g.INTERVAL_ESCAPE_RE.match(ln))
+        levels = _levels(lines[0], c + " " + escape)
         if len(levels) > g.CLOCK_MAX_LEVELS:
             out.append(Problem("L9", where, f"{len(levels)} levels > {g.CLOCK_MAX_LEVELS}"))
     if hard and not any(re.search(r"at min \d+(?:, \d+)+", c) for c in clock):
         out.append(Problem("L9", where, "intervals without their start minutes"))
+    if hard and m:
+        _lint_intervals(m, lines, clock, where, out)
     has_after = any(ln.startswith("After:") for ln in lines)
     if followed and not has_after:
         out.append(Problem("L10", where, "a Hevy block follows the cardio but there is no After line"))
@@ -362,10 +481,11 @@ def lint_routine(rt: LintRoutine) -> LintResult:
                 # a cardio-only session has no big lifts and no load rule: no block (session_block.place_on_first)
                 out.append(Problem("L12", where, "exercise 1 does not open with the session block"))
             else:
-                _lint_session(session, note, out)
+                _lint_session(session, note, out, rt)
         bodies.append(body)
         total += len(note)
         _banned(note, where, out)
+        _lint_set_words(ex, note, where, out)
         if ex.kind == "cardio":
             followed = any(e.kind != "cardio" for e in exs[i + 1 :])
             _lint_cardio(body, where, followed, out)
@@ -486,14 +606,25 @@ def _reps_of(s: dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _rows_of(sets: list[dict[str, Any]]) -> list[Row]:
+def _rows_of(sets: list[dict[str, Any]], *, carry: bool = False) -> list[Row]:
+    """The wire's rows. On a carry the distance is his step count (#5373), so it reads `60 steps`, never `60 m`."""
     rows: list[Row] = []
     for s in sets or []:
         kind = "W" if str(s.get("type") or "") == "warmup" else "N"
         kg = s.get("weight_kg")
         lb = None if kg is None else round(float(kg) / KG_PER_LB, 1)
-        rows.append((kind, lb, _reps_of(s)))
+        reps = _reps_of(s)
+        if carry and s.get("distance_meters") and not s.get("reps") and not s.get("rep_range"):
+            reps = f"{g.fmt_num(float(s['distance_meters']))} steps"
+        rows.append((kind, lb, reps))
     return rows
+
+
+def _num_or_none(v: Any) -> Optional[float]:
+    try:
+        return None if v is None else float(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def _previous_value(v: Any) -> Previous:
@@ -537,16 +668,20 @@ def from_wire(
     for i, w in enumerate(wire):
         key = keys[i] if i < len(keys) else ""
         entry = entry_for(key, catalog) if key else None
+        kind = kind_of(key, entry) if key else "other"
+        prev = prev_map.get(key) if isinstance(prev_map, dict) else None
         exs.append(
             LintExercise(
                 name=str((entry or {}).get("title") or key or f"exercise {i + 1}"),
-                kind=kind_of(key, entry) if key else "other",
-                rows=_rows_of(w.get("sets") or []),
+                kind=kind,
+                rows=_rows_of(w.get("sets") or [], carry=kind == "carry"),
                 note=str(w.get("notes") or ""),
                 compound=bool((entry or {}).get("anchor_family")),
                 family=fam(key, entry) if key else None,
                 anchor_family=(entry or {}).get("anchor_family"),
-                previous_lb=_previous_value(prev_map.get(key)) if isinstance(prev_map, dict) else None,
+                previous_lb=_previous_value(prev),
+                previous_reps=_num_or_none(prev.get("reps")) if isinstance(prev, dict) else None,
+                previous_rpe=_num_or_none(prev.get("rpe")) if isinstance(prev, dict) else None,
             )
         )
     return LintRoutine(

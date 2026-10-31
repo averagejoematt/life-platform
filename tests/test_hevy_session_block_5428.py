@@ -38,7 +38,8 @@ from mcp.recovery_authoring import derive_training_context  # noqa: E402
 
 LB = 0.45359237
 MEMORY_TEXT = "STANDING: (1) one. (2) two. (3) three. (4) PLACEHOLDER-STOP-LIST. (5) five."
-LOAD_RULE = "Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift."
+# #5428 re-grade #2 (2026-10-31): RPE 7.5–8.5 is the one-step branch; no pins; per hand; "sets left", never "later sets"
+LOAD_RULE = "Top reps at RPE 7 or less → +10 lb on sets left; 7.5–8.5 → +5. Under 40 lb: +5 max. Dumbbells per hand. Once per lift."
 UPPER_BLOCK = "Upper volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n" + LOAD_RULE
 LOWER_BLOCK = "Lower volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n" + LOAD_RULE
 

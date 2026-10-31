@@ -53,6 +53,8 @@ def routine_from_dict(d: dict[str, Any]) -> lint.LintRoutine:
             family=e.get("family"),
             anchor_family=e.get("anchor_family"),
             previous_lb=e.get("previous_lb"),
+            previous_reps=e.get("previous_reps"),
+            previous_rpe=e.get("previous_rpe"),
         )
         for e in d.get("exercises") or []
     ]
@@ -114,8 +116,14 @@ def test_the_session_block_is_three_lines_with_no_safety_line():
         assert word not in block
         assert all(word not in e["note"] for r in GOLDEN for e in r["exercises"]), word
     assert "Under 40 lb: +5 max" in g.LOAD_RULE_LINE  # R3's safeguard
+    # re-grade #2 (2026-10-31): RPE 7.5 and 8.5 each sit in a branch; no pins (a dumbbell has none); per hand said;
+    # "sets left", never "later sets" (a one-set lift has none)
+    assert "7.5–8.5 → +5" in g.LOAD_RULE_LINE and "Dumbbells per hand" in g.LOAD_RULE_LINE
+    assert "pin" not in g.LOAD_RULE_LINE and "later sets" not in g.LOAD_RULE_LINE and len(g.LOAD_RULE_LINE) <= g.LINE_MAX_CHARS
     for r in GOLDEN:
-        assert r["exercises"][0]["note"].split("\n\n", 1)[0].split("\n")[1:] == [g.LOW_ENERGY_LINE, g.LOAD_RULE_LINE], r["date"]
+        # a session whose only cardio is a hard kind (10-23 tempo, 10-25 intervals) promises no easy cardio
+        low = g.LOW_ENERGY_HARD_CARDIO_LINE if r["date"] in ("2026-10-23", "2026-10-25") else g.LOW_ENERGY_LINE
+        assert r["exercises"][0]["note"].split("\n\n", 1)[0].split("\n")[1:] == [low, g.LOAD_RULE_LINE], r["date"]
 
 
 def test_the_warm_up_text_is_one_prep_cue_per_family():
@@ -135,9 +143,15 @@ def test_the_grammar_builders():
     assert g.effort_line((8, 9)) == "RPE 8–9"
     assert g.effort_line((8, 9), (9, 10)) == "RPE 8–9, last set RPE 9–10"
     assert g.cardio_line1("Recumbent", "L11", (4, 5)) == "Recumbent · L11 · RPE 4–5 (full sentences)"
-    assert g.cardio_line1("Recumbent", "L10/L12", 8, hard=True) == "Recumbent · L10/L12 · hard RPE 8 (a few words)"
+    assert g.cardio_line1("Recumbent", "L11/L12", 8, hard=True) == "Recumbent · L11/L12 · hard RPE 8 (a few words)"
     assert g.carry_line1((8, 9)) == "RPE 8–9 · pick the load per hand"
-    assert g.pick_load_line() == "W set: up to 8 easy reps, find the load."
+    assert g.pick_load_line() == "W set: up to 8 easy reps, test the load."
+    assert g.pick_load_line(rows_loaded=False) == "W set: up to 8 easy reps, find the load."
+    assert g.held_top_line(15) == "Same load: hit 15 again to move it up." and g.REASON_RE.match(g.held_top_line(15))
+    assert g.stale_reason_line(g.LIGHTER, "2 years") == "Lighter: first time in 2 years." and g.REASON_RE.match(
+        "Lighter: first time in 2 years."
+    )
+    assert g.interval_escape_line(13) == "Full sentences as rep 1 ends → L13 reps." and g.phone_lines(g.interval_escape_line(13)) == 1
     assert g.sets_today_clause(2, "first incline in 5 weeks") == "2 sets today: first incline in 5 weeks."
     assert g.reason_line(g.HEAVIER, "15 reps was RPE 7") == "Heavier: 15 reps was RPE 7."
     assert g.delta_word(90, 80, 5) == g.HEAVIER and g.delta_word(80, 90, 5) == g.LIGHTER and g.delta_word(85, 80, 5) is None
@@ -262,7 +276,7 @@ MUTATIONS: list[tuple[str, str, Mut, str]] = [
     ("a prep cue on the wrong lift", "2026-10-23", _note(1, lambda n: n.replace("Hip hinges first.", "Band pull-aparts first.")), "L8"),
     # L9 — clock lines
     ("a clock number with no min", "2026-10-23", _note(5, lambda n: n.replace("at min 5 and 15", "at 5 and 15")), "L9"),
-    ("four levels on one ride", "2026-10-25", _note(6, lambda n: n.replace("L10 between", "L9 between")), "L9"),
+    ("four levels on one ride", "2026-10-25", _note(6, lambda n: n.replace("L11 before", "L10 before")), "L9"),
     (
         "a tempo ride with no clock line",
         "2026-10-23",
@@ -283,6 +297,116 @@ MUTATIONS: list[tuple[str, str, Mut, str]] = [
     # L13 — the dumbbell warm-up row (R4)
     ("the first DB compound with no W row", "2026-10-26", _rows(0, lambda r: [x for x in r if x[0] != "W"]), "L13"),
 ]
+
+OLD_LOAD_RULE = "Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift."
+
+
+def _previous_full(i: int, lb: float, reps: float, rpe: float, note_fn: Callable[[str], str] | None = None) -> Mut:
+    def m(rt: dict[str, Any]) -> None:
+        _previous(i, lb, note_fn)(rt)
+        rt["exercises"][i].update(previous_reps=reps, previous_rpe=rpe)
+
+    return m
+
+
+# #5428 blind re-grade #2 (2026-10-31, draft 40f2c0b5): six defect classes the linter read clean on. Each is a one-line
+# break of a clean golden routine, and each must fire its OWN message (label, date, mutation, rule, message fragment).
+REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
+    (
+        "New: replaces … over a PREVIOUS",
+        "2026-10-26",
+        _previous(3, 30.0, lambda n: n.replace("RPE 9–10\n", "RPE 9–10\nNew: replaces Face Pull.\n", 1)),
+        "L4",
+        "'New: replaces …' over a PREVIOUS",
+    ),
+    (
+        "a drop past one step with only the W line for a reason",
+        "2026-10-26",
+        _previous(3, 65.0),
+        "L4",
+        "against PREVIOUS 65 lb with no reason line",
+    ),
+    (
+        "find the load over a loaded row",
+        "2026-10-26",
+        _note(4, lambda n: n.replace(g.PICK_LOAD_FIXED_TAIL, g.PICK_LOAD_OPEN_TAIL)),
+        "L4",
+        "find the load",
+    ),
+    (
+        "a held load after a top-of-range PREVIOUS at RPE 8.5, no reason",
+        "2026-10-25",
+        _previous_full(3, 20.0, 15, 8.5),
+        "L4",
+        "held at PREVIOUS",
+    ),
+    (
+        "pins on a dumbbell lift",
+        "2026-10-26",
+        _note(0, lambda n: n.replace("+10 lb on sets left", "+10 lb (2 pins) on sets left")),
+        "L11",
+        "'pins'",
+    ),
+    ("later sets on a one-set lift", "2026-10-25", _note(0, lambda n: n.replace(g.LOAD_RULE_LINE, OLD_LOAD_RULE)), "L11", "'later sets'"),
+    (
+        "the old load rule's RPE 8.5 gap",
+        "2026-10-26",
+        _note(0, lambda n: n.replace(g.LOAD_RULE_LINE, OLD_LOAD_RULE)),
+        "L3",
+        "session block",
+    ),
+    ("metres on a carry", "2026-10-25", _append(5, "Walk 60 m."), "L11", "names metres"),
+    (
+        "a carry row that is not whole steps",
+        "2026-10-25",
+        _rows(5, lambda r: [["N", None, "45.72 steps"] for _ in r]),
+        "L11",
+        "whole step count",
+    ),
+    (
+        "easy cardio promised over an intervals-only session",
+        "2026-10-25",
+        _note(0, lambda n: n.replace(g.LOW_ENERGY_HARD_CARDIO_LINE, g.LOW_ENERGY_LINE)),
+        "L3",
+        "low-energy line for this session's cardio",
+    ),
+    (
+        "between below his steady level",
+        "2026-10-25",
+        _note(6, lambda n: n.replace("L11/L12", "L10/L12")),
+        "L9",
+        "between is his steady level",
+    ),
+    (
+        "no warm-up or cool-down level",
+        "2026-10-25",
+        _note(6, lambda n: n.replace("L11 before, between, after", "L11 between")),
+        "L9",
+        "before and after",
+    ),
+    (
+        "a talk check at a bare minute",
+        "2026-10-25",
+        _note(
+            6, lambda n: n.replace("after.\nFull sentences as rep 1 ends → L13 reps.", "after. Full sentences at min 8 → L13 from min 10.")
+        ),
+        "L9",
+        "bare minute",
+    ),
+    ("a two-level escape", "2026-10-25", _note(6, lambda n: n.replace("→ L13 reps", "→ L14 reps")), "L9", "more than one level"),
+]
+
+
+def test_every_regrade_2_class_has_a_mutation_control_that_fires_its_own_message():
+    silent = []
+    for label, date, mutate, rule, fragment in REGRADE_2_MUTATIONS:
+        rt = _by_date(GOLDEN, date)
+        assert not _lint(rt).problems, (label, "its golden routine must start clean")
+        mutate(rt)
+        res = _lint(rt)
+        if not any(p.rule == rule and fragment in str(p) for p in res.problems):
+            silent.append((label, rule, fragment, res.lines()))
+    assert silent == [], silent
 
 
 def test_every_rule_has_a_mutation_control_that_fires():
@@ -333,7 +457,9 @@ def _ir_from_golden(rt: dict[str, Any]) -> tuple[RoutineSpec, str, dict[str, Any
             if reps.endswith(" min"):
                 s.duration_seconds = int(reps.split()[0]) * 60
             elif reps.endswith(" steps"):
-                s.distance_meters = round(int(reps.split()[0]) * 0.9144, 2)
+                # the step count goes on the wire as written (`session_cues.CARRY_EXPOSURE`: `carry_steps` IS the
+                # `distance_meters` value; his yards box shows it unconverted, #5373) — never a yards-to-metres conversion
+                s.distance_meters = int(reps.split()[0])
             elif "–" in reps:
                 lo, hi = reps.split("–")
                 s.rep_range_start, s.rep_range_end = int(lo), int(hi)

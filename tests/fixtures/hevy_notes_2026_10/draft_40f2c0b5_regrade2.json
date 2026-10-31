@@ -1,0 +1,223 @@
+{
+ "_source": "#5428 blind re-grade #2 (2026-10-31): nightly pre-draft routine 40f2c0b5 v3 (target 2026-10-31, Shoulders + arms, week 5), read from DynamoDB read-only. Public repo: notes, set rows (kg as stored), Hevy's PREVIOUS (load, reps, RPE, date, template), the rotation swaps, each movement's progression basis and the cardio dose's steady level only. No rationale, no load-model detail (it carries bodyweights), no critic text.",
+ "routine_id": "40f2c0b5",
+ "target_date": "2026-10-31",
+ "title": "Foundation - Upper - 14 - 43",
+ "archetype": "upper",
+ "session_role": "shoulders_arms",
+ "exercises": [
+  {
+   "movement_key": "db_shoulder_press",
+   "rationale_tag": "anchor:overhead_press:moderate",
+   "rest_seconds": 120,
+   "sets": [
+    {
+     "type": "warmup",
+     "weight_kg": 20.41165665,
+     "reps": 8
+    },
+    {
+     "type": "normal",
+     "weight_kg": 34.01942775,
+     "rep_range_start": 6,
+     "rep_range_end": 10
+    }
+   ],
+   "stored_note": "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\nTop reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.\n\nRPE 8–9\nBreathe out on the press."
+  },
+  {
+   "movement_key": "lateral_raise_machine",
+   "rationale_tag": "accessory:lateral_raise_machine:accessory",
+   "rest_seconds": 90,
+   "sets": [
+    {
+     "type": "warmup",
+     "reps": 8,
+     "feeler": true
+    },
+    {
+     "type": "normal",
+     "weight_kg": 15.875732950000002,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 15.875732950000002,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 15.875732950000002,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    }
+   ],
+   "stored_note": "RPE 8–9, last set RPE 9–10\nNew: replaces Lateral Raise (Dumbbell).\nW set: up to 8 easy reps, find the load."
+  },
+  {
+   "movement_key": "reverse_pec_deck",
+   "rationale_tag": "accessory:reverse_pec_deck:accessory",
+   "rest_seconds": 90,
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 27.215574566138386,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 27.215574566138386,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 27.215574566138386,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    }
+   ],
+   "stored_note": "RPE 8–9, last set RPE 9–10"
+  },
+  {
+   "movement_key": "seated_incline_curl_dumbbell",
+   "rationale_tag": "accessory:seated_incline_curl_dumbbell:accessory",
+   "rest_seconds": 90,
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 13.6077711,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 13.6077711,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    }
+   ],
+   "stored_note": "RPE 8–9, last set RPE 9–10"
+  },
+  {
+   "movement_key": "triceps_rope_pushdown",
+   "rationale_tag": "accessory:triceps_rope_pushdown:accessory",
+   "rest_seconds": 90,
+   "sets": [
+    {
+     "type": "normal",
+     "weight_kg": 22.67964547178199,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    },
+    {
+     "type": "normal",
+     "weight_kg": 22.67964547178199,
+     "rep_range_start": 8,
+     "rep_range_end": 15
+    }
+   ],
+   "stored_note": "RPE 8–9, last set RPE 9–10"
+  },
+  {
+   "movement_key": "farmers_walk",
+   "rationale_tag": "accessory:farmers_walk:carry",
+   "rest_seconds": 90,
+   "sets": [
+    {
+     "type": "normal",
+     "distance_meters": 60
+    },
+    {
+     "type": "normal",
+     "distance_meters": 60
+    }
+   ],
+   "stored_note": "RPE 8–9 · pick the load per hand\nTall, ribs down, bells off your legs.\nSteps go in the yards box."
+  },
+  {
+   "movement_key": "cycling",
+   "rationale_tag": "cardio:cycling:menu:intervals",
+   "rest_seconds": null,
+   "sets": [
+    {
+     "type": "normal",
+     "duration_seconds": 1800
+    }
+   ],
+   "stored_note": "Recumbent · L10/L12 · hard RPE 8 (a few words)\n⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; L10 between. Full sentences at min 8 → L14 from min 10."
+  }
+ ],
+ "previous_loads": {
+  "db_shoulder_press": {
+   "date": "2026-10-25",
+   "lb": 75,
+   "reps": 8,
+   "rpe": 8,
+   "template_id": "878CD1D0"
+  },
+  "lateral_raise_machine": {
+   "date": "2024-02-09",
+   "lb": 65,
+   "reps": 10,
+   "rpe": null,
+   "template_id": "D5D0354D"
+  },
+  "reverse_pec_deck": {
+   "date": "2026-10-25",
+   "lb": 60,
+   "reps": 15,
+   "rpe": 8.5,
+   "template_id": "D8281C62"
+  },
+  "seated_incline_curl_dumbbell": {
+   "date": "2026-10-25",
+   "lb": 30,
+   "reps": 10,
+   "rpe": 8.5,
+   "template_id": "8BAB2735"
+  },
+  "triceps_rope_pushdown": {
+   "date": "2026-10-25",
+   "lb": 50,
+   "reps": 15,
+   "rpe": 8.5,
+   "template_id": "94B7239B"
+  }
+ },
+ "rotations": {
+  "lateral_raise_machine": "Lateral Raise (Dumbbell)",
+  "reverse_pec_deck": "Face Pull",
+  "seated_incline_curl_dumbbell": "Bicep Curl (Dumbbell)",
+  "triceps_rope_pushdown": "Triceps Pushdown"
+ },
+ "progression": {
+  "db_shoulder_press": {
+   "basis": "hold"
+  },
+  "farmers_walk": {
+   "basis": "hold"
+  },
+  "lateral_raise_machine": {
+   "basis": "hold"
+  },
+  "reverse_pec_deck": {
+   "basis": "hold"
+  },
+  "seated_incline_curl_dumbbell": {
+   "basis": "floor_raise"
+  },
+  "triceps_rope_pushdown": {
+   "basis": "hold"
+  }
+ },
+ "cardio": {
+  "movement_key": "cycling",
+  "minutes": 30,
+  "kind": "intervals",
+  "steady_level": 11
+ }
+}

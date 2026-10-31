@@ -59,6 +59,16 @@ COMPOSER_WIRE = ("lift note 5 phone lines > 4", "dumbbell load 44 lb is not on a
 # the 2026-10-30 re-grade's cardio defects, which the linter now sees on the same stored ride (L3 talk words, L9 levels
 # counted through the ladder; tests/test_hevy_note_regrade_5428.py) — not on the 10-29 wire, which predates both checks
 REGRADE_CARDIO = ("Cycling: RPE 5–7 is not the talk table's row for 'short phrases'", "Cycling: 5 levels > 3")
+# the 2026-10-31 blind re-grade #2's classes, which the linter now also sees on these stored drafts (lint 1.1.0;
+# tests/test_hevy_note_regrade2_5428.py): the old load rule, "+ easy cardio" over a hill-only session, "find the load" over rows that carry a load, `New: replaces …`
+# over a PREVIOUS, and a held load whose PREVIOUS reached the top of its range at RPE <= 8.5 with no reason
+REGRADE_2 = (
+    "the low-energy line, the load rule",
+    "the low-energy line for this session's cardio",
+    "the W line says 'find the load.' but the working rows carry a load",
+    "'New: replaces …' over a PREVIOUS",
+    "with no reason (what moves it?)",
+)
 
 # ── the two stored drafts, as the compiler saw them (loads in kg off the stored IR; reps as floats, as stored) ────────
 
@@ -217,11 +227,15 @@ def test_the_stored_drafts_lint_to_exactly_the_wire_minus_the_false_positives(mo
     """The replay. Every wire problem in a false-positive class is gone; every composer-class problem is still there,
     word for word — the linter was right about those, and the composer fixes below are what clear them."""
     monkeypatch.setenv(lint.MODE_ENV, "off")
+    seen_2: set[str] = set()
     for wire, ir in ((WIRE_LOWER, _lower()), (WIRE_UPPER, _upper())):
         got = _lint(ir).lines()
         want = [p for p in _problems(wire) if any(c in p for c in COMPOSER_WIRE)]
-        assert [p for p in got if not p.endswith(REGRADE_CARDIO)] == want, (wire[:60], got)
+        later = [p for p in got if p.endswith(REGRADE_CARDIO) or any(c in p for c in REGRADE_2)]
+        assert [p for p in got if p not in later] == want, (wire[:60], got)
         assert [p.split(" ", 2)[2] for p in got if p.endswith(REGRADE_CARDIO)] == list(REGRADE_CARDIO), got
+        seen_2 |= {c for c in REGRADE_2 for p in later if c in p}
+    assert seen_2 == set(REGRADE_2), seen_2  # every re-grade #2 class fires on at least one of the two 10-29 drafts
     assert len(_problems(WIRE_LOWER)) == 4 and len(_problems(WIRE_UPPER)) == 4
 
 
@@ -257,6 +271,7 @@ CALF_COMPOSED = (
     "Full stretch at the bottom; knees soft."
 )  # the composer's own 4 lines on 2026-10-29 (inputs_snapshot.critics.draft_exercises)
 CLAUSE = "3 sets today: first time in 19 weeks."
+CALF_COMPOSED_2 = "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, test the load.\nFull stretch at the bottom; knees soft."
 
 
 def test_the_critic_clause_displaces_the_rotation_reason_and_fits_the_budget():
@@ -312,7 +327,9 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
         target_date="2026-10-29",
         rotations={"seated_calf_raise": "Calf Press (Machine)"},
     )
-    assert calf.notes == CALF_COMPOSED, calf.notes
+    # re-grade #2 (2026-10-31): PREVIOUS (90 lb, 8 months back) exists, so no `New: replaces …`; the row is its load,
+    # so no reason; the feeler W line tests the start load
+    assert calf.notes == CALF_COMPOSED_2, calf.notes
     verdict = {
         "critic": "joints_tendons",
         "verdict": "change",
@@ -324,7 +341,7 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
     recs = critics_apply.apply_changes(ir, [verdict])
     assert recs[0]["applied"] and recs[0]["clauses"][0]["clause"] == "No jumps: 3 sets today, 8 months off.", recs
     assert ir.exercises[2].notes == (
-        "RPE 7\nNo jumps: 3 sets today, 8 months off.\nW set: up to 8 easy reps, find the load.\nFull stretch at the bottom; knees soft."
+        "RPE 7\nNo jumps: 3 sets today, 8 months off.\nW set: up to 8 easy reps, test the load.\nFull stretch at the bottom; knees soft."
     )
     res = _lint(ir)
     assert not [p for p in res.lines() if "[3]" in p], res.lines()

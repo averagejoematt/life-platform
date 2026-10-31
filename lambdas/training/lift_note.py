@@ -15,7 +15,9 @@ the W rows and the PREVIOUS column, so the note carries only what a row cannot:
     ‹one cue›                       the first exercise of a movement family (`movement_cues`)
 
 A movement with no session on file, or none in `STALE_AFTER_DAYS`, is the pick-load form: a no-load W row of 8 ahead
-of the engine's start load, and `W set: up to 8 easy reps, find the load.` in place of a reason.
+of the engine's start load, and `W set: up to 8 easy reps, test the load.` (`find the load.` when the rows carry
+no load). A stale PREVIOUS more than one step from the row still gets its reason (`Lighter: first time in 2 years.`):
+Hevy shows that PREVIOUS beside the row, and the drop needs a why (#5428 re-grade #2, 2026-10-31).
 
 WHAT LEAVES THE WIRE, NOT THE RECORD. The passes still compute everything they did — the floor, the ramp, the hold, the
 progression — and their text is kept on `inputs_snapshot["lift_notes"][key]["detail"]` and in the rationale, where
@@ -43,6 +45,7 @@ the pick-load form. HEVY_NOTE_STANDARD §3.3: "the newest one is over 180 days o
 
 PICK_LOAD_W_REPS = hevy_note_grammar.PICK_LOAD_W_REPS
 PICK_LOAD_LINE = hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS)
+PICK_LOAD_OPEN_LINE = hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS, rows_loaded=False)
 ROTATION_HEAD = hevy_note_grammar.ROTATION_HEAD
 rotation_line = hevy_note_grammar.rotation_line  # #5083: the rotated accessory's one reason line, from the grammar
 
@@ -110,6 +113,21 @@ def _same_load_after_a_grind(row_lb: float | None, previous: dict[str, Any] | No
     return abs(float(row_lb) - float(previous["lb"])) < 1e-6 and float(previous["rpe"]) >= hevy_note_grammar.SAME_LOAD_FROM_RPE
 
 
+def _held_at_top(row_lb: float | None, previous: dict[str, Any] | None, rep_hi: int | None, prog: dict[str, Any], re_entry: bool) -> bool:
+    """The engine HOLDS the load at PREVIOUS although PREVIOUS reached the top of the rep range at RPE <= 8.5 (#5428
+    re-grade #2: the reverse fly at 60 x 15 @ 8.5 and the pushdown at 50 x 15 @ 8.5 read as "never progresses"). The
+    gain rule wants the top twice in a row, and the load rule moves it in-session at RPE <= 8.5 — the note says so."""
+    if re_entry or row_lb is None or not rep_hi or not previous or previous.get("lb") is None or previous.get("rpe") is None:
+        return False
+    if (prog or {}).get("basis") not in (None, "hold"):
+        return False
+    return (
+        abs(float(row_lb) - float(previous["lb"])) < 0.6
+        and int(float(previous.get("reps") or 0)) >= int(rep_hi)
+        and float(previous["rpe"]) <= hevy_note_grammar.HELD_TOP_MAX_RPE
+    )
+
+
 def _stall_why(prog: dict[str, Any], history: list[dict[str, Any]] | None) -> str:
     """'8s were RPE 8 three times' — the stall rule's run, in his words."""
     dates = set(prog.get("dates") or [])
@@ -150,6 +168,8 @@ def reason_line(
         word = word or "Heavier"
     if word is None and _same_load_after_a_grind(row_lb, previous, re_entry):
         return hevy_note_grammar.SAME_LOAD_LINE
+    if word is None and _held_at_top(row_lb, previous, rep_hi, prog, re_entry):
+        return hevy_note_grammar.held_top_line(rep_hi)
     if word == "Heavier":
         return f"Heavier: {_heavier_why(previous)}."
     if word == "Lighter":
@@ -276,6 +296,18 @@ def _engine_reason(
     )
 
 
+def _stale_reason(block: Any, entry: dict[str, Any], previous: dict[str, Any], target_date: str) -> str:
+    """A stale PREVIOUS (§3.3) still shows in Hevy's PREVIOUS column, so a row more than one step from it says why
+    (`hevy_note_grammar.stale_reason_line`), or "" within a step / on a stack with no fixed step."""
+    row_lb = _top_lb(block.sets)
+    word = delta_word(row_lb, previous.get("lb"), implement_step_lb(entry.get("equipment"), row_lb))
+    if not word:
+        return ""
+    return hevy_note_grammar.stale_reason_line(
+        word, hevy_note_grammar.gap_text(_days_between(str(previous.get("date") or ""), target_date))
+    )
+
+
 def _has_load(block: Any) -> bool:
     return any(getattr(s, "weight_kg", None) for s in _working(block.sets))
 
@@ -339,11 +371,13 @@ def compose_blocks(
     note, the reason kind and its line, whether the pick-load form fired, and the replaced text as `detail`).
 
     `rotations` (`variant_rotation.swaps`: served key -> the title it replaces) gives a rotated accessory its ONE reason
-    line, `New: replaces …` (#5083) — only when the movement is genuinely new to him: no PREVIOUS inside
-    `STALE_AFTER_DAYS` (the 2026-10-30 re-grade: a hammer curl and a face pull he had logged weeks before read "New").
-    A rotation onto a lift he has done recently keeps its computed reason; the swap stays on the record (`rotation_of`).
-    The line never outranks a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line
-    is the instruction for the feeler W row, not a second reason.
+    line, `New: replaces …` (#5083) — only when the movement is genuinely new to him: NO PREVIOUS at all (the 2026-10-30
+    re-grade: a hammer curl and a face pull he had logged weeks before read "New"; re-grade #2, 2026-10-31: a machine
+    lateral raise whose PREVIOUS column showed 65 lb x 10 from 2024 read "New" beside a 35 lb row). A stale PREVIOUS
+    more than one step from the row gets `stale_reason_line` (`Lighter: first time in 2 years.`) instead; a rotation onto
+    a lift with any PREVIOUS keeps its computed reason and the swap stays on the record (`rotation_of`). The line never
+    outranks a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line is the
+    instruction for the feeler W row, not a second reason.
 
     A capped exposure (OD1, the ramp's `exposure_caps`) reads `RPE 7` and opts out of the load rule by name
     (`no_jumps_line`); a critic's layoff set cap gets the same treatment downstream (`session_block.add_capped_reason`).
@@ -388,14 +422,18 @@ def compose_blocks(
         elif stale:
             pick = _feeler_fits(block, entry, authored is not None) and _add_feeler(block)
             reason_kind = "pick_load" if pick else None
+            if previous is not None:
+                line2 = _stale_reason(block, entry, previous, target_date)
+                reason_kind = line2.split(":")[0] if line2 else reason_kind
         else:
             line2 = _engine_reason(block, entry, row, previous, (history_index or {}).get(tid) if tid else None, intensity)
             reason_kind = line2.split(":")[0] if line2 else None
         swapped = (rotations or {}).get(key)
-        lead = rotation_line(swapped) if swapped and stale and reason_kind != "no_jumps" else ""
+        lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
         if lead:
             reason_kind = "rotation"
-        body = [x for x in (line1, lead, line2, PICK_LOAD_LINE if pick else "") if x]
+        pick_line = (PICK_LOAD_LINE if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""
+        body = [x for x in (line1, lead, line2, pick_line) if x]
         cue = own.get("line") or ""
         if family and family not in seen_families:
             cue = cue or _cue_for(family, entry, body, _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES)

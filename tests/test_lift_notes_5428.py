@@ -166,8 +166,12 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
         "incline_db_press": "RPE 8–9\nBand pull-aparts first. Breathe out on the press.",
         "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull.",
         "lat_pulldown": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.",
-        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load.",
-        "lying_db_tricep_extension": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load.\nElbows still.",
+        # #5428 re-grade #2 (2026-10-31): a stale PREVIOUS still shows in Hevy's PREVIOUS column, so a row more than one
+        # step under it says why; the feeler W line tests the rows' start load ("find the load" read as "ignore the rows")
+        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW set: up to 8 easy reps, test the load.",
+        "lying_db_tricep_extension": (
+            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW set: up to 8 easy reps, test the load.\nElbows still."
+        ),
     }
     assert all(not note_problems(n) for n in notes.values())
     # Hevy's PREVIOUS, for the note linter: the last performed top load per movement (lb), with its date

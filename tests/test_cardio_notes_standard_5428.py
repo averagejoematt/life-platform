@@ -34,6 +34,7 @@ from training import (  # noqa: E402
     cardio_menu as cm,
     cardio_note as cn,
     cardio_progression as cp,
+    hevy_note_grammar as g,
     logging_conventions as lc,
     routine_generator as rg,
     training_notes as tn,
@@ -90,12 +91,21 @@ def test_MUTATION_CONTROL_a_ramp_read_as_a_single_level_brings_back_L18(monkeypa
 
 
 def test_the_10_25_intervals_list_every_start_minute_and_carry_the_escape():
+    """#5428 re-grade #2 (2026-10-31): the easy minutes — warm-up, between and cool-down — are his steady L11 (was L10,
+    one under), the escape is one level (L13, was L14), and the talk check lands as rep 1 ENDS on its own line (was
+    "at min 8", the minute the easy block also starts)."""
     note, audit = _compose("intervals", facts=_facts(), followed=True)
     assert note == (
-        "Recumbent · L10/L12 · hard RPE 8 (a few words)\n"
-        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; L10 between. Full sentences at min 8 → L14 from min 10.\n" + AFTER
+        "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
+        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; L11 before, between, after.\n"
+        "Full sentences as rep 1 ends → L13 reps.\n" + AFTER
     )
-    assert audit["clock_numbers"] == ["10", "12"] and audit["clock_off_grid"] == []
+    assert audit["clock_numbers"] == ["11", "12"] and audit["clock_off_grid"] == []
+    assert audit["steady_level"] == 11 and audit["interval_escape"] == "Full sentences as rep 1 ends → L13 reps."
+    # the read-back (adherence grades against it): warm-up and cool-down at L11, the sprints at L12
+    shape = cn.clock_of(note, 30)
+    assert shape["levels"] == [11, 12] and shape["family"] == "intervals", shape
+    assert g.phone_lines(note) <= g.CARDIO_MAX_LINES and len(note) <= g.CARDIO_NOTE_MAX_CHARS
 
 
 def test_the_10_23_tempo_is_one_level_over_his_logged_steady_with_talk_test_check_ins():

@@ -7,7 +7,10 @@ lift's own note:
 
     Upper volume · RPE 8–9 on big lifts
     Low energy → first 2 lifts + easy cardio.
-    Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.
+    Top reps at RPE 7 or less → +10 lb on sets left; 7.5–8.5 → +5. Under 40 lb: +5 max. Dumbbells per hand. Once per lift.
+
+(#5428 re-grade #2, 2026-10-31: a session whose only cardio is a hard kind reads `Low energy → first 2 lifts + cardio, no
+hard efforts.` — `cardio_kinds_of` — and the load rule closed the RPE 7.5 / 8.5 gap, dropped pins and "later sets".)
 
 No safety or medical line, no daily gate, no Whoop-band header, no bookkeeping (protein, rate,
 badges), no provenance (`inputs_current_through`, the loaded-lifting streak) and no critics'
@@ -35,8 +38,9 @@ from training import hevy_note_grammar
 # Lines 2 and 3 are Lane D's grammar (`hevy_note_grammar`), so the block, routine_title's fallback and the linter read
 # one text.
 LOW_ENERGY_LINE = hevy_note_grammar.LOW_ENERGY_LINE
-# The load rule (R3). One pin is the charter's plate step (`progression.gain_rule.step_lb`), read, never typed here.
-LOAD_RULE_HEAD = "Top reps at RPE 7 or less → "
+LOW_ENERGY_LINES = hevy_note_grammar.LOW_ENERGY_LINES
+# The load rule (R3). The step is the charter's plate step (`progression.gain_rule.step_lb`), read, never typed here.
+LOAD_RULE_HEAD = hevy_note_grammar.LOAD_RULE_HEAD
 LIGHT_LOAD_LB = hevy_note_grammar.SMALL_LOAD_LB  # R3's panel safeguard: under this load a 2-pin jump is too large a share
 
 
@@ -51,7 +55,7 @@ def step_lb(read: Callable[..., Any] | None = None) -> Any:
 
 
 def load_rule_line(step: Any) -> str:
-    """`Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift.`"""
+    """`Top reps at RPE 7 or less → +10 lb on sets left; 7.5–8.5 → +5. Under 40 lb: +5 max. Dumbbells per hand. Once per lift.`"""
     return hevy_note_grammar.load_rule_line(float(step) if step else None)
 
 
@@ -100,9 +104,27 @@ def session_line(day: str, band: Any) -> str:
     return f"{day} · RPE {text} on big lifts" if text else day
 
 
-def render(day: str, band: Any, step: Any) -> str:
-    """The three lines, newline-joined."""
-    return "\n".join((session_line(day, band), LOW_ENERGY_LINE, load_rule_line(step)))
+def render(day: str, band: Any, step: Any, cardio_kinds: list[str] | None = None) -> str:
+    """The three lines, newline-joined. `cardio_kinds` (`cardio_kinds_of`) picks the low-energy line."""
+    return "\n".join((session_line(day, band), hevy_note_grammar.low_energy_line(cardio_kinds), load_rule_line(step)))
+
+
+def cardio_kinds_of(exercises: Any) -> list[str]:
+    """The menu kind of every cardio block in the session: its composed note's line 1 (`cardio_note.composed_kind`), else
+    its rationale tag's last field (`cardio:cycling:menu:intervals`). The low-energy line reads them (#5428 re-grade #2:
+    "+ easy cardio" over a session whose only cardio was intervals)."""
+    from training import cardio_note
+
+    kinds: list[str] = []
+    for ex in exercises or []:
+        if not cardio_note.machine_for(str(getattr(ex, "movement_key", "") or "")):
+            continue
+        kind = cardio_note.composed_kind(getattr(ex, "notes", None))
+        if not kind:
+            tag = str(getattr(ex, "rationale_tag", "") or "")
+            kind = tag.split(":")[-1] if tag.startswith("cardio") and tag.count(":") >= 3 else "easy"
+        kinds.append(kind)
+    return kinds
 
 
 def compounds_band(read: Callable[..., Any] | None = None) -> list[Any] | None:
@@ -120,14 +142,14 @@ def render_for(ir: Any, band: Any = None, read: Callable[..., Any] | None = None
     """The block for a routine IR: its role/archetype for ‹Day›, the charter's compounds band for the RPE."""
     cal = ((getattr(ir, "inputs_snapshot", None) or {}).get("calendar")) or {}
     day = day_label(cal.get("session_role"), getattr(ir, "archetype", None))
-    return render(day, band if band is not None else compounds_band(read), step_lb(read))
+    return render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(getattr(ir, "exercises", None)))
 
 
 def split(note: str | None) -> tuple[str, str]:
     """(the session block, the lift's own note). The block is "" when the note does not open with one."""
     text = note or ""
     lines = text.split("\n")
-    if len(lines) >= 3 and lines[1] == LOW_ENERGY_LINE and lines[2].startswith(LOAD_RULE_HEAD):
+    if len(lines) >= 3 and lines[1] in LOW_ENERGY_LINES and lines[2].startswith(LOAD_RULE_HEAD):
         return "\n".join(lines[:3]), "\n".join(lines[3:]).strip("\n")
     return "", text
 
@@ -155,6 +177,25 @@ def place_on_first(ir: Any, band: Any = None, read: Callable[..., Any] | None = 
     block = render_for(ir, band=band, read=read)
     exercises[0].notes = place(getattr(exercises[0], "notes", "") or "", block)
     return block
+
+
+def sync_low_energy(ir: Any) -> bool:
+    """Re-read the low-energy line off the session's cardio as it now stands (a critic swap or drop can change it after
+    the block was placed — #5428 re-grade #2). IN PLACE; True when line 2 changed. A note with no block is left alone."""
+    exercises = getattr(ir, "exercises", None) or []
+    if not exercises:
+        return False
+    note = getattr(exercises[0], "notes", "") or ""
+    block, own = split(note)
+    if not block:
+        return False
+    lines = block.split("\n")
+    want = hevy_note_grammar.low_energy_line(cardio_kinds_of(exercises))
+    if lines[1] == want:
+        return False
+    lines[1] = want
+    exercises[0].notes = "\n".join(lines) + ("\n\n" + own if own else "")
+    return True
 
 
 def block_of(ir: Any) -> str:
