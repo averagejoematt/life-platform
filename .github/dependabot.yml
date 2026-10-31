@@ -2,7 +2,8 @@
 # Actions are SHA-pinned; Dependabot bumps the SHA + version comment for us.
 # Lambda *source* is stdlib-only, but three binary *layers* (pillow/garth/lameenc) ship
 # third-party code into running Lambdas — those are version-pinned in
-# lambdas/requirements/ and CVE-scanned by the scheduled pip_audit_lambda (#1336), not by
+# lambdas/requirements/ and CVE-scanned in CI (layer-pip-audit.yml weekly + ci-lint per PR,
+# #5473; the scheduled pip_audit_lambda retired 2026-10-30, #5474), not by
 # Dependabot (which can't resolve a binary Lambda layer). Here only the dev + CDK
 # toolchains are Dependabot-tracked.
 version: 2

@@ -913,19 +913,12 @@ COVERAGE = {
     "life-platform-traffic-digest": (
         CENSUS,
         "2026-08-29",
-        "#2835: the Monday ops-pack email (traffic + green report + subscriber funnel + the folded reconciliation and "
-        "pip-audit sections); a missing issue is noticed by its reader (Matthew) same-morning — the operator-email class.",
+        "#2835: the Monday ops-pack email (traffic + green report + subscriber funnel + the folded reconciliation section; "
+        "the pip-audit fold retired with its Lambda, #5474); a missing issue is noticed by its reader (Matthew) same-morning — "
+        "the operator-email class.",
     ),
-    "life-platform-pip-audit": (
-        EXEMPT,
-        "2026-08-29",
-        "#2835: advisory dependency audit, now artifact-only (pip-audit/latest.json) embedded in the Monday ops pack — a dead "
-        "cron renders as a loud dated STALE line there within a week, and a terminal failure lands in the DLQ digest. "
-        "Findings are advisory by design; absence = a missed advisory section, not a data-path failure. "
-        "#3506 CORRECTED this clause: it used to say 'within its monthly cadence', and this Lambda is not monthly — "
-        "operational_stack.py schedules cron(0 15 ? * MON *), every Monday. The cadence assertion above does not catch a "
-        "bare adverb like this one (see its block comment for why); a human reading the row for #3506 did.",
-    ),
+    # `life-platform-pip-audit` had an EXEMPT row here (2026-08-29, #2835; corrected by #3506) until the Lambda itself
+    # retired on 2026-10-30 (#5474): its scan could never run pip on python3.12 and read "0 vulnerabilities" (#5473).
     # #3506: this row was a dated EXEMPT from 2026-07-19 until the cadence assertion
     # above red it. The waiver read "the 4x-daily synthetic prober ... its own silent
     # death is uncaught; every path it probes (DDB, S3, MCP) also has independent
@@ -1430,11 +1423,11 @@ def test_cadence_resolver_population_floor():
 # Lambdas are producers in deploy/emf_namespace_ledger.py with a readable cadence, so the
 # producer census now grades their silence and their rows are CENSUS. The 5 left are the
 # scheduled/SES Lambdas that write no ledger namespace (delete-user-data,
-# data-reconciliation, pip-audit, subscriber-onboarding) or have no gradable cadence
+# data-reconciliation, subscriber-onboarding) or have no gradable cadence
 # (insight-email-parser, SES-only). test_no_exemption_is_census_gradable() makes the
 # number structural rather than a ratchet someone remembers to tighten: an EXEMPT row
-# the census CAN grade reds.
-EXEMPT_CEILING = 5
+# the census CAN grade reds. 5 -> 4 on 2026-10-30: the pip-audit Lambda retired (#5474).
+EXEMPT_CEILING = 4
 
 
 def coverage_census() -> dict:

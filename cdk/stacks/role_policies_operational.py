@@ -511,35 +511,6 @@ def operational_canary() -> list[iam.PolicyStatement]:
     ]
 
 
-def operational_pip_audit() -> list[iam.PolicyStatement]:
-    """Pip audit (#2835): reads the pinned requirements manifests from S3 and
-    writes the report artifact the Monday ops pack embeds. No SES — the
-    standalone email is retired; delivery is pip-audit/latest.json.
-
-    The read grant is also a live-bug fix folded in here: the role held ONLY
-    SES before, so every scheduled run's ListObjectsV2 on config/requirements/
-    died AccessDenied (verified in the 2026-08-03 run's logs) and the 'scan'
-    early-returned having audited nothing."""
-    return [
-        iam.PolicyStatement(
-            sid="ReadRequirementsManifests",
-            actions=["s3:GetObject"],
-            resources=_s3("config/requirements/*"),
-        ),
-        iam.PolicyStatement(
-            sid="ListRequirementsPrefix",
-            actions=["s3:ListBucket"],
-            resources=[BUCKET_ARN],
-            conditions={"StringLike": {"s3:prefix": "config/requirements/*"}},
-        ),
-        iam.PolicyStatement(
-            sid="OpsArtifactWrite",
-            actions=["s3:PutObject"],
-            resources=_s3("pip-audit/*"),
-        ),
-    ]
-
-
 def operational_qa_smoke() -> list[iam.PolicyStatement]:
     """QA smoke: reads DDB + cache, S3, MCP API key, Lambda/Secrets inventory, sends SES report.
 

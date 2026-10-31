@@ -131,7 +131,6 @@ WATCHED_LOG_GROUPS = (
     "/aws/lambda/life-platform-freshness-checker",
     "/aws/lambda/life-platform-key-rotator",
     "/aws/lambda/life-platform-permanence",
-    "/aws/lambda/life-platform-pip-audit",
     "/aws/lambda/life-platform-qa-smoke",
     "/aws/lambda/life-platform-remediation-dispatcher",
     "/aws/lambda/life-platform-traffic-digest",

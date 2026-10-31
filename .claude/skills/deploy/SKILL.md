@@ -201,7 +201,6 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - life-platform-dlq-consumer → `lambdas/operational/dlq_consumer_lambda.py`
 - life-platform-key-rotator → `lambdas/operational/key_rotator_lambda.py`
 - life-platform-permanence → `lambdas/operational/permanence_lambda.py`
-- life-platform-pip-audit → `lambdas/operational/pip_audit_lambda.py`
 - life-platform-qa-smoke → `lambdas/operational/qa_smoke_lambda.py`
 - life-platform-remediation-dispatcher → `lambdas/operational/remediation_dispatcher_lambda.py`
 - life-platform-traffic-digest → `lambdas/operational/traffic_digest_lambda.py`

@@ -222,7 +222,7 @@ privacy page documents this verbatim under "Cookies and tracking."
 
 One-time infra (step 2 below is already CDK-declared; both require AWS perms beyond the site/API deploys — **hand to
 Matthew**, do not run from the agent). It is the weekly Monday ops-pack email (#2835): the same
-digest also carries the folded data-reconciliation and pip-audit artifacts.
+digest also carries the folded data-reconciliation artifact (the pip-audit fold retired with its Lambda, #5474).
 
 1. **CDK** — `bash deploy/cdk_deploy.sh LifePlatformOperational` (the drift-guarded path, `docs/CONVENTIONS.md` §6). This creates:
    - the log bucket `matthew-life-platform-cf-logs` (BUCKET_OWNER_PREFERRED ACL so
