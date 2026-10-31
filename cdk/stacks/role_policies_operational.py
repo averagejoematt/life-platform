@@ -266,15 +266,16 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
     partition: counts by status, 7d new-pending/new-confirmed, stray-canary-row
     warning. Query only, never write — the digest is read-only by contract.
 
-    #2835 (ops pack): + s3:GetObject on exactly the two folded-report artifact
-    keys (reconciliation/latest.json, pip-audit/latest.json) so the Monday
-    email can embed the retired standalone reports. Read-only additions."""
+    #2835 (ops pack): + s3:GetObject on exactly the folded-report artifact key
+    (reconciliation/latest.json) so the Monday email can embed the retired
+    standalone report. Read-only addition. (pip-audit/latest.json left the grant
+    with its Lambda, #5474 — the pack points at the CI scan instead.)"""
     log_bucket_arn = "arn:aws:s3:::matthew-life-platform-cf-logs"
     return [
         iam.PolicyStatement(
             sid="FoldedOpsArtifactsRead",
             actions=["s3:GetObject"],
-            resources=_s3("reconciliation/latest.json", "pip-audit/latest.json"),
+            resources=_s3("reconciliation/latest.json"),
         ),
         iam.PolicyStatement(
             sid="SubscriberFunnelRead",
