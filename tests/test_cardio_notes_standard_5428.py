@@ -99,14 +99,14 @@ def test_the_10_25_intervals_list_every_start_minute_and_carry_the_escape():
     assert note == (
         "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
         "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\n"
-        "Rep 1: full sentences → L13; none → L11.\n" + AFTER
+        "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12.\n" + AFTER
     )
     assert audit["clock_numbers"] == ["11", "12"] and audit["clock_off_grid"] == []
-    assert audit["steady_level"] == 11 and audit["interval_escape"] == "Rep 1: full sentences → L13; none → L11."
+    assert audit["steady_level"] == 11 and audit["interval_escape"] == "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12."
     # the read-back (adherence grades against it): warm-up and cool-down at L11, the sprints at L12
     shape = cn.clock_of(note, 30)
     assert shape["levels"] == [11, 12] and shape["family"] == "intervals", shape
-    assert g.phone_lines(note) <= g.CARDIO_MAX_LINES and len(note) <= g.CARDIO_NOTE_MAX_CHARS
+    assert g.phone_lines(note) <= g.CARDIO_INTERVAL_MAX_LINES and len(note) <= g.CARDIO_NOTE_MAX_CHARS
 
 
 def test_the_10_23_tempo_is_one_level_over_his_logged_steady_with_talk_test_check_ins():

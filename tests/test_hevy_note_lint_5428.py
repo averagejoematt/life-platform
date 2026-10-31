@@ -113,10 +113,13 @@ def test_the_session_block_is_three_lines_with_no_safety_line():
     block = g.session_block("Upper volume", (8, 9))
     assert block.split("\n") == ["Upper volume · RPE 8–9 on big lifts", g.LOW_ENERGY_LINE, *g.LOAD_RULE_LINES]
     # re-grade #3: a one-set exercise 1 has no later set to step, so its block carries no load rule
-    assert g.session_block("Shoulders + arms", (8, 9), ex1_working_sets=1).split("\n") == [
+    assert g.session_block("Shoulders + arms", (8, 9), ex1_working_sets=1, others_multi=False).split("\n") == [
         "Shoulders + arms · RPE 8–9 on big lifts",
         g.LOW_ENERGY_LINE,
     ]
+    # re-grade #4: the session's multi-set lifts still get it, addressed to them (dropping it left them with no rule)
+    assert g.session_block("Shoulders + arms", (8, 9), ex1_working_sets=1).split("\n")[2:] == list(g.OTHER_LIFTS_RULE_LINES)
+    assert g.OTHER_LIFTS_RULE_LINES[0].startswith("Other lifts: top reps at RPE 7 or less → +10 lb on later sets")
     assert g.phone_lines(block) <= g.SESSION_BLOCK_MAX_LINES
     for word in ("Chest pain", "dizziness", "faint", "911", "heartbeat"):
         assert word not in block
@@ -131,7 +134,7 @@ def test_the_session_block_is_three_lines_with_no_safety_line():
         # a session whose only cardio is a hard kind (10-23 tempo, 10-25 intervals) promises no easy cardio; the 10-25
         # Shoulders + arms opens on a one-set press, so no load rule
         low = g.LOW_ENERGY_HARD_CARDIO_LINE if r["date"] in ("2026-10-23", "2026-10-25") else g.LOW_ENERGY_LINE
-        rule = [] if r["date"] == "2026-10-25" else list(g.LOAD_RULE_LINES)
+        rule = list(g.OTHER_LIFTS_RULE_LINES) if r["date"] == "2026-10-25" else list(g.LOAD_RULE_LINES)
         assert r["exercises"][0]["note"].split("\n\n", 1)[0].split("\n")[1:] == [low, *rule], r["date"]
 
 
@@ -156,7 +159,11 @@ def test_the_grammar_builders():
     assert g.carry_line1((8, 9)) == "RPE 8–9 · pick the load per hand"
     assert g.carry_line1((8, 9), 60) == "RPE 8–9 · 60 lb per hand to start" and g.CARRY_LINE1_RE.match(g.carry_line1((8, 9), 60))
     assert g.carry_adjust_line(5) == "Set 1 at RPE 7 or less: +10 lb per hand." and g.CARRY_ADJUST_RE.match(g.carry_adjust_line(5))
-    assert g.pick_load_line() == "W set: up to 8 easy reps, test the load."
+    assert g.pick_load_line() == "W set at RPE 5 or less → next plate."  # re-grade #4: the feeler's result rule
+    assert (
+        g.pick_load_line(step_text="+5 lb per hand") == "W set at RPE 5 or less → +5 lb per hand."
+        and g.phone_lines(g.pick_load_line(step_text="+5 lb per hand")) == 1
+    )
     assert g.pick_load_line(rows_loaded=False) == "W set: up to 8 easy reps, find the load."
     # re-grade #3: the held-top reason IS the load rule on this lift's set 1 (one timeline), in its implement's step
     held = {
@@ -166,21 +173,23 @@ def test_the_grammar_builders():
         "one set": g.held_top_line(10, working_sets=1, next_step_lb=5),
     }
     assert held == {
-        "stack": "Same load to start: 15 reps on set 1 at RPE 8.5 or less → next plate.",
-        "small": "Same load to start: 15 reps on set 1 at RPE 8.5 or less → +5 lb per hand.",
-        "fixed": "Same load to start: 10 reps on set 1 at RPE 7 or less → +10 lb, 7.5–8.5 → +5 lb.",
-        "one set": "Same load: 10 reps again → +5 lb next time.",
+        # re-grade #4: in the load rule's own timeline words ("on later sets" today; "next session" on a one-set lift)
+        "stack": "Set 1: 15 reps at RPE 8.5 or less → next plate on later sets.",
+        "small": "Set 1: 15 reps at RPE 8.5 or less → +5 lb per hand on later sets.",
+        "fixed": "Set 1: 10 reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.",
+        "one set": "Same load: 10 reps again → +5 lb next session.",
     }
-    assert all(g.REASON_RE.match(x) and g.HELD_TOP_RE.match(x) for x in held.values()) and not g.HELD_TOP_RE.match(
-        "Same load: hit 15 again to move it up."
+    assert all(g.REASON_RE.match(x) and g.HELD_TOP_RE.match(x) for x in held.values()) and not any(
+        g.HELD_TOP_RE.match(x)
+        for x in ("Same load: hit 15 again to move it up.", "Same load to start: 15 reps on set 1 at RPE 8.5 or less → next plate.")
     )
     assert g.one_set_line(10, 9, 5, True) == "One set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand."
     assert g.stale_reason_line(g.LIGHTER, "2 years") == "Lighter: first time in 2 years." and g.REASON_RE.match(
         "Lighter: first time in 2 years."
     )
-    assert (
-        g.interval_escape_line(13, 11) == "Rep 1: full sentences → L13; none → L11." and g.phone_lines(g.interval_escape_line(13, 11)) == 1
-    )
+    # re-grade #4: the standard's talk words; too hard shortens the reps at the hard level, never drops to the recovery level
+    assert g.interval_escape_line(13, 12) == "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12."
+    assert g.phone_lines(g.interval_escape_line(13, 12)) == 2
     assert g.sets_today_clause(2, "first incline in 5 weeks") == "2 sets today: first incline in 5 weeks."
     assert g.reason_line(g.HEAVIER, "15 reps was RPE 7") == "Heavier: 15 reps was RPE 7."
     assert g.delta_word(90, 80, 5) == g.HEAVIER and g.delta_word(80, 90, 5) == g.LIGHTER and g.delta_word(85, 80, 5) is None
@@ -267,7 +276,15 @@ MUTATIONS: list[tuple[str, str, Mut, str]] = [
     ),
     # L4 — text agrees with the rows
     ("a set count that is not the rows", "2026-10-26", _rows(0, lambda r: r + [["N", 80, "8–12"]]), "L4"),
-    ("W text that is not the W rows", "2026-10-26", _rows(3, lambda r: [["W", None, "5"]] + r[1:]), "L4"),
+    (
+        "W text that is not the W rows",
+        "2026-10-26",
+        lambda rt: (
+            _rows(3, lambda r: [["W", None, "5"]] + [[x[0], None, x[2]] for x in r[1:]])(rt),
+            _note(3, lambda n: n.replace(n.split("\n")[-1], "W set: up to 8 easy reps, find the load."))(rt),
+        ),
+        "L4",
+    ),
     ("a row two steps off PREVIOUS with no reason", "2026-10-25", _previous(1, 25.0), "L4"),
     (
         "a reason pointing the wrong way",
@@ -358,7 +375,7 @@ REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
     (
         "find the load over a loaded row",
         "2026-10-26",
-        _note(4, lambda n: n.replace(g.PICK_LOAD_FIXED_TAIL, g.PICK_LOAD_OPEN_TAIL)),
+        _note(4, lambda n: n.replace(n.split("\n")[-1], "W set: up to 8 easy reps, find the load.")),
         "L4",
         "find the load",
     ),
@@ -407,7 +424,20 @@ REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
         "L9",
         "no talk words",
     ),
-    ("an escape that only steps up", "2026-10-25", _note(6, lambda n: n.replace("; none → L11.", ".")), "L9", "one level each way"),
+    (
+        "an escape that steps down to the recovery level",
+        "2026-10-25",
+        _note(6, lambda n: n.replace("; can't talk → 1 min at L12.", "; none → L11.")),
+        "L9",
+        "shorter reps at the hard level",
+    ),
+    (
+        "an escape with no too-hard branch",
+        "2026-10-25",
+        _note(6, lambda n: n.replace("; can't talk → 1 min at L12.", ".")),
+        "L9",
+        "can't talk",
+    ),
     (
         "the old load rule's RPE 8.5 gap",
         "2026-10-26",
@@ -450,11 +480,34 @@ REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
         _note(
             6,
             lambda n: n.replace(
-                "sentences).\nRep 1: full sentences → L13; none → L11.", "sentences). Full sentences at min 8 → L13 from min 10."
+                "sentences).\nAs rep 1 ends: full sentences → L13; can't talk → 1 min at L12.",
+                "sentences). Full sentences at min 8 → L13 from min 10.",
             ),
         ),
         "L9",
         "bare minute",
+    ),
+    # re-grade #4 (lint 1.3.0)
+    (
+        "no load rule for a one-set exercise 1's other lifts",
+        "2026-10-25",
+        _note(0, lambda n: n.replace("\n" + "\n".join(g.OTHER_LIFTS_RULE_LINES), "")),
+        "L3",
+        "no load rule for the session's multi-set lifts",
+    ),
+    (
+        "a feeler W line with no result rule",
+        "2026-10-26",
+        _note(4, lambda n: n.replace(n.split("\n")[-1], "W set: up to 8 easy reps, test the load.")),
+        "L4",
+        "no result rule",
+    ),
+    (
+        "a carry's start load only in the note",
+        "2026-10-25",
+        _note(5, lambda n: n.replace("pick the load per hand", "60 lb per hand to start")),
+        "L4",
+        "not on its rows",
     ),
     ("a two-level escape", "2026-10-25", _note(6, lambda n: n.replace("→ L13;", "→ L14;")), "L9", "more than one level"),
 ]

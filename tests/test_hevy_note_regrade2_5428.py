@@ -141,6 +141,7 @@ OLD_DRAFT_PROBLEMS = [
     "L11 [1] Shoulder Press (Dumbbell): 'pins' on a dumbbell lift (a step is lb per hand)",
     "L11 [1] Shoulder Press (Dumbbell): 'later sets' on a lift with one working set",
     "L4 [2] Lateral Raise (Machine): the W line says 'find the load.' but the working rows carry a load",
+    "L4 [2] Lateral Raise (Machine): the W line gives its test no result rule: 'W set: up to 8 easy reps, find the load.'",
     "L4 [2] Lateral Raise (Machine): 'New: replaces …' over a PREVIOUS (Hevy shows it beside the row): New is only for a lift never logged",
     "L4 [3] Rear Delt Reverse Fly (Machine): held at PREVIOUS 60 lb, which reached the top of 15 reps at RPE 8.5, with no reason "
     "(what moves it?)",
@@ -151,7 +152,7 @@ OLD_DRAFT_PROBLEMS = [
     "L9 [7] Cycling: interval talk check at a bare minute; it lands as a hard rep ends",
     "L9 [7] Cycling: interval clock gives the easy minutes no talk words",
     "L9 [7] Cycling: interval escape L12 → L14 is more than one level",
-    "L9 [7] Cycling: interval escape is not one level each way, checked as rep 1 ends",
+    "L9 [7] Cycling: interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level",
 ]
 
 
@@ -172,8 +173,9 @@ def test_MUTATION_the_10_lint_rules_read_the_stored_draft_clean(monkeypatch):
     monkeypatch.setattr(lint, "_lint_carry", lambda *a, **k: None)
     monkeypatch.setattr(lint, "cardio_kinds", lambda rt: [])
     monkeypatch.setattr(lint, "_session_effort", lambda session: None)
-    monkeypatch.setattr(g, "rule_fits", lambda n: True)
-    monkeypatch.setattr(g, "LOAD_RULE_LINES", (DRAFT["exercises"][0]["stored_note"].split("\n")[2],))
+    monkeypatch.setattr(g, "rule_mode", lambda *a: "ex1")
+    monkeypatch.setattr(g, "rule_lines", lambda mode: [DRAFT["exercises"][0]["stored_note"].split("\n")[2]])
+    monkeypatch.setattr(g, "PICK_LOAD_RESULT_RE", __import__("re").compile("W set"))
     ir = stored_ir()
     for key in ir.inputs_snapshot[lint.PREVIOUS_LOADS_KEY].values():
         key.pop("rpe")  # the held-top rule reads PREVIOUS's RPE; 1.0.0 read the load only
@@ -205,15 +207,29 @@ ROUND_1_NOTES = {
 ROUND_1_PROBLEMS = [
     "L3 session block: the load rule heads a one-set exercise 1 (no later set to step)",
     "L6 [1] Shoulder Press (Dumbbell): exercise 1 repeats the session line's effort ('RPE 8–9')",
-    "L4 [3] Rear Delt Reverse Fly (Machine): the reason contradicts the load rule: 'Same load: hit 15 again to move it up.' "
-    "(PREVIOUS's top reps at RPE <= 8.5 earn the step)",
-    "L4 [5] Triceps Rope Pushdown: the reason contradicts the load rule: 'Same load: hit 15 again to move it up.' "
-    "(PREVIOUS's top reps at RPE <= 8.5 earn the step)",
+    "L4 [2] Lateral Raise (Machine): the W line gives its test no result rule: 'W set: up to 8 easy reps, test the load.'",
+    "L4 [3] Rear Delt Reverse Fly (Machine): the reason contradicts the load rule or leaves its timeline open: 'Same load: hit 15 "
+    "again to move it up.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the step on later sets)",
+    "L4 [5] Triceps Rope Pushdown: the reason contradicts the load rule or leaves its timeline open: 'Same load: hit 15 again to "
+    "move it up.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the step on later sets)",
     "L4 [6] Farmers Walk: a carry with no adjust rule after set 1",
     "L4 [6] Farmers Walk: a carry with his last load on file (60 lb per hand) names no start",
     "L9 [7] Cycling: interval clock gives the easy minutes no talk words",
-    "L9 [7] Cycling: interval escape is not one level each way, checked as rep 1 ends",
+    "L9 [7] Cycling: interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level",
 ]
+
+
+def _as_rendered(notes: dict[str, str]) -> RoutineSpec:
+    """The recomposed rows with an earlier round's notes, and that round's rows: the feeler W row without a load and the
+    carry rows without one (both were added in round 4)."""
+    ir = recomposed_ir()
+    for b in ir.exercises:
+        b.notes = notes[b.movement_key]
+        if b.movement_key in ("lateral_raise_machine", "farmers_walk"):
+            for st in b.sets:
+                if st.type == "warmup" or b.movement_key == "farmers_walk":
+                    st.weight_kg = None
+    return ir
 
 
 def test_the_round_1_rendering_fails_the_round_3_rules(monkeypatch):
@@ -221,20 +237,17 @@ def test_the_round_1_rendering_fails_the_round_3_rules(monkeypatch):
     twice, the hold reason against the load rule, a carry with no start and no adjust rule, and intervals whose easy
     minutes have no talk words and whose escape only steps up."""
     monkeypatch.setenv(lint.MODE_ENV, "off")
-    ir = recomposed_ir()
-    for b in ir.exercises:
-        b.notes = ROUND_1_NOTES[b.movement_key]
-    res = _lint(ir)
+    res = _lint(_as_rendered(ROUND_1_NOTES))
     assert res.lines() == ROUND_1_PROBLEMS, res.lines()
 
 
-SESSION = "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts."
-NEW_NOTES = {
-    # one working set: no load rule (nothing to step today), no second "RPE 8–9", the gain rule's next-session step
-    "db_shoulder_press": SESSION
-    + "\n\nOne set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press.",
+# round 3 (re-grade #3's fixes), graded B/B+ by blind re-grade #4 — it must fail the round-4 rules
+ROUND_2_NOTES = {
+    "db_shoulder_press": (
+        "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\n\n"
+        "One set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press."
+    ),
     "lateral_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 2 years.\nW set: up to 8 easy reps, test the load.",
-    # one timeline: the load rule, applied to this lift's set 1 on a stack
     "reverse_pec_deck": "RPE 8–9, last set RPE 9–10\nSame load to start: 15 reps on set 1 at RPE 8.5 or less → next plate.",
     "seated_incline_curl_dumbbell": "RPE 8–9, last set RPE 9–10",
     "triceps_rope_pushdown": "RPE 8–9, last set RPE 9–10\nSame load to start: 15 reps on set 1 at RPE 8.5 or less → next plate.",
@@ -248,6 +261,54 @@ NEW_NOTES = {
         "Rep 1: full sentences → L13; none → L11."
     ),
 }
+ROUND_2_PROBLEMS = [
+    "L3 session block: no load rule for the session's multi-set lifts ('Other lifts: …')",
+    "L4 [2] Lateral Raise (Machine): the W line gives its test no result rule: 'W set: up to 8 easy reps, test the load.'",
+    "L4 [3] Rear Delt Reverse Fly (Machine): the reason contradicts the load rule or leaves its timeline open: 'Same load to start: "
+    "15 reps on set 1 at RPE 8.5 or less → next plate.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the "
+    "step on later sets)",
+    "L4 [5] Triceps Rope Pushdown: the reason contradicts the load rule or leaves its timeline open: 'Same load to start: 15 reps on "
+    "set 1 at RPE 8.5 or less → next plate.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the step on "
+    "later sets)",
+    "L4 [6] Farmers Walk: the carry's start load is in the note but not on its rows",
+    "L9 [7] Cycling: interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level",
+]
+
+
+def test_the_round_3_rendering_fails_the_round_4_rules(monkeypatch):
+    """Blind re-grade #4's four defects, on the rendering it graded: no in-session load rule left for the multi-set lifts
+    (it was dropped with the one-set exercise 1), a feeler W line with no result, the carry's load only in the note, and
+    an escape whose "none" is not a talk word and whose step down cancels the intervals."""
+    monkeypatch.setenv(lint.MODE_ENV, "off")
+    res = _lint(_as_rendered(ROUND_2_NOTES))
+    assert res.lines() == ROUND_2_PROBLEMS, res.lines()
+
+
+SESSION = (
+    "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\n"
+    # re-grade #4: the press has one set, but the session's multi-set lifts still get the in-session rule, addressed to them
+    "Other lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\n"
+    "Under 40 lb: +5 lb max. Stack: next plate. Once per lift."
+)
+NEW_NOTES = {
+    "db_shoulder_press": SESSION
+    + "\n\nOne set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press.",
+    # the feeler W row is AT the 35-lb start load now, and the line says what its answer does
+    "lateral_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 2 years.\nW set at RPE 5 or less → next plate.",
+    # the load rule's own step on this lift, in the rule's own timeline words
+    "reverse_pec_deck": "RPE 8–9, last set RPE 9–10\nSet 1: 15 reps at RPE 8.5 or less → next plate on later sets.",
+    "seated_incline_curl_dumbbell": "RPE 8–9, last set RPE 9–10",
+    "triceps_rope_pushdown": "RPE 8–9, last set RPE 9–10\nSet 1: 15 reps at RPE 8.5 or less → next plate on later sets.",
+    "farmers_walk": (
+        "RPE 8–9 · 60 lb per hand to start\nTall, ribs down, bells off your legs.\nSet 1 at RPE 7 or less: +10 lb per hand.\n"
+        "Steps go in the yards box."
+    ),
+    "cycling": (
+        "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
+        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\n"
+        "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12."
+    ),
+}
 
 
 def test_the_recomposed_draft_reads_the_new_notes_and_lints_clean(monkeypatch):
@@ -256,12 +317,17 @@ def test_the_recomposed_draft_reads_the_new_notes_and_lints_clean(monkeypatch):
     assert {b.movement_key: b.notes for b in ir.exercises} == NEW_NOTES
     res = _lint(ir)
     assert res.ok and res.not_checked == [], res.lines()
-    # the rows the engine chose are untouched: the feeler W row is back ahead of the 35-lb lateral raise, nothing else moved
+    # the working rows the engine chose are untouched; two rows gained a load (round 4): the feeler W row is AT the
+    # 35-lb start load it tests, and the carry rows carry his last carry, 60 lb per hand (the current convention)
     stored = stored_ir()
     for new, old in zip(ir.exercises, stored.exercises):
-        assert [(s.type, s.weight_kg, s.reps, s.rep_range_end, s.distance_meters) for s in new.sets] == [
-            (s.type, s.weight_kg, s.reps, s.rep_range_end, s.distance_meters) for s in old.sets
-        ], new.movement_key
+        got = [(s.type, s.weight_kg, s.reps, s.rep_range_end, s.distance_meters) for s in new.sets]
+        want = [(s.type, s.weight_kg, s.reps, s.rep_range_end, s.distance_meters) for s in old.sets]
+        if new.movement_key == "lateral_raise_machine":
+            want[0] = ("warmup", new.sets[1].weight_kg, 8, None, None)
+        if new.movement_key == "farmers_walk":
+            want = [(t, round(60 * 0.45359237, 6), r, e, d) for t, _w, r, e, d in want]
+        assert got == want, new.movement_key
 
 
 def test_the_carry_row_is_a_whole_step_count_and_reads_as_steps():
@@ -281,7 +347,8 @@ def test_each_fixed_note_fits_its_budget():
     for b in ir.exercises[1:6]:
         assert g.phone_lines(b.notes) <= g.LIFT_MAX_LINES, b.movement_key
     cardio = ir.exercises[6].notes
-    assert g.phone_lines(cardio) <= g.CARDIO_MAX_LINES - 1 and len(cardio) <= g.CARDIO_NOTE_MAX_CHARS  # room for an After line
+    # an interval ride's budget is 7 with its two-line escape (re-grade #4); room for an After line
+    assert g.phone_lines(cardio) <= g.CARDIO_INTERVAL_MAX_LINES - 1 and len(cardio) + 1 + len(g.AFTER_LINE) <= g.CARDIO_NOTE_MAX_CHARS
     assert all(len(ln) <= g.LINE_MAX_CHARS for b in ir.exercises for ln in b.notes.split("\n"))
 
 

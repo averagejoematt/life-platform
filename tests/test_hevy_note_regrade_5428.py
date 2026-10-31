@@ -225,7 +225,7 @@ def test_MUTATION_the_28_day_line_brings_back_the_graded_wire(monkeypatch):
     curl, face = _accessory("hammer_curl_dumbbell", 22.5), _accessory("face_pull", 65)
     history = {**_history("hammer_curl_dumbbell", ("2026-09-20", 22.5, 12, 8.0)), **_history("face_pull", ("2026-10-21", 65, 15, 9.0))}
     _compose([curl, face], history, {"hammer_curl_dumbbell": "Bicep Curl (Dumbbell)"}, target="2026-10-29")
-    assert curl.notes == "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, test the load.", curl.notes
+    assert curl.notes == "RPE 8–9, last set RPE 9–10\nW set at RPE 5 or less → +5 lb per hand.", curl.notes
     assert curl.sets[0].type == "warmup" and "New: replaces" in GRADED_HAMMER_CURL
     # the face pull's "New" came from the rotation alone (its PREVIOUS was 8 days old): not stale even at 28 days
     face2 = _accessory("face_pull", 65)
@@ -244,12 +244,12 @@ def test_a_stale_previous_far_off_is_lighter_not_new_and_a_lift_never_logged_kee
     _compose(
         [leg], _history("lying_leg_curl_machine", ("2024-11-29", 40, 8, None)), {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"}
     )
-    assert leg.notes == "RPE 8–9, last set RPE 9–10\nLighter: first time in 23 months.\nW set: up to 8 easy reps, test the load."
+    assert leg.notes == "RPE 8–9, last set RPE 9–10\nLighter: first time in 23 months.\nW set at RPE 5 or less → next plate."
     assert leg.sets[0].type == "warmup" and leg.sets[0].reps == g.PICK_LOAD_W_REPS and leg.notes != GRADED_LEG_CURL
     # never logged: New stands, with the feeler line over the engine's start load
     fresh = _accessory("lying_leg_curl_machine", 30)
     _compose([fresh], {}, {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"})
-    assert fresh.notes == "RPE 8–9, last set RPE 9–10\nNew: replaces Seated Leg Curl (Machine).\nW set: up to 8 easy reps, test the load."
+    assert fresh.notes == "RPE 8–9, last set RPE 9–10\nNew: replaces Seated Leg Curl (Machine).\nW set at RPE 5 or less → next plate."
 
 
 def test_the_stale_line_is_the_standards_180_days_at_its_boundary():
@@ -357,7 +357,7 @@ def _cap(ir: RoutineSpec, value: Any, to: int = 3) -> list[dict[str, Any]]:
     return critics_apply.apply_changes(ir, [{**verdict, "field": "exercises[1].set_count", "to": to}])
 
 
-STANDING_CALF_COMPOSED = "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, test the load.\nFull stretch at the bottom; knees soft."
+STANDING_CALF_COMPOSED = "RPE 8–9, last set RPE 9–10\nW set at RPE 5 or less → next plate.\nFull stretch at the bottom; knees soft."
 
 
 def test_a_layoff_cap_with_no_days_since_value_reads_its_gap_off_previous(monkeypatch):
@@ -370,7 +370,7 @@ def test_a_layoff_cap_with_no_days_since_value_reads_its_gap_off_previous(monkey
         {"movement_key": "standing_calf_raise_machine", "clause": "No jumps: 3 sets today, 18 months off.", "effort_capped": True}
     ]
     assert ir.exercises[1].notes == (
-        "RPE 7\nNo jumps: 3 sets today, 18 months off.\nW set: up to 8 easy reps, test the load.\nFull stretch at the bottom; knees soft."
+        "RPE 7\nNo jumps: 3 sets today, 18 months off.\nW set at RPE 5 or less → next plate.\nFull stretch at the bottom; knees soft."
     )
     assert ir.exercises[1].notes != GRADED_STANDING_CALF and _lint(ir).ok, _lint(ir).lines()
 

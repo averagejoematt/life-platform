@@ -11,7 +11,7 @@ THE NOTE (≤ 4 lines; `HEVY_NOTE_STANDARD.md` §3.7)
 
     line 1   <Machine> · <levels> · [hard ]RPE <a[–b]> (<talk words>)                  always (`LINE1_RE`)
     line 2   ⌚ ride clock: <rule>   (`⌚ walk clock:` on the treadmill)                  tempo / hills / intervals
-    line 3   Rep 1: full sentences → L<hard+1>; none → L<hard−1>.                         intervals (the escape)
+    line 3   As rep 1 ends: full sentences → L<hard+1>; can't talk → 1 min at L<hard>.     intervals (the escape)
     line 4   <one why>                                                                   optional, a route choice only
     line 4   After: end watch cardio, restart Hevy.                                       when a Hevy block follows
 
@@ -24,7 +24,8 @@ THE NOTE (≤ 4 lines; `HEVY_NOTE_STANDARD.md` §3.7)
   * The clock rule is read off the session clock from 0 in whole minutes, `min` on every time, at most three levels,
     ≤ `CLOCK_LINE_MAX` characters (the owner's wrist-clock rule, 2026-10-25: an iPad covers the console and the watch
     does not alert). Intervals list every start minute, put every other minute at his steady level with its talk words,
-    and carry a one-level escape each way on its own line, checked as rep 1 ends.
+    and carry the escape on its own line, checked as rep 1 ends: full sentences one level up, can't talk 1-min reps at the
+    same level (never down to the recovery level).
   * Levels come from HIS log (`steady_level`: the median of his last single-level rides), never from the top of a ramp:
     easy = steady, tempo = steady + 1, intervals = steady before / between / after and steady + 1 hard (an escape one
     more), hills climb from steady. A treadmill hill starts no steeper than his steepest logged grade.
@@ -47,7 +48,8 @@ from typing import Any
 
 from training import hevy_note_grammar, wrist_clock
 
-CARDIO_NOTE_VERSION = "cardio-note@4.3.0"  # 4.3.0 = re-grade #3: the easy minutes' talk words, a two-way escape  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
+CARDIO_NOTE_VERSION = "cardio-note@4.4.0"  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
+# 4.3.0 = re-grade #3: the easy minutes' talk words; 4.4.0 = re-grade #4: the escape never drops below the hard level
 # 4.1.0 = the 2026-10-30 re-grade: ≤ 3 levels on a bike hill, the talk words' band on line 1, `walk clock` on a treadmill
 # 4.2.0 = the 2026-10-31 re-grade #2: intervals ride his steady level before / between / after, a one-level escape on its
 # own line, checked as rep 1 ends
@@ -582,7 +584,7 @@ def interval_escape(kind: str, dose: dict[str, Any], minutes: int, *, walk: bool
     if plan is None or len(plan["starts"]) < 2:
         return None
     hard = steady + INTERVAL_LEVEL_STEP
-    return hevy_note_grammar.interval_escape_line(hard + INTERVAL_ESCAPE_STEP, hard - INTERVAL_ESCAPE_STEP)
+    return hevy_note_grammar.interval_escape_line(hard + INTERVAL_ESCAPE_STEP, hard)
 
 
 def levels_text(kind: str, dose: dict[str, Any], *, walk: bool, usual: dict[str, Any] | None = None, top: Any = None) -> str:

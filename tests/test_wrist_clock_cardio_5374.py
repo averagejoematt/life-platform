@@ -202,7 +202,7 @@ def test_the_level_line_comes_first_and_the_clock_second():
         if kind == "easy":
             assert lines == [lines[0]], note
         elif kind == "intervals":  # #5428 re-grade #2: the one-level escape rides its own line under the clock
-            assert len(lines) == 3 and lines[1].startswith(cn.CLOCK_PREFIXES) and lines[2] == g.interval_escape_line(12, 10), note
+            assert len(lines) == 3 and lines[1].startswith(cn.CLOCK_PREFIXES) and lines[2] == g.interval_escape_line(12, 11), note
         else:
             assert len(lines) == 2 and lines[1].startswith(cn.CLOCK_PREFIXES), note
 

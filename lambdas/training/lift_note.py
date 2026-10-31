@@ -193,7 +193,10 @@ def _add_feeler(block: Any) -> bool:
         return False
     if any(getattr(s, "distance_meters", None) or getattr(s, "duration_seconds", None) for s in sets):
         return False
-    block.sets = [Set(type="warmup", reps=PICK_LOAD_W_REPS)] + sets
+    # #5428 re-grade #4: the feeler is the test OF the start load, so it carries that load (a "— lb" W row under "test
+    # the load" had nothing to act on); a block with no load on its rows keeps the no-load feeler (find the load)
+    top = max((float(st.weight_kg) for st in sets if not _is_warmup(st) and getattr(st, "weight_kg", None)), default=None)
+    block.sets = [Set(type="warmup", reps=PICK_LOAD_W_REPS, weight_kg=top)] + sets
     return True
 
 
@@ -443,6 +446,8 @@ def compose_blocks(
             start = _last_carry(history_index, tid, target_date)
             if start is not None:
                 previous_loads[key] = start
+            if start is not None:
+                _load_carry_rows(block, start)
             block.notes = carry_note(start)
             seen_families.add("carry")
             notes[key] = {"note": block.notes, "reason": None, "reason_line": None, "pick_load": False, "detail": detail}
@@ -472,7 +477,7 @@ def compose_blocks(
         lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
         if lead:
             reason_kind = "rotation"
-        pick_line = (PICK_LOAD_LINE if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""
+        pick_line = (_pick_result_line(block, entry) if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""
         body = [x for x in (line1, lead, line2, pick_line) if x]
         cue = own.get("line") or ""
         if family and family not in seen_families:
@@ -505,6 +510,24 @@ def _last_carry(history_index: dict[str, list] | None, tid: str | None, target_d
             lb = float(s["top_weight_kg"]) / LB_IN_KG
             return {"date": d, "template_id": tid, "lb": round(lb * 2) / 2, "reps": 0, "rpe": None, "carry": True}
     return None
+
+
+def _pick_result_line(block: Any, entry: dict[str, Any]) -> str:
+    """The pick-load W line with its result rule (#5428 re-grade #4: "test the load." said nothing about the answer):
+    `W set: up to 8 reps at the start load; RPE 5 or less → next plate.` — a stack's step is its next plate, a fixed
+    implement's one charter step (per hand on a dumbbell)."""
+    shape = _step_shape(block, entry)
+    step = None if shape["stack"] else hevy_note_grammar._step_text(shape["step_lb"] or 5, shape["per_hand"])
+    return hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS, step_text=step)
+
+
+def _load_carry_rows(block: Any, start: dict[str, Any]) -> None:
+    """Put his last carry load on the carry's unloaded working rows (#5428 re-grade #4: the load lived only in the note,
+    so the logged set recorded none and the next PREVIOUS came back empty). `start["lb"]` is already in the movement's
+    CURRENT convention (`exercise_history` scales a dated total to per hand, #5373), which is what he types now."""
+    for st in _working(block.sets):
+        if getattr(st, "weight_kg", None) is None:
+            st.weight_kg = round(float(start["lb"]) * LB_IN_KG, 6)
 
 
 def carry_note(start: dict[str, Any] | None) -> str:

@@ -1541,7 +1541,7 @@
        "6–10"
       ]
      ],
-     "note": "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\n\nOne hard set: aim for 8.\nBreathe out on the press."
+     "note": "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\nOther lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: +5 lb max. Stack: next plate. Once per lift.\n\nOne hard set: aim for 8.\nBreathe out on the press."
     },
     {
      "name": "Lateral Raise (Dumbbell)",
@@ -1671,7 +1671,7 @@
        "30 min"
       ]
      ],
-     "note": "Recumbent · L11/L12 · hard RPE 8 (a few words)\n⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\nRep 1: full sentences → L13; none → L11.\nAfter: end watch cardio, restart Hevy."
+     "note": "Recumbent · L11/L12 · hard RPE 8 (a few words)\n⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\nAs rep 1 ends: full sentences → L13; can't talk → 1 min at L12.\nAfter: end watch cardio, restart Hevy."
     },
     {
      "name": "Stretching",
@@ -1773,7 +1773,7 @@
      "rows": [
       [
        "W",
-       null,
+       30,
        "8"
       ],
       [
@@ -1792,7 +1792,7 @@
        "8–15"
       ]
      ],
-     "note": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, test the load."
+     "note": "RPE 8–9, last set RPE 9–10\nW set at RPE 5 or less → +5 lb per hand."
     },
     {
      "name": "Chest Fly (Machine)",
@@ -1803,7 +1803,7 @@
      "rows": [
       [
        "W",
-       null,
+       60,
        "8"
       ],
       [
@@ -1817,7 +1817,7 @@
        "8–15"
       ]
      ],
-     "note": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW set: up to 8 easy reps, test the load."
+     "note": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW set at RPE 5 or less → next plate."
     },
     {
      "name": "Lying DB Tricep Extension",
@@ -1828,7 +1828,7 @@
      "rows": [
       [
        "W",
-       null,
+       20,
        "8"
       ],
       [
@@ -1842,7 +1842,7 @@
        "8–15"
       ]
      ],
-     "note": "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW set: up to 8 easy reps, test the load.\nElbows still."
+     "note": "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW set at RPE 5 or less → +5 lb per hand.\nElbows still."
     },
     {
      "name": "Preacher Curl (Machine)",
@@ -1853,7 +1853,7 @@
      "rows": [
       [
        "W",
-       null,
+       80,
        "8"
       ],
       [
@@ -1867,7 +1867,7 @@
        "8–15"
       ]
      ],
-     "note": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, test the load."
+     "note": "RPE 8–9, last set RPE 9–10\nW set at RPE 5 or less → next plate."
     },
     {
      "name": "Cycling",

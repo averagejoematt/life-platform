@@ -54,9 +54,9 @@ def step_lb(read: Callable[..., Any] | None = None) -> Any:
         return None
 
 
-def load_rule_line(step: Any) -> str:
+def load_rule_line(step: Any, other_lifts: bool = False) -> str:
     """`Top reps at RPE 7 or less → +10 lb on sets left; 7.5–8.5 → +5. Under 40 lb: +5 max. Dumbbells per hand. Once per lift.`"""
-    return hevy_note_grammar.load_rule_line(float(step) if step else None)
+    return hevy_note_grammar.load_rule_line(float(step) if step else None, other_lifts=other_lifts)
 
 
 # ‹Day› by the program's session role first (`inputs_snapshot.calendar.session_role`), then the archetype.
@@ -104,12 +104,30 @@ def session_line(day: str, band: Any) -> str:
     return f"{day} · RPE {text} on big lifts" if text else day
 
 
-def render(day: str, band: Any, step: Any, cardio_kinds: list[str] | None = None, ex1_working_sets: int = 2) -> str:
+def render(
+    day: str, band: Any, step: Any, cardio_kinds: list[str] | None = None, ex1_working_sets: int = 2, others_multi: bool = True
+) -> str:
     """The block, newline-joined: the session line, the low-energy line (`cardio_kinds`, `cardio_kinds_of`), then the
-    load rule's two lines — only when exercise 1 has 2+ working sets (#5428 re-grade #3: on a one-set lift the rule has
-    no later set to step; `hevy_note_grammar.rule_fits`)."""
+    load rule's two lines (`hevy_note_grammar.rule_mode`): as written when exercise 1 has 2+ working sets; addressed to
+    `Other lifts:` when exercise 1 has one and another lift has 2+ (#5428 re-grade #4 — dropping it left the session with
+    no in-session rule); none when no lift can step."""
     head = [session_line(day, band), hevy_note_grammar.low_energy_line(cardio_kinds)]
-    return "\n".join(head + ([load_rule_line(step)] if hevy_note_grammar.rule_fits(ex1_working_sets) else []))
+    mode = hevy_note_grammar.rule_mode(ex1_working_sets, others_multi)
+    return "\n".join(head + ([load_rule_line(step, other_lifts=mode == "others")] if mode else []))
+
+
+def steppable(ex: Any) -> bool:
+    """A rep-counted lift with 2+ working sets — one the load rule can step (not a carry, ride or timed block)."""
+    sets = getattr(ex, "sets", None) or []
+    reps = any(getattr(s, "reps", None) is not None or getattr(s, "rep_range_start", None) is not None for s in sets)
+    timed = any(getattr(s, "distance_meters", None) or getattr(s, "duration_seconds", None) for s in sets)
+    return reps and not timed and working_sets_of(ex) >= 2
+
+
+def rule_args(exercises: Any) -> tuple[int, bool]:
+    """(exercise 1's working sets, whether another lift is steppable) — what picks the block's load rule."""
+    exs = list(exercises or [])
+    return (working_sets_of(exs[0]) if exs else 2), any(steppable(e) for e in exs[1:])
 
 
 def working_sets_of(ex: Any) -> int:
@@ -151,8 +169,8 @@ def render_for(ir: Any, band: Any = None, read: Callable[..., Any] | None = None
     cal = ((getattr(ir, "inputs_snapshot", None) or {}).get("calendar")) or {}
     day = day_label(cal.get("session_role"), getattr(ir, "archetype", None))
     exercises = getattr(ir, "exercises", None) or []
-    first = working_sets_of(exercises[0]) if exercises else 2
-    return render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(exercises), first)
+    first, others = rule_args(exercises)
+    return render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(exercises), first, others)
 
 
 def split(note: str | None) -> tuple[str, str]:
@@ -162,7 +180,11 @@ def split(note: str | None) -> tuple[str, str]:
     text = note or ""
     head, _sep, rest = text.partition("\n\n")
     lines = head.split("\n")
-    if len(lines) >= 2 and lines[1] in LOW_ENERGY_LINES and (len(lines) == 2 or lines[2].startswith(LOAD_RULE_HEAD)):
+    if (
+        len(lines) >= 2
+        and lines[1] in LOW_ENERGY_LINES
+        and (len(lines) == 2 or lines[2].startswith((LOAD_RULE_HEAD, hevy_note_grammar.OTHER_LIFTS_HEAD)))
+    ):
         return head, rest.strip("\n")
     return "", text
 
@@ -254,7 +276,8 @@ def conform_block(block: str, ir: Any) -> str:
     """`block`'s session line, with the low-energy line and the load rule this routine calls for."""
     exercises = getattr(ir, "exercises", None) or []
     lines = block.strip().split("\n")
-    rule = load_rule_line(step_lb()).split("\n") if exercises and hevy_note_grammar.rule_fits(working_sets_of(exercises[0])) else []
+    mode = hevy_note_grammar.rule_mode(*rule_args(exercises)) if exercises else None
+    rule = load_rule_line(step_lb(), other_lifts=mode == "others").split("\n") if mode else []
     return "\n".join([lines[0], hevy_note_grammar.low_energy_line(cardio_kinds_of(exercises))] + rule)
 
 

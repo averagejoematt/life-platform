@@ -67,6 +67,8 @@ REGRADE_2 = (
     # re-grade #3 (lint 1.2.0): exercise 1's effort printed twice; a hold reason against the load rule
     "repeats the session line's effort",
     "the reason contradicts the load rule",
+    # re-grade #4 (lint 1.3.0): a feeler W line whose test has no result rule
+    "the W line gives its test no result rule",
     "the low-energy line for this session's cardio",
     "the W line says 'find the load.' but the working rows carry a load",
     "'New: replaces …' over a PREVIOUS",
@@ -274,7 +276,7 @@ CALF_COMPOSED = (
     "Full stretch at the bottom; knees soft."
 )  # the composer's own 4 lines on 2026-10-29 (inputs_snapshot.critics.draft_exercises)
 CLAUSE = "3 sets today: first time in 19 weeks."
-CALF_COMPOSED_2 = "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, test the load.\nFull stretch at the bottom; knees soft."
+CALF_COMPOSED_2 = "RPE 8–9, last set RPE 9–10\nW set at RPE 5 or less → next plate.\nFull stretch at the bottom; knees soft."
 
 
 def test_the_critic_clause_displaces_the_rotation_reason_and_fits_the_budget():
@@ -344,7 +346,7 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
     recs = critics_apply.apply_changes(ir, [verdict])
     assert recs[0]["applied"] and recs[0]["clauses"][0]["clause"] == "No jumps: 3 sets today, 8 months off.", recs
     assert ir.exercises[2].notes == (
-        "RPE 7\nNo jumps: 3 sets today, 8 months off.\nW set: up to 8 easy reps, test the load.\nFull stretch at the bottom; knees soft."
+        "RPE 7\nNo jumps: 3 sets today, 8 months off.\nW set at RPE 5 or less → next plate.\nFull stretch at the bottom; knees soft."
     )
     res = _lint(ir)
     assert not [p for p in res.lines() if "[3]" in p], res.lines()

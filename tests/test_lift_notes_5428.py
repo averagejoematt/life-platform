@@ -167,10 +167,10 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
         "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull.",
         "lat_pulldown": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.",
         # #5428 re-grade #2 (2026-10-31): a stale PREVIOUS still shows in Hevy's PREVIOUS column, so a row more than one
-        # step under it says why; the feeler W line tests the rows' start load ("find the load" read as "ignore the rows")
-        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW set: up to 8 easy reps, test the load.",
+        # step under it says why; the feeler W row is at the start load and its line is the result rule (re-grade #4)
+        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW set at RPE 5 or less → next plate.",
         "lying_db_tricep_extension": (
-            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW set: up to 8 easy reps, test the load.\nElbows still."
+            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW set at RPE 5 or less → +5 lb per hand.\nElbows still."
         ),
     }
     assert all(not note_problems(n) for n in notes.values())
@@ -180,11 +180,12 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
 
 
 def test_a_stale_anchor_is_the_pick_load_form_with_a_feeler_row():
-    """The 10-26 chest fly (a 2022 anchor): a no-load W row of 8 ahead of the engine's start load, and the pick line."""
+    """The 10-26 chest fly (a 2022 anchor): a W row of 8 at the engine's start load, and the pick line's result rule."""
     blocks, floors = _upper_volume()
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=HISTORY, target_date=TARGET)
     fly = next(b for b in blocks if b.movement_key == "chest_fly_machine")
-    assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", None, 8)
+    # re-grade #4: the feeler W row is AT the start load — it is the test of that load, and its line says what the answer does
+    assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", fly.sets[1].weight_kg, 8)
     assert [s.weight_kg for s in fly.sets[1:]] == [60 * LB, 60 * LB]  # the engine's start load stays on the working rows
     assert "80% of your band anchor" not in fly.notes and "Last:" not in fly.notes
 
