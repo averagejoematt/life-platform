@@ -39,6 +39,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #4088: derived per source
 from training import training_load  # shared TSS-like load model (layer module, #490) — basis_note
@@ -173,6 +174,10 @@ def _resolve_include_pilot(source, include_pilot):
 
 
 def query_source(source, start_date, end_date, include_pilot=None):
+    _w = intake_window(source, start_date, end_date)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start_date, end_date = _w
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     items = []

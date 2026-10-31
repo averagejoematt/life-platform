@@ -50,6 +50,7 @@ _GENOME_SCAN_MAX_DEPTH = 12
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import PACIFIC, pacific_now, pacific_today  # #2817: the Pacific frame
 
 from mcp.config import logger, table
@@ -838,12 +839,10 @@ def tool_get_freshness_status(args):
         threshold_hours = SOURCE_STALE_HOURS.get(src, DEFAULT_STALE_HOURS)
         threshold_days = threshold_hours / 24
         # Latest sk for this partition
-        from boto3.dynamodb.conditions import Key as DDBKey
-
         pk = f"USER#matthew#SOURCE#{src}"
         try:
             resp = table.query(
-                KeyConditionExpression=DDBKey("pk").eq(pk) & DDBKey("sk").begins_with("DATE#"),
+                KeyConditionExpression=latest_day_condition(pk, src),  # #5431: intake bounded at the Pacific today
                 Limit=1,
                 ScanIndexForward=False,
             )

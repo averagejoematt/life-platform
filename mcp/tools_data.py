@@ -8,6 +8,7 @@ import operator
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from common.macrofactor_fields import latest_day_condition, latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from ingestion.strava_population import DISTANCE_POPULATION, DISTANCE_POPULATION_LABEL, ELEVATION_POPULATION_LABEL, activity_type
 from privacy.field_tiers import strip_map
@@ -116,7 +117,8 @@ def tool_get_sources(_args):
             "ExpressionAttributeNames": {"#dt": "date"},
         }
         oldest = table.query(**edge_kwargs, ScanIndexForward=True)
-        newest = table.query(**edge_kwargs, ScanIndexForward=False)
+        # #5431: the newest intake row is the newest day that HAPPENED — never a projected future day
+        newest = table.query(**{**edge_kwargs, "KeyConditionExpression": latest_day_condition(pk, source)}, ScanIndexForward=False)
         last = _date_of(newest["Items"])
         state = resolve_source_state(source, last, today, rate_limited=has_rate_limit_marker(table, "matthew", source))
         result[source] = {
@@ -151,7 +153,7 @@ def _get_latest(args):
     for source in sources:
         pk = f"{USER_PREFIX}{source}"
         kwargs = _apply_phase_filter(
-            {"KeyConditionExpression": Key("pk").eq(pk), "Limit": 1, "ScanIndexForward": False},
+            {"KeyConditionExpression": latest_day_condition(pk, source, require_prefix=False), "Limit": 1, "ScanIndexForward": False},
             include_pilot=_resolve_include_pilot(source, requested)[0],
         )
         response = table.query(**kwargs)
@@ -177,6 +179,8 @@ def _get_daily_summary(args):
         )
         response = table.query(**kwargs)
         items = response.get("Items", [])
+        if latest_sk_ceiling(source) and date > pacific_today():
+            items = []  # #5431: an intake source has no snapshot for a day that has not happened
         if derived:
             items = [i for i in items if not i.get("tombstone")]  # superseded rows stay out, as in query_source
         items = decimal_to_float(items)

@@ -71,6 +71,7 @@ if _MISSING:
 # BUG-10: Validate email format for recipient and sender
 import re as _re
 
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 _EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -408,6 +409,10 @@ def fetch_range(source, start, end):
     Cross-phase for non-scoped sources (#2089) — see the block comment above. The
     date window is what bounds the answer; the phase tag is not.
     """
+    _w = intake_window(source, start, end)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start, end = _w
     try:
         kwargs = with_phase_filter(
             {

@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from ai.model_routing import model_for  # #4770: the one model registry
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target, resolved per call
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
@@ -162,6 +163,10 @@ def fetch_range(source, start, end):
     failure mode is a loud one: the invocation fails, the alarm fires, and the letter
     is re-sent from real data rather than mailed once with fabricated absence.
     """
+    _w = intake_window(source, start, end)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start, end = _w
     # ADR-058: phase=pilot hidden by default unless the source reads cross-phase.
     from experiment.phase_filter import source_reads_cross_phase, with_phase_filter
 

@@ -44,6 +44,7 @@ from typing import TYPE_CHECKING, Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.macrofactor_fields import intake_window, latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.metric_truth import STEPS, resolve_by_date  # #4630: the ONE steps resolver
 
 # #1993: labs fact extraction against the real draw-record schema (SCHEMA.md).
@@ -142,6 +143,10 @@ from experiment import phase_taxonomy as _phase_taxonomy  # noqa: E402 — #2113
 
 
 def _query_source(source, start_date, end_date):
+    _w = intake_window(source, start_date, end_date)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start_date, end_date = _w
     pk = f"{USER_PREFIX}{source}"
     start_date = _phase_taxonomy.cycle_read_floor(pk, start_date)  # #2113: genesis floor, EXPERIMENT_SCOPED only
     resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~"))
@@ -152,10 +157,11 @@ def _latest_item(source):
     pk = f"{USER_PREFIX}{source}"
     kce = Key("pk").eq(pk)
     floor = _phase_taxonomy.cycle_read_floor(pk)  # #2113: None unless EXPERIMENT_SCOPED
-    # #5431: the newest MacroFactor row is the newest day that HAPPENED — never a projected future day
-    ceiling = f"DATE#{pacific_today()}~" if source == "macrofactor" else "DATE#9999-12-31"
-    if floor or source == "macrofactor":
-        kce = kce & Key("sk").between(f"DATE#{floor or ''}", ceiling)
+    # #5431: the newest intake row is the newest day that HAPPENED — never a projected future day; the ceiling
+    # comes from the ONE helper (it reads the Pacific clock at call time, not at import)
+    ceiling = latest_sk_ceiling(source)
+    if floor or ceiling:
+        kce = kce & Key("sk").between(f"DATE#{floor or ''}", f"{ceiling}~" if ceiling else "DATE#9999-12-31")
     resp = table.query(KeyConditionExpression=kce, ScanIndexForward=False, Limit=1)
     items = _decimal_to_float(resp.get("Items", []))
     return strava_read_seam(source, items[0] if items else None)

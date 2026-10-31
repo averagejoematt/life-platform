@@ -20,6 +20,7 @@ facade; no import cycle. Every other shared helper comes straight from
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.metric_truth import (
     steps_by_date as resolved_steps_by_date,  # #4630 — the ONE steps resolver
     steps_sources_by_date as resolved_steps_sources_by_date,  # #4980 — whose count it is
@@ -146,7 +147,7 @@ def _workout_evidence(table, today_pt):
             continue  # neither a row predicate nor a field predicate — cannot be consulted
         try:
             items = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{src}") & Key("sk").begins_with("DATE#"),
+                KeyConditionExpression=latest_day_condition(f"{USER_PREFIX}{src}", src),  # #5431
                 ScanIndexForward=False,
                 Limit=1,
                 ProjectionExpression="sk",

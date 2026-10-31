@@ -36,6 +36,7 @@ import logging
 from datetime import date, datetime
 from typing import Optional
 
+from common.macrofactor_fields import latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from ingestion.source_registry import SOURCE_REGISTRY
 
 try:
@@ -135,12 +136,24 @@ def _parse_day(sk: str) -> Optional[str]:
     return raw
 
 
+def _day_key_condition(user_id: str, source: str) -> dict:
+    """Key-condition kwargs for a newest-first read of one partition's DATE# rows (#5431: an intake source
+    is bounded at the Pacific today, so a projected future row is never the 'newest')."""
+    pk = f"USER#{user_id}#SOURCE#{source}"
+    ceiling = latest_sk_ceiling(source)
+    if ceiling:
+        return {
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :lo AND :hi",
+            "ExpressionAttributeValues": {":pk": pk, ":lo": "DATE#", ":hi": f"{ceiling}~"},
+        }
+    return {"KeyConditionExpression": "pk = :pk AND begins_with(sk, :pfx)", "ExpressionAttributeValues": {":pk": pk, ":pfx": "DATE#"}}
+
+
 def _last_partition_day(table, user_id: str, source: str) -> tuple[str, Optional[str]]:
     """(status, YYYY-MM-DD) for the newest DATE# row. status in ok|empty|error."""
     try:
         resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-            ExpressionAttributeValues={":pk": f"USER#{user_id}#SOURCE#{source}", ":pfx": "DATE#"},
+            **_day_key_condition(user_id, source),
             ScanIndexForward=False,
             Limit=1,
             ProjectionExpression="sk",
@@ -159,8 +172,7 @@ def _last_value_day(table, user_id: str, source: str, field: str, window: int) -
     """(status, YYYY-MM-DD) for the newest DATE# row whose ``field`` exceeds zero."""
     try:
         resp = table.query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-            ExpressionAttributeValues={":pk": f"USER#{user_id}#SOURCE#{source}", ":pfx": "DATE#"},
+            **_day_key_condition(user_id, source),
             ScanIndexForward=False,
             Limit=window,
             ProjectionExpression=f"sk, {field}",

@@ -97,6 +97,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, NamedTuple
 
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from training import session_count  # #5387: its zone2_by_date reads THE Zone 2 computation
 
@@ -581,11 +582,14 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         # DATE#{today}~ also captures DATE#{today}#WORKOUT#… items. #4129: unconditional —
         # on a partition with no suffixed rows the `~` admits nothing extra, so an opt-in
         # flag only ever bought the chance to forget it (scripts/date_range_read_census.py).
+        _w = intake_window(source, start, today)  # #5431: an intake source is never read past the Pacific today
+        if _w is None:
+            return []
         return strava_read_seam(
             source,
             _query_all(
                 KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-                ExpressionAttributeValues={":pk": user_prefix + source, ":s": f"DATE#{start}", ":e": f"DATE#{today}~"},
+                ExpressionAttributeValues={":pk": user_prefix + source, ":s": f"DATE#{_w[0]}", ":e": f"DATE#{_w[1]}~"},
             ),
         )
 

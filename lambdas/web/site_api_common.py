@@ -30,6 +30,7 @@ import experiment.phase_filter as _phase_filter  # #4088: the derived phase deci
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
 from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024 / DIL-049
+from common.macrofactor_fields import latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
 from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, parse and day-index
     PACIFIC,
@@ -732,8 +733,9 @@ def _latest_item(source: str, include_pilot: bool | None = None, *, since: str |
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
     key_cond = Key("pk").eq(pk)
-    if since:
-        key_cond = key_cond & Key("sk").between(f"DATE#{since}", "DATE#~")
+    ceiling = latest_sk_ceiling(source)  # #5431: an intake source's newest row is the newest day that HAPPENED
+    if since or ceiling:
+        key_cond = key_cond & Key("sk").between(f"DATE#{since or ''}", f"{ceiling}~" if ceiling else "DATE#~")
     kwargs = with_phase_filter(
         {
             "KeyConditionExpression": key_cond,
@@ -753,6 +755,8 @@ def _latest_item_asof(source: str, date: str, include_pilot: bool | None = None)
     include_pilot (e.g. /api/vitals' `ip`) still wins."""
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
+    if latest_sk_ceiling(source):
+        date = min(date, _pacific_today_5431())  # #5431: never as-of a day that has not happened
     kwargs = with_phase_filter(
         {
             "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between("DATE#0000-00-00", f"DATE#{date}~"),
