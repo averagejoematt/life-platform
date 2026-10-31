@@ -41,7 +41,6 @@ sys.path.insert(0, str(_REPO / "lambdas"))
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 
 import check_pip_audit as pam  # noqa: E402
-from operational import pip_audit_lambda as pa  # noqa: E402
 
 # A pip-audit-shaped advisory table: (normalized name, version) -> vulns.
 _ADVISORIES = {
@@ -229,51 +228,5 @@ def test_ci_lint_blocking_step_uses_the_same_parser_for_dev_and_cdk():
     assert "--ignore-vuln" not in step["run"], "the allowlist is parsed in ONE place now"
 
 
-# ── the Lambda: a scan error is a hard fail ─────────────────────────────────────
-
-
-class _RecordingS3:
-    def __init__(self):
-        self.puts = []
-
-    def put_object(self, **kw):
-        self.puts.append(kw)
-
-
-def _wire_lambda(monkeypatch, result, installed=True):
-    s3 = _RecordingS3()
-    monkeypatch.setattr(pa, "s3", s3)
-    monkeypatch.setattr(pa, "ensure_pip_audit", lambda: installed)
-    monkeypatch.setattr(pa, "list_requirements_files", lambda: ["config/requirements/pillow.txt"])
-    monkeypatch.setattr(pa, "download_requirements", lambda key, path: True)
-    monkeypatch.setattr(pa, "audit_requirements_file", lambda path, name: dict(result))
-    monkeypatch.setattr(pa, "check_layer_manifest_coverage", lambda: [])
-    monkeypatch.setattr(pa, "check_alerts_enabled", lambda: {"status": "skipped", "reason": "no token"})
-    return s3
-
-
-def test_lambda_scan_error_is_a_hard_fail_reason_and_raises_after_the_artifact(monkeypatch):
-    err = {
-        "lambda": "pillow",
-        "vulnerabilities": [],
-        "packages_checked": 1,
-        "status": "error",
-        "error_msg": "JSON parse failed. stdout=, stderr=/var/lang/bin/python3.12: No module named pip",
-    }
-    s3 = _wire_lambda(monkeypatch, err)
-    with pytest.raises(RuntimeError, match="scan error on pillow"):
-        pa.lambda_handler({"force": True}, None)
-    artifact = json.loads(s3.puts[-1]["Body"])
-    assert artifact["hard_fail_reasons"] and "No module named pip" in artifact["hard_fail_reasons"][0]
-
-
-def test_lambda_clean_scan_still_returns_200(monkeypatch):
-    s3 = _wire_lambda(monkeypatch, {"lambda": "pillow", "vulnerabilities": [], "packages_checked": 1, "status": "clean"})
-    assert pa.lambda_handler({"force": True}, None)["statusCode"] == 200
-    assert json.loads(s3.puts[-1]["Body"])["hard_fail_reasons"] == []
-
-
-def test_lambda_without_pip_audit_raises_instead_of_returning_a_quiet_500(monkeypatch):
-    _wire_lambda(monkeypatch, {}, installed=False)
-    with pytest.raises(RuntimeError, match="pip-audit not available"):
-        pa.lambda_handler({"force": True}, None)
+# The Lambda-leg tests (hard_fail_reasons on a scan error, the quiet-500 fix) left with the Lambda itself: `life-platform-pip-audit`
+# retired on 2026-10-30 (#5474). The CI scan above is the whole instrument now.

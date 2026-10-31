@@ -406,13 +406,6 @@
       "facing": "internal",
       "purpose": "The Permanence Contract's nightly run (#1400)."
     },
-    "life-platform-pip-audit": {
-      "function": "life-platform-pip-audit",
-      "stack": "LifePlatformOperational",
-      "expression": "cron(0 8 ? * MON *)",
-      "facing": "internal",
-      "purpose": "SEC-5: Monthly dependency vulnerability scanning."
-    },
     "life-platform-qa-smoke": {
       "function": "life-platform-qa-smoke",
       "stack": "LifePlatformOperational",

@@ -22,11 +22,12 @@ Schedule: weekly (Mondays). Reuses the SES email pattern. No external deps.
 
 THE OPS PACK (#2835): this email is the ONE weekly ops email. Besides the
 traffic sections it already carried (green report #1446, subscriber funnel
-#1954), it now embeds the two reports that used to be standalone Monday
-emails — data-reconciliation (weekly source-coverage gaps) and pip-audit
-(monthly dependency scan). Those Lambdas still run on their own crons; they
-deliver S3 JSON artifacts (`reconciliation/latest.json`, `pip-audit/latest.json`)
-whose pre-rendered `html` section this pack embeds verbatim. Every fold is
+#1954), it now embeds the report that used to be a standalone Monday email —
+data-reconciliation (weekly source-coverage gaps). That Lambda still runs on
+its own cron; it delivers an S3 JSON artifact (`reconciliation/latest.json`)
+whose pre-rendered `html` section this pack embeds verbatim. (The pip-audit
+fold retired with its Lambda on 2026-10-30, #5474 — the dependency scan is
+CI's, and the pack points at it.) Every fold is
 fail-soft with honest absence + loud staleness (ADR-104): a dead producer
 renders as a dated STALE/not-collected line, never as silence.
 
@@ -889,10 +890,10 @@ def build_green_report_html(report):
 
 
 # ── Folded ops reports (#2835) ───────────────────────────────────────────────
-# data-reconciliation (Mon 07:30 UTC, weekly) and pip-audit (first Monday
-# 15:00 UTC, monthly) used to be standalone Monday emails. They now deliver S3
-# JSON artifacts carrying a pre-rendered `html` fragment; this pack embeds
-# them, making it the one weekly ops email. Both folds are fail-soft: a
+# data-reconciliation (Mon 07:30 UTC, weekly) used to be a standalone Monday
+# email (so did pip-audit, until its Lambda retired — #5474). It now delivers
+# an S3 JSON artifact carrying a pre-rendered `html` fragment; this pack embeds
+# it, making it the one weekly ops email. The fold is fail-soft: a
 # missing/unreadable artifact renders an honest "not collected" line, and an
 # artifact older than its producer's cadence renders a loud STALE warning —
 # a dead producer must be more visible in the pack than it was as a silently
@@ -900,9 +901,21 @@ def build_green_report_html(report):
 
 OPS_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 RECON_ARTIFACT_KEY = "reconciliation/latest.json"
-PIP_AUDIT_ARTIFACT_KEY = "pip-audit/latest.json"
 RECON_MAX_AGE_DAYS = 8  # weekly cadence + one day of cron slippage
-PIP_AUDIT_MAX_AGE_DAYS = 38  # monthly (first-Monday) cadence + slippage
+# #5474 (2026-10-30): the pip-audit fold is gone with its Lambda — the scan is CI's (`layer-pip-audit.yml` weekly,
+# ci-lint per PR; both red when they cannot scan, #5473). The pack points at it rather than embedding a dead artifact.
+CI_DEPENDENCY_AUDIT_URL = "https://github.com/averagejoematt/life-platform/actions/workflows/layer-pip-audit.yml"
+
+
+def build_ci_dependency_audit_html():
+    """The one-line successor of the folded pip-audit section: where the dependency scan lives now and how it fails."""
+    return (
+        '<h2 style="font-size:16px;margin-top:28px">Dependency audit — CI</h2>'
+        '<p style="color:#6e665a;font-size:13px">Scanned in CI since #5473: the pinned layer manifests weekly '
+        f'(<a href="{CI_DEPENDENCY_AUDIT_URL}">layer-pip-audit.yml</a>, Mon 15:17 UTC) and every PR that touches them; '
+        "a scan that cannot run is red there, never a green 0. The scheduled pip-audit Lambda was retired on 2026-10-30 (#5474); "
+        "open Dependabot alerts print at every session boot.</p>"
+    )
 
 
 def collect_ops_artifact(s3, key):
@@ -947,18 +960,16 @@ def build_ops_section_html(title, artifact, max_age_days, cadence_note, now=None
     return "".join(parts)
 
 
-def ops_subject_suffix(recon_artifact, pip_artifact):
-    """Carry the retired emails' inbox-scannability into the pack's subject:
-    a RED/YELLOW reconciliation week or a vulnerable dependency scan must be
-    visible without opening the email (the folded shape of the old subjects)."""
+def ops_subject_suffix(recon_artifact):
+    """Carry the retired email's inbox-scannability into the pack's subject: a RED/YELLOW reconciliation week must be
+    visible without opening the email (the folded shape of the old subject). The `deps VULNERABLE` bit left with the
+    pip-audit Lambda (#5474): a vulnerable layer is a red CI run now, not a line in a Monday email."""
     bits = []
     severity = str((recon_artifact or {}).get("severity") or "")
     if severity.startswith("RED"):
         bits.append("recon RED")
     elif severity.startswith("YELLOW"):
         bits.append("recon YELLOW")
-    if (pip_artifact or {}).get("has_vulnerabilities"):
-        bits.append("deps VULNERABLE")
     return "".join(f" · {b}" for b in bits)
 
 
@@ -1157,27 +1168,24 @@ def lambda_handler(event, context):
             logger.warning("subscribe attempt-stage aggregation failed (fail-soft, #3619): %s", e)
         t_attempts = time.monotonic() - t_attempts
 
-        # #2835: the folded ops-report sections — the reconciliation and
-        # pip-audit reports now deliver as S3 artifacts this pack embeds
-        # instead of standalone Monday emails. Fail-soft belt-and-braces: even
-        # a builder bug must not take the pack down.
+        # #2835: the folded ops-report section — the reconciliation report
+        # delivers as an S3 artifact this pack embeds instead of a standalone
+        # Monday email (the pip-audit fold retired with its Lambda, #5474: the
+        # pack now points at the CI scan). Fail-soft belt-and-braces: even a
+        # builder bug must not take the pack down.
         try:
             recon_artifact = collect_ops_artifact(s3, RECON_ARTIFACT_KEY)
-            pip_artifact = collect_ops_artifact(s3, PIP_AUDIT_ARTIFACT_KEY)
-            ops_html = build_ops_section_html(
-                "Data reconciliation — weekly source coverage",
-                recon_artifact,
-                RECON_MAX_AGE_DAYS,
-                "weekly (Mon 07:30 UTC, data-reconciliation Lambda)",
-                now=now,
-            ) + build_ops_section_html(
-                "Dependency audit — pip-audit",
-                pip_artifact,
-                PIP_AUDIT_MAX_AGE_DAYS,
-                "monthly (first Monday 15:00 UTC, pip-audit Lambda)",
-                now=now,
+            ops_html = (
+                build_ops_section_html(
+                    "Data reconciliation — weekly source coverage",
+                    recon_artifact,
+                    RECON_MAX_AGE_DAYS,
+                    "weekly (Mon 07:30 UTC, data-reconciliation Lambda)",
+                    now=now,
+                )
+                + build_ci_dependency_audit_html()
             )
-            subject_suffix = ops_subject_suffix(recon_artifact, pip_artifact)
+            subject_suffix = ops_subject_suffix(recon_artifact)
         except Exception as e:
             logger.warning("folded ops sections failed (fail-soft, #2835): %s", e)
             ops_html = (

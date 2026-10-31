@@ -318,9 +318,6 @@
     "lambdas/operational/key_rotator_lambda.py": {
       "function": "life-platform-key-rotator"
     },
-    "lambdas/operational/pip_audit_lambda.py": {
-      "function": "life-platform-pip-audit"
-    },
     "lambdas/operational/permanence_lambda.py": {
       "function": "life-platform-permanence"
     },

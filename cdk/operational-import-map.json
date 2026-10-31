@@ -9,9 +9,6 @@
   "Canary": "life-platform-canary",
   "CanarySchedule": "canary-schedule",
 
-  "PipAudit": "life-platform-pip-audit",
-  "PipAuditSchedule": "life-platform-pip-audit-monthly",
-
   "QaSmoke": "life-platform-qa-smoke",
   "QaSmokeSchedule": "life-platform-qa-smoke",
 

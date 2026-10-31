@@ -473,14 +473,9 @@ _HISTORICAL_FILES = ("tests/test_ci_pin_consistency.py", "tests/test_formatter_p
 # and this guard could only ever see 7 of the 13, so exactness there was a fact
 # nothing could keep true. The mechanism stays for the next genuinely-deferred row.
 _KNOWN_STALE_DECLARATIONS: dict = {
-    # #2760 widened _GATED_TOOLS to pip-audit and immediately saw this: the
-    # scheduled Lambda installs its own pip-audit into /tmp at runtime, pinned at
-    # 2.7.3 vs the CI gate's requirements-dev.txt pin. It CANNOT resolve the pin —
-    # the Lambda bundle does not carry requirements-dev.txt — so aligning it is a
-    # deliberate Lambda change + deploy, not a text edit here. Debt, not exemption.
-    ("lambdas/operational/pip_audit_lambda.py", "pip-audit"): (
-        "runtime /tmp install inside the Lambda; bundle carries no pin file (#2760)"
-    ),
+    # Empty since 2026-10-30. The one row — `lambdas/operational/pip_audit_lambda.py` installing its own pip-audit
+    # into /tmp at a pin the bundle could not resolve (#2760) — left when that Lambda retired (#5474). The mechanism
+    # stays for the next genuinely-deferred row.
 }
 
 # The code that RESOLVES a pinned tool at runtime must derive the version, never

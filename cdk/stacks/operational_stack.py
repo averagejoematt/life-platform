@@ -462,24 +462,11 @@ class OperationalStack(Stack):
         alerts_email = self.node.try_get_context("alerts_email") or "awsdev@mattsusername.com"
         local_alerts_topic.add_subscription(sns_subs.EmailSubscription(alerts_email))
 
-        # ── 4. Pip Audit — every Monday (self-guards to first Monday of month)
-        # #2835: no longer sends its own email — it writes pip-audit/latest.json,
-        # which the 16:00 UTC Monday ops pack (traffic-digest) embeds; the cron
-        # moved 17:00 → 15:00 UTC so the artifact is fresh before the pack sends.
-        create_platform_lambda(
-            self,
-            "PipAudit",
-            function_name="life-platform-pip-audit",
-            source_file="lambdas/operational/pip_audit_lambda.py",
-            handler="operational.pip_audit_lambda.lambda_handler",
-            timeout_seconds=300,
-            memory_mb=512,
-            custom_policies=rp.operational_pip_audit(),
-            table=local_table,
-            bucket=local_bucket,
-            dlq=local_dlq,  # #809/ADR-116: terminal async failures -> DLQ digest (replaces the 2026-05-25 orphan error alarm)
-            alerts_topic=None,
-        )
+        # ── 4. (retired 2026-10-30, #5474) Pip Audit — `life-platform-pip-audit` scanned the pinned layer manifests on
+        # a Monday cron, but the python3.12 runtime ships no pip, so every scan errored and read "0 vulnerabilities"
+        # (#5473). The scan is CI's now (`.github/workflows/layer-pip-audit.yml` weekly + ci-lint per PR, both red when
+        # they cannot scan); the Dependabot count prints at every session boot. Its ops-pack section, role policy,
+        # denial-alarm log group, schedule row and import-map rows left with it.
 
         # ── 5. QA Smoke — daily 11:30 AM PT
         create_platform_lambda(

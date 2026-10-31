@@ -1073,7 +1073,7 @@
     "ai_features": 30,
     "alarms": 144,
     "emf_namespaces": 34,
-    "schedules": 97,
+    "schedules": 96,
     "secrets": 30
   },
   "edges": [
@@ -7617,22 +7617,6 @@
       "stack": "operational_stack",
       "timeout_seconds": 600
     },
-    "life-platform-pip-audit": {
-      "declared_alarm": null,
-      "handler": "operational.pip_audit_lambda.lambda_handler",
-      "memory_mb": 512,
-      "module": "lambdas/operational/pip_audit_lambda.py",
-      "schedules": [
-        {
-          "expr": "cron(0 8 ? * MON *)",
-          "key": "life-platform-pip-audit",
-          "resolution": "table",
-          "tz": "America/Los_Angeles"
-        }
-      ],
-      "stack": "operational_stack",
-      "timeout_seconds": 300
-    },
     "life-platform-qa-smoke": {
       "declared_alarm": null,
       "handler": "operational.qa_smoke_lambda.lambda_handler",
@@ -8303,7 +8287,7 @@
       "contracts_known": 15,
       "contracts_ratchet": 15,
       "edges": 795,
-      "lambdas": 108,
+      "lambdas": 107,
       "mcp_tool_modules": 38,
       "mcp_tools": 89,
       "partitions": 124,
@@ -8311,8 +8295,8 @@
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 25,
       "privacy_sources_owner_published": 3,
-      "scheduled_lambdas": 81,
-      "schedules": 97
+      "scheduled_lambdas": 80,
+      "schedules": 96
     },
     "coverage": {
       "edge_sites": {
@@ -8322,7 +8306,7 @@
       },
       "schedule_resolution": {
         "dynamic": 0,
-        "resolved": 81
+        "resolved": 80
       }
     },
     "non_census_families": [
@@ -9726,15 +9710,6 @@
       "expr": "cron(0 23 * * ? *)",
       "lambda": "life-platform-permanence",
       "local": "23:00",
-      "resolution": "table",
-      "stack": "operational_stack",
-      "tz": "America/Los_Angeles",
-      "utc": null
-    },
-    {
-      "expr": "cron(0 8 ? * MON *)",
-      "lambda": "life-platform-pip-audit",
-      "local": "08:00",
       "resolution": "table",
       "stack": "operational_stack",
       "tz": "America/Los_Angeles",

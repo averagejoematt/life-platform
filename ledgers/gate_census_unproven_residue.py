@@ -181,7 +181,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "guard::lambdas/common/send_guard.py": "2026-09-05 seal (#3536)",
     "guard::lambdas/experiment/er03_gate.py": "2026-09-05 seal (#3536)",
     "guard::lambdas/intelligence/grounding_guard.py": "2026-09-05 seal (#3536)",
-    "guard::lambdas/operational/pip_audit_lambda.py": "2026-09-05 seal (#3536)",
     "guard::lambdas/privacy/broadcast_sensitivity_gate.py": "2026-09-05 seal (#3536)",
     "guard::lambdas/privacy/memoir_gate.py": "2026-09-05 seal (#3536)",
     "guard::lambdas/privacy/privacy_guard.py": "2026-09-05 seal (#3536)",

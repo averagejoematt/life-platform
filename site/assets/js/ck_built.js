@@ -24,7 +24,7 @@ import { dayInWords, instantDayInWords } from "/assets/js/entry_age.js";
 import { coachComparison, comparisonText } from "/assets/js/coach_comparison.js";
 
 /** Programs that run on a timer. Source: model/platform_model.json meta.counts.scheduled_lambdas. */
-export const SCHEDULED = { count: 81, asOf: "2026-10-17" };
+export const SCHEDULED = { count: 80, asOf: "2026-10-30" };
 
 /** The cost governor's rules, restated: each tier's threshold as a share of the ceiling, and
  *  the opening days of a month in which only money actually spent can raise the tier.
