@@ -17,7 +17,11 @@ WHAT IT DOES
      (`coach_input_facts.served_run_facts`), from what the site serves:
      `/api/nutrition_overview.nutrition_trend` (each day's `protein_g` as `total_protein_g`)
      and `/api/journey` (`current_weight_lbs`, `weekly_rate_lbs` and its CI).
-  3. Runs `served_fact_findings` on each text and prints one line per finding: the JSON path,
+  3. A coach line is judged as-of the day it was written (#4580): `moves.lines[].date`, joined to
+     the same text served undated as `/api/coach/<id>` `daily`. The window it saw then held days
+     the 30-day window has since dropped, so a correct "30 logged days" is not a contradiction
+     tomorrow. A text with no discoverable date keeps today's comparison.
+  4. Runs `served_fact_findings` on each text and prints one line per finding: the JSON path,
      the cited figure and the served value. Never the whole text — the path is the triage key.
 
 EXIT
@@ -71,9 +75,33 @@ def served_texts(payloads: dict) -> list:
     return out
 
 
-def facts_from_served(nutrition_overview: dict, journey: dict, today: str | None = None) -> dict | None:
-    """The gate's facts, built from what the site serves (the SAME `served_run_facts`)."""
+def line_dates(payloads: dict) -> dict:
+    """{text: day} for every served coach line that carries its own date (#4580).
+
+    `/api/coaching-dashboard` `moves.lines[]` carry `date` beside `text`; the same line is
+    served again as `/api/coach/<id>` `daily`, which has no date of its own, so the text is
+    the join key. A line was written on its own day against that day's window, so it is judged
+    as-of that day. A text with no discoverable date is absent here (today's comparison)."""
+    moves = ((payloads.get("/api/coaching-dashboard") or {}).get("moves")) or {}
+    out: dict = {}
+    for ln in moves.get("lines") or []:
+        if isinstance(ln, dict) and isinstance(ln.get("text"), str):
+            day = str(ln.get("date") or moves.get("date") or "")[:10]
+            if len(day) == 10:
+                out[ln["text"]] = day
+    return out
+
+
+def facts_from_served(nutrition_overview: dict, journey: dict, today: str | None = None, as_of: str | None = None) -> dict | None:
+    """The gate's facts, built from what the site serves (the SAME `served_run_facts`).
+
+    `as_of` (a day before `today`) builds the facts a line written on that day was judged
+    against: the trend rows up to that day, `today=as_of`, and `days_logged` credited with the
+    days the 30-day window has since dropped off its front (no longer served, so unknowable;
+    an upper bound, the right direction for a "claims more days than exist" check). A real
+    over-claim still fires; nothing here is a blanket tolerance (#4580)."""
     from coach import coach_input_facts as cif
+    from common.pacific_time import pacific_today
 
     trend = (nutrition_overview or {}).get("nutrition_trend")
     jr = (journey or {}).get("journey") or {}
@@ -87,16 +115,47 @@ def facts_from_served(nutrition_overview: dict, journey: dict, today: str | None
         "weekly_rate_ci_low": jr.get("weekly_rate_ci_low"),
         "weekly_rate_ci_high": jr.get("weekly_rate_ci_high"),
     }
-    return cif.served_run_facts(data, table=None, today=today)
+    if not as_of or as_of >= (today or pacific_today()):
+        return cif.served_run_facts(data, table=None, today=today)
+    now = today or pacific_today()
+    dropped = _dropped_days(rows, as_of, now)
+    data["macrofactor_window"] = [r for r in rows if str(r.get("date") or "")[:10] <= as_of]
+    facts = cif.served_run_facts(data, table=None, today=as_of)
+    nut = (facts or {}).get("nutrition")
+    if nut and dropped:
+        facts = {**facts, "nutrition": {**nut, "days_logged": nut["days_logged"] + dropped}}
+    return facts
 
 
-def findings(texts: list, facts: dict, today: str | None = None) -> list:
-    """[(json_path, finding)] — every served text's contradictions of the served facts."""
+def _dropped_days(rows: list, as_of: str, today: str) -> int:
+    """Days of the window ending `as_of` that the window ending `today` no longer serves
+    (calendar days from the old window's start up to the new one's, none already in `rows`)."""
+    from datetime import date, timedelta
+
+    from common.constants import EXPERIMENT_START_DATE
+    from health import nutrition_logging as _nl
+
+    old, new = _nl.window_start(as_of, EXPERIMENT_START_DATE), _nl.window_start(today, EXPERIMENT_START_DATE)
+    have = {str(r.get("date") or "")[:10] for r in rows}
+    d, n = date.fromisoformat(old), 0
+    while d.isoformat() < min(new, (date.fromisoformat(as_of) + timedelta(days=1)).isoformat()):
+        n += d.isoformat() not in have
+        d += timedelta(days=1)
+    return n
+
+
+def findings(texts: list, facts: dict, today: str | None = None, dates: dict | None = None, facts_for=None) -> list:
+    """[(json_path, finding)] — every served text's contradictions of the served facts.
+
+    A text found in `dates` (#4580: {text: day}) is judged against `facts_for(day)` — the facts
+    as of the day it was written — and that day; any other text against `facts`, today."""
     from coach import coach_input_facts as cif
 
     out = []
     for path, text in texts:
-        for f in cif.served_fact_findings(text, facts, today=today):
+        day = (dates or {}).get(text)
+        f_as, t_as = (facts_for(day), day) if day and facts_for else (facts, today)
+        for f in cif.served_fact_findings(text, f_as or facts, today=t_as if f_as else today):
             out.append((path, f))
     return out
 
@@ -114,7 +173,8 @@ def main(argv=None) -> int:
         payloads = {p: (roster if p == "/api/coaches" else _fetch(args.base_url, p)) for p in FIXED_SURFACES}
         for pid in ids:
             payloads[f"/api/coach/{pid}"] = _fetch(args.base_url, f"/api/coach/{pid}")
-        facts = facts_from_served(_fetch(args.base_url, "/api/nutrition_overview"), _fetch(args.base_url, "/api/journey"))
+        nutrition_overview, journey = _fetch(args.base_url, "/api/nutrition_overview"), _fetch(args.base_url, "/api/journey")
+        facts = facts_from_served(nutrition_overview, journey)
     except Exception as exc:  # any fetch/parse failure is UNEVALUABLE, never a pass
         print(f"UNEVALUABLE — {type(exc).__name__}: {exc}")
         return 2
@@ -122,7 +182,12 @@ def main(argv=None) -> int:
         print("UNEVALUABLE — the served facts could not be built (no nutrition trend and no weight trajectory).")
         return 2
     texts = served_texts(payloads)
-    hits = findings(texts, facts)
+    hits = findings(
+        texts,
+        facts,
+        dates=line_dates(payloads),
+        facts_for=lambda day: facts_from_served(nutrition_overview, journey, as_of=day),
+    )
     for path, f in hits:
         print(f"  {path}  {f.get('metric')}: cites {f.get('cited')}, served {f.get('canonical')} — {f.get('detail')}")
     verdict = "OK" if not hits else "NONGREEN"
