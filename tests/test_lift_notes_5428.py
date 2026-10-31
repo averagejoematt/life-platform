@@ -166,8 +166,12 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
         "incline_db_press": "RPE 8–9\nBand pull-aparts first. Breathe out on the press.",
         "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull.",
         "lat_pulldown": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.",
-        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load.",
-        "lying_db_tricep_extension": "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load.\nElbows still.",
+        # #5428 re-grade #2 (2026-10-31): a stale PREVIOUS still shows in Hevy's PREVIOUS column, so a row more than one
+        # step under it says why; the feeler W row is at the start load and its line is the result rule (re-grade #4)
+        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW at RPE 5 or less → one step, no more.",
+        "lying_db_tricep_extension": (
+            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW at RPE 5 or less → one step, no more.\nElbows still."
+        ),
     }
     assert all(not note_problems(n) for n in notes.values())
     # Hevy's PREVIOUS, for the note linter: the last performed top load per movement (lb), with its date
@@ -176,11 +180,12 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
 
 
 def test_a_stale_anchor_is_the_pick_load_form_with_a_feeler_row():
-    """The 10-26 chest fly (a 2022 anchor): a no-load W row of 8 ahead of the engine's start load, and the pick line."""
+    """The 10-26 chest fly (a 2022 anchor): a W row of 8 at the engine's start load, and the pick line's result rule."""
     blocks, floors = _upper_volume()
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=HISTORY, target_date=TARGET)
     fly = next(b for b in blocks if b.movement_key == "chest_fly_machine")
-    assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", None, 8)
+    # re-grade #4: the feeler W row is AT the start load — it is the test of that load, and its line says what the answer does
+    assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", fly.sets[1].weight_kg, 8)
     assert [s.weight_kg for s in fly.sets[1:]] == [60 * LB, 60 * LB]  # the engine's start load stays on the working rows
     assert "80% of your band anchor" not in fly.notes and "Last:" not in fly.notes
 
@@ -225,7 +230,9 @@ def test_one_cue_per_family_and_no_press_cue_on_a_squat_day():
     blocks = [
         ExerciseBlock(
             movement_key="squat_barbell",
-            sets=[Set(weight_kg=245 * LB, rep_range_start=4, rep_range_end=6)],
+            # two working sets: a one-set exercise 1 now carries the gain rule's next-session line (re-grade #3,
+            # `test_hevy_note_regrade2_5428`), which is not what this test is about
+            sets=[Set(weight_kg=245 * LB, rep_range_start=4, rep_range_end=6) for _ in range(2)],
             rationale_tag="anchor:squat:heavy",
         ),
         ExerciseBlock(

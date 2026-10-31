@@ -46,7 +46,9 @@ def exposure_cue(intensity: str, sets: list[dict[str, Any]], stride: dict[str, A
     the chat's, not the set's."""
     del stride
     if intensity == "carry":
-        return "\n".join((hevy_note_grammar.carry_line1(_EFFORT[effort_ceilings.COMPOUNDS]), CARRY_CUE, CARRY_STEPS_LINE))
+        # #5428 re-grade #3: the one adjust rule after set 1 rides with it (`lift_note.carry_note` adds his last load)
+        adjust = hevy_note_grammar.carry_adjust_line(hevy_note_grammar.charter_step_lb())
+        return "\n".join((hevy_note_grammar.carry_line1(_EFFORT[effort_ceilings.COMPOUNDS]), CARRY_CUE, adjust, CARRY_STEPS_LINE))
     if intensity == "accessory":
         if len(sets) == 1:
             return effort_line(_EFFORT[effort_ceilings.LAST_ISOLATION_SET])

@@ -66,9 +66,9 @@ GRADED_TREADMILL_HILL = (
     "Treadmill · today 2.8 mph, 6% → 10% · RPE 5–7 (short phrases)\n"
     "⌚ ride clock: 6% to min 6 · +1% every 2 min to min 14 · down the same to min 22 · 6% to the end"
 )
-SESSION = (
+SESSION = (  # the load rule as re-grade #3 (2026-10-31) left it: two lines, a unit on every step
     "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n"
-    "Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift."
+    "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift."
 )
 TARGET = "2026-10-30"  # routine 81fe18c0's day; be80e308 / dde23e6b were 10-29
 
@@ -109,7 +109,7 @@ def _clean_ir(rid: str = "r-5428") -> RoutineSpec:
     squat = ExerciseBlock(
         movement_key="squat_barbell",
         sets=[Set(type="warmup", reps=5, weight_kg=_kg(135))] + [_n(225, 4, 6) for _ in range(3)],
-        notes=SESSION + "\n\nRPE 8–9\nAnkles + hips first. Brace each rep, breathe between reps.",
+        notes=SESSION + "\n\nAnkles + hips first. Brace each rep, breathe between reps.",  # its RPE 8–9 is the session line's
     )
     return RoutineSpec(
         routine_id=rid,
@@ -165,9 +165,11 @@ def test_MUTATION_a_defective_draft_logs_its_warning_and_no_clean_line(monkeypat
     out = _note_lint(ir, caplog)
     assert out["state"] == "problems" and {"L3", "L9"} <= set(out["rules"]), out
     msgs = [r.getMessage() for r in caplog.records if "hevy note lint" in r.getMessage()]
-    assert len(msgs) == 1 and msgs[0].startswith("hevy note lint (warn): 2 problem(s)") and "clean" not in msgs[0], msgs
+    # three since re-grade #2: the hill's talk band (L3) and levels (L9), and the session's "+ easy cardio" over a
+    # session whose only cardio is now a hill (L3)
+    assert len(msgs) == 1 and msgs[0].startswith("hevy note lint (warn): 3 problem(s)") and "clean" not in msgs[0], msgs
     line = predraft_summary.summary_line({"job": "nightly_predraft", "outcome": "drafted", "note_lint": out})
-    assert '"note_lint":{"state":"problems","problems":2,"rules":["L3","L9"]}' in line, line
+    assert '"note_lint":{"state":"problems","problems":3,"rules":["L3","L9"]}' in line, line
     clean = predraft_summary.summary_line({"note_lint": {"state": "clean", "problems": 0}})
     assert '"note_lint":{"state":"clean"}' in clean and '"note_lint":{"state":"absent"}' in predraft_summary.summary_line({})
 
@@ -216,12 +218,15 @@ def test_a_rotated_lift_he_logged_weeks_ago_is_not_new_and_not_find_the_load():
 
 
 def test_MUTATION_the_28_day_line_brings_back_the_graded_wire(monkeypatch):
-    """Control: put the old 28-day line back and the same inputs render exactly the graded notes."""
+    """Control: put the old 28-day line back and the same inputs fall back into the pick-load form. Re-grade #2
+    (2026-10-31) closed the second door too: `New: replaces …` needs NO PREVIOUS at all, so even at 28 days the hammer
+    curl (PREVIOUS 39 days old, same load) is not "New" — the graded wire minus its New line, W line reworded."""
     monkeypatch.setattr(lift_note, "STALE_AFTER_DAYS", 28)
     curl, face = _accessory("hammer_curl_dumbbell", 22.5), _accessory("face_pull", 65)
     history = {**_history("hammer_curl_dumbbell", ("2026-09-20", 22.5, 12, 8.0)), **_history("face_pull", ("2026-10-21", 65, 15, 9.0))}
     _compose([curl, face], history, {"hammer_curl_dumbbell": "Bicep Curl (Dumbbell)"}, target="2026-10-29")
-    assert curl.notes == GRADED_HAMMER_CURL, curl.notes
+    assert curl.notes == "RPE 8–9, last set RPE 9–10\nW at RPE 5 or less → one step, no more.", curl.notes
+    assert curl.sets[0].type == "warmup" and "New: replaces" in GRADED_HAMMER_CURL
     # the face pull's "New" came from the rotation alone (its PREVIOUS was 8 days old): not stale even at 28 days
     face2 = _accessory("face_pull", 65)
     monkeypatch.setattr(lift_note, "STALE_AFTER_DAYS", 180)
@@ -229,14 +234,22 @@ def test_MUTATION_the_28_day_line_brings_back_the_graded_wire(monkeypatch):
     assert "New: replaces" not in face2.notes and GRADED_FACE_PULL.split("\n")[0] == face2.notes
 
 
-def test_a_lift_genuinely_new_to_him_keeps_new_and_the_pick_load_form():
-    """81fe18c0's lying leg curl (PREVIOUS 40 lb × 8, 2024-11-29 — 23 months): stale, so `New: replaces …` stands and
-    the feeler W row leads (the A-grade corpus keeps a stale pick-load lift at its band, §3.3)."""
+def test_a_stale_previous_far_off_is_lighter_not_new_and_a_lift_never_logged_keeps_new():
+    """81fe18c0's lying leg curl (PREVIOUS 40 lb × 8, 2024-11-29 — 23 months, row 30 lb): stale, so the feeler W row
+    leads (§3.3) and the band stays (owner ruling 2026-10-30: no blanket layoff cap). Re-grade #2 (2026-10-31): Hevy
+    still shows that PREVIOUS beside the 30-lb row, so the reason slot carries `Lighter: first time in 23 months.`, not
+    `New: replaces …` — New is only for a lift with NO PREVIOUS (the 40f2c0b5 machine lateral raise read "New" over 65 lb
+    × 10 from 2024 and dropped to 35 lb with no why)."""
     leg = _accessory("lying_leg_curl_machine", 30)
     _compose(
         [leg], _history("lying_leg_curl_machine", ("2024-11-29", 40, 8, None)), {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"}
     )
-    assert leg.notes == GRADED_LEG_CURL and leg.sets[0].type == "warmup" and leg.sets[0].reps == g.PICK_LOAD_W_REPS
+    assert leg.notes == "RPE 8–9, last set RPE 9–10\nLighter: first time in 23 months.\nW at RPE 5 or less → one step, no more."
+    assert leg.sets[0].type == "warmup" and leg.sets[0].reps == g.PICK_LOAD_W_REPS and leg.notes != GRADED_LEG_CURL
+    # never logged: New stands, with the feeler line over the engine's start load
+    fresh = _accessory("lying_leg_curl_machine", 30)
+    _compose([fresh], {}, {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"})
+    assert fresh.notes == "RPE 8–9, last set RPE 9–10\nNew: replaces Seated Leg Curl (Machine).\nW at RPE 5 or less → one step, no more."
 
 
 def test_the_stale_line_is_the_standards_180_days_at_its_boundary():
@@ -254,6 +267,8 @@ def test_the_stale_line_is_the_standards_180_days_at_its_boundary():
 
 def _cardio_ir(note: str, key: str = "cycling") -> RoutineSpec:
     squat = _clean_ir().exercises[0]
+    # re-grade #2: a session whose only cardio is a hard kind (a hill) promises no easy cardio
+    squat.notes = squat.notes.replace(g.LOW_ENERGY_LINE, g.low_energy_line([cardio_note.composed_kind(note) or "easy"]), 1)
     return RoutineSpec(
         routine_id="r-c",
         target_date=TARGET,
@@ -342,7 +357,7 @@ def _cap(ir: RoutineSpec, value: Any, to: int = 3) -> list[dict[str, Any]]:
     return critics_apply.apply_changes(ir, [{**verdict, "field": "exercises[1].set_count", "to": to}])
 
 
-STANDING_CALF_COMPOSED = "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load.\nFull stretch at the bottom; knees soft."
+STANDING_CALF_COMPOSED = "RPE 8–9, last set RPE 9–10\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft."
 
 
 def test_a_layoff_cap_with_no_days_since_value_reads_its_gap_off_previous(monkeypatch):
@@ -355,7 +370,7 @@ def test_a_layoff_cap_with_no_days_since_value_reads_its_gap_off_previous(monkey
         {"movement_key": "standing_calf_raise_machine", "clause": "No jumps: 3 sets today, 18 months off.", "effort_capped": True}
     ]
     assert ir.exercises[1].notes == (
-        "RPE 7\nNo jumps: 3 sets today, 18 months off.\nW set: up to 8 easy reps, find the load.\nFull stretch at the bottom; knees soft."
+        "RPE 7\nNo jumps: 3 sets today, 18 months off.\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft."
     )
     assert ir.exercises[1].notes != GRADED_STANDING_CALF and _lint(ir).ok, _lint(ir).lines()
 

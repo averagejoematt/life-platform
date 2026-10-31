@@ -82,7 +82,9 @@ _EFFORT_LINE = re.compile(
     r"^RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?(?:, last set RPE \d+(?:\.5)?(?:–\d+(?:\.5)?)?)?(?: · pick the load per hand)?$"
 )
 _RESTATES = re.compile(
-    r"\d+\s*sets?\b|\bsets? of\b|\btop sets?\b|back-offs?|\d+\s*(?:carr(?:y|ies)|steps)\b|\d+\s*(?:kg|lb)\b|@", re.IGNORECASE
+    # a `+10 lb` step is a delta, not a row's load (#5428 re-grade #3: the carry's adjust rule after set 1)
+    r"\d+\s*sets?\b|\bsets? of\b|\btop sets?\b|back-offs?|\d+\s*(?:carr(?:y|ies)|steps)\b|(?<![+\d])\d+\s*(?:kg|lb)\b|@",
+    re.IGNORECASE,
 )
 
 

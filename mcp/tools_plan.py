@@ -1002,6 +1002,7 @@ def _run_stage_2(
     WRITES NOTHING: no version, no index row, no thread row, no ledger row; each is returned under
     `would_write` (`mcp.plan_stage2_writes`)."""
     from coach import critic_overrides, critics
+    from training import session_block
     from training.cardio_note import apply_after_lines
     from training.routine_repo import put_versioned
 
@@ -1087,6 +1088,7 @@ def _run_stage_2(
     )
     changes = critics.apply_changes(ir, verdicts, set_floors=critic_set_floors(ir))  # #4149: held to the commit gate's floor
     apply_after_lines(ir.exercises)  # #5428: a swap or drop moves what follows the cardio — re-stamp `After:` on the final order
+    session_block.sync_low_energy(ir)  # #5428 re-grade #2: and can change whether the session has easy cardio to fall back on
     overridden = {v["critic"] for v in verdicts if critics.is_overridden(v)}
     rc = critics.recheck(ir, build, overridden=overridden)
     precheck = _validate_ir_for_hevy(ir)

@@ -38,7 +38,9 @@ from mcp.recovery_authoring import derive_training_context  # noqa: E402
 
 LB = 0.45359237
 MEMORY_TEXT = "STANDING: (1) one. (2) two. (3) three. (4) PLACEHOLDER-STOP-LIST. (5) five."
-LOAD_RULE = "Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift."
+# #5428 re-grade #2 (2026-10-31): RPE 7.5–8.5 is the one-step branch; no pins; per hand; "sets left", never "later sets"
+# re-grade #3: two if/then lines, a unit on every step, a stack's step its next plate, no "per hand"
+LOAD_RULE = "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift."
 UPPER_BLOCK = "Upper volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n" + LOAD_RULE
 LOWER_BLOCK = "Lower volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n" + LOAD_RULE
 
@@ -178,7 +180,7 @@ def test_the_10_26_upper_volume_shape_exercise_1_is_the_block_plus_its_own_note(
     structured = _draft(ir)
     changes = _stage_2(ir, VERDICTS_10_26)
     wire = _wire(ir)
-    assert wire[0]["notes"] == UPPER_BLOCK + "\n\nRPE 8–9\n2 sets today: first time in 5 weeks.\nBreathe out on the press."
+    assert wire[0]["notes"] == UPPER_BLOCK + "\n\n2 sets today: first time in 5 weeks.\nBreathe out on the press."
     # the set count in the clause equals the working rows, and the warm-up row survived the cut
     assert [s["type"] for s in wire[0]["sets"]] == ["warmup", "normal", "normal"]
     assert [c["clauses"] for c in changes if c.get("applied")] == [
@@ -200,7 +202,7 @@ def test_the_10_27_lower_volume_shape_exercise_1_is_the_block_plus_its_own_note(
     _draft(ir)
     _stage_2(ir, [v for v in VERDICTS_10_26 if v["critic"] != "joints_tendons"])
     wire = _wire(ir)
-    assert wire[0]["notes"] == LOWER_BLOCK + "\n\nRPE 8–9\nBrace; breathe out on the way up."
+    assert wire[0]["notes"] == LOWER_BLOCK + "\n\nBrace; breathe out on the way up."
     assert [n["notes"] for n in wire[1:]] == ["RPE 8–9\nAs deep as your hips stay on the pad.", "RPE 8–9, last set RPE 9–10"]
 
 
@@ -307,7 +309,7 @@ def test_the_clause_is_plain_short_and_written_once():
         assert clause and len(clause) <= session_block.CLAUSE_MAX_CHARS and "#" not in clause
     note = UPPER_BLOCK + "\n\nRPE 8–9\nBreathe out on the press."
     once = session_block.add_reason(note, "2 sets today.")
-    assert once == UPPER_BLOCK + "\n\nRPE 8–9\n2 sets today.\nBreathe out on the press."
+    assert once == UPPER_BLOCK + "\n\n2 sets today.\nBreathe out on the press."
     assert session_block.add_reason(once, "2 sets today.") == once
 
 

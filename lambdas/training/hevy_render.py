@@ -239,7 +239,10 @@ def _reason_field(text: str) -> str:
 
 
 def _leads_after_effort(own: str, start: int) -> bool:
-    """#5428: the standard puts the effort on line 1 and the one reason on line 2 — a reason there LEADS its note."""
+    """#5428: the standard puts the effort on line 1 and the one reason on line 2 — a reason there LEADS its note. On
+    exercise 1 the session line can carry the effort (re-grade #3: printed once), so a reason opening the note leads too."""
+    if start == 0:
+        return True
     before = own[:start].rstrip("\n").split("\n")
     return len(before) == 1 and bool(_EFFORT_LINE_RE.match(before[0]))
 

@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from typing import Optional, Union
 
-GRAMMAR_VERSION = "hevy-note-grammar@1.0.0"
+GRAMMAR_VERSION = "hevy-note-grammar@1.3.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4 (see each builder)
 
 Rpe = Union[float, int, tuple[float, float], list[float]]
 
@@ -40,6 +40,9 @@ SESSION_BLOCK_MAX_LINES = 7
 EX1_MAX_LINES = 11
 LIFT_MAX_LINES = 4
 CARDIO_MAX_LINES = 6
+# #5428 re-grade #4: an interval ride's two-way escape (full sentences up; can't talk → shorter reps at the same level) is
+# two phone lines; with line 1, the clock and the After line that is 7. Every other cardio note keeps 6.
+CARDIO_INTERVAL_MAX_LINES = 7
 CARDIO_LINE1_MAX_CHARS = 80
 CARDIO_NOTE_MAX_CHARS = 240
 CLOCK_LINE_MAX_CHARS = 110
@@ -68,19 +71,71 @@ SESSION_DAYS = (
 )
 # owner ruling 2026-10-27 ~04:50Z ("yes add it back"): the low-energy option returns as one line.
 LOW_ENERGY_LINE = "Low energy → first 2 lifts + easy cardio."
+# #5428 re-grade #2 (2026-10-31): a session whose only cardio is a hard kind (intervals, tempo, hills) has no easy cardio
+# to fall back on, so the line names the change instead of promising a block that is not there.
+LOW_ENERGY_HARD_CARDIO_LINE = "Low energy → first 2 lifts + cardio, no hard efforts."
+LOW_ENERGY_LINES = (LOW_ENERGY_LINE, LOW_ENERGY_HARD_CARDIO_LINE)
+HARD_CARDIO_KINDS = ("tempo", "hills", "intervals")  # `cardio_menu.HARD`
+
+
+def low_energy_line(cardio_kinds: Optional[list[str]] = None) -> str:
+    """Session line 2: the hard-cardio form when the session's cardio blocks are ALL hard kinds, else the ruled line."""
+    kinds = [k for k in (cardio_kinds or []) if k]
+    return LOW_ENERGY_HARD_CARDIO_LINE if kinds and all(k in HARD_CARDIO_KINDS for k in kinds) else LOW_ENERGY_LINE
+
+
 TEST_DAY = "Test"
 # R3's small-load safeguard: under this load a lift moves one step at most (two steps on a 15 lb raise is +67 %).
 SMALL_LOAD_LB = 40
 
 
-def load_rule_line(step_lb: Optional[float]) -> str:
-    """Session line 2, owner ruling 2026-10-27 R3: two load steps when the top reps land at RPE <= 7, one step at RPE 8,
-    one step at most under SMALL_LOAD_LB, once per lift. The step is the charter's (`progression.gain_rule.step_lb`),
-    so the line moves with it; with no charter step the line says pins only."""
+# R3's one-step band. #5428 re-grade #2 (2026-10-31): the rule said "RPE 7 or less" and "at RPE 8", so RPE 7.5 and 8.5 —
+# his PREVIOUS on three lifts that day — fell in neither branch. The one-step branch now runs to the top of the band
+# under it: everything up to 8.5 moves, RPE 9 holds.
+ONE_STEP_RPE = (7.5, 8.5)
+LOAD_RULE_HEAD = "Top reps at RPE 7 or less → "
+
+
+OTHER_LIFTS_HEAD = "Other lifts: top reps at RPE 7 or less → "
+# #5428 re-grade #5 (2026-10-31): "Under 40 lb: +5 lb max" was two steps on a 30-lb dumbbell (§5's step there is 2.5 lb)
+# and said nothing when a lift is both a stack and under 40 lb. "One step" is §5's table's step for that implement, and a
+# stack's next plate wins at any load.
+LOAD_RULE_LIMITS = f"Under {SMALL_LOAD_LB} lb: one step. Stack: next plate at any load. Once per lift."
+
+
+def load_rule_line(step_lb: Optional[float], *, other_lifts: bool = False) -> str:
+    """The load rule (owner ruling 2026-10-27 R3): two load steps when the top reps land at RPE <= 7, one step at RPE
+    7.5–8.5, one step at most under SMALL_LOAD_LB, once per lift. The step is the charter's
+    (`progression.gain_rule.step_lb`), so the line moves with it.
+
+    TWO lines, newline-joined (#5428 re-grade #3: the one-line form was five clauses with a unitless "+5"): the if/then,
+    then the limits. Every step carries its unit; no "per hand" (a step adds to the row, and a dumbbell row is already
+    per hand); a stack has no fixed step (§5), so its step is the next plate.
+
+    `other_lifts` (re-grade #4, 2026-10-31): a one-set exercise 1 has no later set to step, but the rule must still reach
+    the session's multi-set lifts — removing it left the routine with no in-session rule at all. So the block keeps it,
+    addressed to them: `Other lifts: top reps …` (`rule_mode`)."""
+    lo, hi = fmt_num(ONE_STEP_RPE[0]), fmt_num(ONE_STEP_RPE[1])
+    head = OTHER_LIFTS_HEAD if other_lifts else LOAD_RULE_HEAD
     if not step_lb:
-        return f"Top reps at RPE 7 or less → 2 pins on later sets; at RPE 8 → 1 pin. Under {SMALL_LOAD_LB} lb: 1 pin max. Once per lift."
+        first = f"{head}2 steps on later sets; {lo}–{hi} → 1 step."
+        return first + f"\n{LOAD_RULE_LIMITS}"
     one, two = fmt_num(step_lb), fmt_num(2 * step_lb)
-    return f"Top reps at RPE 7 or less → +{two} lb (2 pins) on later sets; at RPE 8 → +{one} lb (1 pin). Under {SMALL_LOAD_LB} lb: +{one} max. Once per lift."
+    first = f"{head}+{two} lb on later sets; {lo}–{hi} → +{one} lb."
+    return first + f"\n{LOAD_RULE_LIMITS}"
+
+
+def rule_fits(working_sets: int) -> bool:
+    """Exercise 1 itself has a later set to step (#5428 re-grade #3)."""
+    return int(working_sets or 0) >= 2
+
+
+def rule_mode(ex1_working_sets: int, others_multi: bool = True) -> Optional[str]:
+    """Which load rule the block carries (re-grade #4): `ex1` (exercise 1 has 2+ working sets: the rule as written),
+    `others` (exercise 1 has one, another lift has 2+: `Other lifts: …`), or None (no lift in the session can step)."""
+    if rule_fits(ex1_working_sets):
+        return "ex1"
+    return "others" if others_multi else None
 
 
 def charter_step_lb() -> Optional[float]:
@@ -120,9 +175,21 @@ def fitness_test_line(protocol: str) -> str:
 LOAD_RULE_LINE = load_rule_line(charter_step_lb())
 
 
-def session_block(day: str, big_lift_rpe: Rpe) -> str:
-    """The three-line block that heads exercise 1 (followed by a blank line, then exercise 1's own note)."""
-    return "\n".join((session_line(day, big_lift_rpe), LOW_ENERGY_LINE, LOAD_RULE_LINE))
+LOAD_RULE_LINES = tuple(LOAD_RULE_LINE.split("\n"))
+OTHER_LIFTS_RULE_LINES = tuple(load_rule_line(charter_step_lb(), other_lifts=True).split("\n"))
+
+
+def rule_lines(mode: Optional[str]) -> list[str]:
+    return list(LOAD_RULE_LINES) if mode == "ex1" else list(OTHER_LIFTS_RULE_LINES) if mode == "others" else []
+
+
+def session_block(
+    day: str, big_lift_rpe: Rpe, cardio_kinds: Optional[list[str]] = None, ex1_working_sets: int = 2, others_multi: bool = True
+) -> str:
+    """The block that heads exercise 1 (followed by a blank line, then exercise 1's own note): the session line, the
+    low-energy line, then the load rule's two lines in the form `rule_mode` picks."""
+    head = [session_line(day, big_lift_rpe), low_energy_line(cardio_kinds)]
+    return "\n".join(head + rule_lines(rule_mode(ex1_working_sets, others_multi)))
 
 
 # ── lift notes (standard §3.2–3.4) ──────────────────────────────────────────────────────────────────────────────────
@@ -135,9 +202,32 @@ def effort_line(rpe: Rpe, last_set_rpe: Optional[Rpe] = None) -> str:
 PICK_LOAD_W_REPS = 8
 
 
-def pick_load_line(w_reps: int = PICK_LOAD_W_REPS) -> str:
-    """The pick-load form's line 2 (no history, or stale history), over a no-load W row of `w_reps`."""
-    return f"W set: up to {w_reps} easy reps, find the load."
+# #5428 re-grade #2 (2026-10-31): "find the load" over working rows that carry the engine's start load read as "ignore the
+# rows". With a load on the rows the feeler checks THAT load; "find" is kept only where the rows carry none (a chat draft).
+PICK_LOAD_FIXED_TAIL = "test the load."  # 40 chars with its head: one phone line, as "find the load." was
+PICK_LOAD_OPEN_TAIL = "find the load."
+
+
+# re-grade #4 (2026-10-31): "test the load." gave the test no result — the W line now says what the answer does. RPE 5 is
+# the top of the talk table's "full sentences" row: a start load that easy is a step light.
+PICK_LOAD_EASY_RPE = 5
+
+
+def pick_load_line(w_reps: int = PICK_LOAD_W_REPS, *, rows_loaded: bool = True, step_text: Optional[str] = None) -> str:
+    """The pick-load form's W line (no history, or stale history). Over loaded rows the feeler W row is AT the start load
+    and the line is its result rule: `W set at RPE 5 or less → next plate.` (`step_text`: the lift's one step — a stack's
+    next plate, a fixed implement's `+5 lb[ per hand]`); over unloaded rows (a chat draft, a no-load W row of `w_reps`):
+    `W set: up to 8 easy reps, find the load.`"""
+    if not rows_loaded:
+        return f"W set: up to {w_reps} easy reps, {PICK_LOAD_OPEN_TAIL}"
+    del step_text  # re-grade #5: "one step" (§5's step for the implement; a stack's next plate), not a typed number
+    return f"W at RPE {PICK_LOAD_EASY_RPE} or less → one step, no more."
+
+
+# the feeler W row carries the start load itself (it IS the test of that load), so the line is the result rule alone —
+# one phone line, so a lift with a reason and its family cue stays inside 4. Re-grade #5: "no more" — the feeler's step
+# IS the lift's once ("Once per lift"); "next plate" alone left a second step open on a lift last done years ago.
+PICK_LOAD_RESULT_RE = re.compile(r"^W at RPE \d+ or less → one step, no more\.$")
 
 
 def gap_text(days: Union[int, float, str, None]) -> Optional[str]:
@@ -176,13 +266,76 @@ NO_JUMPS = "No jumps"
 SAME_LOAD = "Same load"
 SAME_LOAD_LINE = f"{SAME_LOAD}: aim to leave one more rep."
 SAME_LOAD_FROM_RPE = 10.0
+# #5428 re-grade #2 (2026-10-31): a held load after a PREVIOUS that reached the top of its rep range at RPE <= 8.5 read as
+# "never progresses" (the reverse fly at 60 x 15 @ 8.5, the pushdown at 50 x 15 @ 8.5). The gain rule wants the top of the
+# range twice in a row, and the load rule moves it in-session at RPE <= 8.5, so the note says what moves it.
+HELD_TOP_MAX_RPE = 8.5
+
+
+def _step_text(lb: Union[int, float], per_hand: bool) -> str:
+    return f"+{fmt_num(lb)} lb" + (" per hand" if per_hand else "")
+
+
+def held_top_line(
+    rep_hi: Union[int, float],
+    *,
+    working_sets: int = 2,
+    row_lb: Optional[float] = None,
+    stack: bool = False,
+    per_hand: bool = False,
+    step_lb: Optional[float] = None,
+    next_step_lb: Optional[float] = None,
+    small_step_lb: Optional[float] = None,
+) -> str:
+    """A held load whose PREVIOUS reached the top of the range at RPE <= 8.5 (#5428): ONE timeline, the load rule's.
+
+    Re-grade #3: the reason IS the load rule applied to this lift's set 1, in its implement's step (a stack: the next
+    plate; under SMALL_LOAD_LB: one step; else two steps at RPE 7 or less, one at 7.5–8.5). Re-grade #4: it names its
+    timeline in the rule's own words ("on later sets" — today) and opens on set 1, not "Same load to start"; a one-set
+    lift has no later set, so it names the gain rule's step "next session" (`next_step_lb`)."""
+    hi = fmt_num(rep_hi)
+    if int(working_sets or 0) < 2:
+        return f"{SAME_LOAD}: {hi} reps again → {_step_text(next_step_lb or step_lb or 5, per_hand)} next session."
+    lo_rpe, hi_rpe = fmt_num(ONE_STEP_RPE[0]), fmt_num(ONE_STEP_RPE[1])
+    one = float(step_lb or 5)
+    head = f"{SET_1_HEAD}{hi} reps at RPE"
+    if stack:
+        return f"{head} {hi_rpe} or less → next plate on later sets."
+    if row_lb is not None and float(row_lb) < SMALL_LOAD_LB:
+        # under 40 lb: ONE step of the implement's own size (§5: 2.5 lb on a dumbbell under 50) — re-grade #5
+        return f"{head} {hi_rpe} or less → {_step_text(small_step_lb or one, per_hand)} on later sets."
+    return f"{head} 7 or less → {_step_text(2 * one, per_hand)} on later sets; {lo_rpe}–{hi_rpe} → {_step_text(one, per_hand)}."
+
+
+SET_1_HEAD = "Set 1: "
+
+
+# what a held-top reason must read as (lint L4): the in-session step on set 1, or the next-session step on a one-set lift
+HELD_TOP_RE = re.compile(r"^(?:Set 1: \d+ reps at RPE .* on later sets|Same load: \d+ reps again → .* next session\.)")
+# #5428 re-grade #3: a one-set exercise 1 carries no load rule (nothing to step today), so its note names the gain rule's
+# next-session step instead — the live branch on the lift that most needs one
+ONE_SET_HEAD = "One set: "
+
+
+def one_set_line(rep_hi: Union[int, float], ceiling_rpe: Union[int, float], next_step_lb: float, per_hand: bool) -> str:
+    """`One set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.` (the charter's gain rule: the top of
+    the range on two consecutive same-type exposures, at or under the effort ceiling)."""
+    return f"{ONE_SET_HEAD}{fmt_num(rep_hi)} reps at RPE {fmt_num(ceiling_rpe)} or less two sessions running → {_step_text(next_step_lb, per_hand)}."
+
+
+def stale_reason_line(word: str, gap: Optional[str]) -> str:
+    """A stale PREVIOUS (§3.3) more than one step from the row: `Lighter: first time in 2 years.` (`gap_text`), never
+    `New: replaces …`, which is only for a lift with no PREVIOUS at all."""
+    return f"{word}: first time in {gap}." if gap else f"{word}: back after a break."
+
+
 # #5083/#5075: a rotated accessory's one reason — the exercise it stands in for, by its Hevy title
 ROTATION_HEAD = "New: replaces "
 # #5057 on the chat path: a stall-rule load step the author's rows did not take, named as a delta
 STEP_DUE_HEAD = "Step due: +"
 REASON_RE = re.compile(
     r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |No jumps(?: today)?: |Set \d over RPE \d+(?:\.5)? → |\d+ sets? today[:.]"
-    r"|New: replaces |Step due: \+|Same load: "
+    r"|New: replaces |Step due: \+|Same load(?: to start)?: |One set: |Set 1: \d+ reps at RPE "
     # a critic's applied load / rep change (`session_block.applied_clause`) is a reason too (standard §3.2's list, §3.8)
     r"|(?:Lighter|Heavier|Fewer reps) today[:.])"
 )
@@ -244,12 +397,29 @@ def on_step(lb: float, step: float) -> bool:
 
 
 # ── carry (standard §3.5) ───────────────────────────────────────────────────────────────────────────────────────────
-def carry_line1(rpe: Rpe) -> str:
+def carry_line1(rpe: Rpe, start_lb: Optional[float] = None) -> str:
+    """`RPE 8–9 · 60 lb per hand to start` when his last carry load is known (#5428 re-grade #3: "pick the load" gave no
+    number to start from), else `RPE 8–9 · pick the load per hand`."""
+    if start_lb:
+        return f"RPE {fmt_rpe(rpe)} · {fmt_num(start_lb)} lb per hand to start"
     return f"RPE {fmt_rpe(rpe)} · pick the load per hand"
+
+
+def carry_adjust_line(step_lb: Optional[float]) -> str:
+    """The carry's one adjust rule after set 1 (re-grade #3): `Set 1 at RPE 7 or less: +10 lb per hand.` — two steps,
+    the load rule's RPE <= 7 branch; anything harder stays."""
+    return f"Set 1 at RPE 7 or less: {_step_text(2 * float(step_lb or 5), True)}."
+
+
+CARRY_ADJUST_RE = re.compile(r"^Set 1 at RPE \d+(?:\.5)? or less: \+\d+(?:\.5)? lb per hand\.$")
 
 
 CARRY_CUE = "Tall, ribs down, bells off your legs."
 CARRY_STEPS_LINE = "Steps go in the yards box."
+# #5428 re-grade #2 (2026-10-31): a carry row's distance is his STEP COUNT (owner 2026-10-25, #5373): the number the
+# routine writes is the number his yards box shows (Hevy passes it through unconverted — his own logged carries read back
+# as whole numbers, 50 / 60 / 60 on 2026-10-25). So a carry row is a whole number of steps and the note names no metres.
+CARRY_METRE_RE = re.compile(r"\bmet(?:re|er)s?\b|\b\d+(?:\.\d+)? ?m\b", re.I)
 
 # ── cardio (standard §3.7) ──────────────────────────────────────────────────────────────────────────────────────────
 CARDIO_MACHINES = ("Recumbent", "Upright bike", "Treadmill", "Elliptical", "Rower", "Air bike")
@@ -266,6 +436,22 @@ CLOCK_PREFIX = "⌚ ride clock: "
 WALK_CLOCK_PREFIX = "⌚ walk clock: "
 CLOCK_PREFIXES = (CLOCK_PREFIX, WALK_CLOCK_PREFIX)
 AFTER_LINE = "After: end watch cardio, restart Hevy."
+# #5428 re-grade #2 (2026-10-31), §3.7 intervals: the talk check lands at the END of a hard rep (not a bare minute that is
+# also where the easy minutes start), and the escape is one level.
+INTERVAL_ESCAPE_STEP = 1
+
+
+def interval_escape_line(up_level: int, hard_level: int) -> str:
+    """`As rep 1 ends: full sentences → L13; can't talk → 1 min at L12.` — the talk check as rep 1 ends: full sentences
+    (too easy) one level up; "a few words" is the target (line 1); can't talk (too hard) shortens the hard reps to 1 min
+    at the SAME hard level — never below it (re-grade #4: `none → L11` was a non-standard word and dropped the reps to
+    the recovery level, cancelling the intervals). Two phone lines."""
+    return f"As rep 1 ends: full sentences → L{int(up_level)}; can't talk → 1 min at L{int(hard_level)}."
+
+
+INTERVAL_ESCAPE_RE = re.compile(r"^As rep 1 ends: full sentences → L(?P<up>\d+); can't talk → 1 min at L(?P<hard>\d+)\.$")
+# the easy minutes' talk words on the interval clock (warm-up, recoveries, cool-down: his steady level)
+INTERVAL_EASY_TALK = "full sentences"
 
 
 def clock_prefix_for(machine: str) -> str:
@@ -412,7 +598,7 @@ TRUNCATION_RE = re.compile(r"…|\.\.\.")
 LOAD = r"\d+(?:\.5)?"
 RPE_RANGE = r"\d+(?:\.5)?(?:–\d+(?:\.5)?)?"
 EFFORT_RE = re.compile(rf"^RPE (?P<rpe>{RPE_RANGE})(?:, last set RPE \d+(?:\.5)?–\d+(?:\.5)?)?$")
-CARRY_LINE1_RE = re.compile(rf"^RPE (?P<rpe>{RPE_RANGE}) · pick the load per hand$")
+CARRY_LINE1_RE = re.compile(rf"^RPE (?P<rpe>{RPE_RANGE}) · (?:pick the load per hand|(?P<start>{LOAD}) lb per hand to start)$")
 _TALK = "|".join(re.escape(w) for w in TALK_WORDS)
 CARDIO_LINE1_RE = re.compile(
     rf"^(?P<machine>{'|'.join(re.escape(m) for m in CARDIO_MACHINES)}) · (?P<levels>[^·]+) · "

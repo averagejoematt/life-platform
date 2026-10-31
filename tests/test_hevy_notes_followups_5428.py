@@ -249,7 +249,8 @@ def test_the_chat_draft_notes_are_composed_to_the_standard():
     lift = {k: n.split("\n\n")[-1] for k, n in notes.items()}  # exercise 1's own note, under the session block
     assert lift == {
         # no PREVIOUS on file for the press template: the author's load stands, his coach's own cue is kept as the cue
-        "db_shoulder_press": "RPE 8–9\nExhale through the press.",
+        # (its RPE 8–9 is the session line's — re-grade #3 prints it once)
+        "db_shoulder_press": "Exhale through the press.",
         # PREVIOUS 15 x 15 on 10-04 is within one step of the row: no reason, nothing the rows show
         "db_lateral_raise": "RPE 8–9, last set RPE 9–10",
         # no load authored, none on file: the pick-load form (one no-load W row of 8)
@@ -287,7 +288,7 @@ def test_the_chat_path_step_is_the_standards_reason_and_the_render_check_finds_i
     exercises = [{"movement_key": "lat_pulldown", "sets": [{"weight_lbs": 160, "rep_range_start": 8, "rep_range_end": 12, "count": 2}]}]
     ir, out = _draft_custom(exercises, target_date="2026-10-26", archetype="upper", role="upper_volume")
     note = ir.exercises[0].notes.split("\n\n")[-1]
-    assert note == "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.\nBreathe out on the pull."
+    assert note == "Now aiming 10–12: 8s were RPE 8 three times.\nBreathe out on the pull."  # RPE 8–9 is the session line's
     [step] = out["step_due"]
     assert step["carried"] is False and step["wire_line"] == "Now aiming 10–12: 8s were RPE 8 three times."
     assert "160 lb x 8" in step["reason"]  # the engine's audit text stays on the stored record
@@ -315,7 +316,10 @@ def test_every_minimum_and_travel_routine_heads_with_the_session_block_and_carri
                 bad.setdefault(f"{role}/{pool}", []).append("a second WHY line")
             if hits := banned_hits(notes):
                 bad.setdefault(f"{role}/{pool}", []).append(f"banned {hits}")
-            if any(not n.split("\n\n")[-1].startswith("RPE ") for n in notes):
+            # exercise 1's effort is the session line's when they match (re-grade #3: printed once)
+            if any(not n.split("\n\n")[-1].startswith("RPE ") for n in notes[1:]) or (
+                not notes[0].split("\n\n")[-1].startswith("RPE ") and " · RPE " not in head[0]
+            ):
                 bad.setdefault(f"{role}/{pool}", []).append("a lift note not led by its effort")
     assert bad == {}
 

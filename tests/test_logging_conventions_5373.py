@@ -264,7 +264,11 @@ def test_the_routine_note_renders_the_estimate_and_his_rule():
     cue = session_cues.exposure_cue("carry", sets, stride=lc.trailing_stride(STRIDE_ROWS, DAY))
     # #5428 (standard §3.5): the carry note is the effort + per hand, the carry cue and his steps rule — the step count is
     # the row's own distance field, and the stride estimate is the chat's, never the set's
-    assert cue == "RPE 8–9 · pick the load per hand\nTall, ribs down, bells off your legs.\nSteps go in the yards box."
+    # (re-grade #3: plus the one adjust rule after set 1)
+    assert cue == (
+        "RPE 8–9 · pick the load per hand\nTall, ribs down, bells off your legs.\nSet 1 at RPE 7 or less: +10 lb per hand.\n"
+        "Steps go in the yards box."
+    )
     assert "est. from unloaded stride" not in cue and "60 steps" not in cue
     assert session_cues.exposure_cue("carry", sets) == cue  # the stride no longer changes the note
 
