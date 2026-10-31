@@ -34,7 +34,12 @@ THE ORDER CONTRACT (``ORDER`` / ``order_violations``)
   guidance, the charter, the May tracker) -> ``plan_next_session`` -> ``manage_hevy_routine``
   draft. The clinical guidance, the charter and the May tracker arrive TOGETHER, as this
   module's context on ``get_coach_session_packet`` — so the packet is the pre-flight call that
-  satisfies those three members (``PRE_FLIGHT``). ``order_violations`` checks a transcript's
+  satisfies those three members (``PRE_FLIGHT``). Since #5501 (option (a)) the packet also carries
+  ``lift_history`` — the day's programmed lifts with their newest sessions and latest note — so a packet
+  call that CARRIED it (``PACKET_LIFT_HISTORY``: the call record says ``lift_history`` measured or absent,
+  read off the packet's own ``[#5501] coach packet lift_history state=`` log line) satisfies the
+  exercise_history and exercise_notes members too, and the pre-flight set is one call. A packet call with
+  no such record (every conversation before #5501 deployed) satisfies only the three. ``order_violations`` checks a transcript's
   tool-call sequence against the contract; tests/test_coach_context_5071.py runs it over three
   real planning conversations (tests/fixtures/coach_transcripts_5071/).
 """
@@ -46,16 +51,22 @@ from typing import Any, Iterable, Optional
 
 from training.logging_conventions import CONVENTIONS_LINE  # #5373: the one line both conventions are stated in
 
-CONTEXT_VERSION = "coach-context@1.8.1"  # 1.8.1 #5373: the conventions line states the one-hand carry rule (owner 2026-10-27) and the dated read of the older totals; 1.8.0 #5373: logging_conventions (steps on a carry, per-hand vs total load); 1.7.0 #5122: day_mode (the whole-day disruption mode + the lapse offer, owner channel); 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
+CONTEXT_VERSION = "coach-context@1.9.0"  # 1.9.0 #5501: a packet call carrying lift_history satisfies the exercise pre-flight members; 1.8.1 #5373: the conventions line states the one-hand carry rule (owner 2026-10-27) and the dated read of the older totals; 1.8.0 #5373: logging_conventions (steps on a carry, per-hand vs total load); 1.7.0 #5122: day_mode (the whole-day disruption mode + the lapse offer, owner channel); 1.6.0 #5126: response_protocol (the ONE early-warning owner, owner channel); 1.5.0 #5111: lab_followup (the next draw, owner channel); 1.4.0 #5200: the May tracker read on every caller path + not_supplied_reason; 1.3.0 #5111: lab_priorities (owner channel, seam only); 1.1.0 #5059: clinical_guidance.freshness (owner channel, reference only); 1.2.0 #5090: run_gate
 
 # ── the order contract, as data ───────────────────────────────────────────────────────────
 ORDER: tuple[str, ...] = ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
 
+# A packet call that carried `lift_history` (#5501) — not a tool name: `call_tokens` adds it for a
+# `get_coach_session_packet` call whose record says the field read measured or absent.
+PACKET_LIFT_HISTORY = "get_coach_session_packet[lift_history]"
+LIFT_HISTORY_SATISFYING_STATES: frozenset[str] = frozenset({"measured", "absent"})
+
 # Each pre-flight member and the tool calls that satisfy it. The clinical guidance, the charter and
-# the May tracker have no tool of their own: they ride this module's context on the packet.
+# the May tracker have no tool of their own: they ride this module's context on the packet. The
+# exercise history and notes ride the packet's `lift_history` since #5501 — the dedicated tool first.
 PRE_FLIGHT: dict[str, tuple[str, ...]] = {
-    "exercise_history": ("get_exercise_history",),
-    "exercise_notes": ("get_exercise_notes",),
+    "exercise_history": ("get_exercise_history", PACKET_LIFT_HISTORY),
+    "exercise_notes": ("get_exercise_notes", PACKET_LIFT_HISTORY),
     "clinical_guidance": ("get_coach_session_packet",),
     "charter": ("get_coach_session_packet",),
     "may_tracker": ("get_coach_session_packet",),
@@ -503,7 +514,15 @@ def render(ctx: dict[str, Any]) -> str:
     if dm and dm.get("lines"):  # #5122: the whole-day mode and the lapse offer; nothing when the day is off
         parts.append([f"DAY MODE (owner-only) [{dm.get('source')}]"] + [f"- {ln}" for ln in dm["lines"]])
     if not ctx["published"]:  # the order contract is the owner's planning conversation's, never a reader prompt's
-        parts.append(["ORDER: " + " -> ".join(ctx["order"]) + " (pre-flight = " + ", ".join(PRE_FLIGHT) + ")"])
+        parts.append(
+            [
+                "ORDER: "
+                + " -> ".join(ctx["order"])
+                + " (pre-flight = "
+                + ", ".join(PRE_FLIGHT)
+                + "; the packet's lift_history carries exercise_history + exercise_notes for the day's programmed lifts, #5501)"
+            ]
+        )
     return "\n\n".join("\n".join(p) for p in parts)
 
 
@@ -796,6 +815,17 @@ def _call(c: Any) -> tuple[str, dict[str, Any]]:
     return str((c or {}).get("tool") or ""), dict((c or {}).get("args") or {})
 
 
+def call_tokens(c: Any) -> set[str]:
+    """What one call contributes toward ``PRE_FLIGHT``: its tool name, plus ``PACKET_LIFT_HISTORY`` for a
+    packet call whose record says its ``lift_history`` read measured or absent (#5501). read_failed, or no
+    record (a bare name, a pre-#5501 fixture), is the tool name only — never assumed carried."""
+    tool = _call(c)[0]
+    out = {tool}
+    if tool == "get_coach_session_packet" and isinstance(c, dict) and c.get("lift_history") in LIFT_HISTORY_SATISFYING_STATES:
+        out.add(PACKET_LIFT_HISTORY)
+    return out
+
+
 def _stage_of(tool: str, args: dict[str, Any]) -> Optional[str]:
     if tool == "plan_next_session":
         return "stage_2" if args.get("routine_id") else "plan_next_session"
@@ -814,7 +844,8 @@ def stage_of(call: Any) -> Optional[str]:
 def order_violations(tool_calls: Iterable[Any]) -> list[dict[str, Any]]:
     """Every place a planning conversation's tool calls break ``ORDER``, in call order.
 
-    A call is ``{"tool": name, "args": {...}}`` (or a bare tool name). A conversation with no
+    A call is ``{"tool": name, "args": {...}}`` (or a bare tool name); a packet call may carry
+    ``"lift_history": <state>`` (#5501, see ``call_tokens``). A conversation with no
     plan/draft/commit call is not a planning conversation and returns []. Codes:
     ``plan_before_preflight`` / ``draft_before_preflight`` (with the ``missing`` members),
     ``draft_before_plan``, ``commit_before_plan``, ``no_plan_next_session``."""
@@ -824,7 +855,7 @@ def order_violations(tool_calls: Iterable[Any]) -> list[dict[str, Any]]:
     planning = False
     for i, c in enumerate(tool_calls):
         tool = _call(c)[0]
-        seen.add(tool)
+        seen |= call_tokens(c)
         stage = stage_of(c)
         if stage is None or stage == "stage_2":
             continue
