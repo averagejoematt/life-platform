@@ -134,18 +134,18 @@
   "chronicle-delivery-heartbeat": {
     "added": "2026-10-04",
     "cause": "week-8-desk-stale-thread-fallback",
-    "cause_observed": "2026-10-28",
-    "updated": "2026-10-29",
-    "citation": "#4531 — week 7 was budget-paused (2026-10-21T15:00:34Z 'Budget guard paused chronicle') and week 8's desk budget failed validation twice on stale threads (2026-10-28T15:03:06Z: the ledger's last told weeks were 5 and a backfilled 6, so the calendar count called every live thread stale). The run fell back to the legacy writer and stored Week 8 as an unapproved draft, preview email sent 15:03:54Z; seven zero days → ALARM 2026-10-28 16:00Z. The code fix (staleness counts installments told; the desk retires what a retry leaves stale) is in the Session CL integration PR. Clears when the owner approves Week 8 from the preview email, or at the first delivered week after the Wed 2026-11-04 run.",
+    "cause_observed": "2026-10-31",
+    "updated": "2026-10-31",
+    "citation": "#4531 — week 7 was budget-paused (2026-10-21T15:00:34Z 'Budget guard paused chronicle') and week 8's desk budget failed validation twice on stale threads (2026-10-28T15:03:06Z: the ledger's last told weeks were 5 and a backfilled 6, so the calendar count called every live thread stale). The run fell back to the legacy writer and stored Week 8 as an unapproved draft, preview email sent 15:03:54Z; seven zero days → ALARM 2026-10-28 16:00Z. The code fix (staleness counts installments told; the desk retires what a retry leaves stale) is in the Session CL integration PR. Clears when the owner approves Week 8 from the preview email, or at the first delivered week after the Wed 2026-11-04 run. Re-derived 2026-10-31T17:45Z (Session CO): the Week 8 draft DATE#2026-10-27 is still unapproved (2d23h at the 14:27Z pre-flight), the 48-h sweep holds it daily, no subscriber delivery since — the cause is unchanged and is the owner's approve, not a code path.",
     "note": "Prior entry (2026-10-17, cause week-6-unapproved-draft): the week-6 unapproved legacy draft (#4914). Prior entry (2026-10-04, issue 4593, closed): week 4 published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; cleared when week 5 delivered through the approve path 2026-10-09 18:00Z. The current episode is a different cause on the same heartbeat."
   },
   "swallowed-permission-denial": {
     "added": "2026-10-20",
-    "cause": "life-platform-freshness-checker cold-start read of config/coaching/training_charter.private.json denied (no grant) — fix in the Session CL integration PR (#5220)",
-    "cause_observed": "2026-10-28",
-    "updated": "2026-10-29",
-    "citation": "#5220 — after PR #5459 cleared the og roster denial, the 2026-10-27 23:04, 10-28 09:46 and 10-28 17:49 PDT flaps all trace to one log line: life-platform-freshness-checker 'training-charter: s3://matthew-life-platform/config/coaching/training_charter.private.json not read (AccessDenied)' on cold start (e.g. 2026-10-28T06:03:52Z). Its role had neither CharterTwinRead nor CharterTwinList. The Session CL integration PR adds both (additive); proof: after LifePlatformOperational applies, the next freshness-checker cold start logs no AccessDenied and the alarm stays OK for 72 h, then #5220 closes and this entry is pruned.",
-    "note": "Prior causes: og-image-generator board-roster read (2026-10-27, resolved by PR #5459); charter-private-twin-absent-403 (2026-10-20 → 10-25). Prior cause (2026-10-20 → 2026-10-25): charter-private-twin-absent-403, resolved by the charter-twin grant (PR 5354, applied 2026-10-25 06:33Z)."
+    "cause": "RESOLVED — life-platform-freshness-checker cold-start read of config/coaching/training_charter.private.json was denied (no grant); the grant shipped in the Session CL integration PR #5476 and the alarm has been OK since 2026-10-29T06:07:55Z (#5220, closed 2026-10-31)",
+    "cause_observed": "2026-10-31",
+    "updated": "2026-10-31",
+    "citation": "#5220 (closed 2026-10-31) — the last episode: flaps at 2026-10-28 06:04Z, 2026-10-29 00:49Z and 05:38Z PDT-adjusted (describe-alarm-history), each the freshness-checker's cold-start 'not read (AccessDenied)' line on the private charter twin. PR #5476 added CharterTwinRead + CharterTwinList to its role; after the apply the alarm went OK at 2026-10-29T06:07:55Z and stayed OK across the 2026-10-31 ~04:30Z deploy_all fleet deploy (run 41167764705) and the 06:25Z-06:31Z code deploys; cold starts at 2026-10-31T16:45:13Z and 16:52:06Z logged zero AccessDenied. The entry stays only because the 2026-10-29 00:49Z / 05:38Z transitions are inside the 72-h flap window until 2026-11-01T06:07Z; prune it at the first wrap after that.",
+    "note": "Prior causes: og-image-generator board-roster read (2026-10-27, resolved by PR #5459); charter-private-twin-absent-403 (2026-10-20 → 10-25, resolved by the charter-twin grant PR 5354, applied 2026-10-25 06:33Z)."
   },
   "nightly-predraft-missing": {
     "added": "2026-10-04",
