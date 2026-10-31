@@ -18,51 +18,29 @@ echo "Trail:  $TRAIL_NAME"
 echo "Bucket: s3://$BUCKET/$PREFIX/"
 echo ""
 
-# ── Step 1: Add CloudTrail bucket policy ──────────────────────────────────────
-echo "[1/4] Applying S3 bucket policy for CloudTrail..."
+# ── Step 1: Apply the bucket policy FROM THE REPO'S SOURCE OF TRUTH ─────────────
+# #5512 (2026-10-31): this step used to write its own inline policy — a hand-maintained
+# TWIN of deploy/bucket_policy.json holding only the two CloudTrail statements, while the
+# repo file held only the public-read + delete-protection statements. `put-bucket-policy`
+# REPLACES the whole document, so whichever document was applied last silently dropped the
+# other's statements: the repo file was applied on 2026-07-08 and CloudTrail delivered
+# nothing (AccessDenied, retried every few minutes) for 115 days. Both statement sets now
+# live in deploy/bucket_policy.json and this script applies THAT file verbatim
+# (tests/test_cloudtrail_delivery_deadman_5512.py pins both halves and bans an inline
+# policy literal here — the INCIDENT_LOG 2026-08-30 twin-document class).
+echo "[1/4] Applying S3 bucket policy from deploy/bucket_policy.json (public-read + delete-protection + CloudTrail)..."
 
-# Fetch existing policy (if any) and merge — for now we set fresh
-POLICY=$(cat << EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AWSCloudTrailAclCheck",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "cloudtrail.amazonaws.com"
-      },
-      "Action": "s3:GetBucketAcl",
-      "Resource": "arn:aws:s3:::$BUCKET",
-      "Condition": {
-        "StringEquals": {
-          "aws:SourceArn": "arn:aws:cloudtrail:$REGION:$ACCOUNT_ID:trail/$TRAIL_NAME"
-        }
-      }
-    },
-    {
-      "Sid": "AWSCloudTrailWrite",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "cloudtrail.amazonaws.com"
-      },
-      "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::$BUCKET/$PREFIX/AWSLogs/$ACCOUNT_ID/*",
-      "Condition": {
-        "StringEquals": {
-          "s3:x-amz-acl": "bucket-owner-full-control",
-          "aws:SourceArn": "arn:aws:cloudtrail:$REGION:$ACCOUNT_ID:trail/$TRAIL_NAME"
-        }
-      }
-    }
-  ]
-}
-EOF
-)
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+POLICY_FILE="$REPO_ROOT/deploy/bucket_policy.json"
+
+if ! grep -q '"AWSCloudTrailWrite"' "$POLICY_FILE"; then
+  echo "  ✗ $POLICY_FILE carries no AWSCloudTrailWrite statement — refusing to apply a policy that would keep CloudTrail dark" >&2
+  exit 1
+fi
 
 aws s3api put-bucket-policy \
   --bucket "$BUCKET" \
-  --policy "$POLICY" \
+  --policy "file://$POLICY_FILE" \
   --region "$REGION"
 
 echo "  ✓ Bucket policy applied"
@@ -74,8 +52,8 @@ aws cloudtrail create-trail \
   --name "$TRAIL_NAME" \
   --s3-bucket-name "$BUCKET" \
   --s3-key-prefix "$PREFIX" \
-  --no-include-global-service-events \
-  --no-is-multi-region-trail \
+  --include-global-service-events \
+  --is-multi-region-trail \
   --enable-log-file-validation \
   --region "$REGION" > /dev/null
 

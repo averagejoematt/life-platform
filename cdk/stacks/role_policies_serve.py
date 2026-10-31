@@ -29,6 +29,10 @@ from stacks.role_policies_base import (
     _secret_arn,
 )
 
+# #5512: the account's one CloudTrail trail (setup/setup_cloudtrail.sh; outside CDK).
+CLOUDTRAIL_TRAIL_NAME = "life-platform-trail"
+CLOUDTRAIL_TRAIL_ARN = f"arn:aws:cloudtrail:{REGION}:{ACCT}:trail/{CLOUDTRAIL_TRAIL_NAME}"
+
 
 def site_api() -> list[iam.PolicyStatement]:
     """Site API Lambda: read access + limited writes for public interaction endpoints.
@@ -774,6 +778,16 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
                 f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts",
                 f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest",
             ],
+        ),
+        iam.PolicyStatement(
+            # #5512: the CloudTrail delivery dead-man. The daily {check_ingest_liveness} run
+            # reads the trail's LatestDeliveryTime / LatestDeliveryError (read-only, this one
+            # trail) and emits CloudTrailDeliveryStale for the cloudtrail-delivery-stale alarm.
+            # The trail delivered nothing for 115 days (2026-07-08 → 10-31) and no platform
+            # signal said so — the trail lives outside CDK, so no drift check saw it.
+            sid="CloudTrailStatusRead",
+            actions=["cloudtrail:GetTrailStatus"],
+            resources=[CLOUDTRAIL_TRAIL_ARN],
         ),
     ]
 
