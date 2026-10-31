@@ -274,18 +274,21 @@ def test_the_minimum_session_label_falls_back_to_the_session_line():
     assert _status(rc)["minimum_session"] == "lands" and _render_problems(rc) == [], rc["problems"]
     notes = [e["notes"] for e in body["routine"]["exercises"]]
     assert notes[0].split("\n")[:2] == ["Minimum · RPE 8–9 on big lifts", session_block.LOW_ENERGY_LINE]
-    assert all(n.split("\n\n")[-1].split("\n")[:2] == ["RPE 8–9", "Top set, then one back-off 10% lighter."] for n in notes)
+    assert all(n.split("\n\n")[-1].split("\n")[:2] == ["RPE 8–9", "Top set, then one back-off 10% lighter."] for n in notes[1:])
+    # exercise 1's RPE 8–9 is the session line's (#5428 re-grade #3: printed once)
+    assert notes[0].split("\n\n")[-1].startswith("Top set, then one back-off 10% lighter.")
     assert not any(re.search(r"#\d|Minimum:", n) for n in notes), notes
 
 
 def test_every_role_session_block_is_the_grammar():
-    """#5428: each program role's WHY is the standard's three-line session block, line 1 within its 60 chars."""
+    """#5428: each program role's WHY is the standard's session block (the session line, the low-energy line, the load
+    rule's two lines since re-grade #3), line 1 within its 60 chars."""
     from training import hevy_note_grammar as g
 
     for block in _ROLE_WHY.values():
         lines = block.split("\n")
         assert g.SESSION_LINE_RE.match(lines[0]) and len(lines[0]) <= g.SESSION_LINE_MAX_CHARS, block
-        assert lines[1:] == [g.LOW_ENERGY_LINE, g.LOAD_RULE_LINE], block
+        assert lines[1:] == [g.LOW_ENERGY_LINE, *g.LOAD_RULE_LINES], block
 
 
 def test_the_doc_table_is_the_machine_table():

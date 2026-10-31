@@ -28,6 +28,7 @@ import pathlib
 from typing import Any
 
 from training import cardio_note, hevy_compiler, hevy_note_grammar as g, hevy_note_lint as lint, lift_note, session_block
+from training.exercise_history import CARRY_INDEX_PREFIX
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -87,6 +88,10 @@ def _history() -> dict[str, list[dict[str, Any]]]:
     for prev in DRAFT["previous_loads"].values():
         top = {"weight_kg": prev["lb"] * 0.45359237, "reps": prev["reps"], "rpe": prev["rpe"]}
         out[prev["template_id"]] = [{"date": prev["date"], "sets": [top]}]
+    # a loaded carry lives under its own key (`exercise_history.CARRY_INDEX_PREFIX`), in the current per-hand unit
+    for c in DRAFT["carry_history"].values():
+        kg = c["top_lb_per_hand"] * 0.45359237
+        out[CARRY_INDEX_PREFIX + c["template_id"]] = [{"date": c["date"], "sets": [{"weight_kg": kg, "reps": 0}], "top_weight_kg": kg}]
     return out
 
 
@@ -105,7 +110,7 @@ def recomposed_ir() -> RoutineSpec:
         for e in DRAFT["exercises"]
     ]
     floors = {"movements": {k: {"progression": v} for k, v in DRAFT["progression"].items()}}
-    lift_note.compose_blocks(
+    record = lift_note.compose_blocks(
         blocks, CATALOG, load_floors=floors, history_index=_history(), target_date=DRAFT["target_date"], rotations=DRAFT["rotations"]
     )
     c = DRAFT["cardio"]
@@ -116,6 +121,7 @@ def recomposed_ir() -> RoutineSpec:
     )
     cardio_note.apply_after_lines(blocks)
     ir = _ir(blocks)
+    ir.inputs_snapshot[lint.PREVIOUS_LOADS_KEY] = record["previous_loads"]  # what the generator stores: the carry's last load too
     session_block.place_on_first(ir)
     return ir
 
@@ -130,7 +136,8 @@ def _lint(ir: RoutineSpec) -> lint.LintResult:
 
 OLD_DRAFT_PROBLEMS = [
     "L3 session block: the low-energy line for this session's cardio is 'Low energy → first 2 lifts + cardio, no hard efforts.'",
-    "L3 session block: line 3 is not the load rule (the session line, the low-energy line, the load rule)",
+    "L3 session block: the load rule heads a one-set exercise 1 (no later set to step)",
+    "L6 [1] Shoulder Press (Dumbbell): exercise 1 repeats the session line's effort ('RPE 8–9')",
     "L11 [1] Shoulder Press (Dumbbell): 'pins' on a dumbbell lift (a step is lb per hand)",
     "L11 [1] Shoulder Press (Dumbbell): 'later sets' on a lift with one working set",
     "L4 [2] Lateral Raise (Machine): the W line says 'find the load.' but the working rows carry a load",
@@ -138,10 +145,13 @@ OLD_DRAFT_PROBLEMS = [
     "L4 [3] Rear Delt Reverse Fly (Machine): held at PREVIOUS 60 lb, which reached the top of 15 reps at RPE 8.5, with no reason "
     "(what moves it?)",
     "L4 [5] Triceps Rope Pushdown: held at PREVIOUS 50 lb, which reached the top of 15 reps at RPE 8.5, with no reason (what moves it?)",
+    "L4 [6] Farmers Walk: a carry with no adjust rule after set 1",
     "L9 [7] Cycling: interval levels L10/L12: between is his steady level, one under the hard level",
     "L9 [7] Cycling: interval clock names no level before and after the reps (warm-up, cool-down)",
     "L9 [7] Cycling: interval talk check at a bare minute; it lands as a hard rep ends",
+    "L9 [7] Cycling: interval clock gives the easy minutes no talk words",
     "L9 [7] Cycling: interval escape L12 → L14 is more than one level",
+    "L9 [7] Cycling: interval escape is not one level each way, checked as rep 1 ends",
 ]
 
 
@@ -161,7 +171,9 @@ def test_MUTATION_the_10_lint_rules_read_the_stored_draft_clean(monkeypatch):
     monkeypatch.setattr(lint, "_lint_intervals", lambda *a, **k: None)
     monkeypatch.setattr(lint, "_lint_carry", lambda *a, **k: None)
     monkeypatch.setattr(lint, "cardio_kinds", lambda rt: [])
-    monkeypatch.setattr(g, "LOAD_RULE_LINE", DRAFT["exercises"][0]["stored_note"].split("\n")[2])
+    monkeypatch.setattr(lint, "_session_effort", lambda session: None)
+    monkeypatch.setattr(g, "rule_fits", lambda n: True)
+    monkeypatch.setattr(g, "LOAD_RULE_LINES", (DRAFT["exercises"][0]["stored_note"].split("\n")[2],))
     ir = stored_ir()
     for key in ir.inputs_snapshot[lint.PREVIOUS_LOADS_KEY].values():
         key.pop("rpe")  # the held-top rule reads PREVIOUS's RPE; 1.0.0 read the load only
@@ -172,13 +184,13 @@ def test_MUTATION_the_10_lint_rules_read_the_stored_draft_clean(monkeypatch):
 
 # ── the same draft, re-composed: the new notes, clean ────────────────────────────────────────────────────────────────
 
-SESSION = (
-    "Shoulders + arms · RPE 8–9 on big lifts\n"
-    "Low energy → first 2 lifts + cardio, no hard efforts.\n"
-    "Top reps at RPE 7 or less → +10 lb on sets left; 7.5–8.5 → +5. Under 40 lb: +5 max. Dumbbells per hand. Once per lift."
-)
-NEW_NOTES = {
-    "db_shoulder_press": SESSION + "\n\nRPE 8–9\nBreathe out on the press.",
+# re-grade #2's rendering (round 1 of this PR), graded B− by blind re-grade #3 — it must fail the round-3 rules too
+ROUND_1_NOTES = {
+    "db_shoulder_press": (
+        "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\n"
+        "Top reps at RPE 7 or less → +10 lb on sets left; 7.5–8.5 → +5. Under 40 lb: +5 max. Dumbbells per hand. Once per lift.\n\n"
+        "RPE 8–9\nBreathe out on the press."
+    ),
     "lateral_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 2 years.\nW set: up to 8 easy reps, test the load.",
     "reverse_pec_deck": "RPE 8–9, last set RPE 9–10\nSame load: hit 15 again to move it up.",
     "seated_incline_curl_dumbbell": "RPE 8–9, last set RPE 9–10",
@@ -188,6 +200,52 @@ NEW_NOTES = {
         "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
         "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; L11 before, between, after.\n"
         "Full sentences as rep 1 ends → L13 reps."
+    ),
+}
+ROUND_1_PROBLEMS = [
+    "L3 session block: the load rule heads a one-set exercise 1 (no later set to step)",
+    "L6 [1] Shoulder Press (Dumbbell): exercise 1 repeats the session line's effort ('RPE 8–9')",
+    "L4 [3] Rear Delt Reverse Fly (Machine): the reason contradicts the load rule: 'Same load: hit 15 again to move it up.' "
+    "(PREVIOUS's top reps at RPE <= 8.5 earn the step)",
+    "L4 [5] Triceps Rope Pushdown: the reason contradicts the load rule: 'Same load: hit 15 again to move it up.' "
+    "(PREVIOUS's top reps at RPE <= 8.5 earn the step)",
+    "L4 [6] Farmers Walk: a carry with no adjust rule after set 1",
+    "L4 [6] Farmers Walk: a carry with his last load on file (60 lb per hand) names no start",
+    "L9 [7] Cycling: interval clock gives the easy minutes no talk words",
+    "L9 [7] Cycling: interval escape is not one level each way, checked as rep 1 ends",
+]
+
+
+def test_the_round_1_rendering_fails_the_round_3_rules(monkeypatch):
+    """Blind re-grade #3's five defects, on the rendering it graded: the load rule on a one-set exercise 1, RPE 8–9
+    twice, the hold reason against the load rule, a carry with no start and no adjust rule, and intervals whose easy
+    minutes have no talk words and whose escape only steps up."""
+    monkeypatch.setenv(lint.MODE_ENV, "off")
+    ir = recomposed_ir()
+    for b in ir.exercises:
+        b.notes = ROUND_1_NOTES[b.movement_key]
+    res = _lint(ir)
+    assert res.lines() == ROUND_1_PROBLEMS, res.lines()
+
+
+SESSION = "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts."
+NEW_NOTES = {
+    # one working set: no load rule (nothing to step today), no second "RPE 8–9", the gain rule's next-session step
+    "db_shoulder_press": SESSION
+    + "\n\nOne set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press.",
+    "lateral_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 2 years.\nW set: up to 8 easy reps, test the load.",
+    # one timeline: the load rule, applied to this lift's set 1 on a stack
+    "reverse_pec_deck": "RPE 8–9, last set RPE 9–10\nSame load to start: 15 reps on set 1 at RPE 8.5 or less → next plate.",
+    "seated_incline_curl_dumbbell": "RPE 8–9, last set RPE 9–10",
+    "triceps_rope_pushdown": "RPE 8–9, last set RPE 9–10\nSame load to start: 15 reps on set 1 at RPE 8.5 or less → next plate.",
+    "farmers_walk": (
+        "RPE 8–9 · 60 lb per hand to start\nTall, ribs down, bells off your legs.\nSet 1 at RPE 7 or less: +10 lb per hand.\n"
+        "Steps go in the yards box."
+    ),
+    "cycling": (
+        "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
+        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\n"
+        "Rep 1: full sentences → L13; none → L11."
     ),
 }
 
@@ -235,6 +293,25 @@ def test_a_critic_change_to_the_cardio_resyncs_the_low_energy_line():
     assert session_block.sync_low_energy(ir) is False  # already right
     ir.exercises.pop()  # a critic dropped the ride
     assert session_block.sync_low_energy(ir) is True and ir.exercises[0].notes.split("\n")[1] == g.LOW_ENERGY_LINE
-    assert ir.exercises[0].notes.endswith("\n\nRPE 8–9\nBreathe out on the press.") and session_block.sync_low_energy(ir) is False
+    assert ir.exercises[0].notes.endswith("\n\n" + NEW_NOTES["db_shoulder_press"].split("\n\n", 1)[1])
+    assert session_block.sync_low_energy(ir) is False
     src = (ROOT / "mcp" / "tools_plan.py").read_text(encoding="utf-8")
     assert "session_block.sync_low_energy(ir)" in src
+
+
+def test_a_loaded_carry_is_indexed_under_its_own_key_and_starts_the_note():
+    """His 10-25 Farmers Walk (120 lb logged as the total, distances 50/60/60): the weighted index's reps filter drops
+    it, so `exercise_history` keeps it under `carry:<template>`, in the current per-hand unit, and the carry note starts
+    from it. Control: a reps-bearing block is never a carry entry."""
+    from training import exercise_history
+
+    index: dict[str, list] = {}
+    sets = [{"weight_kg": 54.43114913227677, "distance_m": d, "reps": None, "type": "normal"} for d in (50, 60, 60)]
+    exercise_history._index_carry(index, "50C613D0", {"name": "Farmers Walk"}, sets, 0.5, "2026-10-25")
+    assert list(index) == [CARRY_INDEX_PREFIX + "50C613D0"] and round(index["carry:50C613D0"][0]["top_weight_kg"] / 0.45359237) == 60
+    start = lift_note._last_carry(index, "50C613D0", "2026-10-31")
+    assert start == {"date": "2026-10-25", "template_id": "50C613D0", "lb": 60.0, "reps": 0, "rpe": None, "carry": True}
+    assert lift_note.carry_note(start).split("\n")[0] == "RPE 8–9 · 60 lb per hand to start"
+    assert lift_note.carry_note(None).split("\n")[0] == "RPE 8–9 · pick the load per hand"
+    exercise_history._index_carry(index, "T-CURL", {"name": "Curl"}, [{"weight_kg": 13.6, "reps": 10}], 1.0, "2026-10-25")
+    assert "carry:T-CURL" not in index

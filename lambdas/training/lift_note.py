@@ -155,6 +155,7 @@ def reason_line(
     rep_hi: int | None,
     history: list[dict[str, Any]] | None,
     re_entry: bool,
+    shape: dict[str, Any] | None = None,
 ) -> str:
     """At most ONE reason (standard §3.2), or "": a scheme change (the stall rule's rep step), a heavier row the gain rule
     earned, any top row more than one step from PREVIOUS, or the same load as a PREVIOUS that ran to RPE 10 (#5428, owner
@@ -169,7 +170,7 @@ def reason_line(
     if word is None and _same_load_after_a_grind(row_lb, previous, re_entry):
         return hevy_note_grammar.SAME_LOAD_LINE
     if word is None and _held_at_top(row_lb, previous, rep_hi, prog, re_entry):
-        return hevy_note_grammar.held_top_line(rep_hi)
+        return hevy_note_grammar.held_top_line(rep_hi, row_lb=row_lb, **(shape or {}))
     if word == "Heavier":
         return f"Heavier: {_heavier_why(previous)}."
     if word == "Lighter":
@@ -293,7 +294,41 @@ def _engine_reason(
         rep_hi=_rep_hi(block.sets),
         history=history,
         re_entry=bool(row.get("layoff_reason")),
+        shape=_step_shape(block, entry),
     )
+
+
+def _step_shape(block: Any, entry: dict[str, Any]) -> dict[str, Any]:
+    """What a step looks like on THIS lift (#5428 re-grade #3), for the held-top reason and the one-set line: its working
+    set count, whether it is a stack (anything but a barbell or a dumbbell — the catalog cannot tell a plate machine from a
+    pin stack, standard §5, so the step is "the next plate"), whether a load is per hand, the session's load-rule step
+    (the charter's) and the gain rule's next-session step for this load."""
+    from training import load_progression
+
+    top = _top_lb(block.sets)
+    nxt = load_progression.step_kg(top * LB_IN_KG, load_progression.gain_rule()) if top else None
+    return {
+        "working_sets": len(_working(block.sets)),
+        "stack": str(entry.get("equipment") or "") not in ("barbell", "dumbbell"),
+        "per_hand": entry.get("equipment") == "dumbbell",
+        "step_lb": hevy_note_grammar.charter_step_lb(),
+        "next_step_lb": round(nxt / LB_IN_KG * 2) / 2 if nxt else None,
+    }
+
+
+def _one_set_line(block: Any, entry: dict[str, Any]) -> str:
+    """Exercise 1 with ONE working set carries no load rule (nothing to step today), so its note names the gain rule's
+    next-session step instead (#5428 re-grade #3): `One set: 10 reps at RPE 9 or less two sessions running → +5 lb per
+    hand.` "" with no rep range or no load."""
+    from training import load_progression
+
+    shape, hi = _step_shape(block, entry), _rep_hi(block.sets)
+    if shape["working_sets"] != 1 or not hi or not shape["next_step_lb"]:
+        return ""
+    ceiling = load_progression.set_ceiling(load_progression.movement_class(entry), True).get("ceiling_rpe")
+    if ceiling is None:
+        return ""
+    return hevy_note_grammar.one_set_line(hi, ceiling, shape["next_step_lb"], shape["per_hand"])
 
 
 def _stale_reason(block: Any, entry: dict[str, Any], previous: dict[str, Any], target_date: str) -> str:
@@ -405,7 +440,10 @@ def compose_blocks(
         family = movement_cues.family_of(key, entry)
         detail = str(block.notes or "")
         if intensity == "carry" or family == "carry":
-            block.notes = exposure_cue("carry", [])
+            start = _last_carry(history_index, tid, target_date)
+            if start is not None:
+                previous_loads[key] = start
+            block.notes = carry_note(start)
             seen_families.add("carry")
             notes[key] = {"note": block.notes, "reason": None, "reason_line": None, "pick_load": False, "detail": detail}
             continue
@@ -427,6 +465,8 @@ def compose_blocks(
                 reason_kind = line2.split(":")[0] if line2 else reason_kind
         else:
             line2 = _engine_reason(block, entry, row, previous, (history_index or {}).get(tid) if tid else None, intensity)
+            if not line2 and index == 0:
+                line2 = _one_set_line(block, entry)
             reason_kind = line2.split(":")[0] if line2 else None
         swapped = (rotations or {}).get(key)
         lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
@@ -450,6 +490,32 @@ def compose_blocks(
         if swapped and not lead:
             notes[key]["rotation_of"] = swapped  # #5428: a swap onto a lift he did recently is not "New" on the wire
     return {"previous_loads": previous_loads, "lift_notes": notes}
+
+
+def _last_carry(history_index: dict[str, list] | None, tid: str | None, target_date: str) -> dict[str, Any] | None:
+    """His last carry before `target_date`: {date, lb (per hand — the index is already in the current unit, #5373),
+    template_id, carry}; None when none is on file."""
+    from training.exercise_history import CARRY_INDEX_PREFIX  # a loaded carry's own key in the index (#5428 re-grade #3)
+
+    if not tid:
+        return None
+    for s in (history_index or {}).get(CARRY_INDEX_PREFIX + tid) or []:
+        d = str(s.get("date") or "")
+        if d and d < target_date and s.get("top_weight_kg"):
+            lb = float(s["top_weight_kg"]) / LB_IN_KG
+            return {"date": d, "template_id": tid, "lb": round(lb * 2) / 2, "reps": 0, "rpe": None, "carry": True}
+    return None
+
+
+def carry_note(start: dict[str, Any] | None) -> str:
+    """The carry's note (standard §3.5): the effort with his last load per hand to start (or "pick the load" with none on
+    file), the cue, the one adjust rule after set 1, and where the steps go (#5428 re-grade #3)."""
+    from training import effort_ceilings
+    from training.session_cues import _EFFORT
+
+    g = hevy_note_grammar
+    line1 = g.carry_line1(_EFFORT[effort_ceilings.COMPOUNDS], (start or {}).get("lb"))
+    return "\n".join((line1, g.CARRY_CUE, g.carry_adjust_line(g.charter_step_lb()), g.CARRY_STEPS_LINE))
 
 
 def render_floor_cue(floor: dict[str, Any]) -> str:

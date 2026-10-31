@@ -138,7 +138,13 @@ def test_the_weighted_index_shape_is_untouched_by_the_cardio_arm():
     bodyweight movements legitimately carry one. Rep-bearing sets are.)
     """
     weighted, cardio = _indexes()
+    from training.exercise_history import CARRY_INDEX_PREFIX
+
     for tid, sessions in weighted.items():
+        if tid.startswith(CARRY_INDEX_PREFIX):
+            # #5428 re-grade #3: a loaded carry (load + distance, no reps) under its OWN key — no template-id reader sees it
+            assert tid[len(CARRY_INDEX_PREFIX) :] not in weighted, f"{tid} shadows a template id"
+            continue
         for s in sessions:
             assert s["sets"] and all(x["reps"] > 0 for x in s["sets"]), f"{tid} carries a rep-less session"
             assert set(s) == {"date", "sets", "top_weight_kg"}, f"{tid} session shape changed"

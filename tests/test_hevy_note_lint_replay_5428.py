@@ -64,6 +64,9 @@ REGRADE_CARDIO = ("Cycling: RPE 5–7 is not the talk table's row for 'short phr
 # over a PREVIOUS, and a held load whose PREVIOUS reached the top of its range at RPE <= 8.5 with no reason
 REGRADE_2 = (
     "the low-energy line, the load rule",
+    # re-grade #3 (lint 1.2.0): exercise 1's effort printed twice; a hold reason against the load rule
+    "repeats the session line's effort",
+    "the reason contradicts the load rule",
     "the low-energy line for this session's cardio",
     "the W line says 'find the load.' but the working rows carry a load",
     "'New: replaces …' over a PREVIOUS",

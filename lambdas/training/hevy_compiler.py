@@ -189,7 +189,13 @@ def _place_routine_note(exercises: list[dict[str, Any]], composed: str, menu: st
     last — so a cut of the visible note lands on a menu, never on exercise 0's reason line."""
     if (composed or menu) and exercises:
         first = exercises[0]
-        parts = (composed, first.get(PINNED_ROUTINE_NOTE_FIELD) or "", menu)
+        own = first.get(PINNED_ROUTINE_NOTE_FIELD) or ""
+        if composed and own:
+            # #5428 re-grade #3: a session line that already says exercise 1's effort is not repeated by its own note
+            from training.session_block import dedupe_effort
+
+            own = "\n".join(dedupe_effort(own.split("\n"), composed))
+        parts = (composed, own, menu)
         first[PINNED_ROUTINE_NOTE_FIELD] = "\n\n".join(p for p in parts if p)
     return exercises
 

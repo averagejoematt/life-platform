@@ -66,9 +66,9 @@ GRADED_TREADMILL_HILL = (
     "Treadmill · today 2.8 mph, 6% → 10% · RPE 5–7 (short phrases)\n"
     "⌚ ride clock: 6% to min 6 · +1% every 2 min to min 14 · down the same to min 22 · 6% to the end"
 )
-SESSION = (  # the load rule as re-grade #2 (2026-10-31) left it
+SESSION = (  # the load rule as re-grade #3 (2026-10-31) left it: two lines, a unit on every step
     "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n"
-    "Top reps at RPE 7 or less → +10 lb on sets left; 7.5–8.5 → +5. Under 40 lb: +5 max. Dumbbells per hand. Once per lift."
+    "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: +5 lb max. Stack: next plate. Once per lift."
 )
 TARGET = "2026-10-30"  # routine 81fe18c0's day; be80e308 / dde23e6b were 10-29
 
@@ -109,7 +109,7 @@ def _clean_ir(rid: str = "r-5428") -> RoutineSpec:
     squat = ExerciseBlock(
         movement_key="squat_barbell",
         sets=[Set(type="warmup", reps=5, weight_kg=_kg(135))] + [_n(225, 4, 6) for _ in range(3)],
-        notes=SESSION + "\n\nRPE 8–9\nAnkles + hips first. Brace each rep, breathe between reps.",
+        notes=SESSION + "\n\nAnkles + hips first. Brace each rep, breathe between reps.",  # its RPE 8–9 is the session line's
     )
     return RoutineSpec(
         routine_id=rid,

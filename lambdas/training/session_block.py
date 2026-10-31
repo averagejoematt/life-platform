@@ -104,9 +104,17 @@ def session_line(day: str, band: Any) -> str:
     return f"{day} · RPE {text} on big lifts" if text else day
 
 
-def render(day: str, band: Any, step: Any, cardio_kinds: list[str] | None = None) -> str:
-    """The three lines, newline-joined. `cardio_kinds` (`cardio_kinds_of`) picks the low-energy line."""
-    return "\n".join((session_line(day, band), hevy_note_grammar.low_energy_line(cardio_kinds), load_rule_line(step)))
+def render(day: str, band: Any, step: Any, cardio_kinds: list[str] | None = None, ex1_working_sets: int = 2) -> str:
+    """The block, newline-joined: the session line, the low-energy line (`cardio_kinds`, `cardio_kinds_of`), then the
+    load rule's two lines — only when exercise 1 has 2+ working sets (#5428 re-grade #3: on a one-set lift the rule has
+    no later set to step; `hevy_note_grammar.rule_fits`)."""
+    head = [session_line(day, band), hevy_note_grammar.low_energy_line(cardio_kinds)]
+    return "\n".join(head + ([load_rule_line(step)] if hevy_note_grammar.rule_fits(ex1_working_sets) else []))
+
+
+def working_sets_of(ex: Any) -> int:
+    """Exercise 1's working-set count (W rows excluded) — whether the load rule heads it."""
+    return sum(1 for s in getattr(ex, "sets", None) or [] if str(getattr(s, "type", "") or "").lower() not in ("warmup", "warm_up"))
 
 
 def cardio_kinds_of(exercises: Any) -> list[str]:
@@ -142,22 +150,44 @@ def render_for(ir: Any, band: Any = None, read: Callable[..., Any] | None = None
     """The block for a routine IR: its role/archetype for ‹Day›, the charter's compounds band for the RPE."""
     cal = ((getattr(ir, "inputs_snapshot", None) or {}).get("calendar")) or {}
     day = day_label(cal.get("session_role"), getattr(ir, "archetype", None))
-    return render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(getattr(ir, "exercises", None)))
+    exercises = getattr(ir, "exercises", None) or []
+    first = working_sets_of(exercises[0]) if exercises else 2
+    return render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(exercises), first)
 
 
 def split(note: str | None) -> tuple[str, str]:
-    """(the session block, the lift's own note). The block is "" when the note does not open with one."""
+    """(the session block, the lift's own note). The block is "" when the note does not open with one. The block is
+    everything before the first blank line once line 2 is a low-energy line: two lines on a one-set exercise 1, four
+    with the load rule, three in the pre-re-grade-#3 form."""
     text = note or ""
-    lines = text.split("\n")
-    if len(lines) >= 3 and lines[1] in LOW_ENERGY_LINES and lines[2].startswith(LOAD_RULE_HEAD):
-        return "\n".join(lines[:3]), "\n".join(lines[3:]).strip("\n")
+    head, _sep, rest = text.partition("\n\n")
+    lines = head.split("\n")
+    if len(lines) >= 2 and lines[1] in LOW_ENERGY_LINES and (len(lines) == 2 or lines[2].startswith(LOAD_RULE_HEAD)):
+        return head, rest.strip("\n")
     return "", text
 
 
+def session_effort(block: str) -> str | None:
+    """The session line's band as an effort line (`RPE 8–9`), or None."""
+    m = SESSION_LINE_RE.match((block or "").split("\n", 1)[0])
+    return f"RPE {m.group('band')}" if m else None
+
+
+def _own_lines(block: str, own: str) -> list[str]:
+    """Exercise 1's own lines with its effort line restored when the block's session line carries it (deduped on the wire,
+    `_join`), so the reason-slot logic below always sees line 1 as the effort."""
+    lines = own.split("\n") if own.strip() else []
+    eff = session_effort(block) if block else None
+    if eff and (not lines or not hevy_note_grammar.EFFORT_RE.match(lines[0])):
+        lines = [eff] + lines
+    return lines
+
+
 def place(note: str | None, block: str) -> str:
-    """`block`, a blank line, then the lift's own note. Idempotent: an existing block is replaced, never stacked."""
-    own = split(note)[1].strip()
-    return block + ("\n\n" + own if own else "")
+    """`block`, a blank line, then the lift's own note. Idempotent: an existing block is replaced, never stacked.
+    #5428 re-grade #3: exercise 1's own `RPE 8–9` is dropped when the session line already says it (it printed twice)."""
+    block_was, own = split(note)
+    return _join(block, _own_lines(block_was or block, own.strip()))
 
 
 def _is_lift(ex: Any) -> bool:
@@ -198,6 +228,12 @@ def sync_low_energy(ir: Any) -> bool:
     return True
 
 
+def dedupe_effort(lines: list[str], block: str) -> list[str]:
+    """Drop exercise 1's own effort line when it repeats the session line's band (#5428 re-grade #3)."""
+    eff = session_effort(block) if block else None
+    return lines[1:] if eff and lines and lines[0] == eff else lines
+
+
 def block_of(ir: Any) -> str:
     """The session block on exercise 1's note ("" when there is none)."""
     exercises = getattr(ir, "exercises", None) or []
@@ -206,8 +242,20 @@ def block_of(ir: Any) -> str:
 
 def why_note_for(ir: Any, fallback: str) -> str:
     """The compiler's WHY line: "" when exercise 1 already opens with the session block (its first line IS
-    the session line — a second one would only repeat it), else `fallback` (`routine_title.format_why_note`)."""
-    return "" if block_of(ir) else fallback
+    the session line — a second one would only repeat it), else `fallback` (`routine_title.format_why_note`) —
+    conformed to this routine when it is a session block (#5428 re-grade #3: the role's static block carried the
+    load rule onto a one-set exercise 1 and "+ easy cardio" onto an intervals-only session)."""
+    if block_of(ir):
+        return ""
+    return conform_block(fallback, ir) if split(fallback)[0] == fallback.strip() and fallback.strip() else fallback
+
+
+def conform_block(block: str, ir: Any) -> str:
+    """`block`'s session line, with the low-energy line and the load rule this routine calls for."""
+    exercises = getattr(ir, "exercises", None) or []
+    lines = block.strip().split("\n")
+    rule = load_rule_line(step_lb()).split("\n") if exercises and hevy_note_grammar.rule_fits(working_sets_of(exercises[0])) else []
+    return "\n".join([lines[0], hevy_note_grammar.low_energy_line(cardio_kinds_of(exercises))] + rule)
 
 
 # ── a critic's applied change, as one plain clause on the exercise it changed (standard §3.8) ──────────
@@ -328,8 +376,10 @@ def _fit(block: str, lines: list[str]) -> list[str]:
 
 
 def _join(block: str, lines: list[str]) -> str:
-    own_out = "\n".join(_fit(block, lines))
-    return block + "\n\n" + own_out if block else own_out
+    own_out = "\n".join(dedupe_effort(_fit(block, lines), block))
+    if not block:
+        return own_out
+    return block + ("\n\n" + own_out if own_out else "")
 
 
 def add_reason(note: str | None, clause: str | None) -> str:
@@ -347,7 +397,7 @@ def add_reason(note: str | None, clause: str | None) -> str:
     if not clause or clause in text.split("\n"):
         return text
     block, own = split(text)
-    lines = own.split("\n") if own.strip() else []
+    lines = _own_lines(block, own)
     slot = next((i for i, ln in enumerate(lines[1:], start=1) if _displaceable(ln)), None)
     lines = lines[:slot] + [clause] + lines[slot + 1 :] if slot is not None else lines[:1] + [clause] + lines[1:]
     return _join(block, lines)
@@ -361,7 +411,7 @@ def add_capped_reason(note: str | None, clause: str, rpe_max: Any) -> str:
     An earlier critic clause keeps its line. Idempotent."""
     text = note or ""
     block, own = split(text)
-    lines = own.split("\n") if own.strip() else []
+    lines = _own_lines(block, own)
     if not lines:
         return text
     if hevy_note_grammar.EFFORT_RE.match(lines[0]):

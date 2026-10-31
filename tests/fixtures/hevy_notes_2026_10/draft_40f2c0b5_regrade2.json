@@ -1,5 +1,5 @@
 {
- "_source": "#5428 blind re-grade #2 (2026-10-31): nightly pre-draft routine 40f2c0b5 v3 (target 2026-10-31, Shoulders + arms, week 5), read from DynamoDB read-only. Public repo: notes, set rows (kg as stored), Hevy's PREVIOUS (load, reps, RPE, date, template), the rotation swaps, each movement's progression basis and the cardio dose's steady level only. No rationale, no load-model detail (it carries bodyweights), no critic text.",
+ "_source": "#5428 blind re-grade #2 (2026-10-31): nightly pre-draft routine 40f2c0b5 v3 (target 2026-10-31, Shoulders + arms, week 5), read from DynamoDB read-only. Public repo: notes, set rows (kg as stored), Hevy's PREVIOUS (load, reps, RPE, date, template), the rotation swaps, each movement's progression basis and the cardio dose's steady level only. No rationale, no load-model detail (it carries bodyweights), no critic text. Re-grade #3 adds his last carry (per hand), as exercise_history's carry index reads it.",
  "routine_id": "40f2c0b5",
  "target_date": "2026-10-31",
  "title": "Foundation - Upper - 14 - 43",
@@ -219,5 +219,13 @@
   "minutes": 30,
   "kind": "intervals",
   "steady_level": 11
+ },
+ "carry_history": {
+  "farmers_walk": {
+   "template_id": "50C613D0",
+   "date": "2026-10-25",
+   "top_lb_per_hand": 60,
+   "_note": "his last Farmers Walk: 120 lb logged as the total of both hands (before the 2026-10-27 per-hand convention, #5373), so 60 per hand; distances 50/60/60 (steps)"
+  }
  }
 }

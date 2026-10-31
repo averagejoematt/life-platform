@@ -228,6 +228,7 @@ def load_history_indexes(
                     if _to_int(s.get("reps")) > 0
                 ]
                 if not sets:
+                    _index_carry(index, tid, ex, sets_raw, unit_scale, workout_date)
                     continue
                 top_weight = max((s["weight_kg"] for s in sets), default=0.0)
                 index.setdefault(tid, []).append(
@@ -246,6 +247,34 @@ def load_history_indexes(
     for tid in cardio:
         cardio[tid].sort(key=lambda s: s["date"], reverse=True)
     return index, cardio
+
+
+CARRY_INDEX_PREFIX = "carry:"
+
+
+def _index_carry(index: dict[str, list[dict[str, Any]]], tid: str, ex: dict[str, Any], sets_raw: list, unit_scale: float, day: str) -> None:
+    """#5428 re-grade #3: a loaded carry (load + distance, no reps — `carry_line.is_carry`) is invisible to the weighted
+    index, whose readers are rep-based, so its note could not name his last load. It is kept under its OWN key,
+    `carry:<template id>`, in the current load unit (per hand, #5373): no rep-based reader looks a template up by that
+    key, so nothing that reads `index[tid]` changes."""
+    from training import carry_line
+
+    if not carry_line.is_carry(str(ex.get("name") or ""), sets_raw):
+        return
+    sets = [
+        {
+            "weight_kg": _to_float(s.get("weight_kg")) * unit_scale,
+            "reps": 0,
+            "rpe": _to_float(s.get("rpe")) if s.get("rpe") is not None else None,
+            "distance_m": _to_float(s.get("distance_m") or s.get("distance_meters")),
+        }
+        for s in sets_raw
+        if str(s.get("set_type") or s.get("type") or "normal").lower() != "warmup" and _to_float(s.get("weight_kg")) > 0
+    ]
+    if sets:
+        index.setdefault(CARRY_INDEX_PREFIX + tid, []).append(
+            {"date": day, "sets": sets, "top_weight_kg": max(_to_float(s["weight_kg"]) for s in sets)}
+        )
 
 
 def load_bodyweight_index(

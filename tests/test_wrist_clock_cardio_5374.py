@@ -188,7 +188,7 @@ def test_with_no_level_on_record_the_rule_rides_his_own_base():
     shape = cn.clock_of(note, 30)
     assert note.split("\n")[0] == "Recumbent · your level · hard RPE 8 (a few words)"
     # #5428 re-grade #2: the easy level is named for the warm-up and cool-down too
-    assert note.split("\n")[1] == "⌚ ride clock: hard 2 min at min 6, 10, 14, 18, 22; easy before, between, after."
+    assert note.split("\n")[1] == "⌚ ride clock: hard 2 min at min 6, 10, 14, 18, 22; else easy (full sentences)."
     assert shape["levels"] == []  # no level is invented
 
 
@@ -202,7 +202,7 @@ def test_the_level_line_comes_first_and_the_clock_second():
         if kind == "easy":
             assert lines == [lines[0]], note
         elif kind == "intervals":  # #5428 re-grade #2: the one-level escape rides its own line under the clock
-            assert len(lines) == 3 and lines[1].startswith(cn.CLOCK_PREFIXES) and lines[2] == g.interval_escape_line(12), note
+            assert len(lines) == 3 and lines[1].startswith(cn.CLOCK_PREFIXES) and lines[2] == g.interval_escape_line(12, 10), note
         else:
             assert len(lines) == 2 and lines[1].startswith(cn.CLOCK_PREFIXES), note
 

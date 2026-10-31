@@ -223,7 +223,8 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     # #5428: the chat path composes the bench's own note to the standard — effort first, then the press family's cue;
     # the cardio arm wrote nothing on it
     own = session_block.split(next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes)[1].split("\n")
-    assert own[0] == "RPE 8–9" and own[-1] in ("Breathe out on the press.", cue_clause("bench") + " Breathe out on the press."), own
+    # (its RPE 8–9 is the session line's: re-grade #3 prints it once, so line 1 here is the cue)
+    assert "RPE 8–9" not in own and own[-1] in ("Breathe out on the press.", cue_clause("bench") + " Breathe out on the press."), own
     assert not [ln for ln in own if cn.LINE1_RE.match(ln)]
     assert CUE_MARKER not in bike.notes
     assert out["cardio_cues"] == 1
@@ -319,7 +320,10 @@ def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count(
 
     for b in ir.exercises:
         block, own = session_block.split(b.notes)
-        assert block == session_block.block_of(ir) and own.split("\n")[0].startswith("RPE "), b.notes
+        # exercise 1's effort is the session line's when the bands match (re-grade #3: printed once)
+        assert block == session_block.block_of(ir) and (
+            own.split("\n")[0].startswith("RPE ") or session_block.session_effort(block)
+        ), b.notes
         assert not [ln for ln in own.split("\n") if cn.LINE1_RE.match(ln)]
 
 

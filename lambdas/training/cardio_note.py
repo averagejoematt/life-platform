@@ -11,7 +11,7 @@ THE NOTE (≤ 4 lines; `HEVY_NOTE_STANDARD.md` §3.7)
 
     line 1   <Machine> · <levels> · [hard ]RPE <a[–b]> (<talk words>)                  always (`LINE1_RE`)
     line 2   ⌚ ride clock: <rule>   (`⌚ walk clock:` on the treadmill)                  tempo / hills / intervals
-    line 3   Full sentences as rep 1 ends → L<n> reps.                                    intervals (the escape)
+    line 3   Rep 1: full sentences → L<hard+1>; none → L<hard−1>.                         intervals (the escape)
     line 4   <one why>                                                                   optional, a route choice only
     line 4   After: end watch cardio, restart Hevy.                                       when a Hevy block follows
 
@@ -23,8 +23,8 @@ THE NOTE (≤ 4 lines; `HEVY_NOTE_STANDARD.md` §3.7)
     callers' signature and never printed.
   * The clock rule is read off the session clock from 0 in whole minutes, `min` on every time, at most three levels,
     ≤ `CLOCK_LINE_MAX` characters (the owner's wrist-clock rule, 2026-10-25: an iPad covers the console and the watch
-    does not alert). Intervals list every start minute, name the level before, between and after the hard reps, and carry
-    one escape upward on its own line, checked as rep 1 ends.
+    does not alert). Intervals list every start minute, put every other minute at his steady level with its talk words,
+    and carry a one-level escape each way on its own line, checked as rep 1 ends.
   * Levels come from HIS log (`steady_level`: the median of his last single-level rides), never from the top of a ramp:
     easy = steady, tempo = steady + 1, intervals = steady before / between / after and steady + 1 hard (an escape one
     more), hills climb from steady. A treadmill hill starts no steeper than his steepest logged grade.
@@ -47,7 +47,7 @@ from typing import Any
 
 from training import hevy_note_grammar, wrist_clock
 
-CARDIO_NOTE_VERSION = "cardio-note@4.2.0"  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
+CARDIO_NOTE_VERSION = "cardio-note@4.3.0"  # 4.3.0 = re-grade #3: the easy minutes' talk words, a two-way escape  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
 # 4.1.0 = the 2026-10-30 re-grade: ≤ 3 levels on a bike hill, the talk words' band on line 1, `walk clock` on a treadmill
 # 4.2.0 = the 2026-10-31 re-grade #2: intervals ride his steady level before / between / after, a one-level escape on its
 # own line, checked as rep 1 ends
@@ -259,8 +259,9 @@ def shape_of(note: str | None) -> str:
 # ── reading a composed note back as its clock (adherence grades against it) ───────────
 _RE_TEMPO_CLOCK = re.compile(r"^at min (?P<pts>[\d, and]+), full sentences → one level up, a few words → one down$")
 _RE_INTERVAL_CLOCK = re.compile(
-    r"^(?:L(?P<hard>\d{1,2})|hard) (?P<work>\d{1,2}) min at min (?P<starts>[\d, ]+); (?:L(?P<easy>\d{1,2})|easy)"
-    r" (?:before, between, after|between)\."  # 4.2.0 names the warm-up and cool-down level; 4.1.0's `between` still reads
+    r"^(?:L(?P<hard>\d{1,2})|hard) (?P<work>\d{1,2}) min at min (?P<starts>[\d, ]+); "
+    # 4.3.0 `else L11 (full sentences).`; 4.2.0 `L11 before, between, after.`; 4.1.0 `L10 between.` — all still read
+    r"(?:else (?:L(?P<easy3>\d{1,2})|easy) \([a-z ]+\)|(?:L(?P<easy>\d{1,2})|easy) (?:before, between, after|between))\."
     r"(?: Full sentences at min \d{1,3} → L\d{1,2} from min \d{1,3}\.)?$"
 )
 _RE_HILL_CLOCK = re.compile(
@@ -299,7 +300,8 @@ def clock_of(note: str | None, total_min: int | None = None) -> dict[str, Any] |
         starts = _numbers(m.group("starts"))
         work = int(m.group("work"))
         hard: Any = int(m.group("hard")) if m.group("hard") else "base+1"
-        easy: Any = int(m.group("easy")) if m.group("easy") else "base"
+        easy_txt = m.group("easy") or m.group("easy3")
+        easy: Any = int(easy_txt) if easy_txt else "base"
         every = (starts[1] - starts[0]) if len(starts) > 1 else work * 2
         end = starts[-1] + every
         clauses = [{"type": "hold", "value": easy, "start": 0, "end": starts[0]}]
@@ -551,7 +553,7 @@ def clock_shape(kind: str, minutes: int, dose: dict[str, Any], *, walk: bool) ->
         easy_txt = f"L{easy}" if isinstance(easy, int) else "easy"
         # re-grade #2: the easy level is named for the warm-up and the cool-down too; the escape is its own line
         # (`interval_escape`), so the talk check reads as the END of rep 1, not a minute that is also the easy start
-        line = f"{hard_txt} {work} min at min {', '.join(str(s) for s in starts)}; {easy_txt} {INTERVAL_EASY_WORDS}."
+        line = f"{hard_txt} {work} min at min {', '.join(str(s) for s in starts)}; {INTERVAL_EASY_WORDS} {easy_txt} ({g_easy_talk()})."
         return clauses, unit, line
     clauses, _every = wrist_clock.steady(base, total)
     if kind == "tempo" and not walk:
@@ -561,7 +563,13 @@ def clock_shape(kind: str, minutes: int, dose: dict[str, Any], *, walk: bool) ->
     return clauses, unit, None
 
 
-INTERVAL_EASY_WORDS = "before, between, after"
+# re-grade #3 (2026-10-31): every minute that is not a hard rep — warm-up, recoveries, cool-down — at his steady level,
+# with its talk words (they had none). "else" keeps the ⌚ line inside two phone lines so the note fits with its After.
+INTERVAL_EASY_WORDS = "else"
+
+
+def g_easy_talk() -> str:
+    return hevy_note_grammar.INTERVAL_EASY_TALK
 
 
 def interval_escape(kind: str, dose: dict[str, Any], minutes: int, *, walk: bool) -> str | None:
@@ -573,7 +581,8 @@ def interval_escape(kind: str, dose: dict[str, Any], minutes: int, *, walk: bool
     plan = interval_plan(int(minutes))
     if plan is None or len(plan["starts"]) < 2:
         return None
-    return hevy_note_grammar.interval_escape_line(steady + INTERVAL_LEVEL_STEP + INTERVAL_ESCAPE_STEP)
+    hard = steady + INTERVAL_LEVEL_STEP
+    return hevy_note_grammar.interval_escape_line(hard + INTERVAL_ESCAPE_STEP, hard - INTERVAL_ESCAPE_STEP)
 
 
 def levels_text(kind: str, dose: dict[str, Any], *, walk: bool, usual: dict[str, Any] | None = None, top: Any = None) -> str:

@@ -229,7 +229,9 @@ def test_one_cue_per_family_and_no_press_cue_on_a_squat_day():
     blocks = [
         ExerciseBlock(
             movement_key="squat_barbell",
-            sets=[Set(weight_kg=245 * LB, rep_range_start=4, rep_range_end=6)],
+            # two working sets: a one-set exercise 1 now carries the gain rule's next-session line (re-grade #3,
+            # `test_hevy_note_regrade2_5428`), which is not what this test is about
+            sets=[Set(weight_kg=245 * LB, rep_range_start=4, rep_range_end=6) for _ in range(2)],
             rationale_tag="anchor:squat:heavy",
         ),
         ExerciseBlock(

@@ -93,15 +93,16 @@ def test_MUTATION_CONTROL_a_ramp_read_as_a_single_level_brings_back_L18(monkeypa
 def test_the_10_25_intervals_list_every_start_minute_and_carry_the_escape():
     """#5428 re-grade #2 (2026-10-31): the easy minutes — warm-up, between and cool-down — are his steady L11 (was L10,
     one under), the escape is one level (L13, was L14), and the talk check lands as rep 1 ENDS on its own line (was
-    "at min 8", the minute the easy block also starts)."""
+    "at min 8", the minute the easy block also starts). Re-grade #3: those easy minutes carry their talk words, and the
+    escape steps one level either way (L13 up, L11 down) — still ≤ 6 phone lines with the After line."""
     note, audit = _compose("intervals", facts=_facts(), followed=True)
     assert note == (
         "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
-        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; L11 before, between, after.\n"
-        "Full sentences as rep 1 ends → L13 reps.\n" + AFTER
+        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\n"
+        "Rep 1: full sentences → L13; none → L11.\n" + AFTER
     )
     assert audit["clock_numbers"] == ["11", "12"] and audit["clock_off_grid"] == []
-    assert audit["steady_level"] == 11 and audit["interval_escape"] == "Full sentences as rep 1 ends → L13 reps."
+    assert audit["steady_level"] == 11 and audit["interval_escape"] == "Rep 1: full sentences → L13; none → L11."
     # the read-back (adherence grades against it): warm-up and cool-down at L11, the sprints at L12
     shape = cn.clock_of(note, 30)
     assert shape["levels"] == [11, 12] and shape["family"] == "intervals", shape
