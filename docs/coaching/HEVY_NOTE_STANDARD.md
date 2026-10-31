@@ -97,6 +97,7 @@ RPE ‹a–b›[, last set RPE ‹c–d›]        line 1, always
 - `Heavier: 6 reps is a pass.`
 - `Volume day: chase 12.`
 - `Now aiming 10–12: 8s were RPE 8 three times.`
+- `Same load: aim to leave one more rep.` (PREVIOUS ran to RPE 10 at this load and today's band is 8–9 — owner ruling 2026-10-30, #5428; `lift_note._same_load_after_a_grind`)
 - `Set 1 over RPE 9 → sets 2–3 at 195 lb.` (the only place a load appears; a threshold follows its band)
 - `No jumps today: 3rd trap-bar session.` / `No jumps: first time on it.` / `No jumps: first time in 19 weeks.` (a capped lift opts out of the load rule, and its line 1 is the cap's `RPE 7`)
 - `New: replaces Calf Press (Machine).` (a rotated accessory, only when it is new to him: no PREVIOUS inside §3.3's 180 days)
@@ -105,6 +106,7 @@ RPE ‹a–b›[, last set RPE ‹c–d›]        line 1, always
 **Rules for reasons:**
 - **A capped exposure** is OD1's: exposures 1–3 after a gap of more than 90 days in his own log (`layoff_tiers.exposure_caps`), on any lift, not only a ramped anchor. Its note is `RPE 7`, then its `No jumps` line; on stale history (§3.3) the pick-load W line follows.
 - **Every working row more than one step from PREVIOUS gets a reason.** The engine derives the Heavier / Lighter / Volume-day word from PREVIOUS, his last performed load on that template (`hevy_note_grammar.delta_word`; the draft writes PREVIOUS to `inputs_snapshot["previous_loads"]`).
+- **One exception inside a step (owner ruling 2026-10-30, #5428): the same load as a PREVIOUS that ran to RPE 10 gets `Same load: aim to leave one more rep.`** Two of the four 10-30 graders read a bare same-load row after a grind as a copy of the grind; the reason says the intent is a lower effort at the same load. A re-entry lift keeps its layoff clause instead (§6.3), and a lift back after a long layoff that no critic capped keeps the normal band (the owner declined a blanket layoff cap the same day).
 - A reason never repeats a number the rows already show.
 
 ### 3.3 Pick-load (no history, or stale history)

@@ -54,10 +54,13 @@ def _phases(recs: list[dict], first: str, n: int) -> list[str]:
     return [d.state(recs, shift_day_key(first, i))["phase"] for i in range(n)]
 
 
-def test_the_charter_carries_min_days_beside_days_and_labels_it_an_owner_default():
+def test_the_charter_carries_min_days_beside_days_and_names_the_owner_ruling_that_confirmed_it():
+    """3 was a labelled owner-default (ADR-105) until the owner confirmed it on 2026-10-30; the basis names the ruling,
+    never a 'pending' label the ruling has already answered."""
     sbu = d.policy()["step_back_up"]
     assert sbu["days"] == 7 and sbu["min_days"] == 3
-    assert "owner-default" in sbu["min_days_basis"] and "ADR-105" in sbu["min_days_basis"]
+    assert "owner ruling 2026-10-30" in sbu["min_days_basis"] and "#5122" in sbu["min_days_basis"]
+    assert "pending" not in sbu["min_days_basis"]
     assert tc.charter_value("disruption.step_back_up.min_days") == 3
 
 

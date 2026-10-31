@@ -274,7 +274,7 @@
     "added": "2026-10-27",
     "cause_observed": "2026-10-27",
     "cause": "no tape measurement or progress-photo set logged this cycle (the biweekly calibration prompt's dead-man)",
-    "citation": "#5061 — the owner deferred the tape + photo sitting in session on 2026-10-26 (\"defer later in week\") and again 2026-10-27 (\"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect.",
-    "note": "Cited by Session CJ wrap 2026-10-27."
+    "citation": "#3759 — the owner's tape + photo sitting (deferred in session 2026-10-26 \"defer later in week\", 2026-10-27 \"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect: the prompt + dead-man mechanism (#5061) closed 2026-10-30 on this very firing.",
+    "note": "Cited by Session CJ wrap 2026-10-27; re-cited from #5061 to #3759 on 2026-10-30 (owner ruling: the mechanism is proven, the sitting is #3759's)."
   }
 }
