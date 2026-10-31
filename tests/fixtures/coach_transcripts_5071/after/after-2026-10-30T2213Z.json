@@ -1,0 +1,49 @@
+{
+  "conversation": "after-2026-10-30T2213Z",
+  "phase": "after",
+  "source": "CloudWatch Logs /aws/lambda/life-platform-mcp, the handler's `Calling tool '<name>' with args` line (read-only filter-log-events paginated to the last page, 2026-10-31); one conversation = calls with no gap over 45 minutes",
+  "window_utc": [
+    "2026-10-30T22:13:06Z",
+    "2026-10-30T22:41:27Z"
+  ],
+  "redaction": "tool name only, plus manage_hevy_routine's `action` and whether plan_next_session carried a routine_id; every other argument dropped",
+  "coach_context_failures_logged": 0,
+  "coach_context_failures_basis": "filter-log-events '\"coach context could not be assembled\"' (mcp/plan_helpers.coach_context_for's fail-soft line) over 2026-10-28T20:00Z..2026-10-31T05:23Z: 0 events",
+  "continues": "after-2026-10-30T2059Z",
+  "continues_basis": "the same Hevy routine id as the conversation it continues (compared off-repo; the id is not stored)",
+  "tool_calls": [
+    {
+      "at": "2026-10-30T22:13:06Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-10-30T22:13:11Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-10-30T22:13:45Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-10-30T22:41:18Z",
+      "tool": "log_decision"
+    },
+    {
+      "at": "2026-10-30T22:41:23Z",
+      "tool": "write_platform_memory"
+    },
+    {
+      "at": "2026-10-30T22:41:27Z",
+      "tool": "write_platform_memory"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "conversation": "after-2026-10-31T0433Z",
+  "phase": "after",
+  "source": "CloudWatch Logs /aws/lambda/life-platform-mcp, the handler's `Calling tool '<name>' with args` line (read-only filter-log-events paginated to the last page, 2026-10-31); one conversation = calls with no gap over 45 minutes",
+  "window_utc": [
+    "2026-10-31T04:33:25Z",
+    "2026-10-31T05:02:51Z"
+  ],
+  "redaction": "tool name only, plus manage_hevy_routine's `action` and whether plan_next_session carried a routine_id; every other argument dropped",
+  "coach_context_failures_logged": 0,
+  "coach_context_failures_basis": "filter-log-events '\"coach context could not be assembled\"' (mcp/plan_helpers.coach_context_for's fail-soft line) over 2026-10-28T20:00Z..2026-10-31T05:23Z: 0 events",
+  "tool_calls": [
+    {
+      "at": "2026-10-31T04:33:25Z",
+      "tool": "get_sources"
+    },
+    {
+      "at": "2026-10-31T04:33:26Z",
+      "tool": "get_todoist_snapshot"
+    },
+    {
+      "at": "2026-10-31T04:40:25Z",
+      "tool": "get_coach_session_packet"
+    },
+    {
+      "at": "2026-10-31T04:40:33Z",
+      "tool": "get_freshness_status"
+    },
+    {
+      "at": "2026-10-31T04:40:34Z",
+      "tool": "get_coach_checkin_queue"
+    },
+    {
+      "at": "2026-10-31T04:40:51Z",
+      "tool": "plan_next_session"
+    },
+    {
+      "at": "2026-10-31T04:41:09Z",
+      "tool": "get_coach_thread"
+    },
+    {
+      "at": "2026-10-31T04:41:35Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-10-31T04:41:36Z",
+      "tool": "get_exercise_notes"
+    },
+    {
+      "at": "2026-10-31T04:45:15Z",
+      "tool": "get_sources"
+    },
+    {
+      "at": "2026-10-31T04:45:15Z",
+      "tool": "get_todoist_snapshot"
+    },
+    {
+      "at": "2026-10-31T05:02:30Z",
+      "tool": "get_workouts"
+    },
+    {
+      "at": "2026-10-31T05:02:42Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-10-31T05:02:47Z",
+      "tool": "get_workout_detail"
+    },
+    {
+      "at": "2026-10-31T05:02:51Z",
+      "tool": "get_workout_detail"
+    }
+  ]
+}
