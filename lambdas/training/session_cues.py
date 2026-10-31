@@ -10,7 +10,7 @@ deload); `full_body_session` re-derives it for the sets a block actually carries
 #5318 (owner ruling B3, 2026-10-24): the shoulders+arms farmer's carry is its own accessory shape (`CARRY_EXPOSURE`). #5372: it is
 Hevy's standard distance-typed 'Farmers Walk' template (`short_distance_weight`, 50C613D0 — the one he logs), so its sets carry a
 distance, not a duration. On a carry the distance field is his STEP COUNT (owner, 2026-10-25), so the dose is steps. #5373: the cue
-says so in his words ("count steps, type the count in yards") and, given his stride, adds the labelled estimated distance.
+says so in the note grammar's line ("Steps go in the yards box.", `hevy_note_grammar.CARRY_STEPS_LINE`) and, given his stride, adds the labelled estimated distance.
 
 Split out of `training.program_structure` (which re-exports every public name here) so neither module crosses the
 1000-line ceiling (#1665).

@@ -84,7 +84,10 @@ import sys
 # refreshed MEASURED_SAMPLE minimum to 86.36, which put floor 80 6.36pt under it —
 # past FLOOR_HEADROOM_MAX_POINTS, so test_the_floor_tracks_measured_coverage asked
 # for this raise. 82 sits 4.36pt under the sample minimum, the same ~4.2pt convention.
-RATCHET_FLOOR = 82
+# Ratcheted 82->85 (2026-10-31, #1658): banking the high-water gain refreshed the
+# MEASURED_SAMPLE minimum to 89.37, which put floor 82 7.37pt under it, past
+# FLOOR_HEADROOM_MAX_POINTS. 85 sits 4.37pt under the sample minimum.
+RATCHET_FLOOR = 85
 
 # ── THE SAMPLE THE FLOOR WAS SET FROM (#3732). ───────────────────────────────
 # "Total coverage: N%" read out of the CI job's own output on consecutive GREEN main
@@ -94,19 +97,19 @@ RATCHET_FLOOR = 82
 # Spread across this sample is 0.02pt (the 2026-09-13 sample read 0.26pt), which is why
 # 4pt of headroom is generous rather than tight.
 MEASURED_SAMPLE = {
-    # Refreshed 2026-10-15 (#1658): the ten most recent green-main CI/CD runs that
+    # Refreshed 2026-10-31 (#1658): the ten most recent green-main CI/CD runs that
     # carried a reading (the "Measured line coverage" annotation on `test / Unit
-    # Tests`). The 2026-10-01 sample (min 86.36) is in git history.
-    "38792378058": 87.84,  # 45a1fed8  2026-10-15
-    "38784495082": 87.84,  # 898b0177  2026-10-15
-    "38781588444": 87.84,  # e31343ad  2026-10-15
-    "38779742104": 87.84,  # b9a38a4f  2026-10-15
-    "38777862422": 87.83,  # 898bddd4  2026-10-15
-    "38775029050": 87.83,  # 3cf2ad61  2026-10-15
-    "38669735624": 87.82,  # 9a593f6a  2026-10-15
-    "38635275694": 87.82,  # e208242c  2026-10-14
-    "38633202898": 87.82,  # dafd58a4  2026-10-14
-    "38630563774": 87.82,  # cde57c1a  2026-10-14
+    # Tests`). The 2026-10-15 sample (min 87.82) is in git history.
+    "41231018656": 89.42,  # 191734ef  2026-10-31
+    "41226458509": 89.41,  # 8241d6d6  2026-10-31
+    "41225501362": 89.41,  # 4f4249bc  2026-10-31
+    "41202556189": 89.41,  # 37224924  2026-10-31
+    "41181700090": 89.40,  # 7e9e3799  2026-10-31
+    "41178846002": 89.38,  # 13c6800a  2026-10-31
+    "41176028027": 89.38,  # aa23921c  2026-10-31
+    "41174348408": 89.38,  # 5baea1f4  2026-10-31
+    "41172375728": 89.37,  # ac1d4539  2026-10-31
+    "41170049795": 89.37,  # 431ec99b  2026-10-31
 }
 
 # The band the floor is allowed to sit in, below the SAMPLE MINIMUM. Under the low
@@ -156,7 +159,10 @@ FLOOR_HEADROOM_MAX_POINTS = 6.0
 # measured 87.84%, 1.54pt past the deadband — the ::warning:: fired and this is the
 # sanctioned response. Banked under the refreshed MEASURED_SAMPLE minimum (87.82),
 # same convention. The regression catch line is therefore 86.30%.
-RATCHET_HIGH_WATER = 87.80
+# Raised 87.80 -> 89.37 (2026-10-31, #1658): green main run 41231018656 (191734ef)
+# measured 89.42%, 1.62pt past the deadband. Banked under the refreshed
+# MEASURED_SAMPLE minimum (89.37), same convention. Catch line therefore 87.87%.
+RATCHET_HIGH_WATER = 89.37
 
 # The regression tolerance CI runs with. Mirrors coverage_gap_warn.py's default;
 # asserted equal below so the two can't drift (the #1206 drift class again).

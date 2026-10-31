@@ -321,7 +321,7 @@ jobs:
           fi
           python3 -m coverage combine --keep "${DATA[@]}"
           python3 -m coverage xml -o coverage.xml
-          python3 -m coverage report --fail-under=82 --skip-covered --show-missing 2>&1 | tail -160
+          python3 -m coverage report --fail-under=85 --skip-covered --show-missing 2>&1 | tail -160
           echo "::endgroup::"
 
       - name: Coverage regression gate + drift warnings (ratchet, #1206/#1349/#1658)
@@ -426,9 +426,9 @@ jobs:
           # #4252: the budget measures the test phase — from the EARLIEST leg's start.
           UNIT_TESTS_START_EPOCH=$(python3 -c 'import glob; v=[int(open(p).read()) for p in glob.glob("shard-out/start-*.epoch")]; print(min(v) if v else "")')
           DURATION_SECONDS=$(( $(date +%s) - ${UNIT_TESTS_START_EPOCH:-$(date +%s)} ))
-          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 82 --gap-threshold 10 \
+          python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 85 --gap-threshold 10 \
               --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1950 \
-              --high-water 87.80 --fail-on-regression
+              --high-water 89.37 --fail-on-regression
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
