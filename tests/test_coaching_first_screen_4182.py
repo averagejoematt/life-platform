@@ -104,3 +104,21 @@ def test_todays_read_precedes_the_weekly_call_and_the_call_is_labelled_weekly():
 
 
 # premerge-gate: 4182: rglob sweep of site/coaching/**/index.html — "Third Wall" is absent from every coaching page's <main>, the first-screen mount ships on the hub + read shells only, and the hero's roster numeral equals the persona registry's served roster. Pure repo shape on generator output: a PR that re-adds the phrase or hand-types the count is its own diff, and site/** auto-deploys on merge (#750).
+
+
+def test_dispute_kicker_prints_a_human_week_range_not_an_iso_token_5456():
+    """#5456: '2026-W43' under 'written Tuesday Oct 27' read as two weeks on one card."""
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    assert node, "node is required to pin the rendered kicker"
+    src = (_JS / "coaching.js").read_text(encoding="utf-8")
+    assert "isoWeekRange(dp.week)" in src and "${esc(dp.week)}" not in src
+    cases = {"2026-W43": "Oct 19–25", "2026-W44": "Oct 26–Nov 1", "2027-W01": "Jan 4–10", "2026-W53": "Dec 28–Jan 3", "junk": ""}
+    today = (_JS / "coach_today.js").read_text(encoding="utf-8")
+    fn = re.search(r"export function isoWeekRange\(.*?\n}\n", today, re.S).group(0).replace("export ", "", 1)
+    script = fn + "console.log(JSON.stringify(" + json.dumps(list(cases)) + ".map(isoWeekRange)))"
+    out = subprocess.run([node, "-e", script], capture_output=True, text=True, check=True).stdout
+    assert json.loads(out) == list(cases.values())
