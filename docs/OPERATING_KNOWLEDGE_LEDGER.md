@@ -46,11 +46,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-10-18 (Session BX: +1 feedback already-homed, +1 reference narrative, +1 project narrative; snapshot and counters recomputed from the rows in the same edit as the rows). Prior: 2026-10-15 (Session BU: +1 reference +1 project, both narrative; snapshot and counters recomputed from the rows in the same edit as the row). Prior: 2026-10-10 (Session BK: +2 project, both narrative, +1 index; snapshot and counters updated in the same edit as the rows). Prior: 2026-10-01 (Session BC: +1 feedback +1 project, both narrative; snapshot and counters updated in the same edit as the rows). Prior: 2026-10-01 (Session BB: +1 feedback +1 project, both narrative; snapshot and counters updated in the same edit as the rows). Prior: 2026-09-29 (Session AZ: +1 project, the session record; snapshot and counters updated in the same edit as the row). Prior: 2026-09-28 (Session AY: +3 feedback +2 reference +4 project — seven inherited from Session AX / the Sonnet burn-down whose wraps had not landed rows; snapshot regenerated from the live directory and counters recomputed by parsing the rows in the same edit). Prior: 2026-09-27 (Session AW: +3 feedback +3 reference +4 project, all narrative). Prior: 2026-09-25 (Session AT: +4 reference +3 project +1 index — four of them inherited from Sessions AR/AS, whose wraps never landed the rows; snapshot regenerated from the live directory and counters recomputed by parsing the rows in the same edit). Prior: 2026-09-22 (Session AQ: +2 reference +1 project this session — the second, the TTL-0 cache-policy constraint, from the attended afternoon; snapshot and counters updated from the rows in the same edit). Prior: 2026-09-21 (Session AP: +12 reference +1 feedback +4 project rows — 13 of them inherited from Sessions AM–AO whose wraps never landed the row; snapshot regenerated from the live directory). Prior: 2026-09-17 (Session AI: +3 reference +1 project this session, plus **12 inherited rows** for files Sessions AG/AH wrote whose ledger rows never landed — the backlog `--live` reports and the test reports are DIFFERENT SETS, which is why this cleared 10 then still failed on 6: `--live` compares the live directory against the ROWS, the test compares the SNAPSHOT against the rows, and a file missing from both is invisible to the first check. Snapshot regenerated from the live directory and counters recomputed by parsing the row table in the SAME edit as the rows; 450 rows / 450 snapshot files, `tests/test_operating_knowledge_ledger_2848.py` 18 passed). Prior: 2026-09-15 (Session AF: +2 reference +1 project this session; snapshot AND counters regenerated from the rows in the SAME edit as the rows, which is the whole lesson of the Session AE wrap — `--live` reported 0 unledgered and passed while the committed snapshot stayed stale and red-ed main. Counters here were recomputed by parsing the row table, never by arithmetic on the previous line). Prior: 2026-09-13 (Session AD: +1 project this session; snapshot regenerated from the live directory, clearing the 3-file drift the Session AB wrap left on main — the rows were added, the snapshot and counters were not, which red-walled CI/CD on `614990bd4` and every branch merged after it. Counters recomputed from the rows in the same edit). Prior: 2026-09-13 (Session AA: +3 reference this session, +3 inherited rows for files Session Z wrote on the unmerged #3713 branch whose ledger rows never reached main; counters recomputed from the rows themselves in the same edit). Prior: 2026-09-08 (Session Y: +1 reference +1 project this session; snapshot and counters recomputed from the list itself in the same edit). Prior: 2026-09-07 (Session X: +3 reference +1 feedback +1 project this session; snapshot regenerated from the live directory and counters recomputed from the rows, clearing an 11-file drift three earlier wraps had left). Prior: 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 602** — feedback 49 · reference 312 · security 1 · project 235 · user 1 · index 4
+**Files in the memory index snapshot: 607** — feedback 50 · reference 315 · security 1 · project 236 · user 1 · index 4
 
-**Rule-class files (feedback + reference + security): 362** — homed-here 89 · already-homed 203 · superseded 7 · narrative 46 · off-repo 17
+**Rule-class files (feedback + reference + security): 366** — homed-here 89 · already-homed 204 · superseded 7 · narrative 49 · off-repo 17
 
-**Program/session files (project): 235** — already-homed 15 · superseded 1 · narrative 215 · off-repo 3 · index 1
+**Program/session files (project): 236** — already-homed 15 · superseded 1 · narrative 216 · off-repo 3 · index 1
 
 **Out of scope: user 1 · index 4**
 <!-- LEDGER-COVERAGE:END -->
@@ -83,6 +83,7 @@ feedback_deploy_s3.md
 feedback_deploy_two_prefixes.md
 feedback_garmin_rate_limit.md
 feedback_hae_water_dedup.md
+feedback_harvest_times_come_from_the_schedule_source_in_utc.md
 feedback_heartbeat_progress.md
 feedback_hevy_carry_yards_are_steps_and_load_is_total.md
 feedback_hevy_single_routine_source_echoes_counted_once.md
@@ -312,6 +313,7 @@ project_session_ck_2026_10_28.md
 project_session_cl_2026_10_29.md
 project_session_cm_2026_10_30.md
 project_session_cn_2026_10_30.md
+project_session_co_2026_10_31.md
 project_session_d_2026_08_26.md
 project_session_e_2026_08_27.md
 project_session_f_2026_08_27.md
@@ -369,6 +371,7 @@ reference_a_ci_gate_that_cannot_fail.md
 reference_a_ci_warning_that_no_action_can_clear.md
 reference_a_citation_string_is_not_an_owner.md
 reference_a_client_cap_below_the_callee_p50.md
+reference_a_clock_pin_leaks_when_a_module_bound_the_name_at_import.md
 reference_a_colour_can_carry_a_claim.md
 reference_a_comparison_gate_is_blind_when_both_sides_agree.md
 reference_a_contact_sheet_review_misses_the_edge.md
@@ -379,6 +382,7 @@ reference_a_dry_run_that_only_gates_the_last_step.md
 reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_gate_that_cannot_be_satisfied_trains_readers_to_skip_it.md
 reference_a_generated_artifact_with_a_committed_twin.md
+reference_a_lane_agent_can_go_silent_on_its_commit_step.md
 reference_a_lane_fixes_keyword_closes_the_issue_on_merge.md
 reference_a_lease_steward_that_pauses_is_not_a_steward.md
 reference_a_measurement_that_aborts_reports_zero.md
@@ -567,6 +571,7 @@ reference_llm_json_maxtokens_truncation.md
 reference_local_axe_blind_to_color_mix_contrast.md
 reference_local_black_vs_pinned_black.md
 reference_local_render_qa.md
+reference_macrofactor_replay_goes_through_the_upload_prefix.md
 reference_magicmock_pagination_oom_runner_shutdown.md
 reference_mcp_bridge_key_rotation_detach.md
 reference_mcp_bundle_needs_reading.md
@@ -1300,3 +1305,8 @@ checked against the tree by `tests/test_operating_knowledge_ledger_2848.py`)
 | `feedback_rulings_2026_10_30_session_cn.md` | feedback | — narrative: the owner's 17 rulings of 2026-10-30 (9 closes/folds, #4517 re-scoped, #5474 retire whole, #5428 same-load reason, four stories released); each is recorded on its issue the same hour, the standard change is docs/coaching/HEVY_NOTE_STANDARD.md §3.2 (PR #5489) | narrative |
 | `reference_cdk_deploy_from_the_bang_runner_has_no_tty.md` | reference | homed-here: `.claude/skills/land/SKILL.md` §3 (code-only merges deploy with no gate) is the rule's home; the `!`-runner TTY and the `-- --require-approval never` form are documented in deploy/cdk_deploy.sh's own usage line | homed-here |
 | `project_session_cn_2026_10_30.md` | project | — narrative: the session record (open 62 → 51, rulings walked, four PRs merged + deployed, the owner's CDK deploy); its lessons are the handover gotchas and the cdk-deploy memory | narrative |
+| `feedback_harvest_times_come_from_the_schedule_source_in_utc.md` | feedback | already-homed: `docs/CONVENTIONS.md` §1b (crons follow `platform_timezone`) and `config/schedules.json` state every schedule in platform time; the memory is the one plan-mode slip (a CDK comment's "11:30 AM PT" read as Z) and the reflex to print both in a harvest line | already-homed |
+| `reference_a_clock_pin_leaks_when_a_module_bound_the_name_at_import.md` | reference | — narrative: one suite-order failure (#5431 lane, 2026-10-31); the structural fix is in code — `common.macrofactor_fields.latest_sk_ceiling` resolves the clock at call time and `tests/test_macrofactor_readers_today_bound_5431.py`'s autouse fixture pins every importer via `sys.modules`; re-home to docs/TESTING.md if a fixture-conventions section lands | narrative |
+| `reference_a_lane_agent_can_go_silent_on_its_commit_step.md` | reference | — narrative: the driver reflex from the #5431 lane (compare the agent's last output timestamp to the clock; `git show --stat HEAD` after `deploy/agent_commit.sh`); a procedural guard would belong in `.claude/agents/worktree-implementer.md`, not written yet | narrative |
+| `reference_macrofactor_replay_goes_through_the_upload_prefix.md` | reference | — narrative: the replay path for one owner act (copy the CSV to the `uploads/macrofactor/` trigger prefix; the archive key is AccessDenied by design, SEC-01); the layout itself is the `raw_layout` facet in `lambdas/ingestion/source_registry.py` | narrative |
+| `project_session_co_2026_10_31.md` | project | — narrative: the session record (open 51 → 38, 18 closures, seven PRs deployed, 11 rulings); its lessons are the four own-file memories ledgered above and the handover gotchas | narrative |

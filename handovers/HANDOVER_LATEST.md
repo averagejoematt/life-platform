@@ -1,66 +1,85 @@
-# Handover — Session CN: open 62 → 51, the owner's 17 rulings walked one at a time, four PRs merged and deployed (CI layer scan, same-load reason, emails consume the menu, pip-audit Lambda retired), MacroFactor + Apple Health repairs applied (2026-10-31)
+# Handover — Session CO: open 51 → 38, a 15-hour autonomous paydown — eight rulings and three more in chat, seven PRs merged and deployed, eighteen closures each on a live or ruled proof (2026-10-31)
 
 ## Driving instruction
-- **Owner, 2026-10-30 ~17:40Z (attended, Fable 5.1):** "what should we work on to get the open issues down the lowest / get the most value of this session." Then: walk the rulings "prompt by prompt with eli5 explanation and recommendation"; then "you do them all" for the merges, the CDK deploy, the MacroFactor cleanup and the Apple Health repair.
-- **Method:** the biggest lever was the owner's rulings, not code — 17 walked via four-at-a-time prompts (ELI5 line + recommendation first); he took every recommendation. Then the acts and lanes those rulings unlocked, each verified by content.
-- **Result: 62 → 51.** Nine closed/folded on his word; #5473 + #5474 closed on the CDK deploy he ran himself.
+- **Owner, 2026-10-31 04:30Z (plan mode, Fable 5.1):** "plan for a 15 hour autonomous session that tries to pay down as much of backlog as possible, parallel agents, synthetic tests for evidence." Plan approved with four answers: he would set `GH_POSTURE_TOKEN` and approve ONE one-off analyzer run; "take all 8 rulings as recommended"; run the ask-list invokes in the attended window; archive the dirty worktree diffs then reap.
+- **Owner, 16:35Z–17:05Z (back in chat):** "Are we good to clear?" (no — four wakeups and the wrap were pending) · "anything we can pull in from the backlog" → two lanes started · rulings **#5099 (a), #5076 (a), "Run it"** for a second analyzer run.
+- **Method:** every closure carries Shipped / Outcome / Live proof / Residual / Closure class; rulings recorded on the issue in the owner's words; synthetic proofs (dry runs, replays, one-off invokes) where the natural clock fell outside the window; never a Hevy commit, Habitify write or owner-channel message.
 
 ## Shipped (merged, deployed, verified by content)
-- **PR #5475 (0cefcfaa2)** — the CI layer-manifest scan (`scripts/check_pip_audit.py --layers`, `layer-pip-audit.yml` weekly + ci-lint per PR, red when it cannot scan; Dependabot-by-severity in the boot brief). Run 41161150554 deployed green (Deploy, Smoke, visual QA — no `waiting` gate: code-only merges deploy straight through, ADR-158). First dispatched scan (41162872348): `pillow.txt`, `lameenc.txt`, `garmin.txt` all `SCANNED CLEAN`, 20 packages, 0 red — pasted on #5473.
-- **PR #5489 (2036a4181)** — `Same load: aim to leave one more rep.` when PREVIOUS ran to RPE 10 at the prescribed load (#5428 ruling a; standard §3.2 + `REASON_RE`); charter 1.37.0 (`step_back_up.min_days` 3 confirmed, #5122); `calibration-deadman` re-cited to #3759. `SAME_LOAD_LINE` present in the live warmer bundle (03:36Z).
-- **PR #5490 (f7bb5165d)** — #5103 box 4: `health/weekly_menu_feed.py`; the Weekly Plate and the Nutrition Review print the code-built menu for every planned day after today above the model's column, and the prompt says the numbers are final (both of the Review's prompt paths). `html_block`, `menus_ahead` and `PROMPT_NOTE` verified in the live `weekly-plate` and `nutrition-review` bundles. Dry run 04:03Z: `menu ahead: built=True days=9`, Sonnet called, validator warned not blocked, send suppressed, nothing written.
-- **PR #5491 (347573a7f, `owner-required-ack`)** — `life-platform-pip-audit` retired whole (#5474): CDK function + role + denial MetricFilter + import-map rows, schedule and map rows, module and tests, census/pin/heartbeat rows (`EXEMPT_CEILING` 5 → 4), cost-surface baseline (schedules 97 → 96), built page (81 → 80), model 108 → 107; the ops pack points at the CI scan instead of the fold. **Deployed by the owner:** `bash deploy/cdk_deploy.sh LifePlatformOperational LifePlatformMonitoring -- --require-approval never` → UPDATE_COMPLETE 04:10:48Z / 04:12:33Z; `get-function life-platform-pip-audit` → ResourceNotFoundException; the schedule rule and role are gone.
+- **PR #5502** (`fe4dc2bc0`) — every MacroFactor reader bounds its query at the Pacific today: `common.macrofactor_fields.intake_window / latest_sk_ceiling / latest_day_condition`, 22 reader files, 39 tests with an AST census; the analyzer's hand-rolled ceiling replaced. Deployed 12:53–13:01Z (run 41202497169), bundle content verified in mcp, site-api, analyzer, daily-brief. Closed #5431.
+- **PR #5504** (`4f4249bc7`) — the coach session packet carries `lift_history` for the day's programmed lifts (3 sessions each, ≤10 lifts, <20 KB), so the pre-flight contract is one call; `coach_context.PRE_FLIGHT` credits only a packet that carried it; the #5071 eval gains a labelled projection row. Deployed 18:07:26Z (run 41225501362), `mcp/coach_packet_lift_history.py` in the live bundle. #5501 stays open for its live proof (first real planning conversation).
+- **PR #5506** (`8241d6d60`) — paperwork: `swallowed-permission-denial` citation re-pointed to RESOLVED (kept until the 72-h flap window closes 2026-11-01T06:07Z), `chronicle-delivery-heartbeat` re-stamped after re-deriving the cause, retirement-ledger row `two-1500-prompted-meal-emails` → `kept` (rewired, PR #5490), nutrition-W3 `adds_only_reason`, the ledger arming test no longer leans on a planned row. Closed #5220.
+- **Overnight (04:30–08:00Z):** Dependabot #5492 · #5495 coaching dispute kicker (site live 05:22Z, visual-qa 41174079328 green → #5456) · #5497 og sweep time-box + salt + per-reason sweep line (06:31Z) · #5498 analyzer grounding fixes: lean-mass label, week-named figures, `averages_since` (06:25Z) · #5499 Hevy note grammar 1.1.0 (warmer 07:59Z) · #5500 the #5071 transcript eval over real conversations (tests only).
 
-## Owner acts done on "you do them all"
-- **MacroFactor (#5431):** `macrofactor_future_rows_cleanup.py --apply --backup ~/Desktop/macrofactor_future_rows_2026-10-30.json` deleted the two empty rows (DATE#2026-10-31, DATE#2026-11-01); re-check 0. `/api/source_freshness` reads MacroFactor `2026-10-30 fresh`. The writer fix (`_is_future`) shipped in wave 10.
-- **Apple Health (#5440):** `hae_additive_backfill_4628.py --apply` on 10-21→10-22 and 10-26 only, never 10-25; the post-apply dry run reads `same` on every repaired day; only 10-25 still `differs` (by design).
-- **Visual QA (#5456):** re-dispatched after the cleanup — the MacroFactor "ahead of today" finding is gone; the run still reads 95/1 on a `/coaching/` reader-truth judge finding (`"WRITTEN TUESDAY OCT 27" …`, truncated in the log; 10-27 *is* a Tuesday). Left for the Sat 20:15Z run; the artifact's full text decides.
+## Owner acts taken this session
+- **One-off `ai-expert-analyzer` runs:** 04:49Z (diagnosis, pre-fix bundle) and 17:00Z (`dc49b7c3…`, on the #5498 bundle): physical and nutrition WROTE after serving empty since 10-28, month wrote, `experiment_arc` held only on the model's own `1000`. Closed #5458.
+- **Rulings in chat 17:0xZ:** #5099 box 5 option (a) → closed #5099 and epic #5091 · #5076 option (a) → closed #5076, cadence counting re-filed as #5505 · #5501 option (a) taken as the recommended default (he may still overrule to (b); the code is deployed).
+- **Not taken:** `gh secret set GH_POSTURE_TOKEN` (checked 11:37Z; #4887/#4287 wait) · the evening check-in reply (#5106 #5123 #5093 #5120) · lab/DEXA path (#4639) · photos + tape (#3759).
 
-## Closed (ADR-099 verdict + evidence)
-- **By ruling:** #4182 (partial → 3 boxes onto #4580), #4076 (stage-2 dry run accepted) → #3742, #5061 (dead-man firing is the proof; sitting is #3759's), #5109 (fixture + 10-20 partial proof).
-- **Folded:** #4775 + #4778 → #4772 (one AWS 5.5 account block; `closure:live-proof` moved with the box), #4977 → #4972, #4624 → #4625 (Later section carries the five unmet boxes).
-- **On the deploy:** #5474, #5473.
-- Every closing comment carries Shipped / Outcome / Live proof / Residual; `closure_sweep.py --session` clean (one non-blocking post-close-comment warn on #5297).
+## Closed (18, each with the ADR-099 verdict and its evidence)
+- **Live proof:** #5440 (04:37Z deploy, qa-smoke clean) · #5412 (one-off analyzer, 0 503s) · #5456 (visual-qa 96/0) · #5211 (nine `no_checkin` pair rows 10-22…10-30, dead-man silent-pass 08:03Z) · #5431 (deploy + bundle content + replay + qa-smoke) · #5458 (17:00Z run) · #5103, #5105, epic #5092 (the scheduled 17:00Z Nutrition Review: `menu ahead: built=True days=8`, the food-quality line, sent, no truncation) · #5220 (freshness-checker cold starts 16:45/16:52Z with zero AccessDenied; alarm OK since 10-29 06:07Z across a fleet deploy; PR #5506 for box 4).
+- **Ruling:** #5079 (skill shipped; retro → #5496) · #5104 (kit and playbook exist) · #4517 (10-26 laptop run out of pattern) · #5099 (hold week is the proof) · #5076 (10-23 replay; speed dropped per #5428) · epic #5091 (all stories closed, R1–R8 ruled 10-23).
+- **Carried:** #5071 → #5501 (PR #5500) · #5503 auto-filed 13:21Z on a wrap-nightly hygiene red and auto-closed on the re-dispatched green run 13:31Z.
 
-## Rulings recorded, not closed
-- **#4517:** re-scoped to "7 days no urgent flap AT THE RUNNING TIER". Not closed: the one post-retune ALARM was the 10-26 deliberate laptop run (OK 10-27 05:20Z) → clean read **Mon 11-03 ~05:20Z**, unless the owner rules that episode out of pattern.
-- **#5103** named misses accepted · **#5110** judge-paused grade counts · **#5297** no card-aware guard · **#5428b** no blanket layoff cap · **#5122** 3 confirmed.
-- **Released to Now for the week of 11-02:** #5071, #5104, #5078, #5211.
+## Verified, not closed
+- **#5421:** box 1 re-enumerated over 112 Lambdas (two within 10% of timeout: og-image-generator, and traffic-digest whose p95 still carries the pre-#5433 Monday timeout); boxes 1 and 3 ticked; box 4 is the 7-run count from 11-01.
+- **#5428:** grade half open at B; PR #5499 merged; the 11-01 02:00Z pre-draft is the natural proof.
+- **#5507** (auto-filed 17:45Z, served-coach-facts advisory): the known `days_logged` as-of-date false positive (#4580 backlog row), reproduced locally, dispositioned by comment, left to auto-close.
+- **Epics #4580 and #4531:** every story closed, but the owner parked both on 10-26 and the Done-when lines need the cut-over and the season rebuild — not closeable.
 
 ## Gotchas learned
-- **Auto mode denies `cdk_deploy.sh` outright** (Protected-Scope IaC Apply), even with the owner's "go"; his `!` run has **no TTY**, so CDK stops at its security confirmation with nothing applied — hand him the diff run first, then `-- --require-approval never`. Pull the bot's reconcile commit before, or the drift guard reads the checkout as stale.
-- **Code-only merges deploy with no gate now** — `Deploy IAM (production gate)` reads `skipped`; a watcher for a `waiting` run never fires. An OWNER-REQUIRED CDK merge strands main's Plan (`CDK diff detected resource DESTRUCTIONS`) until the owner deploy lands; recovery = `gh workflow run ci-cd.yml -f deploy_all=true` (run 41167764705, dispatched 04:33Z).
-- **The PR-time IAM gate's `owner-required-ack` label is the ack mechanism** for a non-additive PR; it printed exactly the expected removals.
-- **A handler test that runs the real handler is a privacy probe:** the feed printed a boto3 auth error's text into the email page before being trimmed to the exception class.
-- **"NON-REPRODUCED" judge findings don't gate**, but one that reproduces on an advisory page can hold an auto-filed tracker open with a truncated log line as its only record.
-- **A fold's `closure:live-proof` label travels with the box** to the carrier, or the sweep reds the fold as an instrument closed without proof.
+- **The #5431 lane agent went silent for five hours** on its `agent_commit --push` step with 24 files staged and nothing committed; `TaskStop`, took over the staged diff, ran the gate battery by hand. `agent_commit.sh` then committed 8 of 24 paths — always `git show --stat HEAD` after it.
+- **A clock pin leaks when a module bound the name at import:** `test_latest_readers_skip_future_rows` passed alone and failed in suite order because the analyzer imported `pacific_today` directly. Route clock reads through a call-time helper (`latest_sk_ceiling`) AND patch every importer via a `sys.modules` walk.
+- **Harvest times come from the schedule source, in UTC:** the plan's "11:30 qa-smoke" was 11:30 PT = 18:30Z; the 11:30Z read returned nothing. Print both in the plan line.
+- **Doc-sync literals in a lane:** `agent_commit.sh` refuses `docs/MCP_TOOL_CATALOG.md`, `ARCHITECTURE.md`, `RUNBOOK.md` (and `docs/alarm_citations.json`) without `ALLOW_DOC_LITERALS=1`; a lane that adds an `mcp/` module must move the module count or its Wiki drift gate and `test_doc_drift_date_stamp_2649` stay red. Safe when it is the only open PR.
+- **A second push to main cancels the in-flight run's unit-test shards** (`ci-cd-unit-tests-<ref>`, `cancel-in-progress: true`); wait for the shards to settle before merging the next PR or the first deploy is stranded.
+- **A pruned flapper reds the wrap:** `check_alarm_citations.py` (#2912) wants an entry for every alarm that transitioned inside the last 72 h, even if OK now — re-point the entry to RESOLVED and prune at the first wrap after the window closes.
+- **Closing-comment residuals need a home in the same block** (`#N` or `not-work — <home>`); a later comment does not cure an earlier block — edit the closing comment.
+- **In-session one-shot wakeups do not fire while the owner is chatting**; the 16:53Z and 17:13Z harvests were done by hand and their crons deleted.
 
-## Next session plan (Mon 2026-11-02 after ~10:30 PT, as Session CM planned)
-1. Boot: `ps` for zombie loops; read whether the recovery run 41167764705 deployed (Deploy/Smoke green) and whether `og:coach-cards` / `qa-smoke-warnings` cleared.
-2. Harvest in clock order: Sat 17:00Z Nutrition Review (#5103's Review half — `menu ahead: built=True` in its log, the block in the HTML, length vs `MAX_OUTPUT_TOKENS`); Sat 20:15Z visual QA (#5456); Sun 02:00Z predraft (#5428 — the same-load line on an RPE-10 PREVIOUS, then the blind re-grade); Sun 06:07Z #5220 close; #4641 paste; Mon 11-03 05:20Z #4517; Mon 15:00Z analyzer (#5458, #5412); Mon 15:17Z the first scheduled layer scan; Mon 15:30Z panel grade (#5110, counts judge-paused); Mon 16:00Z traffic-digest shows "Dependency audit — CI".
-3. Build: the four released stories (#5071, #5104, #5078, #5211); #5440's code boxes (conditional write + interleaving test); #5431 box 2 (readers bound at today).
-4. Owner: `gh secret set GH_POSTURE_TOKEN` (#4887 → #4287); photos + tape (#3759); watch settings (#4968).
+## Next session plan (Mon 2026-11-02, in the lane that has the work — sonnet/opus; clock-ordered harvest, UTC)
+- Sun 11-01 02:00Z nightly pre-draft → #5428 grade (natural proof), #5505 "conditioning 1 of 2" placement count, #5076 natural confirmation (closed).
+- Sun 11-01 after 06:07Z → prune the `swallowed-permission-denial` citation entry (#5220 residual, not-work — wrap doc edit) · 06:21Z #4641 re-measure.
+- Daily 19:30Z og-image run, 11-01 → 11-07, max Duration ≤ 36 s → #5421 box 4.
+- Mon 11-02 00:00Z+ → #5371 7-day read (seam fold count, `MissingActivityCount{Source=strava}`).
+- Mon 11-02 14:00Z scheduled analyzer → does `experiment_arc` write, or hold again on a bare round number (then a prompt-fix issue; #5458 residual).
+- Mon 11-02 15:30Z panel → #5110 and the `PANEL#` `quality` field (#5105 residual) · 16:00Z traffic-digest first attempt finishes (#5433 natural read).
+- Mon, first real planning conversation → #5501 live proof: `[#5501] coach packet lift_history state=` in `/aws/lambda/life-platform-mcp`, eval row with no order violation, capture the after-fixture.
+- Wed 11-04 15:00Z desk writes week 9 with no legacy fallback → `chronicle-delivery-heartbeat` clears (#4531).
+- Sun 11-08 block 1 ends → #5075, #5078, #5496 (retro; needs the baseline letters first, gate:owner) · Fri 11-20 → #5221 box 3 window closes.
+- Monday session also: bank the coverage gain in one PR (`RATCHET_HIGH_WATER` 87.80 → 89.40 together with the CI `--high-water` literal, #1658 convention).
+
+## For Matthew (one line each, unblocks named)
+- `gh secret set GH_POSTURE_TOKEN --body "<fine-grained PAT: Administration:read, Actions:read, Contents:read>"` → the remediation agent's posture leg → #4887 + epic #4287 close.
+- Reply to one evening check-in (Telegram) → the first `state: checkin` pair row → #5106, #5123, epic #5093, epic #5120.
+- Approve Week 8 of the chronicle from the 10-28 15:03Z preview email → `chronicle-delivery-heartbeat` clears before 11-04.
+- `cdk deploy LifePlatformCore` for the pending `MonthlyBudget75` ResourceTags change (the standing Plan warning; owner-attended).
+- Re-upload the claude.ai copy of the coach-session skill (`python3 scripts/check_synced_skill_drift.py --skill coach-session --package <out.zip>`) — PR #5504 changed its text; both synced copies already differed.
+- #5505 ruling: does a substituted bike ride count as the week's conditioning; does a skipped block roll forward once? (recommendation in the issue).
+- #5501: option (a) is deployed; say "b" if you would rather trim the contract instead.
+- Photos + tape (#3759, `calibration-deadman` red 7 d) · lab/DEXA path (#4639) · watch + HAE settings (#4968).
+- Two dirty worktrees (`issue-5075-variant-slots-rotation`, `fix/walk-completeness`) have their diffs archived at `~/Desktop/worktree-archive-2026-10-31/`; say "drop" and the reaper retires them.
 
 ## Residual / next picks
-- #5103: the Sat 17:00Z Review's natural run, then the owner's read of the first edition with the block; watch the Plate's length (the menu block's prose cost) — cap the day list at the coming week if it truncates.
-- #5428: the Sun 02:00Z predraft and the blind four-voice re-grade.
-- #4517: the 11-03 05:20Z read at the running tier.
-- #5456: the `/coaching/` judge finding's full text from the Sat 20:15Z artifact.
-- #5440: boxes 1–3 (the conditional write) and the next qa-smoke `data:hae_additive_integrity` read.
-- #5431: box 2 and the next export's live proof.
-- #5421: the 7-run count through 11-03; `qa-smoke-warnings` must evaluate OK (if it never publishes a zero, that is #5421's defect).
-- #4887: the posture token is the owner's; closes #4287 with it.
-- not-work — the dirty pre-existing worktrees (`fix/walk-completeness`, `issue-5075-variant-slots-rotation`) are untouched; the reaper names them every wrap.
-- not-work — main's recovery run 41167764705 was in progress at wrap; its Deploy/Smoke verdict is Monday's first read (its tree is 3ad2ecb77 + nothing new).
+- #5501 live proof (first real planning conversation after the 18:07Z deploy; capture the after-fixture).
+- #5421 boxes 2 and 4 (seven og runs ≤ 36 s from 11-01).
+- #5428 grade half (11-01 02:00Z pre-draft, blind four-voice re-grade).
+- #5505 cadence counting (owner ruling, then a sonnet lane).
+- #5507 auto-filed served-coach-facts red — the #4580 backlog row ("compare as-of the line's date") is the fix if it keeps re-filing.
+- Coverage high-water bank (RATCHET_HIGH_WATER + CI literal) — not-work — a one-PR Monday chore, named under CI warnings below; file it if Monday's session cannot take it.
+- Prune the `swallowed-permission-denial` citation after 2026-11-01T06:07Z — not-work — a wrap doc edit (#5220 residual).
+- Remove `speak-to-coaches` from `NO_CONTRACT_TEST` in `scripts/skill_lint.py` (it now has a contract test) — not-work — ratchet maintenance line, advisory.
+- Two worktrees outside the canonical parent and two dirty lanes — not-work — the owner's keep-or-drop call above.
+- `prompt cache NO-OP` on every analyzer call (prefix ~1,586 tok vs 4,096 minimum) — #2888.
 
-**Build beat:** none — the shipped work is coaching, nutrition-email and ops paths; no reader-facing page changed beyond one dated count on "How it's built"
-**Docs:** `docs/coaching/HEVY_NOTE_STANDARD.md` §3.2 (PR #5489) · `docs/PROPORTIONALITY.md`, `docs/IDEMPOTENCY.md`, `docs/SITE_UPLEVEL_PLAYBOOK.md`, `docs/DEPENDENCY_GRAPH.md` (PR #5491) · `docs/alarm_citations.json` (calibration-deadman → #3759; qa-smoke-warnings dated/self-clearing, cause cleared live) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+3 rows)
-**Decisions:** none needed — every change sits inside an existing standard, charter amendment or owner ruling recorded on its issue; the Lambda retirement is a PROPORTIONALITY row, not an ADR
-**Main:** stranded — Plan red on 347573a7f/3ad2ecb77 (`CDK diff detected resource DESTRUCTIONS`, OWNER-REQUIRED) until the owner's 04:10Z CDK deploy; recovery `deploy_all=true` run 41167764705 dispatched 04:33Z and in progress at wrap; the last green deploy is f7bb5165d (run 41163929086)
-**Incidents:** none — the stranded-Plan window was the designed OWNER-REQUIRED hold (#5221), 33 minutes from merge to the owner's deploy, nothing rolled back, no data gap
+**Build beat:** none — a paydown session: reader bounds, packet history, grounding fixes and paperwork; the only reader-facing change was the coaching dispute kicker's week text (#5456), one line
+**Docs:** `docs/alarm_citations.json` (PR #5506) · `docs/MCP_TOOL_CATALOG.md`, `docs/ARCHITECTURE.md`, `docs/RUNBOOK.md` (85-module count, PR #5504) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+4 rows) · `ledgers/retirement_ledger.py`, `scripts/backlog_waves.json` (PR #5506)
+**Decisions:** none needed — every change sits inside an existing standard or an owner ruling recorded on its issue (#5099 a, #5076 a, #5501 option a as the recommended default, open to override)
+**Main:** green (8241d6d6)
+**Incidents:** none — the wrap-nightly hygiene red lasted ten minutes (#5503, fixed, auto-closed); the #5431 lane agent's five-hour silence cost session time, not data or availability; nothing rolled back, no data gap, no budget-tier event
 **Stash/hooks:** clean
-**Closures:** #4182, #4076, #3742, #5061, #5109, #4775, #4778, #4977, #4624, #5474, #5473 commented · DoD: `closure_sweep.py --session` scanned=2 hits=0 (10-31 window) and the 10-30 window's 14 scanned with 1 non-blocking post-close-comment warn on #5297
-**Backlog:** Now live at 1 startable fable story (floor 3) — NO REMEDY IN THE CORPUS for lane fable (9 startable stories exist in sonnet/opus lanes; four stories released to Now this session are opus/sonnet); the Monday session runs in the lane that has the work; Later sweep — OK, 51 open issues satisfy the filing contract, no stale Later issue
-**Alarms:** 4 red >72h, all cited — calibration-deadman (#3759, owner act), chronicle-delivery-heartbeat (#4531; week 8 approved by the owner 10-30, clears on the 11-04 desk run), qa-smoke-failures (dated, self-clearing), qa-smoke-warnings (dated, self-clearing; cause channel empty since the 10-30 19:30Z og run — a never-published zero becomes #5421's defect)
-**CI warnings:** none to triage — the latest completed main run was not green at wrap (the stranded Plan above); the last green run's 7 warnings were triaged by the Session CM wrap and are unchanged
-**Ledger:** none — no standing machinery shipped; one retired (the pip-audit Lambda — its PROPORTIONALITY row now says so in PR #5491)
+**Closures:** #5440, #5412, #5079, #5104, #4517, #5456, #5071, #5211, #5431, #5503, #5099, #5091, #5076, #5458, #5103, #5105, #5092, #5220 commented · DoD: `closure_sweep.py --session` scanned=20 hits=0 after homing eleven residual blocks by editing their closing comments and posting #5503's verdict
+**Backlog:** Now live at 1 startable fable story (floor 3) — NO REMEDY IN THE CORPUS for lane fable (8 startable stories exist in the sonnet/opus lanes; #5505 filed to Next); Monday runs in the lane that has the work; Later sweep — OK, 38 open issues satisfy the filing contract, no stale Later issue
+**Alarms:** 2 red >72h, both cited — calibration-deadman (#3759, owner act), chronicle-delivery-heartbeat (#4531; re-derived and re-stamped 2026-10-31 in PR #5506; Week 8 approve or the 11-04 run); qa-smoke-warnings cleared 18:31:31Z; swallowed-permission-denial OK since 10-29 06:07Z, its entry kept as RESOLVED until the flap window closes 11-01 06:07Z
+**CI warnings:** 8 — coverage high-water mark stale (89.41% measured vs 87.80% banked): bank it in one Monday PR, `RATCHET_HIGH_WATER` and the CI `--high-water` literal together (#1658; not this wrap — the pair must ride CI) · 5× "SKIPPED in CI — no playwright/chromium" (#3640, standing, no action) · "Pending owner cdk deploy (LifePlatformCore) MonthlyBudget75 ResourceTags" (owner act, listed above) · `test_grant_enumeration_drift` 91.2 s against the 90 s per-test bar (no action: 1.3% over on a loaded shard, first sighting; file it if Monday's run repeats it)
+**Ledger:** none — no standing machinery shipped; one retirement row flipped to `kept` (the two meal emails, rewired by PR #5490, recorded in PR #5506)
