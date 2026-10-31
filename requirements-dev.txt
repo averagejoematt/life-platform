@@ -5,7 +5,7 @@
 # Testing
 # pytest/pytest-cov versions MUST equal the CI gate's pins (CQ-01, #1963) — read
 # from ci-test.yml (Unit Tests) and ci-cd.yml's test-critical lane, not quoted here.
-pytest==9.1.1
+pytest==9.2.0
 pytest-cov==7.1.0
 # pytest-xdist — the pre-merge full suite runs `-n auto --dist loadfile` (#3025's
 # duration class, 8th instance). `loadfile` keeps a file's tests on one worker, which
@@ -18,7 +18,7 @@ pytest-xdist==3.8.0
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
 # #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-hypothesis==6.170.9
+hypothesis==6.170.12
 # PyYAML — scripts/apply_branch_protection.py's preflight_contexts() parses
 # .github/workflows/*.yml to verify every required check context actually exists
 # as an unfiltered, un-gated job (#1662/#2198). tests/test_branch_protection_spec.py
@@ -65,8 +65,8 @@ mypy==2.4.0
 
 # AWS SDK (for tests that call boto3 directly). Versions MUST equal the CI gate's
 # pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-boto3==1.43.118
-botocore==1.43.118
+boto3==1.43.120
+botocore==1.43.120
 
 # CI supply-chain gates (#2760 — the one-legged-pin class): both were pinned as
 # workflow literals with NO Dependabot leg, so the pins could only rot. This file
@@ -87,5 +87,5 @@ claude-agent-sdk==0.2.174
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release
 # reach CI unpinned). Bump both files together as a deliberate PR, plus the
 # `npm install -g aws-cdk@X.Y.Z` CLI pin in ci-cd.yml.
-aws-cdk-lib==2.274.0
+aws-cdk-lib==2.275.0
 constructs==10.8.1
