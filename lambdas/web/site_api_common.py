@@ -244,7 +244,7 @@ PLATFORM_STATS = {
     # and everything else derives from it (#2898).
     # This is a hand-maintained judgment field (never rewritten by sync_doc_metadata);
     # tests/test_platform_stats_cost.py is the offline drift guard.
-    "review_count": 19,
+    "review_count": 20,  # 2026-10-31 full review (the 20th)
     # #3690: was "A" while the newest full review graded ZERO lenses at A — the
     # 2026-09-05 baseline is B+ 9 · B 3 · B- 3 · C+ 2 across 17 lenses, modal B+,
     # worst C+. This is the platform's most-quoted credibility number, on the page a
@@ -257,8 +257,11 @@ PLATFORM_STATS = {
     # it. tests/test_platform_stats_honesty_3690.py re-derives all three fields below
     # from their real sources and reds when any drifts, which is what makes correcting
     # them today more than a one-time patch.
+    # 2026-10-31 baseline: A- 3 · B+ 10 · B 2 · B- 2 across 17 lenses, modal B+ (the run's
+    # calibration block reads UNCALIBRATED on the withheld-issue control — that governs the
+    # review CLOCK, not whether these 17 grades were awarded; docs/reviews/FULLREVIEW_2026-10-31.md).
     "review_grade": "B+",
-    "review_grade_distribution": "B+ 9 · B 3 · B- 3 · C+ 2 (17 lenses, 2026-09-05)",
+    "review_grade_distribution": "A- 3 · B+ 10 · B 2 · B- 2 (17 lenses, 2026-10-31)",
     "active_secrets": 30,  # #3690: was 21; 28 -> 29 with life-platform/ip-hash-salt (#3620); 29 -> 30 with life-platform/progress-photos-signing (#3760). model/platform_model.json cost_surface.secrets
     "site_pages": 95,  # #3690: was 77; qa/qa_manifest.py is the single page registry. 93 -> 95 with /start/ and /coaches/ (#4588 cut-over)
     "board_technical": 12,
