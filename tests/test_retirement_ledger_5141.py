@@ -300,7 +300,10 @@ def test_the_live_ledger_has_no_stale_planned_row_shape():
 
 def test_severity_names_match_the_linter_and_fixtures_stay_unarmed():
     assert (br.VIOLATION, br.ADVISORY) == (hy.VIOLATION, hy.ADVISORY)
-    fixture = [_issue(5095, "x")]
+    # A wave story (nutrition-W3 lists #5113) with no `## Retires` line and no ledger row: the live wave spec
+    # recognises it, so the retirement rules see it only when armed. (The committed ledger carried no `planned`
+    # row from 2026-10-31, so the arming proof cannot lean on one.)
+    fixture = [_issue(5113, "## Outcome\n**operator** — x\n")]
     assert not [f for f in hy.check(fixture) if f.rule.startswith("retire")], "an offline check() must not arm the ledger rules"
     armed = hy.check(fixture, retirement=True)
-    assert any(f.rule == "retirement_ledger_liveness" for f in armed), "armed, the committed ledger's other planned rows are stale here"
+    assert any(f.rule == "retires_section" for f in armed), "armed, the retirement rules run over the fixture"

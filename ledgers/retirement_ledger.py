@@ -173,8 +173,13 @@ RETIREMENTS = {
         "what": "the two LLM meal emails prompted with a stale 1500 kcal (`weekly_plate_lambda.py`, "
         "`nutrition_review_lambda.py`) — retired or rewired onto the deterministic menu",
         "story": 5103,
-        "status": "planned",
-        "record": "#5103 acceptance: 'The two 1500-prompted emails are retired or rewired'.",
+        "status": "kept",
+        "reason": "#5103 closed 2026-10-31 on the REWIRED branch of its box: PR #5490 (main f7bb5165d, deployed 2026-10-31 "
+        "~03:36Z) makes both emails carry the code-built weekly menu as a block above the model's column and tells the "
+        "model the numbers are final (prose only); the 1500 prompt is gone, the two emails stay. First sent edition on "
+        "the new path: Nutrition Review 2026-10-31T17:01:48Z.",
+        "retire_when": "either email is removed as a surface (for example both folded into one menu email) — then this row "
+        "flips to `retired` with that PR and its merge date.",
     },
     "zone2-same-session-union-find": {
         "what": "the zone-2 reader's own cross-source session rule — `_same_session` / `_groups` in "
