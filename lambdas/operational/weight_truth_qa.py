@@ -18,6 +18,7 @@ split as `assess_hero_weight` and the `reader_truth_qa` helper.
 import re
 from datetime import date as _date, timedelta as _timedelta
 
+from operational.lean_mass_claims import lean_mass_figure
 from operational.protein_target_refs import protein_target_starts
 from operational.protein_window_claims import protein_window_tags, served_protein_windows
 from operational.rate_claims import _rate_claims, _rate_tolerance, _rate_value
@@ -166,6 +167,8 @@ def weights_cited_in(prose: str) -> list[float]:
                 continue
             if _HISTORICAL_ANCHOR.match(text[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
                 continue  # dated, therefore not a claim about now
+            if lean_mass_figure(text, m.start(), m.end()):
+                continue  # #5458: lean / fat-free mass, not his weight
             out.append(v)
     return out
 

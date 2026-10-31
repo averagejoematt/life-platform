@@ -793,6 +793,7 @@ def grounding_findings(
     known_absence_days=None,
     evaluated_predictions=None,
     nightly_vitals=None,
+    named_week_values=None,
     number_tolerance: float = NUMBER_TOLERANCE_TOLERANT,
     unit_voids_benign: bool = False,
 ) -> list:
@@ -832,7 +833,8 @@ def grounding_findings(
     - "unlabeled_night_figure"/"night_value_mismatch": a vitals figure naming no night,
       or naming one and disagreeing with what is stored for it NOW — #1968, and the one
       class that also runs at serve time. Checked ONLY when ``nightly_vitals`` is passed
-      (night-keyed); see ``ai/night_scope.py``.
+      (night-keyed); see ``ai/night_scope.py``. ``named_week_values`` (#5458) lets a rollup's
+      figure tied to a named week pass when that week's served note states it.
     """
     findings = []
     if facts and _hard_contradictions is not None:
@@ -880,7 +882,9 @@ def grounding_findings(
         findings.extend(self_graded_verdict_findings(text, evaluated_predictions=evaluated_predictions))
     if nightly_vitals is not None:
         findings.extend(
-            _night_scope.night_scoped_vitals_findings(text, nightly_vitals=nightly_vitals, generation_date_iso=generation_date_iso)
+            _night_scope.night_scoped_vitals_findings(
+                text, nightly_vitals=nightly_vitals, generation_date_iso=generation_date_iso, named_week_values=named_week_values
+            )
         )
     return findings
 

@@ -175,3 +175,27 @@ def clinical_parts(table) -> list:
     except Exception:  # noqa: BLE001 — a weekly cron is never load-bearing on this read
         return []
     return [block] if block else []
+
+
+def averages_window_block(data) -> str:
+    """#5458: the prompt rider that names the window of an expert's `avg_*` figures; "" without `averages_since`.
+
+    The 2026-10-31 run held the sleep read on "your 8.2-hour average" with no window. 8.2 is the context's own
+    `avg_sleep_hours`, but the context never said what it averages over: `period` reads "experiment days 1-N" while the
+    pack averages only the rows since `d30`. The gate is right to refuse an average with no window in its sentence
+    (owner ruling 8, #4343; `coach.reader_checks._WINDOW_RE`); the model was never told the window. "since <Month D>"
+    is the form both the window rule and the night-scope gate accept. No year: "September 30, 2026" is a full date,
+    which the night-scope gate would read as ONE night and compare the average against that night's reading.
+    """
+    from common.pacific_time import parse_day_key
+
+    since = parse_day_key(str(data.get("averages_since") or "")[:10])
+    if since is None:
+        return ""
+    when = f"{since:%B} {since.day}"
+    return f"""
+AVERAGES NAME THEIR WINDOW — READ BEFORE CITING ANY:
+Every avg_* figure in the data below is an average over the nights since {when}, not one night's reading. A sentence
+that cites one names that window in the same sentence ("averaged <value> hours since {when}", "<value> ms on average
+since {when}"). An average with no window beside it is refused.
+"""
