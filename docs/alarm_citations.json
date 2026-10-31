@@ -240,10 +240,9 @@
   "qa-smoke-warnings": {
     "added": "2026-10-28",
     "cause_observed": "2026-10-30",
-    "updated": "2026-10-30",
-    "cause": "og:coach-cards",
-    "citation": "#5421 — PR #5488. Since 2026-10-30T03:46Z every run warns `og:coach-cards` (all 10 cards \"older than 30h\"). The origin cards are fresh (S3 LastModified 2026-10-29T19:30:58Z) but the edge serves the 10-28 copy (`X-Cache: Hit`, Age ~78k s, max-age 86400): og-image-generator fired its CloudFront invalidation inside the render step, BEFORE the sweep rewrote the coach cards, so the edge re-cached yesterday's card. #5488 invalidates once after every writer (path `/assets/images/og-*`, PNG + WebP). Clears after the first 19:30Z og run on the fix plus a daily WarnCount evaluation with no warning.",
-    "note": "Re-cited by the Session CM wrap 2026-10-30 (the 10-28 entry described the cured never-written episode and had no cause field)."
+    "updated": "2026-10-31",
+    "citation": "#5421 — dated, self-clearing: the one lit datapoint is 2026-10-30T03:47Z (WarnCount 1 — every run then warned `og:coach-cards`, the edge serving the 10-28 card because og-image-generator invalidated CloudFront before the sweep rewrote the cards). The fix (invalidate once after every writer, PR 5488, main a8ebc1d32) deployed 2026-10-30T05:28Z; the live `[QA] CAUSE warn` channel has read none since the 10-30 19:30Z og run (the wrap gate read `-` on 2026-10-31T04:30Z). The alarm stays ALARM until the next daily WarnCount evaluation carries a datapoint under 1; if it is still ALARM at the Mon 2026-11-02 wrap with the cause channel empty, the metric publishes no zero and that is a #5421 defect to fix, not a citation to refresh.",
+    "note": "Re-cited by the Session CN wrap 2026-10-31: cause cleared live (channel empty), window named; the Session CM entry cited the then-live cause."
   },
   "field-notes-missing": {
     "added": "2026-10-25",
@@ -274,7 +273,7 @@
     "added": "2026-10-27",
     "cause_observed": "2026-10-27",
     "cause": "no tape measurement or progress-photo set logged this cycle (the biweekly calibration prompt's dead-man)",
-    "citation": "#3759 — the owner's tape + photo sitting (deferred in session 2026-10-26 \"defer later in week\", 2026-10-27 \"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect: the prompt + dead-man mechanism (#5061) closed 2026-10-30 on this very firing.",
-    "note": "Cited by Session CJ wrap 2026-10-27; re-cited from #5061 to #3759 on 2026-10-30 (owner ruling: the mechanism is proven, the sitting is #3759's)."
+    "citation": "#3759 — the owner's tape + photo sitting (deferred in session 2026-10-26 \"defer later in week\", 2026-10-27 \"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect: the prompt + dead-man mechanism (the biweekly-prompt story, closed 2026-10-30) closed on this very firing.",
+    "note": "Cited by Session CJ wrap 2026-10-27; re-cited to the sitting's story on 2026-10-30 (owner ruling: the mechanism is proven, the sitting is the owner's act) — the PR that moved this entry is 5489."
   }
 }
