@@ -89,6 +89,23 @@ BEST_EFFORT_SOURCES = best_effort_source_ids()
 # an inert mechanism (#2309 census note, ADR-103/144): deleted; every source uses
 # the 1560-minute (~26h) default below. Reintroduce a map only WITH a first entry.
 
+# ── #5512: the CloudTrail delivery dead-man ──────────────────────────────────
+# The account's one trail (setup/setup_cloudtrail.sh) lives OUTSIDE CDK, so no drift
+# check sees it. It delivered nothing from 2026-07-08 to 2026-10-31: a bucket-policy
+# apply replaced the document and dropped the two cloudtrail.amazonaws.com statements,
+# CloudTrail retried every few minutes with AccessDenied, and nothing in the platform
+# said so for 115 days. The daily {check_ingest_liveness} run now reads the trail's own
+# status and emits one gauge the cloudtrail-delivery-stale alarm watches. Fail-loud: an
+# unreadable status (IAM, throttle, deleted trail) is reported stale, never skipped —
+# a dead-man that goes quiet when its sensor breaks is the class this exists to end.
+CLOUDTRAIL_TRAIL_ARN = os.environ.get(
+    "CLOUDTRAIL_TRAIL_ARN",
+    f"arn:aws:cloudtrail:{REGION}:205930651321:trail/life-platform-trail",
+)
+CLOUDTRAIL_DELIVERY_MAX_AGE_HOURS = 24
+CLOUDTRAIL_STALE_METRIC = "CloudTrailDeliveryStale"  # 0/1 — the alarmed gauge
+CLOUDTRAIL_AGE_METRIC = "CloudTrailDeliveryAgeHours"  # the measurement behind it
+
 try:
     from ingestion.ingest_health import SYSTEM_PK, evaluate_source_health
 
@@ -248,13 +265,23 @@ def _check_ingest_liveness(now: datetime, day: str | None = None) -> dict:
     alerting = [v for v in verdicts if v["alert"] and v["source"] not in BEST_EFFORT_SOURCES and not v["paused"]]
     unhealthy_count = len(alerting)
 
-    # Emit the metric the ingest-liveness alarm watches.
+    # #5512: the CloudTrail delivery dead-man rides this daily run (same namespace, so the
+    # ingest-liveness-heartbeat covers its death too). Computed BEFORE the emit so the two
+    # gauges and UnhealthySourceCount land in one put_metric_data call.
+    cloudtrail = _check_cloudtrail_delivery(now)
+    if cloudtrail["stale"]:
+        logger.warning(f"CLOUDTRAIL DELIVERY STALE: {cloudtrail['reason']}")
+
+    # Emit the metrics the ingest-liveness and cloudtrail-delivery-stale alarms watch.
     try:
         cw = boto3.client("cloudwatch", region_name=REGION)
-        cw.put_metric_data(
-            Namespace="LifePlatform/IngestLiveness",
-            MetricData=[{"MetricName": "UnhealthySourceCount", "Value": unhealthy_count, "Unit": "Count"}],
-        )
+        metric_data = [
+            {"MetricName": "UnhealthySourceCount", "Value": unhealthy_count, "Unit": "Count"},
+            {"MetricName": CLOUDTRAIL_STALE_METRIC, "Value": 1 if cloudtrail["stale"] else 0, "Unit": "Count"},
+        ]
+        if cloudtrail["age_hours"] is not None:
+            metric_data.append({"MetricName": CLOUDTRAIL_AGE_METRIC, "Value": cloudtrail["age_hours"], "Unit": "None"})
+        cw.put_metric_data(Namespace="LifePlatform/IngestLiveness", MetricData=metric_data)
     except Exception as e:
         logger.warning(f"ingest_liveness metric emit failed: {e}")
 
@@ -285,13 +312,63 @@ def _check_ingest_liveness(now: datetime, day: str | None = None) -> dict:
                 "checked_at": now.isoformat(),
                 "unhealthy_count": unhealthy_count,
                 "verdicts": json.dumps(verdicts, default=str),
+                "cloudtrail": json.dumps(cloudtrail, default=str),  # #5512
             }
         )
     except Exception as e:
         logger.warning(f"ingest_liveness store failed: {e}")
 
-    logger.info(f"ingest_liveness: {unhealthy_count} unhealthy of {len(ACTIVE_API_SOURCES)} active sources")
-    return {"unhealthy_count": unhealthy_count, "verdicts": verdicts}
+    logger.info(
+        f"ingest_liveness: {unhealthy_count} unhealthy of {len(ACTIVE_API_SOURCES)} active sources; "
+        f"cloudtrail {'STALE' if cloudtrail['stale'] else 'delivering'} ({cloudtrail['reason']})"
+    )
+    return {"unhealthy_count": unhealthy_count, "verdicts": verdicts, "cloudtrail": cloudtrail}
+
+
+def _check_cloudtrail_delivery(now: datetime) -> dict:
+    """#5512: is the CloudTrail trail still delivering log files to the bucket?
+
+    Reads get_trail_status (read-only, this one trail). Stale when ANY of: the last
+    delivery is older than CLOUDTRAIL_DELIVERY_MAX_AGE_HOURS, the trail reports a
+    LatestDeliveryError, logging is off, or the status cannot be read. Returns the
+    verdict; the caller emits the gauges and persists it beside the liveness verdicts.
+    """
+    verdict = {
+        "trail_arn": CLOUDTRAIL_TRAIL_ARN,
+        "stale": True,
+        "age_hours": None,
+        "latest_delivery_time": None,
+        "latest_delivery_error": None,
+        "is_logging": None,
+        "reason": None,
+    }
+    try:
+        status = boto3.client("cloudtrail", region_name=REGION).get_trail_status(Name=CLOUDTRAIL_TRAIL_ARN)
+    except Exception as e:  # fail-loud: an unreadable trail is reported stale, not skipped
+        verdict["reason"] = f"get_trail_status failed: {type(e).__name__}: {e}"
+        return verdict
+
+    verdict["is_logging"] = bool(status.get("IsLogging"))
+    verdict["latest_delivery_error"] = status.get("LatestDeliveryError") or None
+    last = status.get("LatestDeliveryTime")
+    if last is not None:
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        verdict["latest_delivery_time"] = last.isoformat()
+        verdict["age_hours"] = round((now - last).total_seconds() / 3600, 2)
+
+    reasons = []
+    if not verdict["is_logging"]:
+        reasons.append("IsLogging is false")
+    if verdict["latest_delivery_error"]:
+        reasons.append(f"LatestDeliveryError={verdict['latest_delivery_error']}")
+    if verdict["age_hours"] is None:
+        reasons.append("no LatestDeliveryTime on the trail")
+    elif verdict["age_hours"] > CLOUDTRAIL_DELIVERY_MAX_AGE_HOURS:
+        reasons.append(f"last delivery {verdict['age_hours']}h ago (> {CLOUDTRAIL_DELIVERY_MAX_AGE_HOURS}h)")
+    verdict["stale"] = bool(reasons)
+    verdict["reason"] = "; ".join(reasons) or "delivering"
+    return verdict
 
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
