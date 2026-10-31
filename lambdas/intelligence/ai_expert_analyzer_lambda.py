@@ -563,6 +563,7 @@ def gather_data_for_expert(expert_key):
             "expert_key": "sleep",
             "period": _frame.period,
             "nights_tracked": len(whoop_items),
+            "averages_since": d30,  # #5458: the avg_* window, named in the prompt (`_ag.averages_window_block`)
             "avg_sleep_hours": avg(sleep_hours),
             "avg_sleep_score": avg(score_vals),
             "avg_recovery": avg(recovery_vals),
@@ -643,8 +644,9 @@ training load from Hevy first, then note the confirmed-empty aerobic/NEAT pictur
     # block it frames — this module is at its #1665 ceiling and the two belong together.
     labs_context = labs_facts.labs_prompt_block(data) if expert_key == "labs" else ""
 
-    # #1894: forbid day-labelling a stale weigh-in (silent when fresh); #5458: a DXA figure is cited with its scan date.
-    weight_context = weight_recency.physical_prompt_blocks(data) if expert_key == "physical" else ""
+    # #1894: forbid day-labelling a stale weigh-in (silent when fresh); #5458: a DXA figure is cited with its scan date,
+    # and an avg_* figure with its window (`_ag.averages_window_block`, silent without `averages_since`).
+    weight_context = (weight_recency.physical_prompt_blocks(data) if expert_key == "physical" else "") + _ag.averages_window_block(data)
 
     # Build intelligence preamble (goals, data inventory, data maturity, first-person voice)
     preamble_block = ""
@@ -846,6 +848,7 @@ try:
         build_synthesis_prompt,
         gate_json_record as _integrator_gate_json_record,
         rollup_facts_block,  # #5458
+        served_week_figures,  # #5458: a rollup figure tied to a named week its note states
     )
 except ImportError:  # pragma: no cover — flat-staged runtime layout
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
@@ -855,6 +858,7 @@ except ImportError:  # pragma: no cover — flat-staged runtime layout
             build_synthesis_prompt,
             gate_json_record as _integrator_gate_json_record,
             rollup_facts_block,  # #5458
+            served_week_figures,
         )
 
 
@@ -1071,6 +1075,7 @@ def _gate_prose(
                 generation_date_iso=gen_date_iso,
                 start_date_iso=EXPERIMENT_START,
                 nightly_vitals=_night_map(facts),  # #1968: the unlabeled "7.5-hour sleep"
+                named_week_values=served_week_figures(prompt) if week_window else None,  # #5458
                 available_logs=available_logs,  # #2056/#1699
                 known_absence_days=absence,  # #2756: narrated absence spans vs measured
             )

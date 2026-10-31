@@ -33,6 +33,9 @@ chokepoint (#2972's shape, pointed at the producer #2972 didn't reach).
 """
 
 import logging
+import re
+
+from common.pacific_time import parse_day_key
 
 from intelligence import labelled_facts as _lf  # #4580 A-X1: the reader-surface (cycle/attempt/reset) findings
 
@@ -124,6 +127,62 @@ ROLLUP_FIGURE_GUIDANCE = (
     "- Quote figures exactly as the notes and facts give them. Never round one to a round number, never compute a new "
     "one (a difference, a total, a change in points), and refer to the start by its date, never by a day number."
 )
+
+
+# #5458 (2026-10-31 run): the arc held on "HRV climbed to 69.9 ms in Week 6", which IS Week 6's note. A rollup's
+# figure tied to a named week passes the night-scope gate when that week's note states it (`ai.night_scope.
+# _served_week_figure`). The figures are read back out of the prompt the model was given, so the set is exactly what
+# was served. Each week block opens "[<label>] tone=" (the arc and month generators) and the block list ends where
+# both templates continue "Write in first person as".
+_WEEK_HEADER = re.compile(r"^\[(?P<label>[^\]\n]+)\] tone=", re.MULTILINE)
+_WEEKS_END = "\n\nWrite in first person as"
+_PRESENCE_MONDAY = re.compile(r"BEHAVIORAL PRESENCE \((\d{4}-\d{2}-\d{2})\.\.")
+_DATE_OR_WEEK = re.compile(r"\d{4}-\d{2}-\d{2}|\b(?:\d{4}-)?W\d{1,2}\b|\bweek\s+\d{1,2}\b", re.IGNORECASE)
+_NOTE_FIGURE = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
+# A note also quotes OTHER weeks: "up from the 33.9 ms low point in W37", "from last week's 37.2 ms", "above your W40
+# recovery baseline of 49.6 ms", "well above the concerning 33.9 ms low point". A figure with a comparison origin
+# before it, an earlier-time word after it, or any week reference this close is not the week's own. "dropped to 33.9 ms
+# from last week's 37.2" keeps the 33.9: "from"/"last" AFTER a figure name what it moved from, not what it is.
+_NOT_THIS_WEEKS_BEFORE = re.compile(r"\b(?:from|than|above|below|versus|vs|compared|last|previous|prior|earlier)\b", re.IGNORECASE)
+_NOT_THIS_WEEKS_AFTER = re.compile(r"\b(?:earlier|previous|prior|ago)\b", re.IGNORECASE)
+# Before: "your W40 recovery baseline of " is 30 characters. After: " ms low point in W37" is 20, and a wider window
+# reaches the next clause ("49.3 ms, consistent with your W40 baseline" is Week 7's own 49.3).
+_BEFORE_CHARS, _AFTER_CHARS = 32, 20
+
+
+def _own_figures(note):
+    """The figures a week note states as that week's own, cross-references to other weeks dropped."""
+    blank = _DATE_OR_WEEK.sub(lambda m: " " * len(m.group(0)), note)
+    out = set()
+    for m in _NOTE_FIGURE.finditer(blank):
+        before, after = note[max(0, m.start() - _BEFORE_CHARS) : m.start()], note[m.end() : m.end() + _AFTER_CHARS]
+        if _NOT_THIS_WEEKS_BEFORE.search(before) or _NOT_THIS_WEEKS_AFTER.search(after) or _DATE_OR_WEEK.search(before + " " + after):
+            continue
+        out.add(float(m.group(0).replace(",", "")))
+    return out
+
+
+def served_week_figures(prompt):
+    """{week key: figures} for every week block in a rollup prompt; {} when it carries none. Keys are
+    `ai.night_scope.week_keys` of the label ("Week 5") plus the ISO week of its BEHAVIORAL PRESENCE Monday ("W40")."""
+    try:
+        from ai.night_scope import week_keys
+    except ImportError:  # pragma: no cover — flat-staged runtime layout
+        from night_scope import week_keys
+    end = prompt.find(_WEEKS_END)
+    heads = list(_WEEK_HEADER.finditer(prompt))
+    out: dict = {}
+    for i, h in enumerate(heads):
+        block = prompt[h.end() : heads[i + 1].start() if i + 1 < len(heads) else (end if end > h.start() else len(prompt))]
+        keys = set(week_keys(h.group("label")))
+        found = _PRESENCE_MONDAY.search(block)
+        monday = parse_day_key(found.group(1)) if found else None
+        if monday:
+            keys.add(("w", monday.isocalendar()[1]))
+        figures = _own_figures(block)
+        for k in keys:
+            out.setdefault(k, set()).update(figures)
+    return out
 
 
 def build_synthesis_prompt(coach_sections, goals_json, facts_block, presence_block):

@@ -79,6 +79,36 @@ def _windowed_average(sentence, pos):
     return windowed_average_at(sentence, pos)
 
 
+# #5458: a NAMED week, as the rollups write one ("in Week 5", "W40", "2026-W40"). Each form is its own key so a
+# label ("Week 5") and an ISO week ("2026-W40") resolve independently; `named_week_values` maps keys to figures.
+_NAMED_WEEK_RES = (
+    ("week", re.compile(r"\bweek\s+(\d{1,2})\b", re.IGNORECASE)),
+    ("w", re.compile(r"\b(?:\d{4}-)?W(\d{1,2})\b")),
+)
+# A week note states its averages to one decimal; a figure quoted from it matches to that rounding, no looser.
+WEEK_FIGURE_ROUNDING = 0.05
+
+
+def week_keys(text):
+    """The named-week keys in `text`: ("week", 5) for "Week 5", ("w", 40) for "W40" or "2026-W40"."""
+    return {(kind, int(m.group(1))) for kind, rx in _NAMED_WEEK_RES for m in rx.finditer(text or "")}
+
+
+def _served_week_figure(sentence, claimed, named_week_values):
+    """#5458: True when the sentence names a week whose served note states `claimed`.
+
+    The experiment arc and the month rollup read the weekly lab notes, whose every sleep / HRV
+    figure is THAT week's average. "HRV climbed to 69.9 ms in Week 6" quotes Week 6's own note,
+    so it names its window even without the word "averaged" (which is all `_windowed_average`
+    clears, #5442). The figure must equal a figure the named week's note serves: "HRV climbed to
+    71 ms in Week 6" and a figure from a week the sentence does not name stay held.
+    `named_week_values` is caller-supplied (`integrator_prompts.served_week_figures`, derived from
+    the prompt the model read); None leaves every other surface exactly as before."""
+    if not named_week_values:
+        return False
+    return any(abs(claimed - v) <= WEEK_FIGURE_ROUNDING for k in week_keys(sentence) for v in named_week_values.get(k, ()))
+
+
 NIGHT_OF_OFFSET_DAYS = 1
 
 
@@ -212,7 +242,7 @@ def _night_named_in(sentence: str, generation_date_iso=None):
     return None, None
 
 
-def night_scoped_vitals_findings(text: str, *, nightly_vitals, generation_date_iso: str = None) -> list:
+def night_scoped_vitals_findings(text: str, *, nightly_vitals, generation_date_iso: str = None, named_week_values=None) -> list:
     """Deterministic night-scope check for narrative vitals figures (#1968).
 
     Two finding classes, both zero-AI:
@@ -238,6 +268,10 @@ def night_scoped_vitals_findings(text: str, *, nightly_vitals, generation_date_i
     does not adjudicate whether a date is legitimate (``fabricated_dates`` does), and
     silently flagging every night outside the caller's window would punish correct
     history. Unknown means unknown (ADR-104).
+
+    ``named_week_values`` (#5458, rollups only): ``{week_key: figures}`` from the week notes the
+    prompt served. An unlabeled figure the sentence ties to a named week whose note states it is
+    that week's average, not a night's reading (``_served_week_figure``).
     """
     if nightly_vitals is None:
         return []
@@ -266,7 +300,12 @@ def night_scoped_vitals_findings(text: str, *, nightly_vitals, generation_date_i
                 snippet = sent if len(sent) <= 140 else sent[:137].rstrip() + "…"
                 if night is None:
                     key = ("unlabeled", metric, claimed)
-                    if key in seen or _ANY_TEMPORAL_TOKEN_RE.search(sent) or _windowed_average(sent, m.start("n")):
+                    if (
+                        key in seen
+                        or _ANY_TEMPORAL_TOKEN_RE.search(sent)
+                        or _windowed_average(sent, m.start("n"))
+                        or _served_week_figure(sent, claimed, named_week_values)
+                    ):
                         break
                     seen.add(key)
                     findings.append(

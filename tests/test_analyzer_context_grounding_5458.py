@@ -160,10 +160,10 @@ class TestPhysicalLeanMassIsLabelledAndDated:
         assert az.generate_and_cache("physical"), "the dated DXA citation was held"
         assert m.calls == 1, "a grounded draft must not be regenerated"
 
-        bare = f"Your lean mass of {LEAN:g} lb is a strong base to protect."
+        bare = f"You are carrying {LEAN:g} lb into this week."
         m = model(bare, bare)
         table.items.pop((az.CACHE_PK, "EXPERT#physical"), None)
-        assert az.generate_and_cache("physical") == "", "an undated pound figure must still hold (gate not weakened)"
+        assert az.generate_and_cache("physical") == "", "an undated, unlabelled pound figure must still hold (gate not weakened)"
         assert (az.CACHE_PK, "EXPERT#physical") not in table.items
 
     def test_an_undated_scan_asks_for_no_pound_figure_at_all(self, table):
@@ -276,7 +276,7 @@ class TestRollupsCarryTheCycleStart:
     def test_the_held_shapes_that_are_the_models_own_still_hold(self, model):
         residuals = (
             "He started at 341.1 lb.",  # an invented start: allow-list + stale baseline
-            "In Week 2 his HRV sat at 33.9 ms.",  # a weekly figure stated as a reading, no average named
+            "In Week 2 his HRV sat at 33.9 ms.",  # Week 2's note cites 33.9 only as the low it rose FROM, not its own
             "Training ran to nearly 900 minutes.",  # a rounded figure no note carries
         )
         published = []
@@ -306,7 +306,9 @@ class TestRollupsCarryTheCycleStart:
 # while the rollup prompt asks for "averaged … in Week <N>". The rewrite now offers both on a
 # surface whose prompt carries that guidance, and only there.
 
-BARE_WEEK = "In Week 2 your HRV climbed to 49.6 ms, the best stretch of the arc."
+# 2026-10-31 (#5458): a figure tied to a NAMED week whose note states it now passes on its own
+# (`TestRollupWeekNamedServedFigure`), so the bare draft that needs the rewrite names no week.
+BARE_WEEK = "Your HRV climbed to 49.6 ms, the best stretch of the arc."
 NIGHTS_FORM = '"averaged <value> ms over the last <N> nights"'
 WEEK_FORM_RE = re.compile(r'"(averaged <value> ms in Week <N>)"')
 
@@ -448,3 +450,181 @@ def test_frozen_clock_is_inside_the_cycle():
     """These fixtures assume an in-experiment generation date (Day 22): a pre-start clock would
     change which findings arm. Derived, never a literal."""
     assert FROZEN_NOW.date() > GENESIS_D
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# the 2026-10-31 run (request dd1af562, after #5467 and #5481 were deployed)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# physical held AGAIN on "cites 170.6 lb as his weight": the label and the date rider reached the
+# prompt, and the model still wrote the lean mass undated. The extractor read a figure LABELLED lean
+# mass as a bodyweight claim (`operational.lean_mass_claims`). experiment_arc held on figures that ARE
+# the named week's note ("HRV climbed to 69.9 ms in Week 6"). sleep held on "your 8.2-hour average",
+# the context's own average, because the context never named the window it averages over.
+
+
+class TestPhysicalLeanMassIsNotHisWeight:
+    def test_the_live_held_shape_publishes_and_the_controls_hold(self, table, model, monkeypatch):
+        """End to end through `generate_and_cache("physical")` over the real physical context. A
+        lean-labelled served figure publishes in each written form; an unlabelled pound figure and a
+        lean figure the context never served both hold. One test, every offender reported."""
+        _seed_physical(table)
+        _canon(monkeypatch, latest_weight=WEIGH_IN)
+        publish = (
+            f"Your lean mass of {LEAN:g} lb is a strong base to protect.",  # the 10-28 reproduction of the held line
+            f"The scan put {LEAN:g} lb of lean mass on your frame, a base worth protecting.",
+            f"You carry {LEAN:g} lb lean, and that base is what the deficit has to spare.",
+        )
+        hold = (
+            f"You are carrying {LEAN:g} lb into this week.",  # unlabelled: still his weight
+            "Your lean mass of 181.2 lb is a strong base to protect.",  # labelled, but never served
+        )
+        sk = (az.CACHE_PK, "EXPERT#physical")
+        offenders = []
+        for text, want in [(t, True) for t in publish] + [(t, False) for t in hold]:
+            table.items.pop(sk, None)
+            model(text, text)
+            if bool(az.generate_and_cache("physical")) is not want:
+                offenders.append(f"{'held' if want else 'published'}: {text}")
+        assert offenders == [], offenders
+
+    def test_the_nightly_qa_reads_the_label_the_same_way(self):
+        """One extractor (`weights_cited_in`) serves the generation gate and the nightly cross-surface
+        QA, so a published lean-mass sentence cannot red the QA the gate let through."""
+        from operational.weight_truth_qa import weights_cited_in
+
+        assert weights_cited_in(f"Your lean mass of {LEAN:g} lb is a base. You weigh {WEIGH_IN:g} lb.") == [WEIGH_IN]
+        assert weights_cited_in("You look lean at 280 lb.") == [280.0]
+
+
+# Excerpts of the real WEEK# notes the 10-31 arc read (field_notes `ai_present`, same keys), under
+# their live labels. Each also quotes OTHER weeks, the way the real notes do.
+LIVE_WEEKS = (
+    ("Week 2", "Sleep stayed at 7 nights averaging 7.4 hours per night, but your HRV dropped to 33.9 ms from last week's 37.2 ms."),
+    (
+        "Week 3",
+        "Sleep stayed strong at 7 nights averaging 7.5 hours, and your HRV rebounded to 43.4 ms, up from the concerning 33.9 ms dip in W37.",
+    ),
+    (
+        "Week 5",
+        "You logged 7 nights averaging 8.6 hours per night, and your HRV rebounded to 49.6 ms, an improvement from the 33.9 ms low point in W37.",
+    ),
+    ("Week 6", "Your sleep stayed excellent, averaging 7.6 hours per night. Your HRV climbed to 69.9 ms, your highest reading yet."),
+    ("Week 8", "Your HRV dipped to 57.0 ms, a decline from last week's 69.9 ms peak but above your W40 recovery baseline of 49.6 ms."),
+)
+
+
+def _seed_live_weeks(table):
+    pk = az.USER_PREFIX + "field_notes"
+    iso = {}
+    for label, present in LIVE_WEEKS:
+        n = int(label.split()[1])
+        y, w, _ = (GENESIS_D + timedelta(days=7 * (n - 1))).isocalendar()
+        iso[label] = w
+        table.add_raw(pk, f"WEEK#{y}-W{w:02d}", week=f"{y}-W{w:02d}", week_label=label, ai_tone="mixed", ai_present=present)
+    return iso
+
+
+class TestRollupWeekNamedServedFigure:
+    @pytest.fixture(autouse=True)
+    def _env(self, table, monkeypatch):
+        self.iso = _seed_live_weeks(table)
+        _canon(monkeypatch, latest_weight=LATEST, recovery_pct=55.0)
+        self.table = table
+
+    def test_each_weeks_own_figures_are_read_back_from_the_real_prompt(self, model):
+        from intelligence.integrator_prompts import served_week_figures
+
+        m = model(_arc("Showing up held."))
+        az.generate_experiment_arc()
+        figs = served_week_figures(m.prompts[0])
+        own = {("week", 2): 33.9, ("week", 3): 43.4, ("week", 5): 49.6, ("week", 6): 69.9, ("week", 8): 57.0}
+        quoted = {("week", 2): 37.2, ("week", 3): 33.9, ("week", 5): 33.9, ("week", 8): 49.6}
+        offenders = [f"{k} lacks its own {v}" for k, v in own.items() if v not in figs.get(k, ())]
+        offenders += [f"{k} claims another week's {v}" for k, v in quoted.items() if v in figs.get(k, ())]
+        if 69.9 not in figs.get(("w", self.iso["Week 6"]), ()):
+            offenders.append(f"W{self.iso['Week 6']} (Week 6's ISO week) is not keyed")
+        assert offenders == [], offenders
+
+    def test_the_live_week_named_figures_publish_and_misattributions_hold(self, model):
+        """The 10-31 residuals, through `generate_experiment_arc` and the real gate. A figure tied to a
+        named week whose note states it publishes; a figure from a week the sentence does not name, a
+        week-less figure and a figure no note serves all still hold."""
+        w40 = self.iso["Week 5"]
+        publish = (
+            "By Week 2 he had overcorrected hard and HRV dropped to 33.9 ms in Week 2.",
+            "Sleep climbed to 7.5 hours per night, HRV recovered to 43.4 ms in Week 3.",
+            "In Week 5 his HRV climbed to 49.6 ms, the first sign the reset was working.",
+            "HRV climbed to 69.9 ms in Week 6, his best reading yet.",
+            "Week 8 was the plateau: HRV dipped to 57.0 ms.",
+            f"In W{w40} his HRV climbed to 49.6 ms.",
+        )
+        hold = (
+            "Week 5 showed the nervous system bottoming out (33.9 ms HRV).",  # Week 5's note quotes W37's low
+            "In Week 8 HRV sat at 49.6 ms.",  # Week 8's note quotes W40's baseline
+            "HRV climbed to 57.0 ms in Week 6.",  # a served figure, but Week 8's
+            "HRV crashed to 33.9 ms in the first three weeks.",  # no week named
+            "Training ran to 1000 minutes in Week 2.",  # the live allow-list hold: no note serves 1000
+        )
+        sk = (az.CACHE_PK, "EXPERT#experiment_arc")
+        offenders = []
+        for text, want in [(t, True) for t in publish] + [(t, False) for t in hold]:
+            self.table.items.pop(sk, None)
+            model(_arc(text), _arc(text))
+            az.generate_experiment_arc()
+            if (self.table.items.pop(sk, None) is not None) is not want:
+                offenders.append(f"{'held' if want else 'published'}: {text}")
+        assert offenders == [], offenders
+
+    def test_the_month_rollup_gets_the_same_reading(self, model):
+        sk = (az.CACHE_PK, "EXPERT#integrator_month")
+        model(_month("HRV climbed to 69.9 ms in Week 6, then dipped to 57.0 ms in Week 8."))
+        az.generate_month_rollup()
+        assert self.table.items.pop(sk, None) is not None, "the month's week-named served figures were held"
+        text = "HRV climbed to 57.0 ms in Week 6."
+        model(_month(text), _month(text))
+        az.generate_month_rollup()
+        assert sk not in self.table.items, "a figure put on the wrong week published"
+
+    def test_a_per_night_expert_never_gets_the_week_reading(self, model):
+        """The week figures come only from a prompt carrying the rollup guidance; the sleep expert's
+        "in Week 5" is not a window."""
+        text = "Your HRV climbed to 49.6 ms in Week 5."
+        model(text, text)
+        assert az.generate_and_cache("sleep") == ""
+
+
+SLEEP_HOURS = (8.0, 8.4, 8.1, 8.3)  # mean 8.2, the 10-31 held figure
+
+
+def _seed_sleep(table):
+    for n, h in enumerate(SLEEP_HOURS):
+        table.add("whoop", _days_ago(n + 1), sleep_duration_hours=Decimal(str(h)), recovery_score=Decimal("58"), hrv=Decimal("57.6"))
+
+
+class TestSleepAveragesNameTheirWindow:
+    def test_the_context_names_the_window_its_averages_cover(self, table):
+        _seed_sleep(table)
+        data = az.gather_data_for_expert("sleep")
+        assert data["avg_sleep_hours"] == round(sum(SLEEP_HOURS) / len(SLEEP_HOURS), 1)
+        # the 30-day lookback, clamped to genesis on the suite's day 22 (the same `d30` the rows are queried from)
+        assert data["averages_since"] == GENESIS
+        assert f"is an average over the nights since {_prose(GENESIS_D)}" in az.build_prompt("sleep", data)
+
+    def test_the_prescribed_window_publishes_and_the_live_bare_average_still_holds(self, table, model, monkeypatch):
+        """The window form is lifted from the prompt, so the rider and the gate cannot drift. The live
+        held sentence (no window) still holds: the gate is unchanged, the context was the gap."""
+        _seed_sleep(table)
+        _canon(monkeypatch, recovery_pct=58.0)
+        prompt = az.build_prompt("sleep", az.gather_data_for_expert("sleep"))
+        form = re.search(r'\("(averaged <value> hours since [A-Z][a-z]+ \d+)"', prompt).group(1).replace("<value>", "8.2")
+        sk = (az.CACHE_PK, "EXPERT#sleep")
+
+        m = model(f"Your sleep {form}, and the deep-sleep share is where the gap sits.")
+        assert az.generate_and_cache("sleep"), "the windowed average was held"
+        assert m.calls == 1, "a grounded draft must not be regenerated"
+
+        bare = "The gap between your 8.2-hour average and your deep-sleep yield points to a familiar cascade."
+        table.items.pop(sk, None)
+        model(bare, bare)
+        assert az.generate_and_cache("sleep") == "", "an average with no window must still hold (gate not weakened)"

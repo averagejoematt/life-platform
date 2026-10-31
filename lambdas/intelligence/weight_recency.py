@@ -252,9 +252,9 @@ def dexa_facts(dexa, today_date, genesis=None):
 def dexa_prompt_block(data, genesis=None):
     """The prompt rider for a DXA in the physical context; "" when there is no scan.
 
-    Tells the model the one citation form the weight check accepts: the scan's date
-    in the same sentence as the figure. Nothing here relaxes the check; an undated
-    pound figure is still held.
+    Asks for the scan's date in the same sentence as the figure (ADR-104 provenance). The
+    weight check also skips a figure labelled lean mass beside it (`operational.lean_mass_claims`,
+    #5458); an undated, unlabelled pound figure is still held.
     """
     if not data.get("dexa_scan_date"):
         return ""
@@ -277,8 +277,8 @@ DXA FIGURES ARE ONE DATED SCAN — READ BEFORE CITING ANY:
 body_fat_pct, lean_mass_lb and visceral_fat_lb come from a single DXA scan on {when}{before}.
 lean_mass_lb is fat-free mass, NOT his body weight; his weight is current_weight_lb. Any
 sentence that cites a DXA figure, or compares one with the lean mass floor, names the scan
-date in that same sentence ({example}). A pound figure with no date beside it reads as his
-weight today and is refused.
+date in that same sentence ({example}). A pound figure with neither a date nor "lean mass"
+beside it reads as his weight today and is refused.
 """
 
 
