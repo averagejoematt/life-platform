@@ -175,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # MANDATORY (#1908 / #973). check_doc_index.py's engine-doc drift gate reads
           # per-file `git log -1 --format=%cs` dates. On a shallow clone every file
@@ -186,7 +186,7 @@ jobs:
           # the gate's only home, a shallow checkout would silently disable it outright.
           fetch-depth: 0
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
 
