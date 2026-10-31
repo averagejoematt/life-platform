@@ -74,6 +74,8 @@ def _registry():
 # replacement, `review`, is NOT added here — it ships with a contract test.
 # 2026-10-23 (#5055): daily-debrief retired — tests/test_draft_custom_departure_reason_5055.py
 # now pins its draft-by-default text. The ceiling drops with it (10 -> 9).
+# 2026-10-31 (#1658): speak-to-coaches now has a contract test (it names the prompt path, which is
+# what has_contract_test requires); row pruned, ceiling 9 -> 8.
 NO_CONTRACT_TEST: dict[str, str] = {
     "cost-diligence": "2026-08-27",
     "design-implement": "2026-08-27",
@@ -81,11 +83,10 @@ NO_CONTRACT_TEST: dict[str, str] = {
     "frontier-plan": "2026-08-27",
     "interview": "2026-08-27",
     "open-checkin": "2026-08-27",
-    "speak-to-coaches": "2026-08-27",
     "team-meeting": "2026-08-27",
     "uplevel": "2026-08-27",
 }
-RATCHET_CEILING = 9
+RATCHET_CEILING = 8
 
 MIN_DESCRIPTION = 80
 

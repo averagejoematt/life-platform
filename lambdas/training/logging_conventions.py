@@ -73,6 +73,8 @@ from common.hevy_schema import STEP_COUNT_HEVY_TYPES, loaded_distance_shape  # n
 from common.pacific_time import shift_day_key
 from common.repo_config import config_path
 
+from training.hevy_note_grammar import CARRY_STEPS_LINE
+
 logger = logging.getLogger("logging_conventions")
 
 DISTANCE_UNIT_FIELD = "distance_unit_convention"
@@ -113,8 +115,9 @@ CONVENTIONS_LINE = (
 )
 """The one line the coach-session skill and the coach context state (#5373 box 4)."""
 
-ROUTINE_NOTE_RULE = "count steps, type the count in yards"
-"""The owner's own rule, written back into the carry block's Hevy note (#5373 box 5)."""
+ROUTINE_NOTE_RULE = CARRY_STEPS_LINE
+"""The owner's own rule, written back into the carry block's Hevy note (#5373 box 5). Not restated here: the live wording is
+`hevy_note_grammar.CARRY_STEPS_LINE` (#5428), so the two cannot drift."""
 
 CARRY_STEPS_LINE = "Steps go in the yards box."
 """#5428 (HEVY_NOTE_STANDARD §3.5): the same rule as the carry note's own line, in the standard's voice."""
