@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
@@ -74,6 +75,10 @@ def fetch_range(source, start, end):
     withings. All truncate to the cycle's age post-reset. Derived per source (#2092's
     shape); see `experiment.phase_filter.source_reads_cross_phase`.
     """
+    _w = intake_window(source, start, end)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start, end = _w
     try:
         r = table.query(
             **with_phase_filter(

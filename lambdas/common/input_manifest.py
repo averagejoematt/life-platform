@@ -90,6 +90,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, Iterable, Optional, Tuple
 
+from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import PACIFIC, pacific_now, pacific_today
 
 # ── Per-source verdicts ───────────────────────────────────────────────────────
@@ -327,10 +328,8 @@ def latest_source_day(table: Any, source: str, *, user_id: str) -> Optional[str]
     Raises whatever the table raises; ``build_input_manifest`` turns a read
     failure into ``unknown``.
     """
-    from boto3.dynamodb.conditions import Key
-
     resp = table.query(
-        KeyConditionExpression=Key("pk").eq(f"USER#{user_id}#SOURCE#{source}") & Key("sk").begins_with("DATE#"),
+        KeyConditionExpression=latest_day_condition(f"USER#{user_id}#SOURCE#{source}", source),  # #5431: intake bounded at today
         ScanIndexForward=False,
         Limit=1,
         ProjectionExpression="sk",

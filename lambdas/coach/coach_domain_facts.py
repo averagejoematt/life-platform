@@ -48,6 +48,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Optional
 
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
@@ -70,6 +71,10 @@ def _num(v) -> Optional[float]:
 
 
 def _query_source(table, source: str, start: str, end: str) -> list:
+    _w = intake_window(source, start, end)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start, end = _w
     resp = table.query(
         KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
         ExpressionAttributeValues={

@@ -51,6 +51,7 @@ import boto3
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's floor, never the profile row
 from common.habit_registry import habit_tier  # #5232
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import pacific_clock_label, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import (
@@ -152,6 +153,10 @@ def fetch_range(source, start, end):
     experiment-metric source is unclassified and keeps the filter. See the block
     comment on `experiment.phase_filter.source_reads_cross_phase`.
     """
+    _w = intake_window(source, start, end)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start, end = _w
     try:
         records = []
         cross_phase = source_reads_cross_phase(source)
