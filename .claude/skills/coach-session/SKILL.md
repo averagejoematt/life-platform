@@ -51,9 +51,13 @@ Every planning conversation runs in this order (`lambdas/training/coach_context.
      data tool.** It carries the plan inputs AND `coach_context`: the charter, the panel
      synthesis, the clinical guidance and the May tracker together. That one call is the
      pre-flight for those three members (`coach_context.PRE_FLIGHT`).
-   - `get_exercise_history` for the lifts in play, scoped by Hevy `template_id`, never by name
-     (name matching is substring-based and merges movements).
-   - `get_exercise_notes` (action `read`): his notes say why a number happened.
+   - The packet's `lift_history` (#5501) IS the exercise pre-flight for the day's programmed lifts:
+     each lift's newest performed sessions (top set, working sets, his note) and its latest note +
+     pain flag, read through `get_exercise_history` and `get_exercise_notes` by Hevy `template_id`.
+     A packet that carried it satisfies the `exercise_history` and `exercise_notes` members.
+   - Call `get_exercise_history` (by `template_id`, never by name — name matching is substring-based
+     and merges movements) or `get_exercise_notes` (action `read`) yourself only for a lift the
+     packet does not carry (a departure he states, a swap), or one whose read there failed.
 2. **`plan_next_session`** (stage 1, no routine id): the deterministic constraint block. The
    packet is the INPUTS; the plan is this call. Never plan from the packet alone.
 3. **`manage_hevy_routine` action `draft`** is the default: the engine authors the session and

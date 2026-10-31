@@ -22,6 +22,19 @@ Three measures per conversation:
     path). Whether the chat then QUOTED the frame is in the owner's words, which are not logged and
     not kept here.
 
+THE PACKET'S lift_history (#5501, option (a)). Since #5501 `get_coach_session_packet` carries per-lift history for
+the day's programmed lifts, and `coach_context.PRE_FLIGHT` lets a packet call that CARRIED it satisfy the
+exercise_history and exercise_notes members (`coach_context.call_tokens`). An order violation is therefore a planning
+call reached before {get_exercise_history OR a packet call carrying lift_history} and {get_exercise_notes OR the same}.
+A fixture records that on the packet call itself — ``{"tool": "get_coach_session_packet", "lift_history": "measured"}``
+— read off the packet's own ``[#5501] coach packet lift_history state=<state>`` log line in the same request. A packet
+call with no such field (every fixture captured before #5501 deployed) is scored exactly as before: it never claimed
+the history.
+
+PROJECTION (``--project-lift-history``): the real AFTER conversations re-scored as if each packet call had carried
+lift_history (state measured) — labelled ``after (projected #5501)``, never a real conversation. It is what option (a)
+does to the same call sequences; the live proof is the first real conversation captured after the deploy.
+
 FALLBACK (``--synthesized``): the earlier AFTER, kept and labelled as such — each BEFORE conversation
 re-ordered to the contract by `to_contract`. It is what the contract asks for, not what happened.
 
@@ -29,6 +42,7 @@ re-ordered to the contract by `to_contract`. It is what the contract asks for, n
     python3 scripts/coach_transcript_eval_5071.py --markdown    # the same table as markdown
     python3 scripts/coach_transcript_eval_5071.py --json        # machine-readable
     python3 scripts/coach_transcript_eval_5071.py --synthesized # the to_contract fallback
+    python3 scripts/coach_transcript_eval_5071.py --markdown --project-lift-history  # + the #5501 projection rows
 """
 
 from __future__ import annotations
@@ -55,12 +69,12 @@ def _tool(c: Any) -> str:
 
 
 def to_contract(calls: list[Any]) -> list[Any]:
-    """The same conversation in the contract's order: each pre-flight tool it never called, or called
-    only after the first planning call, is called (once) before that call. Nothing else moves."""
+    """The same conversation in the contract's order: for each pre-flight member it never reached, or reached
+    only after the first planning call, that member's first tool is called (once) before that call. Nothing else moves."""
     first = next((i for i, c in enumerate(calls) if coach_context.stage_of(c) is not None), len(calls))
-    before = {_tool(c) for c in calls[:first]}
-    tools = list(dict.fromkeys(t for ts in coach_context.PRE_FLIGHT.values() for t in ts))
-    missing = [{"tool": t, "synthesized": "pre-flight, per the contract"} for t in tools if t not in before]
+    before = set().union(*(coach_context.call_tokens(c) for c in calls[:first]))
+    tools = [ts[0] for ts in coach_context.PRE_FLIGHT.values() if not before.intersection(ts)]
+    missing = [{"tool": t, "synthesized": "pre-flight, per the contract"} for t in dict.fromkeys(tools)]
     return calls[:first] + missing + calls[first:]
 
 
@@ -101,7 +115,7 @@ def context_sources(calls: list[Any], contract_live: bool = True) -> list[str]:
     """The `coach_context.PRE_FLIGHT` members reached before the first planning call (plan, draft or commit). Before
     the deploy (``contract_live=False``) a packet call reached none of `PACKET_MEMBERS`: the field did not exist."""
     first = next((i for i, c in enumerate(calls) if coach_context.stage_of(c) not in (None, "stage_2")), len(calls))
-    seen = {_tool(c) for c in calls[:first]}
+    seen = set().union(*(coach_context.call_tokens(c) for c in calls[:first]))
     reached = [m for m, tools in coach_context.PRE_FLIGHT.items() if seen.intersection(tools)]
     return reached if contract_live else [m for m in reached if m not in PACKET_MEMBERS]
 
@@ -137,9 +151,26 @@ def _row(fx: dict[str, Any], phase: str) -> dict[str, Any]:
     }
 
 
-def evaluate_real(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The before/after rows over real conversations only — no synthesized call anywhere."""
-    return [_row(fx, "before") for fx in join_continuations(before)] + [_row(fx, "after") for fx in join_continuations(after)]
+PROJECTED = "after (projected #5501)"
+
+
+def project_lift_history(fx: dict[str, Any]) -> dict[str, Any]:
+    """PROJECTION, not a conversation: the same calls, each packet call marked as having carried lift_history."""
+    calls = [
+        dict(c, lift_history="measured") if isinstance(c, dict) and c.get("tool") == "get_coach_session_packet" else c
+        for c in fx["tool_calls"]
+    ]
+    return dict(fx, tool_calls=calls)
+
+
+def evaluate_real(before: list[dict[str, Any]], after: list[dict[str, Any]], projected: bool = False) -> list[dict[str, Any]]:
+    """The before/after rows over real conversations only — no synthesized call anywhere. ``projected`` appends the
+    #5501 projection rows (`project_lift_history` over the AFTER set), each labelled as a projection."""
+    joined = join_continuations(after)
+    rows = [_row(fx, "before") for fx in join_continuations(before)] + [_row(fx, "after") for fx in joined]
+    if projected:
+        rows += [_row(project_lift_history(fx), PROJECTED) for fx in joined]
+    return rows
 
 
 def evaluate(fixtures: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -166,7 +197,7 @@ def _violation_text(v: list[dict[str, Any]]) -> str:
 def summarize(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     n_members = len(coach_context.PRE_FLIGHT)
-    for phase in ("before", "after"):
+    for phase in dict.fromkeys(r["phase"] for r in rows):
         rs = [r for r in rows if r["phase"] == phase]
         out[phase] = {
             "conversations": len(rs),
@@ -199,8 +230,7 @@ def markdown(rows: list[dict[str, Any]]) -> str:
     lines.append("")
     lines.append("| phase | conversations | with a violation | context sources reached | packet before planning | May frame on payload |")
     lines.append("|---|---|---|---|---|---|")
-    for phase in ("before", "after"):
-        p = s[phase]
+    for phase, p in s.items():
         lines.append(
             f"| {phase} | {p['conversations']} | {p['with_violations']} | {p['context_sources_reached']} | "
             f"{p['packet_first']}/{p['conversations']} | {p['may_frame_on_payload']}/{p['conversations']} |"
@@ -213,6 +243,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--markdown", action="store_true")
     ap.add_argument("--synthesized", action="store_true", help="FALLBACK: the to_contract re-ordering, not a real AFTER")
+    ap.add_argument(
+        "--project-lift-history", action="store_true", help="#5501: + the AFTER set re-scored as if the packet carried lift_history"
+    )
     args = ap.parse_args(argv)
     if args.synthesized:
         rows = evaluate(load_fixtures())
@@ -225,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
             for label in ("before", "after"):
                 print(f"  {label:6s} {len(r[label])} violation(s): {_violation_text(r[label])}")
         return 0
-    rows = evaluate_real(load_fixtures(), load_fixtures(AFTER_DIR))
+    rows = evaluate_real(load_fixtures(), load_fixtures(AFTER_DIR), projected=args.project_lift_history)
     if args.json:
         print(json.dumps({"rows": rows, "summary": summarize(rows)}, indent=2))
     elif args.markdown:
