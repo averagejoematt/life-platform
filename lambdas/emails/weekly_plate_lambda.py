@@ -35,7 +35,10 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
-from health import eating_window  # #5099: THE eating window (charter nutrition.eating_window, via public_view)
+from health import (
+    eating_window,  # #5099: THE eating window (charter nutrition.eating_window, via public_view)
+    weekly_menu_feed,  # #5103 box 4: the code-built menu ahead, printed by code and written around
+)
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 
 _logger_std = logging.getLogger()
@@ -443,6 +446,8 @@ Targets: {calorie_target} cal/day, {protein_target_g}g protein, eating window {e
 Shops at: Metropolitan Market in Seattle (premium grocer — think quality proteins, good produce, specialty items).
 Cooking style: Mexican, Asian, simple protein+sides. Weeknight meals under 30 min.
 
+{menu_note}
+
 ## YOUR VOICE
 Warm, fun, conversational — like a food magazine column written just for him. Partner (his wife) should enjoy reading this too, even though the macros are his. Not clinical. Not preachy. Occasionally playful. You genuinely love food and it shows.
 
@@ -524,6 +529,8 @@ def build_user_message(data):
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
             "eating_window": eating_window.published_text(),  # #5099: the charter's window (published whitelist)
         },
+        # #5103 box 4: the code-built menu ahead — its figures are final; the writer riffs on it (PROMPT_NOTE)
+        "menu_ahead": data.get("menu_feed") or {"built": False, "reason": "the menu was not read"},
     }
     return json.dumps(payload, indent=2, default=str)
 
@@ -538,6 +545,7 @@ def build_system_prompt(profile, withings_data):
         calorie_target=cal,
         protein_target_g=pro,
         eating_window=eating_window.published_text(),  # #5099
+        menu_note=weekly_menu_feed.PROMPT_NOTE,  # #5103 box 4
     )
 
 
@@ -581,7 +589,9 @@ def call_anthropic(system_prompt, user_message):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def build_email_html(ai_content, dates, weight_info):
+def build_email_html(ai_content, dates, weight_info, menu_html=""):
+    """`menu_html` (#5103 box 4) is the code-built menu block, printed ABOVE the model's column so its figures never
+    pass through the writer; empty keeps the page exactly as before."""
     try:
         dt_end = datetime.strptime(dates["end"], "%Y-%m-%d")
         week_label = dt_end.strftime("%B %-d, %Y")
@@ -607,7 +617,7 @@ def build_email_html(ai_content, dates, weight_info):
         <div style="color:#9ca3af;font-size:13px;margin-top:4px;">Friday · {week_label}</div>
         {weight_line}
     </div>
-    {ai_content}
+    {menu_html}{ai_content}
     <div style="text-align:center;padding:16px 0;border-top:1px solid #2a2d4a;margin-top:24px;">
         <div style="color:#6b7280;font-size:11px;">The Weekly Plate · Life Platform · Friday Edition</div>
         <div style="color:#9ca3af;font-size:9px;margin-top:6px;">⚕️ Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet or supplement regimen.</div>
@@ -681,6 +691,13 @@ def lambda_handler(event, context):
     plate_history = load_plate_history(today_str)
     history_context = build_plate_history_context(plate_history)
 
+    # #5103 box 4: the code-built menu for every planned day after today (this weekend + the coming week). Read
+    # once; the same feed goes to the prompt (prose around it) and to the page (the block, by code). Never raises.
+    data["menu_feed"] = weekly_menu_feed.feed(weekly_menu_feed.menus_ahead(table=table, today=today_str))
+    logger.info(
+        f"menu ahead: built={data['menu_feed']['built']} days={len(data['menu_feed']['days'])} reason={data['menu_feed']['reason']}"
+    )
+
     user_message = build_user_message(data)
     if history_context:
         user_message = history_context + "\n\n" + user_message
@@ -731,7 +748,7 @@ def lambda_handler(event, context):
             logger.warning(f"[AI-3] Weekly Plate warnings: {_val.warnings}")
 
     weight_info = extract_weight_trend(data["withings"])
-    html = build_email_html(ai_content, dates, weight_info)
+    html = build_email_html(ai_content, dates, weight_info, weekly_menu_feed.html_block(data["menu_feed"]))
 
     # P1: Store plate summary for future anti-repeat context
     try:

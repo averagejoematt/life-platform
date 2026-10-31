@@ -48,6 +48,7 @@ from health import (  # #4244: THE food + supplements micronutrient join (shared
     nutrient_intake,
     protein_engine,
     titration,  # #5096: the weekly calorie titration decision (owner-only; this email is an owner surface)
+    weekly_menu_feed,  # #5103 box 4: the code-built menu ahead, printed by code and written around
 )
 
 _logger_std = logging.getLogger()
@@ -563,6 +564,8 @@ Write as three distinct expert voices analyzing the week's nutrition data, follo
 
 {MICRONUTRIENT_SCOPE_NOTE}
 
+{weekly_menu_feed.PROMPT_NOTE}
+
 ## UNIFIED TACTICAL SECTION
 
 ### Top 3 Nutrition Priorities This Week
@@ -662,6 +665,8 @@ Principle: "Rate of loss matters less than body composition trajectory."
 
 """
     + MICRONUTRIENT_SCOPE_NOTE
+    + "\n\n"
+    + weekly_menu_feed.PROMPT_NOTE  # #5103 box 4: both prompt paths, like the scope note (no braces: this is .format()ed)
     + """
 
 ## UNIFIED TACTICAL SECTION
@@ -727,6 +732,8 @@ def build_user_message(data):
             "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
         },
+        # #5103 box 4: the code-built menu ahead — its figures are final; the panel writes around it (PROMPT_NOTE)
+        "menu_ahead": data.get("menu_feed") or {"built": False, "reason": "the menu was not read"},
     }
     if data.get("prev_review"):
         pr = data["prev_review"]
@@ -917,7 +924,9 @@ def build_titration_html(today, read=None):
     )
 
 
-def build_email_html(summary_table, ai_content, dates, weight_info, titration_html=""):
+def build_email_html(summary_table, ai_content, dates, weight_info, titration_html="", menu_html=""):
+    """`menu_html` (#5103 box 4) is the code-built menu block, printed between the titration card and the panel's
+    column so its figures never pass through the model; empty keeps the page exactly as before."""
     try:
         dt_start = datetime.strptime(dates["this_start"], "%Y-%m-%d")
         dt_end = datetime.strptime(dates["this_end"], "%Y-%m-%d")
@@ -945,7 +954,7 @@ def build_email_html(summary_table, ai_content, dates, weight_info, titration_ht
         <div style="font-size:12px;letter-spacing:1px;color:#9ca3af;font-weight:600;margin-bottom:10px;">WEEKLY SNAPSHOT</div>
         {summary_table}
     </div>
-    {titration_html}{ai_content}
+    {titration_html}{menu_html}{ai_content}
     <div style="text-align:center;padding:16px 0;border-top:1px solid #2a2d4a;margin-top:24px;">
         <div style="color:#6b7280;font-size:11px;">Life Platform - Saturday Nutrition Review</div>
         <div style="color:#9ca3af;font-size:9px;margin-top:6px;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</div>
@@ -1091,6 +1100,12 @@ def lambda_handler(event, context):
     logged_food_items = sum(len(d.get("foods") or []) for d in days_this)
 
     summary_table = build_summary_table(days_this, profile)
+    # #5103 box 4: the code-built menu for every planned day after today (the coming week). Read once; the same
+    # feed goes to the prompt (prose around it) and to the page (the block, by code). Never raises.
+    data["menu_feed"] = weekly_menu_feed.feed(weekly_menu_feed.menus_ahead(table=table, today=pacific_now().date().isoformat()))
+    logger.info(
+        f"menu ahead: built={data['menu_feed']['built']} days={len(data['menu_feed']['days'])} reason={data['menu_feed']['reason']}"
+    )
     user_message = build_user_message(data)
     logger.info(f"Prompt size: {len(user_message)} chars")
 
@@ -1174,7 +1189,14 @@ def lambda_handler(event, context):
             logger.warning(f"[AI-3] Nutrition review warnings: {_val.warnings}")
 
     weight_info = extract_weight_trend(data["withings"])
-    html = build_email_html(summary_table, ai_content, dates, weight_info, build_titration_html(pacific_now().date().isoformat()))
+    html = build_email_html(
+        summary_table,
+        ai_content,
+        dates,
+        weight_info,
+        build_titration_html(pacific_now().date().isoformat()),
+        weekly_menu_feed.html_block(data["menu_feed"], accent="#4cc9f0"),
+    )
 
     summary = compute_weekly_summary(days_this)
     # #2221: a week of records that carry no totals (the partial-record case, and
