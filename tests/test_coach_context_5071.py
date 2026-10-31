@@ -4,9 +4,11 @@ What is held here:
   * ``training.coach_context.assemble`` — every section labelled with its source, absence stated
     (never invented), deterministic, no model import; the owner form carries the May frame and the
     published form carries no May target, no rate band and no record name;
-  * the order contract — ``order_violations`` on synthetic sequences (each code reachable) and on the
-    three REAL planning conversations in tests/fixtures/coach_transcripts_5071/ (before: the
-    violations they had; after: the contract order, none);
+  * the order contract — ``order_violations`` on synthetic sequences (each code reachable), on the
+    three REAL planning conversations held BEFORE the deploy (tests/fixtures/coach_transcripts_5071/)
+    and on the four REAL conversations held AFTER it (.../after/, two resumed after a break and joined
+    onto the conversation they continue); the earlier synthesized AFTER (``to_contract``) is kept as
+    a labelled fallback;
   * the wiring — the MCP attach helper, the critics' charter summary and its prompt, the Telegram
     training route, the physical_coach ``context_source`` pointer, the retired role-play text and
     the retired training_coach stance file.
@@ -170,9 +172,9 @@ def test_the_contract_order_has_no_violation_and_each_code_is_reachable():
     assert cc.ORDER == ("pre_flight", "plan_next_session", "manage_hevy_routine draft")
 
 
-def test_three_real_planning_conversations_before_and_after():
-    """BEFORE: each real conversation planned before its pre-flight. AFTER: the same calls in the contract's
-    order. The AFTER is the contract's shape; it is proven live only by the next real conversation."""
+def test_three_real_planning_conversations_before_and_the_synthesized_fallback():
+    """BEFORE: each real conversation planned before its pre-flight. FALLBACK AFTER: the same calls re-ordered to
+    the contract by `to_contract` — the contract's shape, not a real conversation (the real AFTER is the next test)."""
     ev = _eval_script()
     fixtures = ev.load_fixtures(str(_FIXTURES))
     assert len(fixtures) == 3
@@ -192,6 +194,67 @@ def test_three_real_planning_conversations_before_and_after():
     for fx in fixtures:  # the redaction: tool names and the action/routine flag only
         for c in fx["tool_calls"]:
             assert set(c) <= {"at", "tool", "args"} and set(c.get("args", {})) <= {"action", "routine_id"}, c
+
+
+_ALLOWED_FIXTURE_KEYS = {
+    "conversation",
+    "phase",
+    "source",
+    "window_utc",
+    "redaction",
+    "coach_context_failures_logged",
+    "coach_context_failures_basis",
+    "continues",
+    "continues_basis",
+    "tool_calls",
+}
+
+
+def test_real_after_conversations_reach_the_packet_context_but_not_exercise_history():
+    """AFTER, from the MCP log of four real planning conversations (2026-10-29..31) under the deployed contract:
+    every one called the packet before planning (the charter, the clinical guidance and the May tracker reached, and
+    the May frame on the payload), none called get_exercise_history first — the residual the table reports."""
+    ev = _eval_script()
+    after = ev.load_fixtures(str(_FIXTURES / "after"))
+    rows = ev.evaluate_real(ev.load_fixtures(str(_FIXTURES)), after)
+    got = {
+        r["conversation"]: ([(v["code"], v["missing"]) for v in r["violations"]], r["context_sources"], r["may_frame_on_payload"])
+        for r in rows
+    }
+    packet = ["clinical_guidance", "charter", "may_tracker"]
+    all5 = ["exercise_history", "exercise_notes"] + packet
+    expected = {
+        "planning-2026-09-22": ([("plan_before_preflight", all5)], [], False),
+        "planning-2026-10-09": ([("plan_before_preflight", ["exercise_history", "exercise_notes"])], [], False),
+        "planning-2026-10-18": ([("plan_before_preflight", all5)], [], False),
+        "after-2026-10-29T0020Z": ([("plan_before_preflight", ["exercise_history", "exercise_notes"])], packet, True),
+        "after-2026-10-29T0408Z": ([("plan_before_preflight", ["exercise_history"])], ["exercise_notes"] + packet, True),
+        "after-2026-10-30T2059Z": ([("plan_before_preflight", ["exercise_history", "exercise_notes"])], packet, True),
+        "after-2026-10-31T0433Z": ([("plan_before_preflight", ["exercise_history", "exercise_notes"])], packet, True),
+    }
+    assert got == expected
+    joined = {r["conversation"]: r["continued_by"] for r in rows if r["continued_by"]}
+    assert joined == {"after-2026-10-29T0408Z": ["after-2026-10-29T2243Z"], "after-2026-10-30T2059Z": ["after-2026-10-30T2213Z"]}
+    s = ev.summarize(rows)
+    assert (s["before"]["packet_first"], s["before"]["may_frame_on_payload"]) == (1, 0)
+    assert (s["after"]["packet_first"], s["after"]["may_frame_on_payload"], s["after"]["conversations"]) == (4, 4, 4)
+    for fx in after:  # the redaction: tool names, timestamps and the action/routine flag only — PUBLIC repo
+        assert set(fx) <= _ALLOWED_FIXTURE_KEYS, set(fx) - _ALLOWED_FIXTURE_KEYS
+        assert fx["phase"] == "after" and fx["window_utc"][0] >= ev.CONTRACT_DEPLOYED_UTC
+        for c in fx["tool_calls"]:
+            assert set(c) <= {"at", "tool", "args"} and set(c.get("args", {})) <= {"action", "routine_id"}, c
+            assert c.get("args", {}).get("routine_id") in (None, "<present>"), c
+
+
+def test_a_continuation_without_its_parent_is_refused_not_scored_alone():
+    ev = _eval_script()
+    orphan = {"conversation": "x", "continues": "gone", "window_utc": ["2026-10-30T00:00:00Z"] * 2, "tool_calls": []}
+    try:
+        ev.join_continuations([orphan])
+    except ValueError as e:
+        assert "gone" in str(e)
+    else:
+        raise AssertionError("an orphan continuation was scored as its own conversation")
 
 
 # ── the wiring ────────────────────────────────────────────────────────────────────────────
