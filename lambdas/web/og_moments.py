@@ -49,7 +49,12 @@ MOMENTS_PREFIX = "generated/moments/"
 # run (their digests are simply not recorded, so they are retried). Without a readable
 # previous index every digest is "new" and the sweep does exactly what it did before.
 
-SWEEP_RESERVE_MS = 8000  # left for the fingerprint, the index put and the coach-card sweep
+# Left for the fingerprint, the index put, the CloudFront invalidation and the coach-card sweep. 8 s was
+# too little (#5421, 2026-10-30): the first run after a deploy re-renders every card (the salt changed), the
+# summary printed at ~51 s of 60, the coach cards then ran past the timeout, the index was never written, and
+# the retry started cold again — so "unchanged=0" twice. A cold run now stops early and converges over a
+# couple of days; a warm run never gets near the reserve.
+SWEEP_RESERVE_MS = 20000
 
 RENDER, SKIP, DEFER = "render", "skip", "defer"
 
@@ -89,6 +94,8 @@ class SweepPlan:
         self.prior = {str(k): str(v) for k, v in (usable.get("digests") or {}).items()}
         self.prior_retired = {str(i) for i in (usable.get("wrong_retired") or [])}
         self.salt = _source_salt()
+        self.prior_salt = (previous_index or {}).get("salt") if (previous_index and not self.force) else None
+        self.why = {}  # reason -> [first few keys] for every RENDER, so the log says WHY nothing was skipped
         self.digests = {}  # key -> digest of every moment known current after this run
         self.counts = {RENDER: 0, SKIP: 0, DEFER: 0}
 
@@ -118,7 +125,24 @@ class SweepPlan:
                 self.digests[key] = self.prior[key]  # the older render still serves; retried next run
             self.counts[DEFER] += 1
             return DEFER, digest
+        self.note_render(key)
         return RENDER, digest
+
+    def reason(self, key):
+        if self.force:
+            return "force"
+        if self.salt is None:
+            return "no-salt"
+        if self.previous_index is None:
+            return "no-index"
+        if key not in self.prior:
+            return "new-moment"
+        if self.prior_salt != self.salt:
+            return "code-changed" if self.prior_salt else "salt-unrecorded"
+        return "payload-changed"
+
+    def note_render(self, key):
+        self.why.setdefault(self.reason(key), []).append(key)
 
     def rendered(self, key, digest):
         self.digests[key] = digest
@@ -129,7 +153,11 @@ class SweepPlan:
         return key in self.prior
 
     def summary(self):
-        return f"rendered={self.counts[RENDER]} unchanged={self.counts[SKIP]} deferred={self.counts[DEFER]}"
+        base = f"rendered={self.counts[RENDER]} unchanged={self.counts[SKIP]} deferred={self.counts[DEFER]}"
+        if not self.why:
+            return base
+        why = " ".join(f"{r}={len(k)}(first:{k[0]})" for r, k in sorted(self.why.items()))
+        return f"{base} why[{why}] salt={self.salt} prior_salt={self.prior_salt}"
 
 
 # ── The card (Pillow, reusing the daily generator's design system) ──────────
@@ -771,6 +799,7 @@ def sweep_moments(s3, stats, time_left=None, force=False):
         "wrong_published": wrong_ledger["published"],  # #4404 — every id ever published; the next run's retirement input
         "wrong_retired": wrong_ledger["retired"],  # #4404 — ids whose shell + card now redirect
         "fingerprint": _sweep_fingerprint(s3, stats),  # #1402 — the day's dated mark + caption
+        "salt": plan.salt,  # #5421 — which drawing code the digests were made under (names a code-change re-render in the log)
         "digests": plan.digests,  # #5421 — moment key -> digest of what was last published; the next run's skip input
     }
     print(f"[moments] incremental sweep: {plan.summary()}")

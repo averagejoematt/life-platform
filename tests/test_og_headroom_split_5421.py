@@ -353,3 +353,72 @@ def test_the_invalidation_path_covers_the_coach_cards_in_both_formats():
     assert path.endswith("og-*"), path  # og-coach-*.png and .webp, and the page cards, under one wildcard
     render = next(n for n in tree.body if isinstance(n, _ast.FunctionDef) and n.name == "render_cards")
     assert "create_invalidation" not in _ast.unparse(render)  # never again before the sweep's writes
+
+
+# ── #5421, 2026-10-30: why `unchanged=0` — the log must say, and a cold run must leave room ──────────
+
+
+def _plan_for(w):
+    """The SweepPlan a run would build now, from the index the previous run left."""
+    return om.SweepPlan(w.index)
+
+
+def test_second_pass_reports_every_moment_unchanged_and_none_rendered(monkeypatch, capsys):
+    w = _world(monkeypatch)
+    w.run()
+    capsys.readouterr()
+    s3, idx = w.run()
+    out = capsys.readouterr().out
+    assert "incremental sweep: rendered=0 unchanged=13 deferred=0" in out, out
+    assert s3.cards() == [] and "why[" not in out  # nothing re-rendered -> nothing to explain
+
+
+def test_a_code_change_rerender_names_the_cause_in_the_log(monkeypatch, capsys):
+    w = _world(monkeypatch)
+    w.run()
+    monkeypatch.setattr(om, "_source_salt", lambda: "a-different-drawing-code-digest")
+    capsys.readouterr()
+    w.run()
+    out = capsys.readouterr().out
+    assert "rendered=13 unchanged=0" in out and "code-changed=13(first:" in out and "prior_salt=" in out, out
+
+
+def test_a_cold_or_changed_run_names_its_reason(monkeypatch, capsys):
+    w = _world(monkeypatch)
+    capsys.readouterr()
+    w.run()
+    assert "no-index=13(first:" in capsys.readouterr().out
+    w.obits[1] = _obit(1, believed="changed belief")
+    w.preds.append(_pred(9))
+    w.run()
+    out = capsys.readouterr().out
+    assert "payload-changed=1(first:wrong/" in out and "new-moment=1(first:" in out, out
+
+
+def test_the_index_records_the_salt_it_was_drawn_under(monkeypatch):
+    w = _world(monkeypatch)
+    _, idx = w.run()
+    assert idx["salt"] == om._source_salt()
+    assert _plan_for(w).prior_salt == idx["salt"]
+
+
+def test_the_reserve_covers_the_coach_cards_a_cold_run_ends_with():
+    """2026-10-30: an 8 s reserve left a cold run 9 s for the coach cards + index put; it timed out
+    twice in a row and the index never landed. Do not shrink this back."""
+    assert om.SWEEP_RESERVE_MS >= 20000
+
+
+def test_a_cold_run_that_hits_the_reserve_still_writes_the_index_so_the_retry_is_not_cold(monkeypatch):
+    w = _world(monkeypatch)
+    clock = {"left": 40_000}
+    s3 = None
+
+    def left():
+        clock["left"] -= 3_000  # each moment costs ~3 s
+        return clock["left"]
+
+    s3, idx = w.run(time_left=left)
+    assert 0 < len(idx["digests"]) < 13  # partial progress is recorded ...
+    assert "generated/moments/index.json" in s3.puts  # ... and published
+    s3b, idxb = w.run(time_left=lambda: 55_000)
+    assert len(s3b.cards()) == 13 - len(idx["digests"]) and len(idxb["digests"]) == 13  # the next run finishes only the rest
