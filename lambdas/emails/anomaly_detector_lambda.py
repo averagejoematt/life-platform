@@ -70,6 +70,7 @@ from decimal import Decimal
 
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.metric_truth import resolve, resolve_by_date, sources_for  # #4630: the ONE multi-source resolver
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from health import illness_triad  # #4978: the owner-only early-illness/overload triad — its own row, never this mail
@@ -249,6 +250,10 @@ def fetch_range(source, start, end):
     is the `sk BETWEEN` window below, not the phase tag. Guarded by
     tests/test_genesis_blind_reads_2080_2081.py.
     """
+    _w = intake_window(source, start, end)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start, end = _w
     try:
         from experiment.phase_filter import with_phase_filter
 

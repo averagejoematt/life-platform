@@ -70,6 +70,7 @@ _s3 = boto3.client("s3", region_name=REGION)
 # held THREE hand-typed copies, two of them in different orders.
 from coach import narrative_cadence  # #4589: the twice-weekly narrative cadence (fresh floor below)
 from coach.persona_registry import OPERATIONAL_COACH_IDS, OPERATIONAL_SHORT_IDS
+from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 COACH_IDS = list(OPERATIONAL_COACH_IDS)
@@ -102,7 +103,9 @@ def _decimal(o):
 
 
 def _latest(source):
-    resp = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source}"), ScanIndexForward=False, Limit=1)
+    # #5431: an intake source's newest row is the newest day that HAPPENED (bounded at the Pacific today)
+    kce = latest_day_condition(f"{USER_PREFIX}{source}", source, require_prefix=False)
+    resp = table.query(KeyConditionExpression=kce, ScanIndexForward=False, Limit=1)
     items = _decimal(resp.get("Items", []))
     return strava_read_seam(source, items[0] if items else {})
 

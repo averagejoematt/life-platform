@@ -283,9 +283,11 @@ def session_token_revoke(token: str) -> bool:
 
 import re
 
+from common.macrofactor_fields import NO_FUTURE_SOURCES
+
 _SAFE_SOURCE = re.compile(r"^[a-zA-Z0-9_]+$")
 #: #5431: sources whose DATE# rows are observations of a day that has happened — never read past today.
-_NO_FUTURE_SOURCES = frozenset({"macrofactor"})
+_NO_FUTURE_SOURCES = NO_FUTURE_SOURCES  # the ONE declaration lives in common/macrofactor_fields.py (box 2)
 
 # ADR-058: phase filter — hides phase=pilot records. Applied to an EXPERIMENT_SCOPED
 # source by default (the decision is derived per source since #4061 — see query_source)

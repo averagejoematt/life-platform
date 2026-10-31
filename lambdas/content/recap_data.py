@@ -59,6 +59,7 @@ from typing import Any
 
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import d2f
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.metric_truth import resolve_steps, steps_sources  # #4630 / ADR-163: the ONE steps resolver
 from common.pacific_time import pacific_day_n
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
@@ -95,6 +96,10 @@ def _query_prefix(table, source: str, sk_prefix: str) -> list[dict[str, Any]]:
 
 
 def _query_range(table, source: str, start: str, end: str) -> list[dict[str, Any]]:
+    _w = intake_window(source, start, end)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start, end = _w
     from boto3.dynamodb.conditions import Key
 
     try:

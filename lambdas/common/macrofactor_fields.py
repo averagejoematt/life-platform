@@ -75,3 +75,51 @@ def protein_meals_at(row: Optional[dict], threshold_g: float) -> Optional[float]
     if float(threshold_g) == MEALS_ABOVE_PROTEIN_THRESHOLD_G:
         return meals_above_protein_threshold(row)
     return None
+
+
+# ── #5431 box 2: the ONE today-bound for every intake reader ────────────────────────────────────
+#
+# MacroFactor's export carries projected values (targets, expenditure) for days that have not
+# happened; the writer no longer stores them (`_is_future`), but a reader must not depend on that: a
+# stored future-dated row reads as intake. Every range read of an intake partition clamps its upper
+# bound through ``intake_window`` and every "latest" read rides ``latest_day_condition`` / ``latest_sk_ceiling`` —
+# today being the PACIFIC date (the platform timezone), not the UTC one.
+
+#: sources whose DATE# rows are observations of a day that has happened (mcp/core.py reuses the name).
+NO_FUTURE_SOURCES = frozenset({"macrofactor"})
+
+
+def intake_window(source: str, start: str, end: str, today: Optional[str] = None) -> Optional[tuple]:
+    """``(start, end)`` with ``end`` clamped to the Pacific today for an intake source, or None when
+    the window lies wholly in the future (DynamoDB rejects a BETWEEN whose lower bound exceeds the
+    upper). Any other source passes through unchanged."""
+    if source not in NO_FUTURE_SOURCES:
+        return (start, end)
+    from common.pacific_time import pacific_today
+
+    end = min(end, today or pacific_today())
+    return None if start > end else (start, end)
+
+
+def latest_sk_ceiling(source: str, today: Optional[str] = None) -> Optional[str]:
+    """The sort-key ceiling day for a newest-first read of ``source``: ``DATE#<pacific today>`` for an intake
+    source, None for any other (no bound). The caller closes the END day with ``~`` (#4129: it admits the
+    day's ``#``-suffixed rows). ``Limit=1`` reads cannot post-filter, so the bound has to ride the key condition."""
+    if source not in NO_FUTURE_SOURCES:
+        return None
+    from common.pacific_time import pacific_today
+
+    return f"DATE#{today or pacific_today()}"
+
+
+def latest_day_condition(pk: str, source: str, require_prefix: bool = True, today: Optional[str] = None):
+    """A boto3 ``Key`` condition for a newest-first read of one partition: unchanged for every source
+    except an intake one, which is bounded at the Pacific today. ``require_prefix`` keeps the
+    ``begins_with("DATE#")`` the call site already carried (so a non-day sentinel never reads as latest)."""
+    from boto3.dynamodb.conditions import Key
+
+    kce = Key("pk").eq(pk)
+    ceiling = latest_sk_ceiling(source, today)
+    if ceiling:
+        return kce & Key("sk").between("DATE#", f"{ceiling}~")
+    return kce & Key("sk").begins_with("DATE#") if require_prefix else kce

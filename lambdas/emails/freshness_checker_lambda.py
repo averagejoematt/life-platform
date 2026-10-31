@@ -75,6 +75,7 @@ AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 # (a sensor-session lapse reports, it never pages). Lookback below covers the widest.
 # #746: the list now lives in the canonical source_registry (apple_health.hae_datatypes)
 # so every source threshold sits in one place; this is an alias, not a second copy.
+from common.macrofactor_fields import latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import anchor_day_key, pacific_now  # #2817/#3257: the Pacific frame + THE per-source day-key anchor
 from ingestion.source_registry import hae_datatype_thresholds  # noqa: E402
 
@@ -669,9 +670,10 @@ def lambda_handler(event, context):
             # REFRESH_RATELIMIT for garmin, YEAR#2026 for food_delivery) —
             # which sort lexicographically after DATE#YYYY-MM-DD — are never
             # returned as the "latest" record, causing a false-stale alarm.
+            _ceiling = latest_sk_ceiling(source_key)  # #5431: a projected future row is not the latest record
             response = table.query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-                ExpressionAttributeValues={":pk": pk, ":pfx": "DATE#"},
+                KeyConditionExpression="pk = :pk AND sk BETWEEN :pfx AND :hi" if _ceiling else "pk = :pk AND begins_with(sk, :pfx)",
+                ExpressionAttributeValues={":pk": pk, ":pfx": "DATE#", **({":hi": f"{_ceiling}~"} if _ceiling else {})},
                 ScanIndexForward=False,
                 Limit=1,
                 ProjectionExpression="sk",

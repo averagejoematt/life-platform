@@ -25,6 +25,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import anchor_day_key  # #3913: a DATE# day key is aged in the calendar that NAMED it — never a hardcoded tz
 from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
 from ingestion.source_registry import AVAILABILITY_PAUSED, availability_facet, due_months  # #3669 cadence, #3615 absence facets
@@ -529,7 +530,7 @@ def status(*, _g) -> dict:
                 from boto3.dynamodb.conditions import Attr
 
                 resp = table.query(
-                    KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
+                    KeyConditionExpression=latest_day_condition(f"{USER_PREFIX}{source_id}", source_id),  # #5431
                     FilterExpression=Attr(field_check).exists(),
                     ScanIndexForward=False,
                     ProjectionExpression="sk",
@@ -539,7 +540,7 @@ def status(*, _g) -> dict:
                 return items[0]["sk"].replace("DATE#", "")[:10] if items else None
             else:
                 resp = table.query(
-                    KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").begins_with("DATE#"),
+                    KeyConditionExpression=latest_day_condition(f"{USER_PREFIX}{source_id}", source_id),  # #5431
                     ScanIndexForward=False,
                     Limit=1,
                     ProjectionExpression="sk",
@@ -766,7 +767,7 @@ def status(*, _g) -> dict:
                 if last:
                     try:
                         _hist_resp = table.query(
-                            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{sid}") & Key("sk").begins_with("DATE#"),
+                            KeyConditionExpression=latest_day_condition(f"{USER_PREFIX}{sid}", sid),  # #5431
                             ScanIndexForward=False,
                             Limit=14,
                             ProjectionExpression="sk",

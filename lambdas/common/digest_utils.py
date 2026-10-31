@@ -29,6 +29,7 @@ from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny p
 from ingestion.source_registry import SOURCE_REGISTRY, stale_hours_overrides  # #2235: one staleness threshold, not three copies
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
+from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import pacific_now, parse_iso_utc  # #2811 pacific_now; #3609 the canonical ISO-8601 parser
 from common.strava_read_seam import dedup_activities, strava_read_seam  # noqa: F401 — #4419: the one dedupe + the read seam
 
@@ -130,6 +131,10 @@ def query_range(table, source, start_date, end_date, user_id="matthew", include_
     the same taxonomy-derived decision #2109 established for the compute layer's
     generic `fetch_range` readers.
     """
+    _w = intake_window(source, start_date, end_date)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return {}
+    start_date, end_date = _w
     pk = f"USER#{user_id}#SOURCE#{source}"
     records = {}
     kwargs = {
@@ -168,6 +173,10 @@ def query_range_list(table, source, start_date, end_date, user_id="matthew", inc
     `include_pilot` (#2150): same pass-through contract as query_range above,
     default False.
     """
+    _w = intake_window(source, start_date, end_date)  # #5431: never read an intake source past the Pacific today
+    if _w is None:
+        return []
+    start_date, end_date = _w
     pk = f"USER#{user_id}#SOURCE#{source}"
     records: list[dict] = []
     kwargs = {
