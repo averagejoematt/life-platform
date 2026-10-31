@@ -4010,6 +4010,82 @@ GUARD_PROOFS["guard::scripts/reconcile_child_guard.py"] = {
     "proved_on": "2026-10-26",
 }
 
+# #5473 (2026-10-28): the pinned binary-layer manifests are scanned in CI, and a scan that cannot
+# run reds. One guard script (both pip-audit legs) + the layer workflow's step + ci-lint's
+# re-plumbed blocking step. Every plant restored from a byte copy (md5 checked).
+GUARD_PROOFS["guard::scripts/check_pip_audit.py"] = {
+    "gate_name": "scripts/check_pip_audit.py",
+    "command": "python3 -m pytest tests/test_check_pip_audit_5473.py -q -p no:cacheprovider   # baseline 14 passed",
+    "mutation": (
+        "Four plants in scripts/check_pip_audit.py, ONE AT A TIME (md5 9183f43a668c8a6ad226936c0d1bc316 before and after each "
+        "restore): M1 classify()'s `if proc.returncode != 0:` -> `if False:` (a non-zero pip-audit exit with no finding reads "
+        "clean); M2 the not-JSON branch returns CLEAN instead of ERROR (the Lambda's `No module named pip` shape reads as 0 "
+        "vulnerabilities); M3 main()'s red set `(VULNERABLE, ERROR)` -> `(ERROR,)` (a finding no longer exits 1); M4 "
+        "ignore_ids_for() ignores scope= (`e.applies_to(manifest)` -> `True`, the garth certifi waiver travels to every manifest)."
+    ),
+    "observed": (
+        "2026-10-28. M1 1 failed / 13 passed (test_classify_every_red_shape_and_the_one_green_one). M2 2 failed / 12 passed "
+        "(the classify test, test_the_scan_that_cannot_run_reds_and_never_reads_zero_vulnerabilities). M3 2 failed / 12 passed "
+        "(test_NEGATIVE_CONTROL_a_vulnerable_pillow_pin_reds_the_layer_scan, the live-tree scope test). M4 3 failed / 11 passed "
+        "(the parser test, test_real_allowlist_scopes_the_garth_certifi_waiver_to_garmin_only, the live-tree scope test). "
+        "RESTORED 14 passed."
+    ),
+    "scope": (
+        "pip-audit is a fake runner in the unit file; the real pip-audit legs are proved by the two CI-step records below. "
+        "Exact-pin mode scans what the manifest says the layer holds (--disable-pip --no-deps); it cannot see a layer whose "
+        "manifest is stale against the live zip — tests/test_layer_build_manifest.py and --check-manifest own that."
+    ),
+    "proved_on": "2026-10-28",
+}
+CI_PROOFS["ci::layer-pip-audit.yml::audit::2"] = {
+    "gate_name": "audit / pip-audit every pinned layer manifest (blocking)",
+    "command": (
+        'bash -eo pipefail -c "$(the step\'s run: text read from .github/workflows/layer-pip-audit.yml)" in a fresh venv on '
+        "PATH (the step's own `pip install` of the ci_pins pip-audit==2.10.1)   # baseline exit 0"
+    ),
+    "mutation": (
+        "The step's REAL run: text, real pip-audit, real OSV/PyPI advisory lookups. Plant: lambdas/requirements/pillow.txt "
+        "`pillow==13.0.0` -> `pillow==12.3.0` (the version the 41 Dependabot advisories were filed against), restored from a "
+        "byte copy (md5 ff4f5ddbfa7251fdc80b3026cea30e4e before and after)."
+    ),
+    "observed": (
+        "2026-10-28. BASELINE exit 0: SCANNED CLEAN garmin.txt packages=18 (allowlisted: GHSA-6q48-6c7w-9gw2), lameenc.txt "
+        "packages=1, pillow.txt packages=1; '3 manifest(s) scanned (20 packages), 16 empty, 0 red'. PLANTED exit 1: 'SCANNED "
+        "VULNERABLE lambdas/requirements/pillow.txt packages=1 pillow==12.3.0 PYSEC-2026-4327 …', '::error title=Dependency "
+        "vulnerability (blocking)::lambdas/requirements/pillow.txt: VULNERABLE'. A direct run on a pillow==12.3.0 fixture "
+        "reported 39 advisories. RESTORED exit 0."
+    ),
+    "scope": (
+        "Proves the step reds on a vulnerable layer pin through the real tool. It does not prove the schedule fires (that is "
+        "scripts/check_cron_freshness.py's watched row) or that the #1447 filer opens an issue on a scheduled red; the first "
+        "live scheduled/dispatched run on main is #5473's closing proof."
+    ),
+    "proved_on": "2026-10-28",
+}
+CI_PROOFS["ci::ci-lint.yml::lint::9"] = {
+    "gate_name": "lint / Dependency Security Scan (pip-audit — ENFORCED, allowlisted)",
+    "command": (
+        'bash -eo pipefail -c "$(the step\'s run: text read from .github/workflows/ci-lint.yml)" in a fresh venv on PATH   '
+        "# baseline exit 0"
+    ),
+    "mutation": (
+        "#5473 re-plumbed this step onto scripts/check_pip_audit.py --resolve. The step's REAL run: text, real pip-audit "
+        "2.10.1 resolving both manifests. Plant: `pillow==12.3.0` appended to cdk/requirements.txt, restored from a byte copy "
+        "(md5 56bd75d992072387b6c68ba5841b23be before and after)."
+    ),
+    "observed": (
+        "2026-10-28. BASELINE exit 0: SCANNED CLEAN requirements-dev.txt packages=98, cdk/requirements.txt packages=14. "
+        "PLANTED exit 1: 'SCANNED VULNERABLE cdk/requirements.txt packages=15 pillow==12.3.0 PYSEC-2026-4327 …', '::error "
+        "title=Dependency vulnerability (blocking)::cdk/requirements.txt: VULNERABLE'. RESTORED exit 0."
+    ),
+    "scope": (
+        "Resolve mode: the transitive set is whatever pip resolves on the runner, as before #5473; a dependency pip-audit "
+        "skips is reported, not failed (the pre-#5473 semantics). This step runs on the push-to-main path only (ci-cd.yml "
+        "calls ci-lint.yml), so a PR does not exercise it."
+    ),
+    "proved_on": "2026-10-28",
+}
+
 # ── ATTEMPTED and NOT proved, extracted from scripts/gate_census.py for its #1665 ceiling ──
 # #4284 (ADR-165): the REQUIRED_EB_RULES entries re-pointed at the rules that stay fixed-UTC.
 _EB_RULES_4284_REASON = (

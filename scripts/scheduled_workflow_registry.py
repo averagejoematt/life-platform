@@ -250,6 +250,17 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "nothing looked. A cron that stops puts the archive straight back into that state, with "
         "a closed #1447 tracker that reads as clean.",
     },
+    "layer-pip-audit.yml": {
+        "watched": True,
+        "grace_hours": 24.0,
+        "basis": "newly added (#5473) — no fire history of its own yet. Weekly (Mon 15:17 UTC) -> "
+        "derived 168h cadence; the same one-day grace as the other weekly rows (raw-kms-readability, "
+        "fresh-eyes, golden-brief-eval) until check_cron_freshness's live derivation can re-derive its own.",
+        "reason": "The only scan of the pinned binary-layer manifests (pillow, lameenc, garmin). The "
+        "Lambda meant to cover them never ran pip, and 41 Pillow advisories sat unseen for a week. "
+        "A cron that stops leaves the layers unscanned again behind a closed #1447 tracker that reads "
+        "as clean; PR runs only fire when a manifest changes.",
+    },
     # ── deliberately NOT watched (each with its argument) ─────────────────────
     "codeql.yml": {
         "watched": False,

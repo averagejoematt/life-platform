@@ -1,0 +1,84 @@
+# Layer-manifest pip-audit (#5473).
+#
+# Third-party code reaches a running Lambda only inside the binary layers, whose
+# contents are pinned in lambdas/requirements/{pillow,lameenc,garmin}.txt. Before this
+# workflow nothing scanned them: ci-lint.yml's blocking pip-audit step covers the dev and
+# CDK manifests only, and the life-platform-pip-audit Lambda that was meant to cover the
+# layers could never run pip on python3.12. Its report said 0 vulnerabilities while every
+# manifest errored, and 41 Pillow advisories sat on pillow.txt for a week.
+#
+# What it runs: scripts/check_pip_audit.py --layers. It scans every
+# lambdas/requirements/*.txt that pins a package, in exact-pin mode (the manifest is the
+# measured contents of the live layer), with the same allowlist as ci-lint
+# (.github/pip-audit-allowlist.txt, scope= entries honoured per manifest). It names each
+# manifest SCANNED with a package count, or EMPTY, or ERROR. A scan that cannot run is
+# ERROR and reds, never "0 vulnerabilities".
+#
+# Triggers:
+#   * schedule (weekly) + workflow_dispatch: a newly disclosed CVE on a pinned layer
+#     files or updates ONE advisory issue (#1447) and the next green run closes it. Not on
+#     ci-lint's push path, so a fresh advisory does not red every unrelated push.
+#   * pull_request on the manifests, the layer builder, the allowlist or the scanner: a
+#     bump is verified before merge. On a PR the red is the check itself; the advisory
+#     filer does not run.
+#
+# No AWS, no secrets beyond GITHUB_TOKEN, no Lambda. Cost: about 1 min on a free
+# public-repo runner.
+
+name: Layer pip-audit
+
+on:
+  schedule:
+    - cron: '17 15 * * 1'   # Mondays 15:17 UTC (fixed UTC, weekly) — a fresh layer CVE is seen within 7 days
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'lambdas/requirements/**'
+      - 'deploy/build_lambda_layer.py'
+      - 'deploy/layers/**'
+      - '.github/pip-audit-allowlist.txt'
+      - 'scripts/check_pip_audit.py'
+      - '.github/workflows/layer-pip-audit.yml'
+
+permissions:
+  contents: read
+  issues: write   # advisory-failure issue filing (#1447), schedule/dispatch only
+
+concurrency:
+  group: layer-pip-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: pip-audit the pinned layer manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-ci
+
+      - name: pip-audit every pinned layer manifest (blocking)
+        # pip-audit's version comes from requirements-dev.txt via ci_pins.py (CQ-01, #2760).
+        # Unpiped: the script's own exit code is the verdict (the #3103 class). It also
+        # writes the per-manifest table to the step summary.
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pip-audit)
+          pip install --quiet $PINS
+          python3 scripts/check_pip_audit.py --layers
+
+      - name: File/resolve advisory failure issue (#1447)
+        if: always() && github.event_name != 'pull_request'
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: layer-pip-audit
+          workflow-name: Layer pip-audit
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            A pinned binary-layer manifest in lambdas/requirements/ carries a known
+            advisory not on .github/pip-audit-allowlist.txt, or pip-audit could not scan
+            it. The run's step summary names the manifest, package, advisory ID and fix
+            version. Editing the pin deploys nothing: rebuild the layer
+            (lambdas/requirements/README.md), or allowlist the ID scoped to that manifest
+            with a rationale and removal path.

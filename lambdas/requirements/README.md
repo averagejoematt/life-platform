@@ -43,6 +43,17 @@ enforces coverage**: `check_layer_manifest_coverage()` enumerates those ARNs and
 scan RED if any referenced layer has no matching manifest here — so a future layer added
 without a pinned manifest can't slip back into the unscanned state that #1336 fixed.
 
+**Who scans them (#5473).** CI does: `.github/workflows/layer-pip-audit.yml` runs
+`python3 scripts/check_pip_audit.py --layers` weekly, on dispatch, and on every PR that
+touches this directory, `deploy/build_lambda_layer.py`, `deploy/layers/` or the allowlist.
+It scans every manifest here that pins a package, in exact-pin mode (these files ARE the
+layer's contents, so nothing is resolved), names each one SCANNED with a package count,
+and reds on a finding or on a scan that could not run. A scheduled red files one
+advisory issue (#1447). Waivers live in `.github/pip-audit-allowlist.txt`, `scope=`d to the
+manifest they apply to. The `life-platform-pip-audit` Lambda never managed this scan: the
+python3.12 runtime has no pip, and its report read 0 vulnerabilities while every manifest
+errored. Since #5473 those scan errors hard-fail it; retiring its scan leg is #5474.
+
 ## The three layer manifests are GENERATED (#2099)
 
 `garmin.txt`, `pillow.txt` and `lameenc.txt` are **derived artifacts** — do not hand-edit

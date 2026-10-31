@@ -72,7 +72,6 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "ci::.github/workflows/ci-cd.yml::visual-qa / Accuracy gate (per-page resolves + no impossible numbers)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-cd.yml::visual-qa / Install Playwright + Chromium": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-lint.yml::lint / Check lambda_map coverage": "2026-09-05 seal (#3536)",
-    "ci::.github/workflows/ci-lint.yml::lint / Dependency Security Scan (pip-audit — ENFORCED, allowlisted)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-lint.yml::lint / Generate SBOM (syft — supply-chain provenance,": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-lint.yml::lint / Install black + ruff": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/ci-lint.yml::lint / Install flake8": "2026-09-05 seal (#3536)",

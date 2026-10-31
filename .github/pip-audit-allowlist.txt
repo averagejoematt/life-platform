@@ -1,14 +1,31 @@
 # pip-audit allowlist (#1661) — advisory IDs the BLOCKING pip-audit gate ignores.
 #
-# The CI gate ("Dependency Security Scan" in ci-cd.yml) is blocking: a known CVE
+# The CI gate ("Dependency Security Scan" in ci-lint.yml) is blocking: a known CVE
 # on any scanned dependency (requirements-dev.txt, cdk/requirements.txt) fails the
-# build. This file is the escape hatch so a single unfixable / not-yet-fixed /
-# inapplicable transitive advisory can't red-wall main indefinitely. Every entry
-# is passed to pip-audit as `--ignore-vuln <ID>`.
+# build. Since #5473 the same file also feeds the layer-manifest scan
+# (lambdas/requirements/*.txt — the pinned binary layers; the weekly
+# layer-pip-audit workflow, also run on PRs that touch a manifest). Both legs parse
+# it with ONE parser: scripts/check_pip_audit.py. This file is the escape hatch so a
+# single unfixable / not-yet-fixed / inapplicable transitive advisory can't red-wall
+# main indefinitely. Every entry that applies to the manifest being scanned is passed
+# to pip-audit as `--ignore-vuln <ID>` (pip-audit matches it against aliases too, so a
+# GHSA ID waives the PYSEC record it aliases).
 #
 # Format: one advisory ID per line. The first whitespace-delimited token is the ID;
-# everything after `#` is human rationale. Blank lines and full-line comments are
-# ignored. Each entry MUST state (a) why it's safe to ignore and (b) a removal path
-# (the bump/PR that retires it) — an entry with no removal path is a bug, not a waiver.
+# an optional `scope=<manifest>[,<manifest>]` token restricts the waiver to those
+# manifests (any other token is a malformed line and fails the scan; a scope naming
+# no file fails it too); everything after `#` is human rationale. Blank lines and
+# full-line comments are ignored. Each entry MUST state (a) why it's safe to ignore
+# and (b) a removal path (the bump/PR that retires it) — an entry with no removal
+# path is a bug, not a waiver.
 #
 # ─────────────────────────────────────────────────────────────────────────────
+
+# certifi emSign ECC Root CA - G3 (PYSEC-2026-4320 / GHSA-6q48-6c7w-9gw2), certifi
+# 2026.7.22 in the RETIRED garth-layer:4. Scoped to garmin.txt only, so it can never
+# silence the same advisory on the dev/CDK toolchain.
+# (a) Why safe: garth-layer is attached to no Lambda since #4640 — nothing loads this
+#     certifi. Dependabot alert #73 dismissed `not_used` by the owner, 2026-10-28.
+# (b) Removal path: delete this line when garth-layer is deleted and garmin.txt with it,
+#     or if the layer is ever re-attached (then rebuild with certifi >= 2026.10.19 first).
+GHSA-6q48-6c7w-9gw2  scope=lambdas/requirements/garmin.txt  # #5473 — retired garth-layer, owner-dismissed not_used 2026-10-28

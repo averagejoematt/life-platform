@@ -1199,7 +1199,10 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # M3 3 failed, M4 1 failed; reverted 19 passed). Stacked, never max'd.
         # 301 -> 302 (2026-10-27, #5434): qa::lambdas/operational/qa_check_coach_cards.py::check_coach_cards, PROVEN via QA_PROOFS
         # (reader reverted to the first-semicolon cut: 5 failed; restored 16 passed). Stacked, never max'd.
-        <= 302
+        # 302 -> 305 (2026-10-28, #5473): guard::scripts/check_pip_audit.py (GUARD_PROOFS: M1 1 failed, M2 2 failed, M3 2 failed,
+        # M4 3 failed; reverted 14 passed), ci::layer-pip-audit.yml::audit::2 and the re-plumbed ci::ci-lint.yml::lint::9 (CI_PROOFS:
+        # planted pillow==12.3.0 exit 1 through the real step text + real pip-audit, restored exit 0). Stacked, never max'd.
+        <= 305
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
