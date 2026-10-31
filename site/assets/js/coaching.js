@@ -45,7 +45,7 @@ import { rosterEntries, scorecardSeats, retiredSeatNote, rateText, rateWord } fr
 import { callReasonText } from "/assets/js/scorecard_reason.js"; // #4220 — a graded call's reason in reader words
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
 import { instantDayInWords } from "/assets/js/entry_age.js"; // #4182 sweep fix 2 — the lab-note card's date in words
-import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
+import { chooseTodaysRead, freshness, writtenStamp, weekCallLabel, sinceBanner, recordLine, glossesFor, pickAsk, writtenDay, calendarDay, isoWeekRange } from "/assets/js/coach_today.js"; // #4182/#4188 — one read, dated in words
 
 /* #4182 (owner ruling 2026-09-26): the cycle count is internal. The server's archival
    sentence (site_api_phase_frame.archival_frame) says "from a previous cycle — N days
@@ -453,7 +453,7 @@ function tensionsHTML(d, opts = {}) {
   const dp = d.dispute;
   if (dp && Array.isArray(dp.turns) && dp.turns.length >= 2) {
     const kindLabel = { position: "the claim", reply: "the reply", rejoinder: "the rejoinder" };
-    h += `<div class="tt-dispute"><p class="dx-kicker label">the dispute · an actual exchange${dp.week ? ` · ${esc(dp.week)}` : ""}</p>` +
+    h += `<div class="tt-dispute"><p class="dx-kicker label">the dispute · an actual exchange${isoWeekRange(dp.week) ? ` · week of ${esc(isoWeekRange(dp.week))}` : ""}</p>` +
       `<p class="tt-topic">${esc(dp.topic || "")}</p>` +
       dp.turns.map((t) =>
         `<div class="ttd-turn ttd-${esc(t.kind || "turn")}"><span class="ttd-who label">${esc(t.name || t.speaker || "")}` +

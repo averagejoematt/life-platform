@@ -153,6 +153,22 @@ export function writtenDay(iso) {
   return `${wd} ${md}`;
 }
 
+// "2026-W43" -> "Oct 19–25" (#5456) — an ISO week token beside a "written <date>" stamp reads as a
+// second, contradicting week; the range is derived from the ISO week (Monday–Sunday, UTC math so no
+// timezone can shift it). Returns "" for anything that is not an ISO week.
+export function isoWeekRange(week) {
+  const m = /^(\d{4})-W(\d{1,2})$/.exec(String(week || "").trim());
+  if (!m) return "";
+  const jan4 = Date.UTC(+m[1], 0, 4);
+  const mon = jan4 - ((new Date(jan4).getUTCDay() + 6) % 7) * 864e5 + (+m[2] - 1) * 7 * 864e5;
+  const sun = mon + 6 * 864e5;
+  const f = (t, o) => new Date(t).toLocaleDateString("en-US", { timeZone: "UTC", ...o });
+  const a = new Date(mon).getUTCMonth();
+  const b = new Date(sun).getUTCMonth();
+  const start = f(mon, { month: "short", day: "numeric" });
+  return `${start}–${a === b ? f(sun, { day: "numeric" }) : f(sun, { month: "short", day: "numeric" })}`;
+}
+
 // "written Thursday 10:10 AM PT" — the weekday alone while it is unambiguous (inside a
 // week); the date joins it once the read is six days old or more.
 export function writtenStamp(iso, now) {
