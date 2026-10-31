@@ -227,7 +227,22 @@ def test_probe_handles_a_naive_delivery_time(cloudtrail):
 # ── 4. producer and consumer agree ───────────────────────────────────────────
 
 
-def test_liveness_run_emits_the_stale_gauge_beside_the_source_count(monkeypatch):
+@pytest.fixture()
+def frozen_handler_clock(monkeypatch):
+    """Pin the handler module's clock to NOW (the #2376 idiom): the liveness run is handed
+    `now` explicitly, but the module also reads its own wall clock for the Pacific day, and
+    a dated fixture against an unfrozen handler clock is the class that reds at midnight."""
+
+    class _FrozenDatetime(phc.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW if tz is None else NOW.astimezone(tz)
+
+    monkeypatch.setattr(phc, "datetime", _FrozenDatetime)
+    return _FrozenDatetime
+
+
+def test_liveness_run_emits_the_stale_gauge_beside_the_source_count(monkeypatch, frozen_handler_clock):
     """The daily run puts UnhealthySourceCount AND CloudTrailDeliveryStale in ONE emit, same namespace."""
 
     class _Rec:
@@ -269,7 +284,7 @@ def test_liveness_run_emits_the_stale_gauge_beside_the_source_count(monkeypatch)
     assert json.loads(row["cloudtrail"])["stale"] is True, "the status page row must carry the trail verdict"
 
 
-def test_liveness_run_emits_zero_when_the_trail_is_delivering(monkeypatch):
+def test_liveness_run_emits_zero_when_the_trail_is_delivering(monkeypatch, frozen_handler_clock):
     class _Rec:
         metrics: list = []
 
