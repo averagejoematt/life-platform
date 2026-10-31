@@ -97,6 +97,10 @@ LOAD_RULE_HEAD = "Top reps at RPE 7 or less → "
 
 
 OTHER_LIFTS_HEAD = "Other lifts: top reps at RPE 7 or less → "
+# #5428 re-grade #5 (2026-10-31): "Under 40 lb: +5 lb max" was two steps on a 30-lb dumbbell (§5's step there is 2.5 lb)
+# and said nothing when a lift is both a stack and under 40 lb. "One step" is §5's table's step for that implement, and a
+# stack's next plate wins at any load.
+LOAD_RULE_LIMITS = f"Under {SMALL_LOAD_LB} lb: one step. Stack: next plate at any load. Once per lift."
 
 
 def load_rule_line(step_lb: Optional[float], *, other_lifts: bool = False) -> str:
@@ -115,10 +119,10 @@ def load_rule_line(step_lb: Optional[float], *, other_lifts: bool = False) -> st
     head = OTHER_LIFTS_HEAD if other_lifts else LOAD_RULE_HEAD
     if not step_lb:
         first = f"{head}2 steps on later sets; {lo}–{hi} → 1 step."
-        return first + f"\nUnder {SMALL_LOAD_LB} lb: 1 step max. Stack: next plate. Once per lift."
+        return first + f"\n{LOAD_RULE_LIMITS}"
     one, two = fmt_num(step_lb), fmt_num(2 * step_lb)
     first = f"{head}+{two} lb on later sets; {lo}–{hi} → +{one} lb."
-    return first + f"\nUnder {SMALL_LOAD_LB} lb: +{one} lb max. Stack: next plate. Once per lift."
+    return first + f"\n{LOAD_RULE_LIMITS}"
 
 
 def rule_fits(working_sets: int) -> bool:
@@ -216,12 +220,14 @@ def pick_load_line(w_reps: int = PICK_LOAD_W_REPS, *, rows_loaded: bool = True, 
     `W set: up to 8 easy reps, find the load.`"""
     if not rows_loaded:
         return f"W set: up to {w_reps} easy reps, {PICK_LOAD_OPEN_TAIL}"
-    return f"W set at RPE {PICK_LOAD_EASY_RPE} or less → {step_text or 'next plate'}."
+    del step_text  # re-grade #5: "one step" (§5's step for the implement; a stack's next plate), not a typed number
+    return f"W at RPE {PICK_LOAD_EASY_RPE} or less → one step, no more."
 
 
 # the feeler W row carries the start load itself (it IS the test of that load), so the line is the result rule alone —
-# one phone line, so a lift with a reason and its family cue stays inside 4
-PICK_LOAD_RESULT_RE = re.compile(r"^W set at RPE \d+ or less → ")
+# one phone line, so a lift with a reason and its family cue stays inside 4. Re-grade #5: "no more" — the feeler's step
+# IS the lift's once ("Once per lift"); "next plate" alone left a second step open on a lift last done years ago.
+PICK_LOAD_RESULT_RE = re.compile(r"^W at RPE \d+ or less → one step, no more\.$")
 
 
 def gap_text(days: Union[int, float, str, None]) -> Optional[str]:
@@ -279,6 +285,7 @@ def held_top_line(
     per_hand: bool = False,
     step_lb: Optional[float] = None,
     next_step_lb: Optional[float] = None,
+    small_step_lb: Optional[float] = None,
 ) -> str:
     """A held load whose PREVIOUS reached the top of the range at RPE <= 8.5 (#5428): ONE timeline, the load rule's.
 
@@ -295,7 +302,8 @@ def held_top_line(
     if stack:
         return f"{head} {hi_rpe} or less → next plate on later sets."
     if row_lb is not None and float(row_lb) < SMALL_LOAD_LB:
-        return f"{head} {hi_rpe} or less → {_step_text(one, per_hand)} on later sets."
+        # under 40 lb: ONE step of the implement's own size (§5: 2.5 lb on a dumbbell under 50) — re-grade #5
+        return f"{head} {hi_rpe} or less → {_step_text(small_step_lb or one, per_hand)} on later sets."
     return f"{head} 7 or less → {_step_text(2 * one, per_hand)} on later sets; {lo_rpe}–{hi_rpe} → {_step_text(one, per_hand)}."
 
 

@@ -171,7 +171,7 @@ def _lint_session(session: str, note: str, out: list[Problem], rt: Optional["Lin
             if mode == "others" and not lines[2:]:
                 # #5428 re-grade #4: dropping the rule for a one-set exercise 1 left the session with no in-session rule
                 out.append(Problem("L3", "session block", "no load rule for the session's multi-set lifts ('Other lifts: …')"))
-            elif not fits and lines[2:] and lines[2:] != g.rule_lines("others"):
+            elif not fits and lines[2:] and not lines[2].startswith(g.OTHER_LIFTS_HEAD):
                 out.append(Problem("L3", "session block", "the load rule heads a one-set exercise 1 (no later set to step)"))
             else:
                 out.append(
@@ -345,7 +345,7 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
     if ex.kind != "carry" and any(r[1] is not None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
         # #5428 re-grade #2: "find the load" over rows that carry the start load reads as "ignore the rows"
         out.append(Problem("L4", where, f"the W line says {g.PICK_LOAD_OPEN_TAIL!r} but the working rows carry a load"))
-    w_line = next((ln for ln in body.split("\n") if ln.startswith("W set: up to")), None)
+    w_line = next((ln for ln in body.split("\n") if ln.startswith(("W set", "W at "))), None)
     if w_line and any(r[1] is not None for r in work) and not g.PICK_LOAD_RESULT_RE.match(w_line):
         # #5428 re-grade #4: "test the load." — a test with no result rule has nothing to act on
         out.append(Problem("L4", where, f"the W line gives its test no result rule: {w_line!r}"))

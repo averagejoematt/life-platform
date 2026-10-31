@@ -316,6 +316,7 @@ def _step_shape(block: Any, entry: dict[str, Any]) -> dict[str, Any]:
         "per_hand": entry.get("equipment") == "dumbbell",
         "step_lb": hevy_note_grammar.charter_step_lb(),
         "next_step_lb": round(nxt / LB_IN_KG * 2) / 2 if nxt else None,
+        "small_step_lb": implement_step_lb(entry.get("equipment"), top),  # §5's step for this implement at this load
     }
 
 
@@ -514,11 +515,10 @@ def _last_carry(history_index: dict[str, list] | None, tid: str | None, target_d
 
 def _pick_result_line(block: Any, entry: dict[str, Any]) -> str:
     """The pick-load W line with its result rule (#5428 re-grade #4: "test the load." said nothing about the answer):
-    `W set: up to 8 reps at the start load; RPE 5 or less → next plate.` — a stack's step is its next plate, a fixed
-    implement's one charter step (per hand on a dumbbell)."""
-    shape = _step_shape(block, entry)
-    step = None if shape["stack"] else hevy_note_grammar._step_text(shape["step_lb"] or 5, shape["per_hand"])
-    return hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS, step_text=step)
+    `W at RPE 5 or less → one step, no more.` — one step of the implement's own size (a stack's next plate), and it IS
+    the lift's one step today (re-grade #5: "next plate" alone left the load rule's step open on top of it)."""
+    del block, entry
+    return hevy_note_grammar.pick_load_line(PICK_LOAD_W_REPS)
 
 
 def _load_carry_rows(block: Any, start: dict[str, Any]) -> None:

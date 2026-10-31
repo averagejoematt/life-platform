@@ -68,7 +68,7 @@ The review that produced this standard graded the 30 routines published 2026-09-
 ‹Day› · RPE ‹a–b› on big lifts
 Low energy → first 2 lifts + easy cardio.
 Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.     when exercise 1 has 2+ working sets
-Under 40 lb: +5 lb max. Stack: next plate. Once per lift.
+Under 40 lb: one step. Stack: next plate at any load. Once per lift.
 ```
 
 - **Line 1, the session line** (`hevy_note_grammar.session_line`):
@@ -82,6 +82,7 @@ Under 40 lb: +5 lb max. Stack: next plate. Once per lift.
   - "Later sets" are the rest of that lift. On a top-set day, the back-offs move and the top set stays.
   - **Who it addresses** (`hevy_note_grammar.rule_mode`). Exercise 1 with 2+ working sets: the rule as above. A one-set exercise 1 has no later set to step, so the rule opens `Other lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.` (re-grade #4: dropping it left the session's multi-set lifts with no in-session rule), and exercise 1's own note names the gain rule's next-session step: `One set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.` No rule at all only when no lift in the session has 2+ working sets (lint L3, L11).
   - A step adds to the row, and a dumbbell row is already per hand, so the rule says no "per hand". A stack has no fixed step (§5): its step is the next plate. No "pins" on a dumbbell (lint L11).
+  - **"One step" is §5's step for the implement** — 2.5 lb on a dumbbell under 50, 5 lb on a barbell — so under 40 lb a lift moves one step and no more (R3's safeguard; re-grade #5: "+5 lb max" was two steps on a 30-lb dumbbell). **A stack's next plate wins at any load**, so a stack under 40 lb (the machine lateral raise) still moves one plate.
 - **Exercise 1's effort is printed once.** When its own line 1 would repeat the session line's band (`RPE 8–9`), it is dropped; a different effort (a capped `RPE 7`, `last set RPE 9–10`) stays (lint L6).
 - **No safety line (R7).** The block carries no medical or warning-sign text.
 - **Who writes it:** `routine_title.format_why_note` returns the block for every program role, and for a chat draft whose first note line is a session line. The compiler places it, then a blank line, then exercise 1's own note.
@@ -125,10 +126,10 @@ Used when there is no logged load, or the newest one is over 180 days old or fro
 ```
 RPE ‹a–b›[, last set RPE ‹c–d›]
 [‹one reason›]                              a stale PREVIOUS more than a step away, or New (no PREVIOUS)
-W set at RPE 5 or less → next plate.          the feeler W row is AT the start load; this is its result rule
+W at RPE 5 or less → one step, no more.       the feeler W row is AT the start load; this is its result rule
 ```
 
-- **The feeler W row is the start load** (8 reps at the working rows' load) and the W line is its result rule: `W set at RPE 5 or less → next plate.` (a fixed implement's one step, `+5 lb per hand` on a dumbbell). Re-grade #4: a "— lb" W row under "test the load." had nothing to act on. RPE 5 is the top of the talk table's full-sentences row: a start that easy is a step light. One phone line. `W set: up to 8 easy reps, find the load.` stays only where the rows carry no load (a chat draft). This is not an effort cap: the band and last-set target are unchanged (lint L4, L5).
+- **The feeler W row is the start load** (8 reps at the working rows' load) and the W line is its result rule: `W at RPE 5 or less → one step, no more.` — §5's step for the implement (a stack's next plate), and **that step IS the lift's "once"** under the load rule: no second step on later sets (re-grade #5: "→ next plate" alone left a double step open on a lift last done years ago). Re-grade #4: a "— lb" W row under "test the load." had nothing to act on. RPE 5 is the top of the talk table's full-sentences row: a start that easy is a step light. One phone line. `W set: up to 8 easy reps, find the load.` stays only where the rows carry no load (a chat draft). This is not an effort cap: the band and last-set target are unchanged (lint L4, L5).
 
 ### 3.4 Warm-up
 

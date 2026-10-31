@@ -168,9 +168,9 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
         "lat_pulldown": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.",
         # #5428 re-grade #2 (2026-10-31): a stale PREVIOUS still shows in Hevy's PREVIOUS column, so a row more than one
         # step under it says why; the feeler W row is at the start load and its line is the result rule (re-grade #4)
-        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW set at RPE 5 or less → next plate.",
+        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW at RPE 5 or less → one step, no more.",
         "lying_db_tricep_extension": (
-            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW set at RPE 5 or less → +5 lb per hand.\nElbows still."
+            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW at RPE 5 or less → one step, no more.\nElbows still."
         ),
     }
     assert all(not note_problems(n) for n in notes.values())

@@ -124,7 +124,8 @@ def test_the_session_block_is_three_lines_with_no_safety_line():
     for word in ("Chest pain", "dizziness", "faint", "911", "heartbeat"):
         assert word not in block
         assert all(word not in e["note"] for r in GOLDEN for e in r["exercises"]), word
-    assert "Under 40 lb: +5 lb max" in g.LOAD_RULE_LINE  # R3's safeguard
+    # R3's safeguard as §5's step (re-grade #5: "+5 lb max" was two steps on a 30-lb dumbbell), a stack's plate at any load
+    assert "Under 40 lb: one step. Stack: next plate at any load." in g.LOAD_RULE_LINE
     # re-grade #2: RPE 7.5 and 8.5 each sit in a branch; no pins. Re-grade #3: two if/then lines, a unit on every step,
     # no "per hand" (a dumbbell row is already per hand), a stack's step is its next plate
     assert "7.5–8.5 → +5 lb" in g.LOAD_RULE_LINE and "Stack: next plate" in g.LOAD_RULE_LINE and "per hand" not in g.LOAD_RULE_LINE
@@ -159,9 +160,10 @@ def test_the_grammar_builders():
     assert g.carry_line1((8, 9)) == "RPE 8–9 · pick the load per hand"
     assert g.carry_line1((8, 9), 60) == "RPE 8–9 · 60 lb per hand to start" and g.CARRY_LINE1_RE.match(g.carry_line1((8, 9), 60))
     assert g.carry_adjust_line(5) == "Set 1 at RPE 7 or less: +10 lb per hand." and g.CARRY_ADJUST_RE.match(g.carry_adjust_line(5))
-    assert g.pick_load_line() == "W set at RPE 5 or less → next plate."  # re-grade #4: the feeler's result rule
+    # re-grade #4: the feeler's result rule; #5: its step is the lift's one step today ("no more")
+    assert g.pick_load_line() == "W at RPE 5 or less → one step, no more."
     assert (
-        g.pick_load_line(step_text="+5 lb per hand") == "W set at RPE 5 or less → +5 lb per hand."
+        g.pick_load_line(step_text="+5 lb per hand") == "W at RPE 5 or less → one step, no more."
         and g.phone_lines(g.pick_load_line(step_text="+5 lb per hand")) == 1
     )
     assert g.pick_load_line(rows_loaded=False) == "W set: up to 8 easy reps, find the load."

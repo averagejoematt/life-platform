@@ -284,17 +284,45 @@ def test_the_round_3_rendering_fails_the_round_4_rules(monkeypatch):
     assert res.lines() == ROUND_2_PROBLEMS, res.lines()
 
 
+# round 4 (re-grade #4's fixes), graded B by blind re-grade #5 — it must fail the round-5 rules: its limits line gave a
+# 30-lb dumbbell two steps (+5 lb against §5's 2.5) with no stack-vs-under-40 precedence, and its feeler line left a
+# second step open under "Once per lift"
+ROUND_3_CHANGED = {
+    "db_shoulder_press": (
+        "Under 40 lb: one step. Stack: next plate at any load. Once per lift.",
+        "Under 40 lb: +5 lb max. Stack: next plate. Once per lift.",
+    ),
+    "lateral_raise_machine": ("W at RPE 5 or less → one step, no more.", "W set at RPE 5 or less → next plate."),
+}
+ROUND_3_PROBLEMS = [
+    "L3 session block: the load rule lines are not the standard's (the session line, the low-energy line, the load rule)",
+    "L4 [2] Lateral Raise (Machine): the W line gives its test no result rule: 'W set at RPE 5 or less → next plate.'",
+    "L5 [2] Lateral Raise (Machine): warm-up rows do not ascend below the work",  # a W row at the work load needs the bound line
+]
+
+
+def test_the_round_4_rendering_fails_the_round_5_rules(monkeypatch):
+    monkeypatch.setenv(lint.MODE_ENV, "off")
+    ir = recomposed_ir()  # round 4's rows: the feeler at 35 lb, the carry at 60 lb per hand
+    for b in ir.exercises:
+        if b.movement_key in ROUND_3_CHANGED:
+            new, old = ROUND_3_CHANGED[b.movement_key]
+            assert new in b.notes
+            b.notes = b.notes.replace(new, old)
+    assert _lint(ir).lines() == ROUND_3_PROBLEMS, _lint(ir).lines()
+
+
 SESSION = (
     "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\n"
     # re-grade #4: the press has one set, but the session's multi-set lifts still get the in-session rule, addressed to them
     "Other lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\n"
-    "Under 40 lb: +5 lb max. Stack: next plate. Once per lift."
+    "Under 40 lb: one step. Stack: next plate at any load. Once per lift."
 )
 NEW_NOTES = {
     "db_shoulder_press": SESSION
     + "\n\nOne set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press.",
     # the feeler W row is AT the 35-lb start load now, and the line says what its answer does
-    "lateral_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 2 years.\nW set at RPE 5 or less → next plate.",
+    "lateral_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 2 years.\nW at RPE 5 or less → one step, no more.",
     # the load rule's own step on this lift, in the rule's own timeline words
     "reverse_pec_deck": "RPE 8–9, last set RPE 9–10\nSet 1: 15 reps at RPE 8.5 or less → next plate on later sets.",
     "seated_incline_curl_dumbbell": "RPE 8–9, last set RPE 9–10",
