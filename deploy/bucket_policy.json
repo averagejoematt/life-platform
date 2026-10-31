@@ -45,6 +45,35 @@
         "arn:aws:s3:::matthew-life-platform/datadrops-archive/*",
         "arn:aws:s3:::matthew-life-platform/claude-memory-backup/*"
       ]
+    },
+    {
+      "Sid": "AWSCloudTrailAclCheck",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "cloudtrail.amazonaws.com"
+      },
+      "Action": "s3:GetBucketAcl",
+      "Resource": "arn:aws:s3:::matthew-life-platform",
+      "Condition": {
+        "StringEquals": {
+          "aws:SourceArn": "arn:aws:cloudtrail:us-west-2:205930651321:trail/life-platform-trail"
+        }
+      }
+    },
+    {
+      "Sid": "AWSCloudTrailWrite",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "cloudtrail.amazonaws.com"
+      },
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::matthew-life-platform/cloudtrail/AWSLogs/205930651321/*",
+      "Condition": {
+        "StringEquals": {
+          "s3:x-amz-acl": "bucket-owner-full-control",
+          "aws:SourceArn": "arn:aws:cloudtrail:us-west-2:205930651321:trail/life-platform-trail"
+        }
+      }
     }
   ]
 }

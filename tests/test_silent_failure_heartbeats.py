@@ -33,6 +33,9 @@ _DETECTORS = [
     ("coherence-overall", "coherence-heartbeat", "OverallAlarm"),
     ("compute-pipeline-stale", "compute-pipeline-stale-heartbeat", "ComputePipelineStaleness"),
     ("compute-outputs-missing", "compute-outputs-heartbeat", "ComputeOutputsMissing"),
+    # #5512: the CloudTrail delivery dead-man rides the same daily liveness run, so its
+    # heartbeat IS ingest-liveness-heartbeat (same namespace, same producer invocation).
+    ("cloudtrail-delivery-stale", "ingest-liveness-heartbeat", "CloudTrailDeliveryStale"),
 ]
 
 

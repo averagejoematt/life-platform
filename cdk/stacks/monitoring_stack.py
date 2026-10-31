@@ -258,6 +258,29 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #5512: the CloudTrail delivery dead-man. The trail (setup/setup_cloudtrail.sh,
+        # outside CDK) delivered nothing from 2026-07-08 to 2026-10-31 — a bucket-policy
+        # apply had replaced the document and dropped the two cloudtrail.amazonaws.com
+        # statements; CloudTrail retried every few minutes with AccessDenied and no
+        # platform signal said so for 115 days. The same daily {check_ingest_liveness}
+        # run now reads get_trail_status and emits CloudTrailDeliveryStale = 1 when the
+        # last delivery is older than 24 h, the trail reports a delivery error, logging
+        # is off, or the status cannot be read at all (fail-loud: an unreadable trail is
+        # not a healthy one). Same namespace as the run's other gauge, so the existing
+        # ingest-liveness-heartbeat covers this detector's own death. Digest, not urgent:
+        # an audit-log gap is a security-posture defect, not a reader-facing one.
+        _alarm(
+            "CloudTrailDeliveryStale",
+            "cloudtrail-delivery-stale",
+            "LifePlatform/IngestLiveness",
+            "CloudTrailDeliveryStale",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # DI-2: source-of-truth reconciliation. Unlike liveness/freshness (which
         # read only DDB and so see only the high-water mark), the strava reconcile
         # job diffs the trailing-14d Strava API activity set against the store and

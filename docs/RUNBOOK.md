@@ -11,7 +11,7 @@ Last updated: 2026-10-31 (v8.6.0 — 89 MCP tools, 85-module package, 107 Lambda
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
 - DLQ: `life-platform-ingestion-dlq`, retention 14d, normally near-empty — check depth via `aws sqs get-queue-attributes --queue-url $(aws sqs get-queue-url --queue-name life-platform-ingestion-dlq --query QueueUrl --output text) --attribute-names ApproximateNumberOfMessages`; investigate via `dlq-consumer` Lambda logs
 - SES configuration set: `life-platform-emails` — wired to the email Lambdas that name it (`grep -rl life-platform-emails lambdas/`; see "SES Email Pipeline"), CloudWatch event destination tracks open/click/bounce/complaint/delivery
-- CloudTrail: `life-platform-trail` now has data events on `s3://matthew-life-platform/raw/*` and `uploads/*`
+- CloudTrail: `life-platform-trail` (multi-region, outside CDK — `setup/setup_cloudtrail.sh`) has data events on `s3://matthew-life-platform/raw/*` and `uploads/*`. **The bucket policy's ONE source of truth is `deploy/bucket_policy.json`** — it carries the public-read, delete-protection AND the two CloudTrail statements; apply it whole, never a partial document (#5512: a partial apply kept the trail dark 2026-07-08 → 10-31). Dead-man: `cloudtrail-delivery-stale` (digest) from the daily liveness run; check `aws cloudtrail get-trail-status --name life-platform-trail --query '{t:LatestDeliveryTime,e:LatestDeliveryError}'`.
 
 ---
 
