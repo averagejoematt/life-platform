@@ -217,7 +217,10 @@ def test_the_script_selects_exactly_the_touched_rows_and_nothing_after_a_revert(
     rows = {
         "COACH#sleep_coach": [dict(v) for (pk, _sk), v in t.items.items() if pk == "COACH#sleep_coach" and _sk.startswith("PREDICTION#")]
     }
-    plan = revert.select(rows)
+    run_plan = {"entries": [{"pk": b["pk"], "sk": b["sk"], "action": "restate"}]}
+    pre = {"rows": [dict(a), dict(b), dict(c)]}
+    assert [e["action"] for e in revert.select(rows)] == ["revert"], "unscoped: the correction only, never an un-stamp"
+    plan = revert.select(rows, plan=run_plan, pre=pre)
     assert sorted((e["sk"], e["action"]) for e in plan) == [
         ("PREDICTION#pred_20261002_recovery_running_average", "revert"),
         ("PREDICTION#pred_b", "unstamp"),
@@ -229,7 +232,7 @@ def test_the_script_selects_exactly_the_touched_rows_and_nothing_after_a_revert(
     rows2 = {
         "COACH#sleep_coach": [dict(v) for (pk, _sk), v in t.items.items() if pk == "COACH#sleep_coach" and _sk.startswith("PREDICTION#")]
     }
-    assert revert.select(rows2) == [], "a second run selects nothing"
+    assert revert.select(rows2, plan=run_plan, pre=pre) == [], "a second run selects nothing"
     assert t.items[(c["pk"], c["sk"])] == c, "an untouched row is untouched"
 
 
@@ -253,11 +256,7 @@ def test_a_plan_scopes_the_unstamps_to_the_rows_the_run_stamped_and_leaves_the_e
     }
     rows = {"COACH#sleep_coach": [dict(v) for (pk, _sk), v in t.items.items() if _sk.startswith("PREDICTION#")]}
     unscoped = revert.select(rows)
-    assert sorted(e["sk"] for e in unscoped) == [
-        "PREDICTION#pred_noop",
-        "PREDICTION#pred_ours",
-        "PREDICTION#pred_theirs",
-    ], "without a plan every 1.1 stamp is offered"
+    assert unscoped == [], "without a plan NO un-stamp is offered — the evaluator's own stamps can never be reversed by this script"
     scoped = revert.select(rows, plan=plan, pre=pre)
     assert [e["sk"] for e in scoped] == ["PREDICTION#pred_ours"], "with the plan + snapshot only the run's own stamp is offered"
     assert revert.stamped_by_the_run(None, None) is None
