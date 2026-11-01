@@ -16,6 +16,14 @@ const all = await loadAll();
 const coach = all.get("coach", p.coach_id);
 const methods = p.method_ids.map((id) => all.get("method", id)).filter(Boolean);
 const graded = p.status === "confirmed" || p.status === "refuted";
+const metric = p.metric_id ? all.get("metric", p.metric_id) : null;
+const stamp = (iso: string | null | undefined) => {
+  if (!iso) return "—";
+  const day = dayInWords(iso.slice(0, 10));
+  const t = /T(\d{2}:\d{2})/.exec(iso);
+  return t ? `${day}, ${t[1]} UTC` : day || "—";
+};
+const gradeWords = (g: any) => (g && typeof g === "object" ? [g.status, g.outcome_notes].filter(Boolean).join(" — ") : g ? String(g) : "—");
 const FLAG_TEXT: Record<string, string> = {
   logging_gap: "graded through a logging gap",
   low_power: "low-power grade: the band is wide against the value",
@@ -27,16 +35,16 @@ const FLAG_TEXT: Record<string, string> = {
   <section class="section">
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:18px">
-        <p class="label">Prediction · <span class="mono">{p.id}</span></p>
+        <p class="label">Prediction · {p.coach_name}{p.retired ? " (retired)" : ""} · {p.kind === "observation" ? "an observation" : p.kind === "yes_no" ? "yes or no" : `a ${p.kind}`}</p>
         <div class="row"><StatusTag status={p.status} date={p.settled_date} />{p.quality_flags.map((f) => <span class={`flag ${f}`}>{f.replace("_", " ")}</span>)}<Provenance object={p} /></div>
         <h1 style="font-size:28px;font-family:var(--mono);font-weight:500;letter-spacing:-.01em;line-height:1.3;overflow-wrap:anywhere">“{p.claim}”</h1>
         <div class="rows">
-          <span><span>Coach</span>{coach ? <a href={href(pathOf("coach", coach.id))} style="font-weight:700;text-decoration:none">{coach.name}</a> : <span class="mono">{p.coach_id}</span>}</span>
+          <span><span>Coach</span>{coach ? <a href={href(pathOf("coach", coach.id))} style="font-weight:700;text-decoration:none">{coach.name}{p.retired ? " · retired" : ""}</a> : <span>{p.coach_name}</span>}</span>
           <span><span>Made</span><span>{dayInWords(p.logged_date)}</span></span>
-          <span><span>Metric</span><span class="mono">{p.metric_id || "—"}</span></span>
+          <span><span>Measure</span>{metric ? <a href={href(pathOf("metric", metric.id))} style="font-weight:700;text-decoration:none">{metric.label}</a> : <span class="mono">{p.metric_key ? p.metric_key.replace(/_/g, " ") : "—"}</span>}</span>
           <span><span>Kind</span><span class="mono">{p.kind}{p.sealed ? " · sealed before day one" : ""}</span></span>
           {p.due_date && <span><span>Graded by</span><span>{dayInWords(p.due_date)}</span></span>}
-          {p.confidence != null && <span><span>Confidence stated</span><span class="mono">{p.confidence}</span></span>}
+          {p.sealed && p.confidence != null && <span><span>Confidence stated</span><span class="mono">{p.confidence}</span></span>}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:18px">
@@ -74,6 +82,25 @@ const FLAG_TEXT: Record<string, string> = {
                 Beside a simple guess
               </p>
               <p style="font-size:14px;line-height:1.55">{p.simple_guess.text || (p.simple_guess.state === "scored" ? (p.simple_guess.right ? "The simple guess was also right." : "The simple guess was wrong.") : "Not yet scored against a guess.")}</p>
+            </div>
+          )
+        }
+        {
+          p.corrections.length > 0 && (
+            <div style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+              <span class="label">Corrected · the original grade is kept</span>
+              {p.corrections.map((c: any) => (
+                <div class="rows" style="font-size:13px">
+                  <span><span>Original grade</span><span style="text-align:right;max-width:60%;overflow-wrap:anywhere">{gradeWords(c.original_grade)}</span></span>
+                  <span><span>Originally graded</span><span>{stamp(c.original_timestamp)}</span></span>
+                  <span><span>Corrected grade</span><span class="mono">{c.corrected_grade || "—"}</span></span>
+                  <span><span>Corrected</span><span>{stamp(c.corrected_at)}</span></span>
+                  <span><span>Reason</span><span style="text-align:right;max-width:60%;overflow-wrap:anywhere">{c.reason || "—"}</span></span>
+                  <span><span>Evaluator version</span><span class="mono">{c.evaluator_version || "—"}</span></span>
+                  <span><span>Aggregate impact</span><span style="text-align:right;max-width:60%;overflow-wrap:anywhere">{c.aggregate_impact || "not stated"}</span></span>
+                </div>
+              ))}
+              <span class="muted" style="font-size:12px">A correction never rewrites the row silently: the original grade, both timestamps, the reason and the evaluator version travel with it.</span>
             </div>
           )
         }

@@ -38,7 +38,9 @@
    "directional_window_verdict"
   ],
   "metric_id": "deep_pct",
-  "quality_flags": [],
+  "quality_flags": [
+   "logging_gap"
+  ],
   "sample": true,
   "sealed": false,
   "settled_date": "2026-10-26",
@@ -56,7 +58,26 @@
   "title": "Lisa Park called deep sleep up as zone-2 volume rose",
   "type": "prediction",
   "verdict_text": "Lisa Park was wrong.",
-  "visibility": "public"
+  "visibility": "public",
+  "coach_name": "Lisa Park",
+  "retired": false,
+  "metric_key": "deep_pct",
+  "corrections": [
+   {
+    "original_grade": {
+     "status": "confirmed",
+     "outcome_date": "2026-10-26",
+     "outcome_notes": "graded through a logging gap",
+     "evaluator_version": "1.0"
+    },
+    "original_timestamp": "2026-10-20T17:02:11Z",
+    "corrected_grade": "refuted",
+    "corrected_at": "2026-10-31T06:00:00Z",
+    "reason": "re-graded by evaluator 1.1: the window spanned a logging gap; the series after the gap moved the other way",
+    "evaluator_version": "1.1",
+    "aggregate_impact": "the coach's record moves from 9 of 12 to 8 of 12"
+   }
+  ]
  },
  {
   "absent_text": null,
@@ -108,7 +129,11 @@
   "title": "Max Reyes called his weight at about 304.5 lb",
   "type": "prediction",
   "verdict_text": "Right.",
-  "visibility": "public"
+  "visibility": "public",
+  "coach_name": "Lisa Park",
+  "retired": false,
+  "metric_key": "weight_lbs",
+  "corrections": []
  },
  {
   "absent_text": null,
@@ -151,7 +176,11 @@
   "title": "Marcus Webb: a non-neutral carb cut will make the protein problem worse",
   "type": "prediction",
   "verdict_text": null,
-  "visibility": "public"
+  "visibility": "public",
+  "coach_name": "Marcus Webb",
+  "retired": false,
+  "metric_key": "total_protein_g",
+  "corrections": []
  },
  {
   "absent_text": null,
@@ -208,7 +237,11 @@
   "title": "Protein recovery would lift the journaling silence",
   "type": "prediction",
   "verdict_text": "Wrong.",
-  "visibility": "public"
+  "visibility": "public",
+  "coach_name": "Marcus Webb",
+  "retired": false,
+  "metric_key": "total_protein_g",
+  "corrections": []
  },
  {
   "absent_text": "No sensor this cycle.",
@@ -251,7 +284,11 @@
   "title": "CGM data will reveal high-amplitude excursions",
   "type": "prediction",
   "verdict_text": null,
-  "visibility": "public"
+  "visibility": "public",
+  "coach_name": "Glucose Coach",
+  "retired": false,
+  "metric_key": null,
+  "corrections": []
  },
  {
   "absent_text": null,
@@ -303,7 +340,11 @@
   "title": "Sealed before day one: the first month's rate",
   "type": "prediction",
   "verdict_text": "Right.",
-  "visibility": "public"
+  "visibility": "public",
+  "coach_name": "Lisa Park",
+  "retired": false,
+  "metric_key": "weight_lbs",
+  "corrections": []
  },
  {
   "absent_text": null,
@@ -335,6 +376,10 @@
   "title": "PRIVATE-SENTINEL-DO-NOT-PUBLISH",
   "type": "prediction",
   "verdict_text": null,
-  "visibility": "private"
+  "visibility": "private",
+  "coach_name": "Lisa Park",
+  "retired": false,
+  "metric_key": null,
+  "corrections": []
  }
 ]

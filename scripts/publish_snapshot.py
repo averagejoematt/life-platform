@@ -39,7 +39,6 @@ Exit codes: 0 ok · 2 schema violation · 3 dangling edge · 4 fetch failure (li
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -130,7 +129,6 @@ LIVE_ENDPOINTS = {
     "episodes": "/panelcast/episodes.json",
     "coaches": "/api/coaches",
     "predictions": "/api/predictions",
-    "calls": "/api/calls",
     "docket": "/api/coach_docket",
     "freshness": "/api/source_freshness",
     "methods": "/api/methods",
@@ -384,6 +382,14 @@ def _live_chapters(ctx: LiveContext) -> None:
             e["chapter_id"] = ctx.chapter_by_week[e["number"]]
 
 
+def _quality_counts(q: Any) -> dict | None:
+    """The grader's per-coach quality counts (#5533), as served: clean + flagged + unassessed == n."""
+    if not isinstance(q, dict) or not all(isinstance(q.get(k), int) for k in ("clean", "flagged", "unassessed", "n")):
+        return None
+    by_flag = {str(k): int(v) for k, v in (q.get("by_flag") or {}).items() if isinstance(v, int)}
+    return {"clean": q["clean"], "flagged": q["flagged"], "unassessed": q["unassessed"], "n": q["n"], "by_flag": by_flag}
+
+
 def _live_coaches(ctx: LiveContext) -> None:
     by_coach = (ctx.fetched.get("predictions") or {}).get("by_coach") or {}
     for c in ctx.rows("coaches", "coaches"):
@@ -410,76 +416,82 @@ def _live_coaches(ctx: LiveContext) -> None:
                 short_bio=c.get("short_bio"),
                 record=record,
                 comparison_text=comp if isinstance(comp, str) and comp else None,
+                quality=_quality_counts(bc.get("quality")),
                 instrument_absent={"absent": bool(c.get("absent")), "reason": c.get("reason")} if c.get("absent") else None,
             )
         )
     ctx.coach_ids = {c["id"] for c in ctx.objs["coach"]}
 
 
-def _live_checked_calls(ctx: LiveContext) -> set[str]:
-    """The checked calls (`/api/calls`): real ids, grading, the simple guess. Returns the ids seen."""
-    seen: set[str] = set()
-    for k in ctx.rows("calls", "calls"):
-        pid = _persona(k["coach_id"])
-        if pid not in ctx.coach_ids:
-            continue
-        status = {"right": "confirmed", "wrong": "refuted"}.get(k.get("verdict"), "inconclusive")
-        tol = k.get("tolerance") or {}
-        act = k.get("actual") or {}
-        sg = k.get("simple_guess") or None
-        kind = k.get("kind") if k.get("kind") in ("number", "direction", "yes_no", "sealed", "interval") else "unknown"
-        ctx.objs["prediction"].append(
-            envelope(
-                id=k["id"],
-                type="prediction",
-                as_of=ctx.as_of,
-                data_through=k.get("settled_date"),
-                source=["/api/calls"],
-                title=k.get("title") or k.get("called_short") or k["claim"],
-                summary=k.get("happened_short"),
-                coach_id=pid,
-                metric_id=None,
-                claim=k["claim"],
-                logged_date=k["logged_date"],
-                due_date=None,
-                settled_date=k.get("settled_date"),
-                kind=kind,
-                status=status,
-                verdict_text=k.get("verdict_text"),
-                grading={
-                    "how": tol.get("statistic"),
-                    "actual_text": act.get("text"),
-                    "tolerance_text": tol.get("text"),
-                    "outcome_notes": k.get("happened"),
-                },
-                simple_guess={"state": sg.get("state", "unknown"), "right": sg.get("right"), "text": sg.get("text")} if sg else None,
-                quality_flags=[],
-                sealed=bool(k.get("sealed")),
-                confidence=None,
-                edges=[{"type": "coach", "id": pid, "rel": "made_by"}],
-            )
-        )
-        seen.add(k["id"])
-    return seen
+LEDGER_STATUS = {
+    "observational": "observation",
+    "pending": "pending",
+    "confirmed": "confirmed",
+    "refuted": "refuted",
+    "expired": "expired",
+    "inconclusive": "inconclusive",
+}
+LEDGER_KIND = ("number", "direction", "yes_no", "sealed", "interval", "observation")
 
 
-def _live_pending_calls(ctx: LiveContext, seen: set[str]) -> None:
-    """The pending rows (`/api/predictions`): served without an id, so a stable one is minted
-    from coach · date · claim until Phase 3 exports prediction_id."""
-    for r in ctx.rows("predictions", "predictions"):
-        if r.get("status") != "pending":
+def _ledger_pages(ctx: LiveContext) -> list[dict]:
+    """Every row of `/api/ledger_export`, page by page (the route serves at most 100 a page). A page
+    that cannot be fetched is a hard failure — a partial ledger would read as a smaller record."""
+    out: list[dict] = []
+    page = 1
+    while True:
+        payload = _get(ctx.base_url, f"/api/ledger_export?page={page}&size=100", ctx.timeout)
+        out.extend(r for r in payload.get("items") or [] if isinstance(r, dict))
+        pages = int(payload.get("pages") or 1)
+        if page >= pages:
+            break
+        page += 1
+    return out
+
+
+def _correction_entry(e: dict) -> dict:
+    """One correction as the ledger serves it, every key kept (owner requirement B — the original
+    grade, its timestamp, the corrected grade, the correction timestamp, the reason, the evaluator
+    version and the aggregate impact), with the names the page reads normalised."""
+    out = dict(e)
+    out.setdefault("original_grade", e.get("original") or None)
+    out.setdefault(
+        "original_timestamp", (e.get("original_grade") or {}).get("snapshot_at") if isinstance(e.get("original_grade"), dict) else None
+    )
+    out.setdefault("corrected_grade", e.get("corrected_status"))
+    out.setdefault("corrected_at", None)
+    out.setdefault("reason", None)
+    out.setdefault("evaluator_version", None)
+    out.setdefault("aggregate_impact", None)
+    return out
+
+
+def _live_ledger(ctx: LiveContext) -> None:
+    """The whole prediction ledger from `/api/ledger_export` (Phase 3, #5537): one Prediction per
+    row, id = coach · prediction_id (a prediction_id repeats across coaches). The grade, the
+    simple guess, the grader's quality flags and every correction travel as served — nothing is
+    re-graded here. A metric the row names becomes an edge when it is a public Metric id."""
+    for r in _ledger_pages(ctx):
+        coach = str(r.get("coach_id") or "")
+        pred = str(r.get("prediction_id") or "")
+        if not coach or not pred or not ID_RE.match(pred):
             continue
-        pid = _persona(r["coach_id"])
+        if not str(r.get("claim") or "").strip():
+            log(f"  ledger row {coach}:{pred} served with no claim text — not a publishable record, skipped")
+            continue
+        pid = _persona(coach)
         if pid not in ctx.coach_ids:
             continue
-        digest = hashlib.sha1((r.get("text") or "").encode("utf-8")).hexdigest()[:10]  # noqa: S324 — id minting, not security
-        rid = f"{r['coach_id']}-{r['date'].replace('-', '')}-{digest}"
-        if rid in seen:
-            continue
-        seen.add(rid)
+        rid = f"{coach}-{pred}"
+        status = LEDGER_STATUS.get(str(r.get("status") or ""), "inconclusive")
+        kind = r.get("kind") if r.get("kind") in LEDGER_KIND else "unknown"
         metric = r.get("metric") if isinstance(r.get("metric"), str) and ID_RE.match(r.get("metric") or "") else None
         if metric:
             ctx.metric_keys.add(metric)
+        g = r.get("grading") or {}
+        sg = r.get("simple_guess") or None
+        flags = [f for f in (r.get("quality_flags") or []) if isinstance(f, str)]
+        corrections = [_correction_entry(e) for e in (r.get("corrections") or []) if isinstance(e, dict)]
         edges = [{"type": "coach", "id": pid, "rel": "made_by"}]
         if metric:
             edges.append({"type": "metric", "id": metric, "rel": "about"})
@@ -488,22 +500,41 @@ def _live_pending_calls(ctx: LiveContext, seen: set[str]) -> None:
                 id=rid,
                 type="prediction",
                 as_of=ctx.as_of,
-                source=["/api/predictions"],
-                title=(r.get("text") or rid)[:120],
+                data_through=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
+                source=["/api/ledger_export"],
+                title=(r.get("claim") or rid)[:120],
+                summary=(sg or {}).get("short"),
                 coach_id=pid,
+                coach_name=str(r.get("coach_name") or pid),
+                retired=bool(r.get("retired")),
                 metric_id=metric,
-                claim=r["text"],
-                logged_date=r["date"],
-                due_date=r.get("due_date"),
-                settled_date=None,
-                kind={"directional": "direction", "point": "number", "machine": "number"}.get(r.get("eval_type") or "", "unknown"),
-                status="pending",
-                verdict_text=None,
-                grading=None,
-                simple_guess=None,
-                quality_flags=[],
-                sealed=bool(r.get("pre_registered")),
-                confidence=float(r["confidence"]) if isinstance(r.get("confidence"), (int, float)) else None,
+                metric_key=r.get("metric") if isinstance(r.get("metric"), str) else None,
+                claim=str(r.get("claim") or ""),
+                logged_date=r.get("logged_date"),
+                due_date=r.get("due_date") if ISO_DAY.match(str(r.get("due_date") or "")) else None,
+                settled_date=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
+                kind=kind,
+                status=status,
+                verdict_text=g.get("outcome_notes") if isinstance(g.get("outcome_notes"), str) else None,
+                grading=(
+                    {
+                        "how": g.get("how"),
+                        "actual_text": g.get("actual_text"),
+                        "tolerance_text": g.get("tolerance_text"),
+                        "outcome_notes": g.get("outcome_notes"),
+                    }
+                    if g
+                    else None
+                ),
+                simple_guess={"state": str(sg.get("state") or "unknown"), "right": sg.get("right"), "text": sg.get("text")} if sg else None,
+                quality_flags=flags,
+                corrections=corrections,
+                sealed=bool(r.get("sealed")),
+                confidence=(
+                    float(r["confidence"])
+                    if isinstance(r.get("confidence"), (int, float)) and not isinstance(r.get("confidence"), bool)
+                    else None
+                ),
                 edges=edges,
             )
         )
@@ -824,8 +855,7 @@ def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
     _live_chapters(ctx)
     _live_week_states(ctx)
     _live_coaches(ctx)
-    seen = _live_checked_calls(ctx)
-    _live_pending_calls(ctx, seen)
+    _live_ledger(ctx)
     _live_disagreements(ctx)
     _live_sources(ctx)
     _live_methods(ctx)

@@ -24,7 +24,8 @@
   "tier": "lead",
   "title": "Eli Marsh",
   "type": "coach",
-  "visibility": "public"
+  "visibility": "public",
+  "quality": null
  },
  {
   "absent_text": null,
@@ -55,7 +56,18 @@
   "tier": "staff",
   "title": "Lisa Park",
   "type": "coach",
-  "visibility": "public"
+  "visibility": "public",
+  "quality": {
+   "clean": 10,
+   "flagged": 1,
+   "unassessed": 1,
+   "n": 12,
+   "by_flag": {
+    "logging_gap": 1,
+    "low_power": 0,
+    "proxy_metric": 0
+   }
+  }
  },
  {
   "absent_text": null,
@@ -86,7 +98,8 @@
   "tier": "staff",
   "title": "Marcus Webb",
   "type": "coach",
-  "visibility": "public"
+  "visibility": "public",
+  "quality": null
  },
  {
   "absent_text": null,
@@ -117,7 +130,8 @@
   "tier": "staff",
   "title": "Sarah Chen",
   "type": "coach",
-  "visibility": "public"
+  "visibility": "public",
+  "quality": null
  },
  {
   "absent_text": null,
@@ -151,6 +165,7 @@
   "tier": "staff",
   "title": "Amara Patel",
   "type": "coach",
-  "visibility": "public"
+  "visibility": "public",
+  "quality": null
  }
 ]

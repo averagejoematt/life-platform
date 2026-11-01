@@ -173,6 +173,22 @@ const predictions = defineCollection({
       .nullable(),
     // Phase 3: emitted by the grader, never computed in a page (owner requirement A).
     quality_flags: z.array(z.enum(["logging_gap", "low_power", "proxy_metric"])),
+    coach_name: z.string().min(1),
+    retired: z.boolean(),
+    metric_key: z.string().nullable(),
+    corrections: z.array(
+      z
+        .object({
+          original_grade: z.record(z.any()).nullable().optional(),
+          original_timestamp: z.string().nullable().optional(),
+          corrected_grade: z.string().nullable().optional(),
+          corrected_at: z.string().nullable().optional(),
+          reason: z.string().nullable().optional(),
+          evaluator_version: z.string().nullable().optional(),
+          aggregate_impact: z.string().nullable().optional(),
+        })
+        .passthrough(),
+    ),
     sealed: z.boolean(),
     confidence: z.number().min(0).max(1).nullable(),
   }),
@@ -210,6 +226,9 @@ const coaches = defineCollection({
       })
       .nullable(),
     comparison_text: z.string().nullable(),
+    quality: z
+      .object({ clean: z.number().int(), flagged: z.number().int(), unassessed: z.number().int(), n: z.number().int(), by_flag: z.record(z.number().int()) })
+      .nullable(),
     instrument_absent: z.object({ absent: z.boolean(), reason: z.string().nullable() }).nullable(),
   }),
 });

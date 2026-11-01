@@ -1,6 +1,6 @@
 ---
-// The ledger — Phase 0: the static index, newest first, grouped by status. The client
-// filter island is Phase 3; every row already has its own page.
+// The ledger: every record the platform serves, one row each, newest first; the counts are
+// of the records in the snapshot; the filter island hides and shows and computes nothing.
 import Base from "../../../layouts/Base.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { dayInWords } from "../../../lib/format.js";
@@ -9,13 +9,18 @@ import { href, pathOf } from "../../../lib/url.js";
 
 const all = await loadAll();
 const edition = await latestEdition();
-const rows = [...all.byType.prediction].sort((a, b) => (a.logged_date < b.logged_date ? 1 : -1));
-const counts = Object.fromEntries(["confirmed", "refuted", "pending", "expired", "inconclusive", "observation"].map((s) => [s, rows.filter((r) => r.status === s).length]));
+const ORDER = ["pending", "confirmed", "refuted", "expired", "inconclusive", "observation"];
+const rows = [...all.byType.prediction].sort((a, b) => (a.logged_date < b.logged_date ? 1 : a.logged_date > b.logged_date ? -1 : a.id < b.id ? -1 : 1));
+const counts = Object.fromEntries(ORDER.map((s) => [s, rows.filter((r) => r.status === s).length]));
 const flagged = rows.filter((r) => r.quality_flags.length).length;
+const corrected = rows.filter((r) => r.corrections.length).length;
+const coaches = [...all.byType.coach].filter((c) => rows.some((r) => r.coach_id === c.id)).sort((a, b) => (a.name < b.name ? -1 : 1));
+const kinds = [...new Set(rows.map((r) => r.kind))].sort();
 const disagreements = all.byType.disagreement;
+const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a direction", yes_no: "yes or no", sealed: "sealed", interval: "an interval", observation: "an observation", unknown: "unclassified" };
 ---
 
-<Base title="The prediction ledger" top="system" description="Every prediction, dated and graded, with the grades that should not count flagged." status={edition ? dayInWords(edition.as_of) : null}>
+<Base title="The prediction ledger" top="system" description="Every prediction, dated and graded, with the grades that should not count flagged and every correction kept." status={edition ? dayInWords(edition.as_of) : null}>
   <section class="section" style="padding-bottom:20px">
     <div class="wrap">
       <p class="label">System · the ledger · {rows.length} records in the snapshot</p>
@@ -25,34 +30,47 @@ const disagreements = all.byType.disagreement;
         <div><span class="label">Refuted</span><span class="v num verm">{counts.refuted}</span></div>
         <div><span class="label">Pending</span><span class="v num">{counts.pending}</span><span class="muted" style="font-size:12px">windows still open</span></div>
         <div><span class="label">Expired</span><span class="v num">{counts.expired}</span><span class="muted" style="font-size:12px">too few readings</span></div>
-        <div><span class="label">Flagged by the grader</span><span class="v num">{flagged}</span><span class="muted" style="font-size:12px">kept out of the clean rate</span></div>
+        <div><span class="label">Observations</span><span class="v num">{counts.observation}</span><span class="muted" style="font-size:12px">not graded, by design</span></div>
+        <div><span class="label">Flagged · corrected</span><span class="v num">{flagged} <small>· {corrected}</small></span><span class="muted" style="font-size:12px">flags stay out of the clean rate; corrections keep the original</span></div>
       </div>
-      <p class="muted" style="margin-top:12px;font-size:13px">Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page.</p>
+      <p class="muted" style="margin-top:12px;font-size:13px">Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page; the filter below only hides and shows.</p>
     </div>
   </section>
-  <section class="wrap" style="padding-bottom:56px">
+  <section class="wrap" style="padding-bottom:56px" data-ledger>
+    <div class="controls" data-needs-js hidden style="display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;margin-bottom:16px">
+      <label class="sel-wrap"><span class="label">Coach</span><select class="sel" data-f-coach aria-label="Filter by coach"><option value="">every coach</option>{coaches.map((c) => <option value={c.id}>{c.name}{c.retired ? " · retired" : ""}</option>)}</select></label>
+      <span class="seg" role="group" aria-label="Filter by status">
+        <button type="button" data-f-status="" aria-pressed="true">All</button>
+        {ORDER.filter((s) => counts[s]).map((s) => <button type="button" data-f-status={s} aria-pressed="false">{s}</button>)}
+      </span>
+      <label class="sel-wrap"><span class="label">Kind</span><select class="sel" data-f-kind aria-label="Filter by kind"><option value="">every kind</option>{kinds.map((k) => <option value={k}>{KIND_WORDS[k] || k}</option>)}</select></label>
+      <label class="sel-wrap" style="flex:1 1 220px"><span class="label">A word in the claim</span><input class="sel" type="search" data-f-text aria-label="Search the claims" placeholder="protein, recovery, sleep…" /></label>
+      <span class="mono muted" style="font-size:12px;min-height:44px;display:inline-flex;align-items:center" data-count aria-live="polite">all {rows.length} records</span>
+    </div>
     {
       rows.length ? (
         <div class="rows">
           {rows.map((p) => (
-            <a href={href(pathOf("prediction", p.id))}>
+            <a href={href(pathOf("prediction", p.id))} data-row data-coach={p.coach_id} data-status={p.status} data-kind={p.kind} data-text={`${p.claim} ${p.coach_name} ${p.metric_key || ""}`.toLowerCase()}>
               <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
                 <span style="font-size:14px;line-height:1.35">
-                  <b>{all.get("coach", p.coach_id)?.title || p.coach_id}</b>
+                  <b>{p.coach_name}</b>
                   <span class="muted">
                     {" "}
-                    · {dayInWords(p.logged_date, { short: true })}
-                    {p.metric_id && ` · ${p.metric_id}`}
+                    · {dayInWords(p.logged_date, { short: true })} · {KIND_WORDS[p.kind] || p.kind}
+                    {p.metric_key && ` · ${p.metric_key.replace(/_/g, " ")}`}
+                    {p.sealed && " · sealed"}
                   </span>
                 </span>
                 <span class="mono" style="font-size:13px;line-height:1.45">
                   {p.claim}
                 </span>
-                {p.quality_flags.length > 0 && (
+                {(p.quality_flags.length > 0 || p.corrections.length > 0) && (
                   <span>
                     {p.quality_flags.map((f) => (
                       <span class={`flag ${f}`}>{f.replace("_", " ")}</span>
                     ))}
+                    {p.corrections.length > 0 && <span class="flag">corrected · original kept</span>}
                   </span>
                 )}
               </span>
@@ -86,3 +104,7 @@ const disagreements = all.byType.disagreement;
     }
   </section>
 </Base>
+
+<script>
+  import "../../../islands/ledger.js";
+</script>

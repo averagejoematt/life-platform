@@ -313,26 +313,86 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
                 }
             ],
         },
-        "/api/calls": {
-            "calls": [
+        "/api/ledger_export?page=1&size=100": {
+            "items": [
                 {
-                    "id": "sleep-20261005-abc1234567",
-                    "kind": "direction",
+                    "item_id": "sleep:pred_20261005_deep_sleep_will_rise",
+                    "prediction_id": "pred_20261005_deep_sleep_will_rise",
                     "coach_id": "sleep",
+                    "coach_name": "Lisa Park",
+                    "retired": False,
+                    "metric": "deep_pct",
                     "claim": "Deep sleep will rise.",
                     "logged_date": "2026-10-05",
-                    "sealed": False,
+                    "due_date": "2026-10-19",
                     "settled_date": "2026-10-26",
-                    "verdict": "wrong",
-                    "verdict_text": "Lisa Park was wrong.",
-                    "actual": {"text": "17%"},
-                    "tolerance": {"text": "2 points", "statistic": "the median day-to-day change"},
-                    "simple_guess": {"state": "scored", "right": True, "text": "also right"},
-                    "title": "Lisa called deep sleep up",
-                    "happened": "flat",
-                    "happened_short": "flat",
-                }
-            ]
+                    "kind": "direction",
+                    "status": "refuted",
+                    "confidence": 0.5,
+                    "sealed": False,
+                    "grading": {
+                        "how": "deep sleep trend up over 14 days",
+                        "actual_text": "17%",
+                        "tolerance_text": "2 points",
+                        "outcome_notes": "flat",
+                    },
+                    "simple_guess": {"state": "scored", "right": True, "text": "also right", "short": "also right"},
+                    "quality_flags": ["logging_gap"],
+                    "corrections": [
+                        {
+                            "original_grade": {"status": "confirmed", "evaluator_version": "1.0"},
+                            "corrected_status": "refuted",
+                            "corrected_at": "2026-10-31T06:00:00Z",
+                            "reason": "re-graded by evaluator 1.1",
+                            "evaluator_version": "1.1",
+                        }
+                    ],
+                },
+                {
+                    "item_id": "sleep:pred_20261019_recovery_will_stabilise",
+                    "prediction_id": "pred_20261019_recovery_will_stabilise",
+                    "coach_id": "sleep",
+                    "coach_name": "Lisa Park",
+                    "retired": False,
+                    "metric": "recovery_score",
+                    "claim": "Recovery will stabilise.",
+                    "logged_date": "2026-10-19",
+                    "due_date": "2026-11-02",
+                    "settled_date": None,
+                    "kind": "direction",
+                    "status": "pending",
+                    "confidence": 0.5,
+                    "sealed": False,
+                    "grading": {"how": None, "actual_text": None, "tolerance_text": None, "outcome_notes": None},
+                    "simple_guess": {"state": "not_yet_scored", "right": None, "text": None, "short": "not checked on this call yet"},
+                    "quality_flags": [],
+                    "corrections": [],
+                },
+                {
+                    "item_id": "mind:pred_20261029_upstream",
+                    "prediction_id": "pred_20261029_upstream",
+                    "coach_id": "mind",
+                    "coach_name": "Nathan Reeves",
+                    "retired": False,
+                    "metric": None,
+                    "claim": "Something upstream shifted both.",
+                    "logged_date": "2026-10-29",
+                    "due_date": None,
+                    "settled_date": None,
+                    "kind": "observation",
+                    "status": "observational",
+                    "confidence": 0.5,
+                    "sealed": False,
+                    "grading": {"how": "an observation, not graded", "actual_text": None, "tolerance_text": None, "outcome_notes": None},
+                    "simple_guess": {"state": "not_yet_scored", "right": None, "text": None, "short": "not checked"},
+                    "quality_flags": [],
+                    "corrections": [],
+                },
+            ],
+            "total": 3,
+            "page": 1,
+            "size": 100,
+            "pages": 1,
         },
         "/api/coach_docket": {
             "open": [],
@@ -433,10 +493,25 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
     lisa = next(c for c in public["coach"] if c["id"] == "sleep_coach")
     assert lisa["record"] == {"right": 19, "n": 48, "through": "2026-10-31"}
     kinds = {p["id"]: (p["status"], p["kind"]) for p in public["prediction"]}
-    assert kinds["sleep-20261005-abc1234567"] == ("refuted", "direction")
+    assert kinds["sleep-pred_20261005_deep_sleep_will_rise"] == (
+        "refuted",
+        "direction",
+    ), "id = coach · prediction_id (a prediction_id repeats across coaches)"
+    assert "mind-pred_20261029_upstream" not in kinds, "a coach the roster does not carry is dropped"
+    refuted = next(p for p in public["prediction"] if p["id"] == "sleep-pred_20261005_deep_sleep_will_rise")
+    assert refuted["quality_flags"] == ["logging_gap"] and refuted["coach_name"] == "Lisa Park" and refuted["metric_key"] == "deep_pct"
+    assert refuted["corrections"][0]["corrected_grade"] == "refuted" and refuted["corrections"][0]["original_grade"] == {
+        "status": "confirmed",
+        "evaluator_version": "1.0",
+    }
+    assert refuted["corrections"][0]["evaluator_version"] == "1.1" and refuted["corrections"][0]["corrected_at"] == "2026-10-31T06:00:00Z"
+    assert refuted["summary"] == "also right" and refuted["edges"][1] == {"type": "metric", "id": "deep_pct", "rel": "about"}
     pending = [p for p in public["prediction"] if p["status"] == "pending"]
-    assert len(pending) == 1 and pending[0]["metric_id"] == "recovery_score"
-    assert {m["id"] for m in public["metric"]} == {"recovery_score"}
+    assert len(pending) == 1 and pending[0]["metric_id"] == "recovery_score" and pending[0]["grading"]["how"] is None
+    assert {m["id"] for m in public["metric"]} == {
+        "deep_pct",
+        "recovery_score",
+    }, "a metric a ledger row names becomes a (series-less) Metric"
     assert [x["id"] for x in public["experiment"]] == ["real_2026-10-01"], "the library catalogue is not an experiment"
     assert public["source"][0]["status"] == "live"
     assert public["edition"][0]["edges"] == [{"type": "chapter", "id": "week-09", "rel": "this_week"}]
