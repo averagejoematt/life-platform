@@ -147,8 +147,17 @@ def check_pubmed(pairs: list[tuple[str, str, str]]) -> list[str]:
     url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=" + ",".join(ids)
     try:
         result = _fetch_json(url)["result"]
-    except (urllib.error.URLError, KeyError, ValueError) as exc:
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429 or exc.code >= 500:
+            return [f"UNVERIFIED eutils answered {exc.code} for {len(ids)} PMID(s) — NCBI could not be observed, not drift"]
         return [f"eutils lookup failed for {len(ids)} PMID(s): {exc}"]
+    except (urllib.error.URLError, KeyError, ValueError) as exc:
+        return [f"UNVERIFIED eutils lookup failed for {len(ids)} PMID(s): {exc}"]
+    # A throttled eutils answers 200 with an EMPTY result set (`uids: []`) — on 2026-11-01 it did so
+    # for every PMID on three CI runs and a laptop at once. One missing id is drift; none resolving
+    # is NCBI not answering, reported UNVERIFIED (never counted as drift, never silently dropped).
+    if not result.get("uids") and not any(result.get(pmid) for pmid in ids):
+        return [f"UNVERIFIED eutils returned no record for any of {len(ids)} PMID(s) — NCBI could not be observed, not drift"]
     failures = []
     for loc, pmid, stored in pairs:
         rec = result.get(pmid) or {}
