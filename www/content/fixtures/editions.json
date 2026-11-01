@@ -79,6 +79,43 @@
     },
     "source": "/api/journey",
     "state": "ok"
+   },
+   "portrait": {
+    "state": "ok",
+    "as_of": "2026-10-31",
+    "source": [
+     "/api/journal_analysis",
+     "/api/mind_overview"
+    ],
+    "absent_text": null,
+    "data": {
+     "mind": {
+      "state": "ok",
+      "entries_total": 2,
+      "entries_30d": 0,
+      "first": "2026-09-06",
+      "last": "2026-09-09",
+      "weeks": [
+       2,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0
+      ]
+     },
+     "connection": {
+      "state": "ok",
+      "interactions_30d": 0,
+      "meaningful_pct": 0
+     },
+     "purpose": {
+      "state": "absent",
+      "text": "No instrument for this yet. Deliberately an empty frame."
+     }
+    }
    }
   },
   "data_through": "2026-10-31",

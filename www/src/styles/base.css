@@ -749,8 +749,8 @@ footer.site a {
     min-height: 200px;
   }
   .door {
-    min-height: 180px;
-    gap: 20px;
+    min-height: 132px;
+    gap: 16px;
   }
 }
 
@@ -826,4 +826,62 @@ footer.site a {
 .label .mono,
 .label {
   overflow-wrap: anywhere;
+}
+
+/* the Start page: premise + portrait */
+.hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr));
+  gap: 56px;
+  align-items: start;
+}
+.premise {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.portrait {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.portrait-tiles {
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+}
+.portrait-tiles .tile .v {
+  font-size: 36px;
+}
+.portrait-tiles .tile .v.hollow {
+  color: var(--hollow);
+}
+.portrait-tiles .tile .note {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.inv .label {
+  color: var(--inkmuted);
+}
+.inv-rows > * {
+  border-color: var(--inkrule);
+  color: var(--paper);
+}
+.inv .serif,
+.inv .big {
+  color: var(--paper);
+}
+.inv-rows > *:last-child {
+  border-bottom-color: var(--inkrule);
+}
+@media (max-width: 640px) {
+  .portrait-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .portrait-tiles .tile {
+    padding: 14px 12px 12px;
+  }
+  .portrait-tiles .tile .v {
+    font-size: 28px;
+  }
 }

@@ -11,7 +11,7 @@ URLs) and renders EVERY built page at a phone (390×844) and a laptop (1280×900
      "Thirty-seven" (the age the owner struck), and the fixture sentinels for a held or
      private object (the privacy gate measured on the OUTPUT, not just the snapshot).
   5. Every <script> has a src (the CSP is `script-src 'self'`; an inline script is a defect).
-  6. The front page's phone height stays under its budget (six screens, as the kit's did).
+  6. The front page's phone height stays under its budget (7.5 screens since the owner's 2026-11-01 brief; six before).
 
 MUTATION CONTROL (always runs first): a copy of the build with one page widened past the
 viewport, an inline <script>, and a sentinel word MUST fail — a gate that cannot fail is a
@@ -43,7 +43,7 @@ AXE_JS_PATH = os.path.join(HERE, "vendor", "axe.min.js")  # the bundle tests/a11
 AXE_GATING_IMPACTS = ("critical", "serious")
 PHONE = {"width": 390, "height": 844}
 LAPTOP = {"width": 1280, "height": 900}
-FRONT_PAGE_SCREENS = 6.0
+FRONT_PAGE_SCREENS = 7.5  # was 6.0 (the kit's); raised 2026-11-01 for the owner's Start-page brief — the six-dimensional portrait and the chapter feature are on the front page by his ruling, not padding
 FORBIDDEN = (
     (re.compile(r"\[object Object\]"), "a leaked non-value"),
     (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "an ISO date (dates are written in words)"),
