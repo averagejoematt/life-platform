@@ -1,0 +1,140 @@
+{
+  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture.",
+  "captured_at": "2026-11-01T03:32:29.507818+00:00",
+  "fetch_path": "/api/ledger_export",
+  "is_prefix_sample": false,
+  "path": "/api/ledger_export",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "items": {
+        "items": {
+          "keys": {
+            "claim": {
+              "type": "string"
+            },
+            "coach_id": {
+              "type": "string"
+            },
+            "coach_name": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "corrections": {
+              "items": null,
+              "length_sample": 0,
+              "type": "array"
+            },
+            "due_date": {
+              "type": "string"
+            },
+            "grading": {
+              "keys": {
+                "actual_text": {
+                  "type": "null"
+                },
+                "how": {
+                  "type": "string"
+                },
+                "outcome_notes": {
+                  "type": "null"
+                },
+                "tolerance_text": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "item_id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "logged_date": {
+              "type": "string"
+            },
+            "metric": {
+              "type": "string"
+            },
+            "prediction_id": {
+              "type": "string"
+            },
+            "quality_flags": {
+              "items": null,
+              "length_sample": 0,
+              "type": "array"
+            },
+            "retired": {
+              "type": "boolean"
+            },
+            "sealed": {
+              "type": "boolean"
+            },
+            "settled_date": {
+              "type": "null"
+            },
+            "simple_guess": {
+              "keys": {
+                "right": {
+                  "type": "null"
+                },
+                "short": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 100,
+        "type": "array"
+      },
+      "page": {
+        "type": "integer"
+      },
+      "pages": {
+        "type": "integer"
+      },
+      "size": {
+        "type": "integer"
+      },
+      "source": {
+        "type": "string"
+      },
+      "total": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

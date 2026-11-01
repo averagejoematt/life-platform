@@ -126,6 +126,10 @@ EXPECTED_ROUTE_MAP = {
     "/api/observatory_week": "handle_observatory_week",
     "/api/page_feedback": "_handle_page_feedback",  # #4182
     "/api/morning_note": "_route_morning_note",  # #4189 — GET served note / POST owner write
+    "/api/series": "handle_series",  # #5532 — one metric's daily series (v9 data room)
+    "/api/ledger_export": "handle_ledger_export",  # #5532 — the whole ledger, paged (v9 ledger)
+    "/api/chapters": "handle_chapters",  # #5532 — program-week chapter states (v9 Story)
+    "/api/pairs": "handle_pairs",  # #5532 — precomputed pair statistics (v9 data room)
     "/api/panel_ledger": "handle_panel_ledger",
     "/api/phenoage": "handle_phenoage",
     "/api/physical_overview": "handle_physical_overview",

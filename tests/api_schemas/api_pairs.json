@@ -1,0 +1,142 @@
+{
+  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture.",
+  "captured_at": "2026-11-01T03:32:29.507818+00:00",
+  "fetch_path": "/api/pairs",
+  "is_prefix_sample": false,
+  "path": "/api/pairs",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "family": {
+        "keys": {
+          "offered": {
+            "type": "integer"
+          },
+          "tested": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "lag_meaning": {
+        "type": "string"
+      },
+      "lags": {
+        "items": {
+          "type": "integer"
+        },
+        "length_sample": 5,
+        "type": "array"
+      },
+      "method_ids": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 6,
+        "type": "array"
+      },
+      "min_n": {
+        "type": "integer"
+      },
+      "pairs": {
+        "items": {
+          "keys": {
+            "a": {
+              "type": "string"
+            },
+            "b": {
+              "type": "string"
+            },
+            "ci95": {
+              "items": {
+                "type": "number"
+              },
+              "length_sample": 2,
+              "type": "array"
+            },
+            "family_size": {
+              "type": "integer"
+            },
+            "fdr_q": {
+              "type": "number"
+            },
+            "lag": {
+              "type": "integer"
+            },
+            "method_ids": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 6,
+              "type": "array"
+            },
+            "n": {
+              "type": "integer"
+            },
+            "n_eff": {
+              "type": "number"
+            },
+            "p_eff": {
+              "type": "number"
+            },
+            "r": {
+              "type": "number"
+            },
+            "rho": {
+              "type": "number"
+            },
+            "tested": {
+              "type": "boolean"
+            },
+            "window": {
+              "keys": {
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 30,
+        "type": "array"
+      },
+      "source": {
+        "type": "string"
+      },
+      "window": {
+        "keys": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

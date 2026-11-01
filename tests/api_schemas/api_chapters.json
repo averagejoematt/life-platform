@@ -1,0 +1,112 @@
+{
+  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture.",
+  "captured_at": "2026-11-01T03:32:29.507818+00:00",
+  "fetch_path": "/api/chapters",
+  "is_prefix_sample": false,
+  "path": "/api/chapters",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "counts": {
+        "keys": {
+          "held": {
+            "type": "integer"
+          },
+          "pending": {
+            "type": "integer"
+          },
+          "published": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "genesis": {
+        "type": "string"
+      },
+      "held": {
+        "keys": {
+          "display": {
+            "type": "string"
+          },
+          "noted_at": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "week": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "source": {
+        "type": "string"
+      },
+      "week_length_days": {
+        "type": "integer"
+      },
+      "weeks": {
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "drafted_at": {
+              "type": "null"
+            },
+            "end": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "null"
+            },
+            "start": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "week": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 9,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

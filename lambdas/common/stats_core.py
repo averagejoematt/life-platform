@@ -87,6 +87,39 @@ def pearson_r(xs, ys, min_n=3):
     return max(-1.0, min(1.0, num / denom))
 
 
+def average_ranks(values):
+    """Fractional (mid) ranks of ``values``, 1-based, ties averaged — the rank transform
+    Spearman's rho is Pearson's r over. ``[10, 20, 20, 30]`` -> ``[1.0, 2.5, 2.5, 4.0]``."""
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        mid = (i + j) / 2.0 + 1.0
+        for k in range(i, j + 1):
+            ranks[order[k]] = mid
+        i = j + 1
+    return ranks
+
+
+def spearman_rho(xs, ys, min_n=3):
+    """Spearman rank correlation over paired lists (None pairs dropped) — #5532.
+
+    Pearson's r over the mid-ranks of each side (ties averaged), so a monotone but
+    non-linear association scores where ``pearson_r`` under-reads it, and one outlying
+    day moves it by one rank rather than by its distance. Same contract as
+    ``pearson_r``: unrounded float in [-1, 1], None below ``min_n`` or when either side
+    has no variance (every value tied). Not autocorrelation-corrected on its own — pair
+    it with ``effective_sample_size`` on daily series, as the Pearson surface does.
+    """
+    xs2, ys2 = clean_pairs(xs, ys)
+    if len(xs2) < max(min_n, 2):
+        return None
+    return pearson_r(average_ranks(xs2), average_ranks(ys2), min_n=min_n)
+
+
 def lag1_autocorr(xs):
     """Lag-1 autocorrelation of a series (None entries dropped, order kept).
 

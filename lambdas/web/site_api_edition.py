@@ -63,6 +63,7 @@ from common.pacific_time import day_in_words, pacific_date_of, pacific_day_n, pa
 
 from web import record_words
 from web.prediction_reason import measure_unit
+from web.site_api_chapters import held_marker  # #5532
 
 #: The block order. The last four (#4582 box 1, the front page makes one data request) are
 #: what the front page and the week page read from their own routes until then: the last
@@ -331,10 +332,7 @@ def _held_chapter(journal: dict) -> dict | None:
     was generated and withheld, with the writer's reason. A publish clears it. None when no draft is held —
     a page says a chapter is waiting ONLY when this is served (round 1: "Week 6 is waiting for Matthew's
     approval" was inferred from dates, and happened to be true)."""
-    held = journal.get("pending")
-    if not isinstance(held, dict) or not held.get("week"):
-        return None
-    return {"week": held.get("week"), "reason": held.get("reason"), "display": held.get("display"), "noted_at": held.get("noted_at")}
+    return held_marker(journal)  # #5532: ONE reader for "a draft is waiting" — /api/chapters serves the same marker
 
 
 def _chapter(journal: dict | None, panelcast: dict | None, today: str, persona_of, cadence: dict | None = None) -> dict:
