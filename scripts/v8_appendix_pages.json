@@ -78,7 +78,13 @@
     {"url": "/coaching/qa/", "title": "Reader questions", "line": "A question form to the coaches, and the questions already answered.", "kind": "tools"},
     {"url": "/method/scenarios/", "title": "Scenario explorer", "line": "Pick a kind of day and see what usually followed.", "kind": "tools"},
     {"url": "/reference/2026-10-22-home-v5/", "title": "The front page, before 22 October 2026", "line": "The earlier front page, kept as it was last served: the loop dial, the constellation of seven areas and the three doors.", "kind": "replaced", "earlier_of": "The front page"},
-    {"url": "/reference/2026-10-22-story-v5/", "title": "The story hub, before 22 October 2026", "line": "The earlier story page, kept as it was last served: the weekly write-ups, the journal and the lab notes in tabs.", "kind": "replaced", "earlier_of": "The story"}
+    {"url": "/reference/2026-10-22-story-v5/", "title": "The story hub, before 22 October 2026", "line": "The earlier story page, kept as it was last served: the weekly write-ups, the journal and the lab notes in tabs.", "kind": "replaced", "earlier_of": "The story"},
+    {"url": "/reference/2026-11-01-home-v8/", "title": "The front page, before 1 November 2026", "line": "The kit front page, kept as it was last served: the dated edition, this week's chapter, today's weight and the coaches' lines.", "kind": "replaced", "earlier_of": "The front page"},
+    {"url": "/reference/2026-11-01-start-v8/", "title": "Start here, before 1 November 2026", "line": "The kit's two-minute version of the story, kept as it was last served.", "kind": "replaced", "earlier_of": "Start here"},
+    {"url": "/reference/2026-11-01-story-v8/", "title": "The story, before 1 November 2026", "line": "The kit story page, kept as it was last served: the latest chapter, the podcast and every chapter in order.", "kind": "replaced", "earlier_of": "The story"},
+    {"url": "/reference/2026-11-01-coaches-v8/", "title": "The AI coaches, before 1 November 2026", "line": "The kit coaches page, kept as it was last served: the record beside a simple guess, the team, one hit and one miss.", "kind": "replaced", "earlier_of": "The AI coaches"},
+    {"url": "/reference/2026-11-01-data-v5/", "title": "The data hub, before 1 November 2026", "line": "The earlier data door, kept as it was last served: every measured source, now and over time, with a readout per topic.", "kind": "replaced", "earlier_of": "The data hub"},
+    {"url": "/reference/2026-11-01-privacy-v5/", "title": "The privacy page, before 1 November 2026", "line": "The earlier privacy policy page, kept as it was last served, with the Permanence Contract and the AI disclaimer.", "kind": "replaced", "earlier_of": "Privacy"}
   ],
   "held": [
     {"url": "/data/wall/", "why": "owner ruling pending (#4604)"},

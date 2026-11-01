@@ -178,6 +178,28 @@ S3_PREFIX="site"
 REGION="us-west-2"
 DRY_RUN="${1:-}"
 
+# ── #5534: ONE OWNER PER PATH. The v9 build (www/dist, deploy/www_preview_sync.sh) and this
+# script both write s3://$BUCKET/site/. Every path the build emits — its directory routes,
+# 404.html, the sitemap files, _astro/ and assets/fonts/v9/ — is listed in the committed
+# www/owned_paths.json and EXCLUDED from every sync below, so a site/** merge or a red-sweep
+# rollback (deploy/rollback_site.sh re-runs this script) can never re-publish the v8 front page
+# over the v9 one. Exact paths, never a prefix: /story/chronicle/ stays site-owned even though
+# /story/*/ is a v9 route pattern. FAIL-CLOSED: no exclude set, no sync. The patterns are
+# relative to each sync's SOURCE directory, so the assets/ and data/ sub-syncs get re-rooted sets.
+# tests/test_v9_cutover_5534.py plants a v9-owned path under a copy of site/ and proves the
+# derivation covers it (and that a kept page beside it is NOT covered).
+_WWW_OWNED="$(dirname "$0")/www_owned_paths.py"
+if ! WWW_EX_RAW="$(python3 "$_WWW_OWNED" --exclude-args)"; then
+  echo "❌ v9 owned-paths exclude set unavailable (deploy/www_owned_paths.py) — refusing to sync without it (#5534)." >&2
+  exit 1
+fi
+WWW_EX_ASSETS_RAW="$(python3 "$_WWW_OWNED" --exclude-args --under assets)"
+WWW_EX_DATA_RAW="$(python3 "$_WWW_OWNED" --exclude-args --under data)"
+read -r -a WWW_EXCLUDES <<< "$WWW_EX_RAW"
+read -r -a WWW_EXCLUDES_ASSETS <<< "$WWW_EX_ASSETS_RAW"
+read -r -a WWW_EXCLUDES_DATA <<< "$WWW_EX_DATA_RAW"
+echo "→ v9-owned paths excluded from this sync (#5534): $(( ${#WWW_EXCLUDES[@]} / 2 )) patterns from www/owned_paths.json"
+
 # ER-06 — PII / guardrail gate (FAIL-CLOSED, before any publish). Scans the
 # static site for blocked-vice terms, structural PII, and (if a local/CI denylist
 # is present) guarded personal literals. A hit aborts the sync. set -e propagates
@@ -297,6 +319,7 @@ if [[ "$DRY_RUN" == "--dry-run" ]]; then
     --exclude "data/*" \
     --exclude ".git/*" \
     --exclude ".DS_Store" \
+    ${WWW_EXCLUDES[@]+"${WWW_EXCLUDES[@]}"} \
     --dryrun \
     --region "$REGION"
   echo "(dry run complete, no changes made)"
@@ -358,6 +381,7 @@ aws s3 sync "$BUILD_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
   --exclude "*" \
   --include "*.????????.css" \
   --include "*.????????.js" \
+  ${WWW_EXCLUDES_ASSETS[@]+"${WWW_EXCLUDES_ASSETS[@]}"} \
   --cache-control "max-age=31536000, public, immutable" \
   --region "$REGION"
 
@@ -367,6 +391,7 @@ aws s3 sync "$BUILD_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
   --exclude "*.????????.css" \
   --exclude "*.????????.js" \
   --exclude "*.map" \
+  ${WWW_EXCLUDES_ASSETS[@]+"${WWW_EXCLUDES_ASSETS[@]}"} \
   --cache-control "max-age=86400, public" \
   --region "$REGION"
 
@@ -381,6 +406,7 @@ aws s3 sync "$BUILD_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
 echo "→ Data JSON (max-age=86400)..."
 aws s3 sync "$BUILD_DIR/data/" "s3://$BUCKET/$S3_PREFIX/data/" \
   --exclude "*.html" \
+  ${WWW_EXCLUDES_DATA[@]+"${WWW_EXCLUDES_DATA[@]}"} \
   --cache-control "max-age=86400, public" \
   --content-type "application/json" \
   --region "$REGION" 2>/dev/null || true
@@ -396,6 +422,7 @@ aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --exclude "*.webmanifest" \
   --exclude "sw.js" \
   --exclude "version.json" \
+  ${WWW_EXCLUDES[@]+"${WWW_EXCLUDES[@]}"} \
   --cache-control "max-age=3600, public" \
   --region "$REGION"
 
@@ -406,6 +433,7 @@ aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --exclude "*" \
   --include "*.webmanifest" \
   --include "sw.js" \
+  ${WWW_EXCLUDES[@]+"${WWW_EXCLUDES[@]}"} \
   --cache-control "max-age=300, must-revalidate, public" \
   --region "$REGION"
 
@@ -416,10 +444,13 @@ aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
 # read 43 pages red on it. Assets first means a page can never reference a file that is
 # not yet in S3; old hashed files stay until the next --delete-safe prune, so old HTML keeps
 # working during the swap.
-echo "→ HTML files (max-age=300)..."
+# #5534: the v9-owned pages (/, /story/, /data/, /privacy/, 404.html and every route the build
+# emits) are excluded here — this is the step that would otherwise put the v8 front page back.
+echo "→ HTML files (max-age=300; v9-owned pages excluded)..."
 aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --exclude "*" \
   --include "*.html" \
+  ${WWW_EXCLUDES[@]+"${WWW_EXCLUDES[@]}"} \
   --cache-control "max-age=300, public" \
   --content-type "text/html; charset=utf-8" \
   --region "$REGION"

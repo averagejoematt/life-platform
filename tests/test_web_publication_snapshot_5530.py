@@ -201,8 +201,11 @@ def test_appendix_derives_from_qa_manifest_and_excludes_the_kit_doors():
     from qa.qa_manifest import MANIFEST
 
     app = ps.build_appendix()
-    paths = {it["path"] for it in app["items"]}
+    # #5534: the reference copies of replaced layouts (site/reference/<date>-<slug>/, EXEMPT from the
+    # registry) join in their own group, derived from the tree; everything else is a registry row.
+    paths = {it["path"] for it in app["items"] if it["group"] != ps.REFERENCE_GROUP}
     assert paths <= {m["path"] for m in MANIFEST}
+    assert all(it["path"].startswith("/reference/") for it in app["items"] if it["group"] == ps.REFERENCE_GROUP)
     assert not (paths & ps.KIT_LIVE) and not (paths & ps.UTILITY)
     assert len(paths) >= 50, "the appendix lost most of the registry"
     assert all(it["group"] for it in app["items"])

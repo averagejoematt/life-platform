@@ -1,18 +1,33 @@
-# v9 preview deploy (#5530, epic #5529) — the LIVE snapshot built to the preview path.
+# v9 deploy (#5530 preview · #5534 root, epic #5529) — the LIVE snapshot built to ONE of two targets.
 #
-# Runs only on a push to main that touches the v9 build (i.e. after a merge) and only ever
-# writes under s3://matthew-life-platform/site/next/v9/ — the existing noindex preview
-# convention (robots.txt already disallows /next/). It never touches `/`, never deletes,
-# never changes CloudFront configuration, and uses the same OIDC deploy role the site
-# deploy already holds (site/* write) under the same `ungated-deploy` environment (#4257:
-# the role trusts only environment subjects, never a bare main ref) — no new grant.
+# One workflow, two targets, one owner per path:
+#   preview  s3://matthew-life-platform/site/next/v9/  (WEB_BASE=/next/v9/, noindex; robots.txt
+#            disallows /next/). Runs on every push to main touching the build, as since #5530.
+#   root     s3://matthew-life-platform/site/           (WEB_BASE=/, sitemap on, self-canonical).
+#            ONLY when www/owned_paths.json carries `live_at_root: true` — the committed cut-over
+#            switch. deploy/www_deploy_target.py resolves the target: a push deploys root once the
+#            switch is on; a `workflow_dispatch` with target=root is REFUSED while it is off, so a
+#            dispatch cannot launch ahead of the repo. Flipping `/` is therefore ONE merge
+#            (scripts/www_cutover_switch.py --live, then a PR); the owner's go is that merge.
 #
-# The snapshot is read from the PUBLIC Site API over HTTPS with no credentials (owner
-# decision 4): what the API will not serve, this build cannot render. If the live export
-# fails, nothing is deployed and the run is red; a fixture build is never published here.
-# No schedule in Phase 0; the nightly rebuild (plan §B3) arrives later with its dead-man.
+# What makes a root deploy safe (#5534): the site/ deploy excludes every path this build writes
+# (www/owned_paths.json via deploy/www_owned_paths.py, in sync_site_to_s3.sh AND rollback_site.sh),
+# and this workflow's own rollback restores the v9 paths from the previous green v9 build
+# (s3://…/site/_v9_previous/, S3 → S3, v9 keys only) — never from site/. Neither path can
+# re-publish the v8 front page over the launch. After a root sync the smoke + visual sweeps judge the
+# live site (qa/qa_manifest.py describes `/` as the v9 page set once the switch is on); a green run
+# records the build as the new previous; a red one rolls the v9 paths back, scope-checked the way
+# site-deploy.yml's rollback is (#3352/#3395).
+#
+# It never deletes, never changes CloudFront configuration, and uses the same OIDC deploy role the
+# site deploy already holds (site/* write) under the same `ungated-deploy` environment (#4257) — no
+# new grant. The snapshot is read from the PUBLIC Site API over HTTPS with no credentials (owner
+# decision 4): what the API will not serve, this build cannot render. If the live export fails,
+# nothing is deployed and the run is red; a fixture build is never published here. The shell lives
+# in tested entrypoints (deploy/www_deploy_target.py, deploy/www_build_target.sh,
+# deploy/www_preview_sync.sh, deploy/www_root_rollback.sh), not here (#4885).
 
-name: v9 preview deploy
+name: v9 deploy (preview · root)
 
 on:
   push:
@@ -23,25 +38,35 @@ on:
       - 'deploy/www_preview_sync.sh'
       - '.github/workflows/web-preview-deploy.yml'
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'preview = /next/v9/ (default) · root = / — REFUSED unless www/owned_paths.json has live_at_root: true (the switch is that one-line merge, #5534)'
+        required: false
+        default: preview
+        type: choice
+        options: [preview, root]
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: v9-preview-deploy
+  group: v9-deploy
   cancel-in-progress: false
 
 env:
   AWS_ACCOUNT_ID: "205930651321"
   AWS_REGION: us-west-2
+  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest
 
 jobs:
-  preview:
-    name: Live snapshot → build → sync to /next/v9/
+  deploy:
+    name: Live snapshot → build → sync to the resolved target
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: ungated-deploy
+    outputs:
+      target: ${{ steps.target.outputs.target }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-ci
@@ -58,15 +83,146 @@ jobs:
         working-directory: www
         run: npm ci --ignore-scripts --no-fund --loglevel=error
 
+      # push → preview (or root once the switch is on); dispatch root → refused while it is off.
+      - name: Resolve the target (the committed switch decides, #5534)
+        id: target
+        env:
+          WWW_TARGET_INPUT: ${{ github.event.inputs.target }}
+        run: python3 deploy/www_deploy_target.py --event "${{ github.event_name }}"
+
       - name: Export the LIVE publication snapshot (public API, no credentials)
         run: python3 scripts/publish_snapshot.py --mode live --out www/content/snapshot
 
-      - name: Build to the preview base
-        working-directory: www
-        run: npm run build:preview
+      # preview: build:preview + scan (noindex required). root: build + scan (no noindex) + the live
+      # build's routes checked against the kept site/ pages (deploy/www_owned_paths.py --check-dist).
+      - name: Build and scan for the target (scripts/check_www_build.py --scan-only; root adds the live collision check)
+        run: |
+          bash deploy/www_build_target.sh "${{ steps.target.outputs.target }}"  # runs scripts/check_www_build.py --scan-only [+ www_owned_paths.py --check-dist]
 
-      - name: Output scan — no sentinel, no inline script, noindex on every page
-        run: python3 scripts/check_www_build.py --scan-only
+      - name: Sync to the target prefix and invalidate it (root waits for the invalidation)
+        run: bash deploy/www_preview_sync.sh --target "${{ steps.target.outputs.target }}"
 
-      - name: Sync to the preview prefix and invalidate it
-        run: bash deploy/www_preview_sync.sh www/dist site/next/v9 "/next/v9/*"
+      - name: Keep the root build for the record step
+        if: steps.target.outputs.target == 'root'
+        # #1331: this job feeds the rollback (needs.deploy.result); quota noise on an upload must not read as a failed deploy.
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: v9-root-${{ github.sha }}
+          path: www/dist
+          retention-days: 14
+
+  # ── root only: the same two sweeps site-deploy.yml gates on, against the live site ─────────────
+  smoke:
+    name: Site smoke test (root deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: deploy
+    if: needs.deploy.outputs.target == 'root'
+    outputs:
+      site_reachable: ${{ steps.smoke.outputs.site_reachable }}
+      surfaces: ${{ steps.smoke.outputs.surfaces }}
+      summary: ${{ steps.smoke.outputs.summary }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Credential-free (pure HTTP). No SMOKE_EXPECT_BUILD: the v9 build carries no version.json; the
+      # deploy job blocked on `aws cloudfront wait invalidation-completed` instead (#1526).
+      - name: Run site smoke test (pure HTTP — no AWS access)
+        id: smoke
+        run: bash deploy/smoke_test_site.sh
+
+  visual-qa:
+    name: Visual + AI-vision QA (root deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    needs: deploy
+    if: needs.deploy.outputs.target == 'root'
+    outputs:
+      site_reachable: ${{ steps.verdict.outputs.site_reachable }}
+      surfaces: ${{ steps.verdict.outputs.surfaces }}
+      summary: ${{ steps.verdict.outputs.summary }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          python-cache: 'pip'
+      - name: Install Playwright + Chromium
+        uses: ./.github/actions/playwright-browser
+        with:
+          browser: chromium
+      - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
+        uses: ./.github/actions/setup-ci
+        with:
+          python: 'false'
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-diagnosis-role
+          aws-region: ${{ env.AWS_REGION }}
+      # The same sweep and dial as site-deploy.yml: deterministic over the full registered surface,
+      # AI-vision on the tier-1 doors (#1428). The v9 pages are in the registry once the switch is on.
+      - name: Run visual + AI-vision QA sweep
+        run: python3 qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+      - name: Classify the failing surface (rollback scope check)
+        id: verdict
+        if: always()
+        run: python3 qa/visual_qa_verdict.py --report qa-screenshots/report.json --out qa-screenshots/verdict.json --github-output
+      - name: Upload screenshots + report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: v9-root-visual-qa-${{ github.sha }}
+          path: qa-screenshots/
+          retention-days: 14
+
+  # ── root only, green: this build becomes the previous build the next red rolls back to ──────────
+  record-previous:
+    name: Record this green root build as the previous build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy, smoke, visual-qa]
+    if: "!cancelled() && needs.deploy.outputs.target == 'root' && needs.smoke.result == 'success' && needs.visual-qa.result == 'success'"
+    environment: ungated-deploy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: v9-root-${{ github.sha }}
+          path: www/dist
+      - name: Record the build at site/_v9_previous/ (no delete)
+        run: bash deploy/www_preview_sync.sh --target root --record-previous
+
+  # ── root only, red: roll the v9 paths back to the previous v9 build — never to site/ ──────────────
+  rollback-v9-on-failure:
+    name: Auto-rollback the v9 paths (smoke or visual-QA failure)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy, smoke, visual-qa]
+    if: >-
+      always() &&
+      needs.deploy.result == 'success' &&
+      needs.deploy.outputs.target == 'root' &&
+      (needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure')
+    environment: ungated-deploy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+      # Scope check (#3352/#3395 applied to the v9 paths), then `www_preview_sync.sh --restore-previous`,
+      # then one SNS line either way — all inside the tested script, never inline here.
+      - name: Scope-check, restore the previous v9 build, notify
+        id: rollback
+        env:
+          SITE_REACHABLE: ${{ needs.visual-qa.outputs.site_reachable }}
+          QA_SURFACES: ${{ needs.visual-qa.outputs.surfaces }}
+          QA_SUMMARY: ${{ needs.visual-qa.outputs.summary }}
+          SMOKE_REACHABLE: ${{ needs.smoke.outputs.site_reachable }}
+          SMOKE_SURFACES: ${{ needs.smoke.outputs.surfaces }}
+          SMOKE_SUMMARY: ${{ needs.smoke.outputs.summary }}
+          GATE: smoke=${{ needs.smoke.result }} visual-qa=${{ needs.visual-qa.result }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash deploy/www_root_rollback.sh

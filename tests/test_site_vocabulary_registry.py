@@ -62,7 +62,10 @@ def _ruled(reg: dict) -> list[dict]:
 def census() -> dict[str, list[str]]:
     """term -> reader pages that still carry it (ungloss'd, for keep-with-gloss terms)."""
     reg = _registry()
-    pages = site_text.reader_pages()
+    # #5534: a reference copy of a replaced layout (site/reference/<date>-<slug>/, owner ruling 2026-10-18) is a byte copy
+    # of a page this census already counted, served noindex and unlinked; counting it twice would make the ratchet red every
+    # cut-over that keeps a page, which is the opposite of the ruling. The copies are not reader-facing navigation.
+    pages = [p for p in site_text.reader_pages() if not p.startswith("site/reference/")]
     texts = {p: site_text.main_text(p) for p in pages}
     out: dict[str, list[str]] = {}
     for t in _ruled(reg):

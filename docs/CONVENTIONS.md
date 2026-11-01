@@ -155,6 +155,13 @@ was the drift class itself). Manual `sync_site_to_s3.sh` remains sanctioned for
 attended work (its clobber guard still protects a stale checkout), but merge-to-main
 is the default ship path for the site.
 
+**One owner per S3 path (#5534).** Two workflows write `s3://matthew-life-platform/site/` —
+`site-deploy.yml` (the `site/` tree) and `web-preview-deploy.yml` (the v9 build, `www/dist`) — and
+neither may write the other's keys: the build's paths are the committed `www/owned_paths.json`,
+`sync_site_to_s3.sh`/`rollback_site.sh` exclude exactly them (`deploy/www_owned_paths.py`,
+fail-closed), and the v9 workflow rolls its paths back from its own previous build, never from
+`site/`. A new path gets one owner before it gets a second writer.
+
 **A red site-deploy is silent (#3878, #4703).** The workflow has no production gate and
 nothing pages on its failure, so merged `site/**` work can publish-and-revert, or never
 publish, for days — 3 d in 2026-09 (two sub-floor labels), 23 h in 2026-10 (a stale

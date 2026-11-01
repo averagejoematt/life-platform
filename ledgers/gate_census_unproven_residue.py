@@ -133,6 +133,7 @@ UNPROVEN_RESIDUE: dict[str, str] = {
     "ci::.github/workflows/site-deploy.yml::visual-qa / Classify the failing surface (rollback scope check)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/site-deploy.yml::visual-qa / Install Playwright + Chromium": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/web-gate.yml::web-gate / Playwright (chromium) for the render gate": "2026-11-01 (#5530): the local playwright-browser composite install step, the same class as the four sibling installs sealed 2026-09-05 — an install, not a verdict; the verdict is the next step's (ci::web-gate.yml::web-gate::7, proven)",
+    "ci::.github/workflows/web-preview-deploy.yml::visual-qa / Install Playwright + Chromium": "2026-11-01 (#5534): the local playwright-browser composite install step of the v9 root deploy's visual sweep, the same class as site-deploy.yml's identically named step and the four sibling installs sealed 2026-09-05 — an install, not a verdict; the verdict is the next step's (ci::web-preview-deploy.yml::visual-qa::4, ATTEMPTED_UNPROVEN in scripts/gate_census.py)",
     "ci::.github/workflows/site-deploy.yml::visual-qa / Run visual + AI-vision QA sweep": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/surface-drift.yml::surface-drift / Surface-drift gate (#1454)": "2026-09-05 seal (#3536)",
     "ci::.github/workflows/v4-gate.yml::render-accuracy-gate / Install Playwright + Chromium": "2026-09-05 seal (#3536)",

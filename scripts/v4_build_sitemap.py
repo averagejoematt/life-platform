@@ -29,7 +29,16 @@ the only way search engines discover them. As a side-effect, injects a <noscript
 fallback link-list into site/story/chronicle/index.html so crawlers without JS
 can follow the same links.
 
-Writes site/sitemap.xml. Run from repo root:  python3 scripts/v4_build_sitemap.py
+#5534 (the v9 cut-over) — ONE writer per sitemap file. This generator writes the KEPT site/ pages to
+`site/sitemap-site.xml` on every deploy. `site/sitemap.xml` has two writers across time but one at a
+time, arbitrated by the committed switch `live_at_root` in www/owned_paths.json: while it is false the
+v9 build is a /next/v9/ preview and THIS script also writes sitemap.xml (as it always has); once it is
+true the v9 build writes sitemap.xml (its sitemap index, www/scripts/postbuild.mjs) and this script
+leaves that file alone. robots.txt lists both files. A page the v9 build owns (`owner: www` in the
+registry) is in the build's sitemap, never this one.
+
+Writes site/sitemap-site.xml (+ site/sitemap.xml before the cut-over). Run from repo root:
+    python3 scripts/v4_build_sitemap.py
 """
 
 from __future__ import annotations
@@ -60,6 +69,17 @@ def _page_registry():
     from qa import qa_manifest  # noqa: E402 — local import, path just inserted
 
     return qa_manifest.MANIFEST
+
+
+def v9_owns_sitemap_xml() -> bool:
+    """#5534: once the v9 build owns `/`, it owns sitemap.xml too (www/owned_paths.json: live_at_root)."""
+    sys.path.insert(0, str(REPO_ROOT))
+    from deploy import www_owned_paths  # noqa: E402 — the one reader of the switch
+
+    try:
+        return www_owned_paths.live_at_root()
+    except (OSError, ValueError):
+        return False
 
 
 def file_for_path(path: str) -> Path:
@@ -133,6 +153,8 @@ def registry_urls() -> list[str]:
     for p in _page_registry():
         if p["path"] in v4_chrome.HELD_UNTIL_RULED:
             continue  # #4604: held until the owner's per-page ruling — out even if its noindex goes missing
+        if p.get("owner") == "www":
+            continue  # #5534: the v9 build's page — in the build's own sitemap, never this one
         f = file_for_path(p["path"])
         if not f.exists():
             continue
@@ -161,9 +183,16 @@ def main() -> int:
     for u in sorted(post_urls):
         lines.append(f"  <url><loc>{u}</loc><lastmod>{today}</lastmod><priority>0.8</priority></url>")
     lines.append("</urlset>")
-    (SITE / "sitemap.xml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    body = "\n".join(lines) + "\n"
+    (SITE / "sitemap-site.xml").write_text(body, encoding="utf-8")
+    written = "site/sitemap-site.xml"
+    if v9_owns_sitemap_xml():
+        print("site/sitemap.xml left to the v9 build (www/owned_paths.json live_at_root=true, #5534).")
+    else:
+        (SITE / "sitemap.xml").write_text(body, encoding="utf-8")
+        written += " + site/sitemap.xml"
     print(
-        f"wrote site/sitemap.xml — {len(urls)} registry URL(s) + {len(post_urls)} post URL(s) "
+        f"wrote {written} — {len(urls)} registry URL(s) + {len(post_urls)} post URL(s) "
         f"(derived from qa/qa_manifest.MANIFEST, #3567; noindex pages excluded live)."
     )
 

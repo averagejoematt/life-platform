@@ -273,6 +273,14 @@ ALLOWED_ABSENT = (
         "the CloudWatch PutMetricData path is armed only by DEPLOY_RACE_PUT_METRIC=1; the smoke job holds no AWS credentials by design "
         "and the EMF log line is the durable record",
     ),
+    (
+        "web-preview-deploy.yml",
+        "smoke",
+        "deploy/deploy_convergence.py",
+        "boto3",
+        "#5534: the v9 root deploy's smoke job is site-deploy.yml's twin — the same script, the same credential-free design; the "
+        "PutMetricData path is armed only by DEPLOY_RACE_PUT_METRIC=1, which it never sets",
+    ),
     # ── the PII gate reaches playwright only through accuracy_audit's optional visual_qa
     # import (screenshot sanity_scan); pii_surface_guard never screenshots.
     (

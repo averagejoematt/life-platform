@@ -101,6 +101,7 @@ PUSH_TRIGGER_GLOBS = (
     "www/**",  # #5530 — the v9 build (web-gate.yml, web-preview-deploy.yml)
     "scripts/publish_snapshot.py",  # #5530 — its one producer
     "scripts/check_www_build.py",  # #5530 — its build gate
+    "deploy/www_owned_paths.py",  # #5534 — the owned-paths reader the build gate's drift check imports (web-gate.yml)
     "tests/web_preview_gate.py",  # #5530 — its render gate
     "deploy/www_preview_sync.sh",  # #5530 — its preview sync
     ".github/workflows/web-preview-deploy.yml",  # #5530 — the preview deploy exercises itself

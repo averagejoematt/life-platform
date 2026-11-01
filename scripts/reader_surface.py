@@ -100,6 +100,10 @@ FUNCTION_URLS_NO_SWEPT_PAGE = {
 # (it consults this script) or here, and site-deploy.yml's filter still names SITE_PREFIX.
 UNGATED_JUDGE_WORKFLOWS = {
     ".github/workflows/site-deploy.yml": "path-triggered on site/** — always runs the vision judge",
+    ".github/workflows/web-preview-deploy.yml": (
+        "#5534: the v9 ROOT deploy's visual sweep is site-deploy.yml's twin — it runs only after a root sync (www/** push once "
+        "live_at_root is on) and always judges the live site; its result feeds the v9 rollback, so a skip could never read as green"
+    ),
 }
 
 # The two AI judges and the harness that drives them. A judge edit must run the judge.

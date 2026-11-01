@@ -296,6 +296,12 @@ The chain, when you move/rename a page:
    build, re-invalidate) + SNS alert — but only when the failed check's surface is
    `site/**`-reachable (#3352 / #3395); a data-plane or edge-config red files an issue instead.
 
+**One owner per path (#5534).** The v9 build (`www/`) and the `site/` tree share the `site/` S3
+prefix; every path the build writes is listed in `www/owned_paths.json` and `sync_site_to_s3.sh` +
+`rollback_site.sh` exclude exactly those (`deploy/www_owned_paths.py`), so a `site/**` deploy or
+rollback never touches `/`, `/story/`, `/data/`, `/privacy/`, `404.html` or the build's assets once
+the cut-over switch is on — the v9 paths roll back through their own workflow (`www/README.md` § Deploy).
+
 **A red site-deploy is silent (#3878, #4703).** Nothing pages on the workflow's failure, so a
 merge can publish-and-revert, or never publish. Read the newest `site-deploy.yml` conclusion
 before merging anything under `site/**` or a `scripts/v4_build_*.py` generator — the SessionStart

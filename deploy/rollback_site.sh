@@ -22,6 +22,13 @@
 #      live (docs/CONVENTIONS.md §4b).
 #   5. Restores the working tree to its original state
 #
+# #5534 — what this NEVER touches: the paths the v9 build owns (www/owned_paths.json: `/`,
+# /story/, /data/, /privacy/, 404.html, sitemap*.xml, _astro/, assets/fonts/v9/ and every route
+# the build emits). sync_site_to_s3.sh excludes them on every run, this one included, so a
+# site/** rollback cannot un-launch the v9 site by accident. Rolling the v9 paths back is the
+# v9 workflow's own job (web-preview-deploy.yml: `deploy/www_preview_sync.sh --restore-previous`,
+# from s3://matthew-life-platform/site/_v9_previous/), never this script.
+#
 # History (#418/ADR-117): previously this synced the raw site/ tree via safe_sync
 # with NO re-hash and NO version.json regen — which, in the v4 content-hashed-asset
 # era, would leave the live version.json on the BAD build and pair fresh HTML with
@@ -72,6 +79,8 @@ for line in sys.stdin:
 if [ "$DRY_RUN" = "--dry-run" ]; then
   echo "[DRY RUN] Would checkout site/ from $REF ($TARGET_SHA)"
   echo "[DRY RUN] Would re-run deploy/sync_site_to_s3.sh (re-hash + stamp version.json=$TARGET_SHA + invalidate CloudFront)"
+  echo "[DRY RUN] Would EXCLUDE the v9-owned paths (#5534, www/owned_paths.json via deploy/www_owned_paths.py):"
+  python3 deploy/www_owned_paths.py --exclude-args | tr ' ' '\n' | grep -v '^--exclude$' | sed 's/^/  - /'
   echo "[DRY RUN] Would restore config/ from $REF and re-run deploy/config_twin_sync.py --apply --strict (#3654)"
   if [ -n "$ADDED_CONFIG_KEYS" ]; then
     echo "[DRY RUN] Would LEAVE LIVE (config/ twin added since $REF — no prior bytes, delete-protected):"
@@ -101,8 +110,9 @@ git checkout "$REF" -- site/
 
 # Re-run the canonical build+sync. ALLOW_STALE_SITE=1 bypasses the clobber guard
 # (this is a deliberate rollback), OVERRIDE_BUILD_SHA stamps the restored build's
-# SHA into version.json + the page <meta build> tags.
-echo "Re-running canonical build+sync (rollback)..."
+# SHA into version.json + the page <meta build> tags. The v9-owned paths are excluded
+# inside sync_site_to_s3.sh (#5534) — a site/ rollback never writes the v9 build's keys.
+echo "Re-running canonical build+sync (rollback; v9-owned paths excluded, #5534)..."
 ALLOW_STALE_SITE=1 OVERRIDE_BUILD_SHA="$TARGET_SHA" bash deploy/sync_site_to_s3.sh
 
 # ── #3654: restore bucket-root config/ twins to $REF's bytes ──────────────────

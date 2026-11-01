@@ -166,8 +166,9 @@ def test_the_install_composite_runs_what_the_guards_expand_it_to():
         "site-deploy.yml": ["chromium"],
         "visual-qa.yml": ["chromium"],
         "web-gate.yml": ["chromium"],  # #5530: the v9 render gate (tests/web_preview_gate.py) on the fixture build
+        "web-preview-deploy.yml": ["chromium"],  # #5534: the v9 ROOT deploy's visual sweep (site-deploy.yml's twin, root target only)
         "webkit-mobile-qa.yml": ["webkit"],
-    }, f"the five Playwright jobs must each install through {ACTION_REF} exactly once: {callers}"
+    }, f"the six Playwright jobs must each install through {ACTION_REF} exactly once: {callers}"
 
 
 def test_ci_cd_no_longer_owns_the_site_deploy():
