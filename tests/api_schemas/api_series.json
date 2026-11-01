@@ -1,0 +1,85 @@
+{
+  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture.",
+  "captured_at": "2026-11-01T02:55:44.620971+00:00",
+  "fetch_path": "/api/series?metric=hrv",
+  "is_prefix_sample": false,
+  "path": "/api/series",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "behavioral": {
+        "type": "boolean"
+      },
+      "days": {
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "gap": {
+              "type": "boolean"
+            },
+            "present": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 4,
+        "type": "array"
+      },
+      "method_ids": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "metric": {
+        "type": "string"
+      },
+      "n_gap": {
+        "type": "integer"
+      },
+      "n_present": {
+        "type": "integer"
+      },
+      "source_id": {
+        "type": "string"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "window": {
+        "keys": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

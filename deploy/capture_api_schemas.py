@@ -174,6 +174,15 @@ DYNAMIC_PARAM_LOOKUP = {
         "extract": lambda data: int(time.time()) - 7 * 86400,
         "query_param": "ts",
     },
+    "/api/series": {
+        # ?metric=<key> selects the series; the bare route is the catalogue (a different, smaller
+        # shape). `hrv` is one of the ten offered keys (site_api_series.SERIES, #5532) — a static
+        # sample, no live lookup needed. The committed baseline was first written OFFLINE from the
+        # handler on fixture rows (the route was not yet deployed); the next live capture reconciles it.
+        "lookup_path": None,
+        "extract": lambda data: "hrv",
+        "query_param": "metric",
+    },
     "/api/social_context": {
         # ?route=training|mind is a closed 2-value enum (site_api_social._CONTEXT_ROUTES,
         # #1674) — no live lookup needed, just a fixed valid sample.

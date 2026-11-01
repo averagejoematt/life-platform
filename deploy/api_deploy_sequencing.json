@@ -21,5 +21,12 @@
     "entry hides a genuinely dead route (same discipline as the old inline set)."
   ],
   "sequenced_routes": [],
-  "pending_deploy_routes": []
+  "pending_deploy_routes": [
+    {
+      "route": "/api/pairs",
+      "pr": 5538,
+      "date": "2026-10-31",
+      "reason": "#5532: /api/pairs is a NEW site-api route and the regenerated /method/registry/ page (scripts/v4_build_methods.py, the spearman_rho registry entry's used_by text) names it — a text mention, not a fetch, but site/** auto-deploys on merge while the Site API deploys behind the production gate. Defer smoke/visual enforcement until the Site API bundle is live; REMOVE this entry at the next post-deploy schema capture."
+    }
+  ]
 }
