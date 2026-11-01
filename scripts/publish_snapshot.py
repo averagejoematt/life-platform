@@ -196,6 +196,7 @@ class LiveContext:
         self.metric_keys: set[str] = set()
         self.series: dict[str, dict] = {}  # metric key -> the series payload (written as a data file)
         self.pairs: dict | None = None
+        self.ledger_counts: dict | None = None  # the export route's own served / counted / withheld numbers
 
     def rows(self, key: str, field: str) -> list:
         return (self.fetched.get(key) or {}).get(field) or []
@@ -441,11 +442,20 @@ LEDGER_KIND = ("number", "direction", "yes_no", "sealed", "interval", "observati
 
 def _ledger_pages(ctx: LiveContext) -> list[dict]:
     """Every row of `/api/ledger_export`, page by page (the route serves at most 100 a page). A page
-    that cannot be fetched is a hard failure — a partial ledger would read as a smaller record."""
+    that cannot be fetched is a hard failure — a partial ledger would read as a smaller record.
+    The route's own accounting (`total` served · `record_total` counted · `withheld`) is kept on the
+    context for the edition's `ledger` block, so the page can say what it does not show and why."""
     out: list[dict] = []
     page = 1
     while True:
         payload = _get(ctx.base_url, f"/api/ledger_export?page={page}&size=100", ctx.timeout)
+        if page == 1:
+            ctx.ledger_counts = {
+                "served": payload.get("total"),
+                "record_total": payload.get("record_total", payload.get("total")),
+                "withheld": dict(payload.get("withheld") or {}),
+                "as_of": payload.get("as_of"),
+            }
         out.extend(r for r in payload.get("items") or [] if isinstance(r, dict))
         pages = int(payload.get("pages") or 1)
         if page >= pages:
@@ -481,9 +491,20 @@ def _live_ledger(ctx: LiveContext) -> None:
         pred = str(r.get("prediction_id") or "")
         if not coach or not pred or not ID_RE.match(pred):
             continue
-        if not str(r.get("claim") or "").strip():
-            log(f"  ledger row {coach}:{pred} served with no claim text — not a publishable record, skipped")
-            continue
+        claim_text = str(r.get("claim") or "").strip()
+        withheld = None
+        if not claim_text:
+            # The route removes the words on purpose: `unsourced` (#4701 — the claim rests on an instrument that
+            # had sent no reading when it was said) or `withheld` (the dossier filter). The row keeps its place
+            # and its grade; the page prints the hold's own sentence, never the words and never a stand-in claim.
+            hold = r.get("unsourced") if isinstance(r.get("unsourced"), dict) else None
+            if hold and isinstance(hold.get("text"), str) and hold["text"].strip():
+                claim_text, withheld = hold["text"].strip(), "unsourced"
+            elif r.get("withheld"):
+                claim_text, withheld = "Not quoted: the words did not clear the privacy filter.", "privacy"
+            else:
+                log(f"  ledger row {coach}:{pred} served with no claim text and no hold — not a publishable record, skipped")
+                continue
         pid = _persona(coach)
         if pid not in ctx.coach_ids:
             continue
@@ -507,14 +528,15 @@ def _live_ledger(ctx: LiveContext) -> None:
                 as_of=ctx.as_of,
                 data_through=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
                 source=["/api/ledger_export"],
-                title=(r.get("claim") or rid)[:120],
+                title=claim_text[:120],
                 summary=(sg or {}).get("short"),
                 coach_id=pid,
                 coach_name=str(r.get("coach_name") or pid),
                 retired=bool(r.get("retired")),
                 metric_id=metric,
                 metric_key=r.get("metric") if isinstance(r.get("metric"), str) else None,
-                claim=str(r.get("claim") or ""),
+                claim=claim_text,
+                claim_withheld=withheld,
                 logged_date=r.get("logged_date"),
                 due_date=r.get("due_date") if ISO_DAY.match(str(r.get("due_date") or "")) else None,
                 settled_date=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
@@ -867,6 +889,14 @@ def _live_edition(ctx: LiveContext) -> None:
     latest_chapter = _week_id(chapter_block.get("url")) if isinstance(chapter_block, dict) else None
     known = latest_chapter and any(c["id"] == latest_chapter for c in ctx.objs["chapter"])
     blocks["portrait"] = _portrait_block(ctx, today.get("start_date") if ISO_DAY.match(str(today.get("start_date") or "")) else None)
+    if ctx.ledger_counts:
+        blocks["ledger"] = {
+            "state": "ok",
+            "as_of": ctx.ledger_counts.get("as_of") or ctx.as_of,
+            "source": ["/api/ledger_export"],
+            "absent_text": None,
+            "data": ctx.ledger_counts,
+        }
     ctx.objs["edition"].append(
         envelope(
             id=ctx.as_of,

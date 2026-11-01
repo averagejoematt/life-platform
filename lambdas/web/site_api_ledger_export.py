@@ -33,6 +33,16 @@ PRIVACY. A claim is served only when the dossier filter clears it (``coach_dossi
 the same gate `/api/calls` and the docket apply); a withheld claim is ``""`` with
 ``withheld: true`` — the row keeps its place and its grade, its words do not travel.
 
+THE JOURNAL'S SILENCE (#5131). The Lambda's last step before the wire drops every list element
+whose subtree speaks of the journal's silence (``common.journal_silence.guard_api_response``), and
+a ledger row carries that pattern in its claim AND in its stored id (``…_journaling_silence_…``),
+so such a row cannot be served at all — not even as a held row. Measured 2026-11-01: twelve of
+468 rows. The wire guard ran AFTER this handler had counted and paged, so ``total`` named rows
+no page could reach and a 100-row page came back with 97 (#5532). The handler now applies the
+SAME scrub to the item set BEFORE paging: ``total`` and ``pages`` count what is served, every
+page is whole, and ``withheld.journal_silence`` names how many rows the record counts that this
+ledger does not show — the coaches' record (`/api/predictions` ``overall``) still counts them.
+
 THE READ. One concurrent, projected Query per coach partition — the `/api/predictions` sweep
 (``site_api_coach_ledger._query_partition`` / ``_parallel_fetch``), paginated to the end of
 each partition because this projection carries the claim text. Every partition failing is a
@@ -46,6 +56,7 @@ import math
 from typing import Any, Callable
 
 from coach import coach_baseline, coach_dossier, coach_record, prediction_windows
+from common import journal_silence
 from common.pacific_time import pacific_date_of, pacific_today
 
 from web import claim_sourcing, prediction_reason, site_api_calls
@@ -203,6 +214,15 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
     return item
 
 
+def servable(items: list[dict]) -> tuple[list[dict], int]:
+    """``(served, withheld)``: the items the wire guard (#5131) would let through, and how many it would
+    drop. The guard works on the serialised body; running its payload form here, on the SAME items, is
+    what keeps ``total`` honest — a row it drops is counted as withheld, never as a page's missing seat."""
+    kept, _hits = journal_silence.scrub_payload(items)
+    kept = [i for i in kept if isinstance(i, dict)]
+    return kept, len(items) - len(kept)
+
+
 def export_items(rows_by_short: dict[str, list], genesis: str | None = EXPERIMENT_START, dark: list | None = None) -> list[dict]:
     """Every item the season's record counts, newest logged first — the `/api/predictions` row-set."""
     items = []
@@ -257,7 +277,8 @@ def handle_ledger_export(event, *, fetch: Callable = fetch_rows, today: str | No
         rows_by_short, failed, dark = fetch()
         if failed and len(failed) >= len(_CALIB_COACH_NAMES):
             raise RuntimeError(f"all {len(failed)} coach partition reads failed: {failed}")
-        items = export_items(rows_by_short, dark=dark)
+        counted = export_items(rows_by_short, dark=dark)
+        items, withheld = servable(counted)
     except Exception as e:  # noqa: BLE001 — a failed read is a 503, never a shorter ledger
         logger.error(f"[ledger_export] {type(e).__name__}: {e}")
         return _error(503, UNAVAILABLE)
@@ -271,6 +292,10 @@ def handle_ledger_export(event, *, fetch: Callable = fetch_rows, today: str | No
         "pages": max(1, math.ceil(total / size)),
         "as_of": today,
         "source": SOURCE,
+        # The record counts `record_total` rows; `total` is what this ledger serves. The difference is named,
+        # never silent: rows the journal-silence guard keeps off every public surface (#5131).
+        "record_total": len(counted),
+        "withheld": {"journal_silence": withheld},
     }
     degraded = {"partitions_failed": failed} if failed else None
     if failed:

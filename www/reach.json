@@ -2,17 +2,19 @@
   "_about": "The static reach from the v9 front page (tests/test_site_nav_reach_ratchet.py, #4182 ruling vi), measured on the build this file was emitted from — the fixture snapshot in CI, so live data adds object pages of the same templates. `depth1` is what a newcomer meets on landing (every <a href> on `/`); `transitive` follows links through the built pages. The appendix is a sink by ruling (2026-10-18); a kept site/ page that the build links (e.g. /subscribe/) counts as a leaf and is not walked.",
   "depth1": [
     "/data/",
+    "/data/deep_pct/",
+    "/data/weight_lbs/",
     "/privacy/",
     "/story/",
-    "/story/program-week-09/",
     "/story/week-06/",
-    "/story/week-08/",
     "/subscribe/",
     "/system/",
     "/system/ledger/",
-    "/system/ledger/nutrition-20261029-carbcut01/"
+    "/system/ledger/disagreements/protein-deep-sleep-2026-10-29/",
+    "/system/ledger/nutrition-20261029-carbcut01/",
+    "/system/ledger/sleep-20261005-deepsleep01/"
   ],
-  "depth1_count": 10,
+  "depth1_count": 12,
   "sinks": [
     "/system/everything-else/"
   ],

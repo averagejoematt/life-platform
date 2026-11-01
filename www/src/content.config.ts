@@ -176,6 +176,7 @@ const predictions = defineCollection({
     coach_name: z.string().min(1),
     retired: z.boolean(),
     metric_key: z.string().nullable(),
+    claim_withheld: z.enum(["unsourced", "privacy"]).nullable(),
     corrections: z.array(
       z
         .object({

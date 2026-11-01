@@ -212,6 +212,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "retired": ("bool", False),
         "metric_key": ("str", True),
         "corrections": ("list[obj]", False),
+        "claim_withheld": ("enum:unsourced|privacy", True),
     },
     "disagreement": {
         "topic": ("str", False),

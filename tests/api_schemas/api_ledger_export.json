@@ -1,5 +1,5 @@
 {
-  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture.",
+  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture. 2026-11-01: `record_total` + `withheld.journal_silence` added \u2014 the route now counts what the journal-silence guard lets through (#5131) and names the rest.",
   "captured_at": "2026-11-01T03:32:29.507818+00:00",
   "fetch_path": "/api/ledger_export",
   "is_prefix_sample": false,
@@ -132,6 +132,17 @@
       },
       "total": {
         "type": "integer"
+      },
+      "record_total": {
+        "type": "integer"
+      },
+      "withheld": {
+        "type": "object",
+        "keys": {
+          "journal_silence": {
+            "type": "integer"
+          }
+        }
       }
     },
     "type": "object"

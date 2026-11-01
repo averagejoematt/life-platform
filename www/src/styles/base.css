@@ -885,3 +885,10 @@ footer.site a {
     font-size: 28px;
   }
 }
+
+/* the Connected rail: a held claim's sentence, or a long title, wraps instead of overflowing */
+.conn a b,
+.conn a span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}

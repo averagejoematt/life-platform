@@ -189,7 +189,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           }
         </div>
         <p class="serif muted" style="font-size:16px;line-height:1.5">
-          {WORDS[measured] ? WORDS[measured][0].toUpperCase() + WORDS[measured].slice(1) : measured} dimensions measured,{barely ? ` ${WORDS[barely]} barely,` : ""}{" "}
+          {WORDS[measured] ? WORDS[measured][0].toUpperCase() + WORDS[measured].slice(1) : measured} {measured === 1 ? "dimension" : "dimensions"} measured,{barely ? ` ${WORDS[barely]} barely,` : ""}{" "}
           {WORDS[6 - measured - barely] || 6 - measured - barely} not yet. That ratio is the project: the body is the easy part to instrument.
         </p>
       </figure>

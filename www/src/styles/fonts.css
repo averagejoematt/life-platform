@@ -1,15 +1,18 @@
 /* Self-hosted type, Stage 2 identity sheet: Archivo (structure, numerals), Newsreader
    (Matthew's voice), IBM Plex Mono (the machine's voice). Latin subsets as Google serves
    them, then instanced to the axis ranges the design uses (fontTools varLib.instancer):
-   Archivo wght 400–800 · wdth 100–125; italic wght 400–700 at wdth 100; Newsreader wght
-   400–600 · opsz 6–72; italic 400 only. All three families are SIL OFL 1.1
+   Archivo wght 400–800 · wdth 100–118 (the three stretches the design sets); italic wght
+   400–700 at wdth 100; Newsreader wght 400–600 with the optical size pinned at 18 (the
+   page sets it between 13 and 24 px — one text master, no display cut); italic 400, opsz 16.
+   Trimmed 2026-11-01 from 299 KB to 179 KB against the 250 KB budget (owner ruling 8);
+   letterforms unchanged at the sizes used. All three families are SIL OFL 1.1
    (docs/LICENSES.md §3.1). Paths are relative to the emitted stylesheet in _astro/, so
    they resolve under any base path. */
 @font-face {
   font-family: "Archivo";
   font-style: normal;
   font-weight: 400 800;
-  font-stretch: 100% 125%;
+  font-stretch: 100% 118%;
   font-display: swap;
   src: url("../assets/fonts/v9/archivo-latin.woff2") format("woff2");
 }

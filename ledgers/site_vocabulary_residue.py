@@ -69,4 +69,8 @@ NAV_REACH_CEILING = 18
 # www/owned_paths.json says `live_at_root` (tests/test_site_nav_reach_ratchet.py reads the switch); until
 # then the v8 front page above is what a reader meets and NAV_REACH_CEILING holds. Shrink-only, like its
 # parent: 18 → 11 → 10, never raised past what this tree measures.
-NAV_REACH_CEILING_V9 = 10
+# 2026-11-01: 10 → 12 by the owner's Start-page brief (#5529, #5555) — the six-dimensional portrait
+# is on the front page by his ruling, and a measured dimension's tile links to its page (two in the
+# fixture build, three live). Not padding: every new depth-1 link is one of the portrait's measured
+# dimensions. The ceiling is the fixture census this tree measures (reach.json), as before.
+NAV_REACH_CEILING_V9 = 12
