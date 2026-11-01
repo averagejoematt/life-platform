@@ -150,7 +150,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/web/site_api_body.py::vitals": 174,
     "lambdas/web/site_api_budget.py::inference_receipt": 229,
     "lambdas/web/site_api_character.py::character": 186,
-    "lambdas/web/site_api_coach_ledger.py::handle_predictions": 193,
+    "lambdas/web/site_api_coach_ledger.py::handle_predictions": 193,  # unchanged by #5533: the quality block rides the #4585 comparison line via _decided_blocks
     "lambdas/web/site_api_coach_narrative.py::handle_coach_analysis": 190,
     "lambdas/web/site_api_coach_narrative.py::handle_coach_timeline": 163,
     "lambdas/web/site_api_habits.py::habits": 286,

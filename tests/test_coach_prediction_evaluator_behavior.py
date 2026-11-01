@@ -55,7 +55,7 @@ try:
         coach_checkin as _coach_checkin,  # noqa: E402
         dispute_docket as _dispute_docket,  # noqa: E402
     )
-    from coach.persona_registry import OPERATIONAL_COACH_IDS  # noqa: E402
+    from coach.persona_registry import OPERATIONAL_COACH_IDS, RETIRED_COACH_IDS  # noqa: E402
     from common.constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
     from experiment.measurable_metrics import METRIC_SOURCES, METRIC_SUBDOMAIN  # noqa: E402
     from ingestion.source_registry import EXTRA_QUERYABLE_PARTITIONS, SOURCE_REGISTRY  # noqa: E402
@@ -792,18 +792,24 @@ class TestConditionalPredictions:
 
 
 class TestPredictionScan:
-    def test_every_operational_coach_partition_and_the_diary_claims_are_scanned(self, table):
+    def test_every_coach_partition_retired_included_and_the_diary_claims_are_scanned(self, table):
         """Derived from the persona registry — a ninth coach must not be able to
-        vanish from grading without this failing."""
+        vanish from grading without this failing. #5533 (b): a RETIRED seat's partition is
+        scanned too — its sealed bets and pending calls are still owed a grade (the seat is
+        closed to new emissions, never to the grade it already owes)."""
         ev._fetch_predictions()
         scanned = {q["ExpressionAttributeValues"][":pk"] for q in table.queries}
-        expected = {f"COACH#{c}" for c in OPERATIONAL_COACH_IDS} | {ev.DIARY_CLAIMS_PK}
+        expected = {f"COACH#{c}" for c in OPERATIONAL_COACH_IDS} | {f"COACH#{c}" for c in RETIRED_COACH_IDS} | {ev.DIARY_CLAIMS_PK}
         assert scanned == expected
+        assert RETIRED_COACH_IDS, "the fix is only exercised while the registry carries a retired seat"
 
     def test_the_evaluator_roster_is_the_canonical_operational_roster(self):
         """Order is display-only and differs between the two lists; membership is
-        the contract — a coach absent here is a coach whose calls are never graded."""
+        the contract — a coach absent here is a coach whose calls are never graded.
+        #5533: COACH_IDS stays the OPERATIONAL roster (commitments, stance refresh); only
+        GRADING_COACH_IDS adds the retired seats, and adds nothing else."""
         assert set(ev.COACH_IDS) == set(OPERATIONAL_COACH_IDS)
+        assert set(ev.GRADING_COACH_IDS) == set(OPERATIONAL_COACH_IDS) | set(RETIRED_COACH_IDS)
 
     @pytest.mark.parametrize("status", sorted(ev.EVALUABLE_STATUSES))
     def test_an_open_prediction_is_picked_up_for_grading(self, table, status):
@@ -837,7 +843,7 @@ class TestPredictionScan:
         table.pages = [
             {"Items": [prediction(pred_id="a")], "LastEvaluatedKey": {"pk": "COACH#sleep_coach", "sk": "PREDICTION#a"}},
             {"Items": [prediction(pred_id="b")]},
-        ] + [{"Items": []}] * len(OPERATIONAL_COACH_IDS)
+        ] + [{"Items": []}] * len(ev.GRADING_COACH_IDS)
         assert len(ev._fetch_predictions()[0]) == 2
 
     def test_one_unreadable_partition_does_not_lose_the_other_coaches_forecasts(self, table):

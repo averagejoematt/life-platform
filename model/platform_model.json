@@ -995,6 +995,16 @@
       "producer": "coach.dispute_docket::_write_docket_prediction"
     },
     {
+      "consumer": "coach.coach_record::record_from_rows",
+      "enrolled": true,
+      "floor": false,
+      "mutations": 3,
+      "name": "coach grade correction -> the record, the Brier pair and the clean count read the corrected grade",
+      "note": "#5533 (epic #5529): owner requirement B \u2014 never a silent rewrite. `agree` also holds the ledger row to land BEFORE the grade changes and `original_grade` to be the grade before it (no shipped consumer reads those two yet \u2014 the v9 ledger will; they are asserted, not mutated). The CONFIDENCE# Beta and the LEARNING# row are not rewritten (same residual as #4617/#4618).",
+      "partition": null,
+      "producer": "coach.grade_corrections::apply_correction"
+    },
+    {
       "consumer": "experiment.canonical_facts::build_canonical_facts",
       "enrolled": true,
       "floor": true,
@@ -8288,10 +8298,10 @@
         "via-composite": 3
       },
       "alarms_composite": 4,
-      "contracts": 15,
-      "contracts_enrolled": 15,
+      "contracts": 16,
+      "contracts_enrolled": 16,
       "contracts_known": 15,
-      "contracts_ratchet": 15,
+      "contracts_ratchet": 16,
       "edges": 795,
       "lambdas": 107,
       "mcp_tool_modules": 38,

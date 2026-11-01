@@ -674,7 +674,13 @@ REGISTRY = {
         # ±2% band, same 9-observation floor. What moved is `_get_source_data`: a resolved
         # pseudo-source (`resolved:steps`) reads every source in the registry's steps truth
         # facet and serves the resolved day rows — steps' series is now Whoop-first.
-        "46278ce3929c",
+        # Re-recorded 2026-10-31 (#5533). METHOD unchanged, prose re-read: same EWMA, same
+        # ±2% band, same 9-observation floor. What moved is `_extract_metric_series`: a
+        # behavioral source's zero-entry day (`entries_count == 0`, no `food_log` — the #5519
+        # MacroFactor stub) yields NO reading instead of its pre-filled default, so the
+        # trailing series is shorter on such days and the 9-observation floor applies to
+        # logged days only. Non-behavioral metrics are untouched.
+        "fec01b467e15",
         min_n=9,
         used_by=(
             "Coach prediction grading \u2014 since #4617 only a direction call with no filing date "

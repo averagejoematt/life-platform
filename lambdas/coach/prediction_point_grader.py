@@ -50,10 +50,12 @@ def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_sourc
     qualifies. Reads the shared source cache anchored on today (its key is
     source+lookback, never the end date), then filters by date itself.
 
-    `after_day` (#4618) is the day the call was filed: a raw reading on or before it can
+    `after_day` (#4618) is the day the call was filed: a reading on or before it can
     never settle the call — the coach had already seen it. Without this bound the grace
     look-back turned "about 61% tomorrow" with no reading tomorrow into a verdict on the
-    filing day's own reading."""
+    filing day's own reading. #5533 (d): the bound applies to an AGGREGATE key too — the
+    `_7day_avg` branch used to return before it, so a seven-day mean on the target day
+    was built mostly from readings the coach had on the page when the call was filed."""
     base = metric_key
     agg_days = None
     for suffix, days in _AGGREGATE_SUFFIXES:
@@ -65,7 +67,8 @@ def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_sourc
     if not source or not target_date:
         return None, None
     records = get_source_data(source, data_cache, today_str, lookback_days=POINT_LOOKBACK_DAYS)
-    series = [(d, v) for d, v in extract_metric_series(records, base) if d <= target_date]
+    filed = str(after_day)[:10] if after_day else None
+    series = [(d, v) for d, v in extract_metric_series(records, base) if d <= target_date and not (filed and d <= filed)]
     if not series:
         return None, None
     if agg_days:
@@ -76,7 +79,7 @@ def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_sourc
     except (TypeError, ValueError):
         return None, None
     d, v = series[-1]
-    if d < floor or (after_day and d <= str(after_day)[:10]):
+    if d < floor:  # the after_day bound was applied to the whole series above
         return None, None
     return v, d
 

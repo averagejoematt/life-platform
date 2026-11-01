@@ -64,7 +64,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
-ALGO_VERSION = "1.0"
+from coach.grading_quality import EVALUATOR_VERSION as ALGO_VERSION  # noqa: E402  (#5533: 1.1 — the rules below + the quality flags)
 
 # #1841 — the on-tape claims ledger. Claims the SUBJECT made on camera are written in the
 # canonical PREDICTION# record shape (diary_claims.build_claim_record) into their own
@@ -77,9 +77,12 @@ DIARY_CLAIMS_PK = f"{USER_PREFIX}diary_claims"
 # Coach IDs — exhaustive list of all coaches that can issue predictions, derived
 # from the canonical persona registry, never re-typed (#2334; guard:
 # tests/test_coach_roster_set_guard_2334.py).
-from coach.persona_registry import OPERATIONAL_COACH_IDS
+from coach.persona_registry import OPERATIONAL_COACH_IDS, RETIRED_COACH_IDS
 
 COACH_IDS = list(OPERATIONAL_COACH_IDS)
+# #5533 (b): a retired coach's sealed bets and pending calls are still graded — the seat is closed to NEW
+# emissions (coach_state_updater reads OPERATIONAL_COACH_IDS), never to the grade it already owes.
+GRADING_COACH_IDS = COACH_IDS + [c for c in RETIRED_COACH_IDS if c not in COACH_IDS]
 
 # Metric → DynamoDB source mapping. CONSOLIDATED 2026-06-28 (Coherence Program
 # Phase 2): this was a hand-synced duplicate of coach_state_updater's allowlist —
@@ -117,6 +120,7 @@ DIRECTIONAL_NOISE_THRESHOLD = 0.02
 from coach import (  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts)
     coach_baseline,
     commitment_grading,
+    grading_quality,  # #5533: zero-entry days, the HR regime marker, the quality flags
     prediction_count_grader,
     prediction_direction_window as direction_window,  # noqa: E402  (#4617: a direction call graded across its window)
 )
@@ -128,6 +132,7 @@ from coach.prediction_grading import (  # noqa: E402  — #2221: the EWMA observ
     build_outcome_notes,
     check_expiry as _check_expiry,
     grading_window_still_open,
+    was_terminalized_by_duplicate_grader as _was_terminalized_by_duplicate_grader,  # #5533: moved beside its #2221 sibling
 )
 from coach.prediction_point_grader import (  # noqa: E402,F401  (#3551 — the point path + the threshold comparison it shares with machine specs)
     POINT_GRACE_DAYS,
@@ -233,25 +238,6 @@ def _fetch_range(source, start_date, end_date, include_pilot=False):
         return []
 
 
-def _was_terminalized_by_duplicate_grader(item):
-    """#813: True for status='inconclusive' records graded by coach_computation_engine's
-    now-removed duplicate grader — those were killed at the raw stated window (before
-    this evaluator's domain-clamped window elapsed) and with threshold=None could only
-    ever be inconclusive, so they never got a real grading pass.
-
-    Deterministic discriminator: THIS evaluator always stamps algo_version into
-    outcome_notes; the duplicate grader never did. One-way — once re-graded here (any
-    outcome), algo_version is present and the record is terminal again.
-    """
-    if item.get("status") != "inconclusive":
-        return False
-    try:
-        notes = json.loads(item.get("outcome_notes") or "{}")
-    except (ValueError, TypeError):
-        return False
-    return isinstance(notes, dict) and "algo_version" not in notes
-
-
 def _fetch_predictions():
     """
     Fetch all evaluable predictions across all coaches.
@@ -276,7 +262,7 @@ def _fetch_predictions():
     ungradeable = []
     reclaimed = 0
     second_look = 0
-    partitions = [f"COACH#{coach_id}" for coach_id in COACH_IDS] + [DIARY_CLAIMS_PK]
+    partitions = [f"COACH#{coach_id}" for coach_id in GRADING_COACH_IDS] + [DIARY_CLAIMS_PK]  # #5533 (b): retired seats included
     for partition_pk in partitions:
         try:
             kwargs = {
@@ -415,7 +401,7 @@ def _extract_metric_series(records, metric):
     """
     series = []
     for rec in records:
-        val = _safe_float(rec, metric)
+        val = None if grading_quality.is_zero_entry_day(rec) else _safe_float(rec, metric)  # #5533 (c): an unlogged day is no reading
         if val is not None:
             date_str = rec.get("date") or (rec.get("sk", "").replace("DATE#", ""))
             if date_str:
@@ -690,22 +676,45 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str, include_pilot=
     coach.prediction_direction_window. A flat window refutes (#801); only missing data or a
     malformed call is inconclusive. An undated row keeps the legacy EWMA trend verdict.
     """
-    return direction_window.evaluate(
+    window_days = eval_spec.get("evaluation_window_days") or _get_effective_window(eval_spec, (pred or {}).get("subdomain", ""))
+    # #5533 (e): an HR call whose window spans the 2026-10-10 regime marker is re-baselined after it (health.hr_regime)
+    pred, window_days, series_fn, regime = grading_quality.regime_adjust(
+        pred or {}, eval_spec, window_days, today_str, _extract_metric_series, _fetch_range, data_cache
+    )
+    if regime and regime.get("verdict"):
+        return regime["verdict"]
+    result = direction_window.evaluate(
         pred,
         eval_spec,
         data_cache,
         today_str,
-        window_days=eval_spec.get("evaluation_window_days") or _get_effective_window(eval_spec, (pred or {}).get("subdomain", "")),
+        window_days=window_days,
         get_source_data=_get_source_data,
-        extract_metric_series=_extract_metric_series,
+        extract_metric_series=series_fn,
         ewma_trend=_get_ewma_trend,  # resolved at call time: the legacy path for an undated row
         noise_threshold=DIRECTIONAL_NOISE_THRESHOLD,
         include_pilot=include_pilot,
     )
+    return grading_quality.note_regime(result, regime)
 
 
 def _evaluate_point(pred, eval_spec, data_cache, today_str):
-    """#3551 — delegates to prediction_point_grader with this module's own data path."""
+    """#3551 — delegates to prediction_point_grader with this module's own data path.
+    #5533 (e): a number call priced before the 2026-10-10 HR regime marker and due after it has no single-regime comparison."""
+    pred, _days, series_fn, regime = grading_quality.regime_adjust(
+        pred,
+        eval_spec,
+        _get_effective_window(eval_spec, pred.get("subdomain", "")),
+        today_str,
+        _extract_metric_series,
+        _fetch_range,
+        data_cache,
+    )
+    if regime:
+        return regime.get("verdict") or grading_quality.note_regime(
+            evaluate_point(pred, eval_spec, data_cache, today_str, get_source_data=_get_source_data, extract_metric_series=series_fn),
+            regime,
+        )
     return evaluate_point(
         pred, eval_spec, data_cache, today_str, get_source_data=_get_source_data, extract_metric_series=_extract_metric_series
     )
@@ -776,13 +785,18 @@ def _update_prediction_status(prediction, evaluation, baseline=None):
 
         table.update_item(
             Key={"pk": pk, "sk": sk},
-            UpdateExpression=("SET #status = :status, outcome = :outcome, " "outcome_date = :odate, outcome_notes = :notes"),
+            UpdateExpression=(
+                "SET #status = :status, outcome = :outcome, outcome_date = :odate, outcome_notes = :notes, "
+                "quality_flags = :qf, evaluator_version = :ver"  # #5533 (a): the grader's own flags, top-level for projected reads
+            ),
             ExpressionAttributeNames={"#status": "status"},
             ExpressionAttributeValues={
                 ":status": evaluation["status"],
                 ":outcome": evaluation["status"],
                 ":odate": evaluation["evaluated_date"],
                 ":notes": outcome_notes,
+                ":qf": list(evaluation.get("quality_flags") or []),
+                ":ver": ALGO_VERSION,
             },
         )
         coach_baseline.write_stamp(table, pk, sk, baseline)
@@ -933,7 +947,7 @@ def _write_learning_record(coach_id, today_str, evaluation):
 _BASELINE_IO = (_get_source_data, _extract_metric_series, DIRECTIONAL_NOISE_THRESHOLD)  # #4585: the rule reads the grader's own data path
 
 
-def _evaluate_all(predictions, today_str):
+def _evaluate_all(predictions, today_str, write=True):
     """
     Evaluate all pending predictions.
 
@@ -945,6 +959,9 @@ def _evaluate_all(predictions, today_str):
       5. Update prediction status in DynamoDB
       6. Update Bayesian confidence if confirmed or refuted
       7. Write LEARNING# record
+
+    ``write=False`` (#5533) grades without steps 5-7 — the re-grade script's dry run and
+    its correction path read the evaluation dicts (each carries its ``baseline`` stamp).
 
     Returns a list of evaluation result dicts.
     """
@@ -1059,11 +1076,15 @@ def _evaluate_all(predictions, today_str):
             # #2221: undecidable inside the grace period -> provisional, re-graded tomorrow.
             "grading_open": status == "inconclusive" and not past_grace,
             "window": result.get("window"),  # #4617: the start/end readings a direction call was graded on
+            **grading_quality.stamp(pred, eval_spec, result, data_cache, effective_window, today_str),  # #5533 (a): flags + version
         }
         evaluations.append(evaluation)
 
         # Write status update to prediction record
         _bl = coach_baseline.stamp_at_grading(pred, result.get("rule_spec", eval_spec), result, status, data_cache, *_BASELINE_IO)  # #4585
+        evaluation["baseline"] = _bl  # #5533: carried so a re-grade can write the stamp with its correction
+        if not write:
+            continue
         _update_prediction_status(pred, evaluation, _bl)
 
         # Update Bayesian confidence if applicable
