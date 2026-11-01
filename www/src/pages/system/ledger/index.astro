@@ -17,6 +17,9 @@ const corrected = rows.filter((r) => r.corrections.length).length;
 const coaches = [...all.byType.coach].filter((c) => rows.some((r) => r.coach_id === c.id)).sort((a, b) => (a.name < b.name ? -1 : 1));
 const kinds = [...new Set(rows.map((r) => r.kind))].sort();
 const disagreements = all.byType.disagreement;
+const ledgerBlock = edition?.blocks?.ledger?.state === "ok" ? edition.blocks.ledger.data : null;
+const withheldJournal = ledgerBlock?.withheld?.journal_silence || 0;
+const recordTotal = ledgerBlock?.record_total ?? null;
 const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a direction", yes_no: "yes or no", sealed: "sealed", interval: "an interval", observation: "an observation", unknown: "unclassified" };
 ---
 
@@ -33,7 +36,10 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
         <div><span class="label">Observations</span><span class="v num">{counts.observation}</span><span class="muted" style="font-size:12px">not graded, by design</span></div>
         <div><span class="label">Flagged · corrected</span><span class="v num">{flagged} <small>· {corrected}</small></span><span class="muted" style="font-size:12px">flags stay out of the clean rate; corrections keep the original</span></div>
       </div>
-      <p class="muted" style="margin-top:12px;font-size:13px">Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page; the filter below only hides and shows.</p>
+      <p class="muted" style="margin-top:12px;font-size:13px">
+        Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page; the filter below only hides and shows.
+        {recordTotal != null && recordTotal !== rows.length && ` The coaches' record counts ${recordTotal}: ${withheldJournal ? `${withheldJournal} ${withheldJournal === 1 ? "row speaks" : "rows speak"} of the journal and ${withheldJournal === 1 ? "is" : "are"} kept off every public page by a standing rule; ` : ""}their grades still count in every K of N.`}
+      </p>
     </div>
   </section>
   <section class="wrap" style="padding-bottom:56px" data-ledger>
@@ -62,7 +68,7 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
                     {p.sealed && " · sealed"}
                   </span>
                 </span>
-                <span class="mono" style="font-size:13px;line-height:1.45">
+                <span class={p.claim_withheld ? "serif muted" : "mono"} style="font-size:13px;line-height:1.45">
                   {p.claim}
                 </span>
                 {(p.quality_flags.length > 0 || p.corrections.length > 0) && (

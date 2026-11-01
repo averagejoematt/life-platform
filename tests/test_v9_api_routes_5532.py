@@ -43,7 +43,7 @@ os.environ.setdefault("USER_ID", "matthew")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
-from common import stats_core  # noqa: E402
+from common import journal_silence, stats_core  # noqa: E402
 from experiment import methods_registry as mr  # noqa: E402
 from privacy import field_tiers  # noqa: E402
 from web import (
@@ -335,11 +335,15 @@ def test_total_equals_api_predictions_overall_total_on_the_same_rows():
     rows = _rows()
     overall = _predictions_overall(rows)
     body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], []), today=TODAY))
-    assert body["total"] == overall["overall"]["total"] == 147
-    per_coach = {cid: sum(1 for i in body["items"] if i["coach_id"] == cid) for cid in rows}
+    # `record_total` is the /api/predictions row-set; `total` is what the journal-silence guard (#5131) lets
+    # through — the captured partition holds two rows whose claim speaks of the journal's silence.
+    assert body["record_total"] == overall["overall"]["total"] == 147
+    assert body["withheld"] == {"journal_silence": 2} and body["total"] == 145 == len(body["items"])
+    counted = ledger.export_items(rows, genesis=ledger.EXPERIMENT_START, dark=[])
+    per_coach = {cid: sum(1 for i in counted if i["coach_id"] == cid) for cid in rows}
     assert per_coach == {cid: overall["by_coach"][cid]["total"] for cid in rows}
     for bucket in ledger.BUCKETS:
-        assert sum(1 for i in body["items"] if i["status"] == bucket) == overall["overall"][bucket], bucket
+        assert sum(1 for i in counted if i["status"] == bucket) == overall["overall"][bucket], bucket
 
 
 def test_every_item_is_pinned_to_the_shape_on_every_real_row():
@@ -385,7 +389,7 @@ def test_flags_and_corrections_ride_off_the_row_and_a_diary_claim_is_excluded():
     diary.update(prediction_id="diary_claim_x", coach_id="")
     rows["sleep"] = [flagged, diary] + rows["sleep"]
     body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], []), today=TODAY))
-    assert body["total"] == 148
+    assert body["record_total"] == 148 and body["total"] == 148 - body["withheld"]["journal_silence"]
     got = next(i for i in body["items"] if i["prediction_id"] == "pred_20261030_flagged")
     assert got["quality_flags"] == ["logging_gap", "low_power"] and got["corrections"][0]["corrected_status"] == "refuted"
     assert not any(i["prediction_id"] == "diary_claim_x" for i in body["items"])
@@ -455,7 +459,8 @@ def test_every_partition_failing_is_503_and_a_partial_failure_is_declared():
     )
     body = _body(partial)
     assert partial["statusCode"] == 200 and "labs" in body["_meta"]["degraded"]["reason"]
-    assert body["total"] == 147 - 9  # the nine labs rows the fixture carries are missing, and the envelope says so
+    assert body["record_total"] == 147 - 9  # the nine labs rows the fixture carries are missing, and the envelope says so
+    assert body["total"] == body["record_total"] - body["withheld"]["journal_silence"]
 
     def boom():
         raise RuntimeError("dynamo down")
@@ -716,3 +721,62 @@ def test_spearman_rho_is_registered_with_a_live_fingerprint():
     assert entry["fingerprint"] == entry["recorded_fingerprint"] == mr._fingerprint(stats_core.spearman_rho)
     assert "/api/pairs" in entry["used_by"] and entry["category"] == "Correlation"
     assert "spearman_rho" not in mr.verify_fingerprints()
+
+
+# ── #5532 follow-up (2026-11-01): the journal-silence guard and the page count ───────────────────────────
+def _journaling_row(coach="mind", n=1):
+    """A real-shaped row whose claim AND stored id carry the journal-silence pattern (#5131)."""
+    return {
+        "pk": f"COACH#{coach}_coach",
+        "sk": f"PREDICTION#pred_2026100{n}_if_journaling_silence_persists_through_p",
+        "prediction_id": f"pred_2026100{n}_if_journaling_silence_persists_through_p",
+        "coach_id": f"{coach}_coach",
+        "claim_natural": "If journaling silence persists through protein recovery, the barrier is not metabolic.",
+        "created_date": f"2026-10-0{n}",
+        "status": "observation",
+        "confidence": 0.5,
+        "evaluation": {"type": "observation", "metric": None},
+        "phase": "experiment",
+        "subdomain": "mind",
+    }
+
+
+def test_a_row_the_journal_silence_guard_would_drop_is_counted_as_withheld_not_as_a_missing_seat():
+    """Before the fix a 100-row page came back with 97 and `total` named rows no page could reach
+    (live, 2026-11-01: 12 of 468). The handler now scrubs BEFORE paging — the same rule the wire applies —
+    so every page is whole and the withheld count is named."""
+    rows = _rows()
+    base_counted = ledger.export_items(rows, genesis="2026-09-06", dark=[])
+    _, base_withheld = ledger.servable(base_counted)  # the captured partition already carries two such rows
+    rows_with = {k: list(v) for k, v in rows.items()}
+    rows_with.setdefault("mind", []).extend([_journaling_row("mind", 1), _journaling_row("mind", 2)])
+    counted = ledger.export_items(rows_with, genesis="2026-09-06", dark=[])
+    served, withheld = ledger.servable(counted)
+    assert withheld == base_withheld + 2 and len(served) == len(counted) - withheld
+    assert all("journaling_silence" not in (i["prediction_id"] or "") for i in served)
+    resp = ledger.handle_ledger_export(_event(page="1", size="5"), fetch=lambda: (rows_with, [], []), today="2026-11-01")
+    body = _body(resp)
+    assert resp["statusCode"] == 200
+    assert len(body["items"]) == 5, "a page is whole"
+    assert body["total"] == len(served) and body["record_total"] == len(counted) and body["withheld"] == {"journal_silence": withheld}
+    assert body["pages"] == math.ceil(len(served) / 5)
+    # the wire guard then finds nothing left to withhold — the two scrubs agree
+    guarded = journal_silence.guard_api_response(resp)
+    assert guarded is resp or guarded["headers"].get(journal_silence.WITHHELD_HEADER) is None
+    # every page concatenated is exactly the served set, once each
+    seen = []
+    for pg in range(1, body["pages"] + 1):
+        seen += [
+            i["item_id"]
+            for i in _body(
+                ledger.handle_ledger_export(_event(page=str(pg), size="5"), fetch=lambda: (rows_with, [], []), today="2026-11-01")
+            )["items"]
+        ]
+    assert len(seen) == len(set(seen)) == body["total"]
+
+
+def test_a_clean_ledger_withholds_nothing_and_total_equals_record_total():
+    rows = {k: [r for r in v if not journal_silence.mentions_journal_silence(json.dumps(r, default=str))] for k, v in _rows().items()}
+    resp = ledger.handle_ledger_export(_event(page="1", size="100"), fetch=lambda: (rows, [], []), today="2026-11-01")
+    body = _body(resp)
+    assert body["withheld"] == {"journal_silence": 0} and body["total"] == body["record_total"]

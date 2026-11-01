@@ -77,7 +77,8 @@
     "evaluator_version": "1.1",
     "aggregate_impact": "the coach's record moves from 9 of 12 to 8 of 12"
    }
-  ]
+  ],
+  "claim_withheld": null
  },
  {
   "absent_text": null,
@@ -133,13 +134,14 @@
   "coach_name": "Lisa Park",
   "retired": false,
   "metric_key": "weight_lbs",
-  "corrections": []
+  "corrections": [],
+  "claim_withheld": null
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
-  "claim": "A non-neutral carb cut at 1,121 kcal will make the protein problem worse, not better.",
+  "claim": "Not quoted: this was said on September 26 and rests on his glucose sensor, which had sent no reading since August 27.",
   "coach_id": "nutrition_coach",
   "confidence": 0.5,
   "data_through": null,
@@ -180,7 +182,8 @@
   "coach_name": "Marcus Webb",
   "retired": false,
   "metric_key": "total_protein_g",
-  "corrections": []
+  "corrections": [],
+  "claim_withheld": "unsourced"
  },
  {
   "absent_text": null,
@@ -241,7 +244,8 @@
   "coach_name": "Marcus Webb",
   "retired": false,
   "metric_key": "total_protein_g",
-  "corrections": []
+  "corrections": [],
+  "claim_withheld": null
  },
  {
   "absent_text": "No sensor this cycle.",
@@ -288,7 +292,8 @@
   "coach_name": "Glucose Coach",
   "retired": false,
   "metric_key": null,
-  "corrections": []
+  "corrections": [],
+  "claim_withheld": null
  },
  {
   "absent_text": null,
@@ -344,7 +349,8 @@
   "coach_name": "Lisa Park",
   "retired": false,
   "metric_key": "weight_lbs",
-  "corrections": []
+  "corrections": [],
+  "claim_withheld": null
  },
  {
   "absent_text": null,
@@ -380,6 +386,7 @@
   "coach_name": "Lisa Park",
   "retired": false,
   "metric_key": null,
-  "corrections": []
+  "corrections": [],
+  "claim_withheld": null
  }
 ]

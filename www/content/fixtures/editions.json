@@ -116,6 +116,22 @@
       "text": "No instrument for this yet. Deliberately an empty frame."
      }
     }
+   },
+   "ledger": {
+    "state": "ok",
+    "as_of": "2026-10-31",
+    "source": [
+     "/api/ledger_export"
+    ],
+    "absent_text": null,
+    "data": {
+     "served": 7,
+     "record_total": 9,
+     "withheld": {
+      "journal_silence": 2
+     },
+     "as_of": "2026-10-31"
+    }
    }
   },
   "data_through": "2026-10-31",
