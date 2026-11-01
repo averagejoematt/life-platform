@@ -1,5 +1,5 @@
 // The relationship index: dangling edges fail, inverse edges resolve, the rail is ordered
-// and capped. node --test (zero dependencies), run from web/ as `npm test`.
+// and capped. node --test (zero dependencies), run from www/ as `npm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

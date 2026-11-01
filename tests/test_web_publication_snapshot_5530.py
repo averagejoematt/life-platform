@@ -2,7 +2,7 @@
 epic #5529; docs/design/v9/STAGE4_ENGINEERING_PLAN.md §B, §D).
 
 What is pinned, and why each is a test rather than a convention:
-  * the Python SCHEMA mirror and the Astro zod schema (web/src/content.config.ts) declare
+  * the Python SCHEMA mirror and the Astro zod schema (www/src/content.config.ts) declare
     the same field set per collection — the two halves of the contract cannot drift apart
     silently (CHARTER primitive 4, "every must-agree pair gets a contract test");
   * a ``held`` or ``private`` object never reaches the public snapshot: not its id, not its
@@ -33,8 +33,8 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 SCRIPT = os.path.join(REPO, "scripts", "publish_snapshot.py")
-FIXTURES = os.path.join(REPO, "web", "content", "fixtures")
-CONFIG_TS = os.path.join(REPO, "web", "src", "content.config.ts")
+FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
+CONFIG_TS = os.path.join(REPO, "www", "src", "content.config.ts")
 
 
 def _load():

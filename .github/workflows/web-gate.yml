@@ -1,4 +1,4 @@
-# v9 web gate (#5530, epic #5529) — the pre-merge gate for the static build in web/.
+# v9 web gate (#5530, epic #5529) — the pre-merge gate for the static build in www/.
 #
 # Deliberately separate from v4-gate.yml (which guards the site/ tree) and from ci-cd.yml:
 # it has NO AWS access and NO deploy capability. It builds the preview from the committed
@@ -24,7 +24,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'web/**'
+      - 'www/**'
       - 'scripts/publish_snapshot.py'
       - 'tests/test_web_publication_snapshot_5530.py'
       - 'tests/web_preview_gate.py'
@@ -32,7 +32,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'web/**'
+      - 'www/**'
       - 'scripts/publish_snapshot.py'
       - 'tests/web_preview_gate.py'
 
@@ -55,10 +55,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: www/package-lock.json
 
       - name: Install the build toolchain (lockfile, no scripts)
-        working-directory: web
+        working-directory: www
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Install the Python lane (pins read from requirements-dev.txt, never copied here — CQ-01, #2609)
@@ -70,10 +70,10 @@ jobs:
         run: python3 -m pytest tests/test_web_publication_snapshot_5530.py -q -p no:randomly
 
       - name: Export the fixture snapshot
-        run: python3 scripts/publish_snapshot.py --mode fixture --out web/content/snapshot
+        run: python3 scripts/publish_snapshot.py --mode fixture --out www/content/snapshot
 
       - name: Build the preview twice and compare tree hashes (exit criterion 1)
-        working-directory: web
+        working-directory: www
         run: |
           npm run build:preview
           (cd dist && find . -type f | sort | xargs sha256sum | sha256sum) > /tmp/build1.sha
@@ -82,11 +82,11 @@ jobs:
           diff /tmp/build1.sha /tmp/build2.sha && echo "reproducible: $(cat /tmp/build1.sha)"
 
       - name: Unit tests for the index and formatters
-        working-directory: web
+        working-directory: www
         run: npm test
 
       - name: Mutation — a held object in the snapshot MUST fail the build (exit criterion 3)
-        working-directory: web
+        working-directory: www
         run: |
           cp content/snapshot/chapters.json /tmp/chapters.json
           python3 - <<'PY'
@@ -98,7 +98,7 @@ jobs:
           cp /tmp/chapters.json content/snapshot/chapters.json
 
       - name: Mutation — a dangling edge MUST fail the build (exit criterion 4)
-        working-directory: web
+        working-directory: www
         run: |
           cp content/snapshot/predictions.json /tmp/predictions.json
           python3 - <<'PY'
@@ -111,7 +111,7 @@ jobs:
           npm run build:preview
 
       - name: Output scan — no sentinel, no inline script, noindex on every page
-        working-directory: web
+        working-directory: www
         run: |
           ! grep -rl "SENTINEL\|DO-NOT-PUBLISH" dist || { echo "::error::sentinel in dist"; exit 1; }
           if grep -rhoiE "<script\b[^>]*>" dist | grep -vi "src=" ; then echo "::error::inline script"; exit 1; fi
@@ -123,7 +123,7 @@ jobs:
           browser: chromium
 
       - name: Render gate at 390 + 1280 with axe (exit criterion 5)
-        run: python3 tests/web_preview_gate.py --dist web/dist --base /next/v9/ --out /tmp/web-gate
+        run: python3 tests/web_preview_gate.py --dist www/dist --base /next/v9/ --out /tmp/web-gate
 
       - name: Upload the build and the screenshots
         if: always()
@@ -131,6 +131,6 @@ jobs:
         with:
           name: v9-preview-${{ github.sha }}
           path: |
-            web/dist
+            www/dist
             /tmp/web-gate
           retention-days: 14

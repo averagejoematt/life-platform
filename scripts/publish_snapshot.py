@@ -10,7 +10,7 @@ What it does
   * wraps every object in the publication envelope (id · type · visibility · as_of ·
     data_through · source · state · absent_text · approved · method_ids · edges · sample ·
     title · summary) and validates it against SCHEMA, the Python mirror of
-    ``web/src/content.config.ts`` (the two field sets are a contract, checked by
+    ``www/src/content.config.ts`` (the two field sets are a contract, checked by
     tests/test_web_publication_snapshot_5530.py);
   * WRITES ONLY ``visibility == "public"`` objects. A ``held`` or ``private`` object is
     counted in the manifest and never serialised — not its id, not its title (owner
@@ -30,8 +30,8 @@ the full paginated ledger with the grader's quality flags is Phase 3. Nothing is
 here that a page would present as a published statistic: counts are carried, not derived.
 
 Usage
-  python3 scripts/publish_snapshot.py --mode fixture --out web/content/snapshot
-  python3 scripts/publish_snapshot.py --mode live --out web/content/snapshot [--base-url URL]
+  python3 scripts/publish_snapshot.py --mode fixture --out www/content/snapshot
+  python3 scripts/publish_snapshot.py --mode live --out www/content/snapshot [--base-url URL]
 
 Exit codes: 0 ok · 2 schema violation · 3 dangling edge · 4 fetch failure (live).
 """
@@ -50,7 +50,7 @@ from typing import Any
 
 EXPORTER_VERSION = "0.1.0"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_FIXTURES = os.path.join(REPO, "web", "content", "fixtures")
+DEFAULT_FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
 DEFAULT_BASE_URL = "https://averagejoematt.com"
 ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
@@ -875,7 +875,7 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--mode", choices=("fixture", "live"), required=True)
-    ap.add_argument("--out", required=True, help="directory to write the snapshot into (web/content/snapshot)")
+    ap.add_argument("--out", required=True, help="directory to write the snapshot into (www/content/snapshot)")
     ap.add_argument("--fixtures", default=DEFAULT_FIXTURES)
     ap.add_argument("--base-url", default=DEFAULT_BASE_URL)
     ap.add_argument("--timeout", type=float, default=20.0)

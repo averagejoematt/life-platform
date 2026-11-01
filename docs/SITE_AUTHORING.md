@@ -14,7 +14,7 @@ change-method (render-sweep → fix → verify) lives in
 ## 1. The IA — where a new page belongs
 
 The site (ADR-071, "The Measured Life") is a static S3 + CloudFront site (distribution
-`E3S424OXQZ8NBE`), no framework, no build toolchain beyond the Python helper scripts — **for the `site/` tree.** The successor build in `web/` (v9, #5530) is an Astro static build with a Node toolchain at build time only; see `web/README.md`.
+`E3S424OXQZ8NBE`), no framework, no build toolchain beyond the Python helper scripts — **for the `site/` tree.** The successor build in `www/` (v9, #5530) is an Astro static build with a Node toolchain at build time only; see `www/README.md`.
 
 Top nav = **Home + 5 doors** (DESIGN_SYSTEM_V5.md §2):
 
@@ -60,7 +60,7 @@ The stack (all self-hosted, zero external requests):
   `font-src 'self'`). Note fonts have a *separate* deploy step (§7).
 - **Vanilla-JS ES modules** — `site/assets/js/*.js` (`cockpit.js`, `evidence.js`,
   `charts.js`, `theme.js`, `motion.js`, …). No framework, no npm, no bundler (in `site/`;
-  the `web/` build bundles at build time and still ships no client framework).
+  the `www/` build bundles at build time and still ships no client framework).
 - **Inline-SVG charts** — rendered by `site/assets/js/charts.js` (and the
   `evidence_*.js` modules) into the page; no chart library. Icons come from the
   `site/assets/icons/icons.svg` sprite via `<use href="…#i-…">` (never emoji —

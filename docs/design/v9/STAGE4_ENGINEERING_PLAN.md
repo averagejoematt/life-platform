@@ -1,6 +1,6 @@
 # Stage 4 — Engineering architecture and implementation plan for the Stage 3 prototype
 
-> **Status:** approved by the owner on 2026-10-31 with twelve decisions and four additional requirements (recorded on epic #5529); **Phase 0 authorised and built as the PR for #5530** — a non-public preview shell in `web/`, nothing deployed to `/`, nothing migrated. · **Written:** 2026-10-31 (Fable 5.1) · ADR-166 records the toolchain decision; `web/README.md` is the tree's guide.
+> **Status:** approved by the owner on 2026-10-31 with twelve decisions and four additional requirements (recorded on epic #5529); **Phase 0 authorised and built as the PR for #5530** — a non-public preview shell in `www/`, nothing deployed to `/`, nothing migrated. · **Written:** 2026-10-31 (Fable 5.1) · ADR-166 records the toolchain decision; `www/README.md` is the tree's guide.
 > **Design source of truth:** the Stage 3 functional prototype (`https://claude.ai/artifact/7jvmahzD8fLQvux2qgoWhK`, version `1793493829-9b55`, 912 lines, read in full) and the Stage 1–2 canvas (`https://claude.ai/artifact/1SBbKGGAZjuWkjXFyA5SRk`, identity sheet `S2-Identity.dc.html`).
 > **Companions:** `docs/PLATFORM_NORTH_STAR.md` (the why, unchanged) · `docs/SITE_MAP_AND_INTENT.md` (today's doors) · `docs/design/v8/README.md` (the kit this would supersede) · `docs/SITE_UPLEVEL_PLAYBOOK.md` (the gotchas still apply).
 
@@ -56,11 +56,11 @@ Everything below was measured on the working tree and the live site on 2026-10-3
 ```
                  nightly (after compute, ~10:30Z) · on merge · on chapter approval
                                    │
-  Life-Platform  ──public API──▶  publish_snapshot.py  ──▶  web/content/snapshot/*.json
+  Life-Platform  ──public API──▶  publish_snapshot.py  ──▶  www/content/snapshot/*.json
   (DDB, S3,          (HTTPS,           (Python; the ONE          (typed, validated,
    compute)           no creds)         publication boundary)      visibility-stamped)
                                                                       │
-                                                     Astro static build (web/) ──▶ dist/
+                                                     Astro static build (www/) ──▶ dist/
                                                        content collections + schemas
                                                        one template per object type
                                                        "Connected" rail derived from edges
@@ -235,7 +235,7 @@ Each phase ends with something a reader can use on the preview path (`/next/v9/`
 
 ### Phase 0 — Foundations (≈1 week) · no reader-visible change
 - Decisions in §H recorded on the epic.
-- `web/` scaffold: Astro static, `astro.config` with `inlineStylesheets: 'never'` and no inline scripts (CSP `script-src 'self'`), the identity as CSS custom properties, the three families self-hosted and subset, the four-destination shell, the Figure/Provenance/Connected components, the appendix and privacy pages.
+- `www/` scaffold: Astro static, `astro.config` with `inlineStylesheets: 'never'` and no inline scripts (CSP `script-src 'self'`), the identity as CSS custom properties, the three families self-hosted and subset, the four-destination shell, the Figure/Provenance/Connected components, the appendix and privacy pages.
 - Content schemas for the eleven collections; `scripts/publish_snapshot.py` reading the public API; the `held/private` build gate as tests.
 - `site-deploy.yml` gains a `web` job building to `/next/v9/`; the v4 render gate, axe and `node:test` run against it. Record the nightly cron's dead-man.
 - **Exit:** an empty-shell preview builds in CI and passes the gates.
@@ -289,7 +289,7 @@ Search (Pagefind); essays; insights and experiments as they are created; the ref
 
 ## H. Decisions requiring your approval
 
-1. **Toolchain.** Astro static build in `web/` (recommended) vs. a Python/Jinja generator. Approving Astro also approves restating the "no framework/deps" rule as "no client-side framework".
+1. **Toolchain.** Astro static build in `www/` (recommended) vs. a Python/Jinja generator. Approving Astro also approves restating the "no framework/deps" rule as "no client-side framework".
 2. **Supersession.** The Stage 3 direction replaces the v8 kit as the approved look (your 2026-10-03 and 10-18 rulings named the kit "the approved direction"). The four live v8 pages move to `/reference/` at cut-over under your 10-18 keep-the-old-layout rule. Confirm.
 3. **Freshness.** Nightly rebuild (a GitHub Actions cron with a dead-man) plus two progressive-enhancement fetches, vs. client-side fetching everywhere. Recommended: nightly.
 4. **Publication snapshot source.** Read the public API over HTTPS with no credentials (recommended), vs. a read-only IAM role in CI reading DynamoDB directly (faster, but a second privacy boundary to guard).

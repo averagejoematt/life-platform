@@ -40,7 +40,7 @@ ALLOWLIST = {
     "mcp": "MCP server — domain tool modules (tools_*.py) wired in registry.py.",
     "cdk": "Infrastructure-as-code — the 9 CDK stacks; the only sanctioned way infra changes.",
     "site": "v4 static site (Cockpit/Story/Evidence), deployed to S3 + CloudFront.",
-    "web": "The v9 static build (Astro, #5530/#5529): content schemas, templates, fixtures; built from the publication snapshot to /next/v9/ (Phase 0) — supersedes site/ at the Phase 4 cut-over.",
+    "www": "The v9 static build (Astro, #5530/#5529): content schemas, templates, fixtures; built from the publication snapshot to /next/v9/ (Phase 0) — supersedes site/ at the Phase 4 cut-over.",
     "deploy": "Build/deploy scripts — build_bundle.py, deploy_*.sh, restart_pipeline.py, smoke tests, lib/.",
     "scripts": "Operational helpers — v4_build_*.py site generators + migration/reporting tooling.",
     "tests": "pytest (unit/contract/structural) + Playwright visual_qa.py + AI-vision QA.",

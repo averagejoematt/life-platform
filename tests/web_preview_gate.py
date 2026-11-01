@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tests/web_preview_gate.py — the pre-merge render gate for the v9 build (#5530, epic #5529).
 
-Serves ``web/dist`` the way the S3 website origin will (under its base path, directory
+Serves ``www/dist`` the way the S3 website origin will (under its base path, directory
 URLs) and renders EVERY built page at a phone (390×844) and a laptop (1280×900), holding:
 
   1. No horizontal overflow at 390 px (document wider than the viewport).
@@ -18,8 +18,8 @@ viewport, an inline <script>, and a sentinel word MUST fail — a gate that cann
 green light wired to nothing (CHARTER §paved roads). The run exits 2 if the control passes.
 
 Usage:
-    python3 tests/web_preview_gate.py                      # gate web/dist (self-test first)
-    python3 tests/web_preview_gate.py --dist web/dist --base /next/v9/ --out DIR   # + PNGs
+    python3 tests/web_preview_gate.py                      # gate www/dist (self-test first)
+    python3 tests/web_preview_gate.py --dist www/dist --base /next/v9/ --out DIR   # + PNGs
 Exit: 0 pass · 1 fail · 2 the mutation control did not fail (blind gate) · 3 setup error.
 """
 
@@ -191,13 +191,13 @@ def mutation_control(dist: str, base: str) -> bool:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Render gate for the v9 static build.")
-    ap.add_argument("--dist", default=os.path.join(REPO, "web", "dist"))
+    ap.add_argument("--dist", default=os.path.join(REPO, "www", "dist"))
     ap.add_argument("--base", default=os.environ.get("WEB_BASE", "/next/v9/"))
     ap.add_argument("--out", default=None, help="save full-page PNGs per page and viewport")
     ap.add_argument("--skip-control", action="store_true", help="skip the mutation control (local iteration only)")
     args = ap.parse_args()
     if not os.path.isdir(args.dist):
-        print(f"dist not found: {args.dist} — run `npm run build:preview` in web/ first", file=sys.stderr)
+        print(f"dist not found: {args.dist} — run `npm run build:preview` in www/ first", file=sys.stderr)
         return 3
     if not os.path.exists(AXE_JS_PATH):
         print(f"axe bundle missing: {AXE_JS_PATH}", file=sys.stderr)

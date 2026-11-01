@@ -1,4 +1,4 @@
-# `web/` — the v9 static build
+# `www/` — the v9 static build
 
 > **Status:** Phase 0 (foundations) — a non-public preview shell. Plan: [`docs/design/v9/STAGE4_ENGINEERING_PLAN.md`](../docs/design/v9/STAGE4_ENGINEERING_PLAN.md) (owner-approved 2026-10-31). Story #5530, epic #5529. **Nothing here is deployed to the public root.**
 
@@ -20,7 +20,7 @@ The Stage 3 design (Claude Design, 2026-10-31) as a static site: one typed conte
 ## Build
 
 ```bash
-cd web && npm ci                                   # pinned toolchain, lockfile
+cd www && npm ci                                   # pinned toolchain, lockfile
 python3 ../scripts/publish_snapshot.py --mode fixture --out content/snapshot   # or --mode live
 npm run build:preview                              # WEB_BASE=/next/v9/ WEB_NOINDEX=1 → dist/
 npm test                                           # node --test: the index and formatters
