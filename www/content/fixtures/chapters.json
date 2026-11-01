@@ -136,5 +136,34 @@
   "week": 10,
   "week_label": "Week 10",
   "word_count": 10
+ },
+ {
+  "absent_text": "No chapter yet for this week.",
+  "approved": null,
+  "as_of": "2026-10-31",
+  "body_html": null,
+  "data_through": null,
+  "date": "2026-11-03",
+  "edges": [],
+  "episode_id": null,
+  "excerpt": null,
+  "id": "program-week-09",
+  "method_ids": [],
+  "read_minutes": null,
+  "sample": true,
+  "source": [
+   "/journal/posts.json",
+   "/api/edition"
+  ],
+  "state": "absent",
+  "status": "pending",
+  "summary": null,
+  "title": "Week 9",
+  "type": "chapter",
+  "url_legacy": null,
+  "visibility": "public",
+  "week": 9,
+  "week_label": "Week 9",
+  "word_count": null
  }
 ]

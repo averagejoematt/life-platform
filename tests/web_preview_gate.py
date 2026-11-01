@@ -99,6 +99,7 @@ def pages_of(dist: str) -> list[str]:
 # `undefined` / `NaN` are English words in the methods registry's own prose ("skill is undefined
 # against a degenerate base rate"), so the leak rule is positional: the whole text of an element,
 # or the token beside a number, a unit or a separator — the shapes a template binding produces.
+_PUBLISHED_BODY = re.compile(r"<div data-published-body[^>]*>[\s\S]*?</div>\s*(?=</article>)", re.IGNORECASE)
 _LEAK_TOKEN = r"(?:undefined|NaN|null)"
 _LEAK_RULES = (
     re.compile(rf"^\s*{_LEAK_TOKEN}\s*$"),  # the element says nothing else
@@ -127,9 +128,12 @@ def _static_checks(html: str, path: str) -> list[str]:
     for tag in re.findall(r"<script\b[^>]*>", html, re.IGNORECASE):
         if "src=" not in tag.lower():
             issues.append(f"{path}: inline <script> (CSP script-src 'self')")
-    for hit in _leaked_values(html)[:3]:
+    # A published body (a chapter or an essay, rendered as published — owner decision 12) is the
+    # author's text, not the template's: the forbidden-word scan covers everything around it.
+    scanned = _PUBLISHED_BODY.sub(" ", html)
+    for hit in _leaked_values(scanned)[:3]:
         issues.append(f"{path}: a leaked non-value: {hit!r}")
-    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"<[^>]+>", " ", scanned)
     for rx, why in FORBIDDEN:
         m = rx.search(text)
         if m:

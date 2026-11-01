@@ -3,7 +3,7 @@
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
-  "data_through": null,
+  "data_through": "2026-10-17",
   "decimals": 1,
   "edges": [
    {
@@ -18,7 +18,7 @@
   "method_ids": [],
   "sample": true,
   "sentence": "One real weigh-in per point; a missed morning is a gap, never an interpolated value.",
-  "series_url": null,
+  "series_url": "/api/series?metric=weight_lbs",
   "source": [
    "fixture"
   ],
@@ -31,7 +31,7 @@
   "visibility": "public"
  },
  {
-  "absent_text": null,
+  "absent_text": "No series is served for this measure yet.",
   "approved": null,
   "as_of": "2026-10-31",
   "data_through": null,
@@ -56,7 +56,7 @@
    "fixture"
   ],
   "source_id": "whoop",
-  "state": "ok",
+  "state": "absent",
   "summary": "WHOOP staging.",
   "title": "Deep sleep share",
   "type": "metric",
@@ -67,7 +67,7 @@
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
-  "data_through": null,
+  "data_through": "2026-10-17",
   "decimals": 0,
   "edges": [
    {
@@ -82,7 +82,7 @@
   "method_ids": [],
   "sample": true,
   "sentence": null,
-  "series_url": null,
+  "series_url": "/api/series?metric=recovery_score",
   "source": [
    "fixture"
   ],
@@ -91,14 +91,14 @@
   "summary": "WHOOP recovery, 0–100.",
   "title": "Recovery",
   "type": "metric",
-  "unit": "",
+  "unit": "out of 100",
   "visibility": "public"
  },
  {
   "absent_text": "The last three days hold zero entries.",
   "approved": null,
   "as_of": "2026-10-31",
-  "data_through": null,
+  "data_through": "2026-10-17",
   "decimals": 0,
   "edges": [
    {
@@ -113,12 +113,12 @@
   "method_ids": [],
   "sample": true,
   "sentence": "The only series typed in by a human, and it shows.",
-  "series_url": null,
+  "series_url": "/api/series?metric=total_protein_g",
   "source": [
    "fixture"
   ],
   "source_id": "macrofactor",
-  "state": "stale",
+  "state": "ok",
   "summary": "MacroFactor, as logged.",
   "title": "Protein",
   "type": "metric",
