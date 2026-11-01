@@ -21,6 +21,7 @@ on:
       - 'www/**'
       - 'scripts/publish_snapshot.py'
       - 'scripts/check_www_build.py'
+      - 'deploy/www_owned_paths.py'
       - 'tests/web_preview_gate.py'
       - '.github/workflows/web-gate.yml'
   push:
@@ -29,6 +30,7 @@ on:
       - 'www/**'
       - 'scripts/publish_snapshot.py'
       - 'scripts/check_www_build.py'
+      - 'deploy/www_owned_paths.py'
       - 'tests/web_preview_gate.py'
 
 permissions:

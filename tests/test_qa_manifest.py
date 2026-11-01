@@ -29,6 +29,17 @@ import qa_manifest  # noqa: E402
 # ── 1. Completeness ───────────────────────────────────────────────────────────
 def test_every_site_page_registered_or_exempt():
     unregistered, ghosts = qa_manifest.self_check()
+    # #5534 control: a v9 row (owner "www") is written by the build, never by a file under site/ — it is
+    # not a ghost; a site-owned row with no file still is.
+    saved = dict(qa_manifest.PAGES_BY_PATH)
+    try:
+        qa_manifest.PAGES_BY_PATH["/v9-only-page/"] = {"path": "/v9-only-page/", "owner": "www"}
+        qa_manifest.PAGES_BY_PATH["/site-ghost/"] = {"path": "/site-ghost/", "owner": "site"}
+        _u, g = qa_manifest.self_check()
+        assert "/v9-only-page/" not in g and "/site-ghost/" in g
+    finally:
+        qa_manifest.PAGES_BY_PATH.clear()
+        qa_manifest.PAGES_BY_PATH.update(saved)
     assert not unregistered, f"Unregistered site/ pages (add a qa/qa_manifest.py entry or an EXEMPT reason): {sorted(unregistered)}"
     assert not ghosts, f"Manifest entries with no file under site/: {sorted(ghosts)}"
 
@@ -45,7 +56,12 @@ def test_manifest_entries_well_formed():
 
 def test_tier1_pages_are_the_doors():
     tier1 = {p["path"] for p in qa_manifest.MANIFEST if p["tier"] == 1}
-    assert tier1 == {"/", "/cockpit/", "/data/", "/story/", "/coaching/", "/protocols/"}
+    doors = {"/", "/cockpit/", "/data/", "/story/", "/coaching/", "/protocols/"}
+    # #5534: once the v9 build owns `/`, its four destinations are the doors — /system/ joins, and
+    # `/`, /data/, /story/ are the v9 rows (the v5 doors keep their rows while they are served).
+    if qa_manifest.www_live_at_root():
+        doors |= {"/system/"}
+    assert tier1 == doors
 
 
 def test_tier1_and_tier2_pages_are_visually_swept():
@@ -109,7 +125,9 @@ def test_tier1_pages_have_bindings():
 
     bound = {e["path"] for e in b.PAGE_BINDINGS}
     for p in qa_manifest.MANIFEST:
-        if p["tier"] == 1:
+        # #5534: a v9 page renders from the publication snapshot, not from the API the site-review
+        # bindings judge — the exporter's own gates (scripts/publish_snapshot.py) are its review.
+        if p["tier"] == 1 and p.get("owner") != "www":
             assert p["path"] in bound, f"tier-1 page {p['path']} has no site-review binding"
 
 

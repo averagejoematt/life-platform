@@ -29,9 +29,12 @@ const order = Object.keys(groups).sort();
                   <span>
                     <b style="font-size:14px">{it.name}</b>
                   </span>
-                  <span class="mono muted" style="font-size:12px">
-                    {it.path}
-                  </span>
+                  {/* a reference copy's path carries its date (/reference/<date>-<slug>/); dates render in words only (#5534) */}
+                  {!it.path.startsWith("/reference/") && (
+                    <span class="mono muted" style="font-size:12px">
+                      {it.path}
+                    </span>
+                  )}
                 </a>
               ))}
             </div>

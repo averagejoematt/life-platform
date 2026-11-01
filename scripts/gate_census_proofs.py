@@ -540,6 +540,33 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    # #5534 — the v9 root deploy's auto-rollback decision + action (the #3352/#3395 scope check applied to the v9 paths).
+    "guard::deploy/www_root_rollback.sh": {
+        "gate_name": "deploy/www_root_rollback.sh",
+        "command": (
+            "SITE_REACHABLE=false QA_SURFACES=api QA_SUMMARY='api red' GITHUB_SHA=abc1234567 SNS_TOPIC_ARN= bash deploy/www_root_rollback.sh"
+            "   # + python3 -m pytest tests/test_v9_cutover_5534.py -q (baseline 32 passed)"
+        ),
+        "mutation": (
+            'M1 the decline branch disabled (`if [ "${SITE_REACHABLE:-}" = "false" ] || …` → `if false`), the one line that keeps an '
+            "`api`/`deploy-script`/`ai-unevaluated` red from restoring the previous build over a defect a v9 revert cannot reach; "
+            "restored from a byte copy."
+        ),
+        "observed": (
+            "2026-11-01, this lane. BASELINE: `⛔ v9 ROLLBACK DECLINED — … visual-qa[api]`, `::warning title=v9 root rollback DECLINED`, "
+            "declined=true, exit 0. M1: the same input went straight to `⚠️  … restoring the previous v9 build (never site/)` and into "
+            "deploy/www_preview_sync.sh --restore-previous; tests/test_v9_cutover_5534.py 1 failed "
+            "(test_root_rollback_script_declines_on_an_unreachable_surface_and_restores_otherwise). REVERTED 32 passed. The M1 run also "
+            "exposed a second defect, fixed the same day: with no credentials `aws s3 ls` failed and the restore read that as 'no "
+            "previous build' — the listing's error text and its empty-exit-1 absence are now two different answers (exit 2 vs exit 0)."
+        ),
+        "scope": (
+            "The decision (an explicit `false` from either sweep's verdict declines; absent verdicts roll back), the GITHUB_OUTPUT lines, "
+            "the SNS text, and the hand-off to `www_preview_sync.sh --restore-previous`. NOT SEEN: the S3→S3 restore itself and "
+            "CloudFront (no credentials in a lane; the sync's command lines are rehearsed with --print), the live sweeps that feed it."
+        ),
+        "proved_on": "2026-11-01",
+    },
     # #5530 — the v9 (www/) build gate: one entrypoint, two mutations by construction, a reproducibility check and a scan.
     "guard::scripts/check_www_build.py": {
         "gate_name": "scripts/check_www_build.py",
@@ -548,18 +575,25 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
             "Two plants the script makes itself on every run in the real www/content/snapshot — chapters[0].visibility → `held` "
             "(+ a POISON title) and predictions[0].edges += {metric, does_not_exist_anywhere} — each of which MUST fail `astro build` "
             "or the script exits 2 (BLIND). A third, hand plant on 2026-11-01: a sentinel paragraph and an inline <script> appended "
-            "to www/dist/index.html, then `--scan-only`."
+            "to www/dist/index.html, then `--scan-only`. #5534 adds the owned-paths check and two more hand plants: M4 a route "
+            "removed from the committed www/owned_paths.json (drift against the fresh emit); M5 a kept page planted at "
+            "site/system/index.html (a v9 route landing on a site/ page outside REPLACED_ROUTES)."
         ),
         "observed": (
             "2026-11-01, this lane, exit 0 in 5.6 s: `reproducible: 1e4a1118713ed28a… == 1e4a1118713ed28a…`; `held object refused by "
             "the build (exit 1, the schema named visibility)`; `dangling edge refused by the build (exit 1, named)`; `scan ✓ 38 pages: "
             "no sentinel, no inline script, noindex everywhere`. Hand plant: `--scan-only` exit 1 naming index.html ×3 (two sentinels, "
-            "one inline script); REVERTED exit 0."
+            "one inline script); REVERTED exit 0. #5534 (the same day, the cut-over lane): the full gate exit 0 with `owned paths ✓ "
+            "owned_paths.json + reach.json match the build; no collision outside the replaced set`; M4 `--owned-paths` exit 1 "
+            "`✗ www/owned_paths.json: DRIFT — the build emits a different file; commit the regenerated one`; M5 exit 1 `✗ collision — "
+            "route /system/ — site/system/index.html is a kept page (not in REPLACED_ROUTES)`; REVERTED exit 0."
         ),
         "scope": (
             "The fixture snapshot and the preview-base build: byte-reproducibility, the schema's visibility literal, the edge index's "
-            "dangling check, and the output scan (sentinels, inline <script>, noindex). NOT SEEN: the exporter's own exclusion of "
-            "held/private objects (tests/test_web_publication_snapshot_5530.py), page rendering (tests/web_preview_gate.py), live data."
+            "dangling check, the output scan (sentinels, inline <script>, noindex), and (#5534) the committed route manifest + reach "
+            "census against the fresh emit plus the collision rule. NOT SEEN: the exporter's own exclusion of held/private objects "
+            "(tests/test_web_publication_snapshot_5530.py), page rendering (tests/web_preview_gate.py), live data (the live build's "
+            "collision check is the deploy step's, ci::web-preview-deploy.yml::deploy::6)."
         ),
         "proved_on": "2026-11-01",
     },
@@ -1997,6 +2031,36 @@ GUARD_PROOFS.update(
 
 STRUCTURAL_HAND_PROOFS.update(
     {
+        # #5534: the v9 cut-over's one-owner-per-path contract — the exclusion derivation on a planted copy of site/, the sync
+        # and rollback scripts threading it, the live collision rule, the committed route manifest, the target resolution, the
+        # registry's v9 rows in both switch states, the reference copies, the sitemap writer and the workflow's shape.
+        "structural::test_v9_cutover_5534.py": {
+            "gate_name": "test_v9_cutover_5534.py",
+            "command": "python3 -m pytest tests/test_v9_cutover_5534.py -q -p no:randomly   # baseline 32 passed",
+            "mutation": (
+                "Four plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 the HTML sync step in "
+                "deploy/sync_site_to_s3.sh loses its `${WWW_EXCLUDES[@]…}` (the step that would put the v8 front page back); M2 "
+                "site/reference/2026-11-01-story-v8/ deleted (a superseded page with no kept copy); M3 the cut-over switch flipped in "
+                "the committed www/owned_paths.json (`scripts/www_cutover_switch.py --live`) with nothing else changed; M4 the live "
+                "collision rule in deploy/www_owned_paths.py disarmed (`if False and route not in REPLACED_ROUTES`)."
+            ),
+            "observed": (
+                "2026-11-01, this lane. BASELINE 32 passed. M1: 1 failed (test_sync_script_derives_its_excludes_from_the_reader_and_"
+                "fails_closed — `a sync from / runs without the owned excludes`). M2: 3 failed (the copies' contract, the script's "
+                "idempotence, the appendix group). M3: 5 failed (the committed switch, the target CLI's refusal, the root sync's "
+                "refusal, the registry's no-v9-rows state, the sitemap writer's switch read). M4: 1 failed (the collision rule's "
+                "control). REVERTED 32 passed each time. The exclusion derivation's own control is in-test (a route dropped from the "
+                "owned set uncovers the planted path, test_exclusion_derivation_can_fail_control)."
+            ),
+            "scope": (
+                "The repo-side contract only: the exclude set and its fnmatch semantics on a tmp copy of site/, the script text, "
+                "the committed artifacts, the pure target rule, the registry derivation with the switch forced both ways, the six "
+                "reference copies and the two twinless pages, robots.txt and both committed sitemaps, the workflow YAML. NOT SEEN: "
+                "S3 (no credentials in a lane — `aws s3 sync --exclude` is exercised through `--print` command lines and fnmatch), the "
+                "live sweeps after a root sync, CloudFront."
+            ),
+            "proved_on": "2026-11-01",
+        },
         # #4880: the function-length ratchet (D3) — the module-size guard's shape, one level down.
         "structural::test_function_length_guard_4880.py": {
             "gate_name": "test_function_length_guard_4880.py",
@@ -2915,19 +2979,29 @@ CI_PROOFS: dict[str, dict[str, Any]] = {
         "scope": "See guard::tests/web_preview_gate.py. In CI it runs on the fixture build that step 4 left behind.",
         "proved_on": "2026-11-01",
     },
-    "ci::web-preview-deploy.yml::preview::6": {
-        "gate_name": "preview / Output scan — no sentinel, no inline script, noindex on every page",
-        "command": "python3 scripts/check_www_build.py --scan-only   # on the LIVE-snapshot build, before the S3 sync",
-        "mutation": "A sentinel paragraph and an inline <script> appended to www/dist/index.html after a clean build.",
+    # #5534: was ci::web-preview-deploy.yml::preview::6 (#5530); the scan now runs inside deploy/www_build_target.sh, the
+    # deploy job's step 6, for whichever target deploy/www_deploy_target.py resolved — and for the ROOT target the same step
+    # also runs the live collision rule (deploy/www_owned_paths.py --check-dist) before any sync.
+    "ci::web-preview-deploy.yml::deploy::6": {
+        "gate_name": "deploy / Build and scan for the target (scripts/check_www_build.py --scan-only; root adds the live collision check)",
+        "command": "bash deploy/www_build_target.sh preview|root   # = npm run build[:preview] + check_www_build.py --scan-only [--no-noindex] [+ www_owned_paths.py --check-dist www/dist]",
+        "mutation": (
+            "M1 a sentinel paragraph and an inline <script> appended to www/dist/index.html after a clean build, then the scan. "
+            "M2 (root leg) a kept page planted at site/system/index.html — a path the live build writes — then --check-dist."
+        ),
         "observed": (
-            "2026-11-01, this lane: MUTATED `scan ✗ index.html: sentinel 'SENTINEL' · ✗ index.html: sentinel 'DO-NOT-PUBLISH' · "
-            "✗ index.html: inline <script>` exit 1. REVERTED `✓ 38 pages: no sentinel, no inline script, noindex everywhere` exit 0. "
-            "The step precedes `deploy/www_preview_sync.sh`, so a red here deploys nothing."
+            "2026-11-01, the #5534 lane: M1 `scan ✗ index.html: sentinel 'SENTINEL' · ✗ index.html: inline <script>` exit 1; REVERTED "
+            "`✓ 38 pages: no sentinel, no inline script, noindex everywhere` exit 0, and `bash deploy/www_build_target.sh preview` exit 0 "
+            "(`preview build in www/dist passed the scan`). M2 `www_owned_paths: the built tree would overwrite kept site/ content — "
+            "refusing (#5534): ✗ route /system/ — site/system/index.html is a kept page (not in REPLACED_ROUTES)` exit 1; REVERTED "
+            "`37 routes + 1 files collide only with the declared replaced set ✓` exit 0. Both precede `deploy/www_preview_sync.sh`, "
+            "so a red deploys nothing. (#5530's observation of the same scan on the preview step: three findings, exit 1 / exit 0.)"
         ),
         "scope": (
-            "Every html/css/js/json/xml/txt file under www/dist: the fixture sentinels, inline <script> (CSP script-src 'self'), "
-            "the noindex meta on every page (the preview base). NOT SEEN: a leak that carries none of the sentinel strings — "
-            "that is the exporter's gate (visibility) and the Site API's privacy tiers, not this scan's."
+            "Every html/css/js/json/xml/txt file under www/dist: the fixture sentinels, inline <script> (CSP script-src 'self'), the "
+            "noindex meta on every page (preview) or its absence (root); for root, every built route against the kept site/ pages "
+            "outside the declared replaced set. NOT SEEN: a leak that carries none of the sentinel strings — that is the exporter's "
+            "gate (visibility) and the Site API's privacy tiers, not this scan's; the live sweeps after the sync (smoke, visual)."
         ),
         "proved_on": "2026-11-01",
     },
@@ -4223,3 +4297,15 @@ ATTEMPTED_UNPROVEN_EXTRACTED: dict[str, str] = {
         "LifePlatformOperational-DlqConsumerScheduleEC15B7F4-jl4JyU2rFaNS",
     )
 }
+
+# #5534 — the v9 root deploy's live visual sweep (gate_census.py sits at its 1000-line ceiling, so the record lives here).
+ATTEMPTED_UNPROVEN_EXTRACTED["ci::web-preview-deploy.yml::visual-qa::4"] = (
+    "#5534 the v9 ROOT deploy's visual + AI-vision sweep — NOT PROVED from a lane. The step is site-deploy.yml's own sweep "
+    "(`python3 qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1`, the same unproven step there, sealed 2026-09-05) "
+    "re-pointed at the live site after a root sync; it needs the live root, Playwright against averagejoematt.com and the "
+    "diagnosis role for Bedrock, none of which a lane has, and the job itself is skipped until www/owned_paths.json says "
+    "live_at_root. What IS proved offline: the sweep's page set — qa/qa_manifest.py derives the v9 rows from the committed "
+    "route manifest with the switch forced on (tests/test_v9_cutover_5534.py::test_registry_derives_the_v9_rows_once_the_switch_"
+    "is_on, mutation M3) — and the rollback the step feeds (deploy/www_root_rollback.sh: declined on an explicit `false`, "
+    "restore otherwise). The live half is watched on the first root run after the owner's switch merge."
+)

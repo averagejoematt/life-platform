@@ -2,5 +2,8 @@
 User-agent: *
 Allow: /
 Disallow: /next/
+Disallow: /reference/
+Disallow: /_v9_previous/
 
 Sitemap: https://averagejoematt.com/sitemap.xml
+Sitemap: https://averagejoematt.com/sitemap-site.xml

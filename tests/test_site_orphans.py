@@ -38,6 +38,11 @@ UNLISTED_PAGES = {
     "/mind/": "0-second redirect stub to /data/reading/ — chrome-free by design (#1104)",
     "/subscribe/confirm/": "email-flow landing — reached from the confirmation email, never from menus",
     "/kit/": "v8 kit specimen (#4581) — a build reference reached by direct URL only; noindex, in no menu and no sitemap",
+    # #5534: the two v8 kit pages with no v9 twin. Served at their URLs (nothing deleted, no 301s), noindex, canonical to
+    # their v9 successor (`/`, /system/) — so the self-canonical that used to count as their link is gone by design. The
+    # front page still reaches them at runtime through the kit's data-ck-base rewrite (static href /next/v8/<page>/).
+    "/start/": "v8 kit page with no v9 twin (#5534): served, noindex, canonical → /; reached from / via the kit's data-ck-base rewrite",
+    "/coaches/": "v8 kit page with no v9 twin (#5534): served, noindex, canonical → /system/; reached from / via the kit's data-ck-base rewrite",
 }
 
 HREF = re.compile(r'href=\\?"([^"\\]+)\\?"')  # plain hrefs + hrefs escaped in embedded JSON

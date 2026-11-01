@@ -48,8 +48,14 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "v4-gate.yml": (170, 31),
     "visual-qa.yml": (326, 107),
     "webkit-mobile-qa.yml": (179, 26),
-    "web-gate.yml": (82, 4),  # #5530: the v9 build gate (new); its shell lives in scripts/check_www_build.py + tests/web_preview_gate.py
-    "web-preview-deploy.yml": (72, 5),  # #5530: the v9 preview deploy (new); its sync lives in deploy/www_preview_sync.sh
+    "web-gate.yml": (
+        84,
+        4,
+    ),  # #5530: the v9 build gate (new); its shell lives in scripts/check_www_build.py + tests/web_preview_gate.py; #5534: +2 path lines (deploy/www_owned_paths.py)
+    "web-preview-deploy.yml": (
+        228,
+        10,
+    ),  # #5534: preview + ROOT targets, four root-only jobs (smoke, visual, record-previous, rollback); every run line is one tested entrypoint (deploy/www_deploy_target.py, www_build_target.sh, www_preview_sync.sh, www_root_rollback.sh) — was (72, 5) at #5530
     "wrap-nightly.yml": (137, 11),  # #5316 box 2 + #5143 box 4: two AWS read-only legs (matrix rows + header, one guarded pip line)
 }
 
