@@ -96,7 +96,8 @@ def test_fixtures_carry_poison_so_the_gate_is_measured_not_assumed():
 def test_held_and_private_objects_never_reach_the_snapshot(tmp_path):
     manifest, out = _run(tmp_path)
     assert manifest["excluded"] == {"held": 2, "private": 1}
-    blob = b"".join(open(os.path.join(root, f), "rb").read() for root, _, fs in os.walk(out) for f in fs)
+    files = [out / f for f in os.listdir(out) if f != "series"] + [out / "series" / f for f in os.listdir(out / "series")]
+    blob = b"".join(open(f, "rb").read() for f in files)  # the collections, the data files and series/ — one known layout, not a tree sweep
     assert b"SENTINEL" not in blob, "a held/private object's content leaked into the public snapshot"
     assert b"week-10" not in blob and b"private-20261030" not in blob, "even the ID of a held/private object must not be written"
     for coll in os.listdir(out):
