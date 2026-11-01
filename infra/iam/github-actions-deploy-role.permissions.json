@@ -177,6 +177,20 @@
         "cloudfront:GetInvalidation"
       ],
       "Resource": "arn:aws:cloudfront::205930651321:distribution/E3S424OXQZ8NBE"
+    },
+    {
+      "Sid": "DenyLifeOsPrivatePrefixes",
+      "Effect": "Deny",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/claude-memory-backup/*",
+        "arn:aws:s3:::matthew-life-platform/session-artifacts/*"
+      ]
     }
   ]
 }
