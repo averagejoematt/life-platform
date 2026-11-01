@@ -377,7 +377,7 @@ def load_fixtures(fixtures_dir: str) -> dict[str, list[dict]]:
 _PROSE = re.compile(
     r'<article class="post-body">\s*<div class="prose">([\s\S]*?)</div>\s*(?:<div class="signature">[\s\S]*?</div>\s*)?</article>'
 )
-_SCRIPT = re.compile(r"<script\b[\s\S]*?</script\s*>|<script\b[^>]*/>", re.IGNORECASE)  # `</script >` too (CodeQL py/bad-tag-filter)
+_SCRIPT = re.compile(r"<script\b[\s\S]*?</script\b[^>]*>|<script\b[^>]*/>", re.IGNORECASE)  # an end tag with whitespace or attributes too
 _ON_ATTR = re.compile(r'\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', re.IGNORECASE)
 _ROOT_LINK = re.compile(r'(href|src)="(/[^"]*)"')
 

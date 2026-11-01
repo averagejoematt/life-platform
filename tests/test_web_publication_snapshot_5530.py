@@ -486,6 +486,10 @@ def test_extract_prose_keeps_the_text_and_drops_what_a_different_host_must_not_r
         '<article class="post-body"><div class="prose"><p>a</p><script>x()</script ><p>b</p></div></article>', "https://x"
     )
     assert spaced == "<p>a</p><p>b</p>"
+    attr = ps.extract_prose(
+        '<article class="post-body"><div class="prose"><p>a</p><script>x()</script\t\n bar><p>b</p></div></article>', "https://x"
+    )
+    assert attr == "<p>a</p><p>b</p>"
     assert 'src="https://averagejoematt.com/assets/a.png"' in out
     assert ps.extract_prose("<main>no prose block</main>", "https://x") is None
 
