@@ -618,28 +618,29 @@ if [[ "$QUICK" != "--quick" ]]; then
   SUB_FILE=$(mktemp);    CURRENT_CHECK="body fetch $BASE/subscribe/"; smoke_curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
   trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
-  # Home: the kit front page since the #4588 cut-over (2026-10-23, owner's "asap"). The v5
-  # constellation + five doors live on as the served, noindex /reference/ copy (owner 10-18
-  # ruling: a replaced layout is kept as a reference page, never deleted), so they are no longer
-  # the front page's contract. Static markers only: the kit renders its blocks client-side.
-  check_body_contains "Home: kit front page"          "$HOME_FILE"  'data-ck-page="front"'  "$BASE/"
-  check_body_contains "Home: loads the kit module"    "$HOME_FILE"  'assets/js/ck_pages'    "$BASE/"
-  check_body_contains "Home: the daily mark (C)"      "$HOME_FILE"  'ck-mark'               "$BASE/"
+  # Home: the v9 Start page since the #5534 cut-over (2026-11-01, the owner's explicit go). The v8 kit
+  # page and the v5 constellation live on as served, noindex /reference/ copies (owner 10-18 ruling: a
+  # replaced layout is kept as a reference page, never deleted), so neither is the front page's
+  # contract any more. The build is fully static — assert its rendered markup, not a client mount.
+  check_body_contains "Home: v9 masthead"             "$HOME_FILE"  'header class="mast"'   "$BASE/"
+  check_body_contains "Home: the six-dimensional portrait" "$HOME_FILE" 'portrait-tiles' "$BASE/"
+  check_body_contains "Home: self-canonical at /"     "$HOME_FILE"  'rel="canonical" href="https://averagejoematt.com/"' "$BASE/"
+  check_body_not_contains "Home: not the preview build" "$HOME_FILE" 'name="robots" content="noindex' "$BASE/"
+  check_body_not_contains "Home: kit front page gone"   "$HOME_FILE" 'data-ck-page="front"'  "$BASE/"
   check_body_not_contains "Home: v5 constellation gone" "$HOME_FILE" 'class="constellation"' "$BASE/"
   # Cockpit: live data wiring
   check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'             "$BASE/cockpit/"
   check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'    "$BASE/cockpit/"
-  # Story: the kit story page since the #4588 cut-over; its chapter and episode lists render
-  # client-side into these static mounts.
-  check_body_contains "Story: kit story page"         "$STORY_FILE" 'data-ck-page="story"'  "$BASE/story/"
-  check_body_contains "Story: chapters mount"         "$STORY_FILE" 'id="ck-chapters"'      "$BASE/story/"
-  check_body_contains "Story: episodes mount"         "$STORY_FILE" 'id="ck-episodes"'      "$BASE/story/"
-  # Evidence: registry + readout shell + the new live Pipeline-status topic
-  # #3048: the registry ships as the non-executable #page-data JSON island
-  # (the old inline window.__EVIDENCE_REGISTRY__ global is gone with the CSP
-  # hardening) — assert the island marker, not the retired global.
-  check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  'id="page-data"' "$BASE/data/"
-  check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'          "$BASE/data/"
+  # Story: the v9 chapters page since the #5534 cut-over — the chapter list is rendered at build time.
+  check_body_contains "Story: v9 masthead"            "$STORY_FILE" 'header class="mast"'   "$BASE/story/"
+  check_body_contains "Story: the chapters"           "$STORY_FILE" 'The chapters'          "$BASE/story/"
+  check_body_contains "Story: chapters published count" "$STORY_FILE" 'chapters published'  "$BASE/story/"
+  # Data: the v9 data room since the #5534 cut-over (the v5 evidence hub's #page-data island and
+  # readout mount are the /reference/ copy's). The kept topic pages under /data/<topic>/ are still
+  # site/'s and keep their own rows below.
+  check_body_contains "Data: v9 masthead"             "$EVID_FILE"  'header class="mast"'   "$BASE/data/"
+  check_body_contains "Data: the data room"           "$EVID_FILE"  'The data room'         "$BASE/data/"
+  check_body_contains "Data: series tiles"            "$EVID_FILE"  'class="tile"'          "$BASE/data/"
   check_body_contains "Method: Pipeline-status topic" "$PIPE_FILE" 'Pipeline status'        "$BASE/method/pipeline/"
   check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness' "$BASE/method/pipeline/"
   # Subscribe form present
@@ -741,7 +742,7 @@ if [[ "$QUICK" != "--quick" ]]; then
   # #4588: the kit front page ships the wordmark card on purpose until #5267's daily og-front card
   # has rendered (pointing og at an unrendered PNG would unfurl blank). Flip back to fail with that follow-up.
   check_og_has_number "Home og:title has a number"      "/" warn
-  check_og_has_number "Data og:title has a number"      "/data/"
+  check_og_has_number "Data og:title has a number"      "/data/" warn  # v9 (#5534): the build's titles carry no number by design; the og-card follow-up is #5267's
   check_og_has_number "Protocols og:title has a number" "/protocols/"
   echo ""
 
