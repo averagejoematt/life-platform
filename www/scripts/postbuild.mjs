@@ -136,11 +136,20 @@ function linksOf(route) {
   for (const m of html.matchAll(/<a\s[^>]*href="([^"#]+)(?:#[^"]*)?"/g)) {
     let href = m[1];
     let keptSite = false; // an absolute link to the kept site (e.g. /subscribe/) carries no base
-    if (href.startsWith(SITE_HOST)) {
-      href = href.slice(SITE_HOST.length);
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+      // Absolute: parse it and compare the ORIGIN exactly (a prefix test on the bare host string would
+      // accept https://averagejoematt.com.evil.example — CodeQL js/incomplete-url-substring-sanitization).
+      let parsed;
+      try {
+        parsed = new URL(href);
+      } catch {
+        continue;
+      }
+      if (parsed.origin !== SITE_HOST) continue; // another host: external
+      href = parsed.pathname;
       keptSite = true;
     }
-    if (!href.startsWith("/")) continue; // external or fragment
+    if (!href.startsWith("/")) continue; // fragment or relative — not a site page
     if (!keptSite && base !== "/") {
       if (!(href === base || href.startsWith(base + "/"))) continue; // outside the preview base
       href = href.slice(base.length) || "/";
