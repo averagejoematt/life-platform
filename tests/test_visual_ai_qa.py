@@ -68,7 +68,8 @@ def test_ai_qa_targets_deploy_time_restricts_to_exactly_the_six_doors():
     manifest-derived PAGES restricts to exactly the tier-1 flagship doors."""
     results = [_r(p["path"], p["tier"]) for p in visual_qa.PAGES]
     tier1 = visual_qa.ai_qa_targets(results, 1)
-    assert {r["path"] for r in tier1} == {"/", "/cockpit/", "/data/", "/story/", "/coaching/", "/protocols/"}
+    # #5534 (2026-11-01): the v9 System page is a plan §C destination and joins the tier-1 doors at the cut-over.
+    assert {r["path"] for r in tier1} == {"/", "/cockpit/", "/data/", "/story/", "/coaching/", "/protocols/", "/system/"}
 
 
 # ── qa_manifest.visual_pages() carries tier ────────────────────────────────────
