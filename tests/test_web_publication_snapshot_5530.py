@@ -316,7 +316,27 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
                 }
             ]
         },
-        "/api/coach_docket": {"open": [], "resolved": []},
+        "/api/coach_docket": {
+            "open": [],
+            # the real wire shape (2026-11-01): `verdict` is a dict once code settled the bet
+            "resolved": [
+                {
+                    "topic": "Deep sleep spike interpretation: signal vs. noise",
+                    "topic_slug": "deep-sleep-spike-interpretation-signal-vs-noise",
+                    "coach_a": "sleep_coach",
+                    "coach_b": "eli_marsh",
+                    "claims": {"sleep_coach": "Regression to the mean.", "eli_marsh": "A real shift."},
+                    "resolved_date": "2026-10-16",
+                    "verdict": {
+                        "actual_value": 16.357142857142858,
+                        "holds": False,
+                        "loser": "eli_marsh",
+                        "outcome": "graded",
+                        "winner": "sleep_coach",
+                    },
+                }
+            ],
+        },
         "/api/source_freshness": {
             "sources": [
                 {
@@ -381,6 +401,9 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
     assert [x["id"] for x in public["experiment"]] == ["real_2026-10-01"], "the library catalogue is not an experiment"
     assert public["source"][0]["status"] == "live"
     assert public["edition"][0]["edges"] == [{"type": "chapter", "id": "week-09", "rel": "this_week"}]
+    dis = public["disagreement"]
+    assert len(dis) == 1 and dis[0]["status"] == "resolved" and dis[0]["resolved_date"] == "2026-10-16"
+    assert isinstance(dis[0]["verdict"], str) and "sleep_coach" in dis[0]["verdict"] and "16.4" in dis[0]["verdict"]
     for type_, items in public.items():
         for o in items:
             ps.validate(o, type_)
