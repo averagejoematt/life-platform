@@ -47,3 +47,11 @@ python3 ../tests/web_preview_gate.py --out /tmp/web-gate   # Playwright, 390 + 1
 - Canonical tags, sitemap inclusion and the fate of superseded layouts are settled before the Phase 4 cut-over (requirement C); until then every preview page is `noindex` and self-canonical.
 - One canonical object, many discovery paths; a new object type is a schema, a template and an edge type — never a navigation edit (requirement D).
 - The age is never published; "British, in Seattle" stays (decision 7). Reflections are owner-only; the public sees aggregates through the ADR-155 stamp (decision 5).
+
+## Phase 2 — the data room (#5536)
+
+- `scripts/publish_snapshot.py` maps the series catalogue (`/api/series`) to one Metric per publishable key and fetches each daily series for the experiment window into `content/snapshot/series/<metric>.json`; the platform's pair statistics (`/api/pairs`) land in `content/snapshot/pairs.json`. Both are data files beside the collections, hashed into the manifest and validated against the public Metric set (a series or a pairing naming a non-public metric fails the export). The chart marker is the reader-facing baseline-change date (`lambdas/web/baseline_change.py`), never the clinical module. The exporter's pure contract (schema mirror, envelope, validation, partition, writer) lives in `scripts/publish_snapshot_contract.py` and is re-exported.
+- `src/lib/chart.js` draws the one line chart at build time AND in the island (a reader without JavaScript sees the same chart). Absence is drawn, not interpolated: a line never bridges a missing reading or a logging gap.
+- `src/islands/explorer.js` is the progressive enhancement: range, 7-day mean, a second series, a lag of −2…+2 days. Every statistic it shows is READ from `pairs.json` via `src/lib/pairs.js`; nothing is computed in the browser (owner requirement A), and the word "significant" is never produced.
+- `src/pages/data/series/[metric].json.ts` and `src/pages/data/pairs.json.ts` serve the snapshot's files beside the pages for the island (same origin; the CSP's `connect-src 'self'`).
+- Node tests: `tests/chart.test.mjs`, `tests/pairs.test.mjs`.
