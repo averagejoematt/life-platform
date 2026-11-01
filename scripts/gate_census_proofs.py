@@ -584,7 +584,8 @@ GUARD_PROOFS: dict[str, dict[str, Any]] = {
         "scope": (
             "Every index.html under www/dist, served under its base path, at 390x844 and 1280x900, light theme: horizontal "
             "overflow, page errors, failed or non-2xx same-origin requests, axe serious/critical at phone width, forbidden "
-            "strings (undefined, NaN, [object Object], an ISO date, the age, the fixture sentinels), inline <script>, the front "
+            "strings ([object Object] anywhere; undefined/NaN/null in a VALUE position — alone in an element or beside a number, unit or "
+            "separator, pinned by tests/test_web_preview_gate_rules_5530.py; an ISO date; the age; the fixture sentinels), inline <script>, the front "
             "page's six-screen budget. NOT SEEN: dark theme (light-only by owner decision 6), live data (the fixture snapshot "
             "pins it), desktop-width axe, anything outside www/dist."
         ),

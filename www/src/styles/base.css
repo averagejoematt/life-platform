@@ -50,6 +50,7 @@ h3 {
   letter-spacing: -0.03em;
   line-height: 1.05;
   text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 h1 {
   font-size: var(--fs-h1);
@@ -377,6 +378,13 @@ h3 {
 }
 .rows > * > :last-child:not(:only-child) {
   flex: 0 0 auto;
+  max-width: 60%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rows > * > :last-child:not(:only-child).status,
+.rows > * > :last-child:not(:only-child).mono {
+  max-width: none;
 }
 .rows > *:last-child {
   border-bottom: 1px solid var(--ink);

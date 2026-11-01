@@ -45,7 +45,7 @@ PHONE = {"width": 390, "height": 844}
 LAPTOP = {"width": 1280, "height": 900}
 FRONT_PAGE_SCREENS = 6.0
 FORBIDDEN = (
-    (re.compile(r"\bundefined\b|\bNaN\b|\[object Object\]"), "a leaked non-value"),
+    (re.compile(r"\[object Object\]"), "a leaked non-value"),
     (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "an ISO date (dates are written in words)"),
     (re.compile(r"\bThirty-seven\b"), "the age (never published)"),
     (re.compile(r"SENTINEL|POISON-HELD|DO-NOT-PUBLISH"), "a held/private fixture sentinel"),
@@ -96,11 +96,39 @@ def pages_of(dist: str) -> list[str]:
     return sorted(out)
 
 
+# `undefined` / `NaN` are English words in the methods registry's own prose ("skill is undefined
+# against a degenerate base rate"), so the leak rule is positional: the whole text of an element,
+# or the token beside a number, a unit or a separator — the shapes a template binding produces.
+_LEAK_TOKEN = r"(?:undefined|NaN|null)"
+_LEAK_RULES = (
+    re.compile(rf"^\s*{_LEAK_TOKEN}\s*$"),  # the element says nothing else
+    re.compile(rf"\b{_LEAK_TOKEN}\s+(?:of|lb|g|%|ms|bpm|kcal|h|min|steps|right|checked)\b"),
+    re.compile(rf"(?:\bof|·|:|—|\d)\s*{_LEAK_TOKEN}\b"),
+    re.compile(rf"\b{_LEAK_TOKEN}\s+{_LEAK_TOKEN}\b"),
+)
+
+
+def _leaked_values(html: str) -> list[str]:
+    hits = []
+    for seg in re.split(r"<[^>]+>", html):
+        t = seg.strip()
+        if not t:
+            continue
+        for rx in _LEAK_RULES:
+            m = rx.search(t)
+            if m:
+                hits.append(t[:60])
+                break
+    return hits
+
+
 def _static_checks(html: str, path: str) -> list[str]:
     issues = []
     for tag in re.findall(r"<script\b[^>]*>", html, re.IGNORECASE):
         if "src=" not in tag.lower():
             issues.append(f"{path}: inline <script> (CSP script-src 'self')")
+    for hit in _leaked_values(html)[:3]:
+        issues.append(f"{path}: a leaked non-value: {hit!r}")
     text = re.sub(r"<[^>]+>", " ", html)
     for rx, why in FORBIDDEN:
         m = rx.search(text)

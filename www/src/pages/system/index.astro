@@ -2,7 +2,7 @@
 // System — three depths on one page (Stage 3 `#system`). Depth 1 plain English; depth 2 the
 // record, from the edition's one producer; depth 3 the sources and methods.
 import Base from "../../layouts/Base.astro";
-import { kOfN } from "../../lib/format.js";
+import { dayInWords, kOfN } from "../../lib/format.js";
 import { loadAll, latestEdition } from "../../lib/snapshot.js";
 import { href, pathOf } from "../../lib/url.js";
 
@@ -119,7 +119,7 @@ const steps = [
                       </a>
                     </td>
                     <td class="mono" style="border-color:var(--inkrule);color:var(--inkmuted)">
-                      {s.latest || "—"}
+                      {s.latest ? dayInWords(s.latest, { short: true }) : "—"}
                     </td>
                     <td style="border-color:var(--inkrule)">
                       <span style="display:inline-flex;align-items:center;gap:6px">

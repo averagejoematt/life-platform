@@ -1,5 +1,6 @@
 ---
 import Base from "../../../layouts/Base.astro";
+import { dayInWords } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -21,7 +22,7 @@ const sources = [...all.byType.source].sort((a, b) => (a.status === b.status ? (
               </span>
               <span class="mono" style="font-size:12px">
                 {s.status}
-                {s.latest && ` · ${s.latest}`}
+                {s.latest && ` · ${dayInWords(s.latest, { short: true })}`}
               </span>
             </a>
           ))
