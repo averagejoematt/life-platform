@@ -15,7 +15,8 @@ The Stage 3 design (Claude Design, 2026-10-31) as a static site: one typed conte
 | Templates | `src/pages/` | One per object type; four destinations (Start · Story · Data · System), the appendix, privacy, 404. |
 | The identity | `src/styles/tokens.css`, `fonts.css`, `base.css` | Frozen from the Stage 2 identity sheet. Light only (owner decision 6). Two AA corrections from the prototype: `--faint` 4.64:1, smallest type 12 px. |
 | Fonts | `public/assets/fonts/v9/` | Archivo, Newsreader, IBM Plex Mono — Google's latin subsets, instanced to the axis ranges used (fontTools). 304 KB in all; the heaviest page loads ~262 KB. SIL OFL 1.1 (`docs/LICENSES.md` §3.1). |
-| Fixtures | `content/fixtures/*.json` | Sample objects marked `sample: true`, including one `held` chapter, one `held` insight and one `private` prediction whose sentinel strings the gates look for. |
+| Fixtures | `content/fixtures/*.json` | Sample objects marked `sample: true`, including one `held` chapter, one `pending` week, one `held` insight and one `private` prediction whose sentinel strings the gates look for. |
+| Phase 1 content | the exporter's `_chapter_body`, `_live_week_states`, episode `transcript` | A published chapter's body is the permalink's `.prose` block as published (scripts and inline handlers stripped, links made absolute), never rewritten; a program week with no chapter is a `held` / `skipped` / `pending` row with no title or body; an episode carries its transcript turns for the read-along. |
 
 ## Build
 
@@ -88,3 +89,11 @@ The owner's go is that one-line merge (his five-reader bar on #5529 comes first;
 - Canonical tags, sitemap inclusion and the fate of superseded layouts are settled before the Phase 4 cut-over (requirement C); until then every preview page is `noindex` and self-canonical.
 - One canonical object, many discovery paths; a new object type is a schema, a template and an edge type — never a navigation edit (requirement D).
 - The age is never published; "British, in Seattle" stays (decision 7). Reflections are owner-only; the public sees aggregates through the ADR-155 stamp (decision 5).
+
+## Phase 2 — the data room (#5536)
+
+- `scripts/publish_snapshot.py` maps the series catalogue (`/api/series`) to one Metric per publishable key and fetches each daily series for the experiment window into `content/snapshot/series/<metric>.json`; the platform's pair statistics (`/api/pairs`) land in `content/snapshot/pairs.json`. Both are data files beside the collections, hashed into the manifest and validated against the public Metric set (a series or a pairing naming a non-public metric fails the export). The chart marker is the reader-facing baseline-change date (`lambdas/web/baseline_change.py`), never the clinical module. The exporter's pure contract (schema mirror, envelope, validation, partition, writer) lives in `scripts/publish_snapshot_contract.py` and is re-exported.
+- `src/lib/chart.js` draws the one line chart at build time AND in the island (a reader without JavaScript sees the same chart). Absence is drawn, not interpolated: a line never bridges a missing reading or a logging gap.
+- `src/islands/explorer.js` is the progressive enhancement: range, 7-day mean, a second series, a lag of −2…+2 days. Every statistic it shows is READ from `pairs.json` via `src/lib/pairs.js`; nothing is computed in the browser (owner requirement A), and the word "significant" is never produced.
+- `src/pages/data/series/[metric].json.ts` and `src/pages/data/pairs.json.ts` serve the snapshot's files beside the pages for the island (same origin; the CSP's `connect-src 'self'`).
+- Node tests: `tests/chart.test.mjs`, `tests/pairs.test.mjs`.

@@ -1,4 +1,7 @@
 ---
+// A chapter: the published text as published, its episode with the real audio and a
+// read-along transcript, its Connected rail, and the previous/next walk. A week with no
+// chapter (held · skipped · pending) renders its state in the same place.
 import Base from "../../layouts/Base.astro";
 import Connected from "../../components/Connected.astro";
 import Provenance from "../../components/Provenance.astro";
@@ -13,10 +16,16 @@ export async function getStaticPaths() {
 const { chapter: c } = Astro.props;
 const all = await loadAll();
 const episode = c.episode_id ? all.get("episode", c.episode_id) : null;
-const ordered = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? -1 : 1));
+const ordered = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.week ?? 0) - (b.week ?? 0)));
 const i = ordered.findIndex((x) => x.id === c.id);
 const prev = i > 0 ? ordered[i - 1] : null;
 const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
+const stateCopy: Record<string, string> = {
+  held: "Held.",
+  skipped: "Skipped.",
+  pending: "Not yet.",
+};
+const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
 <Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.date)}>
@@ -24,10 +33,12 @@ const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
       <div style="flex:0 0 150px">
         <p class="label">Chapter</p>
-        <span class={`big ${c.status === "published" ? "cobalt" : "faint"}`} style="font-size:96px;display:block">{c.week_label}</span>
+        <span class={`big ${c.status === "published" ? "cobalt" : "faint"}`} style="font-size:96px;display:block">{c.week == null ? "—" : String(c.week).padStart(2, "0")}</span>
       </div>
       <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:14px">
         <div class="row mono muted" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase">
+          <span>{c.week_label}</span>
+          <span>·</span>
           <span>{dayInWords(c.date)}</span>
           <Provenance object={c} />
         </div>
@@ -36,6 +47,8 @@ const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
         <div class="row muted" style="font-size:14px">
           {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
           {c.word_count && <span>{num(c.word_count)} words</span>}
+          {episode && episode.duration_sec && <span>Listen · {mins(episode.duration_sec)}</span>}
+          {c.status === "published" && <span class="muted">Written by the platform's narrator from the week's data; published after Matthew approved it.</span>}
         </div>
       </div>
     </div>
@@ -45,16 +58,30 @@ const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
     episode && (
       <section class="wrap" style="padding-bottom:40px" id="listen">
         <div class="player">
-          <span>
+          <span style="flex:1 1 220px">
             <b>{episode.title}</b> <span class="muted">· {episode.byline || "The Panel"}</span>
           </span>
           {episode.audio_url ? <audio controls preload="none" src={episode.audio_url} /> : <span class="chip">No audio file yet</span>}
-          {episode.transcript_url && (
-            <a href={episode.transcript_url} style="font-size:13px">
-              Transcript
-            </a>
-          )}
         </div>
+        {episode.transcript && episode.transcript.length > 0 && (
+          <details style="margin-top:12px">
+            <summary class="label" style="cursor:pointer;min-height:44px;display:flex;align-items:center">
+              Read along · {episode.transcript.length} turns
+            </summary>
+            <div class="rows" style="margin-top:8px">
+              {episode.transcript.map((t) => (
+                <span style="justify-content:flex-start;gap:14px;align-items:flex-start;flex-wrap:nowrap">
+                  <span class="mono" style="font-size:12px;flex:0 0 110px;color:var(--muted)">
+                    {t.speaker}
+                  </span>
+                  <span class="serif" style="font-size:16px;line-height:1.5;flex:1 1 auto;min-width:0">
+                    {t.line}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </details>
+        )}
       </section>
     )
   }
@@ -65,15 +92,15 @@ const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
         {
           c.status !== "published" ? (
             <div class="empty" style="font-family:var(--sans)">
-              <b style="color:var(--ink)">{c.status === "held" ? "Held." : "Skipped."}</b>
-              <span>{c.absent_text || (c.status === "held" ? "This chapter is drafted and waiting for approval." : "No chapter was published for this week.")}</span>
+              <b style="color:var(--ink)">{stateCopy[c.status] || c.status}</b>
+              <span>{c.absent_text || ""}</span>
             </div>
           ) : c.body_html ? (
-            <Fragment set:html={c.body_html} />
+            <div data-published-body set:html={c.body_html} />
           ) : (
             <div class="empty" style="font-family:var(--sans)">
               <b style="color:var(--ink)">The text lives on the current site.</b>
-              <span>This preview holds the chapter's record; its body moves here in Phase 1, as published, not rewritten.</span>
+              <span>The permalink did not serve a readable body at build time; nothing is invented in its place.</span>
               {c.url_legacy && (
                 <a class="btn sm" href={`https://averagejoematt.com${c.url_legacy}`} style="align-self:flex-start">
                   Read it there
@@ -111,7 +138,7 @@ const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
           </a>
         ) : (
           <span style="padding:22px" class="muted">
-            The latest chapter.
+            The latest week.
           </span>
         )
       }

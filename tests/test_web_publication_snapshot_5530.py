@@ -25,8 +25,10 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import urllib.error
 
 import pytest
 
@@ -94,11 +96,12 @@ def test_fixtures_carry_poison_so_the_gate_is_measured_not_assumed():
 def test_held_and_private_objects_never_reach_the_snapshot(tmp_path):
     manifest, out = _run(tmp_path)
     assert manifest["excluded"] == {"held": 2, "private": 1}
-    blob = b"".join(open(out / f, "rb").read() for f in os.listdir(out))
+    files = [out / f for f in os.listdir(out) if f != "series"] + [out / "series" / f for f in os.listdir(out / "series")]
+    blob = b"".join(open(f, "rb").read() for f in files)  # the collections, the data files and series/ — one known layout, not a tree sweep
     assert b"SENTINEL" not in blob, "a held/private object's content leaked into the public snapshot"
     assert b"week-10" not in blob and b"private-20261030" not in blob, "even the ID of a held/private object must not be written"
     for coll in os.listdir(out):
-        if coll == "manifest.json" or coll == "appendix.json":
+        if coll in ("manifest.json", "appendix.json", "pairs.json", "series"):
             continue
         for o in json.load(open(out / coll)):
             assert o["visibility"] == "public"
@@ -116,6 +119,9 @@ def test_a_dangling_edge_fails_the_export_naming_the_edge(tmp_path):
     fx = tmp_path / "fx"
     fx.mkdir()
     for name in os.listdir(FIXTURES):
+        if not name.endswith(".json"):
+            shutil.copytree(os.path.join(FIXTURES, name), fx / name)
+            continue
         data = json.load(open(os.path.join(FIXTURES, name)))
         if name == "predictions.json":
             data[0]["edges"].append({"type": "metric", "id": "no_such_metric"})
@@ -130,6 +136,9 @@ def test_an_edge_to_a_held_object_is_dangling_in_the_public_snapshot(tmp_path):
     fx = tmp_path / "fx"
     fx.mkdir()
     for name in os.listdir(FIXTURES):
+        if not name.endswith(".json"):
+            shutil.copytree(os.path.join(FIXTURES, name), fx / name)
+            continue
         data = json.load(open(os.path.join(FIXTURES, name)))
         if name == "chapters.json":
             pub = next(c for c in data if c["visibility"] == "public")
@@ -171,6 +180,10 @@ def test_two_exports_are_byte_identical_except_the_manifest_clock(tmp_path):
     _, a = _run(tmp_path / "a")
     _, b = _run(tmp_path / "b")
     for name in os.listdir(a):
+        if name == "series":
+            for f in os.listdir(a / name):
+                assert open(a / name / f, "rb").read() == open(b / name / f, "rb").read(), f
+            continue
         if name == "manifest.json":
             ma, mb = json.load(open(a / name)), json.load(open(b / name))
             ma.pop("generated_at")
@@ -185,7 +198,12 @@ def test_manifest_hashes_match_the_files(tmp_path):
     for name, meta in manifest["files"].items():
         assert hashlib.sha256(open(out / name, "rb").read()).hexdigest() == meta["sha256"]
         data = json.load(open(out / name))
-        assert meta["count"] == (len(data) if isinstance(data, list) else len(data["items"]))
+        rows = (
+            data
+            if isinstance(data, list)
+            else (data.get("items") if "items" in data else data.get("days") if "days" in data else data["pairs"])
+        )
+        assert meta["count"] == len(rows), name
 
 
 def test_ids_are_unique_and_sorted(tmp_path):
@@ -386,13 +404,34 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
             "posts": [{"id": "org-chart-of-one", "title": "Org chart", "date": "2026-09-20", "url": "/journal/essays/org-chart-of-one/"}]
         },
     }
-    monkeypatch.setattr(ps, "_get", lambda base, path, timeout: copy.deepcopy(captured[path]))
+    import urllib.error
+
+    def fake_get(base, path, timeout):
+        if path not in captured:  # /api/chapters before it is live, the transcript file, …
+            raise urllib.error.HTTPError(base + path, 404, "not found", None, None)
+        return copy.deepcopy(captured[path])
+
+    page = (
+        '<html><body><article class="post-body"><div class="prose"><p>Week six, <a href="/data/sleep/">as published</a>.</p>'
+        '<script>alert(1)</script><p onclick="x()">Kept text.</p></div><div class="signature">— E.V.</div></article></body></html>'
+    )
+    monkeypatch.setattr(ps, "_get", fake_get)
+    monkeypatch.setattr(ps, "_get_text", lambda base, path, timeout: page)
     objs = ps.build_live("https://example.test", 1.0)
     public, excluded = ps.partition(objs)
     assert excluded == {"held": 0, "private": 0}
     assert ps.dangling_edges(public) == []
-    assert {o["id"] for o in public["chapter"]} == {"week-09"}
-    assert public["chapter"][0]["episode_id"] == "wk6" and public["episode"][0]["chapter_id"] == "week-09"
+    chapters = {o["id"]: o for o in public["chapter"]}
+    # the published chapter carries its body as published: scripts and inline handlers gone, links absolute
+    body = chapters["week-09"]["body_html"]
+    assert "Week six" in body and 'href="https://example.test/data/sleep/"' in body
+    assert "<script" not in body and "onclick" not in body and "signature" not in body
+    assert chapters["week-09"]["episode_id"] == "wk6" and public["episode"][0]["chapter_id"] == "week-09"
+    assert public["episode"][0]["transcript"] is None  # the transcript file 404s in this capture
+    # week states derived without /api/chapters: day 56 = week 8; week 6 published → 1–5 skipped, 7–8 pending
+    states = {o["week"]: o["status"] for o in public["chapter"] if o["id"].startswith("program-week-")}
+    assert states == {1: "skipped", 2: "skipped", 3: "skipped", 4: "skipped", 5: "skipped", 7: "pending", 8: "pending"}
+    assert all(o["body_html"] is None and o["title"].startswith("Week ") for o in public["chapter"] if o["id"].startswith("program-week-"))
     assert public["coach"][0]["record"] is None  # the lead has no by_coach row
     lisa = next(c for c in public["coach"] if c["id"] == "sleep_coach")
     assert lisa["record"] == {"right": 19, "n": 48, "through": "2026-10-31"}
@@ -422,6 +461,9 @@ def test_cli_exit_codes(tmp_path):
     fx = tmp_path / "fx"
     fx.mkdir()
     for name in os.listdir(FIXTURES):
+        if not name.endswith(".json"):
+            shutil.copytree(os.path.join(FIXTURES, name), fx / name)
+            continue
         data = json.load(open(os.path.join(FIXTURES, name)))
         if name == "coaches.json":
             data[0].pop("domain")
@@ -434,3 +476,109 @@ def test_cli_exit_codes(tmp_path):
     )
     assert bad.returncode == 2 and "SNAPSHOT-SCHEMA-ERROR" in bad.stderr
     assert not (tmp_path / "t").exists(), "a failed export must write nothing"
+
+
+def test_extract_prose_keeps_the_text_and_drops_what_a_different_host_must_not_run():
+    html = (
+        '<article class="post-body"><div class="prose"><p>Hello <em>there</em>.</p><script src="/x.js"></script>'
+        '<img src="/assets/a.png" onerror="evil()"><p>Bye.</p></div><div class="signature">sig</div></article>'
+    )
+    out = ps.extract_prose(html, "https://averagejoematt.com")
+    assert out.startswith("<p>Hello <em>there</em>.</p>") and out.endswith("<p>Bye.</p>")
+    assert "<script" not in out and "onerror" not in out and "sig" not in out
+    spaced = ps.extract_prose(
+        '<article class="post-body"><div class="prose"><p>a</p><script>x()</script ><p>b</p></div></article>', "https://x"
+    )
+    assert spaced == "<p>a</p><p>b</p>"
+    attr = ps.extract_prose(
+        '<article class="post-body"><div class="prose"><p>a</p><script>x()</script\t\n bar><p>b</p></div></article>', "https://x"
+    )
+    assert attr == "<p>a</p><p>b</p>"
+    assert 'src="https://averagejoematt.com/assets/a.png"' in out
+    assert ps.extract_prose("<main>no prose block</main>", "https://x") is None
+
+
+def test_live_metrics_write_series_files_and_filter_pairs_to_public_metrics(monkeypatch):
+    """Phase 2: the series catalogue becomes Metrics with a series file each; the pairs file keeps
+    only rows whose both sides are public Metrics; the chart marker is the baseline-change date."""
+    catalogue = {
+        "metrics": [
+            {"metric": "hrv", "unit": "ms", "source_id": "whoop", "behavioral": False},
+            {"metric": "ghost", "unit": "x", "source_id": None},
+        ]
+    }
+    pairs = {
+        "lags": [-1, 0, 1],
+        "min_n": 10,
+        "window": {"from": "2026-09-06", "to": "2026-10-31"},
+        "family": {"offered": 2, "tested": 2},
+        "method_ids": ["pearson_r"],
+        "pairs": [
+            {"a": "hrv", "b": "ghost", "lag": 0, "n": 40, "r": 0.1},
+            {"a": "hrv", "b": "secret_metric", "lag": 0, "n": 40, "r": 0.9},
+        ],
+    }
+    series = {
+        "hrv": {
+            "window": {"from": "2026-09-06", "to": "2026-10-31"},
+            "method_ids": [],
+            "n_present": 2,
+            "n_gap": 1,
+            "days": [
+                {"date": "2026-09-06", "value": 31.3, "present": True, "gap": False},
+                {"date": "2026-09-07", "value": None, "present": False, "gap": True},
+            ],
+        },
+    }
+
+    def fake_get(base, path, timeout):
+        if path.startswith("/api/series?metric="):
+            key = path.split("metric=")[1].split("&")[0]
+            if key in series:
+                return series[key]
+            raise urllib.error.HTTPError(path, 404, "nf", None, None)
+        raise AssertionError(path)
+
+    monkeypatch.setattr(ps, "_get", fake_get)
+    monkeypatch.setattr(ps, "_baseline_change_markers", lambda: [{"date": "2026-10-10", "label": "baseline change"}])
+    fetched = {
+        "edition": {"as_of": "2026-10-31", "blocks": {"today": {"data": {"start_date": "2026-09-06"}}}},
+        "series_catalogue": catalogue,
+        "pairs": pairs,
+    }
+    ctx = ps.LiveContext("https://x", fetched, 5.0)
+    ctx.objs["source"] = (
+        [
+            ps.envelope(
+                id="whoop",
+                type="source",
+                as_of="2026-10-31",
+                source=["/api/sources"],
+                title="Whoop",
+                label="Whoop",
+                kind="wearable",
+                cadence="daily",
+                latest=None,
+                fields=[],
+                paused=False,
+            )
+        ]
+        if "kind" in ps.SCHEMA["source"]
+        else [{"id": "whoop", "label": "Whoop"}]
+    )
+    ps._live_metrics(ctx)
+    ids = {o["id"]: o for o in ctx.objs["metric"]}
+    assert ids["hrv"]["state"] == "ok" and ids["hrv"]["series_url"] == "/api/series?metric=hrv" and ids["hrv"]["source_id"] == "whoop"
+    assert ids["ghost"]["state"] == "absent" and ids["ghost"]["series_url"] is None
+    assert ctx.series["hrv"]["markers"] == [{"date": "2026-10-10", "label": "baseline change"}]
+    assert ctx.series["hrv"]["days"][1] == {"date": "2026-09-07", "value": None, "present": False, "gap": True}
+    assert "ghost" not in ctx.series
+    assert [r["b"] for r in ctx.pairs["pairs"]] == ["ghost"], "a pairing naming a non-public metric is dropped"
+    # the validator refuses a series or a pairing that names a metric outside the public set
+    public = {"metric": [ids["hrv"]]}
+    with pytest.raises(LookupError):
+        ps.validate_data_files({"series": {"ghost": ctx.series["hrv"]}, "pairs": None}, public)
+    with pytest.raises(LookupError):
+        ps.validate_data_files({"series": {}, "pairs": {"pairs": [{"a": "hrv", "b": "ghost"}]}}, public)
+    with pytest.raises(ps.SchemaError):
+        ps.validate_data_files({"series": {}, "pairs": {"pairs": [{"a": "hrv", "b": "hrv", "note": "Significant!"}]}}, public)

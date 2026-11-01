@@ -83,13 +83,14 @@ run() {
 invalidate() {
   local paths="$1" wait="$2"
   if [ "$PRINT" = "1" ]; then
-    echo "  \$ DIST_ID=\$(aws cloudformation describe-stacks --stack-name $STACK --query \"Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue\" --output text)"
+    echo "  \$ DIST_ID=\$(aws cloudformation describe-stacks --region us-east-1 --stack-name $STACK --query \"Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue\" --output text)"
     echo "  \$ INV=\$(aws cloudfront create-invalidation --distribution-id \$DIST_ID --paths '$paths' --query Invalidation.Id --output text)"
     [ "$wait" = "1" ] && echo "  \$ aws cloudfront wait invalidation-completed --distribution-id \$DIST_ID --id \$INV   # #1526: the sweeps read fresh edges"
     return 0
   fi
   local dist_id inv
-  dist_id=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue" --output text)
+  # the LifePlatformWeb stack (CloudFront) lives in us-east-1 (carried from main's #5553 fix)
+  dist_id=$(aws cloudformation describe-stacks --region us-east-1 --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue" --output text)
   test -n "$dist_id" && test "$dist_id" != "None"
   inv=$(aws cloudfront create-invalidation --distribution-id "$dist_id" --paths "$paths" --query "Invalidation.Id" --output text)
   echo "www_preview_sync: invalidation $inv on $dist_id for $paths"
