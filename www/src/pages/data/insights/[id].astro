@@ -1,0 +1,28 @@
+---
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll } from "../../../lib/snapshot.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.insight.map((i) => ({ params: { id: i.id }, props: { insight: i } }));
+}
+const { insight: i } = Astro.props;
+---
+
+<Base title={i.title} top="data" description={i.summary || i.text} status={dayInWords(i.date)}>
+  <section class="section">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:20px;max-width:900px">
+      <div class="row">
+        <span class="label cobalt">{i.kind}</span>
+        <span class={`status ${i.status}`}>{i.status} · {dayInWords(i.date, { short: true })}</span>
+        <Provenance object={i} />
+      </div>
+      <h1 style="font-size:44px">{i.title}</h1>
+      <p class="dek" style="font-size:19px">{i.text}</p>
+      <Connected type="insight" id={i.id} heading="This insight surfaces in" />
+    </div>
+  </section>
+</Base>

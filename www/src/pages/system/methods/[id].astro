@@ -1,0 +1,31 @@
+---
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import { loadAll } from "../../../lib/snapshot.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.method.map((m) => ({ params: { id: m.id }, props: { method: m } }));
+}
+const { method: m } = Astro.props;
+---
+
+<Base title={m.name} top="system" description={m.summary || m.name}>
+  <section class="section">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="row"><span class="label">Method · {m.category || "—"} · <span class="mono">{m.id}</span></span><Provenance object={m} /></div>
+        <h1 style="font-size:40px">{m.name}</h1>
+        {m.formula && <pre class="code">{m.formula}</pre>}
+        <div class="rows">
+          <span><span>Window</span><span style="max-width:60%;text-align:right">{m.window || "—"}</span></span>
+          <span><span>Minimum n</span><span class="mono">{m.min_n ?? "—"}</span></span>
+          <span><span>Used by</span><span class="mono" style="max-width:60%;text-align:right;min-width:0;flex:1 1 auto;overflow-wrap:anywhere">{m.used_by.length ? m.used_by.join(", ") : "—"}</span></span>
+        </div>
+        {m.limitations && <div><p class="label" style="margin-bottom:6px">Limitations</p><p style="font-size:14px;line-height:1.55">{m.limitations}</p></div>}
+      </div>
+      <Connected type="method" id={m.id} heading="Figures that cite this method" />
+    </div>
+  </section>
+</Base>

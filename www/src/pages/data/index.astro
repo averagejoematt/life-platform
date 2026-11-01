@@ -1,0 +1,94 @@
+---
+// The data room — Phase 0 shell: one card per metric; the explorer island is Phase 2.
+import Base from "../../layouts/Base.astro";
+import Provenance from "../../components/Provenance.astro";
+import { loadAll } from "../../lib/snapshot.js";
+import { href, pathOf } from "../../lib/url.js";
+
+const all = await loadAll();
+const metrics = [...all.byType.metric].sort((a, b) => (a.label < b.label ? -1 : 1));
+const insights = [...all.byType.insight].sort((a, b) => (a.date < b.date ? 1 : -1));
+const experiments = all.byType.experiment;
+---
+
+<Base title="The data room" top="data" description="One dimension at a time: one series, one source, one method.">
+  <section class="section" style="padding-bottom:20px">
+    <div class="wrap between" style="align-items:flex-end">
+      <div style="max-width:760px">
+        <h1 style="font-size:48px">The data room</h1>
+        <p class="dek" style="margin-top:10px;font-size:19px">
+          One dimension at a time. Pick one, read the sentence, stop there if you like — or open its method and follow it into a chapter, a coach's call
+          or an experiment. Charts and comparisons arrive in Phase 2.
+        </p>
+      </div>
+    </div>
+  </section>
+  <section class="wrap" style="padding-bottom:40px">
+    <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))">
+      {
+        metrics.map((m) => (
+          <a class="tile" href={href(pathOf("metric", m.id))}>
+            <span class="label">
+              {m.label}
+              {m.instrument && ` · ${m.instrument}`}
+            </span>
+            <span class="v num" style="font-size:22px">
+              {m.unit || "—"}
+            </span>
+            <span class="muted" style="font-size:13px;line-height:1.4">
+              {m.sentence || m.summary || "No sentence yet."}
+            </span>
+            <Provenance object={m} />
+          </a>
+        ))
+      }
+    </div>
+  </section>
+  <section class="wrap" style="padding-bottom:56px">
+    <div class="grid cols2" style="gap:48px;align-items:start">
+      <div>
+        <p class="label" style="margin-bottom:8px">Insights · {insights.length}</p>
+        {
+          insights.length ? (
+            <div class="rows">
+              {insights.map((i) => (
+                <a href={href(pathOf("insight", i.id))}>
+                  <span style="font-size:14px">
+                    <b>{i.title}</b>
+                  </span>
+                  <span class={`status ${i.status}`}>{i.status}</span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div class="empty">
+              <span>No insight in the snapshot yet.</span>
+            </div>
+          )
+        }
+      </div>
+      <div>
+        <p class="label" style="margin-bottom:8px">Experiments · {experiments.length}</p>
+        {
+          experiments.length ? (
+            <div class="rows">
+              {experiments.map((x) => (
+                <a href={href(pathOf("experiment", x.id))}>
+                  <span style="font-size:14px">
+                    <b>{x.name}</b>
+                  </span>
+                  <span class="status">{x.status}</span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div class="empty">
+              <b style="color:var(--ink)">None running.</b>
+              <span>An experiment becomes real when its first day is logged.</span>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  </section>
+</Base>

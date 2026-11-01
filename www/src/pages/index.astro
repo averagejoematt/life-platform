@@ -1,0 +1,210 @@
+---
+// Start — the entry point (Stage 3 `#start`). Phase 0: the shell with the blocks the
+// edition already serves. Copy marked "sample" is the prototype's, pending the owner's
+// Phase 1 yes; the age is gone (owner decision 7). No number here is typed by hand.
+import Base from "../layouts/Base.astro";
+import Provenance from "../components/Provenance.astro";
+import StatusTag from "../components/StatusTag.astro";
+import { dayInWords, num, kOfN, clip } from "../lib/format.js";
+import { loadAll, latestEdition, dayLine } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+const all = await loadAll();
+const edition = await latestEdition();
+const blocks = (edition && edition.blocks) || {};
+const today = blocks.today && blocks.today.state === "ok" ? (blocks.today.data as any) : null;
+const record = blocks.record && blocks.record.state === "ok" ? (blocks.record.data as any) : null;
+const next = blocks.next && blocks.next.state === "ok" ? (blocks.next.data as any) : null;
+
+const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
+const latestChapter = chapters.find((c) => c.status === "published") || null;
+const pending = all.byType.prediction
+  .filter((p) => p.status === "pending")
+  .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
+  .slice(0, 3);
+const staff = all.byType.coach.filter((c) => c.tier === "staff" && !c.retired).sort((a, b) => (b.record?.n || 0) - (a.record?.n || 0));
+const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Boolean).join(" · ") : null;
+---
+
+<Base title="Average Joe Matt" top="start" status={status}>
+  <section class="section">
+    <div class="wrap grid" style="grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr));gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:26px">
+        <p class="label">
+          An experiment, in public{today?.start_date && ` · began ${dayInWords(today.start_date)}`}{edition?.day_n != null && ` · day ${edition.day_n}`}
+        </p>
+        <h1>Can an ordinary person engineer an extraordinary life?</h1>
+        <p class="dek">
+          I'm Matt. British, in Seattle. On {today?.start_date ? dayInWords(today.start_date, { short: true }) : "day one"} I weighed
+          {today?.start_weight_lbs ? ` ${num(today.start_weight_lbs, 0)} pounds` : " what the scale said"} and started this: the data sources on my
+          body, a team of AI coaches, one honest journal, and a question I can't answer yet — whether getting healthier and getting happier are the
+          same thing. The weight is the catalyst. It isn't the point.
+        </p>
+        <div class="row">
+          {latestChapter && <a class="btn" href={href(pathOf("chapter", latestChapter.id))}>This week's chapter</a>}
+          <a class="btn ghost" href={href("/story/")}>Every chapter</a>
+          <span class="chip">Sample copy · awaiting approval</span>
+        </div>
+        <p class="margin">
+          The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
+        </p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div
+          style="position:relative;border:1px solid var(--ink);background:repeating-linear-gradient(135deg,#ECECE7 0 6px,#F4F4F0 6px 12px);display:flex;align-items:flex-end;padding:14px;min-height:240px;aspect-ratio:4/5"
+        >
+          <span class="chip" style="position:absolute;top:10px;left:10px">Photo · pending approval</span>
+          <span class="serif" style="font-size:15px;line-height:1.35;background:var(--paper);padding:8px 10px;border:1px solid var(--ink)">
+            Day one. It exists; it goes here when it is approved, and not before.
+          </span>
+        </div>
+        <p class="muted" style="font-size:13px">Photographs are deliberate publications, like everything else here.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section hair">
+    <div class="wrap">
+      <div class="between" style="margin-bottom:14px">
+        <p class="label">Today · from the edition</p>
+        {blocks.today && <Provenance object={{ ...edition, state: blocks.today.state, as_of: blocks.today.as_of || edition.as_of, data_through: null, absent_text: blocks.today.absent_text }} />}
+      </div>
+      {
+        today ? (
+          <div class="tiles">
+            <a class="tile" href={href("/data/")}>
+              <span class="label">Body · this morning</span>
+              <span class="v num">
+                {num(today.weight_lbs, 1)}
+                <small> lb</small>
+              </span>
+              <span class="muted" style="font-size:13px">
+                {num(today.change_lbs, 1)} lb since {dayInWords(today.start_date, { short: true })}.
+              </span>
+            </a>
+            <a class="tile" href={href("/system/")}>
+              <span class="label">The coaches' record</span>
+              <span class="v num">{record ? kOfN(record.right, record.decided) : "—"}</span>
+              <span class="muted" style="font-size:13px">
+                {record?.comparison_text || record?.count_text || "No coach call has been checked yet."}
+              </span>
+            </a>
+          </div>
+        ) : (
+          <div class="empty">
+            <b style="color:var(--ink)">No reading today.</b>
+            <span>{blocks.today?.absent_text || "The edition has no today block."}</span>
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="section hair">
+    <div class="wrap">
+      <div class="between" style="margin-bottom:24px">
+        <h2>What's alive right now</h2>
+        <span class="label">Updates nightly</span>
+      </div>
+      <div class="grid cols3">
+        <div>
+          <p class="label" style="margin-bottom:10px">Open predictions · {all.byType.prediction.filter((p) => p.status === "pending").length} pending</p>
+          {
+            pending.length ? (
+              <div class="rows">
+                {pending.map((p) => (
+                  <a href={href(pathOf("prediction", p.id))}>
+                    <span style="font-size:14px;line-height:1.35">
+                      <b>{all.get("coach", p.coach_id)?.title || p.coach_id}</b> · {clip(p.claim, 88)}
+                    </span>
+                    <StatusTag status="pending" date={p.due_date} />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div class="empty">
+                <span>No open call in the snapshot.</span>
+              </div>
+            )
+          }
+          <a href={href("/system/ledger/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">All calls →</a>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:10px">Upcoming</p>
+          <div class="rows">
+            {
+              next?.chapter?.state === "ok" && (
+                <a href={href("/story/")}>
+                  <span>
+                    <b style="font-size:14px">Next chapter</b>
+                    <br />
+                    <span class="muted" style="font-size:13px">
+                      {next.chapter.data?.drafted_not_promised ? "Drafted, not promised." : ""}
+                    </span>
+                  </span>
+                  <span class="mono" style="font-size:12px">{dayInWords(next.chapter.data?.date, { short: true, weekday: true })}</span>
+                </a>
+              )
+            }
+            {
+              next?.bet?.state !== "ok" && (
+                <span>
+                  <span class="muted" style="font-size:14px">{next?.bet?.absent_text || "No coach bet is waiting to settle."}</span>
+                </span>
+              )
+            }
+          </div>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:10px">The coaches, this week</p>
+          <div class="rows">
+            {
+              staff.slice(0, 3).map((c) => (
+                <a href={href(pathOf("coach", c.id))}>
+                  <span>
+                    <b style="font-size:14px">{c.name}</b> <span class="muted">· {c.domain}</span>
+                  </span>
+                  <span class="mono" style="font-size:12px">{c.record ? kOfN(c.record.right, c.record.n) : c.instrument_absent?.reason || "—"}</span>
+                </a>
+              ))
+            }
+          </div>
+          <p class="muted" style="margin-top:10px;font-size:13px">Code grades them beside a simple guess. They are software built with Claude, not people.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section hair">
+    <div class="wrap">
+      <div class="between" style="margin-bottom:22px">
+        <h2>Three doors. Depth behind each, never in front of it.</h2>
+        <span class="label">Simple on arrival · deep on demand</span>
+      </div>
+      <div class="doors">
+        <a class="door" href={href("/story/")}>
+          <span class="between mono muted" style="font-size:12px"><span class="cobalt">01</span><span>Follow · 10 min a week</span></span>
+          <span><span class="t">The story</span><p class="serif muted" style="font-size:17px;margin-top:10px">A chapter a week, each with audio. Where I started, what's happened, how I'm doing — not just what I weigh.</p></span>
+        </a>
+        <a class="door" href={href("/data/")}>
+          <span class="between mono muted" style="font-size:12px"><span class="cobalt">02</span><span>Explore · an hour, if you like</span></span>
+          <span><span class="t">The data</span><p class="serif muted" style="font-size:17px;margin-top:10px">Every dimension, every live source, every method on show. Compare, and see how little that proves.</p></span>
+        </a>
+        <a class="door" href={href("/system/")}>
+          <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, every dated prediction, every grade public — beside what a simple guess would have scored.</p></span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap between">
+      <div style="max-width:560px">
+        <h2 style="font-size:28px">A new chapter most weeks. Audio soon after.</h2>
+        <p class="serif muted" style="font-size:17px;margin-top:8px">Follow by email on the current site; this preview sends nothing.</p>
+      </div>
+      <a class="btn" href="https://averagejoematt.com/subscribe/">Follow</a>
+    </div>
+  </section>
+</Base>

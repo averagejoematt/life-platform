@@ -1,0 +1,59 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": "2026-10-26",
+  "date": "2026-10-26",
+  "edges": [
+   {
+    "id": "deep_pct",
+    "rel": "about",
+    "type": "metric"
+   },
+   {
+    "id": "protein-deep-sleep_2026-11-01",
+    "rel": "spawned",
+    "type": "experiment"
+   }
+  ],
+  "id": "zone2-deep-sleep",
+  "kind": "insight",
+  "method_ids": [],
+  "metric_id": "deep_pct",
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "refuted",
+  "summary": "Refuted prediction; the mechanism may be protein, not cardio.",
+  "text": "The sleep coach predicted on 5 October that deep-sleep share would rise as zone-2 volume increased. Over the fourteen-day window it went from 17.3% to 17.0%: flat, inside the band.",
+  "title": "Zone-2 volume isn't moving deep sleep (yet)",
+  "type": "insight",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": null,
+  "date": "2026-10-30",
+  "edges": [],
+  "id": "held-insight-sentinel",
+  "kind": "insight",
+  "method_ids": [],
+  "metric_id": null,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "open",
+  "summary": null,
+  "text": "HELD-INSIGHT-SENTINEL",
+  "title": "HELD-INSIGHT-SENTINEL",
+  "type": "insight",
+  "visibility": "held"
+ }
+]

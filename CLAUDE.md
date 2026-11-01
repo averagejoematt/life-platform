@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation Index
 
 - **`docs/CHARTER.md` — READ FIRST** (#2843): the architecture primitives, the paved roads (the ONLY sanctioned way to add a signal/lambda/page/coach/gate) and the standing rules. Boot derives the architecture from it + `model/platform_model.json` (printed by `scripts/boot_brief.py` at SessionStart, #3314) — every count here is a pointer, the model is the number.
-- **Website work** — the v5 brief: `docs/PLATFORM_NORTH_STAR.md` (why), `docs/SITE_MAP_AND_INTENT.md` (what each page is for), `docs/DESIGN_SYSTEM_V5.md` (standards), `docs/SITE_UPLEVEL_PLAYBOOK.md` (how to change it well); `/uplevel` (`.claude/skills/uplevel/SKILL.md`) drives a session.
+- **Website work** — the v5 brief: `docs/PLATFORM_NORTH_STAR.md` (why), `docs/SITE_MAP_AND_INTENT.md` (what each page is for), `docs/DESIGN_SYSTEM_V5.md` (standards), `docs/SITE_UPLEVEL_PLAYBOOK.md` (how to change it well); `/uplevel` (`.claude/skills/uplevel/SKILL.md`) drives a session. **v9 build (#5530): `www/README.md`, ADR-166.**
 - `docs/README.md` — the full doc index · `docs/ONBOARDING.md` · `docs/QUICKSTART.md` · `docs/ARCHITECTURE.md` · `docs/SCHEMA.md` (DynamoDB fields, authoritative) · `docs/RUNBOOK.md`
 - **The backlog is GitHub Issues (ADR-099)** — epics + ranked stories on Now/Next/Later (+ `Roadmap`); seed sessions from `python3 scripts/backlog_next.py`. `docs/BACKLOG.md` is a frozen archive.
 - **`docs/CONVENTIONS.md` — the canonical home for the deploy/CI reflexes** (one bundle, deploy-from-main, squash drift, CI gate ordering, asset staging). A rule stated below as a pointer is maintained THERE.
@@ -27,8 +27,7 @@ flake8 lambdas/ mcp/
 # Syntax check all Python
 find lambdas/ mcp/ -name '*.py' -exec python3 -m py_compile {} \;
 
-# Deploy a single Lambda (both args required; the function->source table is generated
-# into .claude/skills/deploy/SKILL.md from ci/lambda_map.json)
+# Deploy a single Lambda (both args required; the function->source table is in .claude/skills/deploy/SKILL.md)
 bash deploy/deploy_lambda.sh <function-name> <source-file>
 
 # Deploy the whole fleet — the one Lambda code deploy path CI runs (#4255)

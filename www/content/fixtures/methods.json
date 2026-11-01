@@ -1,0 +1,83 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "category": "Calibration",
+  "data_through": null,
+  "edges": [],
+  "formula": "trend = up if change > band · down if change < −band · else flat; grade = confirmed if trend == predicted",
+  "id": "directional_window_verdict",
+  "limitations": "A flat metric counts against an up or down call; a band wider than the move says little either way.",
+  "method_ids": [],
+  "min_n": 4,
+  "name": "Directional window verdict",
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Calibration",
+  "title": "Directional window verdict",
+  "type": "method",
+  "used_by": [
+   "coach_prediction_evaluator"
+  ],
+  "visibility": "public",
+  "window": "The call's own window"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "category": "Correlation",
+  "data_through": null,
+  "edges": [],
+  "formula": "r = Σ(x-x̄)(y-ȳ) / √(Σ(x-x̄)² · Σ(y-ȳ)²)",
+  "id": "pearson_r",
+  "limitations": "Linear association only; not corrected for autocorrelation on its own.",
+  "method_ids": [],
+  "min_n": 10,
+  "name": "Pearson correlation (r)",
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Correlation",
+  "title": "Pearson correlation (r)",
+  "type": "method",
+  "used_by": [
+   "weekly_correlation_compute"
+  ],
+  "visibility": "public",
+  "window": "90 days"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "category": "Correlation",
+  "data_through": null,
+  "edges": [],
+  "formula": "n_eff = n · (1 − r1·r2) / (1 + r1·r2)",
+  "id": "effective_sample_size",
+  "limitations": "AR(1) only.",
+  "method_ids": [],
+  "min_n": 10,
+  "name": "Effective sample size",
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Correlation",
+  "title": "Effective sample size",
+  "type": "method",
+  "used_by": [
+   "weekly_correlation_compute"
+  ],
+  "visibility": "public",
+  "window": "the paired series"
+ }
+]

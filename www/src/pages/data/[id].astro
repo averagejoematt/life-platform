@@ -1,0 +1,67 @@
+---
+import Base from "../../layouts/Base.astro";
+import Connected from "../../components/Connected.astro";
+import Provenance from "../../components/Provenance.astro";
+import { loadAll } from "../../lib/snapshot.js";
+import { href, pathOf } from "../../lib/url.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.metric.map((m) => ({ params: { id: m.id }, props: { metric: m } }));
+}
+const { metric: m } = Astro.props;
+const all = await loadAll();
+const methods = m.method_ids.map((id) => all.get("method", id)).filter(Boolean);
+const source = m.source_id ? all.get("source", m.source_id) : null;
+---
+
+<Base title={m.label} top="data" description={m.sentence || m.summary || m.label}>
+  <section class="section">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="row"><span class="label">Metric · <span class="mono">{m.id}</span></span><Provenance object={m} /></div>
+        <h1>{m.label}</h1>
+        <p class="dek">{m.sentence || m.summary || "No sentence yet."}</p>
+        <div class="rows">
+          <span><span>Unit</span><span class="mono">{m.unit || "—"}</span></span>
+          <span><span>Source</span>{source ? <a href={href(pathOf("source", source.id))} style="font-weight:700;text-decoration:none">{source.label}</a> : <span class="muted">—</span>}</span>
+          <span><span>Instrument</span><span>{m.instrument || "—"}</span></span>
+          <span><span>Series</span><span class="muted">{m.series_url ? "available" : "Phase 2"}</span></span>
+        </div>
+        <div class="empty"><b style="color:var(--ink)">No chart yet.</b><span>The series and the compare/lag panel arrive in Phase 2, with their statistics precomputed by the platform.</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:22px">
+        <div>
+          <p class="label" style="margin-bottom:8px">How this is measured</p>
+          {
+            methods.length ? (
+              <div class="rows">
+                {methods.map((x) => (
+                  <a href={href(pathOf("method", x.id))}>
+                    <span>
+                      <b>{x.name}</b>
+                      {x.limitations && (
+                        <>
+                          <br />
+                          <span class="muted" style="font-size:13px">
+                            {x.limitations.length > 140 ? `${x.limitations.slice(0, 139)}…` : x.limitations}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                    <span class="mono muted" style="font-size:12px">
+                      {x.category || ""}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p class="chip">Descriptive only · no method attached</p>
+            )
+          }
+        </div>
+        <Connected type="metric" id={m.id} heading="Connected to this dimension" />
+      </div>
+    </div>
+  </section>
+</Base>

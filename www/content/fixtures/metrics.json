@@ -1,0 +1,128 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": null,
+  "decimals": 1,
+  "edges": [
+   {
+    "id": "withings",
+    "rel": "measured_by",
+    "type": "source"
+   }
+  ],
+  "id": "weight_lbs",
+  "instrument": "Withings · every morning",
+  "label": "Body",
+  "method_ids": [],
+  "sample": true,
+  "sentence": "One real weigh-in per point; a missed morning is a gap, never an interpolated value.",
+  "series_url": null,
+  "source": [
+   "fixture"
+  ],
+  "source_id": "withings",
+  "state": "ok",
+  "summary": "Withings, every morning.",
+  "title": "Bodyweight",
+  "type": "metric",
+  "unit": "lb",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": null,
+  "decimals": 1,
+  "edges": [
+   {
+    "id": "whoop",
+    "rel": "measured_by",
+    "type": "source"
+   }
+  ],
+  "id": "deep_pct",
+  "instrument": "WHOOP · overnight",
+  "label": "Sleep · deep share",
+  "method_ids": [
+   "effective_sample_size"
+  ],
+  "sample": true,
+  "sentence": "Wrist staging is an estimate; treat stage percentages as trends.",
+  "series_url": null,
+  "source": [
+   "fixture"
+  ],
+  "source_id": "whoop",
+  "state": "ok",
+  "summary": "WHOOP staging.",
+  "title": "Deep sleep share",
+  "type": "metric",
+  "unit": "%",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": null,
+  "decimals": 0,
+  "edges": [
+   {
+    "id": "whoop",
+    "rel": "measured_by",
+    "type": "source"
+   }
+  ],
+  "id": "recovery_score",
+  "instrument": "WHOOP",
+  "label": "Recovery",
+  "method_ids": [],
+  "sample": true,
+  "sentence": null,
+  "series_url": null,
+  "source": [
+   "fixture"
+  ],
+  "source_id": "whoop",
+  "state": "ok",
+  "summary": "WHOOP recovery, 0–100.",
+  "title": "Recovery",
+  "type": "metric",
+  "unit": "",
+  "visibility": "public"
+ },
+ {
+  "absent_text": "The last three days hold zero entries.",
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": null,
+  "decimals": 0,
+  "edges": [
+   {
+    "id": "macrofactor",
+    "rel": "measured_by",
+    "type": "source"
+   }
+  ],
+  "id": "total_protein_g",
+  "instrument": "MacroFactor · as logged",
+  "label": "Fuel · protein",
+  "method_ids": [],
+  "sample": true,
+  "sentence": "The only series typed in by a human, and it shows.",
+  "series_url": null,
+  "source": [
+   "fixture"
+  ],
+  "source_id": "macrofactor",
+  "state": "stale",
+  "summary": "MacroFactor, as logged.",
+  "title": "Protein",
+  "type": "metric",
+  "unit": "g",
+  "visibility": "public"
+ }
+]

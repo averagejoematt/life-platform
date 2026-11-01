@@ -1,0 +1,32 @@
+---
+import Base from "../../../../layouts/Base.astro";
+import Connected from "../../../../components/Connected.astro";
+import Provenance from "../../../../components/Provenance.astro";
+import { dayInWords } from "../../../../lib/format.js";
+import { loadAll } from "../../../../lib/snapshot.js";
+import { href, pathOf } from "../../../../lib/url.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.disagreement.map((d) => ({ params: { id: d.id }, props: { d } }));
+}
+const { d } = Astro.props;
+const all = await loadAll();
+const a = all.get("coach", d.coach_a);
+const b = all.get("coach", d.coach_b);
+---
+
+<Base title={d.topic} top="system" description={d.summary || d.topic}>
+  <section class="section">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:20px;max-width:960px">
+      <div class="row"><span class="label">Disagreement</span><span class={`status ${d.status}`}>{d.status}{d.resolved_date && ` · ${dayInWords(d.resolved_date, { short: true })}`}</span><Provenance object={d} /></div>
+      <h1 style="font-size:40px">{d.topic}</h1>
+      <div class="facts" style="grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))">
+        <div><span class="label">{a ? <a href={href(pathOf("coach", a.id))} style="text-decoration:none">{a.name}</a> : d.coach_a}</span><span class="mono" style="font-size:14px;line-height:1.5">{d.claim_a || "—"}</span></div>
+        <div><span class="label">{b ? <a href={href(pathOf("coach", b.id))} style="text-decoration:none">{b.name}</a> : d.coach_b}</span><span class="mono" style="font-size:14px;line-height:1.5">{d.claim_b || "—"}</span></div>
+        <div style="grid-column:1/-1;border-right:0;border-top:1px solid var(--ink)"><span class="label">The engine's verdict</span><span style="font-size:14px">{d.verdict || "Not yet settled — code decides, with the data, when the window closes."}</span></div>
+      </div>
+      <Connected type="disagreement" id={d.id} />
+    </div>
+  </section>
+</Base>

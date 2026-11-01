@@ -48,6 +48,8 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "v4-gate.yml": (170, 31),
     "visual-qa.yml": (326, 107),
     "webkit-mobile-qa.yml": (179, 26),
+    "web-gate.yml": (82, 4),  # #5530: the v9 build gate (new); its shell lives in scripts/check_www_build.py + tests/web_preview_gate.py
+    "web-preview-deploy.yml": (72, 5),  # #5530: the v9 preview deploy (new); its sync lives in deploy/www_preview_sync.sh
     "wrap-nightly.yml": (137, 11),  # #5316 box 2 + #5143 box 4: two AWS read-only legs (matrix rows + header, one guarded pip line)
 }
 

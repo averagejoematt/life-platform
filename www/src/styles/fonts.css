@@ -1,0 +1,50 @@
+/* Self-hosted type, Stage 2 identity sheet: Archivo (structure, numerals), Newsreader
+   (Matthew's voice), IBM Plex Mono (the machine's voice). Latin subsets as Google serves
+   them, then instanced to the axis ranges the design uses (fontTools varLib.instancer):
+   Archivo wght 400–800 · wdth 100–125; italic wght 400–700 at wdth 100; Newsreader wght
+   400–600 · opsz 6–72; italic 400 only. All three families are SIL OFL 1.1
+   (docs/LICENSES.md §3.1). Paths are relative to the emitted stylesheet in _astro/, so
+   they resolve under any base path. */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 100% 125%;
+  font-display: swap;
+  src: url("../assets/fonts/v9/archivo-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Archivo";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/v9/archivo-italic-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("../assets/fonts/v9/newsreader-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Newsreader";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/v9/newsreader-italic-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/v9/ibm-plex-mono-400-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../assets/fonts/v9/ibm-plex-mono-500-latin.woff2") format("woff2");
+}

@@ -1,0 +1,140 @@
+[
+ {
+  "absent_text": null,
+  "approved": {
+   "at": "2026-10-13T18:00:00Z",
+   "by": "owner",
+   "via": "chronicle-approve"
+  },
+  "as_of": "2026-10-31",
+  "body_html": "<p>Sample chapter body, for layout only. The published chronicle text moves here in Phase 1.</p><h2>What Lisa got wrong</h2><p>Two weeks later the evaluator looked at the window and graded it.</p>",
+  "data_through": "2026-10-13",
+  "date": "2026-10-13",
+  "edges": [
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "mentions",
+    "type": "prediction"
+   },
+   {
+    "id": "deep_pct",
+    "rel": "figure",
+    "type": "metric"
+   },
+   {
+    "id": "protein-deep-sleep-2026-10-29",
+    "rel": "mentions",
+    "type": "disagreement"
+   }
+  ],
+  "episode_id": null,
+  "excerpt": "Lisa and Marcus go on the record. The ledger will decide.",
+  "id": "week-06",
+  "method_ids": [],
+  "read_minutes": 8,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "published",
+  "summary": "Lisa and Marcus go on the record. The ledger will decide.",
+  "title": "The protein argument",
+  "type": "chapter",
+  "url_legacy": "/journal/posts/week-09/",
+  "visibility": "public",
+  "week": 6,
+  "week_label": "Week 6",
+  "word_count": 1800
+ },
+ {
+  "absent_text": "No chapter was published for the week of 20 October.",
+  "approved": null,
+  "as_of": "2026-10-31",
+  "body_html": null,
+  "data_through": null,
+  "date": "2026-10-20",
+  "edges": [],
+  "episode_id": null,
+  "excerpt": null,
+  "id": "week-07",
+  "method_ids": [],
+  "read_minutes": null,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "absent",
+  "status": "skipped",
+  "summary": null,
+  "title": "Week 7",
+  "type": "chapter",
+  "url_legacy": null,
+  "visibility": "public",
+  "week": 7,
+  "week_label": "Week 7",
+  "word_count": null
+ },
+ {
+  "absent_text": "Drafted on 28 October and waiting for approval.",
+  "approved": null,
+  "as_of": "2026-10-31",
+  "body_html": null,
+  "data_through": null,
+  "date": "2026-10-27",
+  "edges": [
+   {
+    "id": "wk8",
+    "rel": "listen",
+    "type": "episode"
+   }
+  ],
+  "episode_id": "wk8",
+  "excerpt": null,
+  "id": "week-08",
+  "method_ids": [],
+  "read_minutes": null,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "stale",
+  "status": "held",
+  "summary": "A logging gap, a refuted coach, and a walk instead of an argument.",
+  "title": "The week I lifted nine tonnes and logged eighty calories",
+  "type": "chapter",
+  "url_legacy": null,
+  "visibility": "public",
+  "week": 8,
+  "week_label": "Week 8",
+  "word_count": null
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "body_html": "<p>HELD-SENTINEL-DO-NOT-PUBLISH</p>",
+  "data_through": null,
+  "date": "2026-11-10",
+  "edges": [],
+  "episode_id": null,
+  "excerpt": "HELD-SENTINEL-DO-NOT-PUBLISH",
+  "id": "week-10",
+  "method_ids": [],
+  "read_minutes": 1,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "published",
+  "summary": "HELD-SENTINEL-DO-NOT-PUBLISH",
+  "title": "HELD-SENTINEL-DO-NOT-PUBLISH",
+  "type": "chapter",
+  "url_legacy": null,
+  "visibility": "held",
+  "week": 10,
+  "week_label": "Week 10",
+  "word_count": 10
+ }
+]

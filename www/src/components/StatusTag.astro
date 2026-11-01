@@ -1,0 +1,11 @@
+---
+import { dayInWords } from "../lib/format.js";
+
+interface Props {
+  status: string;
+  date?: string | null;
+}
+const { status, date = null } = Astro.props;
+---
+
+<span class={`status ${status}`}>{status}{date && ` ${dayInWords(date, { short: true })}`}</span>

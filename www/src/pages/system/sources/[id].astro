@@ -1,0 +1,37 @@
+---
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import { loadAll } from "../../../lib/snapshot.js";
+import { href, pathOf } from "../../../lib/url.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.source.map((s) => ({ params: { id: s.id }, props: { source: s } }));
+}
+const { source: s } = Astro.props;
+const all = await loadAll();
+const coach = s.instrument_for ? all.get("coach", s.instrument_for) : null;
+---
+
+<Base title={s.label} top="system" description={s.summary || `${s.label}: ${s.status}`}>
+  <section class="section">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="row"><span class="label">Source · <span class="mono">{s.id}</span></span><Provenance object={s} /></div>
+        <h1 style="font-size:44px">{s.label}</h1>
+        {s.summary && <p class="dek" style="font-size:19px">{s.summary}</p>}
+        <div class="rows">
+          <span><span>State</span><span class="mono">{s.status}</span></span>
+          <span><span>Category</span><span>{s.category || "—"}</span></span>
+          <span><span>Since</span><span>{s.since || "—"}</span></span>
+          <span><span>Latest</span><span>{s.latest || "—"}</span></span>
+          <span><span>Counts as stale after</span><span class="mono">{s.stale_hours != null ? `${s.stale_hours} h` : "—"}</span></span>
+          <span><span>Kind</span><span>{s.behavioral ? "logged by a person" : "measured by a device"}</span></span>
+          <span><span>Instrument for</span>{coach ? <a href={href(pathOf("coach", coach.id))} style="font-weight:700;text-decoration:none">{coach.name}</a> : <span class="muted">—</span>}</span>
+        </div>
+      </div>
+      <Connected type="source" id={s.id} />
+    </div>
+  </section>
+</Base>

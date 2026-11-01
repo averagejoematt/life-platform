@@ -1,0 +1,82 @@
+# v9 web gate (#5530, epic #5529) — the pre-merge gate for the static build in www/.
+#
+# Separate from v4-gate.yml (the site/ tree) and from ci-cd.yml: NO AWS access, NO deploy.
+# It builds the preview from the committed FIXTURE snapshot (offline, deterministic) and
+# holds the Phase 0 exit criteria through two tested entrypoints, not inline shell:
+#   scripts/check_www_build.py   reproducible build · a held object MUST fail the build ·
+#                                a dangling edge MUST fail the build · output scan
+#                                (exit 2 = a planted defect built clean = blind gate)
+#   tests/web_preview_gate.py    Playwright at 390 + 1280 with axe on every built page,
+#                                its own mutation control first
+# The snapshot contract tests (tests/test_web_publication_snapshot_5530.py) run in the
+# pre-merge Python lane with the rest of the suite. The live-snapshot preview deploy is
+# web-preview-deploy.yml and runs only after a merge to main.
+
+name: v9 web gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - 'scripts/publish_snapshot.py'
+      - 'scripts/check_www_build.py'
+      - 'tests/web_preview_gate.py'
+      - '.github/workflows/web-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - 'scripts/publish_snapshot.py'
+      - 'scripts/check_www_build.py'
+      - 'tests/web_preview_gate.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'pr' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  web-gate:
+    name: Build from fixtures · schema + visibility + edge mutations · render gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: www/package-lock.json
+
+      - name: Install the build toolchain (lockfile, no lifecycle scripts)
+        working-directory: www
+        run: npm ci --ignore-scripts --no-fund --loglevel=error
+
+      - name: Build gate — reproducible · held-object mutation · dangling-edge mutation · output scan
+        run: python3 scripts/check_www_build.py
+
+      - name: Unit tests for the relationship index and formatters
+        working-directory: www
+        run: npm test
+
+      - name: Playwright (chromium) for the render gate
+        uses: ./.github/actions/playwright-browser
+        with:
+          browser: chromium
+
+      - name: Render gate at 390 + 1280 with axe (mutation control first)
+        run: python3 tests/web_preview_gate.py --dist www/dist --base /next/v9/ --out /tmp/web-gate
+
+      - name: Upload the build and the screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: v9-preview-${{ github.sha }}
+          path: |
+            www/dist
+            /tmp/web-gate
+          retention-days: 14

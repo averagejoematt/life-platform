@@ -1,0 +1,157 @@
+---
+// System — three depths on one page (Stage 3 `#system`). Depth 1 plain English; depth 2 the
+// record, from the edition's one producer; depth 3 the sources and methods.
+import Base from "../../layouts/Base.astro";
+import { kOfN } from "../../lib/format.js";
+import { loadAll, latestEdition } from "../../lib/snapshot.js";
+import { href, pathOf } from "../../lib/url.js";
+
+const all = await loadAll();
+const edition = await latestEdition();
+const recordBlock = edition?.blocks?.record;
+const record = recordBlock && recordBlock.state === "ok" ? (recordBlock.data as any) : null;
+const coaches = [...all.byType.coach].sort((a, b) => (a.tier === b.tier ? (b.record?.n || 0) - (a.record?.n || 0) : a.tier === "lead" ? -1 : 1));
+const sources = [...all.byType.source].sort((a, b) => (a.status === b.status ? (a.label < b.label ? -1 : 1) : a.status === "live" ? -1 : 1));
+const methods = all.byType.method;
+const steps = [
+  "<b>Sources arrive nightly.</b> The scale, the strap, the watch, the food log, the lifting log, the running log, habits, supplements, tasks, weather.",
+  "<b>Each coach reads one slice.</b> They don't share a brain, which is why they disagree.",
+  "<b>Every claim is written down.</b> With a date, the metric it's about, the direction or value expected, and a window.",
+  "<b>When the window closes, code grades it.</b> Confirmed, refuted, or expired for lack of readings. The grader is arithmetic with a tolerance band, not a language model.",
+  "<b>I publish the ledger beside a simple guess.</b> A grade that ran through a logging gap, or a band wider than the claim, is flagged by the grader and kept out of the clean rate.",
+];
+---
+
+<Base title="The system" top="system" description="Eight AI coaches read my life. Code marks their homework.">
+  <section class="section">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:22px">
+        <p class="label">Depth 1 of 3 · plain English</p>
+        <h1>AI coaches read my life. Code marks their homework.</h1>
+        <p class="dek" style="font-size:20px">
+          Every night my data lands in one place. Each coach reads one slice of it and writes down what it believes will happen next, with a date and a
+          number. When the date arrives, a separate program checks. I don't grade them and I can't edit the result. Then I publish all of it, including the
+          wrong ones. The coaches are software I built with Claude, not people.
+        </p>
+        <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;border-top:1px solid var(--ink)">
+          {
+            steps.map((t, i) => (
+              <li style="display:grid;grid-template-columns:44px 1fr;gap:14px;padding:13px 0;border-bottom:1px solid var(--rule);font-size:15px;line-height:1.5">
+                <span class="mono cobalt">0{i + 1}</span>
+                <span set:html={t} />
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+      <div>
+        <div class="between" style="padding-bottom:10px"><span class="label">The coaches · the record</span></div>
+        <div class="rows">
+          {
+            coaches.map((c) => (
+              <a href={href(pathOf("coach", c.id))}>
+                <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                  <b style="font-size:16px">
+                    {c.name} <span class="muted" style="font-weight:400">· {c.domain}</span>
+                  </b>
+                  <span class="mono muted" style="font-size:12px">
+                    {c.retired ? "Retired." : c.instrument_absent?.absent ? c.instrument_absent.reason || "No instrument." : c.tier === "lead" ? "The lead: no calls of its own." : c.comparison_text || ""}
+                  </span>
+                </span>
+                <span class="mono" style="font-size:14px;white-space:nowrap">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <a href={href("/system/ledger/")} class="hair" style="display:block;text-decoration:none;border-bottom:1px solid var(--ink)">
+    <div class="wrap between" style="padding:16px var(--pad)">
+      <b style="font-size:15px">↓ Depth 2 · The ledger — every prediction, graded, beside a simple guess</b>
+      <span class="mono muted" style="font-size:12px">for the follower who wants receipts</span>
+    </div>
+  </a>
+
+  <section class="section">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:900px">
+      <p class="label">Depth 2 of 3 · the headline, from one producer</p>
+      {
+        record ? (
+          <>
+            <h2 style="font-size:36px">{record.count_text || kOfN(record.right, record.decided)}</h2>
+            {record.counted_text && <p class="muted">{record.counted_text}</p>}
+            {record.comparison_text && <p class="serif" style="font-size:18px">{record.comparison_text}</p>}
+          </>
+        ) : (
+          <div class="empty">
+            <span>{recordBlock?.absent_text || "No coach call has been checked yet."}</span>
+          </div>
+        )
+      }
+      <a class="btn ghost sm" href={href("/system/ledger/")} style="align-self:flex-start">Open the ledger</a>
+    </div>
+  </section>
+
+  <a href="#system-hood" class="inv" style="display:block;text-decoration:none;color:var(--paper)">
+    <div class="wrap between" style="padding:16px var(--pad)">
+      <b style="font-size:15px">↓ Depth 3 · Under the hood — sources, methods, the build</b>
+      <span class="mono" style="font-size:12px;color:var(--inkmuted)">for the builder</span>
+    </div>
+  </a>
+
+  <section class="section inv" id="system-hood">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:36px">
+      <div><p class="label">Depth 3 of 3 · the build</p><h2 style="font-size:36px;margin-top:8px">Built solo on AWS, Bedrock and MCP. Documented in the open.</h2></div>
+      <div class="grid cols2" style="gap:40px;align-items:start">
+        <div class="scroll">
+          <p class="label" style="margin-bottom:8px">Sources · {sources.length}</p>
+          <table style="min-width:360px">
+            <thead><tr><th style="border-color:var(--paper)">Source</th><th style="border-color:var(--paper)">Latest</th><th style="border-color:var(--paper)">State</th></tr></thead>
+            <tbody>
+              {
+                sources.map((s) => (
+                  <tr>
+                    <td style="border-color:var(--inkrule);font-weight:600">
+                      <a href={href(pathOf("source", s.id))} style="text-decoration:none">
+                        {s.label}
+                      </a>
+                    </td>
+                    <td class="mono" style="border-color:var(--inkrule);color:var(--inkmuted)">
+                      {s.latest || "—"}
+                    </td>
+                    <td style="border-color:var(--inkrule)">
+                      <span style="display:inline-flex;align-items:center;gap:6px">
+                        <span aria-hidden="true" style={`width:8px;height:8px;${s.status === "live" ? "background:var(--inklink)" : "border:1px dashed var(--inkmuted)"}`} />
+                        {s.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:8px">Methods · {methods.length} · every figure cites one or says "descriptive only"</p>
+          <div class="rows">
+            {
+              methods.slice(0, 8).map((m) => (
+                <a href={href(pathOf("method", m.id))} style="color:var(--paper)">
+                  <span>
+                    <b>{m.name}</b>
+                  </span>
+                  <span class="mono" style="font-size:12px;color:var(--inkmuted)">
+                    {m.category || ""}
+                  </span>
+                </a>
+              ))
+            }
+          </div>
+          {methods.length > 8 && <p style="margin-top:10px;font-size:13px;color:var(--inkmuted)">{methods.length - 8} more in the registry.</p>}
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

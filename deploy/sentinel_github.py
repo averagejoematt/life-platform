@@ -98,6 +98,12 @@ PUSH_TRIGGER_GLOBS = (
     "scripts/generate_adr_index.py",
     "scripts/generate_mcp_tool_catalog.py",
     "scripts/operating_calendar.py",  # #2832 — the calendar doc derives from its registry
+    "www/**",  # #5530 — the v9 build (web-gate.yml, web-preview-deploy.yml)
+    "scripts/publish_snapshot.py",  # #5530 — its one producer
+    "scripts/check_www_build.py",  # #5530 — its build gate
+    "tests/web_preview_gate.py",  # #5530 — its render gate
+    "deploy/www_preview_sync.sh",  # #5530 — its preview sync
+    ".github/workflows/web-preview-deploy.yml",  # #5530 — the preview deploy exercises itself
     "scripts/gate_census.py",  # #3000 — docs/PROPORTIONALITY.md's gate_census_count fact
     "scripts/gate_census_precision.py",  # #3000 — gate_census.py's error-bar sibling module
     "qa/qa_manifest.py",  # #4270 — PAGES fact source, moved out of tests/ (shim left there)

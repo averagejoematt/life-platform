@@ -1,0 +1,23 @@
+{
+  "name": "life-platform-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "averagejoematt.com v9 \u2014 the Stage 3 design as a static Astro build over the publication snapshot (docs/design/v9/STAGE4_ENGINEERING_PLAN.md). Build-time toolchain only: the reader receives HTML, CSS, self-hosted fonts and vanilla ES modules.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "snapshot:fixture": "python3 ../scripts/publish_snapshot.py --mode fixture --out content/snapshot",
+    "snapshot:live": "python3 ../scripts/publish_snapshot.py --mode live --out content/snapshot",
+    "build": "astro build && node -e \"require('fs').rmSync('dist/.prerender',{recursive:true,force:true})\"",
+    "build:preview": "WEB_BASE=/next/v9/ WEB_NOINDEX=1 npm run build",
+    "check": "astro check",
+    "dev": "astro dev",
+    "test": "node --test \"tests/**/*.test.mjs\""
+  },
+  "devDependencies": {
+    "astro": "7.4.4",
+    "@astrojs/sitemap": "3.7.4"
+  }
+}

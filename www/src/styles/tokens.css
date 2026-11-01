@@ -1,0 +1,59 @@
+/* The identity as tokens — frozen from the Stage 2 identity sheet (Claude Design,
+   2026-10-31) and the Stage 3 prototype. Light only at launch (owner decision 6).
+   Colour carries meaning, never decoration: cobalt = measured, confirmed, the primary
+   series, links; vermillion = refuted, flagged, what broke (meaning, never direction);
+   ochre = the compared series; hollow dashed = pending, missing, sample.
+
+   Two corrections from the prototype, both for AA contrast on paper (UX change 10 in
+   the Stage 4 plan): --faint was #B9B9B3 (1.79:1) and is now #6E6E6A (4.64:1); the
+   smallest type is 12px, not 10px. */
+:root {
+  --paper: #f4f4f0;
+  --ink: #121212;
+  --rule: #c9c9c3;
+  --rule2: #e3e3dd;
+  --muted: #5c5c58; /* 6.09:1 on paper */
+  --faint: #6e6e6a; /* 4.64:1 on paper — text-safe; use --rule for non-text hairlines */
+  --hollow: #b9b9b3; /* the prototype's faint, kept for dashed borders only (not text) */
+  --cobalt: #1b3fd6; /* 6.98:1 */
+  --ochre: #b97a12; /* 3.25:1 — never body text; series lines and large figures only */
+  --verm: #d9341c; /* 4.27:1 — series lines and large figures; never small text */
+  --verm-text: #bd2d16; /* 5.3:1 on paper — the refuted tag and the gap flag at small sizes */
+  --inkmuted: #a3a39d; /* on ink 7.39:1 */
+  --inkrule: #3a3a36;
+  --inklink: #9db1ff; /* on ink 9.07:1 */
+  --inkverm: #ff7a5c; /* on ink 7.31:1 */
+
+  --sans: Archivo, "Helvetica Neue", Arial, sans-serif;
+  --serif: Newsreader, Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --max: 1344px;
+  --pad: 48px;
+
+  --fs-label: 12px;
+  --fs-small: 13px;
+  --fs-body: 15px;
+  --fs-ui: 14px;
+  --fs-dek: 22px;
+  --fs-h3: 22px;
+  --fs-h2: 34px;
+  --fs-h1: 56px;
+  --fs-article: 20px;
+
+  --tap: 44px;
+}
+@media (max-width: 900px) {
+  :root {
+    --fs-h1: 42px;
+    --fs-h2: 28px;
+    --fs-dek: 19px;
+  }
+}
+@media (max-width: 760px) {
+  :root {
+    --pad: 20px;
+    --fs-h1: 36px;
+    --fs-article: 18px;
+  }
+}

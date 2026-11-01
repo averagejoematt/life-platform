@@ -1,0 +1,27 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "audio_url": "https://averagejoematt.com/panelcast/wk8.mp3",
+  "byline": "The Panel",
+  "chapter_id": "week-08",
+  "data_through": "2026-10-29",
+  "date": "2026-10-29",
+  "duration_sec": 1420,
+  "edges": [],
+  "id": "wk8",
+  "method_ids": [],
+  "number": 8,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "The Panel on the logging gap.",
+  "title": "EP8 · The week I lifted nine tonnes",
+  "transcript_url": null,
+  "type": "episode",
+  "visibility": "public"
+ }
+]

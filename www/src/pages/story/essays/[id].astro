@@ -1,0 +1,44 @@
+---
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll } from "../../../lib/snapshot.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.essay.map((e) => ({ params: { id: e.id }, props: { essay: e } }));
+}
+const { essay: e } = Astro.props;
+---
+
+<Base title={e.title} top="story" description={e.summary || e.title} status={dayInWords(e.date)}>
+  <section class="section">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:900px">
+      <div class="row"><span class="label">In my own words</span><Provenance object={e} /></div>
+      <h1>{e.title}</h1>
+      {e.summary && <p class="dek">{e.summary}</p>}
+    </div>
+  </section>
+  <section class="section hair">
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <article class="article" style="flex:1 1 600px;min-width:0">
+        {
+          e.body_html ? (
+            <Fragment set:html={e.body_html} />
+          ) : (
+            <div class="empty" style="font-family:var(--sans)">
+              <b style="color:var(--ink)">The text lives on the current site.</b>
+              {e.url_legacy && (
+                <a href={`https://averagejoematt.com${e.url_legacy}`} style="font-weight:700;color:var(--ink)">
+                  Read it there →
+                </a>
+              )}
+            </div>
+          )
+        }
+      </article>
+      <aside style="flex:0 1 300px;min-width:260px"><Connected type="essay" id={e.id} /></aside>
+    </div>
+  </section>
+</Base>

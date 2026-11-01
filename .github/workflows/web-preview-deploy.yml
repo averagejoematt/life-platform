@@ -1,0 +1,72 @@
+# v9 preview deploy (#5530, epic #5529) — the LIVE snapshot built to the preview path.
+#
+# Runs only on a push to main that touches the v9 build (i.e. after a merge) and only ever
+# writes under s3://matthew-life-platform/site/next/v9/ — the existing noindex preview
+# convention (robots.txt already disallows /next/). It never touches `/`, never deletes,
+# never changes CloudFront configuration, and uses the same OIDC deploy role the site
+# deploy already holds (site/* write) under the same `ungated-deploy` environment (#4257:
+# the role trusts only environment subjects, never a bare main ref) — no new grant.
+#
+# The snapshot is read from the PUBLIC Site API over HTTPS with no credentials (owner
+# decision 4): what the API will not serve, this build cannot render. If the live export
+# fails, nothing is deployed and the run is red; a fixture build is never published here.
+# No schedule in Phase 0; the nightly rebuild (plan §B3) arrives later with its dead-man.
+
+name: v9 preview deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - 'scripts/publish_snapshot.py'
+      - 'deploy/www_preview_sync.sh'
+      - '.github/workflows/web-preview-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: v9-preview-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_ACCOUNT_ID: "205930651321"
+  AWS_REGION: us-west-2
+
+jobs:
+  preview:
+    name: Live snapshot → build → sync to /next/v9/
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ungated-deploy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: www/package-lock.json
+
+      - name: Install the build toolchain (lockfile, no lifecycle scripts)
+        working-directory: www
+        run: npm ci --ignore-scripts --no-fund --loglevel=error
+
+      - name: Export the LIVE publication snapshot (public API, no credentials)
+        run: python3 scripts/publish_snapshot.py --mode live --out www/content/snapshot
+
+      - name: Build to the preview base
+        working-directory: www
+        run: npm run build:preview
+
+      - name: Output scan — no sentinel, no inline script, noindex on every page
+        run: python3 scripts/check_www_build.py --scan-only
+
+      - name: Sync to the preview prefix and invalidate it
+        run: bash deploy/www_preview_sync.sh www/dist site/next/v9 "/next/v9/*"

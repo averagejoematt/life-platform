@@ -1,0 +1,112 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "blocks": {
+   "chapter": {
+    "absent_text": "No new chapter since Tuesday, 13 October.",
+    "as_of": "2026-10-13",
+    "data": {
+     "url": "/journal/posts/week-09/"
+    },
+    "source": [
+     "/journal/posts.json"
+    ],
+    "state": "ok"
+   },
+   "next": {
+    "absent_text": "The next chapter is paused.",
+    "as_of": "2026-10-31",
+    "data": {
+     "bet": {
+      "absent_text": "No coach bet is waiting to settle.",
+      "as_of": null,
+      "data": null,
+      "source": "/api/coach_docket",
+      "state": "absent"
+     },
+     "chapter": {
+      "absent_text": "The next chapter is paused.",
+      "as_of": "2026-11-04",
+      "data": {
+       "date": "2026-11-04",
+       "drafted_not_promised": true
+      },
+      "source": "/api/content_cadence",
+      "state": "ok"
+     }
+    },
+    "source": [
+     "/api/content_cadence"
+    ],
+    "state": "ok"
+   },
+   "premise": {
+    "absent_text": null,
+    "as_of": "2026-10-31",
+    "data": {
+     "copy_key": "premise"
+    },
+    "source": "static",
+    "state": "ok"
+   },
+   "record": {
+    "absent_text": "No coach call has been checked yet.",
+    "as_of": "2026-10-31",
+    "data": {
+     "comparison_text": "Across 214 checked calls, so far they do not beat a simple guess.",
+     "count_text": "88 of 214 checked calls right.",
+     "counted_text": "Sample counts, for layout only.",
+     "decided": 214,
+     "right": 88
+    },
+    "source": [
+     "/api/predictions"
+    ],
+    "state": "ok"
+   },
+   "today": {
+    "absent_text": "No weigh-in today.",
+    "as_of": "2026-10-31",
+    "data": {
+     "change_lbs": -30.7,
+     "date": "2026-10-31",
+     "goal_weight_lbs": 185.0,
+     "start_date": "2026-09-06",
+     "start_weight_lbs": 327.3,
+     "weight_lbs": 296.6
+    },
+    "source": "/api/journey",
+    "state": "ok"
+   }
+  },
+  "data_through": "2026-10-31",
+  "day_n": 56,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   }
+  ],
+  "id": "2026-10-31",
+  "method_ids": [],
+  "order": [
+   "premise",
+   "chapter",
+   "today",
+   "record"
+  ],
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "start_date": "2026-09-06",
+  "state": "ok",
+  "summary": null,
+  "title": "The edition of 31 October 2026",
+  "type": "edition",
+  "visibility": "public"
+ }
+]

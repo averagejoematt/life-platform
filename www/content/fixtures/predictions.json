@@ -1,0 +1,340 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "Deep sleep percentage will rise as zone-2 training volume builds.",
+  "coach_id": "sleep_coach",
+  "confidence": 0.5,
+  "data_through": "2026-10-26",
+  "due_date": "2026-10-19",
+  "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "deep_pct",
+    "rel": "about",
+    "type": "metric"
+   },
+   {
+    "id": "zone2-deep-sleep",
+    "rel": "produced",
+    "type": "insight"
+   }
+  ],
+  "grading": {
+   "actual_text": "17.0%",
+   "how": "predicted up, metric flat",
+   "outcome_notes": "deep_pct 17.3 on 5 October → 17.0 on 19 October (change −0.3, band ±2)",
+   "tolerance_text": "±2 points"
+  },
+  "id": "sleep-20261005-deepsleep01",
+  "kind": "direction",
+  "logged_date": "2026-10-05",
+  "method_ids": [
+   "directional_window_verdict"
+  ],
+  "metric_id": "deep_pct",
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": "2026-10-26",
+  "simple_guess": {
+   "right": true,
+   "state": "scored",
+   "text": "The simple guess was that nothing changes. That guess was right."
+  },
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "refuted",
+  "summary": "Deep share went 17.3% to 17.0%: flat.",
+  "title": "Lisa Park called deep sleep up as zone-2 volume rose",
+  "type": "prediction",
+  "verdict_text": "Lisa Park was wrong.",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "Weight will be around 304.5 pounds tomorrow morning.",
+  "coach_id": "sleep_coach",
+  "confidence": 0.5,
+  "data_through": "2026-10-17",
+  "due_date": "2026-10-16",
+  "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "about",
+    "type": "metric"
+   }
+  ],
+  "grading": {
+   "actual_text": "304 lb",
+   "how": "one standard deviation of his readings over the 30 days before the call",
+   "outcome_notes": "304.03 vs 304.5 ±3.97: within tolerance",
+   "tolerance_text": "4 lb"
+  },
+  "id": "physical-20261015-weight01",
+  "kind": "number",
+  "logged_date": "2026-10-15",
+  "method_ids": [],
+  "metric_id": "weight_lbs",
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": "2026-10-17",
+  "simple_guess": {
+   "right": true,
+   "state": "scored",
+   "text": "The simple guess, that it would stay at 305.6 lb, was also right."
+  },
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "confirmed",
+  "summary": "It came in at 304 lb.",
+  "title": "Max Reyes called his weight at about 304.5 lb",
+  "type": "prediction",
+  "verdict_text": "Right.",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "A non-neutral carb cut at 1,121 kcal will make the protein problem worse, not better.",
+  "coach_id": "nutrition_coach",
+  "confidence": 0.5,
+  "data_through": null,
+  "due_date": "2026-11-12",
+  "edges": [
+   {
+    "id": "nutrition_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "total_protein_g",
+    "rel": "about",
+    "type": "metric"
+   }
+  ],
+  "grading": null,
+  "id": "nutrition-20261029-carbcut01",
+  "kind": "direction",
+  "logged_date": "2026-10-29",
+  "method_ids": [],
+  "metric_id": "total_protein_g",
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": null,
+  "simple_guess": null,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "pending",
+  "summary": null,
+  "title": "Marcus Webb: a non-neutral carb cut will make the protein problem worse",
+  "type": "prediction",
+  "verdict_text": null,
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "Protein recovery would lift the journaling silence.",
+  "coach_id": "nutrition_coach",
+  "confidence": 0.5,
+  "data_through": "2026-10-29",
+  "due_date": "2026-10-29",
+  "edges": [
+   {
+    "id": "nutrition_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "total_protein_g",
+    "rel": "about",
+    "type": "metric"
+   }
+  ],
+  "grading": {
+   "actual_text": "15 g",
+   "how": "predicted up, metric down",
+   "outcome_notes": "98 → 15 (Δ −83, band ±46): trend down, predicted up",
+   "tolerance_text": "±46 g"
+  },
+  "id": "mind-20261015-journal01",
+  "kind": "direction",
+  "logged_date": "2026-10-15",
+  "method_ids": [
+   "directional_window_verdict"
+  ],
+  "metric_id": "total_protein_g",
+  "quality_flags": [
+   "logging_gap",
+   "proxy_metric"
+  ],
+  "sample": true,
+  "sealed": false,
+  "settled_date": "2026-10-29",
+  "simple_guess": {
+   "right": false,
+   "state": "scored",
+   "text": "The simple guess was wrong too."
+  },
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "refuted",
+  "summary": "Graded on protein, not on journaling.",
+  "title": "Protein recovery would lift the journaling silence",
+  "type": "prediction",
+  "verdict_text": "Wrong.",
+  "visibility": "public"
+ },
+ {
+  "absent_text": "No sensor this cycle.",
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "CGM data will reveal high-amplitude post-prandial glucose excursions masked by an unremarkable mean.",
+  "coach_id": "glucose_coach",
+  "confidence": 0.5,
+  "data_through": null,
+  "due_date": "2026-10-04",
+  "edges": [
+   {
+    "id": "glucose_coach",
+    "rel": "made_by",
+    "type": "coach"
+   }
+  ],
+  "grading": {
+   "actual_text": null,
+   "how": null,
+   "outcome_notes": "Expired: 0 readings inside the window — no CGM data",
+   "tolerance_text": null
+  },
+  "id": "glucose-20260920-cgm01",
+  "kind": "direction",
+  "logged_date": "2026-09-20",
+  "method_ids": [],
+  "metric_id": null,
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": "2026-10-19",
+  "simple_guess": null,
+  "source": [
+   "fixture"
+  ],
+  "state": "absent",
+  "status": "expired",
+  "summary": "Expired: no sensor.",
+  "title": "CGM data will reveal high-amplitude excursions",
+  "type": "prediction",
+  "verdict_text": null,
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "Weekly loss over the first four weeks will exceed 2 lb per week.",
+  "coach_id": "sleep_coach",
+  "confidence": 0.7,
+  "data_through": "2026-10-04",
+  "due_date": "2026-10-04",
+  "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "about",
+    "type": "metric"
+   }
+  ],
+  "grading": {
+   "actual_text": "3.1 lb/wk",
+   "how": "sealed yes/no, read from the record",
+   "outcome_notes": "sealed call; actual 3.1 lb/wk",
+   "tolerance_text": null
+  },
+  "id": "sealed-20260906-genesis01",
+  "kind": "sealed",
+  "logged_date": "2026-09-06",
+  "method_ids": [],
+  "metric_id": "weight_lbs",
+  "quality_flags": [],
+  "sample": true,
+  "sealed": true,
+  "settled_date": "2026-10-04",
+  "simple_guess": {
+   "right": null,
+   "state": "unscorable",
+   "text": "A sealed call has no simple guess."
+  },
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "confirmed",
+  "summary": null,
+  "title": "Sealed before day one: the first month's rate",
+  "type": "prediction",
+  "verdict_text": "Right.",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "PRIVATE-SENTINEL-DO-NOT-PUBLISH",
+  "coach_id": "sleep_coach",
+  "confidence": null,
+  "data_through": null,
+  "due_date": null,
+  "edges": [],
+  "grading": null,
+  "id": "private-20261030-sentinel",
+  "kind": "unknown",
+  "logged_date": "2026-10-30",
+  "method_ids": [],
+  "metric_id": null,
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": null,
+  "simple_guess": null,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "pending",
+  "summary": null,
+  "title": "PRIVATE-SENTINEL-DO-NOT-PUBLISH",
+  "type": "prediction",
+  "verdict_text": null,
+  "visibility": "private"
+ }
+]
