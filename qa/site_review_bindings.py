@@ -609,6 +609,46 @@ PAGE_BINDINGS.append(
     }
 )
 # #1427: the standalone utility pages (no live-data door of their own) joined visual_qa.PAGES.
+# #5534 (2026-11-01, the v9 cut-over): the System door — how the platform works — four pages the build writes.
+PAGE_BINDINGS.extend(
+    [
+        {
+            "path": "/system/",
+            "name": "System (v9)",
+            "door": "method",
+            "narrative_order": 103,
+            "story_intent": "how the platform works: the coaches' graded record beside a simple guess, then the ledger, sources and methods",
+            "endpoints": [
+                {"url": "/api/coaches", "role": "primary", "metrics": []},
+                {"url": "/api/predictions", "role": "secondary", "metrics": []},
+            ],
+        },
+        {
+            "path": "/system/ledger/",
+            "name": "System · the ledger (v9)",
+            "door": "method",
+            "narrative_order": 104,
+            "story_intent": "every prediction the coaches made, graded, with every correction and its original grade kept",
+            "endpoints": [{"url": "/api/ledger_export", "role": "primary", "metrics": []}],
+        },
+        {
+            "path": "/system/sources/",
+            "name": "System · sources (v9)",
+            "door": "method",
+            "narrative_order": 105,
+            "story_intent": "where each number comes from and how fresh it is",
+            "endpoints": [{"url": "/api/source_freshness", "role": "primary", "metrics": []}],
+        },
+        {
+            "path": "/system/everything-else/",
+            "name": "Everything else on the site (v9 appendix)",
+            "door": "method",
+            "narrative_order": 106,
+            "story_intent": "the footnote appendix: every kept page the four doors do not link, including the earlier front pages",
+            "endpoints": [],  # editorial
+        },
+    ]
+)
 PAGE_BINDINGS.append(
     {
         "path": "/privacy/",
