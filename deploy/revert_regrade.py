@@ -20,9 +20,13 @@ run selects nothing. After a revert, ``already_corrected`` still sees the #5533 
 drift back. The ``CONFIDENCE#`` posterior and ``LEARNING#`` rows the first grade wrote are not touched by
 the correction and not touched here (the same residual the correction names).
 
-RUN:  python3 deploy/revert_regrade.py              # dry-run: the table of what would be restored
-      python3 deploy/revert_regrade.py --json plan.json
-      python3 deploy/revert_regrade.py --apply      # WRITE — owner-authorised only
+RUN — THE RECOVERY COMMAND (the only documented form; owner condition 6, 2026-11-01):
+      python3 deploy/revert_regrade.py --plan plan.json --pre pre.json            # dry run (default)
+      python3 deploy/revert_regrade.py --plan plan.json --pre pre.json --apply    # WRITE — owner-authorised only
+  plan.json = the correction run's `--json` file; pre.json = its pre-change snapshot
+  (the #5533 run's are at s3://matthew-life-platform/backups/regrade-5533/20261101T181146Z/).
+  Without --plan the script reverts corrections only and offers NO un-stamp — the scheduled evaluator's own
+  quality stamps are indistinguishable in the data and are never touched by this script.
 """
 
 from __future__ import annotations
@@ -49,8 +53,41 @@ EVALUATOR_VERSION = "1.1"
 REVERT, UNSTAMP = "revert", "unstamp"
 
 
-def select(rows_by_pk: dict[str, list[dict]], *, evaluator_version: str = EVALUATOR_VERSION, issue: str = ISSUE) -> list[dict]:
-    """The rows the #5533 run touched and this run would restore — pure."""
+def stamped_by_the_run(plan: dict | None, pre: dict | None) -> set[tuple[str, str]] | None:
+    """The restate rows the correction run itself stamped: in the plan as `restate` AND carrying no
+    `quality_flags` in the pre-change snapshot. None when no plan was given (every 1.1 stamp is eligible).
+
+    Owner condition 6 (2026-11-01): the scheduled evaluator writes the same `evaluator_version` and
+    `quality_flags` on rows it grades itself (the retired coach's two bets, an inconclusive HR-window call,
+    graded 2026-11-01 before the correction ran). Those are legitimate and not ours to undo; the data
+    cannot tell them apart from a restate stamp, so the plan + the pre-change snapshot are the scope."""
+    if plan is None:
+        return None
+    pre_rows = {(r["pk"], r["sk"]): r for r in ((pre or {}).get("rows") or [])}
+    out: set[tuple[str, str]] = set()
+    for e in plan.get("entries") or []:
+        if e.get("action") != "restate":
+            continue
+        key = (e["pk"], e["sk"])
+        if pre is not None and "quality_flags" in (pre_rows.get(key) or {}):
+            continue  # already stamped before the run → the run's stamp was a no-op → nothing to undo
+        out.add(key)
+    return out
+
+
+def select(
+    rows_by_pk: dict[str, list[dict]],
+    *,
+    evaluator_version: str = EVALUATOR_VERSION,
+    issue: str = ISSUE,
+    plan: dict | None = None,
+    pre: dict | None = None,
+) -> list[dict]:
+    """The rows the #5533 run touched and this run would restore — pure. Reverts (rows carrying
+    `original_grade` + a #5533 correction) are always offered; an un-stamp is offered ONLY with `plan`
+    (the run's --json file) and `pre` (the pre-change snapshot), and only for rows that run stamped.
+    The scheduled evaluator's own stamps can therefore never be reversed by this script."""
+    scope = stamped_by_the_run(plan, pre)
     out: list[dict] = []
     for pk, rows in rows_by_pk.items():
         for row in rows:
@@ -72,6 +109,12 @@ def select(rows_by_pk: dict[str, list[dict]], *, evaluator_version: str = EVALUA
                         }
                     )
             elif str(row.get("evaluator_version") or "") == evaluator_version and "quality_flags" in row:
+                # An un-stamp is offered ONLY inside a plan's scope (owner, 2026-11-01): without the correction
+                # run's plan the data cannot tell the run's stamp from the scheduled evaluator's own, so the
+                # unscoped form reverts corrections (ours by construction: original_grade + the #5533 entry)
+                # and offers no un-stamp at all.
+                if scope is None or (pk, row.get("sk")) not in scope:
+                    continue
                 out.append(
                     {"pk": pk, "sk": row.get("sk"), "action": UNSTAMP, "row": row, "now": row.get("status"), "restored": row.get("status")}
                 )
@@ -122,14 +165,18 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true", help="WRITE the reversals + a revert summary row — default is a dry run")
     ap.add_argument("--json", help="also write the plan as JSON")
+    ap.add_argument("--plan", help="the correction run's --json plan file: scope the un-stamps to the rows that run restated")
+    ap.add_argument("--pre", help="the pre-change snapshot (rows[] with pk/sk): a row already stamped before the run is left alone")
     args = ap.parse_args(argv)
+    plan = json.load(open(args.plan, encoding="utf-8")) if args.plan else None
+    pre = json.load(open(args.pre, encoding="utf-8")) if args.pre else None
     import boto3  # noqa: E402
     import regrade_predictions as regrade  # noqa: E402 — the same partition reader the correction used
 
     ev = regrade._evaluator()
     table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
     rows_by_pk = {pk: regrade.partition_rows(table, pk) for pk in regrade.partitions(ev)}
-    entries = select(rows_by_pk)
+    entries = select(rows_by_pk, plan=plan, pre=pre)
     print(report(entries))
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
