@@ -1,0 +1,50 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim_a": "A week above 145 g protein improves deep-sleep architecture.",
+  "claim_b": "That hypothesis cannot activate at the current trajectory.",
+  "coach_a": "sleep_coach",
+  "coach_b": "nutrition_coach",
+  "data_through": null,
+  "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "side_a",
+    "type": "coach"
+   },
+   {
+    "id": "nutrition_coach",
+    "rel": "side_b",
+    "type": "coach"
+   },
+   {
+    "id": "deep_pct",
+    "rel": "about",
+    "type": "metric"
+   },
+   {
+    "id": "nutrition-20261029-carbcut01",
+    "rel": "side_b_call",
+    "type": "prediction"
+   }
+  ],
+  "id": "protein-deep-sleep-2026-10-29",
+  "method_ids": [],
+  "metric_id": "deep_pct",
+  "resolved_date": null,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "open",
+  "summary": "Lisa says yes. Marcus says the condition can't activate.",
+  "title": "Does a week above 145 g protein improve deep sleep?",
+  "topic": "Does a week above 145 g protein improve deep sleep?",
+  "type": "disagreement",
+  "verdict": null,
+  "visibility": "public"
+ }
+]

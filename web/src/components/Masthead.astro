@@ -1,0 +1,25 @@
+---
+import { href } from "../lib/url.js";
+
+interface Props {
+  top?: string | null;
+  status?: string | null;
+}
+const { top = null, status = null } = Astro.props;
+const nav = [
+  ["start", "Start", "/"],
+  ["story", "Story", "/story/"],
+  ["data", "Data", "/data/"],
+  ["system", "System", "/system/"],
+];
+---
+
+<header class="mast">
+  <div class="wrap">
+    <a class="brand" href={href("/")}>Average Joe Matt</a>
+    {status && <span class="status">{status}</span>}
+    <nav aria-label="Primary">
+      {nav.map(([key, label, path]) => <a href={href(path)} aria-current={top === key ? "page" : undefined}>{label}</a>)}
+    </nav>
+  </div>
+</header>

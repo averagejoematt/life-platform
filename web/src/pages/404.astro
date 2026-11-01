@@ -1,0 +1,16 @@
+---
+import Base from "../layouts/Base.astro";
+import { href } from "../lib/url.js";
+---
+
+<Base title="Not here" top={null}>
+  <section class="section">
+    <div class="wrap">
+      <div class="empty" style="max-width:640px">
+        <b style="color:var(--ink)">There is nothing at this address.</b>
+        <span>Every object on the site lives at one canonical address; this is not one of them.</span>
+        <a href={href("/")} style="color:var(--ink);font-weight:700">Start →</a>
+      </div>
+    </div>
+  </section>
+</Base>

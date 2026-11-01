@@ -1,0 +1,23 @@
+---
+// The provenance chip every object carries: verified + dated, or honestly stale/absent,
+// or sample. Rendered only from the record; no template places a chip by hand.
+import { dayInWords } from "../lib/format.js";
+
+interface Props {
+  object: { state: string; as_of: string; data_through: string | null; sample: boolean; source: string[]; absent_text: string | null };
+}
+const { object: o } = Astro.props;
+const through = o.data_through || o.as_of;
+---
+
+{
+  o.sample ? (
+    <span class="chip">Sample · for layout only</span>
+  ) : o.state === "ok" ? (
+    <span class="verified">Verified · {dayInWords(through, { short: true })}</span>
+  ) : (
+    <span class="chip">
+      {o.state} · {o.absent_text || `last ${dayInWords(through, { short: true })}`}
+    </span>
+  )
+}

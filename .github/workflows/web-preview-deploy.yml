@@ -1,0 +1,87 @@
+# v9 preview deploy (#5530, epic #5529) — the LIVE snapshot built to the preview path.
+#
+# Runs only on a push to main that touches the v9 build (i.e. after a merge the owner made)
+# and only ever writes under s3://matthew-life-platform/site/next/v9/ — the existing
+# noindex preview convention (robots.txt already disallows /next/). It never touches `/`,
+# never deletes (no --delete), never changes CloudFront configuration, and uses the same
+# OIDC deploy role the site deploy already holds (site/* write) — no new grant.
+#
+# The snapshot is read from the PUBLIC Site API over HTTPS with no credentials (owner
+# decision 4): what the API will not serve, this build cannot render. If the live export
+# fails, nothing is deployed and the run is red; a fixture build is never published here.
+#
+# No schedule in Phase 0. The nightly rebuild (plan §B3) is a later phase and arrives with
+# its dead-man.
+
+name: v9 preview deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'scripts/publish_snapshot.py'
+      - '.github/workflows/web-preview-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: v9-preview-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_ACCOUNT_ID: "205930651321"
+  AWS_REGION: us-west-2
+  BUCKET: matthew-life-platform
+  PREVIEW_PREFIX: site/next/v9
+
+jobs:
+  preview:
+    name: Live snapshot → build → sync to /next/v9/
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the build toolchain
+        working-directory: web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Export the LIVE publication snapshot (public API, no credentials)
+        run: python3 scripts/publish_snapshot.py --mode live --out web/content/snapshot
+
+      - name: Build to the preview base
+        working-directory: web
+        run: npm run build:preview
+
+      - name: Output scan — noindex on every page, no inline script
+        working-directory: web
+        run: |
+          for f in $(find dist -name index.html); do grep -q 'name="robots" content="noindex' "$f" || { echo "::error::$f lacks noindex"; exit 1; }; done
+          if grep -rhoE "<script\b[^>]*>" dist | grep -v 'src=' ; then echo "::error::inline script"; exit 1; fi
+
+      - name: Sync to the preview prefix (no delete; hashed assets immutable, HTML 300 s)
+        working-directory: web
+        run: |
+          aws s3 sync dist/_astro "s3://$BUCKET/$PREVIEW_PREFIX/_astro" --cache-control "public, max-age=31536000, immutable" --only-show-errors
+          aws s3 sync dist/assets "s3://$BUCKET/$PREVIEW_PREFIX/assets" --cache-control "public, max-age=31536000, immutable" --only-show-errors
+          aws s3 sync dist "s3://$BUCKET/$PREVIEW_PREFIX" --exclude "_astro/*" --exclude "assets/*" --cache-control "public, max-age=300" --only-show-errors
+          echo "synced $(find dist -name index.html | wc -l) pages to s3://$BUCKET/$PREVIEW_PREFIX"
+
+      - name: Invalidate the preview path only
+        run: |
+          DIST_ID=$(aws cloudformation describe-stacks --stack-name LifePlatformWeb --query "Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue" --output text)
+          test -n "$DIST_ID" || { echo "::error::distribution id not found"; exit 1; }
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/next/v9/*" --query "Invalidation.Id" --output text

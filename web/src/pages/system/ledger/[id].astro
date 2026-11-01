@@ -1,0 +1,84 @@
+---
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import StatusTag from "../../../components/StatusTag.astro";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll } from "../../../lib/snapshot.js";
+import { href, pathOf } from "../../../lib/url.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.prediction.map((p) => ({ params: { id: p.id }, props: { prediction: p } }));
+}
+const { prediction: p } = Astro.props;
+const all = await loadAll();
+const coach = all.get("coach", p.coach_id);
+const methods = p.method_ids.map((id) => all.get("method", id)).filter(Boolean);
+const graded = p.status === "confirmed" || p.status === "refuted";
+const FLAG_TEXT: Record<string, string> = {
+  logging_gap: "graded through a logging gap",
+  low_power: "low-power grade: the band is wide against the value",
+  proxy_metric: "graded on a proxy metric, not the thing the claim is about",
+};
+---
+
+<Base title={p.title} top="system" description={p.claim} status={dayInWords(p.logged_date)}>
+  <section class="section">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <p class="label">Prediction · <span class="mono">{p.id}</span></p>
+        <div class="row"><StatusTag status={p.status} date={p.settled_date} />{p.quality_flags.map((f) => <span class={`flag ${f}`}>{f.replace("_", " ")}</span>)}<Provenance object={p} /></div>
+        <h1 style="font-size:32px;font-family:var(--mono);font-weight:500;letter-spacing:-.01em;line-height:1.3">“{p.claim}”</h1>
+        <div class="rows">
+          <span><span>Coach</span>{coach ? <a href={href(pathOf("coach", coach.id))} style="font-weight:700;text-decoration:none">{coach.name}</a> : <span class="mono">{p.coach_id}</span>}</span>
+          <span><span>Made</span><span>{dayInWords(p.logged_date)}</span></span>
+          <span><span>Metric</span><span class="mono">{p.metric_id || "—"}</span></span>
+          <span><span>Kind</span><span class="mono">{p.kind}{p.sealed ? " · sealed before day one" : ""}</span></span>
+          {p.due_date && <span><span>Graded by</span><span>{dayInWords(p.due_date)}</span></span>}
+          {p.confidence != null && <span><span>Confidence stated</span><span class="mono">{p.confidence}</span></span>}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div>
+          <p class="label" style="margin-bottom:8px">How it was graded</p>
+          <pre class="code">{p.grading?.how || (p.status === "pending" ? "Window open — graded by code when it closes." : "No grading record served.")}{p.grading?.outcome_notes ? `\n\nevaluator: ${p.grading.outcome_notes}` : ""}{p.grading?.actual_text ? `\nactual: ${p.grading.actual_text}` : ""}{p.grading?.tolerance_text ? `\ntolerance: ${p.grading.tolerance_text}` : ""}</pre>
+          {methods.length > 0 && <p class="muted" style="margin-top:8px;font-size:13px">Method: {methods.map((m) => <a href={href(pathOf("method", m.id))}>{m.name}</a>)}</p>}
+        </div>
+        {
+          p.quality_flags.length ? (
+            <div style="border:1px solid var(--verm-text);padding:16px 18px;display:flex;flex-direction:column;gap:8px">
+              <span class="label" style="color:var(--verm-text)">
+                Why this grade is flagged
+              </span>
+              {p.quality_flags.map((f) => (
+                <span style="font-size:14px">
+                  <b>{f.replace("_", " ")}</b> — {FLAG_TEXT[f]}.
+                </span>
+              ))}
+              <span class="muted" style="font-size:12px">
+                Flagged grades stay in the ledger and out of the clean rate. The flag is the grader's, not this page's.
+              </span>
+            </div>
+          ) : graded ? (
+            <div style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:6px">
+              <span class="label">Grade quality</span>
+              <span style="font-size:14px">The grader raised no flag on this grade.</span>
+            </div>
+          ) : null
+        }
+        {
+          p.simple_guess && (
+            <div>
+              <p class="label" style="margin-bottom:8px">
+                Beside a simple guess
+              </p>
+              <p style="font-size:14px;line-height:1.55">{p.simple_guess.text || (p.simple_guess.state === "scored" ? (p.simple_guess.right ? "The simple guess was also right." : "The simple guess was wrong.") : "Not yet scored against a guess.")}</p>
+            </div>
+          )
+        }
+        <Connected type="prediction" id={p.id} heading="Surfaces in" />
+      </div>
+    </div>
+  </section>
+</Base>

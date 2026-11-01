@@ -102,7 +102,7 @@ All permissive or library-use-exempt; nothing here reaches a distributable artif
 
 ### 3.1 Self-hosted fonts (shipped to readers)
 
-Not Python, so no manifest lists them; they are binary assets in the tree. All four
+Not Python, so no manifest lists them; they are binary assets in the tree. All six
 families below are published under the **SIL Open Font License 1.1** (permissive for
 embedding and redistribution; the OFL forbids selling the font on its own and requires
 the copyright/licence notice to travel with redistributed font files).
@@ -113,6 +113,9 @@ the copyright/licence notice to travel with redistributed font files).
 | IBM Plex Mono | `site/assets/fonts/v4/`, `lambdas/fonts/ibm-plex-mono-{400,500}.ttf` | Site mono; share-card mono |
 | Instrument Sans | `site/assets/fonts/v4/` | Site body face (`site/assets/css/fonts.css`) |
 | Geist | `site/assets/fonts/clean/geist-latin.woff2` | The clean/v5 pages (`site/assets/css/clean.css`) |
+| Archivo | `web/public/assets/fonts/v9/archivo-{,italic-}latin.woff2` | The v9 build's structure and numerals (`web/src/styles/fonts.css`, #5530); Google's latin subset, instanced to wght 400–800 · wdth 100–125 with fontTools |
+| Newsreader | `web/public/assets/fonts/v9/newsreader-{,italic-}latin.woff2` | The v9 build's human voice; latin subset, instanced to wght 400–600 (italic 400) |
+| IBM Plex Mono | `web/public/assets/fonts/v9/ibm-plex-mono-{400,500}-latin.woff2` | The v9 build's machine voice (a second copy of the family already listed above, latin subset) |
 
 `site/legacy/assets/fonts/` additionally holds Inter, Lora and Space Mono woff2 files
 (by filename; the other hashed files there are unidentified Google-Fonts subsets) — the

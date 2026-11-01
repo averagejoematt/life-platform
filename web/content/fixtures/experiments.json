@@ -1,0 +1,39 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": null,
+  "edges": [
+   {
+    "id": "deep_pct",
+    "rel": "outcome",
+    "type": "metric"
+   },
+   {
+    "id": "total_protein_g",
+    "rel": "condition",
+    "type": "metric"
+   }
+  ],
+  "end_date": null,
+  "hypothesis": "Seven consecutive days ≥ 145 g protein raises deep-sleep share by ≥ 2 points over a 14-day window.",
+  "id": "protein-deep-sleep_2026-11-01",
+  "method_ids": [],
+  "metric_id": "deep_pct",
+  "name": "Protein and deep sleep",
+  "pillar": "nutrition",
+  "pre_registered": false,
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "start_date": null,
+  "state": "ok",
+  "status": "proposed",
+  "summary": "Proposed, not registered.",
+  "title": "Does protein above 145 g move deep sleep?",
+  "type": "experiment",
+  "visibility": "public"
+ }
+]

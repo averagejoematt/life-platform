@@ -1,0 +1,52 @@
+---
+import Base from "../../layouts/Base.astro";
+import StatusTag from "../../components/StatusTag.astro";
+import { dayInWords } from "../../lib/format.js";
+import { loadAll } from "../../lib/snapshot.js";
+import { href, pathOf } from "../../lib/url.js";
+
+const all = await loadAll();
+const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
+const published = chapters.filter((c) => c.status === "published").length;
+---
+
+<Base title="The story" top="story" description="Every chapter of the experiment, in order, with its figures and audio.">
+  <section class="section">
+    <div class="wrap">
+      <p class="label">Story · {published} chapters published · a new one most weeks</p>
+      <h1 style="margin-top:10px">The chapters</h1>
+      <p class="dek" style="margin-top:14px;max-width:720px">
+        Read them in order, or start with the latest and work back. A week with no chapter says so here, in its place.
+      </p>
+    </div>
+  </section>
+  <section class="section hair">
+    <div class="wrap">
+      <div class="rows">
+        {
+          chapters.map((c) => (
+            <a href={href(pathOf("chapter", c.id))}>
+              <span style="display:flex;gap:18px;align-items:baseline;min-width:0">
+                <span class="mono cobalt" style="font-size:14px;white-space:nowrap">{c.week_label}</span>
+                <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                  <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{c.title}</b>
+                  {c.excerpt && (
+                    <span class="serif muted" style="font-size:15px">
+                      {c.excerpt}
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;white-space:nowrap">
+                <span class="mono muted" style="font-size:12px">
+                  {dayInWords(c.date, { short: true })}
+                </span>
+                {c.status !== "published" && <StatusTag status={c.status} />}
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,35 @@
+---
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll } from "../../../lib/snapshot.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.experiment.map((x) => ({ params: { id: x.id }, props: { experiment: x } }));
+}
+const { experiment: x } = Astro.props;
+---
+
+<Base title={x.name} top="data" description={x.hypothesis || x.name}>
+  <section class="section">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="row"><span class="label">Experiment</span><Provenance object={x} /></div>
+        <h1 style="font-size:44px">{x.name}</h1>
+        {x.hypothesis && <p class="dek" style="font-size:19px">{x.hypothesis}</p>}
+        <div class="rows">
+          <span><span>Status</span><span class="status">{x.status}</span></span>
+          <span><span>Pillar</span><span>{x.pillar || "—"}</span></span>
+          <span><span>Pre-registered</span><span class="mono">{x.pre_registered ? "yes" : "no"}</span></span>
+          <span><span>Window</span><span class="mono">{x.start_date ? dayInWords(x.start_date, { short: true }) : "—"} → {x.end_date ? dayInWords(x.end_date, { short: true }) : "open"}</span></span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="empty"><b style="color:var(--ink)">No result panel yet.</b><span>Results, with their intervals, come from the platform's evaluator (Phase 3), never from this page.</span></div>
+        <Connected type="experiment" id={x.id} />
+      </div>
+    </div>
+  </section>
+</Base>

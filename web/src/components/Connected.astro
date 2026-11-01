@@ -1,0 +1,66 @@
+---
+// The Connected rail — one object, every place it surfaces, derived from the edge index.
+// Nothing here is a copy: each row is a link plus the one line that makes it relevant.
+import { connectedTo } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+interface Props {
+  type: string;
+  id: string;
+  heading?: string;
+  cap?: number;
+}
+const { type, id, heading = "Connected", cap = 7 } = Astro.props;
+const rail = await connectedTo(type, id, { cap });
+
+const tail = (o: any): string => {
+  switch (o.type) {
+    case "prediction":
+      return o.status;
+    case "coach":
+      return o.retired ? "retired" : o.record && o.record.n ? `${o.record.right ?? "–"} of ${o.record.n}` : "";
+    case "chapter":
+      return o.status === "published" ? o.week_label : o.status;
+    case "source":
+      return o.status;
+    case "disagreement":
+      return o.status;
+    default:
+      return o.state === "ok" ? "" : o.state;
+  }
+};
+---
+
+{
+  rail.items.length > 0 && (
+    <section aria-label={heading}>
+      <p class="label" style="margin-bottom:8px">
+        {heading}
+      </p>
+      <div class="conn">
+        {rail.items.map((e) => (
+          <a href={href(pathOf(e.type, e.id, e.object))}>
+            <span class="k">{e.type}</span>
+            <span>
+              <b>{e.object.title}</b>
+              {e.object.summary && (
+                <>
+                  <br />
+                  <span class="muted" style="font-size:13px">
+                    {e.object.summary}
+                  </span>
+                </>
+              )}
+            </span>
+            <span class={`r ${e.object.status === "refuted" ? "verm" : ""}`}>{tail(e.object) || "→"}</span>
+          </a>
+        ))}
+      </div>
+      {rail.more > 0 && (
+        <p class="muted" style="margin-top:10px;font-size:13px">
+          {rail.more} more connected to this.
+        </p>
+      )}
+    </section>
+  )
+}

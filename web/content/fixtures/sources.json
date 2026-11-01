@@ -1,0 +1,118 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "behavioral": false,
+  "category": "wearable",
+  "data_through": null,
+  "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "instrument_for",
+    "type": "coach"
+   }
+  ],
+  "id": "whoop",
+  "instrument_for": "sleep_coach",
+  "label": "WHOOP",
+  "latest": "31 Oct",
+  "method_ids": [],
+  "sample": true,
+  "since": "2020",
+  "source": [
+   "fixture"
+  ],
+  "stale_hours": 36,
+  "state": "ok",
+  "status": "live",
+  "summary": "Sleep, HRV, resting heart rate, recovery.",
+  "title": "WHOOP",
+  "type": "source",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "behavioral": false,
+  "category": "wearable",
+  "data_through": null,
+  "edges": [],
+  "id": "withings",
+  "instrument_for": null,
+  "label": "Withings",
+  "latest": "31 Oct",
+  "method_ids": [],
+  "sample": true,
+  "since": "2012",
+  "source": [
+   "fixture"
+  ],
+  "stale_hours": 36,
+  "state": "ok",
+  "status": "live",
+  "summary": "The scale, every morning.",
+  "title": "Withings",
+  "type": "source",
+  "visibility": "public"
+ },
+ {
+  "absent_text": "No entries for three days.",
+  "approved": null,
+  "as_of": "2026-10-31",
+  "behavioral": true,
+  "category": "log",
+  "data_through": null,
+  "edges": [
+   {
+    "id": "nutrition_coach",
+    "rel": "instrument_for",
+    "type": "coach"
+   }
+  ],
+  "id": "macrofactor",
+  "instrument_for": "nutrition_coach",
+  "label": "MacroFactor",
+  "latest": "30 Oct",
+  "method_ids": [],
+  "sample": true,
+  "since": "Nov 2025",
+  "source": [
+   "fixture"
+  ],
+  "stale_hours": 48,
+  "state": "stale",
+  "status": "behavioral-stale",
+  "summary": "Food, logged by hand.",
+  "title": "MacroFactor",
+  "type": "source",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "behavioral": false,
+  "category": "wearable",
+  "data_through": null,
+  "edges": [],
+  "id": "garmin",
+  "instrument_for": null,
+  "label": "Garmin",
+  "latest": "15 Jun",
+  "method_ids": [],
+  "sample": true,
+  "since": "2022",
+  "source": [
+   "fixture"
+  ],
+  "stale_hours": null,
+  "state": "ok",
+  "status": "paused",
+  "summary": "Paused this cycle.",
+  "title": "Garmin",
+  "type": "source",
+  "visibility": "public"
+ }
+]

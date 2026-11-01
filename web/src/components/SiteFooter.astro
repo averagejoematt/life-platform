@@ -1,0 +1,21 @@
+---
+import { href } from "../lib/url.js";
+---
+
+<footer class="site">
+  <div class="wrap" style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px">
+    <p style="display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+      <span class="verified">Verified, from the platform, dated</span>
+      <span class="chip">Sample content, for layout only</span>
+    </p>
+    <p style="max-width:520px">
+      Only deliberately published figures appear here. Journals, photos and medical records stay private. The coaches are software built with
+      Claude, not people.
+    </p>
+    <p style="display:flex;flex-wrap:wrap;gap:18px">
+      <a href={href("/system/everything-else/")}>Everything else on the site</a>
+      <a href={href("/privacy/")}>Privacy</a>
+      <a href="https://github.com/averagejoematt/life-platform">The code</a>
+    </p>
+  </div>
+</footer>

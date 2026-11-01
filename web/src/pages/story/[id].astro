@@ -1,0 +1,120 @@
+---
+import Base from "../../layouts/Base.astro";
+import Connected from "../../components/Connected.astro";
+import Provenance from "../../components/Provenance.astro";
+import { dayInWords, num } from "../../lib/format.js";
+import { loadAll } from "../../lib/snapshot.js";
+import { href } from "../../lib/url.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.chapter.map((c) => ({ params: { id: c.id }, props: { chapter: c } }));
+}
+const { chapter: c } = Astro.props;
+const all = await loadAll();
+const episode = c.episode_id ? all.get("episode", c.episode_id) : null;
+const ordered = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? -1 : 1));
+const i = ordered.findIndex((x) => x.id === c.id);
+const prev = i > 0 ? ordered[i - 1] : null;
+const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
+---
+
+<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.date)}>
+  <section class="section" style="padding-bottom:24px">
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
+      <div style="flex:0 0 150px">
+        <p class="label">Chapter</p>
+        <span class={`big ${c.status === "published" ? "cobalt" : "faint"}`} style="font-size:96px;display:block">{c.week_label}</span>
+      </div>
+      <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:14px">
+        <div class="row mono muted" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase">
+          <span>{dayInWords(c.date)}</span>
+          <Provenance object={c} />
+        </div>
+        <h1>{c.title}</h1>
+        {c.excerpt && <p class="dek">{c.excerpt}</p>}
+        <div class="row muted" style="font-size:14px">
+          {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
+          {c.word_count && <span>{num(c.word_count)} words</span>}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {
+    episode && (
+      <section class="wrap" style="padding-bottom:40px" id="listen">
+        <div class="player">
+          <span>
+            <b>{episode.title}</b> <span class="muted">· {episode.byline || "The Panel"}</span>
+          </span>
+          {episode.audio_url ? <audio controls preload="none" src={episode.audio_url} /> : <span class="chip">No audio file yet</span>}
+          {episode.transcript_url && (
+            <a href={episode.transcript_url} style="font-size:13px">
+              Transcript
+            </a>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section hair">
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <article class="article" style="flex:1 1 600px;min-width:0">
+        {
+          c.status !== "published" ? (
+            <div class="empty" style="font-family:var(--sans)">
+              <b style="color:var(--ink)">{c.status === "held" ? "Held." : "Skipped."}</b>
+              <span>{c.absent_text || (c.status === "held" ? "This chapter is drafted and waiting for approval." : "No chapter was published for this week.")}</span>
+            </div>
+          ) : c.body_html ? (
+            <Fragment set:html={c.body_html} />
+          ) : (
+            <div class="empty" style="font-family:var(--sans)">
+              <b style="color:var(--ink)">The text lives on the current site.</b>
+              <span>This preview holds the chapter's record; its body moves here in Phase 1, as published, not rewritten.</span>
+              {c.url_legacy && (
+                <a class="btn sm" href={`https://averagejoematt.com${c.url_legacy}`} style="align-self:flex-start">
+                  Read it there
+                </a>
+              )}
+            </div>
+          )
+        }
+      </article>
+      <aside style="flex:0 1 300px;min-width:260px">
+        <Connected type="chapter" id={c.id} heading="Connected to this chapter" />
+      </aside>
+    </div>
+  </section>
+
+  <section class="section hair">
+    <div class="wrap grid cols2" style="gap:0;border:1px solid var(--ink)">
+      {
+        prev ? (
+          <a href={href(`/story/${prev.id}/`)} style="display:flex;flex-direction:column;gap:6px;padding:22px;border-right:1px solid var(--ink);text-decoration:none">
+            <span class="label">← Previous · {prev.week_label}</span>
+            <b style="font-size:22px;letter-spacing:-.02em">{prev.title}</b>
+          </a>
+        ) : (
+          <span style="padding:22px;border-right:1px solid var(--ink)" class="muted">
+            The first chapter.
+          </span>
+        )
+      }
+      {
+        next ? (
+          <a href={href(`/story/${next.id}/`)} style="display:flex;flex-direction:column;gap:6px;padding:22px;text-decoration:none">
+            <span class="label">Next · {next.week_label} →</span>
+            <b style="font-size:22px;letter-spacing:-.02em">{next.title}</b>
+          </a>
+        ) : (
+          <span style="padding:22px" class="muted">
+            The latest chapter.
+          </span>
+        )
+      }
+    </div>
+  </section>
+</Base>

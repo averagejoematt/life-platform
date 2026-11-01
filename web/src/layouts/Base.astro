@@ -1,0 +1,62 @@
+---
+// The one page shell: masthead, four destinations, footer, the mobile tab bar.
+// Light only (owner decision 6). No client script in Phase 0.
+import "../styles/base.css";
+
+import Masthead from "../components/Masthead.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import TabBar from "../components/TabBar.astro";
+import { href } from "../lib/url.js";
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Which of the four destinations this page belongs to. */
+  top?: "start" | "story" | "data" | "system" | null;
+  /** The masthead's status line, e.g. "Day 56 · 31 October 2026". */
+  status?: string | null;
+}
+
+const { title, description = "An experiment, in public: can an ordinary person engineer an extraordinary life?", top = null, status = null } = Astro.props;
+
+const noindex = import.meta.env.WEB_NOINDEX === "1" || process.env.WEB_NOINDEX === "1";
+const site = (Astro.site ?? new URL("https://averagejoematt.com/")).toString().replace(/\/$/, "");
+// Self-canonical. On the preview path the page is also noindex, so it can never
+// compete with the live site; the production canonical policy for superseded layouts is
+// settled before cut-over (owner requirement C).
+const canonical = `${site}${Astro.url.pathname}`;
+const fullTitle = title === "Average Joe Matt" ? title : `${title} — Average Joe Matt`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content="https://averagejoematt.com/assets/og/wordmark-1200x630.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#F4F4F0" />
+    <link rel="icon" href="https://averagejoematt.com/favicon.ico" />
+    <link rel="preload" href={href("/assets/fonts/v9/archivo-latin.woff2")} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={href("/assets/fonts/v9/newsreader-latin.woff2")} as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <Masthead top={top} status={status} />
+    <main id="main">
+      <slot />
+    </main>
+    <SiteFooter />
+    <TabBar top={top} />
+  </body>
+</html>

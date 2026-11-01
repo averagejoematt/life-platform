@@ -1,0 +1,43 @@
+---
+// The footnote appendix (owner rulings 2026-10-04 and 10-18): every page the site keeps
+// serving under its earlier designs, grouped, one plain line each. A footnote, not
+// navigation — excluded from the reach ratchet by ruling. Derived from the page
+// registry (qa/qa_manifest.py) through the snapshot, never hand-listed here.
+import Base from "../../../layouts/Base.astro";
+import appendix from "../../../../content/snapshot/appendix.json";
+
+const groups: Record<string, any[]> = {};
+for (const item of appendix.items) (groups[item.group] ||= []).push(item);
+const order = Object.keys(groups).sort();
+---
+
+<Base title="Everything else on the site" top="system" description="The pages that still use the site's earlier designs, in one list.">
+  <section class="section">
+    <div class="wrap" style="max-width:900px">
+      <p class="label">Appendix · {appendix.items.length} pages · the earlier designs</p>
+      <h1 style="margin-top:8px;font-size:40px">Everything else on the site</h1>
+      <p class="dek" style="margin-top:12px;font-size:19px">These pages are kept at their addresses and still use the site's earlier designs. Nothing is deleted; this list is a footnote, not a menu.</p>
+      {
+        order.map((g) => (
+          <div style="margin-top:32px">
+            <p class="label" style="margin-bottom:8px">
+              {g}
+            </p>
+            <div class="rows">
+              {groups[g].map((it) => (
+                <a href={`https://averagejoematt.com${it.path}`}>
+                  <span>
+                    <b style="font-size:14px">{it.name}</b>
+                  </span>
+                  <span class="mono muted" style="font-size:12px">
+                    {it.path}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</Base>

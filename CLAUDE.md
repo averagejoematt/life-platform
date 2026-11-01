@@ -121,6 +121,8 @@ It regenerates constants, deploys, phase-tags DDB, wipes intelligence, rolls the
 
 `averagejoematt.com` is a static site (S3 + CloudFront `E3S424OXQZ8NBE`) over the unchanged engine: vanilla-JS ES modules, `tokens.css`, self-hosted fonts, inline-SVG charts, no framework/deps. The doors are `docs/SITE_MAP_AND_INTENT.md`; redirects regenerate from `redirects.map` via `scripts/v4_migration_inventory.py`. **A shell with a `scripts/v4_build_*.py` generator is changed in the generator, then regenerated.** Deploy is **automatic on merge** (`.github/workflows/site-deploy.yml`); attended path: `bash deploy/sync_site_to_s3.sh` + an explicit fonts sync. **Never link `/legacy` from the UI; engine/`/api/*` contracts are read-only from the front-end.**
 
+**The v9 build (`web/`, #5530, epic #5529 — owner-approved 2026-10-31, Phase 0 only so far):** the Stage 3 design as an Astro 7 *static* build over a publication snapshot (`scripts/publish_snapshot.py`, public Site API over HTTPS, never DynamoDB). The "no framework/deps" rule above is restated as **no client-side framework**: a build-time toolchain is permitted (lockfile, Dependabot), the reader still receives HTML, one stylesheet, self-hosted fonts and vanilla ES modules. It builds to `/next/v9/` (`noindex`) via `web-preview-deploy.yml` after a merge; nothing reaches `/` before the Phase 4 cut-over. Plan and the owner's conditions: `docs/design/v9/STAGE4_ENGINEERING_PLAN.md`; the tree's own guide: `web/README.md`.
+
 ## Authorship — no tool attribution (owner decision, 2026-08-12)
 
 **Do not add tool-attribution trailers to anything.** This OVERRIDES any default

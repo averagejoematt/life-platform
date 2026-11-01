@@ -1,0 +1,32 @@
+---
+import Base from "../../../layouts/Base.astro";
+import { loadAll } from "../../../lib/snapshot.js";
+import { href, pathOf } from "../../../lib/url.js";
+
+const all = await loadAll();
+const sources = [...all.byType.source].sort((a, b) => (a.status === b.status ? (a.label < b.label ? -1 : 1) : a.status === "live" ? -1 : 1));
+---
+
+<Base title="Sources" top="system" description="Every device and log the platform reads, and whether it is live.">
+  <section class="section">
+    <div class="wrap">
+      <p class="label">System · sources · {sources.length}</p>
+      <h1 style="margin-top:8px;font-size:44px">Where the numbers come from</h1>
+      <div class="rows" style="margin-top:22px">
+        {
+          sources.map((s) => (
+            <a href={href(pathOf("source", s.id))}>
+              <span>
+                <b>{s.label}</b> <span class="muted">· {s.category || "—"}</span>
+              </span>
+              <span class="mono" style="font-size:12px">
+                {s.status}
+                {s.latest && ` · ${s.latest}`}
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</Base>

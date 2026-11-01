@@ -1,0 +1,156 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "comparison_text": null,
+  "data_through": null,
+  "domain": "The lead coach",
+  "edges": [],
+  "id": "eli_marsh",
+  "instrument_absent": null,
+  "method_ids": [],
+  "name": "Eli Marsh",
+  "record": null,
+  "retired": false,
+  "retired_date": null,
+  "sample": true,
+  "short_bio": "Reads every coach's read and writes the daily line. Makes no calls of its own.",
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "The lead",
+  "tier": "lead",
+  "title": "Eli Marsh",
+  "type": "coach",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "comparison_text": "On the calls a guess could also be checked against, the coach and a guess that nothing changes were level, on too few calls to tell.",
+  "data_through": null,
+  "domain": "Sleep, recovery",
+  "edges": [],
+  "id": "sleep_coach",
+  "instrument_absent": null,
+  "method_ids": [],
+  "name": "Lisa Park",
+  "record": {
+   "n": 48,
+   "right": 19,
+   "through": "2026-10-31"
+  },
+  "retired": false,
+  "retired_date": null,
+  "sample": true,
+  "short_bio": "Reads the sleep strap. Makes the most calls of any coach.",
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Sleep, recovery",
+  "tier": "staff",
+  "title": "Lisa Park",
+  "type": "coach",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "comparison_text": null,
+  "data_through": null,
+  "domain": "Nutrition",
+  "edges": [],
+  "id": "nutrition_coach",
+  "instrument_absent": null,
+  "method_ids": [],
+  "name": "Marcus Webb",
+  "record": {
+   "n": 48,
+   "right": 13,
+   "through": "2026-10-31"
+  },
+  "retired": false,
+  "retired_date": null,
+  "sample": true,
+  "short_bio": "Reads the food log.",
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Nutrition",
+  "tier": "staff",
+  "title": "Marcus Webb",
+  "type": "coach",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "comparison_text": null,
+  "data_through": null,
+  "domain": "Training",
+  "edges": [],
+  "id": "training_coach",
+  "instrument_absent": null,
+  "method_ids": [],
+  "name": "Sarah Chen",
+  "record": {
+   "n": 0,
+   "right": null,
+   "through": null
+  },
+  "retired": true,
+  "retired_date": "2026-10-18",
+  "sample": true,
+  "short_bio": "Prescribed rather than predicted.",
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Training (retired)",
+  "tier": "staff",
+  "title": "Sarah Chen",
+  "type": "coach",
+  "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "comparison_text": null,
+  "data_through": null,
+  "domain": "Glucose",
+  "edges": [],
+  "id": "glucose_coach",
+  "instrument_absent": {
+   "absent": true,
+   "reason": "No sensor since 20 September."
+  },
+  "method_ids": [],
+  "name": "Amara Patel",
+  "record": {
+   "n": 7,
+   "right": 1,
+   "through": "2026-10-31"
+  },
+  "retired": false,
+  "retired_date": null,
+  "sample": true,
+  "short_bio": "Reads the glucose monitor when there is one.",
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Glucose",
+  "tier": "staff",
+  "title": "Amara Patel",
+  "type": "coach",
+  "visibility": "public"
+ }
+]
