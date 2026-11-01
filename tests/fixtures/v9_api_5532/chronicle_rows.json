@@ -1,0 +1,77 @@
+{
+ "_note": "USER#matthew#SOURCE#chronicle DATE# rows >= genesis 2026-09-06 as the read-only query returned them on 2026-10-31 (sk, date, week_number [a STRING on the wire], status, generated_at, phase); the draft row keeps its title here ONLY so the test can prove the route never serves it. Tombstoned pilot rows (DATE#2026-09-01, DATE#2026-09-04) are dropped by _query_source's phase filter and are not part of what the route reads.",
+ "captured_on": "2026-10-31",
+ "rows": [
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-09-05",
+   "date": "2026-09-05",
+   "generated_at": "2026-09-06T02:14:32.851373+00:00",
+   "phase": "experiment",
+   "status": "published",
+   "week_number": "0"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-09-08",
+   "date": "2026-09-08",
+   "generated_at": "2026-09-09T15:02:50.077255+00:00",
+   "phase": "experiment",
+   "status": "published",
+   "week_number": "1"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-09-15",
+   "date": "2026-09-15",
+   "generated_at": "2026-09-16T15:02:59.004166+00:00",
+   "phase": "experiment",
+   "status": "published",
+   "week_number": "2"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-09-22",
+   "date": "2026-09-22",
+   "generated_at": "2026-09-23T15:02:57.510438+00:00",
+   "phase": "experiment",
+   "status": "published",
+   "week_number": "3"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-09-29",
+   "date": "2026-09-29",
+   "generated_at": "2026-09-30T15:02:52.531645+00:00",
+   "phase": "experiment",
+   "status": "published",
+   "week_number": "4"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-10-06",
+   "date": "2026-10-06",
+   "generated_at": "2026-10-07T15:08:26.609062+00:00",
+   "phase": "experiment",
+   "status": "published",
+   "week_number": "5"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-10-13",
+   "date": "2026-10-13",
+   "generated_at": "2026-10-14T15:04:39.633571+00:00",
+   "status": "published",
+   "week_number": "6"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "DATE#2026-10-27",
+   "date": "2026-10-27",
+   "generated_at": "2026-10-28T15:03:53.828371+00:00",
+   "status": "draft",
+   "week_number": "8",
+   "title": "The Weight of 299"
+  }
+ ]
+}

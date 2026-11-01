@@ -244,6 +244,23 @@ REGISTRY = {
             "exercise-efficiency correlations, get_cross_source_correlation."
         ),
     ),
+    "spearman_rho": _entry(
+        "spearman_rho",
+        "Spearman rank correlation (rho)",
+        stats_core.spearman_rho,
+        "Correlation",
+        "rho = Pearson r over the mid-ranks of each series (ties averaged, 1-based)",
+        "Whatever paired series the caller passes in — no lookback of its own. The data room's "
+        "pair table (/api/pairs, #5532) passes the genesis-to-today daily series at lags -2…+2.",
+        "Requires n ≥ min_n (default 3); returns None below that or when every value on one side "
+        "is tied. Reads monotone association, so a curved but one-directional relationship scores "
+        "where Pearson under-reads it, and one outlying day moves it by one rank, not by its "
+        "distance. Not corrected for day-to-day autocorrelation on its own — served beside "
+        "effective_sample_size, never alone (ADR-105).",
+        "876e2e684937",
+        min_n=3,
+        used_by="/api/pairs (the v9 data room's compare/lag panel), served beside pearson_r on the same pairs.",
+    ),
     "lag1_autocorr": _entry(
         "lag1_autocorr",
         "Lag-1 autocorrelation",

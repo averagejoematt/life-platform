@@ -62,6 +62,7 @@ from web.site_api_autonomic import (
     handle_zone2_breakdown,
 )
 from web.site_api_cadence import handle_content_cadence  # #1972 — cron-derived next-installment line
+from web.site_api_chapters import handle_chapters  # #5532 — every program week's chapter state (v9 Story)
 
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
@@ -167,6 +168,7 @@ from web.site_api_intelligence import (
     handle_status_summary,
     handle_wrong,
 )
+from web.site_api_ledger_export import handle_ledger_export  # #5532 — the whole prediction ledger, paged (v9 ledger)
 
 # P1.1 Phase B step 2 (2026-05-26): observatory handlers extracted to sibling module.
 from web.site_api_observatory import (
@@ -186,6 +188,7 @@ from web.site_api_observatory import (
     handle_weekly_physical_summary,
     handle_workouts,
 )
+from web.site_api_pairs import handle_pairs  # #5532 — precomputed pair statistics for the v9 data room (ADR-105)
 
 # P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
 from web.site_api_reading import (
@@ -194,6 +197,7 @@ from web.site_api_reading import (
     handle_reading_overview,
     handle_reading_shelf,
 )
+from web.site_api_series import handle_series  # #5532 — one metric, every day, with presence/gap flags (v9 data room)
 
 # P1.1 Phase B step 4 (2026-05-26): social cluster extracted to sibling module.
 from web.site_api_social import (
@@ -451,6 +455,11 @@ ROUTES = {
     "/api/submit_finding": None,  # NEW-1: POST handler in lambda_handler
     "/api/page_feedback": None,  # #4182: POST handler in _SIMPLE_ROUTES
     "/api/morning_note": None,  # #4189: GET read + POST owner write in _SIMPLE_ROUTES
+    # #5532 (epic #5529): the four v9 reads — query-string routes, so each is a GET entry in _SIMPLE_ROUTES below.
+    "/api/series": None,  # one metric's daily series with presence/gap flags
+    "/api/ledger_export": None,  # the whole prediction ledger, paged, with the grader's flags and corrections
+    "/api/chapters": None,  # every program week since genesis: published | held | skipped | pending
+    "/api/pairs": None,  # precomputed pair statistics (Pearson, Spearman, n_eff, Fisher CI, BH-FDR) for the data room
     # EL-2: Experiment library (GET) + EL-3: Experiment vote (POST)
     "/api/experiment_library": handle_experiment_library,
     "/api/experiment_vote": None,  # POST handler in lambda_handler
@@ -583,6 +592,11 @@ _SIMPLE_ROUTES = {
     "/api/replicate_certify": ({"POST"}, _handle_replicate_certify),  # #1393 — Replicator self-cert
     "/api/page_feedback": ({"POST"}, _handle_page_feedback),  # #4182 — the two-question reader door
     "/api/morning_note": ({"GET", "POST"}, _route_morning_note),  # #4189 — the morning note: GET served / POST owner write
+    # #5532: the v9 reads (read-only, query-string GETs; privacy through field_tiers + the dossier filter)
+    "/api/series": ({"GET"}, handle_series),
+    "/api/ledger_export": ({"GET"}, handle_ledger_export),
+    "/api/chapters": ({"GET"}, handle_chapters),
+    "/api/pairs": ({"GET"}, handle_pairs),
 }
 
 
