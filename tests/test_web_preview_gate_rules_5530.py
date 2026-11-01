@@ -61,3 +61,10 @@ def test_iso_dates_and_the_age_are_forbidden_words():
     issues = gate._static_checks("<p>since 2026-10-31</p><p>Thirty-seven, British</p>", "/x/")
     assert any("ISO date" in i for i in issues) and any("the age" in i for i in issues)
     assert gate._static_checks("<p>since 31 October 2026</p><script src=/a.js></script>", "/x/") == []
+
+
+def test_a_published_body_is_the_authors_text_not_the_templates():
+    page = '<article class="article"><div data-published-body><p>On 2026-08-30 I wrote: undefined is a word.</p></div></article><p>since 31 October 2026</p>'
+    assert gate._static_checks(page, "/x/") == []
+    leak_outside = page + "<span>undefined</span>"
+    assert gate._static_checks(leak_outside, "/x/")

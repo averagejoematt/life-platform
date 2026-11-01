@@ -6,17 +6,19 @@ import { loadAll } from "../../lib/snapshot.js";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
-const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
+const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.week ?? 0) - (a.week ?? 0)));
 const published = chapters.filter((c) => c.status === "published").length;
+const episodes = all.byType.episode.length;
 ---
 
 <Base title="The story" top="story" description="Every chapter of the experiment, in order, with its figures and audio.">
   <section class="section">
     <div class="wrap">
-      <p class="label">Story · {published} chapters published · a new one most weeks</p>
+      <p class="label">Story · {published} chapters published{episodes ? ` · ${episodes} with audio` : ""}</p>
       <h1 style="margin-top:10px">The chapters</h1>
       <p class="dek" style="margin-top:14px;max-width:720px">
-        Read them in order, or start with the latest and work back. A week with no chapter says so here, in its place.
+        Read them in order, or start with the latest and work back. Each chapter is written by the platform's narrator from that week's
+        data and published only after Matthew approves it. A week with no chapter says so here, in its place.
       </p>
     </div>
   </section>
@@ -25,16 +27,16 @@ const published = chapters.filter((c) => c.status === "published").length;
       <div class="rows">
         {
           chapters.map((c) => (
-            <a href={href(pathOf("chapter", c.id))}>
+            <a href={href(pathOf("chapter", c.id))} style={c.status !== "published" ? "color:var(--muted)" : ""}>
               <span style="display:flex;gap:18px;align-items:baseline;min-width:0">
-                <span class="mono cobalt" style="font-size:14px;white-space:nowrap">{c.week_label}</span>
+                <span class={`mono ${c.status === "published" ? "cobalt" : "faint"}`} style="font-size:14px;white-space:nowrap">
+                  {c.week == null ? "—" : String(c.week).padStart(2, "0")}
+                </span>
                 <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
-                  <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{c.title}</b>
-                  {c.excerpt && (
-                    <span class="serif muted" style="font-size:15px">
-                      {c.excerpt}
-                    </span>
-                  )}
+                  <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{c.status === "published" ? c.title : c.week_label}</b>
+                  <span class="serif muted" style="font-size:15px">
+                    {c.status === "published" ? c.excerpt || c.week_label : c.absent_text}
+                  </span>
                 </span>
               </span>
               <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;white-space:nowrap">
@@ -42,6 +44,11 @@ const published = chapters.filter((c) => c.status === "published").length;
                   {dayInWords(c.date, { short: true })}
                 </span>
                 {c.status !== "published" && <StatusTag status={c.status} />}
+                {c.status === "published" && c.episode_id && (
+                  <span class="mono muted" style="font-size:12px">
+                    audio
+                  </span>
+                )}
               </span>
             </a>
           ))

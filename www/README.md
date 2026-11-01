@@ -15,7 +15,8 @@ The Stage 3 design (Claude Design, 2026-10-31) as a static site: one typed conte
 | Templates | `src/pages/` | One per object type; four destinations (Start · Story · Data · System), the appendix, privacy, 404. |
 | The identity | `src/styles/tokens.css`, `fonts.css`, `base.css` | Frozen from the Stage 2 identity sheet. Light only (owner decision 6). Two AA corrections from the prototype: `--faint` 4.64:1, smallest type 12 px. |
 | Fonts | `public/assets/fonts/v9/` | Archivo, Newsreader, IBM Plex Mono — Google's latin subsets, instanced to the axis ranges used (fontTools). 304 KB in all; the heaviest page loads ~262 KB. SIL OFL 1.1 (`docs/LICENSES.md` §3.1). |
-| Fixtures | `content/fixtures/*.json` | Sample objects marked `sample: true`, including one `held` chapter, one `held` insight and one `private` prediction whose sentinel strings the gates look for. |
+| Fixtures | `content/fixtures/*.json` | Sample objects marked `sample: true`, including one `held` chapter, one `pending` week, one `held` insight and one `private` prediction whose sentinel strings the gates look for. |
+| Phase 1 content | the exporter's `_chapter_body`, `_live_week_states`, episode `transcript` | A published chapter's body is the permalink's `.prose` block as published (scripts and inline handlers stripped, links made absolute), never rewritten; a program week with no chapter is a `held` / `skipped` / `pending` row with no title or body; an episode carries its transcript turns for the read-along. |
 
 ## Build
 

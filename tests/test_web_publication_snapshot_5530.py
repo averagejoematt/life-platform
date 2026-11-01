@@ -383,13 +383,34 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
             "posts": [{"id": "org-chart-of-one", "title": "Org chart", "date": "2026-09-20", "url": "/journal/essays/org-chart-of-one/"}]
         },
     }
-    monkeypatch.setattr(ps, "_get", lambda base, path, timeout: copy.deepcopy(captured[path]))
+    import urllib.error
+
+    def fake_get(base, path, timeout):
+        if path not in captured:  # /api/chapters before it is live, the transcript file, …
+            raise urllib.error.HTTPError(base + path, 404, "not found", None, None)
+        return copy.deepcopy(captured[path])
+
+    page = (
+        '<html><body><article class="post-body"><div class="prose"><p>Week six, <a href="/data/sleep/">as published</a>.</p>'
+        '<script>alert(1)</script><p onclick="x()">Kept text.</p></div><div class="signature">— E.V.</div></article></body></html>'
+    )
+    monkeypatch.setattr(ps, "_get", fake_get)
+    monkeypatch.setattr(ps, "_get_text", lambda base, path, timeout: page)
     objs = ps.build_live("https://example.test", 1.0)
     public, excluded = ps.partition(objs)
     assert excluded == {"held": 0, "private": 0}
     assert ps.dangling_edges(public) == []
-    assert {o["id"] for o in public["chapter"]} == {"week-09"}
-    assert public["chapter"][0]["episode_id"] == "wk6" and public["episode"][0]["chapter_id"] == "week-09"
+    chapters = {o["id"]: o for o in public["chapter"]}
+    # the published chapter carries its body as published: scripts and inline handlers gone, links absolute
+    body = chapters["week-09"]["body_html"]
+    assert "Week six" in body and 'href="https://example.test/data/sleep/"' in body
+    assert "<script" not in body and "onclick" not in body and "signature" not in body
+    assert chapters["week-09"]["episode_id"] == "wk6" and public["episode"][0]["chapter_id"] == "week-09"
+    assert public["episode"][0]["transcript"] is None  # the transcript file 404s in this capture
+    # week states derived without /api/chapters: day 56 = week 8; week 6 published → 1–5 skipped, 7–8 pending
+    states = {o["week"]: o["status"] for o in public["chapter"] if o["id"].startswith("program-week-")}
+    assert states == {1: "skipped", 2: "skipped", 3: "skipped", 4: "skipped", 5: "skipped", 7: "pending", 8: "pending"}
+    assert all(o["body_html"] is None and o["title"].startswith("Week ") for o in public["chapter"] if o["id"].startswith("program-week-"))
     assert public["coach"][0]["record"] is None  # the lead has no by_coach row
     lisa = next(c for c in public["coach"] if c["id"] == "sleep_coach")
     assert lisa["record"] == {"right": 19, "n": 48, "through": "2026-10-31"}
@@ -431,3 +452,15 @@ def test_cli_exit_codes(tmp_path):
     )
     assert bad.returncode == 2 and "SNAPSHOT-SCHEMA-ERROR" in bad.stderr
     assert not (tmp_path / "t").exists(), "a failed export must write nothing"
+
+
+def test_extract_prose_keeps_the_text_and_drops_what_a_different_host_must_not_run():
+    html = (
+        '<article class="post-body"><div class="prose"><p>Hello <em>there</em>.</p><script src="/x.js"></script>'
+        '<img src="/assets/a.png" onerror="evil()"><p>Bye.</p></div><div class="signature">sig</div></article>'
+    )
+    out = ps.extract_prose(html, "https://averagejoematt.com")
+    assert out.startswith("<p>Hello <em>there</em>.</p>") and out.endswith("<p>Bye.</p>")
+    assert "<script" not in out and "onerror" not in out and "sig" not in out
+    assert 'src="https://averagejoematt.com/assets/a.png"' in out
+    assert ps.extract_prose("<main>no prose block</main>", "https://x") is None
