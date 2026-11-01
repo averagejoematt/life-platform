@@ -22,7 +22,7 @@ const sources = [...all.byType.source].sort((a, b) => (a.status === b.status ? (
               </span>
               <span class="mono" style="font-size:12px">
                 {s.status}
-                {s.latest && ` · ${dayInWords(s.latest, { short: true })}`}
+                {s.latest && ` · ${dayInWords(s.latest, { short: true }) ?? s.latest}`}
               </span>
             </a>
           ))
