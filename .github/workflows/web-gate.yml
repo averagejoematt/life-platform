@@ -61,6 +61,11 @@ jobs:
         working-directory: web
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Install the Python lane (pins read from requirements-dev.txt, never copied here — CQ-01, #2609)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml pillow pytest-xdist)
+          pip install $PINS
+
       - name: Snapshot contract tests
         run: python3 -m pytest tests/test_web_publication_snapshot_5530.py -q -p no:randomly
 
@@ -109,7 +114,7 @@ jobs:
         working-directory: web
         run: |
           ! grep -rl "SENTINEL\|DO-NOT-PUBLISH" dist || { echo "::error::sentinel in dist"; exit 1; }
-          if grep -rhoE "<script\b[^>]*>" dist | grep -v 'src=' ; then echo "::error::inline script"; exit 1; fi
+          if grep -rhoiE "<script\b[^>]*>" dist | grep -vi "src=" ; then echo "::error::inline script"; exit 1; fi
           for f in $(find dist -name index.html); do grep -q 'name="robots" content="noindex' "$f" || { echo "::error::$f lacks noindex"; exit 1; }; done
           echo "scan clean: $(find dist -name index.html | wc -l) pages"
 

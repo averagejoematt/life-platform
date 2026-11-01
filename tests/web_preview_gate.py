@@ -98,8 +98,8 @@ def pages_of(dist: str) -> list[str]:
 
 def _static_checks(html: str, path: str) -> list[str]:
     issues = []
-    for tag in re.findall(r"<script\b[^>]*>", html):
-        if "src=" not in tag:
+    for tag in re.findall(r"<script\b[^>]*>", html, re.IGNORECASE):
+        if "src=" not in tag.lower():
             issues.append(f"{path}: inline <script> (CSP script-src 'self')")
     text = re.sub(r"<[^>]+>", " ", html)
     for rx, why in FORBIDDEN:

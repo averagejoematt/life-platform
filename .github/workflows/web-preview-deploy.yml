@@ -70,7 +70,7 @@ jobs:
         working-directory: web
         run: |
           for f in $(find dist -name index.html); do grep -q 'name="robots" content="noindex' "$f" || { echo "::error::$f lacks noindex"; exit 1; }; done
-          if grep -rhoE "<script\b[^>]*>" dist | grep -v 'src=' ; then echo "::error::inline script"; exit 1; fi
+          if grep -rhoiE "<script\b[^>]*>" dist | grep -vi "src=" ; then echo "::error::inline script"; exit 1; fi
 
       - name: Sync to the preview prefix (no delete; hashed assets immutable, HTML 300 s)
         working-directory: web
