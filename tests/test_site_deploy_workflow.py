@@ -165,8 +165,9 @@ def test_the_install_composite_runs_what_the_guards_expand_it_to():
         "ci-cd.yml": ["chromium"],
         "site-deploy.yml": ["chromium"],
         "visual-qa.yml": ["chromium"],
+        "web-gate.yml": ["chromium"],  # #5530: the v9 render gate (tests/web_preview_gate.py) on the fixture build
         "webkit-mobile-qa.yml": ["webkit"],
-    }, f"the four visual-QA jobs must each install through {ACTION_REF} exactly once: {callers}"
+    }, f"the five Playwright jobs must each install through {ACTION_REF} exactly once: {callers}"
 
 
 def test_ci_cd_no_longer_owns_the_site_deploy():

@@ -362,53 +362,71 @@ def _week_id(url: str | None) -> str | None:
     return f"week-{int(m.group(1)):02d}" if m else None
 
 
-def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
-    """Map the public Site API onto the content model. Only public endpoints, only GETs."""
+LIVE_ENDPOINTS = {
+    "edition": "/api/edition",
+    "posts": "/journal/posts.json",
+    "episodes": "/panelcast/episodes.json",
+    "coaches": "/api/coaches",
+    "predictions": "/api/predictions",
+    "calls": "/api/calls",
+    "docket": "/api/coach_docket",
+    "freshness": "/api/source_freshness",
+    "methods": "/api/methods",
+    "experiments": "/api/experiments",
+    "blog": "/journal/blog.json",
+}
+OPTIONAL_ENDPOINTS = ("blog", "docket", "experiments")
+
+
+class LiveContext:
+    """What the per-collection mappers share: the fetched payloads and the cross-references
+    built as the collections are mapped (episodes by week, chapters by week, the coach ids,
+    the metric keys the pending calls name)."""
+
+    def __init__(self, base_url: str, fetched: dict[str, Any]):
+        self.base_url = base_url.rstrip("/")
+        self.fetched = fetched
+        self.as_of: str = (fetched["edition"] or {}).get("as_of")
+        self.objs: dict[str, list[dict]] = {t: [] for t in OBJECT_TYPES}
+        self.ep_by_week: dict[int, str] = {}
+        self.chapter_by_week: dict[int, str] = {}
+        self.coach_ids: set[str] = set()
+        self.metric_keys: set[str] = set()
+
+    def rows(self, key: str, field: str) -> list:
+        return (self.fetched.get(key) or {}).get(field) or []
+
+
+def fetch_live(base_url: str, timeout: float) -> dict[str, Any]:
     fetched: dict[str, Any] = {}
-    for key, path in {
-        "edition": "/api/edition",
-        "posts": "/journal/posts.json",
-        "episodes": "/panelcast/episodes.json",
-        "coaches": "/api/coaches",
-        "predictions": "/api/predictions",
-        "calls": "/api/calls",
-        "docket": "/api/coach_docket",
-        "freshness": "/api/source_freshness",
-        "methods": "/api/methods",
-        "experiments": "/api/experiments",
-        "blog": "/journal/blog.json",
-    }.items():
+    for key, path in LIVE_ENDPOINTS.items():
         try:
             fetched[key] = _get(base_url, path, timeout)
         except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
-            if key in ("blog", "docket", "experiments"):
+            if key in OPTIONAL_ENDPOINTS:
                 log(f"  optional {path} unavailable ({exc}); collection left empty")
                 fetched[key] = None
             else:
                 raise RuntimeError(f"fetch failed for {path}: {exc}") from exc
+    return fetched
 
-    edition = fetched["edition"]
-    as_of = edition.get("as_of")
-    objs: dict[str, list[dict]] = {t: [] for t in OBJECT_TYPES}
 
-    # episodes first so chapters can point at them
-    eps = (fetched["episodes"] or {}).get("episodes") or []
-    ep_by_week: dict[int, str] = {}
-    for e in eps:
+def _live_episodes(ctx: LiveContext) -> None:
+    for e in ctx.rows("episodes", "episodes"):
         m = re.search(r"wk(\d+)", e.get("url") or "")
         if not m:
             continue
         n = int(m.group(1))
         eid = f"wk{n}"
-        ep_by_week[n] = eid
+        ctx.ep_by_week[n] = eid
         audio = e.get("url")
         if audio and audio.startswith("/"):
-            audio = base_url.rstrip("/") + audio
-        objs["episode"].append(
+            audio = ctx.base_url + audio
+        ctx.objs["episode"].append(
             envelope(
                 id=eid,
                 type="episode",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 data_through=e.get("date"),
                 source=["/panelcast/episodes.json"],
                 title=e.get("title") or f"Episode {n}",
@@ -423,21 +441,22 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
             )
         )
 
-    posts = (fetched["posts"] or {}).get("posts") or []
-    chapter_by_week: dict[int, str] = {}
-    for p in posts:
+
+def _live_chapters(ctx: LiveContext) -> None:
+    for p in ctx.rows("posts", "posts"):
         cid = _week_id(p.get("url"))
         if not cid:
             continue
         week = p.get("week") if isinstance(p.get("week"), int) else None
         if week is not None:
-            chapter_by_week[week] = cid
+            ctx.chapter_by_week[week] = cid
         wc = p.get("word_count") if isinstance(p.get("word_count"), int) else None
-        objs["chapter"].append(
+        has_ep = week is not None and week in ctx.ep_by_week
+        ctx.objs["chapter"].append(
             envelope(
                 id=cid,
                 type="chapter",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 data_through=p.get("date"),
                 source=["/journal/posts.json"],
                 approved={"by": "owner", "at": p["date"], "via": "chronicle-approve"},
@@ -452,18 +471,18 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
                 word_count=wc,
                 read_minutes=max(1, round(wc / 230)) if wc else None,
                 url_legacy=p.get("url"),
-                episode_id=ep_by_week.get(week) if week is not None else None,
-                edges=[{"type": "episode", "id": ep_by_week[week], "rel": "listen"}] if week is not None and week in ep_by_week else [],
+                episode_id=ctx.ep_by_week.get(week) if week is not None else None,
+                edges=[{"type": "episode", "id": ctx.ep_by_week[week], "rel": "listen"}] if has_ep else [],
             )
         )
-    for e in objs["episode"]:
-        if e["number"] in chapter_by_week:
-            e["chapter_id"] = chapter_by_week[e["number"]]
+    for e in ctx.objs["episode"]:
+        if e["number"] in ctx.chapter_by_week:
+            e["chapter_id"] = ctx.chapter_by_week[e["number"]]
 
-    # coaches
-    preds = fetched["predictions"] or {}
-    by_coach = preds.get("by_coach") or {}
-    for c in (fetched["coaches"] or {}).get("coaches") or []:
+
+def _live_coaches(ctx: LiveContext) -> None:
+    by_coach = (ctx.fetched.get("predictions") or {}).get("by_coach") or {}
+    for c in ctx.rows("coaches", "coaches"):
         pid = c["persona_id"]
         short = pid[: -len("_coach")] if pid.endswith("_coach") else pid
         bc = by_coach.get(short) or {}
@@ -471,11 +490,11 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
         decided = bc.get("decided")
         record = {"right": bc.get("confirmed"), "n": int(decided), "through": rec.get("through")} if isinstance(decided, int) else None
         comp = (bc.get("comparison") or {}).get("sentence")
-        objs["coach"].append(
+        ctx.objs["coach"].append(
             envelope(
                 id=pid,
                 type="coach",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 source=["/api/coaches", "/api/predictions"],
                 title=c.get("name") or pid,
                 summary=c.get("domain"),
@@ -490,27 +509,26 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
                 instrument_absent={"absent": bool(c.get("absent")), "reason": c.get("reason")} if c.get("absent") else None,
             )
         )
-    coach_ids = {c["id"] for c in objs["coach"]}
+    ctx.coach_ids = {c["id"] for c in ctx.objs["coach"]}
 
-    # predictions: the checked calls (with ids and grading) + the pending rows (no id served
-    # yet; a stable one is minted from coach · date · claim until Phase 3 exports prediction_id)
-    metric_keys: set[str] = set()
-    seen_pred: set[str] = set()
-    calls = (fetched["calls"] or {}).get("calls") or []
-    for k in calls:
+
+def _live_checked_calls(ctx: LiveContext) -> set[str]:
+    """The checked calls (`/api/calls`): real ids, grading, the simple guess. Returns the ids seen."""
+    seen: set[str] = set()
+    for k in ctx.rows("calls", "calls"):
         pid = _persona(k["coach_id"])
-        if pid not in coach_ids:
+        if pid not in ctx.coach_ids:
             continue
         status = {"right": "confirmed", "wrong": "refuted"}.get(k.get("verdict"), "inconclusive")
         tol = k.get("tolerance") or {}
         act = k.get("actual") or {}
         sg = k.get("simple_guess") or None
         kind = k.get("kind") if k.get("kind") in ("number", "direction", "yes_no", "sealed", "interval") else "unknown"
-        objs["prediction"].append(
+        ctx.objs["prediction"].append(
             envelope(
                 id=k["id"],
                 type="prediction",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 data_through=k.get("settled_date"),
                 source=["/api/calls"],
                 title=k.get("title") or k.get("called_short") or k["claim"],
@@ -537,29 +555,35 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
                 edges=[{"type": "coach", "id": pid, "rel": "made_by"}],
             )
         )
-        seen_pred.add(k["id"])
-    for r in preds.get("predictions") or []:
+        seen.add(k["id"])
+    return seen
+
+
+def _live_pending_calls(ctx: LiveContext, seen: set[str]) -> None:
+    """The pending rows (`/api/predictions`): served without an id, so a stable one is minted
+    from coach · date · claim until Phase 3 exports prediction_id."""
+    for r in ctx.rows("predictions", "predictions"):
         if r.get("status") != "pending":
             continue
         pid = _persona(r["coach_id"])
-        if pid not in coach_ids:
+        if pid not in ctx.coach_ids:
             continue
         digest = hashlib.sha1((r.get("text") or "").encode("utf-8")).hexdigest()[:10]  # noqa: S324 — id minting, not security
         rid = f"{r['coach_id']}-{r['date'].replace('-', '')}-{digest}"
-        if rid in seen_pred:
+        if rid in seen:
             continue
-        seen_pred.add(rid)
+        seen.add(rid)
         metric = r.get("metric") if isinstance(r.get("metric"), str) and ID_RE.match(r.get("metric") or "") else None
         if metric:
-            metric_keys.add(metric)
+            ctx.metric_keys.add(metric)
         edges = [{"type": "coach", "id": pid, "rel": "made_by"}]
         if metric:
             edges.append({"type": "metric", "id": metric, "rel": "about"})
-        objs["prediction"].append(
+        ctx.objs["prediction"].append(
             envelope(
                 id=rid,
                 type="prediction",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 source=["/api/predictions"],
                 title=(r.get("text") or rid)[:120],
                 coach_id=pid,
@@ -580,13 +604,15 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
             )
         )
 
-    # metrics: the keys the pending calls name (Phase 2 exports the registry proper)
-    for key in sorted(metric_keys):
-        objs["metric"].append(
+
+def _live_metrics(ctx: LiveContext) -> None:
+    """The metric keys the pending calls name (Phase 2 exports the registry proper)."""
+    for key in sorted(ctx.metric_keys):
+        ctx.objs["metric"].append(
             envelope(
                 id=key,
                 type="metric",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 source=["/api/predictions"],
                 title=key.replace("_", " "),
                 label=key.replace("_", " "),
@@ -599,21 +625,22 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
             )
         )
 
-    # disagreements
-    docket = fetched["docket"] or {}
+
+def _live_disagreements(ctx: LiveContext) -> None:
+    docket = ctx.fetched.get("docket") or {}
     for status_key, status in (("open", "open"), ("resolved", "resolved")):
         for d in docket.get(status_key) or []:
             a, b = d.get("coach_a"), d.get("coach_b")
-            if a not in coach_ids or b not in coach_ids:
+            if a not in ctx.coach_ids or b not in ctx.coach_ids:
                 continue
             slug = d.get("topic_slug") or _slug(d.get("topic") or "topic")
-            did = f"{slug}-{(d.get('resolved_date') or d.get('opened') or as_of)}"
+            did = f"{slug}-{(d.get('resolved_date') or d.get('opened') or ctx.as_of)}"
             claims = d.get("claims") or {}
-            objs["disagreement"].append(
+            ctx.objs["disagreement"].append(
                 envelope(
                     id=_slug(did),
                     type="disagreement",
-                    as_of=as_of,
+                    as_of=ctx.as_of,
                     source=["/api/coach_docket"],
                     title=d.get("topic") or slug,
                     topic=d.get("topic") or slug,
@@ -629,19 +656,21 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
                 )
             )
 
-    # sources
-    for s in (fetched["freshness"] or {}).get("sources") or []:
+
+def _live_sources(ctx: LiveContext) -> None:
+    for s in ctx.rows("freshness", "sources"):
         status = (
             s.get("status")
             if s.get("status") in ("live", "stale", "paused", "behavioral-stale")
             else ("live" if s.get("status") == "fresh" else "unknown")
         )
-        objs["source"].append(
+        last = (s.get("last_update") or "")[:10]
+        ctx.objs["source"].append(
             envelope(
                 id=s["id"],
                 type="source",
-                as_of=as_of,
-                data_through=(s.get("last_update") or "")[:10] if ISO_DAY.match((s.get("last_update") or "")[:10]) else None,
+                as_of=ctx.as_of,
+                data_through=last if ISO_DAY.match(last) else None,
                 source=["/api/source_freshness"],
                 state="ok" if status in ("live", "paused") else "stale",
                 title=s.get("label") or s["id"],
@@ -657,13 +686,14 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
             )
         )
 
-    # methods
-    for m in (fetched["methods"] or {}).get("stats") or []:
-        objs["method"].append(
+
+def _live_methods(ctx: LiveContext) -> None:
+    for m in ctx.rows("methods", "stats"):
+        ctx.objs["method"].append(
             envelope(
                 id=m["id"],
                 type="method",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 source=["/api/methods"],
                 title=m.get("name") or m["id"],
                 summary=m.get("category"),
@@ -677,15 +707,17 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
             )
         )
 
-    # experiments: the real ones, not the library catalogue
-    for x in (fetched["experiments"] or {}).get("experiments") or []:
+
+def _live_experiments(ctx: LiveContext) -> None:
+    """The real experiments, not the library catalogue."""
+    for x in ctx.rows("experiments", "experiments"):
         if x.get("status") in (None, "backlog") or x.get("origin") == "library":
             continue
-        objs["experiment"].append(
+        ctx.objs["experiment"].append(
             envelope(
                 id=_slug(str(x["id"])),
                 type="experiment",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 source=["/api/experiments"],
                 title=x.get("name") or str(x["id"]),
                 summary=x.get("result_summary"),
@@ -700,16 +732,17 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
             )
         )
 
-    # essays
-    for p in (fetched["blog"] or {}).get("posts") or []:
+
+def _live_essays(ctx: LiveContext) -> None:
+    for p in ctx.rows("blog", "posts"):
         slug = p.get("id") or _slug(p.get("title") or "essay")
-        objs["essay"].append(
+        ctx.objs["essay"].append(
             envelope(
                 id=_slug(slug),
                 type="essay",
-                as_of=as_of,
+                as_of=ctx.as_of,
                 source=["/journal/blog.json"],
-                approved={"by": "owner", "at": p.get("date") or as_of, "via": "journal-interview PR"},
+                approved={"by": "owner", "at": p.get("date") or ctx.as_of, "via": "journal-interview PR"},
                 title=p.get("title") or slug,
                 summary=p.get("excerpt") or p.get("summary"),
                 date=p["date"],
@@ -718,24 +751,23 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
             )
         )
 
-    # the edition
+
+def _live_edition(ctx: LiveContext) -> None:
+    edition = ctx.fetched["edition"]
     blocks = edition.get("blocks") or {}
-    today = ((blocks.get("today") or {}).get("data") or {}) if isinstance((blocks.get("today") or {}).get("data"), dict) else {}
+    today_data = (blocks.get("today") or {}).get("data")
+    today = today_data if isinstance(today_data, dict) else {}
     chapter_block = (blocks.get("chapter") or {}).get("data") or {}
     latest_chapter = _week_id(chapter_block.get("url")) if isinstance(chapter_block, dict) else None
-    edges = (
-        [{"type": "chapter", "id": latest_chapter, "rel": "this_week"}]
-        if latest_chapter and any(c["id"] == latest_chapter for c in objs["chapter"])
-        else []
-    )
-    objs["edition"].append(
+    known = latest_chapter and any(c["id"] == latest_chapter for c in ctx.objs["chapter"])
+    ctx.objs["edition"].append(
         envelope(
-            id=as_of,
+            id=ctx.as_of,
             type="edition",
-            as_of=as_of,
-            data_through=as_of,
+            as_of=ctx.as_of,
+            data_through=ctx.as_of,
             source=["/api/edition"],
-            title=f"The edition of {as_of}",
+            title=f"The edition of {ctx.as_of}",
             day_n=edition.get("day_n") if isinstance(edition.get("day_n"), int) else None,
             start_date=today.get("start_date") if ISO_DAY.match(str(today.get("start_date") or "")) else None,
             order=[str(k) for k in (edition.get("order") or [])],
@@ -744,10 +776,27 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
                 for k, v in blocks.items()
                 if isinstance(v, dict)
             },
-            edges=edges,
+            edges=[{"type": "chapter", "id": latest_chapter, "rel": "this_week"}] if known else [],
         )
     )
-    return objs
+
+
+def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
+    """Map the public Site API onto the content model. Only public endpoints, only GETs."""
+    ctx = LiveContext(base_url, fetch_live(base_url, timeout))
+    _live_episodes(ctx)  # first, so chapters can point at them
+    _live_chapters(ctx)
+    _live_coaches(ctx)
+    seen = _live_checked_calls(ctx)
+    _live_pending_calls(ctx, seen)
+    _live_metrics(ctx)
+    _live_disagreements(ctx)
+    _live_sources(ctx)
+    _live_methods(ctx)
+    _live_experiments(ctx)
+    _live_essays(ctx)
+    _live_edition(ctx)
+    return ctx.objs
 
 
 # ── the appendix (the kept pages, from the page registry) ───────────────────────────────

@@ -540,6 +540,33 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    # #5530 — the v9 (www/) render gate: every built page at a phone and a laptop, with axe.
+    "guard::tests/web_preview_gate.py": {
+        "gate_name": "tests/web_preview_gate.py",
+        "command": "python3 tests/web_preview_gate.py --dist www/dist --base /next/v9/   # after `npm ci && npm run build:preview` in www/",
+        "mutation": (
+            "Built in and run before every grade: a COPY of the build gets a 2000px-wide div, an inline <script> and a "
+            "HELD-SENTINEL paragraph appended to index.html; the gate must report all three classes (overflow, inline script, "
+            "sentinel) on that copy or it exits 2 (BLIND) without grading. A second, hand-planted check on 2026-11-01: the same "
+            "three lines appended to the real www/dist/index.html and `python3 scripts/check_www_build.py --scan-only` run."
+        ),
+        "observed": (
+            "2026-10-31 → 2026-11-01 on this lane. Control: `mutation control … ok (the gate can fail)` on every run. On the real "
+            "fixture build the gate first REDDED four genuine defects, each fixed before it passed: axe serious color-contrast on "
+            "`.refuted`, `.logging_gap` and the inverted table's `th`; `[object Object]` leaked on nine ledger pages (Astro "
+            "reference() hands templates an object); horizontal overflow 394px on the three method pages and 403–451px on the "
+            "row pages at 390px. After the fixes: `✅ GATE PASSED — 37 pages, 0 with issues`. Hand plant: `--scan-only` exit 1 "
+            "naming index.html three times (two sentinels, one inline script); reverted exit 0."
+        ),
+        "scope": (
+            "Every index.html under www/dist, served under its base path, at 390x844 and 1280x900, light theme: horizontal "
+            "overflow, page errors, failed or non-2xx same-origin requests, axe serious/critical at phone width, forbidden "
+            "strings (undefined, NaN, [object Object], an ISO date, the age, the fixture sentinels), inline <script>, the front "
+            "page's six-screen budget. NOT SEEN: dark theme (light-only by owner decision 6), live data (the fixture snapshot "
+            "pins it), desktop-width axe, anything outside www/dist."
+        ),
+        "proved_on": "2026-11-01",
+    },
     # #4586 — the kit pages' pre-merge gate (height budget, overflow, axe).
     "guard::tests/kit_page_gate.py": {
         "gate_name": "tests/kit_page_gate.py",
@@ -2826,6 +2853,60 @@ REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::pace fl
 # itself states at its own family-2 import (19 lines of headroom at the time this
 # was written) — `gate_census.py` still `.update()`s it into the SAME dict.
 CI_PROOFS: dict[str, dict[str, Any]] = {
+    # #5530 — the v9 (www/) build gate: one entrypoint, four properties, two of them mutations by construction.
+    "ci::web-gate.yml::web-gate::4": {
+        "gate_name": "web-gate / Build gate — reproducible · held-object mutation · dangling-edge mutation · output scan",
+        "command": "python3 scripts/check_www_build.py",
+        "mutation": (
+            "Two plants the script makes itself on every run, in the real www/content/snapshot: chapters[0].visibility → "
+            "`held` (and a POISON title) must fail `astro build`; predictions[0].edges += {metric, does_not_exist_anywhere} must "
+            "fail `astro build`. Either building clean is exit 2 (BLIND). A third, hand plant on 2026-11-01: a sentinel "
+            "paragraph and an inline <script> appended to www/dist/index.html, then `--scan-only`."
+        ),
+        "observed": (
+            "2026-11-01, this lane, 5.6 s: `reproducible: 1e4a1118713ed28a… == 1e4a1118713ed28a…` (two builds, one tree hash); "
+            "`held object refused by the build (exit 1, the schema named visibility)` — Astro's InvalidContentEntryDataError "
+            '`visibility: Invalid input: expected "public"`; `dangling edge refused by the build (exit 1, named)` — '
+            "`dangling edge(s): prediction:… -> metric:does_not_exist_anywhere`; `scan ✓ 38 pages: no sentinel, no inline "
+            "script, noindex everywhere`; exit 0. Hand plant: `--scan-only` exit 1 naming index.html ×3; reverted exit 0."
+        ),
+        "scope": (
+            "The FIXTURE snapshot and the preview-base build only. Proves the schema's visibility literal and the edge index "
+            "are load-bearing and that the build is byte-reproducible from the same input. NOT SEEN: the live snapshot's "
+            "content (the preview deploy's scan step, ci::web-preview-deploy.yml::preview::6), the exporter's own exclusion "
+            "of held/private objects (tests/test_web_publication_snapshot_5530.py), page rendering (the render gate)."
+        ),
+        "proved_on": "2026-11-01",
+    },
+    "ci::web-gate.yml::web-gate::7": {
+        "gate_name": "web-gate / Render gate at 390 + 1280 with axe (mutation control first)",
+        "command": "python3 tests/web_preview_gate.py --dist www/dist --base /next/v9/ --out /tmp/web-gate",
+        "mutation": "The same as guard::tests/web_preview_gate.py — the step IS that script; its in-run control exits 2 if a planted overflow + inline script + sentinel is not reported.",
+        "observed": (
+            "2026-10-31 → 2026-11-01. BASELINE exit 0: `mutation control … ok (the gate can fail)` then `✅ GATE PASSED — 37 pages, "
+            "0 with issues`. MUTATED (the control copy, every run): the planted overflow, inline <script> and sentinel are all three "
+            "reported — the run exits 2 (BLIND) if any is not. On the way to the baseline the same gate exited 1 four times on real "
+            "defects (AA contrast ×3 classes, [object Object] ×9 pages, overflow ×6 pages), each fixed; REVERTED to the fixed build, exit 0."
+        ),
+        "scope": "See guard::tests/web_preview_gate.py. In CI it runs on the fixture build that step 4 left behind.",
+        "proved_on": "2026-11-01",
+    },
+    "ci::web-preview-deploy.yml::preview::6": {
+        "gate_name": "preview / Output scan — no sentinel, no inline script, noindex on every page",
+        "command": "python3 scripts/check_www_build.py --scan-only   # on the LIVE-snapshot build, before the S3 sync",
+        "mutation": "A sentinel paragraph and an inline <script> appended to www/dist/index.html after a clean build.",
+        "observed": (
+            "2026-11-01, this lane: MUTATED `scan ✗ index.html: sentinel 'SENTINEL' · ✗ index.html: sentinel 'DO-NOT-PUBLISH' · "
+            "✗ index.html: inline <script>` exit 1. REVERTED `✓ 38 pages: no sentinel, no inline script, noindex everywhere` exit 0. "
+            "The step precedes `deploy/www_preview_sync.sh`, so a red here deploys nothing."
+        ),
+        "scope": (
+            "Every html/css/js/json/xml/txt file under www/dist: the fixture sentinels, inline <script> (CSP script-src 'self'), "
+            "the noindex meta on every page (the preview base). NOT SEEN: a leak that carries none of the sentinel strings — "
+            "that is the exporter's gate (visibility) and the Site API's privacy tiers, not this scan's."
+        ),
+        "proved_on": "2026-11-01",
+    },
     # #4586 — the same gate as its CI step (the PR render job).
     "ci::v4-gate.yml::render-accuracy-gate::4": {
         "gate_name": "render-accuracy-gate / Kit page gate (height budget, overflow, axe)",
@@ -3130,6 +3211,21 @@ REGISTRY_PROOFS.update(
         }
     }
 )
+
+REGISTRY_PROOFS["registry::tests/test_root_clutter_guard.py::ALLOWLIST::www"] = {
+    "gate_name": "ALLOWLIST[www]",
+    "command": "python3 -m pytest tests/test_root_clutter_guard.py -q   # 4 tests",
+    "mutation": "the entry's own line deleted from ALLOWLIST, leaving the tracked `www/` dir (the v9 Astro build, #5530) unlisted.",
+    "observed": (
+        "2026-11-01 on this lane: ARMED (entry removed) — 1 failed, 3 passed, `test_no_unlisted_top_level_dir` asserting "
+        "`not ['www']`. REVERTED (entry restored): 4 passed."
+    ),
+    "scope": (
+        "Proves the entry is load-bearing for the D1 ratchet given the real tracked `www/` dir (package.json, src/, content/fixtures/, "
+        "public/). It does not prove the reason text beyond matching docs/REPO_STRUCTURE.md's row for the same directory."
+    ),
+    "proved_on": "2026-11-01",
+}
 
 REGISTRY_PROOFS["registry::tests/test_root_clutter_guard.py::ALLOWLIST::qa"] = {
     "gate_name": "ALLOWLIST[qa]",

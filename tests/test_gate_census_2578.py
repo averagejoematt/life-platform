@@ -1202,7 +1202,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # 302 -> 305 (2026-10-28, #5473): guard::scripts/check_pip_audit.py (GUARD_PROOFS: M1 1 failed, M2 2 failed, M3 2 failed,
         # M4 3 failed; reverted 14 passed), ci::layer-pip-audit.yml::audit::2 and the re-plumbed ci::ci-lint.yml::lint::9 (CI_PROOFS:
         # planted pillow==12.3.0 exit 1 through the real step text + real pip-audit, restored exit 0). Stacked, never max'd.
-        <= 305
+        # 305 -> 310 (2026-11-01, #5530 the v9 build): five new proofs — guard::tests/web_preview_gate.py (GUARD_PROOFS, the
+        # in-run control + four real reds before the pass), ci::web-gate.yml::web-gate::4 and ::7, ci::web-preview-deploy.yml::preview::6
+        # (CI_PROOFS: hash equal, held exit 1, dangling exit 1, planted-sentinel scan exit 1 / reverted 0) and
+        # registry::tests/test_root_clutter_guard.py::ALLOWLIST::www (REGISTRY_PROOFS: armed 1 failed naming ['www'], reverted 4 passed).
+        # Stacked, never max'd.
+        <= 310
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

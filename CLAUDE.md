@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation Index
 
 - **`docs/CHARTER.md` — READ FIRST** (#2843): the architecture primitives, the paved roads (the ONLY sanctioned way to add a signal/lambda/page/coach/gate) and the standing rules. Boot derives the architecture from it + `model/platform_model.json` (printed by `scripts/boot_brief.py` at SessionStart, #3314) — every count here is a pointer, the model is the number.
-- **Website work** — the v5 brief: `docs/PLATFORM_NORTH_STAR.md` (why), `docs/SITE_MAP_AND_INTENT.md` (what each page is for), `docs/DESIGN_SYSTEM_V5.md` (standards), `docs/SITE_UPLEVEL_PLAYBOOK.md` (how to change it well); `/uplevel` (`.claude/skills/uplevel/SKILL.md`) drives a session.
+- **Website work** — the v5 brief: `docs/PLATFORM_NORTH_STAR.md` (why), `docs/SITE_MAP_AND_INTENT.md` (what each page is for), `docs/DESIGN_SYSTEM_V5.md` (standards), `docs/SITE_UPLEVEL_PLAYBOOK.md` (how to change it well); `/uplevel` (`.claude/skills/uplevel/SKILL.md`) drives a session. **v9 build (#5530): `www/README.md`, ADR-166.**
 - `docs/README.md` — the full doc index · `docs/ONBOARDING.md` · `docs/QUICKSTART.md` · `docs/ARCHITECTURE.md` · `docs/SCHEMA.md` (DynamoDB fields, authoritative) · `docs/RUNBOOK.md`
 - **The backlog is GitHub Issues (ADR-099)** — epics + ranked stories on Now/Next/Later (+ `Roadmap`); seed sessions from `python3 scripts/backlog_next.py`. `docs/BACKLOG.md` is a frozen archive.
 - **`docs/CONVENTIONS.md` — the canonical home for the deploy/CI reflexes** (one bundle, deploy-from-main, squash drift, CI gate ordering, asset staging). A rule stated below as a pointer is maintained THERE.
@@ -27,8 +27,7 @@ flake8 lambdas/ mcp/
 # Syntax check all Python
 find lambdas/ mcp/ -name '*.py' -exec python3 -m py_compile {} \;
 
-# Deploy a single Lambda (both args required; the function->source table is generated
-# into .claude/skills/deploy/SKILL.md from ci/lambda_map.json)
+# Deploy a single Lambda (both args required; the function->source table is in .claude/skills/deploy/SKILL.md)
 bash deploy/deploy_lambda.sh <function-name> <source-file>
 
 # Deploy the whole fleet — the one Lambda code deploy path CI runs (#4255)
@@ -120,8 +119,6 @@ It regenerates constants, deploys, phase-tags DDB, wipes intelligence, rolls the
 ## Public Website (ADR-071)
 
 `averagejoematt.com` is a static site (S3 + CloudFront `E3S424OXQZ8NBE`) over the unchanged engine: vanilla-JS ES modules, `tokens.css`, self-hosted fonts, inline-SVG charts, no framework/deps. The doors are `docs/SITE_MAP_AND_INTENT.md`; redirects regenerate from `redirects.map` via `scripts/v4_migration_inventory.py`. **A shell with a `scripts/v4_build_*.py` generator is changed in the generator, then regenerated.** Deploy is **automatic on merge** (`.github/workflows/site-deploy.yml`); attended path: `bash deploy/sync_site_to_s3.sh` + an explicit fonts sync. **Never link `/legacy` from the UI; engine/`/api/*` contracts are read-only from the front-end.**
-
-**The v9 build (`www/`, #5530, epic #5529 — owner-approved 2026-10-31, Phase 0 only so far):** the Stage 3 design as an Astro 7 *static* build over a publication snapshot (`scripts/publish_snapshot.py`, public Site API over HTTPS, never DynamoDB). The "no framework/deps" rule above is restated as **no client-side framework**: a build-time toolchain is permitted (lockfile, Dependabot), the reader still receives HTML, one stylesheet, self-hosted fonts and vanilla ES modules. It builds to `/next/v9/` (`noindex`) via `web-preview-deploy.yml` after a merge; nothing reaches `/` before the Phase 4 cut-over. Plan and the owner's conditions: `docs/design/v9/STAGE4_ENGINEERING_PLAN.md`; the tree's own guide: `www/README.md`.
 
 ## Authorship — no tool attribution (owner decision, 2026-08-12)
 

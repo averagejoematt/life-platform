@@ -1,22 +1,16 @@
 # v9 web gate (#5530, epic #5529) — the pre-merge gate for the static build in www/.
 #
-# Deliberately separate from v4-gate.yml (which guards the site/ tree) and from ci-cd.yml:
-# it has NO AWS access and NO deploy capability. It builds the preview from the committed
-# FIXTURE snapshot (offline, deterministic — no live data, so it cannot flake on a day's
-# numbers and cannot leak one), then holds the five Phase 0 exit criteria it can measure:
-#
-#   1. the build is reproducible (two builds, one tree hash);
-#   2. the schemas validate (the build itself, plus tests/test_web_publication_snapshot_5530.py);
-#   3. a held/private object cannot enter the build — proven by MUTATION, not assumed:
-#      a poisoned snapshot MUST fail `astro build`, and the output is scanned for the
-#      fixture sentinels;
-#   4. the relationship index resolves — a dangling edge MUST fail the build;
-#   5. the existing QA architecture reaches the output: the Playwright render gate at
-#      390/1280 with axe, the same harness family as qa/pr_render_gate.py and
-#      tests/kit_page_gate.py, with its own mutation control.
-#
-# The live-snapshot preview deploy to /next/v9/ is a different workflow
-# (web-preview-deploy.yml) and runs only after a merge to main.
+# Separate from v4-gate.yml (the site/ tree) and from ci-cd.yml: NO AWS access, NO deploy.
+# It builds the preview from the committed FIXTURE snapshot (offline, deterministic) and
+# holds the Phase 0 exit criteria through two tested entrypoints, not inline shell:
+#   scripts/check_www_build.py   reproducible build · a held object MUST fail the build ·
+#                                a dangling edge MUST fail the build · output scan
+#                                (exit 2 = a planted defect built clean = blind gate)
+#   tests/web_preview_gate.py    Playwright at 390 + 1280 with axe on every built page,
+#                                its own mutation control first
+# The snapshot contract tests (tests/test_web_publication_snapshot_5530.py) run in the
+# pre-merge Python lane with the rest of the suite. The live-snapshot preview deploy is
+# web-preview-deploy.yml and runs only after a merge to main.
 
 name: v9 web gate
 
@@ -26,7 +20,7 @@ on:
     paths:
       - 'www/**'
       - 'scripts/publish_snapshot.py'
-      - 'tests/test_web_publication_snapshot_5530.py'
+      - 'scripts/check_www_build.py'
       - 'tests/web_preview_gate.py'
       - '.github/workflows/web-gate.yml'
   push:
@@ -34,6 +28,7 @@ on:
     paths:
       - 'www/**'
       - 'scripts/publish_snapshot.py'
+      - 'scripts/check_www_build.py'
       - 'tests/web_preview_gate.py'
 
 permissions:
@@ -57,72 +52,23 @@ jobs:
           cache: npm
           cache-dependency-path: www/package-lock.json
 
-      - name: Install the build toolchain (lockfile, no scripts)
+      - name: Install the build toolchain (lockfile, no lifecycle scripts)
         working-directory: www
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-fund --loglevel=error
 
-      - name: Install the Python lane (pins read from requirements-dev.txt, never copied here — CQ-01, #2609)
-        run: |
-          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml pillow pytest-xdist)
-          pip install $PINS
+      - name: Build gate — reproducible · held-object mutation · dangling-edge mutation · output scan
+        run: python3 scripts/check_www_build.py
 
-      - name: Snapshot contract tests
-        run: python3 -m pytest tests/test_web_publication_snapshot_5530.py -q -p no:randomly
-
-      - name: Export the fixture snapshot
-        run: python3 scripts/publish_snapshot.py --mode fixture --out www/content/snapshot
-
-      - name: Build the preview twice and compare tree hashes (exit criterion 1)
-        working-directory: www
-        run: |
-          npm run build:preview
-          (cd dist && find . -type f | sort | xargs sha256sum | sha256sum) > /tmp/build1.sha
-          npm run build:preview
-          (cd dist && find . -type f | sort | xargs sha256sum | sha256sum) > /tmp/build2.sha
-          diff /tmp/build1.sha /tmp/build2.sha && echo "reproducible: $(cat /tmp/build1.sha)"
-
-      - name: Unit tests for the index and formatters
+      - name: Unit tests for the relationship index and formatters
         working-directory: www
         run: npm test
 
-      - name: Mutation — a held object in the snapshot MUST fail the build (exit criterion 3)
-        working-directory: www
-        run: |
-          cp content/snapshot/chapters.json /tmp/chapters.json
-          python3 - <<'PY'
-          import json
-          p = "content/snapshot/chapters.json"; d = json.load(open(p)); d[0]["visibility"] = "held"; json.dump(d, open(p, "w"))
-          PY
-          if npm run build:preview > /tmp/poison.log 2>&1; then echo "::error::a held object built — the visibility gate is blind"; exit 1; fi
-          grep -q 'expected "public"' /tmp/poison.log && echo "held object refused by the schema"
-          cp /tmp/chapters.json content/snapshot/chapters.json
-
-      - name: Mutation — a dangling edge MUST fail the build (exit criterion 4)
-        working-directory: www
-        run: |
-          cp content/snapshot/predictions.json /tmp/predictions.json
-          python3 - <<'PY'
-          import json
-          p = "content/snapshot/predictions.json"; d = json.load(open(p)); d[0]["edges"].append({"type": "metric", "id": "does_not_exist"}); json.dump(d, open(p, "w"))
-          PY
-          if npm run build:preview > /tmp/dangle.log 2>&1; then echo "::error::a dangling edge built — the index is blind"; exit 1; fi
-          grep -q "dangling edge" /tmp/dangle.log && echo "dangling edge refused"
-          cp /tmp/predictions.json content/snapshot/predictions.json
-          npm run build:preview
-
-      - name: Output scan — no sentinel, no inline script, noindex on every page
-        working-directory: www
-        run: |
-          ! grep -rl "SENTINEL\|DO-NOT-PUBLISH" dist || { echo "::error::sentinel in dist"; exit 1; }
-          if grep -rhoiE "<script\b[^>]*>" dist | grep -vi "src=" ; then echo "::error::inline script"; exit 1; fi
-          for f in $(find dist -name index.html); do grep -q 'name="robots" content="noindex' "$f" || { echo "::error::$f lacks noindex"; exit 1; }; done
-          echo "scan clean: $(find dist -name index.html | wc -l) pages"
-
-      - uses: ./.github/actions/playwright-browser
+      - name: Playwright (chromium) for the render gate
+        uses: ./.github/actions/playwright-browser
         with:
           browser: chromium
 
-      - name: Render gate at 390 + 1280 with axe (exit criterion 5)
+      - name: Render gate at 390 + 1280 with axe (mutation control first)
         run: python3 tests/web_preview_gate.py --dist www/dist --base /next/v9/ --out /tmp/web-gate
 
       - name: Upload the build and the screenshots
