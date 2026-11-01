@@ -540,6 +540,29 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    # #5530 — the v9 (www/) build gate: one entrypoint, two mutations by construction, a reproducibility check and a scan.
+    "guard::scripts/check_www_build.py": {
+        "gate_name": "scripts/check_www_build.py",
+        "command": "python3 scripts/check_www_build.py   # after `npm ci` in www/; `--scan-only` is the deploy path's form",
+        "mutation": (
+            "Two plants the script makes itself on every run in the real www/content/snapshot — chapters[0].visibility → `held` "
+            "(+ a POISON title) and predictions[0].edges += {metric, does_not_exist_anywhere} — each of which MUST fail `astro build` "
+            "or the script exits 2 (BLIND). A third, hand plant on 2026-11-01: a sentinel paragraph and an inline <script> appended "
+            "to www/dist/index.html, then `--scan-only`."
+        ),
+        "observed": (
+            "2026-11-01, this lane, exit 0 in 5.6 s: `reproducible: 1e4a1118713ed28a… == 1e4a1118713ed28a…`; `held object refused by "
+            "the build (exit 1, the schema named visibility)`; `dangling edge refused by the build (exit 1, named)`; `scan ✓ 38 pages: "
+            "no sentinel, no inline script, noindex everywhere`. Hand plant: `--scan-only` exit 1 naming index.html ×3 (two sentinels, "
+            "one inline script); REVERTED exit 0."
+        ),
+        "scope": (
+            "The fixture snapshot and the preview-base build: byte-reproducibility, the schema's visibility literal, the edge index's "
+            "dangling check, and the output scan (sentinels, inline <script>, noindex). NOT SEEN: the exporter's own exclusion of "
+            "held/private objects (tests/test_web_publication_snapshot_5530.py), page rendering (tests/web_preview_gate.py), live data."
+        ),
+        "proved_on": "2026-11-01",
+    },
     # #5530 — the v9 (www/) render gate: every built page at a phone and a laptop, with axe.
     "guard::tests/web_preview_gate.py": {
         "gate_name": "tests/web_preview_gate.py",
