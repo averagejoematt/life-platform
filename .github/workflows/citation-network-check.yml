@@ -36,6 +36,7 @@ on:
 
 permissions:
   contents: read
+  issues: write # the auto-filed tracker below (#1447 action) — a red here is reported, not just logged
 
 concurrency:
   group: citation-network-check
@@ -76,3 +77,27 @@ jobs:
             *) echo "::error::scripts/verify_citations.py exited ${rc} unexpectedly — read the output above." ;;
           esac
           exit "${rc}"
+
+      # Owner direction 2026-11-01: the two live-network pytest checks left the mandatory pre-merge lane
+      # (they red-ed three suites at once when NCBI throttled, #5556); they run HERE, with the flag the
+      # tests require, so a real retraction or title drift is still caught on the schedule.
+      - name: The network pytest halves (CITATION_NETWORK=1)
+        if: always()
+        env:
+          CITATION_NETWORK: "1"
+        run: |
+          python3 -m pip install -q pytest
+          python3 -m pytest tests/test_citation_resolution_1892.py tests/test_experiment_library_citations_1983.py -q -p no:randomly
+
+      - name: File or resolve this check's tracker
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: citation-network-check
+          workflow-name: Citation network re-resolution
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            A citation no longer resolves to its stored title, was retracted, or NCBI/Crossref could not be
+            observed (an UNVERIFIED line, not drift — re-run before acting). Detail is in the step summary;
+            the enumeration is scripts/verify_citations.py.

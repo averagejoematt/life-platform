@@ -22,7 +22,10 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "ci-cd.yml": (1732, 744),  # #5316: the rollback loop moved to deploy/rollback_fleet.sh
     "ci-lint.yml": (436, 148),  # #5473: the pip-audit allowlist parse moved to scripts/check_pip_audit.py
     "ci-test.yml": (439, 124),
-    "citation-network-check.yml": (78, 21),
+    "citation-network-check.yml": (
+        103,
+        23,
+    ),  # 2026-11-01: the two live pytest halves + the auto-filed tracker moved here from the pre-merge lane (owner direction)
     "codeql.yml": (137, 0),
     "config-drift.yml": (280, 154),
     "cron-freshness.yml": (149, 3),

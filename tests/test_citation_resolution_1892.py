@@ -150,7 +150,15 @@ def test_the_supplement_registry_twin_stays_in_sync():
 # ── the network half (opt-in; catches retraction + PMID drift) ──────────────
 
 
+# Owner direction 2026-11-01: a LIVE network check is not a pre-merge gate. These two tests run only when
+# the scheduled citation workflow sets CITATION_NETWORK=1; the offline fixture coverage above stays mandatory.
+_NETWORK = pytest.mark.skipif(
+    not os.environ.get("CITATION_NETWORK"), reason="live PubMed/Crossref check — scheduled lane only (CITATION_NETWORK=1)"
+)
+
+
 @pytest.mark.integration
+@_NETWORK
 def test_every_citation_still_resolves_to_its_stored_title():
     """Reuses scripts/verify_citations.py's own PubMed check — the SAME code path
     the scheduled workflow runs, so this test is a local rehearsal of it, not a
@@ -174,6 +182,7 @@ def test_an_all_empty_eutils_answer_is_unverified_not_drift(monkeypatch):
 
 
 @pytest.mark.integration
+@_NETWORK
 def test_every_doi_citation_still_resolves_to_its_stored_title():
     """The 3 DOIs #3621 box 4 names (deep-work-block, date-night-weekly,
     digital-free-dinner) sit outside evidence_for/evidence_against, so

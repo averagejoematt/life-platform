@@ -372,6 +372,26 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
                     "corrections": [],
                 },
                 {
+                    "item_id": "training:pred_20260906_sealed_zone2",
+                    "prediction_id": "pred_20260906_sealed_zone2",
+                    "coach_id": "training",
+                    "coach_name": "Sarah Chen",
+                    "retired": True,
+                    "metric": "resting_heart_rate",
+                    "claim": "Zone-2 by RPE for two weeks will lower resting heart rate.",
+                    "logged_date": "2026-09-06",
+                    "due_date": "2026-09-27",
+                    "settled_date": None,
+                    "kind": "sealed",
+                    "status": "pending",
+                    "confidence": 0.6,
+                    "sealed": True,
+                    "grading": {"how": None, "actual_text": None, "tolerance_text": None, "outcome_notes": None},
+                    "simple_guess": {"state": "not_yet_scored", "right": None, "text": None, "short": "not checked"},
+                    "quality_flags": [],
+                    "corrections": [],
+                },
+                {
                     "item_id": "mind:pred_20261029_upstream",
                     "prediction_id": "pred_20261029_upstream",
                     "coach_id": "mind",
@@ -500,7 +520,10 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
         "refuted",
         "direction",
     ), "id = coach · prediction_id (a prediction_id repeats across coaches)"
-    assert "mind-pred_20261029_upstream" not in kinds, "a coach the roster does not carry is dropped"
+    assert "mind-pred_20261029_upstream" not in kinds, "an unknown ACTIVE coach's row is dropped (a roster defect)"
+    assert kinds["training-pred_20260906_sealed_zone2"] == ("pending", "sealed"), "a RETIRED coach's row stays discoverable"
+    sarah = next(c for c in public["coach"] if c["id"] == "training_coach")
+    assert sarah["retired"] is True and sarah["name"] == "Sarah Chen" and sarah["tier"] == "staff"
     refuted = next(p for p in public["prediction"] if p["id"] == "sleep-pred_20261005_deep_sleep_will_rise")
     assert refuted["quality_flags"] == ["logging_gap"] and refuted["coach_name"] == "Lisa Park" and refuted["metric_key"] == "deep_pct"
     assert refuted["corrections"][0]["corrected_grade"] == "refuted" and refuted["corrections"][0]["original_grade"] == {
@@ -510,10 +533,12 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
     assert refuted["corrections"][0]["evaluator_version"] == "1.1" and refuted["corrections"][0]["corrected_at"] == "2026-10-31T06:00:00Z"
     assert refuted["summary"] == "also right" and refuted["edges"][1] == {"type": "metric", "id": "deep_pct", "rel": "about"}
     pending = [p for p in public["prediction"] if p["status"] == "pending"]
-    assert len(pending) == 1 and pending[0]["metric_id"] == "recovery_score" and pending[0]["grading"]["how"] is None
+    assert len(pending) == 2 and {p["metric_id"] for p in pending} == {"recovery_score", "resting_heart_rate"}
+    assert all(p["grading"]["how"] is None for p in pending)
     assert {m["id"] for m in public["metric"]} == {
         "deep_pct",
         "recovery_score",
+        "resting_heart_rate",
     }, "a metric a ledger row names becomes a (series-less) Metric"
     assert [x["id"] for x in public["experiment"]] == ["real_2026-10-01"], "the library catalogue is not an experiment"
     assert public["source"][0]["status"] == "live"
