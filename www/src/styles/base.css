@@ -86,6 +86,8 @@ h3 {
 }
 .chip {
   display: inline-flex;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   align-items: center;
   gap: 6px;
   font-family: var(--mono);
@@ -95,7 +97,7 @@ h3 {
   color: var(--muted);
   border: 1px dashed var(--muted);
   padding: 3px 7px;
-  white-space: nowrap;
+  white-space: normal;
 }
 .verified {
   display: inline-flex;
@@ -543,6 +545,8 @@ th.r {
   color: var(--verm-text);
 }
 .code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.6;
@@ -768,7 +772,13 @@ footer.site a {
 }
 .seg {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   border: 1px solid var(--ink);
+}
+.seg button {
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: -1px;
 }
 .seg button {
   min-height: var(--tap);
@@ -810,4 +820,10 @@ footer.site a {
 }
 .spark svg {
   display: block;
+}
+
+/* long machine ids in labels (a prediction id, a metric key) break rather than overflow */
+.label .mono,
+.label {
+  overflow-wrap: anywhere;
 }

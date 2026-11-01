@@ -32,6 +32,13 @@ const by = (s: string) => mine.filter((p) => p.status === s).length;
         <div class="facts">
           <div><span class="label">Record</span><span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span><span class="muted" style="font-size:12px">{c.record?.through ? `through ${dayInWords(c.record.through, { short: true })}` : c.retired ? "retired" : "no checked call yet"}</span></div>
           <div><span class="label">Beside a simple guess</span><span style="font-size:14px;line-height:1.5">{c.comparison_text || "Too few calls to compare yet."}</span></div>
+          {c.quality && (
+            <div>
+              <span class="label">Grade quality</span>
+              <span class="v num" style="font-size:22px">{c.quality.clean} <small>clean of {c.quality.n}</small></span>
+              <span class="muted" style="font-size:12px">{c.quality.flagged} flagged · {c.quality.unassessed} graded before the flags existed, never counted as clean</span>
+            </div>
+          )}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:22px">
@@ -55,7 +62,7 @@ const by = (s: string) => mine.filter((p) => p.status === s).length;
               </div>
             )
           }
-          {mine.length > 12 && <a href={href("/system/ledger/")} style="display:inline-block;margin-top:10px;font-size:13px;font-weight:700">{mine.length - 12} more in the ledger →</a>}
+          {mine.length > 12 && <a href={`${href("/system/ledger/")}?coach=${c.id}`} style="display:inline-block;margin-top:10px;font-size:13px;font-weight:700">{mine.length - 12} more in the ledger →</a>}
         </div>
         <Connected type="coach" id={c.id} cap={5} />
       </div>

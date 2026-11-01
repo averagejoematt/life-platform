@@ -48,6 +48,13 @@ _WORDED_TEXT_KEYS = frozenset(
         "claim_b",
         "verdict",
         "text",
+        "how",
+        "actual_text",
+        "tolerance_text",
+        "outcome_notes",
+        "short",
+        "aggregate_impact",
+        "absent_text",
         "excerpt",
         "absent_text",
         "label",
@@ -201,6 +208,10 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "quality_flags": ("list[str]", False),
         "sealed": ("bool", False),
         "confidence": ("num", True),
+        "coach_name": ("str", False),
+        "retired": ("bool", False),
+        "metric_key": ("str", True),
+        "corrections": ("list[obj]", False),
     },
     "disagreement": {
         "topic": ("str", False),
@@ -222,6 +233,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "short_bio": ("str", True),
         "record": ("obj", True),
         "comparison_text": ("str", True),
+        "quality": ("obj", True),
         "instrument_absent": ("obj", True),
     },
     "source": {
@@ -377,7 +389,7 @@ def load_fixtures(fixtures_dir: str) -> dict[str, list[dict]]:
 _PROSE = re.compile(
     r'<article class="post-body">\s*<div class="prose">([\s\S]*?)</div>\s*(?:<div class="signature">[\s\S]*?</div>\s*)?</article>'
 )
-_SCRIPT = re.compile(r"<script\b[\s\S]*?</script\s*>|<script\b[^>]*/>", re.IGNORECASE)  # `</script >` too (CodeQL py/bad-tag-filter)
+_SCRIPT = re.compile(r"<script\b[\s\S]*?</script\b[^>]*>|<script\b[^>]*/>", re.IGNORECASE)  # an end tag with whitespace or attributes too
 _ON_ATTR = re.compile(r'\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', re.IGNORECASE)
 _ROOT_LINK = re.compile(r'(href|src)="(/[^"]*)"')
 
