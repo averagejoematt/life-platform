@@ -147,7 +147,15 @@ def test_the_twin_stays_in_sync():
 # ── the network half (opt-in; catches retraction + record drift) ────────────
 
 
+# Owner direction 2026-11-01: a LIVE network check is not a pre-merge gate. These two tests run only when
+# the scheduled citation workflow sets CITATION_NETWORK=1; the offline fixture coverage above stays mandatory.
+_NETWORK = pytest.mark.skipif(
+    not os.environ.get("CITATION_NETWORK"), reason="live PubMed/Crossref check — scheduled lane only (CITATION_NETWORK=1)"
+)
+
+
 @pytest.mark.integration
+@_NETWORK
 def test_every_citation_still_resolves_to_its_stored_title():
     import urllib.parse
     import urllib.request

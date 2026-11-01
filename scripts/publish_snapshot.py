@@ -481,6 +481,36 @@ def _correction_entry(e: dict) -> dict:
     return out
 
 
+def _retired_coach(ctx: LiveContext, pid: str, short: str, name: str) -> None:
+    """A retired coach is off the active roster (`/api/coaches` serves staff and the lead only) but its
+    historical predictions stay discoverable (owner direction, 2026-11-01): the ledger's own `retired`
+    rows give the byline, `/api/predictions` `by_coach` the career record. One Coach object, retired."""
+    bc = ((ctx.fetched.get("predictions") or {}).get("by_coach") or {}).get(short) or {}
+    rec = bc.get("record") or {}
+    decided = bc.get("decided")
+    ctx.objs["coach"].append(
+        envelope(
+            id=pid,
+            type="coach",
+            as_of=ctx.as_of,
+            source=["/api/ledger_export", "/api/predictions"],
+            title=name,
+            summary=f"{short} · retired",
+            name=name,
+            domain=short,
+            tier="staff",
+            retired=True,
+            retired_date=None,
+            short_bio="A retired seat: off the active roster, its calls kept under its own byline.",
+            record={"right": bc.get("confirmed"), "n": int(decided), "through": rec.get("through")} if isinstance(decided, int) else None,
+            comparison_text=None,
+            quality=_quality_counts(bc.get("quality")),
+            instrument_absent=None,
+        )
+    )
+    ctx.coach_ids.add(pid)
+
+
 def _live_ledger(ctx: LiveContext) -> None:
     """The whole prediction ledger from `/api/ledger_export` (Phase 3, #5537): one Prediction per
     row, id = coach · prediction_id (a prediction_id repeats across coaches). The grade, the
@@ -507,7 +537,9 @@ def _live_ledger(ctx: LiveContext) -> None:
                 continue
         pid = _persona(coach)
         if pid not in ctx.coach_ids:
-            continue
+            if not r.get("retired"):
+                continue  # an unknown ACTIVE coach is a roster defect, not a page
+            _retired_coach(ctx, pid, coach, str(r.get("coach_name") or pid))  # a retired seat keeps its history (owner, 2026-11-01)
         rid = f"{coach}-{pred}"
         status = LEDGER_STATUS.get(str(r.get("status") or ""), "inconclusive")
         kind = r.get("kind") if r.get("kind") in LEDGER_KIND else "unknown"

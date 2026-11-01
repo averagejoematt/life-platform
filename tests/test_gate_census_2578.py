@@ -1213,7 +1213,7 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # same scan step on the resolved target, plus the root leg's collision check: planted sentinel exit 1, planted site/system/ exit 1,
         # reverted 0 / 0) and guard::deploy/www_root_rollback.sh (GUARD_PROOFS: decline branch disabled → 1 failed; reverted 32 passed).
         # Net +2: one proof re-keyed, two added. Stacked, never max'd.
-        <= 313
+        <= 314  # 313 -> 314 (2026-11-01): ci::citation-network-check.yml::verify::2 arrives proven
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

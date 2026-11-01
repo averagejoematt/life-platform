@@ -2942,6 +2942,26 @@ REGISTRY_PROOFS["registry::ledgers/site_vocabulary_residue.py::BASELINE::pace fl
 # was written) — `gate_census.py` still `.update()`s it into the SAME dict.
 CI_PROOFS: dict[str, dict[str, Any]] = {
     # #5530 — the v9 (www/) build gate: one entrypoint, four properties, two of them mutations by construction.
+    "ci::citation-network-check.yml::verify::2": {
+        "gate_name": "verify / The network pytest halves (CITATION_NETWORK=1)",
+        "command": "CITATION_NETWORK=1 python3 -m pytest tests/test_citation_resolution_1892.py tests/test_experiment_library_citations_1983.py -q",
+        "mutation": (
+            "One stored title in config/supplement_registry.json (supplements/sleep[0]:l_threonate#0, PMID 20152124) replaced "
+            "by `A PLANTED TITLE THAT NO PAPER CARRIES.`; the live esummary answer then disagrees with the stored title."
+        ),
+        "observed": (
+            "2026-11-01 ~17:20Z, this lane, NCBI answering: planted → `1 failed` naming the row — `PMID 20152124 is now "
+            "'Enhancement of learning and memory by elevating brain magnesium.', stored 'A PLANTED TITLE THAT NO PAPER "
+            "CARRIES.'`; reverted → `1 passed`. Without CITATION_NETWORK the same tests are `skipped` (3) — the mandatory lane "
+            "never runs them (owner direction 2026-11-01); an all-empty / 429 / 5xx eutils answer skips as UNVERIFIED (#5556)."
+        ),
+        "scope": (
+            "The scheduled lane only (monthly, citation-network-check.yml), with the flag set. Proves the live title "
+            "comparison is load-bearing. NOT SEEN: a retraction status (no retracted PMID in the corpus to plant), the "
+            "Crossref DOI leg under drift, the auto-filed tracker step (the #1447 action, proven at its own home)."
+        ),
+        "proved_on": "2026-11-01",
+    },
     "ci::web-gate.yml::web-gate::4": {
         "gate_name": "web-gate / Build gate — reproducible · held-object mutation · dangling-edge mutation · output scan",
         "command": "python3 scripts/check_www_build.py",
