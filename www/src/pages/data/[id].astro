@@ -1,8 +1,14 @@
 ---
+// A dimension: its series drawn at build time (a reader without JavaScript sees the same
+// chart), the explorer island over it (range · 7-day mean · compare · lag), the platform's
+// pair statistics read from the snapshot — never computed here — and its methods and rail.
 import Base from "../../layouts/Base.astro";
 import Connected from "../../components/Connected.astro";
 import Provenance from "../../components/Provenance.astro";
-import { loadAll } from "../../lib/snapshot.js";
+import { headline, presentCount, svgChart } from "../../lib/chart.js";
+import { dayInWords, num } from "../../lib/format.js";
+import { findPair, pairSentence, partnersOf, strengthInWords } from "../../lib/pairs.js";
+import { loadAll, loadPairs, loadSeries } from "../../lib/snapshot.js";
 import { href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -11,26 +17,174 @@ export async function getStaticPaths() {
 }
 const { metric: m } = Astro.props;
 const all = await loadAll();
+const series = (await loadSeries())[m.id] || null;
+const pairs = await loadPairs();
 const methods = m.method_ids.map((id) => all.get("method", id)).filter(Boolean);
 const source = m.source_id ? all.get("source", m.source_id) : null;
+const labels = Object.fromEntries(all.byType.metric.map((x) => [x.id, x.label]));
+const withSeries = all.byType.metric.filter((x) => x.id !== m.id && x.series_url).sort((a, b) => (a.label < b.label ? -1 : 1));
+const labelDay = (iso: string) => dayInWords(iso, { short: true }) || "";
+const head = series ? headline(series.days) : null;
+const svg = series
+  ? svgChart({
+      series: [{ days: series.days, color: "#1B3FD6", name: m.label }],
+      markers: series.markers || [],
+      labelDay,
+      aria: `${m.label}, ${presentCount(series.days)} readings over ${series.days.length} days`,
+    })
+  : null;
+const partners = partnersOf(pairs, m.id).filter((id) => labels[id]);
+const tested = partners
+  .map((id) => ({ id, row: findPair(pairs, m.id, id, 0) }))
+  .filter((x) => x.row);
+const windowWords = series ? `${dayInWords(series.window.from)} to ${dayInWords(series.window.to)}` : null;
 ---
 
 <Base title={m.label} top="data" description={m.sentence || m.summary || m.label}>
-  <section class="section">
+  <section class="section" style="padding-bottom:24px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:14px">
+      <div class="row"><span class="label">Dimension · <span class="mono">{m.id}</span></span><Provenance object={m} /></div>
+      <h1>{m.label}</h1>
+      <p class="dek">{m.sentence || m.summary || (series ? `One reading a day from ${source ? source.label : "the platform"}, ${windowWords}.` : m.absent_text || "No sentence yet.")}</p>
+    </div>
+  </section>
+
+  {
+    series && head ? (
+      <section class="wrap" style="padding-bottom:40px">
+        <div class="facts" style="margin-bottom:22px">
+          <div>
+            <span class="label">Latest</span>
+            <span class="v num">
+              {num(head.last, m.decimals)} <small>{m.unit}</small>
+            </span>
+            <span class="muted" style="font-size:13px">
+              {dayInWords(head.lastDate, { weekday: true })}
+              {series.behavioral && head.lastDate === series.window.to ? " · logged so far that day" : ""}
+            </span>
+          </div>
+          <div>
+            <span class="label">First reading</span>
+            <span class="v num">
+              {num(head.first, m.decimals)} <small>{m.unit}</small>
+            </span>
+            <span class="muted" style="font-size:13px">
+              {dayInWords(head.firstDate, { weekday: true })}
+            </span>
+          </div>
+          <div>
+            <span class="label">Readings</span>
+            <span class="v num">
+              {head.n} <small>of {series.days.length} days</small>
+            </span>
+            <span class="muted" style="font-size:13px">
+              {series.n_gap ? `${series.n_gap} logging ${series.n_gap === 1 ? "gap" : "gaps"}` : "no logging gap"}
+            </span>
+          </div>
+        </div>
+
+        <div
+          class="explorer"
+          data-explorer
+          data-base={import.meta.env.BASE_URL}
+          data-metric={m.id}
+          data-decimals={m.decimals}
+          data-labels={JSON.stringify(labels)}
+        >
+          <div class="controls" data-needs-js hidden>
+            <span class="seg" role="group" aria-label="Range">
+              <button type="button" data-range="28" aria-pressed="false">4 weeks</button>
+              <button type="button" data-range="56" aria-pressed="false">8 weeks</button>
+              <button type="button" data-range="all" aria-pressed="true">All</button>
+            </span>
+            <span class="seg" role="group" aria-label="Smoothing">
+              <button type="button" data-smooth="raw" aria-pressed="true">Readings</button>
+              <button type="button" data-smooth="mean" aria-pressed="false">7-day mean</button>
+            </span>
+            {withSeries.length > 0 && (
+              <label class="sel-wrap">
+                <span class="label">Compare with</span>
+                <select class="sel" data-compare aria-label="Compare with another measure">
+                  <option value="">— nothing —</option>
+                  {withSeries.map((x) => (
+                    <option value={x.id}>{x.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <span class="seg" role="group" aria-label="Lag in days" data-compare-controls hidden>
+              {[-2, -1, 0, 1, 2].map((lag) => (
+                <button type="button" data-lag={lag} aria-pressed={lag === 0 ? "true" : "false"}>
+                  {lag > 0 ? `+${lag}` : lag}
+                </button>
+              ))}
+            </span>
+          </div>
+          <div class="chart" data-chart-a set:html={svg} />
+          <p class="muted" style="font-size:13px;margin-top:8px" data-caption>
+            {presentCount(series.days)} of {series.days.length} days with a reading
+            {series.markers && series.markers.length ? " · the dashed ochre rule is the baseline change" : ""}
+          </p>
+          <div class="chart" data-chart-b hidden />
+          <p class="serif" style="font-size:16px;line-height:1.55;margin-top:12px;max-width:760px" data-pair-stats>
+            {tested.length
+              ? `The platform paired this with ${tested.length} other ${tested.length === 1 ? "measure" : "measures"}; its numbers are below. Choose one above to see them aligned.`
+              : "The platform has not paired this measure with another yet."}
+          </p>
+          <p class="muted" style="font-size:13px;margin-top:10px">
+            How to read it: one reading a day; the line never bridges a day without one. A hollow vermillion mark is a logging gap, a small square is a day with no reading.
+            Every statistic on this page was computed by the platform and is shown as it was published; the controls only change what is drawn.
+          </p>
+        </div>
+      </section>
+    ) : (
+      <section class="wrap" style="padding-bottom:40px">
+        <div class="empty">
+          <b style="color:var(--ink)">No series yet.</b>
+          <span>{m.absent_text || "The platform serves no public daily series for this measure."}</span>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    tested.length > 0 && (
+      <section class="section hair">
+        <div class="wrap">
+          <p class="label" style="margin-bottom:8px">What the platform found when it paired this · same day</p>
+          <div class="rows">
+            {tested.map(({ id, row }) => (
+              <a href={href(pathOf("metric", id))} style="align-items:flex-start">
+                <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                  <b style="font-size:16px">{labels[id]}</b>
+                  <span class="serif muted" style="font-size:15px;line-height:1.5;white-space:normal">
+                    {pairSentence(row, labels)}
+                  </span>
+                </span>
+                <span class="mono muted" style="font-size:12px;white-space:nowrap">
+                  {strengthInWords(row.r)}
+                </span>
+              </a>
+            ))}
+          </div>
+          <p class="muted" style="font-size:13px;margin-top:12px;max-width:760px">
+            {pairs.family ? `${pairs.family.tested} of ${pairs.family.offered} pairings tested together; q is the false-discovery rate across that family.` : ""}
+            {pairs.min_n ? ` A pairing needs at least ${pairs.min_n} shared days to be tested.` : ""}
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section hair">
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="row"><span class="label">Metric · <span class="mono">{m.id}</span></span><Provenance object={m} /></div>
-        <h1>{m.label}</h1>
-        <p class="dek">{m.sentence || m.summary || "No sentence yet."}</p>
+      <div style="display:flex;flex-direction:column;gap:22px">
         <div class="rows">
           <span><span>Unit</span><span class="mono">{m.unit || "—"}</span></span>
           <span><span>Source</span>{source ? <a href={href(pathOf("source", source.id))} style="font-weight:700;text-decoration:none">{source.label}</a> : <span class="muted">—</span>}</span>
           <span><span>Instrument</span><span>{m.instrument || "—"}</span></span>
-          <span><span>Series</span><span class="muted">{m.series_url ? "available" : "Phase 2"}</span></span>
+          <span><span>Window</span><span class="muted">{windowWords || "—"}</span></span>
         </div>
-        <div class="empty"><b style="color:var(--ink)">No chart yet.</b><span>The series and the compare/lag panel arrive in Phase 2, with their statistics precomputed by the platform.</span></div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:22px">
         <div>
           <p class="label" style="margin-bottom:8px">How this is measured</p>
           {
@@ -60,8 +214,12 @@ const source = m.source_id ? all.get("source", m.source_id) : null;
             )
           }
         </div>
-        <Connected type="metric" id={m.id} heading="Connected to this dimension" />
       </div>
+      <Connected type="metric" id={m.id} heading="Connected to this dimension" />
     </div>
   </section>
 </Base>
+
+<script>
+  import "../../islands/explorer.js";
+</script>

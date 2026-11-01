@@ -1,0 +1,320 @@
+{
+ "as_of": "2026-10-17",
+ "lags": [
+  -2,
+  -1,
+  0,
+  1,
+  2
+ ],
+ "min_n": 10,
+ "window": {
+  "from": "2026-09-06",
+  "to": "2026-10-17"
+ },
+ "family": {
+  "offered": 10,
+  "tested": 10
+ },
+ "lag_meaning": "b is read lag days after a; a on day d is paired with b on day d+lag",
+ "method_ids": [
+  "pearson_r",
+  "spearman_rho",
+  "effective_sample_size",
+  "pearson_p_value",
+  "fisher_ci",
+  "bh_fdr"
+ ],
+ "pairs": [
+  {
+   "a": "weight_lbs",
+   "b": "recovery_score",
+   "lag": -2,
+   "n": 34,
+   "n_eff": 27.2,
+   "r": -0.231,
+   "rho": -0.168,
+   "ci95": [
+    -0.531,
+    0.069
+   ],
+   "p_eff": 0.7061,
+   "fdr_q": 0.5773,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "weight_lbs",
+   "b": "recovery_score",
+   "lag": -1,
+   "n": 35,
+   "n_eff": 28.0,
+   "r": -0.005,
+   "rho": 0.003,
+   "ci95": [
+    -0.305,
+    0.295
+   ],
+   "p_eff": 0.2754,
+   "fdr_q": 0.9315,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "weight_lbs",
+   "b": "recovery_score",
+   "lag": 0,
+   "n": 36,
+   "n_eff": 28.8,
+   "r": 0.05,
+   "rho": -0.021,
+   "ci95": [
+    -0.25,
+    0.35
+   ],
+   "p_eff": 0.5236,
+   "fdr_q": 0.5562,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "weight_lbs",
+   "b": "recovery_score",
+   "lag": 1,
+   "n": 35,
+   "n_eff": 28.0,
+   "r": 0.275,
+   "rho": 0.246,
+   "ci95": [
+    -0.025,
+    0.575
+   ],
+   "p_eff": 0.3084,
+   "fdr_q": 0.9283,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "weight_lbs",
+   "b": "recovery_score",
+   "lag": 2,
+   "n": 34,
+   "n_eff": 27.2,
+   "r": 0.409,
+   "rho": 0.419,
+   "ci95": [
+    0.109,
+    0.709
+   ],
+   "p_eff": 0.6785,
+   "fdr_q": 0.2486,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "total_protein_g",
+   "b": "recovery_score",
+   "lag": -2,
+   "n": 34,
+   "n_eff": 27.2,
+   "r": -0.331,
+   "rho": -0.282,
+   "ci95": [
+    -0.631,
+    -0.031
+   ],
+   "p_eff": 0.6082,
+   "fdr_q": 0.631,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "total_protein_g",
+   "b": "recovery_score",
+   "lag": -1,
+   "n": 35,
+   "n_eff": 28.0,
+   "r": 0.084,
+   "rho": 0.122,
+   "ci95": [
+    -0.216,
+    0.384
+   ],
+   "p_eff": 0.2595,
+   "fdr_q": 0.7112,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "total_protein_g",
+   "b": "recovery_score",
+   "lag": 0,
+   "n": 36,
+   "n_eff": 28.8,
+   "r": -0.154,
+   "rho": -0.089,
+   "ci95": [
+    -0.454,
+    0.146
+   ],
+   "p_eff": 0.6414,
+   "fdr_q": 0.9469,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "total_protein_g",
+   "b": "recovery_score",
+   "lag": 1,
+   "n": 35,
+   "n_eff": 28.0,
+   "r": 0.396,
+   "rho": 0.344,
+   "ci95": [
+    0.096,
+    0.696
+   ],
+   "p_eff": 0.6576,
+   "fdr_q": 0.1218,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  },
+  {
+   "a": "total_protein_g",
+   "b": "recovery_score",
+   "lag": 2,
+   "n": 34,
+   "n_eff": 27.2,
+   "r": -0.275,
+   "rho": -0.348,
+   "ci95": [
+    -0.575,
+    0.025
+   ],
+   "p_eff": 0.0392,
+   "fdr_q": 0.27,
+   "family_size": 10,
+   "window": {
+    "from": "2026-09-06",
+    "to": "2026-10-17"
+   },
+   "method_ids": [
+    "pearson_r",
+    "spearman_rho",
+    "effective_sample_size",
+    "pearson_p_value",
+    "fisher_ci",
+    "bh_fdr"
+   ],
+   "tested": true
+  }
+ ]
+}

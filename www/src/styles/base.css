@@ -749,3 +749,65 @@ footer.site a {
     gap: 20px;
   }
 }
+
+/* the data room: charts, the explorer's controls, tiles' sparklines */
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.chart svg text {
+  font-variant-numeric: tabular-nums;
+}
+.explorer .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--ink);
+}
+.seg button {
+  min-height: var(--tap);
+  padding: 0 14px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 0;
+  border-right: 1px solid var(--ink);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+.seg button:last-child {
+  border-right: 0;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.seg button:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: -2px;
+}
+.sel-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sel {
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-small);
+  max-width: 100%;
+}
+.spark svg {
+  display: block;
+}

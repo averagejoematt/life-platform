@@ -1,14 +1,43 @@
 ---
-// The data room — Phase 0 shell: one card per metric; the explorer island is Phase 2.
+// The data room: one tile per dimension — the latest reading, the change over the window
+// and eight weekly bars, each read from the snapshot's series. Then the insights and the
+// experiments. Nothing here is computed beyond a mean of the week's readings for a bar.
 import Base from "../../layouts/Base.astro";
 import Provenance from "../../components/Provenance.astro";
-import { loadAll } from "../../lib/snapshot.js";
+import { headline, weeklyBars } from "../../lib/chart.js";
+import { dayInWords, num } from "../../lib/format.js";
+import { loadAll, loadPairs, loadSeries } from "../../lib/snapshot.js";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
-const metrics = [...all.byType.metric].sort((a, b) => (a.label < b.label ? -1 : 1));
+const series = await loadSeries();
+const pairs = await loadPairs();
+const metrics = [...all.byType.metric].sort((a, b) => (a.series_url && !b.series_url ? -1 : !a.series_url && b.series_url ? 1 : a.label < b.label ? -1 : 1));
 const insights = [...all.byType.insight].sort((a, b) => (a.date < b.date ? 1 : -1));
 const experiments = all.byType.experiment;
+const withSeries = metrics.filter((m) => series[m.id]);
+const windows = withSeries.map((m) => series[m.id].window).filter(Boolean);
+const window = windows[0] || null;
+
+function bars(days: any[]) {
+  const b = weeklyBars(days, 8);
+  const vals = b.filter((v) => v != null) as number[];
+  if (!vals.length) return null;
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  const W = 8 * 12;
+  const H = 28;
+  let out = "";
+  b.forEach((v, i) => {
+    if (v == null) {
+      out += `<rect x="${i * 12 + 2}" y="${H - 3}" width="8" height="2" fill="#F4F4F0" stroke="#5C5C58" stroke-width="1"/>`;
+      return;
+    }
+    const h = hi === lo ? H * 0.6 : 4 + ((v - lo) / (hi - lo)) * (H - 6);
+    out += `<rect x="${i * 12 + 2}" y="${(H - h).toFixed(1)}" width="8" height="${h.toFixed(1)}" fill="${i === b.length - 1 ? "#1B3FD6" : "#C9C9C3"}"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="weekly means, latest week in cobalt">${out}</svg>`;
+}
 ---
 
 <Base title="The data room" top="data" description="One dimension at a time: one series, one source, one method.">
@@ -17,30 +46,47 @@ const experiments = all.byType.experiment;
       <div style="max-width:760px">
         <h1 style="font-size:48px">The data room</h1>
         <p class="dek" style="margin-top:10px;font-size:19px">
-          One dimension at a time. Pick one, read the sentence, stop there if you like — or open its method and follow it into a chapter, a coach's call
-          or an experiment. Charts and comparisons arrive in Phase 2.
+          One dimension at a time. Pick one, read the latest reading, stop there if you like — or open it, compare it with another at a lag of a day or
+          two, and read what the platform found when it paired them. {window ? `The window is ${dayInWords(window.from)} to ${dayInWords(window.to)}.` : ""}
         </p>
       </div>
+      <p class="muted" style="font-size:13px;max-width:300px">
+        {withSeries.length} {withSeries.length === 1 ? "series" : "series"} · {pairs.family ? `${pairs.family.tested} pairings tested by the platform` : "no pairings yet"}
+      </p>
     </div>
   </section>
   <section class="wrap" style="padding-bottom:40px">
-    <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))">
+    <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))">
       {
-        metrics.map((m) => (
-          <a class="tile" href={href(pathOf("metric", m.id))}>
-            <span class="label">
-              {m.label}
-              {m.instrument && ` · ${m.instrument}`}
-            </span>
-            <span class="v num" style="font-size:22px">
-              {m.unit || "—"}
-            </span>
-            <span class="muted" style="font-size:13px;line-height:1.4">
-              {m.sentence || m.summary || "No sentence yet."}
-            </span>
-            <Provenance object={m} />
-          </a>
-        ))
+        metrics.map((m) => {
+          const s = series[m.id];
+          const h = s ? headline(s.days) : null;
+          const spark = s ? bars(s.days) : null;
+          return (
+            <a class="tile" href={href(pathOf("metric", m.id))}>
+              <span class="label">
+                {m.label}
+                {m.instrument && ` · ${m.instrument}`}
+              </span>
+              {h && h.last != null ? (
+                <span class="v num" style="font-size:30px">
+                  {num(h.last, m.decimals)} <small>{m.unit}</small>
+                </span>
+              ) : (
+                <span class="v num muted" style="font-size:22px">
+                  —
+                </span>
+              )}
+              {spark && <span class="spark" set:html={spark} />}
+              <span class="muted" style="font-size:13px;line-height:1.4">
+                {h && h.last != null
+                  ? `${dayInWords(h.lastDate, { short: true })}${s.behavioral && h.lastDate === s.window.to ? ", so far" : ""} · ${h.n} of ${s.days.length} days · eight weekly means`
+                  : m.absent_text || "No series yet."}
+              </span>
+              <Provenance object={m} />
+            </a>
+          );
+        })
       }
     </div>
   </section>

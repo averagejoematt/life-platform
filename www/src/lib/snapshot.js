@@ -59,3 +59,36 @@ export function dayLine(edition) {
   if (!edition || edition.day_n == null) return null;
   return `Day ${edition.day_n}`;
 }
+
+// ── data files beside the collections (not collections: one JSON per metric series, one
+// pairs file). Read once per build from the snapshot directory the collections load from.
+// Resolved from the build's working directory (`astro build` runs in www/, as the content
+// loaders' paths do) — NOT from import.meta.url, which points into the bundled output.
+// A missing directory or file is a broken export, not an empty data room: the build fails.
+import { readFile, readdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
+
+const SNAPSHOT_DIR = resolve(process.cwd(), "content", "snapshot");
+let _series = null;
+let _pairs = null;
+
+/** Every metric series in the snapshot, keyed by metric id. */
+export async function loadSeries() {
+  if (_series) return _series;
+  const out = {};
+  const dir = join(SNAPSHOT_DIR, "series");
+  const names = await readdir(dir); // throws when the exporter did not write series/
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    out[name.slice(0, -5)] = JSON.parse(await readFile(join(dir, name), "utf8"));
+  }
+  _series = out;
+  return out;
+}
+
+/** The precomputed pair statistics (the platform's numbers; the island reads, never computes). */
+export async function loadPairs() {
+  if (_pairs) return _pairs;
+  _pairs = JSON.parse(await readFile(join(SNAPSHOT_DIR, "pairs.json"), "utf8")); // throws when absent
+  return _pairs;
+}

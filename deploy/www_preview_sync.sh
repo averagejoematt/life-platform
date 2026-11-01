@@ -32,7 +32,7 @@ aws s3 sync "$DIST/_astro" "s3://$BUCKET/$PREFIX/_astro" --cache-control "public
 aws s3 sync "$DIST/assets" "s3://$BUCKET/$PREFIX/assets" --cache-control "public, max-age=31536000, immutable" --only-show-errors
 aws s3 sync "$DIST" "s3://$BUCKET/$PREFIX" --exclude "_astro/*" --exclude "assets/*" --cache-control "public, max-age=300" --only-show-errors
 
-DIST_ID=$(aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue" --output text)
+DIST_ID=$(aws cloudformation describe-stacks --region us-east-1 --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='AmjDistributionId'].OutputValue" --output text)
 test -n "$DIST_ID" && test "$DIST_ID" != "None"
 INV=$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "$INVALIDATE" --query "Invalidation.Id" --output text)
 echo "www_preview_sync: invalidation $INV on $DIST_ID for $INVALIDATE"
