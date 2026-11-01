@@ -107,11 +107,21 @@ if [ "$MODE" = "restore" ]; then
   [ "$TARGET" = "root" ] || { echo "www_preview_sync: --restore-previous is a root-target operation" >&2; exit 3; }
   echo "www_preview_sync: ROLLBACK — restoring the previous v9 build from s3://$BUCKET/$PREVIOUS_PREFIX/ over s3://$BUCKET/site/ (no delete; v9-owned keys only, #5534)"
   if [ "$PRINT" = "1" ]; then
-    echo "  \$ aws s3 ls s3://$BUCKET/$PREVIOUS_PREFIX/index.html   # absent → first root deploy, nothing to restore, exit 0"
-  elif ! aws s3 ls "s3://$BUCKET/$PREVIOUS_PREFIX/index.html" >/dev/null 2>&1; then
-    echo "www_preview_sync: no previous v9 build at s3://$BUCKET/$PREVIOUS_PREFIX/ (the first root deploy) — NOTHING RESTORED."
-    echo "  The v9 build stays live at /. Un-launching is the owner's deliberate command (www/README.md § Rollback), never this script."
-    exit 0
+    echo "  \$ aws s3 ls s3://$BUCKET/$PREVIOUS_PREFIX/index.html   # absent (exit 1, no error text) → first root deploy, nothing to restore, exit 0; an ERROR (no credentials, AccessDenied) → exit 2"
+  else
+    # `aws s3 ls` on a missing key exits 1 with NO output; a credentials/permission failure exits non-zero WITH error text.
+    # The two must not be confused — a denied listing read as "no previous build" would silently skip the restore.
+    # (`&& … ||` so a non-zero listing does not trip `set -e` before the two answers are told apart)
+    LS_ERR=$(aws s3 ls "s3://$BUCKET/$PREVIOUS_PREFIX/index.html" 2>&1 >/dev/null) && LS_RC=0 || LS_RC=$?
+    if [ "$LS_RC" -ne 0 ] && [ -n "$LS_ERR" ]; then
+      echo "www_preview_sync: could not list s3://$BUCKET/$PREVIOUS_PREFIX/ (exit $LS_RC): $LS_ERR" >&2
+      echo "www_preview_sync: RESTORE NOT ATTEMPTED — fix the credentials/role and re-run: bash deploy/www_preview_sync.sh --target root --restore-previous" >&2
+      exit 2
+    elif [ "$LS_RC" -ne 0 ]; then
+      echo "www_preview_sync: no previous v9 build at s3://$BUCKET/$PREVIOUS_PREFIX/ (the first root deploy) — NOTHING RESTORED."
+      echo "  The v9 build stays live at /. Un-launching is the owner's deliberate command (www/README.md § Rollback), never this script."
+      exit 0
+    fi
   fi
   run aws s3 sync "s3://$BUCKET/$PREVIOUS_PREFIX/_astro" "s3://$BUCKET/site/_astro" --cache-control "public, max-age=31536000, immutable" --only-show-errors
   run aws s3 sync "s3://$BUCKET/$PREVIOUS_PREFIX/assets" "s3://$BUCKET/site/assets" --cache-control "public, max-age=31536000, immutable" --only-show-errors
@@ -119,6 +129,12 @@ if [ "$MODE" = "restore" ]; then
   invalidate "/*" 1
   echo "www_preview_sync: previous v9 build restored over / — verify https://averagejoematt.com/"
   exit 0
+fi
+
+# ── the policy gate comes before any look at the tree (#5534): a root sync is refused while the committed
+# switch is off, whether or not a build exists — a dispatch cannot launch ahead of the repo.
+if [ "$TARGET" = "root" ] && [ "$MODE" = "sync" ] && [ "$PRINT" != "1" ]; then
+  python3 "$HERE/www_owned_paths.py" --live-at-root || { echo "www_preview_sync: REFUSED — www/owned_paths.json has live_at_root=false; the switch is a one-line merge, not a dispatch (#5534)" >&2; exit 4; }
 fi
 
 # ── sync and record both need a built tree ────────────────────────────────────────────────────
@@ -135,13 +151,13 @@ fi
 
 if [ "$TARGET" = "root" ]; then
   # The two gates a root sync must pass, both fail-closed and both AWS-free (#5534):
-  #   1. the committed cut-over switch — a dispatch cannot launch before the repo says `/` is v9's;
+  #   1. the committed cut-over switch (checked above, before the tree) — a dispatch cannot launch
+  #      before the repo says `/` is v9's;
   #   2. the LIVE build's routes land on no kept site/ page outside the replaced set.
   if [ "$PRINT" = "1" ]; then
-    echo "  \$ python3 deploy/www_owned_paths.py --live-at-root    # exit 1 → refuse the root sync"
+    echo "  \$ python3 deploy/www_owned_paths.py --live-at-root    # exit 1 → refuse the root sync (runs before the tree is read)"
     echo "  \$ python3 deploy/www_owned_paths.py --check-dist $DIST   # exit 1 → refuse the root sync"
   else
-    python3 "$HERE/www_owned_paths.py" --live-at-root || { echo "www_preview_sync: REFUSED — www/owned_paths.json has live_at_root=false; the switch is a one-line merge, not a dispatch (#5534)" >&2; exit 4; }
     python3 "$HERE/www_owned_paths.py" --check-dist "$DIST" || exit 4
   fi
 fi

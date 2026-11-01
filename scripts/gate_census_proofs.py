@@ -540,6 +540,33 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    # #5534 — the v9 root deploy's auto-rollback decision + action (the #3352/#3395 scope check applied to the v9 paths).
+    "guard::deploy/www_root_rollback.sh": {
+        "gate_name": "deploy/www_root_rollback.sh",
+        "command": (
+            "SITE_REACHABLE=false QA_SURFACES=api QA_SUMMARY='api red' GITHUB_SHA=abc1234567 SNS_TOPIC_ARN= bash deploy/www_root_rollback.sh"
+            "   # + python3 -m pytest tests/test_v9_cutover_5534.py -q (baseline 32 passed)"
+        ),
+        "mutation": (
+            'M1 the decline branch disabled (`if [ "${SITE_REACHABLE:-}" = "false" ] || …` → `if false`), the one line that keeps an '
+            "`api`/`deploy-script`/`ai-unevaluated` red from restoring the previous build over a defect a v9 revert cannot reach; "
+            "restored from a byte copy."
+        ),
+        "observed": (
+            "2026-11-01, this lane. BASELINE: `⛔ v9 ROLLBACK DECLINED — … visual-qa[api]`, `::warning title=v9 root rollback DECLINED`, "
+            "declined=true, exit 0. M1: the same input went straight to `⚠️  … restoring the previous v9 build (never site/)` and into "
+            "deploy/www_preview_sync.sh --restore-previous; tests/test_v9_cutover_5534.py 1 failed "
+            "(test_root_rollback_script_declines_on_an_unreachable_surface_and_restores_otherwise). REVERTED 32 passed. The M1 run also "
+            "exposed a second defect, fixed the same day: with no credentials `aws s3 ls` failed and the restore read that as 'no "
+            "previous build' — the listing's error text and its empty-exit-1 absence are now two different answers (exit 2 vs exit 0)."
+        ),
+        "scope": (
+            "The decision (an explicit `false` from either sweep's verdict declines; absent verdicts roll back), the GITHUB_OUTPUT lines, "
+            "the SNS text, and the hand-off to `www_preview_sync.sh --restore-previous`. NOT SEEN: the S3→S3 restore itself and "
+            "CloudFront (no credentials in a lane; the sync's command lines are rehearsed with --print), the live sweeps that feed it."
+        ),
+        "proved_on": "2026-11-01",
+    },
     # #5530 — the v9 (www/) build gate: one entrypoint, two mutations by construction, a reproducibility check and a scan.
     "guard::scripts/check_www_build.py": {
         "gate_name": "scripts/check_www_build.py",
