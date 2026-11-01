@@ -231,3 +231,33 @@ def test_the_script_selects_exactly_the_touched_rows_and_nothing_after_a_revert(
     }
     assert revert.select(rows2) == [], "a second run selects nothing"
     assert t.items[(c["pk"], c["sk"])] == c, "an untouched row is untouched"
+
+
+def test_a_plan_scopes_the_unstamps_to_the_rows_the_run_stamped_and_leaves_the_evaluators_own_stamps():
+    """Owner condition 6 (2026-11-01): the scheduled evaluator stamps the same version + flags on rows it
+    grades itself; a revert scoped by the run's plan and pre-change snapshot never touches them."""
+    t = Table()
+    ours = _row(sk="PREDICTION#pred_ours", prediction_id="pred_ours")
+    theirs = _row(
+        sk="PREDICTION#pred_theirs", prediction_id="pred_theirs", quality_flags=[], evaluator_version="1.1"
+    )  # the evaluator's own write
+    noop = _row(
+        sk="PREDICTION#pred_noop", prediction_id="pred_noop", quality_flags=[], evaluator_version="1.1"
+    )  # in the plan, but already stamped
+    t.seed(ours, theirs, noop)
+    pre = {"rows": [dict(ours), dict(theirs), dict(noop)]}
+    assert gc.stamp_quality(t, ours, ["low_power"], evaluator_version="1.1")
+    assert gc.stamp_quality(t, noop, ["low_power"], evaluator_version="1.1") is False  # the designed no-op
+    plan = {
+        "entries": [{"pk": ours["pk"], "sk": ours["sk"], "action": "restate"}, {"pk": noop["pk"], "sk": noop["sk"], "action": "restate"}]
+    }
+    rows = {"COACH#sleep_coach": [dict(v) for (pk, _sk), v in t.items.items() if _sk.startswith("PREDICTION#")]}
+    unscoped = revert.select(rows)
+    assert sorted(e["sk"] for e in unscoped) == [
+        "PREDICTION#pred_noop",
+        "PREDICTION#pred_ours",
+        "PREDICTION#pred_theirs",
+    ], "without a plan every 1.1 stamp is offered"
+    scoped = revert.select(rows, plan=plan, pre=pre)
+    assert [e["sk"] for e in scoped] == ["PREDICTION#pred_ours"], "with the plan + snapshot only the run's own stamp is offered"
+    assert revert.stamped_by_the_run(None, None) is None
