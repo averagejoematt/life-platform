@@ -226,6 +226,20 @@
         "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/todoist*",
         "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/ingestion-keys*"
       ]
+    },
+    {
+      "Sid": "DenyLifeOsPrivatePrefixes",
+      "Effect": "Deny",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/claude-memory-backup/*",
+        "arn:aws:s3:::matthew-life-platform/session-artifacts/*"
+      ]
     }
   ]
 }
