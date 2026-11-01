@@ -38,7 +38,7 @@ per-week ``held`` state from the row is this route's.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any, Callable
 
 from common.pacific_time import pacific_today, parse_day_key
@@ -76,8 +76,10 @@ def _int(value: Any) -> int | None:
 
 def program_weeks(genesis: str, today: str) -> list[dict]:
     """``[{week, start, end}]`` — every 7-day bin from genesis whose first day is on or before today."""
-    g, t = date.fromisoformat(genesis), date.fromisoformat(today)
-    out = []
+    g, t = parse_day_key(genesis), parse_day_key(today)
+    out: list[dict] = []
+    if g is None or t is None:
+        return out
     k = 1
     while True:
         start = g + timedelta(days=WEEK_DAYS * (k - 1))
@@ -90,9 +92,10 @@ def program_weeks(genesis: str, today: str) -> list[dict]:
 
 def week_of_day(day: str | None, genesis: str) -> int | None:
     """The program week a calendar day falls in (1-based), None before genesis or unparseable."""
-    if not day or parse_day_key(str(day)[:10]) is None:
+    d, g = parse_day_key(str(day or "")[:10]), parse_day_key(genesis)
+    if d is None or g is None:
         return None
-    n = (date.fromisoformat(str(day)[:10]) - date.fromisoformat(genesis)).days
+    n = (d - g).days
     return n // WEEK_DAYS + 1 if n >= 0 else None
 
 

@@ -334,7 +334,7 @@ def _predictions_overall(rows):
 def test_total_equals_api_predictions_overall_total_on_the_same_rows():
     rows = _rows()
     overall = _predictions_overall(rows)
-    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, []), today=TODAY))
+    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], []), today=TODAY))
     assert body["total"] == overall["overall"]["total"] == 147
     per_coach = {cid: sum(1 for i in body["items"] if i["coach_id"] == cid) for cid in rows}
     assert per_coach == {cid: overall["by_coach"][cid]["total"] for cid in rows}
@@ -343,7 +343,7 @@ def test_total_equals_api_predictions_overall_total_on_the_same_rows():
 
 
 def test_every_item_is_pinned_to_the_shape_on_every_real_row():
-    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (_rows(), []), today=TODAY))
+    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (_rows(), [], []), today=TODAY))
     assert body["page"] == 1 and body["size"] == 200 and body["pages"] == 1 and body["as_of"] == TODAY
     items = body["items"]
     assert len(items) == body["total"] and len({i["item_id"] for i in items}) == len(items)
@@ -352,7 +352,7 @@ def test_every_item_is_pinned_to_the_shape_on_every_real_row():
     assert len({i["prediction_id"] for i in items}) == len(items) - 2
     assert all(i["item_id"] == f"{i['coach_id']}:{i['prediction_id']}" for i in items)
     for item in items:
-        assert set(item) - {"withheld"} == ITEM_KEYS, item["prediction_id"]
+        assert set(item) - {"withheld", "unsourced"} == ITEM_KEYS, item["prediction_id"]
         assert set(item["grading"]) == GRADING_KEYS and item["grading"]["how"]
         assert item["kind"] in KINDS and item["status"] in ledger.BUCKETS
         assert isinstance(item["sealed"], bool) and isinstance(item["retired"], bool)
@@ -384,7 +384,7 @@ def test_flags_and_corrections_ride_off_the_row_and_a_diary_claim_is_excluded():
     diary = copy.deepcopy(_visible_pending(rows["sleep"]))
     diary.update(prediction_id="diary_claim_x", coach_id="")
     rows["sleep"] = [flagged, diary] + rows["sleep"]
-    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, []), today=TODAY))
+    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], []), today=TODAY))
     assert body["total"] == 148
     got = next(i for i in body["items"] if i["prediction_id"] == "pred_20261030_flagged")
     assert got["quality_flags"] == ["logging_gap", "low_power"] and got["corrections"][0]["corrected_status"] == "refuted"
@@ -398,15 +398,40 @@ def test_a_claim_the_dossier_filter_withholds_keeps_its_place_without_its_words(
         prediction_id="pred_20261030_withheld", claim_natural="He will sleep better after fizzlewick tonight."
     )  # the suite's neutral vocabulary
     rows["sleep"].insert(0, row)
-    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, []), today=TODAY))
+    body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], []), today=TODAY))
     got = next(i for i in body["items"] if i["prediction_id"] == "pred_20261030_withheld")
     assert got["claim"] == "" and got["withheld"] is True and got["status"]
     assert "fizzlewick" not in json.dumps(body)
 
 
+def test_a_claim_resting_on_a_dark_instrument_is_held_not_quoted():
+    """#4701: the same hold /api/predictions applies — the row keeps its place and grade, its words do not travel."""
+    from web import claim_sourcing
+
+    rows = _rows()
+    row = copy.deepcopy(_visible_pending(rows["sleep"]))
+    row.update(
+        prediction_id="pred_20260920_cgm_call",
+        created_date="2026-09-20",
+        claim_natural="The CGM will show a flatter overnight glucose trace.",
+    )
+    rows["sleep"].insert(0, row)
+    dark = claim_sourcing.gap_instruments(
+        {"glucose_coach": {"source": "apple_health", "datatype": "cgm", "label": "CGM", "last_seen": "2026-09-15", "reason": "sensor_dark"}}
+    )
+    held = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], dark), today=TODAY))
+    got = next(i for i in held["items"] if i["prediction_id"] == "pred_20260920_cgm_call")
+    assert got["claim"] == "" and got["unsourced"]["instrument"] == {"source": "apple_health", "datatype": "cgm"}
+    assert got["unsourced"]["said_on"] == "2026-09-20" and got["unsourced"]["text"].startswith("Not quoted:")
+    assert got["status"] == "pending" and got["logged_date"] == "2026-09-20"  # the row stays, dated and counted
+    quoted = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], []), today=TODAY))
+    assert next(i for i in quoted["items"] if i["prediction_id"] == "pred_20260920_cgm_call")["claim"].startswith("The CGM")
+    assert "CGM will show" not in json.dumps(held["items"])
+
+
 def test_paging_is_stable_and_bad_paging_is_400():
     rows = _rows()
-    fetch = lambda: (rows, [])  # noqa: E731
+    fetch = lambda: (rows, [], [])  # noqa: E731
     whole = _body(ledger.handle_ledger_export(_event(size=200), fetch=fetch, today=TODAY))["items"]
     p1 = _body(ledger.handle_ledger_export(_event(page=1, size=50), fetch=fetch, today=TODAY))
     p2 = _body(ledger.handle_ledger_export(_event(page=2, size=50), fetch=fetch, today=TODAY))
@@ -423,10 +448,10 @@ def test_paging_is_stable_and_bad_paging_is_400():
 
 def test_every_partition_failing_is_503_and_a_partial_failure_is_declared():
     rows = _rows()
-    all_failed = ledger.handle_ledger_export(_event(), fetch=lambda: ({}, sorted(rows)), today=TODAY)
+    all_failed = ledger.handle_ledger_export(_event(), fetch=lambda: ({}, sorted(rows), []), today=TODAY)
     assert all_failed["statusCode"] == 503
     partial = ledger.handle_ledger_export(
-        _event(size=200), fetch=lambda: ({k: v for k, v in rows.items() if k != "labs"}, ["labs"]), today=TODAY
+        _event(size=200), fetch=lambda: ({k: v for k, v in rows.items() if k != "labs"}, ["labs"], []), today=TODAY
     )
     body = _body(partial)
     assert partial["statusCode"] == 200 and "labs" in body["_meta"]["degraded"]["reason"]

@@ -43,17 +43,18 @@ so a short list is never mistaken for a short ledger (ADR-104).
 from __future__ import annotations
 
 import math
-import re
 from typing import Any, Callable
 
 from coach import coach_baseline, coach_dossier, coach_record, prediction_windows
 from common.pacific_time import pacific_date_of, pacific_today
 
-from web import prediction_reason, site_api_calls
+from web import claim_sourcing, prediction_reason, site_api_calls
 from web.site_api_coach_ledger import (
     _CALIB_COACH_NAMES,
     _PREDICTION_PROJECTION_FIELDS,
     _RETIRED_SHORT_IDS,
+    PRESENCE_JOB,
+    _instrument_presence_safe,
     _parallel_fetch,
     _query_partition,
 )
@@ -145,18 +146,6 @@ def _due(row: dict, ev: dict) -> str | None:
     return prediction_windows.due_date(row.get("created_date"), ev, row.get("subdomain", ""))
 
 
-_DOCKET_DAY = re.compile(r"-(\d{4}-\d{2}-\d{2})$")
-
-
-def _docket_day(row: dict) -> str | None:
-    """A dispute-docket row carries no ``created_date``; its id ends in the day the bet opened
-    (``docket-<a>__<b>-<slug>-YYYY-MM-DD``, ``coach.dispute_docket``). None for any other dateless row."""
-    if row.get("source") != "dispute_docket":
-        return None
-    m = _DOCKET_DAY.search(str(row.get("prediction_id") or row.get("sk") or ""))
-    return m.group(1) if m else None
-
-
 def _list(value: Any) -> list:
     return [v for v in value] if isinstance(value, (list, tuple)) else []
 
@@ -170,17 +159,19 @@ def _dossier_safe(text: str) -> bool:
         return False
 
 
-def export_item(short_id: str, row: dict) -> dict:
-    """One PREDICTION# row as a ledger item — pure."""
+def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
+    """One PREDICTION# row as a ledger item — pure. ``dark`` is the interval form of the instrument gaps (#4702)."""
     ev = _spec(row)
     status = bucket_status(row)
     sealed = bool(row.get("pre_registered"))
     claim = str(row.get("claim_natural") or "").strip()
     withheld = bool(claim) and not _dossier_safe(claim)
     kind = coach_baseline.record_of(row) or "observation"
-    logged = (
-        (pacific_date_of(row.get("pre_registered_at")) if sealed else None) or str(row.get("created_date") or "")[:10] or _docket_day(row)
-    )
+    said_on = claim_sourcing.claim_day(row)  # created_date, or a docket row's opened day from its id
+    logged = (pacific_date_of(row.get("pre_registered_at")) if sealed else None) or said_on
+    # #4701: a claim resting on an instrument that had sent no reading by the day it was said is not quoted —
+    # the same hold /api/predictions and /api/calls apply; the row keeps its place and its grade.
+    held = claim_sourcing.unsourced([claim], said_on, dark or []) if claim and not withheld else None
     pid = coach_record.prediction_key(row) or None
     item = {
         # The stored id is unique within a coach's partition, not across them: a docket bet is stamped on both
@@ -192,7 +183,7 @@ def export_item(short_id: str, row: dict) -> dict:
         "coach_name": _CALIB_COACH_NAMES.get(short_id, short_id),
         "retired": short_id in _RETIRED_SHORT_IDS,
         "metric": ev.get("metric"),
-        "claim": "" if withheld else claim,
+        "claim": "" if (withheld or held) else claim,  # held words are removed, never edited (#4701)
         "logged_date": logged,
         "due_date": _due(row, ev),
         "settled_date": str(row.get("outcome_date") or "")[:10] or None,
@@ -207,10 +198,12 @@ def export_item(short_id: str, row: dict) -> dict:
     }
     if withheld:
         item["withheld"] = True
+    if held:
+        item["unsourced"] = held  # the same note shape /api/predictions, /api/calls and the docket serve
     return item
 
 
-def export_items(rows_by_short: dict[str, list], genesis: str | None = EXPERIMENT_START) -> list[dict]:
+def export_items(rows_by_short: dict[str, list], genesis: str | None = EXPERIMENT_START, dark: list | None = None) -> list[dict]:
     """Every item the season's record counts, newest logged first — the `/api/predictions` row-set."""
     items = []
     for short_id, rows in rows_by_short.items():
@@ -219,7 +212,7 @@ def export_items(rows_by_short: dict[str, list], genesis: str | None = EXPERIMEN
                 continue  # a diary claim's shape, never a coach's call
             if not coach_record.counts_this_cycle(row, genesis):
                 continue
-            items.append(export_item(short_id, row))
+            items.append(export_item(short_id, row, dark))
     items.sort(key=lambda i: (str(i.get("logged_date") or ""), str(i.get("prediction_id") or "")), reverse=True)
     return items
 
@@ -235,16 +228,21 @@ def _page_args(qs: dict) -> tuple[int, int] | None:
     return page, size
 
 
-def fetch_rows(*, _table=None) -> tuple[dict[str, list], list]:
-    """Every coach's PREDICTION# partition, read concurrently; ``(rows_by_short, failed_short_ids)``."""
+def _partition_job(pk: str, g: dict) -> Callable[[], list]:
+    """One partition read as a thunk for the concurrent round — the whole PREDICTION# prefix, paginated."""
+    return lambda: _query_partition(pk, "PREDICTION#", PROJECTION, paginate=True, _g=g)
+
+
+def fetch_rows(*, _table=None) -> tuple[dict[str, list], list, list]:
+    """Every coach's PREDICTION# partition, read concurrently, with the instrument-presence read riding the
+    SAME round (#4701, the `/api/predictions` pattern); ``(rows_by_short, failed_short_ids, dark)``."""
     g = {"table": _table if _table is not None else table}
     failures: list = []
-    jobs = {
-        cid: (lambda pk=f"COACH#{cid}_coach": _query_partition(pk, "PREDICTION#", PROJECTION, paginate=True, _g=g))
-        for cid in _CALIB_COACH_NAMES
-    }
+    jobs: dict[str, Callable[[], Any]] = {cid: _partition_job(f"COACH#{cid}_coach", g) for cid in _CALIB_COACH_NAMES}
+    jobs[PRESENCE_JOB] = lambda: _instrument_presence_safe(_g=g)  # never raises, so it is never counted as a failed partition
     fetched = _parallel_fetch(jobs, failures=failures)
-    return fetched, sorted(failures)
+    dark = fetched.pop(PRESENCE_JOB, None) or []
+    return fetched, sorted(f for f in failures if f != PRESENCE_JOB), dark
 
 
 def handle_ledger_export(event, *, fetch: Callable = fetch_rows, today: str | None = None):
@@ -256,10 +254,10 @@ def handle_ledger_export(event, *, fetch: Callable = fetch_rows, today: str | No
     page, size = args
     today = today or pacific_today()
     try:
-        rows_by_short, failed = fetch()
+        rows_by_short, failed, dark = fetch()
         if failed and len(failed) >= len(_CALIB_COACH_NAMES):
             raise RuntimeError(f"all {len(failed)} coach partition reads failed: {failed}")
-        items = export_items(rows_by_short)
+        items = export_items(rows_by_short, dark=dark)
     except Exception as e:  # noqa: BLE001 — a failed read is a 503, never a shorter ledger
         logger.error(f"[ledger_export] {type(e).__name__}: {e}")
         return _error(503, UNAVAILABLE)

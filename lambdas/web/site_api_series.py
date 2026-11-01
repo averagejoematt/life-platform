@@ -36,11 +36,11 @@ has a 200 to probe. A ``from``/``to`` that is not a calendar day is a 400.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any, Callable
 
 from common import metric_truth
-from common.pacific_time import pacific_today, parse_day_key
+from common.pacific_time import pacific_today, parse_day_key, shift_day_key
 from experiment.measurable_metrics import METRIC_SOURCES
 from ingestion.source_registry import SOURCE_REGISTRY
 from privacy.field_tiers import is_publishable, tier_of
@@ -145,7 +145,10 @@ def logging_gap(row: dict) -> bool:
 
 
 def days_between(start: str, end: str) -> list[str]:
-    a, b = date.fromisoformat(start), date.fromisoformat(end)
+    """Every calendar day from ``start`` to ``end`` inclusive (both YYYY-MM-DD day keys, parsed by the one helper — #3609)."""
+    a, b = parse_day_key(start), parse_day_key(end)
+    if a is None or b is None:
+        return []
     return [(a + timedelta(days=i)).isoformat() for i in range((b - a).days + 1)]
 
 
@@ -194,8 +197,8 @@ def _window(qs: dict, today: str) -> tuple[str, str] | None:
     start, end = max(start, EARLIEST_DAY), min(end, today)
     if start > end:
         return None
-    if (date.fromisoformat(end) - date.fromisoformat(start)).days >= MAX_SPAN_DAYS:
-        start = (date.fromisoformat(end) - timedelta(days=MAX_SPAN_DAYS - 1)).isoformat()
+    if (parse_day_key(end) - parse_day_key(start)).days >= MAX_SPAN_DAYS:  # both parsed above
+        start = shift_day_key(end, -(MAX_SPAN_DAYS - 1))
     return start, end
 
 

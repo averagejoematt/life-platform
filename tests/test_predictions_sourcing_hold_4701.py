@@ -210,6 +210,7 @@ def test_the_presence_read_rides_the_one_concurrent_round(monkeypatch):
 CLAIM_NATURAL_READERS = {
     "site_api_coach_ledger.py": "hold",  # /api/predictions (#4701); the docket (#4673)
     "site_api_calls.py": "hold",  # /api/calls build_call (#4673)
+    "site_api_ledger_export.py": "hold",  # /api/ledger_export export_item (#5532) — the presence read rides its partition round
     "site_api_diary.py": (
         "exempt: diary_claims (`USER#…#diary_claims`) are Matthew's OWN on-tape forecasts, not a coach "
         "speaking from an instrument; the hold is about a coach claim resting on a dark sensor, and his "

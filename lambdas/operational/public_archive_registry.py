@@ -142,6 +142,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/calls",
     "/api/challenge_catalog",
     "/api/challenges",
+    "/api/chapters",  # #5532: program-week chapter states (published | held | skipped | pending)
     "/api/character",
     "/api/character_calibration",
     "/api/character_config",
@@ -195,6 +196,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/ladder_counts",
     "/api/last_sync",
     "/api/ledger",
+    "/api/ledger_export",  # #5532: the whole prediction ledger, paged (page 1 of the default size is the archived read)
     "/api/meal_glucose",
     "/api/membrane",
     "/api/methods",
@@ -203,6 +205,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/nutrition_overview",
     "/api/observatory_week",
     "/api/owner_words",  # owner ruling 2026-10-11 ("add it", #4584): served only past content.owner_words.screen (privacy content filter + broadcast_sensitivity_gate, fail-closed)
+    "/api/pairs",  # #5532: precomputed pair statistics for the data room (stats_core, ADR-105)
     "/api/panel_ledger",
     "/api/phenoage",
     "/api/physical_overview",
@@ -221,6 +224,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/receipts",
     "/api/routine",
     "/api/scenarios",
+    "/api/series",  # #5532: bare = the catalogue of offered metric keys; ?metric= is a per-metric slice of the same read
     "/api/session",
     "/api/sleep_correlations",
     "/api/sleep_detail",

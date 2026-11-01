@@ -1,6 +1,6 @@
 {
   "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture.",
-  "captured_at": "2026-11-01T02:55:44.620971+00:00",
+  "captured_at": "2026-11-01T03:32:29.507818+00:00",
   "fetch_path": "/api/ledger_export",
   "is_prefix_sample": false,
   "path": "/api/ledger_export",
