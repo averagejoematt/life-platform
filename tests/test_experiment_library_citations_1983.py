@@ -168,8 +168,15 @@ def test_every_citation_still_resolves_to_its_stored_title():
 
     ids = sorted({p for p, _t in pubmed.values()})
     api = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=" + ",".join(ids)
-    with urllib.request.urlopen(api, timeout=45) as fh:
-        result = json.load(fh)["result"]
+    try:
+        with urllib.request.urlopen(api, timeout=45) as fh:
+            result = json.load(fh)["result"]
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429 or exc.code >= 500:
+            pytest.skip(f"NCBI answered {exc.code} — could not be observed, not drift")
+        raise
+    if ids and not result.get("uids") and not any(result.get(p) for p in ids):
+        pytest.skip("NCBI returned no record for any PMID — throttled or down, not drift")
     for eid, (pmid, stored) in sorted(pubmed.items()):
         live = ((result.get(pmid) or {}).get("title") or "").strip()
         if not live:
