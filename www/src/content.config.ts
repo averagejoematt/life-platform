@@ -73,7 +73,7 @@ const chapters = defineCollection({
     week: z.number().int().nullable(),
     week_label: z.string().min(1),
     date: z.string().regex(ISO_DAY),
-    status: z.enum(["published", "held", "skipped"]),
+    status: z.enum(["published", "held", "skipped", "pending"]),
     excerpt: z.string().nullable(),
     body_html: z.string().nullable(),
     word_count: z.number().int().nullable(),
@@ -93,6 +93,7 @@ const episodes = defineCollection({
     transcript_url: z.string().nullable(),
     byline: z.string().nullable(),
     chapter_id: z.string().regex(ID).nullable(),
+    transcript: z.array(z.object({ speaker: z.string(), line: z.string() })).nullable(),
   }),
 });
 

@@ -1,7 +1,9 @@
 ---
-// Start — the entry point (Stage 3 `#start`). Phase 0: the shell with the blocks the
-// edition already serves. Copy marked "sample" is the prototype's, pending the owner's
-// Phase 1 yes; the age is gone (owner decision 7). No number here is typed by hand.
+// Start — the entry point (Stage 3 `#start`), Phase 1.
+// Every number comes from the edition snapshot (one producer). The hero copy is the
+// prototype's as approved, with the age removed (owner decision 7). His own words
+// (`his_words`) are NOT rendered: owner decision 10 requires an explicit publication
+// approval that the served block does not yet carry.
 import Base from "../layouts/Base.astro";
 import Provenance from "../components/Provenance.astro";
 import StatusTag from "../components/StatusTag.astro";
@@ -11,19 +13,28 @@ import { href, pathOf } from "../lib/url.js";
 
 const all = await loadAll();
 const edition = await latestEdition();
-const blocks = (edition && edition.blocks) || {};
-const today = blocks.today && blocks.today.state === "ok" ? (blocks.today.data as any) : null;
-const record = blocks.record && blocks.record.state === "ok" ? (blocks.record.data as any) : null;
-const next = blocks.next && blocks.next.state === "ok" ? (blocks.next.data as any) : null;
+const blocks: Record<string, any> = (edition && edition.blocks) || {};
+const ok = (k: string) => (blocks[k] && blocks[k].state === "ok" ? blocks[k].data : null);
+const today = ok("today");
+const record = ok("record");
+const next = ok("next");
+const week = ok("week");
+const lines: any[] = (ok("coach_lines")?.lines || []).slice(0, 2);
 
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
 const latestChapter = chapters.find((c) => c.status === "published") || null;
+const latestEpisode = latestChapter?.episode_id ? all.get("episode", latestChapter.episode_id) : null;
+const waiting = chapters.filter((c) => c.status === "held" || c.status === "pending").sort((a, b) => (a.week ?? 0) - (b.week ?? 0));
 const pending = all.byType.prediction
   .filter((p) => p.status === "pending")
   .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
   .slice(0, 3);
+const openDisagreements = all.byType.disagreement.filter((d) => d.status === "open");
 const staff = all.byType.coach.filter((c) => c.tier === "staff" && !c.retired).sort((a, b) => (b.record?.n || 0) - (a.record?.n || 0));
+const coachName = (id: string) => all.get("coach", id)?.name || all.get("coach", `${id}_coach`)?.name || id;
 const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Boolean).join(" · ") : null;
+const weekOrder: string[] = week?.order || [];
+const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 ---
 
 <Base title="Average Joe Matt" top="start" status={status}>
@@ -43,7 +54,6 @@ const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Bo
         <div class="row">
           {latestChapter && <a class="btn" href={href(pathOf("chapter", latestChapter.id))}>This week's chapter</a>}
           <a class="btn ghost" href={href("/story/")}>Every chapter</a>
-          <span class="chip">Sample copy · awaiting approval</span>
         </div>
         <p class="margin">
           The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
@@ -51,7 +61,7 @@ const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Bo
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div
-          style="position:relative;border:1px solid var(--ink);background:repeating-linear-gradient(135deg,#ECECE7 0 6px,#F4F4F0 6px 12px);display:flex;align-items:flex-end;padding:14px;min-height:240px;aspect-ratio:4/5"
+          class="photo-frame"
         >
           <span class="chip" style="position:absolute;top:10px;left:10px">Photo · pending approval</span>
           <span class="serif" style="font-size:15px;line-height:1.35;background:var(--paper);padding:8px 10px;border:1px solid var(--ink)">
@@ -66,8 +76,8 @@ const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Bo
   <section class="section hair">
     <div class="wrap">
       <div class="between" style="margin-bottom:14px">
-        <p class="label">Today · from the edition</p>
-        {blocks.today && <Provenance object={{ ...edition, state: blocks.today.state, as_of: blocks.today.as_of || edition.as_of, data_through: null, absent_text: blocks.today.absent_text }} />}
+        <p class="label">Today</p>
+        {blocks.today && <Provenance object={{ ...edition, state: blocks.today.state, as_of: blocks.today.as_of || edition.as_of, data_through: null, absent_text: blocks.today.absent_text, sample: false }} />}
       </div>
       {
         today ? (
@@ -84,7 +94,7 @@ const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Bo
             </a>
             <a class="tile" href={href("/system/")}>
               <span class="label">The coaches' record</span>
-              <span class="v num">{record ? kOfN(record.right, record.decided) : "—"}</span>
+              <span class="v num" style="font-size:30px">{record ? kOfN(record.right, record.decided) : "—"}</span>
               <span class="muted" style="font-size:13px">
                 {record?.comparison_text || record?.count_text || "No coach call has been checked yet."}
               </span>
@@ -100,22 +110,144 @@ const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Bo
     </div>
   </section>
 
+  {
+    latestChapter && (
+      <section class="section hair">
+        <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+          <div style="flex:0 0 150px">
+            <p class="label">Chapter</p>
+            <span class="big cobalt" style="font-size:110px;display:block">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
+            <span class="mono muted" style="font-size:12px">{dayInWords(latestChapter.date, { short: true })}</span>
+          </div>
+          <article style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px">
+            <div class="row">
+              <span class="label">The latest chapter</span>
+              <Provenance object={latestChapter} />
+            </div>
+            <h2 style="font-size:40px">{latestChapter.title}</h2>
+            {latestChapter.excerpt && (
+              <p class="dek" style="font-size:20px">
+                {latestChapter.excerpt}
+              </p>
+            )}
+            <div class="row">
+              <a class="btn" href={href(pathOf("chapter", latestChapter.id))}>
+                Read{latestChapter.read_minutes ? ` · ${latestChapter.read_minutes} min` : ""}
+              </a>
+              {latestEpisode && latestEpisode.audio_url && (
+                <a class="btn ghost" href={`${href(pathOf("chapter", latestChapter.id))}#listen`}>
+                  Listen
+                </a>
+              )}
+            </div>
+          </article>
+          <aside style="flex:1 1 240px;min-width:0">
+            <p class="label" style="margin-bottom:8px">
+              Since then
+            </p>
+            <div class="rows">
+              {waiting.length ? (
+                waiting.map((w) => (
+                  <a href={href(pathOf("chapter", w.id))}>
+                    <span>{w.week_label}</span>
+                    <StatusTag status={w.status} />
+                  </a>
+                ))
+              ) : (
+                <span>
+                  <span class="muted">Every week so far has its chapter.</span>
+                </span>
+              )}
+              {next?.chapter?.state === "ok" && next.chapter.data?.date && (
+                <span>
+                  <span>Next chapter</span>
+                  <span class="mono" style="font-size:12px">
+                    {dayInWords(next.chapter.data.date, { short: true, weekday: true })}
+                    {next.chapter.data.drafted_not_promised ? " · drafted, not promised" : ""}
+                  </span>
+                </span>
+              )}
+            </div>
+            <a href={href("/story/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">
+              All chapters →
+            </a>
+          </aside>
+        </div>
+      </section>
+    )
+  }
+
   <section class="section hair">
     <div class="wrap">
       <div class="between" style="margin-bottom:24px">
-        <h2>What's alive right now</h2>
+        <h2>This week, and what's alive</h2>
         <span class="label">Updates nightly</span>
       </div>
       <div class="grid cols3">
         <div>
-          <p class="label" style="margin-bottom:10px">Open predictions · {all.byType.prediction.filter((p) => p.status === "pending").length} pending</p>
+          <p class="label" style="margin-bottom:10px">The last seven days</p>
+          {
+            week ? (
+              <div class="rows">
+                {weekOrder.map((k) => {
+                  const m = week.measures?.[k];
+                  if (!m) return null;
+                  return (
+                    <span>
+                      <span>
+                        <b style="font-size:14px">{weekLabel[k] || k}</b>
+                        <br />
+                        <span class="muted" style="font-size:13px">
+                          {m.state === "ok" ? m.data?.text : m.absent_text}
+                        </span>
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <div class="empty">
+                <span>{blocks.week?.absent_text || "No seven-day read in the edition."}</span>
+              </div>
+            )
+          }
+          <a href={href("/data/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">The data room →</a>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:10px">What the coaches said</p>
+          {
+            lines.length ? (
+              <div class="rows">
+                {lines.map((l) => (
+                  <span style="flex-direction:column;align-items:flex-start;gap:4px">
+                    <span class="serif" style="font-size:15px;line-height:1.45">
+                      {l.text}
+                    </span>
+                    <span class="mono muted" style="font-size:12px">
+                      {l.coach || coachName(l.coach_id || "")}
+                      {l.domain ? ` · ${l.domain}` : ""}
+                      {l.move_label ? ` · ${l.move_label}` : ""}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div class="empty">
+                <span>{blocks.coach_lines?.absent_text || "No coach line today."}</span>
+              </div>
+            )
+          }
+          <p class="muted" style="margin-top:10px;font-size:13px">The coaches are software built with Claude, not people. Code grades what they predict, beside a simple guess.</p>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:10px">Open calls · {all.byType.prediction.filter((p) => p.status === "pending").length} pending</p>
           {
             pending.length ? (
               <div class="rows">
                 {pending.map((p) => (
                   <a href={href(pathOf("prediction", p.id))}>
                     <span style="font-size:14px;line-height:1.35">
-                      <b>{all.get("coach", p.coach_id)?.title || p.coach_id}</b> · {clip(p.claim, 88)}
+                      <b>{all.get("coach", p.coach_id)?.name || p.coach_id}</b> · {clip(p.claim, 88)}
                     </span>
                     <StatusTag status="pending" date={p.due_date} />
                   </a>
@@ -127,49 +259,15 @@ const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Bo
               </div>
             )
           }
+          {
+            openDisagreements.length > 0 && (
+              <p class="muted" style="margin-top:10px;font-size:13px">
+                {openDisagreements.length} open disagreement{openDisagreements.length === 1 ? "" : "s"} between two coaches —{" "}
+                <a href={href("/system/ledger/")}>the ledger</a>.
+              </p>
+            )
+          }
           <a href={href("/system/ledger/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">All calls →</a>
-        </div>
-        <div>
-          <p class="label" style="margin-bottom:10px">Upcoming</p>
-          <div class="rows">
-            {
-              next?.chapter?.state === "ok" && (
-                <a href={href("/story/")}>
-                  <span>
-                    <b style="font-size:14px">Next chapter</b>
-                    <br />
-                    <span class="muted" style="font-size:13px">
-                      {next.chapter.data?.drafted_not_promised ? "Drafted, not promised." : ""}
-                    </span>
-                  </span>
-                  <span class="mono" style="font-size:12px">{dayInWords(next.chapter.data?.date, { short: true, weekday: true })}</span>
-                </a>
-              )
-            }
-            {
-              next?.bet?.state !== "ok" && (
-                <span>
-                  <span class="muted" style="font-size:14px">{next?.bet?.absent_text || "No coach bet is waiting to settle."}</span>
-                </span>
-              )
-            }
-          </div>
-        </div>
-        <div>
-          <p class="label" style="margin-bottom:10px">The coaches, this week</p>
-          <div class="rows">
-            {
-              staff.slice(0, 3).map((c) => (
-                <a href={href(pathOf("coach", c.id))}>
-                  <span>
-                    <b style="font-size:14px">{c.name}</b> <span class="muted">· {c.domain}</span>
-                  </span>
-                  <span class="mono" style="font-size:12px">{c.record ? kOfN(c.record.right, c.record.n) : c.instrument_absent?.reason || "—"}</span>
-                </a>
-              ))
-            }
-          </div>
-          <p class="muted" style="margin-top:10px;font-size:13px">Code grades them beside a simple guess. They are software built with Claude, not people.</p>
         </div>
       </div>
     </div>

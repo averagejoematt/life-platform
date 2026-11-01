@@ -54,6 +54,69 @@ DEFAULT_FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
 DEFAULT_BASE_URL = "https://averagejoematt.com"
 ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+_ISO_IN_TEXT = re.compile(r"\b(20\d\d)-(\d\d)-(\d\d)\b")
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+# Free-text fields a page prints verbatim. Dates on a reader surface are written in words
+# (the kit's standing rule, held by tests/web_preview_gate.py), so an ISO date inside served
+# prose is rewritten here — presentation only; ids, urls, formulas and the dated fields the
+# templates format themselves are left exactly as served.
+_WORDED_TEXT_KEYS = frozenset(
+    {
+        "title",
+        "summary",
+        "claim",
+        "verdict_text",
+        "reason",
+        "short_bio",
+        "comparison_text",
+        "limitations",
+        "window",
+        "sentence",
+        "instrument",
+        "hypothesis",
+        "topic",
+        "claim_a",
+        "claim_b",
+        "verdict",
+        "text",
+        "excerpt",
+        "absent_text",
+        "label",
+        "name",
+        "outcome_notes",
+        "how",
+        "actual_text",
+        "tolerance_text",
+        "byline",
+    }
+)
+
+
+def day_in_words(iso: str) -> str:
+    """'2026-10-31' -> '31 October 2026'; anything else is returned unchanged."""
+    m = _ISO_IN_TEXT.fullmatch(iso or "")
+    if not m:
+        return iso
+    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if not 1 <= mo <= 12:
+        return iso
+    return f"{d} {_MONTHS[mo - 1]} {y}"
+
+
+def _words_in_text(value: str) -> str:
+    return _ISO_IN_TEXT.sub(lambda m: day_in_words(m.group(0)), value)
+
+
+def word_dates(obj: Any, key: str | None = None) -> Any:
+    """Rewrite ISO dates to words inside the free-text keys, recursively (grading, simple_guess, instrument_absent)."""
+    if isinstance(obj, dict):
+        return {k: word_dates(v, k) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [word_dates(v, key) for v in obj]
+    if isinstance(obj, str) and key in _WORDED_TEXT_KEYS:
+        return _words_in_text(obj)
+    return obj
+
 
 OBJECT_TYPES = (
     "chapter",
@@ -86,7 +149,7 @@ COLLECTION_OF = {
 VISIBILITIES = ("public", "held", "private")
 
 # ── the schema mirror ────────────────────────────────────────────────────────────────────
-# Each field: (kind, nullable). kinds: str (non-empty), text (may be empty), int, num, bool, day, id, list[str], list[id],
+# Each field: (kind, nullable). kinds: str (non-empty), text (may be empty), int, num, bool, day, id, list[str], list[id], list[obj],
 # edges, approval, enum:<a|b|c>, obj (unchecked structure), list[obj].
 ENVELOPE: dict[str, tuple[str, bool]] = {
     "id": ("id", False),
@@ -109,7 +172,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "week": ("int", True),
         "week_label": ("str", False),
         "date": ("day", False),
-        "status": ("enum:published|held|skipped", False),
+        "status": ("enum:published|held|skipped|pending", False),
         "excerpt": ("str", True),
         "body_html": ("str", True),
         "word_count": ("int", True),
@@ -125,6 +188,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "transcript_url": ("str", True),
         "byline": ("str", True),
         "chapter_id": ("id", True),
+        "transcript": ("list[obj]", True),
     },
     "essay": {"date": ("day", False), "body_html": ("str", True), "url_legacy": ("str", True)},
     "metric": {
@@ -280,6 +344,9 @@ def _check(kind: str, nullable: bool, value: Any, where: str) -> None:
     elif kind == "obj":
         if not isinstance(value, dict):
             raise SchemaError(f"{where}: expected object")
+    elif kind == "list[obj]":
+        if not isinstance(value, list) or not all(isinstance(x, dict) for x in value):
+            raise SchemaError(f"{where}: expected list of objects")
     else:  # pragma: no cover — a typo in SCHEMA
         raise SchemaError(f"{where}: unknown kind {kind}")
 
@@ -348,6 +415,34 @@ def _get(base_url: str, path: str, timeout: float) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _get_text(base_url: str, path: str, timeout: float) -> str:
+    url = base_url.rstrip("/") + path
+    req = urllib.request.Request(url, headers={"User-Agent": "life-platform publish_snapshot/" + EXPORTER_VERSION, "Accept": "text/html"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — constant public base URL
+        return resp.read().decode("utf-8", errors="replace")
+
+
+_PROSE = re.compile(
+    r'<article class="post-body">\s*<div class="prose">([\s\S]*?)</div>\s*(?:<div class="signature">[\s\S]*?</div>\s*)?</article>'
+)
+_SCRIPT = re.compile(r"<script\b[\s\S]*?</script\s*>|<script\b[^>]*/>", re.IGNORECASE)  # `</script >` too (CodeQL py/bad-tag-filter)
+_ON_ATTR = re.compile(r'\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', re.IGNORECASE)
+_ROOT_LINK = re.compile(r'(href|src)="(/[^"]*)"')
+
+
+def extract_prose(html: str, base_url: str) -> str | None:
+    """The published body as published: the `.prose` block of a permalink page, with any script,
+    inline handler or root-relative link made safe for a different host. None when the page has no
+    prose block (the permalink changed shape) — the chapter then says the text lives on the site."""
+    m = _PROSE.search(html or "")
+    if not m:
+        return None
+    body = _SCRIPT.sub("", m.group(1))
+    body = _ON_ATTR.sub("", body)
+    body = _ROOT_LINK.sub(lambda mm: f'{mm.group(1)}="{base_url.rstrip("/")}{mm.group(2)}"', body)
+    return body.strip() or None
+
+
 def _slug(s: str) -> str:
     s = re.sub(r"[^A-Za-z0-9._:-]+", "-", s).strip("-")
     return s or "x"
@@ -374,8 +469,9 @@ LIVE_ENDPOINTS = {
     "methods": "/api/methods",
     "experiments": "/api/experiments",
     "blog": "/journal/blog.json",
+    "chapters": "/api/chapters",  # the program-week states (PR #5538); optional until it is live
 }
-OPTIONAL_ENDPOINTS = ("blog", "docket", "experiments")
+OPTIONAL_ENDPOINTS = ("blog", "docket", "experiments", "chapters")
 
 
 class LiveContext:
@@ -383,9 +479,10 @@ class LiveContext:
     built as the collections are mapped (episodes by week, chapters by week, the coach ids,
     the metric keys the pending calls name)."""
 
-    def __init__(self, base_url: str, fetched: dict[str, Any]):
+    def __init__(self, base_url: str, fetched: dict[str, Any], timeout: float = 20.0):
         self.base_url = base_url.rstrip("/")
         self.fetched = fetched
+        self.timeout = timeout
         self.as_of: str = (fetched["edition"] or {}).get("as_of")
         self.objs: dict[str, list[dict]] = {t: [] for t in OBJECT_TYPES}
         self.ep_by_week: dict[int, str] = {}
@@ -403,6 +500,8 @@ def fetch_live(base_url: str, timeout: float) -> dict[str, Any]:
         try:
             fetched[key] = _get(base_url, path, timeout)
         except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
+            # HTTPError is a URLError: a 404 on an optional route (e.g. /api/chapters before PR #5538
+            # is live) leaves that collection empty; anything else is fatal.
             if key in OPTIONAL_ENDPOINTS:
                 log(f"  optional {path} unavailable ({exc}); collection left empty")
                 fetched[key] = None
@@ -422,6 +521,16 @@ def _live_episodes(ctx: LiveContext) -> None:
         audio = e.get("url")
         if audio and audio.startswith("/"):
             audio = ctx.base_url + audio
+        transcript = None
+        t_url = e.get("transcript_url")
+        if isinstance(t_url, str) and t_url.startswith("/"):
+            try:
+                turns = (_get(ctx.base_url, t_url, ctx.timeout) or {}).get("turns") or []
+                transcript = [
+                    {"speaker": str(t.get("speaker") or ""), "line": str(t.get("line") or "")} for t in turns if t.get("line")
+                ] or None
+            except (urllib.error.URLError, json.JSONDecodeError, TimeoutError, ValueError) as exc:
+                log(f"  transcript {t_url} unavailable ({exc})")
         ctx.objs["episode"].append(
             envelope(
                 id=eid,
@@ -435,11 +544,102 @@ def _live_episodes(ctx: LiveContext) -> None:
                 date=e["date"],
                 duration_sec=int(e["duration_sec"]) if e.get("duration_sec") is not None else None,
                 audio_url=audio,
-                transcript_url=e.get("transcript_url"),
+                transcript_url=(ctx.base_url + t_url) if isinstance(t_url, str) and t_url.startswith("/") else t_url,
                 byline=e.get("byline"),
                 chapter_id=None,
+                transcript=transcript,
             )
         )
+
+
+def _chapter_body(ctx: LiveContext, url: str | None) -> str | None:
+    """The published permalink's prose, as published. A fetch failure is logged and leaves the
+    body None (the page says the text lives on the site), never a fabricated body."""
+    if not url:
+        return None
+    try:
+        return extract_prose(_get_text(ctx.base_url, url, ctx.timeout), ctx.base_url)
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        log(f"  body {url} unavailable ({exc})")
+        return None
+
+
+def _live_week_states(ctx: LiveContext) -> None:
+    """Program weeks with no published chapter: `held` (a draft awaiting approval), `skipped`
+    (a later week published, this one never was) or `pending` (the current or most recent week,
+    not yet written). From `/api/chapters` when it is served; otherwise derived from the
+    published weeks and the edition's day count — never a title or a body for any of them."""
+    published = {c["week"] for c in ctx.objs["chapter"] if isinstance(c.get("week"), int)}
+    weeks_api = (ctx.fetched.get("chapters") or {}).get("weeks") or []
+    states: dict[int, dict] = {}
+    if weeks_api:
+        for w in weeks_api:
+            n, st = w.get("week"), w.get("status")
+            if isinstance(n, int) and st in ("held", "skipped", "pending") and n not in published:
+                states[n] = {"status": st, "start": w.get("start"), "reason": w.get("reason"), "drafted_at": w.get("drafted_at")}
+    else:
+        edition = ctx.fetched.get("edition") or {}
+        day_n = edition.get("day_n") if isinstance(edition.get("day_n"), int) else 0
+        last_week = max(day_n // 7, max(published, default=0))
+        held = ((((edition.get("blocks") or {}).get("chapter") or {}).get("data") or {}) or {}).get("held")
+        for n in range(1, last_week + 1):
+            if n in published:
+                continue
+            later_published = any(m > n for m in published)
+            st = "skipped" if later_published else "pending"
+            if isinstance(held, dict) and held.get("week") == n:
+                st = "held"
+            states[n] = {
+                "status": st,
+                "start": None,
+                "reason": None,
+                "drafted_at": held.get("drafted_at") if st == "held" and isinstance(held, dict) else None,
+            }
+    for n, st in sorted(states.items()):
+        status = st["status"]
+        text = {
+            "held": "Drafted and waiting for approval.",
+            "skipped": "No chapter was published for this week.",
+            "pending": "No chapter yet for this week.",
+        }[status]
+        if st.get("reason"):
+            text = str(st["reason"])
+        ctx.objs["chapter"].append(
+            envelope(
+                id=f"program-week-{n:02d}",
+                type="chapter",
+                as_of=ctx.as_of,
+                source=["/api/chapters"] if weeks_api else ["/journal/posts.json", "/api/edition"],
+                state="stale" if status == "held" else "absent",
+                absent_text=text,
+                title=f"Week {n}",
+                summary=None,
+                week=n,
+                week_label=f"Week {n}",
+                date=st.get("start") if ISO_DAY.match(str(st.get("start") or "")) else _program_week_start(ctx, n),
+                status=status,
+                excerpt=None,
+                body_html=None,
+                word_count=None,
+                read_minutes=None,
+                url_legacy=None,
+                episode_id=None,
+            )
+        )
+
+
+def _program_week_start(ctx: LiveContext, n: int) -> str:
+    """The Tuesday-anchored week date used for ordering a weekless row: genesis + 7·n days,
+    read from the edition's start_date; falls back to as_of."""
+    import datetime as _dt
+
+    edition = ctx.fetched.get("edition") or {}
+    today = (((edition.get("blocks") or {}).get("today") or {}).get("data") or {}) or {}
+    start = today.get("start_date") if ISO_DAY.match(str(today.get("start_date") or "")) else None
+    if not start:
+        return ctx.as_of
+    d = _dt.date.fromisoformat(start) + _dt.timedelta(days=7 * n)
+    return d.isoformat()
 
 
 def _live_chapters(ctx: LiveContext) -> None:
@@ -467,7 +667,7 @@ def _live_chapters(ctx: LiveContext) -> None:
                 date=p["date"],
                 status="published",
                 excerpt=p.get("excerpt"),
-                body_html=None,  # Phase 1 carries the published body across, as published
+                body_html=_chapter_body(ctx, p.get("url")),
                 word_count=wc,
                 read_minutes=max(1, round(wc / 230)) if wc else None,
                 url_legacy=p.get("url"),
@@ -626,6 +826,32 @@ def _live_metrics(ctx: LiveContext) -> None:
         )
 
 
+def _docket_verdict_text(d: dict) -> str | None:
+    """The docket's settled verdict as one sentence. On the wire `verdict` is a dict
+    ({winner, loser, holds, outcome, actual_value}) once code has settled the bet — the
+    platform's verdict, carried, never recomputed here; a string is passed through."""
+    v = d.get("verdict")
+    if isinstance(v, str):
+        return v.strip() or None
+    if isinstance(v, dict):
+        winner, loser, outcome = v.get("winner"), v.get("loser"), v.get("outcome")
+        actual = v.get("actual_value")
+        parts = []
+        if outcome:
+            parts.append(f"Settled by code ({outcome})")
+        if winner:
+            parts.append(f"the call that held was {winner}'s")
+        if loser:
+            parts.append(f"{loser}'s did not")
+        if isinstance(actual, (int, float)):
+            parts.append(f"the measured value was {actual:.1f}")
+        return "; ".join(parts) + "." if parts else None
+    for key in ("resolution_text", "resolution"):
+        if isinstance(d.get(key), str) and d[key].strip():
+            return d[key].strip()
+    return None
+
+
 def _live_disagreements(ctx: LiveContext) -> None:
     docket = ctx.fetched.get("docket") or {}
     for status_key, status in (("open", "open"), ("resolved", "resolved")):
@@ -646,11 +872,11 @@ def _live_disagreements(ctx: LiveContext) -> None:
                     topic=d.get("topic") or slug,
                     coach_a=a,
                     coach_b=b,
-                    claim_a=claims.get(a),
-                    claim_b=claims.get(b),
+                    claim_a=claims.get(a) if isinstance(claims.get(a), str) else None,
+                    claim_b=claims.get(b) if isinstance(claims.get(b), str) else None,
                     status=status if d.get("resolution") != "void_no_data" else "void",
                     resolved_date=d.get("resolved_date") if ISO_DAY.match(str(d.get("resolved_date") or "")) else None,
-                    verdict=d.get("verdict") or d.get("resolution_text") or d.get("resolution"),
+                    verdict=_docket_verdict_text(d),
                     metric_id=None,
                     edges=[{"type": "coach", "id": a, "rel": "side_a"}, {"type": "coach", "id": b, "rel": "side_b"}],
                 )
@@ -665,6 +891,7 @@ def _live_sources(ctx: LiveContext) -> None:
             else ("live" if s.get("status") == "fresh" else "unknown")
         )
         last = (s.get("last_update") or "")[:10]
+        latest_day = last if ISO_DAY.match(last) else None
         ctx.objs["source"].append(
             envelope(
                 id=s["id"],
@@ -678,7 +905,7 @@ def _live_sources(ctx: LiveContext) -> None:
                 label=s.get("label") or s["id"],
                 category=s.get("category"),
                 since=None,
-                latest=s.get("last_update"),
+                latest=latest_day,
                 status=status,
                 stale_hours=int(s["stale_hours"]) if isinstance(s.get("stale_hours"), int) else None,
                 instrument_for=None,
@@ -746,7 +973,7 @@ def _live_essays(ctx: LiveContext) -> None:
                 title=p.get("title") or slug,
                 summary=p.get("excerpt") or p.get("summary"),
                 date=p["date"],
-                body_html=None,
+                body_html=_chapter_body(ctx, p.get("url") or f"/journal/essays/{slug}/"),
                 url_legacy=p.get("url") or f"/journal/essays/{slug}/",
             )
         )
@@ -767,7 +994,7 @@ def _live_edition(ctx: LiveContext) -> None:
             as_of=ctx.as_of,
             data_through=ctx.as_of,
             source=["/api/edition"],
-            title=f"The edition of {ctx.as_of}",
+            title=f"The edition of {day_in_words(ctx.as_of)}",
             day_n=edition.get("day_n") if isinstance(edition.get("day_n"), int) else None,
             start_date=today.get("start_date") if ISO_DAY.match(str(today.get("start_date") or "")) else None,
             order=[str(k) for k in (edition.get("order") or [])],
@@ -783,9 +1010,10 @@ def _live_edition(ctx: LiveContext) -> None:
 
 def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
     """Map the public Site API onto the content model. Only public endpoints, only GETs."""
-    ctx = LiveContext(base_url, fetch_live(base_url, timeout))
+    ctx = LiveContext(base_url, fetch_live(base_url, timeout), timeout)
     _live_episodes(ctx)  # first, so chapters can point at them
     _live_chapters(ctx)
+    _live_week_states(ctx)
     _live_coaches(ctx)
     seen = _live_checked_calls(ctx)
     _live_pending_calls(ctx, seen)
@@ -843,6 +1071,7 @@ def partition(objs: dict[str, list[dict]]) -> tuple[dict[str, list[dict]], dict[
             if vis not in VISIBILITIES:
                 raise SchemaError(f"{type_} {o.get('id')}: visibility {vis!r} is not one of {VISIBILITIES}")
             if vis == "public":
+                o = word_dates(o)
                 validate(o, type_)
                 public[type_].append(o)
             else:

@@ -50,6 +50,7 @@ h3 {
   letter-spacing: -0.03em;
   line-height: 1.05;
   text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 h1 {
   font-size: var(--fs-h1);
@@ -377,6 +378,13 @@ h3 {
 }
 .rows > * > :last-child:not(:only-child) {
   flex: 0 0 auto;
+  max-width: 60%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rows > * > :last-child:not(:only-child).status,
+.rows > * > :last-child:not(:only-child).mono {
+  max-width: none;
 }
 .rows > *:last-child {
   border-bottom: 1px solid var(--ink);
@@ -447,6 +455,18 @@ h3 {
 }
 .inv td {
   border-color: var(--inkrule);
+}
+
+/* the photo frame (a frame until a photo is approved) */
+.photo-frame {
+  position: relative;
+  border: 1px solid var(--ink);
+  background: repeating-linear-gradient(135deg, #ecece7 0 6px, #f4f4f0 6px 12px);
+  display: flex;
+  align-items: flex-end;
+  padding: 14px;
+  min-height: 240px;
+  aspect-ratio: 4 / 5;
 }
 
 /* marginalia · tables · status · code */
@@ -581,6 +601,44 @@ th.r {
 .article > * + * {
   margin-top: 26px;
 }
+.article p,
+.article li,
+.article blockquote {
+  overflow-wrap: anywhere;
+}
+.article table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  font-family: var(--sans);
+}
+.article pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.article code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.article img,
+.article figure {
+  max-width: 100%;
+  height: auto;
+}
+.article h2,
+.article h3 {
+  overflow-wrap: anywhere;
+}
+.article blockquote {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--ink);
+  font-style: italic;
+}
 .article h2 {
   font-family: var(--sans);
   font-size: var(--fs-small);
@@ -660,7 +718,7 @@ footer.site a {
     padding-bottom: 64px;
   }
   .section {
-    padding: 36px 0;
+    padding: 32px 0;
   }
   .big {
     font-size: 72px !important;
@@ -681,5 +739,13 @@ footer.site a {
   }
   .facts .v {
     font-size: 24px;
+  }
+  .photo-frame {
+    aspect-ratio: 3 / 2;
+    min-height: 200px;
+  }
+  .door {
+    min-height: 180px;
+    gap: 20px;
   }
 }
