@@ -4,16 +4,15 @@
     "/data/",
     "/privacy/",
     "/story/",
+    "/story/program-week-09/",
     "/story/week-06/",
+    "/story/week-08/",
     "/subscribe/",
     "/system/",
-    "/system/coaches/glucose_coach/",
-    "/system/coaches/nutrition_coach/",
-    "/system/coaches/sleep_coach/",
     "/system/ledger/",
     "/system/ledger/nutrition-20261029-carbcut01/"
   ],
-  "depth1_count": 11,
+  "depth1_count": 10,
   "sinks": [
     "/system/everything-else/"
   ],
@@ -29,6 +28,7 @@
     "/data/weight_lbs/",
     "/privacy/",
     "/story/",
+    "/story/program-week-09/",
     "/story/week-06/",
     "/story/week-07/",
     "/story/week-08/",
@@ -55,5 +55,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 35
+  "transitive_count": 36
 }

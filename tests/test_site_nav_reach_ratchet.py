@@ -64,7 +64,7 @@ def test_static_reach_only_ratchets_down():
 def test_v9_reach_census_is_committed_and_under_its_ceiling():
     """The v9 measure is held in both switch states, so the flip merge cannot red on it: the committed
     census is the fixture build's, the appendix is a sink (not in either list), and the v9 ceiling is a
-    LOWERING of the v8 one (shrink-only, 18 → 11, ledgers/site_vocabulary_residue.py)."""
+    LOWERING of the v8 one (shrink-only, 18 → 11 → 10, ledgers/site_vocabulary_residue.py)."""
     reach = v9_reach()
     assert NAV_REACH_CEILING_V9 <= NAV_REACH_CEILING, "the v9 ceiling may only lower the ratchet"
     assert reach["depth1_count"] == len(reach["depth1"]) <= NAV_REACH_CEILING_V9, reach["depth1"]

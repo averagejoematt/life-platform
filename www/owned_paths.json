@@ -3,6 +3,10 @@
   "base": "/",
   "files": [
     "404.html",
+    "data/pairs.json",
+    "data/series/recovery_score.json",
+    "data/series/total_protein_g.json",
+    "data/series/weight_lbs.json",
     "sitemap-0.xml",
     "sitemap-index.xml",
     "sitemap.xml"
@@ -37,6 +41,7 @@
     "/privacy/",
     "/story/",
     "/story/essays/org-chart-of-one/",
+    "/story/program-week-09/",
     "/story/week-06/",
     "/story/week-07/",
     "/story/week-08/",

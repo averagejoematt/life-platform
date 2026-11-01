@@ -63,9 +63,10 @@ NAV_REACH_CEILING = 18
 # appendix a sink by the 2026-10-18 ruling. The transitive closure is recorded in the same file but NOT
 # ratcheted: on a content graph it equals the number of published objects (every chapter, prediction and
 # coach page is reachable by design — plan §E3), so a ceiling on it would be a ceiling on publishing.
-# Measured 11 on the fixture build (3 coaches, 1 chapter, 1 call); live data adds object links of the
-# same templates, which is why the fixture, not the live build, is the ratchet's subject. Applies the
-# moment www/owned_paths.json says `live_at_root` (tests/test_site_nav_reach_ratchet.py reads the switch);
-# until then the v8 front page above is what a reader meets and NAV_REACH_CEILING holds. Shrink-only,
-# like its parent: 18 → 11, never raised past what this tree measures.
-NAV_REACH_CEILING_V9 = 11
+# Measured 11 on the Phase 0 fixture build (3 coaches, 1 chapter, 1 call), 10 after the Phase 1–2 front page
+# (#5553: three chapters, one call, no coach tiles); live data adds object links of the same templates,
+# which is why the fixture, not the live build, is the ratchet's subject. Applies the moment
+# www/owned_paths.json says `live_at_root` (tests/test_site_nav_reach_ratchet.py reads the switch); until
+# then the v8 front page above is what a reader meets and NAV_REACH_CEILING holds. Shrink-only, like its
+# parent: 18 → 11 → 10, never raised past what this tree measures.
+NAV_REACH_CEILING_V9 = 10
