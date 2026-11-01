@@ -50,7 +50,7 @@ jobs:
       - uses: ./.github/actions/setup-ci
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: '^22.23.4'  # Astro 7.4 needs >=22.23.4; the runner's cached 22.x was 22.23.3 on 2026-11-01 (run 41283361073)
           cache: npm
           cache-dependency-path: www/package-lock.json
 
