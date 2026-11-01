@@ -319,6 +319,16 @@ ARTIFACTS: dict[str, dict] = {
             "publish time is the only correct moment."
         ),
     ),
+    "scripts/v4_build_sitemap.py": _builder(
+        "scripts/v4_build_sitemap.py",
+        step="deploy/sync_site_to_s3.sh",
+        reason=(
+            "#5534: generates site/sitemap-site.xml (the kept pages' sitemap, committed so the deploy ships it) and, while the v9 "
+            "cut-over switch in www/owned_paths.json is off, site/sitemap.xml too — one writer per file at any time. Like "
+            "v4_build_rss.py its input is LIVE data (the published posts feed) plus the page registry's live noindex check, so "
+            "regenerating at publish time is the only correct moment; the sync step runs it on every site deploy."
+        ),
+    ),
     "scripts/v4_build_cockpit_proof.py": _builder(
         "scripts/v4_build_cockpit_proof.py",
         step="deploy/sync_site_to_s3.sh",

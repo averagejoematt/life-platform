@@ -501,7 +501,7 @@ CLAIMS: dict[str, dict] = {
     },
     "subscriber_deletion_promise": {
         "subject": "the subscriber deletion/anonymization promise (on-the-spot anonymize, hard delete within 7 days)",
-        "stated": ("site/privacy/index.html",),
+        "stated": ("site/privacy/index.html", "site/reference/2026-11-01-privacy-v5/index.html"),  # #5534: the kept v5 copy
         "phrases": (
             r"anonymized on the spot",
             r"hard-deleted within \d+ days",

@@ -12,11 +12,17 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
   dangling       add one edge to a non-existent object → `astro build` MUST fail
   scan           the clean build carries no fixture sentinel, no inline <script>, and
                  (on the preview base) `noindex` on every page
+  owned-paths    (#5534) the build's committed route manifest www/owned_paths.json and the reach
+                 census www/reach.json equal what the clean build just emitted (drift = someone
+                 changed a route and did not commit the artifact the deploy excludes by), the
+                 static routes are a subset of the built routes, and no built route lands on a
+                 kept site/ page outside deploy/www_owned_paths.REPLACED_ROUTES
 
 Usage:
-  python3 scripts/check_www_build.py                 # all four, from the fixture snapshot
+  python3 scripts/check_www_build.py                 # all five, from the fixture snapshot
   python3 scripts/check_www_build.py --scan-only     # scan an existing www/dist (the deploy path)
   python3 scripts/check_www_build.py --no-noindex    # scan a production-base build (Phase 4)
+  python3 scripts/check_www_build.py --owned-paths   # only the owned-paths check (one clean build)
 
 Exit: 0 pass · 1 a check failed · 2 a mutation did NOT fail (blind gate) · 3 setup error.
 No AWS, no network: `npm ci` must already have run in www/.
@@ -37,6 +43,11 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WWW = os.path.join(REPO, "www")
 DIST = os.path.join(WWW, "dist")
 SNAPSHOT = os.path.join(WWW, "content", "snapshot")
+OWNED_PATHS = os.path.join(WWW, "owned_paths.json")
+REACH = os.path.join(WWW, "reach.json")
+sys.path.insert(0, REPO)
+from deploy import www_owned_paths  # noqa: E402 — the one reader of owned_paths.json (#5534)
+
 SENTINELS = ("SENTINEL", "DO-NOT-PUBLISH", "POISON-HELD")
 SCRIPT_TAG = re.compile(r"<script\b[^>]*>", re.IGNORECASE)
 NOINDEX = re.compile(r'<meta name="robots" content="noindex', re.IGNORECASE)
@@ -163,16 +174,77 @@ def scan(dist: str, require_noindex: bool) -> list[str]:
     return issues
 
 
+def _read_bytes(path: str) -> bytes | None:
+    try:
+        with open(path, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def check_owned_paths(committed: dict[str, bytes | None], dist: str = DIST) -> list[str]:
+    """#5534 — the committed owned_paths.json / reach.json equal the fresh emit, and the routes are sane.
+
+    `committed` holds the bytes of the two artifacts as they were BEFORE the build (the postbuild
+    step rewrites them on every build, so the comparison has to be against a snapshot taken first).
+    """
+    issues: list[str] = []
+    for path in (OWNED_PATHS, REACH):
+        before = committed.get(path)
+        after = _read_bytes(path)
+        rel = os.path.relpath(path, REPO)
+        if before is None:
+            issues.append(f"{rel}: not committed — run `npm run build` in www/ and commit the file")
+        elif after is None:
+            issues.append(f"{rel}: the build did not emit it (www/scripts/postbuild.mjs)")
+        elif before != after:
+            issues.append(f"{rel}: DRIFT — the build emits a different file; commit the regenerated one (the deploy excludes by it)")
+    try:
+        data = www_owned_paths.load(OWNED_PATHS)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return issues + [f"owned_paths.json unreadable: {exc}"]
+    if not isinstance(data.get("live_at_root"), bool):
+        issues.append("owned_paths.json: live_at_root must be a boolean (the cut-over switch)")
+    missing = sorted(set(data["static_routes"]) - set(data["routes"]))
+    if missing:
+        issues.append(f"owned_paths.json: static routes not in the built routes: {missing}")
+    if "/" not in data["routes"] or "404.html" not in data["files"]:
+        issues.append("owned_paths.json: the build must own `/` and 404.html")
+    routes, files = www_owned_paths.dist_routes(dist)
+    if set(data["routes"]) != routes or not set(files) <= set(data["files"]):
+        issues.append("owned_paths.json: routes/files disagree with the dist that was just built")
+    for bad in www_owned_paths.collisions(routes, files):
+        issues.append(f"collision — {bad}")
+    return issues
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="The v9 build gate: reproducible · held · dangling · scan.")
+    ap = argparse.ArgumentParser(description="The v9 build gate: reproducible · held · dangling · scan · owned-paths.")
     ap.add_argument("--scan-only", action="store_true", help="only scan the existing www/dist")
     ap.add_argument("--no-noindex", action="store_true", help="production base: do not require noindex")
+    ap.add_argument("--owned-paths", action="store_true", help="only the owned-paths drift check (one clean build)")
     ap.add_argument("--dist", default=DIST)
     args = ap.parse_args()
     preview = not args.no_noindex
     if not os.path.isdir(os.path.join(WWW, "node_modules")):
         print("www/node_modules missing — run `npm ci` in www/ first", file=sys.stderr)
         return 3
+    # Snapshot the committed artifacts BEFORE anything builds (postbuild rewrites them).
+    committed = {OWNED_PATHS: _read_bytes(OWNED_PATHS), REACH: _read_bytes(REACH)}
+
+    if args.owned_paths:
+        export_fixture_snapshot()
+        if build(preview).returncode != 0:
+            log("  ✗ build failed")
+            return 1
+        log("owned paths")
+        issues = check_owned_paths(committed, args.dist)
+        for i in issues:
+            log(f"  ✗ {i}")
+        if issues:
+            return 1
+        log("  ✓ owned_paths.json + reach.json match the build; no collision outside the replaced set")
+        return 0
 
     if not args.scan_only:
         log("reproducible build")
@@ -199,6 +271,14 @@ def main() -> int:
         return 1
     pages = sum(1 for _d, _s, f in os.walk(args.dist) for n in f if n.endswith(".html"))
     log(f"  ✓ {pages} pages: no sentinel, no inline script{', noindex everywhere' if preview else ''}")
+    if not args.scan_only:
+        log("owned paths")
+        issues = check_owned_paths(committed, args.dist)
+        for i in issues:
+            log(f"  ✗ {i}")
+        if issues:
+            return 1
+        log("  ✓ owned_paths.json + reach.json match the build; no collision outside the replaced set")
     log("✅ www build gate passed")
     return 0
 

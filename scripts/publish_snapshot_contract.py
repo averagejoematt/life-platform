@@ -422,8 +422,44 @@ GROUPS = [
 ]
 
 
+REFERENCE_GROUP = "Earlier front pages"
+_TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S)
+
+
+def reference_copies(site: str = os.path.join(REPO, "site")) -> list[dict]:
+    """The kept copies of replaced layouts under site/reference/<date>-<slug>/ (owner ruling 2026-10-18).
+
+    Derived from the tree, never hand-listed: each copy is a served, noindex page whose head comment
+    names the last live sha (scripts/v9_reference_copies.py writes them; the #4588 v5 copies are the
+    precedent). They are EXEMPT from the page registry, so the appendix reads them here (#5534). The
+    date in the name is rendered in words — the site never shows an ISO date (tests/web_preview_gate.py).
+    """
+    root = os.path.join(site, "reference")
+    if not os.path.isdir(root):
+        return []
+    items = []
+    for name in sorted(os.listdir(root)):
+        index = os.path.join(root, name, "index.html")
+        if not os.path.isfile(index):
+            continue
+        with open(index, encoding="utf-8") as fh:
+            head = fh.read(8000)
+        m = _TITLE_RE.search(head)
+        title = re.sub(r"\s+", " ", m.group(1)).strip() if m else name
+        items.append(
+            {
+                "path": f"/reference/{name}/",
+                "name": f"{title} — as served until {day_in_words(name[:10])}",
+                "group": REFERENCE_GROUP,
+                "unlisted": True,
+            }
+        )
+    return items
+
+
 def build_appendix() -> dict:
-    """Every registered page that keeps an earlier design, grouped — read from qa/qa_manifest.py."""
+    """Every registered page that keeps an earlier design, grouped — read from qa/qa_manifest.py,
+    plus the reference copies of replaced layouts (from the site/reference/ tree, #5534)."""
     sys.path.insert(0, REPO)
     try:
         from qa.qa_manifest import MANIFEST  # type: ignore
@@ -435,8 +471,11 @@ def build_appendix() -> dict:
         path = m.get("path")
         if not path or path in KIT_LIVE or path in UTILITY:
             continue
+        if m.get("owner") == "www":
+            continue  # #5534: a v9 page is the site, not something the site keeps from an earlier design
         group = next((g for prefix, g in GROUPS if path.startswith(prefix)), "Other pages")
         items.append({"path": path, "name": m.get("name") or path, "group": group, "unlisted": bool(m.get("unlisted"))})
+    items.extend(reference_copies())
     items.sort(key=lambda it: (it["group"], it["path"]))
     return {"items": items}
 

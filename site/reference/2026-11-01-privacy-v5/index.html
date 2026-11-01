@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en" data-door="story">
+<head>
+<!-- reference copy of /privacy/ at 775aa2fcc2caa1c9304cc206d690613b1bf0cd3a (the v5 layout, last live on main before the #5534 v9 cut-over), replaced 2026-11-01. Served, noindex, out of navigation, canonical to its v9 successor /privacy/, listed in the footnote appendix (owner ruling 2026-10-18). Not rebuilt by any generator: scripts/v4_apply_chrome.py prunes site/reference/. -->
+  <meta name="robots" content="noindex,nofollow">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Privacy Policy — averagejoematt</title>
+  <meta name="description" content="Privacy policy for averagejoematt.com — how subscriber data is handled, in plain terms — and the Permanence Contract: what happens to the record if Matthew stops.">
+  <link rel="canonical" href="https://averagejoematt.com/privacy/">
+  <meta property="og:title" content="Privacy Policy — averagejoematt">
+  <meta property="og:description" content="Privacy policy and AI disclaimer for averagejoematt.com.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/assets/marks/favicon-dark.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <link rel="stylesheet" href="/assets/css/fonts.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <script src="/assets/js/boot_theme.js"></script>
+  <style>
+    /* Policy as an honest ledger (#1473): serif human title, mono numbered section
+       heads (the machine files the paperwork), the TL;DR in Matthew's voice. Tokens
+       only — the pre-v4 token shim this page used to carry is gone. */
+    .policy-layout { max-width: var(--container-read); margin-inline: auto;
+      padding: var(--sp-7) var(--gutter) var(--sp-9); }
+    .policy-kicker { color: var(--ember); }
+    .policy-title { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1);
+      line-height: var(--lh-tight); color: var(--ink); margin-top: var(--sp-3); }
+    .policy-updated { margin-top: var(--sp-4); padding-bottom: var(--sp-5); border-bottom: 1px solid var(--rule);
+      font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ink-faint); }
+    .policy-tldr { margin-top: var(--sp-6); border: var(--border-hair); border-left: 2px solid var(--ember);
+      border-radius: var(--radius-sm); background: var(--surface); padding: var(--sp-5); }
+    .policy-tldr .pt-h { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ember); }
+    .policy-tldr p { margin-top: var(--sp-3); font-family: var(--font-serif); font-size: var(--fs-quote);
+      line-height: var(--lh-snug); color: var(--ink); }
+    .policy-section { margin-top: var(--sp-7); }
+    .policy-section h2 { display: flex; align-items: baseline; gap: var(--sp-3);
+      font-family: var(--font-mono); font-weight: var(--weight-reg); font-size: var(--fs-label);
+      letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink);
+      padding-bottom: var(--sp-2); border-bottom: 1px solid var(--rule); }
+    .policy-section h2 .ps-n { color: var(--ember); }
+    .policy-section p { margin-top: var(--sp-4); color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
+    .policy-section ul { margin: var(--sp-4) 0 0 var(--sp-5); display: grid; gap: var(--sp-2);
+      color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
+    .policy-section li::marker { color: var(--ember); }
+    .policy-section strong { color: var(--ink); font-weight: var(--weight-med); }
+    .policy-section a { color: var(--ember); text-decoration: underline; text-underline-offset: 0.15em; }
+    .policy-section a:hover { text-decoration-thickness: 2px; }
+    /* #2574 — the Permanence Contract, on the site. The clause list between the
+       generated markers is rendered from docs/PERMANENCE_CONTRACT.md by
+       scripts/v4_build_permanence_terms.py; the live panel above it reads the
+       published archive documents at load and states an absent number absent. */
+    .perm-live { margin-top: var(--sp-5); border: var(--border-hair); border-left: 2px solid var(--ember);
+      border-radius: var(--radius-sm); background: var(--surface); padding: var(--sp-5); }
+    .perm-live .pl-h { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ember); margin: 0; }
+    .pl-grid { margin: var(--sp-4) 0 0; display: grid; gap: var(--sp-4);
+      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+    .pl-grid dt { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ink-faint); }
+    .pl-grid dd { margin: var(--sp-2) 0 0; font-family: var(--font-mono); font-size: var(--fs-body);
+      color: var(--ink); overflow-wrap: anywhere; }
+    .pl-grid dd[data-absent="1"] { color: var(--ink-faint); }
+    /* The fifth cell is the longest string in the panel and auto-fit never fits
+       five columns in the reading measure — it orphaned into a quarter-width
+       column and wrapped to three lines. Give it the whole row deliberately. */
+    .pl-grid .pl-wide { grid-column: 1 / -1; }
+    .pl-sum { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--rule); }
+    .pl-sum code { display: block; margin-top: var(--sp-2); font-family: var(--font-mono);
+      font-size: var(--fs-small, var(--fs-label)); color: var(--ink-muted); overflow-wrap: anywhere; }
+    .pl-links { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; gap: var(--sp-3);
+      font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; }
+    .pl-note { margin-top: var(--sp-4); color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
+    .perm-clauses { list-style: none; margin: var(--sp-6) 0 0; padding: 0; display: grid; gap: var(--sp-5); }
+    .perm-clause { border-top: 1px solid var(--rule); padding-top: var(--sp-4); }
+    .perm-clause .pc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3); margin: 0; }
+    .perm-clause .pc-id { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      color: var(--ember); }
+    .perm-clause .pc-title { font-family: var(--font-serif); font-size: var(--fs-h3, var(--fs-quote));
+      line-height: var(--lh-snug); color: var(--ink); }
+    .perm-clause .pc-kind { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ink-faint); }
+    .perm-clause p + p { margin-top: var(--sp-3); }
+    .policy-back { margin-top: var(--sp-8); padding-top: var(--sp-6); border-top: 1px solid var(--rule); }
+    .policy-back a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ember); text-decoration: none; }
+    .policy-back a:hover { text-decoration: underline; text-underline-offset: 0.15em; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="story-top">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">privacy</span></a>
+    <nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today, in one screen — how his week is going, how he slept, what today holds"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>today</a><a href="/data/" title="His numbers — weight, sleep, training, eating and blood tests, as his devices record them"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the numbers</a><a href="/coaching/" title="What his AI coaches say about his data — and how often they have been right"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaches</a><a href="/protocols/" title="What he takes and what he tries — each with what it should move"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>what he tries</a><a href="/story/" title="The weekly write-up, his own words, and who he is"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><a href="/subscribe/" class="nav-follow" aria-label="Follow the experiment">follow</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav>
+  </header>
+
+  <main id="main" class="policy-layout">
+
+    <p class="policy-kicker label">the paperwork</p>
+    <h1 class="policy-title">Privacy Policy</h1>
+    <p class="policy-updated">last updated · august 2026</p>
+
+    <div class="policy-tldr">
+      <p class="pt-h">the short version</p>
+      <p>I collect your email address to send you The Measured Life. I don&#x27;t sell it, share it with advertisers, or send you anything other than what you signed up for. You can unsubscribe anytime. That&#x27;s it.</p>
+    </div>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">01</span> who this is</h2>
+      <p>This site — averagejoematt.com — is a personal project run by Matthew, a solo developer in Seattle. It is not a company. There are no advertisers and no investors; any affiliate arrangements are limited to the disclosed product links on the <a href="/gear/">gear page</a>.</p>
+      <p>Questions or requests: <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a></p>
+    </section>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">02</span> what I collect</h2>
+      <p>When you subscribe, I collect:</p>
+      <ul>
+        <li><strong>Email address</strong> — required to send The Measured Life.</li>
+        <li><strong>Why you&#x27;re here / how you found this</strong> — optional free-text fields on the subscribe form. Helps me understand the audience. Never shared.</li>
+        <li><strong>Subscribe source</strong> — which page or referral link you used.</li>
+        <li><strong>Confirmation timestamp</strong> — when you confirmed your double opt-in.</li>
+      </ul>
+      <p>I do not collect your name unless you volunteer it. I do not collect payment information — this newsletter is free. I do not use tracking pixels or third-party analytics in the emails.</p>
+    </section>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">03</span> how I use it</h2>
+      <p>Your email address is used for exactly one thing: sending you The Measured Life, which you signed up for. I will never sell or share your email with any third party, advertiser, or sponsor.</p>
+    </section>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">04</span> where data lives</h2>
+      <p>Subscriber data is stored in Amazon DynamoDB (AWS us-west-2, encrypted at rest). Email delivery is handled via Amazon SES. No subscriber data is stored in any third-party marketing platform or CRM.</p>
+    </section>
+
+    <section class="policy-section" id="unsubscribe">
+      <h2><span class="ps-n">05</span> unsubscribing</h2>
+      <p>Every email includes a one-click unsubscribe link, signed so that only you (the person holding the email) can use it. Click it and two things happen in the same instant: you stop receiving emails, and your email address is <strong>anonymized on the spot</strong> — the stored address is overwritten with a redaction marker. You can also email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I&#x27;ll unsubscribe you within 24 hours.</p>
+      <p>Here is exactly what remains after you unsubscribe, and why: a one-way cryptographic hash (SHA-256) of your address, plus the subscribe/unsubscribe timestamps. The hash is the suppression record — it&#x27;s what stops the system from ever emailing that address again, and it keeps the historical subscriber counts honest. It cannot be reversed back into your address. If you want even that hash gone, email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and the whole record is hard-deleted within 7 days.</p>
+    </section>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">06</span> cookies and tracking</h2>
+      <p>This site uses no tracking cookies and no third-party analytics. There is no Google Analytics, Meta Pixel, or equivalent.</p>
+      <p>The one thing I do look at is standard server access logs — the same first-party request records every web server keeps. Once a week I aggregate them into a simple count of page views, how many distinct visitors came, and which ones returned, so I know whether anyone finds this useful. To count distinct visitors I hash the IP address in memory and immediately discard it; no raw IP, no individual visitor, and nothing about you personally is ever stored, emailed, or linked across sessions. The output is plain totals.</p>
+    </section>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">07</span> your rights</h2>
+      <p>You can request a copy of any data I hold about you, ask for corrections, or request deletion. Email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I&#x27;ll respond within 7 days.</p>
+    </section>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">08</span> AI-generated content</h2>
+      <p>The <a href="/ask/">/ask</a> and <a href="/board/">/board</a> pages use AI (Claude by Anthropic) to generate responses based on my personal health and life data. Answers are informational only — they reflect patterns in my data and should not be treated as medical, nutritional, or professional advice.</p>
+      <p>Questions you type into /ask or /board are sent to Anthropic&#x27;s API to generate a response. I do not store your questions. Anthropic&#x27;s data handling is governed by their <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
+    </section>
+
+    <section class="policy-section" id="permanence">
+      <h2><span class="ps-n">09</span> what happens to all this if I stop</h2>
+      <p>The question friends actually ask, answered in writing rather than in reassurance. Every night the whole public record is packaged into a single download at a fixed address, with a manifest that lists every file and its checksum, and a clock that measures how long it has been since the platform last heard from me. The terms below are the contract; the numbers above them are what it produced last night. Both are checkable — that is the point of writing it down.</p>
+
+      <div class="perm-live" id="perm-live">
+        <p class="pl-h">the archive right now</p>
+        <dl class="pl-grid">
+          <div><dt>built</dt><dd data-perm="built">reading…</dd></div>
+          <div><dt>download size</dt><dd data-perm="bytes">reading…</dd></div>
+          <div><dt>files inside</dt><dd data-perm="entries">reading…</dd></div>
+          <div><dt>edition</dt><dd data-perm="version">reading…</dd></div>
+          <div class="pl-wide"><dt>continuity</dt><dd data-perm="state">reading…</dd></div>
+        </dl>
+        <p class="pl-sum"><span class="label">sha-256 of the download</span> <code data-perm="sha">reading…</code></p>
+        <p class="pl-links"><a href="/archive/latest.tar.gz">download the archive</a> <a href="/archive/manifest.json">the manifest</a> <a href="/archive/continuity.json">the continuity clock</a></p>
+        <p class="pl-note" data-perm="note" hidden></p>
+      </div>
+
+      <!-- BEGIN PERMANENCE TERMS · generated by scripts/v4_build_permanence_terms.py -->
+    <ol class="perm-clauses" data-built-version="1.0.0">
+      <li class="perm-clause" id="clause-P1">
+        <p class="pc-head"><span class="pc-id">P1</span><span class="pc-title">Nothing here is for sale</span><span class="pc-kind">policy</span></p>
+        <p>No reader&#x27;s email address, question, or submitted finding is ever sold, rented, or handed to an advertiser, a data broker, or a sponsor. Neither is any of Matthew&#x27;s own health data. There is no advertising business here to be tempted by.</p>
+      </li>
+      <li class="perm-clause" id="clause-P2">
+        <p class="pc-head"><span class="pc-id">P2</span><span class="pc-title">The public record is rebuilt as a single download every night</span><span class="pc-kind">mechanism</span></p>
+        <p>Every night the platform packages everything it already publishes — the data, the methods, the chronicle, the sealed pre-registrations — into one compressed archive at a fixed address, and overwrites yesterday&#x27;s. It is not generated on request and it is not gated: it is simply there.</p>
+      </li>
+      <li class="perm-clause" id="clause-P3">
+        <p class="pc-head"><span class="pc-id">P3</span><span class="pc-title">What may enter the archive is decided by a gate, not by hand</span><span class="pc-kind">mechanism</span></p>
+        <p>Nothing enters because someone remembered to add it. An artefact enters only if the public site already serves it at a public address, and only if a registry classifies that address as part of the published record. Anything the registry does not classify is refused. The API portion is fetched with no credentials at all, over the same public address a reader would use, so it can contain nothing a reader could not already fetch themselves.</p>
+      </li>
+      <li class="perm-clause" id="clause-P4">
+        <p class="pc-head"><span class="pc-id">P4</span><span class="pc-title">Every archive publishes its own inventory and checksum</span><span class="pc-kind">mechanism</span></p>
+        <p>Alongside the archive sits a manifest listing every file in it with a size and a SHA-256, the checksum of the archive as a whole, the moment it was built, and — in the same document — a list of what was deliberately left out and why. You do not have to trust the description; you can check it.</p>
+      </li>
+      <li class="perm-clause" id="clause-P5">
+        <p class="pc-head"><span class="pc-id">P5</span><span class="pc-title">Silence is measured out loud</span><span class="pc-kind">mechanism</span></p>
+        <p>The platform watches for its own silence: the number of days since the last signal from any source that only produces data when a living person is doing something. That number, and the state it puts the contract in, are published in the same place as the archive, every night, whether the news is good or not.</p>
+      </li>
+      <li class="perm-clause" id="clause-P6">
+        <p class="pc-head"><span class="pc-id">P6</span><span class="pc-title">Ninety days of silence freezes the record and raises the alarm</span><span class="pc-kind">mechanism</span></p>
+        <p>At 30 days of silence the contract enters a notice state, at 60 a warning state, and at 90 the switch trips: the archive stops being overwritten and is sealed as a final, dated edition, the published state says so plainly, and the people configured as continuity contacts are told where the record is and how to check it. Any new signal from any watched source resets the clock — the switch is a measurement, and it is reversible.</p>
+      </li>
+      <li class="perm-clause" id="clause-P7">
+        <p class="pc-head"><span class="pc-id">P7</span><span class="pc-title">What this contract does not promise</span><span class="pc-kind">limit</span></p>
+        <p>It does not promise the archive outlives the bill: everything here sits in one cloud account, and if that account lapses the archive lapses with it. This edition grants no mirroring rights, so that single point of failure is not mitigated by anything written here. It does not promise a third-party mirror — no automatic copy is made to any host outside this account, and any claim that one exists would be false. It does not promise the archive is complete: audio, artwork, and the site&#x27;s presentation layer are excluded, and the manifest names every exclusion. It does not promise the switch detects a person: it detects the absence of data, which a long holiday, a hardware failure, or a vendor lockout can also produce — that is why the first two thresholds notify rather than act. And it does not promise to publish anything currently private: the archive is a repackaging of the public surface, never a widening of it.</p>
+      </li>
+      <li class="perm-clause" id="clause-P8">
+        <p class="pc-head"><span class="pc-id">P8</span><span class="pc-title">The terms are versioned, and amendments are append-only</span><span class="pc-kind">mechanism</span></p>
+        <p>This contract carries a version and a dated amendment history. Clauses are added or superseded, never quietly rewritten, and the published version number tells you which edition you are reading.</p>
+      </li>
+    </ol>
+    <!-- END PERMANENCE TERMS -->
+    </section>
+
+    <section class="policy-section">
+      <h2><span class="ps-n">10</span> changes</h2>
+      <p>Material changes will be notified to subscribers before taking effect. The last-updated date above reflects the current version.</p>
+    </section>
+
+    <p class="policy-back"><a href="/subscribe/">← back to subscribe</a></p>
+
+  </main>
+
+  <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/cockpit/">today</a> — Start with today&#x27;s live read</p><p class="lf-return"><span class="label">or come back</span> the coaches read his numbers every morning; <span data-next-writeup>a new write-up lands each week</span> — <a href="/subscribe/">follow by email</a><script type="module" src="/assets/js/loop_return.js"></script></p></aside><footer class="site-foot"><form class="page-feedback" hidden><fieldset class="pf-set"><legend class="pf-q">Did this page make sense?</legend><label class="pf-opt"><input type="radio" name="made_sense" value="yes" required> Yes</label><label class="pf-opt"><input type="radio" name="made_sense" value="partly"> Partly</label><label class="pf-opt"><input type="radio" name="made_sense" value="no"> No</label></fieldset><label class="pf-more">What were you looking for? <span class="pf-optional">(optional)</span><textarea name="looking_for" maxlength="500" rows="2"></textarea></label><button class="pf-send" type="submit">Send</button><p class="pf-status" role="status" aria-live="polite"></p></form><nav class="wayfinder" aria-label="The loop"><p class="wf-lede label">the loop</p><div class="wf-ribbon"><a class="wf-stop is-next is-vantage" data-station="cockpit" href="/cockpit/"><span class="wf-name">Today</span><span class="wf-role">one screen</span><span class="wf-tag">start here</span></a><span class="wf-sep" aria-hidden="true">&middot;</span><a class="wf-stop" data-station="data" href="/data/"><span class="wf-name">The numbers</span><span class="wf-role">what his devices record</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="coaching" href="/coaching/"><span class="wf-name">The coaches</span><span class="wf-role">what the AI makes of it</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="protocols" href="/protocols/"><span class="wf-name">What he tries</span><span class="wf-role">what he takes and tests</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="story" href="/story/"><span class="wf-name">The story</span><span class="wf-role">the weekly write-up</span></a><span class="wf-arrow wf-cycle" aria-hidden="true">&#8635;</span></div></nav><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col" data-station="data"><p class="sf-h label">The numbers</p><a href="/data/physical/">Weight &amp; body</a><a href="/data/sleep/">Sleep</a><a href="/data/training/">Training</a><a href="/data/nutrition/">Eating</a><a href="/data/labs/">Blood tests</a></div><div class="sf-col" data-station="coaching"><p class="sf-h label">The coaches</p><a href="/coaching/">The read</a><a href="/coaching/by-coach/">By coach</a><a href="/coaching/scorecard/">Their record</a><a href="/coaching/lab-notes/">What the AI said, and how it felt</a></div><div class="sf-col" data-station="protocols"><p class="sf-h label">What he tries</p><a href="/protocols/">What he takes</a><a href="/protocols/experiments/">Experiments</a></div><div class="sf-col" data-station="story"><p class="sf-h label">The story</p><a href="/story/">The weekly write-up</a><a href="/story/journal/">In his own words</a><a href="/story/panel/">The podcast</a><a href="/story/about/">Who he is</a></div><div class="sf-col"><p class="sf-h label">How it&#x27;s built</p><a href="/method/">Under the hood</a><a href="/story/build/">The build log</a><a href="/gear/">The gear</a><a href="/method/character/">How the score works</a></div><div class="sf-col"><p class="sf-h label">Follow</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script><script type="module" src="/assets/js/gloss_runtime.js"></script><script type="module" src="/assets/js/page_feedback.js"></script></footer>
+
+  <script src="/assets/js/privacy_permanence.js"></script>
+
+  <script src="/assets/js/boot_theme_toggle.js"></script>
+</body>
+</html>

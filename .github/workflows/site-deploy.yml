@@ -228,9 +228,9 @@ jobs:
           # sync_site_to_s3.sh's asset steps only ship CSS/JS under assets/ and its
           # "other files" step excludes assets/* entirely, so fonts need this
           # explicit sync (the documented manual companion step — now automated).
-          # No --delete: additive only, can never remove live objects.
+          # No --delete: additive only. assets/fonts/v9/ is the v9 build's (#5534) — excluded.
           aws s3 sync site/assets/fonts/ \
-            "s3://matthew-life-platform/site/assets/fonts/" \
+            "s3://matthew-life-platform/site/assets/fonts/" --exclude "v9/*" \
             --content-type "font/woff2" \
             --cache-control "max-age=31536000, public, immutable" \
             --region ${{ env.AWS_REGION }}

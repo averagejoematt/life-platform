@@ -77,6 +77,99 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 
 
+# ── #5534: the v9 build's pages, derived from www/owned_paths.json ─────────────
+# The v9 build (www/, Astro) emits its route manifest on every build; the deploy excludes those
+# paths from the site/ sync by it (deploy/www_owned_paths.py) and THIS registry derives the v9
+# rows from it, so the sweeps know the pages without a hand list (plan §E4). Only the STATIC
+# routes (one per template file without a [param]) can be registered — the object pages
+# (/story/week-NN/, /system/ledger/<id>/ …) are the snapshot's and differ between the fixture
+# build and the live one. While `live_at_root` is false the build is served at /next/v9/ only
+# (EXEMPT, below) and no v9 row exists; once the owner's one-line switch merge sets it, the v9
+# rows REPLACE the site/ rows for the paths the build owns at `/` and the rest join as new pages.
+_V9_TIER1 = {"/", "/story/", "/data/", "/system/"}  # the four destinations (plan §C)
+_V9_NAMES = {
+    "/": "Start (the v9 front page)",
+    "/story/": "Story (v9)",
+    "/data/": "Data room (v9)",
+    "/system/": "System (v9)",
+    "/system/ledger/": "System · the ledger (v9)",
+    "/system/sources/": "System · sources (v9)",
+    "/system/everything-else/": "Everything else on the site (the footnote appendix, v9)",
+    "/privacy/": "Privacy (v9)",
+}
+# The shell every v9 page shares (www/src/layouts/Base.astro): masthead, main, footer, tab bar.
+_V9_VISUAL = {
+    "wait_for": "main#main",
+    "checks": [
+        {"selector": "header.mast nav a", "min_count": 4, "desc": "the four destinations in the masthead"},
+        {"selector": "main#main", "not_empty": True, "desc": "the page body rendered"},
+        {"selector": "footer.site a", "min_count": 2, "desc": "the footer's appendix + privacy links"},
+    ],
+}
+
+
+def www_owned() -> dict | None:
+    """www/owned_paths.json via deploy/www_owned_paths.py, or None when the build has not emitted it."""
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
+    try:
+        from deploy import www_owned_paths  # noqa: E402
+
+        return www_owned_paths.load()
+    except (OSError, ValueError, ImportError):
+        return None
+
+
+def www_live_at_root(owned: dict | None = None) -> bool:
+    owned = owned if owned is not None else www_owned()
+    return bool(owned and owned.get("live_at_root") is True)
+
+
+def _v9_rows(owned: dict | None = None, live: bool | None = None) -> list[dict]:
+    """One registry row per STATIC v9 route, at `/` once the build owns the root; [] before that."""
+    owned = owned if owned is not None else www_owned()
+    live = www_live_at_root(owned) if live is None else live
+    if not owned or not live:
+        return []
+    scripts = os.path.join(_REPO, "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import publish_snapshot as ps  # noqa: E402 — LIVE_ENDPOINTS: what the snapshot (and so every page) reads
+
+    api_deps = sorted(path for key, path in ps.LIVE_ENDPOINTS.items() if key not in ps.OPTIONAL_ENDPOINTS)
+    rows = []
+    for route in sorted(owned["static_routes"]):
+        rows.append(
+            {
+                "path": route,
+                "name": _V9_NAMES.get(route, f"{route} (v9)"),
+                "owner": "www",  # the v9 build writes this page; site/ has no file for it
+                "tier": 1 if route in _V9_TIER1 else 2,
+                "content_class": "live-data",  # baked from the nightly publication snapshot
+                "api_deps": api_deps,
+                "js_modules": [],
+                "visual": dict(_V9_VISUAL),
+                "leak_scan": True,
+                "smoke": "200",
+                "static_core": False,  # the whole page is static; there is no <noscript> core to assert
+            }
+        )
+    rows.append(
+        {
+            "path": "/404.html",
+            "name": "404 page (v9, direct object)",
+            "owner": "www",
+            "tier": 4,
+            "content_class": "utility",
+            "api_deps": [],
+            "js_modules": [],
+            "visual": None,
+            "structural": {"marker": "Not here", "fetch_path": "/nonexistent-page-xyz/"},
+        }
+    )
+    return rows
+
+
 def _evidence_rows():
     """(path, title, group, mode, endpoint, flags) per archive topic, from the build registry."""
     scripts = os.path.join(_REPO, "scripts")
@@ -989,19 +1082,28 @@ def private_rows():
 # its reason — the completeness gate treats anything else as unregistered.
 EXEMPT = {
     "/legacy/": "verbatim pre-v4 archive, private rollback surface — never QA-swept by policy (ADR-071)",
-    "/next/": "v7 preview subtree (#4182, plan §1b), noindex + unlinked from the live pages; struck at cut-over when the nine get real rows",
+    "/next/": (
+        "preview subtree (#4182, plan §1b): v7/v8 previews under site/next/, and the v9 build at /next/v9/ (S3 only, not under site/; "
+        "#5530) — noindex + unlinked from the live pages; the v9 rows arrive at `/` through _v9_rows() once www/owned_paths.json "
+        "says live_at_root (#5534)"
+    ),
     "/kit/": "v8 kit specimen (#4581): the twelve components on one unlisted, noindex page — a build reference, not a reader page; scripts/check_css_tokens.py holds it to the kit rules",
     "/index.html": "the '/' entry covers it (directory index)",
     "/reference/": (
-        "reference copies of layouts a cut-over replaced (#4588, owner ruling 2026-10-18): served, noindex, out of navigation, "
-        "listed under the appendix's Replaced layouts, kept byte-for-byte as last served (the last live sha is in each head comment); "
-        "never rebuilt by a generator (scripts/v4_apply_chrome.py prunes the tree) and never QA-swept"
+        "reference copies of layouts a cut-over replaced (#4588, owner ruling 2026-10-18; #5534 adds the 2026-11-01 v8 + v5 copies): "
+        "served, noindex, out of navigation, listed under the appendix's Replaced layouts (v8) / Earlier front pages (v9), kept "
+        "byte-for-byte as last served (the last live sha is in each head comment); never rebuilt by a generator "
+        "(scripts/v4_apply_chrome.py prunes the tree) and never QA-swept"
     ),
 }
 
 
-def _build():
-    pages = list(_CURATED) + _archive_entries() + _essay_rows()
+def _build(v9_rows: list[dict] | None = None):
+    v9_rows = _v9_rows() if v9_rows is None else v9_rows
+    replaced = {r["path"] for r in v9_rows}
+    # #5534: once the v9 build owns `/`, its rows REPLACE the site/ rows for the same paths
+    # (the v8 and v5 pages those rows described live on as /reference/ copies, EXEMPT below).
+    pages = [dict(p) for p in list(_CURATED) + _archive_entries() + _essay_rows() if p["path"] not in replaced] + v9_rows
     for p in pages:
         p.setdefault("leak_scan", True)
         p.setdefault("smoke", "200")
@@ -1011,6 +1113,7 @@ def _build():
         # real content, not a blank shell? True only for the growth-surface pages
         # (Home + the doors); deploy/smoke_test_site.sh asserts it per page.
         p.setdefault("static_core", False)
+        p.setdefault("owner", "site")  # #5534: "site" = site/<path>; "www" = the v9 build writes it
     seen = {}
     for p in pages:
         if p["path"] in seen:
@@ -1322,9 +1425,11 @@ def self_check():
     exempt_prefixes = tuple(k for k in EXEMPT if k.endswith("/"))
     exempt_exact = {k for k in EXEMPT if not k.endswith("/")}
     unregistered = {f for f in files if f not in registered and f not in exempt_exact and not f.startswith(exempt_prefixes)}
+    # #5534: a v9 row is written by the build, not by a file under site/ — never a ghost.
+    www_owned_paths = {p for p, e in PAGES_BY_PATH.items() if e.get("owner") == "www"}
     ghosts = {
         p
-        for p in registered
+        for p in registered - www_owned_paths
         if p not in files
         and not os.path.exists(os.path.join(_REPO, "site", p.strip("/").replace("/", os.sep), "index.html"))
         and not os.path.exists(os.path.join(_REPO, "site", p.strip("/")))

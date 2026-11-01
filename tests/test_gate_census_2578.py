@@ -1208,7 +1208,12 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # (CI_PROOFS: hash equal, held exit 1, dangling exit 1, planted-sentinel scan exit 1 / reverted 0) and
         # registry::tests/test_root_clutter_guard.py::ALLOWLIST::www (REGISTRY_PROOFS: armed 1 failed naming ['www'], reverted 4 passed).
         # Stacked, never max'd.
-        <= 311
+        # 311 -> 312 (2026-11-01, #5534 the v9 cut-over): structural::test_v9_cutover_5534.py (STRUCTURAL_HAND_PROOFS: M1 1 failed, M2 3 failed,
+        # M3 5 failed, M4 1 failed; reverted 32 passed) and ci::web-preview-deploy.yml::deploy::6 (CI_PROOFS, re-keyed from ::preview::6 — the
+        # same scan step on the resolved target, plus the root leg's collision check: planted sentinel exit 1, planted site/system/ exit 1,
+        # reverted 0 / 0) and guard::deploy/www_root_rollback.sh (GUARD_PROOFS: decline branch disabled → 1 failed; reverted 32 passed).
+        # Net +2: one proof re-keyed, two added. Stacked, never max'd.
+        <= 313
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
