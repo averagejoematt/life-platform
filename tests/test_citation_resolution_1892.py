@@ -157,6 +157,20 @@ def test_every_citation_still_resolves_to_its_stored_title():
     second implementation that could drift from the one that actually gates."""
     drift, unverified = vc.split_unverified(vc.check_pubmed(vc.pubmed_citations()))
     assert not drift, "citation drift:\n  " + "\n  ".join(drift)
+    if unverified:
+        pytest.skip("NCBI could not be observed (rate limit / outage) — not drift:\n  " + "\n  ".join(unverified))
+
+
+def test_an_all_empty_eutils_answer_is_unverified_not_drift(monkeypatch):
+    """Guard the SET, not the instance (#1892): esummary answering 200 with `uids: []` for every
+    id is NCBI throttling, not 40 withdrawn papers. One id missing from a populated answer is still drift."""
+    pairs = [("a", "111", "Title A"), ("b", "222", "Title B")]
+    monkeypatch.setattr(vc, "_fetch_json", lambda url, timeout=30.0: {"result": {"uids": []}})
+    drift, unverified = vc.split_unverified(vc.check_pubmed(pairs))
+    assert drift == [] and len(unverified) == 1 and "could not be observed" in unverified[0]
+    monkeypatch.setattr(vc, "_fetch_json", lambda url, timeout=30.0: {"result": {"uids": ["111"], "111": {"title": "Title A"}}})
+    drift, unverified = vc.split_unverified(vc.check_pubmed(pairs))
+    assert unverified == [] and drift == ["b: PMID 222 did not resolve (404/withdrawn)"]
 
 
 @pytest.mark.integration
