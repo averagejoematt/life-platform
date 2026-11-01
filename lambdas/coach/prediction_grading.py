@@ -53,6 +53,26 @@ def check_expiry(pred: dict[str, Any], effective_window: int, today: datetime) -
     return (today - created_dt).days > effective_window * EXPIRY_MULTIPLIER
 
 
+def was_terminalized_by_duplicate_grader(item: dict[str, Any]) -> bool:
+    """#813: True for status='inconclusive' records graded by coach_computation_engine's
+    now-removed duplicate grader — those were killed at the raw stated window (before
+    the evaluator's domain-clamped window elapsed) and with threshold=None could only
+    ever be inconclusive, so they never got a real grading pass.
+
+    Deterministic discriminator: the evaluator always stamps algo_version into
+    outcome_notes; the duplicate grader never did. One-way — once re-graded (any
+    outcome), algo_version is present and the record is terminal again. Lives here, beside
+    ``grading_window_still_open`` (the #2221 discriminator of the same shape), since #5533.
+    """
+    if item.get("status") != "inconclusive":
+        return False
+    try:
+        notes = json.loads(item.get("outcome_notes") or "{}")
+    except (ValueError, TypeError):
+        return False
+    return isinstance(notes, dict) and "algo_version" not in notes
+
+
 def grading_window_still_open(item: dict[str, Any]) -> bool:
     """True for an 'inconclusive' written while the 2x grace period was still open.
 
@@ -94,4 +114,10 @@ def build_outcome_notes(evaluation: dict[str, Any], algo_version: str) -> str:
         # `actual_value` is a day count, and a reader of the row must not read it as the
         # stored spec's slope or level (coach.latest_checked, web.prediction_reason).
         notes["graded_as"] = "count"
+    # #5533: the grader's own account of the grade — the quality flags and rule version it was
+    # graded under (also top-level row attributes, so a projected read can count them) and, for
+    # a heart-rate call graded across the 2026-10-10 regime marker, the boundary it honoured.
+    for key in ("quality_flags", "evaluator_version", "hr_regime"):
+        if evaluation.get(key) is not None:
+            notes[key] = evaluation[key]
     return json.dumps(notes)

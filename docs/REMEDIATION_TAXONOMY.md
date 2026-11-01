@@ -161,6 +161,36 @@ hand-waved content edit.
 
 ---
 
+## Grade corrections — the correction ledger (#5533, owner requirement B 2026-10-31)
+
+A coach prediction's grade is a published claim about a coach's record, so a change to the
+grader's RULES that changes a grade is a remediation class of its own — never a Bucket A
+template, never a silent rewrite, never a hand edit of the row:
+
+- **The fix lands in the grader** (`lambdas/coach/coach_prediction_evaluator.py` and its
+  helpers — `grading_quality.py`, `prediction_point_grader.py`, `prediction_direction_window.py`)
+  with a failing-then-passing test per rule. From that point every newly graded row carries
+  `quality_flags` and `evaluator_version` (SCHEMA.md, PREDICTION# row).
+- **Rows already graded under the old rule are re-graded by the fixed grader itself**, through
+  `deploy/regrade_predictions.py` — dry-run by default; the dry-run table (per coach,
+  before/after confirmed/refuted/pending/expired, headline K of N delta) is posted on the issue
+  and read by the owner BEFORE `--apply`. `--apply` is a DynamoDB write — an owner/driver act.
+- **Every changed grade keeps its history** (`lambdas/coach/grade_corrections.py`): a
+  `CORRECTION#<prediction_id>#<ts>` ledger row written FIRST, then `corrections[]` appended and
+  `original_grade` snapshotted once on the prediction row, and only then the corrected
+  `status/outcome/outcome_date/outcome_notes` — conditional on the status the plan read. One
+  `CORRECTION#SUMMARY#<ts>` row records the run's aggregate impact.
+- **Aggregates read the corrected grade** — the K of N record (`coach_record`), the Brier pairs
+  (`calibration_core`) and the "nothing changes" comparison (`coach_baseline`) all read
+  `status`. Deliberately NOT rewritten: the `CONFIDENCE#` Beta posterior and the `LEARNING#`
+  row the first grade wrote (the same residual #4617/#4618 carried); the served record is
+  counted from `PREDICTION#` rows only (#4220).
+
+Bucket: **B** for the grader fix (a PR, human-merged); the `--apply` is the operational
+step after it, never run from a lane or by the agent.
+
+---
+
 ## Operational remediations (direct, not a code PR)
 
 A few fixes are idempotent operational actions the agent does via its scoped role

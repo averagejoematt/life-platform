@@ -55,6 +55,69 @@ DEFAULT_FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
 DEFAULT_BASE_URL = "https://averagejoematt.com"
 ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+_ISO_IN_TEXT = re.compile(r"\b(20\d\d)-(\d\d)-(\d\d)\b")
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+# Free-text fields a page prints verbatim. Dates on a reader surface are written in words
+# (the kit's standing rule, held by tests/web_preview_gate.py), so an ISO date inside served
+# prose is rewritten here — presentation only; ids, urls, formulas and the dated fields the
+# templates format themselves are left exactly as served.
+_WORDED_TEXT_KEYS = frozenset(
+    {
+        "title",
+        "summary",
+        "claim",
+        "verdict_text",
+        "reason",
+        "short_bio",
+        "comparison_text",
+        "limitations",
+        "window",
+        "sentence",
+        "instrument",
+        "hypothesis",
+        "topic",
+        "claim_a",
+        "claim_b",
+        "verdict",
+        "text",
+        "excerpt",
+        "absent_text",
+        "label",
+        "name",
+        "outcome_notes",
+        "how",
+        "actual_text",
+        "tolerance_text",
+        "byline",
+    }
+)
+
+
+def day_in_words(iso: str) -> str:
+    """'2026-10-31' -> '31 October 2026'; anything else is returned unchanged."""
+    m = _ISO_IN_TEXT.fullmatch(iso or "")
+    if not m:
+        return iso
+    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if not 1 <= mo <= 12:
+        return iso
+    return f"{d} {_MONTHS[mo - 1]} {y}"
+
+
+def _words_in_text(value: str) -> str:
+    return _ISO_IN_TEXT.sub(lambda m: day_in_words(m.group(0)), value)
+
+
+def word_dates(obj: Any, key: str | None = None) -> Any:
+    """Rewrite ISO dates to words inside the free-text keys, recursively (grading, simple_guess, instrument_absent)."""
+    if isinstance(obj, dict):
+        return {k: word_dates(v, k) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [word_dates(v, key) for v in obj]
+    if isinstance(obj, str) and key in _WORDED_TEXT_KEYS:
+        return _words_in_text(obj)
+    return obj
+
 
 OBJECT_TYPES = (
     "chapter",
@@ -627,6 +690,32 @@ def _live_metrics(ctx: LiveContext) -> None:
         )
 
 
+def _docket_verdict_text(d: dict) -> str | None:
+    """The docket's settled verdict as one sentence. On the wire `verdict` is a dict
+    ({winner, loser, holds, outcome, actual_value}) once code has settled the bet — the
+    platform's verdict, carried, never recomputed here; a string is passed through."""
+    v = d.get("verdict")
+    if isinstance(v, str):
+        return v.strip() or None
+    if isinstance(v, dict):
+        winner, loser, outcome = v.get("winner"), v.get("loser"), v.get("outcome")
+        actual = v.get("actual_value")
+        parts = []
+        if outcome:
+            parts.append(f"Settled by code ({outcome})")
+        if winner:
+            parts.append(f"the call that held was {winner}'s")
+        if loser:
+            parts.append(f"{loser}'s did not")
+        if isinstance(actual, (int, float)):
+            parts.append(f"the measured value was {actual:.1f}")
+        return "; ".join(parts) + "." if parts else None
+    for key in ("resolution_text", "resolution"):
+        if isinstance(d.get(key), str) and d[key].strip():
+            return d[key].strip()
+    return None
+
+
 def _live_disagreements(ctx: LiveContext) -> None:
     docket = ctx.fetched.get("docket") or {}
     for status_key, status in (("open", "open"), ("resolved", "resolved")):
@@ -647,11 +736,11 @@ def _live_disagreements(ctx: LiveContext) -> None:
                     topic=d.get("topic") or slug,
                     coach_a=a,
                     coach_b=b,
-                    claim_a=claims.get(a),
-                    claim_b=claims.get(b),
+                    claim_a=claims.get(a) if isinstance(claims.get(a), str) else None,
+                    claim_b=claims.get(b) if isinstance(claims.get(b), str) else None,
                     status=status if d.get("resolution") != "void_no_data" else "void",
                     resolved_date=d.get("resolved_date") if ISO_DAY.match(str(d.get("resolved_date") or "")) else None,
-                    verdict=d.get("verdict") or d.get("resolution_text") or d.get("resolution"),
+                    verdict=_docket_verdict_text(d),
                     metric_id=None,
                     edges=[{"type": "coach", "id": a, "rel": "side_a"}, {"type": "coach", "id": b, "rel": "side_b"}],
                 )
@@ -666,6 +755,7 @@ def _live_sources(ctx: LiveContext) -> None:
             else ("live" if s.get("status") == "fresh" else "unknown")
         )
         last = (s.get("last_update") or "")[:10]
+        latest_day = last if ISO_DAY.match(last) else None
         ctx.objs["source"].append(
             envelope(
                 id=s["id"],
@@ -679,7 +769,7 @@ def _live_sources(ctx: LiveContext) -> None:
                 label=s.get("label") or s["id"],
                 category=s.get("category"),
                 since=None,
-                latest=s.get("last_update"),
+                latest=latest_day,
                 status=status,
                 stale_hours=int(s["stale_hours"]) if isinstance(s.get("stale_hours"), int) else None,
                 instrument_for=None,
@@ -768,7 +858,7 @@ def _live_edition(ctx: LiveContext) -> None:
             as_of=ctx.as_of,
             data_through=ctx.as_of,
             source=["/api/edition"],
-            title=f"The edition of {ctx.as_of}",
+            title=f"The edition of {day_in_words(ctx.as_of)}",
             day_n=edition.get("day_n") if isinstance(edition.get("day_n"), int) else None,
             start_date=today.get("start_date") if ISO_DAY.match(str(today.get("start_date") or "")) else None,
             order=[str(k) for k in (edition.get("order") or [])],
@@ -891,6 +981,7 @@ def partition(objs: dict[str, list[dict]]) -> tuple[dict[str, list[dict]], dict[
             if vis not in VISIBILITIES:
                 raise SchemaError(f"{type_} {o.get('id')}: visibility {vis!r} is not one of {VISIBILITIES}")
             if vis == "public":
+                o = word_dates(o)
                 validate(o, type_)
                 public[type_].append(o)
             else:
