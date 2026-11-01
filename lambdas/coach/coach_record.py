@@ -110,6 +110,9 @@ _PROJECTION_NAMES = {
     # #5356: an open call's due day (``prediction_windows.due_date``) bounds ``through``.
     "#cd": "created_date",
     "#sd": "subdomain",
+    # #5533: the grader's own flags on a graded row — ``quality_counts`` reads them off the
+    # SAME projected rows, so the clean count beside K of N can never come from a second read.
+    "#qf": "quality_flags",
 }
 
 
@@ -245,6 +248,41 @@ def record_from_rows(rows: Iterable[Any], *, genesis: str | None, career: bool =
     if through and not career:
         through = complete_through(rows, latest_decided=through, as_of=as_of or today_pt())
     return {"confirmed": confirmed, "refuted": refuted, "n": confirmed + refuted, "through": through or None}
+
+
+# ── #5533: the grader's own flags, counted beside the record ─────────────────────────────
+# The record is ``K of N`` and stays ``K of N`` (ADR-157: the full count is never replaced).
+# Beside it a reader can see how many of the N were graded clean — no logging gap in the
+# window, no low-power band, no proxy metric — and how many predate the flags altogether.
+
+
+def quality_counts(decided: Iterable[Any]) -> dict:
+    """``{clean, flagged, unassessed, n}`` over DECIDED rows (``decided_rows``).
+
+    ``clean`` counts rows the grader assessed and left unflagged; ``flagged`` rows carry at
+    least one flag; ``unassessed`` rows were graded before the flags existed (no
+    ``quality_flags`` attribute) and are NEVER counted as clean. ``by_flag`` carries each
+    flag's own count. ``clean + flagged + unassessed == n``.
+    """
+    from coach.grading_quality import FLAGS, is_clean  # local: coach_record is imported by the grader's own helpers
+
+    out: dict = {"clean": 0, "flagged": 0, "unassessed": 0, "n": 0, "by_flag": {f: 0 for f in FLAGS}}
+    for row in decided or []:
+        if not isinstance(row, dict) or graded_status(row) is None:
+            continue
+        out["n"] += 1
+        verdict = is_clean(row)
+        if verdict is None:
+            out["unassessed"] += 1
+            continue
+        if verdict:
+            out["clean"] += 1
+            continue
+        out["flagged"] += 1
+        for f in row.get("quality_flags") or []:
+            if f in out["by_flag"]:
+                out["by_flag"][f] += 1
+    return out
 
 
 # ── #4617: what the record counts ─────────────────────────────────────────────────────────

@@ -624,6 +624,13 @@ def _score_coach_calibration(cid, records=None, *, _g):
     return season_summary, season_pairs, career_summary, career_pairs
 
 
+def _decided_blocks(coach_decided):
+    """The two blocks every record-bearing surface serves BESIDE ``record`` over the SAME decided
+    rows: the "nothing changes" comparison (#4585) and the grader's quality counts (#5533 —
+    ``{clean, flagged, unassessed, n, by_flag}``; the clean count never replaces K of N)."""
+    return {"comparison": coach_baseline.comparison_block(coach_decided), "quality": coach_record.quality_counts(coach_decided)}
+
+
 def handle_calibration(event, *, _g):
     """GET /api/calibration — the calibration scoreboard (#538).
 
@@ -699,8 +706,9 @@ def handle_calibration(event, *, _g):
                     # #4220: K of N through <day> — the ONE record producer's block, over the
                     # same rows the Brier numbers beside it were scored on.
                     "record": coach_record.record_from_rows(fetched[cid], genesis=EXPERIMENT_START),
-                    # #4585: the record never appears alone — the same rows, scored by a guess.
-                    "comparison": coach_baseline.comparison_block(coach_decided),
+                    # #4585: the record never appears alone — the same rows, scored by a guess; #5533: and
+                    # beside K of N, how many of the N the grader graded clean — never instead of it.
+                    **_decided_blocks(coach_decided),
                     "lifetime": career_summary,
                 }
             )
@@ -1076,7 +1084,7 @@ def handle_predictions(event, *, _g):
                 by_coach[cid]["record"] = coach_record.record_from_rows(records, genesis=EXPERIMENT_START)
                 coach_decided = coach_record.decided_rows(records, genesis=EXPERIMENT_START)
                 season_decided.extend(coach_decided)
-                by_coach[cid]["comparison"] = coach_baseline.comparison_block(coach_decided)  # #4585
+                by_coach[cid].update(_decided_blocks(coach_decided))  # #4585 comparison + #5533 quality, beside `record`
                 for rec in records:
                     ev = rec.get("evaluation") or {}
                     ungradeable = not prediction_windows.is_gradeable(ev)
