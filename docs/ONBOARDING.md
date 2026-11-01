@@ -63,7 +63,7 @@ email Lambdas (`email_stack`: daily-brief at 17:00 UTC (10 AM PDT), weekly diges
     │
     ▼
 MCP Lambda (89 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
-site-api Lambda (~141 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
+site-api Lambda (~145 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
 ~107 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 10 CDK stacks. Run-rate against the $215 enforced ceiling (ADR-063/133): `docs/COST_TRACKER.md` (Monthly Actuals) — not restated here.
