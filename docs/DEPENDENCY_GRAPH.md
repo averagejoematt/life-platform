@@ -257,7 +257,7 @@ producer's output is round-tripped through the real consumer, then a disagreemen
 injected into BOTH sides (`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is
 one registry entry in `tests/pair_contract_registry.py`. **Floor** = named in
 `KNOWN_MUST_AGREE_PAIRS` (only ever grows); **Enrolled** = a live `PairContract` backs it —
-a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 15.
+a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 16.
 See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 
 | Pair | Producer | Consumer | Partition | Mutations | Floor | Enrolled |
@@ -269,6 +269,7 @@ See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 | apple_workouts map -> MCP periodization weekly Zone 2 | `ingestion.health_auto_export_workouts::write_apple_workouts` | `mcp.tools_training::_zone2_by_iso_week` | `apple_health` | 3 | yes | yes |
 | coach PREDICTION# graded row -> ledger line (latest_checked) | `coach.coach_prediction_evaluator::_update_prediction_status` | `coach.latest_checked::for_coach` | — | 5 | yes | yes |
 | coach PREDICTION# resolutions -> the one record (K of N through <day>) | `coach.dispute_docket::_write_docket_prediction` | `coach.coach_record::record_from_rows` | — | 4 | yes | yes |
+| coach grade correction -> the record, the Brier pair and the clean count read the corrected grade | `coach.grade_corrections::apply_correction` | `coach.coach_record::record_from_rows` | — | 3 | no | yes |
 | computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 | yes | yes |
 | computed_metrics -> site-stats-refresh tier0_streak | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `web.site_stats_refresh_lambda::resolve_tier0_streak` | `computed_metrics` | 3 | yes | yes |
 | engagement_state -> /api/presence | `content.engagement_core::compute_presence` | `web.site_api_freshness::presence` | `engagement_state` | 4 | yes | yes |

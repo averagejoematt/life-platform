@@ -1544,9 +1544,176 @@ register(
 )
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #5533 — the correction ledger: a changed grade keeps its history, and every
+# aggregate reads the CORRECTED grade.
+#   coach.grade_corrections.apply_correction (after the REAL grader wrote the first grade)
+#     -> coach.coach_record.record_from_rows  (+ calibration_core.pairs_from_prediction_records)
+# The producer is the real grader's write-back followed by the real correction write,
+# over a table that applies both update expressions; the consumer is the one record
+# producer and the Brier pairs. ``agree`` holds the record and the Brier pair to the
+# corrected status, the ledger entry to the snapshot the row kept, and the first write
+# to be the ledger row (owner requirement B, 2026-10-31).
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class _LedgerTable:
+    """Applies the grader's and the ledger's own ``SET`` expressions (``list_append`` /
+    ``if_not_exists`` included) to the one row it holds; records write order."""
+
+    def __init__(self, row):
+        self.row = dict(row)
+        self.puts = []
+        self.order = []
+
+    def put_item(self, Item, **_kw):  # noqa: N803
+        self.puts.append(dict(Item))
+        self.order.append(str(Item["sk"]).split("#")[0])
+
+    def update_item(
+        self, Key=None, UpdateExpression="", ExpressionAttributeNames=None, ExpressionAttributeValues=None, **_kw
+    ):  # noqa: N803
+        assert Key == {"pk": self.row["pk"], "sk": self.row["sk"]}, "a write to a different row"
+        names, values = ExpressionAttributeNames or {}, ExpressionAttributeValues or {}
+        self.order.append("PREDICTION")
+        depth, cur, parts = 0, "", []
+        for ch in UpdateExpression.split("SET", 1)[-1]:
+            depth += (ch == "(") - (ch == ")")
+            if ch == "," and depth == 0:
+                parts.append(cur)
+                cur = ""
+            else:
+                cur += ch
+        parts.append(cur)
+        for assignment in parts:
+            lhs, rhs = (x.strip() for x in assignment.split("=", 1))
+            attr = names.get(lhs, lhs)
+            if rhs.startswith("list_append(if_not_exists("):
+                base_attr, empty, appended = rhs[len("list_append(if_not_exists(") : -1].replace(")", "").replace(" ", "").split(",")
+                self.row[attr] = list(self.row.get(base_attr, values[empty])) + list(values[appended])
+            elif rhs.startswith("if_not_exists("):
+                base_attr, default = rhs[len("if_not_exists(") : -1].replace(" ", "").split(",")
+                self.row.setdefault(attr, values[default])
+            else:
+                self.row[attr] = values[rhs]
+        return {}
+
+    def query(self, **_kw):
+        return {"Items": [dict(self.row)]}
+
+
+def _produce_grade_correction():
+    import json
+
+    from coach import coach_prediction_evaluator as ev, grade_corrections
+    from coach.prediction_emission import build_prediction_record
+    from web.site_api_common import _decimal_to_float
+
+    made, graded_on, corrected_on = _in_cycle_day(2), _in_cycle_day(17), _in_cycle_day(20)
+    spec = {"type": "directional", "metric": "total_protein_g", "condition": "up", "evaluation_window_days": 14, "threshold": None}
+    call = build_prediction_record("nutrition_coach", made, "Protein intake will rise over the next two weeks.", spec, 0.6, "coach_read")
+    table = _LedgerTable(call)
+    real = ev.table
+    ev.table = table
+    try:
+        # The first grade, by the real grader's write-back — refuted through a logging gap.
+        ev._update_prediction_status(
+            call,
+            {
+                "prediction_id": call["prediction_id"],
+                "status": "refuted",
+                "evaluated_date": graded_on,
+                "actual_value": -0.01,
+                "reason": "flat",
+            },
+        )
+    finally:
+        ev.table = real
+    before = dict(table.row)
+    corrected = {
+        "status": "confirmed",
+        "outcome_date": corrected_on,
+        "outcome_notes": json.dumps({"reason": "[window] re-graded with the zero-entry day missing", "algo_version": "1.1"}),
+        "quality_flags": ["logging_gap"],
+    }
+    entry = grade_corrections.apply_correction(
+        table, before, corrected, reason="#5533 (c): the window held a zero-entry day", evaluator_version="1.1", now=None
+    )
+    ledger = [p for p in table.puts if str(p["sk"]).startswith("CORRECTION#")]
+    return {
+        "row": _decimal_to_float(dict(table.row)),
+        "ledger": [_decimal_to_float(p) for p in ledger],
+        "entry": entry,
+        "order": list(table.order),
+    }
+
+
+def _consume_grade_correction(payload):
+    from coach import coach_record, grade_corrections
+    from common.constants import EXPERIMENT_START_DATE
+    from experiment import calibration_core
+
+    rows = [payload["row"]]
+    return {
+        "record": coach_record.record_from_rows(rows, genesis=EXPERIMENT_START_DATE, as_of=str(payload["row"].get("outcome_date") or "")),
+        "pairs": calibration_core.pairs_from_prediction_records(rows),
+        "quality": coach_record.quality_counts(coach_record.decided_rows(rows, genesis=EXPERIMENT_START_DATE)),
+        # The re-grade planner's idempotence read: a row corrected under this version is never selected again.
+        "corrected_under_1_1": grade_corrections.already_corrected(payload["row"], evaluator_version="1.1"),
+    }
+
+
+def _agree_grade_correction(produced, consumed):
+    row, ledger = produced["row"], produced["ledger"]
+    # order = [the grader's first write-back, then the correction's two writes]: ledger row, THEN the grade.
+    assert produced["order"][-2:] == ["CORRECTION", "PREDICTION"], "the ledger row must be written before the grade changes"
+    assert (consumed["record"]["confirmed"], consumed["record"]["refuted"], consumed["record"]["n"]) == (1, 0, 1), consumed
+    assert consumed["pairs"] == [(0.6, 1)], "the Brier pair scores the CORRECTED status"
+    assert consumed["corrected_under_1_1"] is True, "the planner must see the correction it wrote"
+    assert consumed["quality"] == {
+        "clean": 0,
+        "flagged": 1,
+        "unassessed": 0,
+        "n": 1,
+        "by_flag": {"logging_gap": 1, "low_power": 0, "proxy_metric": 0},
+    }
+    assert len(ledger) == 1 and ledger[0]["original_status"] == "refuted" == row["original_grade"]["status"]
+    assert row["corrections"] == [produced["entry"]] and row["corrections"][0]["corrected_status"] == row["status"] == "confirmed"
+    assert ledger[0]["sk"].startswith(f"CORRECTION#{row['prediction_id']}#")
+
+
+register(
+    PairContract(
+        name="coach grade correction -> the record, the Brier pair and the clean count read the corrected grade",
+        producer="coach.grade_corrections::apply_correction",
+        consumer="coach.coach_record::record_from_rows",
+        partition=None,  # COACH# rows are outside the ADR-077 USER#…#SOURCE# partition census
+        produce=_produce_grade_correction,
+        consume=_consume_grade_correction,
+        agree=_agree_grade_correction,
+        mutations=(
+            Mutation(
+                ("row", "status"), "retype", to="refuted", why="a correction that leaves the old status in place is a ledger with no effect"
+            ),
+            Mutation(
+                ("row", "corrections"),
+                "drop",
+                why="the appended entry IS the row's own account of its correction — and the planner's idempotence",
+            ),
+            Mutation(("row", "quality_flags"), "drop", why="an unassessed row is never counted clean — and never counted flagged"),
+        ),
+        note=(
+            "#5533 (epic #5529): owner requirement B — never a silent rewrite. `agree` also holds the ledger row to land BEFORE the grade "
+            "changes and `original_grade` to be the grade before it (no shipped consumer reads those two yet — the v9 ledger will; they are "
+            "asserted, not mutated). The CONFIDENCE# Beta and the LEARNING# row are not rewritten (same residual as #4617/#4618)."
+        ),
+    )
+)
+
+
 #: The enrollment ratchet (see the sweep's module docstring for why this, and not
 #: a 299-entry exemption ledger, is the coverage instrument). Raise it in the same
 #: PR that enrolls a pair; it may never be lowered.
-ENROLLED_FLOOR = 15  # 9 -> 10 (2026-09-26, #4217: the absent coach) -> 11 (2026-09-27, #4220: the one record) -> 12 (2026-09-27, #4189: the morning note) -> 15 (2026-10-24, #5353: the apple_workouts map -> the three Zone 2 readers)
+ENROLLED_FLOOR = 16  # 9 -> 10 (2026-09-26, #4217: the absent coach) -> 11 (2026-09-27, #4220: the one record) -> 12 (2026-09-27, #4189: the morning note) -> 15 (2026-10-24, #5353: the apple_workouts map -> the three Zone 2 readers) -> 16 (2026-10-31, #5533: the grade-correction ledger -> the record)
 
 __all__ = ["ENROLLED_FLOOR", "KNOWN_MUST_AGREE_PAIRS"]
