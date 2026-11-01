@@ -207,3 +207,94 @@ def write_summary(table: Any, summary: dict, *, now: datetime | None = None) -> 
     item = summary_row(summary, now=now)
     table.put_item(Item=item)
     return item
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REVERT (owner ask, 2026-11-01): the exact pre-change grading state is restorable, on the record.
+# A revert is itself a correction entry — the ledger row FIRST, then the prediction row — so the
+# audit trail reads correction → reversal, never a deletion. `original_grade` is never removed:
+# it is the proof of what the row said before anyone touched it.
+# ══════════════════════════════════════════════════════════════════════════════
+
+REVERT_REASON_PREFIX = "REVERT"
+
+
+def reverted_already(row: dict) -> bool:
+    """Has the row's current `original_grade` snapshot already been restored? (A second revert run selects nothing.)"""
+    og = row.get("original_grade") or {}
+    snap = og.get("snapshot_at")
+    for e in row.get("corrections") or []:
+        if isinstance(e, dict) and e.get("reverts") and str(e.get("restores_snapshot_at")) == str(snap):
+            return True
+    return False
+
+
+def revert_entry(row: dict, *, reason: str, reverted_at: str) -> dict:
+    """The reversal as a correction entry: the row's CURRENT grade is the 'original' of this entry and the
+    snapshot's grade is the 'corrected' one — the same nine fields, plus the two that name it a reversal."""
+    og = row.get("original_grade") or {}
+    return {
+        "original_status": row.get("status"),
+        "original_outcome_date": row.get("outcome_date"),
+        "original_outcome_notes": row.get("outcome_notes"),
+        "corrected_status": og.get("status"),
+        "corrected_outcome_date": og.get("outcome_date"),
+        "corrected_outcome_notes": og.get("outcome_notes"),
+        "corrected_at": reverted_at,
+        "reason": reason,
+        "evaluator_version": str(og.get("evaluator_version") or ""),
+        "reverts": True,
+        "restores_snapshot_at": og.get("snapshot_at"),
+    }
+
+
+def revert_correction(table: Any, row: dict, *, reason: str, now: datetime | None = None) -> dict | None:
+    """Restore every field `original_grade` snapshotted to exactly its snapshotted value, and REMOVE a field the
+    snapshot did not carry (it did not exist before the correction — `quality_flags`, `evaluator_version` on a
+    row graded before the flags existed). Ledger row first; then one conditional update on the row still carrying
+    the status being reverted. Returns the entry, or None when there is nothing to revert / it was reverted."""
+    og = row.get("original_grade")
+    if not isinstance(og, dict) or not og or reverted_already(row):
+        return None
+    at = now_iso(now)
+    reason = reason if reason.startswith(REVERT_REASON_PREFIX) else f"{REVERT_REASON_PREFIX} {reason}"
+    e = revert_entry(row, reason=reason, reverted_at=at)
+    table.put_item(Item=floats_to_decimal(correction_row(row, e)))
+    names: dict[str, str] = {"#status": "status"}
+    values: dict[str, Any] = {":empty": [], ":entry": [e], ":prior": row.get("status")}
+    sets = ["corrections = list_append(if_not_exists(corrections, :empty), :entry)"]
+    removes: list[str] = []
+    for k in ORIGINAL_FIELDS:
+        names[f"#{k}"] = k
+        if k in og:
+            sets.append(f"#{k} = :{k}")
+            values[f":{k}"] = og[k]
+        else:
+            removes.append(f"#{k}")
+    expr = "SET " + ", ".join(sets) + (" REMOVE " + ", ".join(removes) if removes else "")
+    table.update_item(
+        Key={"pk": row["pk"], "sk": row["sk"]},
+        UpdateExpression=expr,
+        ConditionExpression="#status = :prior",
+        ExpressionAttributeNames=names,
+        ExpressionAttributeValues=floats_to_decimal(values),
+    )
+    return e
+
+
+def unstamp_quality(table: Any, row: dict, *, evaluator_version: str) -> bool:
+    """Undo `stamp_quality` on a row the grader only annotated (no `original_grade`, so no correction): the two
+    stamped attributes are REMOVED, conditional on the version that stamped them. Returns whether it landed; a
+    row already un-stamped (or stamped by a later version) is the no-op."""
+    if row.get("original_grade") or "quality_flags" not in row:
+        return False
+    try:
+        table.update_item(
+            Key={"pk": row["pk"], "sk": row["sk"]},
+            UpdateExpression="REMOVE quality_flags, evaluator_version",
+            ConditionExpression="evaluator_version = :ev AND attribute_not_exists(original_grade)",
+            ExpressionAttributeValues={":ev": evaluator_version},
+        )
+        return True
+    except Exception:  # noqa: BLE001 — ConditionalCheckFailed is the idempotent path
+        return False
