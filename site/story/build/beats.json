@@ -3928,6 +3928,69 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/4924"
         }
       ]
+    },
+    {
+      "id": "2026-11-01-the-new-site-built-in-a-day-and-kept-off-the-root",
+      "date": "2026-11-01",
+      "title": "A whole new site, built in a day over the same honest numbers, and deliberately not launched yet",
+      "shipped": "The next version of this site now exists end to end on a preview address: a static build generated each night from one publication snapshot of the public API, with no client framework. Every published chapter with its text as published and its audio; a data room where ten daily series are drawn at build time and a small island lets you compare any two at a lag of a day or two, reading only the statistics the platform had already computed; the whole prediction ledger, every grade with its history, the grader's flags and a filter that only hides and shows; and a front page that carries a six-dimensional portrait of the experiment beside the premise. The old pages the new site would replace were copied to dated reference addresses, and a committed switch keeps the public root exactly as it was.",
+      "why_it_mattered": "The old site was the project's flagship defect: zero visits from its own author in three weeks, friends overwhelmed. A build that reads only the public API means the new site can never show a number the platform has not published, and a build that fails closed on a held or private object means a draft cannot leak into it. Keeping the launch behind a switch, a snapshot of the current root and a rehearsed rollback means the one irreversible-feeling step is reversible, and happens only when five readers have said the new site is worth opening.",
+      "gotcha": "Two of the numbers looked wrong and were both privacy rules doing their job. Forty-eight ledger rows arrived with no claim text because they rest on a glucose sensor that had sent no reading when they were said, and the site had been skipping them instead of showing the hold. Twelve rows vanished between the server and the browser because a guard that removes any mention of the journal's silence runs after the server has already counted and paged, so a hundred-row page came back with ninety-seven. The fix was to count after the same guard and say how many are kept off the page, not to loosen either rule.",
+      "honest_miss": "The front page needed a second pass after the author saw it: the first build had traded the portrait and the chapter for a weight tile and a prediction score, which made a life experiment look like a weight-loss dashboard. Of the six dimensions, three are measured, one barely, and two have no instrument at all, and the page now says so. The re-grade of 23 coach calls under the fixed grader, which would move the record from 88 of 214 to 81 of 210, is written, reversible and waiting on an explicit go. The public root is unchanged.",
+      "prs": [
+        {
+          "label": "PR #5531",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5531"
+        },
+        {
+          "label": "PR #5538",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5538"
+        },
+        {
+          "label": "PR #5547",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5547"
+        },
+        {
+          "label": "PR #5552",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5552"
+        },
+        {
+          "label": "PR #5553",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5553"
+        },
+        {
+          "label": "PR #5554",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5554"
+        },
+        {
+          "label": "PR #5551",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5551"
+        },
+        {
+          "label": "PR #5555",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5555"
+        },
+        {
+          "label": "PR #5556",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5556"
+        },
+        {
+          "label": "PR #5557",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5557"
+        },
+        {
+          "label": "PR #5559",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5559"
+        },
+        {
+          "label": "PR #5560",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5560"
+        },
+        {
+          "label": "PR #5561",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5561"
+        }
+      ]
     }
   ]
 }

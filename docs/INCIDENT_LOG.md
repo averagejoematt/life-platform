@@ -24,6 +24,8 @@ Last updated: 2026-10-31 Session CQ Fable (#1332 gate; +1 row — the 115-day Cl
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-11-01 | **P3** (public data; SILENT — a public route served short pages and a reachable-looking total for 20 hours; no reader harm beyond a smaller ledger) | **`/api/ledger_export` served 97 of 100 items a page with `total` 468 (#5532).** Found by the v9 Phase 3 exporter's own count (456 of 468 rows after paging), not by a check. Twelve rows' claims and stored ids carried the journal-silence pattern; the Lambda's last-step wire guard (`common.journal_silence.guard_api_response`, #5131) dropped them AFTER the handler had counted and sliced. | A guard that prunes the serialised body cannot tell the handler what it removed; the handler paged a set the wire would never serve whole. The 48 "empty claims" found alongside were NOT a defect — the #4701 `unsourced` holds the row already names. | ~20 h (route live 03:50Z, measured 23:5xZ) | PR #5559 (`1771e3a2a`, +~13 h to deploy): the handler runs the same scrub BEFORE paging; `total` = served, `record_total` = counted, `withheld.journal_silence` named; verified live 16:45Z (5 whole pages → 456 unique = total; 0 journal-silence spans on the wire). Lesson in memory: count after the guard, and diagnose handler → Function URL → CDN. | No. |
+| 2026-11-01 | **P3** (CI; LOUD — three pre-merge full suites red on the same two tests, ~1 h of merge delay each) | **NCBI eutils throttled: `esummary` answered 200 with `uids: []` for every PMID (efetch 429), so `tests/test_citation_resolution_1892.py` and `test_experiment_library_citations_1983.py` reported forty "withdrawn" citations** on PRs #5554, #5555, #5551 and a laptop at once (04:0x–06:4xZ). | `check_pubmed` treated an all-empty answer as per-row drift; only Crossref's 429/5xx had an UNVERIFIED path. A network check marked `integration` still ran in the unit lane. | immediate (the suite reds) | PR #5556 (`b4e11b417`, ~45 min): an all-empty / 429 / 5xx eutils answer is `UNVERIFIED …` (the vocabulary `split_unverified` already reserved), both tests skip on it; an offline test pins all-empty → unverified vs one-missing → drift. | No. |
 | 2026-10-31 | **P2** (security; SILENT — the account's audit trail delivered nothing for 115 days with no platform signal; no exploitation evidence) | **CloudTrail `life-platform-trail` stopped delivering on 2026-07-08 (#5512).** `get-trail-status` 2026-10-31: `IsLogging true`, `LatestDeliveryError AccessDenied`, `LatestDeliveryTime 2026-07-08T22:39:56Z`, a failed attempt every few minutes; `s3://matthew-life-platform/cloudtrail/` empty (the `cloudtrail-expire-90d` lifecycle rule had expired July's objects). Found by Session CP's read-only IAM audit, not by any alarm. | Two TWIN documents for one bucket policy: `deploy/bucket_policy.json` held the public-read + delete-protection statements, `setup/setup_cloudtrail.sh` held the two `cloudtrail.amazonaws.com` statements as an inline literal. `put-bucket-policy` REPLACES the whole document, so the 07-08 apply of the repo file (the reconcile smoke's own "Fix:" line) dropped the CloudTrail half. The trail lives outside CDK — no drift check saw it and it had no dead-man (CHARTER primitive 5). | 115 d (an audit, not an alarm). | Same session: both statement sets merged into `deploy/bucket_policy.json` (the ONE document) and applied owner-attended; the setup script now applies that file and refuses one without `AWSCloudTrailWrite`; `cloudtrail-delivery-stale` dead-man on the daily `{check_ingest_liveness}` run, fail-loud on an unreadable status (`tests/test_cloudtrail_delivery_deadman_5512.py`). Apply + first delivery recorded on #5512. | **Yes — 115 days of management and S3 data-event (`raw/`, `uploads/`) audit records are unrecoverable.** CloudTrail does not re-deliver; `lookup-events` holds only the trailing 90 days of management events. |
 | 2026-10-28 | **P2** (security; SILENT — six critical and 23 high CVEs sat in a live layer for ~7 days with no platform signal; no exploitation evidence) | **41 Pillow advisories (GHSA-8g5g-8vmr-9782 et al., heap overflows in the JPEG/TIFF/FPX decoders) were open on `pillow-layer:2` (Pillow 12.3.0) from 2026-10-21, read by og-image-generator, recap-card-generator and reading-cover-pipeline, which decodes cover images fetched from outside.** Found 2026-10-28 ~03:00Z from a `git push` banner ("GitHub found 42 vulnerabilities"), not by any platform check. Fixed the same session: pillow-layer:3 on Pillow 13.0.0 (owner yes), PR #5457, LifePlatformOperational hand-applied, recap dry-run render proved it, Dependabot 42 → 0 (certifi on the retired garth layer dismissed `not_used`, owner ruling). | The platform's CVE scanner for binary layers never worked: `life-platform-pip-audit` shells out to `python -m pip`, which the python3.12 runtime does not ship, so every layer manifest errored (`No module named pip`) while the report read `0 vulnerabilities` with no hard-fail; its GitHub-alerts leg skips without `GH_ALERTS_TOKEN`; and CI's enforced pip-audit step skips `lambdas/requirements/` on the assumption the Lambda covers it. A scanner whose error reads as green, guarding a set nothing else covers. Class tracker #5473 (CI scans the layer manifests; a scan that cannot run must red). | ~7 days (alerts 10-21..10-24 → found 10-28) | ~1 h | No |
 | 2026-10-27 | **P3** (the owner's 10-27 training day had no active routine draft for ~9 h overnight; no session was missed — none was logged in the window — and the routine was re-drafted before his training day; quiet: nothing alarmed) | **Session CJ archived the two 10-27 drafts at 06:27Z to re-draft them through the just-deployed Hevy-notes code, and the laptop then paused (~06:27Z → 15:21Z).** The re-draft ran at 15:21Z, after the Pacific day had rolled to 10-27, so the nightly predraft's default target was 10-28 and 10-27 stayed without a draft until an explicit `target_date` re-run at 15:26Z. | A two-step change to the owner's plan (archive, then re-draft) was split across tool calls with no guarantee the second ran; the predraft's target date is relative to the Pacific clock at run time. Fix: re-drafted 10-27 with an explicit `target_date` (15:26Z) and read the dry run back. Procedure: an archive-then-redraft of a routine runs as ONE command with an explicit `target_date`, and never across a likely laptop sleep (handover gotcha). No class tracker — not a code defect. | ~1 min after resume (the predraft printed target 2026-10-28) | ~9 h (15:26Z) | No |
@@ -299,7 +301,7 @@ Last updated: 2026-10-31 Session CQ Fable (#1332 gate; +1 row — the 115-day Cl
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 253 dated rows, 218 post-June** (newest row 2026-10-31):
+**Distribution — 255 dated rows, 220 post-June** (newest row 2026-11-01):
 
 | month | rows |
 |---|---|
@@ -312,16 +314,17 @@ Last updated: 2026-10-31 Session CQ Fable (#1332 gate; +1 row — the 115-day Cl
 | 2026-08 | 126 |
 | 2026-09 | 41 |
 | 2026-10 | 15 |
+| 2026-11 | 2 |
 
-**By severity:** P1 6 · P2 37 · P3 96 · P4 109 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 37 · P3 98 · P4 109 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 31 match none):
 
 | n | class |
 |---|---|
-| 161 | deployment error |
-| 66 | stale config / literal drift |
+| 162 | deployment error |
+| 67 | stale config / literal drift |
 | 48 | QA-oracle false positive |
 | 44 | QA false positive — deploy-race (#2978) |
 | 37 | deploy-plane wedge / strand / race |
@@ -357,17 +360,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**56 of 253 rows are silent.**
+**56 of 255 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 56 | 197 |
-| TTD parseable | 43 | 137 |
+| rows | 56 | 199 |
+| TTD parseable | 43 | 139 |
 | median TTD | **28 min** | 20 min |
-| mean TTD | 1,703 min | 2,635 min |
+| mean TTD | 1,703 min | 2,605 min |
 | exceeded 1 day | 6 (14% of parsed) | 13 (9% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~1.6× more likely to run past a day**. But the *means* are only 35% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (6 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 253 TTD cells (29%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.4× longer to detect at the median** and are **~1.6× more likely to run past a day**. But the *means* are only 35% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (6 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 255 TTD cells (29%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -378,7 +381,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September and 15 in October. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September, 15 in October and 2 in November. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)

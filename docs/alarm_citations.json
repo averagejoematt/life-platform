@@ -1,279 +1,287 @@
 {
-  "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Since #2912 the same holds for an alarm that FIRED AND CLEARED within the last 72h (episode start and end both in-window, read from describe-alarm-history) — a flap between wraps is invisible to current-state duration by construction, so it needs an entry or an explicit --decoded line just like a standing red. Add an entry the same session a new long-red alarm (or flap) is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live. Since #2996 a citation that names a `#N` must name an issue that is still OPEN: the gate reads `gh issue view` for every currently-lit alarm's citation and flags a dead reference, because a citation string is not an owner (measured 2026-08-22: 4 of 7 entries pointed at closed issues, 3 of them on lit alarms). A citation with NO `#N` is never flagged by that check — a dated, self-clearing state is honestly cited in prose — but the 14-day `issueless_ancient_reds` rule still forces a `#N` past that tenure. PRUNE an entry when its alarm recovers. Since #3258 a citation may not assert a recurrence NEGATIVE (\"no recurrence since\", \"has not recurred\") unless the same note names how it was derived — the log group it was read from, or the query that read it (filter-log-events / describe-alarm-history / start-query). A recurrence-negative is unfalsifiable from the registry alone, and the measured instance hid a live recurrence for four days: this alarm's entry read \"fixed by #3066/PR#3075 …, no recurrence since\" while the identical finding fingerprint 539c6d sat in /aws/lambda/life-platform-qa-smoke inside the last 72h. Enforced offline against the committed file by tests/test_check_alarm_citations.py::test_the_live_registry_carries_no_underived_recurrence_negative (scripts/check_alarm_citations.py::unfalsifiable_negatives), so it runs on every PR rather than only at wrap. A POSITIVE claim needs no marker — it is checkable by looking.",
-  "ai-canary-overall": {
-    "added": "2026-10-26",
-    "cause": "vendor transient during the Bedrock 503 episode",
-    "cause_observed": "2026-10-26 16:20Z ai-quality-canary run: ask_factual and ask_causal status 500, board_grounded and board_meta_pressure empty for physical_coach / sleep_coach. Alarm ALARM 16:21Z; Maximum OverallAlarm over 86400 s.",
-    "citation": "self-clearing vendor window, not a code defect: Bedrock Haiku 4.5 503 episode of 2026-10-26 (from ~13:00Z; text calls recovered ~16:17Z, image calls still failing 16:49Z; incident row 2026-10-26). The 86400 s period holds the 16:20Z datapoint until ~2026-10-27 16:21Z. Expiry: if the next canary run after 2026-10-27 16:00Z still reports a FAILING check, file a story naming that check."
-  },
-  "ai-daily-spend-high": {
-    "added": "2026-10-18",
-    "cause_observed": "2026-10-18",
-    "updated": "2026-10-18",
-    "cause": "rolling-24h spend above the bar on an attended Bedrock night (owner's word)",
-    "citation": "self-clearing, 24 h: the 2026-10-18 episode (ALARM since ~05:00Z) is the owner-authorized dev-session spend — season_rebuild.py through week 4 at DEV_AI_BUDGET_USD=20 (~$14) + twelve --repair runs ($9.13, #4537/#4993) + the forced ai-expert-analyzer run; dev-session total $19.12 in 24 h (ai_spend_attribution.py --days 1 at 17:10Z). Clears as the rolling window passes 2026-10-19 ~05:00Z; the threshold class is #4517. Prior entry: the 2026-08-24 D2 session-window flap decode (same shape, dev-day spend), kept as history.",
-    "note": "Flapped x2 in the 2026-08-23/24 D2 session window: the 18-agent implementation fan-out + merge-train verification is a known heavy-dev-day spend shape (same decode as the D1 wrap's flap). Cleared on its own both times. The #2892 CallerClass dimension (deployed 2026-08-24) separates dev/CI spend from prod-class going forward, which removes this alarm's dev-session false-fire mode. Expiry: if it fires on a NON-dev day, investigate fresh."
-  },
-  "ai-tokens-daily-brief-runaway": {
-    "added": "2026-09-04",
-    "cause": "reset-day multi-run",
-    "cause_observed": "2026-09-05",
-    "citation": "Dated, self-clearing, and SUPERSEDED BY A RESHAPE: the cited flap is pre-fix history that falls out of the 72h window on 2026-09-07. Prune this entry on or after 2026-09-07. The alarm it names was `ai-tokens-daily-brief-daily` (Sum/86400 >= 30000) until #3505 renamed and reshaped it to `ai-tokens-daily-brief-runaway` (Sum/3600 >= 35000, ONE brief run's window); the old alarm is deleted by that CDK deploy, so if the digest shows the old name after the LifePlatformMonitoring deploy, the deploy did not land.",
-    "note": "FLAP, not a standing red (#2912 detector). Entered ALARM at 2026-09-04 09:45 PT and again 10:09 PT, each clearing within a minute (describe-alarm-history, 4 transitions). Cause, from the LifePlatform/AI AnthropicOutputTokens{daily-brief} series: the 2026-09-03 Saturday re-anchor forced a brief regeneration at 20:00 PT (8,971 tokens) on top of that day's 10:00 PT send (13,566), and the 09-04 send (8,384 + 11,585) then sat inside the same trailing 86400s Sum window — 30,000-token threshold crossed transiently as the window slid, cleared as the 09-03 10:00 datapoint aged out. No defect: two brief runs in one day is the reset's designed behaviour, and the 09-04 send alone (19,969) is under threshold. Prose citation deliberately carries no '#N' — nothing to fix; the dated self-clearing state is the sanctioned shape. RE-POINTED 2026-09-05 (#3505): the flap's MECHANISM — three ordinary runs summing inside one 86400s window on a reset day — is now structurally impossible rather than merely explained, because the alarm's period is one run's own window. The threshold was re-derived from n=71 hourly Sum datapoints over the trailing 35 days (median 4,717 · Q3 7,664 · max 31,970)."
-  },
-  "ai-tokens-platform-daily-total": {
-    "added": "2026-10-02",
-    "cause": "rolling-24h output tokens above the bar on one owner-ruled laptop eval run (dev-session caller)",
-    "cause_observed": "2026-10-26",
-    "citation": "self-clearing, 24 h: the 2026-10-26 episode (ALARM 05:41Z) is one owner-ruled laptop run — the open-weight swap eval (single process, DEV_AI_BUDGET_USD=15 for that command only), 2026-10-26 05:12–06:10Z: CallerClass dev-session put ~337,000 output tokens into the rolling day (gpt-oss reasoning tokens + the Sonnet pairwise judge), on top of the platform's ordinary day. It clears as the rolling 24 h passes ~2026-10-27T06:15Z; if still ALARM after 2026-10-27T09:00Z, read AnthropicOutputTokens by LambdaFunction before re-citing. The bar class itself is #4517.",
-    "updated": "2026-10-26"
-  },
-  "ai-tokens-platform-daily-total-genesis-window": {
-    "added": "2026-09-05",
-    "citation": "Dated, self-clearing: a genesis-window episode from 2026-09-02, now VISIBLE for the first time because #3503 gave describe_alarm_history its AlarmTypes. Falls out of the 72h window on 2026-09-06 — prune this entry on or after that date.",
-    "note": "COMPOSITE, and it had been structurally invisible to this very gate. The rule is ALARM(ai-tokens-platform-daily-total) AND ALARM(token-alarm-genesis-window-active) — i.e. the platform's daily output-token ceiling breaching WHILE a genesis window is open, which is exactly the conjunction it was built to catch. Episode: OK->ALARM 2026-09-02T11:34:51 PT, ALARM->OK 2026-09-03T00:36:51 PT (~13.0h), one transition pair. Priors on the same alarm: 2026-08-23 01:25->17:01, 2026-08-17 09:01->10:05. It routes to the digest by design (ADR-052). NOT A REGRESSION AND NOT NEW BEHAVIOUR: the alarm fired correctly each time; every reader of alarm history omitted AlarmTypes, so `describe_alarms`/`describe_alarm_history` returned metric alarms only and composites were absent by construction (the #3390 class, fixed for one file then; swept across ten call sites by #3503/PR #3589 tonight). The cited episode PREDATES the fix — this citation records history the platform could not previously see, which is the fix working. State is OK; the September base ceiling ($215, ADR-133) is not implicated. Prune on/after 2026-09-06."
-  },
-  "budget-tier-sustained-7d": {
-    "citation": "#2989",
-    "note": "RE-CUT 2026-08-23 (#2989, chose Option A over Option C): threshold moved from tier >= 1 sustained to tier >= 2 sustained in cdk/stacks/monitoring_stack.py — merged but NOT YET DEPLOYED (this worktree cannot cdk deploy). ADR-133 derived the permanent $150 base FROM a measured steady state ($4.12/day = 82.4% of $150) that lands inside band 1 (73-87%), so a threshold=1 alarm fired continuously on the platform's DESIGNED steady state from 2026-08-12 (17+ consecutive days) — the same background-noise failure #1927 was filed to prevent, one band up. Band 2 (reader narratives paused) is not the designed state at ~81% MTD spend, so a full week pinned there is genuinely rare and worth answering; #1927's own amendment already moved the two CI gates out of band 1, leaving only five internal/dev features there. EXPECTED POST-DEPLOY: this alarm should clear once `cdk deploy LifePlatformMonitoring` ships the new threshold, because live BudgetTier has not sustained >= 2 for a full week. Re-read the live CloudWatch alarm state after that deploy — if it has NOT cleared, that is new information (tier has been at 2+ longer than assumed here) and this entry should stay with an updated note; if it HAS cleared, prune this entry once it has been OK longer than the #2912 72h flap window."
-  },
-  "budget-tier-unreadable": {
-    "added": "2026-08-23",
-    "citation": "#2824",
-    "note": "New alarm (2026-08-23, DIL-036 slice of #2824): fires when budget_guard logs BUDGET_TIER_UNREADABLE on the public site-api-ai path — the SSM budget-tier read failed (ParameterNotFound / AccessDenied / outage), website_ai is failing CLOSED (readers get the honest 'paused' output), and the rest of the fleet is running fail-open with NO ceiling enforcement. Never a routine state: if lit, restore the SSM param/grant (/life-platform/budget-tier) — the guard recovers within one 5-min cache TTL. Prune this entry only if the alarm is retired; while #2824 is open it is the named owner."
-  },
-  "coherence-overall": {
-    "added": "2026-10-27",
-    "cause_observed": "2026-10-26",
-    "cause": "facts_agreement: expert:sleep served stale from 2026-10-05 (the grounding gate held every sleep draft since; renew_held extended the old record with no age cap), coach:mind_coach 'HRV cited in bpm' (a sentinel regex false positive on 'NN ms HRV, NN bpm resting'), then every EXPERT# record lapsed ~2026-10-26 23:15Z after two Monday 503 bursts",
-    "citation": "#5442 — the four code causes are fixed in PR #5455 (one HRV-in-bpm check, windowed averages pass night-scope, a 15-day renewal cap, board records renew on a hold/tripped breaker); the expert surfaces repopulate at the next analyzer run (Mon 2026-11-02 14:00Z) or an owner-approved earlier run. Expiry: if still ALARM after 2026-11-02 16:00Z, re-derive on #5442.",
-    "note": "Re-cited by Session CJ wrap 2026-10-27; prior entry (2026-10-13/10-18) explained the 10-18 episode."
-  },
-  "compute-pipeline-stale": {
-    "added": "2026-10-10",
-    "cause": "daily-metrics-compute TypeError (habit_registry string target_frequency)",
-    "cause_observed": "2026-10-10T04:45Z",
-    "citation": "self-clearing on a dated window — the issue 4704 outage is fixed (PR 4706 deployed 2026-10-10 ~04:30Z; the registry values corrected and 10-04..10-08 back-filled at ~05:20Z). Only the 17:00Z daily-brief emits this metric, and the 86400s window still holds the 10-09 17:00Z datapoint of 1.0; the 16:40Z compute writes 10-09 with the fixed code and the 17:00Z brief emits 0. Expiry of this citation: 2026-10-10T17:30Z — if still ALARM then, file an issue instead of extending this line",
-    "updated": "2026-10-10"
-  },
-  "cost-metric-drift-sustained": {
-    "added": "2026-08-21",
-    "citation": "#2883",
-    "note": "Expected RED from ~7 days after its first deploy: the alarm states a true, known condition. Re-measured live 2026-08-24T23:59Z governor cycle (most recent at time of check): ratio 1.3710 — lowest since 08-21, continuing the slow pullback from the 1.4177 peak on 08-22/23, but still ~19% above the 1.15 bar; 19 consecutive 8h datapoints since box 2 landed (08-19) are ALL above bar, none sub-1.15. CE reconciliation re-measured 2026-08-25: Bedrock UnblendedCost $83.32 MTD vs self-reported LifePlatform/AI EstimatedCostUSD $61.36 MTD, a $21.96 gap (26.4%) — down $0.75 from the prior $22.71/27.4% reading a day earlier. The golden-eval AiCostTelemetry grant (previously staged) is now CONFIRMED APPLIED live (aws iam get-role-policy shows the statement; simulate-principal-policy returns allowed for cloudwatch:PutMetricData/LifePlatform/AI; infra/iam/README.md updated) but has not yet moved the ratio — golden-brief-eval.yml runs weekly (next 2026-08-31) and no run has executed since the grant applied. The dominant unattributed residual remains interactive Claude Code dev-session usage (out of scope per #3070's design — never reaches the ADR-062 chokepoint), still unsized. The alarm itself (cost-metric-drift-sustained, operational_stack.py, #2948) was re-audited this pass and found already correctly configured — threshold/window/routing all verified against DRIFT_RATIO_BAR, no alarm-side change needed. Remove this entry when box 2 lands the ratio < 1.15 for a full week AND the alarm has actually cleared live.",
-    "updated": "2026-08-25"
-  },
-  "freshness-interior-gap": {
-    "added": "2026-09-21",
-    "cause": "eightsleep:2026-09-20",
-    "cause_observed": "2026-09-24T16:48:26Z",
-    "citation": "RE-OBSERVED 2026-09-24T16:48:26Z (Session AT wrap): freshness-checker logged `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-09-20']}` — the SAME single night as the 2026-09-21 episode, no new gap. RE-CITED 2026-09-21 22:1xZ (Session AQ) — a NEW episode of the same class the 2026-08-30 entry closed. ALARM since 2026-09-21T16:46Z (1 datapoint >= 1). LIVE CAUSE: freshness-checker at 16:45:15Z logged `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-09-20']}` — DATE#2026-09-19 and DATE#2026-09-21 exist, DATE#2026-09-20 does not. The vendor has no session for that night: eightsleep-data-ingestion's hourly gap-fill has re-asked since 2026-09-21T00:15Z and every run logs `No day matching 2026-09-20. Available: ['2026-09-19']` → `2026-09-20: no records after transform` (the owner sleeps downstairs some nights — ruling recorded 2026-09-05 on the prior episode; not re-confirmed for this night). Dated, self-clearing, no owner issue by design: the source is configured `record_gap_exhausted_absence=True` with `LOOKBACK_DAYS` 7, so the explicit absence marker for 2026-09-20 lands when the day leaves the gap-fill window (on or about 2026-09-27) and InteriorGapCount reads 0 from that run; the alarm evaluates a 24h count >= 1, so it stays ALARM until ~24h after that. EXPIRES 2026-09-29: if it is still lit then, the marker did not land and that is a NEW defect (the gap-exhausted absence-marker mechanism, pull request 3630's class), not this episode.",
-    "note": "Same shape as the 2026-08-30 episode — the mechanism that closes it already exists on this source and had not reached its boundary day yet. `added` is the day this episode was first cited; `cause_observed` the re-derivation date (#3501)."
-  },
-  "life-platform-budget-tier-escalation": {
-    "added": "2026-10-21",
-    "cause": "budget tier 2 on the October spend projection — re-read 2026-10-23 by Session CC: SSM /life-platform/budget-tier = 2, LastModified 2026-10-19T17:00-07:00 (unchanged since CB's read); the alarm alternates ALARM/OK about every 5 h on 10-22 (01:01, 09:01, 17:01 PT into ALARM) as the governor's datapoints arrive, with the SAME cause, tier 2 on the October projection. The tier was never forced.",
-    "cause_observed": "2026-10-23",
-    "citation": "#5135 — the dev-session AI envelope (epic #5134): laptop/agent spend counts against the one production ceiling and lifts the projection into band 2. Expiry: self-clears at the 2026-11-01 month rollover or when the projection falls below the band; still lit after 2026-11-02 → re-cite.",
-    "history": "Prior citation #2801 (closed) covered the 2026-08-26 flap of the same class."
-  },
-  "life-platform-s3-bucket-size-high": {
-    "citation": "self-clearing on a dated window — the deploys/ noncurrent-version lifecycle was tightened 7d to 1d and applied to the LIVE bucket 2026-08-31 (fin-diligence remediation, verified via get-bucket-lifecycle-configuration); S3 lifecycle expiry runs daily, so the ~72GB noncurrent tail drains over the next runs. Expiry of this citation: 2026-09-03 — if still ALARM then, file a follow-up issue instead of extending this line",
-    "note": "prior citation pointed at a closed issue; the shipped cure is the fin-diligence 2026-08-31 lifecycle change (PR 3381)"
-  },
-  "prediction-gradable-share-low": {
-    "added": "2026-08-28",
-    "citation": "deliberate arming transition (lit 2026-08-26), clearing by DILUTION rather than by the _retire_ungradeable mechanism its own CDK comment names — re-derive at the next wrap; issueless_ancient_reds forces a #N by 2026-09-09",
-    "note": "ADDED 2026-08-28 (Session I). Lit 2026-08-26T10:25 PT; crosses the 72h bar 2026-08-29 ~10:25 PT, hence cited now. The alarm's own CDK comment (cdk/stacks/monitoring_prediction_alarms.py:65-73) says it 'fires on the CURRENT corpus the day it deploys (28/50 pending are legacy qualitative rows) and clears as the evaluator retires them at window end (_retire_ungradeable) — deliberate, same posture as #727'. The firing is therefore expected. WHAT IS NOT EXPECTED, and is why this note exists rather than a bare 'deliberate': measured LifePlatform/Predictions daily 2026-08-23..08-26, GradableShare rises 0.3951 / 0.4024 / 0.4024 / 0.4556 while UngradeablePendingCount is FLAT at 49 / 49 / 49 / 49. The share is improving because the GRADABLE numerator is growing, not because legacy rows are being retired. _retire_ungradeable only retires a record once its domain-clamped window has ELAPSED, so a flat 49 is consistent with 'no window has elapsed yet' AND with 'the retirement is not running' — this note does NOT claim to distinguish them, because I did not read the pending corpus out of DynamoDB. That is the open question. RE-DERIVE, do not trust this note: if UngradeablePendingCount is still exactly 49 at the next wrap, the stated clearing mechanism is not the one clearing it and this earns an issue. The 14-day issueless_ancient_reds rule forces a #N by 2026-09-09."
-  },
-  "site-api-invocation-spike": {
-    "citation": "2026-08-24 session note — self-inflicted QA traffic",
-    "note": "x7 fire/clear cycles in the D2 window: three full-surface visual-QA sweeps, smoke 246-URL runs, render-qa probes, and two site-api deploys' verification traffic — the same self-inflicted decode as the D1 wrap (x4 there). No reader symptom. Expiry: fires outside a session/QA window get fresh triage."
-  },
-  "token-alarm-genesis-window-active": {
-    "added": "2026-09-01",
-    "citation": "dated self-clearing window, expires 2026-09-08 — no issue reference, by design. `lambdas/common/token_alarm_window.py` sets TOKEN_ALARM_GENESIS_WINDOW = ('2026-08-31', '2026-09-08'), the dated window around the cycle-15 genesis (2026-09-01), and the 1/0 gauge is 1 for its duration BY CONSTRUCTION. It self-clears on 2026-09-08 with no deploy and no manual step; PRUNE this entry then. If it is still lit after 2026-09-08, that IS a defect and needs a filed issue.",
-    "note": "Re-pointed 2026-09-01 (Session P) because the entry had ROTTED, not merely aged — the third specimen of that class in two days. It still described the CYCLE-14 window ('2026-08-16','2026-08-24') and told the reader to file an issue if the alarm was lit after 2026-08-24; the alarm re-fired 2026-09-01 01:01 PT on the cycle-15 window, so following the stale instruction would have manufactured a spurious issue for an alarm working exactly as designed. Derived from the live constant at re-point time, not copied: TOKEN_ALARM_GENESIS_WINDOW = ('2026-08-31', '2026-09-08'), cross-checked against restart_verify.py's stamped-window check, which passed with the same pair. The rot is structural — this citation names a dated window that every reset rolls forward, so it needs re-pointing at each genesis or pruning once the window closes."
-  },
-  "weekly-signal-delivery-heartbeat": {
-    "citation": "arming transition of the #2820 dead-man 2026-08-21 — not a delivery failure",
-    "note": "Kept 2026-08-22 (#2996). The alarm is OK, but #2912's flap check reads a 72h window and this alarm's only episode is inside it: describe-alarm-history shows INSUFFICIENT_DATA -> ALARM at 2026-08-21 20:44 PT and ALARM -> OK at 21:44 PT — one hour, immediately after #2820 deployed the WeeklySignalSent dead-man (treat_missing=BREACHING, so a freshly created alarm with no datapoints is ALARM by construction until the first one lands). No signal was missed. THE PRUNE RULE, corrected: remove a recovered alarm's entry once it has been OK for longer than the flap window (72h), not the moment it clears — pruning on recovery alone trades a stale entry for a flap-gate red, which is what happened while writing this. Prune after 2026-08-24 21:44 PT if still OK."
-  },
-  "hevy-template-index-not-rebuilt-48h": {
-    "added": "2026-09-14",
-    "citation": "#3764 — created 2026-09-14, cleared on its first heartbeat the same hour",
-    "note": "BIRTH FLAP, expected and self-clearing: a dead-man alarm declares treat_missing_data=BREACHING, so it enters ALARM the instant CloudFormation creates it (no datapoint exists yet) and clears on the first emit. Both transitions happened inside the 2026-09-14 deploy window. This is the correct shape for the alarm — an absence alarm that stayed OK before its first datapoint would be green over an unknown, which is the state it exists to refuse. Any future BREACHING dead-man will flap once at birth the same way. Cleared when the 13:40Z rebuild rule emitted TemplateIndexRebuilt=1; alarm has been OK since."
-  },
-  "recap-card-no-invocations-24h": {
-    "added": "2026-09-14",
-    "citation": "#3741 — created 2026-09-14, cleared once the generator was invoked",
-    "note": "BIRTH FLAP, expected and self-clearing: a dead-man alarm declares treat_missing_data=BREACHING, so it enters ALARM the instant CloudFormation creates it (no datapoint exists yet) and clears on the first emit. Both transitions happened inside the 2026-09-14 deploy window. This is the correct shape for the alarm — an absence alarm that stayed OK before its first datapoint would be green over an unknown, which is the state it exists to refuse. Any future BREACHING dead-man will flap once at birth the same way. Cleared when the recap-card-generator was first invoked by the backfill; alarm has been OK since."
-  },
-  "life-platform-canary-anthropic-failure": {
-    "citation": "#3830 — a FIRED-AND-CLEARED flap that is fully explained and is the root of tonight's fleet-rollback incident. ALARM 2026-09-15T19:55:44Z -> OK 20:10:44Z (15 min, one cycle). Cause: a single Bedrock `ServiceUnavailableException` — a vendor 503 — on the canary's `anthropic` check at 19:54:50Z, with DDB, S3, MCP and the subscribe flow all round-tripping clean in the same run. The alarm is CORRECT and needed no change: it fired on a real failed inference round-trip and cleared on the next clean one. What it exposed is that ONE datapoint had three consumers with three different confidences: the canary's own email path SUPPRESSED it as a first occurrence, this alarm fired and self-cleared, and the CI/CD smoke gate treated it as gating and auto-reverted 85 Lambdas (run 35013357326). Fixed by PR #3831, merged 28247778f and DEPLOYED 2026-09-16T01:26:13Z (verified in the deployed bundle): `LANE_EXTERNAL_TRANSIENT` + `lane_for_result` classify the FAILURE MODE, not just the check, so a vendor transient is counted in `failed_external_transient` and excluded from `failed_deploy_health` — the only key the smoke oracle gates on. A recurrence of THIS alarm is now expected to be non-gating; if a future 503 ever reverts a deploy again, that is a NEW finding, not this one.",
-    "note": "Deliberately cited rather than suppressed, and the alarm is deliberately NOT retuned. A 15-minute flap on a real vendor outage is this alarm doing its job — it is the only instrument of the three that got the confidence level right, being loud without being destructive. #3830's remaining half (acceptance box 3) is retry-before-gate: making a SINGLE first-occurrence datapoint incapable of reverting a fleet, which is the property the canary's own email suppression already has and the deploy gate still does not. Until that lands, a SECOND transient inside one smoke window could still gate. Recorded 2026-09-16 by Session AF, the session that caused, diagnosed and fixed the episode in the same night."
-  },
-  "daily-brief-duration-high": {
-    "added": "2026-09-29",
-    "citation": "#4343 — FLAP 2026-09-28: the 17:00Z daily brief ran 643 s (17:00:03→17:10:46Z) because six coaches were HELD after a regeneration attempt each (the #4343 live-proof failure: regeneration re-primes banned jargon; cause-C misfires). One ALARM→OK episode, cleared by the next run. It recurs exactly while #4343's hold count stays > 2; the remaining-time floor (the remaining-time-floor budget box) was not exercised. RE-CITED 2026-09-30 (Session BA): the 2026-09-29 17:00Z brief ran 733 s with 5 quality holds (same class); PR 4443 (rewrite revises the draft) and PR 4466 (lead read's own rubric) deployed after it — proof due at the 2026-09-30 17:00Z brief under #4343.",
-    "note": "Session AZ wrap citation for a fired-and-cleared episode (#2912)."
-  },
-  "ai-daily-spend-high-urgent": {
-    "added": "2026-10-01",
-    "cause_observed": "2026-10-18",
-    "cause": "rolling-24h threshold crossed by attended laptop Bedrock on the owner's word",
-    "citation": "self-clearing, 24 h: the 2026-10-18 episode is the owner-authorized dev-session spend — season_rebuild.py through week 4 at DEV_AI_BUDGET_USD=20 (~$14) + twelve --repair runs ($9.13, #4537/#4993) + the forced ai-expert-analyzer run; dev-session total $18.60 in 24 h (ai_spend_attribution.py). Clears as the rolling window passes 2026-10-19 ~05:00Z; the threshold class itself is #4517 · Prior entry (2026-10-18T07:55Z): #4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision vis…",
-    "updated": "2026-10-18"
-  },
-  "ai-tokens-platform-daily-total-urgent": {
-    "added": "2026-10-01",
-    "cause_observed": "2026-10-26",
-    "cause": "rolling-24h output tokens above the bar on one owner-ruled laptop eval run (dev-session caller)",
-    "citation": "self-clearing, 24 h: the 2026-10-26 episode (ALARM 05:41Z) is one owner-ruled laptop run — the open-weight swap eval (single process, DEV_AI_BUDGET_USD=15 for that command only), 2026-10-26 05:12–06:10Z: CallerClass dev-session put ~337,000 output tokens into the rolling day (gpt-oss reasoning tokens + the Sonnet pairwise judge), on top of the platform's ordinary day. It clears as the rolling 24 h passes ~2026-10-27T06:15Z; if still ALARM after 2026-10-27T09:00Z, read AnthropicOutputTokens by LambdaFunction before re-citing. The bar class itself is #4517.",
-    "updated": "2026-10-26"
-  },
-  "chronicle-delivery-heartbeat": {
-    "added": "2026-10-04",
-    "cause": "week-8-desk-stale-thread-fallback",
-    "cause_observed": "2026-10-31",
-    "updated": "2026-10-31",
-    "citation": "#4531 — week 7 was budget-paused (2026-10-21T15:00:34Z 'Budget guard paused chronicle') and week 8's desk budget failed validation twice on stale threads (2026-10-28T15:03:06Z: the ledger's last told weeks were 5 and a backfilled 6, so the calendar count called every live thread stale). The run fell back to the legacy writer and stored Week 8 as an unapproved draft, preview email sent 15:03:54Z; seven zero days → ALARM 2026-10-28 16:00Z. The code fix (staleness counts installments told; the desk retires what a retry leaves stale) is in the Session CL integration PR. Clears when the owner approves Week 8 from the preview email, or at the first delivered week after the Wed 2026-11-04 run. Re-derived 2026-10-31T17:45Z (Session CO): the Week 8 draft DATE#2026-10-27 is still unapproved (2d23h at the 14:27Z pre-flight), the 48-h sweep holds it daily, no subscriber delivery since — the cause is unchanged and is the owner's approve, not a code path.",
-    "note": "Prior entry (2026-10-17, cause week-6-unapproved-draft): the week-6 unapproved legacy draft (#4914). Prior entry (2026-10-04, issue 4593, closed): week 4 published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; cleared when week 5 delivered through the approve path 2026-10-09 18:00Z. The current episode is a different cause on the same heartbeat."
-  },
-  "swallowed-permission-denial": {
-    "added": "2026-10-20",
-    "cause": "RESOLVED — life-platform-freshness-checker cold-start read of config/coaching/training_charter.private.json was denied (no grant); the grant shipped in the Session CL integration PR #5476 and the alarm has been OK since 2026-10-29T06:07:55Z (#5220, closed 2026-10-31)",
-    "cause_observed": "2026-10-31",
-    "updated": "2026-10-31",
-    "citation": "#5220 (closed 2026-10-31) — the last episode: flaps at 2026-10-28 06:04Z, 2026-10-29 00:49Z and 05:38Z PDT-adjusted (describe-alarm-history), each the freshness-checker's cold-start 'not read (AccessDenied)' line on the private charter twin. PR #5476 added CharterTwinRead + CharterTwinList to its role; after the apply the alarm went OK at 2026-10-29T06:07:55Z and stayed OK across the 2026-10-31 ~04:30Z deploy_all fleet deploy (run 41167764705) and the 06:25Z-06:31Z code deploys; cold starts at 2026-10-31T16:45:13Z and 16:52:06Z logged zero AccessDenied. The entry stays only because the 2026-10-29 00:49Z / 05:38Z transitions are inside the 72-h flap window until 2026-11-01T06:07Z; prune it at the first wrap after that.",
-    "note": "Prior causes: og-image-generator board-roster read (2026-10-27, resolved by PR #5459); charter-private-twin-absent-403 (2026-10-20 → 10-25, resolved by the charter-twin grant PR 5354, applied 2026-10-25 06:33Z)."
-  },
-  "nightly-predraft-missing": {
-    "added": "2026-10-04",
-    "cause": "predraft-run-failed",
-    "cause_observed": "2026-10-03T02:00:40Z",
-    "citation": "#4568 — one episode: the 2026-10-03 02:00Z run failed (the draft landed on an archived routine's id and the read-back treated it as not ours), the dead-man went ALARM at 04:01Z, and it cleared after the 2026-10-04 02:00Z run drafted on fresh ids. PR 4572 (merged, deployed 2026-10-04 03:25Z) marks a draft by its version and emits a failed outcome; its live proof is the first night whose date already holds an archived draft."
-  },
-  "site-api-p95-latency-high": {
-    "added": "2026-10-04",
-    "citation": "#4607 — GET /api/edition takes about five seconds uncached: pull requests 4602 and 4603 grew its upstreams from 9 to 17, read one after another. The alarm (p95 over 5000 ms, one 5-minute period) entered ALARM and cleared twice on 2026-10-04 (18:26–18:31Z and 19:00–19:05Z), each on cold loads of the preview front page under /next/v8/ (screenshot runs and cache-busted checks). Only the preview reads the route; the live front page does not. It will flap again on any cold preview load until #4607 lands; it gates the cut-over (issue 4588)."
-  },
-  "key-rotator-errors": {
-    "added": "2026-10-10",
-    "cause": "AccessDenied secretsmanager:UpdateSecretVersionStage in finishSecret",
-    "cause_observed": "2026-10-10T04:45Z",
-    "citation": "#4707 — the mcp-api-key rotation fails at finishSecret since 2026-10-07 (25 retries on one AWSPENDING token): the KeyRotator role lacks secretsmanager:UpdateSecretVersionStage (lost in a 2026-03-10 rewrite). AWSCURRENT is unchanged, so the key still serves. PR 4708 adds the grant; it needs the owner's `bash deploy/cdk_deploy.sh LifePlatformOperational` after merge."
-  },
-  "ingest-reconciliation-hevy-heartbeat": {
-    "added": "2026-10-10",
-    "citation": "#4643 — new tonight (PR 4764, LifePlatformMonitoring deployed ~11:10Z): the heartbeat is BREACHING until the daily Hevy reconcile writes its first datapoint at 18:30Z 2026-10-10. Expiry: 2026-10-10T19:30Z — if still ALARM then, the reconcile did not run; comment on #4643."
-  },
-  "life-platform-dlq-depth-warning": {
-    "added": "2026-10-10",
-    "cause": "daily-metrics-compute async failures (outage now fixed)",
-    "cause_observed": "2026-10-10T04:45Z",
-    "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
-  },
-  "life-platform-ingestion-dlq-messages": {
-    "added": "2026-10-10",
-    "cause": "daily-metrics-compute async failures (outage now fixed)",
-    "cause_observed": "2026-10-10T04:45Z",
-    "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
-  },
-  "coach-vision-no-invocations-7d": {
-    "added": "2026-10-13",
-    "cause": "new_function_no_history",
-    "cause_observed": "2026-10-13T01:30Z",
-    "citation": "#3759 — one OK->ALARM->OK cycle: the alarm lit when the owner's 2026-10-12 03:04Z LifePlatformCompute apply created coach-vision (a 7-day no-invocation alarm reads a brand-new function as silent by construction) and cleared when its first scheduled run executed at 2026-10-12 17:00Z (honest-empty — no Sunday photo set yet). It re-lights by design only if a Monday 17:00Z run is missed; a lit state with the photo set absent is the expected shape until the owner sends one."
-  },
-  "chronicle-autopublish-held": {
-    "added": "2026-10-17",
-    "cause": "week-6-audit-held",
-    "cause_observed": "2026-10-17",
-    "citation": "#4914 — the alarm doing its job: chronicle-approve's 48-hour sweep refused the unapproved, unaudited week-6 legacy draft at 2026-10-16T18:00:44Z (CHRONICLE-AUTOPUBLISH-HELD Week 6 (2026-10-13) held: unapproved for 48.0h and the audit found 1 blocking item(s) — 'no audit on record: the Story Desk did not write this week'), the alarm went OK→ALARM 2026-10-16T18:01:57Z and ALARM→OK 18:16:57Z (period 300, missing data notBreaching: one datapoint per refusal is its design, routed to life-platform-alerts-digest — SNS NumberOfNotificationsDelivered 1 in the 18:00Z bucket). That episode is issue 4694's live proof (closed on it 2026-10-17T02:58Z). The sweep runs daily at 18:00Z and the draft stays inside its 10-day window until 2026-10-24, so the same 15-minute episode is expected every day at ~18:01Z until the owner approves week 6 from the preview email or forces the desk (issue 4914, the open owner). No action for the alarm itself; prune this entry 72 h after the last episode.",
-    "updated": "2026-10-17"
-  },
-  "slo-source-freshness": {
-    "added": "2026-10-18",
-    "cause_observed": "2026-10-18",
-    "updated": "2026-10-18",
-    "citation": "#4970 — a first-deploy effect of the Apple Watch dead-man (the watch-metrics PR merged 2026-10-18 21:08Z, deployed ~21:25Z): the presence stamp `watch_last_reading_epoch_apple` only exists from that deploy, so the checker's 21:33Z run found no stamp in its lookback and counted the dead-man stale on a healthy watch — StaleSourceCount 1 from 21:33Z to 21:40Z, 0 again from 21:45Z once the first post-deploy payload stamped it (checker log '2 stale' → '1 stale'; the one left is behavioural and never counts). The alarm clears on its next evaluation; the fix (an `armed_after` grace on the dead-man facet — an absent stamp is `pending`, never counted, until 2026-10-20T00:00Z; a stamp older than 36 h counts at any time) is the lane PR awaiting CI. Expiry: if still ALARM after 2026-10-19 03:00Z, re-read the metric. Clear timing: the alarm evaluates a daily Maximum (Period 86400, 1 period, ≥ 1), so today's earlier non-zero datapoint keeps it ALARM for the rest of the 2026-10-18 UTC bucket however many later runs read 0; it goes OK on the 2026-10-19 bucket's first evaluation after a clean datapoint.",
-    "note": "Reader-facing alarm class (freshness), cited on first red per #3423."
-  },
-  "slo-ai-coaching-success": {
-    "added": "2026-10-26",
-    "cause": "the same 2026-10-26 14:00Z ai-expert-analyzer Bedrock 503 burst (6 AnthropicAPIFailure), re-lit with no new failure",
-    "cause_observed": "2026-10-29",
-    "citation": "#5412 — the alarm went OK→ALARM again at 2026-10-29T06:05:13Z with StateReason '1 datapoint [6.0 (26/10/26 06:05:00)]': the hourly AnthropicAPIFailure sums from 10-24 to 10-29 08:00Z hold only the 6 failures at 2026-10-26 14:00Z (LambdaFunction=ai-expert-analyzer), so no new source exists — a late re-evaluation of the same 86400 s window. Expected to clear on the next evaluation; if still ALARM after 2026-10-30 07:00Z, re-derive. The breaker (#5412) proves on the Mon 2026-11-02 15:00Z analyzer run (Pacific schedule).",
-    "updated": "2026-10-29"
-  },
-  "ingest-consecutive-failures-strava": {
-    "added": "2026-10-23",
-    "cause": "Strava re-ingest of the already-stored DATE#2026-10-18 raised Decimal + float every hourly run 2026-10-21T04:10Z until the day left the window on 10-22",
-    "citation": "#5255 — the re-ingest Decimal/float defect. Episode ALARM 2026-10-21 05:11 PT → OK 2026-10-22 05:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
-  },
-  "ingest-liveness-unhealthy": {
-    "added": "2026-10-23",
-    "cause": "the composite liveness view of the same Strava episode (RunSuccess 0 on each errored run)",
-    "citation": "#5255 — same episode as ingest-consecutive-failures-strava: ALARM 2026-10-21 10:11 PT → OK 2026-10-22 10:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
-  },
-  "ingest-reconciliation-strava": {
-    "added": "2026-10-25",
-    "cause_observed": "2026-10-25",
-    "cause": "strava store-vs-vendor reconcile: three backdated walks Strava holds that the store lacks",
-    "citation": "#5257 — three backdated Strava walks (created ~10-21, local clock +9 h) the store lacks; deleting the duplicates is an owner phone act (owner acts list, Session CE). Self-clears once they leave the 14-day reconcile window (~10-27/28) or are deleted.",
-    "note": "Read from the alarm's StateReason (3 missing, 2026-10-20 17:21Z datapoint) and #5257's evidence; a Session CE audit found two duplicates remain (20673636264, 20673636369). Resolved 2026-10-26 17:21Z: MissingActivityCount 0, alarm OK; #5257 closed with live proof. Prune 72 h after."
-  },
-  "ingestion-error-og-image-generator": {
-    "added": "2026-10-25",
-    "cause_observed": "2026-10-24",
-    "cause": "one og-image-generator error episode, 2026-10-24 19:31Z → 20:31Z, self-cleared",
-    "citation": "self-clearing single episode (describe-alarm-history: OK→ALARM 2026-10-24T19:31:52Z, ALARM→OK 20:31:52Z); filter-log-events on /aws/lambda/og-image-generator 19:20–19:40Z printed no error line, so the cause is unread — re-cite with #N if it recurs.",
-    "note": "Session CE, 2026-10-25."
-  },
-  "panel-weekly-grade-missing": {
-    "added": "2026-10-25",
-    "cause_observed": "2026-10-25",
-    "cause": "new dead-man created with missing data = BREACHING until its first datapoint",
-    "citation": "#5072 — alarm created by the owner-approved LifePlatformMcp apply at 2026-10-25T06:29Z; ALARM by design (no PanelGradeOutcome datapoint yet) until the forced panel_weekly_grade run at 14:05Z wrote PANEL#2026-10-24 and PanelGradeOutcome=1, then cleared.",
-    "note": "Read from describe-alarm-history and the CloudWatch metric LifePlatform/HevyRoutine PanelGradeOutcome, Session CE."
-  },
-  "qa-smoke-warnings": {
-    "added": "2026-10-28",
-    "cause_observed": "2026-10-30",
-    "updated": "2026-10-31",
-    "citation": "#5421 — dated, self-clearing: the one lit datapoint is 2026-10-30T03:47Z (WarnCount 1 — every run then warned `og:coach-cards`, the edge serving the 10-28 card because og-image-generator invalidated CloudFront before the sweep rewrote the cards). The fix (invalidate once after every writer, PR 5488, main a8ebc1d32) deployed 2026-10-30T05:28Z; the live `[QA] CAUSE warn` channel has read none since the 10-30 19:30Z og run (the wrap gate read `-` on 2026-10-31T04:30Z). The alarm stays ALARM until the next daily WarnCount evaluation carries a datapoint under 1; if it is still ALARM at the Mon 2026-11-02 wrap with the cause channel empty, the metric publishes no zero and that is a #5421 defect to fix, not a citation to refresh.",
-    "note": "Re-cited by the Session CN wrap 2026-10-31: cause cleared live (channel empty), window named; the Session CM entry cited the then-live cause."
-  },
-  "field-notes-missing": {
-    "added": "2026-10-25",
-    "citation": "#5128 (closed on live proof) — the dead-man fired correctly on 2026-10-24/25 for the W42 miss (generated:false after the Sunday cron), cleared after the W42 regenerate at 15:18Z and stayed OK through the W43 run at 18:00:05Z. A true positive by the instrument this issue built, not a defect.",
-    "note": "Session CF 2026-10-25: answered as a flap per the fired-and-cleared rule; state OK at 19:06Z."
-  },
-  "ai-dev-session-month-high": {
-    "added": "2026-10-25",
-    "citation": "self-clearing, dated: RED since its first governor publish 2026-10-26T08:01Z — DevSessionSpendMTD 67.78 against the $48 bar (80% of the $60 calendar-month dev-session cap, live since 2026-10-26). October's dev-session total was already over the cap before deploy; the gauge restarts at 0 on 2026-11-01 and the alarm returns to OK at the 2026-11-01T00:00Z governor run. Expiry: if still ALARM after 2026-11-01T09:00Z, read DevSessionSpendMTD and the November dev-session series before re-citing. Whether the cap should apply to October at all is an open owner ruling: #5406.",
-    "note": "Deploys red-bound on purpose (the cost-metric-drift-sustained precedent): it states a true condition, the October envelope already spent. Added with the alarm itself, before it exists live.",
-    "cause_observed": "2026-10-26",
-    "updated": "2026-10-26"
-  },
-  "qa-smoke-failures": {
-    "added": "2026-10-27",
-    "cause_observed": "2026-10-30",
-    "updated": "2026-10-30",
-    "citation": "Dated, self-clearing: the live runs since 2026-10-30T03:46Z read `[QA] CAUSE fail none -`. The daily-period FailCount alarm (86400 s, Maximum) holds the 2026-10-29 UTC bucket, whose runs failed `data:hae_additive_integrity` until 18:32Z; it clears at the first daily evaluation with no failure, expected by ~2026-10-31T00:30Z. The cause did NOT get repaired, it aged out: `hae_additive_integrity_qa.WINDOW_DAYS = 3` stopped replaying 10-26 on 10-30. The damaged Apple Health field-days 10-21/10-22/10-26 stay owned by #5440 (owner act: `scripts/hae_additive_backfill_4628.py --apply`, never 10-25). The checkin_pair timing false positive was fixed on 10-29 (deployed, due-hour 06:00 PT). If still red after 2026-10-31T06:00Z, re-derive from the live CAUSE line.",
-    "note": "Re-cited by the Session CM wrap 2026-10-30 (the 10-29 entry named two causes the live run no longer shows)."
-  },
-  "ingest-reconciliation-whoop": {
-    "added": "2026-10-26",
-    "cause": "same-day timing race, store vs vendor",
-    "cause_observed": "ALARM 2026-10-25 18:21Z (MissingActivityCount 1), OK 2026-10-26 18:21Z (0). Workout 6086653e was stored at 04:00Z on 10-26, after the 10-25 reconcile read the vendor.",
-    "citation": "self-cleared flap: a workout the reconcile saw at the vendor before the next ingest stored it; cleared at the following day's 18:21Z reconcile with no change. Prune 72 h after 2026-10-26 18:21Z."
-  },
-  "calibration-deadman": {
-    "added": "2026-10-27",
-    "cause_observed": "2026-10-27",
-    "cause": "no tape measurement or progress-photo set logged this cycle (the biweekly calibration prompt's dead-man)",
-    "citation": "#3759 — the owner's tape + photo sitting (deferred in session 2026-10-26 \"defer later in week\", 2026-10-27 \"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect: the prompt + dead-man mechanism (the biweekly-prompt story, closed 2026-10-30) closed on this very firing.",
-    "note": "Cited by Session CJ wrap 2026-10-27; re-cited to the sitting's story on 2026-10-30 (owner ruling: the mechanism is proven, the sitting is the owner's act) — the PR that moved this entry is 5489."
-  }
+ "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Since #2912 the same holds for an alarm that FIRED AND CLEARED within the last 72h (episode start and end both in-window, read from describe-alarm-history) — a flap between wraps is invisible to current-state duration by construction, so it needs an entry or an explicit --decoded line just like a standing red. Add an entry the same session a new long-red alarm (or flap) is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live. Since #2996 a citation that names a `#N` must name an issue that is still OPEN: the gate reads `gh issue view` for every currently-lit alarm's citation and flags a dead reference, because a citation string is not an owner (measured 2026-08-22: 4 of 7 entries pointed at closed issues, 3 of them on lit alarms). A citation with NO `#N` is never flagged by that check — a dated, self-clearing state is honestly cited in prose — but the 14-day `issueless_ancient_reds` rule still forces a `#N` past that tenure. PRUNE an entry when its alarm recovers. Since #3258 a citation may not assert a recurrence NEGATIVE (\"no recurrence since\", \"has not recurred\") unless the same note names how it was derived — the log group it was read from, or the query that read it (filter-log-events / describe-alarm-history / start-query). A recurrence-negative is unfalsifiable from the registry alone, and the measured instance hid a live recurrence for four days: this alarm's entry read \"fixed by #3066/PR#3075 …, no recurrence since\" while the identical finding fingerprint 539c6d sat in /aws/lambda/life-platform-qa-smoke inside the last 72h. Enforced offline against the committed file by tests/test_check_alarm_citations.py::test_the_live_registry_carries_no_underived_recurrence_negative (scripts/check_alarm_citations.py::unfalsifiable_negatives), so it runs on every PR rather than only at wrap. A POSITIVE claim needs no marker — it is checkable by looking.",
+ "ai-canary-overall": {
+  "added": "2026-10-26",
+  "cause": "vendor transient during the Bedrock 503 episode",
+  "cause_observed": "2026-10-26 16:20Z ai-quality-canary run: ask_factual and ask_causal status 500, board_grounded and board_meta_pressure empty for physical_coach / sleep_coach. Alarm ALARM 16:21Z; Maximum OverallAlarm over 86400 s.",
+  "citation": "self-clearing vendor window, not a code defect: Bedrock Haiku 4.5 503 episode of 2026-10-26 (from ~13:00Z; text calls recovered ~16:17Z, image calls still failing 16:49Z; incident row 2026-10-26). The 86400 s period holds the 16:20Z datapoint until ~2026-10-27 16:21Z. Expiry: if the next canary run after 2026-10-27 16:00Z still reports a FAILING check, file a story naming that check."
+ },
+ "ai-daily-spend-high": {
+  "added": "2026-10-18",
+  "cause_observed": "2026-10-18",
+  "updated": "2026-10-18",
+  "cause": "rolling-24h spend above the bar on an attended Bedrock night (owner's word)",
+  "citation": "self-clearing, 24 h: the 2026-10-18 episode (ALARM since ~05:00Z) is the owner-authorized dev-session spend — season_rebuild.py through week 4 at DEV_AI_BUDGET_USD=20 (~$14) + twelve --repair runs ($9.13, #4537/#4993) + the forced ai-expert-analyzer run; dev-session total $19.12 in 24 h (ai_spend_attribution.py --days 1 at 17:10Z). Clears as the rolling window passes 2026-10-19 ~05:00Z; the threshold class is #4517. Prior entry: the 2026-08-24 D2 session-window flap decode (same shape, dev-day spend), kept as history.",
+  "note": "Flapped x2 in the 2026-08-23/24 D2 session window: the 18-agent implementation fan-out + merge-train verification is a known heavy-dev-day spend shape (same decode as the D1 wrap's flap). Cleared on its own both times. The #2892 CallerClass dimension (deployed 2026-08-24) separates dev/CI spend from prod-class going forward, which removes this alarm's dev-session false-fire mode. Expiry: if it fires on a NON-dev day, investigate fresh."
+ },
+ "ai-tokens-daily-brief-runaway": {
+  "added": "2026-09-04",
+  "cause": "reset-day multi-run",
+  "cause_observed": "2026-09-05",
+  "citation": "Dated, self-clearing, and SUPERSEDED BY A RESHAPE: the cited flap is pre-fix history that falls out of the 72h window on 2026-09-07. Prune this entry on or after 2026-09-07. The alarm it names was `ai-tokens-daily-brief-daily` (Sum/86400 >= 30000) until #3505 renamed and reshaped it to `ai-tokens-daily-brief-runaway` (Sum/3600 >= 35000, ONE brief run's window); the old alarm is deleted by that CDK deploy, so if the digest shows the old name after the LifePlatformMonitoring deploy, the deploy did not land.",
+  "note": "FLAP, not a standing red (#2912 detector). Entered ALARM at 2026-09-04 09:45 PT and again 10:09 PT, each clearing within a minute (describe-alarm-history, 4 transitions). Cause, from the LifePlatform/AI AnthropicOutputTokens{daily-brief} series: the 2026-09-03 Saturday re-anchor forced a brief regeneration at 20:00 PT (8,971 tokens) on top of that day's 10:00 PT send (13,566), and the 09-04 send (8,384 + 11,585) then sat inside the same trailing 86400s Sum window — 30,000-token threshold crossed transiently as the window slid, cleared as the 09-03 10:00 datapoint aged out. No defect: two brief runs in one day is the reset's designed behaviour, and the 09-04 send alone (19,969) is under threshold. Prose citation deliberately carries no '#N' — nothing to fix; the dated self-clearing state is the sanctioned shape. RE-POINTED 2026-09-05 (#3505): the flap's MECHANISM — three ordinary runs summing inside one 86400s window on a reset day — is now structurally impossible rather than merely explained, because the alarm's period is one run's own window. The threshold was re-derived from n=71 hourly Sum datapoints over the trailing 35 days (median 4,717 · Q3 7,664 · max 31,970)."
+ },
+ "ai-tokens-platform-daily-total": {
+  "added": "2026-10-02",
+  "cause": "rolling-24h output tokens above the bar on one owner-ruled laptop eval run (dev-session caller)",
+  "cause_observed": "2026-10-26",
+  "citation": "self-clearing, 24 h: the 2026-10-26 episode (ALARM 05:41Z) is one owner-ruled laptop run — the open-weight swap eval (single process, DEV_AI_BUDGET_USD=15 for that command only), 2026-10-26 05:12–06:10Z: CallerClass dev-session put ~337,000 output tokens into the rolling day (gpt-oss reasoning tokens + the Sonnet pairwise judge), on top of the platform's ordinary day. It clears as the rolling 24 h passes ~2026-10-27T06:15Z; if still ALARM after 2026-10-27T09:00Z, read AnthropicOutputTokens by LambdaFunction before re-citing. The bar class itself is #4517.",
+  "updated": "2026-10-26"
+ },
+ "ai-tokens-platform-daily-total-genesis-window": {
+  "added": "2026-09-05",
+  "citation": "Dated, self-clearing: a genesis-window episode from 2026-09-02, now VISIBLE for the first time because #3503 gave describe_alarm_history its AlarmTypes. Falls out of the 72h window on 2026-09-06 — prune this entry on or after that date.",
+  "note": "COMPOSITE, and it had been structurally invisible to this very gate. The rule is ALARM(ai-tokens-platform-daily-total) AND ALARM(token-alarm-genesis-window-active) — i.e. the platform's daily output-token ceiling breaching WHILE a genesis window is open, which is exactly the conjunction it was built to catch. Episode: OK->ALARM 2026-09-02T11:34:51 PT, ALARM->OK 2026-09-03T00:36:51 PT (~13.0h), one transition pair. Priors on the same alarm: 2026-08-23 01:25->17:01, 2026-08-17 09:01->10:05. It routes to the digest by design (ADR-052). NOT A REGRESSION AND NOT NEW BEHAVIOUR: the alarm fired correctly each time; every reader of alarm history omitted AlarmTypes, so `describe_alarms`/`describe_alarm_history` returned metric alarms only and composites were absent by construction (the #3390 class, fixed for one file then; swept across ten call sites by #3503/PR #3589 tonight). The cited episode PREDATES the fix — this citation records history the platform could not previously see, which is the fix working. State is OK; the September base ceiling ($215, ADR-133) is not implicated. Prune on/after 2026-09-06."
+ },
+ "budget-tier-sustained-7d": {
+  "citation": "#2989",
+  "note": "RE-CUT 2026-08-23 (#2989, chose Option A over Option C): threshold moved from tier >= 1 sustained to tier >= 2 sustained in cdk/stacks/monitoring_stack.py — merged but NOT YET DEPLOYED (this worktree cannot cdk deploy). ADR-133 derived the permanent $150 base FROM a measured steady state ($4.12/day = 82.4% of $150) that lands inside band 1 (73-87%), so a threshold=1 alarm fired continuously on the platform's DESIGNED steady state from 2026-08-12 (17+ consecutive days) — the same background-noise failure #1927 was filed to prevent, one band up. Band 2 (reader narratives paused) is not the designed state at ~81% MTD spend, so a full week pinned there is genuinely rare and worth answering; #1927's own amendment already moved the two CI gates out of band 1, leaving only five internal/dev features there. EXPECTED POST-DEPLOY: this alarm should clear once `cdk deploy LifePlatformMonitoring` ships the new threshold, because live BudgetTier has not sustained >= 2 for a full week. Re-read the live CloudWatch alarm state after that deploy — if it has NOT cleared, that is new information (tier has been at 2+ longer than assumed here) and this entry should stay with an updated note; if it HAS cleared, prune this entry once it has been OK longer than the #2912 72h flap window."
+ },
+ "budget-tier-unreadable": {
+  "added": "2026-08-23",
+  "citation": "#2824",
+  "note": "New alarm (2026-08-23, DIL-036 slice of #2824): fires when budget_guard logs BUDGET_TIER_UNREADABLE on the public site-api-ai path — the SSM budget-tier read failed (ParameterNotFound / AccessDenied / outage), website_ai is failing CLOSED (readers get the honest 'paused' output), and the rest of the fleet is running fail-open with NO ceiling enforcement. Never a routine state: if lit, restore the SSM param/grant (/life-platform/budget-tier) — the guard recovers within one 5-min cache TTL. Prune this entry only if the alarm is retired; while #2824 is open it is the named owner."
+ },
+ "coherence-overall": {
+  "added": "2026-10-27",
+  "cause_observed": "2026-10-26",
+  "cause": "facts_agreement: expert:sleep served stale from 2026-10-05 (the grounding gate held every sleep draft since; renew_held extended the old record with no age cap), coach:mind_coach 'HRV cited in bpm' (a sentinel regex false positive on 'NN ms HRV, NN bpm resting'), then every EXPERT# record lapsed ~2026-10-26 23:15Z after two Monday 503 bursts",
+  "citation": "#5442 — the four code causes are fixed in PR #5455 (one HRV-in-bpm check, windowed averages pass night-scope, a 15-day renewal cap, board records renew on a hold/tripped breaker); the expert surfaces repopulate at the next analyzer run (Mon 2026-11-02 14:00Z) or an owner-approved earlier run. Expiry: if still ALARM after 2026-11-02 16:00Z, re-derive on #5442.",
+  "note": "Re-cited by Session CJ wrap 2026-10-27; prior entry (2026-10-13/10-18) explained the 10-18 episode."
+ },
+ "compute-pipeline-stale": {
+  "added": "2026-10-10",
+  "cause": "daily-metrics-compute TypeError (habit_registry string target_frequency)",
+  "cause_observed": "2026-10-10T04:45Z",
+  "citation": "self-clearing on a dated window — the issue 4704 outage is fixed (PR 4706 deployed 2026-10-10 ~04:30Z; the registry values corrected and 10-04..10-08 back-filled at ~05:20Z). Only the 17:00Z daily-brief emits this metric, and the 86400s window still holds the 10-09 17:00Z datapoint of 1.0; the 16:40Z compute writes 10-09 with the fixed code and the 17:00Z brief emits 0. Expiry of this citation: 2026-10-10T17:30Z — if still ALARM then, file an issue instead of extending this line",
+  "updated": "2026-10-10"
+ },
+ "cost-metric-drift-sustained": {
+  "added": "2026-08-21",
+  "citation": "#2883",
+  "note": "Expected RED from ~7 days after its first deploy: the alarm states a true, known condition. Re-measured live 2026-08-24T23:59Z governor cycle (most recent at time of check): ratio 1.3710 — lowest since 08-21, continuing the slow pullback from the 1.4177 peak on 08-22/23, but still ~19% above the 1.15 bar; 19 consecutive 8h datapoints since box 2 landed (08-19) are ALL above bar, none sub-1.15. CE reconciliation re-measured 2026-08-25: Bedrock UnblendedCost $83.32 MTD vs self-reported LifePlatform/AI EstimatedCostUSD $61.36 MTD, a $21.96 gap (26.4%) — down $0.75 from the prior $22.71/27.4% reading a day earlier. The golden-eval AiCostTelemetry grant (previously staged) is now CONFIRMED APPLIED live (aws iam get-role-policy shows the statement; simulate-principal-policy returns allowed for cloudwatch:PutMetricData/LifePlatform/AI; infra/iam/README.md updated) but has not yet moved the ratio — golden-brief-eval.yml runs weekly (next 2026-08-31) and no run has executed since the grant applied. The dominant unattributed residual remains interactive Claude Code dev-session usage (out of scope per #3070's design — never reaches the ADR-062 chokepoint), still unsized. The alarm itself (cost-metric-drift-sustained, operational_stack.py, #2948) was re-audited this pass and found already correctly configured — threshold/window/routing all verified against DRIFT_RATIO_BAR, no alarm-side change needed. Remove this entry when box 2 lands the ratio < 1.15 for a full week AND the alarm has actually cleared live.",
+  "updated": "2026-08-25"
+ },
+ "freshness-interior-gap": {
+  "added": "2026-09-21",
+  "cause": "eightsleep:2026-09-20",
+  "cause_observed": "2026-09-24T16:48:26Z",
+  "citation": "RE-OBSERVED 2026-09-24T16:48:26Z (Session AT wrap): freshness-checker logged `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-09-20']}` — the SAME single night as the 2026-09-21 episode, no new gap. RE-CITED 2026-09-21 22:1xZ (Session AQ) — a NEW episode of the same class the 2026-08-30 entry closed. ALARM since 2026-09-21T16:46Z (1 datapoint >= 1). LIVE CAUSE: freshness-checker at 16:45:15Z logged `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-09-20']}` — DATE#2026-09-19 and DATE#2026-09-21 exist, DATE#2026-09-20 does not. The vendor has no session for that night: eightsleep-data-ingestion's hourly gap-fill has re-asked since 2026-09-21T00:15Z and every run logs `No day matching 2026-09-20. Available: ['2026-09-19']` → `2026-09-20: no records after transform` (the owner sleeps downstairs some nights — ruling recorded 2026-09-05 on the prior episode; not re-confirmed for this night). Dated, self-clearing, no owner issue by design: the source is configured `record_gap_exhausted_absence=True` with `LOOKBACK_DAYS` 7, so the explicit absence marker for 2026-09-20 lands when the day leaves the gap-fill window (on or about 2026-09-27) and InteriorGapCount reads 0 from that run; the alarm evaluates a 24h count >= 1, so it stays ALARM until ~24h after that. EXPIRES 2026-09-29: if it is still lit then, the marker did not land and that is a NEW defect (the gap-exhausted absence-marker mechanism, pull request 3630's class), not this episode.",
+  "note": "Same shape as the 2026-08-30 episode — the mechanism that closes it already exists on this source and had not reached its boundary day yet. `added` is the day this episode was first cited; `cause_observed` the re-derivation date (#3501)."
+ },
+ "life-platform-budget-tier-escalation": {
+  "added": "2026-10-21",
+  "cause": "budget tier 2 on the October spend projection — re-read 2026-10-23 by Session CC: SSM /life-platform/budget-tier = 2, LastModified 2026-10-19T17:00-07:00 (unchanged since CB's read); the alarm alternates ALARM/OK about every 5 h on 10-22 (01:01, 09:01, 17:01 PT into ALARM) as the governor's datapoints arrive, with the SAME cause, tier 2 on the October projection. The tier was never forced.",
+  "cause_observed": "2026-10-23",
+  "citation": "#5135 — the dev-session AI envelope (epic #5134): laptop/agent spend counts against the one production ceiling and lifts the projection into band 2. Expiry: self-clears at the 2026-11-01 month rollover or when the projection falls below the band; still lit after 2026-11-02 → re-cite.",
+  "history": "Prior citation #2801 (closed) covered the 2026-08-26 flap of the same class."
+ },
+ "life-platform-s3-bucket-size-high": {
+  "citation": "self-clearing on a dated window — the deploys/ noncurrent-version lifecycle was tightened 7d to 1d and applied to the LIVE bucket 2026-08-31 (fin-diligence remediation, verified via get-bucket-lifecycle-configuration); S3 lifecycle expiry runs daily, so the ~72GB noncurrent tail drains over the next runs. Expiry of this citation: 2026-09-03 — if still ALARM then, file a follow-up issue instead of extending this line",
+  "note": "prior citation pointed at a closed issue; the shipped cure is the fin-diligence 2026-08-31 lifecycle change (PR 3381)"
+ },
+ "prediction-gradable-share-low": {
+  "added": "2026-08-28",
+  "citation": "deliberate arming transition (lit 2026-08-26), clearing by DILUTION rather than by the _retire_ungradeable mechanism its own CDK comment names — re-derive at the next wrap; issueless_ancient_reds forces a #N by 2026-09-09",
+  "note": "ADDED 2026-08-28 (Session I). Lit 2026-08-26T10:25 PT; crosses the 72h bar 2026-08-29 ~10:25 PT, hence cited now. The alarm's own CDK comment (cdk/stacks/monitoring_prediction_alarms.py:65-73) says it 'fires on the CURRENT corpus the day it deploys (28/50 pending are legacy qualitative rows) and clears as the evaluator retires them at window end (_retire_ungradeable) — deliberate, same posture as #727'. The firing is therefore expected. WHAT IS NOT EXPECTED, and is why this note exists rather than a bare 'deliberate': measured LifePlatform/Predictions daily 2026-08-23..08-26, GradableShare rises 0.3951 / 0.4024 / 0.4024 / 0.4556 while UngradeablePendingCount is FLAT at 49 / 49 / 49 / 49. The share is improving because the GRADABLE numerator is growing, not because legacy rows are being retired. _retire_ungradeable only retires a record once its domain-clamped window has ELAPSED, so a flat 49 is consistent with 'no window has elapsed yet' AND with 'the retirement is not running' — this note does NOT claim to distinguish them, because I did not read the pending corpus out of DynamoDB. That is the open question. RE-DERIVE, do not trust this note: if UngradeablePendingCount is still exactly 49 at the next wrap, the stated clearing mechanism is not the one clearing it and this earns an issue. The 14-day issueless_ancient_reds rule forces a #N by 2026-09-09."
+ },
+ "site-api-invocation-spike": {
+  "citation": "2026-08-24 session note — self-inflicted QA traffic",
+  "note": "x7 fire/clear cycles in the D2 window: three full-surface visual-QA sweeps, smoke 246-URL runs, render-qa probes, and two site-api deploys' verification traffic — the same self-inflicted decode as the D1 wrap (x4 there). No reader symptom. Expiry: fires outside a session/QA window get fresh triage."
+ },
+ "token-alarm-genesis-window-active": {
+  "added": "2026-09-01",
+  "citation": "dated self-clearing window, expires 2026-09-08 — no issue reference, by design. `lambdas/common/token_alarm_window.py` sets TOKEN_ALARM_GENESIS_WINDOW = ('2026-08-31', '2026-09-08'), the dated window around the cycle-15 genesis (2026-09-01), and the 1/0 gauge is 1 for its duration BY CONSTRUCTION. It self-clears on 2026-09-08 with no deploy and no manual step; PRUNE this entry then. If it is still lit after 2026-09-08, that IS a defect and needs a filed issue.",
+  "note": "Re-pointed 2026-09-01 (Session P) because the entry had ROTTED, not merely aged — the third specimen of that class in two days. It still described the CYCLE-14 window ('2026-08-16','2026-08-24') and told the reader to file an issue if the alarm was lit after 2026-08-24; the alarm re-fired 2026-09-01 01:01 PT on the cycle-15 window, so following the stale instruction would have manufactured a spurious issue for an alarm working exactly as designed. Derived from the live constant at re-point time, not copied: TOKEN_ALARM_GENESIS_WINDOW = ('2026-08-31', '2026-09-08'), cross-checked against restart_verify.py's stamped-window check, which passed with the same pair. The rot is structural — this citation names a dated window that every reset rolls forward, so it needs re-pointing at each genesis or pruning once the window closes."
+ },
+ "weekly-signal-delivery-heartbeat": {
+  "citation": "arming transition of the #2820 dead-man 2026-08-21 — not a delivery failure",
+  "note": "Kept 2026-08-22 (#2996). The alarm is OK, but #2912's flap check reads a 72h window and this alarm's only episode is inside it: describe-alarm-history shows INSUFFICIENT_DATA -> ALARM at 2026-08-21 20:44 PT and ALARM -> OK at 21:44 PT — one hour, immediately after #2820 deployed the WeeklySignalSent dead-man (treat_missing=BREACHING, so a freshly created alarm with no datapoints is ALARM by construction until the first one lands). No signal was missed. THE PRUNE RULE, corrected: remove a recovered alarm's entry once it has been OK for longer than the flap window (72h), not the moment it clears — pruning on recovery alone trades a stale entry for a flap-gate red, which is what happened while writing this. Prune after 2026-08-24 21:44 PT if still OK."
+ },
+ "hevy-template-index-not-rebuilt-48h": {
+  "added": "2026-09-14",
+  "citation": "#3764 — created 2026-09-14, cleared on its first heartbeat the same hour",
+  "note": "BIRTH FLAP, expected and self-clearing: a dead-man alarm declares treat_missing_data=BREACHING, so it enters ALARM the instant CloudFormation creates it (no datapoint exists yet) and clears on the first emit. Both transitions happened inside the 2026-09-14 deploy window. This is the correct shape for the alarm — an absence alarm that stayed OK before its first datapoint would be green over an unknown, which is the state it exists to refuse. Any future BREACHING dead-man will flap once at birth the same way. Cleared when the 13:40Z rebuild rule emitted TemplateIndexRebuilt=1; alarm has been OK since."
+ },
+ "recap-card-no-invocations-24h": {
+  "added": "2026-09-14",
+  "citation": "#3741 — created 2026-09-14, cleared once the generator was invoked",
+  "note": "BIRTH FLAP, expected and self-clearing: a dead-man alarm declares treat_missing_data=BREACHING, so it enters ALARM the instant CloudFormation creates it (no datapoint exists yet) and clears on the first emit. Both transitions happened inside the 2026-09-14 deploy window. This is the correct shape for the alarm — an absence alarm that stayed OK before its first datapoint would be green over an unknown, which is the state it exists to refuse. Any future BREACHING dead-man will flap once at birth the same way. Cleared when the recap-card-generator was first invoked by the backfill; alarm has been OK since."
+ },
+ "life-platform-canary-anthropic-failure": {
+  "citation": "#3830 — a FIRED-AND-CLEARED flap that is fully explained and is the root of tonight's fleet-rollback incident. ALARM 2026-09-15T19:55:44Z -> OK 20:10:44Z (15 min, one cycle). Cause: a single Bedrock `ServiceUnavailableException` — a vendor 503 — on the canary's `anthropic` check at 19:54:50Z, with DDB, S3, MCP and the subscribe flow all round-tripping clean in the same run. The alarm is CORRECT and needed no change: it fired on a real failed inference round-trip and cleared on the next clean one. What it exposed is that ONE datapoint had three consumers with three different confidences: the canary's own email path SUPPRESSED it as a first occurrence, this alarm fired and self-cleared, and the CI/CD smoke gate treated it as gating and auto-reverted 85 Lambdas (run 35013357326). Fixed by PR #3831, merged 28247778f and DEPLOYED 2026-09-16T01:26:13Z (verified in the deployed bundle): `LANE_EXTERNAL_TRANSIENT` + `lane_for_result` classify the FAILURE MODE, not just the check, so a vendor transient is counted in `failed_external_transient` and excluded from `failed_deploy_health` — the only key the smoke oracle gates on. A recurrence of THIS alarm is now expected to be non-gating; if a future 503 ever reverts a deploy again, that is a NEW finding, not this one.",
+  "note": "Deliberately cited rather than suppressed, and the alarm is deliberately NOT retuned. A 15-minute flap on a real vendor outage is this alarm doing its job — it is the only instrument of the three that got the confidence level right, being loud without being destructive. #3830's remaining half (acceptance box 3) is retry-before-gate: making a SINGLE first-occurrence datapoint incapable of reverting a fleet, which is the property the canary's own email suppression already has and the deploy gate still does not. Until that lands, a SECOND transient inside one smoke window could still gate. Recorded 2026-09-16 by Session AF, the session that caused, diagnosed and fixed the episode in the same night."
+ },
+ "daily-brief-duration-high": {
+  "added": "2026-09-29",
+  "citation": "#4343 — FLAP 2026-09-28: the 17:00Z daily brief ran 643 s (17:00:03→17:10:46Z) because six coaches were HELD after a regeneration attempt each (the #4343 live-proof failure: regeneration re-primes banned jargon; cause-C misfires). One ALARM→OK episode, cleared by the next run. It recurs exactly while #4343's hold count stays > 2; the remaining-time floor (the remaining-time-floor budget box) was not exercised. RE-CITED 2026-09-30 (Session BA): the 2026-09-29 17:00Z brief ran 733 s with 5 quality holds (same class); PR 4443 (rewrite revises the draft) and PR 4466 (lead read's own rubric) deployed after it — proof due at the 2026-09-30 17:00Z brief under #4343.",
+  "note": "Session AZ wrap citation for a fired-and-cleared episode (#2912)."
+ },
+ "ai-daily-spend-high-urgent": {
+  "added": "2026-10-01",
+  "cause_observed": "2026-10-18",
+  "cause": "rolling-24h threshold crossed by attended laptop Bedrock on the owner's word",
+  "citation": "self-clearing, 24 h: the 2026-10-18 episode is the owner-authorized dev-session spend — season_rebuild.py through week 4 at DEV_AI_BUDGET_USD=20 (~$14) + twelve --repair runs ($9.13, #4537/#4993) + the forced ai-expert-analyzer run; dev-session total $18.60 in 24 h (ai_spend_attribution.py). Clears as the rolling window passes 2026-10-19 ~05:00Z; the threshold class itself is #4517 · Prior entry (2026-10-18T07:55Z): #4517 — fired and cleared twice on 09-30 (08:13–14:34Z, 20:17Z–01:41Z) with the budget tier at 0; the threshold sits ~4 % above the measured $5.74/day steady state (ADR-133), so ordinary heavy days (brief + AI-vision vis…",
+  "updated": "2026-10-18"
+ },
+ "ai-tokens-platform-daily-total-urgent": {
+  "added": "2026-10-01",
+  "cause_observed": "2026-10-26",
+  "cause": "rolling-24h output tokens above the bar on one owner-ruled laptop eval run (dev-session caller)",
+  "citation": "self-clearing, 24 h: the 2026-10-26 episode (ALARM 05:41Z) is one owner-ruled laptop run — the open-weight swap eval (single process, DEV_AI_BUDGET_USD=15 for that command only), 2026-10-26 05:12–06:10Z: CallerClass dev-session put ~337,000 output tokens into the rolling day (gpt-oss reasoning tokens + the Sonnet pairwise judge), on top of the platform's ordinary day. It clears as the rolling 24 h passes ~2026-10-27T06:15Z; if still ALARM after 2026-10-27T09:00Z, read AnthropicOutputTokens by LambdaFunction before re-citing. The bar class itself is #4517.",
+  "updated": "2026-10-26"
+ },
+ "chronicle-delivery-heartbeat": {
+  "added": "2026-10-04",
+  "cause": "week-8-desk-stale-thread-fallback",
+  "cause_observed": "2026-10-31",
+  "updated": "2026-10-31",
+  "citation": "#4531 — week 7 was budget-paused (2026-10-21T15:00:34Z 'Budget guard paused chronicle') and week 8's desk budget failed validation twice on stale threads (2026-10-28T15:03:06Z: the ledger's last told weeks were 5 and a backfilled 6, so the calendar count called every live thread stale). The run fell back to the legacy writer and stored Week 8 as an unapproved draft, preview email sent 15:03:54Z; seven zero days → ALARM 2026-10-28 16:00Z. The code fix (staleness counts installments told; the desk retires what a retry leaves stale) is in the Session CL integration PR. Clears when the owner approves Week 8 from the preview email, or at the first delivered week after the Wed 2026-11-04 run. Re-derived 2026-10-31T17:45Z (Session CO): the Week 8 draft DATE#2026-10-27 is still unapproved (2d23h at the 14:27Z pre-flight), the 48-h sweep holds it daily, no subscriber delivery since — the cause is unchanged and is the owner's approve, not a code path.",
+  "note": "Prior entry (2026-10-17, cause week-6-unapproved-draft): the week-6 unapproved legacy draft (#4914). Prior entry (2026-10-04, issue 4593, closed): week 4 published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; cleared when week 5 delivered through the approve path 2026-10-09 18:00Z. The current episode is a different cause on the same heartbeat."
+ },
+ "swallowed-permission-denial": {
+  "added": "2026-10-20",
+  "cause": "RESOLVED — life-platform-freshness-checker cold-start read of config/coaching/training_charter.private.json was denied (no grant); the grant shipped in the Session CL integration PR #5476 and the alarm has been OK since 2026-10-29T06:07:55Z (#5220, closed 2026-10-31)",
+  "cause_observed": "2026-10-31",
+  "updated": "2026-10-31",
+  "citation": "#5220 (closed 2026-10-31) — the last episode: flaps at 2026-10-28 06:04Z, 2026-10-29 00:49Z and 05:38Z PDT-adjusted (describe-alarm-history), each the freshness-checker's cold-start 'not read (AccessDenied)' line on the private charter twin. PR #5476 added CharterTwinRead + CharterTwinList to its role; after the apply the alarm went OK at 2026-10-29T06:07:55Z and stayed OK across the 2026-10-31 ~04:30Z deploy_all fleet deploy (run 41167764705) and the 06:25Z-06:31Z code deploys; cold starts at 2026-10-31T16:45:13Z and 16:52:06Z logged zero AccessDenied. The entry stays only because the 2026-10-29 00:49Z / 05:38Z transitions are inside the 72-h flap window until 2026-11-01T06:07Z; prune it at the first wrap after that.",
+  "note": "Prior causes: og-image-generator board-roster read (2026-10-27, resolved by PR #5459); charter-private-twin-absent-403 (2026-10-20 → 10-25, resolved by the charter-twin grant PR 5354, applied 2026-10-25 06:33Z)."
+ },
+ "nightly-predraft-missing": {
+  "added": "2026-10-04",
+  "cause": "predraft-run-failed",
+  "cause_observed": "2026-10-03T02:00:40Z",
+  "citation": "#4568 — one episode: the 2026-10-03 02:00Z run failed (the draft landed on an archived routine's id and the read-back treated it as not ours), the dead-man went ALARM at 04:01Z, and it cleared after the 2026-10-04 02:00Z run drafted on fresh ids. PR 4572 (merged, deployed 2026-10-04 03:25Z) marks a draft by its version and emits a failed outcome; its live proof is the first night whose date already holds an archived draft."
+ },
+ "site-api-p95-latency-high": {
+  "added": "2026-10-04",
+  "citation": "#4607 — GET /api/edition takes about five seconds uncached: pull requests 4602 and 4603 grew its upstreams from 9 to 17, read one after another. The alarm (p95 over 5000 ms, one 5-minute period) entered ALARM and cleared twice on 2026-10-04 (18:26–18:31Z and 19:00–19:05Z), each on cold loads of the preview front page under /next/v8/ (screenshot runs and cache-busted checks). Only the preview reads the route; the live front page does not. It will flap again on any cold preview load until #4607 lands; it gates the cut-over (issue 4588)."
+ },
+ "key-rotator-errors": {
+  "added": "2026-10-10",
+  "cause": "AccessDenied secretsmanager:UpdateSecretVersionStage in finishSecret",
+  "cause_observed": "2026-10-10T04:45Z",
+  "citation": "#4707 — the mcp-api-key rotation fails at finishSecret since 2026-10-07 (25 retries on one AWSPENDING token): the KeyRotator role lacks secretsmanager:UpdateSecretVersionStage (lost in a 2026-03-10 rewrite). AWSCURRENT is unchanged, so the key still serves. PR 4708 adds the grant; it needs the owner's `bash deploy/cdk_deploy.sh LifePlatformOperational` after merge."
+ },
+ "ingest-reconciliation-hevy-heartbeat": {
+  "added": "2026-10-10",
+  "citation": "#4643 — new tonight (PR 4764, LifePlatformMonitoring deployed ~11:10Z): the heartbeat is BREACHING until the daily Hevy reconcile writes its first datapoint at 18:30Z 2026-10-10. Expiry: 2026-10-10T19:30Z — if still ALARM then, the reconcile did not run; comment on #4643."
+ },
+ "life-platform-dlq-depth-warning": {
+  "added": "2026-10-10",
+  "cause": "daily-metrics-compute async failures (outage now fixed)",
+  "cause_observed": "2026-10-10T04:45Z",
+  "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
+ },
+ "life-platform-ingestion-dlq-messages": {
+  "added": "2026-10-10",
+  "cause": "daily-metrics-compute async failures (outage now fixed)",
+  "cause_observed": "2026-10-10T04:45Z",
+  "citation": "#4731 — flapped x6 in the window (entered ~00:06Z and ~16:46Z daily since 2026-10-07): each crashed daily-metrics-compute run (the issue 4704 outage, fixed 2026-10-10 ~04:30Z) landed one message on life-platform-ingestion-dlq, and the dlq-consumer re-invoked the crashing function every 6 h without escalating. Cleared ~09:05Z 2026-10-10 once the consumer retried on fixed code. The never-escalates defect is #4731 (PR 4741 held for the owner)."
+ },
+ "coach-vision-no-invocations-7d": {
+  "added": "2026-10-13",
+  "cause": "new_function_no_history",
+  "cause_observed": "2026-10-13T01:30Z",
+  "citation": "#3759 — one OK->ALARM->OK cycle: the alarm lit when the owner's 2026-10-12 03:04Z LifePlatformCompute apply created coach-vision (a 7-day no-invocation alarm reads a brand-new function as silent by construction) and cleared when its first scheduled run executed at 2026-10-12 17:00Z (honest-empty — no Sunday photo set yet). It re-lights by design only if a Monday 17:00Z run is missed; a lit state with the photo set absent is the expected shape until the owner sends one."
+ },
+ "chronicle-autopublish-held": {
+  "added": "2026-10-17",
+  "cause": "week-6-audit-held",
+  "cause_observed": "2026-10-17",
+  "citation": "#4914 — the alarm doing its job: chronicle-approve's 48-hour sweep refused the unapproved, unaudited week-6 legacy draft at 2026-10-16T18:00:44Z (CHRONICLE-AUTOPUBLISH-HELD Week 6 (2026-10-13) held: unapproved for 48.0h and the audit found 1 blocking item(s) — 'no audit on record: the Story Desk did not write this week'), the alarm went OK→ALARM 2026-10-16T18:01:57Z and ALARM→OK 18:16:57Z (period 300, missing data notBreaching: one datapoint per refusal is its design, routed to life-platform-alerts-digest — SNS NumberOfNotificationsDelivered 1 in the 18:00Z bucket). That episode is issue 4694's live proof (closed on it 2026-10-17T02:58Z). The sweep runs daily at 18:00Z and the draft stays inside its 10-day window until 2026-10-24, so the same 15-minute episode is expected every day at ~18:01Z until the owner approves week 6 from the preview email or forces the desk (issue 4914, the open owner). No action for the alarm itself; prune this entry 72 h after the last episode.",
+  "updated": "2026-10-17"
+ },
+ "slo-source-freshness": {
+  "added": "2026-10-18",
+  "cause_observed": "2026-10-18",
+  "updated": "2026-10-18",
+  "citation": "#4970 — a first-deploy effect of the Apple Watch dead-man (the watch-metrics PR merged 2026-10-18 21:08Z, deployed ~21:25Z): the presence stamp `watch_last_reading_epoch_apple` only exists from that deploy, so the checker's 21:33Z run found no stamp in its lookback and counted the dead-man stale on a healthy watch — StaleSourceCount 1 from 21:33Z to 21:40Z, 0 again from 21:45Z once the first post-deploy payload stamped it (checker log '2 stale' → '1 stale'; the one left is behavioural and never counts). The alarm clears on its next evaluation; the fix (an `armed_after` grace on the dead-man facet — an absent stamp is `pending`, never counted, until 2026-10-20T00:00Z; a stamp older than 36 h counts at any time) is the lane PR awaiting CI. Expiry: if still ALARM after 2026-10-19 03:00Z, re-read the metric. Clear timing: the alarm evaluates a daily Maximum (Period 86400, 1 period, ≥ 1), so today's earlier non-zero datapoint keeps it ALARM for the rest of the 2026-10-18 UTC bucket however many later runs read 0; it goes OK on the 2026-10-19 bucket's first evaluation after a clean datapoint.",
+  "note": "Reader-facing alarm class (freshness), cited on first red per #3423."
+ },
+ "slo-ai-coaching-success": {
+  "added": "2026-10-26",
+  "cause": "the same 2026-10-26 14:00Z ai-expert-analyzer Bedrock 503 burst (6 AnthropicAPIFailure), re-lit with no new failure",
+  "cause_observed": "2026-10-29",
+  "citation": "#5412 — the alarm went OK→ALARM again at 2026-10-29T06:05:13Z with StateReason '1 datapoint [6.0 (26/10/26 06:05:00)]': the hourly AnthropicAPIFailure sums from 10-24 to 10-29 08:00Z hold only the 6 failures at 2026-10-26 14:00Z (LambdaFunction=ai-expert-analyzer), so no new source exists — a late re-evaluation of the same 86400 s window. Expected to clear on the next evaluation; if still ALARM after 2026-10-30 07:00Z, re-derive. The breaker (#5412) proves on the Mon 2026-11-02 15:00Z analyzer run (Pacific schedule).",
+  "updated": "2026-10-29"
+ },
+ "ingest-consecutive-failures-strava": {
+  "added": "2026-10-23",
+  "cause": "Strava re-ingest of the already-stored DATE#2026-10-18 raised Decimal + float every hourly run 2026-10-21T04:10Z until the day left the window on 10-22",
+  "citation": "#5255 — the re-ingest Decimal/float defect. Episode ALARM 2026-10-21 05:11 PT → OK 2026-10-22 05:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
+ },
+ "ingest-liveness-unhealthy": {
+  "added": "2026-10-23",
+  "cause": "the composite liveness view of the same Strava episode (RunSuccess 0 on each errored run)",
+  "citation": "#5255 — same episode as ingest-consecutive-failures-strava: ALARM 2026-10-21 10:11 PT → OK 2026-10-22 10:11 PT. Expiry: re-cite if it fires again before #5255 is fixed."
+ },
+ "ingest-reconciliation-strava": {
+  "added": "2026-10-25",
+  "cause_observed": "2026-10-25",
+  "cause": "strava store-vs-vendor reconcile: three backdated walks Strava holds that the store lacks",
+  "citation": "#5257 — three backdated Strava walks (created ~10-21, local clock +9 h) the store lacks; deleting the duplicates is an owner phone act (owner acts list, Session CE). Self-clears once they leave the 14-day reconcile window (~10-27/28) or are deleted.",
+  "note": "Read from the alarm's StateReason (3 missing, 2026-10-20 17:21Z datapoint) and #5257's evidence; a Session CE audit found two duplicates remain (20673636264, 20673636369). Resolved 2026-10-26 17:21Z: MissingActivityCount 0, alarm OK; #5257 closed with live proof. Prune 72 h after."
+ },
+ "ingestion-error-og-image-generator": {
+  "added": "2026-10-25",
+  "cause_observed": "2026-10-24",
+  "cause": "one og-image-generator error episode, 2026-10-24 19:31Z → 20:31Z, self-cleared",
+  "citation": "self-clearing single episode (describe-alarm-history: OK→ALARM 2026-10-24T19:31:52Z, ALARM→OK 20:31:52Z); filter-log-events on /aws/lambda/og-image-generator 19:20–19:40Z printed no error line, so the cause is unread — re-cite with #N if it recurs.",
+  "note": "Session CE, 2026-10-25."
+ },
+ "panel-weekly-grade-missing": {
+  "added": "2026-10-25",
+  "cause_observed": "2026-10-25",
+  "cause": "new dead-man created with missing data = BREACHING until its first datapoint",
+  "citation": "#5072 — alarm created by the owner-approved LifePlatformMcp apply at 2026-10-25T06:29Z; ALARM by design (no PanelGradeOutcome datapoint yet) until the forced panel_weekly_grade run at 14:05Z wrote PANEL#2026-10-24 and PanelGradeOutcome=1, then cleared.",
+  "note": "Read from describe-alarm-history and the CloudWatch metric LifePlatform/HevyRoutine PanelGradeOutcome, Session CE."
+ },
+ "qa-smoke-warnings": {
+  "added": "2026-10-28",
+  "cause_observed": "2026-11-01",
+  "updated": "2026-11-01",
+  "citation": "NEW EPISODE 2026-11-01 (the 10-28/10-30 og:coach-cards cause is cured, PR 5488): the live `[QA] CAUSE warn` channel now reads `data:orphan_routine_drafts` — `qa_smoke_lambda.check_orphan_routine_drafts` warns when a Hevy routine DRAFT has sat past the age `training/routine_repo.py` names without being committed or discarded (the leg is CONTENT_TRUTH, a warn, never a fail). The remedy is a human one on the draft itself (commit it to Hevy or discard it — a coach-session act), or the repo's own draft reaper if one is ruled; no code defect is implied by the warn. Not filed as an issue at this wrap: it is an owner/coach-session act, and the alarm is a WarnCount that clears on the next run after the draft is resolved.",
+  "note": "Re-cited by the Session CN wrap 2026-10-31: cause cleared live (channel empty), window named; the Session CM entry cited the then-live cause. Re-cited 2026-11-01 (Session CR wrap) for the new cause; the previous og:coach-cards citation is history, kept in git.",
+  "cause": "data:orphan_routine_drafts"
+ },
+ "field-notes-missing": {
+  "added": "2026-10-25",
+  "citation": "#5128 (closed on live proof) — the dead-man fired correctly on 2026-10-24/25 for the W42 miss (generated:false after the Sunday cron), cleared after the W42 regenerate at 15:18Z and stayed OK through the W43 run at 18:00:05Z. A true positive by the instrument this issue built, not a defect.",
+  "note": "Session CF 2026-10-25: answered as a flap per the fired-and-cleared rule; state OK at 19:06Z."
+ },
+ "ai-dev-session-month-high": {
+  "added": "2026-10-25",
+  "citation": "self-clearing, dated: RED since its first governor publish 2026-10-26T08:01Z — DevSessionSpendMTD 67.78 against the $48 bar (80% of the $60 calendar-month dev-session cap, live since 2026-10-26). October's dev-session total was already over the cap before deploy; the gauge restarts at 0 on 2026-11-01 and the alarm returns to OK at the 2026-11-01T00:00Z governor run. Expiry: if still ALARM after 2026-11-01T09:00Z, read DevSessionSpendMTD and the November dev-session series before re-citing. Whether the cap should apply to October at all is an open owner ruling: #5406.",
+  "note": "Deploys red-bound on purpose (the cost-metric-drift-sustained precedent): it states a true condition, the October envelope already spent. Added with the alarm itself, before it exists live.",
+  "cause_observed": "2026-10-26",
+  "updated": "2026-10-26"
+ },
+ "qa-smoke-failures": {
+  "added": "2026-10-27",
+  "cause_observed": "2026-10-30",
+  "updated": "2026-10-30",
+  "citation": "Dated, self-clearing: the live runs since 2026-10-30T03:46Z read `[QA] CAUSE fail none -`. The daily-period FailCount alarm (86400 s, Maximum) holds the 2026-10-29 UTC bucket, whose runs failed `data:hae_additive_integrity` until 18:32Z; it clears at the first daily evaluation with no failure, expected by ~2026-10-31T00:30Z. The cause did NOT get repaired, it aged out: `hae_additive_integrity_qa.WINDOW_DAYS = 3` stopped replaying 10-26 on 10-30. The damaged Apple Health field-days 10-21/10-22/10-26 stay owned by #5440 (owner act: `scripts/hae_additive_backfill_4628.py --apply`, never 10-25). The checkin_pair timing false positive was fixed on 10-29 (deployed, due-hour 06:00 PT). If still red after 2026-10-31T06:00Z, re-derive from the live CAUSE line.",
+  "note": "Re-cited by the Session CM wrap 2026-10-30 (the 10-29 entry named two causes the live run no longer shows)."
+ },
+ "ingest-reconciliation-whoop": {
+  "added": "2026-10-26",
+  "cause": "same-day timing race, store vs vendor",
+  "cause_observed": "ALARM 2026-10-25 18:21Z (MissingActivityCount 1), OK 2026-10-26 18:21Z (0). Workout 6086653e was stored at 04:00Z on 10-26, after the 10-25 reconcile read the vendor.",
+  "citation": "self-cleared flap: a workout the reconcile saw at the vendor before the next ingest stored it; cleared at the following day's 18:21Z reconcile with no change. Prune 72 h after 2026-10-26 18:21Z."
+ },
+ "calibration-deadman": {
+  "added": "2026-10-27",
+  "cause_observed": "2026-10-27",
+  "cause": "no tape measurement or progress-photo set logged this cycle (the biweekly calibration prompt's dead-man)",
+  "citation": "#3759 — the owner's tape + photo sitting (deferred in session 2026-10-26 \"defer later in week\", 2026-10-27 \"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect: the prompt + dead-man mechanism (the biweekly-prompt story, closed 2026-10-30) closed on this very firing.",
+  "note": "Cited by Session CJ wrap 2026-10-27; re-cited to the sitting's story on 2026-10-30 (owner ruling: the mechanism is proven, the sitting is the owner's act) — the PR that moved this entry is 5489."
+ },
+ "life-platform-canary-mcp-failure": {
+  "added": "2026-11-01",
+  "cause_observed": "2026-11-01",
+  "updated": "2026-11-01",
+  "citation": "One transition only: the MCP canary entered ALARM once around 2026-11-01T03:1xZ and cleared within the hour (the 04:16Z pre-flight read it as 'fired 1h04m ago, now cleared'). The window is the one in which main took the #5538 Site API merge and its fleet deploy; the canary's own log for that run was not re-read this session, so 'deploy-window transient' is a HYPOTHESIS, not a derived cause. No issue filed: a single cleared transition with no recurrence is below the filing bar; a second flap inside 7 days files one and re-cites this entry with the derived cause.",
+  "note": "Session CR wrap 2026-11-01 — cited under the #2912 flap rule; the honest status is 'unexplained, cleared, watched'."
+ }
 }
