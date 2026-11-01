@@ -86,7 +86,8 @@ jobs:
         env:
           CITATION_NETWORK: "1"
         run: |
-          python3 -m pip install -q pytest
+          PINS=$(python3 scripts/ci_pins.py pytest)
+          pip install -q $PINS
           python3 -m pytest tests/test_citation_resolution_1892.py tests/test_experiment_library_citations_1983.py -q -p no:randomly
 
       - name: File or resolve this check's tracker

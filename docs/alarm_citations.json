@@ -281,7 +281,7 @@
   "added": "2026-11-01",
   "cause_observed": "2026-11-01",
   "updated": "2026-11-01",
-  "citation": "One transition only: the MCP canary entered ALARM once around 2026-11-01T03:1xZ and cleared within the hour (the 04:16Z pre-flight read it as 'fired 1h04m ago, now cleared'). The window is the one in which main took the #5538 Site API merge and its fleet deploy; the canary's own log for that run was not re-read this session, so 'deploy-window transient' is a HYPOTHESIS, not a derived cause. No issue filed: a single cleared transition with no recurrence is below the filing bar; a second flap inside 7 days files one and re-cites this entry with the derived cause.",
-  "note": "Session CR wrap 2026-11-01 — cited under the #2912 flap rule; the honest status is 'unexplained, cleared, watched'."
+  "citation": "One transition only: the MCP canary entered ALARM once around 2026-11-01T03:1xZ and cleared within the hour (the 04:16Z pre-flight read it as 'fired 1h04m ago, now cleared'). The window is the one in which main took the #5538 Site API merge and its fleet deploy; the canary's own log for that run was not re-read this session, so 'deploy-window transient' is a HYPOTHESIS, not a derived cause. No issue filed: a single cleared transition is below the filing bar. Whether it recurs is READ from the alarm's own history at each wrap (scripts/check_alarm_citations.py, the #2912 transition count), never asserted here; a second transition inside 7 days files an issue and re-cites this entry with the derived cause.",
+  "note": "Session CR wrap 2026-11-01 — cited under the #2912 flap rule; the honest status is 'unexplained, cleared, watched by the transition count'."
  }
 }

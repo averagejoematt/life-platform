@@ -23,8 +23,8 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "ci-lint.yml": (436, 148),  # #5473: the pip-audit allowlist parse moved to scripts/check_pip_audit.py
     "ci-test.yml": (439, 124),
     "citation-network-check.yml": (
-        103,
-        23,
+        104,
+        24,
     ),  # 2026-11-01: the two live pytest halves + the auto-filed tracker moved here from the pre-merge lane (owner direction)
     "codeql.yml": (137, 0),
     "config-drift.yml": (280, 154),
