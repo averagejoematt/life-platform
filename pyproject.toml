@@ -79,6 +79,12 @@ external = ["CDK_HANDLER_ORPHAN"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
+# `web/` at the repo root is the v9 Astro build (#5530), not a Python package. Without this
+# pin ruff sees that directory and reclassifies every `from web import …` (the lambdas/web
+# package, reached via sys.path) as first-party, re-sorting 165 untouched test files. The
+# tests were written with `web` in the third-party section; keep it there. Python itself is
+# unaffected: a regular package (lambdas/web/__init__.py) always wins over a bare directory.
+known-third-party = ["web"]
 
 # Import sorting is owned by ruff (tool.ruff.lint select "I" + tool.ruff.lint.isort)
 # — standalone isort was removed: two sorters with different output fought each
