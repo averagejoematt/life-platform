@@ -195,7 +195,7 @@ def test_replaced_set_is_exactly_the_destinations_the_plan_keeps_at_their_addres
 
 
 # ── 4. the committed artifacts ───────────────────────────────────────────────────────────────────
-def test_owned_paths_json_is_consistent_with_src_pages_and_the_switch_is_off():
+def test_owned_paths_json_is_consistent_with_src_pages_and_the_switch_is_on():
     pages = os.path.join(REPO, "www", "src", "pages")
     static, patterns = set(), set()
     for dirpath, _d, files in os.walk(pages):
@@ -213,8 +213,10 @@ def test_owned_paths_json_is_consistent_with_src_pages_and_the_switch_is_off():
     assert "404.html" in OWNED["files"] and {"sitemap.xml", "sitemap-index.xml", "sitemap-0.xml"} <= set(OWNED["files"])
     assert OWNED["prefixes"] == ["_astro/", "assets/fonts/v9/"]
     assert OWNED["base"] == "/"
-    assert OWNED["live_at_root"] is False, "this PR does not flip `/`; the switch is the owner's one-line merge"
-    assert OWNED["flipped_on"] is None
+    assert (
+        OWNED["live_at_root"] is True
+    ), "the owner's explicit go flipped `/` on 2026-11-01; un-launching is a deliberate PR, never a drift"
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", OWNED["flipped_on"] or ""), OWNED["flipped_on"]
     assert OWNED["routes"] == sorted(OWNED["routes"]) and OWNED["files"] == sorted(OWNED["files"]), "deterministic: sorted"
 
 
@@ -244,22 +246,32 @@ def test_target_resolution(event, requested, live, expected):
         assert "REFUSED" in reason and "live_at_root" in reason
 
 
-def test_target_cli_refuses_root_while_the_switch_is_off(tmp_path):
-    env = dict(os.environ, GITHUB_OUTPUT=str(tmp_path / "out"))
+def test_target_cli_resolves_root_once_the_switch_is_on_and_still_refuses_it_while_off(tmp_path):
+    from deploy import www_deploy_target as tgt
+
+    # the pure rule, both states: a dispatch cannot launch ahead of the repo; a push follows the switch
+    target, reason = tgt.resolve("workflow_dispatch", "root", live=False)
+    assert target is None and "REFUSED" in reason
+    assert tgt.resolve("push", "", live=False)[0] == tgt.PREVIEW
+    assert tgt.resolve("push", "", live=True)[0] == tgt.ROOT
+    assert tgt.resolve("workflow_dispatch", "preview", live=True)[0] == tgt.PREVIEW
+    # the CLI against the committed switch (on since 2026-11-01)
+    env = dict(os.environ, GITHUB_OUTPUT=str(tmp_path / "out1"))
     r = subprocess.run(
         [sys.executable, os.path.join(REPO, "deploy", "www_deploy_target.py"), "--event", "workflow_dispatch", "--input", "root"],
         capture_output=True,
         text=True,
         env=env,
     )
-    assert r.returncode == 2 and "REFUSED" in r.stdout, r.stdout
+    assert r.returncode == 0 and "live_at_root=true" in r.stdout and (tmp_path / "out1").read_text() == "target=root\n", r.stdout
+    env = dict(os.environ, GITHUB_OUTPUT=str(tmp_path / "out2"))
     r = subprocess.run(
         [sys.executable, os.path.join(REPO, "deploy", "www_deploy_target.py"), "--event", "push"], capture_output=True, text=True, env=env
     )
-    assert r.returncode == 0 and (tmp_path / "out").read_text() == "target=preview\n"
+    assert r.returncode == 0 and (tmp_path / "out2").read_text() == "target=root\n"
 
 
-def test_www_sync_script_refuses_root_before_the_switch_and_never_deletes():
+def test_www_sync_script_guards_the_root_sync_and_never_deletes(tmp_path):
     assert "--delete" not in WWW_SYNC
     assert "--live-at-root ||" in WWW_SYNC and "exit 4" in WWW_SYNC, "root sync must refuse while live_at_root is false"
     assert "--check-dist" in WWW_SYNC, "root sync must run the live collision check"
@@ -281,16 +293,26 @@ def test_www_sync_script_refuses_root_before_the_switch_and_never_deletes():
         r.stdout + r.stderr
     )
     r = subprocess.run(
-        ["bash", os.path.join(REPO, "deploy", "www_preview_sync.sh"), "--target", "root"], capture_output=True, text=True, env=env, cwd=REPO
+        ["bash", os.path.join(REPO, "deploy", "www_preview_sync.sh"), "--target", "root", "--dist", str(tmp_path / "no-such-dist")],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=REPO,
     )
-    assert r.returncode == 4 and "REFUSED" in r.stderr, "a real root sync with the switch off must be refused before any aws call"
+    # the switch is on (2026-11-01): the root sync passes the switch guard and stops at the next guard — the built
+    # tree must exist — before any aws call; the off-state refusal (exit 4) is pinned in the script text above
+    assert r.returncode == 3 and "dist dir not found" in r.stderr and "aws" not in r.stdout, r.stdout + r.stderr
 
 
 # ── 6. the page registry derives the v9 rows ─────────────────────────────────────────────────────
-def test_registry_has_no_v9_rows_while_the_switch_is_off():
-    assert not [p for p in qa_manifest.MANIFEST if p.get("owner") == "www"]
-    assert qa_manifest._v9_rows(OWNED, live=False) == []
-    assert qa_manifest.PAGES_BY_PATH["/"]["js_modules"] == ["ck_pages.js"], "the v8 kit page is still what / describes"
+def test_registry_describes_the_v9_pages_once_the_switch_is_on():
+    v9 = [p for p in qa_manifest.MANIFEST if p.get("owner") == "www"]
+    assert {p["path"] for p in v9} == set(OWNED["static_routes"]) | {"/404.html"}, "one row per static v9 route + the 404 object"
+    assert qa_manifest._v9_rows(OWNED, live=False) == [], "switch off = no v9 rows (the v8 description returns)"
+    assert (
+        qa_manifest.PAGES_BY_PATH["/"]["owner"] == "www" and qa_manifest.PAGES_BY_PATH["/"]["js_modules"] == []
+    ), "the v9 Start page is what / describes"
+    assert qa_manifest.PAGES_BY_PATH["/privacy/"]["structural"]["marker"], "#1429's named surface stays in the structural sweep"
 
 
 def test_registry_derives_the_v9_rows_once_the_switch_is_on():
@@ -299,7 +321,14 @@ def test_registry_derives_the_v9_rows_once_the_switch_is_on():
     assert set(by_path) == set(OWNED["static_routes"]) | {"/404.html"}
     assert {p for p, r in by_path.items() if r["tier"] == 1} == {"/", "/story/", "/data/", "/system/"}
     assert all(r["tier"] == 2 for p, r in by_path.items() if p not in {"/", "/story/", "/data/", "/system/", "/404.html"})
-    assert all(r["owner"] == "www" and r["content_class"] == "live-data" for p, r in by_path.items() if p != "/404.html")
+    assert all(r["owner"] == "www" for r in by_path.values())
+    assert all(
+        r["content_class"] == ("static" if p in qa_manifest._V9_STRUCTURAL else "live-data") for p, r in by_path.items() if p != "/404.html"
+    ), "every v9 page is baked from the snapshot; #1429's named structural surface (/privacy/) keeps a marker"
+    assert (
+        by_path["/privacy/"]["structural"]["marker"]
+        in open(os.path.join(REPO, "www", "src", "pages", "privacy", "index.astro"), encoding="utf-8").read()
+    )
     assert all(r["visual"] and r["visual"]["wait_for"] == "main#main" for p, r in by_path.items() if p != "/404.html")
     import publish_snapshot as ps
 
@@ -382,7 +411,7 @@ def test_sitemap_writer_follows_the_switch_and_skips_v9_rows(tmp_path, monkeypat
     monkeypatch.setattr(sm, "_page_registry", lambda: [{"path": "/kept-page/"}, {"path": "/data/", "owner": "www"}])
     urls = sm.registry_urls()
     assert urls == [f"{sm.BASE}/kept-page/"], "a page the v9 build owns is in the build's sitemap, never this one"
-    assert sm.v9_owns_sitemap_xml() is False, "before the flip this generator still writes sitemap.xml"
+    assert sm.v9_owns_sitemap_xml() is True, "after the flip the build writes sitemap.xml; this generator writes sitemap-site.xml only"
 
 
 def test_committed_sitemaps_and_robots():

@@ -1,6 +1,6 @@
 # `www/` — the v9 static build
 
-> **Status:** Phase 4 mechanics landed (#5534) — the build still ships to the `/next/v9/` preview only; the cut-over switch `live_at_root` in `owned_paths.json` is **false**. Plan: [`docs/design/v9/STAGE4_ENGINEERING_PLAN.md`](../docs/design/v9/STAGE4_ENGINEERING_PLAN.md) (owner-approved 2026-10-31). Stories #5530 (Phase 0) · #5534 (Phase 4), epic #5529. **Nothing here is deployed to the public root until the owner flips the switch** (§ The switch, below).
+> **Status:** LIVE at the root since 2026-11-01 (the owner's explicit go, #5534) — the cut-over switch `live_at_root` in `owned_paths.json` is **true**: every `www/**` merge deploys the build to `/`; `/next/v9/` stays as the noindex rehearsal target (`workflow_dispatch` with `target=preview`). The production root as it stood before the flip is snapshotted at `s3://matthew-life-platform/backups/root-snapshots/20261101T220956Z/` (`deploy/www_root_snapshot.sh`). Plan: [`docs/design/v9/STAGE4_ENGINEERING_PLAN.md`](../docs/design/v9/STAGE4_ENGINEERING_PLAN.md) (owner-approved 2026-10-31). Stories #5530 (Phase 0) · #5534 (Phase 4), epic #5529.
 
 The Stage 3 design (Claude Design, 2026-10-31) as a static site: one typed content model, one build, one publication boundary, zero new AWS infrastructure. Astro 7 (static output) is a build-time toolchain only — the reader receives HTML, one stylesheet, self-hosted fonts and, from Phase 2, a few vanilla ES-module islands. No client framework.
 

@@ -11,8 +11,8 @@
     "sitemap-index.xml",
     "sitemap.xml"
   ],
-  "flipped_on": null,
-  "live_at_root": false,
+  "flipped_on": "2026-11-01",
+  "live_at_root": true,
   "prefixes": [
     "_astro/",
     "assets/fonts/v9/"

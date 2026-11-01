@@ -58,8 +58,18 @@ def _leak_pattern():
 
 
 def _site_file(page):
-    """Repo file backing a manifest entry ('/x/' → site/x/index.html, '/x.html' → site/x.html)."""
+    """Repo file backing a manifest entry ('/x/' → site/x/index.html, '/x.html' → site/x.html).
+    A page the v9 build owns (owner "www", #5534) has no site/ file: its truth is the Astro source that
+    renders it ('/x/' → www/src/pages/x/index.astro, '/' → index.astro, '/404.html' → 404.astro)."""
     p = page["path"]
+    if page.get("owner") == "www":
+        if p == "/":
+            rel = "index.astro"
+        elif p.endswith(".html"):
+            rel = p.strip("/")[: -len(".html")] + ".astro"
+        else:
+            rel = os.path.join(p.strip("/"), "index.astro")
+        return os.path.join(_REPO, "www", "src", "pages", rel.replace("/", os.sep))
     rel = p.strip("/") if p.endswith(".html") else os.path.join(p.strip("/"), "index.html")
     return os.path.join(_REPO, "site", rel.replace("/", os.sep))
 
