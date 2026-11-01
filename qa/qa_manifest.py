@@ -90,6 +90,22 @@ _V9_TIER1 = {"/", "/story/", "/data/", "/system/"}  # the four destinations (pla
 # #1429 named /privacy/ as a structural-sweep surface; the v9 page is static text, so it keeps a declared
 # marker (the h1 in www/src/pages/privacy/index.astro) and the smoke asserts it after the cut-over.
 _V9_STRUCTURAL = {"/privacy/": "Only deliberately published figures appear here."}
+# The doors' declared intent (qa/comprehension_qa.py grades a newcomer's read against it; <=30 words each).
+_V9_INTENTS = {
+    "/": (
+        "The front page: who Matthew is, the six-dimensional portrait of how he is doing, the latest chapter, "
+        "and the doors into the story, the data and the system."
+    ),
+    "/story/": "The narration: the latest weekly chapter and its episode, then every chapter in order.",
+    "/data/": (
+        "The data room: the published series behind the experiment, paired against each other, "
+        "with how each number is measured and what is missing."
+    ),
+    "/system/": (
+        "How the platform works: the AI coaches' graded record beside a simple guess, the ledger of every prediction, "
+        "the sources and the methods."
+    ),
+}
 _V9_NAMES = {
     "/": "Start (the v9 front page)",
     "/story/": "Story (v9)",
@@ -155,6 +171,8 @@ def _v9_rows(owned: dict | None = None, live: bool | None = None) -> list[dict]:
             "smoke": "200",
             "static_core": False,  # the whole page is static; there is no <noscript> core to assert
         }
+        if route in _V9_INTENTS:
+            row["intent"] = _V9_INTENTS[route]
         if route in _V9_STRUCTURAL:  # #1429's named surface keeps its structural marker across the cut-over
             row["content_class"] = "static"
             row["structural"] = {"marker": _V9_STRUCTURAL[route]}
