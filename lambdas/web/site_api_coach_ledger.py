@@ -332,6 +332,12 @@ def admit_sealed(predictions: list, limit: int) -> list:
 _PREDICTION_PROJECTION_FIELDS = (
     "status",
     "outcome",
+    # #5564 (2026-11-01): the grader's quality stamp travels with the sweep. `coach_record.quality_counts` reads
+    # `quality_flags` off these projected rows; without the two fields every decided row read as `unassessed`
+    # on /api/predictions and /api/calibration while the row itself carried the stamp (the export route had
+    # added them to its own projection — the tell). A row without the attribute is still `unassessed`.
+    "quality_flags",
+    "evaluator_version",
     "confidence",
     "tombstone",
     "phase",

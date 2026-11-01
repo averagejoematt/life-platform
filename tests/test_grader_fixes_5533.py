@@ -747,3 +747,36 @@ def test_main_refuses_to_apply_with_a_pinned_day_and_defaults_to_a_dry_run(monke
     out = capsys.readouterr().out
     assert "dry run — nothing written" in out and "### Per coach" in out
     assert not [w for w in table.writes]
+
+
+# ── #5564 (2026-11-01): the quality stamp survives the /api/predictions sweep's projection ────────────────
+def test_the_predictions_sweep_projects_the_quality_stamp_so_a_clean_row_counts_as_clean():
+    """Live 2026-11-01 after the #5533 re-grade: 21 decided rows carried `quality_flags`, yet
+    `/api/predictions` `by_coach[*].quality` read every row as `unassessed` — the sweep's ProjectionExpression
+    did not fetch the attribute, so `quality_counts` never saw it. The projection is the source; pin it, and
+    pin the count over rows shaped exactly as the projection returns them."""
+    from web import site_api_coach_ledger as ledger
+
+    assert "quality_flags" in ledger._PREDICTION_PROJECTION_FIELDS and "evaluator_version" in ledger._PREDICTION_PROJECTION_FIELDS
+    full = {
+        "pk": "COACH#sleep_coach",
+        "sk": "PREDICTION#pred_x",
+        "status": "refuted",
+        "outcome": "refuted",
+        "outcome_date": "2026-10-16",
+        "quality_flags": [],
+        "evaluator_version": "1.1",
+        "claim_natural": "x",
+        "evaluation": {"type": "directional", "metric": "recovery_score"},
+        "created_date": "2026-10-02",
+        "phase": "experiment",
+    }
+    flagged = {**full, "sk": "PREDICTION#pred_y", "quality_flags": ["logging_gap"]}
+    legacy = {k: v for k, v in full.items() if k not in ("quality_flags", "evaluator_version")}
+    legacy["sk"] = "PREDICTION#pred_z"
+    projected = [
+        {k: v for k, v in r.items() if k in ledger._PREDICTION_PROJECTION_FIELDS or k in ("pk", "sk")} for r in (full, flagged, legacy)
+    ]
+    q = coach_record.quality_counts(projected)
+    assert (q["clean"], q["flagged"], q["unassessed"], q["n"]) == (1, 1, 1, 3), q
+    assert q["by_flag"]["logging_gap"] == 1
