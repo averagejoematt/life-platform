@@ -1,167 +1,253 @@
 ---
-// Start — the entry point (Stage 3 `#start`), Phase 1.
-// Every number comes from the edition snapshot (one producer). The hero copy is the
-// prototype's as approved, with the age removed (owner decision 7). His own words
-// (`his_words`) are NOT rendered: owner decision 10 requires an explicit publication
-// approval that the served block does not yet carry.
+// Start — the entry point. Refined after the owner's 2026-11-01 review against the approved
+// Stage 2/3 home: the six-dimensional portrait returns beside the premise (no photograph needed),
+// the latest chapter is the main feature, the coaches speak in plain words, and every number is
+// the edition's or the snapshot's (one producer). His own words (`his_words`) are still not
+// rendered: owner decision 10 requires an explicit publication approval the served block lacks.
 import Base from "../layouts/Base.astro";
 import Provenance from "../components/Provenance.astro";
 import StatusTag from "../components/StatusTag.astro";
-import { dayInWords, num, kOfN, clip } from "../lib/format.js";
-import { loadAll, latestEdition, dayLine } from "../lib/snapshot.js";
+import { headline, weeklyBars } from "../lib/chart.js";
+import { dayInWords, domainWords, num, kOfN, clip } from "../lib/format.js";
+import { connectedTo, loadAll, loadSeries, latestEdition, dayLine } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
 
 const all = await loadAll();
 const edition = await latestEdition();
+const series = await loadSeries();
 const blocks: Record<string, any> = (edition && edition.blocks) || {};
 const ok = (k: string) => (blocks[k] && blocks[k].state === "ok" ? blocks[k].data : null);
 const today = ok("today");
 const record = ok("record");
 const next = ok("next");
 const week = ok("week");
-const lines: any[] = (ok("coach_lines")?.lines || []).slice(0, 2);
+const portrait = ok("portrait") || {};
+const lines: any[] = (ok("coach_lines")?.lines || []).slice(0, 3);
+const startDate: string | null = today?.start_date || edition?.start_date || null;
 
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
-const latestChapter = chapters.find((c) => c.status === "published") || null;
+const published = chapters.filter((c) => c.status === "published");
+const latestChapter = published[0] || null;
+const firstChapter = published[published.length - 1] || null;
 const latestEpisode = latestChapter?.episode_id ? all.get("episode", latestChapter.episode_id) : null;
-const waiting = chapters.filter((c) => c.status === "held" || c.status === "pending").sort((a, b) => (a.week ?? 0) - (b.week ?? 0));
+const inChapterAll = latestChapter ? await connectedTo("chapter", latestChapter.id, { cap: 6 }) : null;
+const inChapter = inChapterAll ? { ...inChapterAll, items: inChapterAll.items.filter((e) => e.type !== "edition").slice(0, 4) } : null;
 const pending = all.byType.prediction
   .filter((p) => p.status === "pending")
   .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
   .slice(0, 3);
 const openDisagreements = all.byType.disagreement.filter((d) => d.status === "open");
-const staff = all.byType.coach.filter((c) => c.tier === "staff" && !c.retired).sort((a, b) => (b.record?.n || 0) - (a.record?.n || 0));
-const coachName = (id: string) => all.get("coach", id)?.name || all.get("coach", `${id}_coach`)?.name || id;
+const coachById = (id: string) => all.get("coach", id) || all.get("coach", `${id}_coach`);
 const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Boolean).join(" · ") : null;
 const weekOrder: string[] = week?.order || [];
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
+
+// The week a chapter covers: program week N runs from start + 7(N−1) for seven days.
+function weekRange(c: any): string | null {
+  if (!startDate || c?.week == null) return null;
+  const s = new Date(`${startDate}T00:00:00Z`);
+  s.setUTCDate(s.getUTCDate() + 7 * (c.week - 1));
+  const e = new Date(s);
+  e.setUTCDate(e.getUTCDate() + 6);
+  const a = dayInWords(s.toISOString().slice(0, 10), { short: true });
+  const b = dayInWords(e.toISOString().slice(0, 10), { short: true });
+  return a && b ? `${a} – ${b}` : null;
+}
+
+// ── Fig. 1 — the portrait. Body, Sleep and Recovery read their series; Mind and Connection read
+// the edition's published counts; Purpose has no instrument. Bars are eight weekly means (or counts).
+type Dim = { id: string; label: string; instrument: string; value: string | null; unit: string; bars: (number | null)[] | null; note: string; href: string | null; measured: boolean };
+function seriesDim(id: string, key: string, label: string, decimals: number, unit: string, noteOf: (h: any, bars: (number | null)[]) => string): Dim {
+  const s = series[key];
+  const m = all.get("metric", key);
+  if (!s) return { id, label, instrument: m?.instrument || "", value: null, unit, bars: null, note: "No series served for this yet.", href: m ? pathOf("metric", key) : null, measured: false };
+  const h = headline(s.days);
+  const bars = weeklyBars(s.days, 8);
+  return { id, label, instrument: m?.instrument || s.source_id || "", value: h.last == null ? null : num(h.last, decimals), unit, bars, note: noteOf(h, bars), href: pathOf("metric", key), measured: h.last != null };
+}
+const firstBar = (bars: (number | null)[]) => bars.find((v) => v != null);
+const lastBar = (bars: (number | null)[]) => [...bars].reverse().find((v) => v != null);
+const dims: Dim[] = [
+  seriesDim("body", "weight_lbs", "Body", 1, "lb", (h) => (today?.change_lbs != null && startDate ? `${num(today.change_lbs, 1)} lb since ${dayInWords(startDate, { short: true })}.` : `${h.n} mornings on the scale.`)),
+  seriesDim("sleep", "sleep_duration_hours", "Sleep", 1, "h", (h, bars) => {
+    const f = firstBar(bars);
+    const l = lastBar(bars);
+    return f != null && l != null ? `This week's mean. Week one was ${num(f, 1)} h.` : `${h.n} nights measured.`;
+  }),
+  seriesDim("recovery", "hrv", "Recovery", 0, "ms", (h, bars) => {
+    const f = firstBar(bars);
+    return f != null ? `Heart-rate variability. Week one averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
+  }),
+  {
+    id: "mind",
+    label: "Mind",
+    instrument: "journal",
+    value: portrait.mind?.state === "ok" && portrait.mind.entries_total != null ? String(portrait.mind.entries_total) : null,
+    unit: portrait.mind?.entries_total === 1 ? "entry" : "entries",
+    bars: portrait.mind?.weeks || null,
+    note:
+      portrait.mind?.state === "ok"
+        ? `${edition?.day_n != null ? `in ${edition.day_n} days` : "so far"}${portrait.mind.last ? `, the last on ${dayInWords(portrait.mind.last, { short: true })}` : ""}. Counts only; the words stay private. The quietest signal, and the one the coaches guess at most.`
+        : "The journal's counts were not served at build time.",
+    href: null,
+    measured: portrait.mind?.state === "ok" && (portrait.mind.entries_total || 0) > 0,
+  },
+  {
+    id: "connection",
+    label: "Connection",
+    instrument: "logged interactions",
+    value: null,
+    unit: "",
+    bars: null,
+    note:
+      portrait.connection?.state === "ok"
+        ? portrait.connection.interactions_30d
+          ? `${portrait.connection.interactions_30d} logged in the last thirty days; the depth of them is not published.`
+          : "None logged in the last thirty days. The journal went quiet; so did this."
+        : "Not served at build time.",
+    href: null,
+    measured: false,
+  },
+  { id: "purpose", label: "Purpose", instrument: "not yet", value: null, unit: "", bars: null, note: portrait.purpose?.text || "No instrument for this yet. Deliberately an empty frame.", href: null, measured: false },
+];
+// Mind counts as measured only when the journal has entries in the last thirty days; two entries
+// in fifty-six days is "barely" — the tile says so rather than implying a measured dimension.
+const barely = dims.filter((d) => d.id === "mind" && d.measured && !(portrait.mind?.entries_30d > 0)).length;
+const measured = dims.filter((d) => d.measured).length - barely;
+const WORDS = ["none", "one", "two", "three", "four", "five", "six"];
+function barSvg(bars: (number | null)[] | null, faint = false) {
+  const W = 96;
+  const H = 36;
+  if (!bars || !bars.some((v) => v != null)) {
+    let out = "";
+    for (let i = 0; i < 8; i++) out += `<rect x="${i * 12 + 0.5}" y="${H - 4.5}" width="9" height="4" fill="none" stroke="#B9B9B3" stroke-dasharray="2 2"/>`;
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${out}</svg>`;
+  }
+  const vals = bars.filter((v) => v != null) as number[];
+  const lo = Math.min(...vals, 0);
+  const hi = Math.max(...vals);
+  let out = "";
+  bars.forEach((v, i) => {
+    if (v == null) {
+      out += `<rect x="${i * 12 + 0.5}" y="${H - 4.5}" width="9" height="4" fill="none" stroke="#B9B9B3" stroke-dasharray="2 2"/>`;
+      return;
+    }
+    const h = hi === lo ? H * 0.6 : 4 + ((v - lo) / (hi - lo)) * (H - 6);
+    const last = i === bars.length - 1 || bars.slice(i + 1).every((x) => x == null);
+    out += `<rect x="${i * 12}" y="${(H - h).toFixed(1)}" width="10" height="${h.toFixed(1)}" fill="${last && !faint ? "#1B3FD6" : "#C9C9C3"}"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${out}</svg>`;
+}
 ---
 
 <Base title="Average Joe Matt" top="start" status={status}>
-  <section class="section">
-    <div class="wrap grid" style="grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr));gap:56px;align-items:start">
-      <div style="display:flex;flex-direction:column;gap:26px">
+  <section class="section" style="padding-bottom:40px">
+    <div class="wrap hero">
+      <div class="premise">
         <p class="label">
-          An experiment, in public{today?.start_date && ` · began ${dayInWords(today.start_date)}`}{edition?.day_n != null && ` · day ${edition.day_n}`}
+          An experiment, in public{startDate && ` · began ${dayInWords(startDate)}`}{edition?.day_n != null && ` · day ${edition.day_n}`}
         </p>
         <h1>Can an ordinary person engineer an extraordinary life?</h1>
         <p class="dek">
-          I'm Matt. British, in Seattle. On {today?.start_date ? dayInWords(today.start_date, { short: true }) : "day one"} I weighed
+          I'm Matt. British, in Seattle. On {startDate ? dayInWords(startDate, { short: true }) : "day one"} I weighed
           {today?.start_weight_lbs ? ` ${num(today.start_weight_lbs, 0)} pounds` : " what the scale said"} and started this: the data sources on my
           body, a team of AI coaches, one honest journal, and a question I can't answer yet — whether getting healthier and getting happier are the
           same thing. The weight is the catalyst. It isn't the point.
         </p>
         <div class="row">
-          {latestChapter && <a class="btn" href={href(pathOf("chapter", latestChapter.id))}>This week's chapter</a>}
-          <a class="btn ghost" href={href("/story/")}>Every chapter</a>
+          {firstChapter && <a class="btn" href={href(pathOf("chapter", firstChapter.id))}>Start with chapter one</a>}
+          {latestChapter && <a class="btn ghost" href="#week">This week ↓</a>}
         </div>
         <p class="margin">
           The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
         </p>
       </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div
-          class="photo-frame"
-        >
-          <span class="chip" style="position:absolute;top:10px;left:10px">Photo · pending approval</span>
-          <span class="serif" style="font-size:15px;line-height:1.35;background:var(--paper);padding:8px 10px;border:1px solid var(--ink)">
-            Day one. It exists; it goes here when it is approved, and not before.
-          </span>
+      <figure class="portrait">
+        <figcaption class="between">
+          <span class="label">Fig. 1 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`} · eight weekly means</span>
+          <span class="verified" style="font-size:10px">Verified where filled{edition && ` · ${dayInWords(edition.as_of, { short: true })}`}</span>
+        </figcaption>
+        <div class="tiles portrait-tiles">
+          {
+            dims.map((d) =>
+              d.href ? (
+                <a class="tile" href={href(d.href)}>
+                  <span class="label">{d.label} · {d.instrument}</span>
+                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}</span>
+                  <span class="spark" set:html={barSvg(d.bars)} />
+                  <span class="note">{d.note}</span>
+                </a>
+              ) : (
+                <div class="tile">
+                  <span class="label">{d.label} · {d.instrument}</span>
+                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}</span>
+                  <span class="spark" set:html={barSvg(d.bars, d.value == null)} />
+                  <span class="note">{d.note}</span>
+                </div>
+              ),
+            )
+          }
         </div>
-        <p class="muted" style="font-size:13px">Photographs are deliberate publications, like everything else here.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="section hair">
-    <div class="wrap">
-      <div class="between" style="margin-bottom:14px">
-        <p class="label">Today</p>
-        {blocks.today && <Provenance object={{ ...edition, state: blocks.today.state, as_of: blocks.today.as_of || edition.as_of, data_through: null, absent_text: blocks.today.absent_text, sample: false }} />}
-      </div>
-      {
-        today ? (
-          <div class="tiles">
-            <a class="tile" href={href("/data/")}>
-              <span class="label">Body · this morning</span>
-              <span class="v num">
-                {num(today.weight_lbs, 1)}
-                <small> lb</small>
-              </span>
-              <span class="muted" style="font-size:13px">
-                {num(today.change_lbs, 1)} lb since {dayInWords(today.start_date, { short: true })}.
-              </span>
-            </a>
-            <a class="tile" href={href("/system/")}>
-              <span class="label">The coaches' record</span>
-              <span class="v num" style="font-size:30px">{record ? kOfN(record.right, record.decided) : "—"}</span>
-              <span class="muted" style="font-size:13px">
-                {record?.comparison_text || record?.count_text || "No coach call has been checked yet."}
-              </span>
-            </a>
-          </div>
-        ) : (
-          <div class="empty">
-            <b style="color:var(--ink)">No reading today.</b>
-            <span>{blocks.today?.absent_text || "The edition has no today block."}</span>
-          </div>
-        )
-      }
+        <p class="serif muted" style="font-size:16px;line-height:1.5">
+          {WORDS[measured] ? WORDS[measured][0].toUpperCase() + WORDS[measured].slice(1) : measured} dimensions measured,{barely ? ` ${WORDS[barely]} barely,` : ""}{" "}
+          {WORDS[6 - measured - barely] || 6 - measured - barely} not yet. That ratio is the project: the body is the easy part to instrument.
+        </p>
+      </figure>
     </div>
   </section>
 
   {
     latestChapter && (
-      <section class="section hair">
+      <section class="section hair" id="week">
         <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
-          <div style="flex:0 0 150px">
-            <p class="label">Chapter</p>
-            <span class="big cobalt" style="font-size:110px;display:block">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
-            <span class="mono muted" style="font-size:12px">{dayInWords(latestChapter.date, { short: true })}</span>
+          <div style="flex:0 0 160px;display:flex;flex-direction:column;gap:6px">
+            <span class="label">Chapter</span>
+            <span class="big cobalt" style="font-size:130px;display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
+            <span class="mono muted" style="font-size:12px">{weekRange(latestChapter) || dayInWords(latestChapter.date, { short: true })}</span>
           </div>
           <article style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px">
             <div class="row">
-              <span class="label">The latest chapter</span>
+              <span class="label">This week</span>
               <Provenance object={latestChapter} />
             </div>
-            <h2 style="font-size:40px">{latestChapter.title}</h2>
+            <h2 style="font-size:44px;line-height:1.05">{latestChapter.title}</h2>
             {latestChapter.excerpt && (
-              <p class="dek" style="font-size:20px">
+              <p class="dek" style="font-size:21px">
                 {latestChapter.excerpt}
               </p>
             )}
-            <div class="row">
+            <div class="row" style="align-items:stretch">
               <a class="btn" href={href(pathOf("chapter", latestChapter.id))}>
                 Read{latestChapter.read_minutes ? ` · ${latestChapter.read_minutes} min` : ""}
               </a>
-              {latestEpisode && latestEpisode.audio_url && (
-                <a class="btn ghost" href={`${href(pathOf("chapter", latestChapter.id))}#listen`}>
-                  Listen
-                </a>
-              )}
+              {latestEpisode && latestEpisode.audio_url ? (
+                <span class="player" style="flex:1 1 300px;min-height:48px;padding:0 10px 0 0;gap:10px">
+                  <span style="font-weight:600;font-size:14px;padding-left:12px">Listen</span>
+                  <audio controls preload="none" src={latestEpisode.audio_url} style="flex:1 1 200px;min-width:0;height:36px" />
+                </span>
+              ) : null}
             </div>
+            <p class="muted" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
           </article>
           <aside style="flex:1 1 240px;min-width:0">
-            <p class="label" style="margin-bottom:8px">
-              Since then
-            </p>
+            <p class="label" style="margin-bottom:8px">In this chapter</p>
             <div class="rows">
-              {waiting.length ? (
-                waiting.map((w) => (
-                  <a href={href(pathOf("chapter", w.id))}>
-                    <span>{w.week_label}</span>
-                    <StatusTag status={w.status} />
+              {inChapter && inChapter.items.length ? (
+                inChapter.items.map((e) => (
+                  <a href={href(pathOf(e.type, e.id, e.object))}>
+                    <span style="font-size:14px;line-height:1.35">{clip(e.object.title, 60)}</span>
+                    <span class="mono muted" style="font-size:11px;letter-spacing:.08em;text-transform:uppercase">{e.type}</span>
                   </a>
                 ))
               ) : (
                 <span>
-                  <span class="muted">Every week so far has its chapter.</span>
+                  <span class="muted">Its figures, in the data room.</span>
                 </span>
               )}
               {next?.chapter?.state === "ok" && next.chapter.data?.date && (
-                <span>
-                  <span>Next chapter</span>
-                  <span class="mono" style="font-size:12px">
+                <span style="flex-direction:column;align-items:flex-start;gap:3px">
+                  <span style="font-size:14px">Next chapter</span>
+                  <span class="mono muted" style="font-size:12px;max-width:100%">
                     {dayInWords(next.chapter.data.date, { short: true, weekday: true })}
                     {next.chapter.data.drafted_not_promised ? " · drafted, not promised" : ""}
                   </span>
@@ -169,7 +255,7 @@ const weekLabel: Record<string, string> = { weight: "Weight", training: "Trainin
               )}
             </div>
             <a href={href("/story/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">
-              All chapters →
+              {published.length > 1 ? `Chapters 01–${String(Math.max(...published.map((c) => c.week ?? 0))).padStart(2, "0")} →` : "All chapters →"}
             </a>
           </aside>
         </div>
@@ -180,8 +266,8 @@ const weekLabel: Record<string, string> = { weight: "Weight", training: "Trainin
   <section class="section hair">
     <div class="wrap">
       <div class="between" style="margin-bottom:24px">
-        <h2>This week, and what's alive</h2>
-        <span class="label">Updates nightly</span>
+        <h2>What's alive right now</h2>
+        <span class="label">A reason to come back · updates nightly</span>
       </div>
       <div class="grid cols3">
         <div>
@@ -214,32 +300,6 @@ const weekLabel: Record<string, string> = { weight: "Weight", training: "Trainin
           <a href={href("/data/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">The data room →</a>
         </div>
         <div>
-          <p class="label" style="margin-bottom:10px">What the coaches said</p>
-          {
-            lines.length ? (
-              <div class="rows">
-                {lines.map((l) => (
-                  <span style="flex-direction:column;align-items:flex-start;gap:4px">
-                    <span class="serif" style="font-size:15px;line-height:1.45">
-                      {l.text}
-                    </span>
-                    <span class="mono muted" style="font-size:12px">
-                      {l.coach || coachName(l.coach_id || "")}
-                      {l.domain ? ` · ${l.domain}` : ""}
-                      {l.move_label ? ` · ${l.move_label}` : ""}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div class="empty">
-                <span>{blocks.coach_lines?.absent_text || "No coach line today."}</span>
-              </div>
-            )
-          }
-          <p class="muted" style="margin-top:10px;font-size:13px">The coaches are software built with Claude, not people. Code grades what they predict, beside a simple guess.</p>
-        </div>
-        <div>
           <p class="label" style="margin-bottom:10px">Open calls · {all.byType.prediction.filter((p) => p.status === "pending").length} pending</p>
           {
             pending.length ? (
@@ -247,7 +307,7 @@ const weekLabel: Record<string, string> = { weight: "Weight", training: "Trainin
                 {pending.map((p) => (
                   <a href={href(pathOf("prediction", p.id))}>
                     <span style="font-size:14px;line-height:1.35">
-                      <b>{all.get("coach", p.coach_id)?.name || p.coach_id}</b> · {clip(p.claim, 88)}
+                      <b>{p.coach_name}</b> · {clip(p.claim, 88)}
                     </span>
                     <StatusTag status="pending" date={p.due_date} />
                   </a>
@@ -259,16 +319,74 @@ const weekLabel: Record<string, string> = { weight: "Weight", training: "Trainin
               </div>
             )
           }
-          {
-            openDisagreements.length > 0 && (
-              <p class="muted" style="margin-top:10px;font-size:13px">
-                {openDisagreements.length} open disagreement{openDisagreements.length === 1 ? "" : "s"} between two coaches —{" "}
-                <a href={href("/system/ledger/")}>the ledger</a>.
-              </p>
-            )
-          }
           <a href={href("/system/ledger/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">All calls →</a>
         </div>
+        <div>
+          <p class="label" style="margin-bottom:10px">On the table</p>
+          <div class="rows">
+            {openDisagreements.slice(0, 2).map((d) => (
+              <a href={href(pathOf("disagreement", d.id))}>
+                <span style="font-size:14px;line-height:1.35">
+                  <b>Two coaches disagree</b> · {clip(d.topic, 70)}
+                </span>
+                <span class="status open">open</span>
+              </a>
+            ))}
+            {next?.chapter?.state === "ok" && next.chapter.data?.date && (
+              <span>
+                <span style="font-size:14px">
+                  <b>Chapter {String((latestChapter?.week ?? 0) + 1).padStart(2, "0")}</b> · {dayInWords(next.chapter.data.date, { weekday: true, short: true })}
+                </span>
+                <span class="mono muted" style="font-size:12px">{next.chapter.data.drafted_not_promised ? "drafted, not promised" : "due"}</span>
+              </span>
+            )}
+            {!openDisagreements.length && !(next?.chapter?.state === "ok") && (
+              <span>
+                <span class="muted">Nothing on the table today.</span>
+              </span>
+            )}
+          </div>
+          <a href={href("/system/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">How the coaches work →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section inv">
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+      <div style="flex:0 0 240px;display:flex;flex-direction:column;gap:10px">
+        <span class="label">The coaches, this week</span>
+        <span class="big" style="font-size:56px;line-height:.9">{record ? kOfN(record.right, record.decided) : "—"}</span>
+        <span style="font-size:13px;line-height:1.5;color:var(--inkmuted)">{record?.comparison_text || record?.count_text || "No coach call has been checked yet."} Code grades them. I can't.</span>
+      </div>
+      <div style="flex:1 1 520px;min-width:0">
+        {
+          lines.length ? (
+            <div class="rows inv-rows">
+              {lines.map((l) => {
+                const c = coachById(l.coach_id || "");
+                return (
+                  <span style="align-items:flex-start">
+                    <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                      <span class="serif" style="font-size:16px;line-height:1.45">
+                        {l.text}
+                      </span>
+                      <span class="mono" style="font-size:12px;color:var(--inkmuted)">
+                        {l.coach || c?.name || l.coach_id}
+                        {c?.domain || l.domain ? ` · ${domainWords(c?.domain || l.domain)}` : ""}
+                        {l.move_label ? ` · ${l.move_label}` : ""}
+                      </span>
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <p style="color:var(--inkmuted)">{blocks.coach_lines?.absent_text || "No coach line today."}</p>
+          )
+        }
+        <p style="margin-top:14px;font-size:13px;color:var(--inkmuted)">The coaches are software built with Claude, not people. They read real data and speak in their own voices — correlative, never causal.</p>
+        <a href={href("/system/")} style="display:inline-block;margin-top:10px;font-size:13px;font-weight:700;color:var(--paper)">How the coaches work, in plain English →</a>
       </div>
     </div>
   </section>
@@ -282,15 +400,15 @@ const weekLabel: Record<string, string> = { weight: "Weight", training: "Trainin
       <div class="doors">
         <a class="door" href={href("/story/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">01</span><span>Follow · 10 min a week</span></span>
-          <span><span class="t">The story</span><p class="serif muted" style="font-size:17px;margin-top:10px">A chapter a week, each with audio. Where I started, what's happened, how I'm doing — not just what I weigh.</p></span>
+          <span><span class="t">The story</span><p class="serif muted" style="font-size:17px;margin-top:10px">{published.length ? `${WORDS[published.length] ? WORDS[published.length][0].toUpperCase() + WORDS[published.length].slice(1) : published.length} chapters so far` : "A chapter a week"}, each with audio. Where I started, what's happened, how I'm doing — not just what I weigh.</p></span>
         </a>
         <a class="door" href={href("/data/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">02</span><span>Explore · an hour, if you like</span></span>
-          <span><span class="t">The data</span><p class="serif muted" style="font-size:17px;margin-top:10px">Every dimension, every live source, every method on show. Compare, and see how little that proves.</p></span>
+          <span><span class="t">The data</span><p class="serif muted" style="font-size:17px;margin-top:10px">Six dimensions, {all.byType.source.length} live sources, every method on show. Compare anything with anything, and see what the platform found when it did.</p></span>
         </a>
         <a class="door" href={href("/system/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
-          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, every dated prediction, every grade public — beside what a simple guess would have scored.</p></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.length} dated predictions, every grade public — beside what a simple guess would have scored.</p></span>
         </a>
       </div>
     </div>
@@ -299,10 +417,13 @@ const weekLabel: Record<string, string> = { weight: "Weight", training: "Trainin
   <section class="section">
     <div class="wrap between">
       <div style="max-width:560px">
-        <h2 style="font-size:28px">A new chapter most weeks. Audio soon after.</h2>
-        <p class="serif muted" style="font-size:17px;margin-top:8px">Follow by email on the current site; this preview sends nothing.</p>
+        <h2 style="font-size:28px">A new chapter most Sundays. Audio soon after.</h2>
+        <p class="serif muted" style="font-size:17px;margin-top:8px">
+          {next?.chapter?.state === "ok" && next.chapter.data?.date ? `Chapter ${String((latestChapter?.week ?? 0) + 1).padStart(2, "0")} is due ${dayInWords(next.chapter.data.date)}. ` : ""}
+          If the coaches are right, you'll read it there first. If they're wrong, you'll read that too.
+        </p>
       </div>
-      <a class="btn" href="https://averagejoematt.com/subscribe/">Follow</a>
+      <a class="btn" href="https://averagejoematt.com/subscribe/">Follow by email</a>
     </div>
   </section>
 </Base>

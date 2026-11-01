@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clip, dayInWords, kOfN, num } from "../src/lib/format.js";
+import { clip, dayInWords, domainWords, kOfN, num } from "../src/lib/format.js";
 import { href, pathOf, PATH_OF } from "../src/lib/url.js";
 import { COLLECTION_OF } from "../src/lib/edges.js";
 
@@ -50,4 +50,11 @@ test("every object type has a canonical path, directory-style, and episodes reso
   }
   assert.equal(pathOf("episode", "wk8", { chapter_id: "week-08" }), "/story/week-08/#listen");
   assert.throws(() => pathOf("nope", "x"), /no canonical path/);
+});
+
+test("a coach's domain id is shown in words, never as an identifier", () => {
+  assert.equal(domainWords("nutrition_science"), "nutrition");
+  assert.equal(domainWords("biostatistics_n1_research"), "the statistics");
+  assert.equal(domainWords("some_new_field"), "some new field");
+  assert.equal(domainWords(null), "");
 });

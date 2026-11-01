@@ -36,3 +36,20 @@ export function clip(text, max = 90) {
   const sp = cut.lastIndexOf(" ");
   return `${(sp > 40 ? cut.slice(0, sp) : cut).trimEnd()}…`;
 }
+
+/** A coach's domain id in plain words: `nutrition_science` → "nutrition". The ids stay in System. */
+const DOMAIN_WORDS = {
+  orchestration: "runs the program",
+  sleep_science: "sleep",
+  nutrition_science: "nutrition",
+  behavioral_psychology: "mind and habits",
+  performance_science: "training",
+  metabolic_health: "blood sugar",
+  clinical_pathology: "lab results",
+  biostatistics_n1_research: "the statistics",
+  training: "training",
+};
+export function domainWords(id) {
+  if (!id) return "";
+  return DOMAIN_WORDS[id] || String(id).replace(/_/g, " ");
+}
