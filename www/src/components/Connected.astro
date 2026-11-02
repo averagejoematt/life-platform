@@ -2,6 +2,7 @@
 // The Connected rail — one object, every place it surfaces, derived from the edge index.
 // Nothing here is a copy: each row is a link plus the one line that makes it relevant.
 import { connectedTo } from "../lib/snapshot.js";
+import { domainWords } from "../lib/format.js";
 import { href, pathOf } from "../lib/url.js";
 
 interface Props {
@@ -13,6 +14,15 @@ interface Props {
 const { type, id, heading = "Connected", cap = 7 } = Astro.props;
 const rail = await connectedTo(type, id, { cap });
 
+// The one line under a title. A coach's summary in the snapshot is its raw domain id (the wire's shape); the
+// rail says it in words (#5568) — the id itself stays on the object and in the data contract.
+const line = (o: any): string => {
+  if (o.type === "coach") {
+    const w = domainWords(o.domain);
+    return o.retired ? (w ? `${w} · retired` : "retired") : w;
+  }
+  return o.summary || "";
+};
 const tail = (o: any): string => {
   switch (o.type) {
     case "prediction":
@@ -43,11 +53,11 @@ const tail = (o: any): string => {
             <span class="k">{e.type}</span>
             <span>
               <b>{e.object.title}</b>
-              {e.object.summary && (
+              {line(e.object) && (
                 <>
                   <br />
                   <span class="muted" style="font-size:13px">
-                    {e.object.summary}
+                    {line(e.object)}
                   </span>
                 </>
               )}

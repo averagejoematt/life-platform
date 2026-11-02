@@ -20,7 +20,7 @@
       "fixture"
     ],
     "state": "ok",
-    "summary": "The lead",
+    "summary": "orchestration",
     "tier": "lead",
     "title": "Eli Marsh",
     "type": "coach",
@@ -52,7 +52,7 @@
       "fixture"
     ],
     "state": "ok",
-    "summary": "Sleep, recovery",
+    "summary": "sleep_science",
     "tier": "staff",
     "title": "Lisa Park",
     "type": "coach",
@@ -94,7 +94,7 @@
       "fixture"
     ],
     "state": "ok",
-    "summary": "Nutrition",
+    "summary": "nutrition_science",
     "tier": "staff",
     "title": "Marcus Webb",
     "type": "coach",
@@ -126,7 +126,7 @@
       "fixture"
     ],
     "state": "ok",
-    "summary": "Training (retired)",
+    "summary": "performance_science",
     "tier": "staff",
     "title": "Sarah Chen",
     "type": "coach",
@@ -161,7 +161,7 @@
       "fixture"
     ],
     "state": "ok",
-    "summary": "Glucose",
+    "summary": "metabolic_health",
     "tier": "staff",
     "title": "Amara Patel",
     "type": "coach",
