@@ -61,6 +61,9 @@ def test_tier1_pages_are_the_doors():
     # `/`, /data/, /story/ are the v9 rows (the v5 doors keep their rows while they are served).
     if qa_manifest.www_live_at_root():
         doors |= {"/system/"}
+        # #5579: the Journey is a tier-1 destination by the owner's decision 9 (2026-11-02) — the one
+        # non-door page the deploy-gating visual + AI sweep judges on every root deploy.
+        doors |= {"/data/journey/"}
     assert tier1 == doors
 
 

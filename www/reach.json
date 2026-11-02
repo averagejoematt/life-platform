@@ -25,6 +25,7 @@
     "/data/deep_pct/",
     "/data/experiments/protein-deep-sleep_2026-11-01/",
     "/data/insights/zone2-deep-sleep/",
+    "/data/journey/",
     "/data/recovery_score/",
     "/data/total_protein_g/",
     "/data/weight_lbs/",
@@ -51,11 +52,13 @@
     "/system/ledger/sleep-20261005-deepsleep01/",
     "/system/methods/directional_window_verdict/",
     "/system/methods/effective_sample_size/",
+    "/system/methods/ewma_forecast/",
+    "/system/methods/moving_block_bootstrap_ci/",
     "/system/methods/pearson_r/",
     "/system/sources/garmin/",
     "/system/sources/macrofactor/",
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 36
+  "transitive_count": 39
 }

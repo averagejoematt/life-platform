@@ -8,7 +8,7 @@ import Provenance from "../../components/Provenance.astro";
 import { headline, presentCount, svgChart } from "../../lib/chart.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { findPair, pairSentence, partnersOf, strengthInWords } from "../../lib/pairs.js";
-import { loadAll, loadPairs, loadSeries } from "../../lib/snapshot.js";
+import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
 import { href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -30,6 +30,8 @@ const svg = series
       series: [{ days: series.days, color: "#1B3FD6", name: m.label }],
       markers: series.markers || [],
       labelDay,
+      unit: m.unit,
+      decimals: m.decimals,
       aria: `${m.label}, ${presentCount(series.days)} readings over ${series.days.length} days`,
     })
   : null;
@@ -38,6 +40,9 @@ const tested = partners
   .map((id) => ({ id, row: findPair(pairs, m.id, id, 0) }))
   .filter((x) => x.row);
 const windowWords = series ? `${dayInWords(series.window.from)} to ${dayInWords(series.window.to)}` : null;
+// The Journey (#5579): the weight measure opens onto the whole-distance story (owner decision 1, 2026-11-02).
+const journey = await loadJourney();
+const hasJourney = journey.state !== "absent" && journey.metric_id === m.id;
 ---
 
 <Base title={m.label} top="data" description={m.sentence || m.summary || m.label}>
@@ -83,12 +88,29 @@ const windowWords = series ? `${dayInWords(series.window.from)} to ${dayInWords(
           </div>
         </div>
 
+        {hasJourney && (
+          <div class="rows" style="margin-bottom:22px">
+            <a href={href("/data/journey/")}>
+              <span>
+                <b>The journey — every weigh-in on the whole distance</b>
+                <br />
+                <span class="muted" style="font-size:13px">
+                  {num(journey.lost_lbs, 1)} lb down since {dayInWords(journey.start_date)} · {num(journey.weekly_rate_lbs, 2)} lb a week · {num(journey.goal_weight_lbs, 0)} lb projected for {dayInWords(journey.projected_goal_date)}
+                </span>
+              </span>
+              <span class="mono muted" style="font-size:12px">
+                →
+              </span>
+            </a>
+          </div>
+        )}
         <div
           class="explorer"
           data-explorer
           data-base={import.meta.env.BASE_URL}
           data-metric={m.id}
           data-decimals={m.decimals}
+          data-unit={m.unit}
           data-labels={JSON.stringify(labels)}
         >
           <div class="controls" data-needs-js hidden>

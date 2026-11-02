@@ -6,7 +6,7 @@
   "category": "Calibration",
   "data_through": null,
   "edges": [],
-  "formula": "trend = up if change > band · down if change < −band · else flat; grade = confirmed if trend == predicted",
+  "formula": "trend = up if change > band \u00b7 down if change < \u2212band \u00b7 else flat; grade = confirmed if trend == predicted",
   "id": "directional_window_verdict",
   "limitations": "A flat metric counts against an up or down call; a band wider than the move says little either way.",
   "method_ids": [],
@@ -33,34 +33,7 @@
   "category": "Correlation",
   "data_through": null,
   "edges": [],
-  "formula": "r = Σ(x-x̄)(y-ȳ) / √(Σ(x-x̄)² · Σ(y-ȳ)²)",
-  "id": "pearson_r",
-  "limitations": "Linear association only; not corrected for autocorrelation on its own.",
-  "method_ids": [],
-  "min_n": 10,
-  "name": "Pearson correlation (r)",
-  "sample": true,
-  "source": [
-   "fixture"
-  ],
-  "state": "ok",
-  "summary": "Correlation",
-  "title": "Pearson correlation (r)",
-  "type": "method",
-  "used_by": [
-   "weekly_correlation_compute"
-  ],
-  "visibility": "public",
-  "window": "90 days"
- },
- {
-  "absent_text": null,
-  "approved": null,
-  "as_of": "2026-10-31",
-  "category": "Correlation",
-  "data_through": null,
-  "edges": [],
-  "formula": "n_eff = n · (1 − r1·r2) / (1 + r1·r2)",
+  "formula": "n_eff = n \u00b7 (1 \u2212 r1\u00b7r2) / (1 + r1\u00b7r2)",
   "id": "effective_sample_size",
   "limitations": "AR(1) only.",
   "method_ids": [],
@@ -79,5 +52,86 @@
   ],
   "visibility": "public",
   "window": "the paired series"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "category": "Forecasting",
+  "data_through": null,
+  "edges": [],
+  "formula": "the exponentially-weighted level carried h days ahead; the range is the empirical spread of past h-day errors",
+  "id": "ewma_forecast",
+  "limitations": "Correlative, not causal: the model expects what has tended to follow, and says nothing about why.",
+  "method_ids": [],
+  "min_n": null,
+  "name": "EWMA h-step-ahead forecast",
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Forecasting",
+  "title": "EWMA h-step-ahead forecast",
+  "type": "method",
+  "used_by": [
+   "journey"
+  ],
+  "visibility": "public",
+  "window": "one and seven days ahead"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "category": "Interval estimation",
+  "data_through": null,
+  "edges": [],
+  "formula": "resample contiguous blocks of the residual series; the 2.5th and 97.5th percentiles of the statistic are the interval",
+  "id": "moving_block_bootstrap_ci",
+  "limitations": "Blocks must be long enough to carry the autocorrelation; a short window gives a wide, honest interval.",
+  "method_ids": [],
+  "min_n": null,
+  "name": "Moving-block bootstrap CI",
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Interval estimation",
+  "title": "Moving-block bootstrap CI",
+  "type": "method",
+  "used_by": [
+   "journey"
+  ],
+  "visibility": "public",
+  "window": "the last 28 days of weigh-ins"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "category": "Correlation",
+  "data_through": null,
+  "edges": [],
+  "formula": "r = \u03a3(x-x\u0304)(y-\u0233) / \u221a(\u03a3(x-x\u0304)\u00b2 \u00b7 \u03a3(y-\u0233)\u00b2)",
+  "id": "pearson_r",
+  "limitations": "Linear association only; not corrected for autocorrelation on its own.",
+  "method_ids": [],
+  "min_n": 10,
+  "name": "Pearson correlation (r)",
+  "sample": true,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "summary": "Correlation",
+  "title": "Pearson correlation (r)",
+  "type": "method",
+  "used_by": [
+   "weekly_correlation_compute"
+  ],
+  "visibility": "public",
+  "window": "90 days"
  }
 ]

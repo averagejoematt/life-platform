@@ -92,3 +92,12 @@ export async function loadPairs() {
   _pairs = JSON.parse(await readFile(join(SNAPSHOT_DIR, "pairs.json"), "utf8")); // throws when absent
   return _pairs;
 }
+
+let _journey = null;
+/** The Journey's data file (#5579): the platform's published weight-story figures, or its absent record. */
+export async function loadJourney() {
+  if (_journey) return _journey;
+  _journey = JSON.parse(await readFile(join(SNAPSHOT_DIR, "journey.json"), "utf8")); // throws when absent: the exporter always writes it
+  return _journey;
+}
+

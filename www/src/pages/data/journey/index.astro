@@ -1,0 +1,250 @@
+---
+// The Journey (#5579, epic #5577) — layers 0 and 1 of the approved prototype (owner, 2026-11-02):
+// one sentence and three facts, then every weigh-in on the whole distance from the start to the
+// goal with the platform's rate, interval and projection; "where this is heading"; the methods;
+// the rail. Every figure is the platform's (journey.json); the page places them, never recomputes.
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import { journeyCaption, journeyChart } from "../../../lib/journey.js";
+import { dayInWords, num } from "../../../lib/format.js";
+import { loadAll, loadJourney, loadSeries } from "../../../lib/snapshot.js";
+import { href, pathOf } from "../../../lib/url.js";
+
+const all = await loadAll();
+const J = await loadJourney();
+const ok = J.state !== "absent";
+const metric = all.get("metric", J.metric_id || "weight_lbs");
+const series = ok ? (await loadSeries())[J.metric_id] || null : null;
+const methods = (J.method_ids || []).map((id) => all.get("method", id)).filter(Boolean);
+const source = metric && metric.source_id ? all.get("source", metric.source_id) : null;
+const chapters = all.byType.chapter
+  .filter((c) => c.status === "published")
+  .map((c) => ({ date: c.date, label: c.week_label.replace("Prologue · Part ", "P").replace("Week ", "W") }));
+const provenance = { state: J.state, as_of: J.as_of || "", data_through: J.data_through, sample: Boolean(J.sample), source: J.source || [], absent_text: J.absent_text };
+const payload = ok && series ? { days: series.days, journey: J, rungs: J.rungs || [], markers: J.markers || [], chapters, unit: J.unit, decimals: 1 } : null;
+const initial = payload ? { ...payload, frame: "distance", range: null, show: { mean: true, projection: true, rungs: true, chapters: false, events: true } } : null;
+const aria = ok ? `Weight at every weigh-in since ${dayInWords(J.start_date)}, framed from the starting weight to the goal` : "";
+const svg = initial ? journeyChart({ ...initial, aria }) : null;
+const caption = initial ? journeyCaption(initial) : null;
+const silent = ok && J.silent_days > 7;
+const distance = ok ? J.start_weight_lbs - J.goal_weight_lbs : null;
+// The wire names its frames ("tomorrow morning", "in 7 days"); the horizon is the stable key.
+const fc = (h: number) => (J.forecasts || []).find((f) => Number(f.horizon_days) === h) || null;
+const tomorrow = fc(1);
+const week = fc(7);
+const weightCalls = all.byType.prediction.filter((p) => p.metric_id === J.metric_id && p.status !== "observation");
+const right = weightCalls.filter((p) => p.status === "confirmed").length;
+const checked = weightCalls.filter((p) => ["confirmed", "refuted"].includes(p.status)).length;
+const pending = weightCalls.filter((p) => p.status === "pending").length;
+const headline = ok
+  ? silent
+    ? `The scale has been silent ${J.silent_days} days; everything here reads as of ${dayInWords(J.last_weighin_date)}.`
+    : `From ${num(J.start_weight_lbs, 1)} to ${num(J.current_weight_lbs, 1)} pounds by day ${J.day_n}. ${num(J.remaining_lbs, 1)} to go.`
+  : "The journey";
+---
+
+<Base title="The journey" top="data" description={ok ? `${num(J.lost_lbs, 1)} lb down since ${dayInWords(J.start_date)}; ${num(J.remaining_lbs, 1)} to go at ${num(J.weekly_rate_lbs, 2)} lb a week.` : "The weight-loss journey, from the first weigh-in."}>
+  <section class="section" style="padding-bottom:24px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:14px">
+      <div class="row"><span class="label">Fig. 1 — the journey, from the first weigh-in{ok ? ` · day ${J.day_n} · ${J.weighin_count} weigh-ins` : ""}</span><Provenance object={provenance} /></div>
+      <h1>{headline}</h1>
+      {
+        ok ? (
+          <p class="dek" style="color:var(--ink)">
+            {num(J.start_weight_lbs, 1)} lb on {dayInWords(J.start_date)}. {num(J.current_weight_lbs, 1)} lb on {dayInWords(J.last_weighin_date)}. {num(J.lost_lbs, 1)} of the{" "}
+            {num(distance, 1)} pounds between the start and {num(J.goal_weight_lbs, 0)} are gone — {num(J.progress_pct, 0)}% of the way.
+          </p>
+        ) : (
+          <p class="dek">{J.absent_text}</p>
+        )
+      }
+    </div>
+  </section>
+
+  {
+    ok && (
+      <section class="wrap" style="padding-bottom:40px">
+        <div class="facts journey-facts">
+          <div>
+            <span class="label">Down</span>
+            <span class="v num">
+              {num(J.lost_lbs, 1)} <small>lb</small>
+            </span>
+            <span class="muted" style="font-size:13px">
+              {J.weighin_count} weigh-ins · {num(J.progress_pct, 0)}% of the way
+            </span>
+          </div>
+          <div>
+            <span class="label">A week</span>
+            <span class="v num">
+              {num(J.weekly_rate_lbs, 2)} <small>lb</small>
+            </span>
+            <span class="muted" style="font-size:13px">
+              95% interval {num(J.weekly_rate_ci_low, 2)} to {num(J.weekly_rate_ci_high, 2)} over the last {J.weighin_span_days} days{J.rate_provisional ? " · provisional" : ""}
+            </span>
+          </div>
+          <div>
+            <span class="label">Projected</span>
+            <span class="v num" style="font-size:30px">
+              {dayInWords(J.projected_goal_date)}
+            </span>
+            <span class="muted" style="font-size:13px">
+              {num(J.goal_weight_lbs, 0)} lb · 80% range {dayInWords(J.projected_goal_date_earliest, { short: true })} to {dayInWords(J.projected_goal_date_latest)} · {J.days_to_goal} days
+            </span>
+          </div>
+        </div>
+        <p class="muted" style="font-size:13px;margin-top:10px">
+          {source ? `${source.label} · ` : ""}through {dayInWords(J.data_through || J.as_of)} · {checked ? `${right} of ${checked} checked calls on the weight came true` : "no checked call on the weight yet"}
+          {pending ? ` · ${pending} open` : ""}
+        </p>
+      </section>
+    )
+  }
+
+  {
+    ok && svg && (
+      <section class="section hair">
+        <div class="wrap">
+          <h2>Every weigh-in, on one scale</h2>
+          <p class="muted" style="font-size:14px;margin-top:8px;max-width:80ch">
+            The whole distance is the frame: the top line is where he started, the dashed line is the goal. Move along the readings to see each morning; the cobalt line is the 7-day mean, read within each side of a device change.
+          </p>
+          <p class="srOnly" id="journey-chart-help">
+            The chart can be read with the keyboard: Tab to it, then the left and right arrow keys move between weigh-ins, Home and End jump to the first and last, Escape hides the reading.
+          </p>
+          <div class="explorer" data-journey data-payload={JSON.stringify(payload)} data-aria={aria}>
+            <div class="toolbar" role="toolbar" aria-label="Chart controls" data-needs-js hidden>
+              <div class="toolgroup">
+                <span class="label">Frame</span>
+                <span class="seg" role="group" aria-label="Frame">
+                  <button type="button" data-frame="distance" aria-pressed="true">the whole distance</button>
+                  <button type="button" data-frame="readings" aria-pressed="false">the readings</button>
+                </span>
+              </div>
+              <div class="toolgroup">
+                <span class="label">Range</span>
+                <span class="seg" role="group" aria-label="Range">
+                  <button type="button" data-range="all" aria-pressed="true">since the start</button>
+                  <button type="button" data-range="56" aria-pressed="false">8 weeks</button>
+                  <button type="button" data-range="28" aria-pressed="false">4 weeks</button>
+                </span>
+              </div>
+              <div class="toolgroup">
+                <span class="label">Show</span>
+                <button type="button" class="tog" data-show="mean" aria-pressed="true">7-day mean</button>
+                <button type="button" class="tog" data-show="projection" aria-pressed="true">projection</button>
+                <button type="button" class="tog" data-show="rungs" aria-pressed="true">milestones</button>
+                <button type="button" class="tog" data-show="chapters" aria-pressed="false">chapters</button>
+                <button type="button" class="tog" data-show="events" aria-pressed="true">device changes</button>
+              </div>
+            </div>
+            <div class="chart figure" data-journey-chart set:html={svg} />
+            <p class="muted" style="font-size:13px;margin-top:8px;max-width:80ch" data-journey-caption>
+              {caption}
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    ok && (
+      <section class="section hair">
+        <div class="wrap grid cols2" style="gap:56px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <h2>Where this is heading</h2>
+            <p class="dek" style="font-size:19px;color:var(--ink)">
+              At the last {J.weighin_span_days} days' pace, {num(J.goal_weight_lbs, 0)} lb lands on {dayInWords(J.projected_goal_date)}; the 80% range runs from {dayInWords(J.projected_goal_date_earliest, { short: true })} to{" "}
+              {dayInWords(J.projected_goal_date_latest)}.
+            </p>
+            <div class="rows">
+              <span>
+                <span>Tomorrow's weigh-in, expected</span>
+                <span class="mono">{tomorrow ? `${num(tomorrow.point, 1)} lb · 80% range ${num(tomorrow.lo, 1)} to ${num(tomorrow.hi, 1)}` : "not served"}</span>
+              </span>
+              <span>
+                <span>In a week</span>
+                <span class="mono">{week ? `${num(week.point, 1)} lb · 80% range ${num(week.lo, 1)} to ${num(week.hi, 1)}` : "not served"}</span>
+              </span>
+              <span>
+                <span>Days to the goal</span>
+                <span class="mono">{J.days_to_goal}</span>
+              </span>
+              <span>
+                <span>Forecast model</span>
+                <span class="mono">{J.forecast_model || "—"}</span>
+              </span>
+            </div>
+            <p class="muted" style="font-size:13px;max-width:70ch">
+              The projection is the platform's own forecast, not a promise.{" "}
+              {J.coverage && J.coverage.n_resolved
+                ? `Its shorter forecasts are graded every night: the range held ${num(J.coverage.coverage_pct, 1)}% of ${J.coverage.n_resolved} graded forecasts so far.`
+                : "Its shorter forecasts are graded every night."}{" "}
+              A slow week widens the range before it moves the date.
+            </p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:22px">
+            <div>
+              <p class="label" style="margin-bottom:8px">How this is measured</p>
+              {
+                methods.length ? (
+                  <div class="rows">
+                    {methods.map((x) => (
+                      <a href={href(pathOf("method", x.id))}>
+                        <span>
+                          <b>{x.name}</b>
+                          {x.limitations && (
+                            <>
+                              <br />
+                              <span class="muted" style="font-size:13px">
+                                {x.limitations.length > 140 ? `${x.limitations.slice(0, 139)}…` : x.limitations}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                        <span class="mono muted" style="font-size:12px">
+                          {x.category || ""}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p class="chip">Descriptive only · no method attached</p>
+                )
+              }
+              <p class="muted" style="font-size:13px;margin-top:10px;max-width:60ch">
+                The rate's interval and the projection carry a method page; the 7-day mean on the chart is the data room's own, described on every metric page.
+              </p>
+            </div>
+            <div class="rows">
+              <a href={href(pathOf("metric", J.metric_id))}>
+                <span>
+                  <b>Every reading, as a measure</b>
+                  <br />
+                  <span class="muted" style="font-size:13px">
+                    the weight series with the explorer — range, mean, compare, lag
+                  </span>
+                </span>
+                <span class="mono muted" style="font-size:12px">
+                  →
+                </span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section hair">
+    <div class="wrap">
+      <Connected type="metric" id={J.metric_id || "weight_lbs"} heading="Connected to the journey" />
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../../../islands/journey.js";
+</script>

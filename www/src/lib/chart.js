@@ -2,6 +2,13 @@
 // metric page and the explorer island's live redraws, so a reader without JavaScript sees the
 // same chart the island would draw. Statistics are NOT computed here: the island reads them
 // from the precomputed pairs file (owner requirement A). Proven by tests/chart.test.mjs.
+//
+// Every chart answers (#5578, A01): the svg carries `data-points` — one {x, y, date, v, label}
+// per drawn reading, in viewBox units, with the label prewritten here (the date in words, the
+// value, the unit) — and islands/inspect.js reads them back for pointer, touch and keyboard.
+// The device-era rule (A04/A29): the line breaks at every marker date and the rolling mean
+// restarts there, so a series is read within each side of a baseline change, never across.
+import { dayInWords, num } from "./format.js";
 
 /** A 7-day trailing mean over a daily series; windows with fewer than 3 readings are null. */
 export function rollingMean(values, window = 7, minReadings = 3) {
@@ -31,11 +38,15 @@ export function niceTicks(lo, hi, count = 6) {
  * or logging gap, so a line never bridges a day that has no value (ADR-104: absence is drawn,
  * not interpolated).
  */
-export function segments(days, valueOf = (d) => d.value) {
+export function segments(days, valueOf = (d) => d.value, breaks = null) {
   const out = [];
   let cur = [];
   days.forEach((d, i) => {
     const v = valueOf(d, i);
+    if (breaks && breaks.has(i) && cur.length) {
+      out.push(cur);
+      cur = [];
+    }
     if (v == null || d.gap) {
       if (cur.length) out.push(cur);
       cur = [];
@@ -67,9 +78,10 @@ export function svgChart(o) {
   const days = o.series[0].days;
   const n = days.length;
   if (!n) return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "no readings")}"></svg>`;
+  const breakIdx = new Set((o.markers || []).map((m) => days.findIndex((d) => d.date === m.date)).filter((i) => i > 0));
   const prepared = o.series.map((s) => {
     const raw = s.days.map((d) => (d.gap ? null : d.value));
-    const vals = o.smooth ? rollingMean(raw, 7) : raw;
+    const vals = o.smooth ? eraMean(raw, breakIdx) : raw;
     return { ...s, raw, vals };
   });
   const all = [];
@@ -109,7 +121,7 @@ export function svgChart(o) {
   }
   let paths = "";
   prepared.forEach((s) => {
-    for (const seg of segments(s.days, (d, i) => s.vals[i])) {
+    for (const seg of segments(s.days, (d, i) => s.vals[i], breakIdx)) {
       const d = seg.map((p, k) => `${k ? "L" : "M"}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
       paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
     }
@@ -141,11 +153,48 @@ export function svgChart(o) {
       }
     });
   });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "")}" data-chart>${g}${paths}<line class="xh" x1="-10" y1="${padT}" x2="-10" y2="${H - padB}" stroke="#121212" stroke-width="1" stroke-dasharray="2 3"/><rect class="hit" x="${padL}" y="0" width="${W - padL - padR}" height="${H}" fill="transparent"/></svg>`;
+  const points = pointsFor(prepared[0], x, y, o);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "")}" data-chart data-points="${esc(JSON.stringify(points))}">${g}${paths}<line class="xh" x1="-10" y1="${padT}" x2="-10" y2="${H - padB}" stroke="#121212" stroke-width="1" stroke-dasharray="2 3"/><rect class="hit" x="${padL}" y="0" width="${W - padL - padR}" height="${H}" fill="transparent"/></svg>`;
 }
 
 export function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+/** A 7-day trailing mean that restarts at every break index (a device era, A04/A29). */
+export function eraMean(values, breaks = new Set(), window = 7, minReadings = 3) {
+  const out = new Array(values.length).fill(null);
+  let start = 0;
+  const cuts = [...breaks].filter((i) => i > 0 && i < values.length).sort((a, b) => a - b);
+  for (const end of [...cuts, values.length]) {
+    const part = rollingMean(values.slice(start, end), window, minReadings);
+    part.forEach((v, k) => (out[start + k] = v));
+    start = end;
+  }
+  return out;
+}
+
+/** The readable label of one reading: "Saturday 31 October · 296.6 lb" (+ the mean when smoothed). */
+export function pointLabel(day, value, o, mean) {
+  const unit = o.unit ? ` ${o.unit}` : "";
+  const dec = o.decimals == null ? 1 : o.decimals;
+  if (day.gap) return `${dayInWords(day.date, { weekday: true })} · a logging gap`;
+  if (value == null) return `${dayInWords(day.date, { weekday: true })} · no reading`;
+  let label = `${dayInWords(day.date, { weekday: true })} · ${num(value, dec)}${unit}`;
+  if (o.smooth && mean != null) label += ` · 7-day mean ${num(mean, dec)}${unit}`;
+  return label;
+}
+
+/** The inspectable points of the primary series: raw readings (never the mean) with prewritten labels. */
+export function pointsFor(s, x, y, o) {
+  const out = [];
+  s.days.forEach((d, i) => {
+    const v = s.raw[i];
+    if (v == null) return;
+    const shown = o.clip ? Math.min(o.clip, v) : v;
+    out.push({ x: Number(x(i).toFixed(1)), y: Number(y(shown).toFixed(1)), date: d.date, v, label: pointLabel(d, v, o, o.smooth ? s.vals[i] : null) });
+  });
+  return out;
 }
 
 /** Count present readings in a window of days. */

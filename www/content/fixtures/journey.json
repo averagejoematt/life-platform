@@ -1,0 +1,94 @@
+{
+ "absent_text": null,
+ "as_of": "2026-10-31",
+ "coverage": {
+  "coverage_pct": 80.0,
+  "n_covered": 120,
+  "n_resolved": 150
+ },
+ "current_weight_lbs": 233.7,
+ "data_through": "2026-10-17",
+ "day_n": 56,
+ "days_to_goal": 215,
+ "forecast_model": "ewma-v1",
+ "forecasts": [
+  {
+   "frame": "tomorrow",
+   "hi": 234.5,
+   "horizon_days": 1,
+   "lo": 232.5,
+   "point": 233.5,
+   "target_date": "2026-10-18"
+  },
+  {
+   "frame": "in 7 days",
+   "hi": 234.0,
+   "horizon_days": 7,
+   "lo": 230.0,
+   "point": 232.0,
+   "target_date": "2026-10-24"
+  }
+ ],
+ "goal_weight_lbs": 185.0,
+ "last_weighin_date": "2026-10-17",
+ "lost_lbs": 9.5,
+ "markers": [],
+ "method_ids": [
+  "moving_block_bootstrap_ci",
+  "ewma_forecast"
+ ],
+ "metric_id": "weight_lbs",
+ "progress_pct": 16.3,
+ "projected_goal_date": "2027-05-20",
+ "projected_goal_date_earliest": "2027-05-01",
+ "projected_goal_date_latest": "2027-06-12",
+ "projection_confidence": 0.8,
+ "rate_provisional": false,
+ "remaining_lbs": 48.7,
+ "rungs": [
+  {
+   "date": "2026-09-12",
+   "days": 6,
+   "lb": 240
+  },
+  {
+   "date": null,
+   "days": null,
+   "lb": 230
+  },
+  {
+   "date": null,
+   "days": null,
+   "lb": 220
+  },
+  {
+   "date": null,
+   "days": null,
+   "lb": 210
+  },
+  {
+   "date": null,
+   "days": null,
+   "lb": 200
+  },
+  {
+   "date": null,
+   "days": null,
+   "lb": 190
+  }
+ ],
+ "sample": true,
+ "silent_days": 0,
+ "source": [
+  "fixture"
+ ],
+ "start_date": "2026-09-06",
+ "start_weight_lbs": 243.2,
+ "state": "ok",
+ "unit": "lb",
+ "weekly_rate_ci_high": -1.14,
+ "weekly_rate_ci_low": -2.1,
+ "weekly_rate_lbs": -1.62,
+ "weighin_count": 39,
+ "weighin_span_days": 28
+}

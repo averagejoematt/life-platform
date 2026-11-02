@@ -892,3 +892,85 @@ footer.site a {
   overflow-wrap: anywhere;
   min-width: 0;
 }
+
+/* the inspect island (#5578, A01): a focus ring on the chart and a tooltip above the reading */
+.chart,
+.figure {
+  position: relative;
+}
+.chart svg,
+.figure svg {
+  touch-action: pan-y;
+}
+svg .focus {
+  fill: var(--paper);
+  stroke: var(--cobalt);
+  stroke-width: 2.5;
+}
+.tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  line-height: 1.45;
+  padding: 7px 10px;
+  max-width: 240px;
+  transform: translate(-50%, -115%);
+  z-index: 5;
+}
+.tip[hidden] {
+  display: none;
+}
+
+/* the Journey (#5579): the toolbar's labelled groups and the show toggles */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  align-items: center;
+  margin: 18px 0 10px;
+}
+.toolgroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.toolgroup .label {
+  margin-right: 4px;
+}
+.tog {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 11px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.tog::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--ink);
+  display: inline-block;
+}
+.tog[aria-pressed="true"]::before {
+  background: var(--cobalt);
+  border-color: var(--cobalt);
+}
+.journey-facts .v {
+  font-size: 40px;
+}
+@media (max-width: 760px) {
+  .journey-facts .v {
+    font-size: 32px;
+  }
+}
+

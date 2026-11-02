@@ -12,6 +12,8 @@ URLs) and renders EVERY built page at a phone (390×844) and a laptop (1280×900
      private object (the privacy gate measured on the OUTPUT, not just the snapshot).
   5. Every <script> has a src (the CSP is `script-src 'self'`; an inline script is a defect).
   6. The front page's phone height stays under its budget (7.5 screens since the owner's 2026-11-01 brief; six before).
+  7. Every chart answers (#5578, A01): each <svg data-points> has the inspect island mounted on it
+     (data-inspect="mounted") once the page has loaded — a chart a reader cannot read point by point is a defect.
 
 MUTATION CONTROL (always runs first): a copy of the build with one page widened past the
 viewport, an inline <script>, and a sentinel word MUST fail — a gate that cannot fail is a
@@ -185,6 +187,12 @@ def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True) -> tup
                     viol = [v for v in page.evaluate(_RUN_AXE_JS) if v["impact"] in AXE_GATING_IMPACTS]
                     for v in viol:
                         rec["issues"].append(f"{path}@phone axe {v['impact']} {v['id']} ×{v['nodes']} {v['targets']}")
+                if label == "laptop":
+                    unmounted = page.evaluate(
+                        "() => [...document.querySelectorAll('svg[data-points]')].filter(s => s.dataset.inspect !== 'mounted' && JSON.parse(s.dataset.points || '[]').length).length"
+                    )
+                    if unmounted:
+                        rec["issues"].append(f"{path}@{label}: {unmounted} chart(s) with data-points but no inspect island mounted (#5578)")
                 rec["issues"].extend(f"{path}@{label}: {e}" for e in errors)
                 if out_dir:
                     os.makedirs(out_dir, exist_ok=True)
@@ -210,14 +218,16 @@ def mutation_control(dist: str, base: str) -> bool:
     idx = os.path.join(tmp, "index.html")
     html = open(idx, encoding="utf-8").read()
     html = html.replace(
-        "</body>", '<div style="width:2000px;height:2px"></div><script>var x=1</script><p>HELD-SENTINEL-DO-NOT-PUBLISH</p></body>'
+        "</body>",
+        '<div style="width:2000px;height:2px"></div><script>var x=1</script><p>HELD-SENTINEL-DO-NOT-PUBLISH</p>'
+        '<svg viewBox="0 0 10 10" data-points="[{&quot;x&quot;:1,&quot;y&quot;:1,&quot;label&quot;:&quot;planted&quot;}]"></svg></body>',
     )
     open(idx, "w", encoding="utf-8").write(html)
     ok, results = gate(tmp, base, None, verbose=False)
     shutil.rmtree(tmp, ignore_errors=True)
     front = next(r for r in results if r["path"] == "/")
     text = "\n".join(front["issues"])
-    found = ("horizontal overflow" in text, "inline <script>" in text, "sentinel" in text)
+    found = ("horizontal overflow" in text, "inline <script>" in text, "sentinel" in text, "no inspect island" in text)
     return (not ok) and all(found)
 
 
@@ -237,7 +247,7 @@ def main() -> int:
     if not args.skip_control:
         print("mutation control …", end=" ", flush=True)
         if not mutation_control(args.dist, args.base):
-            print("FAILED — the gate did not report a planted overflow + inline script + sentinel; refusing to grade")
+            print("FAILED — the gate did not report a planted overflow + inline script + sentinel + unmounted chart; refusing to grade")
             return 2
         print("ok (the gate can fail)")
     print(f"web preview gate — {args.dist} at base {args.base}")
