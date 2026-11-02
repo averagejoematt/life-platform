@@ -66,6 +66,12 @@ test("every crossed rung is listed: a published chapter of its week links, any o
   );
 });
 
+test("a crossed rung in a week with no chapter object reads 'no chapter yet', not a status (#5598)", () => {
+  const chapters = [{ id: "week-06", week: 6, date: "2026-10-13", status: "published", week_label: "Week 6" }];
+  const got = rungChapters([{ lb: 240, date: "2026-09-12" }], chapters);
+  assert.deepEqual([got[0].link, got[0].label, got[0].state, got[0].chapter], [false, "Week 2", "no chapter yet", null]);
+});
+
 test("the heart captions are plain means of the readings shown, with their counts", () => {
   const d = (i, v, gap = false) => ({ date: `2026-09-${String(6 + i).padStart(2, "0")}`, value: v, present: v != null, gap });
   const days = [d(0, 60), d(1, null), d(2, 62), d(3, 64, true), d(4, 58), d(5, 60), d(6, 60), d(7, 50), d(8, 52)];

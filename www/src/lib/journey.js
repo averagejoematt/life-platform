@@ -196,9 +196,9 @@ export function ladderRows(rungs, current) {
 
 /** Every crossed rung with its real date, and the chapter of the week it fell (#5598): a chapter's date closes its
  * week (the 7 days ending on it). `link` is true only for a published chapter. A week whose chapter is not
- * published carries its label and state as plain text: a skipped or pending chapter is in the snapshot with its
- * status; a held one is withheld from it entirely, so its week is counted from the nearest chapter that IS there
- * and its state reads "held". With no chapter to count from, the rung carries its date alone. */
+ * published carries its label and the chapter's own status as plain text (held, skipped, pending). When no chapter
+ * object exists for that week, the week is counted from the nearest published chapter and reads "no chapter yet",
+ * never a state the record does not have. With nothing to count from, the rung carries its date alone. */
 export function rungChapters(rungs, chapters) {
   const all = (chapters || []).filter((ch) => ch.week >= 1 && ch.date);
   const out = [];
@@ -212,7 +212,7 @@ export function rungChapters(rungs, chapters) {
     } else {
       const anchor = all.find((ch) => ch.status === "published") || all[0] || null;
       const week = anchor ? anchor.week + Math.ceil((t(r.date) - t(anchor.date)) / (7 * DAY_MS)) : 0;
-      out.push({ lb: r.lb, date: r.date, chapter: null, link: false, label: week >= 1 ? `Week ${week}` : "", state: "held" });
+      out.push({ lb: r.lb, date: r.date, chapter: null, link: false, label: week >= 1 ? `Week ${week}` : "", state: "no chapter yet" });
     }
   }
   return out;
