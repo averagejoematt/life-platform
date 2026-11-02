@@ -318,14 +318,8 @@ def test_registry_describes_the_v9_pages_once_the_switch_is_on():
 
 
 def _sampled_paths() -> set[str]:
-    """#5585: the newest built route of each sampled pattern (the day pages: tier 3, sampled — decision 9)."""
-    out = set()
-    for pattern in qa_manifest._V9_SAMPLED:
-        rx = re.compile(re.escape(pattern).replace(r"\*", "[^/]+") + "$")
-        written = sorted(r for r in OWNED["routes"] if rx.match(r))
-        if written:
-            out.add(written[-1])
-    return out
+    """#5585: the fixed exemplar of each sampled pattern the build wrote (the day pages: tier 3, sampled — decision 9)."""
+    return {ex for pat, (ex, _name) in qa_manifest._V9_SAMPLED.items() if pat in OWNED["route_patterns"] and ex in OWNED["routes"]}
 
 
 def test_day_pages_are_one_sampled_tier3_row_never_a_door():
@@ -335,6 +329,9 @@ def test_day_pages_are_one_sampled_tier3_row_never_a_door():
     (path,) = sampled
     assert path.startswith("/data/day/") and rows[path]["tier"] == 3 and rows[path]["sampled_pattern"] == "/data/day/*/"
     assert not any(r.startswith("/data/day/") for r in OWNED["static_routes"])
+    import site_review_bindings  # noqa: E402 — qa/ is on sys.path, like qa_manifest
+
+    assert path in {b["path"] for b in site_review_bindings.PAGE_BINDINGS}, "the exemplar is bound for the site review"
     # control: a build that wrote no day page registers no day row
     bare = {**OWNED, "routes": [r for r in OWNED["routes"] if not r.startswith("/data/day/")]}
     assert not any(r["path"].startswith("/data/day/") for r in qa_manifest._v9_rows(bare, live=True))

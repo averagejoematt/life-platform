@@ -71,7 +71,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -95,9 +94,10 @@ _V9_TIER1 = {
     "/data/journey/",
 }  # the four destinations (plan §C) + the Journey (owner decision 9, #5579)
 # #5585: a route PATTERN the sweeps sample rather than enumerate — one row, tier 3 (owner decision 9: day pages
-# are visual-QA tier 3, sampled; never tier 1/2). The sample is the newest route the build wrote for the pattern;
-# the fixture's days are real dates inside the experiment, so the live build writes the same page.
-_V9_SAMPLED = {"/data/day/*/": "Data · one day, sampled (v9, #5585)"}
+# are visual-QA tier 3, sampled; never tier 1/2). The sample is a FIXED exemplar the build must have written (the
+# fixture's days are real dates inside the experiment, so the live build writes the same page), never "the newest
+# day", so the registry and qa/site_review_bindings.py name the same path and neither drifts with the data.
+_V9_SAMPLED = {"/data/day/*/": ("/data/day/2026-10-16/", "Data · one day, sampled (v9, #5585)")}
 # #1429 named /privacy/ as a structural-sweep surface; the v9 page is static text, so it keeps a declared
 # marker (the h1 in www/src/pages/privacy/index.astro) and the smoke asserts it after the cut-over.
 _V9_STRUCTURAL = {"/privacy/": "Only deliberately published figures appear here."}
@@ -193,13 +193,11 @@ def _v9_rows(owned: dict | None = None, live: bool | None = None) -> list[dict]:
             row["content_class"] = "static"
             row["structural"] = {"marker": _V9_STRUCTURAL[route]}
         rows.append(row)
-    for pattern, name in sorted(_V9_SAMPLED.items()):
-        rx = re.compile(re.escape(pattern).replace(r"\*", "[^/]+") + "$")
-        written = sorted(r for r in owned.get("routes", []) if rx.match(r))
-        if pattern in owned.get("route_patterns", []) and written:
+    for pattern, (exemplar, name) in sorted(_V9_SAMPLED.items()):
+        if pattern in owned.get("route_patterns", []) and exemplar in owned.get("routes", []):
             rows.append(
                 {
-                    "path": written[-1],
+                    "path": exemplar,
                     "name": name,
                     "owner": "www",
                     "tier": 3,
