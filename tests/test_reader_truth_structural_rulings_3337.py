@@ -139,6 +139,11 @@ RULE_CLASSIFICATION = {
         "category + a window / since-date the QUOTED page copy states + a cited Day N + no cited date after today (+1 day PT/UTC), "
         "no future ISO week, no payload date field, quoted weekdays match the calendar",
     ),
+    "is_portrait_distinct_signals": (
+        "structural",
+        "category + page / + every quoted span attributed to the Mind or Connection tile template, both tiles quoted, "
+        "one parsed value per tile, and the Mind tile's last entry (or zero count) at or before today minus the window",
+    ),
     "is_advisory": ("structural", "reads the `rulings` FIELD the assessment loop wrote — never the note"),
 }
 
@@ -173,8 +178,8 @@ def test_every_is_rule_is_classified():
         "Classify the new rule structural-vs-tiebreak (see the module header's bar) before merging."
     )
     assert (
-        len(found) == 18
-    ), f"the ledger holds {len(found)} rules; the sweep counts 18 (#3337 + #3379 + #4845 + #4834 x2 + #5402) — update the sweep with the count"
+        len(found) == 19
+    ), f"the ledger holds {len(found)} rules; the sweep counts 19 (#3337 + #3379 + #4845 + #4834 x2 + #5402 + #5596) — update the sweep with the count"
 
 
 def test_no_rule_is_classified_purely_lexical():
