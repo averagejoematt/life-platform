@@ -150,6 +150,8 @@ LIVE_ENDPOINTS = {
     "journal_analysis": "/api/journal_analysis",  # the analysed-entry dates, for the Mind tile's weekly bars
     "journey": "/api/journey",  # the weight story's published rate, interval and projection (#5579)
     "forecast": "/api/forecast",  # the platform's short forecasts and their coverage (#5579)
+    "physical_overview": "/api/physical_overview",  # the Journey's body: the DEXA baseline, blood pressure, tape (#5583)
+    "phenoage": "/api/phenoage",  # the Journey's PhenoAge (Option A: never an age beside it, #5583)
     **DAY_ENDPOINTS,  # /api/pulse_history + the three window-bound endpoints, read for their dates (#5585)
 }
 OPTIONAL_ENDPOINTS = (
@@ -163,6 +165,8 @@ OPTIONAL_ENDPOINTS = (
     "journal_analysis",
     "journey",
     "forecast",
+    "physical_overview",
+    "phenoage",
     *DAY_ENDPOINTS,
 )
 

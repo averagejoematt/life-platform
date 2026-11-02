@@ -3,11 +3,15 @@
 // one sentence and three facts, then every weigh-in on the whole distance from the start to the
 // goal with the platform's rate, interval and projection; "where this is heading"; the methods;
 // the rail. Every figure is the platform's (journey.json); the page places them, never recomputes.
+// Layers 2–3 (#5583): the pace with its interval, the ten-pound ladder, the body (DEXA · visceral ·
+// PhenoAge, never an age beside it), resting heart rate and HRV since day one read within device eras,
+// and the coaches' checked calls on the weight. The heart captions are plain means of the readings
+// shown, computed at build and said as such; nothing else is computed here.
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
-import { journeyCaption, journeyChart } from "../../../lib/journey.js";
-import { dayInWords, num } from "../../../lib/format.js";
+import { heartChart, heartWeeks, journeyCaption, journeyChart, ladderRows, ordinal, paceBar, rungChapters, visceralBand } from "../../../lib/journey.js";
+import { clip, dayInWords, num } from "../../../lib/format.js";
 import { loadAll, loadJourney, loadSeries } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -15,11 +19,12 @@ const all = await loadAll();
 const J = await loadJourney();
 const ok = J.state !== "absent";
 const metric = all.get("metric", J.metric_id || "weight_lbs");
-const series = ok ? (await loadSeries())[J.metric_id] || null : null;
+const allSeries = ok ? await loadSeries() : {};
+const series = ok ? allSeries[J.metric_id] || null : null;
 const methods = (J.method_ids || []).map((id) => all.get("method", id)).filter(Boolean);
 const source = metric && metric.source_id ? all.get("source", metric.source_id) : null;
-const chapters = all.byType.chapter
-  .filter((c) => c.status === "published")
+const published = all.byType.chapter.filter((c) => c.status === "published");
+const chapters = published
   .map((c) => ({ date: c.date, label: c.week_label.replace("Prologue · Part ", "P").replace("Week ", "W") }));
 const provenance = { state: J.state, as_of: J.as_of || "", data_through: J.data_through, sample: Boolean(J.sample), source: J.source || [], absent_text: J.absent_text };
 const payload = ok && series ? { days: series.days, journey: J, rungs: J.rungs || [], markers: J.markers || [], chapters, unit: J.unit, decimals: 1 } : null;
@@ -37,6 +42,51 @@ const weightCalls = all.byType.prediction.filter((p) => p.metric_id === J.metric
 const right = weightCalls.filter((p) => p.status === "confirmed").length;
 const checked = weightCalls.filter((p) => ["confirmed", "refuted"].includes(p.status)).length;
 const pending = weightCalls.filter((p) => p.status === "pending").length;
+// ── layers 2–3 (#5583)
+const pace = ok ? paceBar(J) : null;
+const ladder = ok ? ladderRows(J.rungs || [], J.current_weight_lbs) : [];
+const rungWeeks = ok ? rungChapters(J.rungs || [], published) : [];
+const C = ok ? J.composition || null : null;
+const otherLb = C ? Math.max(0, C.total_mass_lb - (C.lean_mass_lb || 0) - (C.fat_mass_lb || 0)) : null;
+const share = (v: number | null) => (C && v != null ? `${((v / C.total_mass_lb) * 100).toFixed(1)}%` : "0%");
+const band = C ? visceralBand(C.visceral_fat_lb) : null;
+const VF_MAX = 4; // the gauge runs 0–4 lb: low under 1, moderate 1 to 2, elevated over 2 (the previous site's scale)
+const vfAt = (v: number) => `${Math.min(97, Math.max(0, (v / VF_MAX) * 100)).toFixed(1)}%`;
+const missingScan = Boolean(C && C.next_recommended && J.as_of && C.next_recommended < J.as_of);
+const PA = ok ? J.phenoage || null : null;
+const BP = ok ? J.bp || null : null;
+const heartSpec = [
+  { id: "resting_hr", name: "Resting heart rate", unit: "bpm" },
+  { id: "hrv", name: "Heart-rate variability", unit: "ms" },
+];
+const hearts = ok
+  ? heartSpec
+      .map((h) => {
+        const s = allSeries[h.id];
+        if (!s) return null;
+        const days = s.days.filter((d) => d.date >= J.start_date);
+        if (!days.some((d) => d.value != null && !d.gap)) return null;
+        const m = all.get("metric", h.id);
+        const src = m && m.source_id ? all.get("source", m.source_id) : null;
+        const markers = s.markers || [];
+        const aria = `${h.name} on every day since ${dayInWords(J.start_date)}, read within each side of a device change`;
+        const payload = { days, markers, unit: s.unit || h.unit, decimals: m && m.decimals != null ? m.decimals : 0, name: h.name, aria };
+        const w = heartWeeks(days);
+        const firstEnd = days[Math.min(6, days.length - 1)].date;
+        const lastStart = days[Math.max(0, days.length - 7)].date;
+        const straddles = markers.some((mk) => mk.date > firstEnd && mk.date <= lastStart);
+        return { ...h, unit: payload.unit, payload, svg: heartChart(payload), w, straddles, marker: markers[0] || null, source: src ? src.label : null };
+      })
+      .filter(Boolean)
+  : [];
+const coachName = (p: any) => {
+  const c = p.coach_id ? all.get("coach", p.coach_id) : null;
+  return (c && c.title) || p.coach_name || "";
+};
+const settled = weightCalls
+  .filter((p) => ["confirmed", "refuted"].includes(p.status))
+  .sort((a, b) => String(b.settled_date || "").localeCompare(String(a.settled_date || "")))
+  .slice(0, 4);
 const headline = ok
   ? silent
     ? `The scale has been silent ${J.silent_days} days; everything here reads as of ${dayInWords(J.last_weighin_date)}.`
@@ -150,6 +200,50 @@ const headline = ok
   }
 
   {
+    ok && pace && (
+      <section class="section hair">
+        <div class="wrap grid cols2" style="gap:56px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <h2>The pace</h2>
+            <p class="muted" style="font-size:14px;max-width:62ch">
+              The platform publishes one rate: the last {J.weighin_span_days} days, with a block-bootstrap 95% interval. It publishes no slope over any other window, so none is drawn here.
+            </p>
+            <div class="pace">
+              <span class="k">published · {J.weighin_span_days} days</span>
+              <span class="t" role="img" aria-label={`${num(J.weekly_rate_lbs, 2)} lb a week, 95% interval ${num(J.weekly_rate_ci_low, 2)} to ${num(J.weekly_rate_ci_high, 2)}`}>
+                <i style={`width:${pace.bar}%`} />
+                <span class="ci" style={`left:${pace.ciLeft}%;width:${pace.ciWidth}%`} />
+              </span>
+              <span class="v mono">{num(J.weekly_rate_lbs, 2)} lb a week</span>
+            </div>
+            <p class="muted" style="font-size:13px;max-width:62ch">
+              The cobalt whisker is the 95% interval, {num(J.weekly_rate_ci_low, 2)} to {num(J.weekly_rate_ci_high, 2)} lb a week{J.rate_provisional ? ", and the platform marks the rate provisional" : ""}.{" "}
+              {pace.excludesZero
+                ? `The interval does not reach zero, so the ${pace.losing ? "loss" : "gain"} is established at this pace, not just a noisy week.`
+                : "The interval still reaches zero, so the direction is not established yet."}
+            </p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <h2>The milestones</h2>
+            <p class="muted" style="font-size:14px;max-width:62ch">
+              Ten-pound rungs from the start. The gaps between crossing dates are the honest pace: they widen as the easy water weight goes.
+            </p>
+            <div class="ladder" role="list" aria-label="Ten-pound milestones">
+              {ladder.map((r) => (
+                <div class={`rung ${r.cls}`} role="listitem">
+                  <span class="lb mono">{r.lb} lb</span>
+                  <span>{r.cls === "next" ? "next" : ""}</span>
+                  <span class="d mono">{r.right}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
     ok && (
       <section class="section hair">
         <div class="wrap grid cols2" style="gap:56px;align-items:start">
@@ -185,9 +279,207 @@ const headline = ok
               A slow week widens the range before it moves the date.
             </p>
           </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <h2>The body, not just the weight</h2>
+            {C ? (
+              <>
+                <p class="muted" style="font-size:14px;max-width:62ch">
+                  The last DEXA scan was <b style="color:var(--ink)">{dayInWords(C.scan_date)}</b>
+                  {C.days_before_start != null && C.days_before_start > 0
+                    ? ` — ${C.days_before_start} days before day one, so it is the baseline, not a result of this experiment.`
+                    : C.days_before_start != null
+                      ? ` — day ${1 - C.days_before_start} of the experiment.`
+                      : "."}{" "}
+                  {num(C.total_mass_lb, 1)} lb on the scanner{C.body_fat_pct != null ? `: ${num(C.body_fat_pct, 1)}% fat` : ""}.
+                </p>
+                <div class="stack" role="img" aria-label={`At the scan: ${num(C.lean_mass_lb, 1)} lb lean, ${num(C.fat_mass_lb, 1)} lb fat, ${num(otherLb, 1)} lb bone and other`}>
+                  <i style={`width:${share(C.lean_mass_lb)};background:var(--ink)`} />
+                  <i style={`width:${share(C.fat_mass_lb)};background:var(--muted)`} />
+                  <i style={`width:${share(otherLb)};background:var(--rule2)`} />
+                </div>
+                <div class="legend">
+                  <span class="lean">lean</span>
+                  <span class="fat">fat</span>
+                  <span class="other">bone and other</span>
+                </div>
+                <div class="rows">
+                  <span>
+                    <span>Lean mass</span>
+                    <span class="mono">{num(C.lean_mass_lb, 1)} lb</span>
+                  </span>
+                  <span>
+                    <span>Fat mass</span>
+                    <span class="mono">{num(C.fat_mass_lb, 1)} lb</span>
+                  </span>
+                  {C.almi_kg_m2 != null && (
+                    <span>
+                      <span>Appendicular lean mass index</span>
+                      <span class="mono">
+                        {num(C.almi_kg_m2, 1)} kg/m²{C.almi_percentile != null ? ` · ${ordinal(C.almi_percentile)} percentile` : ""}
+                      </span>
+                    </span>
+                  )}
+                  {C.android_fat_pct != null && C.gynoid_fat_pct != null && (
+                    <span>
+                      <span>Android / gynoid fat</span>
+                      <span class="mono">
+                        {num(C.android_fat_pct, 0)}% / {num(C.gynoid_fat_pct, 0)}%{C.ag_ratio != null ? ` · ratio ${num(C.ag_ratio, 2)}` : ""}
+                      </span>
+                    </span>
+                  )}
+                </div>
+                {C.visceral_fat_lb != null && (
+                  <>
+                    <p class="label" style="margin-top:6px">Visceral fat · the metabolic-risk figure</p>
+                    <div class="gauge" role="img" aria-label={`Visceral fat ${num(C.visceral_fat_lb, 2)} lb against the low, moderate and elevated zones${C.visceral_target_lb != null ? `; the target is ${num(C.visceral_target_lb, 1)} lb` : ""}`}>
+                      <i style={`left:${vfAt(C.visceral_fat_lb)}`} />
+                      {C.visceral_target_lb != null && <span class="target" style={`left:${vfAt(C.visceral_target_lb)}`} />}
+                    </div>
+                    <p class="muted" style="font-size:13px;max-width:62ch">
+                      <b style="color:var(--ink)">{num(C.visceral_fat_lb, 2)} lb</b> at the scan{C.visceral_fat_g != null ? ` (${num(C.visceral_fat_g, 0)} g)` : ""}. On the scale the previous site used (under 1 lb low · 1 to 2 moderate · over 2 elevated) that is {`${band}${C.visceral_target_lb != null ? `; the cobalt line is the ${num(C.visceral_target_lb, 1)} lb target` : ""}.`}{" "}
+                      Directional only until a second scan.
+                    </p>
+                  </>
+                )}
+                {missingScan && (
+                  <p class="callout">
+                    <b>Missing: scan two.</b> {`A follow-up was recommended for ${dayInWords(C.next_recommended)}${C.days_since != null ? `; it is ${C.days_since} days since the last scan` : ""}.`} Until it happens, how much of the {num(J.lost_lbs, 1)} lb was fat is not known, and
+                    nothing on this page estimates it.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p class="callout">The platform did not serve a body-composition scan for this snapshot.</p>
+            )}
+            {PA && (
+              <details class="more">
+                <summary>
+                  {`PhenoAge · ${num(PA.years, 0)} years, as of ${dayInWords(PA.as_of)}${PA.as_of < J.start_date ? " (before day one)" : ""}`}
+                </summary>
+                <div class="rows">
+                  {PA.drivers.map((d: any) => (
+                    <span>
+                      <span>
+                        {d.name}
+                        {d.derived ? " · derived" : ""}
+                      </span>
+                      <span class="mono">
+                        {d.value} {d.unit} · <span class={`dir ${d.direction}`}>{d.direction}</span>
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <p class="muted" style="font-size:13px;margin-top:8px;max-width:62ch">
+                  {PA.drivers.length} blood markers; each is marked by which way it pushes the estimate. The chronological age is never shown, so no gap can be read off it. A population-level estimate, volatile to single markers.
+                </p>
+              </details>
+            )}
+            {(BP || J.tape_date || C) && (
+              <details class="more">
+                <summary>Blood pressure, tape and the checkpoints</summary>
+                <div class="rows">
+                  {BP && (
+                    <span>
+                      <span>Blood pressure</span>
+                      <span>
+                        {`${num(BP.systolic, 0)}/${num(BP.diastolic, 0)} on ${dayInWords(BP.date)}${BP.status ? ` · ${BP.status}` : ""}${BP.readings_count != null ? ` · ${BP.readings_count} readings` : ""}`}
+                      </span>
+                    </span>
+                  )}
+                  {J.tape_date && (
+                    <span>
+                      <span>Tape, last session</span>
+                      <span>{dayInWords(J.tape_date)}</span>
+                    </span>
+                  )}
+                  {C && (
+                    <span>
+                      <span>DEXA, last scan</span>
+                      <span>{dayInWords(C.scan_date)}</span>
+                    </span>
+                  )}
+                  {C && C.next_recommended && (
+                    <span>
+                      <span>DEXA follow-up, recommended for</span>
+                      <span>{dayInWords(C.next_recommended)}</span>
+                    </span>
+                  )}
+                  {PA && (
+                    <span>
+                      <span>PhenoAge</span>
+                      <span>recomputed per blood draw · last {dayInWords(PA.as_of)}</span>
+                    </span>
+                  )}
+                </div>
+              </details>
+            )}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    ok && (
+      <section class="section hair">
+        <div class="wrap" style="display:flex;flex-direction:column;gap:12px">
+          <h2>What changed with it</h2>
+          <p class="muted" style="font-size:14px;max-width:80ch">
+            Two signals that move with a cut, on every day since day one. The ochre line marks a device change; the 7-day mean is read within each side of it, never across. Move along a chart, tap it or use the arrow keys to read a day.
+          </p>
+          {hearts.length ? (
+            <div class="grid cols2" style="gap:28px;align-items:start">
+              {hearts.map((h: any) => (
+                <figure class="figure" data-heart data-payload={JSON.stringify(h.payload)} style="margin:0">
+                  <p class="label" style="margin-bottom:8px">
+                    {h.name} · {h.unit}
+                    {h.source ? ` · ${h.source}` : ""}
+                  </p>
+                  <div class="chart" data-heart-chart set:html={h.svg} />
+                  <figcaption class="muted" style="font-size:13px;margin-top:8px;max-width:60ch">
+                    First week {num(h.w.first.mean, 0)} {h.unit} on average; the latest seven days {num(h.w.last.mean, 0)}. Each is a plain mean of the readings shown ({h.w.first.n} and {h.w.last.n} readings).
+                    {h.straddles && h.marker ? ` The two weeks sit on either side of the ${h.marker.label} on ${dayInWords(h.marker.date)}, so the difference is not only the body.` : ""}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <p class="callout">The platform did not serve the resting heart rate or HRV series for this snapshot.</p>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    ok && (
+      <section class="section hair">
+        <div class="wrap grid cols2" style="gap:56px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <h2>The coaches on the weight</h2>
+            <p class="muted" style="font-size:14px;max-width:62ch">
+              {`${checked ? `${right} of ${checked} checked calls about the weight came true` : "No call about the weight has been checked yet"}${pending ? `; ${pending} ${pending === 1 ? "is" : "are"} still open` : ""}.`} Code grades them; the coaches do not mark their own work.
+            </p>
+            {settled.length > 0 && (
+              <div class="calls">
+                {settled.map((p: any) => (
+                  <a class={`call ${p.status}`} href={href(pathOf("prediction", p.id))}>
+                    <span class="k">
+                      {p.status === "confirmed" ? "right" : "wrong"} · {dayInWords(p.settled_date, { short: true })}
+                      {coachName(p) ? ` · ${coachName(p)}` : ""}
+                    </span>
+                    <span>{clip(p.title || p.claim, 100)}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+            <p class="muted" style="font-size:13px;max-width:62ch">
+              Each settled call has its own page in the ledger: the claim, what happened, the allowed distance, and what a simple guess would have said.
+            </p>
+          </div>
           <div style="display:flex;flex-direction:column;gap:22px">
             <div>
-              <p class="label" style="margin-bottom:8px">How this is measured</p>
+              <h2 style="margin-bottom:12px">How this is measured</h2>
               {
                 methods.length ? (
                   <div class="rows">
@@ -239,7 +531,31 @@ const headline = ok
   }
 
   <section class="section hair">
-    <div class="wrap">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:28px">
+      {
+        rungWeeks.length > 0 && (
+          <section aria-label="The weeks the milestones fell">
+            <p class="label" style="margin-bottom:8px">
+              The weeks the milestones fell
+            </p>
+            <div class="conn">
+              {rungWeeks.map((r) => (
+                <a href={href(pathOf("chapter", r.chapter.id))}>
+                  <span class="k">chapter</span>
+                  <span>
+                    <b>
+                      {r.chapter.week_label} · {r.chapter.title}
+                    </b>
+                  </span>
+                  <span class="r">
+                    the week {r.lb} lb fell · {dayInWords(r.date, { short: true })}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )
+      }
       <Connected type="metric" id={J.metric_id || "weight_lbs"} heading="Connected to the journey" />
     </div>
   </section>

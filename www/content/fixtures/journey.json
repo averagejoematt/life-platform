@@ -1,6 +1,31 @@
 {
  "absent_text": null,
  "as_of": "2026-10-31",
+ "bp": {
+  "date": "2026-10-13",
+  "diastolic": 78,
+  "readings_count": 3,
+  "status": "normal",
+  "systolic": 124
+ },
+ "composition": {
+  "ag_ratio": 1.12,
+  "almi_kg_m2": 11.2,
+  "almi_percentile": 88.0,
+  "android_fat_pct": 46.0,
+  "body_fat_pct": 38.2,
+  "days_before_start": 160,
+  "days_since": 215,
+  "fat_mass_lb": 95.6,
+  "gynoid_fat_pct": 41.0,
+  "lean_mass_lb": 146.1,
+  "next_recommended": "2026-06-28",
+  "scan_date": "2026-03-30",
+  "total_mass_lb": 250.4,
+  "visceral_fat_g": 1089.0,
+  "visceral_fat_lb": 2.4,
+  "visceral_target_lb": 1.0
+ },
  "coverage": {
   "coverage_pct": 80.0,
   "n_covered": 120,
@@ -38,6 +63,40 @@
   "ewma_forecast"
  ],
  "metric_id": "weight_lbs",
+ "phenoage": {
+  "as_of": "2026-04-03",
+  "drivers": [
+   {
+    "derived": false,
+    "direction": "younger",
+    "name": "Albumin",
+    "unit": "g/dL",
+    "value": 4.6
+   },
+   {
+    "derived": false,
+    "direction": "older",
+    "name": "Creatinine",
+    "unit": "mg/dL",
+    "value": 1.1
+   },
+   {
+    "derived": false,
+    "direction": "neutral",
+    "name": "Glucose",
+    "unit": "mg/dL",
+    "value": 94.0
+   },
+   {
+    "derived": true,
+    "direction": "neutral",
+    "name": "Lymphocyte %",
+    "unit": "%",
+    "value": 30.0
+   }
+  ],
+  "years": 31
+ },
  "progress_pct": 16.3,
  "projected_goal_date": "2027-05-20",
  "projected_goal_date_earliest": "2027-05-01",
@@ -85,6 +144,7 @@
  "start_date": "2026-09-06",
  "start_weight_lbs": 243.2,
  "state": "ok",
+ "tape_date": "2026-09-06",
  "unit": "lb",
  "weekly_rate_ci_high": -1.14,
  "weekly_rate_ci_low": -2.1,

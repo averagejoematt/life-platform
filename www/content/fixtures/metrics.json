@@ -124,5 +124,36 @@
   "type": "metric",
   "unit": "g",
   "visibility": "public"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "data_through": "2026-10-17",
+  "decimals": 0,
+  "edges": [
+   {
+    "id": "whoop",
+    "rel": "measured_by",
+    "type": "source"
+   }
+  ],
+  "id": "resting_hr",
+  "instrument": "WHOOP",
+  "label": "Resting heart rate",
+  "method_ids": [],
+  "sample": true,
+  "sentence": null,
+  "series_url": "/api/series?metric=resting_hr",
+  "source": [
+   "fixture"
+  ],
+  "source_id": "whoop",
+  "state": "ok",
+  "summary": "WHOOP resting heart rate, overnight.",
+  "title": "Resting heart rate",
+  "type": "metric",
+  "unit": "bpm",
+  "visibility": "public"
  }
 ]
