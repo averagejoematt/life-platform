@@ -22,7 +22,10 @@ from operational import (
 )
 
 _START = "2026-09-06"
-_TODAY = "2026-11-01"  # Day 57, the wire frame (06:19Z on 11-02 is 11-01 Pacific)
+# A golden pin, not "today": every call below is handed this day explicitly, so no
+# tested path reads the wall clock (phase_context only falls back to pacific_today()
+# when given None) — #2376/#4848.
+_WIRE_DAY = "2026-11-01"  # Day 57, the wire frame (06:19Z on 11-02 is 11-01 Pacific)
 
 WIRE_539C6D = (
     "Surface 1 states 'Mind · journal 2 entries in 57 days, the last on 9 Sep.' Day 1 of the experiment is "
@@ -47,22 +50,22 @@ def _f(note, page="/", category="temporal_contradiction", severity="high"):
     return {"page": page, "category": category, "severity": severity, "note": note}
 
 
-def _fired(finding, today=_TODAY):
-    return [rid for rid, _l, fires, _r in R.advisory_rulings(_START, today) if fires(finding)]
+def _fired(finding, day):
+    return [rid for rid, _l, fires, _r in R.advisory_rulings(_START, day) if fires(finding)]
 
 
 def test_the_wire_note_is_adjudicated_through_the_ledger():
-    assert R.is_portrait_distinct_signals(_f(WIRE_539C6D), _TODAY)
-    assert "portrait_distinct_signals" in _fired(_f(WIRE_539C6D))
+    assert R.is_portrait_distinct_signals(_f(WIRE_539C6D), _WIRE_DAY)
+    assert "portrait_distinct_signals" in _fired(_f(WIRE_539C6D), _WIRE_DAY)
 
 
 def test_wording_independent():
-    assert R.is_portrait_distinct_signals(_f(PARAPHRASE), _TODAY)
+    assert R.is_portrait_distinct_signals(_f(PARAPHRASE), _WIRE_DAY)
 
 
 def test_a_zero_journal_count_is_consistent_too():
     note = "'Mind · journal 0 entries in 57 days.' beside 'Connection · logged interactions — None logged in the last thirty days.'"
-    assert R.is_portrait_distinct_signals(_f(note), _TODAY)
+    assert R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
 
 
 # ── the residue that must keep gating ─────────────────────────────────────────
@@ -75,8 +78,8 @@ def test_one_signal_stated_two_incompatible_ways_still_gates():
         "'Mind · journal 5 entries in 57 days, the last on 9 Sep.' beside 'Connection · logged interactions "
         "— None logged in the last thirty days.' Two journal counts for one cycle cannot both be true."
     )
-    assert not R.is_portrait_distinct_signals(_f(note), _TODAY)
-    assert "portrait_distinct_signals" not in _fired(_f(note))
+    assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
+    assert "portrait_distinct_signals" not in _fired(_f(note), _WIRE_DAY)
 
 
 def test_two_incompatible_last_dates_still_gate():
@@ -84,45 +87,45 @@ def test_two_incompatible_last_dates_still_gate():
         "'Mind · journal 2 entries in 57 days, the last on 9 Sep.' and '2 entries in 57 days, the last on 12 Sep' "
         "beside 'None logged in the last thirty days. The journal went quiet; so did this.'"
     )
-    assert not R.is_portrait_distinct_signals(_f(note), _TODAY)
+    assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
 
 
 def test_a_journal_entry_inside_the_window_beside_went_quiet_still_gates():
     """'The journal went quiet' is false when the last entry is inside the thirty days."""
     note = WIRE_539C6D.replace("9 Sep", "28 Oct")
-    assert not R.is_portrait_distinct_signals(_f(note), _TODAY)
+    assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
 
 
 def test_scoped_to_the_home_page_and_its_category():
-    assert not R.is_portrait_distinct_signals(_f(WIRE_539C6D, page="/story/"), _TODAY)
-    assert not R.is_portrait_distinct_signals(_f(WIRE_539C6D, category="audience_violation"), _TODAY)
+    assert not R.is_portrait_distinct_signals(_f(WIRE_539C6D, page="/story/"), _WIRE_DAY)
+    assert not R.is_portrait_distinct_signals(_f(WIRE_539C6D, category="audience_violation"), _WIRE_DAY)
 
 
 def test_needs_both_tiles_quoted():
     note = "Surface 1 states 'Mind · journal 2 entries in 57 days, the last on 9 Sep.' but Day 57 is too long."
-    assert not R.is_portrait_distinct_signals(_f(note), _TODAY)
+    assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
 
 
 def test_a_quoted_span_from_outside_the_portrait_refuses_it():
     note = WIRE_539C6D + " The chapter says 'The Monday afternoon walk covered 5.4 miles'."
-    assert not R.is_portrait_distinct_signals(_f(note), _TODAY)
+    assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
 
 
 def test_fails_closed_without_a_clock():
     assert not R.is_portrait_distinct_signals(_f(WIRE_539C6D), None)
-    assert not R.is_portrait_distinct_signals(_f(""), _TODAY)
-    assert not R.is_portrait_distinct_signals(_f(None), _TODAY)
+    assert not R.is_portrait_distinct_signals(_f(""), _WIRE_DAY)
+    assert not R.is_portrait_distinct_signals(_f(None), _WIRE_DAY)
 
 
 def test_demotes_never_drops():
-    ids = {rid for rid, _l, _fires, _r in R.advisory_rulings(_START, _TODAY)}
+    ids = {rid for rid, _l, _fires, _r in R.advisory_rulings(_START, _WIRE_DAY)}
     assert "portrait_distinct_signals" in ids
 
 
 def test_the_rubric_states_the_distinction():
     """Owner ruling 2026-11-02: the rubric itself recognises journal entries vs logged
     social interactions as different signals — and keeps the real defect flaggable."""
-    prompt = Q.build_prompt([{"name": "Home", "path": "/", "prose": "x"}], Q.phase_context(_TODAY))
+    prompt = Q.build_prompt([{"name": "Home", "path": "/", "prose": "x"}], Q.phase_context(_WIRE_DAY))
     flat = " ".join(prompt.split())
     assert "counts JOURNAL ENTRIES" in flat
     assert "counts LOGGED SOCIAL INTERACTIONS" in flat
