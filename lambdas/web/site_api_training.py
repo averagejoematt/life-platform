@@ -803,27 +803,36 @@ def benchmark_trends(*, _g) -> dict:
         return {"statusCode": 200, "headers": {**CORS_HEADERS, "Cache-Control": "max-age=300"}, "body": json.dumps({"trends": []})}
 
 
-def workouts(*, _g) -> dict:
+def workouts(*, _g, window: tuple[str, str] | None = None) -> dict:
     """
     GET /api/workouts
     Recent Hevy strength sessions with their per-exercise sets (reps × weight).
-    Read-only — queries SOURCE#hevy WORKOUT# records for the last 30 days.
+    Read-only — queries SOURCE#hevy WORKOUT# records for the last 30 days (the 30 most recent).
+    #5584: ``window`` = an inclusive ``(from, to)`` day pair (``web.day_window``) replaces the
+    trailing 30 days with that range — same key condition, same phase filter, every session in
+    it (the range is capped at ``day_window.MAX_SPAN_DAYS`` upstream), pages followed.
     Cache: 900s.
     """
     table = _g["table"]
-    today = datetime.now(PT).strftime("%Y-%m-%d")
-    d30 = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
+    if window is None:
+        today = datetime.now(PT).strftime("%Y-%m-%d")
+        d30 = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
+    else:
+        d30, today = window
     try:
-        resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot workouts
-                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}hevy")
-                    & Key("sk").between(f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"),
-                    "ScanIndexForward": False,
-                }
-            )
+        kwargs = with_phase_filter(
+            {  # ADR-058: hide pilot workouts
+                "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}hevy")
+                & Key("sk").between(f"DATE#{d30}#WORKOUT#", f"DATE#{today}#WORKOUT#~"),
+                "ScanIndexForward": False,
+            }
         )
-        items = _decimal_to_float(resp.get("Items", []))
+        resp = table.query(**kwargs)
+        raw = list(resp.get("Items", []))
+        while window is not None and resp.get("LastEvaluatedKey"):  # a long window can pass DynamoDB's 1 MB page
+            resp = table.query(**kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"])
+            raw.extend(resp.get("Items", []))
+        items = _decimal_to_float(raw)
     except Exception as exc:  # noqa: BLE001
         return _ok({"workouts": [], "error": str(exc)[:120]}, cache_seconds=300, degraded=exc)
 
@@ -834,7 +843,7 @@ def workouts(*, _g) -> dict:
             return None
 
     workouts = []
-    for w in items[:30]:
+    for w in items if window is not None else items[:30]:
         exercises = []
         for ex in w.get("exercises") or []:
             sets = []

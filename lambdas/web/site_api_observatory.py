@@ -34,6 +34,7 @@ read them through the re-exports below.
 
 # ── Split logic modules — the handler bodies live here; delegated to at call time. ──
 from web import (
+    day_window,
     site_api_meals as _meals,
     site_api_mind as _mind,
     site_api_nutrition as _nutrition,
@@ -72,9 +73,12 @@ __facade_state__ = (table, _query_source, _experiment_date, EXPERIMENT_START)
 
 # ── Thin routed delegators — identical name/signature/__module__ to the pre-split
 # handlers; each hands its own globals() to the split handler as `_g`. ──────────────
-def handle_nutrition_overview() -> dict:
-    """GET /api/nutrition_overview — delegated to web.site_api_nutrition."""
-    return _nutrition.nutrition_overview(_g=globals())
+def handle_nutrition_overview(qs: dict | None = None) -> dict:
+    """GET /api/nutrition_overview[?date= | ?from=&to=] — delegated to web.site_api_nutrition (window: #5584)."""
+    window, err = day_window.parse(qs, floor=EXPERIMENT_START)
+    if err:
+        return err
+    return day_window.attach(_nutrition.nutrition_overview(_g=globals(), window=window), window)
 
 
 def edition_nutrition() -> dict:
@@ -132,9 +136,12 @@ def handle_benchmark_trends() -> dict:
     return _training.benchmark_trends(_g=globals())
 
 
-def handle_workouts() -> dict:
-    """GET /api/workouts — delegated to web.site_api_training."""
-    return _training.workouts(_g=globals())
+def handle_workouts(qs: dict | None = None) -> dict:
+    """GET /api/workouts[?date= | ?from=&to=] — delegated to web.site_api_training (window: #5584)."""
+    window, err = day_window.parse(qs, floor=EXPERIMENT_START)
+    if err:
+        return err
+    return day_window.attach(_training.workouts(_g=globals(), window=window), window)
 
 
 def handle_weekly_physical_summary() -> dict:

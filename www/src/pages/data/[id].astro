@@ -43,6 +43,9 @@ const windowWords = series ? `${dayInWords(series.window.from)} to ${dayInWords(
 // The Journey (#5579): the weight measure opens onto the whole-distance story (owner decision 1, 2026-11-02).
 const journey = await loadJourney();
 const hasJourney = journey.state !== "absent" && journey.metric_id === m.id;
+// One day (#5585): the weight measure opens onto the two latest days — the way into the day pages
+// (never linked from Start); each day then walks to every other one in place.
+const latestDays = m.id === "weight_lbs" ? [...all.byType.day].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 2) : [];
 ---
 
 <Base title={m.label} top="data" description={m.sentence || m.summary || m.label}>
@@ -102,6 +105,24 @@ const hasJourney = journey.state !== "absent" && journey.metric_id === m.id;
                 →
               </span>
             </a>
+          </div>
+        )}
+        {latestDays.length > 0 && (
+          <div class="rows" style="margin-bottom:22px">
+            {latestDays.map((d, k) => (
+              <a href={href(pathOf("day", d.id))}>
+                <span>
+                  <b>{k === 0 ? "The latest day" : "The day before"} — {dayInWords(d.date, { weekday: true })}</b>
+                  <br />
+                  <span class="muted" style="font-size:13px">
+                    Day {d.day_number} · {d.summary || "every reading that day, against its own recent normal"}
+                  </span>
+                </span>
+                <span class="mono muted" style="font-size:12px">
+                  →
+                </span>
+              </a>
+            ))}
           </div>
         )}
         <div

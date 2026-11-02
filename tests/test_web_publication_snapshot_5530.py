@@ -95,7 +95,7 @@ def test_fixtures_carry_poison_so_the_gate_is_measured_not_assumed():
 
 def test_held_and_private_objects_never_reach_the_snapshot(tmp_path):
     manifest, out = _run(tmp_path)
-    assert manifest["excluded"] == {"held": 2, "private": 1}
+    assert manifest["excluded"] == {"held": 3, "private": 1}  # a held chapter, a held insight, a held day (#5585)
     files = [out / f for f in os.listdir(out) if f != "series"] + [out / "series" / f for f in os.listdir(out / "series")]
     blob = b"".join(open(f, "rb").read() for f in files)  # the collections, the data files and series/ — one known layout, not a tree sweep
     assert b"SENTINEL" not in blob, "a held/private object's content leaked into the public snapshot"
@@ -567,7 +567,7 @@ def test_cli_exit_codes(tmp_path):
         [sys.executable, SCRIPT, "--mode", "fixture", "--out", str(tmp_path / "s")], capture_output=True, text=True, cwd=REPO
     )
     assert ok.returncode == 0, ok.stderr
-    assert "SNAPSHOT-OK" in ok.stderr and "excluded={'held': 2, 'private': 1}" in ok.stderr
+    assert "SNAPSHOT-OK" in ok.stderr and "excluded={'held': 3, 'private': 1}" in ok.stderr
     fx = tmp_path / "fx"
     fx.mkdir()
     for name in os.listdir(FIXTURES):

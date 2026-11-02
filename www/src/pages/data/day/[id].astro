@@ -1,0 +1,269 @@
+---
+// One day (#5585, epic #5577 — the approved One Day prototype, owner 2026-11-02): the kicker, the
+// date in words, one sentence; prev/next, the fourteen-day strip and the any-day scrubber; the ten
+// reading tiles, each against its own recent normal (the exporter's numbers, never averaged here);
+// the week's chapter in whatever state it is; where the numbers came from; the rail.
+//
+// Decision 8: changing the date swaps the day in place (islands/day.js) with the URL, the title and
+// the canonical kept in sync — and without JavaScript every control is a plain link to the day's page.
+// The marked parts ([data-day-part]) are what the island swaps; the scrubber and the live region stay.
+import Base from "../../../layouts/Base.astro";
+import Connected from "../../../components/Connected.astro";
+import Provenance from "../../../components/Provenance.astro";
+import { READING_TILES, deltaLine, dekSentence, sparkline, stripWindow, tileValue } from "../../../lib/day.js";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll } from "../../../lib/snapshot.js";
+import { href, pathOf } from "../../../lib/url.js";
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.day.map((d) => ({ params: { id: d.id }, props: { day: d } }));
+}
+const { day: d } = Astro.props;
+const all = await loadAll();
+const days = [...all.byType.day].sort((a, b) => (a.date < b.date ? -1 : 1));
+const i = days.findIndex((x) => x.id === d.id);
+const byId = new Map(days.map((x) => [x.id, x]));
+const prev = d.prev_id ? byId.get(d.prev_id) || null : null;
+const next = d.next_id ? byId.get(d.next_id) || null : null;
+let prevWeighin = null;
+for (let j = i - 1; j >= 0; j--) {
+  if (days[j].readings.weight_lbs != null) {
+    prevWeighin = days[j];
+    break;
+  }
+}
+const short = (iso: string) => (dayInWords(iso, { weekday: true }) || "").replace(/ \d{4}$/, "");
+const words = (iso: string) => (dayInWords(iso) || "").replace(/ \d{4}$/, "");
+const heading = short(d.date);
+const chapter = d.chapter_id ? all.get("chapter", d.chapter_id) : null;
+const firstChapterDate = all.byType.chapter.map((c) => c.date).sort()[0] || null;
+const weekWords = chapter
+  ? `${chapter.week_label}${chapter.status !== "published" ? ` · ${chapter.status}` : ""}`
+  : firstChapterDate && d.date < firstChapterDate
+    ? "before the first chapter"
+    : "no chapter for this week";
+const kicker = `${d.weekday} · day ${d.day_number} · ${weekWords}`;
+const dek = dekSentence(d, prevWeighin);
+const win = stripWindow(days, i);
+const pads = 14 - win.length;
+const tiles = READING_TILES.map((t) => ({
+  ...t,
+  href: t.metric && all.get("metric", t.metric) ? href(pathOf("metric", t.metric)) : null,
+  value: tileValue(d, t),
+  delta: deltaLine(d, t),
+  svg: sparkline({ rows: win, tile: t, markDate: d.date, mean: (d.normals[t.key] || {}).mean7 }),
+}));
+const protein = all.get("metric", "total_protein_g");
+const sourceIds = [...new Set([...tiles.map((t) => (t.metric ? all.get("metric", t.metric)?.source_id : null)), "macrofactor"].filter(Boolean))];
+const sources = sourceIds.map((id) => all.get("source", id)).filter(Boolean);
+const dayHref = (x: { id: string }) => href(pathOf("day", x.id));
+const stripLabel = (x: any) => `${short(x.date)}, ${x.readings.weight_lbs != null ? `${x.readings.weight_lbs.toFixed(1)} pounds` : "no weigh-in"}`;
+const status = `The data · one day · ${words(d.date)}`;
+// Every day since the start, by program week — the no-JavaScript door the scrubber stands in for.
+const weeks: { n: number; days: any[] }[] = [];
+for (const x of days) {
+  const n = Math.floor((x.day_number - 1) / 7) + 1;
+  if (!weeks.length || weeks[weeks.length - 1].n !== n) weeks.push({ n, days: [] });
+  weeks[weeks.length - 1].days.push(x);
+}
+const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_through, sample: d.sample, source: d.source, absent_text: d.absent_text };
+---
+
+<Base title={heading} top="data" description={`${heading}, day ${d.day_number}: ${dek}`} status={status}>
+  <Fragment slot="head">
+    {prev && <link rel="prev" href={dayHref(prev)} />}
+    {next && <link rel="next" href={dayHref(next)} />}
+  </Fragment>
+  <div class="dayview" data-day-root data-day-id={d.id} data-base={import.meta.env.BASE_URL}>
+    <section class="section" style="padding-bottom:8px" data-day-part="head">
+      <div class="wrap" style="display:flex;flex-direction:column;gap:12px">
+        <div class="row"><span class="label">{kicker}</span><Provenance object={provenance} /></div>
+        <h1 tabindex="-1" data-day-h1>{heading}</h1>
+        <p class="dek" style="color:var(--ink)">{dek}</p>
+        <nav class="daynav" aria-label="Other days">
+          {
+            prev ? (
+              <a class="dn" href={dayHref(prev)} data-day-link data-focus="prev">
+                <span aria-hidden="true">←</span> <span>{short(prev.date)}</span>
+              </a>
+            ) : (
+              <span class="dn muted">the start</span>
+            )
+          }
+          <div class="strip" role="group" aria-label="The fourteen days ending on this one">
+            {Array.from({ length: pads }, () => <span class="pad" aria-hidden="true" />)}
+            {
+              win.map((x) => (
+                <a
+                  href={dayHref(x)}
+                  data-day-link
+                  data-focus={`strip-${x.id}`}
+                  aria-current={x.id === d.id ? "date" : undefined}
+                  aria-label={stripLabel(x)}
+                >
+                  <span aria-hidden="true">{x.weekday[0]}</span>
+                  <i class={x.has_weighin ? "w" : "nw"} aria-hidden="true" />
+                </a>
+              ))
+            }
+          </div>
+          {
+            next ? (
+              <a class="dn" href={dayHref(next)} data-day-link data-focus="next">
+                <span>{short(next.date)}</span> <span aria-hidden="true">→</span>
+              </a>
+            ) : (
+              <span class="dn muted">the latest day</span>
+            )
+          }
+        </nav>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <div class="scrub" data-day-scrub hidden>
+        <label for="day-scrub">Any day since the start</label>
+        <input
+          type="range"
+          id="day-scrub"
+          min="0"
+          max={String(days.length - 1)}
+          step="1"
+          value={String(i)}
+          aria-valuetext={`${heading}, day ${d.day_number}`}
+          data-day-index
+        />
+        <output for="day-scrub" class="mono" data-day-out>{heading} · day {d.day_number}</output>
+      </div>
+      <noscript>
+        <nav class="alldays" aria-label="Every day since the start">
+          <p class="label">Every day since the start</p>
+          {
+            weeks.map((w) => (
+              <p>
+                <span class="mono muted">Week {w.n}</span>{" "}
+                {w.days.map((x) => (
+                  <a href={dayHref(x)} aria-current={x.id === d.id ? "date" : undefined}>
+                    {words(x.date)}
+                  </a>
+                ))}
+              </p>
+            ))
+          }
+        </nav>
+      </noscript>
+      <p class="srOnly" role="status" aria-live="polite" data-day-live></p>
+    </div>
+
+    <section class="section" data-day-part="tiles">
+      <div class="wrap">
+        <p class="label" style="margin-bottom:12px">The readings · each against its own recent normal</p>
+        <div class="tiles day-tiles">
+          {
+            tiles.map((t) => (
+              <div class="tile">
+                <span class="label">{t.href ? <a href={t.href}>{t.label}</a> : t.label}</span>
+                <span class="v num">
+                  {t.value}
+                  {t.unit && t.value !== "—" && <small> {t.unit}</small>}
+                </span>
+                <div class="spark" set:html={t.svg} />
+                <span class="d mono">{t.delta}</span>
+              </div>
+            ))
+          }
+          <div class="tile">
+            <span class="label">{protein ? <a href={href(pathOf("metric", protein.id))}>Food · MacroFactor</a> : "Food · MacroFactor"}</span>
+            <span class="v num muted">—</span>
+            <span class="d mono">Detail arrives in M4: the day's food log, as logged, with any logging gap stated. No figure is shown until then.</span>
+          </div>
+          <div class="tile">
+            <span class="label">The engine's score</span>
+            <span class="v num muted">—</span>
+            <span class="d mono">Detail arrives in M4: the morning's level and its seven areas. No figure is shown until then.</span>
+          </div>
+        </div>
+        <p class="muted" style="font-size:13px;margin-top:10px;max-width:760px">
+          Each small line is the fourteen days ending on this one; the dashed rule is the 7-day mean. The means and their counts were computed by the platform when it published
+          the day. Point at a line, tap it, or focus it and use the arrow keys to read a day; Escape clears it.
+        </p>
+      </div>
+    </section>
+
+    <section class="section hair" data-day-part="week">
+      <div class="wrap grid cols2" style="gap:40px 56px;align-items:start">
+        <div>
+          <h2 style="margin-bottom:12px">The week this day belongs to</h2>
+          {
+            chapter ? (
+              <>
+                <div class="rows">
+                  <span>
+                    <span>{chapter.week_label}</span>
+                    <span class="mono">{chapter.status === "published" ? `published · “${chapter.title}”` : chapter.status}</span>
+                  </span>
+                  <span>
+                    <span>{chapter.status === "published" ? "Published" : "Week of"}</span>
+                    <span class="mono">{words(chapter.date)}</span>
+                  </span>
+                </div>
+                {chapter.status === "published" ? (
+                  <p style="margin-top:12px">
+                    This day's figures appear in the chapter; <a href={href(pathOf("chapter", chapter.id))}>read {chapter.week_label}</a>.
+                  </p>
+                ) : chapter.status === "skipped" ? (
+                  <div class="empty" style="margin-top:12px">
+                    <b style="color:var(--ink)">{chapter.absent_text || "No chapter was published for this week."}</b>
+                  </div>
+                ) : (
+                  <div class="empty" style="margin-top:12px">
+                    <span>
+                      <b style="color:var(--ink)">{chapter.absent_text || chapter.status}</b> When the chapter publishes, this day's figures appear in it and the chapter's text
+                      appears here. Nothing stands in for it meanwhile.
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div class="empty">
+                <b style="color:var(--ink)">{weekWords === "before the first chapter" ? "Before the first chapter." : "No chapter covers this week."}</b>
+              </div>
+            )
+          }
+        </div>
+        <div>
+          <h2 style="margin-bottom:12px">Where the day's numbers came from</h2>
+          {
+            sources.length ? (
+              <div class="rows">
+                {sources.map((s) => (
+                  <a href={href(pathOf("source", s.id))}>
+                    <span>{s.label}</span>
+                    <span class="mono muted">
+                      {s.status}
+                      {s.latest && dayInWords(s.latest) ? ` · last ${words(s.latest)}` : ""}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p class="muted">The platform names no source for these readings in this snapshot.</p>
+            )
+          }
+          <p class="muted" style="font-size:13px;margin-top:10px">Each source's state as of the snapshot, not of this day.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section hair" data-day-part="rail">
+      <div class="wrap">
+        <Connected type="day" id={d.id} heading="Connected to this day" />
+      </div>
+    </section>
+  </div>
+</Base>
+
+<script>
+  import "../../../islands/day.js";
+</script>

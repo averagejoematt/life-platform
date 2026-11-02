@@ -17,6 +17,7 @@ from common import (
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
+from common.pacific_time import shift_day_key  # #5584: the window's sub-bounds
 from health import (
     eating_window as eating_window_rule,  # #5099: THE eating window (charter nutrition.eating_window, via public_view)
     nutrient_intake,  # #4244: THE food + supplements micronutrient join (shared with the weekly review)
@@ -280,18 +281,30 @@ def _trend_row(i: dict) -> dict:
     }
 
 
-def nutrition_overview(*, _g) -> dict:
+def _overview_bounds(_g, window: tuple[str, str] | None) -> tuple[str, str, str, str]:
+    """``(today, d30, d7, d60)`` for nutrition_overview — the trailing windows ending today by default.
+
+    #5584: a ``window`` (``web.day_window``'s clamped inclusive ``(from, to)``) makes ``to`` the
+    as-of day and ``from`` the main window's start; the 7-day "recent" window is its last 7 days
+    and the 60-day body-comp lookback ends at ``to`` too, both still floored at genesis.
+    """
+    if window is None:
+        _experiment_date = _g["_experiment_date"]
+        today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
+        return today, _experiment_date(30), _experiment_date(7), _experiment_date(60)
+    start, end = window
+    return end, start, max(start, shift_day_key(end, -6)), max(_g["EXPERIMENT_START"], shift_day_key(end, -59))
+
+
+def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     """
     GET /api/nutrition_overview
     Returns: 30-day macro averages, protein adherence, eating window, deficit status.
-    Source: MacroFactor DynamoDB partition.
+    Source: MacroFactor DynamoDB partition. #5584: ``window`` → over that range, as of its last day.
     Cache: 3600s.
     """
     _query_source = _g["_query_source"]
-    _experiment_date = _g["_experiment_date"]
-    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
-    d30 = _experiment_date(30)
-    d7 = _experiment_date(7)
+    today, d30, d7, d60 = _overview_bounds(_g, window)
 
     # One protein story on every door (#4540): the plan root states ONE protein line — a
     # floor — and this door, daily_metrics_compute (canonical_facts' protein_g_target /
@@ -764,7 +777,7 @@ def nutrition_overview(*, _g) -> dict:
     # ── Lean mass (P1.4): from Withings body-comp → grounds the protein target as a
     # g/kg-lean muscle-retention floor in §2 (Helms: ~2.3 g/kg FFM to retain muscle on a cut).
     lean_mass = None
-    wt_items = _query_source("withings", _experiment_date(60), today)
+    wt_items = _query_source("withings", d60, today)
     lean_lb = None
     for w in sorted(wt_items, key=lambda x: x.get("sk", ""), reverse=True):
         lean_lb = _num(w.get("fat_free_mass_lbs"))
@@ -796,7 +809,7 @@ def nutrition_overview(*, _g) -> dict:
     # bet + band are stated now; the verdict resolves over weeks (pending until the date).
     projection = None
     implied = loss_rate.get("implied_rate_lb_wk")
-    if cur_weight is not None and implied and implied > 0:
+    if window is None and cur_weight is not None and implied and implied > 0:  # #5584: a forward bet is from TODAY only
         # Next 5-lb mark strictly below the current weight. #2221: this was
         # `int((cur_weight - 0.1) // 5) * 5` — the 0.1 lb epsilon existed to stop a weight
         # sitting exactly ON a mark from targeting itself, but it also created a 0.1 lb

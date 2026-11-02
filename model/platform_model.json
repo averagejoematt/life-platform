@@ -5879,14 +5879,14 @@
       "lambda": null,
       "module": "lambdas/web/site_api_training.py",
       "partition": "hevy",
-      "via": "pk"
+      "via": "seam"
     },
     {
-      "direction": "read",
+      "direction": "unknown",
       "lambda": null,
       "module": "lambdas/web/site_api_training.py",
       "partition": "hevy",
-      "via": "seam"
+      "via": "pk"
     },
     {
       "direction": "read",
@@ -8316,9 +8316,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 392,
+        "sites_dynamic": 391,
         "sites_resolved": 1001,
-        "sites_total": 1393
+        "sites_total": 1392
       },
       "schedule_resolution": {
         "dynamic": 0,

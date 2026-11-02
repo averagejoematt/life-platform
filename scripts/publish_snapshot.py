@@ -95,6 +95,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     word_dates,
     write_snapshot,
 )
+from publish_snapshot_day import DAY_ENDPOINTS, live_days  # noqa: E402 — the Day objects (#5585), out of the ceiling too
 from publish_snapshot_journey import (
     live_journey,
 )  # noqa: E402 — the Journey's data file (#5579), kept out of this module's 1000-line ceiling
@@ -151,6 +152,7 @@ LIVE_ENDPOINTS = {
     "forecast": "/api/forecast",  # the platform's short forecasts and their coverage (#5579)
     "physical_overview": "/api/physical_overview",  # the Journey's body: the DEXA baseline, blood pressure, tape (#5583)
     "phenoage": "/api/phenoage",  # the Journey's PhenoAge (Option A: never an age beside it, #5583)
+    **DAY_ENDPOINTS,  # /api/pulse_history + the three window-bound endpoints, read for their dates (#5585)
 }
 OPTIONAL_ENDPOINTS = (
     "blog",
@@ -165,6 +167,7 @@ OPTIONAL_ENDPOINTS = (
     "forecast",
     "physical_overview",
     "phenoage",
+    *DAY_ENDPOINTS,
 )
 
 
@@ -1005,6 +1008,7 @@ def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
     _live_methods(ctx)
     _live_metrics(ctx)  # after sources and methods: its edges point at them
     live_journey(ctx, _baseline_change_markers)  # after the metrics: it derives the rungs from the weight series (#5579)
+    live_days(ctx)  # after the chapters, the week states and the metrics: a day's edges point at them (#5585)
     _live_experiments(ctx)
     _live_essays(ctx)
     _live_edition(ctx)

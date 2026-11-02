@@ -63,6 +63,7 @@ import boto3  # noqa: F401 — `vitals.boto3` is the stub point test_labs_privac
 
 # ── Split logic modules — the handler bodies live here; delegated to at call time. ──
 from web import (
+    day_window,
     site_api_biomarkers as _bio,
     site_api_body as _body,
     site_api_character as _character,
@@ -189,9 +190,12 @@ def handle_character_stats() -> dict:
     return _character.character_stats(_g=globals())
 
 
-def handle_sleep_detail() -> dict:
-    """GET /api/sleep_detail — delegated to web.site_api_sleep."""
-    return _sleep.sleep_detail(_g=globals())
+def handle_sleep_detail(qs: dict | None = None) -> dict:
+    """GET /api/sleep_detail[?date= | ?from=&to=] — delegated to web.site_api_sleep (window: #5584)."""
+    window, err = day_window.parse(qs, floor=EXPERIMENT_START)
+    if err:
+        return err
+    return day_window.attach(_sleep.sleep_detail(_g=globals(), window=window), window)
 
 
 def handle_sleep_correlations() -> dict:

@@ -107,6 +107,7 @@ OBJECT_TYPES = (
     "source",
     "method",
     "edition",
+    "day",
 )
 COLLECTION_OF = {
     "chapter": "chapters",
@@ -121,6 +122,7 @@ COLLECTION_OF = {
     "source": "sources",
     "method": "methods",
     "edition": "editions",
+    "day": "days",
 }
 VISIBILITIES = ("public", "held", "private")
 
@@ -261,6 +263,20 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "start_date": ("day", True),
         "order": ("list[str]", False),
         "blocks": ("obj", False),
+    },
+    # One day since the start (#5585): the readings as served, their trailing normals computed at export
+    # (scripts/publish_snapshot_day.py, which also checks the nested shapes), the week's chapter, the neighbours.
+    "day": {
+        "date": ("day", False),
+        "day_number": ("int", False),
+        "weekday": ("str", False),
+        "readings": ("obj", False),
+        "normals": ("obj", False),
+        "chapter_id": ("id", True),
+        "prev_id": ("id", True),
+        "next_id": ("id", True),
+        "has_weighin": ("bool", False),
+        "in_window": ("obj", False),
     },
 }
 QUALITY_FLAGS = ("logging_gap", "low_power", "proxy_metric")
