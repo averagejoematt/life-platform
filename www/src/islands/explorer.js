@@ -51,9 +51,11 @@ export function mount(root = document.querySelector("[data-explorer]")) {
   async function draw() {
     const a = await seriesFor(metric);
     const days = lastDays(a.days, state.range);
+    const width = mobile() ? Math.max(280, Math.round(chartA.clientWidth || 350)) : undefined;
     chartA.innerHTML = svgChart({
       series: [{ days, color: COBALT, name: labels[metric] || metric }],
       mobile: mobile(),
+      width,
       smooth: state.smooth,
       markers: a.markers || [],
       labelDay,
@@ -80,6 +82,7 @@ export function mount(root = document.querySelector("[data-explorer]")) {
     chartB.innerHTML = svgChart({
       series: [{ days: bDays, color: OCHRE, name: labels[state.b] || state.b }],
       mobile: mobile(),
+      width,
       smooth: state.smooth,
       height: 160,
       labelDay,
