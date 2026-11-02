@@ -10,8 +10,27 @@
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
-import { READING_TILES, deltaLine, dekSentence, sparkline, stripWindow, tileValue } from "../../../lib/day.js";
-import { dayInWords } from "../../../lib/format.js";
+import {
+  READING_TILES,
+  deltaLine,
+  dekSentence,
+  engineLine,
+  engineRows,
+  fellAsleep,
+  foodRows,
+  nearestGraded,
+  recoveryRows,
+  sessionLine,
+  sessionRows,
+  sessionTitle,
+  sparkline,
+  stageRows,
+  stagesLabel,
+  stripWindow,
+  tileValue,
+  unservedText,
+} from "../../../lib/day.js";
+import { dayInWords, num } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -67,6 +86,27 @@ for (const x of days) {
   if (!weeks.length || weeks[weeks.length - 1].n !== n) weeks.push({ n, days: [] });
   weeks[weeks.length - 1].days.push(x);
 }
+// M4 (#5586): the day's layers 2–3, every figure the exporter's. `when` names the day in every unavailable sentence.
+const when = short(d.date);
+const session = d.workout ? { title: sessionTitle(d.workout.title), line: sessionLine(d.workout), rows: sessionRows(d.workout) } : null;
+const night = d.night;
+const bed = night ? night.by_device.eightsleep : null;
+const strap = night ? night.by_device.whoop : null;
+const asleep = night ? fellAsleep(night.sleep_start) : null;
+const devices = [bed && bed.hours != null ? `${num(bed.hours, 1)} h by the bed` : null, strap && strap.hours != null ? `${num(strap.hours, 1)} h by the strap` : null].filter(
+  Boolean,
+) as string[];
+const stages = night ? stageRows(night) : [];
+const recovery = recoveryRows(d);
+const food = d.food;
+const engine = d.engine ? { line: engineLine(d.engine), rows: engineRows(d.engine) } : null;
+const after = next ? next.coach_lines : [];
+const nearest = d.calls_settled.length ? null : nearestGraded(days, i);
+const predHref = (id: string) => (all.get("prediction", id) ? href(pathOf("prediction", id)) : null);
+const coachHref = (id: string) => (all.get("coach", id) ? href(pathOf("coach", id)) : null);
+const foodTile = food
+  ? { value: food.calories != null ? num(food.calories, 0) : "—", unit: "kcal", d: food.logging_gap ? "a logging gap — entries not made; not counted as eaten" : `${food.protein_g != null ? `${num(food.protein_g, 0)} g protein` : "protein not logged"}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}` }
+  : { value: "—", unit: "", d: d.food_state === "not logged" ? "not logged — missing, not zero" : "not readable for this day" };
 const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_through, sample: d.sample, source: d.source, absent_text: d.absent_text };
 ---
 
@@ -175,19 +215,321 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
           }
           <div class="tile">
             <span class="label">{protein ? <a href={href(pathOf("metric", protein.id))}>Food · MacroFactor</a> : "Food · MacroFactor"}</span>
-            <span class="v num muted">—</span>
-            <span class="d mono">Detail arrives in M4: the day's food log, as logged, with any logging gap stated. No figure is shown until then.</span>
+            <span class={`v num${foodTile.value === "—" ? " muted" : ""}`}>
+              {foodTile.value}
+              {foodTile.unit && foodTile.value !== "—" && <small> {foodTile.unit}</small>}
+            </span>
+            <span class="d mono">{foodTile.d}</span>
           </div>
           <div class="tile">
             <span class="label">The engine's score</span>
-            <span class="v num muted">—</span>
-            <span class="d mono">Detail arrives in M4: the morning's level and its seven areas. No figure is shown until then.</span>
+            <span class={`v num${engine ? "" : " muted"}`}>
+              {engine ? `Level ${num(d.engine.level, 0)}` : "—"}
+              {engine && d.engine.composite != null && <small> · {num(d.engine.composite, 1)}</small>}
+            </span>
+            <span class="d mono">
+              {
+                engine
+                  ? d.engine.delta != null
+                    ? `${d.engine.delta >= 0 ? "+" : "−"}${num(Math.abs(d.engine.delta), 1)} since the morning before`
+                    : "no change served"
+                  : "not computed for this day"
+              }
+            </span>
           </div>
         </div>
         <p class="muted" style="font-size:13px;margin-top:10px;max-width:760px">
           Each small line is the fourteen days ending on this one; the dashed rule is the 7-day mean. The means and their counts were computed by the platform when it published
           the day. Point at a line, tap it, or focus it and use the arrow keys to read a day; Escape clears it.
         </p>
+      </div>
+    </section>
+
+    <section class="section hair" data-day-part="session-night">
+      <div class="wrap grid cols2 daylayer" style="gap:40px 56px;align-items:start">
+        <div>
+          {
+            session ? (
+              <>
+                <h2 data-day-session>The session · {session.title}</h2>
+                <p class="small">{session.line}.</p>
+                <div class="scroll" tabindex="0" role="region" aria-label={`The session's sets, ${when}`}>
+                  <table class="sets-table">
+                    <caption class="srOnly">
+                      {when}: each exercise's working sets as reps × kilograms at RPE, and its top set
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Exercise</th>
+                        <th scope="col">Working sets · reps × kg @RPE</th>
+                        <th scope="col" class="r">Top set</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {session.rows.map((r) => (
+                        <tr class={r.heavy ? "top" : undefined}>
+                          <th scope="row">
+                            {r.name}
+                            {r.warmups > 0 && <span class="small"> · {r.warmups} warm-up{r.warmups > 1 ? "s" : ""}</span>}
+                          </th>
+                          <td class="sets">
+                            {r.noLoad ? (
+                              <span class="muted">
+                                {r.blocks} block{r.blocks > 1 ? "s" : ""} · no load logged
+                              </span>
+                            ) : (
+                              r.sets.map((x, k) => (k > 0 ? <> · <span class="set">{x}</span></> : <span class="set">{x}</span>))
+                            )}
+                          </td>
+                          <td class="r mono">{r.top}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p class="small">
+                  Warm-up sets are counted in the session but not in its volume. A top set of 100 kg or more is set in bold. Source: Hevy, as logged.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 data-day-session>The session</h2>
+                <div class="unavail">
+                  <b>{d.workout_state === "none logged" ? "No session logged." : "Not readable for this day."}</b> {unservedText("workout", d.workout_state, when)}
+                </div>
+              </>
+            )
+          }
+        </div>
+        <div>
+          <h2>Last night, and the morning after</h2>
+          {
+            night ? (
+              <>
+                <p class="small">
+                  {bed && bed.night_of ? `Night of ${short(bed.night_of)}: ` : ""}
+                  {devices.map((x, k) => (k > 0 ? <>, <b>{x}</b></> : <b>{x}</b>))}
+                  {devices.length === 2 ? " — two devices, one night, the gap shown rather than averaged." : "."}
+                  {night.efficiency != null && ` Efficiency ${num(night.efficiency, 1)} percent.`}
+                  {night.score != null && ` Sleep score ${num(night.score, 0)}.`}
+                </p>
+                {night.deep_pct != null && night.rem_pct != null && night.light_pct != null && (
+                  <>
+                    <div class="stages" role="img" aria-label={stagesLabel(night)}>
+                      <i class="deep" style={`width:${night.deep_pct}%`} />
+                      <i class="rem" style={`width:${night.rem_pct}%`} />
+                      <i class="light" style={`width:${night.light_pct}%`} />
+                    </div>
+                    <div class="legend" aria-hidden="true">
+                      <span class="deep">deep</span>
+                      <span class="rem">REM</span>
+                      <span class="light">light</span>
+                    </div>
+                  </>
+                )}
+                <div class="rows" style="margin-top:12px">
+                  {stages.map((r) => (
+                    <span>
+                      <span>{r.label}</span>
+                      <span class="val">{r.value}</span>
+                    </span>
+                  ))}
+                  <span>
+                    <span>Fell asleep</span>
+                    <span class="val">{asleep || "not served"}</span>
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div class="unavail">
+                <b>The night's stages are not readable for this day.</b> {unservedText("night", d.night_state, when)}
+              </div>
+            )
+          }
+          <p class="label" style="margin-top:18px">Recovery, decomposed</p>
+          {
+            recovery.map((r) => (
+              <div class="bar-row">
+                <span class="k">{r.label}</span>
+                <span class="t" aria-hidden="true">
+                  {r.v != null && <i style={`width:${r.width.toFixed(1)}%`} />}
+                </span>
+                <span class="v mono">{r.value}</span>
+                <span class="note">{r.text}</span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section hair" data-day-part="food-engine">
+      <div class="wrap grid cols2 daylayer" style="gap:40px 56px;align-items:start">
+        <div>
+          <h2>What he ate, as logged</h2>
+          {
+            food ? (
+              <>
+                <div class="rows">
+                  {foodRows(food).map(([k, v]) => (
+                    <span>
+                      <span>{k}</span>
+                      <span class="val">{v}</span>
+                    </span>
+                  ))}
+                </div>
+                {food.logging_gap ? (
+                  <div class="callout">
+                    <b>A logging gap, stated as one.</b> The platform marks {when} as a day with no diary entries: the figures above are what the
+                    record holds{d.workout ? `, beside a ${num(d.workout.duration_min, 0)}-minute session` : ""}, not what he ate. It treats such a day as
+                    missing, not as eaten — no deficit is published from it, and the coaches' grader reads it the same way.
+                  </div>
+                ) : (
+                  <p class="small">
+                    {food.protein_g != null && food.floor_g != null
+                      ? food.protein_g >= food.floor_g
+                        ? "At or above the protein floor. "
+                        : `${num(food.floor_g - food.protein_g, 0)} g under the protein floor. `
+                      : ""}
+                    The maintenance figure is the platform's estimate over the served window; it publishes a deficit only when one passes its own
+                    plausibility check. Source: MacroFactor, as logged.
+                  </p>
+                )}
+              </>
+            ) : (
+              <div class="unavail">
+                <b>{d.food_state === "not logged" ? "Not logged." : "Not readable for this day."}</b> {unservedText("food", d.food_state, when)}
+              </div>
+            )
+          }
+        </div>
+        <div>
+          <h2>The engine's score that morning</h2>
+          {
+            engine ? (
+              <>
+                <p class="small">{engine.line}.</p>
+                {engine.rows.map((r) => (
+                  <div class="bar-row">
+                    <span class="k">{r.label}</span>
+                    <span class="t" aria-hidden="true">
+                      {!r.absent && <i class={r.low ? "low" : undefined} style={`width:${r.width.toFixed(1)}%`} />}
+                    </span>
+                    <span class={`v mono${r.absent ? " muted" : ""}`}>{r.value}</span>
+                  </div>
+                ))}
+                <p class="small" style="margin-top:10px">
+                  Seven areas scored nightly from the record; an area with no instrument is shown as absent, never as a middling number.
+                </p>
+              </>
+            ) : (
+              <div class="unavail">
+                <b>Not computed for this day.</b> The character engine served no score dated {when}; no other morning's score stands in for it.
+              </div>
+            )
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section hair" data-day-part="coaches-calls">
+      <div class="wrap grid cols2 daylayer" style="gap:40px 56px;align-items:start">
+        <div>
+          <h2>The coaches, that day</h2>
+          {
+            d.coach_lines.length ? (
+              d.coach_lines.map((l) => (
+                <figure class="voice">
+                  <figcaption class="who">
+                    {coachHref(l.coach_id) ? <a href={coachHref(l.coach_id)}>{l.coach}</a> : l.coach} · {l.move_label || l.move}
+                  </figcaption>
+                  <blockquote>{l.text}</blockquote>
+                </figure>
+              ))
+            ) : (
+              <div class="unavail">
+                <b>Nothing quotable that day.</b> The coaches' lines are published only when they pass the platform's quotability and privacy filter; {when} had
+                none.
+              </div>
+            )
+          }
+          {
+            next && after.length > 0 && (
+              <>
+                <p class="label" style="margin-top:16px">The day after · {short(next.date)}</p>
+                {after.map((l) => (
+                  <figure class="voice after">
+                    <figcaption class="who">
+                      {l.coach} · {l.move_label || l.move}
+                    </figcaption>
+                    <blockquote>{l.text}</blockquote>
+                  </figure>
+                ))}
+              </>
+            )
+          }
+        </div>
+        <div>
+          <h2>Calls graded that day</h2>
+          {
+            d.calls_settled.length ? (
+              <div class="chips">
+                {d.calls_settled.map((c) => (
+                  <a class="callchip solid" href={predHref(c.prediction_id)}>
+                    <span class="k">{c.verdict}</span>
+                    <span>
+                      {c.coach_name}: {c.claim_short}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <>
+                <p class="small">
+                  No call was graded on {when}.{nearest ? " The nearest before it:" : " None was graded before it either."}
+                </p>
+                {nearest && (
+                  <div class="chips">
+                    {nearest.calls_settled.slice(0, 2).map((c: any) => (
+                      <a class="callchip solid" href={predHref(c.prediction_id)}>
+                        <span class="k">
+                          {c.verdict} · {short(nearest.date)}
+                        </span>
+                        <span>
+                          {c.coach_name}: {c.claim_short}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </>
+            )
+          }
+          <p class="label" style="margin-top:18px">Open calls as of this day, and when they settle</p>
+          {
+            d.calls_open.length ? (
+              <>
+                <div class="chips">
+                  {d.calls_open.map((c) => (
+                    <a class="callchip" href={predHref(c.prediction_id)}>
+                      <span class="k">settles {words(c.due_date)}</span>
+                      <span>
+                        {c.coach_name}: {c.text}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+                {d.calls_open_count > d.calls_open.length && (
+                  <p class="small" style="margin-top:8px">
+                    The {d.calls_open.length} settling soonest of {d.calls_open_count} open; <a href={href("/system/ledger/")}>the ledger</a> has every one.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p class="small">No call was open on {when}.</p>
+            )
+          }
+        </div>
       </div>
     </section>
 

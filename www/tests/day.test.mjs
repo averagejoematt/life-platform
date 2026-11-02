@@ -55,3 +55,86 @@ test("the sparkline carries readable points, marks the day, dashes the mean and 
   assert.ok(!/\d{4}-\d{2}-\d{2}/.test(svg.replace(/data-points="[^"]*"/, "")), "no ISO date outside the data attribute");
   assert.ok(!sparkline({ rows: rows.slice(0, 1), tile: tile("weight_lbs"), markDate: "2026-10-27", mean: null }).includes("data-points"));
 });
+
+// ── M4 (#5586): the day's layers 2–3 ──
+import { engineLine, engineRows, fellAsleep, foodRows, nearestGraded, recoveryRows, sessionLine, sessionRows, sessionTitle, stageRows, unservedText } from "../src/lib/day.js";
+
+const W1029 = {
+  title: "Foundation - Upper - 13 - 41",
+  duration_min: 143,
+  volume_kg: 7932.2,
+  exercises: [
+    {
+      name: "Bench Press (Barbell)",
+      sets: [
+        { type: "warmup", reps: 8, weight_kg: 52.2, rpe: null },
+        { type: "normal", reps: 4, weight_kg: 102.1, rpe: 9 },
+        { type: "normal", reps: 5, weight_kg: 93, rpe: 8 },
+      ],
+    },
+    { name: "Suitcase Carry", sets: [{ type: "normal", reps: null, weight_kg: 20, rpe: null }] },
+    { name: "Treadmill", sets: [{ type: "normal", reps: null, weight_kg: null, rpe: null }] },
+  ],
+};
+
+test("the session: title without counters, working sets, top set, warm-ups, no-load blocks", () => {
+  assert.equal(sessionTitle(W1029.title), "Foundation · Upper");
+  assert.equal(sessionLine({ ...W1029, exercises: Array(9).fill(W1029.exercises[0]) }), "143 minutes · 9 exercises · 7,932 kg moved (17,487 lb)");
+  const [bench, carry, tread] = sessionRows(W1029);
+  assert.deepEqual(bench.sets, ["4 × 102.1 kg @9", "5 × 93 kg @8"]);
+  assert.equal(bench.top, "102.1 kg × 4");
+  assert.equal(bench.warmups, 1);
+  assert.equal(bench.heavy, true);
+  assert.deepEqual(carry.sets, ["20 kg"]);
+  assert.equal(carry.heavy, false);
+  assert.equal(tread.noLoad, true);
+  assert.equal(tread.top, "—");
+});
+
+test("the night: shares and both devices' hours; fell asleep in Pacific", () => {
+  const night = { deep_pct: 14.4, rem_pct: 28.7, light_pct: 56.9, by_device: { eightsleep: { deep_hours: 1.1 }, whoop: null } };
+  assert.equal(stageRows(night)[0].value, "14.4% of the night · 1.1 h bed · — strap");
+  assert.equal(fellAsleep("2026-10-29T06:56:44.190Z"), "23:56 Pacific");
+  assert.equal(fellAsleep(null), null);
+});
+
+test("recovery decomposed reads the exporter's normals; a missing reading is a dash, never zero", () => {
+  const d = {
+    sleep_target_h: 7.5,
+    readings: { recovery_pct: 74, hrv_ms: 59.8, rhr_bpm: null, sleep_hours: 7.5 },
+    normals: { recovery_pct: { mean7: 70.1 }, hrv_ms: { mean30: 57.7, n30: 30 }, rhr_bpm: { mean7: 52 }, sleep_hours: {} },
+  };
+  const [rec, hrv, rhr, sleep] = recoveryRows(d);
+  assert.equal(rec.text, "74 of 100 · 7-day mean 70");
+  assert.equal(hrv.text, "59.8 ms · 30-day mean 57.7 (n=30)");
+  assert.equal(rhr.value, "—");
+  assert.equal(rhr.width, 0);
+  assert.equal(sleep.text, "7.5 h of a 7.5 h target");
+});
+
+test("food rows as logged; an unlogged macro says so", () => {
+  const rows = foodRows({ calories: 80, protein_g: 15, carbs_g: 4, fat_g: null, floor_g: 170, tdee: 2619, logging_gap: true });
+  assert.deepEqual(rows[0], ["Calories logged", "80 kcal · maintenance about 2,619"]);
+  assert.deepEqual(rows[1], ["Protein", "15 g · floor 170 g"]);
+  assert.deepEqual(rows[3], ["Fat", "not logged"]);
+});
+
+test("the engine: absent is 'absent', never 50", () => {
+  const e = { level: 15, composite: 43.1, delta: 0.6, pillars: [{ name: "relationships", score: null, not_instrumented: true }, { name: "mind", score: 8.3, not_instrumented: false }] };
+  assert.equal(engineLine(e), "Level 15 · composite 43.1 of 100 · up 0.6 since the morning before");
+  const [rel, mind] = engineRows(e);
+  assert.equal(rel.value, "absent");
+  assert.equal(rel.width, 0);
+  assert.equal(mind.low, true);
+});
+
+test("the nearest graded day before, and every unavailable state has its own sentence", () => {
+  const days = [{ calls_settled: [{}] }, { calls_settled: [] }, { calls_settled: [] }];
+  assert.equal(nearestGraded(days, 2), days[0]);
+  assert.equal(nearestGraded(days, 0), null);
+  assert.match(unservedText("food", "not logged", "Saturday 31 October"), /missing, not as eaten/);
+  assert.match(unservedText("workout", "none logged", "Monday 26 October"), /^No gym session was logged on Monday 26 October\.$/);
+  for (const [b, s] of [["workout", "older than the served window"], ["night", "none recorded"], ["night", "not served"], ["food", "older than the served window"]]) {
+    assert.ok(!unservedText(b, s, "X").startsWith("Not readable"), `${b}/${s}`);
+  }
+});

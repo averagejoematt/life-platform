@@ -7,7 +7,7 @@ import Connected from "../../components/Connected.astro";
 import Provenance from "../../components/Provenance.astro";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll } from "../../lib/snapshot.js";
-import { href } from "../../lib/url.js";
+import { href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -20,6 +20,16 @@ const ordered = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? -1 : a
 const i = ordered.findIndex((x) => x.id === c.id);
 const prev = i > 0 ? ordered[i - 1] : null;
 const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
+const weekDays = all.byType.day.filter((d) => d.chapter_id === c.id).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+const dayRow = (d: any) => {
+  const r = d.readings || {};
+  const bits = [
+    r.weight_lbs != null ? `${num(r.weight_lbs, 1)} lb` : "no weigh-in",
+    r.recovery_pct != null ? `recovery ${num(r.recovery_pct)}%` : null,
+    r.sleep_hours != null ? `sleep ${num(r.sleep_hours, 1)} h` : null,
+  ].filter(Boolean);
+  return { href: href(pathOf("day", d.id)), words: (dayInWords(d.date, { weekday: true }) || "").replace(/ \d{4}$/, ""), text: bits.join(" · ") };
+};
 const stateCopy: Record<string, string> = {
   held: "Held.",
   skipped: "Skipped.",
@@ -106,6 +116,26 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
                   Read it there
                 </a>
               )}
+            </div>
+          )
+        }
+        {
+          weekDays.length > 0 && (
+            <div style="margin-top:48px" id="days">
+              <p class="label">The week, day by day</p>
+              <nav class="rows" aria-label="The week, day by day" style="margin-top:8px">
+                {weekDays.map((d) => {
+                  const row = dayRow(d);
+                  return (
+                    <a href={row.href}>
+                      <b>{row.words}</b>
+                      <span class="mono muted" style="font-size:13px">
+                        {row.text}
+                      </span>
+                    </a>
+                  );
+                })}
+              </nav>
             </div>
           )
         }

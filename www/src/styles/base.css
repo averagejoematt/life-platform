@@ -1338,3 +1338,213 @@ details.more summary {
     font-size: 26px;
   }
 }
+/* the Day's layers 2–3 (#5586): the session, the night, the food, the engine, the coaches, the calls */
+.daylayer h2 {
+  margin-bottom: 10px;
+}
+.daylayer .small {
+  font-size: var(--fs-small);
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+.daylayer .small b {
+  color: var(--ink);
+}
+.unavail {
+  border-top: 1px solid var(--ink);
+  padding: 14px 0;
+  color: var(--muted);
+  font-size: var(--fs-ui);
+  line-height: 1.5;
+}
+.unavail b {
+  color: var(--ink);
+}
+.sets-table {
+  margin-top: 10px;
+}
+.sets-table tbody th {
+  font-family: inherit;
+  font-size: var(--fs-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  font-weight: 500;
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+.sets-table td {
+  padding: 10px 12px 10px 0;
+}
+.sets-table td.sets {
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+  color: var(--inkrule);
+}
+.sets-table td.r {
+  white-space: nowrap;
+  padding-right: 0;
+}
+.sets-table tr.top th,
+.sets-table tr.top td.r {
+  font-weight: 700;
+}
+.stages {
+  display: flex;
+  height: 22px;
+  border: 1px solid var(--ink);
+  margin: 12px 0 8px;
+}
+.stages i {
+  display: block;
+  height: 100%;
+}
+.stages .deep,
+.legend .deep::before {
+  background: var(--ink);
+}
+.stages .rem,
+.legend .rem::before {
+  background: var(--faint);
+}
+.stages .light,
+.legend .light::before {
+  background: var(--rule);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+.legend span::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: 112px 1fr 56px;
+  gap: 4px 12px;
+  align-items: center;
+  font-size: var(--fs-ui);
+  margin-top: 8px;
+}
+.bar-row .k {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.bar-row .t {
+  height: 12px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  position: relative;
+}
+.bar-row .t i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--ink);
+}
+.bar-row .t i.low {
+  background: var(--verm);
+}
+.bar-row .v {
+  text-align: right;
+}
+.bar-row .note {
+  grid-column: 1 / -1;
+  font-size: var(--fs-small);
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.callout {
+  border: 1px dashed var(--muted);
+  padding: 12px 14px;
+  font-size: var(--fs-ui);
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.callout b {
+  color: var(--ink);
+}
+.voice {
+  border-left: 3px solid var(--ink);
+  padding: 4px 0 4px 16px;
+  margin: 14px 0;
+}
+.voice.after {
+  border-left-color: var(--rule);
+}
+.voice .who {
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.voice .who a {
+  color: inherit;
+}
+.voice blockquote {
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.45;
+  margin: 6px 0 0;
+  max-width: 62ch;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.callchip {
+  border: 1px dashed var(--ink);
+  padding: 10px 12px;
+  min-height: var(--tap);
+  font-size: var(--fs-small);
+  display: inline-flex;
+  gap: 4px 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  text-decoration: none;
+  color: var(--ink);
+  max-width: 100%;
+}
+.callchip.solid {
+  border-style: solid;
+}
+.callchip .k {
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .bar-row {
+    grid-template-columns: 96px 1fr 48px;
+  }
+  .voice blockquote {
+    font-size: 17px;
+  }
+}
+.daylayer .rows > * > .val {
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  text-align: right;
+  max-width: 72%;
+}
+.sets-table td.sets .set {
+  white-space: nowrap;
+}

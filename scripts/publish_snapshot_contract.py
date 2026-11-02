@@ -277,6 +277,19 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "next_id": ("id", True),
         "has_weighin": ("bool", False),
         "in_window": ("obj", False),
+        # M4 (#5586): the day's layers 2–3; nested shapes checked strictly by publish_snapshot_day.check_layers.
+        "sleep_target_h": ("num", False),
+        "workout": ("obj", True),
+        "workout_state": ("enum:served|none logged|older than the served window|not served", False),
+        "night": ("obj", True),
+        "night_state": ("enum:served|none recorded|older than the served window|not served", False),
+        "food": ("obj", True),
+        "food_state": ("enum:served|not logged|older than the served window|not served", False),
+        "engine": ("obj", True),
+        "coach_lines": ("list[obj]", False),
+        "calls_settled": ("list[obj]", False),
+        "calls_open": ("list[obj]", False),
+        "calls_open_count": ("int", False),
     },
 }
 QUALITY_FLAGS = ("logging_gap", "low_power", "proxy_metric")
