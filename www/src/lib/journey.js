@@ -59,7 +59,31 @@ export function journeyChart(o) {
   const Y = (v) => pad.t + (1 - (v - lo) / (hi - lo || 1)) * (H - pad.t - pad.b);
   const txt = (x, y, s, anchor = "start", fill = "#5C5C58") =>
     `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" font-family="IBM Plex Mono,monospace" font-size="${fs}" fill="${fill}">${esc(s)}</text>`;
+  // Annotation labels never overlap each other or the axis labels, and never leave the frame (acceptance item 5,
+  // 2 November: at 390 px the baseline-change label sat on the 320 milestone label and the projected date ran off the
+  // right edge). IBM Plex Mono advances 0.6 em per glyph, so a label's box is known before it is drawn; a label that
+  // would collide moves to its next slot, never shrinks. tests/web_preview_gate.py measures the rendered result.
+  const boxes = [];
+  const boxOf = (x, y, s, anchor) => {
+    const w = s.length * fs * 0.6;
+    const left = anchor === "end" ? x - w : anchor === "middle" ? x - w / 2 : x;
+    return { l: left, r: left + w, t: y - fs * 1.0, b: y + fs * 0.3 }; // the rendered line box, not just the ink
+  };
+  const hits = (b) => boxes.some((o) => b.l < o.r + 2 && b.r > o.l - 2 && b.t < o.b && b.b > o.t);
   let g = "";
+  let lbl = "";
+  const label = (x, slots, s, anchor = "start", fill = "#5C5C58") => {
+    const w = s.length * fs * 0.6;
+    if (anchor === "middle" && x + w / 2 > W - pad.r) [x, anchor] = [W - pad.r, "end"];
+    else if (anchor === "middle" && x - w / 2 < pad.l) [x, anchor] = [pad.l, "start"];
+    else if (anchor === "start" && x + w > W - pad.r) [x, anchor] = [W - pad.r, "end"];
+    const ys = Array.isArray(slots) ? slots : [slots];
+    const y = ys.find((yy) => !hits(boxOf(x, yy, s, anchor))) ?? ys[ys.length - 1];
+    boxes.push(boxOf(x, y, s, anchor));
+    // drawn last, over the lines and dots, on a paper halo — a hairline may pass behind a label, never through it
+    lbl += txt(x, y, s, anchor, fill).replace("<text ", '<text stroke="#F4F4F0" stroke-width="4" stroke-linejoin="round" paint-order="stroke" ');
+    return "";
+  };
   // y ticks
   const ticks = 5;
   for (let i = 0; i <= ticks; i++) {
@@ -74,33 +98,40 @@ export function journeyChart(o) {
   while (cur.getTime() <= x1) {
     const iso = cur.toISOString().slice(0, 10);
     g += txt(X(iso), H - 9, MONTHS[cur.getUTCMonth()], "middle");
+    boxes.push(boxOf(X(iso), H - 9, MONTHS[cur.getUTCMonth()], "middle"));
     cur.setUTCMonth(cur.getUTCMonth() + 1);
   }
   if (distance && J) {
     g += `<line x1="${pad.l}" y1="${Y(J.start_weight_lbs).toFixed(1)}" x2="${W - pad.r}" y2="${Y(J.start_weight_lbs).toFixed(1)}" stroke="#121212" stroke-width="1"/>`;
-    g += txt(W - pad.r, Y(J.start_weight_lbs) - 5, `start ${J.start_weight_lbs}`, "end", "#121212");
+    g += label(W - pad.r, Y(J.start_weight_lbs) - 5, `start ${J.start_weight_lbs}`, "end", "#121212");
     g += `<line x1="${pad.l}" y1="${Y(J.goal_weight_lbs).toFixed(1)}" x2="${W - pad.r}" y2="${Y(J.goal_weight_lbs).toFixed(1)}" stroke="#121212" stroke-width="1" stroke-dasharray="5 5"/>`;
-    g += txt(W - pad.r, Y(J.goal_weight_lbs) - 5, `goal ${Math.round(J.goal_weight_lbs)}`, "end", "#121212");
+    g += label(W - pad.r, Y(J.goal_weight_lbs) - 5, `goal ${Math.round(J.goal_weight_lbs)}`, "end", "#121212");
   }
   if (o.show.rungs) {
+    // On a phone the readings fill the left of the frame, so a rung's label stands just right of the newest reading
+    // (above the wedge, where nothing is drawn) with its dotted line carried to it; wider, right of its own crossing.
+    const newest = readings.length ? X(readings[readings.length - 1].date) + 12 : pad.l;
     for (const r of o.rungs || []) {
       if (!r.date || t(r.date) < x0 || t(r.date) > x1 || r.lb < lo || r.lb > hi) continue;
-      g += `<line x1="${pad.l}" y1="${Y(r.lb).toFixed(1)}" x2="${X(r.date).toFixed(1)}" y2="${Y(r.lb).toFixed(1)}" stroke="#C9C9C3" stroke-width="1" stroke-dasharray="2 4"/>`;
-      g += txt(pad.l + 6, Y(r.lb) - 4, `${r.lb} · ${dayInWords(r.date, { short: true })}`);
+      const lx = o.mobile ? Math.max(X(r.date) + 8, newest) : X(r.date) + 8;
+      g += `<line x1="${pad.l}" y1="${Y(r.lb).toFixed(1)}" x2="${(o.mobile ? lx - 4 : X(r.date)).toFixed(1)}" y2="${Y(r.lb).toFixed(1)}" stroke="#C9C9C3" stroke-width="1" stroke-dasharray="2 4"/>`;
+      g += label(lx, [Y(r.lb) - 4, Y(r.lb) + fs + 2], `${r.lb} · ${dayInWords(r.date, { short: true })}`);
     }
   }
   if (o.show.chapters) {
     for (const c of o.chapters || []) {
       if (t(c.date) < x0 || t(c.date) > t(days[days.length - 1].date)) continue;
       g += `<line x1="${X(c.date).toFixed(1)}" y1="${pad.t}" x2="${X(c.date).toFixed(1)}" y2="${pad.t + 8}" stroke="#8A8A85" stroke-width="1"/>`;
-      g += txt(X(c.date), pad.t - 6, c.label, "middle");
+      g += label(X(c.date), pad.t - 6, c.label, "middle");
     }
   }
   if (o.show.events) {
     for (const m of o.markers || []) {
       if (t(m.date) < x0 || t(m.date) > x1) continue;
       g += `<line x1="${X(m.date).toFixed(1)}" y1="${pad.t}" x2="${X(m.date).toFixed(1)}" y2="${H - pad.b}" stroke="#B97A12" stroke-width="1" stroke-dasharray="4 4"/>`;
-      g += txt(X(m.date) + 4, pad.t + 10, m.label, "start", "#B97A12");
+      // the top of the line first; then above the goal line, the distance frame's empty floor
+      const floor = distance && J ? Y(J.goal_weight_lbs) - 8 : H - pad.b - 6;
+      g += label(X(m.date) + 4, [pad.t + 10, floor, floor - fs - 4], m.label, "start", "#B97A12");
     }
   }
   if (wedge) {
@@ -110,7 +141,7 @@ export function journeyChart(o) {
     const gy = Y(J.goal_weight_lbs);
     g += `<path d="M${lx.toFixed(1)},${ly.toFixed(1)} L${X(J.projected_goal_date_earliest).toFixed(1)},${gy.toFixed(1)} L${X(J.projected_goal_date_latest).toFixed(1)},${gy.toFixed(1)} Z" fill="#1B3FD6" opacity="0.1"/>`;
     g += `<path d="M${lx.toFixed(1)},${ly.toFixed(1)} L${X(J.projected_goal_date).toFixed(1)},${gy.toFixed(1)}" fill="none" stroke="#1B3FD6" stroke-width="1" stroke-dasharray="4 4"/>`;
-    g += txt(X(J.projected_goal_date), gy + 16, dayInWords(J.projected_goal_date), "middle");
+    g += label(X(J.projected_goal_date), [gy + 16, gy - 8 - fs - 4], dayInWords(J.projected_goal_date), "middle");
   }
   // the series: readings as dots, the mean read within each era
   const breakIdx = new Set((o.markers || []).map((m) => days.findIndex((d) => d.date === m.date)).filter((i) => i > 0));
@@ -142,7 +173,7 @@ export function journeyChart(o) {
     if (prev) label += ` · ${d.value - prev.value >= 0 ? "+" : ""}${(d.value - prev.value).toFixed(1)} vs ${dayInWords(prev.date, { weekday: true }).split(" ")[0]}`;
     return { x: Number(X(d.date).toFixed(1)), y: Number(Y(d.value).toFixed(1)), date: d.date, v: d.value, label };
   });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "")}" data-chart data-points="${esc(JSON.stringify(points))}">${g}${paths}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "")}" data-chart data-points="${esc(JSON.stringify(points))}">${g}${paths}${lbl}</svg>`;
 }
 
 /** The caption under the instrument, from the same state. */
@@ -154,7 +185,7 @@ export function journeyCaption(o) {
     `${n} weigh-ins${o.range ? " in the window" : ` since ${dayInWords(days[0] ? days[0].date : o.journey.start_date)}`}`,
     `the dots are mornings on the scale${o.show.mean ? ", the cobalt line the 7-day mean" : ""}`,
   ];
-  if (wedge) parts.push("the wedge is the platform's projection to the goal, its edges the 80% range of the date");
+  if (wedge) parts.push("the wedge carries the published rate forward to the goal in a straight line, its edges the ends of the rate's interval — an extrapolation, not the short-term forecast");
   if (o.show.events && (o.markers || []).length) parts.push(`the ochre line is the baseline change on ${dayInWords(o.markers[0].date)}`);
   return `${parts.join(" · ")}. Hover, tap or use the arrow keys to read a morning.`;
 }
@@ -164,7 +195,7 @@ export function journeyCaption(o) {
 // slope is computed — owner requirement A); the ladder reads the published rungs; the heart captions are
 // plain means of the readings the chart shows, said as such on the page.
 
-/** The pace bar: the published weekly rate and its 95% interval as percentages of one shared scale. */
+/** The pace bar: the published weekly rate and its interval (at the served projection_confidence) as percentages of one shared scale. */
 export function paceBar(J) {
   const rate = Number(J.weekly_rate_lbs);
   const a = Math.abs(Number(J.weekly_rate_ci_low));
@@ -194,25 +225,25 @@ export function ladderRows(rungs, current) {
   });
 }
 
-/** Every crossed rung with its real date, and the chapter of the week it fell (#5598): a chapter's date closes its
- * week (the 7 days ending on it). `link` is true only for a published chapter. A week whose chapter is not
- * published carries its label and the chapter's own status as plain text (held, skipped, pending). When no chapter
- * object exists for that week, the week is counted from the nearest published chapter and reads "no chapter yet",
- * never a state the record does not have. With nothing to count from, the rung carries its date alone. */
+/** Every crossed rung with its real date, and the chapter of the week it fell (#5598). The week is the chapter whose
+ * explicit interval (`week_start`..`week_end`, served by /api/chapters) contains the crossing day — never a guess from a
+ * chapter's publication date (Week 1 is 6–12 September and was published on the 8th). `link` is true only for a
+ * published chapter; a week whose chapter is not published carries its label and status as plain text (held, skipped,
+ * pending). A week with no chapter object is numbered from the nearest interval and reads "no chapter yet". */
 export function rungChapters(rungs, chapters) {
-  const all = (chapters || []).filter((ch) => ch.week >= 1 && ch.date);
+  const weeks = (chapters || []).filter((ch) => ch.week >= 1 && ch.week_start && ch.week_end);
   const out = [];
   for (const r of rungs || []) {
     if (!r.date) continue;
-    const c = all.find((ch) => t(r.date) <= t(ch.date) && t(ch.date) - t(r.date) < 7 * DAY_MS) || null;
+    const c = weeks.find((ch) => ch.week_start <= r.date && r.date <= ch.week_end) || null;
     if (c && c.status === "published") {
-      out.push({ lb: r.lb, date: r.date, chapter: c, link: true, label: c.week_label, state: "published" });
+      out.push({ lb: r.lb, date: r.date, chapter: c, link: true, label: c.week_label, state: "published", week: c.week });
     } else if (c) {
-      out.push({ lb: r.lb, date: r.date, chapter: null, link: false, label: c.week_label || `Week ${c.week}`, state: c.status });
+      out.push({ lb: r.lb, date: r.date, chapter: null, link: false, label: c.week_label || `Week ${c.week}`, state: c.status, week: c.week });
     } else {
-      const anchor = all.find((ch) => ch.status === "published") || all[0] || null;
-      const week = anchor ? anchor.week + Math.ceil((t(r.date) - t(anchor.date)) / (7 * DAY_MS)) : 0;
-      out.push({ lb: r.lb, date: r.date, chapter: null, link: false, label: week >= 1 ? `Week ${week}` : "", state: "no chapter yet" });
+      const anchor = [...weeks].sort((a, b) => a.week - b.week)[0] || null;
+      const week = anchor ? anchor.week + Math.floor((t(r.date) - t(anchor.week_start)) / (7 * DAY_MS)) : 0;
+      out.push({ lb: r.lb, date: r.date, chapter: null, link: false, label: week >= 1 ? `Week ${week}` : "", state: "no chapter yet", week: week >= 1 ? week : null });
     }
   }
   return out;

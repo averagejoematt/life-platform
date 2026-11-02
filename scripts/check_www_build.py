@@ -219,7 +219,33 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
                                 issues.append(f"{rel}: raw id {raw!r} rendered as text (#5568 domainWords() / #5572 coach name)")
     if pages == 0:
         issues.append("no html pages in dist")
+    issues.extend(heart_coverage(dist))
     return issues
+
+
+HEART_CHARTS = ("Resting heart rate", "Heart-rate variability")
+
+
+def heart_coverage(dist: str) -> list[str]:
+    """The Journey carries BOTH heart charts with inspectable points (resting HR and HRV), and the front page does not
+    link the HRV metric — the fixture keeps HRV inside journey.json so Start's reader-facing link budget is unchanged
+    (#5598; acceptance item 7). A build without the Journey page (an absent journey) is not graded here."""
+    path = os.path.join(dist, "data", "journey", "index.html")
+    if not os.path.exists(path):
+        return []
+    html = open(path, encoding="utf-8").read()
+    out = []
+    figures = re.findall(r"<figure[^>]*data-heart[\s\S]*?</figure>", html)
+    for name in HEART_CHARTS:
+        fig = next((f for f in figures if name in f), None)
+        if fig is None:
+            out.append(f"data/journey/index.html: the {name} chart is missing (#5598 heart coverage)")
+        elif "data-points" not in fig or 'data-points="[]"' in fig:
+            out.append(f"data/journey/index.html: the {name} chart has no inspectable points")
+    front = os.path.join(dist, "index.html")
+    if os.path.exists(front) and re.search(r'href="[^"]*/data/hrv/"', open(front, encoding="utf-8").read()):
+        out.append("index.html: the front page links /data/hrv/ — HRV coverage must not move Start's link budget (#5598)")
+    return out
 
 
 def _read_bytes(path: str) -> bytes | None:

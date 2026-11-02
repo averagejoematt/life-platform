@@ -2,7 +2,7 @@
 // The Connected rail — one object, every place it surfaces, derived from the edge index.
 // Nothing here is a copy: each row is a link plus the one line that makes it relevant.
 import { connectedTo } from "../lib/snapshot.js";
-import { domainWords } from "../lib/format.js";
+import { callOutcome, clip, domainWords } from "../lib/format.js";
 import { href, pathOf } from "../lib/url.js";
 
 interface Props {
@@ -21,12 +21,14 @@ const line = (o: any): string => {
     const w = domainWords(o.domain);
     return o.retired ? (w ? `${w} · retired` : "retired") : w;
   }
+  // A call's line is what happened to IT (the grader's own sentence), never the simple guess's result.
+  if (o.type === "prediction") return o.verdict_text ? clip(o.verdict_text, 110) : callOutcome(o.status);
   return o.summary || "";
 };
 const tail = (o: any): string => {
   switch (o.type) {
     case "prediction":
-      return o.status;
+      return callOutcome(o.status);
     case "coach":
       return o.retired ? "retired" : o.record && o.record.n ? `${o.record.right ?? "–"} of ${o.record.n}` : "";
     case "chapter":

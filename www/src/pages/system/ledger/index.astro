@@ -3,7 +3,7 @@
 // of the records in the snapshot; the filter island hides and shows and computes nothing.
 import Base from "../../../layouts/Base.astro";
 import StatusTag from "../../../components/StatusTag.astro";
-import { dayInWords } from "../../../lib/format.js";
+import { callOutcome, dayInWords } from "../../../lib/format.js";
 import { loadAll, latestEdition } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -29,10 +29,10 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
       <p class="label">System · the ledger · {rows.length} records in the snapshot</p>
       <h1 style="font-size:44px;margin-top:8px">The prediction ledger</h1>
       <div class="facts" style="margin-top:22px">
-        <div><span class="label">Confirmed</span><span class="v num cobalt">{counts.confirmed}</span></div>
-        <div><span class="label">Refuted</span><span class="v num verm">{counts.refuted}</span></div>
-        <div><span class="label">Pending</span><span class="v num">{counts.pending}</span><span class="muted" style="font-size:12px">windows still open</span></div>
-        <div><span class="label">Expired</span><span class="v num">{counts.expired}</span><span class="muted" style="font-size:12px">too few readings</span></div>
+        <div><span class="label">Right</span><span class="v num cobalt">{counts.confirmed}</span><span class="muted" style="font-size:12px">confirmed by the grader</span></div>
+        <div><span class="label">Wrong</span><span class="v num verm">{counts.refuted}</span><span class="muted" style="font-size:12px">refuted by the grader</span></div>
+        <div><span class="label">Open</span><span class="v num">{counts.pending}</span><span class="muted" style="font-size:12px">windows still open</span></div>
+        <div><span class="label">Could not be checked</span><span class="v num">{counts.expired}</span><span class="muted" style="font-size:12px">too few readings</span></div>
         <div><span class="label">Observations</span><span class="v num">{counts.observation}</span><span class="muted" style="font-size:12px">not graded, by design</span></div>
         <div><span class="label">Flagged · corrected</span><span class="v num">{flagged} <small>· {corrected}</small></span><span class="muted" style="font-size:12px">flags stay out of the clean rate; corrections keep the original</span></div>
       </div>
@@ -47,7 +47,7 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
       <label class="sel-wrap"><span class="label">Coach</span><select class="sel" data-f-coach aria-label="Filter by coach"><option value="">every coach</option>{coaches.map((c) => <option value={c.id}>{c.name}{c.retired ? " · retired" : ""}</option>)}</select></label>
       <span class="seg" role="group" aria-label="Filter by status">
         <button type="button" data-f-status="" aria-pressed="true">All</button>
-        {ORDER.filter((s) => counts[s]).map((s) => <button type="button" data-f-status={s} aria-pressed="false">{s}</button>)}
+        {ORDER.filter((s) => counts[s]).map((s) => <button type="button" data-f-status={s} aria-pressed="false">{callOutcome(s)}</button>)}
       </span>
       <label class="sel-wrap"><span class="label">Kind</span><select class="sel" data-f-kind aria-label="Filter by kind"><option value="">every kind</option>{kinds.map((k) => <option value={k}>{KIND_WORDS[k] || k}</option>)}</select></label>
       <label class="sel-wrap" style="flex:1 1 220px"><span class="label">A word in the claim</span><input class="sel" type="search" data-f-text aria-label="Search the claims" placeholder="protein, recovery, sleep…" /></label>
@@ -80,7 +80,7 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
                   </span>
                 )}
               </span>
-              <StatusTag status={p.status} date={p.settled_date} />
+              <StatusTag status={p.status} date={p.settled_date} call />
             </a>
           ))}
         </div>

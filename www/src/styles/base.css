@@ -8,6 +8,9 @@
 }
 html {
   scroll-behavior: smooth;
+  /* keyboard focus and in-page anchors stop clear of the sticky masthead (and, on a phone, the fixed tab bar):
+     the acceptance suite found a focused control scrolled to 4 px, under a 47 px header (2026-11-02) */
+  scroll-padding-top: 72px;
 }
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -388,6 +391,11 @@ h3 {
 .rows > * > :last-child:not(:only-child).mono {
   max-width: none;
 }
+/* a long mono value (a forecast with its range) may wrap at its spaces rather than widen the page at 320 px */
+.rows > * > :last-child:not(:only-child).mono.wraps {
+  max-width: 62%;
+  text-align: right;
+}
 .rows > *:last-child {
   border-bottom: 1px solid var(--ink);
 }
@@ -686,6 +694,9 @@ footer.site a {
   .mast nav,
   .mast .status {
     display: none;
+  }
+  html {
+    scroll-padding-bottom: 76px; /* the fixed tab bar is 52 px plus the safe area */
   }
   .tabbar {
     display: grid;
@@ -1501,6 +1512,16 @@ details.more summary {
   line-height: 1.45;
   margin: 6px 0 0;
   max-width: 62ch;
+}
+/* A dated correction beside a verbatim coach line (acceptance 2026-11-02): the quote is never edited. */
+.voice .correction {
+  margin: 8px 0 0;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 6px 10px;
+  border: 1px solid var(--verm-text);
+  color: var(--ink);
 }
 .chips {
   display: flex;

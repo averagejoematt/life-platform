@@ -44,7 +44,9 @@
   "url_legacy": "/journal/posts/week-09/",
   "visibility": "public",
   "week": 6,
+  "week_end": "2026-10-17",
   "week_label": "Week 6",
+  "week_start": "2026-10-11",
   "word_count": 1800
  },
  {
@@ -72,7 +74,9 @@
   "url_legacy": null,
   "visibility": "public",
   "week": 7,
+  "week_end": "2026-10-24",
   "week_label": "Week 7",
+  "week_start": "2026-10-18",
   "word_count": null
  },
  {
@@ -106,7 +110,9 @@
   "url_legacy": null,
   "visibility": "public",
   "week": 8,
+  "week_end": "2026-10-31",
   "week_label": "Week 8",
+  "week_start": "2026-10-25",
   "word_count": null
  },
  {
@@ -134,7 +140,9 @@
   "url_legacy": null,
   "visibility": "held",
   "week": 10,
+  "week_end": "2026-11-14",
   "week_label": "Week 10",
+  "week_start": "2026-11-08",
   "word_count": 10
  },
  {
@@ -163,7 +171,9 @@
   "url_legacy": null,
   "visibility": "public",
   "week": 9,
+  "week_end": "2026-11-07",
   "week_label": "Week 9",
+  "week_start": "2026-11-01",
   "word_count": null
  }
 ]

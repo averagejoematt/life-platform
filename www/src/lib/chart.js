@@ -71,7 +71,7 @@ export function svgChart(o) {
   // a phone-width viewBox follows the container (the island passes `width`) so the 12.5-unit labels stay ≥ 11 px (#1210)
   const W = o.width || (o.mobile ? 350 : 1000);
   const H = o.height || 220;
-  const padL = o.mobile ? 40 : 44;
+  let padL = o.mobile ? 40 : 44; // widened below to the widest tick label, so "232.5" is never cut at the left edge
   const padR = 12;
   const padT = 12;
   const padB = 26;
@@ -99,6 +99,8 @@ export function svgChart(o) {
   const ticks = niceTicks(lo, hi, 6);
   lo = Math.min(lo, ticks[0]);
   hi = Math.max(hi, ticks[ticks.length - 1]);
+  // IBM Plex Mono advances 0.6 em per glyph: the tick column is as wide as its longest label plus the 8-unit gap
+  padL = Math.max(padL, Math.ceil(Math.max(...ticks.map((t) => String(t).length)) * fs * 0.6 + 12));
   const x = (i) => padL + (W - padL - padR) * (n === 1 ? 0.5 : i / (n - 1));
   const y = (v) => padT + (H - padT - padB) * (hi - (o.clip ? Math.min(o.clip, v) : v)) / (hi - lo || 1);
   const labelDay = o.labelDay || ((iso) => iso.slice(5));
@@ -118,7 +120,10 @@ export function svgChart(o) {
     const i = days.findIndex((d) => d.date === m.date);
     if (i < 0) continue;
     g += `<line x1="${x(i).toFixed(1)}" y1="${padT}" x2="${x(i).toFixed(1)}" y2="${H - padB}" stroke="#B97A12" stroke-width="1" stroke-dasharray="4 4"/>`;
-    g += `<text x="${(x(i) + 4).toFixed(1)}" y="${padT + 10}" font-family="IBM Plex Mono,monospace" font-size="${fs}" fill="#B97A12">${esc(m.label)}</text>`;
+    // the label reads right of the rule; where that would leave the frame, left of it; failing both, flush right
+    const w = String(m.label).length * fs * 0.6;
+    const [lx, anchor] = x(i) + 4 + w <= W - padR ? [x(i) + 4, "start"] : x(i) - 4 - w >= padL ? [x(i) - 4, "end"] : [W - padR, "end"];
+    g += `<text x="${lx.toFixed(1)}" y="${padT + 10}" text-anchor="${anchor}" font-family="IBM Plex Mono,monospace" font-size="${fs}" fill="#B97A12" stroke="#F4F4F0" stroke-width="4" stroke-linejoin="round" paint-order="stroke">${esc(m.label)}</text>`;
   }
   let paths = "";
   prepared.forEach((s) => {

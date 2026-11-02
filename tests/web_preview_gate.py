@@ -73,6 +73,31 @@ _SVG_TEXT_AUDIT_JS = """(floor) => {
     });
     return out;
 }"""
+# Two labels on top of each other, or a label running out of its chart's frame (the Journey at 390 px on 2 November:
+# the baseline-change label sat on the 320 milestone and the projected date was clipped at the right edge). Boxes are
+# the rendered glyph boxes; a 1 px touch is not an overlap.
+_SVG_TEXT_LAYOUT_JS = """() => {
+    const out = [];
+    document.querySelectorAll('svg').forEach(svg => {
+        const frame = svg.getBoundingClientRect();
+        if (frame.width < 1 || frame.height < 1) return;
+        const ts = [...svg.querySelectorAll('text')].filter(t => (t.textContent || '').trim()).map(t => {
+            let b; try { b = t.getBoundingClientRect(); } catch (e) { return null; }
+            return b && b.width >= 1 ? {txt: t.textContent.trim().slice(0, 24), b} : null;
+        }).filter(Boolean);
+        for (const t of ts) {
+            if (t.b.left < frame.left - 1 || t.b.right > frame.right + 1 || t.b.top < frame.top - 1 || t.b.bottom > frame.bottom + 1)
+                out.push({kind: 'clipped', a: t.txt, b: ''});
+        }
+        for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+            const a = ts[i].b, b = ts[j].b;
+            const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+            const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (w > 1 && h > 1) out.push({kind: 'overlap', a: ts[i].txt, b: ts[j].txt});
+        }
+    });
+    return out;
+}"""
 _RUN_AXE_JS = """async () => {
     const r = await axe.run(document, {resultTypes: ['violations']});
     return r.violations.map(v => ({id: v.id, impact: v.impact, nodes: v.nodes.length,
@@ -164,6 +189,16 @@ def _static_checks(html: str, path: str) -> list[str]:
     return issues
 
 
+def _layout_issues(page, path: str, where: str) -> list[str]:
+    out = []
+    for f in page.evaluate(_SVG_TEXT_LAYOUT_JS):
+        if f["kind"] == "clipped":
+            out.append(f"{path}@{where}: SVG text clipped by its chart frame: '{f['a']}'")
+        else:
+            out.append(f"{path}@{where}: SVG labels overlap: '{f['a']}' × '{f['b']}'")
+    return out
+
+
 def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True) -> tuple[bool, list[dict]]:
     from playwright.sync_api import sync_playwright
 
@@ -216,8 +251,10 @@ def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True) -> tup
                             rec["issues"].append(
                                 f"{path}@{wlabel}: SVG text below {SVG_TEXT_FLOOR_PX:g}px floor: '{f['txt']}' = {f['eff']}px effective (#1210)"
                             )
+                        rec["issues"].extend(_layout_issues(page, path, wlabel))
                     page.set_viewport_size({"width": vp["width"], "height": vp["height"]})
                 if label == "laptop":
+                    rec["issues"].extend(_layout_issues(page, path, label))
                     unmounted = page.evaluate(
                         "() => [...document.querySelectorAll('svg[data-points]')].filter(s => s.dataset.inspect !== 'mounted' && JSON.parse(s.dataset.points || '[]').length).length"
                     )
@@ -251,6 +288,8 @@ def mutation_control(dist: str, base: str) -> bool:
         "</body>",
         '<div style="width:2000px;height:2px"></div><script>var x=1</script><p>HELD-SENTINEL-DO-NOT-PUBLISH</p>'
         '<svg viewBox="0 0 1000 100" width="100%"><text x="10" y="50" font-size="20">PLANTED-SMALL</text></svg>'
+        '<svg viewBox="0 0 300 60" width="300" height="60"><text x="10" y="30" font-size="14">PLANTED-A</text>'
+        '<text x="14" y="32" font-size="14">PLANTED-B</text><text x="280" y="50" font-size="14">PLANTED-CLIP</text></svg>'
         '<svg viewBox="0 0 10 10" data-points="[{&quot;x&quot;:1,&quot;y&quot;:1,&quot;label&quot;:&quot;planted&quot;}]"></svg></body>',
     )
     open(idx, "w", encoding="utf-8").write(html)
@@ -264,6 +303,8 @@ def mutation_control(dist: str, base: str) -> bool:
         "sentinel" in text,
         "no inspect island" in text,
         "SVG text below 11px floor: 'PLANTED-SMALL'" in text,
+        "SVG labels overlap: 'PLANTED-A' × 'PLANTED-B'" in text,
+        "SVG text clipped by its chart frame: 'PLANTED-CLIP'" in text,
     )
     return (not ok) and all(found)
 
@@ -285,7 +326,8 @@ def main() -> int:
         print("mutation control …", end=" ", flush=True)
         if not mutation_control(args.dist, args.base):
             print(
-                "FAILED — the gate did not report a planted overflow + inline script + sentinel + unmounted chart + sub-floor SVG text; refusing to grade"
+                "FAILED — the gate did not report a planted overflow + inline script + sentinel + unmounted chart + sub-floor SVG text"
+                " + overlapping/clipped SVG labels; refusing to grade"
             )
             return 2
         print("ok (the gate can fail)")
