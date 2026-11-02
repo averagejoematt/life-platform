@@ -1,12 +1,15 @@
 ---
 import { href } from "../lib/url.js";
+import { snapshotMode } from "../lib/snapshot.js";
+
+const fixture = (await snapshotMode()) === "fixture";
 ---
 
 <footer class="site">
   <div class="wrap" style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px">
     <p style="display:flex;flex-wrap:wrap;gap:18px;align-items:center">
       <span class="verified">Verified, from the platform, dated</span>
-      <span class="chip">Sample content, for layout only</span>
+      {fixture && <span class="chip">Sample content, for layout only</span>}
     </p>
     <p style="max-width:520px">
       Only deliberately published figures appear here. Journals, photos and medical records stay private. The coaches are software built with

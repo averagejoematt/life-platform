@@ -549,7 +549,13 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
     assert public["edition"][0]["edges"] == [{"type": "chapter", "id": "week-09", "rel": "this_week"}]
     dis = public["disagreement"]
     assert len(dis) == 1 and dis[0]["status"] == "resolved" and dis[0]["resolved_date"] == "2026-10-16"
-    assert isinstance(dis[0]["verdict"], str) and "sleep_coach" in dis[0]["verdict"] and "16.4" in dis[0]["verdict"]
+    assert (
+        isinstance(dis[0]["verdict"], str)
+        and "Lisa Park's" in dis[0]["verdict"]
+        and "Eli Marsh's did not" in dis[0]["verdict"]
+        and "_coach" not in dis[0]["verdict"]
+        and "16.4" in dis[0]["verdict"]
+    )
     for type_, items in public.items():
         for o in items:
             ps.validate(o, type_)
@@ -788,3 +794,22 @@ def test_journey_body_contract_refuses_an_age_and_a_malformed_field():
 def test_the_absent_journey_carries_the_body_fields_as_null():
     for k in ("composition", "phenoage", "bp", "tape_date"):
         assert k in ps.ABSENT_JOURNEY and ps.ABSENT_JOURNEY[k] is None
+
+
+def test_coach_persona_id_rendered_as_text_reds_the_build_scan_5572(tmp_path):
+    """Negative control (#5572): a persona id in visible text fails the dist scan; the same page with the name passes."""
+    spec = importlib.util.spec_from_file_location("check_www_build_5572", os.path.join(REPO, "scripts", "check_www_build.py"))
+    cwb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cwb)
+    snap = tmp_path / "snap"
+    snap.mkdir()
+    json.dump([{"id": "nutrition_coach", "domain": "Nutrition"}], open(snap / "coaches.json", "w"))
+    ids = cwb.raw_ids(str(snap))
+    assert "nutrition_coach" in ids
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    page = dist / "index.html"
+    page.write_text("<html><body><p>the call that held was nutrition_coach's</p></body></html>")
+    assert any("nutrition_coach" in i for i in cwb.scan(str(dist), False, ids))
+    page.write_text("<html><body><p>the call that held was Marcus Webb's</p></body></html>")
+    assert not any("nutrition_coach" in i for i in cwb.scan(str(dist), False, ids))

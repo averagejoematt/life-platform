@@ -739,6 +739,15 @@ def _live_metrics(ctx: LiveContext) -> None:
         }
 
 
+def _coach_words(text: str | None, names: dict[str, str]) -> str | None:
+    """A persona id inside prose becomes the coach's name (#5572): `nutrition_coach's` -> `Marcus Webb's`."""
+    if not isinstance(text, str):
+        return text
+    for pid in sorted(names, key=len, reverse=True):
+        text = re.sub(rf"(?<![\w-]){re.escape(pid)}(?![\w-])", names[pid], text)
+    return text
+
+
 def _docket_verdict_text(d: dict) -> str | None:
     """The docket's settled verdict as one sentence. On the wire `verdict` is a dict
     ({winner, loser, holds, outcome, actual_value}) once code has settled the bet — the
@@ -766,6 +775,7 @@ def _docket_verdict_text(d: dict) -> str | None:
 
 
 def _live_disagreements(ctx: LiveContext) -> None:
+    names = {c["id"]: c["name"] for c in ctx.objs["coach"] if c.get("name") and c.get("name") != c["id"]}
     docket = ctx.fetched.get("docket") or {}
     for status_key, status in (("open", "open"), ("resolved", "resolved")):
         for d in docket.get(status_key) or []:
@@ -785,11 +795,11 @@ def _live_disagreements(ctx: LiveContext) -> None:
                     topic=d.get("topic") or slug,
                     coach_a=a,
                     coach_b=b,
-                    claim_a=claims.get(a) if isinstance(claims.get(a), str) else None,
-                    claim_b=claims.get(b) if isinstance(claims.get(b), str) else None,
+                    claim_a=_coach_words(claims.get(a), names) if isinstance(claims.get(a), str) else None,
+                    claim_b=_coach_words(claims.get(b), names) if isinstance(claims.get(b), str) else None,
                     status=status if d.get("resolution") != "void_no_data" else "void",
                     resolved_date=d.get("resolved_date") if ISO_DAY.match(str(d.get("resolved_date") or "")) else None,
-                    verdict=_docket_verdict_text(d),
+                    verdict=_coach_words(_docket_verdict_text(d), names),
                     metric_id=None,
                     edges=[{"type": "coach", "id": a, "rel": "side_a"}, {"type": "coach", "id": b, "rel": "side_b"}],
                 )
