@@ -31,6 +31,7 @@ No AWS, no network: `npm ci` must already have run in www/.
 from __future__ import annotations
 
 import argparse
+import glob
 import hashlib
 import json
 import os
@@ -150,9 +151,36 @@ def check_dangling_mutation(preview: bool) -> int:
     return 0
 
 
-def scan(dist: str, require_noindex: bool) -> list[str]:
+TAG = re.compile(r"<[^>]+>")
+
+
+def raw_ids(snapshot: str = SNAPSHOT) -> set[str]:
+    """The coach domain identifiers in the exported snapshot (`coaches.json` → each record's `domain`): snake_case ids
+    that a page must render through `domainWords()` (#5568 — `nutrition_science` reached the live
+    System page and coach pages on launch day). Derived from the data, never a hand list."""
+    out: set[str] = set()
+    for path in [os.path.join(snapshot, "coaches.json"), *glob.glob(os.path.join(snapshot, "coach*", "*.json"))]:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        records = (
+            data
+            if isinstance(data, list)
+            else (data.get("items") or data.get("records") or list(data.values())) if isinstance(data, dict) else []
+        )
+        for rec in records if isinstance(records, list) else [records]:
+            v = rec.get("domain") if isinstance(rec, dict) else None
+            if isinstance(v, str) and "_" in v:
+                out.add(v)
+    return out
+
+
+def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None) -> list[str]:
     issues: list[str] = []
     pages = 0
+    ids = raw_ids() if forbidden_ids is None else forbidden_ids
     for dirpath, _d, files in os.walk(dist):
         for name in files:
             path = os.path.join(dirpath, name)
@@ -169,6 +197,11 @@ def scan(dist: str, require_noindex: bool) -> list[str]:
                             issues.append(f"{rel}: inline <script>")
                     if require_noindex and not NOINDEX.search(text):
                         issues.append(f"{rel}: missing noindex")
+                    if ids:
+                        visible = TAG.sub(" ", text)
+                        for raw in sorted(ids):
+                            if re.search(rf"(?<![\w-]){re.escape(raw)}(?![\w-])", visible):
+                                issues.append(f"{rel}: raw domain id {raw!r} rendered as text (#5568 — route it through domainWords())")
     if pages == 0:
         issues.append("no html pages in dist")
     return issues

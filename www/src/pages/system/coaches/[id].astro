@@ -3,7 +3,7 @@ import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
 import StatusTag from "../../../components/StatusTag.astro";
-import { dayInWords, kOfN, clip } from "../../../lib/format.js";
+import { dayInWords, domainWords, kOfN, clip } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -17,11 +17,11 @@ const mine = all.byType.prediction.filter((p) => p.coach_id === c.id).sort((a, b
 const by = (s: string) => mine.filter((p) => p.status === s).length;
 ---
 
-<Base title={c.name} top="system" description={c.short_bio || `${c.name} · ${c.domain}`}>
+<Base title={c.name} top="system" description={c.short_bio || `${c.name} · ${domainWords(c.domain)}`}>
   <section class="section">
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="row"><span class="label">{c.tier === "lead" ? "Lead coach" : "Coach"} · {c.domain}</span><Provenance object={c} /></div>
+        <div class="row"><span class="label">{c.tier === "lead" ? "Lead coach" : "Coach"} · {domainWords(c.domain)}</span><Provenance object={c} /></div>
         <h1 style="font-size:48px">{c.name}</h1>
         <p class="dek" style="font-size:19px">
           {c.retired ? `Retired${c.retired_date ? ` on ${dayInWords(c.retired_date)}` : ""}. ` : ""}
