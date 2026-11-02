@@ -56,6 +56,7 @@ from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE 
 # bundled shared module
 from experiment.phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
+from web import day_window  # #5584 — the optional ?date= / ?from=&to= window on three read routes
 from web.site_api_agents import handle_agent_activity
 from web.site_api_autonomic import (
     handle_autonomic_balance,
@@ -571,6 +572,14 @@ def _route_morning_note(event):
     return _handle_morning_note(event) if method == "POST" else handle_morning_note_read(event)
 
 
+# #5584: the ROUTES entries that also take an optional day window (web/day_window.py). The
+# paths are already registered in ROUTES above — this table adds no route, only the qs hand-off.
+_DAY_WINDOW_ROUTES = {
+    "/api/workouts": handle_workouts,
+    "/api/sleep_detail": handle_sleep_detail,
+    "/api/nutrition_overview": handle_nutrition_overview,
+}
+
 _SIMPLE_ROUTES = {
     "/api/verify_subscriber": ({"GET", "OPTIONS"}, _handle_verify_subscriber),
     "/api/nudge": ({"POST"}, _handle_nudge),
@@ -651,8 +660,7 @@ def _dispatch_route(event, path, method):
 
     # Phase 1: Changes-since (GET with query params)
     if path == "/api/changes-since":
-        qs = event.get("queryStringParameters") or {}
-        return handle_changes_since(qs)
+        return handle_changes_since(event.get("queryStringParameters") or {})
 
     # Time scrubber (2026-06-13): /api/character?date=YYYY-MM-DD — any past
     # morning's sheet. Dateless requests fall through to the ROUTES default.
@@ -680,10 +688,15 @@ def _dispatch_route(event, path, method):
     if path == "/api/fingerprint" and (event.get("queryStringParameters") or {}).get("date"):
         return handle_fingerprint(date=event["queryStringParameters"]["date"].strip())
 
+    # #5584: the Day pages' window — ?date=YYYY-MM-DD or ?from=&to= on three read routes
+    # (contract: web/day_window.py). A request with none of the three keys falls through to
+    # the ROUTES default, which serves the trailing window exactly as before.
+    if path in _DAY_WINDOW_ROUTES and method == "GET" and day_window.requested(event.get("queryStringParameters")):
+        return _DAY_WINDOW_ROUTES[path](event.get("queryStringParameters"))
+
     # Phase 1: Observatory week (GET with query params)
     if path == "/api/observatory_week":
-        qs = event.get("queryStringParameters") or {}
-        return handle_observatory_week(qs)
+        return handle_observatory_week(event.get("queryStringParameters") or {})
 
     # #399: Agents Showcase — roster + dated weekly Agent Activity feed, sourced
     # purely from existing watchdog artifacts (coherence-log/, ai-canary-log/,
