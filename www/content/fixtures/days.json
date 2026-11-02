@@ -3,26 +3,58 @@
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Glucose Coach",
+    "due_date": "2026-10-04",
+    "prediction_id": "glucose-20260920-cgm01",
+    "text": "CGM data will reveal high-amplitude post-prandial glucose excursions masked by an unremarkable mean."
+   },
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-04",
+    "prediction_id": "sealed-20260906-genesis01",
+    "text": "Weekly loss over the first four weeks will exceed 2 lb per week."
+   }
+  ],
+  "calls_open_count": 2,
+  "calls_settled": [],
   "chapter_id": null,
+  "coach_lines": [],
   "data_through": "2026-10-03",
   "date": "2026-10-03",
   "day_number": 28,
   "edges": [
+   {
+    "id": "glucose-20260920-cgm01",
+    "rel": "open",
+    "type": "prediction"
+   },
+   {
+    "id": "sealed-20260906-genesis01",
+    "rel": "open",
+    "type": "prediction"
+   },
    {
     "id": "recovery_score",
     "rel": "reading",
     "type": "metric"
    }
   ],
+  "engine": null,
+  "food": null,
+  "food_state": "older than the served window",
   "has_weighin": false,
   "id": "2026-10-03",
   "in_window": {
-   "nutrition": true,
+   "nutrition": false,
    "sleep": false,
    "workouts": false
   },
   "method_ids": [],
   "next_id": "2026-10-04",
+  "night": null,
+  "night_state": "older than the served window",
   "normals": {
    "active_kcal": {
     "mean30": null,
@@ -85,26 +117,45 @@
    "weight_lbs": null
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "no weigh-in · slept 6.5 hours · recovery 43",
+  "summary": "no weigh-in \u00b7 slept 6.5 hours \u00b7 recovery 43",
   "title": "Saturday 3 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Saturday"
+  "weekday": "Saturday",
+  "workout": null,
+  "workout_state": "older than the served window"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [],
+  "calls_open_count": 0,
+  "calls_settled": [
+   {
+    "claim_short": "Weekly loss over the first four weeks will exceed 2 lb per week.",
+    "coach_name": "Lisa Park",
+    "prediction_id": "sealed-20260906-genesis01",
+    "verdict": "confirmed"
+   }
+  ],
   "chapter_id": null,
+  "coach_lines": [],
   "data_through": "2026-10-04",
   "date": "2026-10-04",
   "day_number": 29,
   "edges": [
+   {
+    "id": "sealed-20260906-genesis01",
+    "rel": "graded_that_day",
+    "type": "prediction"
+   },
    {
     "id": "weight_lbs",
     "rel": "reading",
@@ -116,6 +167,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 38.4,
+   "delta": 0.4,
+   "level": 9.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 71.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2105,
+   "carbs_g": 160,
+   "fat_g": 77,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 181,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-04",
   "in_window": {
@@ -125,6 +228,8 @@
   },
   "method_ids": [],
   "next_id": "2026-10-05",
+  "night": null,
+  "night_state": "older than the served window",
   "normals": {
    "active_kcal": {
     "mean30": null,
@@ -187,26 +292,58 @@
    "weight_lbs": 236.9
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "236.9 lb · slept 8.3 hours · recovery 76",
+  "summary": "236.9 lb \u00b7 slept 8.3 hours \u00b7 recovery 76",
   "title": "Sunday 4 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Sunday"
+  "weekday": "Sunday",
+  "workout": null,
+  "workout_state": "older than the served window"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": null,
+  "coach_lines": [
+   {
+    "coach": "Lisa Park",
+    "coach_id": "sleep_coach",
+    "move": "observation",
+    "move_label": "What I noticed",
+    "text": "Sample line: a short night after a long session; the recovery number this morning is the cost, not a verdict."
+   }
+  ],
   "data_through": "2026-10-05",
   "date": "2026-10-05",
   "day_number": 30,
   "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "spoke",
+    "type": "coach"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
    {
     "id": "weight_lbs",
     "rel": "reading",
@@ -218,15 +355,95 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 38.8,
+   "delta": 0.4,
+   "level": 9.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 72.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2450,
+   "carbs_g": 230,
+   "fat_g": 82,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 190,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-05",
   "in_window": {
    "nutrition": true,
    "sleep": true,
-   "workouts": false
+   "workouts": true
   },
   "method_ids": [],
   "next_id": "2026-10-06",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.09,
+     "hours": 7.0,
+     "light_hours": 4.07,
+     "night_of": "2026-10-04",
+     "rem_hours": 1.84,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.36,
+     "hours": 6.8,
+     "light_hours": 3.74,
+     "night_of": "2026-10-04",
+     "rem_hours": 1.7,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 6.8,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-05T06:32:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": null,
@@ -289,26 +506,131 @@
    "weight_lbs": 235.8
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "235.8 lb · slept 6.8 hours · recovery 53",
+  "summary": "235.8 lb \u00b7 slept 6.8 hours \u00b7 recovery 53",
   "title": "Monday 5 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Monday"
+  "weekday": "Monday",
+  "workout": {
+   "duration_min": 96,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "reps": 8,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 52.2
+      },
+      {
+       "reps": 3,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 84.0
+      },
+      {
+       "reps": 4,
+       "rpe": 9,
+       "type": "normal",
+       "weight_kg": 100.2
+      },
+      {
+       "reps": 5,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 93.0
+      },
+      {
+       "reps": 12,
+       "rpe": 7,
+       "type": "normal",
+       "weight_kg": 61.2
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "reps": 6,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 45.4
+      },
+      {
+       "reps": 6,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 47.6
+      }
+     ]
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "reps": 12,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 29.5
+      },
+      {
+       "reps": 12,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 29.5
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    }
+   ],
+   "title": "Foundation - Upper - 6 - 22",
+   "volume_kg": 6120.4
+  },
+  "workout_state": "served"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": null,
+  "coach_lines": [],
   "data_through": "2026-10-06",
   "date": "2026-10-06",
   "day_number": 31,
   "edges": [
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
    {
     "id": "weight_lbs",
     "rel": "reading",
@@ -320,15 +642,95 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 39.2,
+   "delta": -0.3,
+   "level": 9.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 73.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 1980,
+   "carbs_g": 170,
+   "fat_g": 70,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 158,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-06",
   "in_window": {
    "nutrition": true,
    "sleep": true,
-   "workouts": false
+   "workouts": true
   },
   "method_ids": [],
   "next_id": "2026-10-07",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.36,
+     "hours": 8.7,
+     "light_hours": 5.05,
+     "night_of": "2026-10-05",
+     "rem_hours": 2.29,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.7,
+     "hours": 8.5,
+     "light_hours": 4.68,
+     "night_of": "2026-10-05",
+     "rem_hours": 2.12,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 8.5,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-06T06:37:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1003.0,
@@ -391,26 +793,58 @@
    "weight_lbs": 237.3
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "237.3 lb · slept 8.5 hours · recovery 48",
+  "summary": "237.3 lb \u00b7 slept 8.5 hours \u00b7 recovery 48",
   "title": "Tuesday 6 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Tuesday"
+  "weekday": "Tuesday",
+  "workout": null,
+  "workout_state": "none logged"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": null,
+  "coach_lines": [
+   {
+    "coach": "Marcus Webb",
+    "coach_id": "nutrition_coach",
+    "move": "bet",
+    "move_label": "A call",
+    "text": "Sample line: protein at the floor three days running; I expect recovery to hold through the week."
+   }
+  ],
   "data_through": "2026-10-07",
   "date": "2026-10-07",
   "day_number": 32,
   "edges": [
+   {
+    "id": "nutrition_coach",
+    "rel": "spoke",
+    "type": "coach"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
    {
     "id": "weight_lbs",
     "rel": "reading",
@@ -422,15 +856,95 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 39.6,
+   "delta": 0.4,
+   "level": 10.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 74.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2200,
+   "carbs_g": 188,
+   "fat_g": 74,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 176,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-07",
   "in_window": {
    "nutrition": true,
    "sleep": true,
-   "workouts": false
+   "workouts": true
   },
   "method_ids": [],
   "next_id": "2026-10-08",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.3,
+     "hours": 8.3,
+     "light_hours": 4.81,
+     "night_of": "2026-10-06",
+     "rem_hours": 2.19,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.62,
+     "hours": 8.1,
+     "light_hours": 4.46,
+     "night_of": "2026-10-06",
+     "rem_hours": 2.02,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 8.1,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-07T06:36:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1277.5,
@@ -493,26 +1007,113 @@
    "weight_lbs": 235.6
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "235.6 lb · slept 8.1 hours · recovery 48",
+  "summary": "235.6 lb \u00b7 slept 8.1 hours \u00b7 recovery 48",
   "title": "Wednesday 7 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Wednesday"
+  "weekday": "Wednesday",
+  "workout": {
+   "duration_min": 81,
+   "exercises": [
+    {
+     "name": "Deadlift (Barbell)",
+     "sets": [
+      {
+       "reps": 5,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 60.0
+      },
+      {
+       "reps": 5,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 92.5
+      },
+      {
+       "reps": 5,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 97.5
+      }
+     ]
+    },
+    {
+     "name": "Goblet Squat",
+     "sets": [
+      {
+       "reps": 10,
+       "rpe": 7.5,
+       "type": "normal",
+       "weight_kg": 24.0
+      },
+      {
+       "reps": 10,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 24.0
+      }
+     ]
+    },
+    {
+     "name": "Suitcase Carry",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": 20.0
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    }
+   ],
+   "title": "Foundation - Lower - 6 - 23",
+   "volume_kg": 5410.0
+  },
+  "workout_state": "served"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": null,
+  "coach_lines": [],
   "data_through": "2026-10-08",
   "date": "2026-10-08",
   "day_number": 33,
   "edges": [
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
    {
     "id": "weight_lbs",
     "rel": "reading",
@@ -524,6 +1125,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 40.0,
+   "delta": 0.4,
+   "level": 10.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 75.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 12.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 80,
+   "carbs_g": 4,
+   "fat_g": 0,
+   "floor_g": 170.0,
+   "logging_gap": true,
+   "protein_g": 15,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-08",
   "in_window": {
@@ -533,6 +1186,34 @@
   },
   "method_ids": [],
   "next_id": "2026-10-09",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.34,
+     "hours": 8.6,
+     "light_hours": 4.99,
+     "night_of": "2026-10-07",
+     "rem_hours": 2.27,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.68,
+     "hours": 8.4,
+     "light_hours": 4.62,
+     "night_of": "2026-10-07",
+     "rem_hours": 2.1,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 8.4,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-08T06:37:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1170.0,
@@ -595,26 +1276,45 @@
    "weight_lbs": 234.3
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "234.3 lb · slept 8.4 hours · recovery 63",
+  "summary": "234.3 lb \u00b7 slept 8.4 hours \u00b7 recovery 63",
   "title": "Thursday 8 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Thursday"
+  "weekday": "Thursday",
+  "workout": null,
+  "workout_state": "none logged"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": null,
+  "coach_lines": [],
   "data_through": "2026-10-09",
   "date": "2026-10-09",
   "day_number": 34,
   "edges": [
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
    {
     "id": "weight_lbs",
     "rel": "reading",
@@ -626,6 +1326,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 40.4,
+   "delta": -0.3,
+   "level": 10.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 76.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2380,
+   "carbs_g": 214,
+   "fat_g": 80,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 185,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-09",
   "in_window": {
@@ -635,6 +1387,34 @@
   },
   "method_ids": [],
   "next_id": "2026-10-10",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.28,
+     "hours": 8.2,
+     "light_hours": 4.76,
+     "night_of": "2026-10-08",
+     "rem_hours": 2.16,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.6,
+     "hours": 8.0,
+     "light_hours": 4.4,
+     "night_of": "2026-10-08",
+     "rem_hours": 2.0,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 8.0,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-09T06:36:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1212.75,
@@ -697,26 +1477,131 @@
    "weight_lbs": 235.1
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "235.1 lb · slept 8 hours · recovery 46",
+  "summary": "235.1 lb \u00b7 slept 8 hours \u00b7 recovery 46",
   "title": "Friday 9 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Friday"
+  "weekday": "Friday",
+  "workout": {
+   "duration_min": 96,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "reps": 8,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 52.2
+      },
+      {
+       "reps": 3,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 84.0
+      },
+      {
+       "reps": 4,
+       "rpe": 9,
+       "type": "normal",
+       "weight_kg": 100.2
+      },
+      {
+       "reps": 5,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 93.0
+      },
+      {
+       "reps": 12,
+       "rpe": 7,
+       "type": "normal",
+       "weight_kg": 61.2
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "reps": 6,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 45.4
+      },
+      {
+       "reps": 6,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 47.6
+      }
+     ]
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "reps": 12,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 29.5
+      },
+      {
+       "reps": 12,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 29.5
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    }
+   ],
+   "title": "Foundation - Upper - 6 - 22",
+   "volume_kg": 6120.4
+  },
+  "workout_state": "served"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": null,
+  "coach_lines": [],
   "data_through": "2026-10-10",
   "date": "2026-10-10",
   "day_number": 35,
   "edges": [
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
    {
     "id": "weight_lbs",
     "rel": "reading",
@@ -728,6 +1613,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 40.8,
+   "delta": 0.4,
+   "level": 10.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 77.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2040,
+   "carbs_g": 175,
+   "fat_g": 72,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 166,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-10",
   "in_window": {
@@ -737,6 +1674,34 @@
   },
   "method_ids": [],
   "next_id": "2026-10-11",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.26,
+     "hours": 8.1,
+     "light_hours": 4.71,
+     "night_of": "2026-10-09",
+     "rem_hours": 2.13,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.58,
+     "hours": 7.9,
+     "light_hours": 4.35,
+     "night_of": "2026-10-09",
+     "rem_hours": 1.98,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 7.9,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-10T06:35:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1254.4,
@@ -799,22 +1764,51 @@
    "weight_lbs": 234.9
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "234.9 lb · slept 7.9 hours · recovery 64",
+  "summary": "234.9 lb \u00b7 slept 7.9 hours \u00b7 recovery 64",
   "title": "Saturday 10 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Saturday"
+  "weekday": "Saturday",
+  "workout": null,
+  "workout_state": "none logged"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": "week-06",
+  "coach_lines": [
+   {
+    "coach": "Sarah Chen",
+    "coach_id": "training_coach",
+    "move": "reaction",
+    "move_label": "On a result",
+    "text": "Sample line: I was wrong about the deadlift; the bar moved faster than the week before."
+   },
+   {
+    "coach": "Eli Marsh",
+    "coach_id": "eli_marsh",
+    "move": "reply",
+    "move_label": "A reply",
+    "text": "Sample line: two coaches read the same night two ways; both readings stand until the data settles it."
+   }
+  ],
   "data_through": "2026-10-11",
   "date": "2026-10-11",
   "day_number": 36,
@@ -823,6 +1817,21 @@
     "id": "week-06",
     "rel": "this_week",
     "type": "chapter"
+   },
+   {
+    "id": "training_coach",
+    "rel": "spoke",
+    "type": "coach"
+   },
+   {
+    "id": "eli_marsh",
+    "rel": "spoke",
+    "type": "coach"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
    },
    {
     "id": "weight_lbs",
@@ -835,6 +1844,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 41.2,
+   "delta": 0.4,
+   "level": 11.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 78.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2290,
+   "carbs_g": 199,
+   "fat_g": 79,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 171,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-11",
   "in_window": {
@@ -844,6 +1905,8 @@
   },
   "method_ids": [],
   "next_id": "2026-10-12",
+  "night": null,
+  "night_state": "none recorded",
   "normals": {
    "active_kcal": {
     "mean30": 1200.17,
@@ -906,22 +1969,36 @@
    "weight_lbs": 234.1
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "234.1 lb · slept 6.8 hours · recovery 72",
+  "summary": "234.1 lb \u00b7 slept 6.8 hours \u00b7 recovery 72",
   "title": "Sunday 11 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Sunday"
+  "weekday": "Sunday",
+  "workout": null,
+  "workout_state": "none logged"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": "week-06",
+  "coach_lines": [],
   "data_through": "2026-10-12",
   "date": "2026-10-12",
   "day_number": 37,
@@ -930,6 +2007,11 @@
     "id": "week-06",
     "rel": "this_week",
     "type": "chapter"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
    },
    {
     "id": "weight_lbs",
@@ -942,6 +2024,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 41.6,
+   "delta": -0.3,
+   "level": 11.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 79.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2160,
+   "carbs_g": 182,
+   "fat_g": 75,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 177,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-12",
   "in_window": {
@@ -951,6 +2085,34 @@
   },
   "method_ids": [],
   "next_id": "2026-10-13",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.15,
+     "hours": 7.4,
+     "light_hours": 4.31,
+     "night_of": "2026-10-11",
+     "rem_hours": 1.94,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.44,
+     "hours": 7.2,
+     "light_hours": 3.96,
+     "night_of": "2026-10-11",
+     "rem_hours": 1.8,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 7.2,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-12T06:33:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1234.0,
@@ -1013,22 +2175,104 @@
    "weight_lbs": 235.6
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "235.6 lb · slept 7.2 hours · recovery 66",
+  "summary": "235.6 lb \u00b7 slept 7.2 hours \u00b7 recovery 66",
   "title": "Monday 12 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Monday"
+  "weekday": "Monday",
+  "workout": {
+   "duration_min": 81,
+   "exercises": [
+    {
+     "name": "Deadlift (Barbell)",
+     "sets": [
+      {
+       "reps": 5,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 60.0
+      },
+      {
+       "reps": 5,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 92.5
+      },
+      {
+       "reps": 5,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 97.5
+      }
+     ]
+    },
+    {
+     "name": "Goblet Squat",
+     "sets": [
+      {
+       "reps": 10,
+       "rpe": 7.5,
+       "type": "normal",
+       "weight_kg": 24.0
+      },
+      {
+       "reps": 10,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 24.0
+      }
+     ]
+    },
+    {
+     "name": "Suitcase Carry",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": 20.0
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    }
+   ],
+   "title": "Foundation - Lower - 6 - 23",
+   "volume_kg": 5410.0
+  },
+  "workout_state": "served"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": "week-06",
+  "coach_lines": [],
   "data_through": "2026-10-13",
   "date": "2026-10-13",
   "day_number": 38,
@@ -1037,6 +2281,11 @@
     "id": "week-06",
     "rel": "this_week",
     "type": "chapter"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
    },
    {
     "id": "weight_lbs",
@@ -1049,6 +2298,50 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 42.0,
+   "delta": 0.4,
+   "level": 11.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 80.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": null,
+  "food_state": "not logged",
   "has_weighin": true,
   "id": "2026-10-13",
   "in_window": {
@@ -1058,6 +2351,34 @@
   },
   "method_ids": [],
   "next_id": "2026-10-14",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.09,
+     "hours": 7.0,
+     "light_hours": 4.07,
+     "night_of": "2026-10-12",
+     "rem_hours": 1.84,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.36,
+     "hours": 6.8,
+     "light_hours": 3.74,
+     "night_of": "2026-10-12",
+     "rem_hours": 1.7,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 6.8,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-13T06:32:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1198.88,
@@ -1120,22 +2441,36 @@
    "weight_lbs": 235.3
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "235.3 lb · slept 6.8 hours · recovery 53",
+  "summary": "235.3 lb \u00b7 slept 6.8 hours \u00b7 recovery 53",
   "title": "Tuesday 13 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Tuesday"
+  "weekday": "Tuesday",
+  "workout": null,
+  "workout_state": "none logged"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   }
+  ],
+  "calls_open_count": 1,
+  "calls_settled": [],
   "chapter_id": "week-06",
+  "coach_lines": [],
   "data_through": "2026-10-14",
   "date": "2026-10-14",
   "day_number": 39,
@@ -1144,6 +2479,11 @@
     "id": "week-06",
     "rel": "this_week",
     "type": "chapter"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
    },
    {
     "id": "weight_lbs",
@@ -1156,6 +2496,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 42.4,
+   "delta": 0.4,
+   "level": 11.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 81.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2330,
+   "carbs_g": 207,
+   "fat_g": 78,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 183,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-14",
   "in_window": {
@@ -1165,6 +2557,34 @@
   },
   "method_ids": [],
   "next_id": "2026-10-15",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.3,
+     "hours": 8.3,
+     "light_hours": 4.81,
+     "night_of": "2026-10-13",
+     "rem_hours": 2.19,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.62,
+     "hours": 8.1,
+     "light_hours": 4.46,
+     "night_of": "2026-10-13",
+     "rem_hours": 2.02,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 8.1,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-14T06:36:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1209.56,
@@ -1227,22 +2647,134 @@
    "weight_lbs": 232.7
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "232.7 lb · slept 8.1 hours · recovery 65",
+  "summary": "232.7 lb \u00b7 slept 8.1 hours \u00b7 recovery 65",
   "title": "Wednesday 14 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Wednesday"
+  "weekday": "Wednesday",
+  "workout": {
+   "duration_min": 96,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "reps": 8,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 52.2
+      },
+      {
+       "reps": 3,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 84.0
+      },
+      {
+       "reps": 4,
+       "rpe": 9,
+       "type": "normal",
+       "weight_kg": 100.2
+      },
+      {
+       "reps": 5,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 93.0
+      },
+      {
+       "reps": 12,
+       "rpe": 7,
+       "type": "normal",
+       "weight_kg": 61.2
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "reps": 6,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 45.4
+      },
+      {
+       "reps": 6,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 47.6
+      }
+     ]
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "reps": 12,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 29.5
+      },
+      {
+       "reps": 12,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 29.5
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    }
+   ],
+   "title": "Foundation - Upper - 6 - 22",
+   "volume_kg": 6120.4
+  },
+  "workout_state": "served"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-16",
+    "prediction_id": "physical-20261015-weight01",
+    "text": "Weight will be around 304.5 pounds tomorrow morning."
+   },
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   },
+   {
+    "coach_name": "Marcus Webb",
+    "due_date": "2026-10-29",
+    "prediction_id": "mind-20261015-journal01",
+    "text": "Protein recovery would lift the journaling silence."
+   }
+  ],
+  "calls_open_count": 3,
+  "calls_settled": [],
   "chapter_id": "week-06",
+  "coach_lines": [],
   "data_through": "2026-10-15",
   "date": "2026-10-15",
   "day_number": 40,
@@ -1251,6 +2783,21 @@
     "id": "week-06",
     "rel": "this_week",
     "type": "chapter"
+   },
+   {
+    "id": "physical-20261015-weight01",
+    "rel": "open",
+    "type": "prediction"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
+   {
+    "id": "mind-20261015-journal01",
+    "rel": "open",
+    "type": "prediction"
    },
    {
     "id": "weight_lbs",
@@ -1263,6 +2810,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 42.8,
+   "delta": -0.3,
+   "level": 12.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 82.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2250,
+   "carbs_g": 196,
+   "fat_g": 76,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 174,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-15",
   "in_window": {
@@ -1272,6 +2871,34 @@
   },
   "method_ids": [],
   "next_id": "2026-10-16",
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.33,
+     "hours": 8.5,
+     "light_hours": 4.93,
+     "night_of": "2026-10-14",
+     "rem_hours": 2.24,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.66,
+     "hours": 8.3,
+     "light_hours": 4.57,
+     "night_of": "2026-10-14",
+     "rem_hours": 2.08,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 8.3,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-15T06:36:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1166.6,
@@ -1334,22 +2961,50 @@
    "weight_lbs": 233.8
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "233.8 lb · slept 8.3 hours · recovery 62",
+  "summary": "233.8 lb \u00b7 slept 8.3 hours \u00b7 recovery 62",
   "title": "Thursday 15 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Thursday"
+  "weekday": "Thursday",
+  "workout": null,
+  "workout_state": "none logged"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   },
+   {
+    "coach_name": "Marcus Webb",
+    "due_date": "2026-10-29",
+    "prediction_id": "mind-20261015-journal01",
+    "text": "Protein recovery would lift the journaling silence."
+   }
+  ],
+  "calls_open_count": 2,
+  "calls_settled": [],
   "chapter_id": "week-06",
+  "coach_lines": [
+   {
+    "coach": "Amara Patel",
+    "coach_id": "glucose_coach",
+    "move": "observation",
+    "move_label": "What I noticed",
+    "text": "Sample line: no new sensor readings, so nothing new to read on glucose."
+   }
+  ],
   "data_through": "2026-10-16",
   "date": "2026-10-16",
   "day_number": 41,
@@ -1358,6 +3013,21 @@
     "id": "week-06",
     "rel": "this_week",
     "type": "chapter"
+   },
+   {
+    "id": "glucose_coach",
+    "rel": "spoke",
+    "type": "coach"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
+   {
+    "id": "mind-20261015-journal01",
+    "rel": "open",
+    "type": "prediction"
    },
    {
     "id": "weight_lbs",
@@ -1370,6 +3040,58 @@
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 43.2,
+   "delta": 0.4,
+   "level": 12.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 83.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2120,
+   "carbs_g": 180,
+   "fat_g": 74,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 169,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-16",
   "in_window": {
@@ -1379,6 +3101,34 @@
   },
   "method_ids": [],
   "next_id": null,
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.12,
+     "hours": 7.2,
+     "light_hours": 4.19,
+     "night_of": "2026-10-15",
+     "rem_hours": 1.89,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.4,
+     "hours": 7.0,
+     "light_hours": 3.85,
+     "night_of": "2026-10-15",
+     "rem_hours": 1.75,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 7.0,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-16T06:33:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1199.82,
@@ -1441,22 +3191,125 @@
    "weight_lbs": 235.5
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history",
    "/api/chapters"
   ],
   "state": "ok",
-  "summary": "235.5 lb · slept 7 hours · recovery 69",
+  "summary": "235.5 lb \u00b7 slept 7 hours \u00b7 recovery 69",
   "title": "Friday 16 October 2026",
   "type": "day",
   "visibility": "public",
-  "weekday": "Friday"
+  "weekday": "Friday",
+  "workout": {
+   "duration_min": 81,
+   "exercises": [
+    {
+     "name": "Deadlift (Barbell)",
+     "sets": [
+      {
+       "reps": 5,
+       "rpe": null,
+       "type": "warmup",
+       "weight_kg": 60.0
+      },
+      {
+       "reps": 5,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 92.5
+      },
+      {
+       "reps": 5,
+       "rpe": 8.5,
+       "type": "normal",
+       "weight_kg": 97.5
+      }
+     ]
+    },
+    {
+     "name": "Goblet Squat",
+     "sets": [
+      {
+       "reps": 10,
+       "rpe": 7.5,
+       "type": "normal",
+       "weight_kg": 24.0
+      },
+      {
+       "reps": 10,
+       "rpe": 8,
+       "type": "normal",
+       "weight_kg": 24.0
+      }
+     ]
+    },
+    {
+     "name": "Suitcase Carry",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": 20.0
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "reps": null,
+       "rpe": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ]
+    }
+   ],
+   "title": "Foundation - Lower - 6 - 23",
+   "volume_kg": 5410.0
+  },
+  "workout_state": "served"
  },
  {
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "calls_open": [
+   {
+    "coach_name": "Lisa Park",
+    "due_date": "2026-10-19",
+    "prediction_id": "sleep-20261005-deepsleep01",
+    "text": "Deep sleep percentage will rise as zone-2 training volume builds."
+   },
+   {
+    "coach_name": "Marcus Webb",
+    "due_date": "2026-10-29",
+    "prediction_id": "mind-20261015-journal01",
+    "text": "Protein recovery would lift the journaling silence."
+   }
+  ],
+  "calls_open_count": 2,
+  "calls_settled": [
+   {
+    "claim_short": "Weight will be around 304.5 pounds tomorrow morning.",
+    "coach_name": "Lisa Park",
+    "prediction_id": "physical-20261015-weight01",
+    "verdict": "confirmed"
+   }
+  ],
   "chapter_id": "week-06",
+  "coach_lines": [
+   {
+    "coach": "Lisa Park",
+    "coach_id": "sleep_coach",
+    "move": "observation",
+    "move_label": "What I noticed",
+    "text": "Sample line: the held day."
+   }
+  ],
   "data_through": "2026-10-17",
   "date": "2026-10-17",
   "day_number": 42,
@@ -1467,20 +3320,120 @@
     "type": "chapter"
    },
    {
+    "id": "sleep_coach",
+    "rel": "spoke",
+    "type": "coach"
+   },
+   {
+    "id": "physical-20261015-weight01",
+    "rel": "graded_that_day",
+    "type": "prediction"
+   },
+   {
+    "id": "sleep-20261005-deepsleep01",
+    "rel": "open",
+    "type": "prediction"
+   },
+   {
+    "id": "mind-20261015-journal01",
+    "rel": "open",
+    "type": "prediction"
+   },
+   {
     "id": "weight_lbs",
     "rel": "reading",
     "type": "metric"
    }
   ],
+  "engine": {
+   "composite": 43.6,
+   "delta": 0.4,
+   "level": 12.0,
+   "pillars": [
+    {
+     "name": "sleep",
+     "not_instrumented": false,
+     "score": 84.0
+    },
+    {
+     "name": "movement",
+     "not_instrumented": false,
+     "score": 60.5
+    },
+    {
+     "name": "nutrition",
+     "not_instrumented": false,
+     "score": 54.0
+    },
+    {
+     "name": "metabolic",
+     "not_instrumented": false,
+     "score": 58.0
+    },
+    {
+     "name": "mind",
+     "not_instrumented": false,
+     "score": 9.0
+    },
+    {
+     "name": "relationships",
+     "not_instrumented": true,
+     "score": null
+    },
+    {
+     "name": "consistency",
+     "not_instrumented": false,
+     "score": 31.0
+    }
+   ]
+  },
+  "food": {
+   "calories": 2120,
+   "carbs_g": 180,
+   "fat_g": 74,
+   "floor_g": 170.0,
+   "logging_gap": false,
+   "protein_g": 169,
+   "tdee": 2619
+  },
+  "food_state": "served",
   "has_weighin": true,
   "id": "2026-10-17",
   "in_window": {
-   "nutrition": false,
-   "sleep": false,
-   "workouts": false
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
   },
   "method_ids": [],
   "next_id": null,
+  "night": {
+   "by_device": {
+    "eightsleep": {
+     "deep_hours": 1.12,
+     "hours": 7.2,
+     "light_hours": 4.19,
+     "night_of": "2026-10-16",
+     "rem_hours": 1.89,
+     "score": 84.0
+    },
+    "whoop": {
+     "deep_hours": 1.4,
+     "hours": 7.0,
+     "light_hours": 3.85,
+     "night_of": "2026-10-16",
+     "rem_hours": 1.75,
+     "score": 88.0
+    }
+   },
+   "deep_pct": 16.0,
+   "efficiency": 86.5,
+   "hours": 7.0,
+   "light_pct": 57.0,
+   "rem_pct": 27.0,
+   "score": 84.0,
+   "sleep_start": "2026-10-17T06:33:00.000Z"
+  },
+  "night_state": "served",
   "normals": {
    "active_kcal": {
     "mean30": 1532.0,
@@ -1543,6 +3496,7 @@
    "weight_lbs": 235.5
   },
   "sample": true,
+  "sleep_target_h": 7.5,
   "source": [
    "/api/pulse_history"
   ],
@@ -1551,6 +3505,8 @@
   "title": "HELD-SENTINEL-DO-NOT-PUBLISH day",
   "type": "day",
   "visibility": "held",
-  "weekday": "Saturday"
+  "weekday": "Saturday",
+  "workout": null,
+  "workout_state": "none logged"
  }
 ]

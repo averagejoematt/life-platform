@@ -130,3 +130,167 @@ export function sparkline({ rows, tile, markDate, mean, size = 14 }) {
   const meanLine = mean != null ? `<line class="mean" x1="${pad}" x2="${W - pad}" y1="${Y(mean).toFixed(1)}" y2="${Y(mean).toFixed(1)}"/>` : "";
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}" data-points="${esc(JSON.stringify(points))}">${meanLine}<path d="${d}"/>${mark}</svg>`;
 }
+
+// ── M4 (#5586): the day's layers 2–3 — the session, the night, the food, the engine, the coaches,
+// the calls. Every figure is the exporter's (scripts/publish_snapshot_day.py); these functions place
+// and word them, and say in place why a block the platform could not serve is empty.
+
+/** The session's title without Hevy's program counters: "Foundation - Upper - 13 - 41" → "Foundation · Upper". */
+export function sessionTitle(title) {
+  return String(title || "")
+    .replace(/(\s+-\s+\d+)+\s*$/, "")
+    .split(/\s+-\s+/)
+    .join(" · ");
+}
+
+/**
+ * The session table rows. Working sets are every non-warm-up set that carries reps or a load; the top
+ * set is the heaviest working set; a block with neither is "no load logged" (treadmill, stretching).
+ * `heavy` marks a top set of 100 kg or more (the owner's emphasis).
+ */
+export function sessionRows(workout) {
+  if (!workout) return [];
+  return workout.exercises.map((e) => {
+    const warm = e.sets.filter((s) => s.type === "warmup").length;
+    const work = e.sets.filter((s) => s.type !== "warmup" && (s.reps != null || s.weight_kg != null));
+    const top = work.reduce((a, s) => (!a || (s.weight_kg || 0) > (a.weight_kg || 0) ? s : a), null);
+    const setWords = work.map((s) => {
+      const load = s.weight_kg != null ? `${plain(s.weight_kg, 1)} kg` : "bodyweight";
+      const reps = s.reps != null ? `${plain(s.reps, 0)} × ` : "";
+      return `${reps}${load}${s.rpe != null ? ` @${plain(s.rpe, 1)}` : ""}`;
+    });
+    return {
+      name: e.name,
+      warmups: warm,
+      blocks: e.sets.length,
+      noLoad: work.length === 0,
+      sets: setWords,
+      top: top && top.weight_kg != null ? `${plain(top.weight_kg, 1)} kg${top.reps != null ? ` × ${plain(top.reps, 0)}` : ""}` : "—",
+      heavy: Boolean(top && top.weight_kg != null && top.weight_kg >= 100),
+    };
+  });
+}
+
+/** "143 minutes · 9 exercises · 7,932 kg moved (17,487 lb)". */
+export function sessionLine(workout) {
+  const parts = [];
+  if (workout.duration_min != null) parts.push(`${num(workout.duration_min, 0)} minutes`);
+  parts.push(`${workout.exercises.length} exercise${workout.exercises.length === 1 ? "" : "s"}`);
+  if (workout.volume_kg != null) parts.push(`${num(Math.round(workout.volume_kg), 0)} kg moved (${num(Math.round(workout.volume_kg * 2.20462), 0)} lb)`);
+  return parts.join(" · ");
+}
+
+/** The clock time someone fell asleep, in Pacific: "23:56 Pacific". */
+export function fellAsleep(iso) {
+  if (!iso) return null;
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return null;
+  return `${t.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "America/Los_Angeles" })} Pacific`;
+}
+
+/** The stage rows: share of the night, then each device's hours. */
+export function stageRows(night) {
+  const bed = night.by_device.eightsleep;
+  const strap = night.by_device.whoop;
+  const h = (dev, k) => (dev && dev[k] != null ? `${num(dev[k], 2).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")} h` : "—");
+  return [
+    ["Deep", "deep_pct", "deep_hours"],
+    ["REM", "rem_pct", "rem_hours"],
+    ["Light", "light_pct", "light_hours"],
+  ].map(([label, pk, hk]) => ({
+    label,
+    value: `${night[pk] != null ? `${plain(night[pk], 1)}% of the night` : "share not served"} · ${h(bed, hk)} bed · ${h(strap, hk)} strap`,
+  }));
+}
+
+/** The stages bar's label (role=img): what the bar draws, in words. */
+export function stagesLabel(night) {
+  const p = (v) => (v == null ? "not served" : `${plain(v, 1)} percent`);
+  return `The night's stages: deep ${p(night.deep_pct)}, REM ${p(night.rem_pct)}, light ${p(night.light_pct)}`;
+}
+
+/**
+ * Recovery, decomposed: recovery against its 7-day mean, HRV against its 30-day mean (with n), resting
+ * heart rate against its 7-day mean, sleep against the platform's target. Bars are a share of a fixed
+ * scale; a missing reading is a dash, never a zero.
+ */
+export function recoveryRows(day) {
+  const r = day.readings;
+  const m = day.normals;
+  const mean = (k, span, d) => (m[k] && m[k][`mean${span}`] != null ? num(m[k][`mean${span}`], d) : null);
+  return [
+    { label: "Recovery", v: r.recovery_pct, max: 100, d: 0, text: r.recovery_pct == null ? "no reading" : `${num(r.recovery_pct, 0)} of 100${mean("recovery_pct", 7, 0) ? ` · 7-day mean ${mean("recovery_pct", 7, 0)}` : ""}` },
+    {
+      label: "HRV",
+      v: r.hrv_ms,
+      max: 100,
+      d: 1,
+      text: r.hrv_ms == null ? "no reading" : `${num(r.hrv_ms, 1)} ms${mean("hrv_ms", 30, 1) ? ` · 30-day mean ${mean("hrv_ms", 30, 1)} (n=${m.hrv_ms.n30})` : ""}`,
+    },
+    { label: "Resting HR", v: r.rhr_bpm, max: 100, d: 0, text: r.rhr_bpm == null ? "no reading" : `${num(r.rhr_bpm, 0)} bpm${mean("rhr_bpm", 7, 0) ? ` · 7-day mean ${mean("rhr_bpm", 7, 0)}` : ""} · lower is better` },
+    { label: "Sleep", v: r.sleep_hours, max: 10, d: 1, text: r.sleep_hours == null ? "no reading" : `${num(r.sleep_hours, 1)} h of a ${plain(day.sleep_target_h, 1)} h target` },
+  ].map((x) => ({ ...x, width: x.v == null ? 0 : Math.max(0, Math.min(100, (x.v / x.max) * 100)), value: x.v == null ? "—" : num(x.v, x.d) }));
+}
+
+/** The food rows, as logged. */
+export function foodRows(food) {
+  const g = (v) => (v == null ? "not logged" : `${num(v, 0)} g`);
+  return [
+    ["Calories logged", food.calories == null ? "not logged" : `${num(food.calories, 0)} kcal${food.tdee != null ? ` · maintenance about ${num(food.tdee, 0)}` : ""}`],
+    ["Protein", `${g(food.protein_g)}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}`],
+    ["Carbohydrate", g(food.carbs_g)],
+    ["Fat", g(food.fat_g)],
+  ];
+}
+
+const PILLAR_WORDS = { sleep: "Sleep", movement: "Movement", nutrition: "Nutrition", metabolic: "Metabolic", mind: "Mind", relationships: "Relationships", consistency: "Consistency" };
+
+/** The engine's seven areas: an area with no instrument is "absent", never a number. */
+export function engineRows(engine) {
+  return engine.pillars.map((p) => ({
+    label: PILLAR_WORDS[p.name] || p.name,
+    absent: p.not_instrumented || p.score == null,
+    value: p.not_instrumented || p.score == null ? "absent" : num(p.score, 0),
+    width: p.not_instrumented || p.score == null ? 0 : Math.max(0, Math.min(100, p.score)),
+    low: !p.not_instrumented && p.score != null && p.score < 20,
+  }));
+}
+
+/** "Level 15 · 43.1 of 100 · up 0.6 since the morning before". */
+export function engineLine(engine) {
+  const parts = [`Level ${num(engine.level, 0)}`];
+  if (engine.composite != null) parts.push(`composite ${num(engine.composite, 1)} of 100`);
+  if (engine.delta != null) parts.push(engine.delta === 0 ? "unchanged since the morning before" : `${engine.delta > 0 ? "up" : "down"} ${num(Math.abs(engine.delta), 1)} since the morning before`);
+  return parts.join(" · ");
+}
+
+/** The latest day before index i that graded a call, or null. */
+export function nearestGraded(days, i) {
+  for (let j = i - 1; j >= 0; j--) if (days[j].calls_settled && days[j].calls_settled.length) return days[j];
+  return null;
+}
+
+/**
+ * The in-place sentence for a block the platform did not serve for this day. `when` is the day in words
+ * ("Thursday 29 October"). Never another day's content, never blank.
+ */
+export function unservedText(block, state, when) {
+  const T = {
+    workout: {
+      "none logged": `No gym session was logged on ${when}.`,
+      "older than the served window": `${when} is older than the window the workouts endpoint served for this snapshot; the session, if any, is in the record but not readable here.`,
+      "not served": `The workouts endpoint did not answer for this snapshot, so the session is not readable here. Nothing stands in for it.`,
+    },
+    night: {
+      "none recorded": `No night's stages were recorded for the night before ${when}. The hours and recovery in the readings come from the daily record.`,
+      "older than the served window": `${when} is older than the window the sleep endpoint served for this snapshot; the stages are not readable here.`,
+      "not served": `The sleep endpoint did not answer for this snapshot, so the night's stages are not readable here.`,
+    },
+    food: {
+      "not logged": `Nothing was logged on ${when}. The platform treats a day with no entries as missing, not as eaten: no intake is shown, and none is assumed.`,
+      "older than the served window": `${when} is older than the window the nutrition endpoint served for this snapshot; the log is not readable here.`,
+      "not served": `The nutrition endpoint did not answer for this snapshot, so the food log is not readable here. No intake is assumed.`,
+    },
+  };
+  return (T[block] && T[block][state]) || `Not readable for ${when}.`;
+}

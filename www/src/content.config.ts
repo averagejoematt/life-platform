@@ -289,6 +289,50 @@ const reading = z.number().nullable();
 const normal = z.object({ mean7: z.number().nullable(), n7: z.number().int(), mean30: z.number().nullable(), n30: z.number().int() }).strict();
 const READING_KEYS = ["weight_lbs", "recovery_pct", "sleep_hours", "hrv_ms", "rhr_bpm", "strain", "steps", "active_kcal"] as const;
 
+// M4 (#5586): the day's layers 2–3 — mirrored by publish_snapshot_day.check_layers. A block is present
+// exactly when its state is "served"; otherwise the page states why in place.
+const n = z.number().nullable();
+const daySet = z.object({ type: z.string().min(1), reps: n, weight_kg: n, rpe: n }).strict();
+const workout = z
+  .object({
+    title: z.string().min(1),
+    duration_min: n,
+    volume_kg: n,
+    exercises: z.array(z.object({ name: z.string().min(1), sets: z.array(daySet) }).strict()),
+  })
+  .strict();
+const device = z
+  .object({ night_of: z.string().regex(ISO_DAY).nullable(), hours: n, deep_hours: n, rem_hours: n, light_hours: n, score: n })
+  .strict()
+  .nullable();
+const night = z
+  .object({
+    score: n,
+    efficiency: n,
+    hours: n,
+    deep_pct: n,
+    rem_pct: n,
+    light_pct: n,
+    sleep_start: z.string().min(1).nullable(),
+    by_device: z.object({ eightsleep: device, whoop: device }).strict(),
+  })
+  .strict();
+const food = z.object({ calories: n, protein_g: n, carbs_g: n, fat_g: n, logging_gap: z.boolean(), floor_g: n, tdee: n }).strict();
+const engine = z
+  .object({
+    level: z.number(),
+    composite: n,
+    delta: n,
+    pillars: z.array(z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean() }).strict()),
+  })
+  .strict();
+const coachLine = z
+  .object({ coach: z.string().min(1), coach_id: z.string().regex(ID), move: z.string().min(1), move_label: z.string().min(1).nullable(), text: z.string().min(1) })
+  .strict();
+const callSettled = z.object({ prediction_id: z.string().regex(ID), coach_name: z.string().min(1), verdict: z.string().min(1), claim_short: z.string().min(1) }).strict();
+const callOpen = z.object({ prediction_id: z.string().regex(ID), coach_name: z.string().min(1), due_date: z.string().regex(ISO_DAY), text: z.string().min(1) }).strict();
+const UNSERVED = ["older than the served window", "not served"] as const;
+
 const days = defineCollection({
   loader: snapshot("days"),
   schema: envelope("day", {
@@ -302,6 +346,18 @@ const days = defineCollection({
     next_id: z.string().regex(ID).nullable(),
     has_weighin: z.boolean(),
     in_window: z.object({ workouts: z.boolean(), sleep: z.boolean(), nutrition: z.boolean() }).strict(),
+    sleep_target_h: z.number(),
+    workout: workout.nullable(),
+    workout_state: z.enum(["served", "none logged", ...UNSERVED]),
+    night: night.nullable(),
+    night_state: z.enum(["served", "none recorded", ...UNSERVED]),
+    food: food.nullable(),
+    food_state: z.enum(["served", "not logged", ...UNSERVED]),
+    engine: engine.nullable(),
+    coach_lines: z.array(coachLine),
+    calls_settled: z.array(callSettled),
+    calls_open: z.array(callOpen),
+    calls_open_count: z.number().int().min(0),
   }),
 });
 
