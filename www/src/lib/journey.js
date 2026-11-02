@@ -30,9 +30,12 @@ export function windowDays(days, range) {
  */
 export function journeyChart(o) {
   const J = o.journey;
-  const W = o.width || (o.mobile ? 480 : 1100);
-  const H = o.height || (o.mobile ? 320 : 420);
-  const pad = { l: o.mobile ? 40 : 46, r: 14, t: 22, b: 30 };
+  // On a phone the viewBox is the container's own width (the island passes it), so the 12.5-unit labels
+  // render at 12.5 px — a 480-unit box scaled into a 350 px column put them at 9.1 px, under the 11 px
+  // floor the visual sweep holds (#1210; the root deploy of #5580 rolled back on it).
+  const W = o.width || (o.mobile ? 350 : 1100);
+  const H = o.height || (o.mobile ? 300 : 420);
+  const pad = { l: o.mobile ? 36 : 46, r: 12, t: 22, b: 30 };
   const fs = o.mobile ? 12.5 : 11;
   const days = windowDays(o.days, o.range);
   const readings = days.filter((d) => d.value != null && !d.gap);
