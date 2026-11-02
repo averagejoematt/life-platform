@@ -556,7 +556,22 @@ def sleep_correlations(*, _g) -> dict:
     return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
 
 
-def sleep_detail(*, _g) -> dict:
+def _sleep_bounds(_g, window: tuple[str, str] | None) -> tuple[str, str, dict]:
+    """``(today, d30, _w30)`` for sleep_detail. Default: the trailing 30-night window ending today.
+
+    #5584: a ``window`` (``web.day_window``'s clamped inclusive ``(from, to)``) moves both bounds
+    and every figure becomes "over the window, as of its last day". The ``30d_``-named keys stay
+    truthful (#1917): ``full`` holds only when the window IS 30 days, never for a longer one.
+    """
+    if window is None:
+        today = _g["datetime"].now(PT).strftime("%Y-%m-%d")
+        d30 = _g["_experiment_date"](30)
+        return today, d30, _window_span(d30, today, 30)  # #1917: is "30d" a true name today?
+    span = _window_span(window[0], window[1], 30)
+    return window[1], window[0], {**span, "full": span["actual_days"] == 30}
+
+
+def sleep_detail(*, _g, window: tuple[str, str] | None = None) -> dict:
     """
     GET /api/sleep_detail
     Returns: 30-day sleep stats from Eight Sleep + Whoop cross-referenced.
@@ -564,13 +579,8 @@ def sleep_detail(*, _g) -> dict:
     Cache: 3600s (1h).
     """
     EXPERIMENT_START = _g["EXPERIMENT_START"]
-    _experiment_date = _g["_experiment_date"]
     _query_source = _g["_query_source"]
-    datetime = _g["datetime"]
-
-    today = datetime.now(PT).strftime("%Y-%m-%d")
-    d30 = _experiment_date(30)
-    _w30 = _window_span(d30, today, 30)  # #1917: is "30d" a true name today?
+    today, d30, _w30 = _sleep_bounds(_g, window)  # #5584: an optional day window moves both bounds
 
     eight_days = _query_source("eightsleep", d30, today)
     whoop_days = _query_source("whoop", d30, today)
