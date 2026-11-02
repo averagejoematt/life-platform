@@ -974,3 +974,152 @@ svg .focus {
   }
 }
 
+
+/* One day (#5585): prev/next, the fourteen-day strip (7×2 on a phone), the scrubber, the reading tiles */
+.daynav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.daynav .dn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  font-weight: 600;
+  font-size: var(--fs-ui);
+  text-decoration: none;
+  color: var(--ink);
+}
+.daynav span.dn {
+  font-weight: 400;
+}
+.strip {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 4px;
+  flex: 1 1 380px;
+  max-width: 560px;
+}
+.strip a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: var(--tap);
+  border: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  color: var(--muted);
+  text-decoration: none;
+}
+.strip a i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  background: var(--ink);
+}
+.strip a i.nw {
+  background: transparent;
+  border: 1px solid var(--muted);
+}
+.strip a[aria-current] {
+  border-color: var(--cobalt);
+  background: #fff;
+  color: var(--ink);
+}
+.strip a[aria-current] i.w {
+  background: var(--cobalt);
+}
+.scrub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  margin-top: 14px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+.scrub[hidden] {
+  display: none;
+}
+.scrub input {
+  flex: 1 1 200px;
+  min-height: var(--tap);
+  accent-color: var(--cobalt);
+}
+.alldays {
+  margin-top: 14px;
+  font-size: var(--fs-small);
+}
+.alldays p {
+  margin: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.alldays a {
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+}
+.day-tiles {
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+}
+.day-tiles .tile {
+  gap: 6px;
+  padding: 14px 16px 12px;
+}
+.day-tiles .tile .v {
+  font-size: 34px;
+}
+.day-tiles .tile .d {
+  font-size: var(--fs-label);
+  color: var(--muted);
+  line-height: 1.45;
+}
+.day-tiles .tile .label a {
+  color: inherit;
+}
+.day-tiles .spark {
+  position: relative;
+}
+.day-tiles .spark svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.day-tiles .spark path {
+  fill: none;
+  stroke: var(--faint);
+  stroke-width: 1.4;
+}
+.day-tiles .spark .mean {
+  stroke: var(--rule);
+  stroke-dasharray: 2 3;
+}
+.day-tiles .spark .mark {
+  fill: var(--cobalt);
+}
+@media (max-width: 760px) {
+  .strip {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    flex-basis: 100%;
+    max-width: none;
+    order: 3;
+  }
+  .day-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .day-tiles .tile {
+    padding: 12px 12px 10px;
+  }
+  .day-tiles .tile .v {
+    font-size: 26px;
+  }
+}

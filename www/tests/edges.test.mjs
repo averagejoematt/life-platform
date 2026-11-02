@@ -57,3 +57,17 @@ test("an object never lists itself", () => {
   const index = buildIndex([{ id: "a", type: "metric", edges: [{ type: "metric", id: "a" }] }]);
   assert.equal(connected(index, "metric", "a").total, 0);
 });
+
+test("a day lists its chapter and measures, but a measure's rail never lists its days (#5585)", () => {
+  const index = buildIndex([
+    { id: "weight_lbs", type: "metric", edges: [] },
+    { id: "week-06", type: "chapter", edges: [] },
+    { id: "2026-10-15", type: "day", edges: [{ type: "chapter", id: "week-06" }, { type: "metric", id: "weight_lbs" }] },
+  ]);
+  assert.deepEqual(
+    connected(index, "day", "2026-10-15").items.map((e) => e.type),
+    ["chapter", "metric"],
+  );
+  assert.equal(connected(index, "metric", "weight_lbs").total, 0);
+  assert.equal(connected(index, "chapter", "week-06").total, 0);
+});

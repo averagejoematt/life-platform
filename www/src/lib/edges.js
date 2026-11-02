@@ -19,6 +19,7 @@ export const COLLECTION_OF = Object.freeze({
   source: "sources",
   method: "methods",
   edition: "editions",
+  day: "days",
 });
 
 /** The order the Connected rail lists types in: the story first, the machine last. */
@@ -35,7 +36,15 @@ export const RAIL_ORDER = Object.freeze([
   "source",
   "method",
   "edition",
+  "day",
 ]);
+
+/**
+ * Types whose edges are read one way only: a day points at its chapter and its readings' measures,
+ * but a measure or a chapter does not list its days in its rail (57 and counting would bury the
+ * rest). The way into a day is the weight page and the day's own strip, scrubber and neighbours (#5585).
+ */
+export const OUTBOUND_ONLY = Object.freeze(["day"]);
 
 const key = (type, id) => `${type}:${id}`;
 
@@ -85,7 +94,8 @@ export function connected(index, type, id, opts = {}) {
   const k = key(type, id);
   const seen = new Set();
   const all = [];
-  for (const e of [...(index.out.get(k) || []), ...(index.in.get(k) || [])]) {
+  const inbound = (index.in.get(k) || []).filter((e) => !OUTBOUND_ONLY.includes(e.type));
+  for (const e of [...(index.out.get(k) || []), ...inbound]) {
     const ek = key(e.type, e.id);
     if (ek === k || seen.has(ek)) continue;
     seen.add(ek);

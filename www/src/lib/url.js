@@ -15,6 +15,7 @@ export const PATH_OF = Object.freeze({
   source: (id) => `/system/sources/${id}/`,
   method: (id) => `/system/methods/${id}/`,
   edition: () => `/`,
+  day: (id) => `/data/day/${id}/`,
 });
 
 /** Join the build's base path and a site-absolute path, keeping the trailing slash. */
