@@ -2,7 +2,7 @@
 // System — three depths on one page (Stage 3 `#system`). Depth 1 plain English; depth 2 the
 // record, from the edition's one producer; depth 3 the sources and methods.
 import Base from "../../layouts/Base.astro";
-import { dayInWords, kOfN } from "../../lib/format.js";
+import { dayInWords, domainWords, kOfN } from "../../lib/format.js";
 import { loadAll, latestEdition } from "../../lib/snapshot.js";
 import { href, pathOf } from "../../lib/url.js";
 
@@ -52,7 +52,7 @@ const steps = [
               <a href={href(pathOf("coach", c.id))}>
                 <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
                   <b style="font-size:16px">
-                    {c.name} <span class="muted" style="font-weight:400">· {c.domain}</span>
+                    {c.name} <span class="muted" style="font-weight:400">· {domainWords(c.domain)}</span>
                   </b>
                   <span class="mono muted" style="font-size:12px">
                     {c.retired ? "Retired." : c.instrument_absent?.absent ? c.instrument_absent.reason || "No instrument." : c.tier === "lead" ? "The lead: no calls of its own." : c.comparison_text || ""}
