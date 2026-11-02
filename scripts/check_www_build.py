@@ -175,6 +175,9 @@ def raw_ids(snapshot: str = SNAPSHOT) -> set[str]:
             v = rec.get("domain") if isinstance(rec, dict) else None
             if isinstance(v, str) and "_" in v:
                 out.add(v)
+            pid = rec.get("id") if isinstance(rec, dict) else None
+            if isinstance(pid, str) and pid.endswith("_coach"):
+                out.add(pid)  # #5572: a persona id is never prose; render the coach's name
     return out
 
 
@@ -213,7 +216,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
                         visible = TAG.sub(" ", text)
                         for raw in sorted(ids):
                             if re.search(rf"(?<![\w-]){re.escape(raw)}(?![\w-])", visible):
-                                issues.append(f"{rel}: raw domain id {raw!r} rendered as text (#5568 — route it through domainWords())")
+                                issues.append(f"{rel}: raw id {raw!r} rendered as text (#5568 domainWords() / #5572 coach name)")
     if pages == 0:
         issues.append("no html pages in dist")
     return issues
