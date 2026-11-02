@@ -68,7 +68,8 @@ export function segments(days, valueOf = (d) => d.value, breaks = null) {
  * }} o
  */
 export function svgChart(o) {
-  const W = o.width || (o.mobile ? 480 : 1000);
+  // a phone-width viewBox follows the container (the island passes `width`) so the 12.5-unit labels stay ≥ 11 px (#1210)
+  const W = o.width || (o.mobile ? 350 : 1000);
   const H = o.height || 220;
   const padL = o.mobile ? 40 : 44;
   const padR = 12;

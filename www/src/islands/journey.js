@@ -12,7 +12,9 @@ export function mount(root = document.querySelector("[data-journey]")) {
   const state = { frame: "distance", range: null, show: { mean: true, projection: true, rungs: true, chapters: false, events: true } };
   const mobile = () => window.innerWidth < 640;
   const draw = () => {
-    const o = { ...data, ...state, mobile: mobile(), aria: root.dataset.aria || "" };
+    // the viewBox follows the container on a phone, so text keeps its pixel size (#1210)
+    const width = mobile() ? Math.max(280, Math.round(chart.clientWidth || 350)) : undefined;
+    const o = { ...data, ...state, mobile: mobile(), width, aria: root.dataset.aria || "" };
     chart.innerHTML = journeyChart(o);
     if (caption) caption.textContent = journeyCaption(o);
     mountAll(root);
