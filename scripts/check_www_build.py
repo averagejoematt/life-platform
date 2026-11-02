@@ -50,6 +50,7 @@ sys.path.insert(0, REPO)
 from deploy import www_owned_paths  # noqa: E402 — the one reader of owned_paths.json (#5534)
 
 SENTINELS = ("SENTINEL", "DO-NOT-PUBLISH", "POISON-HELD")
+SAMPLE_CHIP = "Sample content, for layout only"  # fixture-only (#5581): on a LIVE build it is a false claim on a real page
 SCRIPT_TAG = re.compile(r"<script\b[^>]*>", re.IGNORECASE)
 NOINDEX = re.compile(r'<meta name="robots" content="noindex', re.IGNORECASE)
 
@@ -177,8 +178,17 @@ def raw_ids(snapshot: str = SNAPSHOT) -> set[str]:
     return out
 
 
-def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None) -> list[str]:
+def snapshot_mode(snapshot_dir: str = SNAPSHOT) -> str | None:
+    try:
+        with open(os.path.join(snapshot_dir, "manifest.json"), encoding="utf-8") as fh:
+            return json.load(fh).get("mode")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None, snapshot_dir: str = SNAPSHOT) -> list[str]:
     issues: list[str] = []
+    live = snapshot_mode(snapshot_dir) == "live"
     pages = 0
     ids = raw_ids() if forbidden_ids is None else forbidden_ids
     for dirpath, _d, files in os.walk(dist):
@@ -190,6 +200,8 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
                 for s in SENTINELS:
                     if s in text:
                         issues.append(f"{rel}: sentinel {s!r}")
+                if live and SAMPLE_CHIP in text:
+                    issues.append(f"{rel}: fixture-only {SAMPLE_CHIP!r} on a LIVE build (#5581)")
                 if name.endswith(".html"):
                     pages += 1
                     for tag in SCRIPT_TAG.findall(text):

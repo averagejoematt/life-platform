@@ -69,6 +69,14 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 const SNAPSHOT_DIR = resolve(process.cwd(), "content", "snapshot");
+
+let _mode = null;
+/** "fixture" or "live" — the snapshot manifest's `mode`, read once per build. Throws when absent. */
+export async function snapshotMode() {
+  if (_mode) return _mode;
+  _mode = JSON.parse(await readFile(join(SNAPSHOT_DIR, "manifest.json"), "utf8")).mode;
+  return _mode;
+}
 let _series = null;
 let _pairs = null;
 
