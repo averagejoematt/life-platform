@@ -43,7 +43,7 @@ const by = (s: string) => mine.filter((p) => p.status === s).length;
       </div>
       <div style="display:flex;flex-direction:column;gap:22px">
         <div>
-          <p class="label" style="margin-bottom:8px">Predictions in the snapshot · {mine.length} · {by("confirmed")} confirmed, {by("refuted")} refuted, {by("pending")} pending</p>
+          <p class="label" style="margin-bottom:8px">Predictions in the snapshot · {mine.length} · {by("confirmed")} right, {by("refuted")} wrong, {by("pending")} open</p>
           {
             mine.length ? (
               <div class="rows">
@@ -52,7 +52,7 @@ const by = (s: string) => mine.filter((p) => p.status === s).length;
                     <span class="mono" style="font-size:13px;line-height:1.45">
                       {clip(p.claim, 110)}
                     </span>
-                    <StatusTag status={p.status} date={p.settled_date} />
+                    <StatusTag status={p.status} date={p.settled_date} call />
                   </a>
                 ))}
               </div>

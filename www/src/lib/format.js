@@ -28,6 +28,22 @@ export function kOfN(right, n) {
   return `${right} of ${n} right`;
 }
 
+/** A call's OWN outcome in words — the one mapping every surface uses (the rail, the Journey, the Day, the
+ * ledger, the coach pages). The simple guess's result is a different fact and never borrows these words: on
+ * 2 November the rail printed the simple guess's "wrong" under a call the ledger graded right. The exporter's
+ * `summary` for a prediction is this same word (scripts/publish_snapshot.py CALL_OUTCOME, pinned equal). */
+export const CALL_OUTCOME = {
+  confirmed: "right",
+  refuted: "wrong",
+  expired: "could not be checked",
+  inconclusive: "inconclusive",
+  pending: "open",
+  observation: "not graded",
+};
+export function callOutcome(status) {
+  return CALL_OUTCOME[status] || String(status || "");
+}
+
 /** Trim a claim for a row without cutting mid-word. */
 export function clip(text, max = 90) {
   if (!text) return "";

@@ -49,6 +49,11 @@ from datetime import date
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from publish_snapshot_chapters import (
+    CALL_OUTCOME,
+    apply_week_intervals,
+    clean_excerpt,
+)  # noqa: E402 — one vocabulary for weeks, excerpts and calls
 from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the contract is one module, reached through this one
     _ISO_IN_TEXT,
     _MONTHS,
@@ -395,12 +400,12 @@ def _live_chapters(ctx: LiveContext) -> None:
                 source=["/journal/posts.json"],
                 approved={"by": "owner", "at": p["date"], "via": "chronicle-approve"},
                 title=p.get("title") or cid,
-                summary=p.get("excerpt"),
+                summary=clean_excerpt(p.get("excerpt")),
                 week=week,
                 week_label=p.get("label") or (f"Week {week}" if week is not None else cid),
                 date=p["date"],
                 status="published",
-                excerpt=p.get("excerpt"),
+                excerpt=clean_excerpt(p.get("excerpt")),
                 body_html=_chapter_body(ctx, p.get("url")),
                 word_count=wc,
                 read_minutes=max(1, round(wc / 230)) if wc else None,
@@ -587,7 +592,7 @@ def _live_ledger(ctx: LiveContext) -> None:
                 data_through=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
                 source=["/api/ledger_export"],
                 title=claim_text[:120],
-                summary=(sg or {}).get("short"),
+                summary=CALL_OUTCOME.get(status, status),  # the call's own outcome; the simple guess is its own field
                 coach_id=pid,
                 coach_name=str(r.get("coach_name") or pid),
                 retired=bool(r.get("retired")),
@@ -1001,6 +1006,7 @@ def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
     _live_episodes(ctx)  # first, so chapters can point at them
     _live_chapters(ctx)
     _live_week_states(ctx)
+    apply_week_intervals(ctx.objs["chapter"], ctx.fetched.get("chapters"), None)  # explicit week intervals on every chapter
     _live_coaches(ctx)
     _live_ledger(ctx)
     _live_disagreements(ctx)

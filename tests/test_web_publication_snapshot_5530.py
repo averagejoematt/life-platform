@@ -535,7 +535,12 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
         "evaluator_version": "1.0",
     }
     assert refuted["corrections"][0]["evaluator_version"] == "1.1" and refuted["corrections"][0]["corrected_at"] == "2026-10-31T06:00:00Z"
-    assert refuted["summary"] == "also right" and refuted["edges"][1] == {"type": "metric", "id": "deep_pct", "rel": "about"}
+    # the summary is the call's own outcome; the simple guess ("also right" in this capture) is its own field (acceptance item 1)
+    assert (
+        refuted["summary"] == "wrong"
+        and refuted["simple_guess"]["state"]
+        and refuted["edges"][1] == {"type": "metric", "id": "deep_pct", "rel": "about"}
+    )
     pending = [p for p in public["prediction"] if p["status"] == "pending"]
     assert len(pending) == 2 and {p["metric_id"] for p in pending} == {"recovery_score", "resting_heart_rate"}
     assert all(p["grading"]["how"] is None for p in pending)

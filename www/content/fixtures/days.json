@@ -325,6 +325,7 @@
    {
     "coach": "Lisa Park",
     "coach_id": "sleep_coach",
+    "corrections": [],
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: a short night after a long session; the recovery number this morning is the cost, not a verdict."
@@ -826,6 +827,7 @@
    {
     "coach": "Marcus Webb",
     "coach_id": "nutrition_coach",
+    "corrections": [],
     "move": "bet",
     "move_label": "A call",
     "text": "Sample line: protein at the floor three days running; I expect recovery to hold through the week."
@@ -1305,11 +1307,27 @@
   "calls_open_count": 1,
   "calls_settled": [],
   "chapter_id": null,
-  "coach_lines": [],
+  "coach_lines": [
+   {
+    "coach": "Lisa Park",
+    "coach_id": "sleep_coach",
+    "corrections": [
+     "Correction: 15 g of protein is not what he ate. It is what an incomplete food record held \u2014 no diary entries, 80 kcal and 15 g of protein recorded in all \u2014 on Thursday 8 October. Intake that day is unknown."
+    ],
+    "move": "reaction",
+    "move_label": "On a result",
+    "text": "Sample line: protein sat at 15 grams yesterday, and recovery climbing to its best still came."
+   }
+  ],
   "data_through": "2026-10-09",
   "date": "2026-10-09",
   "day_number": 34,
   "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "spoke",
+    "type": "coach"
+   },
    {
     "id": "sleep-20261005-deepsleep01",
     "rel": "open",
@@ -1797,6 +1815,7 @@
    {
     "coach": "Sarah Chen",
     "coach_id": "training_coach",
+    "corrections": [],
     "move": "reaction",
     "move_label": "On a result",
     "text": "Sample line: I was wrong about the deadlift; the bar moved faster than the week before."
@@ -1804,6 +1823,7 @@
    {
     "coach": "Eli Marsh",
     "coach_id": "eli_marsh",
+    "corrections": [],
     "move": "reply",
     "move_label": "A reply",
     "text": "Sample line: two coaches read the same night two ways; both readings stand until the data settles it."
@@ -3000,6 +3020,7 @@
    {
     "coach": "Amara Patel",
     "coach_id": "glucose_coach",
+    "corrections": [],
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: no new sensor readings, so nothing new to read on glucose."
@@ -3305,6 +3326,7 @@
    {
     "coach": "Lisa Park",
     "coach_id": "sleep_coach",
+    "corrections": [],
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: the held day."

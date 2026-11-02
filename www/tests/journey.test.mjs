@@ -37,15 +37,23 @@ test("the ladder: crossed rungs carry their date in words and the gap, the next 
   assert.ok(!rows.some((r) => /\d{4}-\d\d-\d\d/.test(r.right)), "no ISO date reaches the page");
 });
 
-test("every crossed rung is listed: a published chapter of its week links, any other week reads as plain text with its state (#5598)", () => {
-  const chapters = [
-    { id: "week-04", week: 1, date: "2026-09-08", status: "published" },
-    { id: "week-05", week: 2, date: "2026-09-15", status: "published", week_label: "Week 2" },
-    { id: "week-08", week: 5, date: "2026-10-06", status: "published", week_label: "Week 5" },
-    { id: "week-09", week: 6, date: "2026-10-13", status: "published" },
-    { id: "program-week-08", week: 8, date: "2026-10-25", status: "held" },
-    { id: "week-01", week: 0, date: "2026-08-31", status: "published" },
-  ];
+// The production shape on 2 November (the owner's review): Week 1 is 6–12 September, published on the 8th; Week 7
+// (18–24 October) was skipped; Week 8 (25–31 October) is held. The intervals decide the week, never the publication date.
+const W = (id, week, start, status, extra = {}) => {
+  const end = new Date(Date.parse(`${start}T00:00:00Z`) + 6 * 86400000).toISOString().slice(0, 10);
+  return { id, week, week_start: start, week_end: end, status, week_label: `Week ${week}`, ...extra };
+};
+const PRODUCTION_WEEKS = [
+  W("week-04", 1, "2026-09-06", "published", { date: "2026-09-08" }),
+  W("week-05", 2, "2026-09-13", "published", { date: "2026-09-15" }),
+  W("week-08", 5, "2026-10-04", "published", { date: "2026-10-06" }),
+  W("week-09", 6, "2026-10-11", "published", { date: "2026-10-13" }),
+  W("program-week-07", 7, "2026-10-18", "skipped", { date: "2026-10-18" }),
+  W("program-week-08", 8, "2026-10-25", "held", { date: "2026-10-25" }),
+  { id: "week-01", week: 0, week_start: null, week_end: null, date: "2026-08-31", status: "published", week_label: "Prologue · Part I" },
+];
+
+test("every crossed rung falls in the week whose explicit interval contains it — 12 Sep is Week 1, 21 Oct is Week 7 (acceptance item 3)", () => {
   const got = rungChapters(
     [
       { lb: 320, date: "2026-09-12" },
@@ -53,23 +61,34 @@ test("every crossed rung is listed: a published chapter of its week links, any o
       { lb: 300, date: "2026-10-21" },
       { lb: 290, date: null },
     ],
-    chapters,
+    PRODUCTION_WEEKS,
   );
   assert.deepEqual(
     got.map((r) => [r.lb, r.link, r.label, r.state, r.chapter ? r.chapter.id : null]),
     [
-      [320, true, "Week 2", "published", "week-05"],
+      [320, true, "Week 1", "published", "week-04"],
       [310, true, "Week 5", "published", "week-08"],
-      [300, false, "Week 8", "held", null],
+      [300, false, "Week 7", "skipped", null],
     ],
-    "300 fell in a week whose chapter is held: it keeps its date and reads Week 8 · held, never a link (#5598)",
+    "a milestone keeps its date in every case; only a published chapter links",
   );
 });
 
-test("a crossed rung in a week with no chapter object reads 'no chapter yet', not a status (#5598)", () => {
-  const chapters = [{ id: "week-06", week: 6, date: "2026-10-13", status: "published", week_label: "Week 6" }];
-  const got = rungChapters([{ lb: 240, date: "2026-09-12" }], chapters);
-  assert.deepEqual([got[0].link, got[0].label, got[0].state, got[0].chapter], [false, "Week 2", "no chapter yet", null]);
+test("the last day of a week stays in it and the next morning starts the next one", () => {
+  const got = rungChapters([{ lb: 1, date: "2026-10-24" }, { lb: 2, date: "2026-10-25" }], PRODUCTION_WEEKS);
+  assert.deepEqual(got.map((r) => [r.week, r.state]), [[7, "skipped"], [8, "held"]]);
+});
+
+test("a crossed rung in a week with no chapter object reads 'no chapter yet', numbered from the intervals", () => {
+  const chapters = [W("week-09", 6, "2026-10-11", "published")];
+  const got = rungChapters([{ lb: 240, date: "2026-11-09" }, { lb: 250, date: "2026-10-10" }], chapters);
+  assert.deepEqual(got.map((r) => [r.link, r.label, r.state, r.chapter]), [[false, "Week 10", "no chapter yet", null], [false, "Week 5", "no chapter yet", null]]);
+});
+
+test("a chapter without an interval (a prologue) never claims a crossing", () => {
+  const got = rungChapters([{ lb: 330, date: "2026-08-31" }], PRODUCTION_WEEKS);
+  assert.equal(got[0].link, false);
+  assert.equal(got[0].state, "no chapter yet");
 });
 
 test("the heart captions are plain means of the readings shown, with their counts", () => {

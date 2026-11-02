@@ -30,7 +30,7 @@ import {
   tileValue,
   unservedText,
 } from "../../../lib/day.js";
-import { dayInWords, num } from "../../../lib/format.js";
+import { callOutcome, dayInWords, num } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -82,7 +82,8 @@ const status = `The data · one day · ${words(d.date)}`;
 // Every day since the start, by program week — the no-JavaScript door the scrubber stands in for.
 const weeks: { n: number; days: any[] }[] = [];
 for (const x of days) {
-  const n = Math.floor((x.day_number - 1) / 7) + 1;
+  const ch = x.chapter_id ? all.get("chapter", x.chapter_id) : null;
+  const n = ch && ch.week >= 1 ? ch.week : Math.floor((x.day_number - 1) / 7) + 1; // the chapter's interval decided the day's week at export
   if (!weeks.length || weeks[weeks.length - 1].n !== n) weeks.push({ n, days: [] });
   weeks[weeks.length - 1].days.push(x);
 }
@@ -100,6 +101,10 @@ const stages = night ? stageRows(night) : [];
 const recovery = recoveryRows(d);
 const food = d.food;
 const engine = d.engine ? { line: engineLine(d.engine), rows: engineRows(d.engine) } : null;
+// On a day whose food record is incomplete the engine scored that record as if it were eaten (character_engine reads the
+// MacroFactor totals; the absence rule covers a missing day, not a stub). Say what the nutrition number measures there.
+const gapPillar = food && food.logging_gap && d.engine ? d.engine.pillars.find((p: any) => p.name === "nutrition" && p.score != null) || null : null;
+const weekSpan = chapter && chapter.week_start && chapter.week_end ? `${words(chapter.week_start)} to ${words(chapter.week_end)}` : null;
 const after = next ? next.coach_lines : [];
 const nearest = d.calls_settled.length ? null : nearestGraded(days, i);
 const predHref = (id: string) => (all.get("prediction", id) ? href(pathOf("prediction", id)) : null);
@@ -381,8 +386,9 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                 {food.logging_gap ? (
                   <div class="callout">
                     <b>A logging gap, stated as one.</b> The platform marks {when} as a day with no diary entries: the figures above are what the
-                    record holds{d.workout ? `, beside a ${num(d.workout.duration_min, 0)}-minute session` : ""}, not what he ate. It treats such a day as
-                    missing, not as eaten — no deficit is published from it, and the coaches' grader reads it the same way.
+                    record holds{d.workout ? `, beside a ${num(d.workout.duration_min, 0)}-minute session` : ""}, not what he ate, so intake that day is unknown. No
+                    deficit is published from it, and since 31 October the grader reads such a day as missing. The coaches' notes and the engine's nutrition
+                    score for this day were written from the record as if it were eaten; a correction stands beside each line that quotes it.
                   </div>
                 ) : (
                   <p class="small">
@@ -418,6 +424,13 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     <span class={`v mono${r.absent ? " muted" : ""}`}>{r.value}</span>
                   </div>
                 ))}
+                {gapPillar && (
+                  <p class="callout" data-gap-score style="margin-top:10px">
+                    <b>What Nutrition {num(gapPillar.score, 0)} means here.</b> The engine scored this day's incomplete record as if it were eaten: {num(food.calories, 0)} kcal
+                    against the calorie target and {num(food.protein_g, 0)} g against the protein floor, beside the body-composition trend. It measures the record,
+                    not his intake, which is unknown. A day with no record at all has calories and protein marked absent instead.
+                  </p>
+                )}
                 <p class="small" style="margin-top:10px">
                   Seven areas scored nightly from the record; an area with no instrument is shown as absent, never as a middling number.
                 </p>
@@ -444,6 +457,11 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     {coachHref(l.coach_id) ? <a href={coachHref(l.coach_id)}>{l.coach}</a> : l.coach} · {l.move_label || l.move}
                   </figcaption>
                   <blockquote>{l.text}</blockquote>
+                  {l.corrections.map((c) => (
+                    <p class="correction" role="note">
+                      {c}
+                    </p>
+                  ))}
                 </figure>
               ))
             ) : (
@@ -463,6 +481,11 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                       {l.coach} · {l.move_label || l.move}
                     </figcaption>
                     <blockquote>{l.text}</blockquote>
+                    {l.corrections.map((c) => (
+                      <p class="correction" role="note">
+                        {c}
+                      </p>
+                    ))}
                   </figure>
                 ))}
               </>
@@ -476,7 +499,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
               <div class="chips">
                 {d.calls_settled.map((c) => (
                   <a class="callchip solid" href={predHref(c.prediction_id)}>
-                    <span class="k">{c.verdict}</span>
+                    <span class="k">{callOutcome(c.verdict)}</span>
                     <span>
                       {c.coach_name}: {c.claim_short}
                     </span>
@@ -493,7 +516,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     {nearest.calls_settled.slice(0, 2).map((c: any) => (
                       <a class="callchip solid" href={predHref(c.prediction_id)}>
                         <span class="k">
-                          {c.verdict} · {short(nearest.date)}
+                          {callOutcome(c.verdict)} · {short(nearest.date)}
                         </span>
                         <span>
                           {c.coach_name}: {c.claim_short}
@@ -545,10 +568,18 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     <span>{chapter.week_label}</span>
                     <span class="mono">{chapter.status === "published" ? `published · “${chapter.title}”` : chapter.status}</span>
                   </span>
-                  <span>
-                    <span>{chapter.status === "published" ? "Published" : "Week of"}</span>
-                    <span class="mono">{words(chapter.date)}</span>
-                  </span>
+                  {weekSpan && (
+                    <span>
+                      <span>The week</span>
+                      <span class="mono">{weekSpan}</span>
+                    </span>
+                  )}
+                  {chapter.status === "published" && (
+                    <span>
+                      <span>Published</span>
+                      <span class="mono">{words(chapter.date)}</span>
+                    </span>
+                  )}
                 </div>
                 {chapter.status === "published" ? (
                   <p style="margin-top:12px">

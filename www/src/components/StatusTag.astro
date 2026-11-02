@@ -1,11 +1,13 @@
 ---
-import { dayInWords } from "../lib/format.js";
+import { callOutcome, dayInWords } from "../lib/format.js";
 
 interface Props {
   status: string;
   date?: string | null;
+  /** a prediction's status: printed as the call's outcome word ("right", "wrong", "open") */
+  call?: boolean;
 }
-const { status, date = null } = Astro.props;
+const { status, date = null, call = false } = Astro.props;
 ---
 
-<span class={`status ${status}`}>{status}{date && ` ${dayInWords(date, { short: true })}`}</span>
+<span class={`status ${status}`}>{call ? callOutcome(status) : status}{date && ` ${dayInWords(date, { short: true })}`}</span>

@@ -151,6 +151,8 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "week_label": ("str", False),
         "date": ("day", False),
         "status": ("enum:published|held|skipped|pending", False),
+        "week_start": ("day", True),
+        "week_end": ("day", True),
         "excerpt": ("str", True),
         "body_html": ("str", True),
         "word_count": ("int", True),

@@ -42,15 +42,10 @@ const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Bo
 const weekOrder: string[] = week?.order || [];
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 
-// The week a chapter covers: program week N runs from start + 7(N−1) for seven days.
+// The week a chapter covers: its explicit interval from the snapshot (/api/chapters), never re-derived here.
 function weekRange(c: any): string | null {
-  if (!startDate || c?.week == null) return null;
-  const s = new Date(`${startDate}T00:00:00Z`);
-  s.setUTCDate(s.getUTCDate() + 7 * (c.week - 1));
-  const e = new Date(s);
-  e.setUTCDate(e.getUTCDate() + 6);
-  const a = dayInWords(s.toISOString().slice(0, 10), { short: true });
-  const b = dayInWords(e.toISOString().slice(0, 10), { short: true });
+  const a = c?.week_start ? dayInWords(c.week_start, { short: true }) : null;
+  const b = c?.week_end ? dayInWords(c.week_end, { short: true }) : null;
   return a && b ? `${a} – ${b}` : null;
 }
 
@@ -156,7 +151,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         </p>
         <div class="row">
           {firstChapter && <a class="btn" href={href(pathOf("chapter", firstChapter.id))}>Start with chapter one</a>}
-          {latestChapter && <a class="btn ghost" href="#week">This week ↓</a>}
+          {latestChapter && <a class="btn ghost" href="#week">Latest published chapter ↓</a>}
         </div>
         <p class="margin">
           The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
@@ -207,7 +202,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           </div>
           <article style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px">
             <div class="row">
-              <span class="label">This week</span>
+              <span class="label">Latest published chapter</span>
               <Provenance object={latestChapter} />
             </div>
             <h2 style="font-size:44px;line-height:1.05">{latestChapter.title}</h2>
@@ -309,7 +304,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                     <span style="font-size:14px;line-height:1.35">
                       <b>{p.coach_name}</b> · {clip(p.claim, 88)}
                     </span>
-                    <StatusTag status="pending" date={p.due_date} />
+                    <StatusTag status="pending" date={p.due_date} call />
                   </a>
                 ))}
               </div>
@@ -375,6 +370,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                         {l.coach || c?.name || l.coach_id}
                         {c?.domain || l.domain ? ` · ${domainWords(c?.domain || l.domain)}` : ""}
                         {l.move_label ? ` · ${l.move_label}` : ""}
+                        {l.as_of && dayInWords(l.as_of) ? ` · said ${dayInWords(l.as_of, { weekday: true, short: true })}` : ""}
                       </span>
                     </span>
                   </span>

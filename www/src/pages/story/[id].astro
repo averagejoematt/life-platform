@@ -35,6 +35,11 @@ const stateCopy: Record<string, string> = {
   skipped: "Skipped.",
   pending: "Not yet.",
 };
+// The calendar week and the address can disagree by design: published chapters keep the journal's post ids
+// (week-04 is program Week 1), which are permanent URLs. The page says which week it is, by its interval.
+const span = c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null;
+const legacyNo = /^week-(\d+)$/.exec(c.id);
+const idNote = legacyNo && c.week != null && Number(legacyNo[1]) !== c.week ? `This page's address keeps the journal's post number (${legacyNo[1]}); the chapter is program ${c.week >= 1 ? `week ${c.week}` : "prologue"}.` : null;
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
@@ -49,11 +54,22 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         <div class="row mono muted" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase">
           <span>{c.week_label}</span>
           <span>·</span>
-          <span>{dayInWords(c.date)}</span>
+          {span ? <span>{span}</span> : <span>{dayInWords(c.date)}</span>}
+          {span && c.status === "published" && (
+            <>
+              <span>·</span>
+              <span>published {dayInWords(c.date)}</span>
+            </>
+          )}
           <Provenance object={c} />
         </div>
         <h1>{c.title}</h1>
         {c.excerpt && <p class="dek">{c.excerpt}</p>}
+        {idNote && (
+          <p class="muted" style="font-size:13px" data-id-note>
+            {idNote}
+          </p>
+        )}
         <div class="row muted" style="font-size:14px">
           {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
           {c.word_count && <span>{num(c.word_count)} words</span>}

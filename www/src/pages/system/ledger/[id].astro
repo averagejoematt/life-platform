@@ -36,7 +36,7 @@ const FLAG_TEXT: Record<string, string> = {
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:18px">
         <p class="label">Prediction · {p.coach_name}{p.retired ? " (retired)" : ""} · {p.kind === "observation" ? "an observation" : p.kind === "yes_no" ? "yes or no" : `a ${p.kind}`}</p>
-        <div class="row"><StatusTag status={p.status} date={p.settled_date} />{p.quality_flags.map((f) => <span class={`flag ${f}`}>{f.replace("_", " ")}</span>)}<Provenance object={p} /></div>
+        <div class="row"><StatusTag status={p.status} date={p.settled_date} call />{p.quality_flags.map((f) => <span class={`flag ${f}`}>{f.replace("_", " ")}</span>)}<Provenance object={p} /></div>
         {
           p.claim_withheld ? (
             <h1 class="serif muted" style="font-size:22px;font-weight:400;line-height:1.4;overflow-wrap:anywhere">

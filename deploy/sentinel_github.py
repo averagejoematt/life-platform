@@ -100,6 +100,7 @@ PUSH_TRIGGER_GLOBS = (
     "scripts/operating_calendar.py",  # #2832 — the calendar doc derives from its registry
     "www/**",  # #5530 — the v9 build (web-gate.yml, web-preview-deploy.yml)
     "scripts/publish_snapshot.py",  # #5530 — its one producer
+    "scripts/publish_snapshot*.py",  # #5602 — the producer's sibling mappers (web-gate.yml), so a mapper change runs the gate
     "scripts/check_www_build.py",  # #5530 — its build gate
     "deploy/www_owned_paths.py",  # #5534 — the owned-paths reader the build gate's drift check imports (web-gate.yml)
     "tests/web_preview_gate.py",  # #5530 — its render gate

@@ -31,6 +31,7 @@ from typing import Any, Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from publish_snapshot_contract import ID_RE, ISO_DAY, SchemaError, envelope, log  # noqa: E402
+from publish_snapshot_corrections import annotate_coach_lines  # noqa: E402
 
 # Optional endpoints the day reads (merged into publish_snapshot.LIVE_ENDPOINTS / OPTIONAL_ENDPOINTS).
 # The three window-bound ones are read for their DATES only: nothing they serve is published here.
@@ -209,6 +210,7 @@ def day_objects(
                 **extra,
             )
         )
+    annotate_coach_lines(out)  # dated corrections beside the verbatim lines (the owner's acceptance ruling, 2026-11-02)
     for o in out:
         check_day(o)
     return out
@@ -502,7 +504,9 @@ def check_layers(o: dict, where: str) -> None:
             if p["not_instrumented"] and p["score"] is not None:
                 raise SchemaError(f"{where}.engine.pillar {p['name']}: an absent area carries no score (never 50)")
     for ln in o["coach_lines"]:
-        _keys(ln, {"coach", "coach_id", "move", "move_label", "text"}, f"{where}.coach_lines")
+        _keys(ln, {"coach", "coach_id", "move", "move_label", "text", "corrections"}, f"{where}.coach_lines")
+        if not isinstance(ln["corrections"], list) or not all(isinstance(c, str) and c for c in ln["corrections"]):
+            raise SchemaError(f"{where}.coach_lines.corrections: a list of sentences")
     for c in o["calls_settled"]:
         _keys(c, {"prediction_id", "coach_name", "verdict", "claim_short"}, f"{where}.calls_settled")
     for c in o["calls_open"]:

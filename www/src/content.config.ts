@@ -75,6 +75,9 @@ const chapters = defineCollection({
     week_label: z.string().min(1),
     date: z.string().regex(ISO_DAY),
     status: z.enum(["published", "held", "skipped", "pending"]),
+    // the program week's explicit interval (/api/chapters), null for a prologue — never inferred from `date`
+    week_start: z.string().regex(ISO_DAY).nullable(),
+    week_end: z.string().regex(ISO_DAY).nullable(),
     excerpt: z.string().nullable(),
     body_html: z.string().nullable(),
     word_count: z.number().int().nullable(),
@@ -327,7 +330,7 @@ const engine = z
   })
   .strict();
 const coachLine = z
-  .object({ coach: z.string().min(1), coach_id: z.string().regex(ID), move: z.string().min(1), move_label: z.string().min(1).nullable(), text: z.string().min(1) })
+  .object({ coach: z.string().min(1), coach_id: z.string().regex(ID), move: z.string().min(1), move_label: z.string().min(1).nullable(), text: z.string().min(1), corrections: z.array(z.string().min(1)) })
   .strict();
 const callSettled = z.object({ prediction_id: z.string().regex(ID), coach_name: z.string().min(1), verdict: z.string().min(1), claim_short: z.string().min(1) }).strict();
 const callOpen = z.object({ prediction_id: z.string().regex(ID), coach_name: z.string().min(1), due_date: z.string().regex(ISO_DAY), text: z.string().min(1) }).strict();

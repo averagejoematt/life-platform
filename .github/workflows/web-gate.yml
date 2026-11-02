@@ -19,7 +19,7 @@ on:
     branches: [main]
     paths:
       - 'www/**'
-      - 'scripts/publish_snapshot.py'
+      - 'scripts/publish_snapshot*.py'
       - 'scripts/check_www_build.py'
       - 'deploy/www_owned_paths.py'
       - 'tests/web_preview_gate.py'
@@ -28,7 +28,7 @@ on:
     branches: [main]
     paths:
       - 'www/**'
-      - 'scripts/publish_snapshot.py'
+      - 'scripts/publish_snapshot*.py'
       - 'scripts/check_www_build.py'
       - 'deploy/www_owned_paths.py'
       - 'tests/web_preview_gate.py'

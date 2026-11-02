@@ -11,7 +11,7 @@ import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
 import { heartChart, heartWeeks, journeyCaption, journeyChart, ladderRows, ordinal, paceBar, rungChapters, visceralBand } from "../../../lib/journey.js";
-import { clip, dayInWords, num } from "../../../lib/format.js";
+import { callOutcome, clip, dayInWords, num } from "../../../lib/format.js";
 import { loadAll, loadJourney, loadSeries } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -25,7 +25,7 @@ const methods = (J.method_ids || []).map((id) => all.get("method", id)).filter(B
 const source = metric && metric.source_id ? all.get("source", metric.source_id) : null;
 const published = all.byType.chapter.filter((c) => c.status === "published");
 const chapters = published
-  .map((c) => ({ date: c.date, label: c.week_label.replace("Prologue · Part ", "P").replace("Week ", "W") }));
+  .map((c) => ({ date: c.week_start || c.date, label: c.week_label.replace("Prologue · Part ", "P").replace("Week ", "W") }));
 const provenance = { state: J.state, as_of: J.as_of || "", data_through: J.data_through, sample: Boolean(J.sample), source: J.source || [], absent_text: J.absent_text };
 const payload = ok && series ? { days: series.days, journey: J, rungs: J.rungs || [], markers: J.markers || [], chapters, unit: J.unit, decimals: 1 } : null;
 const initial = payload ? { ...payload, frame: "distance", range: null, show: { mean: true, projection: true, rungs: true, chapters: false, events: true } } : null;
@@ -42,6 +42,9 @@ const weightCalls = all.byType.prediction.filter((p) => p.metric_id === J.metric
 const right = weightCalls.filter((p) => p.status === "confirmed").length;
 const checked = weightCalls.filter((p) => ["confirmed", "refuted"].includes(p.status)).length;
 const pending = weightCalls.filter((p) => p.status === "pending").length;
+const unchecked = weightCalls.filter((p) => ["expired", "inconclusive"].includes(p.status));
+// The interval's own confidence, as served (weight_trend.weight_trajectory, 0.80) — never a hard-coded level.
+const ci = ok && J.projection_confidence != null ? `${Math.round(Number(J.projection_confidence) * 100)}%` : "the published";
 // ── layers 2–3 (#5583)
 const pace = ok ? paceBar(J) : null;
 const ladder = ok ? ladderRows(J.rungs || [], J.current_weight_lbs) : [];
@@ -50,7 +53,7 @@ const C = ok ? J.composition || null : null;
 const otherLb = C ? Math.max(0, C.total_mass_lb - (C.lean_mass_lb || 0) - (C.fat_mass_lb || 0)) : null;
 const share = (v: number | null) => (C && v != null ? `${((v / C.total_mass_lb) * 100).toFixed(1)}%` : "0%");
 const band = C ? visceralBand(C.visceral_fat_lb) : null;
-const VF_MAX = 4; // the gauge runs 0–4 lb: low under 1, moderate 1 to 2, elevated over 2 (the previous site's scale)
+const VF_MAX = 4; // the gauge runs 0–4 lb: low under 1, moderate 1 to 2, elevated over 2 — site-defined bands (the previous site's), not a clinical standard
 const vfAt = (v: number) => `${Math.min(97, Math.max(0, (v / VF_MAX) * 100)).toFixed(1)}%`;
 const missingScan = Boolean(C && C.next_recommended && J.as_of && C.next_recommended < J.as_of);
 const PA = ok ? J.phenoage || null : null;
@@ -85,10 +88,13 @@ const coachName = (p: any) => {
   const c = p.coach_id ? all.get("coach", p.coach_id) : null;
   return (c && c.title) || p.coach_name || "";
 };
+// Every call the K of N counts is listed — the summary and the list are the same set (acceptance item 1).
 const settled = weightCalls
   .filter((p) => ["confirmed", "refuted"].includes(p.status))
-  .sort((a, b) => String(b.settled_date || "").localeCompare(String(a.settled_date || "")))
-  .slice(0, 4);
+  .sort((a, b) => String(b.settled_date || "").localeCompare(String(a.settled_date || "")) || a.id.localeCompare(b.id));
+const crossed = ok ? (J.rungs || []).filter((r: any) => r.date) : [];
+const gaps = crossed.map((r: any) => r.days).filter((n: any) => n != null);
+const gapWords = gaps.length > 1 ? `${gaps.slice(0, -1).join(", ")} and ${gaps[gaps.length - 1]}` : gaps.length ? String(gaps[0]) : "";
 const headline = ok
   ? silent
     ? `The scale has been silent ${J.silent_days} days; everything here reads as of ${dayInWords(J.last_weighin_date)}.`
@@ -133,21 +139,22 @@ const headline = ok
               {num(J.weekly_rate_lbs, 2)} <small>lb</small>
             </span>
             <span class="muted" style="font-size:13px">
-              95% interval {num(J.weekly_rate_ci_low, 2)} to {num(J.weekly_rate_ci_high, 2)} over the last {J.weighin_span_days} days{J.rate_provisional ? " · provisional" : ""}
+              {ci} interval {num(J.weekly_rate_ci_low, 2)} to {num(J.weekly_rate_ci_high, 2)} over the last {J.weighin_span_days} days{J.rate_provisional ? " · provisional" : ""}
             </span>
           </div>
           <div>
-            <span class="label">Projected</span>
+            <span class="label">At this pace</span>
             <span class="v num" style="font-size:30px">
               {dayInWords(J.projected_goal_date)}
             </span>
             <span class="muted" style="font-size:13px">
-              {num(J.goal_weight_lbs, 0)} lb · 80% range {dayInWords(J.projected_goal_date_earliest, { short: true })} to {dayInWords(J.projected_goal_date_latest)} · {J.days_to_goal} days
+              {num(J.goal_weight_lbs, 0)} lb if the pace holds · range {dayInWords(J.projected_goal_date_earliest, { short: true })} to {dayInWords(J.projected_goal_date_latest)} · {J.days_to_goal} days
             </span>
           </div>
         </div>
         <p class="muted" style="font-size:13px;margin-top:10px">
           {source ? `${source.label} · ` : ""}through {dayInWords(J.data_through || J.as_of)} · {checked ? `${right} of ${checked} checked calls on the weight came true` : "no checked call on the weight yet"}
+          {unchecked.length ? ` · ${unchecked.length} could not be checked` : ""}
           {pending ? ` · ${pending} open` : ""}
         </p>
       </section>
@@ -208,18 +215,18 @@ const headline = ok
           <div style="display:flex;flex-direction:column;gap:12px">
             <h2>The pace</h2>
             <p class="muted" style="font-size:14px;max-width:62ch">
-              The platform publishes one rate: the last {J.weighin_span_days} days, with a block-bootstrap 95% interval. It publishes no slope over any other window, so none is drawn here.
+              The platform publishes one rate: the least-squares slope of the weigh-ins over the last {J.weighin_span_days} days, with a moving-block-bootstrap {ci} interval. It publishes no slope over any other window, so none is drawn here.
             </p>
             <div class="pace">
               <span class="k">published · {J.weighin_span_days} days</span>
-              <span class="t" role="img" aria-label={`${num(J.weekly_rate_lbs, 2)} lb a week, 95% interval ${num(J.weekly_rate_ci_low, 2)} to ${num(J.weekly_rate_ci_high, 2)}`}>
+              <span class="t" role="img" aria-label={`${num(J.weekly_rate_lbs, 2)} lb a week, ${ci} interval ${num(J.weekly_rate_ci_low, 2)} to ${num(J.weekly_rate_ci_high, 2)}`}>
                 <i style={`width:${pace.bar}%`} />
                 <span class="ci" style={`left:${pace.ciLeft}%;width:${pace.ciWidth}%`} />
               </span>
               <span class="v mono">{num(J.weekly_rate_lbs, 2)} lb a week</span>
             </div>
             <p class="muted" style="font-size:13px;max-width:62ch">
-              The cobalt whisker is the 95% interval, {num(J.weekly_rate_ci_low, 2)} to {num(J.weekly_rate_ci_high, 2)} lb a week{J.rate_provisional ? ", and the platform marks the rate provisional" : ""}.{" "}
+              The cobalt whisker is the {ci} interval, {num(J.weekly_rate_ci_low, 2)} to {num(J.weekly_rate_ci_high, 2)} lb a week{J.rate_provisional ? ", and the platform marks the rate provisional" : ""}.{" "}
               {pace.excludesZero
                 ? `The interval does not reach zero, so the ${pace.losing ? "loss" : "gain"} is established at this pace, not just a noisy week.`
                 : "The interval still reaches zero, so the direction is not established yet."}
@@ -228,7 +235,7 @@ const headline = ok
           <div style="display:flex;flex-direction:column;gap:12px">
             <h2>The milestones</h2>
             <p class="muted" style="font-size:14px;max-width:62ch">
-              Ten-pound rungs from the start. The gaps between crossing dates are the honest pace: they widen as the easy water weight goes.
+              Ten-pound rungs from the start, each crossed on the first morning the scale read below it.{gaps.length ? ` The gaps between crossings were ${gapWords} days; they are dates on the record, not a trend, and nothing here explains them.` : ""}
             </p>
             <div class="ladder" role="list" aria-label="Ten-pound milestones">
               {ladder.map((r) => (
@@ -252,21 +259,22 @@ const headline = ok
           <div style="display:flex;flex-direction:column;gap:14px">
             <h2>Where this is heading</h2>
             <p class="dek" style="font-size:19px;color:var(--ink)">
-              At the last {J.weighin_span_days} days' pace, {num(J.goal_weight_lbs, 0)} lb lands on {dayInWords(J.projected_goal_date)}; the 80% range runs from {dayInWords(J.projected_goal_date_earliest, { short: true })} to{" "}
-              {dayInWords(J.projected_goal_date_latest)}.
+              If the last {J.weighin_span_days} days' pace holds, {num(J.goal_weight_lbs, 0)} lb lands on {dayInWords(J.projected_goal_date)}; at the ends of the rate's {ci} interval, between{" "}
+              {dayInWords(J.projected_goal_date_earliest, { short: true })} and {dayInWords(J.projected_goal_date_latest)}.
             </p>
+            <p class="muted" style="font-size:13px;max-width:70ch" data-projection-kind>
+              That date is an extrapolation, not a forecast: the published rate carried forward in a straight line to the goal. It assumes the pace holds for{" "}
+              {J.days_to_goal} days, and nothing grades it.
+            </p>
+            <p class="label" style="margin-top:6px">The short-term forecast · a different model</p>
             <div class="rows">
               <span>
                 <span>Tomorrow's weigh-in, expected</span>
-                <span class="mono">{tomorrow ? `${num(tomorrow.point, 1)} lb · 80% range ${num(tomorrow.lo, 1)} to ${num(tomorrow.hi, 1)}` : "not served"}</span>
+                <span class="mono wraps">{tomorrow ? `${num(tomorrow.point, 1)} lb · 80% range ${num(tomorrow.lo, 1)} to ${num(tomorrow.hi, 1)}` : "not served"}</span>
               </span>
               <span>
                 <span>In a week</span>
-                <span class="mono">{week ? `${num(week.point, 1)} lb · 80% range ${num(week.lo, 1)} to ${num(week.hi, 1)}` : "not served"}</span>
-              </span>
-              <span>
-                <span>Days to the goal</span>
-                <span class="mono">{J.days_to_goal}</span>
+                <span class="mono wraps">{week ? `${num(week.point, 1)} lb · 80% range ${num(week.lo, 1)} to ${num(week.hi, 1)}` : "not served"}</span>
               </span>
               <span>
                 <span>Forecast model</span>
@@ -274,11 +282,10 @@ const headline = ok
               </span>
             </div>
             <p class="muted" style="font-size:13px;max-width:70ch">
-              The projection is the platform's own forecast, not a promise.{" "}
+              These two come from the platform's exponentially weighted moving average of the weigh-ins, not from the rate above, and reach no further than a week.{" "}
               {J.coverage && J.coverage.n_resolved
-                ? `Its shorter forecasts are graded every night: the range held ${num(J.coverage.coverage_pct, 1)}% of ${J.coverage.n_resolved} graded forecasts so far.`
-                : "Its shorter forecasts are graded every night."}{" "}
-              A slow week widens the range before it moves the date.
+                ? `They are graded every night: the 80% range held ${num(J.coverage.coverage_pct, 1)}% of ${J.coverage.n_resolved} graded forecasts so far.`
+                : "They are graded every night."}
             </p>
           </div>
           <div style="display:flex;flex-direction:column;gap:12px">
@@ -338,8 +345,8 @@ const headline = ok
                       {C.visceral_target_lb != null && <span class="target" style={`left:${vfAt(C.visceral_target_lb)}`} />}
                     </div>
                     <p class="muted" style="font-size:13px;max-width:62ch">
-                      <b style="color:var(--ink)">{num(C.visceral_fat_lb, 2)} lb</b> at the scan{C.visceral_fat_g != null ? ` (${num(C.visceral_fat_g, 0)} g)` : ""}. On the scale the previous site used (under 1 lb low · 1 to 2 moderate · over 2 elevated) that is {`${band}${C.visceral_target_lb != null ? `; the cobalt line is the ${num(C.visceral_target_lb, 1)} lb target` : ""}.`}{" "}
-                      Directional only until a second scan.
+                      <b style="color:var(--ink)">{num(C.visceral_fat_lb, 2)} lb</b> at the scan{C.visceral_fat_g != null ? ` (${num(C.visceral_fat_g, 0)} g)` : ""}. On this site's own bands (under 1 lb low · 1 to 2 moderate · over 2 elevated) that is {`${band}${C.visceral_target_lb != null ? `; the cobalt line is the ${num(C.visceral_target_lb, 1)} lb target` : ""}.`}{" "}
+                      The bands are site-defined, carried over from the previous site, and cite no clinical source — DEXA systems disagree on cutoffs, so they read a zone, never a diagnosis.
                     </p>
                   </>
                 )}
@@ -356,7 +363,7 @@ const headline = ok
             {PA && (
               <details class="more">
                 <summary>
-                  {`PhenoAge · ${num(PA.years, 0)} years, as of ${dayInWords(PA.as_of)}${PA.as_of < J.start_date ? " (before day one)" : ""}`}
+                  {`PhenoAge, a biological-age estimate · ${num(PA.years, 0)}, from the blood draw of ${dayInWords(PA.as_of)}${PA.as_of < J.start_date ? " (before day one)" : ""}`}
                 </summary>
                 <div class="rows">
                   {PA.drivers.map((d: any) => (
@@ -372,7 +379,10 @@ const headline = ok
                   ))}
                 </div>
                 <p class="muted" style="font-size:13px;margin-top:8px;max-width:62ch">
-                  {PA.drivers.length} blood markers; each is marked by which way it pushes the estimate. The chronological age is never shown, so no gap can be read off it. A population-level estimate, volatile to single markers.
+                  Levine's Phenotypic Age (Aging, 2018): the {PA.drivers.length} blood markers above and the chronological age go into a published mortality score, which is turned back into
+                  years. The platform computes it per blood draw (/api/phenoage); this one is from {dayInWords(PA.as_of)}. It is not his age: the chronological age is an input
+                  to the formula and is never published, so no gap between the two can be read here. Each marker is marked by which way it pushes the estimate. A
+                  population-level estimate, volatile to single markers.
                 </p>
               </details>
             )}
@@ -460,20 +470,26 @@ const headline = ok
           <div style="display:flex;flex-direction:column;gap:12px">
             <h2>The coaches on the weight</h2>
             <p class="muted" style="font-size:14px;max-width:62ch">
-              {`${checked ? `${right} of ${checked} checked calls about the weight came true` : "No call about the weight has been checked yet"}${pending ? `; ${pending} ${pending === 1 ? "is" : "are"} still open` : ""}.`} Code grades them; the coaches do not mark their own work.
+              {`${checked ? `${right} of ${checked} checked calls about the weight came true` : "No call about the weight has been checked yet"}${unchecked.length ? `; ${unchecked.length} could not be checked` : ""}${pending ? `; ${pending} ${pending === 1 ? "is" : "are"} still open` : ""}.`}{" "}
+              {checked ? `The ${checked} are every one listed below. ` : ""}Code grades them; the coaches do not mark their own work.
             </p>
             {settled.length > 0 && (
               <div class="calls">
                 {settled.map((p: any) => (
-                  <a class={`call ${p.status}`} href={href(pathOf("prediction", p.id))}>
+                  <a class={`call ${p.status}`} href={href(pathOf("prediction", p.id))} data-call={p.status}>
                     <span class="k">
-                      {p.status === "confirmed" ? "right" : "wrong"} · {dayInWords(p.settled_date, { short: true })}
+                      {callOutcome(p.status)} · {dayInWords(p.settled_date, { short: true })}
                       {coachName(p) ? ` · ${coachName(p)}` : ""}
                     </span>
                     <span>{clip(p.title || p.claim, 100)}</span>
                   </a>
                 ))}
               </div>
+            )}
+            {unchecked.length > 0 && (
+              <p class="muted" style="font-size:13px;max-width:62ch">
+                Not counted: {unchecked.map((p: any) => `${coachName(p) || "a coach"}'s call of ${dayInWords(p.logged_date, { short: true })} (${callOutcome(p.status)})`).join("; ")}.
+              </p>
             )}
             <p class="muted" style="font-size:13px;max-width:62ch">
               Each settled call has its own page in the ledger: the claim, what happened, the allowed distance, and what a simple guess would have said.
@@ -509,7 +525,8 @@ const headline = ok
                 )
               }
               <p class="muted" style="font-size:13px;margin-top:10px;max-width:60ch">
-                The rate's interval and the projection carry a method page; the 7-day mean on the chart is the data room's own, described on every metric page.
+                The rate's interval carries the moving-block bootstrap page and the week's forecasts the EWMA forecast page; the goal date is the rate carried forward and has no
+                method of its own. The 7-day mean on the chart is the data room's own, described on every metric page.
               </p>
             </div>
             <div class="rows">
