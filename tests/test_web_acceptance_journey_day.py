@@ -160,3 +160,5 @@ def test_heart_coverage_holds_both_charts_and_the_front_page_budget(tmp_path):
     assert "no inspectable points" in heart_coverage(_dist(tmp_path / "empty", empty))[0]
     linked = heart_coverage(_dist(tmp_path / "linked", both, '<a href="/next/v9/data/hrv/">HRV</a>'))
     assert linked and "link budget" in linked[0]
+    # a live build publishes the real HRV metric, which Start links: only the charts are graded there
+    assert heart_coverage(_dist(tmp_path / "live", both, '<a href="/data/hrv/">HRV</a>'), fixture=False) == []
