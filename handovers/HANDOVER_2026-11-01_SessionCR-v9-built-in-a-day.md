@@ -1,0 +1,47 @@
+# Handover — Session CR: the v9 site built end to end in a day — Stage 4 plan, Phases 0–3, the Start-page refinement, the cut-over mechanics, the ledger's two privacy rules, a reversible re-grade and a snapshotted root — 15 PRs merged, nothing at the root changed (2026-11-01)
+
+## Driving instruction
+- **Owner, 2026-10-31 evening (attended, Fable 5.1):** the Stage 4 brief → `docs/design/v9/STAGE4_ENGINEERING_PLAN.md`, approved with 12 decisions + requirements A–D (epic #5529); Phase 0 authorised, then **"i want phase 1-4 in the next 24 hours ideally" — "Everything, no cuts"**, per-phase review and the Thursday cut-over waived, the five-reader bar and grader-fixes-before-the-ledger KEPT, "I merge and deploy on green".
+- **Owner, 2026-11-01 (two pasted directions):** the homepage refinement brief (the six-dimensional portrait back, the chapter first, no photo dependency, plain words, 7.5 screens provisional → "seven screens is acceptable", fonts toward 250 KB → "179 KB approved"); then: **#5559 approved to merge and verify · #5533 HOLD `--apply` until a revert procedure exists and is proven · root cut-over BLOCKED — snapshot the production root and rehearse the rollback non-destructively · homepage unchanged until his review · five readers kept · owner words unpublished · then `/wrap`.** "No production re-grade or root cutover without an explicit go."
+
+## What is COMPLETE (merged, deployed, verified live)
+- **Phase 0 #5531 · API #5538 · hotfix #5547 · Phases 1+2 #5553 · Phase 3 #5554 · Start-page refinement #5555 · ledger export #5559** — `https://averagejoematt.com/next/v9/` (noindex) serves the whole v9 site over the live snapshot: Start with the portrait + the chapter feature, Story (11 chapters as published, 5 episodes with audio + transcript, held/skipped/pending weeks), the data room (10 series, the explorer reading 30 precomputed pairings), the ledger (454 records in the snapshot, 48 held rows rendered as holds, the note "the coaches' record counts 468: 12 rows speak of the journal and are kept off every public page"), coaches with quality counts, sources, methods, disagreements, the appendix. Last preview deploy 41327858165 ✅ (541 live pages, render gate 0 issues).
+- **Ledger export verified live 16:45Z:** page 1 = 100 items, `total` 456, `record_total` 468, `withheld.journal_silence` 12; five pages → 456 unique = total; held rows expose only the hold note (the shape `/api/predictions` already serves); 0 journal-silence spans on the wire. Recorded on #5532 with the ADR-099 closure verdict.
+- **Cut-over mechanics #5551** — one owner per S3 path (`www/owned_paths.json`, `live_at_root: false`), root deploy refused while the switch is off, reference copies of the six replaced pages at `/reference/2026-11-01-*`, `/start/` + `/coaches/` noindex, one sitemap writer, robots disallows `/next/` `/reference/` `/_v9_previous/`; its site-deploy ✅; verified live.
+- **Grader fixes #5552** deployed (`quality` served on `/api/predictions`); **CI fixes** #5556 (eutils all-empty = UNVERIFIED), #5557 (Node ^22.23.4); **fonts 299 → 179 KB** (#5559; owner approved); **reach ceiling 10 → 12** dated by the Start-page brief.
+- **Root snapshot captured** (owner direction 3): `s3://matthew-life-platform/backups/root-snapshots/20261101T162127Z/` — 6 objects (/, story, data, privacy, 404, sitemap.xml) with a manifest; verified; restore **rehearsed** into `backups/root-restore-rehearsal/…` (6/6 ETags); `restore` refused without `--apply`; production ETags unchanged. Recorded on #5534.
+
+## TESTED, merged, NOT run against production (owner-authorised acts only)
+- **Re-grade:** `deploy/regrade_predictions.py --apply` (dry run on #5533: 23 rows, 88 of 214 → 81 of 210; reconciliation posted) and its inverse **`deploy/revert_regrade.py` (#5560)** — `revert_correction` restores the exact pre-change row from `original_grade`, the reversal is a ledger entry, revert twice = no-op, the correction cannot silently re-apply; 40 tests; live dry run selects 0 (nothing corrected yet). **Sequence on go:** regrade dry run → `--apply` → revert dry run shows 23 revertible → stop.
+- **Root flip:** `python3 scripts/www_cutover_switch.py --live` → PR → merge deploys root (smoke + visual sweeps, `_v9_previous/` recorded on green); rollback `bash deploy/www_root_snapshot.sh restore 20261101T162127Z --apply` (the v8 root) or `deploy/www_preview_sync.sh --target root --restore-previous` (the last green v9). Re-capture the snapshot before the flip if a kept page changes.
+
+## AWAITING THE OWNER
+- Homepage review (preview unchanged since 07:49Z) · "go" for `--apply` · five readers recorded on #5529 · explicit go for the flip · publication approval for his own words (decision 10; `his_words` block unrendered).
+
+## Gotchas learned (each in memory)
+- **A wire guard that prunes after paging shortens pages** (#5131 vs #5532): count and page after the same scrub; diagnose handler → Function URL (origin header) → CDN. The 48 "empty claims" were #4701 holds, not a defect.
+- **NCBI eutils throttles with `200 uids: []`** — three pre-merge suites red on forty "withdrawn" papers at once; an all-empty answer is UNVERIFIED (#5556).
+- **The runner's cached Node can trail Astro's floor** — pin a range (`^22.23.4`), not a major.
+- **A lane that merged another lane pre-squash conflicts with main after the squash** — `git checkout --ours`, verify the hotfix content, commit the merge; never force-push. GitHub's "no checks" on such a PR = CONFLICT.
+- **Everything the wrap-nightly census counts:** a `os.walk` in a test makes it a structural gate (census + residue + sweep-derivation tests); list a known layout instead. A new workflow step/guard needs its `gate_census_proofs.py` record + both pins.
+- **`agent_commit` needs `ALLOW_DOC_LITERALS=1`** for CLAUDE.md and PNGs under docs/; zsh word-splits `${=VAR}`; a `| tail` hides an exit code; the owned-paths/reach files must be committed from the FIXTURE build (CI's), never the live one.
+
+## Residual / next picks
+- #5533 — the re-grade `--apply` + revert rehearsal on the owner's go (owner-authorised production write).
+- #5529 — five readers, then the flip (`www_cutover_switch.py --live`); re-capture the root snapshot first if `site/` changed.
+- #5532 — the 2 training-coach ledger rows are dropped by the exporter because the roster lacks `training_coach`; decide whether a retired coach's rows render under its byline (owner ruling on the retired seat).
+- not-work — homepage review and the owner's-words publication approval are owner reads; the preview is held unchanged for them.
+- #5514 — CodeQL overlay cache config (unchanged; from CP).
+- not-work — PubMed network tests still run in the pre-merge unit lane under an `integration` marker nobody deselects; a lane-selection change is a CONVENTIONS call, not a lane's.
+
+**Build beat:** 2026-11-01-the-new-site-built-in-a-day-and-kept-off-the-root
+**Docs:** `docs/DECISIONS.md` (ADR-167 + index) · `docs/INCIDENT_LOG.md` (+2 P3 rows, Patterns regenerated) · `docs/alarm_citations.json` (canary flap cited; qa-smoke-warnings re-cited with its live cause) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+4 rows) · `www/README.md`, `docs/LICENSES.md`, `docs/PROPORTIONALITY.md`, `docs/CONVENTIONS.md` §2, `docs/SITE_AUTHORING.md` via the merged PRs · `docs/design/v9/STAGE4_ENGINEERING_PLAN.md` + renders
+**Decisions:** ADR-167 filed — a public ledger counts what it serves; a hold keeps a row's place; the wire guard is applied before paging; the difference from the record is named
+**Main:** green (1e9b4159) — HEAD 535158f0 (#5560) and 0c42d6a6b (#5561) have their CI/CD runs in flight at wrap; both code-only, no gate; the #5559 run deployed the Site API and was at its visual QA leg when the live route was verified
+**Incidents:** 2 rows added — the ledger export's short pages under the journal-silence guard (P3, public data, silent 20 h), and NCBI eutils throttling redding three pre-merge suites (P3, CI)
+**Stash/hooks:** clean · worktree-reap removed 10 merged lanes, released 1; no dirty lane
+**Closures:** #5532 commented (Shipped + Outcome realized, live evidence) · DoD: scanned=1 hits=1 — #5532 no-outcome-verdict → commented this wrap; post-close comments are the verification trail, not disputes
+**Backlog:** Now live at 2 startable fable stories (floor 3) — NO REMEDY IN THE CORPUS for lane fable (0 promotable; 11 startable stories exist in sonnet/opus); the unblock lever is the owner's: #5512 (CloudTrail live proof), #4968; this session filed no new stories (the epic's stories #5530–#5537 all closed or carried); Later sweep — OK, 66 open issues satisfy the filing contract, no stale Later issue
+**Alarms:** 2 red >72h, both cited (calibration-deadman #3759, chronicle-delivery-heartbeat #4531); the canary flap (one transition, cleared, cause hypothesised not derived) cited under #2912; qa-smoke-warnings re-cited with `cause: data:orphan_routine_drafts` (a draft to commit or discard — a coach-session act); census CLEAN (147 = 145 + 2 accepted orphans)
+**CI warnings:** none — no `::warning::` annotations on the latest green main run (1e9b4159)
+**Ledger:** omitted — the v9 build gates' row landed in #5531's PROPORTIONALITY diff (Phase 0, this session); `www_root_snapshot.sh` and `revert_regrade.py` are owner-run tools, not standing machinery; the v9 deploy workflow's root-target jobs run only after the flip and get their row in the flip PR
