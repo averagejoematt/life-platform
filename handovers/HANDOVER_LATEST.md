@@ -17,10 +17,16 @@ After the v9 launch (2026-11-01) the owner commissioned a parity audit (125 hist
 ## TESTED, merged, NOT run against production (owner-authorised acts only)
 - none — everything merged this session is deployed and verified at the root.
 
+## Owner rulings applied after the wrap (2026-11-02, same session)
+- **#5596** — keep both Start statements; fix the QA rule: PR #5601 (`0d90963f0`, rubric clause + structural ruling, qa-smoke Lambda deployed). Open until the next nightly smoke reads `fail none -`.
+- **HRV CI coverage + the 300 lb milestone** — PR #5600 (`e4588e030`, root run 41489096100 green): HRV covered via fixture-only `journey.json` `heart_series` (Start untouched, reach 12); every crossed rung keeps its date, "Week 8 · held" shown unlinked, missing chapters read "no chapter yet". #5598 closed.
+- **#5597** — the render gate measures SVG text at 390/360 against 11 px: PR #5599 (`8386410d1`). Closed.
+- **Production review package** delivered (`~/Desktop/averagejoematt-production-review-journey-day-2026-11-02.zip`): full-page screenshots, three interaction recordings, 20/20 interaction checks, the uncached homepage response (ETag 463cf230…, Last-Modified 15:39:43Z).
+- **Hold:** Coaching Room, Laboratory and Story timeline stay on hold until the owner reviews Journey and Day. No further feature work.
+
 ## AWAITING THE OWNER
 - **Start's visual review** (stabilization) — the new pages are reached from the data room, the weight page and chapter pages, not from `/`.
-- **#5596** — the reader-truth smoke's HIGH finding on the Start portrait (Mind "2 entries in 57 days, the last on 9 Sep" vs Connection "the journal went quiet"); holds `qa-smoke-failures` / `qa-smoke-warnings`. Wording change on frozen Start, or a rulings-ledger false-positive call — his.
-- **M2 lane's two judgement calls** (PR #5589 body): HRV is absent from the fixture build (adding it would push the v9 front-page reach to 13 > 12); rungs map to the chapter whose week contains the crossing (300 lb gets no chapter row because Week 8 is held) — the prototype used "latest chapter on or before"; one line to switch.
+- **His visual and interaction review of the Journey and Day** (acceptance is subject to it).
 - The remaining proposed retirements (S09/A32, A07 deferred, A27, A30, M11) and the next restoration milestones (Coaching Room CR1–CR4, Laboratory L1–L4, Story HS1–HS3) — not started; his review first.
 
 ## Gotchas learned (each in memory)
@@ -32,8 +38,7 @@ After the v9 launch (2026-11-01) the owner commissioned a parity audit (125 hist
 - An Opus lane agent went silent mid-merge for 2.5 h (conflicts resolved, nothing committed); took the merge over by hand. The commit-msg hook requires a Conventional Commit subject even on merge commits (`chore(merge): …`).
 
 ## Residual / next picks
-- #5597 — the www render gate measures effective SVG text (class tracker for the M1 rollback).
-- #5596 — the Start-portrait reader-truth finding (owner's call; Start frozen).
+- #5596 — close on the next nightly smoke reading `[QA] CAUSE fail none -` (the rule fix is deployed).
 - #5577 — the restoration epic: next milestones (CR/L/HS/DM) need the owner's review of tonight's pages first.
 - #5573 — the parallel session's open item: `program_structure.py` still names `romanian_deadlift_*` (held for stabilization); lateral-raise/triceps questions unanswered.
 - not-work — the owner's five-reader review of the launched site is his (2026-11-01 ruling).
