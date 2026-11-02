@@ -14,6 +14,8 @@ URLs) and renders EVERY built page at a phone (390×844) and a laptop (1280×900
   6. The front page's phone height stays under its budget (7.5 screens since the owner's 2026-11-01 brief; six before).
   7. Every chart answers (#5578, A01): each <svg data-points> has the inspect island mounted on it
      (data-inspect="mounted") once the page has loaded — a chart a reader cannot read point by point is a defect.
+  8. SVG text floor (#5597, mirrors qa/visual_qa.py #1210): every `svg text` renders >= 11 px effective at 390
+     and 360 — computed font-size x the live getScreenCTM scale (rendered width / viewBox width).
 
 MUTATION CONTROL (always runs first): a copy of the build with one page widened past the
 viewport, an inline <script>, and a sentinel word MUST fail — a gate that cannot fail is a
@@ -52,6 +54,25 @@ FORBIDDEN = (
     (re.compile(r"\bThirty-seven\b"), "the age (never published)"),
     (re.compile(r"SENTINEL|POISON-HELD|DO-NOT-PUBLISH"), "a held/private fixture sentinel"),
 )
+SVG_TEXT_FLOOR_PX = 11.0  # qa/visual_qa.py SVG_TEXT_FLOOR_PX (#1210); same selector, scale (hypot of the screen CTM) and tolerance
+SVG_TEXT_WIDTHS = (("phone", 390), ("phone360", 360))
+_SVG_TEXT_AUDIT_JS = """(floor) => {
+    const out = [];
+    document.querySelectorAll('svg text').forEach(t => {
+        const txt = (t.textContent || '').trim();
+        if (!txt) return;
+        let box; try { box = t.getBoundingClientRect(); } catch (e) { return; }
+        if (!box || box.width < 1 || box.height < 1) return;
+        const cs = getComputedStyle(t);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const fs = parseFloat(cs.fontSize) || 0;
+        let scale = 1;
+        try { const m = t.getScreenCTM(); if (m) { const s = Math.hypot(m.a, m.b); if (s > 0) scale = s; } } catch (e) {}
+        const eff = fs * scale;
+        if (eff < floor - 0.05) out.push({txt: txt.slice(0, 24), eff: Math.round(eff * 100) / 100});
+    });
+    return out;
+}"""
 _RUN_AXE_JS = """async () => {
     const r = await axe.run(document, {resultTypes: ['violations']});
     return r.violations.map(v => ({id: v.id, impact: v.impact, nodes: v.nodes.length,
@@ -187,6 +208,15 @@ def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True) -> tup
                     viol = [v for v in page.evaluate(_RUN_AXE_JS) if v["impact"] in AXE_GATING_IMPACTS]
                     for v in viol:
                         rec["issues"].append(f"{path}@phone axe {v['impact']} {v['id']} ×{v['nodes']} {v['targets']}")
+                    for wlabel, w in SVG_TEXT_WIDTHS:
+                        if w != vp["width"]:
+                            page.set_viewport_size({"width": w, "height": vp["height"]})
+                            page.wait_for_timeout(150)
+                        for f in page.evaluate(_SVG_TEXT_AUDIT_JS, SVG_TEXT_FLOOR_PX):
+                            rec["issues"].append(
+                                f"{path}@{wlabel}: SVG text below {SVG_TEXT_FLOOR_PX:g}px floor: '{f['txt']}' = {f['eff']}px effective (#1210)"
+                            )
+                    page.set_viewport_size({"width": vp["width"], "height": vp["height"]})
                 if label == "laptop":
                     unmounted = page.evaluate(
                         "() => [...document.querySelectorAll('svg[data-points]')].filter(s => s.dataset.inspect !== 'mounted' && JSON.parse(s.dataset.points || '[]').length).length"
@@ -220,6 +250,7 @@ def mutation_control(dist: str, base: str) -> bool:
     html = html.replace(
         "</body>",
         '<div style="width:2000px;height:2px"></div><script>var x=1</script><p>HELD-SENTINEL-DO-NOT-PUBLISH</p>'
+        '<svg viewBox="0 0 1000 100" width="100%"><text x="10" y="50" font-size="20">PLANTED-SMALL</text></svg>'
         '<svg viewBox="0 0 10 10" data-points="[{&quot;x&quot;:1,&quot;y&quot;:1,&quot;label&quot;:&quot;planted&quot;}]"></svg></body>',
     )
     open(idx, "w", encoding="utf-8").write(html)
@@ -227,7 +258,13 @@ def mutation_control(dist: str, base: str) -> bool:
     shutil.rmtree(tmp, ignore_errors=True)
     front = next(r for r in results if r["path"] == "/")
     text = "\n".join(front["issues"])
-    found = ("horizontal overflow" in text, "inline <script>" in text, "sentinel" in text, "no inspect island" in text)
+    found = (
+        "horizontal overflow" in text,
+        "inline <script>" in text,
+        "sentinel" in text,
+        "no inspect island" in text,
+        "SVG text below 11px floor: 'PLANTED-SMALL'" in text,
+    )
     return (not ok) and all(found)
 
 
@@ -247,7 +284,9 @@ def main() -> int:
     if not args.skip_control:
         print("mutation control …", end=" ", flush=True)
         if not mutation_control(args.dist, args.base):
-            print("FAILED — the gate did not report a planted overflow + inline script + sentinel + unmounted chart; refusing to grade")
+            print(
+                "FAILED — the gate did not report a planted overflow + inline script + sentinel + unmounted chart + sub-floor SVG text; refusing to grade"
+            )
             return 2
         print("ok (the gate can fail)")
     print(f"web preview gate — {args.dist} at base {args.base}")
