@@ -184,6 +184,13 @@ def build_cited(data: dict, profile: dict, vitals: dict, today: str) -> list:
     _cite(cited, "sleep last night (hours)", _fmt(vitals.get("sleep_hours")), vitals.get("sleep_as_of"), "whoop.sleep_duration_hours")
 
     mf = data.get("macrofactor") or {}
+    from coach.grading_quality import is_zero_entry_day
+
+    if is_zero_entry_day(mf):
+        # A summary-only stub (no diary entries) is not intake: the lead is told the day was not logged, never its
+        # stub totals (acceptance review 2026-11-02 — "only 15 grams logged Wednesday" quoted a stub as eaten).
+        _cite(cited, "food log", "not logged (no diary entries)", data.get("date"), "macrofactor.entries_count")
+        return cited
     protein = mf.get("total_protein_g")
     if protein is not None:
         _cite(cited, "protein eaten (grams)", _fmt(protein, 0), data.get("date"), "macrofactor.total_protein_g")

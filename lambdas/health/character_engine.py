@@ -523,6 +523,12 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     scores = {}
 
     mf = data.get("macrofactor") or {}
+    from coach.grading_quality import is_zero_entry_day  # noqa: PLC0415 — the ONE zero-entry predicate (#5552)
+
+    # A summary-only stub (no diary entries) is not intake: score it as a missing day — calories and protein absent —
+    # never its stub totals as eaten (acceptance review 2026-11-02: 80 kcal / 15 g scored Nutrition 8 as real intake).
+    if is_zero_entry_day(mf):
+        mf = {}
 
     # Calorie adherence
     # #4580 B-22: the row's macro names come from common.macrofactor_fields (SCHEMA.md § macrofactor) —
@@ -563,6 +569,8 @@ def compute_nutrition_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
         in_range_count = 0
         tracked_count = 0
         for day in mf_14d:
+            if is_zero_entry_day(day):
+                continue  # a stub day was not tracked
             dc = macro_value(day, "calories")
             dt_target = target_kcal(day.get("date") or data.get("date"))  # #5095: that day's week's target
             if dc is not None and dt_target and dt_target > 0:
