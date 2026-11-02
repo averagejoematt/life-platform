@@ -26,6 +26,7 @@ export const OBJECT_TYPES = [
   "source",
   "method",
   "edition",
+  "day",
 ] as const;
 
 const edge = z.object({
@@ -281,6 +282,29 @@ const editions = defineCollection({
   }),
 });
 
+// One day since the start (#5585): the readings exactly as /api/pulse_history serves them, the trailing
+// normals the exporter computed (scripts/publish_snapshot_day.py — never the browser), the week's chapter,
+// the neighbours, and whether the three window-bound endpoints still serve the day (M4 fills the detail).
+const reading = z.number().nullable();
+const normal = z.object({ mean7: z.number().nullable(), n7: z.number().int(), mean30: z.number().nullable(), n30: z.number().int() }).strict();
+const READING_KEYS = ["weight_lbs", "recovery_pct", "sleep_hours", "hrv_ms", "rhr_bpm", "strain", "steps", "active_kcal"] as const;
+
+const days = defineCollection({
+  loader: snapshot("days"),
+  schema: envelope("day", {
+    date: z.string().regex(ISO_DAY),
+    day_number: z.number().int().min(1),
+    weekday: z.string().min(1),
+    readings: z.object(Object.fromEntries(READING_KEYS.map((k) => [k, reading])) as Record<(typeof READING_KEYS)[number], typeof reading>).strict(),
+    normals: z.object(Object.fromEntries(READING_KEYS.map((k) => [k, normal])) as Record<(typeof READING_KEYS)[number], typeof normal>).strict(),
+    chapter_id: z.string().regex(ID).nullable(),
+    prev_id: z.string().regex(ID).nullable(),
+    next_id: z.string().regex(ID).nullable(),
+    has_weighin: z.boolean(),
+    in_window: z.object({ workouts: z.boolean(), sleep: z.boolean(), nutrition: z.boolean() }).strict(),
+  }),
+});
+
 export const collections = {
   chapters,
   episodes,
@@ -294,4 +318,5 @@ export const collections = {
   sources,
   methods,
   editions,
+  days,
 };

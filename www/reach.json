@@ -22,6 +22,20 @@
   "transitive": [
     "/",
     "/data/",
+    "/data/day/2026-10-03/",
+    "/data/day/2026-10-04/",
+    "/data/day/2026-10-05/",
+    "/data/day/2026-10-06/",
+    "/data/day/2026-10-07/",
+    "/data/day/2026-10-08/",
+    "/data/day/2026-10-09/",
+    "/data/day/2026-10-10/",
+    "/data/day/2026-10-11/",
+    "/data/day/2026-10-12/",
+    "/data/day/2026-10-13/",
+    "/data/day/2026-10-14/",
+    "/data/day/2026-10-15/",
+    "/data/day/2026-10-16/",
     "/data/deep_pct/",
     "/data/experiments/protein-deep-sleep_2026-11-01/",
     "/data/insights/zone2-deep-sleep/",
@@ -60,5 +74,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 39
+  "transitive_count": 53
 }

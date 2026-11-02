@@ -1,0 +1,1556 @@
+[
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-03",
+  "date": "2026-10-03",
+  "day_number": 28,
+  "edges": [
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": false,
+  "id": "2026-10-03",
+  "in_window": {
+   "nutrition": true,
+   "sleep": false,
+   "workouts": false
+  },
+  "method_ids": [],
+  "next_id": "2026-10-04",
+  "normals": {
+   "active_kcal": {
+    "mean30": null,
+    "mean7": null,
+    "n30": 0,
+    "n7": 0
+   },
+   "hrv_ms": {
+    "mean30": 50.0,
+    "mean7": 50.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "recovery_pct": {
+    "mean30": 43.0,
+    "mean7": 43.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "rhr_bpm": {
+    "mean30": 58.0,
+    "mean7": 58.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "sleep_hours": {
+    "mean30": 6.5,
+    "mean7": 6.5,
+    "n30": 1,
+    "n7": 1
+   },
+   "steps": {
+    "mean30": 13064.0,
+    "mean7": 13064.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "strain": {
+    "mean30": 11.1,
+    "mean7": 11.1,
+    "n30": 1,
+    "n7": 1
+   },
+   "weight_lbs": {
+    "mean30": null,
+    "mean7": null,
+    "n30": 0,
+    "n7": 0
+   }
+  },
+  "prev_id": null,
+  "readings": {
+   "active_kcal": null,
+   "hrv_ms": 50.0,
+   "recovery_pct": 43,
+   "rhr_bpm": 58,
+   "sleep_hours": 6.5,
+   "steps": 13064,
+   "strain": 11.1,
+   "weight_lbs": null
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "no weigh-in · slept 6.5 hours · recovery 43",
+  "title": "Saturday 3 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Saturday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-04",
+  "date": "2026-10-04",
+  "day_number": 29,
+  "edges": [
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-04",
+  "in_window": {
+   "nutrition": true,
+   "sleep": false,
+   "workouts": false
+  },
+  "method_ids": [],
+  "next_id": "2026-10-05",
+  "normals": {
+   "active_kcal": {
+    "mean30": null,
+    "mean7": null,
+    "n30": 0,
+    "n7": 0
+   },
+   "hrv_ms": {
+    "mean30": 48.95,
+    "mean7": 48.95,
+    "n30": 2,
+    "n7": 2
+   },
+   "recovery_pct": {
+    "mean30": 59.5,
+    "mean7": 59.5,
+    "n30": 2,
+    "n7": 2
+   },
+   "rhr_bpm": {
+    "mean30": 57.5,
+    "mean7": 57.5,
+    "n30": 2,
+    "n7": 2
+   },
+   "sleep_hours": {
+    "mean30": 7.4,
+    "mean7": 7.4,
+    "n30": 2,
+    "n7": 2
+   },
+   "steps": {
+    "mean30": 8888.5,
+    "mean7": 8888.5,
+    "n30": 2,
+    "n7": 2
+   },
+   "strain": {
+    "mean30": 10.55,
+    "mean7": 10.55,
+    "n30": 2,
+    "n7": 2
+   },
+   "weight_lbs": {
+    "mean30": 236.9,
+    "mean7": 236.9,
+    "n30": 1,
+    "n7": 1
+   }
+  },
+  "prev_id": "2026-10-03",
+  "readings": {
+   "active_kcal": null,
+   "hrv_ms": 47.9,
+   "recovery_pct": 76,
+   "rhr_bpm": 57,
+   "sleep_hours": 8.3,
+   "steps": 4713,
+   "strain": 10.0,
+   "weight_lbs": 236.9
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "236.9 lb · slept 8.3 hours · recovery 76",
+  "title": "Sunday 4 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Sunday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-05",
+  "date": "2026-10-05",
+  "day_number": 30,
+  "edges": [
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-05",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": false
+  },
+  "method_ids": [],
+  "next_id": "2026-10-06",
+  "normals": {
+   "active_kcal": {
+    "mean30": null,
+    "mean7": null,
+    "n30": 0,
+    "n7": 0
+   },
+   "hrv_ms": {
+    "mean30": 51.2,
+    "mean7": 51.2,
+    "n30": 3,
+    "n7": 3
+   },
+   "recovery_pct": {
+    "mean30": 57.33,
+    "mean7": 57.33,
+    "n30": 3,
+    "n7": 3
+   },
+   "rhr_bpm": {
+    "mean30": 57.33,
+    "mean7": 57.33,
+    "n30": 3,
+    "n7": 3
+   },
+   "sleep_hours": {
+    "mean30": 7.2,
+    "mean7": 7.2,
+    "n30": 3,
+    "n7": 3
+   },
+   "steps": {
+    "mean30": 11170.33,
+    "mean7": 11170.33,
+    "n30": 3,
+    "n7": 3
+   },
+   "strain": {
+    "mean30": 11.93,
+    "mean7": 11.93,
+    "n30": 3,
+    "n7": 3
+   },
+   "weight_lbs": {
+    "mean30": 236.35,
+    "mean7": 236.35,
+    "n30": 2,
+    "n7": 2
+   }
+  },
+  "prev_id": "2026-10-04",
+  "readings": {
+   "active_kcal": null,
+   "hrv_ms": 55.7,
+   "recovery_pct": 53,
+   "rhr_bpm": 57,
+   "sleep_hours": 6.8,
+   "steps": 15734,
+   "strain": 14.7,
+   "weight_lbs": 235.8
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "235.8 lb · slept 6.8 hours · recovery 53",
+  "title": "Monday 5 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Monday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-06",
+  "date": "2026-10-06",
+  "day_number": 31,
+  "edges": [
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-06",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": false
+  },
+  "method_ids": [],
+  "next_id": "2026-10-07",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1003.0,
+    "mean7": 1003.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "hrv_ms": {
+    "mean30": 50.23,
+    "mean7": 50.23,
+    "n30": 4,
+    "n7": 4
+   },
+   "recovery_pct": {
+    "mean30": 55.0,
+    "mean7": 55.0,
+    "n30": 4,
+    "n7": 4
+   },
+   "rhr_bpm": {
+    "mean30": 56.25,
+    "mean7": 56.25,
+    "n30": 4,
+    "n7": 4
+   },
+   "sleep_hours": {
+    "mean30": 7.53,
+    "mean7": 7.53,
+    "n30": 4,
+    "n7": 4
+   },
+   "steps": {
+    "mean30": 10046.25,
+    "mean7": 10046.25,
+    "n30": 4,
+    "n7": 4
+   },
+   "strain": {
+    "mean30": 11.07,
+    "mean7": 11.07,
+    "n30": 4,
+    "n7": 4
+   },
+   "weight_lbs": {
+    "mean30": 236.67,
+    "mean7": 236.67,
+    "n30": 3,
+    "n7": 3
+   }
+  },
+  "prev_id": "2026-10-05",
+  "readings": {
+   "active_kcal": 1003,
+   "hrv_ms": 47.3,
+   "recovery_pct": 48,
+   "rhr_bpm": 53,
+   "sleep_hours": 8.5,
+   "steps": 6674,
+   "strain": 8.5,
+   "weight_lbs": 237.3
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "237.3 lb · slept 8.5 hours · recovery 48",
+  "title": "Tuesday 6 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Tuesday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-07",
+  "date": "2026-10-07",
+  "day_number": 32,
+  "edges": [
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-07",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": false
+  },
+  "method_ids": [],
+  "next_id": "2026-10-08",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1277.5,
+    "mean7": 1277.5,
+    "n30": 2,
+    "n7": 2
+   },
+   "hrv_ms": {
+    "mean30": 50.56,
+    "mean7": 50.56,
+    "n30": 5,
+    "n7": 5
+   },
+   "recovery_pct": {
+    "mean30": 53.6,
+    "mean7": 53.6,
+    "n30": 5,
+    "n7": 5
+   },
+   "rhr_bpm": {
+    "mean30": 56.2,
+    "mean7": 56.2,
+    "n30": 5,
+    "n7": 5
+   },
+   "sleep_hours": {
+    "mean30": 7.64,
+    "mean7": 7.64,
+    "n30": 5,
+    "n7": 5
+   },
+   "steps": {
+    "mean30": 9841.4,
+    "mean7": 9841.4,
+    "n30": 5,
+    "n7": 5
+   },
+   "strain": {
+    "mean30": 11.46,
+    "mean7": 11.46,
+    "n30": 5,
+    "n7": 5
+   },
+   "weight_lbs": {
+    "mean30": 236.4,
+    "mean7": 236.4,
+    "n30": 4,
+    "n7": 4
+   }
+  },
+  "prev_id": "2026-10-06",
+  "readings": {
+   "active_kcal": 1552,
+   "hrv_ms": 51.9,
+   "recovery_pct": 48,
+   "rhr_bpm": 56,
+   "sleep_hours": 8.1,
+   "steps": 9022,
+   "strain": 13.0,
+   "weight_lbs": 235.6
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "235.6 lb · slept 8.1 hours · recovery 48",
+  "title": "Wednesday 7 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Wednesday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-08",
+  "date": "2026-10-08",
+  "day_number": 33,
+  "edges": [
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-08",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-09",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1170.0,
+    "mean7": 1170.0,
+    "n30": 3,
+    "n7": 3
+   },
+   "hrv_ms": {
+    "mean30": 49.87,
+    "mean7": 49.87,
+    "n30": 6,
+    "n7": 6
+   },
+   "recovery_pct": {
+    "mean30": 55.17,
+    "mean7": 55.17,
+    "n30": 6,
+    "n7": 6
+   },
+   "rhr_bpm": {
+    "mean30": 56.0,
+    "mean7": 56.0,
+    "n30": 6,
+    "n7": 6
+   },
+   "sleep_hours": {
+    "mean30": 7.77,
+    "mean7": 7.77,
+    "n30": 6,
+    "n7": 6
+   },
+   "steps": {
+    "mean30": 9811.33,
+    "mean7": 9811.33,
+    "n30": 6,
+    "n7": 6
+   },
+   "strain": {
+    "mean30": 11.22,
+    "mean7": 11.22,
+    "n30": 6,
+    "n7": 6
+   },
+   "weight_lbs": {
+    "mean30": 235.98,
+    "mean7": 235.98,
+    "n30": 5,
+    "n7": 5
+   }
+  },
+  "prev_id": "2026-10-07",
+  "readings": {
+   "active_kcal": 955,
+   "hrv_ms": 46.4,
+   "recovery_pct": 63,
+   "rhr_bpm": 55,
+   "sleep_hours": 8.4,
+   "steps": 9661,
+   "strain": 10.0,
+   "weight_lbs": 234.3
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "234.3 lb · slept 8.4 hours · recovery 63",
+  "title": "Thursday 8 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Thursday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-09",
+  "date": "2026-10-09",
+  "day_number": 34,
+  "edges": [
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-09",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-10",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1212.75,
+    "mean7": 1212.75,
+    "n30": 4,
+    "n7": 4
+   },
+   "hrv_ms": {
+    "mean30": 51.0,
+    "mean7": 51.0,
+    "n30": 7,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 53.86,
+    "mean7": 53.86,
+    "n30": 7,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 55.57,
+    "mean7": 55.57,
+    "n30": 7,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.8,
+    "mean7": 7.8,
+    "n30": 7,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 9280.29,
+    "mean7": 9280.29,
+    "n30": 7,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 11.54,
+    "mean7": 11.54,
+    "n30": 7,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.83,
+    "mean7": 235.83,
+    "n30": 6,
+    "n7": 6
+   }
+  },
+  "prev_id": "2026-10-08",
+  "readings": {
+   "active_kcal": 1341,
+   "hrv_ms": 57.8,
+   "recovery_pct": 46,
+   "rhr_bpm": 53,
+   "sleep_hours": 8.0,
+   "steps": 6094,
+   "strain": 13.5,
+   "weight_lbs": 235.1
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "235.1 lb · slept 8 hours · recovery 46",
+  "title": "Friday 9 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Friday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": null,
+  "data_through": "2026-10-10",
+  "date": "2026-10-10",
+  "day_number": 35,
+  "edges": [
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-10",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-11",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1254.4,
+    "mean7": 1254.4,
+    "n30": 5,
+    "n7": 5
+   },
+   "hrv_ms": {
+    "mean30": 51.1,
+    "mean7": 51.26,
+    "n30": 8,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 55.12,
+    "mean7": 56.86,
+    "n30": 8,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 56.0,
+    "mean7": 55.71,
+    "n30": 8,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.81,
+    "mean7": 8.0,
+    "n30": 8,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 9626.62,
+    "mean7": 9135.57,
+    "n30": 8,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 11.12,
+    "mean7": 11.13,
+    "n30": 8,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.7,
+    "mean7": 235.7,
+    "n30": 7,
+    "n7": 7
+   }
+  },
+  "prev_id": "2026-10-09",
+  "readings": {
+   "active_kcal": 1421,
+   "hrv_ms": 51.8,
+   "recovery_pct": 64,
+   "rhr_bpm": 59,
+   "sleep_hours": 7.9,
+   "steps": 12051,
+   "strain": 8.2,
+   "weight_lbs": 234.9
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "234.9 lb · slept 7.9 hours · recovery 64",
+  "title": "Saturday 10 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Saturday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": "week-06",
+  "data_through": "2026-10-11",
+  "date": "2026-10-11",
+  "day_number": 36,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-11",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-12",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1200.17,
+    "mean7": 1200.17,
+    "n30": 6,
+    "n7": 6
+   },
+   "hrv_ms": {
+    "mean30": 51.01,
+    "mean7": 51.6,
+    "n30": 9,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 57.0,
+    "mean7": 56.29,
+    "n30": 9,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 56.44,
+    "mean7": 56.14,
+    "n30": 9,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.7,
+    "mean7": 7.79,
+    "n30": 9,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 9086.44,
+    "mean7": 9143.0,
+    "n30": 9,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 11.06,
+    "mean7": 11.2,
+    "n30": 9,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.5,
+    "mean7": 235.3,
+    "n30": 8,
+    "n7": 7
+   }
+  },
+  "prev_id": "2026-10-10",
+  "readings": {
+   "active_kcal": 929,
+   "hrv_ms": 50.3,
+   "recovery_pct": 72,
+   "rhr_bpm": 60,
+   "sleep_hours": 6.8,
+   "steps": 4765,
+   "strain": 10.5,
+   "weight_lbs": 234.1
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "234.1 lb · slept 6.8 hours · recovery 72",
+  "title": "Sunday 11 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Sunday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": "week-06",
+  "data_through": "2026-10-12",
+  "date": "2026-10-12",
+  "day_number": 37,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-12",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-13",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1234.0,
+    "mean7": 1234.0,
+    "n30": 7,
+    "n7": 7
+   },
+   "hrv_ms": {
+    "mean30": 50.21,
+    "mean7": 49.79,
+    "n30": 10,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 57.9,
+    "mean7": 58.14,
+    "n30": 10,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 56.5,
+    "mean7": 56.14,
+    "n30": 10,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.65,
+    "mean7": 7.84,
+    "n30": 10,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 8642.4,
+    "mean7": 7559.0,
+    "n30": 10,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 11.23,
+    "mean7": 10.93,
+    "n30": 10,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.51,
+    "mean7": 235.27,
+    "n30": 9,
+    "n7": 7
+   }
+  },
+  "prev_id": "2026-10-11",
+  "readings": {
+   "active_kcal": 1437,
+   "hrv_ms": 43.0,
+   "recovery_pct": 66,
+   "rhr_bpm": 57,
+   "sleep_hours": 7.2,
+   "steps": 4646,
+   "strain": 12.8,
+   "weight_lbs": 235.6
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "235.6 lb · slept 7.2 hours · recovery 66",
+  "title": "Monday 12 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Monday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": "week-06",
+  "data_through": "2026-10-13",
+  "date": "2026-10-13",
+  "day_number": 38,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-13",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-14",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1198.88,
+    "mean7": 1226.86,
+    "n30": 8,
+    "n7": 7
+   },
+   "hrv_ms": {
+    "mean30": 50.1,
+    "mean7": 50.03,
+    "n30": 11,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 57.45,
+    "mean7": 58.86,
+    "n30": 11,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 56.27,
+    "mean7": 56.29,
+    "n30": 11,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.57,
+    "mean7": 7.6,
+    "n30": 11,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 8580.82,
+    "mean7": 7743.43,
+    "n30": 11,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 10.95,
+    "mean7": 10.87,
+    "n30": 11,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.49,
+    "mean7": 234.99,
+    "n30": 10,
+    "n7": 7
+   }
+  },
+  "prev_id": "2026-10-12",
+  "readings": {
+   "active_kcal": 953,
+   "hrv_ms": 49.0,
+   "recovery_pct": 53,
+   "rhr_bpm": 54,
+   "sleep_hours": 6.8,
+   "steps": 7965,
+   "strain": 8.1,
+   "weight_lbs": 235.3
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "235.3 lb · slept 6.8 hours · recovery 53",
+  "title": "Tuesday 13 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Tuesday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": "week-06",
+  "data_through": "2026-10-14",
+  "date": "2026-10-14",
+  "day_number": 39,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-14",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-15",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1209.56,
+    "mean7": 1190.14,
+    "n30": 9,
+    "n7": 7
+   },
+   "hrv_ms": {
+    "mean30": 50.47,
+    "mean7": 50.4,
+    "n30": 12,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 58.08,
+    "mean7": 61.29,
+    "n30": 12,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 56.08,
+    "mean7": 56.0,
+    "n30": 12,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.62,
+    "mean7": 7.6,
+    "n30": 12,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 8362.08,
+    "mean7": 7305.43,
+    "n30": 12,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 11.18,
+    "mean7": 10.99,
+    "n30": 12,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.24,
+    "mean7": 234.57,
+    "n30": 11,
+    "n7": 7
+   }
+  },
+  "prev_id": "2026-10-13",
+  "readings": {
+   "active_kcal": 1295,
+   "hrv_ms": 54.5,
+   "recovery_pct": 65,
+   "rhr_bpm": 54,
+   "sleep_hours": 8.1,
+   "steps": 5956,
+   "strain": 13.8,
+   "weight_lbs": 232.7
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "232.7 lb · slept 8.1 hours · recovery 65",
+  "title": "Wednesday 14 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Wednesday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": "week-06",
+  "data_through": "2026-10-15",
+  "date": "2026-10-15",
+  "day_number": 40,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-15",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": "2026-10-16",
+  "normals": {
+   "active_kcal": {
+    "mean30": 1166.6,
+    "mean7": 1165.14,
+    "n30": 10,
+    "n7": 7
+   },
+   "hrv_ms": {
+    "mean30": 50.26,
+    "mean7": 50.6,
+    "n30": 13,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 58.38,
+    "mean7": 61.14,
+    "n30": 13,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 56.31,
+    "mean7": 56.57,
+    "n30": 13,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.67,
+    "mean7": 7.59,
+    "n30": 13,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 8140.46,
+    "mean7": 6708.29,
+    "n30": 13,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 11.32,
+    "mean7": 11.4,
+    "n30": 13,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.12,
+    "mean7": 234.5,
+    "n30": 12,
+    "n7": 7
+   }
+  },
+  "prev_id": "2026-10-14",
+  "readings": {
+   "active_kcal": 780,
+   "hrv_ms": 47.8,
+   "recovery_pct": 62,
+   "rhr_bpm": 59,
+   "sleep_hours": 8.3,
+   "steps": 5481,
+   "strain": 12.9,
+   "weight_lbs": 233.8
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "233.8 lb · slept 8.3 hours · recovery 62",
+  "title": "Thursday 15 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Thursday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": "week-06",
+  "data_through": "2026-10-16",
+  "date": "2026-10-16",
+  "day_number": 41,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-16",
+  "in_window": {
+   "nutrition": true,
+   "sleep": true,
+   "workouts": true
+  },
+  "method_ids": [],
+  "next_id": null,
+  "normals": {
+   "active_kcal": {
+    "mean30": 1199.82,
+    "mean7": 1192.43,
+    "n30": 11,
+    "n7": 7
+   },
+   "hrv_ms": {
+    "mean30": 50.52,
+    "mean7": 50.04,
+    "n30": 14,
+    "n7": 7
+   },
+   "recovery_pct": {
+    "mean30": 59.14,
+    "mean7": 64.43,
+    "n30": 14,
+    "n7": 7
+   },
+   "rhr_bpm": {
+    "mean30": 56.57,
+    "mean7": 57.57,
+    "n30": 14,
+    "n7": 7
+   },
+   "sleep_hours": {
+    "mean30": 7.62,
+    "mean7": 7.44,
+    "n30": 14,
+    "n7": 7
+   },
+   "steps": {
+    "mean30": 8297.79,
+    "mean7": 7315.29,
+    "n30": 14,
+    "n7": 7
+   },
+   "strain": {
+    "mean30": 11.33,
+    "mean7": 11.11,
+    "n30": 14,
+    "n7": 7
+   },
+   "weight_lbs": {
+    "mean30": 235.15,
+    "mean7": 234.56,
+    "n30": 13,
+    "n7": 7
+   }
+  },
+  "prev_id": "2026-10-15",
+  "readings": {
+   "active_kcal": 1532,
+   "hrv_ms": 53.9,
+   "recovery_pct": 69,
+   "rhr_bpm": 60,
+   "sleep_hours": 7.0,
+   "steps": 10343,
+   "strain": 11.5,
+   "weight_lbs": 235.5
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history",
+   "/api/chapters"
+  ],
+  "state": "ok",
+  "summary": "235.5 lb · slept 7 hours · recovery 69",
+  "title": "Friday 16 October 2026",
+  "type": "day",
+  "visibility": "public",
+  "weekday": "Friday"
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "chapter_id": "week-06",
+  "data_through": "2026-10-17",
+  "date": "2026-10-17",
+  "day_number": 42,
+  "edges": [
+   {
+    "id": "week-06",
+    "rel": "this_week",
+    "type": "chapter"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "reading",
+    "type": "metric"
+   }
+  ],
+  "has_weighin": true,
+  "id": "2026-10-17",
+  "in_window": {
+   "nutrition": false,
+   "sleep": false,
+   "workouts": false
+  },
+  "method_ids": [],
+  "next_id": null,
+  "normals": {
+   "active_kcal": {
+    "mean30": 1532.0,
+    "mean7": 1532.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "hrv_ms": {
+    "mean30": 53.9,
+    "mean7": 53.9,
+    "n30": 1,
+    "n7": 1
+   },
+   "recovery_pct": {
+    "mean30": 69.0,
+    "mean7": 69.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "rhr_bpm": {
+    "mean30": 60.0,
+    "mean7": 60.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "sleep_hours": {
+    "mean30": 7.0,
+    "mean7": 7.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "steps": {
+    "mean30": 10343.0,
+    "mean7": 10343.0,
+    "n30": 1,
+    "n7": 1
+   },
+   "strain": {
+    "mean30": 11.5,
+    "mean7": 11.5,
+    "n30": 1,
+    "n7": 1
+   },
+   "weight_lbs": {
+    "mean30": 235.5,
+    "mean7": 235.5,
+    "n30": 1,
+    "n7": 1
+   }
+  },
+  "prev_id": null,
+  "readings": {
+   "active_kcal": 1532,
+   "hrv_ms": 53.9,
+   "recovery_pct": 69,
+   "rhr_bpm": 60,
+   "sleep_hours": 7.0,
+   "steps": 10343,
+   "strain": 11.5,
+   "weight_lbs": 235.5
+  },
+  "sample": true,
+  "source": [
+   "/api/pulse_history"
+  ],
+  "state": "ok",
+  "summary": "POISON-HELD",
+  "title": "HELD-SENTINEL-DO-NOT-PUBLISH day",
+  "type": "day",
+  "visibility": "held",
+  "weekday": "Saturday"
+ }
+]

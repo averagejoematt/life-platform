@@ -307,7 +307,9 @@ def test_www_sync_script_guards_the_root_sync_and_never_deletes(tmp_path):
 # ── 6. the page registry derives the v9 rows ─────────────────────────────────────────────────────
 def test_registry_describes_the_v9_pages_once_the_switch_is_on():
     v9 = [p for p in qa_manifest.MANIFEST if p.get("owner") == "www"]
-    assert {p["path"] for p in v9} == set(OWNED["static_routes"]) | {"/404.html"}, "one row per static v9 route + the 404 object"
+    assert {p["path"] for p in v9} == set(OWNED["static_routes"]) | {
+        "/404.html"
+    } | _sampled_paths(), "one row per static v9 route + one sampled page per sampled route pattern (#5585) + the 404 object"
     assert qa_manifest._v9_rows(OWNED, live=False) == [], "switch off = no v9 rows (the v8 description returns)"
     assert (
         qa_manifest.PAGES_BY_PATH["/"]["owner"] == "www" and qa_manifest.PAGES_BY_PATH["/"]["js_modules"] == []
@@ -315,9 +317,29 @@ def test_registry_describes_the_v9_pages_once_the_switch_is_on():
     assert qa_manifest.PAGES_BY_PATH["/privacy/"]["structural"]["marker"], "#1429's named surface stays in the structural sweep"
 
 
+def _sampled_paths() -> set[str]:
+    """#5585: the fixed exemplar of each sampled pattern the build wrote (the day pages: tier 3, sampled — decision 9)."""
+    return {ex for pat, (ex, _name) in qa_manifest._V9_SAMPLED.items() if pat in OWNED["route_patterns"] and ex in OWNED["routes"]}
+
+
+def test_day_pages_are_one_sampled_tier3_row_never_a_door():
+    rows = {r["path"]: r for r in qa_manifest._v9_rows(OWNED, live=True)}
+    sampled = _sampled_paths()
+    assert "/data/day/*/" in OWNED["route_patterns"] and len(sampled) == 1, sampled
+    (path,) = sampled
+    assert path.startswith("/data/day/") and rows[path]["tier"] == 3 and rows[path]["sampled_pattern"] == "/data/day/*/"
+    assert not any(r.startswith("/data/day/") for r in OWNED["static_routes"])
+    import site_review_bindings  # noqa: E402 — qa/ is on sys.path, like qa_manifest
+
+    assert path in {b["path"] for b in site_review_bindings.PAGE_BINDINGS}, "the exemplar is bound for the site review"
+    # control: a build that wrote no day page registers no day row
+    bare = {**OWNED, "routes": [r for r in OWNED["routes"] if not r.startswith("/data/day/")]}
+    assert not any(r["path"].startswith("/data/day/") for r in qa_manifest._v9_rows(bare, live=True))
+
+
 def test_registry_derives_the_v9_rows_once_the_switch_is_on():
     rows = qa_manifest._v9_rows(OWNED, live=True)
-    by_path = {r["path"]: r for r in rows}
+    by_path = {r["path"]: r for r in rows if r.get("tier") != 3}
     assert set(by_path) == set(OWNED["static_routes"]) | {"/404.html"}
     # #5579: /data/journey/ is tier 1 by the owner's decision 9 (2026-11-02), beside the four destinations.
     assert {p for p, r in by_path.items() if r["tier"] == 1} == {"/", "/story/", "/data/", "/system/", "/data/journey/"}

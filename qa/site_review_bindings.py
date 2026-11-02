@@ -649,6 +649,18 @@ PAGE_BINDINGS.extend(
         },
     ]
 )
+# #5585: the day pages are a route pattern, sampled at one fixed exemplar (qa/qa_manifest.py::_V9_SAMPLED names the
+# same path) — every reading on it is /api/pulse_history's row for that date, against the exporter's own normals.
+PAGE_BINDINGS.append(
+    {
+        "path": "/data/day/2026-10-16/",
+        "name": "Data · one day, sampled (v9)",
+        "door": "data",
+        "narrative_order": 107,
+        "story_intent": "one day since the start: what was recorded, each reading against its own recent normal, and the week it belongs to",
+        "endpoints": [{"url": "/api/pulse_history", "role": "primary", "metrics": []}],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/privacy/",
