@@ -219,17 +219,19 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
                                 issues.append(f"{rel}: raw id {raw!r} rendered as text (#5568 domainWords() / #5572 coach name)")
     if pages == 0:
         issues.append("no html pages in dist")
-    issues.extend(heart_coverage(dist))
+    issues.extend(heart_coverage(dist, fixture=snapshot_mode(snapshot_dir) == "fixture"))
     return issues
 
 
 HEART_CHARTS = ("Resting heart rate", "Heart-rate variability")
 
 
-def heart_coverage(dist: str) -> list[str]:
-    """The Journey carries BOTH heart charts with inspectable points (resting HR and HRV), and the front page does not
-    link the HRV metric — the fixture keeps HRV inside journey.json so Start's reader-facing link budget is unchanged
-    (#5598; acceptance item 7). A build without the Journey page (an absent journey) is not graded here."""
+def heart_coverage(dist: str, fixture: bool = True) -> list[str]:
+    """The Journey carries BOTH heart charts with inspectable points (resting HR and HRV). On the FIXTURE build the front
+    page must not link the HRV metric either: the fixture keeps HRV inside journey.json so the reach ratchet's link
+    budget is unchanged (#5598; acceptance item 7). A live build publishes the real HRV metric, which Start has always
+    linked — that half applies to the fixture only (the first root deploy of #5604 refused on it, run 41519666090).
+    A build without the Journey page (an absent journey) is not graded here."""
     path = os.path.join(dist, "data", "journey", "index.html")
     if not os.path.exists(path):
         return []
@@ -243,7 +245,7 @@ def heart_coverage(dist: str) -> list[str]:
         elif "data-points" not in fig or 'data-points="[]"' in fig:
             out.append(f"data/journey/index.html: the {name} chart has no inspectable points")
     front = os.path.join(dist, "index.html")
-    if os.path.exists(front) and re.search(r'href="[^"]*/data/hrv/"', open(front, encoding="utf-8").read()):
+    if fixture and os.path.exists(front) and re.search(r'href="[^"]*/data/hrv/"', open(front, encoding="utf-8").read()):
         out.append("index.html: the front page links /data/hrv/ — HRV coverage must not move Start's link budget (#5598)")
     return out
 
