@@ -232,7 +232,10 @@ def test_prompt_truncates_oversized_prose():
     # capped at 8 weeks) had used the headroom, and the experiment-week sentence that stops
     # the judge reading 'DAY 20 · WEEK 3' as ISO W38 adds ~190. Measured overhead 8202 in this
     # fixture; on a live cycle the calendar grows ~95 chars/week up to its 8-week cap.
-    assert len(prompt) < rtq.MAX_PROSE_CHARS + 8600
+    # 8600 → 9300 on 2026-11-02 (#5596): the owner-ruled portrait clause — the Start page's
+    # "Mind · journal" and "Connection · logged interactions" tiles count different signals
+    # (~470 chars). Measured overhead 8867 in this fixture (≈8400 before it); ~430 kept.
+    assert len(prompt) < rtq.MAX_PROSE_CHARS + 9300
 
 
 def test_batching_four_to_six_surfaces_per_call():

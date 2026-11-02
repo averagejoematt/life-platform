@@ -484,6 +484,16 @@ def _phase_line(phase):
 #     unobserved shape is how a check earns its next false positive. Named here
 #     rather than retired silently; file it if it is ever observed.
 
+# ── 2026-11-02 (#5596): the portrait's tiles are distinct SIGNALS ─────────────
+# Owner ruling: the Start portrait's "Mind · journal" (journal entries, cycle) and
+# "Connection · logged interactions" (logged social interactions, trailing 30 days)
+# are different signals and not contradictory; the copy stays. The DO-NOT-FLAG
+# clause below states the distinction; the durable half is the structural ruling
+# `is_portrait_distinct_signals` in reader_truth_rulings.py (a prose clause alone
+# measured 3-of-3 ignored, #2613). Both keep a real defect flaggable: one tile
+# stating its own signal two ways, or a journal entry inside the window beside
+# "the journal went quiet".
+
 _PROMPT_HEADER = """You are a meticulous editorial truth reviewer for a public "measured life" \
 experiment site. Below is the RENDERED TEXT of {k} of its surfaces (page prose and/or API payloads — \
 no images). The site's data legitimately changes daily; you are judging whether the WORDS AND NUMBERS \
@@ -549,6 +559,11 @@ page dated on or after the cycle start. These metrics are keyed to the MORNING t
 against, so the night behind Day 1's morning is necessarily the night before Day 1 — that is the \
 frame being correct, not two surfaces disagreeing about the date;
 - story/archive/chronicle content clearly dated before the current cycle;
+- the home portrait's tiles read against each other: they count DIFFERENT signals. "Mind · journal" \
+counts JOURNAL ENTRIES over the cycle; "Connection · logged interactions" counts LOGGED SOCIAL \
+INTERACTIONS over the last thirty days. A quiet journal beside zero interactions is consistent, and \
+"the journal went quiet" is true when the last journal entry predates that window. Still flag ONE \
+tile stating its own signal two incompatible ways, or a last entry INSIDE the window beside "went quiet";
 - the same header/nav/footer chrome appearing on every page;
 - API field names or JSON structure — judge only human-readable narrative values inside them;
 - a window/span/n SMALLER than the elapsed day count — e.g. "5 day(s)" or "n = 5" on Day 6, or a \

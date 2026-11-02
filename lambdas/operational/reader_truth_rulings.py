@@ -1417,6 +1417,122 @@ def is_trailing_window_beside_day_counter(finding, start_date, today):
     return _quoted_weekdays_match_calendar(quoted, today_d.year)
 
 
+# ── #5596 (2026-11-02): the portrait's Mind and Connection tiles are two SIGNALS ─
+#
+# THE OBSERVED FAILURE (qa-smoke 2026-11-02 06:19Z, finding 539c6d, high,
+# "confirmed on a second pass" — held qa-smoke-failures in ALARM; the wire note is
+# replayed verbatim in tests/test_reader_truth_portrait_signals_5596.py). The v9
+# Start page's Fig. 1 portrait renders, side by side:
+#
+#   Mind · journal 2 entries in 57 days, the last on 9 Sep. …
+#   Connection · logged interactions — None logged in the last thirty days.
+#     The journal went quiet; so did this.
+#
+# The judge read the pair as "if the journal 'went quiet' in the last 30 days, the
+# last entry cannot be on Day 4". Both tiles are true (ground truth: /api/mind_overview
+# total_interactions_30d = 0; /api/journal_analysis last entry 2026-09-09). The Mind
+# tile counts JOURNAL ENTRIES over the cycle; the Connection tile counts LOGGED
+# SOCIAL INTERACTIONS over a trailing thirty days, and its "the journal went quiet"
+# is TRUE exactly when the last journal entry predates that window — which is what
+# a last entry on 9 Sep, 54 days before 2 Nov, establishes.
+#
+# OWNER RULING (2026-11-02): "Keep the factual Mind and Connection statements. They
+# describe different signals and are not inherently contradictory. Fix the QA rule
+# so it recognizes the distinction between journal activity and logged social
+# interactions." The Start copy does not change; the rubric gains a DO-NOT-FLAG
+# clause naming the distinction AND — because a prose clause alone measures 3-of-3
+# ignored (#2613) — this ledger gains the structural adjudication below.
+#
+# THE STRUCTURAL PREDICATE (#3337's bar: page + the claim class of the QUOTED copy +
+# parsed evidence values; the judge's own wording is never consulted):
+#   1. temporal_contradiction on the home page.
+#   2. Every quoted span is portrait-tile copy, attributed by the tile TEMPLATES
+#      (www/src/pages/index.astro's Mind/Connection notes), and BOTH tiles are quoted
+#      — the objection is precisely "one tile against the other".
+#   3. Each tile states ONE value: two quoted Mind spans parsing to different counts,
+#      day spans or last dates are the same signal stated two incompatible ways — a
+#      real contradiction, never ruled here.
+#   4. The arithmetic the Connection tile's journal clause rests on holds: the Mind
+#      tile's last entry date (or a zero count) falls at or before today minus the
+#      Connection window. A last entry INSIDE the window would make "the journal went
+#      quiet" false — a real cross-tile defect, and it keeps gating.
+# RESIDUE, named honestly: a paraphrase that quotes neither tile's template (e.g.
+# describes the counts without quoting them) is not adjudicated and keeps gating —
+# fail closed, as the rubric clause is the first line for it. DEMOTED to low, never
+# dropped.
+_PORTRAIT_MIND_COUNT_RE = re.compile(r"\b(\d{1,4})\s+entr(?:y|ies)\s+in\s+(\d{1,4})\s+days\b")
+_PORTRAIT_MIND_LAST_RE = re.compile(r"\bthe\s+last\s+on\s+(\d{1,2})\s+([a-z]{3,9})\b")
+_PORTRAIT_CONNECTION_RE = re.compile(r"\b(none|\d{1,4})\s+logged\s+in\s+the\s+last\s+(thirty|\d{1,3})\s+days\b")
+# Fixed tile copy a judge may quote on its own; normalized (casefolded, dashes unified).
+_PORTRAIT_MIND_FIXED = (
+    "mind · journal",
+    "counts only; the words stay private",
+    "the quietest signal, and the one the coaches guess at most",
+)
+_PORTRAIT_CONNECTION_FIXED = ("connection · logged interactions", "the journal went quiet; so did this")
+
+
+def _portrait_tile_of(span):
+    """('mind'|'connection'|None, parsed-values) for one normalized quoted span."""
+    mind = (_PORTRAIT_MIND_COUNT_RE.search(span), _PORTRAIT_MIND_LAST_RE.search(span))
+    conn = _PORTRAIT_CONNECTION_RE.search(span)
+    is_mind = any(mind) or span.startswith("mind ·") or any(span.strip(" .") in t for t in _PORTRAIT_MIND_FIXED)
+    is_conn = bool(conn) or span.startswith("connection ·") or any(span.strip(" .") in t for t in _PORTRAIT_CONNECTION_FIXED)
+    if is_mind == is_conn:  # neither tile, or a span straddling both — not attributable
+        return None, None
+    if is_mind:
+        count, last = mind
+        return "mind", {"count": count and (int(count.group(1)), int(count.group(2))), "last": last and last.groups()}
+    return "connection", {"window": conn and (30 if conn.group(2) == "thirty" else int(conn.group(2)))}
+
+
+def _one_value(values):
+    """The single non-empty value a tile's spans state, None when absent, or a
+    sentinel False when two spans state different values (the same signal two ways)."""
+    seen = {v for v in values if v}
+    return False if len(seen) > 1 else next(iter(seen), None)
+
+
+def _yearless_day_month(day, mon, today_d):
+    month = next((i for name, i in _MONTHS.items() if name.startswith(mon[:3])), None)
+    if month is None:
+        return None
+    try:
+        d = date(today_d.year, month, int(day))
+        return d if d <= today_d else date(today_d.year - 1, month, int(day))
+    except ValueError:
+        return None
+
+
+def is_portrait_distinct_signals(finding, today=None):
+    """True when a home-page temporal_contradiction sets the portrait's Mind (journal
+    entries) tile against its Connection (logged interactions) tile and the quoted
+    values are mutually consistent (#5596). See the comment block above."""
+    if finding.get("category") != "temporal_contradiction" or finding.get("page") != "/":
+        return False
+    try:
+        today_d = date.fromisoformat(str(today))
+    except ValueError:
+        return False
+    tiles = {"mind": [], "connection": []}
+    for span in (_normalize_copy(s) for s in quoted_spans(finding.get("note"))):
+        tile, values = _portrait_tile_of(span)
+        if tile is None:
+            return False
+        tiles[tile].append(values)
+    if not tiles["mind"] or not tiles["connection"]:
+        return False
+    count = _one_value(v["count"] for v in tiles["mind"])
+    last = _one_value(v["last"] for v in tiles["mind"])
+    window = _one_value(v["window"] for v in tiles["connection"])
+    if count is False or last is False or window is False or not window:
+        return False
+    if last:
+        last_d = _yearless_day_month(last[0], last[1], today_d)
+        return last_d is not None and last_d <= today_d - timedelta(days=window)
+    return bool(count) and count[0] == 0
+
+
 RULINGS_FIELD = "rulings"
 
 
@@ -1495,6 +1611,12 @@ def advisory_rulings(start_date, today=None):
             "a trailing window or since-date figure beside the day counter",
             lambda f: is_trailing_window_beside_day_counter(f, start_date, today),
             "a window measured back from today is not bounded by the day counter, #2959/#4834",
+        ),
+        (
+            "portrait_distinct_signals",
+            "a portrait Mind-vs-Connection objection",
+            lambda f: is_portrait_distinct_signals(f, today),
+            "journal entries and logged interactions are two signals; the quoted values agree, #5596",
         ),
     )
 
