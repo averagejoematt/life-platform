@@ -158,7 +158,16 @@ def morning_note_fact(table, today: str) -> dict:
 
 def nutrition_record(rows: list, today: str) -> dict:
     """The prompt-facing logging record: `nutrition_logging.logging_record` plus the
-    protein average (with its 95% CI) over the same window."""
+    protein average (with its 95% CI) over the same window.
+
+    A zero-entry row (a summary-only stub: no diary entries, `grading_quality.is_zero_entry_day`) is not a
+    log: it is dropped before the count, the latest-log date and the protein average, so a coach is never
+    told a stub's 15 g was eaten or that a stub day was logged (the owner's Journey/Day acceptance review,
+    2026-11-02: "30 logged days this month, every one of them" counted three stubs). The grader has read
+    such a day as missing since #5552; this makes the coaches' inputs read it the same way."""
+    from coach.grading_quality import is_zero_entry_day
+
+    rows = [r for r in rows or () if not is_zero_entry_day(r)]
     rec = _nl.logging_record(rows, today)
     series = _nl.protein_series(rows)
     # Deliberately ONE protein figure (the served window's `avg_protein_g`, with its CI).
