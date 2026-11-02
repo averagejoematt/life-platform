@@ -319,8 +319,9 @@ def test_registry_derives_the_v9_rows_once_the_switch_is_on():
     rows = qa_manifest._v9_rows(OWNED, live=True)
     by_path = {r["path"]: r for r in rows}
     assert set(by_path) == set(OWNED["static_routes"]) | {"/404.html"}
-    assert {p for p, r in by_path.items() if r["tier"] == 1} == {"/", "/story/", "/data/", "/system/"}
-    assert all(r["tier"] == 2 for p, r in by_path.items() if p not in {"/", "/story/", "/data/", "/system/", "/404.html"})
+    # #5579: /data/journey/ is tier 1 by the owner's decision 9 (2026-11-02), beside the four destinations.
+    assert {p for p, r in by_path.items() if r["tier"] == 1} == {"/", "/story/", "/data/", "/system/", "/data/journey/"}
+    assert all(r["tier"] == 2 for p, r in by_path.items() if p not in {"/", "/story/", "/data/", "/system/", "/data/journey/", "/404.html"})
     assert all(r["owner"] == "www" for r in by_path.values())
     assert all(
         r["content_class"] == ("static" if p in qa_manifest._V9_STRUCTURAL else "live-data") for p, r in by_path.items() if p != "/404.html"

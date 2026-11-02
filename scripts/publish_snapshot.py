@@ -57,6 +57,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     _ROOT_LINK,
     _SCRIPT,
     _WORDED_TEXT_KEYS,
+    ABSENT_JOURNEY,
     COLLECTION_OF,
     DEFAULT_BASE_URL,
     DEFAULT_FIXTURES,
@@ -83,6 +84,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     day_in_words,
     envelope,
     extract_prose,
+    journey_rungs,
     load_fixture_data_files,
     load_fixtures,
     log,
@@ -93,6 +95,9 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     word_dates,
     write_snapshot,
 )
+from publish_snapshot_journey import (
+    live_journey,
+)  # noqa: E402 — the Journey's data file (#5579), kept out of this module's 1000-line ceiling
 
 
 # ── live mode ────────────────────────────────────────────────────────────────────────────
@@ -142,8 +147,21 @@ LIVE_ENDPOINTS = {
     "pairs": "/api/pairs",  # the precomputed pair statistics for the data room (PR #5538)
     "mind_overview": "/api/mind_overview",  # journal and interaction COUNTS (never text) for the portrait's Mind and Connection
     "journal_analysis": "/api/journal_analysis",  # the analysed-entry dates, for the Mind tile's weekly bars
+    "journey": "/api/journey",  # the weight story's published rate, interval and projection (#5579)
+    "forecast": "/api/forecast",  # the platform's short forecasts and their coverage (#5579)
 }
-OPTIONAL_ENDPOINTS = ("blog", "docket", "experiments", "chapters", "series_catalogue", "pairs", "mind_overview", "journal_analysis")
+OPTIONAL_ENDPOINTS = (
+    "blog",
+    "docket",
+    "experiments",
+    "chapters",
+    "series_catalogue",
+    "pairs",
+    "mind_overview",
+    "journal_analysis",
+    "journey",
+    "forecast",
+)
 
 
 # Presentation labels for the metric keys the series catalogue serves (the key is the id; the
@@ -196,6 +214,7 @@ class LiveContext:
         self.metric_keys: set[str] = set()
         self.series: dict[str, dict] = {}  # metric key -> the series payload (written as a data file)
         self.pairs: dict | None = None
+        self.journey: dict | None = None  # the Journey's data file (#5579), built after the metrics
         self.ledger_counts: dict | None = None  # the export route's own served / counted / withheld numbers
 
     def rows(self, key: str, field: str) -> list:
@@ -957,7 +976,7 @@ def build_live(base_url: str, timeout: float) -> dict[str, list[dict]]:
 
 def build_live_with_data(base_url: str, timeout: float) -> tuple[dict[str, list[dict]], dict]:
     ctx = _build_live_ctx(base_url, timeout)
-    return ctx.objs, {"series": ctx.series, "pairs": ctx.pairs}
+    return ctx.objs, {"series": ctx.series, "pairs": ctx.pairs, "journey": ctx.journey}
 
 
 def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
@@ -971,6 +990,7 @@ def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
     _live_sources(ctx)
     _live_methods(ctx)
     _live_metrics(ctx)  # after sources and methods: its edges point at them
+    live_journey(ctx, _baseline_change_markers)  # after the metrics: it derives the rungs from the weight series (#5579)
     _live_experiments(ctx)
     _live_essays(ctx)
     _live_edition(ctx)

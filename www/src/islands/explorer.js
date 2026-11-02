@@ -5,6 +5,7 @@
 import { lastDays, presentCount, svgChart } from "../lib/chart.js";
 import { dayInWords, num } from "../lib/format.js";
 import { findPair, pairSentence, strengthInWords } from "../lib/pairs.js";
+import { mountAll } from "./inspect.js";
 
 const COBALT = "#1B3FD6";
 const OCHRE = "#B97A12";
@@ -56,8 +57,11 @@ export function mount(root = document.querySelector("[data-explorer]")) {
       smooth: state.smooth,
       markers: a.markers || [],
       labelDay,
+      unit: a.unit || root.dataset.unit || "",
+      decimals,
       aria: `${labels[metric] || metric}, ${presentCount(days)} readings over ${days.length} days`,
     });
+    mountAll(root);
     if (caption) {
       const n = presentCount(days);
       caption.textContent = `${n} of ${days.length} days with a reading${state.smooth ? " · 7-day mean, readings as dots" : ""}${
@@ -79,8 +83,11 @@ export function mount(root = document.querySelector("[data-explorer]")) {
       smooth: state.smooth,
       height: 160,
       labelDay,
+      unit: b.unit || "",
+      decimals,
       aria: `${labels[state.b] || state.b}, aligned ${state.lag ? `${state.lag > 0 ? "+" : ""}${state.lag} days` : "the same day"}`,
     });
+    mountAll(root);
     if (!state.pairs) state.pairs = await getJSON(`${base}data/pairs.json`);
     const row = findPair(state.pairs, metric, state.b, state.lag);
     if (stats) {

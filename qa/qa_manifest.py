@@ -86,7 +86,13 @@ _REPO = os.path.dirname(_HERE)
 # build and the live one. While `live_at_root` is false the build is served at /next/v9/ only
 # (EXEMPT, below) and no v9 row exists; once the owner's one-line switch merge sets it, the v9
 # rows REPLACE the site/ rows for the paths the build owns at `/` and the rest join as new pages.
-_V9_TIER1 = {"/", "/story/", "/data/", "/system/"}  # the four destinations (plan §C)
+_V9_TIER1 = {
+    "/",
+    "/story/",
+    "/data/",
+    "/system/",
+    "/data/journey/",
+}  # the four destinations (plan §C) + the Journey (owner decision 9, #5579)
 # #1429 named /privacy/ as a structural-sweep surface; the v9 page is static text, so it keeps a declared
 # marker (the h1 in www/src/pages/privacy/index.astro) and the smoke asserts it after the cut-over.
 _V9_STRUCTURAL = {"/privacy/": "Only deliberately published figures appear here."}
@@ -105,11 +111,16 @@ _V9_INTENTS = {
         "How the platform works: the AI coaches' graded record beside a simple guess, the ledger of every prediction, "
         "the sources and the methods."
     ),
+    "/data/journey/": (
+        "The weight-loss journey: every weigh-in from the start on the whole distance to the goal, "
+        "the published rate with its interval, the projected date, and where it is heading next."
+    ),
 }
 _V9_NAMES = {
     "/": "Start (the v9 front page)",
     "/story/": "Story (v9)",
     "/data/": "Data room (v9)",
+    "/data/journey/": "Data · the journey (v9, #5579)",
     "/system/": "System (v9)",
     "/system/ledger/": "System · the ledger (v9)",
     "/system/sources/": "System · sources (v9)",

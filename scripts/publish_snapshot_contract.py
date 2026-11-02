@@ -551,6 +551,76 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
     with open(os.path.join(out_dir, "pairs.json"), "w", encoding="utf-8") as fh:
         fh.write(text)
     files["pairs.json"] = {"count": len(pairs.get("pairs", [])), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    # journey.json (#5579, the Journey at /data/journey/): the weight story's published figures — the
+    # platform's own rate, interval and projection (/api/journey), its short forecasts and their coverage
+    # (/api/forecast), the ten-pound rungs derived from the weight series at export. Absent when the
+    # API did not serve it: the page then says so and draws nothing in its place.
+    journey = data_files.get("journey") or ABSENT_JOURNEY
+    text = _dump(journey)
+    with open(os.path.join(out_dir, "journey.json"), "w", encoding="utf-8") as fh:
+        fh.write(text)
+    files["journey.json"] = {"count": len(journey.get("rungs") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+
+
+ABSENT_JOURNEY = {
+    "state": "absent",
+    "absent_text": "The platform did not serve the journey figures for this snapshot.",
+    "as_of": None,
+    "data_through": None,
+    "sample": False,
+    "source": ["/api/journey", "/api/forecast", "/api/series"],
+    "method_ids": [],
+    "metric_id": "weight_lbs",
+    "unit": "lb",
+    "rungs": [],
+    "forecasts": [],
+    "markers": [],
+}
+
+JOURNEY_NUMBERS = (
+    "start_weight_lbs",
+    "goal_weight_lbs",
+    "current_weight_lbs",
+    "lost_lbs",
+    "remaining_lbs",
+    "progress_pct",
+    "weighin_count",
+    "weekly_rate_lbs",
+    "weekly_rate_ci_low",
+    "weekly_rate_ci_high",
+    "weighin_span_days",
+    "days_to_goal",
+    "day_n",
+    "silent_days",
+)
+JOURNEY_DAYS = ("start_date", "last_weighin_date", "projected_goal_date", "projected_goal_date_earliest", "projected_goal_date_latest")
+
+
+def journey_rungs(days: list[dict], start_weight: float, goal_weight: float, start_date: str) -> list[dict]:
+    """Ten-pound rungs from the start down to the goal, each with the first weigh-in at or under it and
+    the days since the previous rung (the first: since the start). Derived from the published series —
+    a pure function so the fixture and the live export agree (tests/test_web_publication_snapshot_5530.py)."""
+    import datetime as _dt
+
+    def _d(iso: str) -> _dt.date:
+        return _dt.date.fromisoformat(iso)
+
+    readings = [(d["date"], d["value"]) for d in days if isinstance(d.get("value"), (int, float)) and not isinstance(d.get("value"), bool)]
+    out: list[dict] = []
+    prev = start_date
+    rung = (int(start_weight) // 10) * 10
+    if rung >= start_weight:
+        rung -= 10
+    while rung >= goal_weight and rung > 0:
+        hit = next((dt for dt, v in readings if v <= rung), None)
+        if hit and prev:
+            out.append({"lb": rung, "date": hit, "days": (_d(hit) - _d(prev)).days})
+            prev = hit
+        else:
+            out.append({"lb": rung, "date": None, "days": None})
+            prev = None
+        rung -= 10
+    return out
 
 
 def write_snapshot(
@@ -609,6 +679,11 @@ def load_fixture_data_files(fixtures_dir: str) -> dict:
     if os.path.exists(ppath):
         with open(ppath, encoding="utf-8") as fh:
             out["pairs"] = json.load(fh)
+    jpath = os.path.join(fixtures_dir, "journey.json")
+    out["journey"] = None
+    if os.path.exists(jpath):
+        with open(jpath, encoding="utf-8") as fh:
+            out["journey"] = json.load(fh)
     return out
 
 
@@ -641,3 +716,23 @@ def validate_data_files(data_files: dict, public: dict[str, list[dict]]) -> None
                 raise LookupError(f"pairs.json names a metric that is not public: {r.get(side)}")
         if "significant" in json.dumps(r).lower():
             raise SchemaError("pairs.json: the word 'significant' is not served")
+    journey = data_files.get("journey")
+    if journey is not None:
+        if journey.get("metric_id") not in metrics:
+            raise LookupError(f"journey.json names a metric that is not public: {journey.get('metric_id')}")
+        if journey.get("state") not in ("ok", "stale", "absent"):
+            raise SchemaError("journey.json: state must be ok, stale or absent")
+        if journey.get("state") != "absent":
+            for k in JOURNEY_NUMBERS:
+                v = journey.get(k)
+                if v is None or isinstance(v, bool) or not isinstance(v, (int, float)):
+                    raise SchemaError(f"journey.json: {k} must be a number")
+            for k in JOURNEY_DAYS:
+                if not ISO_DAY.match(str(journey.get(k) or "")):
+                    raise SchemaError(f"journey.json: {k} must be a day")
+            for r in journey.get("rungs") or []:
+                if not isinstance(r.get("lb"), (int, float)) or (r.get("date") is not None and not ISO_DAY.match(str(r["date"]))):
+                    raise SchemaError(f"journey.json: bad rung {r!r}")
+            for f in journey.get("forecasts") or []:
+                if not all(isinstance(f.get(k), (int, float)) and not isinstance(f.get(k), bool) for k in ("point", "lo", "hi")):
+                    raise SchemaError(f"journey.json: bad forecast {f!r}")

@@ -65,3 +65,39 @@ test("headline, lastDays, presentCount and weeklyBars read the series without in
   assert.ok(bars.every((b) => b == null || Number.isFinite(b)));
   assert.deepEqual(weeklyBars([day(0, null), day(1, null)], 8), [null]);
 });
+
+// ── #5578 — every chart answers: data-points, prewritten labels, the device-era rule ──────────
+import { eraMean, pointsFor } from "../src/lib/chart.js";
+
+test("svgChart carries one inspectable point per reading, labelled in words with the unit", () => {
+  const days = [
+    { date: "2026-10-30", value: 297.9, present: true, gap: false },
+    { date: "2026-10-31", value: 296.6, present: true, gap: false },
+    { date: "2026-11-01", value: null, present: false, gap: false },
+  ];
+  const svg = svgChart({ series: [{ days, color: "#1B3FD6", name: "w" }], unit: "lb", decimals: 1 });
+  const m = svg.match(/data-points="([^"]+)"/);
+  assert.ok(m, "data-points attribute present");
+  const pts = JSON.parse(m[1].replace(/&quot;/g, '"'));
+  assert.equal(pts.length, 2, "a missing reading is not a point");
+  assert.equal(pts[1].date, "2026-10-31");
+  assert.equal(pts[1].label, "Saturday 31 October 2026 · 296.6 lb");
+  assert.ok(Number.isFinite(pts[1].x) && Number.isFinite(pts[1].y));
+});
+
+test("the rolling mean restarts at a marker (a baseline change is read within each era)", () => {
+  const vals = [60, 60, 60, 60, 60, 60, 60, 50, 50, 50, 50];
+  const plain = eraMean(vals);
+  const era = eraMean(vals, new Set([7]));
+  assert.ok(plain[8] > 50, "without the break the mean bridges the step");
+  assert.equal(era[7], null, "the first readings of the new era have no mean yet (fewer than 3)");
+  assert.equal(era[9], 50, "inside the new era the mean is the era's own");
+});
+
+test("the line is drawn as separate segments at a marker", () => {
+  const days = Array.from({ length: 10 }, (_, i) => ({ date: `2026-10-${String(i + 1).padStart(2, "0")}`, value: 60 - i, present: true, gap: false }));
+  const one = svgChart({ series: [{ days, color: "#000", name: "x" }] });
+  const two = svgChart({ series: [{ days, color: "#000", name: "x" }], markers: [{ date: "2026-10-05", label: "baseline change" }] });
+  assert.equal((one.match(/<path /g) || []).length, 1);
+  assert.equal((two.match(/<path /g) || []).length, 2);
+});
