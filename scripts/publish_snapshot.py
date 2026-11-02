@@ -1004,7 +1004,7 @@ def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
     _live_methods(ctx)
     _live_metrics(ctx)  # after sources and methods: its edges point at them
     live_journey(ctx, _baseline_change_markers)  # after the metrics: it derives the rungs from the weight series (#5579)
-    live_days(ctx)  # after the chapters, the week states and the metrics: a day's edges point at them (#5585)
+    live_days(ctx, lambda path: _get(ctx.base_url, path, ctx.timeout))  # after chapters, ledger, metrics: edges point at them (#5585/#5586)
     _live_experiments(ctx)
     _live_essays(ctx)
     _live_edition(ctx)
