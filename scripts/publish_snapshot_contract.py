@@ -575,6 +575,10 @@ ABSENT_JOURNEY = {
     "rungs": [],
     "forecasts": [],
     "markers": [],
+    "composition": None,
+    "phenoage": None,
+    "bp": None,
+    "tape_date": None,
 }
 
 JOURNEY_NUMBERS = (
@@ -593,6 +597,83 @@ JOURNEY_NUMBERS = (
     "day_n",
     "silent_days",
 )
+# The body beside the weight (#5583): every field nullable, every number a number when present.
+JOURNEY_COMPOSITION_NUMBERS = (
+    "days_before_start",
+    "total_mass_lb",
+    "body_fat_pct",
+    "lean_mass_lb",
+    "fat_mass_lb",
+    "visceral_fat_lb",
+    "visceral_fat_g",
+    "android_fat_pct",
+    "gynoid_fat_pct",
+    "ag_ratio",
+    "almi_kg_m2",
+    "almi_percentile",
+    "visceral_target_lb",
+    "days_since",
+)
+PHENOAGE_KEYS = {"years", "as_of", "drivers"}
+PHENOAGE_DRIVER_KEYS = {"name", "value", "unit", "direction", "derived"}
+# PhenoAge Option A: no chronological age, birth date or age gap is ever written beside it.
+_AGE_KEY = re.compile(r"(^|_)(age|birth|dob|chronological)", re.IGNORECASE)
+
+
+def _is_num(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _age_keys(o: Any, path: str = "journey") -> list[str]:
+    if isinstance(o, dict):
+        out = [f"{path}.{k}" for k in o if _AGE_KEY.search(str(k)) and k != "phenoage"]
+        for k, v in o.items():
+            out += _age_keys(v, f"{path}.{k}")
+        return out
+    if isinstance(o, list):
+        return [x for i, v in enumerate(o) for x in _age_keys(v, f"{path}[{i}]")]
+    return []
+
+
+def validate_journey_body(journey: dict) -> None:
+    """The layer-3 fields of journey.json (#5583): nullable, typed when present, and no age beside PhenoAge."""
+    bad = _age_keys(journey)
+    if bad:
+        raise SchemaError(f"journey.json: an age or birth field is never published beside PhenoAge: {bad[:3]}")
+    comp = journey.get("composition")
+    if comp is not None:
+        if not isinstance(comp, dict) or not ISO_DAY.match(str(comp.get("scan_date") or "")):
+            raise SchemaError("journey.json: composition.scan_date must be a day")
+        for k in JOURNEY_COMPOSITION_NUMBERS:
+            if comp.get(k) is not None and not _is_num(comp.get(k)):
+                raise SchemaError(f"journey.json: composition.{k} must be a number or null")
+        if comp.get("next_recommended") is not None and not ISO_DAY.match(str(comp["next_recommended"])):
+            raise SchemaError("journey.json: composition.next_recommended must be a day or null")
+    pa = journey.get("phenoage")
+    if pa is not None:
+        if (
+            not isinstance(pa, dict)
+            or set(pa) != PHENOAGE_KEYS
+            or not _is_num(pa.get("years"))
+            or not ISO_DAY.match(str(pa.get("as_of") or ""))
+        ):
+            raise SchemaError("journey.json: phenoage must be exactly {years, as_of, drivers}")
+        for d in pa.get("drivers") or []:
+            if not isinstance(d, dict) or not set(d) <= PHENOAGE_DRIVER_KEYS or not d.get("name"):
+                raise SchemaError(f"journey.json: bad phenoage driver {d!r}")
+    bp = journey.get("bp")
+    if bp is not None:
+        if (
+            not isinstance(bp, dict)
+            or not _is_num(bp.get("systolic"))
+            or not _is_num(bp.get("diastolic"))
+            or not ISO_DAY.match(str(bp.get("date") or ""))
+        ):
+            raise SchemaError("journey.json: bp needs systolic, diastolic and a day")
+    if journey.get("tape_date") is not None and not ISO_DAY.match(str(journey["tape_date"])):
+        raise SchemaError("journey.json: tape_date must be a day or null")
+
+
 JOURNEY_DAYS = ("start_date", "last_weighin_date", "projected_goal_date", "projected_goal_date_earliest", "projected_goal_date_latest")
 
 
@@ -736,3 +817,4 @@ def validate_data_files(data_files: dict, public: dict[str, list[dict]]) -> None
             for f in journey.get("forecasts") or []:
                 if not all(isinstance(f.get(k), (int, float)) and not isinstance(f.get(k), bool) for k in ("point", "lo", "hi")):
                     raise SchemaError(f"journey.json: bad forecast {f!r}")
+        validate_journey_body(journey)

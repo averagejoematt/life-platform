@@ -4,7 +4,7 @@
 // rungs and the baseline change. Pure: the same function draws the build-time SVG and the island's
 // redraws. Nothing is computed here that the platform did not publish: the rate, the interval, the
 // projected dates and the rungs come from journey.json; this module only places them on a time axis.
-import { eraMean, esc, pointLabel } from "./chart.js";
+import { eraMean, esc, pointLabel, svgChart } from "./chart.js";
 import { dayInWords } from "./format.js";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -157,4 +157,91 @@ export function journeyCaption(o) {
   if (wedge) parts.push("the wedge is the platform's projection to the goal, its edges the 80% range of the date");
   if (o.show.events && (o.markers || []).length) parts.push(`the ochre line is the baseline change on ${dayInWords(o.markers[0].date)}`);
   return `${parts.join(" · ")}. Hover, tap or use the arrow keys to read a morning.`;
+}
+
+// ── layers 2–3 (#5583): the pace, the ladder, the body, the heart beside the weight, the calls ──────
+// Still placement only. The one published rate is drawn with its published interval (no other window's
+// slope is computed — owner requirement A); the ladder reads the published rungs; the heart captions are
+// plain means of the readings the chart shows, said as such on the page.
+
+/** The pace bar: the published weekly rate and its 95% interval as percentages of one shared scale. */
+export function paceBar(J) {
+  const rate = Number(J.weekly_rate_lbs);
+  const a = Math.abs(Number(J.weekly_rate_ci_low));
+  const b = Math.abs(Number(J.weekly_rate_ci_high));
+  const max = Math.max(Math.abs(rate), a, b) * 1.25 || 1;
+  const crossesZero = Number(J.weekly_rate_ci_low) <= 0 && Number(J.weekly_rate_ci_high) >= 0;
+  const pct = (v) => Math.round((v / max) * 1000) / 10;
+  return {
+    bar: pct(Math.abs(rate)),
+    ciLeft: crossesZero ? 0 : pct(Math.min(a, b)),
+    ciWidth: crossesZero ? pct(Math.max(a, b)) : pct(Math.abs(a - b)),
+    excludesZero: !crossesZero,
+    losing: rate < 0,
+  };
+}
+
+/** The milestones ladder: crossed rungs, the next one (with its distance from the last weigh-in), the rest. */
+export function ladderRows(rungs, current) {
+  const next = (rungs || []).find((r) => !r.date) || null;
+  return (rungs || []).map((r, i) => {
+    if (r.date) {
+      const since = i === 0 ? "from the start" : `after ${rungs[i - 1].lb}`;
+      return { lb: r.lb, cls: "hit", right: `crossed ${dayInWords(r.date, { short: true })} · ${r.days} days ${since}` };
+    }
+    if (r === next) return { lb: r.lb, cls: "next", right: `${(Math.round((current - r.lb) * 10) / 10).toFixed(1)} lb away` };
+    return { lb: r.lb, cls: "future", right: "" };
+  });
+}
+
+/** The published chapter of the week each rung fell: a chapter's date closes its week (the 7 days ending on it). */
+export function rungChapters(rungs, chapters) {
+  const out = [];
+  for (const r of rungs || []) {
+    if (!r.date) continue;
+    const c = (chapters || []).find((ch) => ch.status === "published" && ch.week >= 1 && t(r.date) <= t(ch.date) && t(ch.date) - t(r.date) < 7 * DAY_MS);
+    if (c) out.push({ lb: r.lb, date: r.date, chapter: c });
+  }
+  return out;
+}
+
+/** A plain mean of the readings in a list of days (no weighting, no smoothing), with its count. */
+export function plainMean(days) {
+  const v = (days || []).filter((d) => d.value != null && !d.gap).map((d) => d.value);
+  return { mean: v.length ? v.reduce((s, x) => s + x, 0) / v.length : null, n: v.length };
+}
+
+/** The first seven and the latest seven displayed days of a heart series since day one. */
+export function heartWeeks(days) {
+  return { first: plainMean(days.slice(0, 7)), last: plainMean(days.slice(-7)) };
+}
+
+/** The visceral-fat band on the previous site's scale (under 1 lb low · 1 to 2 moderate · over 2 elevated). */
+export function visceralBand(lb) {
+  if (lb == null) return null;
+  return lb < 1 ? "low" : lb <= 2 ? "moderate" : "elevated";
+}
+
+/** "99th", "1st", "22nd", "13th". */
+export function ordinal(n) {
+  const v = Math.round(Number(n));
+  const s = v % 100 >= 11 && v % 100 <= 13 ? "th" : { 1: "st", 2: "nd", 3: "rd" }[v % 10] || "th";
+  return `${v}${s}`;
+}
+
+/** A heart series since day one, drawn by the one line chart (eras broken at the baseline change, data-points emitted).
+ * `width` is the container's own width when the island redraws, so the labels render at their unit size (#1210). */
+export function heartChart(o) {
+  return svgChart({
+    series: [{ days: o.days, color: "#1B3FD6", name: o.name }],
+    width: o.width || 500,
+    height: o.height || 240,
+    mobile: Boolean(o.mobile),
+    smooth: true,
+    markers: o.markers || [],
+    labelDay: (iso) => dayInWords(iso, { short: true }) || "",
+    unit: o.unit || "",
+    decimals: o.decimals == null ? 0 : o.decimals,
+    aria: o.aria || "",
+  });
 }

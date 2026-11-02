@@ -27,6 +27,7 @@
     "/data/insights/zone2-deep-sleep/",
     "/data/journey/",
     "/data/recovery_score/",
+    "/data/resting_hr/",
     "/data/total_protein_g/",
     "/data/weight_lbs/",
     "/privacy/",
@@ -60,5 +61,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 39
+  "transitive_count": 40
 }

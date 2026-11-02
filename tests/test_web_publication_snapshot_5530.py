@@ -686,3 +686,105 @@ def test_live_metrics_write_series_files_and_filter_pairs_to_public_metrics(monk
         ps.validate_data_files({"series": {}, "pairs": {"pairs": [{"a": "hrv", "b": "ghost"}]}}, public)
     with pytest.raises(ps.SchemaError):
         ps.validate_data_files({"series": {}, "pairs": {"pairs": [{"a": "hrv", "b": "hrv", "note": "Significant!"}]}}, public)
+
+
+# ── the Journey's body beside the weight (#5583) ─────────────────────────────────────────
+def _journey_mod():
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    import publish_snapshot_journey as pj  # noqa: E402
+
+    return pj
+
+
+def _contract():
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    import publish_snapshot_contract as pc  # noqa: E402
+
+    return pc
+
+
+_PHYSICAL_OVERVIEW = {  # the shape /api/physical_overview served on 2026-11-02 (trimmed to the fields read)
+    "latest_dexa": {
+        "scan_date": "2026-03-30",
+        "body_composition": {
+            "total_mass_lb": 311.7,
+            "body_fat_pct": 42.7,
+            "fat_mass_lb": 133.1,
+            "lean_mass_lb": 170.6,
+            "visceral_fat_lb": 3.21,
+            "visceral_fat_g": 1456.0,
+            "android_fat_pct": 51.0,
+            "gynoid_fat_pct": 48.0,
+            "ag_ratio": 1.06,
+        },
+        "indices": {"almi_kg_m2": 13.1, "almi_percentile": 99.0},
+        "score_360": {"score": 194.0, "biological_age": 42.0},
+        "targets": {"visceral_fat_lb": 1.0},
+    },
+    "days_since_dexa": 217,
+    "next_dexa_recommended": "2026-06-28",
+    "tape_measurements": {"session_date": "2026-09-06", "waist_navel_in": 55.5},
+    "blood_pressure": {"systolic": 121.0, "diastolic": 70.0, "date": "2026-10-13", "status": "normal", "readings_count": 2, "trend": []},
+}
+_PHENOAGE = {
+    "phenoage": 28,
+    "as_of": "2026-04-03",
+    "chronological_age": 99,  # never served today; planted so the allow-list is measured, not assumed
+    "drivers": [{"name": "Albumin", "value": 4.9, "unit": "g/dL", "direction": "younger", "derived": False, "age_delta": 1}],
+}
+
+
+def test_journey_body_fields_map_the_served_shapes_and_carry_no_age():
+    pj = _journey_mod()
+    f = pj.body_fields({"physical_overview": _PHYSICAL_OVERVIEW, "phenoage": _PHENOAGE}, "2026-09-06")
+    c = f["composition"]
+    assert c["scan_date"] == "2026-03-30" and c["days_before_start"] == 160
+    assert (c["lean_mass_lb"], c["fat_mass_lb"], c["visceral_fat_lb"], c["almi_percentile"]) == (170.6, 133.1, 3.21, 99.0)
+    assert (c["visceral_target_lb"], c["next_recommended"], c["days_since"]) == (1.0, "2026-06-28", 217)
+    assert f["phenoage"] == {
+        "years": 28,
+        "as_of": "2026-04-03",
+        "drivers": [{"name": "Albumin", "value": 4.9, "unit": "g/dL", "direction": "younger", "derived": False}],
+    }
+    assert f["bp"] == {"systolic": 121.0, "diastolic": 70.0, "date": "2026-10-13", "status": "normal", "readings_count": 2}
+    assert f["tape_date"] == "2026-09-06"
+    blob = json.dumps(f)
+    assert "age" not in blob.replace("phenoage", ""), "no age field rides along (PhenoAge Option A)"
+    _contract().validate_journey_body(f)
+    # each endpoint absent → its field is null, never a guess
+    assert pj.body_fields({}, "2026-09-06") == {"composition": None, "phenoage": None, "bp": None, "tape_date": None}
+
+
+_JOURNEY_BODY_MUTATIONS = (
+    (lambda j: j["phenoage"].update(chronological_age=40), "phenoage"),
+    (lambda j: j.update(birth_date="1980-01-01"), "age or birth"),
+    (lambda j: j["phenoage"]["drivers"][0].update(age_gap=3), "age or birth"),
+    (lambda j: j["composition"].update(lean_mass_lb="170"), "composition.lean_mass_lb"),
+    (lambda j: j["composition"].update(scan_date="March"), "composition.scan_date"),
+    (lambda j: j["bp"].update(date=None), "bp"),
+    (lambda j: j.update(tape_date="6 Sept"), "tape_date"),
+)
+
+
+def test_journey_body_contract_refuses_an_age_and_a_malformed_field():
+    """One test over every mutation (one gate in the census), reporting every one that slipped through."""
+    pc = _contract()
+    with open(os.path.join(FIXTURES, "journey.json"), encoding="utf-8") as fh:
+        wire = json.load(fh)
+    pc.validate_journey_body(wire)  # the fixture is the wire and passes as is
+    slipped = []
+    for i, (mutate, needle) in enumerate(_JOURNEY_BODY_MUTATIONS):
+        j = copy.deepcopy(wire)
+        mutate(j)
+        try:
+            pc.validate_journey_body(j)
+            slipped.append(f"#{i} ({needle}) accepted")
+        except pc.SchemaError as exc:
+            if needle not in str(exc):
+                slipped.append(f"#{i} refused without naming {needle!r}: {exc}")
+    assert not slipped, slipped
+
+
+def test_the_absent_journey_carries_the_body_fields_as_null():
+    for k in ("composition", "phenoage", "bp", "tape_date"):
+        assert k in ps.ABSENT_JOURNEY and ps.ABSENT_JOURNEY[k] is None
