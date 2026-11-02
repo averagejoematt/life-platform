@@ -699,6 +699,12 @@ def validate_journey_body(journey: dict) -> None:
             or not ISO_DAY.match(str(bp.get("date") or ""))
         ):
             raise SchemaError("journey.json: bp needs systolic, diastolic and a day")
+    # heart_series (#5598): fixture-only. The fixture build carries the Journey's HRV here so CI renders its chart
+    # without registering an `hrv` metric Start would link; the live export never writes it (it serves series/<metric>).
+    for key, payload in (journey.get("heart_series") or {}).items():
+        days = payload.get("days") if isinstance(payload, dict) else None
+        if not isinstance(days, list) or not days or not all(isinstance(d, dict) and ISO_DAY.match(str(d.get("date") or "")) for d in days):
+            raise SchemaError(f"journey.json: heart_series.{key} needs a list of dated days")
     if journey.get("tape_date") is not None and not ISO_DAY.match(str(journey["tape_date"])):
         raise SchemaError("journey.json: tape_date must be a day or null")
 
