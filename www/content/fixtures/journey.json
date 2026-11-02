@@ -55,6 +55,271 @@
   }
  ],
  "goal_weight_lbs": 185.0,
+ "heart_series": {
+  "hrv": {
+   "days": [
+    {
+     "date": "2026-09-06",
+     "gap": false,
+     "present": true,
+     "value": 54
+    },
+    {
+     "date": "2026-09-07",
+     "gap": false,
+     "present": true,
+     "value": 61
+    },
+    {
+     "date": "2026-09-08",
+     "gap": false,
+     "present": true,
+     "value": 59
+    },
+    {
+     "date": "2026-09-09",
+     "gap": false,
+     "present": true,
+     "value": 57
+    },
+    {
+     "date": "2026-09-10",
+     "gap": false,
+     "present": true,
+     "value": 55
+    },
+    {
+     "date": "2026-09-11",
+     "gap": false,
+     "present": true,
+     "value": 62
+    },
+    {
+     "date": "2026-09-12",
+     "gap": false,
+     "present": true,
+     "value": 60
+    },
+    {
+     "date": "2026-09-13",
+     "gap": false,
+     "present": true,
+     "value": 58
+    },
+    {
+     "date": "2026-09-14",
+     "gap": false,
+     "present": true,
+     "value": 56
+    },
+    {
+     "date": "2026-09-15",
+     "gap": false,
+     "present": true,
+     "value": 54
+    },
+    {
+     "date": "2026-09-16",
+     "gap": false,
+     "present": true,
+     "value": 61
+    },
+    {
+     "date": "2026-09-17",
+     "gap": false,
+     "present": true,
+     "value": 59
+    },
+    {
+     "date": "2026-09-18",
+     "gap": false,
+     "present": true,
+     "value": 57
+    },
+    {
+     "date": "2026-09-19",
+     "gap": false,
+     "present": true,
+     "value": 55
+    },
+    {
+     "date": "2026-09-20",
+     "gap": false,
+     "present": false,
+     "value": null
+    },
+    {
+     "date": "2026-09-21",
+     "gap": false,
+     "present": false,
+     "value": null
+    },
+    {
+     "date": "2026-09-22",
+     "gap": false,
+     "present": true,
+     "value": 58
+    },
+    {
+     "date": "2026-09-23",
+     "gap": false,
+     "present": true,
+     "value": 56
+    },
+    {
+     "date": "2026-09-24",
+     "gap": false,
+     "present": true,
+     "value": 54
+    },
+    {
+     "date": "2026-09-25",
+     "gap": false,
+     "present": true,
+     "value": 61
+    },
+    {
+     "date": "2026-09-26",
+     "gap": false,
+     "present": true,
+     "value": 59
+    },
+    {
+     "date": "2026-09-27",
+     "gap": false,
+     "present": true,
+     "value": 57
+    },
+    {
+     "date": "2026-09-28",
+     "gap": false,
+     "present": true,
+     "value": 55
+    },
+    {
+     "date": "2026-09-29",
+     "gap": false,
+     "present": true,
+     "value": 62
+    },
+    {
+     "date": "2026-09-30",
+     "gap": false,
+     "present": true,
+     "value": 60
+    },
+    {
+     "date": "2026-10-01",
+     "gap": false,
+     "present": true,
+     "value": 58
+    },
+    {
+     "date": "2026-10-02",
+     "gap": false,
+     "present": false,
+     "value": null
+    },
+    {
+     "date": "2026-10-03",
+     "gap": false,
+     "present": true,
+     "value": 54
+    },
+    {
+     "date": "2026-10-04",
+     "gap": false,
+     "present": true,
+     "value": 61
+    },
+    {
+     "date": "2026-10-05",
+     "gap": false,
+     "present": true,
+     "value": 59
+    },
+    {
+     "date": "2026-10-06",
+     "gap": false,
+     "present": true,
+     "value": 57
+    },
+    {
+     "date": "2026-10-07",
+     "gap": false,
+     "present": true,
+     "value": 55
+    },
+    {
+     "date": "2026-10-08",
+     "gap": false,
+     "present": true,
+     "value": 62
+    },
+    {
+     "date": "2026-10-09",
+     "gap": false,
+     "present": true,
+     "value": 60
+    },
+    {
+     "date": "2026-10-10",
+     "gap": false,
+     "present": true,
+     "value": 52
+    },
+    {
+     "date": "2026-10-11",
+     "gap": false,
+     "present": true,
+     "value": 50
+    },
+    {
+     "date": "2026-10-12",
+     "gap": false,
+     "present": true,
+     "value": 48
+    },
+    {
+     "date": "2026-10-13",
+     "gap": false,
+     "present": true,
+     "value": 55
+    },
+    {
+     "date": "2026-10-14",
+     "gap": false,
+     "present": true,
+     "value": 53
+    },
+    {
+     "date": "2026-10-15",
+     "gap": false,
+     "present": true,
+     "value": 51
+    },
+    {
+     "date": "2026-10-16",
+     "gap": false,
+     "present": true,
+     "value": 49
+    },
+    {
+     "date": "2026-10-17",
+     "gap": false,
+     "present": true,
+     "value": 56
+    }
+   ],
+   "markers": [
+    {
+     "date": "2026-10-10",
+     "label": "baseline change"
+    }
+   ],
+   "unit": "ms"
+  }
+ },
  "last_weighin_date": "2026-10-17",
  "lost_lbs": 9.5,
  "markers": [],

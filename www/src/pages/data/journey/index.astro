@@ -45,7 +45,7 @@ const pending = weightCalls.filter((p) => p.status === "pending").length;
 // ── layers 2–3 (#5583)
 const pace = ok ? paceBar(J) : null;
 const ladder = ok ? ladderRows(J.rungs || [], J.current_weight_lbs) : [];
-const rungWeeks = ok ? rungChapters(J.rungs || [], published) : [];
+const rungWeeks = ok ? rungChapters(J.rungs || [], all.byType.chapter) : [];
 const C = ok ? J.composition || null : null;
 const otherLb = C ? Math.max(0, C.total_mass_lb - (C.lean_mass_lb || 0) - (C.fat_mass_lb || 0)) : null;
 const share = (v: number | null) => (C && v != null ? `${((v / C.total_mass_lb) * 100).toFixed(1)}%` : "0%");
@@ -62,7 +62,9 @@ const heartSpec = [
 const hearts = ok
   ? heartSpec
       .map((h) => {
-        const s = allSeries[h.id];
+        // The live snapshot serves the heart series as series/<metric>; the fixture build carries HRV inside
+        // journey.json (heart_series) so a data file here does not register a public metric Start would link (#5598).
+        const s = allSeries[h.id] || (J.heart_series || {})[h.id];
         if (!s) return null;
         const days = s.days.filter((d) => d.date >= J.start_date);
         if (!days.some((d) => d.value != null && !d.gap)) return null;
@@ -539,19 +541,28 @@ const headline = ok
               The weeks the milestones fell
             </p>
             <div class="conn">
-              {rungWeeks.map((r) => (
-                <a href={href(pathOf("chapter", r.chapter.id))}>
-                  <span class="k">chapter</span>
-                  <span>
-                    <b>
-                      {r.chapter.week_label} · {r.chapter.title}
-                    </b>
-                  </span>
-                  <span class="r">
-                    the week {r.lb} lb fell · {dayInWords(r.date, { short: true })}
-                  </span>
-                </a>
-              ))}
+              {rungWeeks.map((r) => {
+                const when = `the week ${r.lb} lb fell · ${dayInWords(r.date, { short: true })}`;
+                return r.link ? (
+                  <a href={href(pathOf("chapter", r.chapter.id))}>
+                    <span class="k">chapter</span>
+                    <span>
+                      <b>
+                        {r.label} · {r.chapter.title}
+                      </b>
+                    </span>
+                    <span class="r">{when}</span>
+                  </a>
+                ) : (
+                  <div class="rung-held" style="display:grid;grid-template-columns:100px 1fr auto;gap:14px;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--rule);min-height:var(--tap)">
+                    <span class="k" style="font-family:var(--mono);font-size:var(--fs-label);letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">chapter</span>
+                    <span>
+                      <b>{r.label ? `${r.label} · ${r.state}` : `${r.lb} lb`}</b>
+                    </span>
+                    <span class="r" style="font-family:var(--mono);font-size:var(--fs-label);color:var(--muted);text-align:right">{when}</span>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )

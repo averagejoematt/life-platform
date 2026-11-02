@@ -37,11 +37,11 @@ test("the ladder: crossed rungs carry their date in words and the gap, the next 
   assert.ok(!rows.some((r) => /\d{4}-\d\d-\d\d/.test(r.right)), "no ISO date reaches the page");
 });
 
-test("a rung's chapter is the published chapter whose week (the seven days ending on its date) holds the crossing", () => {
+test("every crossed rung is listed: a published chapter of its week links, any other week reads as plain text with its state (#5598)", () => {
   const chapters = [
     { id: "week-04", week: 1, date: "2026-09-08", status: "published" },
-    { id: "week-05", week: 2, date: "2026-09-15", status: "published" },
-    { id: "week-08", week: 5, date: "2026-10-06", status: "published" },
+    { id: "week-05", week: 2, date: "2026-09-15", status: "published", week_label: "Week 2" },
+    { id: "week-08", week: 5, date: "2026-10-06", status: "published", week_label: "Week 5" },
     { id: "week-09", week: 6, date: "2026-10-13", status: "published" },
     { id: "program-week-08", week: 8, date: "2026-10-25", status: "held" },
     { id: "week-01", week: 0, date: "2026-08-31", status: "published" },
@@ -56,13 +56,20 @@ test("a rung's chapter is the published chapter whose week (the seven days endin
     chapters,
   );
   assert.deepEqual(
-    got.map((r) => [r.lb, r.chapter.id]),
+    got.map((r) => [r.lb, r.link, r.label, r.state, r.chapter ? r.chapter.id : null]),
     [
-      [320, "week-05"],
-      [310, "week-08"],
+      [320, true, "Week 2", "published", "week-05"],
+      [310, true, "Week 5", "published", "week-08"],
+      [300, false, "Week 8", "held", null],
     ],
-    "300 fell in a week whose chapter is held, so it has none",
+    "300 fell in a week whose chapter is held: it keeps its date and reads Week 8 · held, never a link (#5598)",
   );
+});
+
+test("a crossed rung in a week with no chapter object reads 'no chapter yet', not a status (#5598)", () => {
+  const chapters = [{ id: "week-06", week: 6, date: "2026-10-13", status: "published", week_label: "Week 6" }];
+  const got = rungChapters([{ lb: 240, date: "2026-09-12" }], chapters);
+  assert.deepEqual([got[0].link, got[0].label, got[0].state, got[0].chapter], [false, "Week 2", "no chapter yet", null]);
 });
 
 test("the heart captions are plain means of the readings shown, with their counts", () => {
