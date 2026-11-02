@@ -3991,6 +3991,45 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/5561"
         }
       ]
+    },
+    {
+      "id": "2026-11-02-the-depth-came-back",
+      "date": "2026-11-02",
+      "title": "The depth the new site had lost came back in one night: every weigh-in on the whole distance, and any day you can open",
+      "shipped": "Two new kinds of page went live. The journey page frames every weigh-in from the starting weight to the goal, with the platform's own rate and its interval, the projected date and its range, the ten-pound milestones and the days between them, the body scan with what is still missing, the resting heart rate and heart-rate variability read within each device's era, and the coaches' graded calls on the weight. And every day since the start now has its own page: the readings against his own recent normal, the gym session set by set, the night by two devices, the food as logged, the engine's score, what the coaches said and what was graded — with a strip and a scrubber that move between days without reloading. Every chart on the data pages now answers a hover, a tap or the arrow keys.",
+      "why_it_mattered": "An audit the evening before found the rebuilt site had kept its clarity but lost most of its depth: no chart could be read point by point, the weight story had shrunk to a two-month line, and there was no way to open a single day. The owner approved prototypes drawn on real data and sent seven sections he wanted kept exactly. All seven are now live, built over the same public figures — the pages place the platform's numbers and never compute their own.",
+      "gotcha": "The first deploy of the journey page passed every check on the pull request and was rolled back by the live visual sweep twenty minutes later, for one axis label rendering at nine pixels on a phone. The charts drew into a fixed width that a phone column shrinks by a quarter. The fix was an hour; the lesson is that the pre-merge checks never measured text inside a chart at all, which is now its own tracked gap.",
+      "honest_miss": "The front page was deliberately left alone, so the new pages are reached from the data room, not from the door. The night's last smoke run found a contradiction on that front page — the journal described as both recent and quiet — which is filed and waits for the owner's review. The milestone pages restore the journey and the day; the coaching room, the laboratory and the story's timeline are still plans.",
+      "prs": [
+        {
+          "label": "PR #5580",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5580"
+        },
+        {
+          "label": "PR #5582",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5582"
+        },
+        {
+          "label": "PR #5589",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5589"
+        },
+        {
+          "label": "PR #5590",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5590"
+        },
+        {
+          "label": "PR #5591",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5591"
+        },
+        {
+          "label": "PR #5592",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5592"
+        },
+        {
+          "label": "PR #5594",
+          "url": "https://github.com/averagejoematt/life-platform/pull/5594"
+        }
+      ]
     }
   ]
 }

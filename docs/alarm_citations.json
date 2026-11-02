@@ -239,11 +239,10 @@
  },
  "qa-smoke-warnings": {
   "added": "2026-10-28",
-  "cause_observed": "2026-11-01",
-  "updated": "2026-11-01",
-  "citation": "NEW EPISODE 2026-11-01 (the 10-28/10-30 og:coach-cards cause is cured, PR 5488): the live `[QA] CAUSE warn` channel now reads `data:orphan_routine_drafts` — `qa_smoke_lambda.check_orphan_routine_drafts` warns when a Hevy routine DRAFT has sat past the age `training/routine_repo.py` names without being committed or discarded (the leg is CONTENT_TRUTH, a warn, never a fail). The remedy is a human one on the draft itself (commit it to Hevy or discard it — a coach-session act), or the repo's own draft reaper if one is ruled; no code defect is implied by the warn. Not filed as an issue at this wrap: it is an owner/coach-session act, and the alarm is a WarnCount that clears on the next run after the draft is resolved.",
-  "note": "Re-cited by the Session CN wrap 2026-10-31: cause cleared live (channel empty), window named; the Session CM entry cited the then-live cause. Re-cited 2026-11-01 (Session CR wrap) for the new cause; the previous og:coach-cards citation is history, kept in git.",
-  "cause": "data:orphan_routine_drafts"
+  "cause": "reader_truth:confirm,reader_truth:verdict",
+  "cause_observed": "2026-11-02",
+  "updated": "2026-11-02",
+  "citation": "NEW EPISODE 2026-11-02: the 06:37Z run reads `[QA] CAUSE warn c28c8975 reader_truth:confirm,reader_truth:verdict` — the Reader Truth rubric's HIGH temporal_contradiction on the v9 Start portrait (Mind tile '2 entries in 57 days, the last on 9 Sep' read against the Connection tile 'The journal went quiet'), demoted to WARN when its second pass did not reproduce it (#2741 unconfirmed-high path). Owned by #5596 (Start is frozen until the owner's visual review, so filed, not fixed). The earlier data:orphan_routine_drafts warn cleared at the 04:13Z run (`warn none -`)."
  },
  "field-notes-missing": {
   "added": "2026-10-25",
@@ -259,10 +258,10 @@
  },
  "qa-smoke-failures": {
   "added": "2026-10-27",
-  "cause_observed": "2026-10-30",
-  "updated": "2026-10-30",
-  "citation": "Dated, self-clearing: the live runs since 2026-10-30T03:46Z read `[QA] CAUSE fail none -`. The daily-period FailCount alarm (86400 s, Maximum) holds the 2026-10-29 UTC bucket, whose runs failed `data:hae_additive_integrity` until 18:32Z; it clears at the first daily evaluation with no failure, expected by ~2026-10-31T00:30Z. The cause did NOT get repaired, it aged out: `hae_additive_integrity_qa.WINDOW_DAYS = 3` stopped replaying 10-26 on 10-30. The damaged Apple Health field-days 10-21/10-22/10-26 stay owned by #5440 (owner act: `scripts/hae_additive_backfill_4628.py --apply`, never 10-25). The checkin_pair timing false positive was fixed on 10-29 (deployed, due-hour 06:00 PT). If still red after 2026-10-31T06:00Z, re-derive from the live CAUSE line.",
-  "note": "Re-cited by the Session CM wrap 2026-10-30 (the 10-29 entry named two causes the live run no longer shows)."
+  "cause": "reader_truth:verdict",
+  "cause_observed": "2026-11-02",
+  "updated": "2026-11-02",
+  "citation": "NEW EPISODE 2026-11-02: the 06:19Z nightly smoke reads `[QA] CAUSE fail 29659b98 reader_truth:verdict` — the Reader Truth rubric (CONTENT_TRUTH, never reverts a deploy) confirmed on a second pass a HIGH temporal_contradiction on the v9 Start portrait: the Mind tile '2 entries in 57 days, the last on 9 Sep' read against the Connection tile 'The journal went quiet'. Owned by #5596 (Start is frozen until the owner's visual review, so filed, not fixed). The 10-29 data:hae_additive_integrity episode this entry used to cite aged out on 10-30."
  },
  "ingest-reconciliation-whoop": {
   "added": "2026-10-26",

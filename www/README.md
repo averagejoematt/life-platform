@@ -97,3 +97,12 @@ The owner's go is that one-line merge (his five-reader bar on #5529 comes first;
 - `src/islands/explorer.js` is the progressive enhancement: range, 7-day mean, a second series, a lag of −2…+2 days. Every statistic it shows is READ from `pairs.json` via `src/lib/pairs.js`; nothing is computed in the browser (owner requirement A), and the word "significant" is never produced.
 - `src/pages/data/series/[metric].json.ts` and `src/pages/data/pairs.json.ts` serve the snapshot's files beside the pages for the island (same origin; the CSP's `connect-src 'self'`).
 - Node tests: `tests/chart.test.mjs`, `tests/pairs.test.mjs`.
+
+## Depth restoration (2026-11-02, epic #5577)
+
+Two objects beyond the eleven collections, both from the publication snapshot, both computed by the platform and only placed by the pages:
+
+* **The Journey** — `journey.json` beside `pairs.json` (`scripts/publish_snapshot_journey.py`): `/api/journey` as served, the weight forecasts and their coverage (`/api/forecast`), the ten-pound rungs derived from the weight series, body composition (`/api/physical_overview`), PhenoAge with its drivers (never a chronological age) and the baseline-change marker. Page `/data/journey/` (visual-QA tier 1), linked from the weight page; island `islands/journey.js` (frame · range · show).
+* **The day** — a `day` collection (`scripts/publish_snapshot_day.py`), one object per date since the start: readings and their 7/30-day normals (computed at export), the session, the night, the food with the platform's gap flag, the engine's score, the coaches' lines (as `/api/coach_moves` serves them) and the calls, each block with its served / unavailable state. Page `/data/day/<date>/` (one sampled tier-3 row); island `islands/day.js` swaps days in place and keeps the URL, title, canonical and history in sync. Reached from the weight page and chapter pages, never from `/`.
+
+Every chart carries `data-points`; `islands/inspect.js` answers pointer, touch and keyboard, and `tests/web_preview_gate.py` treats a chart with points and no inspector as a defect. On a phone a chart's viewBox is its container's width, so SVG text keeps its size (the 11 px floor, #1210; #5597 moves that check into the web gate).
