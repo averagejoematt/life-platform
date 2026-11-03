@@ -217,6 +217,23 @@ def test_the_owner_rulings_of_2026_11_03_map_to_registered_words():
     for reason, rid in (
         ("#5611 (o) + owner ruling 2026-11-03: an opinion filed as a prediction", "#5611:o+owner-2026-11-03"),
         ("#5611 (u) + owner ruling 2026-11-03: graded, but names no measurable outcome", "#5611:u+owner-2026-11-03"),
+        ("#5611 (m) + owner ruling 2026-11-03: graded on criteria that measure something else", "#5611:m+owner-2026-11-03"),
     ):
         assert ch.rule_ids_of_reason(reason) == [rid]
         assert cr.explain([rid])
+
+
+def test_an_open_call_reclassified_as_an_observation_reads_as_withdrawn():
+    row = {
+        "prediction_id": "p",
+        "corrections": [
+            {
+                "original_status": "pending",
+                "corrected_status": "observation",
+                "reason": "#5611 (o) + owner ruling 2026-11-03: an opinion",
+                "evaluator_version": "1.1",
+            }
+        ],
+    }
+    (e,) = ch.history(row, said_on=None, due_of=lambda s: None)
+    assert e["kind"] == "withdraw" and e["explanation"]
