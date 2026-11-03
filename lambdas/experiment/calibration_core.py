@@ -291,6 +291,12 @@ def score_pairs(pairs, n_bins=10):
         label, score = "reliable", 70
     else:
         label, score = "developing", 50
+    # #5615 (owner ruling 2026-11-03): a positive label on nearly-one-band confidence is fragile — its skill comes
+    # from a handful of calls off the band — so it is withheld as under_review; score, n and skill stay served.
+    # "developing" (skill > 0 with a weak Brier) is held for review outright (owner, 2026-11-03); the stronger rungs are
+    # held only when their skill rests on one-band confidence.
+    if label == "developing" or (label in ("reliable", "authoritative") and calibration == "not_measurable" and skilled is True):
+        label = "under_review"
 
     return {
         "n": n,

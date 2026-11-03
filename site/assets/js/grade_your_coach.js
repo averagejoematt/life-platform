@@ -30,6 +30,8 @@ const VERDICT_COPY = {
 };
 
 const LABEL_COPY = {
+  under_review:
+    "A positive label is held for review: nearly every call was stated at one confidence, so the skill behind it rests on a handful of calls. The score, sample size and skill are shown beside it.",
   nascent: "fewer than 3 resolved calls",
   not_yet_skillful: "skill at or below the base rate",
   developing: "resolved, but the Brier score is above 0.20",
