@@ -411,6 +411,12 @@ def discover_ci_mirror_sites(repo_root: str = REPO_ROOT) -> set[str]:
 
 
 CI_MIRROR_SITES: dict[str, dict[str, str]] = {
+    "scripts/check_web_gate_required.py": {
+        "clause": "C",
+        "claim": ".github/workflows/web-gate.yml",
+        "notes": "the web gate's scope router + required verdict: SCOPE names the workflow file because a change to it must run "
+        "the build; tests/test_web_gate_required_check.py pins SCOPE to that workflow's on.push.paths. It mirrors no check set",
+    },
     "scripts/reader_surface.py": {
         "clause": "C",
         "claim": ".github/workflows/ci-cd.yml",
@@ -616,7 +622,9 @@ CI_MIRROR_SITES: dict[str, dict[str, str]] = {
 # path — registered, not reworded.
 # C 28 -> 29 (2026-10-26, #5405): scripts/check_staged_secrets.py is the wrap's local run of
 # secret-scan.yml's gitleaks scan and names it by path (and reads its version pin from it).
-MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 29}
+# C 29 -> 30 (2026-11-02, the web gate made REQUIRED): scripts/check_web_gate_required.py's SCOPE names
+# web-gate.yml by path (a change to the workflow must run the build) — registered, not reworded.
+MIRROR_CLAUSE_BASELINE_2026_09_19 = {"A": 3, "B": 4, "C": 30}
 
 
 def main() -> None:

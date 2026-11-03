@@ -52,9 +52,9 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "visual-qa.yml": (326, 107),
     "webkit-mobile-qa.yml": (179, 26),
     "web-gate.yml": (
-        84,
-        4,
-    ),  # #5530: the v9 build gate (new); its shell lives in scripts/check_www_build.py + tests/web_preview_gate.py; #5534: +2 path lines (deploy/www_owned_paths.py)
+        130,
+        6,
+    ),  # #5530: the v9 build gate (new); its shell lives in scripts/check_www_build.py + tests/web_preview_gate.py; #5534: +2 path lines (deploy/www_owned_paths.py); required-check PR: +46 lines / +2 run lines — the scope + verdict jobs, each ONE line calling scripts/check_web_gate_required.py (was 84, 4)
     "web-preview-deploy.yml": (
         228,
         10,
