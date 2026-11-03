@@ -504,7 +504,8 @@ def _correction_entry(e: dict) -> dict:
     null; a served key the contract does not declare is dropped here and the strict
     ``validate_correction`` then names a MISSING one — so a pre-#5610 API (no ``source``, no
     ``explanation``) fails the export instead of rendering engineering text."""
-    return {k: e.get(k) for k in CORRECTION_FIELDS}
+    # An emptied string is the API's provenance gate withholding the words (2026-11-03): absent (null), never ''.
+    return {k: (e.get(k) or None) if isinstance(e.get(k), str) else e.get(k) for k in CORRECTION_FIELDS}
 
 
 def _retired_coach(ctx: LiveContext, pid: str, short: str, name: str) -> None:
@@ -556,7 +557,7 @@ def _live_ledger(ctx: LiveContext) -> None:
             hold = r.get("unsourced") if isinstance(r.get("unsourced"), dict) else None
             if hold and isinstance(hold.get("text"), str) and hold["text"].strip():
                 claim_text, withheld = hold["text"].strip(), "unsourced"
-            elif r.get("withheld"):
+            elif r.get("withheld") or r.get("words_withheld"):  # words_withheld: the API's provenance gate (2026-11-03)
                 claim_text, withheld = "Not quoted: the words did not clear the privacy filter.", "privacy"
             else:
                 log(f"  ledger row {coach}:{pred} served with no claim text and no hold — not a publishable record, skipped")
@@ -600,18 +601,21 @@ def _live_ledger(ctx: LiveContext) -> None:
                 settled_date=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
                 kind=kind,
                 status=status,
-                verdict_text=g.get("outcome_notes") if isinstance(g.get("outcome_notes"), str) else None,
+                # `or None`: the API empties a withheld row's words (provenance gate, 2026-11-03) — absent, never ''.
+                verdict_text=(g.get("outcome_notes") or None) if isinstance(g.get("outcome_notes"), str) else None,
                 grading=(
                     {
-                        "how": g.get("how"),
-                        "actual_text": g.get("actual_text"),
-                        "tolerance_text": g.get("tolerance_text"),
-                        "outcome_notes": g.get("outcome_notes"),
+                        "how": g.get("how") or None,
+                        "actual_text": g.get("actual_text") or None,
+                        "tolerance_text": g.get("tolerance_text") or None,
+                        "outcome_notes": g.get("outcome_notes") or None,
                     }
                     if g
                     else None
                 ),
-                simple_guess={"state": str(sg.get("state") or "unknown"), "right": sg.get("right"), "text": sg.get("text")} if sg else None,
+                simple_guess=(
+                    {"state": str(sg.get("state") or "unknown"), "right": sg.get("right"), "text": sg.get("text") or None} if sg else None
+                ),
                 quality_flags=flags,
                 corrections=corrections,
                 sealed=bool(r.get("sealed")),
@@ -788,6 +792,11 @@ def _live_disagreements(ctx: LiveContext) -> None:
             slug = d.get("topic_slug") or _slug(d.get("topic") or "topic")
             did = f"{slug}-{(d.get('resolved_date') or d.get('opened') or ctx.as_of)}"
             claims = d.get("claims") or {}
+            if not all(isinstance(claims.get(c), str) and claims[c].strip() for c in (a, b)):
+                # The API withheld a side's words (owner ruling 2026-11-03: its sources are not recorded as
+                # publishable). A disagreement is its two claims; without them there is nothing to print.
+                log(f"  disagreement {slug or 'topic'}: a side's words are withheld by the API — not published")
+                continue
             ctx.objs["disagreement"].append(
                 envelope(
                     id=_slug(did),

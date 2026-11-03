@@ -45,6 +45,7 @@ from decimal import Decimal
 from typing import Any, Callable, Optional
 
 from ai.model_routing import model_for  # #4770: the one model registry
+from common import narrative_provenance as NP
 
 from coach import coach_moves_sheet as sheet_mod
 
@@ -338,7 +339,9 @@ def run(
 
             day = parse_day_key(today)
             prev = (day - timedelta(days=1)).isoformat() if day else ""
-            inputs["yesterday"] = ((_row(table, prev) if prev else None) or {}).get("lines") or []
+            _prev_row = (_row(table, prev) if prev else None) or {}
+            inputs["yesterday"] = _prev_row.get("lines") or []
+            inputs["yesterday_provenance"] = _prev_row.get(NP.PROVENANCE_KEY) if _prev_row else None
         sheet = sheet_mod.build_sheet(inputs, today)
         absent_ids = {a["coach_id"] for a in sheet["absent"]}
         eligible = [c for c in coach_ids if c not in absent_ids]
@@ -448,6 +451,7 @@ def run(
 
         cost = _cost(usages)
         row = build_row(today, lines, sheet, eligible, held, plan["dropped"], bet_out, cost)
+        row[NP.PROVENANCE_KEY] = provenance_for(sheet, inputs)  # owner ruling 2026-11-03
         if persist:
             table.put_item(Item=row)
         logger.info(
@@ -457,6 +461,26 @@ def run(
     except Exception as e:  # noqa: BLE001 — the moves never break the reflection batch
         logger.warning("[coach_moves] failed (non-fatal): %s", e)
         return {"status": "error", "error": str(e)}
+
+
+def provenance_for(sheet: dict, inputs: Optional[dict]) -> dict:
+    """The day's provenance (owner ruling 2026-11-03): the family of every fact on the sheet, and the
+    provenance of every stored narrative the prompt read as context — the coaches' positions, the
+    graded claims, yesterday's lines and the lead read. An input row with no record makes the day
+    unrecorded, so it is withheld from the public until that input carries one."""
+    inputs = inputs or {}
+    fams = NP.families_from_fields([f.get("key") for f in sheet.get("facts") or [] if isinstance(f, dict)])
+    upstream: list = []
+    for p in (inputs.get("positions") or {}).values():
+        upstream.append((p or {}).get(NP.PROVENANCE_KEY))
+    upstream += [g.get(NP.PROVENANCE_KEY) for g in inputs.get("graded") or [] if isinstance(g, dict)]
+    if inputs.get("yesterday"):
+        upstream.append(inputs.get("yesterday_provenance"))
+    if isinstance(inputs.get("lead"), dict):
+        fams += NP.families_from_fields([c.get("source_field") for c in inputs["lead"].get("cited") or [] if isinstance(c, dict)])
+    if sheet.get("absent"):
+        fams.append("instrument_presence")
+    return NP.stamp(fams + ["persona", "prediction_ledger"], producer="coach.coach_moves", upstream=upstream)
 
 
 def _cost(usages: list) -> dict:
@@ -602,7 +626,9 @@ def served(item: Optional[dict]) -> Optional[dict]:
         if isinstance(ln.get("bet"), dict):
             out["bet"] = {k: str(ln["bet"].get(k) or "") for k in ("description", "resolution_date")}
         lines.append(out)
+    out_withheld = {"withheld": dict(item["_publication"])} if isinstance(item.get("_publication"), dict) else {}
     return {
+        **out_withheld,  # owner ruling 2026-11-03: the publication gate's neutral withheld state, when it withheld the day
         "date": str(item["date"]),
         "generated_at": str(item.get("generated_at") or ""),
         "lines": lines,

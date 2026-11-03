@@ -44,6 +44,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
+from common import narrative_provenance as NP
+
 from coach.reader_checks import READER_BANNED_TERMS
 
 logger = logging.getLogger(__name__)
@@ -317,7 +319,14 @@ def build_row(text: str, cited: list, data_through: str, today: str, cost: dict,
         except Exception:  # noqa: BLE001 — a score is metadata, never a reason to drop the row
             pass
     row.update(experiment_stamp_for(PK, sk))
+    row[NP.PROVENANCE_KEY] = provenance_for(cited)  # owner ruling 2026-11-03: what the read was written from
     return row
+
+
+def provenance_for(cited: list) -> dict:
+    """The read's provenance: the families of every cited fact (the prompt's only data) + the persona."""
+    fields = [c.get("source_field") for c in cited or [] if isinstance(c, dict)]
+    return NP.stamp(NP.families_from_fields(fields) + ["persona"], producer="coach.lead_daily_read")
 
 
 def run(

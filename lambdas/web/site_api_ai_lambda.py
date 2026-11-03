@@ -39,7 +39,7 @@ from ai.ai_context import (
 from boto3.dynamodb.conditions import Key
 from common.client_ip import client_ip_is_trusted, extract_client_ip, salted_ip_hash  # #1221 / #3620
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
-from common.journal_silence import guard_api_response  # #5131: the one public-surface guard
+from common.journal_silence import guard_api_response  # #5131: defence in depth behind the provenance gate
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085 / #2109
 from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
@@ -47,6 +47,7 @@ from privacy import privacy_guard  # deterministic real-name + vice scrub (layer
 import web.site_api_ai_request as _req  # #2688: body parsing lives in the extracted sibling
 import web.site_api_ai_session as _sess  # #546/#3118: the follow-up session store lives in the extracted sibling
 import web.site_api_board_panel as _board_panel  # #3419: the parallel persona pass lives in the extracted sibling
+from web import narrative_publication  # owner ruling 2026-11-03: the narrative publication chokepoint
 from web.ask_retrieval import retrieve_block as _ask_retrieve  # #2348: the question selects published-archive passages (fail-soft)
 
 # #2667: the context/facts fetch layer lives in the extracted sibling — the size
@@ -97,14 +98,12 @@ from ai.model_routing import model_for  # noqa: E402 — #4770: the one model re
 
 AI_MODEL_HAIKU = model_for("website_ai")
 
-# #387: the prompt's source count derives from the canonical registry — the
-# old hardcoded literal (nineteen) had drifted from the real pipeline board.
-_LIVE_SOURCE_COUNT = len(public_board_sources())
-_PAUSED_SOURCE_COUNT = len(public_paused_sources())
+# #387: the prompt's source count derives from the canonical registry (the old hardcoded nineteen had drifted).
+_LIVE_SOURCE_COUNT, _PAUSED_SOURCE_COUNT = len(public_board_sources()), len(public_paused_sources())
 
 # ── AWS clients (module-level for warm container reuse) ────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
-table = dynamodb.Table(TABLE_NAME)
+table = narrative_publication.wrap(dynamodb.Table(TABLE_NAME), strict=True)  # owner ruling 2026-11-03: stored narrative read strict
 _cw = boto3.client("cloudwatch", region_name=DDB_REGION)
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "life-platform-site-api-ai")
 
