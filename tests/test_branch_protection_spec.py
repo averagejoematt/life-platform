@@ -327,6 +327,8 @@ def test_apply_sends_the_exact_ruleset_payload_when_secret_is_present(monkeypatc
         # #4251, owner ruling 2026-09-29 option (a): the full suite is required.
         "Full unit suite (pre-merge, issue 3025)",
         "gitleaks (PR commit range only, not full history)",
+        # owner ruling 2026-11: the v9 site build check is required (web-gate.yml's aggregator).
+        "v9 web gate verdict (www build, required)",
     }
     assert sent["rules"][0]["parameters"]["strict_required_status_checks_policy"] is False
     # PATCH for repo settings must NOT fire — the fake's repo settings already match

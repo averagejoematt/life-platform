@@ -89,11 +89,23 @@
         "typical_measured_by": "scripts/check_job_timeout_headroom.py sampler (trailing window, genuine completions)",
         "typical_statistic": "p95",
         "typical_n": 29
+      },
+      {
+        "context": "v9 web gate verdict (www build, required)",
+        "workflow": "web-gate.yml",
+        "job": "web-gate-verdict",
+        "typical_seconds": 10,
+        "why": "OWNER RULING (2026-11): the v9 site build check is required before further implementation merges. The aggregator of web-gate.yml: `on: pull_request: branches: [main]` with NO path filter; job-level `if: always()` (the one condition preflight_contexts() allows — it can never be skipped, even on a cancelled run). It passes only when the `scope` job answered AND the build job (`Build from fixtures · …`) either succeeded or was skipped because nothing under the push filter changed; failure, cancelled (supersession and timeout) and an in-scope skip are red. The build job itself is deliberately NOT required: a job skipped by `if:` reports Success to this rule. Its own duration is seconds; the PR waits on the build job (~90-300 s on 2026-11-01/02 runs), which is far inside the full suite's p95, so it adds no merge wall-clock. `typical_seconds` is WRITTEN by deploy/write_lane_posture.py --measure, never typed.",
+        "typical_measured_on": "2026-11-03",
+        "typical_measured_by": "scripts/check_job_timeout_headroom.py sampler (trailing window, genuine completions)",
+        "typical_statistic": "p95",
+        "typical_n": 3
       }
     ],
     "advisory_not_required": [
       "CodeQL analysis (python) / (javascript-typescript) — codeql.yml is unfiltered on PRs but its `analyze` step never exits non-zero on a finding, so requiring it buys latency and no verdict (ADR-148).",
       "Dependabot Auto-merge / automerge — a workflow_run job `if:`-gated to dependabot[bot] dev-tooling branches, so it reports `skipped` on every human PR; a skipped required check never satisfies the rule. (Dependabot Validate was deleted by #4252: pr-checks.yml validates every PR.)",
+      "The v9 build job `Build from fixtures · schema + visibility + edge mutations · render gate` (web-gate.yml) — `if:`-gated on the scope answer, so it reports `skipped` (= Success to the rule) on out-of-scope PRs; its REQUIRED form is the `v9 web gate verdict (www build, required)` aggregator above.",
       "Wiki drift gates (docs-ci.yml), Surface-drift gate (surface-drift.yml), Migration coverage + HTML well-formedness / Render + accuracy gate (v4-gate.yml) — all PATH-FILTERED, so they simply do not report on PRs outside their globs and would block those PRs forever.",
       "Unit Tests / Lint + Syntax Check (ci-cd.yml) and Visual + AI-vision QA — post-merge (push/scheduled) only; they emit no PR check-run to require."
     ],
