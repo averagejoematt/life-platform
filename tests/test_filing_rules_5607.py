@@ -415,7 +415,7 @@ class TestEveryPathFiles:
             assert "filing_rules" in open(os.path.join(_REPO, path)).read(), path
 
 
-_IMPORTS_RULES = re.compile(
+_IMPORT_LINE_RE = re.compile(
     r"^\s*(?:from\s+[\w.]*\s+import\s+[^\n]*\bfiling_rules\b|from\s+[\w.]*filing_rules\s+import|import\s+[\w.]*filing_rules)", re.M
 )
 
@@ -454,6 +454,6 @@ class TestNoRetrospectiveInvention:
                 for f in files:
                     if f.endswith(".py"):
                         path = os.path.join(root, f)
-                        if _IMPORTS_RULES.search(open(path, encoding="utf-8").read()):
+                        if _IMPORT_LINE_RE.search(open(path, encoding="utf-8").read()):
                             importers.add(os.path.relpath(path, _REPO))
         assert importers <= allowed, sorted(importers - allowed)
