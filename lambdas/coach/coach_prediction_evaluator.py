@@ -117,9 +117,10 @@ EWMA_DECAY = 0.87
 # direction call; every dated call is graded against its own window's day-to-day swing.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
-from coach import (  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts)
+from coach import (  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts; #5613 the settled-grade guard)
     coach_baseline,
     commitment_grading,
+    grade_corrections,
     grading_quality,  # #5533: zero-entry days, the HR regime marker, the quality flags
     prediction_count_grader,
     prediction_direction_window as direction_window,  # noqa: E402  (#4617: a direction call graded across its window)
@@ -285,6 +286,8 @@ def _fetch_predictions():
                         continue
                     if status in EVALUABLE_STATUSES:
                         predictions.append(item)
+                    elif grade_corrections.is_settled(item):  # #5613: a corrected or decided row is the ledger's
+                        continue
                     elif _was_terminalized_by_duplicate_grader(item):
                         reclaimed += 1
                         predictions.append(item)
@@ -776,33 +779,19 @@ def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
 
 
 def _update_prediction_status(prediction, evaluation, baseline=None):
-    """Update a prediction record with its evaluation outcome."""
+    """Write a grade onto a row that is not yet settled — through `grade_corrections.write_first_grade`, which
+    refuses a settled row (#5613: a settled grade changes only through `apply_correction`). False when refused/failed."""
     try:
-        pk = prediction.get("pk") or f"COACH#{prediction.get('coach_id', '')}"
-        sk = prediction.get("sk") or f"PREDICTION#{prediction.get('prediction_id', '')}"
-
-        outcome_notes = build_outcome_notes(evaluation, ALGO_VERSION)
-
-        table.update_item(
-            Key={"pk": pk, "sk": sk},
-            UpdateExpression=(
-                "SET #status = :status, outcome = :outcome, outcome_date = :odate, outcome_notes = :notes, "
-                "quality_flags = :qf, evaluator_version = :ver"  # #5533 (a): the grader's own flags, top-level for projected reads
-            ),
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={
-                ":status": evaluation["status"],
-                ":outcome": evaluation["status"],
-                ":odate": evaluation["evaluated_date"],
-                ":notes": outcome_notes,
-                ":qf": list(evaluation.get("quality_flags") or []),
-                ":ver": ALGO_VERSION,
-            },
+        grade_corrections.write_first_grade(
+            table, prediction, evaluation, outcome_notes=build_outcome_notes(evaluation, ALGO_VERSION), evaluator_version=ALGO_VERSION
         )
-        coach_baseline.write_stamp(table, pk, sk, baseline)
+        pk = prediction.get("pk") or f"COACH#{prediction.get('coach_id', '')}"
+        coach_baseline.write_stamp(table, pk, prediction.get("sk") or f"PREDICTION#{prediction.get('prediction_id', '')}", baseline)
         logger.info("Updated prediction %s -> %s", evaluation.get("prediction_id", "?"), evaluation["status"])
+        return True
     except Exception as e:
         logger.error("Failed to update prediction %s: %s", evaluation.get("prediction_id", "?"), e)
+        return False
 
 
 def _update_bayesian_confidence(coach_id, subdomain, update_type):
@@ -1085,7 +1074,8 @@ def _evaluate_all(predictions, today_str, write=True):
         evaluation["baseline"] = _bl  # #5533: carried so a re-grade can write the stamp with its correction
         if not write:
             continue
-        _update_prediction_status(pred, evaluation, _bl)
+        if _update_prediction_status(pred, evaluation, _bl) is False:
+            continue  # #5613: a refused or failed write moves no confidence and writes no learning row
 
         # Update Bayesian confidence if applicable
         if bayesian_update and coach_id and subdomain:

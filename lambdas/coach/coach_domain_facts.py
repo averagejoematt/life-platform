@@ -170,7 +170,10 @@ def _nutrition_pack(table, today: str) -> list:
     else:
         lines.append("Calorie target: none resolved right now (the charter's nutrition.calories block is unreadable). Say so if asked.")
 
-    logged = [i for i in mf if _num(i.get("calories") or i.get("total_calories_kcal")) is not None]
+    # #5613: a zero-entry summary stub (80 kcal, nothing logged) is not the most recent food log.
+    from coach.grading_quality import is_zero_entry_day
+
+    logged = [i for i in mf if not is_zero_entry_day(i) and _num(i.get("calories") or i.get("total_calories_kcal")) is not None]
     if logged:
         recent = _latest(logged)
         lines.append(

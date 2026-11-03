@@ -25,14 +25,21 @@ Every selected row is re-graded by the FIXED grader itself — ``coach_predictio
                outcome_notes`` on the prediction row, conditional on the stored status.
   first_grade  a retired coach's open call that is now due → the evaluator's own write, plus
                a ledger entry (``update_grade=False``) so pending → graded is on the record.
-  restate      the verdict stands → ``quality_flags`` / ``evaluator_version`` stamped once;
-               no ledger entry (a grade that did not change was not corrected).
+  restate      the verdict stands → a ``basis="restate"`` correction (#5613): the status is kept, the
+               row's notes / flags / baseline / ``evaluator_version`` become the fixed grader's
+               TOGETHER, and the old text is kept in ``original_grade``. Never a bare version stamp:
+               the 2026-11-01 run stamped ``evaluator_version 1.1`` onto nine rows whose grade text
+               1.0 wrote, so the stamp named a rule that did not produce the text it sat beside.
+               A row whose text the current version already wrote has nothing to restate (skipped).
+  current      the verdict stands and the current version already wrote the text → nothing.
   open         a retired coach's call not yet due → nothing; the daily grader owns it now.
 
 The run's aggregate impact — the per-coach before/after table and the headline K-of-N delta
 — is printed every run and, with --apply, written once as ``CORRECTION#SUMMARY#{ts}`` on the
-evaluator's state partition. Selection is idempotent: a row already corrected under this
-evaluator version for #5533 is never selected again.
+evaluator's state partition. Selection is idempotent AND version-proof (#5613): a row carrying ANY
+correction history (``grade_corrections.has_correction_history`` — an ``original_grade`` snapshot or a
+``corrections[]`` entry, an owner ruling included) is never selected, whatever the evaluator version or
+the reason's wording. A further change to such a row is a deliberate per-row ruling, not a re-run.
 
 RUN:  python3 deploy/regrade_predictions.py              # dry-run: the tables (post on #5533 BEFORE --apply)
       python3 deploy/regrade_predictions.py --json plan.json
@@ -83,6 +90,7 @@ REASON_WORDS = {
 }
 
 REGRADE, FIRST_GRADE, RESTATE, OPEN = "regrade", "first_grade", "restate", "open"
+CURRENT = "current"  # #5613: the verdict stands AND the current version already wrote the text — nothing to restate
 
 
 def _evaluator():
@@ -129,8 +137,8 @@ def reasons_for(row: dict, *, today: str, zero_days: set[str], retired_ids=RETIR
     created = str(row.get("created_date") or "")[:10]
     if not singleton_visible(row) or not created or not is_gradeable(spec) or row.get("source") == "dispute_docket":
         return []
-    if grade_corrections.already_corrected(row, evaluator_version=evaluator_version, reason_prefix=ISSUE):
-        return []
+    if grade_corrections.has_correction_history(row):
+        return []  # #5613: structural — a corrected / ruled row is never re-selected, under any version or wording
     out = []
     if _coach_of(row) in retired_ids and status in OPEN_STATUSES:
         out.append(RETIRED)
@@ -154,6 +162,13 @@ def _action(before: str, after: dict | None) -> str:
     if before in OPEN_STATUSES:
         return FIRST_GRADE if after["status"] not in OPEN_STATUSES else OPEN
     return REGRADE if after["status"] != before else RESTATE
+
+
+def _plan_action(row: dict, before: str, after: dict | None, version: str) -> str:
+    action = _action(before, after)
+    if action == RESTATE and grade_corrections.grade_text_version(row) == str(version):
+        return CURRENT
+    return action
 
 
 def plan(rows_by_pk: dict[str, list[dict]], *, today: str, zero_days: set[str], ev, retired_ids=RETIRED_COACH_IDS) -> list[dict]:
@@ -195,7 +210,7 @@ def plan(rows_by_pk: dict[str, list[dict]], *, today: str, zero_days: set[str], 
                 "reasons": reasons,
                 "before": {"status": before, "outcome_date": row.get("outcome_date")},
                 "after": after,
-                "action": _action(before, after),
+                "action": _plan_action(row, before, after, ev.ALGO_VERSION),
                 "row": row,
             }
         )
@@ -258,7 +273,7 @@ def headline(table: dict) -> dict:
 
 def summary(entries: list[dict], table: dict, *, today: str, evaluator_version: str) -> dict:
     """The aggregate impact — what the dry run prints and --apply writes as CORRECTION#SUMMARY#."""
-    actions = {a: sum(1 for e in entries if e["action"] == a) for a in (REGRADE, FIRST_GRADE, RESTATE, OPEN)}
+    actions = {a: sum(1 for e in entries if e["action"] == a) for a in (REGRADE, FIRST_GRADE, RESTATE, CURRENT, OPEN)}
     reasons = {r: sum(1 for e in entries if r in e["reasons"]) for r in REASON_WORDS}
     return {
         "issue": ISSUE,
@@ -294,11 +309,23 @@ def apply(table, entries: list[dict], ev, *, today: str, summ: dict, now: dateti
             elif e["action"] == FIRST_GRADE:
                 ev._evaluate_all([dict(row)], today)  # the evaluator's own write path: status, Bayesian confidence, LEARNING#
                 grade_corrections.apply_correction(
-                    table, row, after, reason=reason, evaluator_version=ev.ALGO_VERSION, now=now, update_grade=False
+                    table,
+                    row,
+                    after,
+                    reason=reason,
+                    evaluator_version=ev.ALGO_VERSION,
+                    now=now,
+                    update_grade=False,
+                    basis=grade_corrections.FIRST_GRADE,
                 )
                 done[FIRST_GRADE] += 1
-            elif e["action"] == RESTATE and after is not None:
-                done[RESTATE] += grade_corrections.stamp_quality(table, row, after["quality_flags"], evaluator_version=ev.ALGO_VERSION)
+            elif e["action"] == RESTATE and after is not None and grade_corrections.grade_text_version(row) != ev.ALGO_VERSION:
+                # #5613: the verdict stands, so the outcome date stands; the text, flags, baseline and version move together.
+                restated = {**after, "status": row.get("status"), "outcome_date": row.get("outcome_date")}
+                grade_corrections.apply_correction(
+                    table, row, restated, reason=reason, evaluator_version=ev.ALGO_VERSION, now=now, basis=grade_corrections.RESTATE
+                )
+                done[RESTATE] += 1
         except Exception as exc:  # noqa: BLE001 — one row's failure must not stop the ledger; it is counted and printed
             done["failed"] += 1
             print(f"  FAILED {e['pk']} / {e['sk']}: {exc}", file=sys.stderr)

@@ -58,7 +58,20 @@ from experiment.measurable_metrics import _METRIC_HINT_NORMALIZERS, METRIC_SOURC
 from health import hr_regime
 
 #: The grading-rule version stamped on every graded row and every correction (the
-#: evaluator's ``ALGO_VERSION`` is this value). 1.0 = the rules before #5533.
+#: evaluator's ``ALGO_VERSION`` is this value).
+#:
+#: VERSION HISTORY — a version names the rule that WROTE a row's grade text (``outcome_notes``):
+#:   1.0  the rules before #5533.
+#:   1.1  #5533 (2026-10-31): zero-entry days missing, the HR regime marker, the ``_Nday_avg`` after-day
+#:        bound, retired seats scanned, and the ``quality_flags`` stamp.
+#:   (no bump) #5613 (2026-11-02): the version rule itself — a version is only ever written beside the
+#:        text that version produced. A settled grade changes only through
+#:        ``grade_corrections.apply_correction`` (a verdict that stands is a ``restate`` correction, never
+#:        a bare stamp), and a row with a correction history is never re-selected by a later version's
+#:        re-grade. KNOWN RESIDUE: the 2026-11-01 #5533 run's ``restate`` stamped 1.1 onto nine rows whose
+#:        notes 1.0 wrote; ``grade_corrections.grade_text_version`` reads the truth off the notes, and
+#:        any repair of those rows is an owner-approved re-grade, not a silent fix.
+#: A BUMP (1.2 …) is required whenever a rule here or in the evaluator changes a verdict or its notes.
 EVALUATOR_VERSION = "1.1"
 
 #: The closed vocabulary. A reader of the row never sees a flag outside it.
