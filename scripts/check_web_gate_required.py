@@ -34,6 +34,7 @@ SCOPE = (
     "www/**",
     "scripts/publish_snapshot*.py",
     "scripts/check_www_build.py",
+    "scripts/www_verbatim.py",  # the dates-in-words rule both www gates call (#5609)
     "deploy/www_owned_paths.py",
     "tests/web_preview_gate.py",
     ".github/workflows/web-gate.yml",

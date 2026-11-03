@@ -43,6 +43,7 @@ on:
       - 'www/**'
       - 'scripts/publish_snapshot*.py'
       - 'scripts/check_www_build.py'
+      - 'scripts/www_verbatim.py'
       - 'deploy/www_owned_paths.py'
       - 'tests/web_preview_gate.py'
 
