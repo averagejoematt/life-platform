@@ -2,6 +2,7 @@
 // The Connected rail — one object, every place it surfaces, derived from the edge index.
 // Nothing here is a copy: each row is a link plus the one line that makes it relevant.
 import { connectedTo } from "../lib/snapshot.js";
+import Quote from "./Quote.astro";
 import { callOutcome, clip, domainWords } from "../lib/format.js";
 import { href, pathOf } from "../lib/url.js";
 
@@ -54,7 +55,7 @@ const tail = (o: any): string => {
           <a href={href(pathOf(e.type, e.id, e.object))}>
             <span class="k">{e.type}</span>
             <span>
-              <b>{e.object.title}</b>
+              <b>{e.type === "prediction" && !e.object.claim_withheld ? <Quote text={clip(e.object.claim, 120)} said={e.object.logged_date} /> : e.object.title}</b>
               {line(e.object) && (
                 <>
                   <br />

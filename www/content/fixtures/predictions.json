@@ -141,6 +141,63 @@
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
+  "claim": "Weight will hold within a pound of 304 through 2026-10-17, the morning after the long walk.",
+  "coach_id": "sleep_coach",
+  "confidence": 0.5,
+  "data_through": "2026-10-17",
+  "due_date": "2026-10-17",
+  "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "about",
+    "type": "metric"
+   }
+  ],
+  "grading": {
+   "actual_text": "304 lb",
+   "how": "one standard deviation of his readings over the 30 days before the call",
+   "outcome_notes": "304.03 vs 304.5 ±3.97: within tolerance",
+   "tolerance_text": "4 lb"
+  },
+  "id": "physical-20261016-weight02",
+  "kind": "number",
+  "logged_date": "2026-10-16",
+  "method_ids": [],
+  "metric_id": "weight_lbs",
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": "2026-10-17",
+  "simple_guess": {
+   "right": true,
+   "state": "scored",
+   "text": "The simple guess, that it would stay at 305.6 lb, was also right."
+  },
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "confirmed",
+  "summary": "It came in at 304 lb.",
+  "title": "Lisa Park called his weight to hold near 304 lb",
+  "type": "prediction",
+  "verdict_text": "Right.",
+  "visibility": "public",
+  "coach_name": "Lisa Park",
+  "retired": false,
+  "metric_key": "weight_lbs",
+  "corrections": [],
+  "claim_withheld": null
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
   "claim": "Not quoted: this was said on September 26 and rests on his glucose sensor, which had sent no reading since August 27.",
   "coach_id": "nutrition_coach",
   "confidence": 0.5,

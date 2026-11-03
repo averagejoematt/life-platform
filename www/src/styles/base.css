@@ -1523,6 +1523,24 @@ details.more summary {
   border: 1px solid var(--verm-text);
   color: var(--ink);
 }
+/* A coach's words, verbatim (#5609, owner ruling 2026-11-02): components/Quote.astro is the one road. The
+   readable date sits AFTER the quotation, in the page's own voice — never inside it, never the ISO form. */
+:where(blockquote[data-verbatim="coach"]) {
+  margin: 0;
+}
+p.gloss[data-quote-gloss] {
+  margin: 6px 0 0;
+  max-width: 62ch;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: normal;
+  color: var(--muted);
+}
+span.gloss[data-quote-gloss] {
+  color: var(--muted);
+}
 .chips {
   display: flex;
   flex-wrap: wrap;
