@@ -277,7 +277,7 @@ def test_the_grader_freezes_the_stamp_beside_the_grade(monkeypatch):
 
     t = FakeDdbTable()
     monkeypatch.setattr(ev, "table", t)
-    pred = _row("p", "confirmed")
+    pred = _row("p", "pending")  # #5613: the grader's own write lands only on a row that is not yet settled
     evaluation = {"prediction_id": "p", "status": "confirmed", "evaluated_date": _day(20), "actual_value": 0.05, "reason": "r"}
     ev._update_prediction_status(pred, evaluation, cb.stamp(False))
     assert len(t.updates) == 2 and t.updates[1]["ExpressionAttributeValues"][":baseline"]["right"] is False

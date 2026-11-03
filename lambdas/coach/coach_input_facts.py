@@ -156,6 +156,23 @@ def morning_note_fact(table, today: str) -> dict:
     return _mn.coach_fact(rows[0] if rows else None)
 
 
+def logged_rows(rows) -> list:
+    """The macrofactor rows that are food LOGS: every row but a zero-entry summary stub
+    (`grading_quality.is_zero_entry_day` — entries_count 0, no food_log, a pre-filled ~80 kcal / ~15 g).
+    THE one filter every coach input and the served-fact gate read the window through (#5603, #5613), so
+    the grader (#5552), the engine and the fact-checker all read a stub day as missing."""
+    from coach.grading_quality import is_zero_entry_day
+
+    return [r for r in rows or () if not is_zero_entry_day(r)]
+
+
+def logged_protein_series(rows) -> list:
+    """`[(day, grams)]` over the logged rows only — the series the served-fact gate judges a cited
+    protein figure against (#5613: a stub's 15 g is not a day eaten, so "the last 3 logged days averaged
+    15 g" is a contradiction, never a match). A real low day (779 kcal / 98 g with entries) is a reading."""
+    return _nl.protein_series(logged_rows(rows))
+
+
 def nutrition_record(rows: list, today: str) -> dict:
     """The prompt-facing logging record: `nutrition_logging.logging_record` plus the
     protein average (with its 95% CI) over the same window.
@@ -165,9 +182,7 @@ def nutrition_record(rows: list, today: str) -> dict:
     told a stub's 15 g was eaten or that a stub day was logged (the owner's Journey/Day acceptance review,
     2026-11-02: "30 logged days this month, every one of them" counted three stubs). The grader has read
     such a day as missing since #5552; this makes the coaches' inputs read it the same way."""
-    from coach.grading_quality import is_zero_entry_day
-
-    rows = [r for r in rows or () if not is_zero_entry_day(r)]
+    rows = logged_rows(rows)
     rec = _nl.logging_record(rows, today)
     series = _nl.protein_series(rows)
     # Deliberately ONE protein figure (the served window's `avg_protein_g`, with its CI).
@@ -218,7 +233,8 @@ def served_run_facts(data: Optional[dict] = None, *, table=None, today: Optional
         "data_through": data_through(data),
         "weight": weight_fact(data),
         "nutrition": nutrition_record(rows, today) if rows is not None else None,
-        "protein_series": _nl.protein_series(rows) if rows is not None else [],
+        # #5613: the gate's series reads stubs as missing — the same rows nutrition_record counted.
+        "protein_series": logged_protein_series(rows) if rows is not None else [],
         # #4189: the note is read for TODAY (Pacific) — the brief runs after the morning it
         # was written — not for `data_through`, which is the previous data day.
         "morning_note": morning_note_fact(table, today),
@@ -371,8 +387,12 @@ _GAP_SINCE_DATE = re.compile(
 # A window the sentence names for its protein figure, beyond "N logged days" (which the
 # shared extractor already returns as a `days_logged` claim).
 # #5413: "5-7 days after hitting N g" is a LAG after a future event, not an averaging window.
+# #5613: "this month" / "the past month" is the served 30-day window (`nutrition_logging.WINDOW_DAYS`) — without
+# it "128 g this month" was judged as unwindowed and passed on the 7-day leniency against a served 141.9 g.
+# ("last month" is left alone: it can name the previous calendar month, which no engine serves.)
 _NAMED_WINDOW = re.compile(
-    r"\b(\d{1,2})[- ](?:calendar\s+)?days?\b(?!\s+(?:after|later|from\s+now)\b)|\b(?:this|past|last)\s+week\b|\b7-day\b",
+    r"\b(\d{1,2})[- ](?:calendar\s+)?days?\b(?!\s+(?:after|later|from\s+now)\b)|\b(?:this|past|last)\s+week\b|\b7-day\b"
+    r"|\b(?P<month>(?:this|past)\s+month)\b",
     re.IGNORECASE,
 )
 # #4343: the average refutes only a figure the sentence frames as his daily intake or an
@@ -425,7 +445,7 @@ def _target_framed(sentence: str, value: float) -> bool:
 def _named_windows(sentence: str) -> list:
     out = []
     for m in _NAMED_WINDOW.finditer(sentence):
-        out.append(int(m.group(1)) if m.group(1) else 7)
+        out.append(int(m.group(1)) if m.group(1) else _nl.WINDOW_DAYS if m.group("month") else 7)
     return out
 
 

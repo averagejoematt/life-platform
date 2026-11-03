@@ -108,6 +108,23 @@ def _row(**over):
     return base
 
 
+def _historic_stamp(table, row, flags, *, evaluator_version="1.1"):
+    """The bare quality stamp the 2026-11-01 #5533 run wrote on its `restate` rows (``quality_flags`` +
+    ``evaluator_version``, once, no ledger entry). #5613 removed that writer from ``grade_corrections`` — a
+    version stamp beside text another version wrote is the defect — so the revert tests reproduce the
+    historic write here, verbatim, to keep proving the un-stamp of rows that run left behind."""
+    try:
+        table.update_item(
+            Key={"pk": row["pk"], "sk": row["sk"]},
+            UpdateExpression="SET quality_flags = :qf, evaluator_version = :ev",
+            ConditionExpression="attribute_not_exists(quality_flags)",
+            ExpressionAttributeValues={":qf": list(flags or []), ":ev": evaluator_version},
+        )
+        return True
+    except ConditionFailed:
+        return False
+
+
 T0 = datetime(2026, 11, 1, 6, 0, tzinfo=timezone.utc)
 T1 = datetime(2026, 11, 1, 7, 0, tzinfo=timezone.utc)
 CORRECTED = {
@@ -200,7 +217,7 @@ def test_a_first_grade_reverts_to_pending_and_a_restate_unstamps_once():
     # restate: stamped once, un-stamped once
     stamped = _row(sk="PREDICTION#pred_x", prediction_id="pred_x")
     t.seed(stamped)
-    assert gc.stamp_quality(t, stamped, ["logging_gap"], evaluator_version="1.1")
+    assert _historic_stamp(t, stamped, ["logging_gap"])
     live = dict(t.items[(stamped["pk"], stamped["sk"])])
     assert gc.unstamp_quality(t, live, evaluator_version="1.1") is True
     live2 = t.items[(stamped["pk"], stamped["sk"])]
@@ -213,7 +230,7 @@ def test_the_script_selects_exactly_the_touched_rows_and_nothing_after_a_revert(
     a, b, c = _row(), _row(sk="PREDICTION#pred_b", prediction_id="pred_b"), _row(sk="PREDICTION#pred_c", prediction_id="pred_c")
     t.seed(a, b, c)
     _apply(t, a)
-    gc.stamp_quality(t, b, ["low_power"], evaluator_version="1.1")
+    _historic_stamp(t, b, ["low_power"], evaluator_version="1.1")
     rows = {
         "COACH#sleep_coach": [dict(v) for (pk, _sk), v in t.items.items() if pk == "COACH#sleep_coach" and _sk.startswith("PREDICTION#")]
     }
@@ -249,8 +266,8 @@ def test_a_plan_scopes_the_unstamps_to_the_rows_the_run_stamped_and_leaves_the_e
     )  # in the plan, but already stamped
     t.seed(ours, theirs, noop)
     pre = {"rows": [dict(ours), dict(theirs), dict(noop)]}
-    assert gc.stamp_quality(t, ours, ["low_power"], evaluator_version="1.1")
-    assert gc.stamp_quality(t, noop, ["low_power"], evaluator_version="1.1") is False  # the designed no-op
+    assert _historic_stamp(t, ours, ["low_power"], evaluator_version="1.1")
+    assert _historic_stamp(t, noop, ["low_power"], evaluator_version="1.1") is False  # the designed no-op
     plan = {
         "entries": [{"pk": ours["pk"], "sk": ours["sk"], "action": "restate"}, {"pk": noop["pk"], "sk": noop["sk"], "action": "restate"}]
     }

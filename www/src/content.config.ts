@@ -148,6 +148,36 @@ const experiments = defineCollection({
   }),
 });
 
+// #5610 (owner decision D, 2026-11-02): one correction on a prediction — the served shape of
+// lambdas/web/correction_history.FIELDS + aggregate_impact, pinned equal to CORRECTION_FIELDS in
+// scripts/publish_snapshot_contract.py (tests/test_web_publication_snapshot_5530.py). Every date is the
+// stored one or null: the original grading is a DAY, `corrected_at` the recorded instant, `published_on`
+// null until a publication day is actually recorded. `explanation` is required — reader words, never the
+// stored engineering `reason`, which travels beside it as the audit record.
+const isoDayOrNull = z.string().regex(ISO_DAY).nullable();
+const correction = z
+  .object({
+    source: z.enum(["corrections", "verdict_correction", "respecified"]),
+    kind: z.enum(["regrade", "restate", "withdraw", "respecify", "revert"]),
+    rules: z.array(z.object({ id: z.string().min(1), version: z.string().nullable() }).strict()).min(1),
+    explanation: z.string().min(1),
+    said_on: isoDayOrNull,
+    original_status: z.string().nullable(),
+    original_outcome_date: isoDayOrNull,
+    original_outcome_notes: z.string().nullable(),
+    corrected_status: z.string().nullable(),
+    corrected_outcome_date: isoDayOrNull,
+    corrected_outcome_notes: z.string().nullable(),
+    target_before: isoDayOrNull,
+    target_after: isoDayOrNull,
+    corrected_at: z.string().nullable(),
+    published_on: isoDayOrNull,
+    reason: z.string().nullable(),
+    evaluator_version: z.string().nullable(),
+    aggregate_impact: z.string().nullable(),
+  })
+  .strict();
+
 const predictions = defineCollection({
   loader: snapshot("predictions"),
   schema: envelope("prediction", {
@@ -181,19 +211,7 @@ const predictions = defineCollection({
     retired: z.boolean(),
     metric_key: z.string().nullable(),
     claim_withheld: z.enum(["unsourced", "privacy"]).nullable(),
-    corrections: z.array(
-      z
-        .object({
-          original_grade: z.record(z.any()).nullable().optional(),
-          original_timestamp: z.string().nullable().optional(),
-          corrected_grade: z.string().nullable().optional(),
-          corrected_at: z.string().nullable().optional(),
-          reason: z.string().nullable().optional(),
-          evaluator_version: z.string().nullable().optional(),
-          aggregate_impact: z.string().nullable().optional(),
-        })
-        .passthrough(),
-    ),
+    corrections: z.array(correction),
     sealed: z.boolean(),
     confidence: z.number().min(0).max(1).nullable(),
   }),

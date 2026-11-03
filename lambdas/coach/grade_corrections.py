@@ -41,16 +41,48 @@ A run's aggregate impact is one ``CORRECTION#SUMMARY#{ts}`` row on the evaluator
 state partition (``EVALUATOR#coach_prediction``, SYSTEM_STATE in the phase taxonomy):
 ``summary_row``.
 
+THE INVARIANTS (#5613, owner integrity item 7, 2026-11-02)
+---------------------------------------------------------
+Versioned rules never silently rewrite history. Three rules, each enforced in code here:
+
+1. **A settled grade changes only through this module.** ``is_settled`` names a settled row
+   (a terminal status that is neither the #2221 provisional second look nor the #813 reclaim,
+   or ANY row already carrying a correction history). ``status / outcome / outcome_notes``
+   on such a row are written only by ``apply_correction`` (and its ledgered inverse
+   ``revert_correction``), which keep the original and record ``corrected_at``, ``reason``
+   and ``evaluator_version``. The scheduled grader's own write is ``write_first_grade``,
+   which REFUSES a settled row and is conditional on the row still reading as it did.
+   ``tests/test_settled_grade_writers_5613.py`` fails on any other writer of those fields
+   on a ``PREDICTION#`` row in ``lambdas/``, ``deploy/``, ``scripts/`` or ``mcp/``.
+2. **A version stamp is only written beside the text that version produced.** The
+   ``evaluator_version`` on a row names the rule that wrote its ``outcome_notes``. A re-grade
+   whose verdict stands therefore records a ``basis="restate"`` correction (unchanged
+   status, the new version's notes / flags / baseline, the old grade kept in
+   ``original_grade``) — never a bare stamp. The bare stamp (``stamp_quality``, used by the
+   2026-11-01 #5533 run) is removed; ``grade_text_version`` reads which rule wrote the text.
+3. **A corrected row is never re-selected by an automated re-grade.** Selection keys on the
+   structure (``has_correction_history``: an ``original_grade`` snapshot or any
+   ``corrections[]`` entry), never on a reason's wording or an evaluator version — so a
+   rule bump (1.1 → 1.2) cannot re-grade an owner ruling. A further change to such a row is
+   a deliberate, per-row ``apply_correction`` (``basis="ruling"``, ``ruled_by=...``).
+
+Each entry also carries ``basis`` (``regrade | restate | first_grade | ruling``),
+``verdict_changed`` and, for a ruling, ``ruled_by`` — structured provenance a reader and a
+selector can key on.
+
 Pure over an injected table handle; the clock is a parameter (``now``).
 """
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
 from common.numeric import floats_to_decimal
 from experiment.phase_taxonomy import experiment_stamp_for
+
+from coach.prediction_grading import grading_window_still_open, was_terminalized_by_duplicate_grader
 
 CORRECTION_PREFIX = "CORRECTION#"
 SUMMARY_PREFIX = "CORRECTION#SUMMARY#"
@@ -71,17 +103,114 @@ ENTRY_FIELDS = (
     "corrected_at",
     "reason",
     "evaluator_version",
+    "basis",  # #5613: structured provenance (``ruled_by`` rides beside it on a ruling)
+    "verdict_changed",
 )
+
+#: The structured provenance every entry written since #5613 carries beside ``ENTRY_FIELDS``.
+REGRADE, RESTATE, FIRST_GRADE, RULING = "regrade", "restate", "first_grade", "ruling"
+BASES = (REGRADE, RESTATE, FIRST_GRADE, RULING)
+
+#: A grade in one of these statuses is decided (``is_settled`` adds the two provisional exceptions).
+TERMINAL_STATUSES = ("confirmed", "refuted", "inconclusive", "expired")
+
+
+class SettledGradeError(RuntimeError):
+    """A write that would change a settled grade outside ``apply_correction``."""
+
+
+def has_correction_history(row: dict) -> bool:
+    """Has this row ever been corrected (or reverted)? Structural: an ``original_grade`` snapshot or any
+    ``corrections[]`` entry — never the reason's wording, never the version (#5613 rule 3)."""
+    if not isinstance(row, dict):
+        return False
+    if isinstance(row.get("original_grade"), dict) and row["original_grade"]:
+        return True
+    return any(isinstance(e, dict) for e in row.get("corrections") or [])
+
+
+def is_settled(row: dict) -> bool:
+    """A decided grade the scheduled grader may no longer write (#5613 rule 1): a terminal status that
+    is not provisional (#2221) or an unreal #813 inconclusive — or any terminal row with a correction
+    history (a corrected row is the ledger's, even if its corrected notes read provisional)."""
+    if not isinstance(row, dict) or str(row.get("status") or "") not in TERMINAL_STATUSES:
+        return False
+    if has_correction_history(row):
+        return True
+    return not (grading_window_still_open(row) or was_terminalized_by_duplicate_grader(row))
+
+
+def grade_text_version(row: dict) -> str | None:
+    """The rule version that WROTE the row's grade text — ``outcome_notes.algo_version`` — or None."""
+    try:
+        notes = json.loads(row.get("outcome_notes") or "{}")
+    except (TypeError, ValueError):
+        return None
+    v = notes.get("algo_version") if isinstance(notes, dict) else None
+    return str(v) if v is not None else None
+
+
+def write_first_grade(table: Any, row: dict, evaluation: dict, *, outcome_notes: str, evaluator_version: str) -> bool:
+    """The scheduled grader's write-back of a grade onto a row that is NOT settled (pending, confirming, a
+    provisional second look, an #813 reclaim). Refuses a settled row (``SettledGradeError``) and is
+    conditional on the stored status and notes still being the ones this grade was computed from, so a
+    row corrected between the read and the write is never overwritten. Returns True when it landed."""
+    if is_settled(row):
+        raise SettledGradeError(f"{row.get('pk')} / {row.get('sk')} is settled ({row.get('status')}): only apply_correction may change it")
+    pk = row.get("pk") or f"COACH#{row.get('coach_id', '')}"
+    sk = row.get("sk") or f"PREDICTION#{row.get('prediction_id', '')}"
+    values: dict[str, Any] = {
+        ":status": evaluation["status"],
+        ":outcome": evaluation["status"],
+        ":odate": evaluation["evaluated_date"],
+        ":notes": outcome_notes,
+        ":qf": list(evaluation.get("quality_flags") or []),
+        ":ver": evaluator_version,
+    }
+    conds = []
+    if row.get("status") is not None:
+        conds.append("#status = :prior")
+        values[":prior"] = row["status"]
+    if row.get("outcome_notes") is not None:
+        conds.append("outcome_notes = :prior_notes")
+        values[":prior_notes"] = row["outcome_notes"]
+    kwargs: dict[str, Any] = {
+        "Key": {"pk": pk, "sk": sk},
+        "UpdateExpression": (
+            "SET #status = :status, outcome = :outcome, outcome_date = :odate, outcome_notes = :notes, "
+            "quality_flags = :qf, evaluator_version = :ver"  # #5533 (a): the grader's own flags, top-level for projected reads
+        ),
+        "ExpressionAttributeNames": {"#status": "status"},
+        "ExpressionAttributeValues": values,
+    }
+    if conds:
+        kwargs["ConditionExpression"] = " AND ".join(conds)
+    table.update_item(**kwargs)
+    return True
 
 
 def now_iso(now: datetime | None = None) -> str:
     return (now or datetime.now(timezone.utc)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def entry(row: dict, corrected: dict, *, reason: str, evaluator_version: str, corrected_at: str) -> dict:
+def entry(
+    row: dict,
+    corrected: dict,
+    *,
+    reason: str,
+    evaluator_version: str,
+    corrected_at: str,
+    basis: str = REGRADE,
+    ruled_by: str | None = None,
+) -> dict:
     """One correction entry — the original grade off ``row``, the corrected grade off
-    ``corrected`` (``{status, outcome_date, outcome_notes}``)."""
-    return {
+    ``corrected`` (``{status, outcome_date, outcome_notes}``), plus its structured provenance
+    (``basis``, ``verdict_changed``, and ``ruled_by`` on a ruling)."""
+    if basis not in BASES:
+        raise ValueError(f"basis must be one of {BASES}, not {basis!r}")
+    if basis == RULING and not ruled_by:
+        raise ValueError("a ruling names who ruled (ruled_by)")
+    out = {
         "original_status": row.get("status"),
         "original_outcome_date": row.get("outcome_date"),
         "original_outcome_notes": row.get("outcome_notes"),
@@ -91,7 +220,12 @@ def entry(row: dict, corrected: dict, *, reason: str, evaluator_version: str, co
         "corrected_at": corrected_at,
         "reason": reason,
         "evaluator_version": evaluator_version,
+        "basis": basis,
+        "verdict_changed": corrected.get("status") != row.get("status"),
     }
+    if ruled_by:
+        out["ruled_by"] = ruled_by
+    return out
 
 
 def original_grade(row: dict, snapshot_at: str) -> dict:
@@ -120,8 +254,9 @@ def correction_row(row: dict, e: dict) -> dict:
 
 
 def already_corrected(row: dict, *, evaluator_version: str, reason_prefix: str | None = None) -> bool:
-    """Has this row a correction under ``evaluator_version`` (and ``reason_prefix``)? The
-    planner's idempotence: a second run selects nothing it already corrected."""
+    """Has this row a correction under ``evaluator_version`` (and ``reason_prefix``)? A READ for reports and
+    the #5533 revert's scope only — re-grade SELECTION keys on ``has_correction_history`` (#5613 rule 3):
+    a reason prefix and a version both miss an owner ruling once the rules move on."""
     for e in row.get("corrections") or []:
         if not isinstance(e, dict) or str(e.get("evaluator_version")) != str(evaluator_version):
             continue
@@ -139,6 +274,8 @@ def apply_correction(
     evaluator_version: str,
     now: datetime | None = None,
     update_grade: bool = True,
+    basis: str = REGRADE,
+    ruled_by: str | None = None,
 ) -> dict:
     """Write one correction: the ledger row, then the prediction row. Returns the entry.
 
@@ -147,9 +284,15 @@ def apply_correction(
     snapshot without touching the grade fields — for a row the evaluator's own write path
     has just graded for the first time (a retired coach's sealed bet), so the ledger still
     shows the pending → graded transition.
+
+    ``basis="restate"`` is a re-grade whose verdict stands (#5613 rule 2): the status must not
+    change, and the row's notes / flags / baseline / ``evaluator_version`` become the new
+    rule's together, with the old text kept in ``original_grade``.
     """
+    if basis == RESTATE and corrected.get("status") != row.get("status"):
+        raise ValueError("a restate keeps the verdict; a changed verdict is a regrade")
     at = now_iso(now)
-    e = entry(row, corrected, reason=reason, evaluator_version=evaluator_version, corrected_at=at)
+    e = entry(row, corrected, reason=reason, evaluator_version=evaluator_version, corrected_at=at, basis=basis, ruled_by=ruled_by)
     table.put_item(Item=floats_to_decimal(correction_row(row, e)))
 
     sets = [
@@ -172,28 +315,15 @@ def apply_correction(
             values[":bl"] = corrected["baseline"]
         values[":prior"] = row.get("status")
         kwargs["ConditionExpression"] = "#status = :prior"
+        if row.get("outcome_notes") is not None:  # #5613: the text the plan read is still the text on the row
+            values[":prior_notes"] = row["outcome_notes"]
+            kwargs["ConditionExpression"] += " AND outcome_notes = :prior_notes"
     kwargs["UpdateExpression"] = "SET " + ", ".join(sets)
     kwargs["ExpressionAttributeValues"] = floats_to_decimal(values)
     if names:
         kwargs["ExpressionAttributeNames"] = names
     table.update_item(**kwargs)
     return e
-
-
-def stamp_quality(table: Any, row: dict, quality_flags: list, *, evaluator_version: str) -> bool:
-    """A grade that STANDS under the new rules is not corrected — only annotated: the row
-    gains ``quality_flags`` / ``evaluator_version`` once (``attribute_not_exists``), never a
-    ledger entry. Returns whether the write landed; a refused condition is the no-op."""
-    try:
-        table.update_item(
-            Key={"pk": row["pk"], "sk": row["sk"]},
-            UpdateExpression="SET quality_flags = :qf, evaluator_version = :ev",
-            ConditionExpression="attribute_not_exists(quality_flags)",
-            ExpressionAttributeValues={":qf": list(quality_flags or []), ":ev": evaluator_version},
-        )
-        return True
-    except Exception:  # noqa: BLE001 — ConditionalCheckFailed is the idempotent path
-        return False
 
 
 def summary_row(summary: dict, *, now: datetime | None = None) -> dict:
@@ -231,7 +361,7 @@ def reverted_already(row: dict) -> bool:
 
 def revert_entry(row: dict, *, reason: str, reverted_at: str) -> dict:
     """The reversal as a correction entry: the row's CURRENT grade is the 'original' of this entry and the
-    snapshot's grade is the 'corrected' one — the same nine fields, plus the two that name it a reversal."""
+    snapshot's grade is the 'corrected' one — the entry fields, plus the two that name it a reversal."""
     og = row.get("original_grade") or {}
     return {
         "original_status": row.get("status"),
@@ -245,6 +375,8 @@ def revert_entry(row: dict, *, reason: str, reverted_at: str) -> dict:
         "evaluator_version": str(og.get("evaluator_version") or ""),
         "reverts": True,
         "restores_snapshot_at": og.get("snapshot_at"),
+        "basis": "revert",
+        "verdict_changed": og.get("status") != row.get("status"),
     }
 
 

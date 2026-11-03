@@ -64,6 +64,7 @@ _WORDED_TEXT_KEYS = frozenset(
         "actual_text",
         "tolerance_text",
         "byline",
+        "explanation",
     }
 )
 
@@ -314,6 +315,50 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
 }
 QUALITY_FLAGS = ("logging_gap", "low_power", "proxy_metric")
 
+# ── one correction on a prediction (#5610, owner decision D 2026-11-02) ─────────────────────
+# The served shape of `lambdas/web/correction_history.FIELDS` plus the exporter's `aggregate_impact`,
+# pinned equal to the zod `correction` object in www/src/content.config.ts. Every date is the stored
+# one or null — the original grading is a DAY (no writer recorded its time), `corrected_at` is the
+# correction's recorded instant, `published_on` is null until a publication date is actually recorded.
+CORRECTION_FIELDS: dict[str, tuple[str, bool]] = {
+    "source": ("enum:corrections|verdict_correction|respecified", False),
+    "kind": ("enum:regrade|restate|withdraw|respecify|revert", False),
+    "rules": ("list[obj]", False),
+    "explanation": ("str", False),
+    "said_on": ("day", True),
+    "original_status": ("str", True),
+    "original_outcome_date": ("day", True),
+    "original_outcome_notes": ("str", True),
+    "corrected_status": ("str", True),
+    "corrected_outcome_date": ("day", True),
+    "corrected_outcome_notes": ("str", True),
+    "target_before": ("day", True),
+    "target_after": ("day", True),
+    "corrected_at": ("str", True),
+    "published_on": ("day", True),
+    "reason": ("str", True),
+    "evaluator_version": ("str", True),
+    "aggregate_impact": ("str", True),
+}
+
+
+def validate_correction(c: Any, where: str) -> None:
+    """One correction, strictly: exact keys, typed values, a rule id per rule, and an explanation — a
+    correction whose rule has no reader words (``explanation`` null on the wire) FAILS the export."""
+    if not isinstance(c, dict):
+        raise SchemaError(f"{where}: expected object")
+    unknown, missing = set(c) - set(CORRECTION_FIELDS), set(CORRECTION_FIELDS) - set(c)
+    if unknown or missing:
+        raise SchemaError(f"{where}: correction keys — unknown {sorted(unknown)}, missing {sorted(missing)}")
+    if not isinstance(c.get("explanation"), str) or not c["explanation"].strip():
+        rules = [r.get("id") for r in c.get("rules") or [] if isinstance(r, dict)]
+        raise SchemaError(f"{where}: correction rule(s) {rules} have no reader explanation (lambdas/web/correction_rules.py)")
+    for name, (kind, nullable) in CORRECTION_FIELDS.items():
+        _check(kind, nullable, c[name], f"{where}.{name}")
+    rules = c["rules"]
+    if not rules or not all(isinstance(r, dict) and set(r) == {"id", "version"} and isinstance(r["id"], str) and r["id"] for r in rules):
+        raise SchemaError(f"{where}.rules: expected a non-empty list of {{id, version}}")
+
 
 class SchemaError(ValueError):
     pass
@@ -398,6 +443,8 @@ def validate(obj: dict, type_: str) -> None:
         bad = [f for f in obj["quality_flags"] if f not in QUALITY_FLAGS]
         if bad:
             raise SchemaError(f"prediction {obj['id']}: unknown quality flag(s) {bad}")
+        for i, c in enumerate(obj["corrections"]):
+            validate_correction(c, f"prediction {obj['id']}.corrections[{i}]")
     if "decimals" in obj and not 0 <= obj["decimals"] <= 3:
         raise SchemaError(f"metric {obj['id']}: decimals out of range")
 
