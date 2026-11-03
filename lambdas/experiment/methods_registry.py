@@ -610,7 +610,7 @@ REGISTRY = {
         "confirmed/n, same percentage-point units as accuracy_pct — whenever n > 0 (#3450, "
         "ADR-105): a bare accuracy_pct off a small n reads as more precise than it is (21.6% "
         "vs. 'somewhere between 11% and 37%' are different decisions at n=37).",
-        "f1d7ff696095",
+        "0a8204732761",
         used_by="/api/calibration, /api/coach_team's per-coach calibration line.",
     ),
     "calibration_score_strata": _entry(
@@ -631,7 +631,7 @@ REGISTRY = {
         "n ≥ 5 verdict floor and the same fixed ±0.15 gap trip as calibration_verdict (a documented ADR-105 "
         "exception). A stratum with n < 2 or every outcome identical contributes no reference — unknown, "
         "never counted as unskilled.",
-        "15c2ca104392",
+        "6c35be6f707c",
         min_n=5,
         used_by="/api/calibration's platform + platform.lifetime cards; the State of Matthew calibration section.",
     ),
@@ -729,8 +729,12 @@ REGISTRY = {
         "whose stated confidence tracks observed rates but whose Brier skill is ≤ 0 (worse than "
         "always guessing the base rate) reads 'not_yet_skillful' — reliability alone never earns "
         "the flattering verdict (ADR-104/105, #1370). An undefined skill (degenerate base rate) "
-        "is treated as unknown, not as unskilled.",
-        "f1d7ff696095",
+        "is treated as unknown, not as unskilled. #5615 (2026-11-03): when ≥ CONCENTRATED_SHARE (0.9) of the "
+        "resolved calls sit in ONE stated-confidence bin, 'well-calibrated' is withheld and the verdict reads "
+        "'not_measurable' — one band cannot show confidence tracking outcomes ACROSS confidences (on 2026-11-03, "
+        "203 of the coaches' 211 checked calls were stated at exactly 0.5). Over-/under-confident and "
+        "not-yet-skillful still stand; Brier, skill and every grade are unchanged.",
+        "0a8204732761",
         min_n=5,
     ),
     "credibility_label": _entry(
@@ -747,7 +751,7 @@ REGISTRY = {
         "derived. A negative Brier skill (worse than the base rate) can never render the "
         "reliable/authoritative rungs, however good the raw Brier looks against an extreme "
         "base rate — it reads not-yet-skillful (#1370).",
-        "f1d7ff696095",
+        "0a8204732761",
         used_by="Coach cards that need a single at-a-glance credibility word.",
     ),
     "conversational_enrichment_scope": _entry(
