@@ -121,6 +121,7 @@ from coach import (  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts; 
     coach_baseline,
     commitment_grading,
     conditional_branches,  # #5607: a conditional filed with its antecedent as a frozen, checkable spec
+    evaluation_hold,  # #5607: a held row is skipped by every grading/expiry step here
     grade_corrections,
     grading_quality,  # #5533: zero-entry days, the HR regime marker, the quality flags
     prediction_count_grader,
@@ -325,6 +326,8 @@ def _retire_ungradeable(ungradeable, today_str):
     today = datetime.strptime(today_str, "%Y-%m-%d")
     retired = 0
     for pred in ungradeable:
+        if evaluation_hold.skip_held(pred, logger):  # #5607: a held row is not retired while held
+            continue
         try:
             created_dt = datetime.strptime(str(pred.get("created_date")), "%Y-%m-%d")
         except (ValueError, TypeError):
@@ -969,9 +972,14 @@ def _evaluate_all(predictions, today_str, write=True):
         "skipped_window": 0,
         "skipped_error": 0,
         "pending": 0,
+        "held": 0,  # #5607: rows under an owner evaluation hold — not graded, not expired
     }
 
     for pred in predictions:
+        # #5607: BEFORE any window, grading or expiry logic — a held row emits nothing (no grade, no
+        # confidence move, no learning row, no expiry) until the hold is released.
+        if evaluation_hold.skip_held(pred, logger, stats):
+            continue
         eval_spec = pred.get("evaluation", {})
         eval_type = eval_spec.get("type", "machine")
         coach_id = pred.get("coach_id", "")
@@ -1093,16 +1101,8 @@ def _evaluate_all(predictions, today_str, write=True):
 
         stats[status] = stats.get(status, 0) + 1
 
-    logger.info(
-        "Evaluation stats: confirmed=%d refuted=%d inconclusive=%d " "expired=%d pending=%d skipped_window=%d skipped_error=%d",
-        stats["confirmed"],
-        stats["refuted"],
-        stats["inconclusive"],
-        stats["expired"],
-        stats["pending"],
-        stats["skipped_window"],
-        stats["skipped_error"],
-    )
+    _keys = ("confirmed", "refuted", "inconclusive", "expired", "pending", "skipped_window", "skipped_error", "held")  # #5607: + held
+    logger.info("Evaluation stats: %s", " ".join(f"{k}={stats[k]}" for k in _keys))
     return evaluations, stats
 
 
