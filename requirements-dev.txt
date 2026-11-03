@@ -18,7 +18,7 @@ pytest-xdist==3.8.0
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
 # #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-hypothesis==6.170.12
+hypothesis==6.170.14
 # PyYAML — scripts/apply_branch_protection.py's preflight_contexts() parses
 # .github/workflows/*.yml to verify every required check context actually exists
 # as an unfiltered, un-gated job (#1662/#2198). tests/test_branch_protection_spec.py
@@ -53,7 +53,7 @@ pillow==13.0.0
 # the reusable lint workflow out; the old comment still pointed at ci-cd.yml.)
 # flake8: ci-lint.yml installed it UNPINNED until #2760 — it now resolves this pin
 # via scripts/ci_pins.py like every other gate tool.
-flake8==7.4.1
+flake8==7.5.0
 ruff==0.14.14
 # 26.10.1 fixes CVE-2026-114134 (pip-audit, 2026-10-22); the whole tree is unchanged under it
 black==26.10.1
@@ -61,12 +61,12 @@ black==26.10.1
 # Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
 # see tests/test_mypy_clean_modules.py + mypy.ini). Version MUST equal ci-lint.yml's
 # pin (CQ-01, #1963).
-mypy==2.4.0
+mypy==2.4.1
 
 # AWS SDK (for tests that call boto3 directly). Versions MUST equal the CI gate's
 # pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-boto3==1.43.120
-botocore==1.43.120
+boto3==1.43.123
+botocore==1.43.123
 
 # CI supply-chain gates (#2760 — the one-legged-pin class): both were pinned as
 # workflow literals with NO Dependabot leg, so the pins could only rot. This file
@@ -81,7 +81,7 @@ pip-licenses==5.5.5
 # Remediation-agent runtime (remediation-agent.yml, ADR-064/065). Installed
 # UNPINNED (floating latest) until #2760; now pinned here and Dependabot-bumped,
 # resolved by the workflow via scripts/ci_pins.py.
-claude-agent-sdk==0.2.174
+claude-agent-sdk==0.2.176
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release
