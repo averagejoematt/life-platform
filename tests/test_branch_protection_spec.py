@@ -95,6 +95,30 @@ def test_preflight_rejects_an_if_gated_job():
     assert any("`if:`-gated" in p for p in problems), problems
 
 
+def test_preflight_allows_only_the_always_aggregator():
+    # The web gate's required context is an `if: always()` aggregator (web-gate.yml
+    # `web-gate-verdict`): it can never be skipped, so it always reports a verdict.
+    # `!cancelled()` / `success()` are NOT equivalent — a cancelled run skips them, and a
+    # skipped job reports Success to the required-checks rule.
+    pytest.importorskip("yaml")
+    ok = {
+        "required_status_checks": [
+            {"context": "v9 web gate verdict (www build, required)", "workflow": "web-gate.yml", "job": "web-gate-verdict"}
+        ]
+    }
+    assert abp.preflight_contexts(ok) == []
+    heavy = {
+        "required_status_checks": [
+            {
+                "context": "Build from fixtures · schema + visibility + edge mutations · render gate",
+                "workflow": "web-gate.yml",
+                "job": "web-gate",
+            }
+        ]
+    }
+    assert any("`if:`-gated" in p for p in abp.preflight_contexts(heavy)), "the conditional build job must never be the required context"
+
+
 def test_preflight_rejects_a_matrix_job():
     # codeql.yml's `analyze` is a matrix job — it emits one check-run per language, so
     # a single context string can never name it (and it is advisory by design, ADR-148).

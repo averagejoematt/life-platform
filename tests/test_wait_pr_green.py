@@ -39,6 +39,7 @@ _BASELINE = [
     "Full unit suite (pre-merge, issue 3025)",
     "API-before-frontend sequencing check (#2831)",
     "gitleaks (PR commit range only, not full history)",
+    "v9 web gate verdict (www build, required)",
     "CodeQL analysis (python)",
     "CodeQL analysis (javascript-typescript)",
 ]
