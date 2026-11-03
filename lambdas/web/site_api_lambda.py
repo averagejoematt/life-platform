@@ -635,6 +635,16 @@ _SIMPLE_ROUTES = {
 # `tests/test_route_metric_coverage_2876.py` is the derivation guard: it parses
 # every route literal this function dispatches on and asserts none of them can
 # answer without returning through here.
+def _serve_position_summary(entry: dict, table, item: dict, blurb: str) -> None:
+    """The dashboard's ``position_summary`` (owner rulings 2026-11-03): the publication gate decides FIRST — a withheld
+    read serves "" + the neutral reason and is never re-published by a correction-freshness summary; only a
+    publishable read is then judged against later grade corrections (as-of + derived_from served)."""
+    if narrative_publication.is_withheld(item):
+        _np_slot(entry, item, "position_summary", blurb)
+    else:
+        _cd_fresh.judge_into(entry, table, item, blurb)
+
+
 def _dispatch_route(event, path, method):
     """Resolve `path`/`method` to a response dict, or `None` if unmatched.
 
@@ -994,12 +1004,7 @@ def _dispatch_route(event, path, method):
                         # `observatory_summary`/`content`, both written TO Matthew — the exact
                         # audience_violation the reader-truth oracle flagged. The response key
                         # keeps its historical name; the front-ends drop empty entries honestly.
-                        # Owner rulings 2026-11-03: the publication gate decides first (a withheld read serves "" + the neutral
-                        # reason); only a publishable read is then judged against later grade corrections (as-of + derived_from).
-                        if narrative_publication.is_withheld(_cd_out_item):
-                            _np_slot(coach_entry, _cd_out_item, "position_summary", audience_guard.public_blurb(_cd_out_item))
-                        else:
-                            _cd_fresh.judge_into(coach_entry, table, _cd_out_item, audience_guard.public_blurb(_cd_out_item))
+                        _serve_position_summary(coach_entry, table, _cd_out_item, audience_guard.public_blurb(_cd_out_item))
                         coach_entry["emotional_investment"] = _cd_out_item.get("emotional_investment", "neutral")
                         # #1226: as-of date for the digest card kicker. Prefer the
                         # OUTPUT# record's ISO timestamp (matches the observatory
