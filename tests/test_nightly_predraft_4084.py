@@ -341,7 +341,10 @@ def test_a_failed_run_emits_the_deadman_series_at_zero_never_nothing_and_never_o
         with patch.object(npd, "run", **behaviour):
             resp = npd.lambda_entry(dict(npd.JOB["event"]))
         body = json.loads(resp["body"])
-        lines = [json.loads(ln) for ln in capsys.readouterr().out.splitlines() if ln.startswith("{") and '"_aws"' in ln]
+        # Only the pre-draft's own series: the run's other legs print their own EMF lines (the titration dead-man,
+        # armed from 2026-11-03, emits one wherever no titration record exists — CI has none).
+        emf = [json.loads(ln) for ln in capsys.readouterr().out.splitlines() if ln.startswith("{") and '"_aws"' in ln]
+        lines = [ln for ln in emf if npd.JOB["metric_name"] in ln]
         if body["outcome"] != npd.FAILED or len(lines) != 1 or lines[0][npd.JOB["metric_name"]] != 0 or lines[0]["Outcome"] != npd.FAILED:
             offenders.append((name, body, lines))
         if name == "raised" and "RuntimeError" not in body.get("error", ""):
