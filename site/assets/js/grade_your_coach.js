@@ -24,6 +24,8 @@ const VERDICT_COPY = {
   "well-calibrated": "Stated confidence tracks observed rates, and the forecasts beat the base rate. Both halves are required for this verdict.",
   not_yet_skillful:
     "The stated confidences line up reasonably, but the forecasts do not beat simply guessing the base rate every time. Reliability without skill is not calibration — so this reads as not yet skillful, with its n and skill shown beside it.",
+  not_measurable:
+    "Every resolved forecast was stated at the same confidence, so there is nothing to compare stated confidence against — calibration cannot be read, and no verdict is given.",
   insufficient_data: "Fewer than 5 resolved forecasts. There is not enough here to claim anything about calibration, so nothing is claimed.",
 };
 

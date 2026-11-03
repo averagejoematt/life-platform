@@ -46,7 +46,7 @@ import json
 import math
 import os
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"  # 1.3.0: "well-calibrated" withheld when >= CONCENTRATED_SHARE of calls sit in one band
 
 __all__ = [
     "WORD_CONFIDENCE",
@@ -275,6 +275,11 @@ def reliability_bins(pairs, n_bins=10):
     return out
 
 
+#: #5615: when this share of a forecaster's resolved calls sits in ONE stated-confidence band, calibration
+#: across confidences cannot be read, so the positive verdict "well-calibrated" is withheld ("not_measurable").
+CONCENTRATED_SHARE = 0.9
+
+
 def score_pairs(pairs, n_bins=10):
     """Score a set of ``(confidence, outcome)`` pairs into a calibration summary.
 
@@ -329,6 +334,9 @@ def score_pairs(pairs, n_bins=10):
             calibration = "under-confident"
         elif skilled is False:
             calibration = "not_yet_skillful"
+        elif max(b["n"] for b in bins) >= CONCENTRATED_SHARE * total:
+            # One stated-confidence band cannot show calibration across confidences: no positive verdict.
+            calibration = "not_measurable"
         else:
             calibration = "well-calibrated"
 

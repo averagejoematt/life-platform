@@ -151,6 +151,13 @@ SCORE_CASES = [
         10,
         [[0.2, 1], [0.2, 1], [0.3, 1], [0.2, 1], [0.25, 1], [0.3, 1], [0.2, 0]],
     ),
+    (
+        "concentrated_at_half_with_a_few_confident_hits",
+        "#5615: 18 of 20 calls stated at 0.5, two confident hits lift skill above zero — "
+        "the positive verdict is withheld (not_measurable): one band cannot show calibration across confidences",
+        10,
+        [[0.5, 1]] * 9 + [[0.5, 0]] * 9 + [[0.85, 1]] * 2,
+    ),
 ]
 
 # (id, description, n_bins, {stratum: pairs}) — #3550: the pooled card scored

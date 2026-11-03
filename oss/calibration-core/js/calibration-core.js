@@ -31,7 +31,10 @@
 //
 // Licence: MIT.
 
-export const VERSION = "1.2.0";
+export const VERSION = "1.3.0"; // 1.3.0: "well-calibrated" withheld when >= CONCENTRATED_SHARE of calls sit in one band
+
+// When this share of resolved calls sits in ONE stated-confidence band, calibration across confidences cannot be read.
+export const CONCENTRATED_SHARE = 0.9;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Exact Python-compatible rounding
@@ -335,6 +338,8 @@ export function scorePairs(pairs, nBins = 10) {
     if (gap > 0.15) calibration = "over-confident";
     else if (gap < -0.15) calibration = "under-confident";
     else if (skilled === false) calibration = "not_yet_skillful";
+    // Nearly every call in one stated-confidence band cannot show calibration across confidences: no positive verdict.
+    else if (Math.max(...bins.map((b) => b.n)) >= CONCENTRATED_SHARE * total) calibration = "not_measurable";
     else calibration = "well-calibrated";
   }
 

@@ -1030,6 +1030,125 @@
         "label": "not_yet_skillful",
         "score": 45
       }
+    },
+    {
+      "id": "concentrated_at_half_with_a_few_confident_hits",
+      "description": "#5615: 18 of 20 calls stated at 0.5, two confident hits lift skill above zero \u2014 the positive verdict is withheld (not_measurable): one band cannot show calibration across confidences",
+      "n_bins": 10,
+      "pairs": [
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.85,
+          1
+        ],
+        [
+          0.85,
+          1
+        ]
+      ],
+      "expected": {
+        "n": 20,
+        "confirmed": 11,
+        "refuted": 9,
+        "accuracy_pct": 55.0,
+        "accuracy_ci95": [
+          34.2,
+          74.2
+        ],
+        "brier": 0.2273,
+        "brier_skill": 0.0818,
+        "skilled": true,
+        "reliability_bins": [
+          {
+            "lo": 0.5,
+            "hi": 0.6,
+            "n": 18,
+            "mean_confidence": 0.5,
+            "observed_rate": 0.5
+          },
+          {
+            "lo": 0.8,
+            "hi": 0.9,
+            "n": 2,
+            "mean_confidence": 0.85,
+            "observed_rate": 1.0
+          }
+        ],
+        "calibration": "not_measurable",
+        "label": "developing",
+        "score": 50
+      }
     }
   ],
   "strata_cases": [
