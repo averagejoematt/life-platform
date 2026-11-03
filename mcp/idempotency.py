@@ -297,6 +297,10 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     "manage_diary_claims": (DETERMINISTIC_KEY, "each claim is keyed by its own caller-supplied id, so a replay converges"),
     "manage_sick_days": (DETERMINISTIC_KEY, "one row per DATE# — marking the same day sick twice is one sick day"),
     "mark_journal_quote": (CONTENT_KEY, "QUOTE#{date}#{sha256(norm(quote))[:10]} — the in-repo precedent this change copied"),
+    "log_advice_link": (
+        DETERMINISTIC_KEY,
+        "ADVICELINK#<decision-ts>#<kind>#<coach>#<ref> from the call's own args; an identical replay is read first and writes nothing (#5612)",
+    ),
     "update_decision_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied DECISION# sk in place; no new row is ever created"),
     "update_insight_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied INSIGHT# sk in place; no new row is ever created"),
     "write_platform_memory": (

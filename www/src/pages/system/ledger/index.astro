@@ -3,6 +3,7 @@
 // of the records in the snapshot; the filter island hides and shows and computes nothing.
 import Base from "../../../layouts/Base.astro";
 import StatusTag from "../../../components/StatusTag.astro";
+import Quote from "../../../components/Quote.astro";
 import { callOutcome, dayInWords } from "../../../lib/format.js";
 import { loadAll, latestEdition } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
@@ -69,7 +70,7 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
                   </span>
                 </span>
                 <span class={p.claim_withheld ? "serif muted" : "mono"} style="font-size:13px;line-height:1.45">
-                  {p.claim}
+                  {p.claim_withheld ? p.claim : <Quote text={p.claim} said={p.logged_date} />}
                 </span>
                 {(p.quality_flags.length > 0 || p.corrections.length > 0) && (
                   <span>

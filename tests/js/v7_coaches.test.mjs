@@ -469,3 +469,19 @@ test("R7 fix 2: a windowed form is derived from its base — the reading's own s
   assert.equal(V.metricKnown("recovery_score_1day_avg"), false);
   assert.equal(V.metricKnown("deep_pct_7day_avg"), true);
 });
+
+test("#5626: a corrected trail line reads at its current verdict and names the first one and the correction's day", () => {
+  const row = {
+    date: "2026-10-29",
+    status: "refuted",
+    metric: "total_protein_g",
+    reason: "Protein eaten held flat, from 98 g on October 15 to 111 g on October 27.",
+    grade_correction: { original_status: "confirmed", corrected_status: "refuted", corrected_at: "2026-11-01T18:11:57Z", explanation: "x" },
+  };
+  const l = V.recentLine(row, "Henning Brandt");
+  assert.equal(l.verdict, "wrong");
+  assert.ok(l.checked.includes("first marked right"), l.checked);
+  assert.ok(l.checked.includes("Corrected Sunday, November 1"), l.checked);
+  const plain = V.recentLine({ ...row, grade_correction: undefined }, "Henning Brandt");
+  assert.ok(!/Corrected/.test(plain.checked));
+});

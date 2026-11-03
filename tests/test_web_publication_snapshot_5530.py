@@ -77,6 +77,15 @@ def test_python_schema_mirrors_the_astro_schema_field_for_field():
         assert names == set(ps.SCHEMA[type_]), f"{type_}: {sorted(names ^ set(ps.SCHEMA[type_]))}"
 
 
+def test_the_correction_shape_is_one_contract_on_both_sides_5610():
+    """#5610: the zod `correction` object and CORRECTION_FIELDS declare the same keys."""
+    src = open(CONFIG_TS, encoding="utf-8").read()
+    body = re.search(r"const correction = z\s*\.object\(\{([\s\S]*?)\n  \}\)\s*\.strict\(\);", src).group(1)
+    ts = set(re.findall(r"^    ([a-z_]+):", body, re.M))
+    assert ts == set(ps.CORRECTION_FIELDS), sorted(ts ^ set(ps.CORRECTION_FIELDS))
+    assert "corrections: z.array(correction)" in src
+
+
 def test_object_types_and_collections_agree_with_the_ts_side():
     src = open(CONFIG_TS, encoding="utf-8").read()
     types = re.search(r"OBJECT_TYPES = \[([\s\S]*?)\] as const", src).group(1)
@@ -347,11 +356,24 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
                     "quality_flags": ["logging_gap"],
                     "corrections": [
                         {
-                            "original_grade": {"status": "confirmed", "evaluator_version": "1.0"},
+                            "source": "corrections",
+                            "kind": "regrade",
+                            "rules": [{"id": "#5533:c", "version": "1.1"}],
+                            "explanation": "The grading window held a day with no food logged.",
+                            "said_on": "2026-10-05",
+                            "original_status": "confirmed",
+                            "original_outcome_date": "2026-10-19",
+                            "original_outcome_notes": "{}",
                             "corrected_status": "refuted",
+                            "corrected_outcome_date": "2026-10-26",
+                            "corrected_outcome_notes": "{}",
+                            "target_before": None,
+                            "target_after": None,
                             "corrected_at": "2026-10-31T06:00:00Z",
-                            "reason": "re-graded by evaluator 1.1",
+                            "published_on": None,
+                            "reason": "#5533 (c): re-graded by evaluator 1.1 through 2026-10-26",
                             "evaluator_version": "1.1",
+                            "an_unserved_key": "dropped by the exporter",
                         }
                     ],
                 },
@@ -530,11 +552,11 @@ def test_live_mapper_against_captured_shapes(monkeypatch, tmp_path):
     assert sarah["retired"] is True and sarah["name"] == "Sarah Chen" and sarah["tier"] == "staff"
     refuted = next(p for p in public["prediction"] if p["id"] == "sleep-pred_20261005_deep_sleep_will_rise")
     assert refuted["quality_flags"] == ["logging_gap"] and refuted["coach_name"] == "Lisa Park" and refuted["metric_key"] == "deep_pct"
-    assert refuted["corrections"][0]["corrected_grade"] == "refuted" and refuted["corrections"][0]["original_grade"] == {
-        "status": "confirmed",
-        "evaluator_version": "1.0",
-    }
-    assert refuted["corrections"][0]["evaluator_version"] == "1.1" and refuted["corrections"][0]["corrected_at"] == "2026-10-31T06:00:00Z"
+    (c,) = refuted["corrections"]
+    assert set(c) == set(ps.CORRECTION_FIELDS) and c["aggregate_impact"] is None, "exactly the contract's keys; unserved = null"
+    assert (c["original_status"], c["original_outcome_date"], c["corrected_status"]) == ("confirmed", "2026-10-19", "refuted")
+    assert c["corrected_at"] == "2026-10-31T06:00:00Z" and c["published_on"] is None, "copied as served — never derived"
+    assert c["reason"] == "#5533 (c): re-graded by evaluator 1.1 through 26 October 2026", "the audit reason, dates in words only"
     # the summary is the call's own outcome; the simple guess ("also right" in this capture) is its own field (acceptance item 1)
     assert (
         refuted["summary"] == "wrong"

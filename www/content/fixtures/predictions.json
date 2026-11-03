@@ -64,15 +64,51 @@
   "metric_key": "deep_pct",
   "corrections": [
    {
-    "original_grade": {
-     "status": "confirmed",
-     "outcome_date": "2026-10-26",
-     "outcome_notes": "graded through a logging gap",
-     "evaluator_version": "1.0"
-    },
-    "original_timestamp": "2026-10-20T17:02:11Z",
-    "corrected_grade": "refuted",
+    "source": "respecified",
+    "kind": "respecify",
+    "rules": [
+     {
+      "id": "#4618:respecify",
+      "version": null
+     }
+    ],
+    "explanation": "The target day or window the call was stored with was not the one its sentence states. The target was taken again from the sentence before the call was graded.",
+    "said_on": "2026-10-05",
+    "original_status": "pending",
+    "original_outcome_date": null,
+    "original_outcome_notes": null,
+    "corrected_status": null,
+    "corrected_outcome_date": null,
+    "corrected_outcome_notes": null,
+    "target_before": "2026-11-04",
+    "target_after": "2026-10-19",
+    "corrected_at": "2026-10-11T02:48:10.102408+00:00",
+    "published_on": null,
+    "reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "evaluator_version": null,
+    "aggregate_impact": null
+   },
+   {
+    "source": "corrections",
+    "kind": "regrade",
+    "rules": [
+     {
+      "id": "#5533:c",
+      "version": "1.1"
+     }
+    ],
+    "explanation": "The grading window held a day with no food logged, which the grader had read as a day of almost no eating. It was graded again with such days treated as missing.",
+    "said_on": "2026-10-05",
+    "original_status": "confirmed",
+    "original_outcome_date": "2026-10-19",
+    "original_outcome_notes": "graded through a logging gap",
+    "corrected_status": "refuted",
+    "corrected_outcome_date": "2026-10-26",
+    "corrected_outcome_notes": "the series after the gap moved the other way",
+    "target_before": null,
+    "target_after": null,
     "corrected_at": "2026-10-31T06:00:00Z",
+    "published_on": null,
     "reason": "re-graded by evaluator 1.1: the window spanned a logging gap; the series after the gap moved the other way",
     "evaluator_version": "1.1",
     "aggregate_impact": "the coach's record moves from 9 of 12 to 8 of 12"
@@ -128,6 +164,63 @@
   "status": "confirmed",
   "summary": "It came in at 304 lb.",
   "title": "Max Reyes called his weight at about 304.5 lb",
+  "type": "prediction",
+  "verdict_text": "Right.",
+  "visibility": "public",
+  "coach_name": "Lisa Park",
+  "retired": false,
+  "metric_key": "weight_lbs",
+  "corrections": [],
+  "claim_withheld": null
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "Weight will hold within a pound of 304 through 2026-10-17, the morning after the long walk.",
+  "coach_id": "sleep_coach",
+  "confidence": 0.5,
+  "data_through": "2026-10-17",
+  "due_date": "2026-10-17",
+  "edges": [
+   {
+    "id": "sleep_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "weight_lbs",
+    "rel": "about",
+    "type": "metric"
+   }
+  ],
+  "grading": {
+   "actual_text": "304 lb",
+   "how": "one standard deviation of his readings over the 30 days before the call",
+   "outcome_notes": "304.03 vs 304.5 ±3.97: within tolerance",
+   "tolerance_text": "4 lb"
+  },
+  "id": "physical-20261016-weight02",
+  "kind": "number",
+  "logged_date": "2026-10-16",
+  "method_ids": [],
+  "metric_id": "weight_lbs",
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": "2026-10-17",
+  "simple_guess": {
+   "right": true,
+   "state": "scored",
+   "text": "The simple guess, that it would stay at 305.6 lb, was also right."
+  },
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "confirmed",
+  "summary": "It came in at 304 lb.",
+  "title": "Lisa Park called his weight to hold near 304 lb",
   "type": "prediction",
   "verdict_text": "Right.",
   "visibility": "public",

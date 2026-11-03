@@ -10,8 +10,9 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
   reproducible   export the fixture snapshot, build twice, compare the tree hashes
   held           flip one public object to `held` in the snapshot → `astro build` MUST fail
   dangling       add one edge to a non-existent object → `astro build` MUST fail
-  scan           the clean build carries no fixture sentinel, no inline <script>, and
-                 (on the preview base) `noindex` on every page
+  scan           the clean build carries no fixture sentinel, no inline <script>, no ISO date
+                 outside a verbatim coach quotation (scripts/www_verbatim.py — the render gate's rule,
+                 static, so the LIVE root deploy holds it too), and (on the preview base) `noindex`
   owned-paths    (#5534) the build's committed route manifest www/owned_paths.json and the reach
                  census www/reach.json equal what the clean build just emitted (drift = someone
                  changed a route and did not commit the artifact the deploy excludes by), the
@@ -48,6 +49,9 @@ OWNED_PATHS = os.path.join(WWW, "owned_paths.json")
 REACH = os.path.join(WWW, "reach.json")
 sys.path.insert(0, REPO)
 from deploy import www_owned_paths  # noqa: E402 — the one reader of owned_paths.json (#5534)
+
+sys.path.insert(0, os.path.join(REPO, "scripts"))
+import www_verbatim  # noqa: E402 — dates in words, quote-aware (owner ruling 2026-11-02); a page-universal rule, fixture AND live
 
 SENTINELS = ("SENTINEL", "DO-NOT-PUBLISH", "POISON-HELD")
 SAMPLE_CHIP = "Sample content, for layout only"  # fixture-only (#5581): on a LIVE build it is a false claim on a real page
@@ -194,6 +198,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     live = snapshot_mode(snapshot_dir) == "live"
     pages = 0
     ids = raw_ids() if forbidden_ids is None else forbidden_ids
+    quotes = www_verbatim.verbatim_strings(snapshot_dir)  # the coach strings this build was made from
     for dirpath, _d, files in os.walk(dist):
         for name in files:
             path = os.path.join(dirpath, name)
@@ -210,6 +215,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
                     for tag in SCRIPT_TAG.findall(text):
                         if "src=" not in tag.lower():
                             issues.append(f"{rel}: inline <script>")
+                    issues.extend(www_verbatim.page_issues(text, rel, quotes))
                     if require_noindex and not NOINDEX.search(text):
                         issues.append(f"{rel}: missing noindex")
                     if ids:
@@ -340,13 +346,19 @@ def main() -> int:
             return 1
 
     log("scan")
+    blind = www_verbatim.self_test()
+    if blind:
+        log(f"  ✗ BLIND: the dates-in-words rule misjudged its planted cases: {blind}")
+        return 2
     issues = scan(args.dist, require_noindex=preview)
     for i in issues:
         log(f"  ✗ {i}")
     if issues:
         return 1
     pages = sum(1 for _d, _s, f in os.walk(args.dist) for n in f if n.endswith(".html"))
-    log(f"  ✓ {pages} pages: no sentinel, no inline script{', noindex everywhere' if preview else ''}")
+    log(
+        f"  ✓ {pages} pages: no sentinel, no inline script, dates in words outside verbatim quotations{', noindex everywhere' if preview else ''}"
+    )
     if not args.scan_only:
         log("owned paths")
         issues = check_owned_paths(committed, args.dist)

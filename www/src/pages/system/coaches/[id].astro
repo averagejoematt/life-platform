@@ -2,6 +2,7 @@
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
+import Quote from "../../../components/Quote.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { dayInWords, domainWords, kOfN, clip } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
@@ -50,7 +51,7 @@ const by = (s: string) => mine.filter((p) => p.status === s).length;
                 {mine.slice(0, 12).map((p) => (
                   <a href={href(pathOf("prediction", p.id))}>
                     <span class="mono" style="font-size:13px;line-height:1.45">
-                      {clip(p.claim, 110)}
+                      {p.claim_withheld ? clip(p.claim, 110) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
                     </span>
                     <StatusTag status={p.status} date={p.settled_date} call />
                   </a>

@@ -7,9 +7,12 @@ URLs) and renders EVERY built page at a phone (390×844) and a laptop (1280×900
   1. No horizontal overflow at 390 px (document wider than the viewport).
   2. No JavaScript error, no failed request to the page's own origin.
   3. axe-core: zero serious or critical violations (light theme; the build is light-only).
-  4. Words that must never render: "undefined", "NaN", "[object Object]", an ISO date, a
-     "Thirty-seven" (the age the owner struck), and the fixture sentinels for a held or
-     private object (the privacy gate measured on the OUTPUT, not just the snapshot).
+  4. Words that must never render: "undefined", "NaN", "[object Object]", a "Thirty-seven" (the age
+     the owner struck), and the fixture sentinels for a held or private object (the privacy gate
+     measured on the OUTPUT, not just the snapshot) — scanned INSIDE quotations too. An ISO date is
+     held by scripts/www_verbatim.py: forbidden everywhere except inside a verbatim coach quotation
+     (`<q|blockquote data-verbatim="coach">`, text and <time> only, never in a heading, and — given
+     the snapshot — only words the snapshot carries; owner ruling 2026-11-02).
   5. Every <script> has a src (the CSP is `script-src 'self'`; an inline script is a defect).
   6. The front page's phone height stays under its budget (7.5 screens since the owner's 2026-11-01 brief; six before).
   7. Every chart answers (#5578, A01): each <svg data-points> has the inspect island mounted on it
@@ -43,6 +46,10 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(REPO, "scripts"))
+import www_verbatim  # noqa: E402 — the quote-aware dates-in-words rule; one rule, two callers (check_www_build.scan)
+
+SNAPSHOT = os.path.join(REPO, "www", "content", "snapshot")
 AXE_JS_PATH = os.path.join(HERE, "vendor", "axe.min.js")  # the bundle tests/a11y_audit.py vendors
 AXE_GATING_IMPACTS = ("critical", "serious")
 PHONE = {"width": 390, "height": 844}
@@ -50,7 +57,6 @@ LAPTOP = {"width": 1280, "height": 900}
 FRONT_PAGE_SCREENS = 7.5  # was 6.0 (the kit's); raised 2026-11-01 for the owner's Start-page brief — the six-dimensional portrait and the chapter feature are on the front page by his ruling, not padding
 FORBIDDEN = (
     (re.compile(r"\[object Object\]"), "a leaked non-value"),
-    (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "an ISO date (dates are written in words)"),
     (re.compile(r"\bThirty-seven\b"), "the age (never published)"),
     (re.compile(r"SENTINEL|POISON-HELD|DO-NOT-PUBLISH"), "a held/private fixture sentinel"),
 )
@@ -171,7 +177,7 @@ def _leaked_values(html: str) -> list[str]:
     return hits
 
 
-def _static_checks(html: str, path: str) -> list[str]:
+def _static_checks(html: str, path: str, quotes: set[str] | None = None) -> list[str]:
     issues = []
     for tag in re.findall(r"<script\b[^>]*>", html, re.IGNORECASE):
         if "src=" not in tag.lower():
@@ -182,10 +188,12 @@ def _static_checks(html: str, path: str) -> list[str]:
     for hit in _leaked_values(scanned)[:3]:
         issues.append(f"{path}: a leaked non-value: {hit!r}")
     text = re.sub(r"<[^>]+>", " ", scanned)
-    for rx, why in FORBIDDEN:
+    for rx, why in FORBIDDEN:  # quotations are NOT stripped here: a sentinel or the age inside a quote still fails
         m = rx.search(text)
         if m:
             issues.append(f"{path}: {why}: {m.group(0)!r}")
+    # dates in words, except inside a verbatim coach quotation — structure, ISO and (with the snapshot) provenance
+    issues.extend(www_verbatim.page_issues(html, path, quotes))
     return issues
 
 
@@ -199,9 +207,10 @@ def _layout_issues(page, path: str, where: str) -> list[str]:
     return out
 
 
-def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True) -> tuple[bool, list[dict]]:
+def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True, snapshot: str = SNAPSHOT) -> tuple[bool, list[dict]]:
     from playwright.sync_api import sync_playwright
 
+    quotes = www_verbatim.verbatim_strings(snapshot) if os.path.isdir(snapshot) else None
     pages = pages_of(dist)
     if not pages:
         raise SystemExit("no pages in dist")
@@ -217,7 +226,7 @@ def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True) -> tup
             html = open(
                 os.path.join(dist, path.strip("/"), "index.html") if path != "/" else os.path.join(dist, "index.html"), encoding="utf-8"
             ).read()
-            rec["issues"].extend(_static_checks(html, path))
+            rec["issues"].extend(_static_checks(html, path, quotes))
             for label, vp in (("phone", PHONE), ("laptop", LAPTOP)):
                 ctx = browser.new_context(viewport=vp, color_scheme="light", service_workers="block")
                 page = ctx.new_page()
@@ -278,10 +287,36 @@ def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True) -> tup
     return ok, results
 
 
-def mutation_control(dist: str, base: str) -> bool:
-    """Plant three defects in a COPY of the build; the gate must report all three classes."""
+def _dated_quote(snapshot: str) -> str | None:
+    """A coach string from the snapshot that carries an ISO date — the positive control's quotation (the fixture
+    ships one: tests/fixtures …/predictions.json `physical-20261016-weight02`). None = the control cannot run."""
+    if not os.path.isdir(snapshot):
+        return None
+    return next((q for q in sorted(www_verbatim.verbatim_strings(snapshot)) if www_verbatim.ISO_DATE.search(q)), None)
+
+
+def mutation_control(dist: str, base: str, snapshot: str = SNAPSHOT) -> bool:
+    """Plant defects in a COPY of the build; the gate must report every class — and must NOT report the one
+    sanctioned exception (an ISO date inside a verbatim coach quotation the snapshot carries)."""
+    import html as _html
+
+    said = _dated_quote(snapshot)
+    if said is None:
+        print("the snapshot carries no coach quotation with an ISO date — the quote exemption cannot be proven", file=sys.stderr)
+        return False
     tmp = tempfile.mkdtemp(prefix="web-gate-control-")
     shutil.copytree(dist, tmp, dirs_exist_ok=True)
+    # The positive control lives on its own page so the front page's planted ISO dates cannot mask it.
+    sys_idx = os.path.join(tmp, "system", "index.html")
+    sys_html = open(sys_idx, encoding="utf-8").read()
+    sys_html = sys_html.replace("</main>", f'<p><q data-verbatim="coach">{_html.escape(said, quote=False)}</q></p></main>', 1)
+    open(sys_idx, "w", encoding="utf-8").write(sys_html)
+    # …and the other FORBIDDEN rules still scan INSIDE a quotation: a sentinel quoted on an otherwise clean page.
+    priv_idx = os.path.join(tmp, "privacy", "index.html")
+    priv_html = open(priv_idx, encoding="utf-8").read()
+    open(priv_idx, "w", encoding="utf-8").write(
+        priv_html.replace("</main>", '<p><q data-verbatim="coach">POISON-HELD inside a quote</q></p></main>', 1)
+    )
     idx = os.path.join(tmp, "index.html")
     html = open(idx, encoding="utf-8").read()
     html = html.replace(
@@ -290,13 +325,20 @@ def mutation_control(dist: str, base: str) -> bool:
         '<svg viewBox="0 0 1000 100" width="100%"><text x="10" y="50" font-size="20">PLANTED-SMALL</text></svg>'
         '<svg viewBox="0 0 300 60" width="300" height="60"><text x="10" y="30" font-size="14">PLANTED-A</text>'
         '<text x="14" y="32" font-size="14">PLANTED-B</text><text x="280" y="50" font-size="14">PLANTED-CLIP</text></svg>'
-        '<svg viewBox="0 0 10 10" data-points="[{&quot;x&quot;:1,&quot;y&quot;:1,&quot;label&quot;:&quot;planted&quot;}]"></svg></body>',
+        '<svg viewBox="0 0 10 10" data-points="[{&quot;x&quot;:1,&quot;y&quot;:1,&quot;label&quot;:&quot;planted&quot;}]"></svg>'
+        # dates in words: authored copy, a correction, a quote in a heading, a borrowed exemption
+        "<p>Planted authored copy dated 2031-01-02.</p>"
+        '<p class="correction" role="note">Correction: planted on 2031-01-03.</p>'
+        '<h2><q data-verbatim="coach">PLANTED heading quote</q></h2>'
+        '<p><q data-verbatim="coach">Planted authored words borrowing the exemption on 2031-01-04.</q></p></body>',
     )
     open(idx, "w", encoding="utf-8").write(html)
-    ok, results = gate(tmp, base, None, verbose=False)
+    ok, results = gate(tmp, base, None, verbose=False, snapshot=snapshot)
     shutil.rmtree(tmp, ignore_errors=True)
     front = next(r for r in results if r["path"] == "/")
     text = "\n".join(front["issues"])
+    system = "\n".join(next(r for r in results if r["path"] == "/system/")["issues"])
+    privacy = "\n".join(next(r for r in results if r["path"] == "/privacy/")["issues"])
     found = (
         "horizontal overflow" in text,
         "inline <script>" in text,
@@ -305,6 +347,12 @@ def mutation_control(dist: str, base: str) -> bool:
         "SVG text below 11px floor: 'PLANTED-SMALL'" in text,
         "SVG labels overlap: 'PLANTED-A' × 'PLANTED-B'" in text,
         "SVG text clipped by its chart frame: 'PLANTED-CLIP'" in text,
+        "2031-01-02" in text,  # authored copy: still dates in words
+        "2031-01-03" in text,  # a correction is authored copy
+        "inside <h2>" in text,  # a heading is never a verbatim container
+        "the snapshot never carried" in text,  # authored words cannot borrow the exemption (2031-01-04)
+        "held/private fixture sentinel" in privacy,  # the other FORBIDDEN rules still scan inside quotations
+        "ISO date" not in system and "verbatim" not in system,  # the sanctioned exception passes
     )
     return (not ok) and all(found)
 
@@ -315,6 +363,7 @@ def main() -> int:
     ap.add_argument("--base", default=os.environ.get("WEB_BASE", "/next/v9/"))
     ap.add_argument("--out", default=None, help="save full-page PNGs per page and viewport")
     ap.add_argument("--skip-control", action="store_true", help="skip the mutation control (local iteration only)")
+    ap.add_argument("--snapshot", default=SNAPSHOT, help="the snapshot the build was made from (verbatim provenance + the control's quote)")
     args = ap.parse_args()
     if not os.path.isdir(args.dist):
         print(f"dist not found: {args.dist} — run `npm run build:preview` in www/ first", file=sys.stderr)
@@ -324,15 +373,16 @@ def main() -> int:
         return 3
     if not args.skip_control:
         print("mutation control …", end=" ", flush=True)
-        if not mutation_control(args.dist, args.base):
+        if not mutation_control(args.dist, args.base, args.snapshot):
             print(
                 "FAILED — the gate did not report a planted overflow + inline script + sentinel + unmounted chart + sub-floor SVG text"
-                " + overlapping/clipped SVG labels; refusing to grade"
+                " + overlapping/clipped SVG labels + ISO dates outside a quotation, in a correction, a quote in a heading, a borrowed"
+                " exemption, a sentinel inside a quote — or it DID report the sanctioned in-quote ISO date; refusing to grade"
             )
             return 2
         print("ok (the gate can fail)")
     print(f"web preview gate — {args.dist} at base {args.base}")
-    ok, results = gate(args.dist, args.base, args.out)
+    ok, results = gate(args.dist, args.base, args.out, snapshot=args.snapshot)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as fh:

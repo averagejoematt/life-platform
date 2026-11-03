@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-10-31
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-03
 
-**Version:** v8.6.0 | **Last updated:** 2026-10-31 | **Total tools:** 89
+**Version:** v8.6.0 | **Last updated:** 2026-11-03 | **Total tools:** 90
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 89 Tools — by module
+## All 90 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -48,6 +48,7 @@
 | `mcp/tools_todoist.py` | 4 |
 | `mcp/tools_memory.py` | 4 |
 | `mcp/tools_decisions.py` | 3 |
+| `mcp/tools_advice_links.py` | 1 |
 | `mcp/tools_hevy.py` | 2 |
 | `mcp/tools_hevy_routine.py` | 1 |
 | `mcp/tools_reading.py` | 11 |
@@ -235,6 +236,12 @@
 | `log_decision` | decision, followed=, override_reason=, note=, source=, pillars=[], date= | IC-19: Log a platform-guided decision for trust calibration. Record what the platform recommended, whether Matthew followed or overrode the advice, and why. Outcome recorded later via update_decision_outcome. Use for: 'the brief said rest day but I trained', 'followed protein advice', 'platform recommended X and I did Y'. |
 | `get_decisions` | days=, pillar=, outcome_only= | IC-19: Retrieve recent platform-guided decisions with outcomes and trust calibration. Shows follow vs override patterns and which approach produces better outcomes. Use for: 'how often do I follow platform advice?', 'should I trust the system?', 'decision journal', 'when do my overrides work?'. |
 | `update_decision_outcome` | sk, outcome_metric=, outcome_delta=, outcome_notes=, effectiveness= | IC-19: Record the outcome of a past decision. Call 1-3 days after logging a decision to capture what actually happened. Over time builds trust calibration: when to follow vs override platform advice. Use for: 'that rest day advice worked', 'I ignored the protein tip and felt fine'. |
+
+### mcp.tools_advice_links (`mcp/tools_advice_links.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `log_advice_link` | decision_sk, coach_id, ref_kind, ref_id, state, evidence_text=, evidence_ref= | #5612 (owner ruling F): record whether Matthew acted on ONE coach recommendation, linked to ONE logged decision (sk from get_decisions). state: acted_on / declined / partially_followed / unknown. ONLY when Matthew has SAID so — pass his own words as evidence_text (or evidence_ref: where he recorded it). NEVER from data: a workout, a meal, a metric or any behaviour that happens to match the advice is NOT evidence, and the tool must not be called on that basis. Any state but unknown without evidence is refused. The recommendation is ref_kind + ref_id + coach_id: prediction (prediction_id from get_predictions), coach_output (<YYYY-MM-DD>#<type>, e.g. 2026-11-02#daily_brief_sleep), or coach_action (<YYYY-MM-DD>-<domain>). Both records are checked to exist first. Re-calling with a new state supersedes and keeps the old one. |
 
 ### Workouts (Unified — Hevy + MacroFactor, ADR-060) (`mcp/tools_hevy.py`)
 

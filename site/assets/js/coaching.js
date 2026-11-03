@@ -210,6 +210,13 @@ function coachStanceHTML(st) {
   if (st.graduation_gate) h += `<p class="cs-gate label">graduates when — ${esc(st.graduation_gate)}</p>`;
   return h + `</section>`;
 }
+// #5626: a trail line whose call was re-graded is served at its CURRENT verdict, with the first one beside it.
+function gradeCorrHTML(e) {
+  const g = e && e.grade_correction;
+  if (!g) return "";
+  const at = g.corrected_at ? ` · correction recorded ${esc(String(g.corrected_at).slice(0, 10))}` : "";
+  return ` <span class="cd-corr label">corrected — first graded ${esc(g.original_status)}${at}${g.explanation ? ` — ${esc(g.explanation)}` : ""}</span>`;
+}
 function coachReportHTML(rc) {
   const tr = (rc && rc.track_record) || {};
   let h = `<section class="coach-report"><p class="dx-kicker label">report card</p>`;
@@ -218,7 +225,7 @@ function coachReportHTML(rc) {
   if (tr.headline && tr.decided) h += `<p class="cr-rate">${esc(tr.headline)}</p>`;
   else h += `<p class="cr-rate">${tr.hit_rate_pct == null ? `Score unlocks as predictions resolve <span class="label">— first calls land in the coming weeks</span>` : esc(tr.hit_rate_pct) + "% hit-rate" + ` <span class="label">${esc(tr.n_note || "")}</span>`}</p>`;
   if (tr.decided || tr.hit_rate_pct != null) h += coachComparison(tr.comparison, { cls: "cr-cmp label" }); // #4585: never the count alone
-  if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}</li>`).join("")}</ul>`;
+  if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}${gradeCorrHTML(r)}</li>`).join("")}</ul>`;
   else h += `<p class="dx-prose">No decided predictions yet — hits <em>and</em> misses will both show here as they resolve.</p>`;
   if (tr.caveat) h += `<p class="cr-caveat label">${esc(tr.caveat)}</p>`;
   return h + `</section>`;
@@ -283,7 +290,7 @@ function coachDossierHTML(coach) {
   } else {
     h += `<ul class="ce-trail">`;
     for (const l of learns.slice(0, 8)) {
-      h += `<li class="ce-item">${dateLine(l.date, l.status ? esc(l.status) : "")}<p class="ce-say">${esc(l.reason || l.metric || "")}</p>${l.evidence_link ? `<p class="label cd-check"><a href="${esc(l.evidence_link)}">the graded call ↗</a></p>` : ""}${corrNotes(l)}</li>`;
+      h += `<li class="ce-item">${dateLine(l.date, l.status ? esc(l.status) : "")}<p class="ce-say">${esc(l.reason || l.metric || "")}</p>${gradeCorrHTML(l)}${l.evidence_link ? `<p class="label cd-check"><a href="${esc(l.evidence_link)}">the graded call ↗</a></p>` : ""}${corrNotes(l)}</li>`;
     }
     h += `</ul>`;
   }
