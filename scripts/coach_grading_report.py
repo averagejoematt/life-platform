@@ -514,7 +514,9 @@ def legacy_entries(short: str, row: dict) -> list[dict]:
     return out
 
 
-def correction_audit(rows: dict, *, genesis: str, served_ids: set, withheld_ids: set, live: dict | None) -> dict:
+def correction_audit(
+    rows: dict, *, genesis: str, served_ids: set, withheld_ids: set, live: dict | None, live_held: dict | None = None
+) -> dict:
     """Every correction on every row: the ``corrections[]`` channel (#5533, paired with its ``CORRECTION#`` ledger row)
     and the two legacy channels. ``live`` maps an item_id to the corrections the live ledger serves on it."""
     preds = rows.get("predictions") or {}
@@ -571,16 +573,28 @@ def correction_audit(rows: dict, *, genesis: str, served_ids: set, withheld_ids:
                     "ledger_row": lk in ledger,
                     "entry_served_with_row": base["served_on_ledger_export"],
                     "entry_served_live": served_live,
+                    "held_with_words_live": bool(live_held and not served_live and live_held.get(item_id)),
                 }
             )
         for e in legacy_entries(short, row):
+            # #5610 (PR #5618, deployed 2026-11-03): /api/ledger_export serves every stored channel on a served row,
+            # each entry tagged `source` = its channel. Live match = same channel, same correction day.
+            served_live = None
+            if live is not None and item_id:
+                day = str(e.get("corrected_at") or "")[:10]
+                served_live = any(
+                    x.get("source") == e.get("channel") and str(x.get("corrected_at") or "")[:10] == day and day
+                    for x in live.get(item_id, [])
+                )
             entries.append(
                 {
                     **base,
                     **e,
                     "ledger_row": False,
-                    "entry_served_with_row": False,  # export_item serves `corrections` only
-                    "entry_served_live": False if live is not None else None,
+                    "entry_served_with_row": base["served_on_ledger_export"],
+                    "entry_served_live": served_live,
+                    # #4701: a row whose claim words are held serves its corrections as a count (corrections_withheld)
+                    "held_with_words_live": bool(live_held and not served_live and live_held.get(item_id)),
                 }
             )
     orphans = [
@@ -602,13 +616,16 @@ def correction_audit(rows: dict, *, genesis: str, served_ids: set, withheld_ids:
         "ledger_rows": len(ledger),
         "ledger_rows_without_row_entry": orphans,
         "served_entries": sum(1 for e in entries if e["entry_served_with_row"]),
+        "served_live_entries": sum(1 for e in entries if e["entry_served_live"]),
+        "held_with_words_live_entries": sum(1 for e in entries if e.get("held_with_words_live")),
         "verdict_flips": sum(
             1 for e in entries if e["original_status"] and e["corrected_status"] and e["original_status"] != e["corrected_status"]
         ),
         "entries": entries,
         "note": (
-            "Dates are the stored values; a date the row did not store is null. 'logged' is the call's filing day. The "
-            "legacy channels (verdict_correction, respecified_*) are never served: /api/ledger_export serves corrections[] only."
+            "Dates are the stored values; a date the row did not store is null. 'logged' is the call's filing day. Since "
+            "#5610 /api/ledger_export serves every channel (corrections[], verdict_correction, respecified_*) on a served row; "
+            "an entry on a withheld or out-of-cycle row is not served."
         ),
     }
 
@@ -801,9 +818,16 @@ def build_report(rows: dict, *, as_of: str, api: dict | None, genesis: str = EXP
     )
 
     live_corr = None
+    live_held = None
     if api is not None:
         live_corr = {
             i.get("item_id"): list(i.get("corrections") or []) for p in api.get("ledger_export") or [] for i in (p.get("items") or [])
+        }
+        live_held = {
+            i.get("item_id"): int(i.get("corrections_withheld") or 0)
+            for p in api.get("ledger_export") or []
+            for i in (p.get("items") or [])
+            if i.get("corrections_withheld")
         }
 
     report = {
@@ -843,7 +867,9 @@ def build_report(rows: dict, *, as_of: str, api: dict | None, genesis: str = EXP
             "withheld_graded": sum(1 for i in withheld_list if i["status"] in ("confirmed", "refuted")),
         },
         "provenance": provenance(preds, genesis=genesis),
-        "corrections": correction_audit(rows, genesis=genesis, served_ids=served_ids, withheld_ids=withheld_ids, live=live_corr),
+        "corrections": correction_audit(
+            rows, genesis=genesis, served_ids=served_ids, withheld_ids=withheld_ids, live=live_corr, live_held=live_held
+        ),
         "correction_runs": [
             {k: s.get(k) for k in ("sk", "issue", "evaluator_version", "graded_as_of", "applied", "reasons", "written_at")}
             for s in sorted(rows.get("summaries") or [], key=lambda r: str(r.get("sk")))
@@ -975,7 +1001,7 @@ def render_markdown(report: dict) -> str:
     L.append("")
     L.append(
         f"{ca['n']} corrections ({_fmt(ca['by_channel'])}); {ca['ledger_rows']} CORRECTION# ledger rows; "
-        f"{ca['served_entries']} served with their row on /api/ledger_export; {ca['verdict_flips']} change the verdict. {ca['note']}"
+        f"{ca['served_entries']} on served rows, {ca.get('served_live_entries', '—')} served live, {ca.get('held_with_words_live_entries', '—')} held with their claim's words (#4701, served as a count); {ca['verdict_flips']} change the verdict. {ca['note']}"
     )
     L.append("")
     L.append(

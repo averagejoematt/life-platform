@@ -84,13 +84,31 @@ def _words_in_text(value: str) -> str:
     return _ISO_IN_TEXT.sub(lambda m: day_in_words(m.group(0)), value)
 
 
-def word_dates(obj: Any, key: str | None = None) -> Any:
-    """Rewrite ISO dates to words inside the free-text keys, recursively (grading, simple_guess, instrument_absent)."""
+# A coach's words, published exactly as served (owner ruling 2026-11-02: "Preserve the quotation and add a
+# readable date alongside it"). These paths are NEVER rewritten here — an ISO date inside one is wrapped and
+# glossed by the page (www/src/components/Quote.astro); the render gate exempts only that markup
+# (scripts/www_verbatim.py). Keyed by (object type, path), not by key name: `text` is also authored copy elsewhere.
+VERBATIM_PATHS = frozenset(
+    {
+        ("prediction", "claim"),
+        ("disagreement", "claim_a"),
+        ("disagreement", "claim_b"),
+        ("day", "coach_lines[].text"),
+        ("day", "calls_settled[].claim_short"),
+        ("day", "calls_open[].text"),
+        ("edition", "blocks.coach_lines.data.lines[].text"),
+    }
+)
+
+
+def word_dates(obj: Any, key: str | None = None, *, type_: str | None = None, path: str = "") -> Any:
+    """Rewrite ISO dates to words inside the free-text keys, recursively (grading, simple_guess, instrument_absent) —
+    except a VERBATIM_PATHS string, which is a quotation and stays exactly as served."""
     if isinstance(obj, dict):
-        return {k: word_dates(v, k) for k, v in obj.items()}
+        return {k: word_dates(v, k, type_=type_, path=f"{path}.{k}" if path else k) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [word_dates(v, key) for v in obj]
-    if isinstance(obj, str) and key in _WORDED_TEXT_KEYS:
+        return [word_dates(v, key, type_=type_, path=f"{path}[]") for v in obj]
+    if isinstance(obj, str) and key in _WORDED_TEXT_KEYS and (type_, path) not in VERBATIM_PATHS:
         return _words_in_text(obj)
     return obj
 
@@ -569,7 +587,7 @@ def partition(objs: dict[str, list[dict]]) -> tuple[dict[str, list[dict]], dict[
             if vis not in VISIBILITIES:
                 raise SchemaError(f"{type_} {o.get('id')}: visibility {vis!r} is not one of {VISIBILITIES}")
             if vis == "public":
-                o = word_dates(o)
+                o = word_dates(o, type_=type_)
                 validate(o, type_)
                 public[type_].append(o)
             else:

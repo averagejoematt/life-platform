@@ -37,7 +37,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
 EXPECTED_MAX_TOOLS = (
-    88  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
+    89  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
     # +1 audit_coach_dossier (#1387); +1 manage_diary_claims (#1841) — deliberate additions.
     # +5 (#3668): describe_platform_surfaces + get_platform_surface (the index and the waiter — TWO tools
     # covering 59 unreachable owner-relevant endpoints, deliberately NOT 59 tools, because an oversized
@@ -69,6 +69,9 @@ EXPECTED_MAX_TOOLS = (
     # or from his Claude chat; ONE write tool into the store the email door also writes, no read twin.
     # +1 (#5073): get_may_tracker — the owner-only weekly May tracker; a `view` on a shared tool was ruled
     # out because the target date and band must never ride a tool a reader surface or narrative path calls.
+    # +1 (#5612): log_advice_link — owner ruling F (2026-11-02): an evidence-only link between ONE logged
+    # decision and ONE coach recommendation; the sole writer of the ADVICELINK# family, so it is a tool of
+    # its own (the "only the owner write path sets a state" guard needs exactly one writer to name).
 )
 
 

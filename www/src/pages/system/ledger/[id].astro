@@ -2,6 +2,7 @@
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
+import Quote from "../../../components/Quote.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { correctionRows, ruleText } from "../../../lib/corrections.js";
 import { dayInWords } from "../../../lib/format.js";
@@ -25,7 +26,7 @@ const FLAG_TEXT: Record<string, string> = {
 };
 ---
 
-<Base title={p.title} top="system" description={p.claim} status={dayInWords(p.logged_date)}>
+<Base title={`${p.coach_name}'s call of ${dayInWords(p.logged_date)}`} top="system" description={p.claim} status={dayInWords(p.logged_date)}>
   <section class="section">
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:18px">
@@ -37,7 +38,8 @@ const FLAG_TEXT: Record<string, string> = {
               {p.claim}
             </h1>
           ) : (
-            <h1 style="font-size:28px;font-family:var(--mono);font-weight:500;letter-spacing:-.01em;line-height:1.3;overflow-wrap:anywhere">“{p.claim}”</h1>
+            <h1 class="label" style="font-size:15px">{p.coach_name}'s call of {dayInWords(p.logged_date)}</h1>
+            <div style="font-size:28px;font-family:var(--mono);font-weight:500;letter-spacing:-.01em;line-height:1.3;overflow-wrap:anywhere"><Quote block text={p.claim} said={p.logged_date} /></div>
           )
         }
         {p.claim_withheld && <p class="chip" style="align-self:flex-start">{p.claim_withheld === "unsourced" ? "Words held: the instrument had no reading when this was said" : "Words held by the privacy filter"} · the grade stands</p>}

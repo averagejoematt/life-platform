@@ -4330,6 +4330,31 @@ ATTEMPTED_UNPROVEN_EXTRACTED["ci::web-preview-deploy.yml::visual-qa::4"] = (
     "restore otherwise). The live half is watched on the first root run after the owner's switch merge."
 )
 
+# #5612 (owner ruling F): the advice link — evidence-only, one writer, no backfill, partition isolation.
+STRUCTURAL_HAND_PROOFS["structural::test_advice_links_5612.py"] = {
+    "gate_name": "test_advice_links_5612.py",
+    "command": "python3 -m pytest tests/test_advice_links_5612.py -q -p no:randomly   # baseline 19 passed",
+    "mutation": (
+        "Four plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 a `_m()` appended to "
+        "lambdas/coach/coach_nudge_engine.py importing coach.advice_links and calling build_link_record(state='acted_on') (a "
+        "compute path deriving a state); M2 the evidence check in lambdas/coach/advice_links.py::_evidence disarmed "
+        '(`if False:`); M3 `& Key("sk").begins_with("DECISION#")` removed from lambdas/web/site_api_thirdwall.py (a '
+        "decisions reader that would count link rows); M4 the state enum in mcp/tools_advice_links.py cut to "
+        "['acted_on', 'unknown'] (the copy drifting from the registry)."
+    ),
+    "observed": (
+        "2026-11-02, this lane. BASELINE 19 passed. M1: 2 failed (the one-writer sweep and the no-backfill sweep). M2: 1 failed "
+        "(test_every_evidence_requiring_state_is_refused_without_evidence). M3: 1 failed (test_every_decision_reader_of_the_shared_"
+        "partition_narrows_on_its_prefix). M4: 1 failed (test_the_tool_schema_enums_equal_the_registry_both_ways). REVERTED 19 "
+        "passed each time. The assignment detector's own control is in-test (test_the_state_sweep_can_fail)."
+    ),
+    "scope": (
+        "Repo-side only: the write validator on the tool's real args path over a FakeDdbTable whose query hook evaluates the boto3 "
+        "Key condition, the get_decisions read of the same stored rows, and AST sweeps of `git ls-files *.py` outside tests/. NOT "
+        "SEEN: the live MCP Lambda and the live decisions partition (no link row exists until the owner writes the first one)."
+    ),
+    "proved_on": "2026-11-02",
+}
 
 # The web gate made REQUIRED (owner ruling: the site build check is required before further implementation
 # merges). Three entrants, all from one router: scripts/check_web_gate_required.py + web-gate.yml's scope and

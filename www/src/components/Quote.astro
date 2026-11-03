@@ -1,0 +1,24 @@
+---
+// A coach's words, verbatim (#5609, owner ruling 2026-11-02). The ONE element the render gate's dates-in-words rule
+// exempts: `data-verbatim="coach"` on a <q> or <blockquote> holding text and <time> only. Any ISO
+// date inside is wrapped in <time datetime> and glossed in words after the quotation — the quoted
+// characters are never altered. A trailing clip ellipsis is the page's, not the coach's: it sits outside.
+// The rule it satisfies is scripts/www_verbatim.py (the render gate AND the live root deploy's scan).
+import { quoteParts, glossList, glossText } from "../lib/format.js";
+
+interface Props {
+  text: string;
+  said?: string | null; // ISO day the coach said it (data-said; a machine attribute, never page text)
+  block?: boolean; // <blockquote> (a Day coach line) vs inline <q> (a chip, a row, a rail title)
+}
+const { text, said = null, block = false } = Astro.props;
+const clipped = /…$/.test(text);
+const words = clipped ? text.slice(0, -1) : text;
+const parts = quoteParts(words);
+const gloss = block ? glossText(words) : glossList(words);
+const Tag = block ? "blockquote" : "q";
+---
+
+<Tag data-verbatim="coach" data-said={said || undefined}>{parts.map((p) => (p.date ? <time datetime={p.date}>{p.date}</time> : p.text))}</Tag>{clipped && "…"}{
+  gloss && (block ? <p class="gloss" data-quote-gloss>{gloss}</p> : <span class="gloss" data-quote-gloss> [{gloss}]</span>)
+}

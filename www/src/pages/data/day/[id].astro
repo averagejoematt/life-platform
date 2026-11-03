@@ -10,6 +10,7 @@
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
+import Quote from "../../../components/Quote.astro";
 import {
   READING_TILES,
   deltaLine,
@@ -108,6 +109,8 @@ const weekSpan = chapter && chapter.week_start && chapter.week_end ? `${words(ch
 const after = next ? next.coach_lines : [];
 const nearest = d.calls_settled.length ? null : nearestGraded(days, i);
 const predHref = (id: string) => (all.get("prediction", id) ? href(pathOf("prediction", id)) : null);
+// A withheld claim's chip carries the hold's own sentence ("Not quoted: …"), authored copy, never the coach's words (#5609).
+const heldWords = (id: string) => Boolean(all.get("prediction", id)?.claim_withheld);
 const coachHref = (id: string) => (all.get("coach", id) ? href(pathOf("coach", id)) : null);
 const foodTile = food
   ? { value: food.calories != null ? num(food.calories, 0) : "—", unit: "kcal", d: food.logging_gap ? "a logging gap — entries not made; not counted as eaten" : `${food.protein_g != null ? `${num(food.protein_g, 0)} g protein` : "protein not logged"}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}` }
@@ -456,7 +459,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                   <figcaption class="who">
                     {coachHref(l.coach_id) ? <a href={coachHref(l.coach_id)}>{l.coach}</a> : l.coach} · {l.move_label || l.move}
                   </figcaption>
-                  <blockquote>{l.text}</blockquote>
+                  <Quote block text={l.text} said={d.date} />
                   {l.corrections.map((c) => (
                     <p class="correction" role="note">
                       {c}
@@ -480,7 +483,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     <figcaption class="who">
                       {l.coach} · {l.move_label || l.move}
                     </figcaption>
-                    <blockquote>{l.text}</blockquote>
+                    <Quote block text={l.text} said={next.date} />
                     {l.corrections.map((c) => (
                       <p class="correction" role="note">
                         {c}
@@ -501,7 +504,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                   <a class="callchip solid" href={predHref(c.prediction_id)}>
                     <span class="k">{callOutcome(c.verdict)}</span>
                     <span>
-                      {c.coach_name}: {c.claim_short}
+                      {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}
                     </span>
                   </a>
                 ))}
@@ -519,7 +522,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                           {callOutcome(c.verdict)} · {short(nearest.date)}
                         </span>
                         <span>
-                          {c.coach_name}: {c.claim_short}
+                          {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}
                         </span>
                       </a>
                     ))}
@@ -537,7 +540,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     <a class="callchip" href={predHref(c.prediction_id)}>
                       <span class="k">settles {words(c.due_date)}</span>
                       <span>
-                        {c.coach_name}: {c.text}
+                        {c.coach_name}: {heldWords(c.prediction_id) ? c.text : <Quote text={c.text} />}
                       </span>
                     </a>
                   ))}

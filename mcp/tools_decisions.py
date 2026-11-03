@@ -11,11 +11,15 @@ Tools:
   141. get_decisions         — retrieve recent decisions with outcomes
   142. update_decision_outcome — record what happened after a decision
 
+#5612: get_decisions also returns each decision's advice links (sk family ADVICELINK#, written
+only by mcp/tools_advice_links.py::log_advice_link) and their per-state counts.
+
 v1.0.0 — 2026-03-07
 """
 
 from datetime import datetime, timedelta, timezone
 
+from coach import advice_links as _advice_links  # #5612: the advice-link registry (read side only here)
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp import idempotency as _idem
@@ -142,6 +146,7 @@ def tool_get_decisions(args):
         )
     )
     items = resp.get("Items", [])
+    links_by_decision = _advice_links_by_decision(table, Key, _apply_phase_filter)
 
     cutoff = (pacific_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     items = [i for i in items if i.get("date", "") >= cutoff]
@@ -172,6 +177,9 @@ def tool_get_decisions(args):
             "followed": followed_count,
             "overridden": overridden_count,
             "pending_followup": total - with_outcome,
+            # #5612 (ruling F): owner-asserted advice links. A decision with no link reads
+            # `unknown` — never inferred from `followed` or from what the data shows.
+            "advice_links": _advice_links.state_counts([i.get("sk") for i in items], links_by_decision),
             "trust_calibration": {
                 "follow_effectiveness": round(follow_score, 2) if follow_score is not None else "insufficient data",
                 "override_effectiveness": round(override_score, 2) if override_score is not None else "insufficient data",
@@ -202,11 +210,27 @@ def tool_get_decisions(args):
                     "outcome_delta": i.get("outcome_delta"),
                     "outcome_notes": i.get("outcome_notes"),
                     "effectiveness": i.get("effectiveness"),
+                    # #5612: each link to a coach recommendation; [] = unknown (absence is unknown).
+                    "advice_links": [_advice_links.owner_view(link) for link in links_by_decision.get(i.get("sk")) or []],
                 }
                 for i in items[:20]
             ],
         }
     )
+
+
+def _advice_links_by_decision(table, Key, apply_phase_filter) -> dict:
+    """#5612: every current-cycle ADVICELINK# row in the partition, grouped by its decision sk.
+    Its own query on its own prefix — the DECISION# query above never sees these rows."""
+    grouped: dict = {}
+    kwargs = apply_phase_filter({"KeyConditionExpression": Key("pk").eq(_decisions_pk()) & Key("sk").begins_with(_advice_links.SK_PREFIX)})
+    while True:
+        resp = table.query(**kwargs)
+        for row in resp.get("Items", []):
+            grouped.setdefault(row.get("decision_sk"), []).append(row)
+        if not resp.get("LastEvaluatedKey"):
+            return grouped
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
 def tool_update_decision_outcome(args):

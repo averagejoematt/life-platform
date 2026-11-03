@@ -3002,6 +3002,12 @@
   "calls_open": [
    {
     "coach_name": "Lisa Park",
+    "due_date": "2026-10-17",
+    "prediction_id": "physical-20261016-weight02",
+    "text": "Weight will hold within a pound of 304 through 2026-10-17, the morning after the long walk."
+   },
+   {
+    "coach_name": "Lisa Park",
     "due_date": "2026-10-19",
     "prediction_id": "sleep-20261005-deepsleep01",
     "text": "Deep sleep percentage will rise as zone-2 training volume builds."
@@ -3013,7 +3019,7 @@
     "text": "Protein recovery would lift the journaling silence."
    }
   ],
-  "calls_open_count": 2,
+  "calls_open_count": 3,
   "calls_settled": [],
   "chapter_id": "week-06",
   "coach_lines": [
@@ -3024,6 +3030,14 @@
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: no new sensor readings, so nothing new to read on glucose."
+   },
+   {
+    "coach": "Lisa Park",
+    "coach_id": "sleep_coach",
+    "corrections": [],
+    "move": "observation",
+    "move_label": "What I noticed",
+    "text": "Sample line: the 2026-10-15 walk was the longest of the block, so read 2026-10-17's weigh-in against it."
    }
   ],
   "data_through": "2026-10-16",
@@ -3039,6 +3053,16 @@
     "id": "glucose_coach",
     "rel": "spoke",
     "type": "coach"
+   },
+   {
+    "id": "sleep_coach",
+    "rel": "spoke",
+    "type": "coach"
+   },
+   {
+    "id": "physical-20261016-weight02",
+    "rel": "open",
+    "type": "prediction"
    },
    {
     "id": "sleep-20261005-deepsleep01",
