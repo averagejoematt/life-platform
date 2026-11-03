@@ -4355,3 +4355,55 @@ STRUCTURAL_HAND_PROOFS["structural::test_advice_links_5612.py"] = {
     ),
     "proved_on": "2026-11-02",
 }
+
+# The web gate made REQUIRED (owner ruling: the site build check is required before further implementation
+# merges). Three entrants, all from one router: scripts/check_web_gate_required.py + web-gate.yml's scope and
+# verdict steps. Proved offline on the lane export; the LIVE proof is the deliberately failing PR (PROPOSAL §6).
+GUARD_PROOFS["guard::scripts/check_web_gate_required.py"] = {
+    "gate_name": "scripts/check_web_gate_required.py",
+    "command": "python3 -m pytest tests/test_web_gate_required_check.py -q -p no:cacheprovider   # baseline 25 passed",
+    "mutation": (
+        "Six plants, ONE AT A TIME (md5 a3e609d8b668a976d6607a1040100652 before and after): M1 a cancelled build passes "
+        "the verdict; M2 a failed/cancelled scope job is ignored; M3 an unreadable diff answers run=false; M4 SCOPE drops "
+        "deploy/www_owned_paths.py; M5 `*` crosses `/`; M6 an unwritable $GITHUB_OUTPUT inside Actions reads as success."
+    ),
+    "observed": (
+        "2026-11-02, lane export of fcc341845: each of M1-M6 → 1 failed / 24 passed (the verdict table, the scope fail-safe, "
+        "the on.push.paths parity, the GitHub-glob routing, the silent-answer refusal); RESTORED 25 passed, byte-identical."
+    ),
+    "scope": (
+        "Offline: the routing and the verdict table. NOT SEEN offline: GitHub's own job-result strings and the test-merge "
+        "commit's first parent — those are the live demo PRs (a www PR with a planted sentinel, a docs-only PR)."
+    ),
+    "proved_on": "2026-11-02",
+}
+CI_PROOFS["ci::web-gate.yml::scope::1"] = {
+    "gate_name": "scope / Route — in scope runs the build, out of scope skips it by design",
+    "command": "python3 scripts/check_web_gate_required.py scope",
+    "mutation": "The step's own run text with GITHUB_ACTIONS=true and $GITHUB_OUTPUT unset (the answer cannot be written).",
+    "observed": (
+        "2026-11-02, lane export: unset → exit 1 `FAIL — could not write the routing answer`; set → exit 0 `run=true`. On a "
+        "scratch repo's --no-ff merge commits: a docs-only merge → `run=false`, a www merge → `run=true`, a parentless "
+        "commit → `run=true` (fail-safe)."
+    ),
+    "scope": "Routing only; whether GitHub's merge ref has the expected first parent is the live non-www/www PR pair.",
+    "proved_on": "2026-11-02",
+}
+CI_PROOFS["ci::web-gate.yml::web-gate-verdict::1"] = {
+    "gate_name": "web-gate-verdict / Verdict — scope ok and (build green, or build skipped as out of scope)",
+    "command": "SCOPE_RESULT=success IN_SCOPE=true BUILD_RESULT=failure python3 scripts/check_web_gate_required.py verdict",
+    "mutation": "BUILD_RESULT=failure, then cancelled (supersession and timeout both render cancelled), against the two passing shapes.",
+    "observed": (
+        "2026-11-02, lane export: failure → exit 1; cancelled → exit 1; success/in-scope → exit 0; skipped/out-of-scope → exit 0."
+    ),
+    "scope": "The step text with injected results; the live proof is the planted-sentinel PR's verdict going red (PROPOSAL §6).",
+    "proved_on": "2026-11-02",
+}
+REGISTRY_PROOFS["registry::tests/test_wait_pr_green.py::_BASELINE::v9 web gate verdict (www build, required)"] = {
+    "gate_name": "_BASELINE[v9 web gate verdict (www build, required)]",
+    "command": "python3 -m pytest tests/test_wait_pr_green.py -q -p no:cacheprovider   # baseline 44 passed",
+    "mutation": "The entry deleted from _BASELINE while deploy/wait_pr_green.sh's BASELINE_CHECKS still carries it.",
+    "observed": "2026-11-02, lane export: 6 failed / 38 passed (test_all_green_exits_zero and five more baseline-shape tests); restored 44 passed.",
+    "scope": "Proves the test list and the watcher's baseline agree; the watcher's live behaviour on the new check is the demo PR pair.",
+    "proved_on": "2026-11-02",
+}

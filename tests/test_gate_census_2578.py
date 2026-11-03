@@ -1213,9 +1213,11 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # same scan step on the resolved target, plus the root leg's collision check: planted sentinel exit 1, planted site/system/ exit 1,
         # reverted 0 / 0) and guard::deploy/www_root_rollback.sh (GUARD_PROOFS: decline branch disabled → 1 failed; reverted 32 passed).
         # Net +2: one proof re-keyed, two added. Stacked, never max'd.
-        # 314 -> 315 (2026-11-02, #5612 the advice link): structural::test_advice_links_5612.py arrives PROVEN via
+        <= 319  # 318 -> 319 (2026-11-03, #5612 the advice link): structural::test_advice_links_5612.py arrives PROVEN via
         # STRUCTURAL_HAND_PROOFS (M1 2 failed, M2/M3/M4 1 failed each; reverted 19 passed). Stacked, never max'd.
-        <= 315  # 313 -> 314 (2026-11-01): ci::citation-network-check.yml::verify::2 arrives proven
+        # PRIOR 314 -> 318 (2026-11-02, the web gate made REQUIRED): guard::scripts/check_web_gate_required.py, the _BASELINE registry row,
+        # ci::web-gate.yml::scope::1 and ci::web-gate.yml::web-gate-verdict::1 arrive proven.
+        # PRIOR 313 -> 314 (2026-11-01): ci::citation-network-check.yml::verify::2 arrives proven
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

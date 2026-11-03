@@ -11,19 +11,32 @@
 # The snapshot contract tests (tests/test_web_publication_snapshot_5530.py) run in the
 # pre-merge Python lane with the rest of the suite. The live-snapshot preview deploy is
 # web-preview-deploy.yml and runs only after a merge to main.
+#
+# REQUIRED (owner ruling: the site build check is required before further implementation
+# merges). The REQUIRED context is the `web-gate-verdict` job's `name:` below, NOT the
+# build job's. Why three jobs:
+#   * the pull_request trigger has NO `paths:` filter — a path-filtered workflow never
+#     starts on an out-of-scope PR, and a required check that never starts sits
+#     "Expected — Waiting for status to be reported" forever (GitHub docs, "Handling
+#     skipped but required checks");
+#   * `scope` decides in-run whether the PR touches the build's inputs (the same globs the
+#     push trigger filters on, plus this file and the router; scripts/check_web_gate_required.py
+#     holds the list and tests/test_web_gate_required_check.py pins it to on.push.paths);
+#   * `web-gate` (the heavy build) runs only when `scope` says so — a job skipped by `if:`
+#     reports Success, which is exactly why it is NOT the required context;
+#   * `web-gate-verdict` runs `if: always()` (never skipped, even when the run is cancelled)
+#     and passes only on: scope succeeded AND (build succeeded, OR build skipped because
+#     scope said out-of-scope). failure / cancelled / timed-out / skipped-when-in-scope = red.
+# Renaming the verdict job's `name:`, giving it any `if:` other than always(), or adding a
+# `paths:` filter to pull_request silently un-requires it or wedges every PR:
+# tests/test_branch_protection_spec.py reds on all three. Push-to-main is unchanged: the
+# push trigger keeps its path filter and `scope` answers run=true on push.
 
 name: v9 web gate
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'www/**'
-      - 'scripts/publish_snapshot*.py'
-      - 'scripts/check_www_build.py'
-      - 'deploy/www_owned_paths.py'
-      - 'tests/web_preview_gate.py'
-      - '.github/workflows/web-gate.yml'
   push:
     branches: [main]
     paths:
@@ -41,8 +54,26 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  scope:
+    name: v9 web gate scope (does this change touch the www build inputs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      # depth 2: on pull_request HEAD is GitHub's test merge commit, HEAD^1 the base tip —
+      # their diff is exactly what this PR would change on main. Stdlib python, no action.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Route — in scope runs the build, out of scope skips it by design
+        id: scope
+        run: python3 scripts/check_web_gate_required.py scope
+
   web-gate:
     name: Build from fixtures · schema + visibility + edge mutations · render gate
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -82,3 +113,18 @@ jobs:
             www/dist
             /tmp/web-gate
           retention-days: 14
+
+  web-gate-verdict:
+    name: v9 web gate verdict (www build, required)
+    needs: [scope, web-gate]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verdict — scope ok and (build green, or build skipped as out of scope)
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          IN_SCOPE: ${{ needs.scope.outputs.run }}
+          BUILD_RESULT: ${{ needs.web-gate.result }}
+        run: python3 scripts/check_web_gate_required.py verdict

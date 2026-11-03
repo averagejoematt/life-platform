@@ -1,0 +1,1647 @@
+{
+ "_captured": "2026-11-02 read-only Query of every COACH#<id>_coach PREDICTION# partition (#5610); the rows carrying any correction trail, claim text and top-level outcome_notes removed",
+ "rows": {
+  "explorer": [
+   {
+    "coach_id": "explorer_coach",
+    "created_date": "2026-08-17",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-08-18",
+     "threshold": 50,
+     "tolerance": 20.7935,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=30 readings, SD=20.7935)",
+     "type": "point"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-08-31",
+    "phase": "pilot",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20260817_recovery_score_tomorrow_will_be_around_5",
+    "sk": "PREDICTION#pred_20260817_recovery_score_tomorrow_will_be_around_5",
+    "status": "confirmed",
+    "subdomain": "recovery",
+    "tombstone": true,
+    "verdict_correction": {
+     "new_status": "confirmed",
+     "prior": {
+      "corrected_at": "2026-09-06T07:24:02.711285+00:00",
+      "outcome_notes": "{\"actual_value\": 0.09474083867407812, \"reason\": \"recovery_score trend=up (slope=0.0947), predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reason": "#3551: the claim is a numeric level; it was stored as a directional spec ('recover' in DIR_UP_WORDS matched the metric name) and graded as a 14-day trend sign. Re-graded as the level claim it was.",
+      "status": "confirmed"
+     },
+     "regraded_as": "point"
+    }
+   },
+   {
+    "coach_id": "explorer_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "steps",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-09-27",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_as_an_n_1_statistician_establishing_a_cl",
+    "sk": "PREDICTION#pred_20260906_as_an_n_1_statistician_establishing_a_cl",
+    "status": "refuted",
+    "subdomain": "general",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "refuted",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-27",
+      "outcome_notes": "{\"actual_value\": -0.09780106870294727, \"reason\": \"steps trend=down (slope=-0.0978), predicted=up\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}",
+      "reason": "steps trend=down (slope=-0.0978), predicted=up",
+      "status": "refuted"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "explorer_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "hrv_7day_avg",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-09-20",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_with_the_ramp_discipline_rule_mandating",
+    "sk": "PREDICTION#pred_20260906_with_the_ramp_discipline_rule_mandating",
+    "status": "confirmed",
+    "subdomain": "sleep",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "confirmed",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-20",
+      "outcome_notes": "{\"actual_value\": 0.23412323897684148, \"reason\": \"hrv_7day_avg trend=up (slope=0.2341), predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reason": "hrv_7day_avg trend=up (slope=0.2341), predicted=up",
+      "status": "confirmed"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "explorer_coach",
+    "created_date": "2026-09-14",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20260914_evening_carb_reduction_without_caloric_c",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "down",
+      "evaluation_window_days": 14182,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "threshold": null,
+      "type": "directional"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260914_evening_carb_reduction_without_caloric_c",
+    "status": "confirmed",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "explorer_coach",
+    "created_date": "2026-09-15",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-09-16",
+     "threshold": 63.5,
+     "tolerance": 19.2925,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=19.2925)",
+     "type": "point"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20260915_whoop_recovery_will_rebound_to_approxima",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "within",
+      "evaluation_window_days": 2026,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "target_date": "2032-04-02",
+      "threshold": 63.5,
+      "tolerance": 19.2925,
+      "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=19.2925)",
+      "type": "point"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260915_whoop_recovery_will_rebound_to_approxima",
+    "status": "refuted",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "explorer_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": null, \"reason\": \"Expired: 32 days elapsed (window=14, max=28). [hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-09-30) [window] Insufficient data to grade 'recovery_score' across its window: 3 reading(s) inside the window 2026-10-11..2026-10-14, fewer than 4\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.1\", \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-09-30\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-14\", \"excluded_days_n\": 2}}",
+      "corrected_status": "expired",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-14",
+      "original_outcome_notes": "{\"actual_value\": 0.271186, \"reason\": \"[window] recovery_score 59 on 2026-09-30 -> 75 on 2026-10-14 (change +16, band \\u00b18, window 2026-09-30..2026-10-14): trend=up, predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-30\", \"end\": \"2026-10-14\", \"first_date\": \"2026-09-30\", \"first_value\": 59.0, \"last_date\": \"2026-10-14\", \"last_value\": 75.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 16.0, \"band\": 8.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+      "original_status": "confirmed",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-09-30",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-14",
+     "outcome_notes": "{\"actual_value\": 0.271186, \"reason\": \"[window] recovery_score 59 on 2026-09-30 -> 75 on 2026-10-14 (change +16, band \\u00b18, window 2026-09-30..2026-10-14): trend=up, predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-30\", \"end\": \"2026-10-14\", \"first_date\": \"2026-09-30\", \"first_value\": 59.0, \"last_date\": \"2026-10-14\", \"last_value\": 75.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 16.0, \"band\": 8.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "expired",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20260930_if_carb_reduction_lands_alongside_protei",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20260930_if_carb_reduction_lands_alongside_protei",
+    "status": "expired",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "explorer_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": null, \"reason\": \"Expired: 32 days elapsed (window=14, max=28). [hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-09-30) [window] Insufficient data to grade 'recovery_score' across its window: 3 reading(s) inside the window 2026-10-11..2026-10-14, fewer than 4\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.1\", \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-09-30\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-14\", \"excluded_days_n\": 2}}",
+      "corrected_status": "expired",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-14",
+      "original_outcome_notes": "{\"actual_value\": 0.271186, \"reason\": \"[window] recovery_score 59 on 2026-09-30 -> 75 on 2026-10-14 (change +16, band \\u00b18, window 2026-09-30..2026-10-14): trend=up, predicted=down\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-30\", \"end\": \"2026-10-14\", \"first_date\": \"2026-09-30\", \"first_value\": 59.0, \"last_date\": \"2026-10-14\", \"last_value\": 75.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 16.0, \"band\": 8.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+      "original_status": "refuted",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-09-30",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "refuted",
+     "outcome_date": "2026-10-14",
+     "outcome_notes": "{\"actual_value\": 0.271186, \"reason\": \"[window] recovery_score 59 on 2026-09-30 -> 75 on 2026-10-14 (change +16, band \\u00b18, window 2026-09-30..2026-10-14): trend=up, predicted=down\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-30\", \"end\": \"2026-10-14\", \"first_date\": \"2026-09-30\", \"first_value\": 59.0, \"last_date\": \"2026-10-14\", \"last_value\": 75.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 16.0, \"band\": 8.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "refuted"
+    },
+    "outcome": "expired",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20260930_if_carb_reduction_lands_without_protein",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20260930_if_carb_reduction_lands_without_protein",
+    "status": "expired",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "explorer_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": -0.074627, \"reason\": \"[hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-10-03) [window] predicted down, metric flat \\u2014 recovery_score 67 on 2026-10-12 -> 62 on 2026-10-17 (change -5, band \\u00b111, window 2026-10-11..2026-10-17)\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.1\", \"window\": {\"start\": \"2026-10-11\", \"end\": \"2026-10-17\", \"first_date\": \"2026-10-12\", \"first_value\": 67.0, \"last_date\": \"2026-10-17\", \"last_value\": 62.0, \"averaged_over\": 1, \"readings\": 6, \"change\": -5.0, \"band\": 11.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"flat\"}, \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-10-03\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-17\", \"excluded_days_n\": 2}}",
+      "corrected_status": "refuted",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-17",
+      "original_outcome_notes": "{\"actual_value\": -0.387755, \"reason\": \"[window] recovery_score 98 on 2026-10-03 -> 60 on 2026-10-17 (change -38, band \\u00b111.5, window 2026-10-03..2026-10-17): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-03\", \"end\": \"2026-10-17\", \"first_date\": \"2026-10-03\", \"first_value\": 98.0, \"last_date\": \"2026-10-17\", \"last_value\": 60.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -38.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+      "original_status": "confirmed",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-10-03",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-17",
+     "outcome_notes": "{\"actual_value\": -0.387755, \"reason\": \"[window] recovery_score 98 on 2026-10-03 -> 60 on 2026-10-17 (change -38, band \\u00b111.5, window 2026-10-03..2026-10-17): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-03\", \"end\": \"2026-10-17\", \"first_date\": \"2026-10-03\", \"first_value\": 98.0, \"last_date\": \"2026-10-17\", \"last_value\": 60.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -38.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20261003_if_carb_reduction_lands_without_protein",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20261003_if_carb_reduction_lands_without_protein",
+    "status": "refuted",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "explorer_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": 0.149254, \"reason\": \"[hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-10-08) [window] predicted down, metric flat \\u2014 recovery_score 67 on 2026-10-12 -> 77 on 2026-10-22 (change +10, band \\u00b112.5, window 2026-10-11..2026-10-22)\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.1\", \"window\": {\"start\": \"2026-10-11\", \"end\": \"2026-10-22\", \"first_date\": \"2026-10-12\", \"first_value\": 67.0, \"last_date\": \"2026-10-22\", \"last_value\": 77.0, \"averaged_over\": 1, \"readings\": 11, \"change\": 10.0, \"band\": 12.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"flat\"}, \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-10-08\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-22\", \"excluded_days_n\": 2}}",
+      "corrected_status": "refuted",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-22",
+      "original_outcome_notes": "{\"actual_value\": -0.206186, \"reason\": \"[window] recovery_score 97 on 2026-10-08 -> 77 on 2026-10-22 (change -20, band \\u00b114.5, window 2026-10-08..2026-10-22): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-08\", \"end\": \"2026-10-22\", \"first_date\": \"2026-10-08\", \"first_value\": 97.0, \"last_date\": \"2026-10-22\", \"last_value\": 77.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -20.0, \"band\": 14.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+      "original_status": "confirmed",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-10-08",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-22",
+     "outcome_notes": "{\"actual_value\": -0.206186, \"reason\": \"[window] recovery_score 97 on 2026-10-08 -> 77 on 2026-10-22 (change -20, band \\u00b114.5, window 2026-10-08..2026-10-22): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-08\", \"end\": \"2026-10-22\", \"first_date\": \"2026-10-08\", \"first_value\": 97.0, \"last_date\": \"2026-10-22\", \"last_value\": 77.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -20.0, \"band\": 14.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20261008_if_recovery_flattens_or_reverses_in_the",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20261008_if_recovery_flattens_or_reverses_in_the",
+    "status": "refuted",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "explorer_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": 0.132653, \"reason\": \"[window] predicted down, metric flat \\u2014 total_protein_g 98 on 2026-10-15 -> 111 on 2026-10-27 (change +13, band \\u00b146, window 2026-10-15..2026-10-29)\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.1\", \"window\": {\"start\": \"2026-10-15\", \"end\": \"2026-10-29\", \"first_date\": \"2026-10-15\", \"first_value\": 98.0, \"last_date\": \"2026-10-27\", \"last_value\": 111.0, \"averaged_over\": 1, \"readings\": 13, \"change\": 13.0, \"band\": 46.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"flat\"}, \"quality_flags\": [\"logging_gap\", \"low_power\"], \"evaluator_version\": \"1.1\"}",
+      "corrected_status": "refuted",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-29",
+      "original_outcome_notes": "{\"actual_value\": -0.846939, \"reason\": \"[window] total_protein_g 98 on 2026-10-15 -> 15 on 2026-10-29 (change -83, band \\u00b146, window 2026-10-15..2026-10-29): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-15\", \"end\": \"2026-10-29\", \"first_date\": \"2026-10-15\", \"first_value\": 98.0, \"last_date\": \"2026-10-29\", \"last_value\": 15.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -83.0, \"band\": 46.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+      "original_status": "confirmed",
+      "reason": "#5533 (c): the grading window held a zero-entry MacroFactor day the grader read as ~80 kcal / ~15 g intake; re-graded with such days missing"
+     }
+    ],
+    "created_date": "2026-10-15",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "total_protein_g",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-29",
+     "outcome_notes": "{\"actual_value\": -0.846939, \"reason\": \"[window] total_protein_g 98 on 2026-10-15 -> 15 on 2026-10-29 (change -83, band \\u00b146, window 2026-10-15..2026-10-29): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-15\", \"end\": \"2026-10-29\", \"first_date\": \"2026-10-15\", \"first_value\": 98.0, \"last_date\": \"2026-10-29\", \"last_value\": 15.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -83.0, \"band\": 46.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20261015_if_october_5_6_protein_dropped_below_150",
+    "quality_flags": [
+     "logging_gap",
+     "low_power"
+    ],
+    "sk": "PREDICTION#pred_20261015_if_october_5_6_protein_dropped_below_150",
+    "status": "refuted",
+    "subdomain": "protein"
+   },
+   {
+    "coach_id": "explorer_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-03T02:47:32Z",
+      "corrected_outcome_date": "2026-11-02",
+      "corrected_outcome_notes": "{\"actual_value\": 0.132653, \"reason\": \"Not gradable as worded: an if-then about October 5-6 protein (146 g and 182 g, both logged before the call was filed on 2026-10-15) whose outcome \\u2014 which explanation is more likely \\u2014 names no measurement (#3046: retired at window end, no grace period). The stored spec read it as total_protein_g trending up over 2026-10-15..2026-10-29; on complete days that measured 98 on 2026-10-15 -> 111 on 2026-10-27 (change +13, band \\u00b146), flat \\u2014 a measurement of the misread call, not of this one\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.1\", \"quality_flags\": [\"logging_gap\"], \"evaluator_version\": \"1.1\"}",
+      "corrected_status": "expired",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-29",
+      "original_outcome_notes": "{\"actual_value\": -0.846939, \"reason\": \"[window] total_protein_g 98 on 2026-10-15 -> 15 on 2026-10-29 (change -83, band \\u00b146, window 2026-10-15..2026-10-29): trend=down, predicted=up\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-15\", \"end\": \"2026-10-29\", \"first_date\": \"2026-10-15\", \"first_value\": 98.0, \"last_date\": \"2026-10-29\", \"last_value\": 15.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -83.0, \"band\": 46.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+      "original_status": "refuted",
+      "reason": "#5533 (c) + owner ruling 2026-11-02: the 1.0 grade ran through a zero-entry MacroFactor day (15 g on 2026-10-29); under 1.1 the call is not gradable as worded \u2014 an if-then about October 5-6 protein, already on file when it was filed, whose outcome names no measurement \u2014 so it is retired ungraded (the #3046 rule), not re-graded on the misread direction spec"
+     }
+    ],
+    "created_date": "2026-10-15",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "total_protein_g",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "evaluator_version": "1.1",
+     "outcome": "refuted",
+     "outcome_date": "2026-10-29",
+     "outcome_notes": "{\"actual_value\": -0.846939, \"reason\": \"[window] total_protein_g 98 on 2026-10-15 -> 15 on 2026-10-29 (change -83, band \\u00b146, window 2026-10-15..2026-10-29): trend=down, predicted=up\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-15\", \"end\": \"2026-10-29\", \"first_date\": \"2026-10-15\", \"first_value\": 98.0, \"last_date\": \"2026-10-29\", \"last_value\": 15.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -83.0, \"band\": 46.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+     "quality_flags": [
+      "logging_gap",
+      "low_power"
+     ],
+     "snapshot_at": "2026-11-03T02:47:32Z",
+     "status": "refuted"
+    },
+    "outcome": "expired",
+    "outcome_date": "2026-11-02",
+    "phase": "experiment",
+    "pk": "COACH#explorer_coach",
+    "prediction_id": "pred_20261015_if_october_5_6_protein_stayed_above_150",
+    "quality_flags": [
+     "logging_gap"
+    ],
+    "sk": "PREDICTION#pred_20261015_if_october_5_6_protein_stayed_above_150",
+    "status": "expired",
+    "subdomain": "protein"
+   }
+  ],
+  "glucose": [
+   {
+    "coach_id": "glucose_coach",
+    "created_date": "2026-09-14",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-09-15",
+     "threshold": 59,
+     "tolerance": 18.5929,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.5929)",
+     "type": "point"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-09-28",
+    "phase": "experiment",
+    "pk": "COACH#glucose_coach",
+    "prediction_id": "pred_20260914_recovery_will_soften_to_roughly_59_tomo",
+    "sk": "PREDICTION#pred_20260914_recovery_will_soften_to_roughly_59_tomo",
+    "status": "refuted",
+    "subdomain": "recovery",
+    "verdict_correction": {
+     "action": "regrade",
+     "corrected_at": "2026-10-11T02:48:10.102408+00:00",
+     "issue": "#4618",
+     "named_day": "2026-09-15",
+     "new_status": "refuted",
+     "prior": {
+      "baseline": null,
+      "evaluation_window_days": 14,
+      "outcome_date": "2026-09-28",
+      "outcome_notes": "{\"actual_value\": 64.0, \"reason\": \"recovery_score=64.00 on 2026-09-28 vs predicted 59 \\u00b118.5929 (\\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.5929)); |\\u0394|=5.00 \\u2192 within tolerance\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reading": 64,
+      "status": "confirmed",
+      "target_date": "2026-09-28"
+     },
+     "reason": "#4618: the sentence names its own day; the call was stored with a target that many days out and graded on a day the sentence does not name. Graded again on the reading for the day it named."
+    }
+   }
+  ],
+  "labs": [
+   {
+    "coach_id": "labs_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "hrv_7day_avg",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-09-20",
+    "phase": "experiment",
+    "pk": "COACH#labs_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_with_7_5_hours_of_nightly_sleep_bed_9_0",
+    "sk": "PREDICTION#pred_20260906_with_7_5_hours_of_nightly_sleep_bed_9_0",
+    "status": "confirmed",
+    "subdomain": "sleep",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "confirmed",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-20",
+      "outcome_notes": "{\"actual_value\": 0.23412323897684148, \"reason\": \"hrv_7day_avg trend=up (slope=0.2341), predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reason": "hrv_7day_avg trend=up (slope=0.2341), predicted=up",
+      "status": "confirmed"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "labs_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "resting_heart_rate",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-09-27",
+    "phase": "experiment",
+    "pk": "COACH#labs_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_with_a_structured_8_hour_eating_window",
+    "sk": "PREDICTION#pred_20260906_with_a_structured_8_hour_eating_window",
+    "status": "confirmed",
+    "subdomain": "general",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "confirmed",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-27",
+      "outcome_notes": "{\"actual_value\": -0.02573733468158054, \"reason\": \"resting_heart_rate trend=down (slope=-0.0257), predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reason": "resting_heart_rate trend=down (slope=-0.0257), predicted=down",
+      "status": "confirmed"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "labs_coach",
+    "created_date": "2026-09-21",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-09-22",
+     "threshold": 90.9,
+     "tolerance": 23.7331,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=23.7331)",
+     "type": "point"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#labs_coach",
+    "prediction_id": "pred_20260921_recovery_score_will_be_90_9_tomorrow_f",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "within",
+      "evaluation_window_days": 2026,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "target_date": "2032-04-08",
+      "threshold": 90.9,
+      "tolerance": 23.7331,
+      "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=23.7331)",
+      "type": "point"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260921_recovery_score_will_be_90_9_tomorrow_f",
+    "status": "confirmed",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "labs_coach",
+    "created_date": "2026-09-24",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-09-25",
+     "threshold": 84.8,
+     "tolerance": 20.7078,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=20.7078)",
+     "type": "point"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#labs_coach",
+    "prediction_id": "pred_20260924_recovery_score_is_expected_to_be_around",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "within",
+      "evaluation_window_days": 2026,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "target_date": "2032-04-11",
+      "threshold": 84.8,
+      "tolerance": 20.7078,
+      "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=20.7078)",
+      "type": "point"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260924_recovery_score_is_expected_to_be_around",
+    "status": "confirmed",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "labs_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": -0.052339, \"reason\": \"[hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-10-01) [window] predicted up, metric flat \\u2014 hrv_7day_avg 50.345 on 2026-10-12 -> 47.71 on 2026-10-15 (change -2.635, band \\u00b14.1366, window 2026-10-11..2026-10-15)\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.1\", \"window\": {\"start\": \"2026-10-11\", \"end\": \"2026-10-15\", \"first_date\": \"2026-10-12\", \"first_value\": 50.345, \"last_date\": \"2026-10-15\", \"last_value\": 47.71, \"averaged_over\": 2, \"readings\": 4, \"change\": -2.635, \"band\": 4.1366, \"band_rule\": \"the median day-to-day change of the readings inside the window, over the square root of 2 readings averaged\", \"direction\": \"flat\"}, \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-10-01\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-15\", \"excluded_days_n\": 2}}",
+      "corrected_status": "refuted",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-15",
+      "original_outcome_notes": "{\"actual_value\": 0.085599, \"reason\": \"[window] hrv_7day_avg 57.2271 on 2026-10-01 -> 62.1257 on 2026-10-15 (change +4.8986, band \\u00b12.2054, window 2026-10-01..2026-10-15): trend=up, predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-01\", \"end\": \"2026-10-15\", \"first_date\": \"2026-10-01\", \"first_value\": 57.2271, \"last_date\": \"2026-10-15\", \"last_value\": 62.1257, \"averaged_over\": 7, \"readings\": 15, \"change\": 4.8986, \"band\": 2.2054, \"band_rule\": \"the median day-to-day change of the readings inside the window, over the square root of 7 readings averaged\", \"direction\": \"up\"}}",
+      "original_status": "confirmed",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-10-01",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "hrv_7day_avg",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-15",
+     "outcome_notes": "{\"actual_value\": 0.085599, \"reason\": \"[window] hrv_7day_avg 57.2271 on 2026-10-01 -> 62.1257 on 2026-10-15 (change +4.8986, band \\u00b12.2054, window 2026-10-01..2026-10-15): trend=up, predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-01\", \"end\": \"2026-10-15\", \"first_date\": \"2026-10-01\", \"first_value\": 57.2271, \"last_date\": \"2026-10-15\", \"last_value\": 62.1257, \"averaged_over\": 7, \"readings\": 15, \"change\": 4.8986, \"band\": 2.2054, \"band_rule\": \"the median day-to-day change of the readings inside the window, over the square root of 7 readings averaged\", \"direction\": \"up\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#labs_coach",
+    "prediction_id": "pred_20261001_hrv_running_average_will_continue_edging",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20261001_hrv_running_average_will_continue_edging",
+    "status": "refuted",
+    "subdomain": "hrv"
+   }
+  ],
+  "mind": [
+   {
+    "coach_id": "mind_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "hrv_7day_avg",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-09-20",
+    "phase": "experiment",
+    "pk": "COACH#mind_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_hrv_7_day_average_will_trend_upward_over",
+    "sk": "PREDICTION#pred_20260906_hrv_7_day_average_will_trend_upward_over",
+    "status": "confirmed",
+    "subdomain": "hrv",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "confirmed",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-20",
+      "outcome_notes": "{\"actual_value\": 0.23412323897684148, \"reason\": \"hrv_7day_avg trend=up (slope=0.2341), predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reason": "hrv_7day_avg trend=up (slope=0.2341), predicted=up",
+      "status": "confirmed"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "mind_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 7,
+     "metric": "sleep_duration_hours",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-09-19",
+    "phase": "experiment",
+    "pk": "COACH#mind_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_sleep_duration_will_consistently_reach_o",
+    "sk": "PREDICTION#pred_20260906_sleep_duration_will_consistently_reach_o",
+    "status": "refuted",
+    "subdomain": "sleep",
+    "verdict_correction": {
+     "corrected_at": "2026-10-10T05:20:36.403217+00:00",
+     "correction": "previously CONFIRMED by another rule; the sentence is a count claim, counted \u2192 REFUTED",
+     "issue": "#4541",
+     "prior_reason": "sleep_duration_hours trend=up (slope=0.0603), predicted=up",
+     "prior_status": "confirmed",
+     "regraded_as": "count"
+    }
+   },
+   {
+    "coach_id": "mind_coach",
+    "created_date": "2026-09-17",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-10-01",
+     "threshold": 59.3,
+     "tolerance": 21.1555,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.1555)",
+     "type": "point"
+    },
+    "outcome": "observation",
+    "outcome_date": "2026-10-01",
+    "phase": "experiment",
+    "pk": "COACH#mind_coach",
+    "prediction_id": "pred_20260917_recovery_would_land_around_59_3_on_the",
+    "sk": "PREDICTION#pred_20260917_recovery_would_land_around_59_3_on_the",
+    "status": "observation",
+    "subdomain": "recovery",
+    "verdict_correction": {
+     "action": "withdraw:not-a-forecast",
+     "corrected_at": "2026-10-11T02:48:10.102408+00:00",
+     "issue": "#4618",
+     "named_day": "2026-09-15",
+     "new_status": "observation",
+     "prior": {
+      "baseline": null,
+      "evaluation_window_days": 14,
+      "outcome_date": "2026-10-01",
+      "outcome_notes": "{\"actual_value\": 62.0, \"reason\": \"recovery_score=62.00 on 2026-10-01 vs predicted 59.3 \\u00b121.1555 (\\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.1555)); |\\u0394|=2.70 \\u2192 within tolerance\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reading": 62,
+      "status": "confirmed",
+      "target_date": "2026-10-01"
+     },
+     "reason": "#4618: the number is stated for a day on or before the day the call was filed, so the reading already existed. It is a recollection of a forecast, not a forecast, and nothing can settle it."
+    }
+   },
+   {
+    "coach_id": "mind_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": null, \"reason\": \"[hr-regime] recovery_score: the call was filed 2026-10-05 and its target day 2026-10-19 falls after the 2026-10-10 HR regime marker (health.hr_regime); a level priced in the earlier regime has no single-regime comparison\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.1\", \"grading_open\": true, \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-10-05\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-19\"}}",
+      "corrected_status": "inconclusive",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-19",
+      "original_outcome_notes": "{\"actual_value\": 47.0, \"reason\": \"recovery_score=47.00 on 2026-10-19 vs predicted 65 \\u00b119.0922 (\\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=19.0922)); |\\u0394|=18.00 \\u2192 within tolerance\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "original_status": "confirmed",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-10-05",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-10-19",
+     "threshold": 65,
+     "tolerance": 19.0922,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=19.0922)",
+     "type": "point"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "filed_on": "2026-10-04",
+      "filed_value": 98,
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-19",
+     "outcome_notes": "{\"actual_value\": 47.0, \"reason\": \"recovery_score=47.00 on 2026-10-19 vs predicted 65 \\u00b119.0922 (\\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=19.0922)); |\\u0394|=18.00 \\u2192 within tolerance\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "inconclusive",
+    "outcome_date": "2026-11-02",
+    "phase": "experiment",
+    "pk": "COACH#mind_coach",
+    "prediction_id": "pred_20261005_recovery_score_will_land_around_65_on_o",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20261005_recovery_score_will_land_around_65_on_o",
+    "status": "inconclusive",
+    "subdomain": "recovery"
+   }
+  ],
+  "nutrition": [
+   {
+    "coach_id": "nutrition_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "weight_lbs",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-04",
+    "phase": "experiment",
+    "pk": "COACH#nutrition_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_with_a_strict_1500_kcal_day_intake_and_a",
+    "sk": "PREDICTION#pred_20260906_with_a_strict_1500_kcal_day_intake_and_a",
+    "status": "confirmed",
+    "subdomain": "weight",
+    "verdict_correction": {
+     "action": "regrade",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "confirmed",
+     "prior": {
+      "baseline": {
+       "right": true,
+       "rule": "nothing_changes",
+       "version": 1
+      },
+      "outcome_date": "2026-10-04",
+      "outcome_notes": "{\"actual_value\": -0.007576852336785299, \"reason\": \"predicted down, metric flat (slope=-0.0076, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}",
+      "reason": "predicted down, metric flat (slope=-0.0076, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+      "status": "refuted"
+     },
+     "reason": "#4617: graded again on the change from the first to the last reading of the call's own window, against the metric's own day-to-day swing. The earlier grade compared only the most recent readings with the few before them."
+    }
+   },
+   {
+    "coach_id": "nutrition_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": null, \"reason\": \"Expired: 36 days elapsed (window=14, max=28). [hr-regime] recovery_score: the window 2026-09-26..2026-10-10 ends on the 2026-10-10 HR regime marker's transition day (health.hr_regime); nothing after the marker to grade\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.1\", \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-09-26\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-10\"}}",
+      "corrected_status": "expired",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-10",
+      "original_outcome_notes": "{\"actual_value\": -0.01828359096214562, \"reason\": \"predicted down, metric flat (slope=-0.0183, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}",
+      "original_status": "refuted",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-09-26",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": true,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "refuted",
+     "outcome_date": "2026-10-10",
+     "outcome_notes": "{\"actual_value\": -0.01828359096214562, \"reason\": \"predicted down, metric flat (slope=-0.0183, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "refuted"
+    },
+    "outcome": "expired",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#nutrition_coach",
+    "prediction_id": "pred_20260926_if_carb_reduction_is_recommended_without",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20260926_if_carb_reduction_is_recommended_without",
+    "status": "expired",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "nutrition_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": null, \"reason\": \"Expired: 33 days elapsed (window=14, max=28). [hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-09-29) [window] Insufficient data to grade 'recovery_score' across its window: 2 reading(s) inside the window 2026-10-11..2026-10-13, fewer than 4\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.1\", \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-09-29\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-13\", \"excluded_days_n\": 2}}",
+      "corrected_status": "expired",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-13",
+      "original_outcome_notes": "{\"actual_value\": 0.462963, \"reason\": \"[window] recovery_score 54 on 2026-09-29 -> 79 on 2026-10-13 (change +25, band \\u00b18.5, window 2026-09-29..2026-10-13): trend=up, predicted=down\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-29\", \"end\": \"2026-10-13\", \"first_date\": \"2026-09-29\", \"first_value\": 54.0, \"last_date\": \"2026-10-13\", \"last_value\": 79.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 25.0, \"band\": 8.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+      "original_status": "refuted",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-09-29",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "refuted",
+     "outcome_date": "2026-10-13",
+     "outcome_notes": "{\"actual_value\": 0.462963, \"reason\": \"[window] recovery_score 54 on 2026-09-29 -> 79 on 2026-10-13 (change +25, band \\u00b18.5, window 2026-09-29..2026-10-13): trend=up, predicted=down\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-29\", \"end\": \"2026-10-13\", \"first_date\": \"2026-09-29\", \"first_value\": 54.0, \"last_date\": \"2026-10-13\", \"last_value\": 79.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 25.0, \"band\": 8.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "refuted"
+    },
+    "outcome": "expired",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#nutrition_coach",
+    "prediction_id": "pred_20260929_if_carbs_are_cut_without_calorie_neutral",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20260929_if_carbs_are_cut_without_calorie_neutral",
+    "status": "expired",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "nutrition_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": null, \"reason\": \"Expired: 32 days elapsed (window=14, max=28). [hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-09-30) [window] Insufficient data to grade 'recovery_score' across its window: 3 reading(s) inside the window 2026-10-11..2026-10-14, fewer than 4\", \"beats_null\": false, \"bayesian_update\": null, \"algo_version\": \"1.1\", \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-09-30\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-14\", \"excluded_days_n\": 2}}",
+      "corrected_status": "expired",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-14",
+      "original_outcome_notes": "{\"actual_value\": 0.271186, \"reason\": \"[window] recovery_score 59 on 2026-09-30 -> 75 on 2026-10-14 (change +16, band \\u00b18, window 2026-09-30..2026-10-14): trend=up, predicted=down\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-30\", \"end\": \"2026-10-14\", \"first_date\": \"2026-09-30\", \"first_value\": 59.0, \"last_date\": \"2026-10-14\", \"last_value\": 75.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 16.0, \"band\": 8.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+      "original_status": "refuted",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-09-30",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "refuted",
+     "outcome_date": "2026-10-14",
+     "outcome_notes": "{\"actual_value\": 0.271186, \"reason\": \"[window] recovery_score 59 on 2026-09-30 -> 75 on 2026-10-14 (change +16, band \\u00b18, window 2026-09-30..2026-10-14): trend=up, predicted=down\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-09-30\", \"end\": \"2026-10-14\", \"first_date\": \"2026-09-30\", \"first_value\": 59.0, \"last_date\": \"2026-10-14\", \"last_value\": 75.0, \"averaged_over\": 1, \"readings\": 15, \"change\": 16.0, \"band\": 8.0, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"up\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "refuted"
+    },
+    "outcome": "expired",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#nutrition_coach",
+    "prediction_id": "pred_20260930_a_carb_reduction_without_calorie_neutral",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20260930_a_carb_reduction_without_calorie_neutral",
+    "status": "expired",
+    "subdomain": "recovery"
+   }
+  ],
+  "physical": [
+   {
+    "coach_id": "physical_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "steps",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-09-27",
+    "phase": "experiment",
+    "pk": "COACH#physical_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_daily_step_counts_will_consistently_meet",
+    "sk": "PREDICTION#pred_20260906_daily_step_counts_will_consistently_meet",
+    "status": "refuted",
+    "subdomain": "general",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "refuted",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-27",
+      "outcome_notes": "{\"actual_value\": -0.09780106870294727, \"reason\": \"steps trend=down (slope=-0.0978), predicted=up\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}",
+      "reason": "steps trend=down (slope=-0.0978), predicted=up",
+      "status": "refuted"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "physical_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "weight_lbs",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-04",
+    "phase": "experiment",
+    "pk": "COACH#physical_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_starting_from_326_2_lbs_on_day_1_body_w",
+    "sk": "PREDICTION#pred_20260906_starting_from_326_2_lbs_on_day_1_body_w",
+    "status": "confirmed",
+    "subdomain": "weight",
+    "verdict_correction": {
+     "action": "regrade",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "confirmed",
+     "prior": {
+      "baseline": {
+       "right": true,
+       "rule": "nothing_changes",
+       "version": 1
+      },
+      "outcome_date": "2026-10-04",
+      "outcome_notes": "{\"actual_value\": -0.007576852336785299, \"reason\": \"predicted down, metric flat (slope=-0.0076, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}",
+      "reason": "predicted down, metric flat (slope=-0.0076, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+      "status": "refuted"
+     },
+     "reason": "#4617: graded again on the change from the first to the last reading of the call's own window, against the metric's own day-to-day swing. The earlier grade compared only the most recent readings with the few before them."
+    }
+   },
+   {
+    "coach_id": "physical_coach",
+    "created_date": "2026-09-12",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-09-13",
+     "threshold": 54.7,
+     "tolerance": 18.2532,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.2532)",
+     "type": "point"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#physical_coach",
+    "prediction_id": "pred_20260912_tomorrow_s_recovery_score_will_rebound_t",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "within",
+      "evaluation_window_days": 2026,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "target_date": "2032-03-30",
+      "threshold": 54.7,
+      "tolerance": 18.2532,
+      "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.2532)",
+      "type": "point"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260912_tomorrow_s_recovery_score_will_rebound_t",
+    "status": "refuted",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "physical_coach",
+    "created_date": "2026-09-24",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#physical_coach",
+    "prediction_id": "pred_20260924_the_model_expects_84_8_recovery_tomorro",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "up",
+      "evaluation_window_days": 2026,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "threshold": null,
+      "type": "directional"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260924_the_model_expects_84_8_recovery_tomorro",
+    "status": "refuted",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "physical_coach",
+    "created_date": "2026-09-26",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-09-27",
+     "threshold": 85.3,
+     "tolerance": 21.308,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)",
+     "type": "point"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#physical_coach",
+    "prediction_id": "pred_20260926_recovery_score_will_be_85_3_tomorrow_wi",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "within",
+      "evaluation_window_days": 2026,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "target_date": "2032-04-13",
+      "threshold": 85.3,
+      "tolerance": 21.308,
+      "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)",
+      "type": "point"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260926_recovery_score_will_be_85_3_tomorrow_wi",
+    "status": "confirmed",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "physical_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": 0.044776, \"reason\": \"[hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-10-02) [window] predicted down, metric flat \\u2014 recovery_score 67 on 2026-10-12 -> 70 on 2026-10-16 (change +3, band \\u00b111.5, window 2026-10-11..2026-10-16)\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.1\", \"window\": {\"start\": \"2026-10-11\", \"end\": \"2026-10-16\", \"first_date\": \"2026-10-12\", \"first_value\": 67.0, \"last_date\": \"2026-10-16\", \"last_value\": 70.0, \"averaged_over\": 1, \"readings\": 5, \"change\": 3.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"flat\"}, \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-10-02\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-16\", \"excluded_days_n\": 2}}",
+      "corrected_status": "refuted",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-16",
+      "original_outcome_notes": "{\"actual_value\": -0.285714, \"reason\": \"[window] recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \\u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-02\", \"end\": \"2026-10-16\", \"first_date\": \"2026-10-02\", \"first_value\": 98.0, \"last_date\": \"2026-10-16\", \"last_value\": 70.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -28.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+      "original_status": "confirmed",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-10-02",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-16",
+     "outcome_notes": "{\"actual_value\": -0.285714, \"reason\": \"[window] recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \\u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-02\", \"end\": \"2026-10-16\", \"first_date\": \"2026-10-02\", \"first_value\": 98.0, \"last_date\": \"2026-10-16\", \"last_value\": 70.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -28.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#physical_coach",
+    "prediction_id": "pred_20261002_running_average_of_recovery_across_27_da",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20261002_running_average_of_recovery_across_27_da",
+    "status": "refuted",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "physical_coach",
+    "created_date": "2026-10-02",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-10-03",
+     "threshold": 75.8,
+     "tolerance": 17.8725,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)",
+     "type": "point"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#physical_coach",
+    "prediction_id": "pred_20261002_tomorrow_s_recovery_will_reach_approxima",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "within",
+      "evaluation_window_days": 30,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "target_date": "2026-11-01",
+      "threshold": 75.8,
+      "tolerance": 17.8725,
+      "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)",
+      "type": "point"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20261002_tomorrow_s_recovery_will_reach_approxima",
+    "status": "refuted",
+    "subdomain": "recovery"
+   }
+  ],
+  "sleep": [
+   {
+    "coach_id": "sleep_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "hrv_7day_avg",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-09-20",
+    "phase": "experiment",
+    "pk": "COACH#sleep_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_the_ramp_discipline_in_week_1_reduced",
+    "sk": "PREDICTION#pred_20260906_the_ramp_discipline_in_week_1_reduced",
+    "status": "confirmed",
+    "subdomain": "hrv",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "confirmed",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-20",
+      "outcome_notes": "{\"actual_value\": 0.23412323897684148, \"reason\": \"hrv_7day_avg trend=up (slope=0.2341), predicted=up\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reason": "hrv_7day_avg trend=up (slope=0.2341), predicted=up",
+      "status": "confirmed"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "sleep_coach",
+    "created_date": "2026-09-06",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "sleep_duration_hours",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-09-20",
+    "phase": "experiment",
+    "pk": "COACH#sleep_coach",
+    "pre_registered": true,
+    "prediction_id": "pred_20260906_with_a_fixed_bed_time_of_9_00_pm_and_wak",
+    "sk": "PREDICTION#pred_20260906_with_a_fixed_bed_time_of_9_00_pm_and_wak",
+    "status": "refuted",
+    "subdomain": "sleep",
+    "verdict_correction": {
+     "action": "restate",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "issue": "#4617",
+     "new_status": "refuted",
+     "prior": {
+      "baseline": null,
+      "outcome_date": "2026-09-20",
+      "outcome_notes": "{\"actual_value\": -0.01800574780380214, \"reason\": \"predicted up, metric flat (slope=-0.0180, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.0\"}",
+      "reason": "predicted up, metric flat (slope=-0.0180, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+      "status": "refuted"
+     },
+     "reason": "#4617: graded again across the call's own window; the grade is unchanged and now carries the window's first and last readings."
+    }
+   },
+   {
+    "coach_id": "sleep_coach",
+    "created_date": "2026-09-20",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "deep_pct",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#sleep_coach",
+    "prediction_id": "pred_20260920_once_protein_ewma_escalation_holds_for_a",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "up",
+      "evaluation_window_days": 1015,
+      "metric": "deep_pct",
+      "null_hypothesis": null,
+      "threshold": null,
+      "type": "directional"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260920_once_protein_ewma_escalation_holds_for_a",
+    "status": "refuted",
+    "subdomain": "general"
+   },
+   {
+    "coach_id": "sleep_coach",
+    "created_date": "2026-09-21",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-10-05",
+     "threshold": 90.9,
+     "tolerance": 23.7331,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=23.7331)",
+     "type": "point"
+    },
+    "outcome": "observation",
+    "outcome_date": "2026-10-05",
+    "phase": "experiment",
+    "pk": "COACH#sleep_coach",
+    "prediction_id": "pred_20260921_recovery_score_is_expected_to_hold_aroun",
+    "sk": "PREDICTION#pred_20260921_recovery_score_is_expected_to_hold_aroun",
+    "status": "observation",
+    "subdomain": "recovery",
+    "verdict_correction": {
+     "action": "withdraw:not-a-forecast",
+     "corrected_at": "2026-10-11T02:48:10.102408+00:00",
+     "issue": "#4618",
+     "named_day": "2026-09-20",
+     "new_status": "observation",
+     "prior": {
+      "baseline": {
+       "filed_on": "2026-09-20",
+       "filed_value": 97,
+       "right": true,
+       "rule": "nothing_changes",
+       "version": 1
+      },
+      "evaluation_window_days": 14,
+      "outcome_date": "2026-10-05",
+      "outcome_notes": "{\"actual_value\": 98.0, \"reason\": \"recovery_score=98.00 on 2026-10-05 vs predicted 90.9 \\u00b123.7331 (\\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=23.7331)); |\\u0394|=7.10 \\u2192 within tolerance\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\"}",
+      "reading": 98,
+      "status": "confirmed",
+      "target_date": "2026-10-05"
+     },
+     "reason": "#4618: the number is stated for a day on or before the day the call was filed, so the reading already existed. It is a recollection of a forecast, not a forecast, and nothing can settle it."
+    }
+   },
+   {
+    "coach_id": "sleep_coach",
+    "created_date": "2026-09-22",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "up",
+     "evaluation_window_days": 14,
+     "metric": "total_protein_g",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#sleep_coach",
+    "prediction_id": "pred_20260922_protein_hypothesis_will_activate_once_pr",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "up",
+      "evaluation_window_days": 1015,
+      "metric": "total_protein_g",
+      "null_hypothesis": null,
+      "threshold": null,
+      "type": "directional"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260922_protein_hypothesis_will_activate_once_pr",
+    "status": "confirmed",
+    "subdomain": "protein"
+   },
+   {
+    "coach_id": "sleep_coach",
+    "created_date": "2026-09-26",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "within",
+     "evaluation_window_days": 1,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "target_date": "2026-09-27",
+     "threshold": 85.3,
+     "tolerance": 21.308,
+     "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)",
+     "type": "point"
+    },
+    "outcome": "confirmed",
+    "outcome_date": "2026-10-11",
+    "phase": "experiment",
+    "pk": "COACH#sleep_coach",
+    "prediction_id": "pred_20260926_recovery_score_will_be_approximately_85",
+    "respecified_at": "2026-10-11T02:48:10.102408+00:00",
+    "respecified_from": {
+     "evaluation": {
+      "beats_null_if": null,
+      "condition": "within",
+      "evaluation_window_days": 2026,
+      "metric": "recovery_score",
+      "null_hypothesis": null,
+      "target_date": "2032-04-13",
+      "threshold": 85.3,
+      "tolerance": 21.308,
+      "tolerance_rule": "\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)",
+      "type": "point"
+     },
+     "status": "pending"
+    },
+    "respecified_reason": "#4618: the stored target day or window was not the one the sentence states; re-derived from the sentence.",
+    "sk": "PREDICTION#pred_20260926_recovery_score_will_be_approximately_85",
+    "status": "confirmed",
+    "subdomain": "recovery"
+   },
+   {
+    "coach_id": "sleep_coach",
+    "corrections": [
+     {
+      "corrected_at": "2026-11-01T18:11:57Z",
+      "corrected_outcome_date": "2026-11-01",
+      "corrected_outcome_notes": "{\"actual_value\": 0.044776, \"reason\": \"[hr-regime] graded from 2026-10-11 (re-baselined after the 2026-10-10 HR regime marker, health.hr_regime; the call asked from 2026-10-02) [window] predicted down, metric flat \\u2014 recovery_score 67 on 2026-10-12 -> 70 on 2026-10-16 (change +3, band \\u00b111.5, window 2026-10-11..2026-10-16)\", \"beats_null\": false, \"bayesian_update\": \"failure\", \"algo_version\": \"1.1\", \"window\": {\"start\": \"2026-10-11\", \"end\": \"2026-10-16\", \"first_date\": \"2026-10-12\", \"first_value\": 67.0, \"last_date\": \"2026-10-16\", \"last_value\": 70.0, \"averaged_over\": 1, \"readings\": 5, \"change\": 3.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"flat\"}, \"quality_flags\": [], \"evaluator_version\": \"1.1\", \"hr_regime\": {\"marker_date\": \"2026-10-10\", \"requested_start\": \"2026-10-02\", \"since\": \"2026-10-11\", \"window_end\": \"2026-10-16\", \"excluded_days_n\": 2}}",
+      "corrected_status": "refuted",
+      "evaluator_version": "1.1",
+      "original_outcome_date": "2026-10-16",
+      "original_outcome_notes": "{\"actual_value\": -0.285714, \"reason\": \"[window] recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \\u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-02\", \"end\": \"2026-10-16\", \"first_date\": \"2026-10-02\", \"first_value\": 98.0, \"last_date\": \"2026-10-16\", \"last_value\": 70.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -28.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+      "original_status": "confirmed",
+      "reason": "#5533 (e): an HR-metric window spanning the 2026-10-10 regime marker (health.hr_regime); re-graded re-baselined after the marker"
+     }
+    ],
+    "created_date": "2026-10-02",
+    "evaluation": {
+     "beats_null_if": null,
+     "condition": "down",
+     "evaluation_window_days": 14,
+     "metric": "recovery_score",
+     "null_hypothesis": null,
+     "threshold": null,
+     "type": "directional"
+    },
+    "evaluator_version": "1.1",
+    "original_grade": {
+     "baseline": {
+      "right": false,
+      "rule": "nothing_changes",
+      "version": 1
+     },
+     "outcome": "confirmed",
+     "outcome_date": "2026-10-16",
+     "outcome_notes": "{\"actual_value\": -0.285714, \"reason\": \"[window] recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \\u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down\", \"beats_null\": true, \"bayesian_update\": \"success\", \"algo_version\": \"1.0\", \"window\": {\"start\": \"2026-10-02\", \"end\": \"2026-10-16\", \"first_date\": \"2026-10-02\", \"first_value\": 98.0, \"last_date\": \"2026-10-16\", \"last_value\": 70.0, \"averaged_over\": 1, \"readings\": 15, \"change\": -28.0, \"band\": 11.5, \"band_rule\": \"the median day-to-day change of the readings inside the window\", \"direction\": \"down\"}}",
+     "snapshot_at": "2026-11-01T18:11:57Z",
+     "status": "confirmed"
+    },
+    "outcome": "refuted",
+    "outcome_date": "2026-11-01",
+    "phase": "experiment",
+    "pk": "COACH#sleep_coach",
+    "prediction_id": "pred_20261002_recovery_running_average_shows_downward",
+    "quality_flags": [],
+    "sk": "PREDICTION#pred_20261002_recovery_running_average_shows_downward",
+    "status": "refuted",
+    "subdomain": "recovery"
+   }
+  ]
+ }
+}
