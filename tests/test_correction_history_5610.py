@@ -209,3 +209,14 @@ def test_a_combined_reason_names_every_rule():
 
 def test_the_projection_reads_every_trail():
     assert {"corrections", "verdict_correction", "respecified_at", "respecified_from", "respecified_reason"} <= set(ledger.PROJECTION)
+
+
+def test_the_owner_rulings_of_2026_11_03_map_to_registered_words():
+    # The reasons the three sibling rulings write (owner, 2026-11-03) parse to registered ids — written BEFORE the rows
+    # are corrected, so the ledger export never meets an unexplained rule.
+    for reason, rid in (
+        ("#5611 (o) + owner ruling 2026-11-03: an opinion filed as a prediction", "#5611:o+owner-2026-11-03"),
+        ("#5611 (u) + owner ruling 2026-11-03: graded, but names no measurable outcome", "#5611:u+owner-2026-11-03"),
+    ):
+        assert ch.rule_ids_of_reason(reason) == [rid]
+        assert cr.explain([rid])

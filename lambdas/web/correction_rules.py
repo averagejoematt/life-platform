@@ -17,6 +17,8 @@ outcomes, which outcome. They are derived from what the row stores (``lambdas/we
   ``respecified_at`` / ``respecified_from`` trail it left on a call that was still open
 * ``#5533:<a-e>`` — ``deploy/regrade_predictions.py`` (``corrections[]``, the reason's ``#5533 (x):`` prefix)
 * ``#5533:c+owner-2026-11-02`` — the owner-ruled retirement of the protein if-then (2026-11-02)
+* ``#5611:o+owner-2026-11-03`` / ``#5611:u+owner-2026-11-03`` — the owner's sibling rulings (2026-11-03): an opinion
+  filed as a prediction becomes an observation (o, never graded) or, once graded, could not be checked (u)
 * ``revert`` — ``deploy/revert_regrade.py`` (a reason starting ``REVERT``)
 
 AN UNKNOWN ID IS AN ERROR, NOT A FALLBACK. ``explain`` raises ``UnknownCorrectionRule`` — the
@@ -75,6 +77,16 @@ RULES: dict[str, str] = {
         "The first grade counted a day with no food logged as a day of almost no eating. Read again, the call is an if-then "
         "about two days that had already happened, and its outcome names nothing that can be measured, so it was retired "
         "ungraded rather than graded again."
+    ),
+    "#5611:o+owner-2026-11-03": (
+        "The call was filed as a graded prediction, but its sentence is an opinion: its outcome names nothing that can be "
+        "measured. By the owner's ruling it stays on the record as an observation — never graded and outside the accuracy "
+        "count. Its original wording and the criteria it was filed under are kept."
+    ),
+    "#5611:u+owner-2026-11-03": (
+        "The call was graded, but its sentence names no outcome that can be measured, so the grade measured something the "
+        "sentence does not say. By the owner's ruling it is recorded as could not be checked: kept on the record with its "
+        "original grade preserved, and outside the accuracy count."
     ),
     "#5533:d": (
         "The call's average included readings from on or before the day it was made. It was graded again on readings after that day only."
