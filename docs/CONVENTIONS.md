@@ -346,15 +346,19 @@ holds this paragraph and the workflow to the same literal, so editing one alone 
 
 ### 4a0. What gates the MERGE (#1662, ADR-148)
 
-Distinct from §4a (which gates the *deploy*, on push to `main`). Three check-runs are
+Distinct from §4a (which gates the *deploy*, on push to `main`). Four check-runs are
 **required** on every PR to `main` by the `main-required-fast-lane` ruleset:
 `Collect + deploy-critical + format` and `Full unit suite (pre-merge, issue 3025)`
-(both `pr-checks.yml`), and `gitleaks (PR commit range only, not full history)`
-(`secret-scan.yml`). These are PR gates with no `paths:` filter and no job-level `if:`,
-so they report on every PR class including docs-only. Everything else (post-merge
+(both `pr-checks.yml`), `gitleaks (PR commit range only, not full history)`
+(`secret-scan.yml`), and `v9 web gate verdict (www build, required)` (`web-gate.yml`).
+These are PR gates with no `paths:` filter and no job-level `if:` other than the web
+gate verdict's `always()`, so they report on every PR class including docs-only. The web
+gate decides IN-RUN whether the PR touches the www build inputs: out of scope, its build
+job is skipped by design and the verdict passes in seconds; in scope, the verdict is the
+build's result (failed, cancelled or timed-out = red). Everything else (post-merge
 `Unit Tests`, `Lint + Syntax Check`, CodeQL, visual QA, the API-before-frontend check
 and the path-filtered gates) stays **advisory / post-merge**. Auto-merge is on: arm the
-PR once, GitHub lands it when those three go green.
+PR once, GitHub lands it when those four go green.
 
 **What the required fast lane runs (#4251):** collection + `deploy_critical` under xdist
 + mypy/black/ruff + bundle-boot. The wider `premerge` selection (behaviour suite +

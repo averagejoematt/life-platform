@@ -70,6 +70,9 @@ LAST_MEASURED_SECONDS_2026_09_21 = {
     # set. Frozen at its first write_lane_posture.py --measure reading: p95 1149s over
     # n=29 genuine completions, measured 2026-09-29.
     "Full unit suite (pre-merge, issue 3025)": 1149,
+    # owner ruling 2026-11: the v9 web gate's aggregator joined the required set. Frozen at
+    # its first write_lane_posture.py --measure reading: p95 10s over n=3, measured 2026-11-03.
+    "v9 web gate verdict (www build, required)": 10,
 }
 
 _PROVENANCE_KEYS = ("typical_measured_on", "typical_measured_by", "typical_statistic", "typical_n")
