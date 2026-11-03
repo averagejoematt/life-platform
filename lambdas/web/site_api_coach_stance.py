@@ -240,7 +240,10 @@ def _stance_from_latest(latest):
         "set_aside_for_now": plain_words.plain_items(audience_guard.public_items(latest.get("set_aside_for_now", []))),  # #4714
         "stage": _public_stage(latest.get("stage")),
         "how_my_read_changed": audience_guard.public_or_empty(latest.get("how_my_read_changed")),
-        "confidence_note": audience_guard.public_or_empty(latest.get("confidence_note")),
+        # #5607: `confidence_note` is not served. The summarizer writes it from the coach's
+        # CONFIDENCE# Beta posteriors ("low (0.429)… moderate (0.484)"), and
+        # docs/DATA_GOVERNANCE.md Tier 3 says prediction confidence scores are never
+        # exposed. The stored stance keeps it; the owner's tools still read it.
         "as_of": latest.get("as_of"),
         "grounding_flag": bool(latest.get("grounding_flag")),
     }
@@ -275,7 +278,6 @@ def _stance_block(coach_id, weight_lbs, *, _g):
             "rationale": rung.get("read_of_him") or "",
         },
         "how_my_read_changed": "",
-        "confidence_note": "",
         "as_of": None,
         "grounding_flag": False,
         # the ladder block (the scaffold's graduation framing) — since #4649 /api/coach/<id>

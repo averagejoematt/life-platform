@@ -30,7 +30,7 @@ from coach import (
     coach_presence_gate,  # #4217 — the absent coach: one derivation, fail-open
 )
 from coach.persona_registry import (  # coaching-team v2: names come from the registry
-    OPERATIONAL_SHORT_IDS,  # #3172: the ai_analysis EXPERT# keyspace
+    OPERATIONAL_SHORT_IDS,  # #2334: the ai_analysis EXPERT# keyspace (the ?expert= whitelist)
     display_map as _registry_display_map,
     short_id_names as _registry_short_names,
 )
@@ -172,16 +172,50 @@ def handle_recap(*, _g):
     )
 
 
+# #5607 (owner ruling 2026-11-03, item 5 — contain unintended publication): the weekly
+# EXPERT#{short} rows written by intelligence/ai_expert_analyzer_lambda are the coaches'
+# analysis written TO Matthew (the owner register, "your…"), and their prose carries the
+# weekly-thread predictions that were never filed on the ledger or graded. None of it is
+# served publicly until a reviewed public version exists. The route keeps answering (a 404
+# would break its consumers) with an explicit withheld state. The producer, the stored rows
+# and every owner-side reader (MCP, emails, the coach threads) are untouched.
+AI_ANALYSIS_WITHHELD_REASON = "The coaches' private analysis is not published until a reviewed public version exists."
+# Every prose field the EXPERT# row carries. None of them is ever read into a public body
+# (tests/test_contain_publication_5607.py walks the routed handlers for these keys).
+AI_ANALYSIS_PROSE_FIELDS = ("analysis", "key_recommendation", "journaling_prompt", "elena_quote")
+
+
+def _ai_analysis_withheld(expert_key, item=None, **extra):
+    """The public shape of /api/ai_analysis: no prose, only the facts that a private
+    analysis exists and when. Each kept field is a date or a count, never words:
+    `generated_at` (when the analyzer wrote it), `data_through` (the last data day it
+    read), `week_number` / `days_in_experiment` (which week of the run it covers)."""
+    item = item or {}
+    body = {
+        "expert_key": expert_key,
+        "state": "withheld",
+        "reason": AI_ANALYSIS_WITHHELD_REASON,
+        "generated_at": item.get("generated_at") or None,
+        "data_through": item.get("data_through"),
+    }
+    for field in ("week_number", "days_in_experiment"):
+        try:
+            if item.get(field) is not None:
+                body[field] = int(item[field])
+        except (TypeError, ValueError):
+            pass
+    body.update(extra)
+    return body
+
+
 def handle_ai_analysis(event, *, _g):
-    """GET /api/ai_analysis"""
+    """GET /api/ai_analysis — the withheld state (#5607): metadata only, never the prose."""
     _current_day_n = _g["_current_day_n"]
     table = _g["table"]
     qs = event.get("queryStringParameters") or {}
     expert_key = qs.get("expert", "mind")
     # Roster-derived whitelist, never re-typed (#2334; guard:
     # tests/test_coach_roster_set_guard_2334.py).
-    from coach.persona_registry import OPERATIONAL_SHORT_IDS
-
     if expert_key not in OPERATIONAL_SHORT_IDS:
         return _error(400, "Invalid expert key")
     ai_pk = f"{USER_PREFIX}ai_analysis"
@@ -189,91 +223,36 @@ def handle_ai_analysis(event, *, _g):
     # #946: singleton_visible closes the tombstone gap the days_in_experiment
     # guard below can't see (a wiped record whose day count is <= today's).
     if not singleton_visible(ai_item):
-        return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None, "data_through": None}, cache_seconds=300)
+        return _ok(_ai_analysis_withheld(expert_key), cache_seconds=300)
     ai_item = _decimal_to_float(ai_item)
-    # Stage0 Fix 3 (2026-05-30): freshness guard. The Brandt block on /explorer/
-    # was rendering "still 268 lbs over fifty-five days" because a pre-restart
-    # analysis record survived the genesis re-anchor. If the record's
-    # days_in_experiment is newer than the live experiment day count, the
-    # narrative is from a previous experiment cycle — refuse to serve it.
+    # Stage0 Fix 3 (2026-05-30): freshness guard. A record whose days_in_experiment is
+    # newer than the live experiment day count is from a previous cycle — its dates are
+    # not this run's either, so even the metadata is withheld.
     rec_days = ai_item.get("days_in_experiment")
     if rec_days is not None:
         try:
             if int(rec_days) > _current_day_n():
                 logger.info(
                     f"[ai_analysis] {expert_key} record claims day {rec_days} "
-                    f"but current is day {_current_day_n()} — withholding stale narrative"
+                    f"but current is day {_current_day_n()} — withholding stale metadata"
                 )
-                return _ok(
-                    {
-                        "expert_key": expert_key,
-                        "analysis": None,
-                        "generated_at": None,
-                        "data_through": None,
-                        "stale": True,
-                    },
-                    cache_seconds=300,
-                )
+                return _ok(_ai_analysis_withheld(expert_key, stale=True), cache_seconds=300)
         except (TypeError, ValueError):
             pass
-    analysis_val = ai_item.get("analysis", "")
-    if "[AI_UNAVAILABLE]" in (analysis_val or ""):
-        analysis_val = None
-    resp_data = {
-        "expert_key": expert_key,
-        "analysis": analysis_val,
-        "generated_at": ai_item.get("generated_at", ""),
-        "data_through": ai_item.get("data_through"),  # #4185 box 3 (null = a record written before the stamp)
-    }
-    # #4384 set sweep: this EXPERT# slot serves prose too — never a bare identifier.
-    if ai_item.get("key_recommendation") and not audience_guard.is_bare_token(ai_item["key_recommendation"]):
-        resp_data["key_recommendation"] = ai_item["key_recommendation"]
-    if ai_item.get("journaling_prompt"):
-        resp_data["journaling_prompt"] = ai_item["journaling_prompt"]
-    if ai_item.get("elena_quote"):
-        resp_data["elena_quote"] = ai_item["elena_quote"]
-    if ai_item.get("week_number"):
-        resp_data["week_number"] = int(ai_item["week_number"])
-    if ai_item.get("days_in_experiment"):
-        resp_data["days_in_experiment"] = int(ai_item["days_in_experiment"])
     return _ok(
-        resp_data,
+        _ai_analysis_withheld(expert_key, ai_item),
         cache_seconds=300,
-        # #3352 (the seventh #3252 sibling): the EXPERT# row is a STORED narrative written
-        # by intelligence/ai_expert_analyzer_lambda. The body already exposed its
-        # `generated_at`; the envelope wore the request instant, so `_meta` claimed a
-        # freshness the prose under it never had (ADR-104). One record, one stamp.
+        # #3352 (the seventh #3252 sibling): the envelope declares the stored row's own
+        # instant, not the request's (ADR-104). One record, one stamp.
         content_as_of=content_vintage(ai_item.get("generated_at")),
     )
 
 
-# #3172: "training" has no dedicated `ai_analysis` EXPERT# row of its own — the
-# coaching-team v2 merge (2026-08-10) folded it into physical_coach, and
-# ai_expert_analyzer_lambda's roster (OPERATIONAL_SHORT_IDS) never grew a
-# separate "training" expert_key to match. Mirrors coach_observatory_renderer's
-# alias of the same name.
-_EXPERT_KEY_ALIAS = {"training": "physical"}
-
-
-def _journaling_prompt_for_domain(table, domain):
-    """#3172: ``journaling_prompt`` is written by
-    ``intelligence.ai_expert_analyzer_lambda::generate_and_cache`` onto the
-    ``ai_analysis`` ``EXPERT#{expert_key}`` row — the ``COACH#{coach_id}``
-    ``OUTPUT#`` row ``handle_coach_analysis`` otherwise reads never carries it
-    (``coach.coach_state_updater::_write_output_record``'s item dict has no such
-    key; it never did), so ``output.get("journaling_prompt")`` was a permanent
-    dead-zone None. Resolve from the real producer instead.
-    """
-    expert_key = _EXPERT_KEY_ALIAS.get(domain, domain)
-    if expert_key not in OPERATIONAL_SHORT_IDS:
-        return None
-    try:
-        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": f"EXPERT#{expert_key}"}).get("Item")
-    except Exception:
-        return None
-    if not singleton_visible(item):
-        return None
-    return (item or {}).get("journaling_prompt")
+# #5607: `_journaling_prompt_for_domain` (#3172) used to re-serve the ai_analysis EXPERT#
+# row's journaling prompt on /api/coach_analysis. That row is the owner register and is
+# withheld from every public surface, so the public reader of it is gone, not guarded.
+# The owner-side reader (coach.coach_observatory_renderer, an internal Lambda with no
+# public route) keeps its own copy.
 
 
 def _reader_register(resp, output):
@@ -531,7 +510,9 @@ def handle_coach_analysis(event, *, _g):
             # null, and `_reader_register` refuses a bare token on every prose slot.
             "key_recommendation": output.get("key_recommendation"),
             "elena_quote": output.get("elena_quote"),
-            "journaling_prompt": _journaling_prompt_for_domain(table, domain),  # #3172: real producer is ai_analysis EXPERT#
+            # #5607: the journaling prompt's only producer is the owner-register ai_analysis
+            # EXPERT# row (#3172), which is withheld from every public surface — never re-served here.
+            "journaling_prompt": None,
             "thread_reference": thread_reference,
             "revision_signal": revision_signal,
             "cross_coach_reference": cross_coach_reference,

@@ -121,6 +121,24 @@ def _docket_rows(prefix, limit, newest_first, *, _g):
     return rows[:limit]
 
 
+# #5607 (owner ruling 2026-11-03, item 5): a docket stake's `confidence` is the coach's
+# CONFIDENCE# Beta-posterior mean frozen when the bet opened (coach.dispute_docket.
+# _confidence_at_open) — internal coach state that docs/DATA_GOVERNANCE.md Tier 3 says is
+# never exposed. The page never printed it (coaching.js stakeLine reads brier/brier_n);
+# the stored docket keeps it.
+STAKE_PRIVATE_FIELDS = ("confidence",)
+
+
+def _public_stakes(stakes):
+    """{coach_id: stake} as served: the Brier record and subdomain, never the posterior."""
+    if not isinstance(stakes, dict):
+        return {}
+    return {
+        cid: ({k: v for k, v in stake.items() if k not in STAKE_PRIVATE_FIELDS} if isinstance(stake, dict) else stake)
+        for cid, stake in stakes.items()
+    }
+
+
 def handle_coach_docket(event, *, _g):
     """GET /api/coach_docket — The Dispute Docket (#1386): standing coach
     disagreements with skin in the game.
@@ -195,7 +213,7 @@ def handle_coach_docket(event, *, _g):
                 "sides": it.get("sides") or {},
                 "resolution_date": it.get("resolution_date"),
                 "opened_date": it.get("opened_date"),
-                "stakes": it.get("stakes") or {},
+                "stakes": _public_stakes(it.get("stakes")),
             }
             if dark:
                 kept, held = claim_sourcing.split_claims(claims, it.get("opened_date"), dark)

@@ -969,10 +969,13 @@ def _expert_body_4384(monkeypatch, key_recommendation):
 
 
 def test_ai_analysis_never_serves_a_slug_as_its_recommendation(monkeypatch):
-    """#4384 set sweep: /api/ai_analysis's EXPERT# key_recommendation is the same slot."""
+    """#4384 set sweep: /api/ai_analysis's EXPERT# key_recommendation is the same slot.
+
+    #5607 (owner ruling 2026-11-03): the whole EXPERT# row is the owner register and is
+    withheld — neither a slug nor a real ask is served."""
     assert "key_recommendation" not in _expert_body_4384(monkeypatch, "deep_sleep_variability")
     ask = "Write down the time he got into bed one night this week."
-    assert _expert_body_4384(monkeypatch, ask)["key_recommendation"] == ask
+    assert "key_recommendation" not in _expert_body_4384(monkeypatch, ask)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -706,7 +706,10 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
     .then(function(r) { return r.ok ? r.json() : null; })
     .then(function(data) {
       if (!data || !data.analysis) {
-        el.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:rgba(255,255,255,0.3)">Analysis generates weekly. Check back Monday.</div>';
+        // #5607: the coaches' analysis is withheld until a reviewed public version exists — say so, never "check back".
+        var emptyMsg = (data && data.state === 'withheld' && data.reason) ? data.reason : 'Analysis generates weekly. Check back Monday.';
+        el.innerHTML = '<div style="font-family:var(--font-serif);font-size:13px;color:rgba(255,255,255,0.3)"></div>';
+        el.firstChild.textContent = emptyMsg;
         return;
       }
 
