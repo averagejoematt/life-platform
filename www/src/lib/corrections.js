@@ -45,6 +45,10 @@ export function correctionRows(c) {
 }
 
 /** The audit line under the stored reason: the rule id(s) and evaluator version, as recorded. */
+// A rule id is an identifier, not a quotation: a date inside one (the owner's ruling of 2 November 2026 is
+// `#5533:c+owner-2026-11-02`) is written in words on the page, like every other authored date.
+const idInWords = (id) => String(id).replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (iso) => dayInWords(iso) || iso);
+
 export function ruleText(c) {
-  return (c.rules || []).map((r) => (r.version ? `${r.id}, evaluator ${r.version}` : `${r.id}, version ${NOT_RECORDED}`)).join(" · ");
+  return (c.rules || []).map((r) => (r.version ? `${idInWords(r.id)}, evaluator ${r.version}` : `${idInWords(r.id)}, version ${NOT_RECORDED}`)).join(" · ");
 }
