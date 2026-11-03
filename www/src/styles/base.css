@@ -552,6 +552,12 @@ th.r {
   border-color: var(--verm-text);
   color: var(--verm-text);
 }
+/* owner rulings 2026-11-03: a verdict under classification review — beside the status, never instead of it */
+.flag.disputed {
+  border-color: var(--verm-text);
+  color: var(--verm-text);
+  margin-left: 6px;
+}
 .code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

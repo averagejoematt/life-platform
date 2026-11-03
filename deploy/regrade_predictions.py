@@ -39,7 +39,8 @@ The run's aggregate impact — the per-coach before/after table and the headline
 evaluator's state partition. Selection is idempotent AND version-proof (#5613): a row carrying ANY
 correction history (``grade_corrections.has_correction_history`` — an ``original_grade`` snapshot or a
 ``corrections[]`` entry, an owner ruling included) is never selected, whatever the evaluator version or
-the reason's wording. A further change to such a row is a deliberate per-row ruling, not a re-run.
+the reason's wording. A further change to such a row is a deliberate per-row ruling, not a re-run. A row under
+classification review (``coach.classification_review``, owner ruling 2026-11-03) is never selected either.
 
 RUN:  python3 deploy/regrade_predictions.py              # dry-run: the tables (post on #5533 BEFORE --apply)
       python3 deploy/regrade_predictions.py --json plan.json
@@ -66,7 +67,7 @@ os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 from boto3.dynamodb.conditions import Key  # noqa: E402
-from coach import coach_record, grade_corrections, grading_quality  # noqa: E402
+from coach import classification_review, coach_record, grade_corrections, grading_quality  # noqa: E402
 from coach.persona_registry import RETIRED_COACH_IDS  # noqa: E402
 from coach.prediction_grading import build_outcome_notes  # noqa: E402
 from coach.prediction_windows import effective_window_days, is_gradeable  # noqa: E402
@@ -139,6 +140,8 @@ def reasons_for(row: dict, *, today: str, zero_days: set[str], retired_ids=RETIR
         return []
     if grade_corrections.has_correction_history(row):
         return []  # #5613: structural — a corrected / ruled row is never re-selected, under any version or wording
+    if classification_review.is_under_review(row):
+        return []  # owner ruling 2026-11-03: a disputed verdict waits for a ruling, never a re-run
     out = []
     if _coach_of(row) in retired_ids and status in OPEN_STATUSES:
         out.append(RETIRED)

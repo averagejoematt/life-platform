@@ -56,7 +56,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from coach import coach_baseline, coach_record, grade_corrections, grading_quality  # noqa: E402
+from coach import classification_review, coach_baseline, coach_record, grade_corrections, grading_quality  # noqa: E402
 from common import pacific_time, stats_core  # noqa: E402
 from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from common.numeric import decimals_to_float  # noqa: E402
@@ -291,6 +291,7 @@ def status_buckets(parts: list[list[dict]], *, genesis: str | None) -> dict:
     """The ``/api/predictions`` tally: per partition over ``resolved_once`` rows, bucketed by
     ``ledger_export.bucket_status``; ``genesis`` None = lifetime (every row), else the rows ``counts_this_cycle``."""
     out = {b: 0 for b in STATUS_BUCKETS}
+    out["under_review"] = 0  # owner ruling 2026-11-03: a disputed verdict is its own bucket, never decided
     out["total"] = 0
     for rows in parts:
         for row in coach_record.resolved_once(rows):
@@ -299,7 +300,8 @@ def status_buckets(parts: list[list[dict]], *, genesis: str | None) -> dict:
             if genesis is not None and not coach_record.counts_this_cycle(row, genesis):
                 continue
             out["total"] += 1
-            out[ledger_export.bucket_status(row)] += 1
+            b = ledger_export.bucket_status(row)
+            out["under_review" if b in ("confirmed", "refuted") and classification_review.is_under_review(row) else b] += 1
     out["decided"] = out["confirmed"] + out["refuted"]
     return out
 
@@ -329,6 +331,7 @@ def record_block(parts: list[list[dict]], *, genesis: str, as_of: str, career: b
     the pool is the concatenation of the per-partition results."""
     decided: list = []
     scored_rows: list = []
+    under_review = 0
     confirmed = refuted = 0
     through = ""
     for rows in parts:
@@ -337,6 +340,7 @@ def record_block(parts: list[list[dict]], *, genesis: str, as_of: str, career: b
         refuted += rec["refuted"]
         through = max(through, rec["through"] or "")
         decided.extend(coach_record.decided_rows(rows, genesis=genesis, career=career))
+        under_review += len(coach_record.under_review_rows(rows, genesis=genesis, career=career))
         survivors = coach_record.resolved_once(rows)
         scored_rows.extend(survivors if career else [r for r in survivors if coach_record.counts_this_cycle(r, genesis)])
     record = {"confirmed": confirmed, "refuted": refuted, "n": confirmed + refuted, "through": through or None}
@@ -352,6 +356,9 @@ def record_block(parts: list[list[dict]], *, genesis: str, as_of: str, career: b
         "k_right": k,
         "pct": round(100.0 * k / n, 1) if n >= coach_record.PERCENT_FLOOR else None,
         "headline": coach_record.headline(record),
+        # Owner ruling 2026-11-03: graded calls under classification review — OUT of n / k / Brier / the comparison
+        # (coach_record.decided_rows and calibration_core skip them), disclosed here beside the record.
+        "under_review": under_review,
         "wilson95_pct": cal["accuracy_ci95"],
         "brier": cal["brier"],
         "brier_skill": cal["brier_skill"],
@@ -647,7 +654,7 @@ def reconcile(report: dict, api: dict, *, served_ids: set, local_items: dict) ->
     po = pred.get("overall") or {}
     cyc = report["overall"]["cycle"]
     life = report["overall"]["lifetime"]
-    for b in STATUS_BUCKETS + ("total", "decided"):
+    for b in STATUS_BUCKETS + ("under_review", "total", "decided"):
         _cmp(rows, "/api/predictions overall", b, cyc["calls"][b], po.get(b), unexplained)
         _cmp(rows, "/api/predictions overall.lifetime", b, life["calls"][b], (po.get("lifetime") or {}).get(b), unexplained)
     _cmp(rows, "/api/predictions overall", "counted", cyc["counted"], po.get("counted"), unexplained)
@@ -929,9 +936,14 @@ def render_markdown(report: dict) -> str:
         f"Brier {_fmt(oc['brier'])}, skill {_fmt(oc['brier_skill'])} vs the pool's own base rate; coaches' stratum skill "
         f"{_fmt(report['overall']['coaches_stratum']['brier_skill'])}. Confidence exactly 0.5 on "
         f"{oc['confidence']['at_exactly_0_5']} of {oc['confidence']['n']}."
+        + (
+            f" {oc['under_review']} graded call(s) under classification review are disputed and excluded from every number here."
+            if oc.get("under_review")
+            else ""
+        )
     )
     L.append("")
-    L.append("Calls: " + ", ".join(f"{b} {oc['calls'][b]}" for b in STATUS_BUCKETS + ("total",)))
+    L.append("Calls: " + ", ".join(f"{b} {oc['calls'][b]}" for b in STATUS_BUCKETS + ("under_review", "total")))
     L.append("")
     L.append(f"Simple guess: {_sg(oc)}. Unscorable: {oc['unscorable']['n']} {_fmt(oc['unscorable']['reasons'])}.")
     L.append("")

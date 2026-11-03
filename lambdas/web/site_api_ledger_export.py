@@ -32,8 +32,13 @@ none is an empty list, not a missing key; a row whose words are held serves ``[]
               due_date, settled_date, kind, status, confidence, sealed,
               grading: {how, actual_text, tolerance_text, outcome_notes},
               simple_guess, quality_flags: [], corrections: [],
-              grading_held?, grading_held_reason?}],   # only on a row under an owner evaluation hold (#5607)
+              grading_held?, grading_held_reason?,     # only on a row under an owner evaluation hold (#5607)
+              classification_review?, classification_review_reason?}],  # only on a settled row under review
      total, page, size, pages, as_of}
+
+CLASSIFICATION REVIEW (owner rulings 2026-11-03). A settled verdict the owner disputed keeps its place and its
+STORED status (e.g. ``refuted``) and carries ``classification_review: true`` + a public reason; it is out of every
+verified count (``coach.classification_review``) and the page shows it as disputed beside the verdict.
 
 PRIVACY. A claim is served only when the dossier filter clears it (``coach_dossier.dossier_safe``,
 the same gate `/api/calls` and the docket apply); a withheld claim is ``""`` with
@@ -61,7 +66,7 @@ from __future__ import annotations
 import math
 from typing import Any, Callable
 
-from coach import coach_baseline, coach_dossier, coach_record, evaluation_hold, prediction_windows
+from coach import classification_review, coach_baseline, coach_dossier, coach_record, evaluation_hold, prediction_windows
 from common import journal_silence
 from common.pacific_time import pacific_date_of, pacific_today
 
@@ -245,6 +250,9 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
         # and the reader is told why it is not being graded rather than seeing a silent stall.
         item["grading_held"] = True
         item["grading_held_reason"] = evaluation_hold.hold_reason(row)
+    if classification_review.is_under_review(row):
+        # Owner rulings 2026-11-03: the verdict is preserved as stored and shown DISPUTED, pending classification.
+        item.update(classification_review.served_fields(row, words_held=bool(withheld or held)))
     return item
 
 

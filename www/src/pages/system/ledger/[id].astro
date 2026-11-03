@@ -5,6 +5,7 @@ import Provenance from "../../../components/Provenance.astro";
 import Quote from "../../../components/Quote.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { correctionRows, ruleText } from "../../../lib/corrections.js";
+import { isDisputed } from "../../../lib/disputed.js";
 import { dayInWords } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
@@ -17,7 +18,8 @@ const { prediction: p } = Astro.props;
 const all = await loadAll();
 const coach = all.get("coach", p.coach_id);
 const methods = p.method_ids.map((id) => all.get("method", id)).filter(Boolean);
-const graded = p.status === "confirmed" || p.status === "refuted";
+const disputed = isDisputed(p);
+const graded = (p.status === "confirmed" || p.status === "refuted") && !disputed;
 const metric = p.metric_id ? all.get("metric", p.metric_id) : null;
 const FLAG_TEXT: Record<string, string> = {
   logging_gap: "graded through a logging gap",
@@ -31,7 +33,7 @@ const FLAG_TEXT: Record<string, string> = {
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:18px">
         <p class="label">Prediction · {p.coach_name}{p.retired ? " (retired)" : ""} · {p.kind === "observation" ? "an observation" : p.kind === "yes_no" ? "yes or no" : `a ${p.kind}`}</p>
-        <div class="row"><StatusTag status={p.status} date={p.settled_date} call />{p.quality_flags.map((f) => <span class={`flag ${f}`}>{f.replace("_", " ")}</span>)}<Provenance object={p} /></div>
+        <div class="row"><StatusTag status={p.status} date={p.settled_date} call disputed={disputed} />{p.quality_flags.map((f) => <span class={`flag ${f}`}>{f.replace("_", " ")}</span>)}<Provenance object={p} /></div>
         {
           p.claim_withheld ? (
             <h1 class="serif muted" style="font-size:22px;font-weight:400;line-height:1.4;overflow-wrap:anywhere">
@@ -58,6 +60,15 @@ const FLAG_TEXT: Record<string, string> = {
           <pre class="code">{p.grading?.how || (p.status === "pending" ? "Window open — graded by code when it closes." : "No grading record served.")}{p.grading?.outcome_notes ? `\n\nevaluator: ${p.grading.outcome_notes}` : ""}{p.grading?.actual_text ? `\nactual: ${p.grading.actual_text}` : ""}{p.grading?.tolerance_text ? `\ntolerance: ${p.grading.tolerance_text}` : ""}</pre>
           {methods.length > 0 && <p class="muted" style="margin-top:8px;font-size:13px">Method: {methods.map((m) => <a href={href(pathOf("method", m.id))}>{m.name}</a>)}</p>}
         </div>
+        {
+          disputed && (
+            <div style="border:1px solid var(--verm-text);padding:16px 18px;display:flex;flex-direction:column;gap:8px">
+              <span class="label" style="color:var(--verm-text)">Disputed · under classification review</span>
+              <span style="font-size:14px;line-height:1.5">{p.classification_review_reason}</span>
+              <span class="muted" style="font-size:12px">The verdict is kept exactly as it was graded and is not counted as right or wrong in any record, rate or score until the review is decided.</span>
+            </div>
+          )
+        }
         {
           p.quality_flags.length ? (
             <div style="border:1px solid var(--verm-text);padding:16px 18px;display:flex;flex-direction:column;gap:8px">

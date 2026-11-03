@@ -73,6 +73,7 @@ from common import pacific_time
 from common.pacific_time import shift_day_key
 from experiment.phase_filter import singleton_visible
 
+from coach import classification_review
 from coach.prediction_windows import due_date
 
 logger = logging.getLogger(__name__)
@@ -113,6 +114,8 @@ _PROJECTION_NAMES = {
     # #5533: the grader's own flags on a graded row — ``quality_counts`` reads them off the
     # SAME projected rows, so the clean count beside K of N can never come from a second read.
     "#qf": "quality_flags",
+    # Owner ruling 2026-11-03: ``decided_rows`` leaves a disputed verdict out of K of N — the flag must be read.
+    "#cr": "classification_review",
 }
 
 
@@ -183,7 +186,21 @@ def decided_rows(rows: Iterable[Any], *, genesis: str | None, career: bool = Fal
     obituary cards are drawn from its refuted members (#4220 — the obituaries were a
     second derivation over ``LEARNING#`` that printed 23 explorer refutations beside a
     record of 3, twenty of them one pre-genesis docket re-recorded daily).
+
+    Owner ruling 2026-11-03: a verdict under classification review (``coach.classification_review``) is NOT
+    in this set — it is "excluded from any claim that its outcome has been reliably verified" — and is
+    disclosed beside the record by ``under_review_rows`` instead. Its stored status is unchanged.
     """
+    return [r for r in _graded_in_scope(rows, genesis=genesis, career=career) if not classification_review.is_under_review(r)]
+
+
+def under_review_rows(rows: Iterable[Any], *, genesis: str | None, career: bool = False) -> list[dict]:
+    """The graded rows the record WOULD count but that are under classification review — the
+    ``under_review: N`` disclosure beside a K of N (owner ruling 2026-11-03), never part of it."""
+    return [r for r in _graded_in_scope(rows, genesis=genesis, career=career) if classification_review.is_under_review(r)]
+
+
+def _graded_in_scope(rows: Iterable[Any], *, genesis: str | None, career: bool) -> list[dict]:
     out: list[dict] = []
     for row in resolved_once(rows):
         if graded_status(row) is None:
