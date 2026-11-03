@@ -291,6 +291,10 @@ def score_pairs(pairs, n_bins=10):
         label, score = "reliable", 70
     else:
         label, score = "developing", 50
+    # #5615 (owner ruling 2026-11-03): a positive label on nearly-one-band confidence is fragile — its skill comes
+    # from a handful of calls off the band — so it is withheld as under_review; score, n and skill stay served.
+    if label in ("developing", "reliable", "authoritative") and calibration == "not_measurable" and skilled is True:
+        label = "under_review"
 
     return {
         "n": n,

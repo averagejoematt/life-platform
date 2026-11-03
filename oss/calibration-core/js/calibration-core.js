@@ -31,7 +31,7 @@
 //
 // Licence: MIT.
 
-export const VERSION = "1.3.0"; // 1.3.0: "well-calibrated" withheld when >= CONCENTRATED_SHARE of calls sit in one band
+export const VERSION = "1.4.0"; // 1.4.0: positive labels withheld as under_review on one-band confidence; 1.3.0: "well-calibrated" withheld when >= CONCENTRATED_SHARE of calls sit in one band
 
 // When this share of resolved calls sits in ONE stated-confidence band, calibration across confidences cannot be read.
 export const CONCENTRATED_SHARE = 0.9;
@@ -361,6 +361,8 @@ export function scorePairs(pairs, nBins = 10) {
     label = "developing";
     score = 50;
   }
+  // A positive label on nearly-one-band confidence is fragile: withheld as under_review (score, n, skill still served).
+  if (["developing", "reliable", "authoritative"].includes(label) && calibration === "not_measurable" && skilled === true) label = "under_review";
 
   return {
     n,
