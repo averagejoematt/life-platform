@@ -64,6 +64,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     _WORDED_TEXT_KEYS,
     ABSENT_JOURNEY,
     COLLECTION_OF,
+    CORRECTION_FIELDS,
     DEFAULT_BASE_URL,
     DEFAULT_FIXTURES,
     ENVELOPE,
@@ -96,6 +97,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     partition,
     reference_copies,
     validate,
+    validate_correction,
     validate_data_files,
     word_dates,
     write_snapshot,
@@ -496,20 +498,13 @@ def _ledger_pages(ctx: LiveContext) -> list[dict]:
 
 
 def _correction_entry(e: dict) -> dict:
-    """One correction as the ledger serves it, every key kept (owner requirement B — the original
-    grade, its timestamp, the corrected grade, the correction timestamp, the reason, the evaluator
-    version and the aggregate impact), with the names the page reads normalised."""
-    out = dict(e)
-    out.setdefault("original_grade", e.get("original") or None)
-    out.setdefault(
-        "original_timestamp", (e.get("original_grade") or {}).get("snapshot_at") if isinstance(e.get("original_grade"), dict) else None
-    )
-    out.setdefault("corrected_grade", e.get("corrected_status"))
-    out.setdefault("corrected_at", None)
-    out.setdefault("reason", None)
-    out.setdefault("evaluator_version", None)
-    out.setdefault("aggregate_impact", None)
-    return out
+    """One correction as the ledger serves it (#5610, owner decision D 2026-11-02): every key the
+    contract declares (``CORRECTION_FIELDS`` — the served ``lambdas/web/correction_history.FIELDS``
+    plus ``aggregate_impact``), each copied as served, nothing derived. A key the API did not serve is
+    null; a served key the contract does not declare is dropped here and the strict
+    ``validate_correction`` then names a MISSING one — so a pre-#5610 API (no ``source``, no
+    ``explanation``) fails the export instead of rendering engineering text."""
+    return {k: e.get(k) for k in CORRECTION_FIELDS}
 
 
 def _retired_coach(ctx: LiveContext, pid: str, short: str, name: str) -> None:
