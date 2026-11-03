@@ -810,14 +810,12 @@ def read_inputs(table: Any, today: str, coach_ids: list, names: dict) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("[coach_moves] pillar absence unavailable: %s", e)
     try:
-        from health import nutrition_logging
-
         from coach import coach_input_facts
 
         rows = coach_input_facts.fetch_macrofactor_window(table, today)
         if rows is not None:
             inputs["nutrition"] = coach_input_facts.nutrition_record(rows, today)
-            inputs["protein_series"] = nutrition_logging.protein_series(rows)
+            inputs["protein_series"] = coach_input_facts.logged_protein_series(rows)  # #5613: a stub day is missing
     except Exception as e:  # noqa: BLE001
         logger.warning("[coach_moves] nutrition record unavailable: %s", e)
     try:

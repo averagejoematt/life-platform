@@ -602,6 +602,15 @@ _STRAVA_COUNTED_DIRECTLY_PY = (
     "def workouts_30d(rows):\n"
     '    return sum(len(r.get("activities") or []) for r in rows)\n'
 )
+_SETTLED_GRADE_REWRITER_PY = (
+    '"""census probe — a writer that rewrites a settled grade outside the correction ledger, which must never exist (#5613)."""\n\n\n'
+    "def silent_regrade(table, row):\n"
+    "    table.update_item(\n"
+    '        Key={"pk": row["pk"], "sk": row["sk"]},\n'
+    '        UpdateExpression="SET outcome_notes = :n",\n'
+    '        ExpressionAttributeValues={":n": "1.2 text"},\n'
+    "    )\n"
+)
 _MAY_TRACKER_PUBLISHED_IMPORTER_PY = (
     '"""census probe — a published importer that must never exist."""\n\n'
     "from training import may_tracker\n\n\n"
@@ -1550,6 +1559,17 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/web/_census_probe_5387.py", _STRAVA_COUNTED_DIRECTLY_PY),),
         track=False,  # the guard os.walks lambdas/ mcp/ on disk
     ),
+    # #5613: a settled PREDICTION# grade changes only through coach.grade_corrections.apply_correction.
+    "structural::test_settled_grade_writers_5613.py": MutationSpec(
+        gate_id="structural::test_settled_grade_writers_5613.py",
+        target="tests/test_settled_grade_writers_5613.py",
+        detects=(
+            "a module (lambdas/coach) writing `outcome_notes` onto a prediction row with a bare update_item — a grade "
+            "rewritten with no original kept and no corrected_at / reason / evaluator_version, outside grade_corrections"
+        ),
+        plants=(("lambdas/coach/_census_probe_5613.py", _SETTLED_GRADE_REWRITER_PY),),
+        track=False,  # the guard os.walks lambdas/ deploy/ scripts/ mcp/ on disk
+    ),
 }
 
 
@@ -1680,6 +1700,18 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "STILL INVISIBLE, stated: a count through variables named for nothing activity-like (`n = len(xs)` where `xs` "
         "came from a day row), a count in the front end (site/ JS), and the six residual modules named on #5387's PR.",
         proved_on="2026-10-26",
+    ),
+    "structural::test_settled_grade_writers_5613.py": _proof(
+        "structural::test_settled_grade_writers_5613.py",
+        "ARMED 1/1 — baseline: 7 passed in 8.22s | mutated: 1 failed, 6 passed in 6.99s :: "
+        "test_no_writer_changes_a_settled_grade_outside_grade_corrections | reverted: 7 passed in 6.83s",
+        "lambdas/, deploy/, scripts/ and mcp/ on disk (os.walk, every .py parsed): a function that writes a DynamoDB update "
+        "(update_item / transact_write_items, or an UpdateExpression it builds) whose string constants SET `outcome` or "
+        "`outcome_notes`, or SET `status` (directly or through a `#alias`) in a module naming `PREDICTION#`, fails unless "
+        "it is one of grade_corrections' three writers or a registered other-row-family / retired / open-only writer. "
+        "STILL INVISIBLE, stated: an expression assembled wholly from runtime values (no constant naming the field), and a "
+        "full-item put_item that overwrites a settled row.",
+        proved_on="2026-11-02",
     ),
     "structural::test_repo_walk_5273.py": _proof(
         "structural::test_repo_walk_5273.py",

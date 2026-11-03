@@ -269,6 +269,16 @@ def _decimalize(obj):
     return obj
 
 
+# #5613 (2026-11-02): this run-once correction wrote status / outcome_notes onto settled PREDICTION# rows
+# directly, before the correction ledger existed. Its --apply is retired: a settled grade now changes ONLY
+# through coach.grade_corrections.apply_correction (original kept, corrected_at / reason / evaluator_version
+# recorded). The dry run still prints what it would have selected.
+RETIRED_APPLY = (
+    "--apply is retired (#5613): a settled grade changes only through coach.grade_corrections.apply_correction — "
+    "route a correction through deploy/regrade_predictions.py or a per-row ruling"
+)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true", help="write the corrections (a DDB mutation — owner/driver act)")
@@ -278,6 +288,9 @@ def main() -> int:
     )
     ap.add_argument("--json", help="write the plan here as JSON")
     args = ap.parse_args()
+    if args.apply:  # #5613: a settled grade changes only through coach.grade_corrections.apply_correction
+        print(RETIRED_APPLY, file=sys.stderr)
+        return 2
 
     table = _table()
     coaches = args.coach or list(OPERATIONAL_COACH_IDS)

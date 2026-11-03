@@ -207,12 +207,25 @@ def _fmt_days(day_values):
     return ", ".join(f"{d[5:]} {'—' if v is None else f'{v:g}'}" for d, v in day_values)
 
 
+# #5613 (2026-11-02): this run-once correction wrote status / outcome_notes onto settled PREDICTION# rows
+# directly, before the correction ledger existed. Its --apply is retired: a settled grade now changes ONLY
+# through coach.grade_corrections.apply_correction (original kept, corrected_at / reason / evaluator_version
+# recorded). The dry run still prints what it would have selected.
+RETIRED_APPLY = (
+    "--apply is retired (#5613): a settled grade changes only through coach.grade_corrections.apply_correction — "
+    "route a correction through deploy/regrade_predictions.py or a per-row ruling"
+)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true", help="write the corrections (a DDB mutation — owner/driver act)")
     ap.add_argument("--json", help="write the plan here as JSON")
     ap.add_argument("--all", action="store_true", help="print every count-shaped row, not only decided ones")
     args = ap.parse_args()
+    if args.apply:  # #5613: a settled grade changes only through coach.grade_corrections.apply_correction
+        print(RETIRED_APPLY, file=sys.stderr)
+        return 2
 
     today = ev.pacific_today()
     partitions = [f"COACH#{c}" for c in OPERATIONAL_COACH_IDS] + [ev.DIARY_CLAIMS_PK]

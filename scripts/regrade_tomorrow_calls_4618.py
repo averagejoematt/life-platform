@@ -482,12 +482,25 @@ def record_table(before, after):
     return "\n".join(lines)
 
 
+# #5613 (2026-11-02): this run-once correction wrote status / outcome_notes onto settled PREDICTION# rows
+# directly, before the correction ledger existed. Its --apply is retired: a settled grade now changes ONLY
+# through coach.grade_corrections.apply_correction (original kept, corrected_at / reason / evaluator_version
+# recorded). The dry run still prints what it would have selected.
+RETIRED_APPLY = (
+    "--apply is retired (#5613): a settled grade changes only through coach.grade_corrections.apply_correction — "
+    "route a correction through deploy/regrade_predictions.py or a per-row ruling"
+)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--apply", action="store_true", help="WRITE the corrections (a DynamoDB mutation) — default is a dry run")
     ap.add_argument("--exclude", action="append", default=[], help="a row's sk to leave out of the plan (repeatable)")
     ap.add_argument("--json", help="also write the plan to this path")
     args = ap.parse_args(argv)
+    if args.apply:  # #5613: a settled grade changes only through coach.grade_corrections.apply_correction
+        print(RETIRED_APPLY, file=sys.stderr)
+        return 2
 
     ev = _evaluator()
     table = ev.table
