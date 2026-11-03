@@ -27,7 +27,12 @@ dated correction beside it (``corrections`` / ``summary_corrections`` / ``grade_
 ``<p class="correction">`` in the Day page's figure) is reported as ANNOTATED, not as a failure: a verbatim quotation
 with its correction beside it is the ruling's intended state.
 
-Exit 0: no unannotated contradiction. Exit 1: at least one. Exit 2: a surface could not be read.
+Buckets: ``contradicts`` (unannotated), ``annotated`` (a dated correction stands beside it) and ``flagged_for_review`` —
+every verdict sentence of a quarterly memoir, which a lexical check cannot certify either way (owner review of #5644:
+"Keep the quarterly Mind memoir flagged for review rather than silently declaring everything reconciled").
+
+Exit 0: nothing contradicts and nothing is flagged. Exit 1: an unannotated contradiction. Exit 3: only flagged items.
+Exit 2: a surface could not be read.
 
     python3 scripts/check_coach_verdict_agreement.py                 # live, statuses from DynamoDB (read-only)
     python3 scripts/check_coach_verdict_agreement.py --statuses api  # public ledger only
@@ -169,8 +174,33 @@ def _owner(holder: Any, default: str | None) -> str | None:
 def check_json(surface: str, payload: Any, calls: list[dict], names: dict[str, str] | None = None, owner: str | None = None) -> list[dict]:
     out = []
     for path, text, holder in string_leaves(payload):
-        for f in verdict_claims.findings(text, scoped(calls, text, _owner(holder, owner), names or {}), as_of=_TODAY):
-            out.append({"surface": surface, "path": path, **f, "annotated": annotated(holder), "text": text[:300]})
+        scope = scoped(calls, text, _owner(holder, owner), names or {})
+        if _REVIEW_PATH.search(path):
+            # A quarterly memoir is a long retrospective of the coach's own record: a lexical matcher cannot certify it
+            # reconciled, so every verdict sentence in it is FLAGGED FOR REVIEW (owner review of #5644) — never a pass.
+            matched = {f["sentence"]: f for f in verdict_claims.findings(text, scope, as_of=None)}
+            for sentence in [x for x in verdict_claims.sentences(text) if verdict_claims.polarity(x)]:
+                a = {"sentence": sentence, "polarity": verdict_claims.polarity(sentence)}
+                f = matched.get(a["sentence"]) or {
+                    "prediction_id": None,
+                    "sentence": a["sentence"],
+                    "asserted": a["polarity"],
+                    "status": None,
+                    "status_words": "no call matched",
+                }
+                out.append({"surface": surface, "path": path, **f, "annotated": False, "bucket": FLAGGED, "text": text[:300]})
+            continue
+        for f in verdict_claims.findings(text, scope, as_of=_TODAY):
+            out.append(
+                {
+                    "surface": surface,
+                    "path": path,
+                    **f,
+                    "annotated": annotated(holder),
+                    "bucket": _bucket(annotated(holder)),
+                    "text": text[:300],
+                }
+            )
     return out
 
 
@@ -192,6 +222,15 @@ def check_ledger(items: list[dict]) -> list[dict]:
     return out
 
 
+#: Surfaces a lexical check cannot certify: reported in the `flagged_for_review` bucket, never as a pass.
+_REVIEW_PATH = re.compile(r"(^|\.)memoir(\.|$)")
+CONTRADICTS, ANNOTATED, FLAGGED = "contradicts", "annotated", "flagged_for_review"
+
+
+def _bucket(is_annotated: bool) -> str:
+    return ANNOTATED if is_annotated else CONTRADICTS
+
+
 _WHO = re.compile(r'<figcaption class="who">(.*?)</figcaption>', re.S)
 
 
@@ -209,7 +248,15 @@ def check_day_html(day: str, page: str, calls: list[dict], names: dict[str, str]
         notes = [html.unescape(_TAG.sub("", c)).strip() for c in _CORR.findall(body + tail)]
         for f in verdict_claims.findings(text, scoped(calls, text, names.get(speaker), names), as_of=day):
             out.append(
-                {"surface": f"/data/day/{day}/", "path": "coach_lines", **f, "annotated": bool(notes), "notes": notes, "text": text[:300]}
+                {
+                    "surface": f"/data/day/{day}/",
+                    "path": "coach_lines",
+                    **f,
+                    "annotated": bool(notes),
+                    "bucket": _bucket(bool(notes)),
+                    "notes": notes,
+                    "text": text[:300],
+                }
             )
     return out
 
@@ -262,19 +309,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", help="write the findings here")
     a = ap.parse_args(argv)
     findings, errors = run(a.base, a.statuses, a.days)
-    bad = [f for f in findings if not f["annotated"]]
+    buckets: dict[str, list[dict]] = {CONTRADICTS: [], ANNOTATED: [], FLAGGED: []}
     for f in findings:
-        tag = "ANNOTATED" if f["annotated"] else "CONTRADICTS"
-        print(
-            f"{tag:11} {f['surface']} {f['path']}\n            says {f['asserted']!r} about {f['prediction_id']} (current: {f['status_words']})\n            “{f['sentence'][:220]}”"
-        )
+        buckets[f.get("bucket") or _bucket(f["annotated"])].append(f)
+    for name in (CONTRADICTS, FLAGGED, ANNOTATED):
+        for f in buckets[name]:
+            print(
+                f"{name.upper():18} {f['surface']} {f['path']}\n                   says {f['asserted']!r} about {f['prediction_id']} "
+                f"(current: {f['status_words']})\n                   “{f['sentence'][:220]}”"
+            )
     for e in errors:
-        print(f"UNREAD      {e}")
-    print(f"\n{len(bad)} unannotated contradiction(s), {len(findings) - len(bad)} annotated, {len(errors)} surface(s) unread.")
+        print(f"UNREAD             {e}")
+    print(
+        f"\n{len(buckets[CONTRADICTS])} unannotated contradiction(s), {len(buckets[FLAGGED])} flagged for review (not reconciled), "
+        f"{len(buckets[ANNOTATED])} annotated, {len(errors)} surface(s) unread."
+    )
     if a.json:
         with open(a.json, "w") as fh:
-            json.dump({"findings": findings, "errors": errors}, fh, indent=2, default=str)
-    return 2 if errors else (1 if bad else 0)
+            json.dump({**buckets, "errors": errors}, fh, indent=2, default=str)
+    # Exit 0 only when nothing contradicts AND nothing waits on review: a flagged memoir is not a pass.
+    return 2 if errors else (1 if buckets[CONTRADICTS] else (3 if buckets[FLAGGED] else 0))
 
 
 if __name__ == "__main__":

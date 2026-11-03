@@ -586,7 +586,7 @@ async function renderToday(mount) {
       `${paused ? ` <span>· new reads are paused by the budget guard</span>` : ""}</p>` +
       `<p class="provenance ct-why"><span>${esc(pick.reason)}</span></p>` +
       `<div class="prose ct-text" data-verbatim><p>${esc(text)}</p></div>` +
-      (chosen.lead ? "" : summaryProvenanceHTML(chosen, { cls: "ct", ledgerHref: (id) => `/system/ledger/${chosen.coach_id}-${id}/` })) +
+      (chosen.lead ? "" : summaryProvenanceHTML(chosen, { cls: "ct" })) +
       `<p class="ct-full label"><a href="/coaching/by-coach/#${esc(pid)}">${clipped ? "full read" : "more from this coach"} →</a></p>` +
       glossHTML(text);
     const ask = pickAsk(d.open_actions, chosen.coach_id);

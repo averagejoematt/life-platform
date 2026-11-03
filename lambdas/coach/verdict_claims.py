@@ -15,14 +15,15 @@ WHAT THIS MODULE IS. Pure (no boto3, no clock, no network) so the writer (``coac
 
 * ``assertions(text)`` — each sentence that asserts a verdict about a call (``wrong`` / ``right`` / ``checked``),
   with the window of sentences around it that names the call;
-* ``findings(text, calls)`` — each assertion matched to the call it is about (the call whose claim shares the most
-  content words with the window, at least two), and kept when it CONTRADICTS that call's authoritative status:
+* ``findings(text, calls)`` — each assertion matched to the calls it can be about (claims sharing at least two content
+  words with the window; a negatively framed claim is never a candidate), and kept only when it CONTRADICTS the
+  authoritative status of EVERY such call:
   ``confirmed`` + "wrong", ``refuted`` + "right", or any verdict at all about a call that is not decided
   (``expired`` / ``inconclusive`` / ``observational`` / ``pending``: "could not be checked", "not graded", "open").
 
 The matcher is lexical, deliberately conservative in the SAFE direction: a finding withholds a text (or falls it back
-to a deterministic, records-built summary); it never rewrites one. A tie between a call the text agrees with and one
-it contradicts is resolved as agreement — the text may be about the call it describes correctly.
+to a deterministic, records-built summary); it never rewrites one. When any call the text plausibly names agrees with
+it, it is not a finding — a public correction note beside a quotation that was in fact right is the worse error.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ OUTCOME_WORDS = {
     "pending": "open",
     "observation": "not graded",
     "observational": "not graded",
+    "under_review": "disputed — under classification review",
 }
 
 #: The only statuses a text may describe as right or wrong.
@@ -156,17 +158,23 @@ def contradicts(polarity_: str, status: str | None) -> bool:
     return True  # not decided: neither right, wrong, nor "checked"
 
 
-def _best(window: str, calls: Iterable[dict]) -> list[tuple[int, dict]]:
+#: A claim framed as a negation or a contrast ("the barrier is not metabolic", "X rather than Y") inverts the meaning of a
+#: verdict about it ("the metabolic theory didn't hold" AGREES with it), which a lexical matcher cannot see — so such a
+#: claim is never a match candidate (triage of the 2026-11-03 live findings: every docket-position false positive).
+_NEGATIVE_CLAIM = re.compile(
+    r"\b(?:not|never|no longer|rather than|instead of|isn['’]t|aren['’]t|wasn['’]t|doesn['’]t|don['’]t|won['’]t)\b", re.IGNORECASE
+)
+
+
+def _scored(window: str, calls: Iterable[dict]) -> list[tuple[int, dict]]:
+    """Every call sharing at least ``MIN_OVERLAP`` content words with the window, most shared first."""
     w = stems(window)
     scored = []
     for c in calls:
         n = len(w & stems(c.get("claim") or ""))
         if n >= MIN_OVERLAP:
             scored.append((n, c))
-    if not scored:
-        return []
-    top = max(n for n, _ in scored)
-    return [(n, c) for n, c in scored if n == top]
+    return sorted(scored, key=lambda x: -x[0])
 
 
 def _in_reach(call: dict, as_of: str | None) -> bool:
@@ -188,15 +196,19 @@ def findings(text: str, calls: Iterable[dict], *, as_of: str | None = None) -> l
     ``as_of`` (the text's own day) limits the candidates to calls said in the ``LOOKBACK_DAYS`` before it.
     Each finding: ``{prediction_id, sentence, asserted, status, status_words}``.
     """
-    calls = [c for c in calls or [] if isinstance(c, dict) and str(c.get("claim") or "").strip() and _in_reach(c, as_of)]
+    calls = [
+        c
+        for c in calls or []
+        if isinstance(c, dict) and str(c.get("claim") or "").strip() and _in_reach(c, as_of) and not _NEGATIVE_CLAIM.search(str(c["claim"]))
+    ]
     out = []
     for a in assertions(text):
-        best = _best(a["window"], calls)
-        if not best:
+        scored = _scored(a["window"], calls)
+        if not scored:
             continue
-        if any(not contradicts(a["polarity"], c.get("status")) for _, c in best):
-            continue  # it may be about the call it describes correctly
-        c = best[0][1]
+        if any(not contradicts(a["polarity"], c.get("status")) for _, c in scored):
+            continue  # some call it plausibly names agrees with it: never flag (a false correction is worse than none)
+        c = scored[0][1]
         out.append(
             {
                 "prediction_id": c.get("prediction_id"),

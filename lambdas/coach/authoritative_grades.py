@@ -37,7 +37,7 @@ import logging
 from typing import Any, Iterable
 
 from coach import prediction_windows
-from coach.verdict_claims import DECIDED, outcome_words
+from coach.verdict_claims import DECIDED
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ _VERDICT_KEYS = ("status", "verdict", "outcome", "result")
 
 _PROJECTION = (
     "sk, prediction_id, #st, evaluation, claim_natural, corrections, verdict_correction, respecified_at, "
-    "respecified_from, respecified_reason, created_date, outcome_date, coach_id"
+    "respecified_from, respecified_reason, created_date, outcome_date, coach_id, classification_review"
 )
 
 
@@ -130,11 +130,15 @@ def prediction_rows(table: Any, coach_id: str, *, max_pages: int = 10) -> dict[s
 
 def calls_of(rows: dict[str, dict]) -> list[dict]:
     """The validator's view of a partition: ``[{prediction_id, claim, status}]`` at the authoritative status."""
+    from coach import classification_review
+
     return [
         {
             "prediction_id": pid,
             "claim": str(r.get("claim_natural") or ""),
-            "status": status_of(r),
+            # #5643: a verdict under classification review is disputed — "excluded from any claim that its outcome has
+            # been reliably verified" (owner, 2026-11-03): a text calling it right or wrong contradicts it too.
+            "status": "under_review" if classification_review.is_under_review(r) else status_of(r),
             "said_on": str(r.get("created_date") or "")[:10] or None,
         }
         for pid, r in rows.items()
@@ -283,64 +287,56 @@ def day_words(value: Any) -> str | None:
         return None
 
 
-def _count_words(n: int) -> str:
-    return ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")[n] if 0 <= n <= 10 else str(n)
+#: What a stale read is replaced by on every public surface (owner review of #5644, 2026-11-03: "A concise explanation
+#: such as 'This coach's earlier assessment is being updated following a prediction correction' would be preferable,
+#: with the specific correction and dates available on demand"). The details ride ``summary_corrections``.
+UPDATING_SENTENCE = "This coach's earlier assessment is being updated following a prediction correction."
 
 
 def records_summary(item: dict, stale: list[dict]) -> str:
-    """The deterministic, dated sentence a stale read is replaced by — built from the records, no model, no reason invented.
-
-    The correction's own explanation is served beside it (``served_corrections``), never paraphrased here.
-    """
-    written = day_words(as_of_of(item))
-    real = [c for c in stale if not c.get("flagged_at_write")]
-    lead = f"My read of {written} is withheld until it is rewritten" if written else "My latest read is withheld until it is rewritten"
-    if not real:
-        return f"{lead}: it described a call's grade differently from the ledger."
-    by_day: dict[str, list[dict]] = {}
-    for c in real:
-        by_day.setdefault(day_words(c.get("corrected_at")) or "a date not recorded", []).append(c)
-    parts = []
-    for day, cs in by_day.items():
-        moves = "; ".join(
-            dict.fromkeys(f"from {outcome_words(c.get('original_status'))} to {outcome_words(c.get('corrected_status'))}" for c in cs)
-        )
-        if cited_of(item) is None:  # the read does not name its calls: say only what the records say
-            what = "one of my calls was" if len(cs) == 1 else f"{_count_words(len(cs))} of my calls were"
-        else:
-            what = "a call it rests on was" if len(cs) == 1 else f"{_count_words(len(cs))} calls it rests on were"
-        parts.append(f"on {day} {what} re-graded {moves}")
-    return f"{lead}: " + ", and ".join(parts) + "."
+    """The sentence a stale read is replaced by — fixed, no model, no explanation invented. The specific corrections
+    (dates, grades, registered explanation) are served beside it as ``correction_note`` entries, shown on demand."""
+    return UPDATING_SENTENCE
 
 
-def served_corrections(stale: list[dict], *, public_ids: set[str] | None = None) -> list[dict]:
-    """The corrections a stale read is replaced on account of, in the shape a page prints beside the summary.
+# THE ONE SERVED SHAPE lives in the pure `coach.served_shape` (no boto3 — the publication snapshot imports it).
+from coach.served_shape import (  # noqa: E402 — re-exported: every web read site reaches the shape through this module
+    CORRECTION_NOTE_FIELDS,
+    DERIVED_FROM_FIELDS,
+    correction_note,
+    instant,
+    provenance,
+    short_coach,
+)
 
-    ``prediction_id`` is served only when the public ledger serves that call (``public_ids``); otherwise null —
-    a call the ledger withholds is not named here either. The explanation is the registered one, verbatim.
-    """
-    from web import correction_history
 
+def registered_explanation(reason: str) -> str | None:
+    """The registered reader words for a stored correction reason (``web.correction_rules``), or None — never improvised."""
+    from web import correction_history, correction_rules
+
+    try:
+        return correction_rules.explain(correction_history.rule_ids_of_reason(str(reason or "")))
+    except Exception:  # noqa: BLE001 — an unregistered rule has no reader words
+        return None
+
+
+def served_corrections(stale: list[dict], *, coach_id: str, public_ids: set[str] | None = None) -> list[dict]:
+    """The corrections a stale read is replaced on account of (``correction_note`` shape). ``prediction_id`` only when
+    the public ledger serves that call (``public_ids``); the explanation is the registered one, verbatim."""
     out = []
     for c in stale:
         if c.get("flagged_at_write"):
             continue
         pid = str(c.get("prediction_id") or "")
-        ids = correction_history.rule_ids_of_reason(str(c.get("reason") or ""))
-        try:
-            from web import correction_rules
-
-            explanation = correction_rules.explain(ids)
-        except Exception:  # noqa: BLE001 — an unregistered rule has no reader words; none are invented
-            explanation = None
         out.append(
-            {
-                "prediction_id": pid if (public_ids is not None and pid in public_ids) else None,
-                "original_status": c.get("original_status"),
-                "corrected_status": c.get("corrected_status"),
-                "corrected_at": c.get("corrected_at"),
-                "explanation": explanation,
-            }
+            correction_note(
+                prediction_id=pid if (public_ids is not None and pid in public_ids) else None,
+                coach_id=coach_id,
+                original_status=c.get("original_status"),
+                corrected_status=c.get("corrected_status"),
+                corrected_at=c.get("corrected_at"),
+                explanation=registered_explanation(str(c.get("reason") or "")),
+            )
         )
     return out
 
@@ -356,6 +352,14 @@ def derived_from(as_of: str, predictions: Iterable[str], records: Iterable[str] 
 
 __all__ = [
     "BUCKETS",
+    "CORRECTION_NOTE_FIELDS",
+    "DERIVED_FROM_FIELDS",
+    "UPDATING_SENTENCE",
+    "correction_note",
+    "instant",
+    "provenance",
+    "registered_explanation",
+    "short_coach",
     "DECIDED",
     "as_of_of",
     "calls_of",

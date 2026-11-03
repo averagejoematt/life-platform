@@ -534,7 +534,7 @@ export function readHTML(pick, profile, now, calibration) {
   if (text && !why.length) parts.push(`<blockquote class="v7c-coach" data-src="${src}">${esc(text)}</blockquote>`);
   else if (text) parts.push(`<details class="v7c-details"><summary>The read, as served</summary><blockquote class="v7c-coach" data-src="${src}">${esc(text)}</blockquote><p class="v7c-note">Kept off the main screen: it carries ${esc(why.join(", "))}. Served without edits.</p></details>`);
   else parts.push(`<p class="v7c-absent">No public read is served for today.</p>`);
-  if (!c.lead) parts.push(summaryProvenanceHTML(c, { cls: "v7c", src: "api_coaching-dashboard.coaches[].derived_from", ledgerHref: (id) => `/system/ledger/${shortId(c.coach_id)}-${id}/` }));
+  if (!c.lead) parts.push(summaryProvenanceHTML(c, { cls: "v7c", src: "api_coaching-dashboard.coaches[].derived_from" }));
   const reason = reasonSentence(pick, calibration);
   if (reason) parts.push(`<p class="v7c-note" data-src="${esc(reason.src)}">${esc(reason.text)}</p>`);
   // #4585: a "K of N held up" reason is a coach count — it never appears alone.

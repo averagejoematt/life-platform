@@ -25,13 +25,17 @@ A check that cannot be decided from the snapshot adds nothing; silence is never 
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
-from coach import verdict_claims  # noqa: E402 — pure: the one verdict rule (owner ruling 2026-11-03)
+from coach import (  # noqa: E402 — the one verdict rule and served shape (owner ruling 2026-11-03)
+    served_shape as authoritative_grades,
+    verdict_claims,
+)
 
 _MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
@@ -138,19 +142,20 @@ def _reading_move(text: str, day: str, by_date: dict[str, dict]) -> list[str]:
 _STATUS = {"observation": "observational"}  # the snapshot's prediction status → the ledger vocabulary
 
 
-def _verdict(text: str, day: str, coach_id: str, calls: list[dict], names: dict[str, str]) -> list[str]:
-    """Dated notes for each verdict in the line that the called-on prediction's CURRENT grade contradicts."""
+def _verdict(text: str, day: str, coach_id: str, calls: list[dict], names: dict[str, str]) -> tuple[list[str], list[dict]]:
+    """For each verdict in the line that the called-on prediction's CURRENT grade contradicts: one concise dated note
+    (owner review of #5644: concise on the page, the specifics on demand) and one ``correction_note`` — the SAME served
+    shape the coach APIs use (``coach.authoritative_grades.CORRECTION_NOTE_FIELDS``) — that the page discloses."""
     who = {coach_id}
     low = text.lower()
     for name, cid in names.items():
         if name.lower() in low or name.split()[-1].lower() in low:
             who.add(cid)
-    scope = [c for c in calls if c.get("coach") in who]
-    out = []
+    scope = [c for c in calls if c.get("persona") in who]
+    notes: list[str] = []
+    details: list[dict] = []
     for f in verdict_claims.findings(text, scope, as_of=day):
         c = next((x for x in scope if x.get("prediction_id") == f.get("prediction_id")), {})
-        said = _words(c["said_on"]) if c.get("said_on") else None
-        whose = f"{c.get('coach_name') or 'A coach'}'s call" + (f" of {said}" if said else "")
         corr = next(
             (
                 k
@@ -160,30 +165,40 @@ def _verdict(text: str, day: str, coach_id: str, calls: list[dict], names: dict[
             None,
         )
         if corr:
-            out.append(
-                f"Correction: {whose} was re-graded on {_words(str(corr['corrected_at'])[:10])} from "
-                f"{verdict_claims.outcome_words(corr.get('original_status'))} to {verdict_claims.outcome_words(corr.get('corrected_status'))}."
-                + (f" {corr['explanation']}" if corr.get("explanation") else "")
+            notes.append(
+                f"Corrected {_words(str(corr['corrected_at'])[:10])}: the prediction this line refers to has since been re-graded."
             )
         else:
-            out.append(f"Correction: the ledger holds {whose} as {verdict_claims.outcome_words(f.get('status'))}, not {f.get('asserted')}.")
-    return list(dict.fromkeys(out))
+            notes.append("The ledger grades the prediction this line refers to differently.")
+        details.append(
+            authoritative_grades.correction_note(
+                prediction_id=c.get("prediction_id"),
+                coach_id=c.get("coach"),
+                original_status=corr.get("original_status") if corr else None,
+                corrected_status=corr.get("corrected_status") if corr else f.get("status"),
+                corrected_at=corr.get("corrected_at") if corr else None,
+                explanation=corr.get("explanation") if corr else None,
+            )
+        )
+    keep = list(dict.fromkeys(notes))
+    uniq = list({json.dumps(d, sort_keys=True): d for d in details}.values())
+    return keep, uniq
 
 
 def verdict_calls(predictions: list[dict]) -> tuple[list[dict], dict[str, str]]:
-    """The snapshot's Prediction objects as the verdict rule's calls, and the coach-name → coach-id map."""
+    """The snapshot's Prediction objects as the verdict rule's calls, and the coach-name → persona-id map."""
     calls, names = [], {}
     for p in predictions or []:
         if not isinstance(p, dict) or p.get("claim_withheld"):
             continue  # held words are not matched — a line cannot be tied to a claim the page does not print
-        pid = str(p.get("id") or "")
+        short, _, pid = str(p.get("id") or "").partition("-")  # the Prediction id is `<coach>-<prediction_id>`
         calls.append(
             {
                 "prediction_id": pid,
-                "coach": p.get("coach_id"),
-                "coach_name": p.get("coach_name"),
+                "coach": short,
+                "persona": p.get("coach_id"),
                 "claim": p.get("claim") or "",
-                "status": _STATUS.get(str(p.get("status") or ""), p.get("status")),
+                "status": "under_review" if p.get("classification_review") else _STATUS.get(str(p.get("status") or ""), p.get("status")),
                 "said_on": p.get("logged_date") if isinstance(p.get("logged_date"), str) and len(p.get("logged_date")) == 10 else None,
                 "corrections": p.get("corrections") or [],
             }
@@ -200,9 +215,11 @@ def annotate_coach_lines(days: list[dict], predictions: list[dict] | None = None
     for d in days:
         for line in d.get("coach_lines") or []:
             text = line.get("text") or ""
+            notes, details = _verdict(text, d["date"], str(line.get("coach_id") or ""), calls, names) if calls else ([], [])
             line["corrections"] = (
                 _gap_figure(text, d["date"], by_date)
                 + _logged_count(text, d["date"], by_date)
                 + _reading_move(text, d["date"], by_date)
-                + (_verdict(text, d["date"], str(line.get("coach_id") or ""), calls, names) if calls else [])
+                + notes
             )
+            line["grade_corrections"] = details  # the specifics behind `notes`, disclosed on demand (one served shape)

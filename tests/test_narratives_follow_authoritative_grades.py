@@ -172,10 +172,7 @@ def test_the_writer_holds_contradicting_derived_prose_and_serves_a_records_summa
     }
     derived_text_guard.guard_output_item(item, _Table(brief=[PID]), "mind_coach", "2026-11-04", now="2026-11-04T18:00:00+00:00")
     assert item["derived_prose_held"] is True and item["observatory_summary"] is None
-    assert (
-        item["public_summary"]
-        == "My read of 4 November 2026 is withheld until it is rewritten: it described a call's grade differently from the ledger."
-    )
+    assert item["public_summary"] == ag.UPDATING_SENTENCE
     assert item["verdict_findings"][0]["prediction_id"] == PID
     assert item["derived_from"] == {
         "as_of": "2026-11-04T18:00:00+00:00",
@@ -213,10 +210,7 @@ def test_the_dashboard_read_overtaken_by_a_correction_is_replaced_by_the_dated_r
     entry = {"position_summary": STORED_READ}
     out = f.apply_to_entry(entry, table, "mind_coach", {"created_at": "2026-11-02T18:03:20+00:00", "public_summary": STORED_READ})
     assert "mechanism was wrong" not in out["position_summary"]
-    assert out["position_summary"] == (
-        "My read of 2 November 2026 is withheld until it is rewritten: on 3 November 2026 one of my calls was re-graded "
-        "from wrong to could not be checked."
-    )
+    assert out["position_summary"] == "This coach's earlier assessment is being updated following a prediction correction."
     assert out["summary_state"] == "superseded_by_correction"
     assert out["derived_from"]["built_from"] == "ledger_records" and out["derived_from"]["superseded_read_as_of"].startswith("2026-11-02")
     (c,) = out["summary_corrections"]
@@ -229,7 +223,7 @@ def test_a_read_newer_than_every_correction_is_current_with_its_as_of(monkeypatc
     item = {"created_at": "2026-11-04T18:00:00+00:00", "derived_from": {"as_of": "2026-11-04T18:00:00+00:00", "predictions": [PID]}}
     out = f.apply_to_entry({"position_summary": "A new read."}, table, "mind_coach", item)
     assert out["position_summary"] == "A new read." and out["summary_state"] == "current"
-    assert out["summary_as_of"] == "2026-11-04T18:00:00+00:00" and out["derived_from"]["predictions"] == [PID]
+    assert out["summary_as_of"] == "2026-11-04T18:00:00Z" and out["derived_from"]["predictions"] == [PID]
 
 
 def test_a_cited_read_is_stale_only_for_its_own_calls(monkeypatch):
@@ -281,7 +275,7 @@ def test_a_day_line_keeps_its_words_and_gains_the_recorded_correction():
     text = "I was wrong — my read that protein recovery would lift the evening walks didn't hold."
     days = [{"date": "2026-11-01", "coach_lines": [{"coach": "Nathan Reeves", "coach_id": "mind_coach", "text": text}]}]
     pred = {
-        "id": f"mind-{PID}",
+        "id": f"mind-{PID}",  # the snapshot's Prediction id: `<coach>-<prediction_id>`
         "coach_id": "mind_coach",
         "coach_name": "Nathan Reeves",
         "claim": CLAIM,
@@ -299,12 +293,19 @@ def test_a_day_line_keeps_its_words_and_gains_the_recorded_correction():
     annotate_coach_lines(days, [pred])
     line = days[0]["coach_lines"][0]
     assert line["text"] == text
-    assert line["corrections"] == [
-        "Correction: Nathan Reeves's call of Thursday 15 October was re-graded on Tuesday 3 November from wrong to could not be checked. "
-        "A registered explanation."
+    assert line["corrections"] == ["Corrected Tuesday 3 November: the prediction this line refers to has since been re-graded."]
+    assert line["grade_corrections"] == [
+        {
+            "prediction_id": PID,
+            "coach_id": "mind",
+            "original_status": "refuted",
+            "corrected_status": "expired",
+            "corrected_at": "2026-11-03T18:55:07Z",
+            "explanation": "A registered explanation.",
+        }
     ]
     annotate_coach_lines(days)  # no ledger handed in: the verdict check adds nothing (silence is never a correction)
-    assert days[0]["coach_lines"][0]["corrections"] == []
+    assert days[0]["coach_lines"][0]["corrections"] == [] and days[0]["coach_lines"][0]["grade_corrections"] == []
 
 
 def test_the_ledger_and_the_writers_share_one_status_rule():
@@ -330,3 +331,102 @@ def test_the_agreement_check_flags_an_unannotated_quote_and_passes_an_annotated_
     payload = {"coaches": [{"coach_id": "mind", "position_summary": STORED_READ}]}
     assert chk.check_json("/api/coaching-dashboard", payload, calls, names)[0]["prediction_id"] == PID
     assert json.dumps(chk.check_json("/x", {"coaches": [{"coach_id": "mind", "position_summary": "Walks flat."}]}, calls, names)) == "[]"
+
+
+# ── one served shape across the dashboard, the coach pages, coach_analysis and the Day pages (owner review of #5644) ─
+
+
+def _note_shapes(monkeypatch):
+    """The correction notes and provenance every surface serves for the SAME stale read, from each surface's own code path."""
+    from publish_snapshot_corrections import annotate_coach_lines
+    from web import derived_summary_freshness as f
+
+    f_, table = _freshness(monkeypatch, [_correction_row()], public=True)
+    monkeypatch.setattr(ag, "prediction_rows", lambda table, coach_id: {PID: _row()})
+    item = {"pk": "COACH#mind_coach", "created_at": "2026-11-02T18:03:20.502377+00:00", "public_summary": STORED_READ}
+    dash = f.judge_into({}, table, item, STORED_READ)
+    analysis = f.apply_to_analysis({"analysis": STORED_READ}, table, "mind_coach", item)
+    stance = f.apply_to_stance({"source": "stance", "as_of": "2026-11-02", "headline_read": STORED_READ, "stage": {}}, table, "mind_coach")
+    timeline = f.annotate_timeline([{"date": "2026-11-02", "summary": STORED_READ}], table, "mind_coach")[0]
+    days = [{"date": "2026-11-02", "coach_lines": [{"coach": "Nathan Reeves", "coach_id": "mind_coach", "text": STORED_READ}]}]
+    pred = {
+        "id": f"mind-{PID}",
+        "coach_id": "mind_coach",
+        "coach_name": "Nathan Reeves",
+        "claim": CLAIM,
+        "status": "expired",
+        "logged_date": "2026-10-15",
+    }
+    pred["corrections"] = [
+        {
+            "original_status": "refuted",
+            "corrected_status": "expired",
+            "corrected_at": "2026-11-03T18:55:07Z",
+            "explanation": ag.registered_explanation(RULE_5611_M),
+        }
+    ]
+    annotate_coach_lines(days, [pred])
+    return dash, analysis, stance, timeline, days[0]["coach_lines"][0]
+
+
+def test_one_served_shape_and_one_instant_format_on_every_surface(monkeypatch):
+    dash, analysis, stance, timeline, day_line = _note_shapes(monkeypatch)
+    notes = [dash["summary_corrections"][0], analysis["summary_corrections"][0], stance["summary_corrections"][0]]
+    notes += [timeline["grade_corrections"][0], day_line["grade_corrections"][0]]
+    for n in notes:
+        assert tuple(n) == ag.CORRECTION_NOTE_FIELDS, n
+    assert len({json.dumps(n, sort_keys=True) for n in notes}) == 1, "the same correction is the same object on every surface"
+    assert notes[0] == {
+        "prediction_id": PID,
+        "coach_id": "mind",
+        "original_status": "refuted",
+        "corrected_status": "expired",
+        "corrected_at": "2026-11-03T18:55:07Z",
+        "explanation": ag.registered_explanation(RULE_5611_M),
+    }
+    for surface in (dash, analysis, stance):
+        assert tuple(surface["derived_from"]) == ag.DERIVED_FROM_FIELDS
+        assert surface["summary_as_of"] == surface["derived_from"]["as_of"]
+        for v in (surface["summary_as_of"], surface["derived_from"]["superseded_read_as_of"]):
+            assert v is None or len(v) == 10 or (len(v) == 20 and v.endswith("Z")), v
+    assert dash["derived_from"]["superseded_read_as_of"] == "2026-11-02T18:03:20Z", "fractions and +00:00 normalised to the one form"
+    assert stance["derived_from"]["superseded_read_as_of"] == "2026-11-02", "a stored bare day stays a day — no time invented"
+    for text in (dash["position_summary"], analysis["analysis"]):
+        assert text == ag.UPDATING_SENTENCE and "re-graded" not in text and "wrong" not in text
+
+
+def test_the_day_contract_and_the_zod_schema_pin_the_same_correction_fields():
+    import publish_snapshot_day
+
+    assert tuple(publish_snapshot_day.CORRECTION_NOTE_FIELDS) == ag.CORRECTION_NOTE_FIELDS
+    zod = open(os.path.join(ROOT, "www", "src", "content.config.ts")).read()
+    block = zod[zod.index("const gradeCorrection") : zod.index("const coachLine")]
+    assert [f for f in ag.CORRECTION_NOTE_FIELDS if f"{f}:" not in block] == []
+
+
+def test_the_memoir_is_flagged_for_review_never_passed():
+    import check_coach_verdict_agreement as chk
+
+    payload = {"memoir": {"text": "My model of his baseline stability was wrong in both directions."}}
+    (f,) = chk.check_json("/api/coach/mind_coach", payload, [], {}, owner="mind_coach")
+    assert f["bucket"] == chk.FLAGGED and f["prediction_id"] is None
+
+
+# ── triage of the 2026-11-03 live findings: the two false-positive classes, pinned ─────────────────────
+
+
+def test_a_negatively_framed_claim_is_never_matched():
+    """The docket-position class: "X's theory didn't hold" AGREES with a confirmed "the barrier is not metabolic"."""
+    calls = [{"prediction_id": "docket", "claim": "The barrier to walking is not primarily metabolic", "status": "confirmed"}]
+    assert verdict_claims.findings("Lisa is right: my metabolic theory of the walking barrier didn't hold.", calls) == []
+
+
+def test_a_verdict_any_plausible_call_agrees_with_is_not_flagged():
+    """The sibling class: "I was wrong about the protein-walks coupling" is true of a still-refuted sibling call."""
+    calls = [
+        {"prediction_id": "a", "claim": CLAIM, "status": "expired", "said_on": "2026-10-15"},
+        {"prediction_id": "b", "claim": "As protein climbs the evening walks will return", "status": "refuted", "said_on": "2026-10-02"},
+    ]
+    text = "I was wrong about the protein-walks coupling: my read that protein would bring the evening walks back did not hold."
+    assert verdict_claims.findings(text, calls, as_of="2026-11-01") == []
+    assert verdict_claims.findings(text, calls[:1], as_of="2026-11-01") != [], "with only the corrected call, it is a finding"

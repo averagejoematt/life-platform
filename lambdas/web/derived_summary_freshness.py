@@ -59,7 +59,8 @@ def judge(
 ) -> dict:
     """The served fields for one stored derived text. ``served_text`` is what the slot would serve if current.
 
-    ``corrections`` may be passed in (one CORRECTION# read per coach per request); None reads it here.
+    Every instant and every source-call reference is in the one served shape (``authoritative_grades.provenance`` /
+    ``correction_note`` / ``instant``) — the same on the dashboard, the coach pages, coach_analysis and the Day pages.
     """
     now = now or datetime.now(timezone.utc).isoformat()
     as_of = authoritative_grades.as_of_of(item or {})
@@ -69,43 +70,36 @@ def judge(
             corrections = authoritative_grades.verdict_corrections(table, coach_id)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"[derived_summary_freshness] {coach_id}: CORRECTION# read failed ({e}) — summary withheld")
-            return {
-                "text": "",
-                "summary_state": "unverified",
-                "summary_as_of": None,
-                "derived_from": None,
-                "summary_corrections": [],
-            }
+            return {"text": "", "summary_state": "unverified", "summary_as_of": None, "derived_from": None, "summary_corrections": []}
     stale = authoritative_grades.stale_corrections(item or {}, corrections)
     if not stale:
         public = _public_ids(table, coach_id, sorted(cited)) if cited else set()
         return {
             "text": served_text,
             "summary_state": "current",
-            "summary_as_of": as_of,
-            "derived_from": {
-                "built_from": "coach_read",
-                "as_of": as_of,
-                "predictions": sorted(public) if cited is not None else None,
-                "predictions_not_public": (len(cited) - len(public)) if cited is not None else None,
-            },
+            "summary_as_of": authoritative_grades.instant(as_of),
+            "derived_from": authoritative_grades.provenance(
+                built_from="coach_read",
+                as_of=as_of,
+                predictions=sorted(public) if cited is not None else None,
+                not_public=(len(cited) - len(public)) if cited is not None else None,
+            ),
             "summary_corrections": [],
         }
     pids = [str(c.get("prediction_id") or "") for c in stale if c.get("prediction_id")]
     public = _public_ids(table, coach_id, pids)
-    served = authoritative_grades.served_corrections(stale, public_ids=public)
     return {
         "text": authoritative_grades.records_summary(item or {}, stale),
         "summary_state": "superseded_by_correction",
-        "summary_as_of": now,
-        "derived_from": {
-            "built_from": "ledger_records",
-            "as_of": now,
-            "superseded_read_as_of": as_of,
-            "predictions": sorted(public),
-            "predictions_not_public": len(set(pids) - public),
-        },
-        "summary_corrections": served,
+        "summary_as_of": authoritative_grades.instant(now),
+        "derived_from": authoritative_grades.provenance(
+            built_from="ledger_records",
+            as_of=now,
+            predictions=sorted(public),
+            not_public=len(set(pids) - public),
+            superseded_read_as_of=as_of,
+        ),
+        "summary_corrections": authoritative_grades.served_corrections(stale, coach_id=coach_id, public_ids=public),
     }
 
 
@@ -155,29 +149,18 @@ def annotate_timeline(entries: list[dict], table: Any, coach_id: str, text_keys:
         for h in hits:
             row = rows.get(str(h.get("prediction_id") or "")) or {}
             n = authoritative_grades.note_of(row)
-            if not n:
-                continue
-            public = _public_ids(table, coach_id, [n["prediction_id"]])
+            pid = str(h.get("prediction_id") or "")
+            public = _public_ids(table, coach_id, [pid])
             notes.append(
-                {
-                    "prediction_id": n["prediction_id"] if n["prediction_id"] in public else None,
-                    "original_status": n.get("original_status"),
-                    "corrected_status": n.get("current_status"),
-                    "corrected_at": n.get("corrected_at"),
-                    "explanation": n.get("explanation"),
-                }
+                authoritative_grades.correction_note(
+                    prediction_id=pid if pid in public else None,
+                    coach_id=coach_id,
+                    original_status=n.get("original_status") if n else None,
+                    corrected_status=n.get("current_status") if n else h.get("status"),
+                    corrected_at=n.get("corrected_at") if n else None,
+                    explanation=n.get("explanation") if n else None,
+                )
             )
-        if not notes and hits:  # a verdict the current grade contradicts, with no correction recorded: the grade, stated
-            notes = [
-                {
-                    "prediction_id": None,
-                    "original_status": None,
-                    "corrected_status": h.get("status"),
-                    "corrected_at": None,
-                    "explanation": None,
-                }
-                for h in hits
-            ]
         if notes:
             e["grade_corrections"] = list({json.dumps(n, sort_keys=True): n for n in notes}.values())
     return entries
