@@ -9,6 +9,7 @@ from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from mcp.config import RAW_DAY_LIMIT, SOURCES
 from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 from mcp.tool_output_schemas import attach_output_schemas  # #4286 box 2: outputSchema, the ten most-called tools
+from mcp.tools_advice_links import LOG_ADVICE_LINK_DESCRIPTION, LOG_ADVICE_LINK_INPUT, tool_log_advice_link  # #5612
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
@@ -1547,6 +1548,10 @@ TOOLS = {
                 "required": ["sk"],
             },
         },
+    },
+    "log_advice_link": {  # #5612 (ruling F): owner-asserted decision <-> coach recommendation link
+        "fn": tool_log_advice_link,
+        "schema": {"name": "log_advice_link", "description": LOG_ADVICE_LINK_DESCRIPTION, "inputSchema": LOG_ADVICE_LINK_INPUT},
     },
     # ── IC-18: Cross-Domain Hypothesis Engine ───────────────────────────────────────────
     # ── BS-12: Deficit Sustainability Tracker ──

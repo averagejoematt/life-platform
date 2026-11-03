@@ -250,6 +250,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#ledger` / `TOTALS#current`, `LEDGER#<id>`, `LIFETIME#aggregate`, `CYCLE_TOTALS#<n>` | accountability ledger; `LIFETIME#`/`CYCLE_TOTALS#` written at reset by `deploy/restart_ledger_reset.py` (ADR-072/077 dec F) | MCP `log_ledger_entry`; reset tool | `web/site_api_data.py` | ✓ |
 | `…SOURCE#ai_analysis` / `EXPERT#<name>` | expert-lens analyses | `intelligence/ai_expert_analyzer_lambda.py` | chronicle, site_api_intelligence | ✓ |
 | `…SOURCE#decisions` / `DECISION#<ISO-ts>` | logged decisions + outcomes | `mcp/tools_decisions.py` | `get_decisions` | ✓ |
+| `…SOURCE#decisions` / `ADVICELINK#<decision-ts>#<ref_kind>#<coach_id>#<ref_id>` | **advice links (#5612, ruling F)** — ONE logged decision ↔ ONE coach recommendation, `state` ∈ {`acted_on`,`declined`,`partially_followed`,`unknown`}, evidence required for every state but `unknown`; absence of a row = `unknown`; no backfill. Field table in the Decisions section below | MCP `log_advice_link` ONLY (`mcp/tools_advice_links.py`, registry `lambdas/coach/advice_links.py`) | `get_decisions` (owner); no public reader | n/v (fires on the first owner link) |
 | `…SOURCE#rewards` / `REWARD#<id>` | reward definitions | `lambdas/content/output_writers.py` (MCP `set_reward`) | `get_rewards` | empty |
 | `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle, life_context, constraints_preferences) are cross_phase; coach running-state categories are experiment_scoped. Canonical taxonomy = `lambdas/ai/platform_memory.py` (#1482) | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests, coach prompt injection (`platform_memory_block`) | ✓ |
 
@@ -2506,6 +2507,37 @@ Tracks platform-guided decisions and their outcomes. Builds trust-calibration da
 | `logged_at` | string | ISO timestamp |
 
 Access via `log_decision`, `get_decision_journal`, `get_decision_effectiveness` MCP tools.
+
+### Advice links (`ADVICELINK#`, #5612 — owner ruling F, 2026-11-02)
+
+**pk:** `USER#matthew#SOURCE#decisions` (same partition, so a link rides its decision's
+EXPERIMENT_SCOPED class through the restart tag/tombstone; no new GSI)
+**sk:** `ADVICELINK#<decision-ts>#<ref_kind>#<coach_id>#<ref_id>` — deterministic, so a
+re-assertion overwrites the row and carries the superseded one in `previous`. Every
+`DECISION#` reader narrows on `begins_with("DECISION#")` and never sees these rows.
+
+The ruling: a state other than `unknown` is assigned ONLY on evidence the owner gave —
+never inferred from behaviour that happens to match the advice — and historical decisions
+stay `unknown` (a decision with no link row reads `unknown`; the `followed` boolean above is
+not converted). Registry, validator and the eventual public contract:
+`lambdas/coach/advice_links.py`; the one writer: MCP `log_advice_link`; guards:
+`tests/test_advice_links_5612.py`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `decision_sk` | string | The linked `DECISION#<ts>` row (read before write; must exist in the current cycle) |
+| `coach_id` | string | The recommending coach's persona id (`coach.persona_registry`) — checked against the referenced row |
+| `ref_kind` | string | `prediction` (`COACH#<coach_id>` / `PREDICTION#<ref_id>`) · `coach_output` (`COACH#<coach_id>` / `OUTPUT#<YYYY-MM-DD>#<type>`) · `coach_action` (`USER#matthew` / `SOURCE#coach_actions#<ref_id>`) |
+| `ref_id` | string | The recommendation's id within its kind (read before write; must exist) |
+| `state` | string | `acted_on` / `declined` / `partially_followed` / `unknown` |
+| `evidence` | map | `{asserted_by: "owner", asserted_at, text?, reference?}` — REQUIRED (text or reference) for every state but `unknown`; Matthew's own words or where he recorded them, verbatim |
+| `recorded_at` | string | ISO timestamp of the assertion |
+| `recorded_by` | string | `owner` (the only allowed value) |
+| `previous` | list | Superseded assertions `{state, evidence, recorded_at, recorded_by}`, oldest first (max 20) |
+
+Public surface: none (Coaching Room UI is not authorised). The data contract an eventual
+one would render is `advice_links.public_contract` — per-state COUNTS only (`states`,
+`decisions_n`, `linked_n`, `basis`), no decision, evidence or coach text.
 
 ---
 
