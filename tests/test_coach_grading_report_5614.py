@@ -204,7 +204,8 @@ def test_correction_audit_and_ledger_split(report):
     assert (main["original_status"], main["corrected_status"], main["corrected_at"]) == ("confirmed", "expired", CORR_AT)
     assert main["entry_served_live"] is None  # no API read
     legacy = [e for e in ca["entries"] if e["channel"] != "corrections"]
-    assert all(e["entry_served_with_row"] is False and e["ledger_row"] is False for e in legacy)
+    # #5610: every channel is served with a served row; legacy channels have no CORRECTION# ledger row of their own.
+    assert all(e["entry_served_with_row"] is e["served_on_ledger_export"] and e["ledger_row"] is False for e in legacy)
     respec = [e for e in legacy if e["channel"] == "respecified"][0]
     assert respec["original_outcome_date"] is None and respec["corrected_status"] is None  # not stored → null, never inferred
     assert ca["ledger_rows_without_row_entry"] == []
