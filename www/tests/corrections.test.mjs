@@ -51,5 +51,7 @@ test("a moved target shows both days; an open call was not yet graded", () => {
   assert.equal(r["Day the call was about"], "1 November 2026, corrected to 3 October 2026");
   assert.equal(ruleText(base), "#5533:e, evaluator 1.1");
   assert.equal(ruleText({ rules: [{ id: "#4618:respecify", version: null }] }), "#4618:respecify, version not recorded");
+  // the owner-ruled rule id carries a date: it reads in words, never as an ISO date (the live scan refused run 41581545049)
+  assert.equal(ruleText({ rules: [{ id: "#5533:c+owner-2026-11-02", version: "1.1" }] }), "#5533:c+owner-2 November 2026, evaluator 1.1");
   assert.equal(instantInWords(null), null);
 });
