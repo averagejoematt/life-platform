@@ -82,6 +82,7 @@ from typing import Any
 from common.numeric import floats_to_decimal
 from experiment.phase_taxonomy import experiment_stamp_for
 
+from coach import evaluation_hold  # #5607: the per-row grading hold write_first_grade honours
 from coach.prediction_grading import grading_window_still_open, was_terminalized_by_duplicate_grader
 
 CORRECTION_PREFIX = "CORRECTION#"
@@ -154,9 +155,12 @@ def write_first_grade(table: Any, row: dict, evaluation: dict, *, outcome_notes:
     """The scheduled grader's write-back of a grade onto a row that is NOT settled (pending, confirming, a
     provisional second look, an #813 reclaim). Refuses a settled row (``SettledGradeError``) and is
     conditional on the stored status and notes still being the ones this grade was computed from, so a
-    row corrected between the read and the write is never overwritten. Returns True when it landed."""
+    row corrected between the read and the write is never overwritten. Refuses a row whose grading is held
+    (``HeldGradeError``, #5607) and is conditional on it carrying no hold. Returns True when it landed."""
     if is_settled(row):
         raise SettledGradeError(f"{row.get('pk')} / {row.get('sk')} is settled ({row.get('status')}): only apply_correction may change it")
+    if evaluation_hold.is_held(row):  # #5607: a held row is not graded until the owner rules on it
+        raise evaluation_hold.HeldGradeError(f"{row.get('pk')} / {row.get('sk')} is held for review: {evaluation_hold.hold_reason(row)}")
     pk = row.get("pk") or f"COACH#{row.get('coach_id', '')}"
     sk = row.get("sk") or f"PREDICTION#{row.get('prediction_id', '')}"
     values: dict[str, Any] = {
@@ -167,7 +171,7 @@ def write_first_grade(table: Any, row: dict, evaluation: dict, *, outcome_notes:
         ":qf": list(evaluation.get("quality_flags") or []),
         ":ver": evaluator_version,
     }
-    conds = []
+    conds = [f"attribute_not_exists({evaluation_hold.ATTR})"]  # #5607: a hold set after the read still wins
     if row.get("status") is not None:
         conds.append("#status = :prior")
         values[":prior"] = row["status"]
@@ -183,8 +187,7 @@ def write_first_grade(table: Any, row: dict, evaluation: dict, *, outcome_notes:
         "ExpressionAttributeNames": {"#status": "status"},
         "ExpressionAttributeValues": values,
     }
-    if conds:
-        kwargs["ConditionExpression"] = " AND ".join(conds)
+    kwargs["ConditionExpression"] = " AND ".join(conds)
     table.update_item(**kwargs)
     return True
 

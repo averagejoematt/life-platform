@@ -31,7 +31,8 @@ none is an empty list, not a missing key; a row whose words are held serves ``[]
     {items: [{prediction_id, coach_id, coach_name, retired, metric, claim, logged_date,
               due_date, settled_date, kind, status, confidence, sealed,
               grading: {how, actual_text, tolerance_text, outcome_notes},
-              simple_guess, quality_flags: [], corrections: []}],
+              simple_guess, quality_flags: [], corrections: [],
+              grading_held?, grading_held_reason?}],   # only on a row under an owner evaluation hold (#5607)
      total, page, size, pages, as_of}
 
 PRIVACY. A claim is served only when the dossier filter clears it (``coach_dossier.dossier_safe``,
@@ -60,7 +61,7 @@ from __future__ import annotations
 import math
 from typing import Any, Callable
 
-from coach import coach_baseline, coach_dossier, coach_record, prediction_windows
+from coach import coach_baseline, coach_dossier, coach_record, evaluation_hold, prediction_windows
 from common import journal_silence
 from common.pacific_time import pacific_date_of, pacific_today
 
@@ -91,6 +92,7 @@ PROJECTION = tuple(
         _PREDICTION_PROJECTION_FIELDS
         + ("sk", "coach_id", "quality_flags", "corrections", "gradeable_by")
         + ("verdict_correction", "respecified_at", "respecified_from", "respecified_reason")
+        + (evaluation_hold.ATTR,)  # #5607: an owner evaluation hold is shown, not hidden
     )
 )
 
@@ -238,6 +240,11 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
         item["withheld"] = True
     if held:
         item["unsourced"] = held  # the same note shape /api/predictions, /api/calls and the docket serve
+    if evaluation_hold.is_held(row):
+        # #5607: grading is held under an owner ruling — the status stays what the row stores (pending),
+        # and the reader is told why it is not being graded rather than seeing a silent stall.
+        item["grading_held"] = True
+        item["grading_held_reason"] = evaluation_hold.hold_reason(row)
     return item
 
 
