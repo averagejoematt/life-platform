@@ -160,7 +160,12 @@ def from_corrections_entry(e: dict, said_on: str | None, where: str) -> dict:
     kind = (
         "revert"
         if e.get("reverts") or ids == ["revert"]
-        else ("restate" if e.get("original_status") == e.get("corrected_status") else "regrade")
+        else (
+            "restate"
+            if e.get("original_status") == e.get("corrected_status")
+            # an open call re-classified as an observation is withdrawn, not graded (the #4618 not-a-forecast precedent)
+            else ("withdraw" if e.get("corrected_status") in ("observation", "observational") else "regrade")
+        )
     )
     out = _base("corrections", kind, ids, version, said_on)
     out.update(
