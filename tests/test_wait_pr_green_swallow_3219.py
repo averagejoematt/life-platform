@@ -48,6 +48,7 @@ EXPECTED_CHECK_NAMES = [
     "Full unit suite (pre-merge, issue 3025)",
     "API-before-frontend sequencing check (#2831)",
     "gitleaks (PR commit range only, not full history)",
+    "v9 web gate verdict (www build, required)",
     "CodeQL analysis (python)",
     "CodeQL analysis (javascript-typescript)",
 ]
@@ -273,7 +274,7 @@ def test_late_attaching_checks_still_proceed_and_are_not_called_swallowed():
     out = r.stdout + r.stderr
     assert r.returncode == 0, f"a late attach must still go green\n{out}"
     assert "SWALLOWED" not in out, out
-    assert "All 6 expected checks are GREEN" in r.stdout
+    assert "All 7 expected checks are GREEN" in r.stdout
 
 
 def test_diagnosis_never_runs_once_any_check_has_attached():
@@ -388,7 +389,7 @@ def test_progress_line_says_no_checks_attached_when_none_are():
     env, _ = _make_env([[]], INDETERMINATE)
     r = _run(env, "--zero-check-grace", "99")
     assert "NO CHECKS ATTACHED YET" in r.stdout, r.stdout
-    assert "0 of 6 expected are present" in r.stdout
+    assert "0 of 7 expected are present" in r.stdout
 
 
 def test_progress_line_says_how_many_attached_once_some_have():

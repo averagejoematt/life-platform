@@ -212,10 +212,20 @@ def preflight_contexts(spec: dict) -> list[str]:
         if job is None:
             problems.append(f"{context!r}: {wf_name} has no job `{job_id}`")
             continue
-        if job.get("if"):
+        # `always()` is the ONE job-level condition a required context may carry: it is the
+        # aggregator shape (web-gate.yml's `web-gate-verdict`) — the job runs on every PR,
+        # even when an upstream job failed or the run was cancelled, so it always reports a
+        # real verdict. Any other condition can resolve false, and a job skipped by `if:`
+        # reports SUCCESS to the required-checks rule (GitHub docs, "Handling skipped but
+        # required checks") — a gate that skips is a silent pass, not a wedge.
+        cond = str(job.get("if") or "").strip()
+        if cond.startswith("${{") and cond.endswith("}}"):
+            cond = cond[3:-2].strip()
+        if cond and cond != "always()":
             problems.append(
-                f"{context!r}: job `{job_id}` in {wf_name} is `if:`-gated ({job['if']!r}) — it reports `skipped` on "
-                "the PR classes it does not match, and a skipped check never satisfies a required check (ADR-148)"
+                f"{context!r}: job `{job_id}` in {wf_name} is `if:`-gated ({job['if']!r}) — on the PR classes it does "
+                "not match it reports `skipped`, which the required-checks rule counts as SUCCESS: a silent pass (ADR-148). "
+                "Only `always()` (the aggregator shape) is allowed"
             )
         strategy = job.get("strategy")
         if isinstance(strategy, dict) and strategy.get("matrix"):
