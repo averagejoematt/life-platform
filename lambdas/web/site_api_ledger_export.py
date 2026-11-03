@@ -66,7 +66,15 @@ from __future__ import annotations
 import math
 from typing import Any, Callable
 
-from coach import classification_review, coach_baseline, coach_dossier, coach_record, evaluation_hold, prediction_windows
+from coach import (
+    authoritative_grades,
+    classification_review,
+    coach_baseline,
+    coach_dossier,
+    coach_record,
+    evaluation_hold,
+    prediction_windows,
+)
 from common import journal_silence
 from common.pacific_time import pacific_date_of, pacific_today
 
@@ -102,7 +110,7 @@ PROJECTION = tuple(
 )
 
 #: The status buckets `/api/predictions` counts — one vocabulary (DIL-007: observational is its own).
-BUCKETS = ("confirmed", "refuted", "pending", "inconclusive", "expired", "observational")
+BUCKETS = authoritative_grades.BUCKETS
 
 
 def _spec(row: dict) -> dict:
@@ -112,12 +120,9 @@ def _spec(row: dict) -> dict:
 
 
 def bucket_status(row: dict) -> str:
-    """The served status of one row — the same classification `/api/predictions` tallies."""
-    ev = _spec(row)
-    status = str(row.get("status") or "pending")
-    if status == "observation" or (not prediction_windows.is_gradeable(ev) and status in ("pending", "confirming")):
-        return "observational"
-    return status if status in BUCKETS else "pending"
+    """The served status of one row — the same classification `/api/predictions` tallies. One definition, shared
+    with every coach-facing summary writer (``coach.authoritative_grades.status_of``, owner ruling 2026-11-03)."""
+    return authoritative_grades.status_of(row)
 
 
 def _num_text(value: Any, metric: Any) -> str | None:

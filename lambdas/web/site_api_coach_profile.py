@@ -37,6 +37,7 @@ from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-al
 
 from web import (
     claim_sourcing,  # #4673: dated words citing a sensor with no reading that day are not quoted
+    derived_summary_freshness,  # owner ruling 2026-11-03: summaries at each call's current grade, as-of + derived_from served
     trail_corrections,  # #5626: the learning trail read against the ledger's current verdicts
 )
 from web.site_api_common import (
@@ -421,7 +422,8 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
 
     from web import superseded_gap_reads
 
-    return superseded_gap_reads.apply(out, table, pacific_today())
+    # Owner ruling 2026-11-03: a dated read stays verbatim; a dated correction rides beside a verdict the ledger has since changed.
+    return derived_summary_freshness.annotate_timeline(superseded_gap_reads.apply(out, table, pacific_today()), table, coach_id)
 
 
 def _dossier_block(coach_id, *, _g):
@@ -747,6 +749,8 @@ def handle_coach(event, *, _g):
             # #4649: a coach that has written a stance still serves the author's stage
             # ladder beside it (it used to be one or the other).
             stance = _g["_stance_with_ladder"](_stance_block(pid, weight), pid, weight)
+            # Owner ruling 2026-11-03: a stance a later grade correction overtook is not served as current.
+            stance = derived_summary_freshness.apply_to_stance(stance, _g["table"], pid)
         return _ok(
             {
                 "persona_id": pid,
@@ -776,8 +780,14 @@ def handle_coach(event, *, _g):
                 "absent": bool(absent_state),
                 "reason": absent_state.get("reason") if absent_state else None,
                 "stance": stance,
-                "stance_history": claim_sourcing.scrub_rows(
-                    _stance_history(pid), dark, day_key="as_of", text_keys=("headline_read", "how_my_read_changed")
+                # Owner ruling 2026-11-03: the dated stances stay verbatim; a dated grade correction rides beside a contradicted verdict.
+                "stance_history": derived_summary_freshness.annotate_timeline(
+                    claim_sourcing.scrub_rows(
+                        _stance_history(pid), dark, day_key="as_of", text_keys=("headline_read", "how_my_read_changed")
+                    ),
+                    _g["table"],
+                    pid,
+                    ("headline_read", "how_my_read_changed"),
                 ),
                 # The lead has no generation voice spec (config/coaches/{id}.json) —
                 # null is the honest value, and the front-end omits the section.

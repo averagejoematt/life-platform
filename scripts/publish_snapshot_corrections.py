@@ -12,15 +12,30 @@ model, never a rewrite. Three checks, each stated in words a reader can verify o
 * a count of logged days — "N logged days", "every one of them" — against the complete food logs the
   snapshot holds for that month up to the day (incomplete records and days with none counted apart);
 * a reading said to climb (or fall) to a value it reached from the other side — "recovery climbing to 58"
-  when the morning before read 74.
+  when the morning before read 74;
+* a verdict on a call that its CURRENT grade contradicts — "I was wrong about …" on a call the ledger now holds as
+  could not be checked (owner ruling 2026-11-03: "Preserve original historical quotations verbatim. Add dated
+  corrections rather than rewriting what was originally said"). The rule is the writer's and the read sites' own
+  (``lambdas/coach/verdict_claims.findings``), matched against the speaking coach's calls and those of any coach the
+  line names; the note carries the call's recorded correction (its date and registered explanation) when one exists,
+  else the ledger's current grade — never an explanation of its own.
 
 A check that cannot be decided from the snapshot adds nothing; silence is never a correction.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import sys
 from datetime import date, timedelta
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
+from coach import (  # noqa: E402 — the one verdict rule and served shape (owner ruling 2026-11-03)
+    served_shape as authoritative_grades,
+    verdict_claims,
+)
 
 _MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
@@ -124,12 +139,87 @@ def _reading_move(text: str, day: str, by_date: dict[str, dict]) -> list[str]:
     return out
 
 
-def annotate_coach_lines(days: list[dict]) -> None:
+_STATUS = {"observation": "observational"}  # the snapshot's prediction status → the ledger vocabulary
+
+
+def _verdict(text: str, day: str, coach_id: str, calls: list[dict], names: dict[str, str]) -> tuple[list[str], list[dict]]:
+    """For each verdict in the line that the called-on prediction's CURRENT grade contradicts: one concise dated note
+    (owner review of #5644: concise on the page, the specifics on demand) and one ``correction_note`` — the SAME served
+    shape the coach APIs use (``coach.authoritative_grades.CORRECTION_NOTE_FIELDS``) — that the page discloses."""
+    who = {coach_id}
+    low = text.lower()
+    for name, cid in names.items():
+        if name.lower() in low or name.split()[-1].lower() in low:
+            who.add(cid)
+    scope = [c for c in calls if c.get("persona") in who]
+    notes: list[str] = []
+    details: list[dict] = []
+    for f in verdict_claims.findings(text, scope, as_of=day):
+        c = next((x for x in scope if x.get("prediction_id") == f.get("prediction_id")), {})
+        corr = next(
+            (
+                k
+                for k in reversed(c.get("corrections") or [])
+                if k.get("original_status") != k.get("corrected_status") and k.get("corrected_at")
+            ),
+            None,
+        )
+        if corr:
+            notes.append(
+                f"Corrected {_words(str(corr['corrected_at'])[:10])}: the prediction this line refers to has since been re-graded."
+            )
+        else:
+            notes.append("The ledger grades the prediction this line refers to differently.")
+        details.append(
+            authoritative_grades.correction_note(
+                prediction_id=c.get("prediction_id"),
+                coach_id=c.get("coach"),
+                original_status=corr.get("original_status") if corr else None,
+                corrected_status=corr.get("corrected_status") if corr else f.get("status"),
+                corrected_at=corr.get("corrected_at") if corr else None,
+                explanation=corr.get("explanation") if corr else None,
+            )
+        )
+    keep = list(dict.fromkeys(notes))
+    uniq = list({json.dumps(d, sort_keys=True): d for d in details}.values())
+    return keep, uniq
+
+
+def verdict_calls(predictions: list[dict]) -> tuple[list[dict], dict[str, str]]:
+    """The snapshot's Prediction objects as the verdict rule's calls, and the coach-name → persona-id map."""
+    calls, names = [], {}
+    for p in predictions or []:
+        if not isinstance(p, dict) or p.get("claim_withheld"):
+            continue  # held words are not matched — a line cannot be tied to a claim the page does not print
+        short, _, pid = str(p.get("id") or "").partition("-")  # the Prediction id is `<coach>-<prediction_id>`
+        calls.append(
+            {
+                "prediction_id": pid,
+                "coach": short,
+                "persona": p.get("coach_id"),
+                "claim": p.get("claim") or "",
+                "status": "under_review" if p.get("classification_review") else _STATUS.get(str(p.get("status") or ""), p.get("status")),
+                "said_on": p.get("logged_date") if isinstance(p.get("logged_date"), str) and len(p.get("logged_date")) == 10 else None,
+                "corrections": p.get("corrections") or [],
+            }
+        )
+        if p.get("coach_name") and p.get("coach_id"):
+            names[str(p["coach_name"])] = str(p["coach_id"])
+    return calls, names
+
+
+def annotate_coach_lines(days: list[dict], predictions: list[dict] | None = None) -> None:
     """Add `corrections` (a list of sentences, usually empty) to every coach line of every day, in place."""
     by_date = {d["date"]: d for d in days}
+    calls, names = verdict_calls(predictions or [])
     for d in days:
         for line in d.get("coach_lines") or []:
             text = line.get("text") or ""
+            notes, details = _verdict(text, d["date"], str(line.get("coach_id") or ""), calls, names) if calls else ([], [])
             line["corrections"] = (
-                _gap_figure(text, d["date"], by_date) + _logged_count(text, d["date"], by_date) + _reading_move(text, d["date"], by_date)
+                _gap_figure(text, d["date"], by_date)
+                + _logged_count(text, d["date"], by_date)
+                + _reading_move(text, d["date"], by_date)
+                + notes
             )
+            line["grade_corrections"] = details  # the specifics behind `notes`, disclosed on demand (one served shape)

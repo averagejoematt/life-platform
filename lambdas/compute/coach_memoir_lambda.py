@@ -122,6 +122,10 @@ def _gather_facts(table, coach_id: str, quarter: str):
             )
         )
         learnings = [decimals_to_float(i) for i in resp.get("Items", [])]
+        # Owner ruling 2026-11-03: "what I got right / wrong" is the CURRENT grade, a correction named with its recorded reason.
+        from coach import authoritative_grades
+
+        learnings = authoritative_grades.reconcile_from_table(table, coach_id, learnings)[0]
     except Exception as e:
         logger.warning("[coach_memoir] learnings %s: %s", coach_id, e)
         learnings = []

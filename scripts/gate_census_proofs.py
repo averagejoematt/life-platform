@@ -4432,3 +4432,26 @@ REGISTRY_PROOFS["registry::tests/test_wait_pr_green.py::_BASELINE::v9 web gate v
     "scope": "Proves the test list and the watcher's baseline agree; the watcher's live behaviour on the new check is the demo PR pair.",
     "proved_on": "2026-11-02",
 }
+GUARD_PROOFS["guard::scripts/check_coach_verdict_agreement.py"] = {
+    "gate_name": "scripts/check_coach_verdict_agreement.py",
+    "command": (
+        "python3 -m pytest tests/test_narratives_follow_authoritative_grades.py -q -p no:cacheprovider -k 'agreement or memoir'"
+        "   # baseline 2 passed; live: python3 scripts/check_coach_verdict_agreement.py (read-only)"
+    ),
+    "mutation": (
+        "Two plants, ONE AT A TIME (md5 3def9bce0d066bcda0addf0d6591effa before and after): M1 a Day-page quotation is "
+        'always read as annotated (`"annotated": True`) — an unannotated contradiction would pass; M2 the memoir branch '
+        "is disabled (`if False and _REVIEW_PATH.search(path)`) — a quarterly memoir would pass instead of being flagged."
+    ),
+    "observed": (
+        "2026-11-03, branch fix/narratives-follow-authoritative-grades: M1 → 1 failed / 1 passed "
+        "(test_the_agreement_check_flags_an_unannotated_quote_and_passes_an_annotated_one); M2 → 1 failed / 1 passed "
+        "(test_the_memoir_is_flagged_for_review_never_passed); RESTORED 2 passed, byte-identical."
+    ),
+    "scope": (
+        "Lexical: a verdict sentence matched to a call by shared content words. NOT SEEN: a verdict stated without a "
+        "call-noun subject, or a call named only by paraphrase; a negatively framed claim (a docket position) can "
+        "invert the match — its findings are candidates for review, and a memoir is never certified (flagged_for_review)."
+    ),
+    "proved_on": "2026-11-03",
+}

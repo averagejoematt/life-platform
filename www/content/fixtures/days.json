@@ -326,6 +326,7 @@
     "coach": "Lisa Park",
     "coach_id": "sleep_coach",
     "corrections": [],
+    "grade_corrections": [],
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: a short night after a long session; the recovery number this morning is the cost, not a verdict."
@@ -828,6 +829,7 @@
     "coach": "Marcus Webb",
     "coach_id": "nutrition_coach",
     "corrections": [],
+    "grade_corrections": [],
     "move": "bet",
     "move_label": "A call",
     "text": "Sample line: protein at the floor three days running; I expect recovery to hold through the week."
@@ -1314,6 +1316,7 @@
     "corrections": [
      "Correction: 15 g of protein is not what he ate. It is what an incomplete food record held \u2014 no diary entries, 80 kcal and 15 g of protein recorded in all \u2014 on Thursday 8 October. Intake that day is unknown."
     ],
+    "grade_corrections": [],
     "move": "reaction",
     "move_label": "On a result",
     "text": "Sample line: protein sat at 15 grams yesterday, and recovery climbing to its best still came."
@@ -1816,6 +1819,7 @@
     "coach": "Sarah Chen",
     "coach_id": "training_coach",
     "corrections": [],
+    "grade_corrections": [],
     "move": "reaction",
     "move_label": "On a result",
     "text": "Sample line: I was wrong about the deadlift; the bar moved faster than the week before."
@@ -1824,6 +1828,7 @@
     "coach": "Eli Marsh",
     "coach_id": "eli_marsh",
     "corrections": [],
+    "grade_corrections": [],
     "move": "reply",
     "move_label": "A reply",
     "text": "Sample line: two coaches read the same night two ways; both readings stand until the data settles it."
@@ -3027,6 +3032,7 @@
     "coach": "Amara Patel",
     "coach_id": "glucose_coach",
     "corrections": [],
+    "grade_corrections": [],
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: no new sensor readings, so nothing new to read on glucose."
@@ -3035,6 +3041,7 @@
     "coach": "Lisa Park",
     "coach_id": "sleep_coach",
     "corrections": [],
+    "grade_corrections": [],
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: the 2026-10-15 walk was the longest of the block, so read 2026-10-17's weigh-in against it."
@@ -3351,6 +3358,7 @@
     "coach": "Lisa Park",
     "coach_id": "sleep_coach",
     "corrections": [],
+    "grade_corrections": [],
     "move": "observation",
     "move_label": "What I noticed",
     "text": "Sample line: the held day."

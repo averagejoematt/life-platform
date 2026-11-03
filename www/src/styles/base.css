@@ -1529,6 +1529,29 @@ details.more summary {
   border: 1px solid var(--verm-text);
   color: var(--ink);
 }
+/* The specifics behind a correction note, on demand (owner review of #5644, 2026-11-03). */
+.voice .correction-detail {
+  margin: 4px 0 0;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.voice .correction-detail summary {
+  cursor: pointer;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+.voice .correction-detail dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 4px 0 8px;
+}
+.voice .correction-detail dd {
+  margin: 0;
+}
 /* A coach's words, verbatim (#5609, owner ruling 2026-11-02): components/Quote.astro is the one road. The
    readable date sits AFTER the quotation, in the page's own voice — never inside it, never the ISO form. */
 :where(blockquote[data-verbatim="coach"]) {

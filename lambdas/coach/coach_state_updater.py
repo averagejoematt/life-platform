@@ -29,6 +29,7 @@ from coach import (  # #2972 public frame; #2418 derived-prose SET; #2575 vitals
     audience_guard,
     coach_derived_prose,
     coach_json_schemas as _schemas,  # #4276: structured-output schemas
+    derived_text_guard,
     published_vitals,
 )
 from coach.reading_date_fidelity import guard_derived_summary  # #2343
@@ -602,6 +603,8 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction, d
     published_vitals.stamp_published_vitals(item, table, f"USER#{USER_ID}#SOURCE#")
     if extraction.get("derived_prose_held"):
         item["derived_prose_held"] = True  # #2418: a grounding HOLD, not an empty extraction
+    # Owner ruling 2026-11-03: no verdict the current grade contradicts; `derived_from` + as_of stamped (derived_text_guard).
+    derived_text_guard.guard_output_item(item, table, coach_id, date, now=now_iso)
 
     success = _put_item(item)
     if success:

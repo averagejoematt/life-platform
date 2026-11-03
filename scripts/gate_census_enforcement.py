@@ -222,6 +222,12 @@ VERDICTS = (VERDICT_PROVEN, VERDICT_ATTEMPTED, VERDICT_UNPROVEN, VERDICT_NOT_APP
 # into phantom gates by the family-3 walk, and this module would inject six of them
 # into the census it is cleaning up.
 NOT_APPLICABLE_REASONS: dict[str, str] = {
+    "lambdas/coach/derived_text_guard.py": (
+        "A write-side transformer, not a verdict: `guard_output_item()` stamps `derived_from` and, when "
+        "`coach.verdict_claims.findings()` reports a contradiction, holds the derived prose; it never raises and never "
+        "blocks the OUTPUT# write (fail-soft by contract). The verdict is `verdict_claims.findings()`'s, proven with its "
+        "negative control in tests/test_narratives_follow_authoritative_grades.py (owner ruling 2026-11-03)."
+    ),
     "lambdas/ai/grounding_gate_params.py": (
         "Returns kwargs, decides nothing: `cycle_gate_params()` builds the three cycle anchors and its only "
         "failure branch is `except Exception: return {}` (fail-soft by contract — a grounding gate must never "

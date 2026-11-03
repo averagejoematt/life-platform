@@ -52,3 +52,15 @@ const idInWords = (id) => String(id).replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (iso) =
 export function ruleText(c) {
   return (c.rules || []).map((r) => (r.version ? `${idInWords(r.id)}, evaluator ${r.version}` : `${idInWords(r.id)}, version ${NOT_RECORDED}`)).join(" · ");
 }
+
+/** The specifics behind a Day-page note on a coach line (owner review of #5644, 2026-11-03: concise on the page,
+ *  "the specific correction and dates available on demand"). `g` is one `coach_lines[].grade_corrections` entry — the
+ *  same served shape the coach APIs use (lambdas/coach/authoritative_grades.CORRECTION_NOTE_FIELDS). Words only. */
+export function gradeNoteRows(g) {
+  const rows = [];
+  if (g.original_status) rows.push(["Grade before", callOutcome(g.original_status)]);
+  rows.push([g.original_status ? "Grade now" : "The ledger's grade", g.corrected_status ? callOutcome(g.corrected_status) : NOT_RECORDED]);
+  if (g.original_status) rows.push(["Correction recorded", instantInWords(g.corrected_at) || NOT_RECORDED]);
+  if (g.explanation) rows.push(["What changed", g.explanation]);
+  return rows;
+}

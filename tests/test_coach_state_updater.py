@@ -1131,6 +1131,9 @@ class TestHandlerEndToEnd:
         )
         monkeypatch.setattr(su, "table", t)
         monkeypatch.setattr(su, "_call_haiku", lambda **k: self._extraction_with_everything())
+        # The OUTPUT# verdict check reads its own PREDICTION# page (tests/test_narratives_follow_authoritative_grades.py
+        # owns it); this end-to-end run pins the partition writes, so it does not draw from the routed query queue.
+        monkeypatch.setattr(su.derived_text_guard, "guard_output_item", lambda item, *a, **k: item)
         return t
 
     def test_the_output_record_freezes_the_cockpits_reading_at_publication(self, monkeypatch):

@@ -285,6 +285,11 @@ def test_coach_analysis_flags_regeneration_paused_at_tier_2(monkeypatch):
     monkeypatch.setattr(api.table, "query", _fake_query_first_call_only(out_item))
     monkeypatch.setattr(api.table, "get_item", lambda Key: {})
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)
+    # Owner ruling 2026-11-03: the read is judged against the coach's grade corrections — none here (a failed
+    # CORRECTION# read would withhold it: tests/test_narratives_follow_authoritative_grades.py).
+    from coach import authoritative_grades
+
+    monkeypatch.setattr(authoritative_grades, "verdict_corrections", lambda table, coach_id: [])
     data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
     assert data["analysis"] == "the analysis text"
     assert data["regeneration_paused"] is True
