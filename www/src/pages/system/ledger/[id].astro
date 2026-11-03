@@ -3,6 +3,7 @@ import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
 import StatusTag from "../../../components/StatusTag.astro";
+import { correctionRows, ruleText } from "../../../lib/corrections.js";
 import { dayInWords } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
@@ -17,13 +18,6 @@ const coach = all.get("coach", p.coach_id);
 const methods = p.method_ids.map((id) => all.get("method", id)).filter(Boolean);
 const graded = p.status === "confirmed" || p.status === "refuted";
 const metric = p.metric_id ? all.get("metric", p.metric_id) : null;
-const stamp = (iso: string | null | undefined) => {
-  if (!iso) return "—";
-  const day = dayInWords(iso.slice(0, 10));
-  const t = /T(\d{2}:\d{2})/.exec(iso);
-  return t ? `${day}, ${t[1]} UTC` : day || "—";
-};
-const gradeWords = (g: any) => (g && typeof g === "object" ? [g.status, g.outcome_notes].filter(Boolean).join(" — ") : g ? String(g) : "—");
 const FLAG_TEXT: Record<string, string> = {
   logging_gap: "graded through a logging gap",
   low_power: "low-power grade: the band is wide against the value",
@@ -99,17 +93,22 @@ const FLAG_TEXT: Record<string, string> = {
             <div style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:10px">
               <span class="label">Corrected · the original grade is kept</span>
               {p.corrections.map((c: any) => (
-                <div class="rows" style="font-size:13px">
-                  <span><span>Original grade</span><span style="text-align:right;max-width:60%;overflow-wrap:anywhere">{gradeWords(c.original_grade)}</span></span>
-                  <span><span>Originally graded</span><span>{stamp(c.original_timestamp)}</span></span>
-                  <span><span>Corrected grade</span><span class="mono">{c.corrected_grade || "—"}</span></span>
-                  <span><span>Corrected</span><span>{stamp(c.corrected_at)}</span></span>
-                  <span><span>Reason</span><span style="text-align:right;max-width:60%;overflow-wrap:anywhere">{c.reason || "—"}</span></span>
-                  <span><span>Evaluator version</span><span class="mono">{c.evaluator_version || "—"}</span></span>
-                  <span><span>Aggregate impact</span><span style="text-align:right;max-width:60%;overflow-wrap:anywhere">{c.aggregate_impact || "not stated"}</span></span>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div class="rows" style="font-size:13px">
+                    {correctionRows(c).map(([label, value]) => (
+                      <span><span>{label}</span><span style="text-align:right;max-width:60%;overflow-wrap:anywhere">{value}</span></span>
+                    ))}
+                  </div>
+                  {c.reason && (
+                    <details style="font-size:12px">
+                      <summary class="muted">Recorded reason, as stored (dates written out)</summary>
+                      <p class="mono" style="overflow-wrap:anywhere;margin-top:6px">{c.reason}</p>
+                      <p class="muted">{ruleText(c)}</p>
+                    </details>
+                  )}
                 </div>
               ))}
-              <span class="muted" style="font-size:12px">A correction never rewrites the row silently: the original grade, both timestamps, the reason and the evaluator version travel with it.</span>
+              <span class="muted" style="font-size:12px">A correction never rewrites the row silently: the original grade, the day it was graded, the corrected grade, when the correction was recorded and the reason as stored travel with it. A date the record does not hold says so.</span>
             </div>
           )
         }
