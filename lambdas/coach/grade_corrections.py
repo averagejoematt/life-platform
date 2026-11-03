@@ -159,7 +159,7 @@ def write_first_grade(table: Any, row: dict, evaluation: dict, *, outcome_notes:
     (``HeldGradeError``, #5607) and is conditional on it carrying no hold. Returns True when it landed."""
     if is_settled(row):
         raise SettledGradeError(f"{row.get('pk')} / {row.get('sk')} is settled ({row.get('status')}): only apply_correction may change it")
-    if evaluation_hold.is_held(row):  # #5607: a held row is not graded until the owner rules on it
+    if evaluation_hold.is_grading_held(row):  # #5607: a held row is not graded until the owner rules on it
         raise evaluation_hold.HeldGradeError(f"{row.get('pk')} / {row.get('sk')} is held for review: {evaluation_hold.hold_reason(row)}")
     pk = row.get("pk") or f"COACH#{row.get('coach_id', '')}"
     sk = row.get("sk") or f"PREDICTION#{row.get('prediction_id', '')}"

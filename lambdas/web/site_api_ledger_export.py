@@ -240,7 +240,7 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
         item["withheld"] = True
     if held:
         item["unsourced"] = held  # the same note shape /api/predictions, /api/calls and the docket serve
-    if evaluation_hold.is_held(row):
+    if evaluation_hold.is_grading_held(row):
         # #5607: grading is held under an owner ruling — the status stays what the row stores (pending),
         # and the reader is told why it is not being graded rather than seeing a silent stall.
         item["grading_held"] = True

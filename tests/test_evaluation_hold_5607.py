@@ -123,9 +123,9 @@ def test_a_held_qualitative_row_is_not_retired(tbl):
 
 
 def test_a_malformed_hold_fails_closed():
-    assert evaluation_hold.is_held({"evaluation_hold": "yes"})
-    assert not evaluation_hold.is_held({"evaluation_hold": {}})
-    assert not evaluation_hold.is_held({})
+    assert evaluation_hold.is_grading_held({"evaluation_hold": "yes"})
+    assert not evaluation_hold.is_grading_held({"evaluation_hold": {}})
+    assert not evaluation_hold.is_grading_held({})
 
 
 # ── the one first-grade write ─────────────────────────────────────────────────────────────

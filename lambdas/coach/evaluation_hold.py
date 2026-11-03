@@ -52,7 +52,7 @@ def hold_of(row: dict) -> dict | None:
     return h if isinstance(h, dict) else {"reason": str(h)}
 
 
-def is_held(row: dict) -> bool:
+def is_grading_held(row: dict) -> bool:
     return hold_of(row) is not None
 
 
@@ -65,7 +65,7 @@ def hold_reason(row: dict) -> str:
 def skip_held(row: dict, logger, stats: dict | None = None) -> bool:
     """True when the row is held — after ONE log line naming the call and the reason (and ``stats["held"] += 1``
     when a stats dict is given). The evaluator calls this before any window, grading or expiry logic."""
-    if not is_held(row):
+    if not is_grading_held(row):
         return False
     pid = row.get("prediction_id") or str(row.get("sk", "")).replace("PREDICTION#", "", 1)
     logger.info("[#5607] evaluation HELD — not graded, not expired: %s / %s — %s", row.get("pk", "?"), pid, hold_reason(row))
