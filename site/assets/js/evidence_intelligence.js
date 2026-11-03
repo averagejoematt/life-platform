@@ -494,10 +494,23 @@ export function renderCalibration(d) {
       _OPEN_ARTIFACT_LINE
     );
 
+  // #5615 (owner ruling 2026-11-02): the platform card BLENDS coach calls with the weight model's 80% ranges and
+  // the weekly prescriptions; the ranges are right by design, so the blend is never the coaches' record. Each card
+  // leads with the coaches' own stratum (served counts, nothing computed here) and names the blend as the blend.
+  const _coachLead = (st, scope) =>
+    st && st.n > 0
+      ? `<p class="rd-prose"><strong>The coaches: ${esc(String(st.confirmed))} of ${esc(String(st.n))} checked calls right${scope ? ` · ${esc(scope)}` : ""}.</strong> Brier ${st.brier != null ? fmt(st.brier) : "—"}, skill ${st.brier_skill != null ? fmt(st.brier_skill) : "—"} against the base rate.</p>`
+      : "";
+  const _blendNote = (st, all) =>
+    st && all && all.n > st.n
+      ? `<p class="cs-fresh">The figures below pool all ${esc(String(all.n))} graded items — the coaches' ${esc(String(st.n))} calls with the weight model's forecast ranges and the weekly prescriptions. The ranges are right by design, so this blend is <em>not</em> the coaches' record.</p>`
+      : "";
+  const pc = p.strata && p.strata.coaches;
+  const lc = life.strata && life.strata.coaches;
   const seasonBody = p.n > 0
-    ? _calStatFigs(p, "since Day 1")
+    ? _coachLead(pc, "since Day 1") + _blendNote(pc, p) + _calStatFigs(p, "all graded items, since Day 1")
     : `<p class="cs-fresh">Fresh slate — career: n=${life.n}. Nothing has graded since Day 1 yet; the coaches' calls are already logged and resolve as their windows close.</p>`;
-  const careerBody = life.n > 0 ? _calStatFigs(life, "all time") : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
+  const careerBody = life.n > 0 ? _coachLead(lc, "all time") + _blendNote(lc, life) + _calStatFigs(life, "all graded items, all time") : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
   // #1893: the void ledger, made visible. A reset voids (never grades) every
   // still-open pre-registered bet; without this line the career n silently
   // reads as the whole record when ~85% of all bets were voided at resets.
@@ -521,10 +534,16 @@ export function renderCalibration(d) {
         `<tr><td class="rd-name">${Math.round(b.lo * 100)}–${Math.round(b.hi * 100)}%</td><td class="num">${b.n}</td><td class="num">${Math.round(b.mean_confidence * 100)}%</td><td class="num rd-range">${Math.round(b.observed_rate * 100)}%</td></tr>`,
     )
     .join("");
+  // #5615: say where the coaches' own calls sit — nearly all at one stated confidence, so they are one point, not a curve.
+  const atOne = coaches.reduce((a, c) => a + (((c.reliability_bins || []).length === 1 ? c.n : 0) || 0), 0);
+  const coachN = coaches.reduce((a, c) => a + (c.n || 0), 0);
   const relTbl = bins.length
     ? sec(
-        "Reliability curve — this season's stated confidence vs. what actually happened",
-        `<table class="rd-tbl"><thead><tr><th>confidence band</th><th>n</th><th>said</th><th>came true</th></tr></thead><tbody>${relRows}</tbody></table>`,
+        "Stated confidence vs. what happened — all graded items pooled",
+        `<table class="rd-tbl"><thead><tr><th>confidence band</th><th>n</th><th>said</th><th>came true</th></tr></thead><tbody>${relRows}</tbody></table>` +
+          (coachN > 0
+            ? `<p class="rd-prose">These bands pool every graded item; the weight model's ranges fill most of them. The coaches' own calls are not a curve: ${esc(String(atOne))} of their ${esc(String(coachN))} checked calls come from coaches whose every call was stated at one confidence, so their calibration cannot be read yet.</p>`
+            : ""),
       )
     : "";
   const cRows = coaches
@@ -532,7 +551,11 @@ export function renderCalibration(d) {
       const cl = c.lifetime || {};
       const seasonN = c.n > 0 ? String(c.n) : "fresh slate";
       const careerN = cl.n != null ? String(cl.n) : "—";
-      const calCell = c.calibration && c.calibration !== "insufficient_data"
+      // #5615: a coach whose every checked call carries one stated confidence has no calibration to label.
+      const oneBand = (c.reliability_bins || []).length === 1;
+      const calCell = oneBand
+        ? "one stated confidence — not measurable"
+        : c.calibration && c.calibration !== "insufficient_data"
         ? esc(ttl(String(c.calibration).replace(/_/g, " ")))
         : (cl.calibration && cl.calibration !== "insufficient_data" ? `career ${esc(ttl(String(cl.calibration).replace(/_/g, " ")))}` : "—");
       // #3450: the CI rides as a title tooltip in this dense per-coach table — the

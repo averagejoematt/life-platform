@@ -827,10 +827,21 @@ def _counted_block(decided) -> dict:
     return {"counted": counted, "counted_text": coach_record.counted_text(counted)}
 
 
+def _beats_simple_guess(rows) -> bool | None:
+    """Whether the coaches beat the base-rate guess on these rows — the edition's rule (``site_api_edition``: the
+    coaches stratum's Brier skill > 0), scored by the same calibration functions over the same rows. ``None`` only
+    when no skill can be computed. #5615: this used to be omitted, so the sentence said "too few calls are checked
+    to make it yet" at any N (211 checked calls on 2026-11-03)."""
+    stratum = calibration_core.score_strata({"coaches": calibration_core.pairs_from_prediction_records(rows)})["strata"]["coaches"]
+    skill = stratum.get("brier_skill")
+    return bool(skill > 0) if isinstance(skill, (int, float)) and not isinstance(skill, bool) else None
+
+
 def _record_extras(decided_rows, confirmed: int, decided: int) -> dict:
     """What rides beside a record's counts: what they count (#4617) and, #4580 round 1, the exact rate a
-    base-rate guess assigns every call (``web.record_words.baseline``) — the field behind the one sentence."""
-    return {**_counted_block(decided_rows), "baseline": record_words.baseline(confirmed, decided)}
+    base-rate guess assigns every call (``web.record_words.baseline``) — the field behind the one sentence,
+    with the skill verdict the edition already passes (#5615)."""
+    return {**_counted_block(decided_rows), "baseline": record_words.baseline(confirmed, decided, _beats_simple_guess(decided_rows))}
 
 
 def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
