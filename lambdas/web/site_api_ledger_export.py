@@ -19,9 +19,14 @@ THE ITEM. Every field is read off the stored row or derived by the module that o
 derivation — never a second copy: the four record kinds and the "nothing changes" verdict
 from ``coach.coach_baseline``, the due day from ``coach.prediction_windows``, the grader's
 reason in reader words from ``web.prediction_reason``, the simple-guess sentence from
-``web.site_api_calls``. ``quality_flags`` and ``corrections`` are the grader's (#5533): read
-off the row when present, ``[]`` otherwise — a row written before the grader stamped them is
-an empty list, not a missing key.
+``web.site_api_calls``. ``quality_flags`` is the grader's (#5533): read off the row when present,
+``[]`` otherwise. ``corrections`` is EVERY correction the row stores — the #5533 ``corrections[]``
+entries and the older writers' ``verdict_correction`` / ``respecified_*`` trails — in one shape
+(``web.correction_history``, #5610, owner decision D 2026-11-02): original and corrected grade, the
+day each names, the recorded instant of the correction, a null publication day (never recorded),
+the stored reason verbatim and a plain-words explanation (``web.correction_rules``). A row with
+none is an empty list, not a missing key; a row whose words are held serves ``[]`` and
+``corrections_withheld: N``.
 
     {items: [{prediction_id, coach_id, coach_name, retired, metric, claim, logged_date,
               due_date, settled_date, kind, status, confidence, sealed,
@@ -59,7 +64,7 @@ from coach import coach_baseline, coach_dossier, coach_record, prediction_window
 from common import journal_silence
 from common.pacific_time import pacific_date_of, pacific_today
 
-from web import claim_sourcing, prediction_reason, site_api_calls
+from web import claim_sourcing, correction_history, prediction_reason, site_api_calls
 from web.site_api_coach_ledger import (
     _CALIB_COACH_NAMES,
     _PREDICTION_PROJECTION_FIELDS,
@@ -79,7 +84,15 @@ BAD_PAGE = "page and size must be positive integers (size at most 200)."
 UNAVAILABLE = "The ledger is not served right now."
 
 #: The `/api/predictions` sweep's projection plus what this export serves beside it.
-PROJECTION = tuple(dict.fromkeys(_PREDICTION_PROJECTION_FIELDS + ("sk", "coach_id", "quality_flags", "corrections", "gradeable_by")))
+#: #5610: the three correction trails (``web.correction_history``) — ``corrections[]`` plus the older writers'
+#: ``verdict_correction`` map and #4618's ``respecified_*`` trail, which this route did not read before.
+PROJECTION = tuple(
+    dict.fromkeys(
+        _PREDICTION_PROJECTION_FIELDS
+        + ("sk", "coach_id", "quality_flags", "corrections", "gradeable_by")
+        + ("verdict_correction", "respecified_at", "respecified_from", "respecified_reason")
+    )
+)
 
 #: The status buckets `/api/predictions` counts — one vocabulary (DIL-007: observational is its own).
 BUCKETS = ("confirmed", "refuted", "pending", "inconclusive", "expired", "observational")
@@ -149,6 +162,12 @@ def grading_block(row: dict) -> dict:
     }
 
 
+def corrections_of(row: dict, said_on: str | None) -> list[dict]:
+    """Every correction the row stores, in the one served shape (#5610, ``web.correction_history``). A
+    stored spec's due day is derived by the same ``_due`` the item's own ``due_date`` uses."""
+    return correction_history.history(row, said_on=said_on, due_of=lambda spec: _due(row, spec if isinstance(spec, dict) else {}))
+
+
 def _due(row: dict, ev: dict) -> str | None:
     if ev.get("type") == "point" and ev.get("target_date"):
         return str(ev["target_date"])[:10]
@@ -205,8 +224,16 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
         "grading": grading_block(row),
         "simple_guess": site_api_calls.simple_guess(row.get("baseline"), kind, coach_right=status == "confirmed", metric=ev.get("metric")),
         "quality_flags": _list(row.get("quality_flags")),
-        "corrections": _list(row.get("corrections")),
+        "corrections": [],
     }
+    corrections = corrections_of(row, logged)
+    if withheld or held:
+        # A row whose words are held keeps its place and its grade; its correction history is held with the
+        # words (the stored reasons and notes describe the claim) — counted, never silently absent.
+        if corrections:
+            item["corrections_withheld"] = len(corrections)
+    else:
+        item["corrections"] = corrections
     if withheld:
         item["withheld"] = True
     if held:
