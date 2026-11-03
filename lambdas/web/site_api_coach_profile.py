@@ -376,7 +376,13 @@ def _coach_memoir(coach_id, *, _g):
     _load_s3_json = _g["_load_s3_json"]
     doc = _load_s3_json("generated/coach_memoirs.json", "coach_memoirs")
     m = (doc.get("memoirs") or {}).get(coach_id)
-    return m if isinstance(m, dict) else None
+    if not isinstance(m, dict):
+        return None
+    # Owner ruling 2026-11-03: an S3 artifact is outside the table chokepoint, so the memoir is
+    # gated here by the same policy (its own provenance record; none → withheld).
+    from web import narrative_publication
+
+    return narrative_publication.gate_document(m)
 
 
 def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-journey timeline

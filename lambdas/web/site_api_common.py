@@ -42,6 +42,7 @@ from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, 
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
 
+from web import narrative_publication  # owner ruling 2026-11-03: the one narrative publication chokepoint
 from web.bundle_counts import load_bundle_counts
 from web.platform_counts import DISCOVERED_COUNTS
 
@@ -62,7 +63,10 @@ logger.setLevel(logging.INFO)
 
 # ── AWS clients (module-level for warm container reuse) ─────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
-table = dynamodb.Table(TABLE_NAME)
+# Owner ruling 2026-11-03: every read the public API makes passes the narrative publication
+# chokepoint (web.narrative_publication) — AI-written text is served only with a known,
+# private-free provenance; anything else is withheld, fail-closed. Writes delegate unchanged.
+table = narrative_publication.wrap(dynamodb.Table(TABLE_NAME))
 
 # ── Caches ─────────────────────────────────────────────────
 # COST-OPT-1: cache secrets in warm containers (15-min TTL).

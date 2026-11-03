@@ -627,4 +627,20 @@ UNPROVEN_RESIDUE: dict[str, str] = {
         "2026-10-12 (#4848) — can-fail watched by tests/test_clock_literal_guard_4848.py negative control (unfrozen pin flagged, "
         "exits 1); no census MutationSpec because the plant needs the AST producer world, not a tracked file"
     ),
+    # #5645 (2026-11-03): the four named exemptions from the narrative publication gate's wrapped-table guard. Each is a
+    # lambdas/web module that builds its own table handle and reads no AI-written narrative; the guard
+    # (tests/test_narrative_publication_gate.py::test_every_web_table_handle_is_wrapped) fails on any NEW unwrapped handle,
+    # so the set cannot grow silently. The entries themselves are reasons, not mutable gates — no MutationSpec applies.
+    "registry::tests/test_narrative_publication_gate.py::UNWRAPPED_TABLE_EXEMPT::ask_retrieval.py": (
+        "2026-11-03 (#5645) — exemption from the wrapped-table guard: published-chronicle recall only (PUBLISHED_KINDS); given the wrapped table by the AI Lambda"
+    ),
+    "registry::tests/test_narrative_publication_gate.py::UNWRAPPED_TABLE_EXEMPT::email_subscriber_lambda.py": (
+        "2026-11-03 (#5645) — exemption from the wrapped-table guard: subscriber records only"
+    ),
+    "registry::tests/test_narrative_publication_gate.py::UNWRAPPED_TABLE_EXEMPT::site_stats_refresh_lambda.py": (
+        "2026-11-03 (#5645) — exemption from the wrapped-table guard: public stats counters only"
+    ),
+    "registry::tests/test_narrative_publication_gate.py::UNWRAPPED_TABLE_EXEMPT::subscriber_onboarding_lambda.py": (
+        "2026-11-03 (#5645) — exemption from the wrapped-table guard: subscriber records only"
+    ),
 }
