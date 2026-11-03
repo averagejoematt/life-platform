@@ -66,6 +66,14 @@ Versioned rules never silently rewrite history. Three rules, each enforced in co
    rule bump (1.1 → 1.2) cannot re-grade an owner ruling. A further change to such a row is
    a deliberate, per-row ``apply_correction`` (``basis="ruling"``, ``ruled_by=...``).
 
+4. **A settled grade under classification review is changed by no automated path** (owner ruling 2026-11-03,
+   ``coach/classification_review.py``). ``write_first_grade``, ``revert_correction`` and every non-``ruling``
+   ``apply_correction`` refuse a row carrying ``classification_review`` (``ClassificationReviewError``) and are
+   conditional on its absence, so a review set between the read and the write still wins. An owner ruling
+   (``basis="ruling"``) is what the review waits for: it is allowed, and it RESOLVES the review — a
+   ``CLASSREVIEW#`` audit row first, ``resolves_classification_review`` on the entry, and the flag REMOVEd in
+   the same conditional update.
+
 Each entry also carries ``basis`` (``regrade | restate | first_grade | ruling``),
 ``verdict_changed`` and, for a ruling, ``ruled_by`` — structured provenance a reader and a
 selector can key on.
@@ -82,7 +90,10 @@ from typing import Any
 from common.numeric import floats_to_decimal
 from experiment.phase_taxonomy import experiment_stamp_for
 
-from coach import evaluation_hold  # #5607: the per-row grading hold write_first_grade honours
+from coach import (
+    classification_review,  # owner ruling 2026-11-03: a disputed settled grade is no automated path's
+    evaluation_hold,  # #5607: the per-row grading hold write_first_grade honours
+)
 from coach.prediction_grading import grading_window_still_open, was_terminalized_by_duplicate_grader
 
 CORRECTION_PREFIX = "CORRECTION#"
@@ -161,6 +172,7 @@ def write_first_grade(table: Any, row: dict, evaluation: dict, *, outcome_notes:
         raise SettledGradeError(f"{row.get('pk')} / {row.get('sk')} is settled ({row.get('status')}): only apply_correction may change it")
     if evaluation_hold.is_grading_held(row):  # #5607: a held row is not graded until the owner rules on it
         raise evaluation_hold.HeldGradeError(f"{row.get('pk')} / {row.get('sk')} is held for review: {evaluation_hold.hold_reason(row)}")
+    classification_review.refuse_automated(row, "the scheduled grader")  # a disputed verdict waits for a ruling
     pk = row.get("pk") or f"COACH#{row.get('coach_id', '')}"
     sk = row.get("sk") or f"PREDICTION#{row.get('prediction_id', '')}"
     values: dict[str, Any] = {
@@ -171,7 +183,10 @@ def write_first_grade(table: Any, row: dict, evaluation: dict, *, outcome_notes:
         ":qf": list(evaluation.get("quality_flags") or []),
         ":ver": evaluator_version,
     }
-    conds = [f"attribute_not_exists({evaluation_hold.ATTR})"]  # #5607: a hold set after the read still wins
+    conds = [
+        f"attribute_not_exists({evaluation_hold.ATTR})",  # #5607: a hold set after the read still wins
+        f"attribute_not_exists({classification_review.ATTR})",  # and so does a classification review
+    ]
     if row.get("status") is not None:
         conds.append("#status = :prior")
         values[":prior"] = row["status"]
@@ -294,8 +309,15 @@ def apply_correction(
     """
     if basis == RESTATE and corrected.get("status") != row.get("status"):
         raise ValueError("a restate keeps the verdict; a changed verdict is a regrade")
+    if basis != RULING:  # a disputed verdict changes only by an owner ruling (classification_review)
+        classification_review.refuse_automated(row, f"a {basis} correction")
     at = now_iso(now)
     e = entry(row, corrected, reason=reason, evaluator_version=evaluator_version, corrected_at=at, basis=basis, ruled_by=ruled_by)
+    review = classification_review.review_of(row) if basis == RULING else None
+    if review is not None:
+        # The ruling the review waited for: the review's resolution is on the record BEFORE anything changes.
+        e["resolves_classification_review"] = review
+        table.put_item(Item=floats_to_decimal(classification_review_resolution_row(row, review, e, ruled_by=ruled_by)))
     table.put_item(Item=floats_to_decimal(correction_row(row, e)))
 
     sets = [
@@ -321,12 +343,38 @@ def apply_correction(
         if row.get("outcome_notes") is not None:  # #5613: the text the plan read is still the text on the row
             values[":prior_notes"] = row["outcome_notes"]
             kwargs["ConditionExpression"] += " AND outcome_notes = :prior_notes"
-    kwargs["UpdateExpression"] = "SET " + ", ".join(sets)
+    if basis != RULING:  # a review set after the plan read the row still wins
+        cond = f"attribute_not_exists({classification_review.ATTR})"
+        kwargs["ConditionExpression"] = f"{kwargs['ConditionExpression']} AND {cond}" if kwargs.get("ConditionExpression") else cond
+    kwargs["UpdateExpression"] = "SET " + ", ".join(sets) + (f" REMOVE {classification_review.ATTR}" if review is not None else "")
     kwargs["ExpressionAttributeValues"] = floats_to_decimal(values)
     if names:
         kwargs["ExpressionAttributeNames"] = names
     table.update_item(**kwargs)
     return e
+
+
+def classification_review_resolution_row(row: dict, review: dict, e: dict, *, ruled_by: str | None) -> dict:
+    """The ``CLASSREVIEW#`` audit row an owner ruling writes when it resolves a classification review — the
+    review it resolves, the verdict as it stood and the verdict the ruling sets, at the correction's instant."""
+    pk = str(row["pk"])
+    sk = f"{classification_review.AUDIT_SK_PREFIX}{prediction_id(row)}#{e['corrected_at']}"
+    return {
+        **experiment_stamp_for(pk, sk),
+        "pk": pk,
+        "sk": sk,
+        "action": "resolved",
+        "prediction_id": prediction_id(row),
+        "prediction_sk": row.get("sk"),
+        "actor": ruled_by or "owner",
+        "ruling_ref": review.get("ruling_ref"),
+        "at": e["corrected_at"],
+        "reason": e.get("reason"),
+        "resolved_review": review,
+        "prior_status": row.get("status"),
+        "ruled_status": e.get("corrected_status"),
+        "verdict_changed": e.get("verdict_changed"),
+    }
 
 
 def summary_row(summary: dict, *, now: datetime | None = None) -> dict:
@@ -391,6 +439,7 @@ def revert_correction(table: Any, row: dict, *, reason: str, now: datetime | Non
     og = row.get("original_grade")
     if not isinstance(og, dict) or not og or reverted_already(row):
         return None
+    classification_review.refuse_automated(row, "a revert")  # a disputed verdict waits for a ruling
     at = now_iso(now)
     reason = reason if reason.startswith(REVERT_REASON_PREFIX) else f"{REVERT_REASON_PREFIX} {reason}"
     e = revert_entry(row, reason=reason, reverted_at=at)
@@ -410,7 +459,7 @@ def revert_correction(table: Any, row: dict, *, reason: str, now: datetime | Non
     table.update_item(
         Key={"pk": row["pk"], "sk": row["sk"]},
         UpdateExpression=expr,
-        ConditionExpression="#status = :prior",
+        ConditionExpression=f"#status = :prior AND attribute_not_exists({classification_review.ATTR})",
         ExpressionAttributeNames=names,
         ExpressionAttributeValues=floats_to_decimal(values),
     )

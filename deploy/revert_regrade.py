@@ -46,7 +46,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from coach import grade_corrections  # noqa: E402
+from coach import classification_review, grade_corrections  # noqa: E402
 
 ISSUE = "#5533"
 EVALUATOR_VERSION = "1.1"
@@ -93,6 +93,8 @@ def select(
         for row in rows:
             if not isinstance(row, dict):
                 continue
+            if classification_review.is_under_review(row):
+                continue  # owner ruling 2026-11-03: a disputed verdict waits for a ruling, never a revert run
             og = row.get("original_grade")
             if isinstance(og, dict) and og:
                 if grade_corrections.already_corrected(

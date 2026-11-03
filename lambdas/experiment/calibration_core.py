@@ -73,6 +73,11 @@ def normalize_confidence(value, default=0.5):
         return default
 
 
+#: ``coach.classification_review.ATTR`` (pinned equal by tests/test_classification_review.py) — named here, not
+#: imported, so this pure module keeps no dependency on the coach package.
+CLASSIFICATION_REVIEW_ATTR = "classification_review"
+
+
 def outcome_to_binary(status):
     """confirmed → 1, refuted → 0, anything else → None (not scorable)."""
     s = str(status or "").strip().lower()
@@ -89,9 +94,16 @@ def pairs_from_prediction_records(records):
     Uses the record's numeric `confidence` (coach_state_updater writes a float) and its
     resolved `status`/`outcome`. Records that never resolved to confirmed/refuted are
     skipped — you can't score a forecast whose truth is still unknown.
+
+    A record under classification review (``classification_review`` present — the attribute
+    ``coach.classification_review.ATTR`` names; owner ruling 2026-11-03) is skipped too: its verdict is
+    disputed, "excluded from any claim that its outcome has been reliably verified". The JS port
+    (``site/assets/js/calibration-core.js``) reads API rows that never carry the attribute.
     """
     pairs = []
     for r in records or []:
+        if r.get(CLASSIFICATION_REVIEW_ATTR):
+            continue
         y = outcome_to_binary(r.get("status") or r.get("outcome"))
         if y is None:
             continue

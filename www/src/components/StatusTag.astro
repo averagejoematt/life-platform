@@ -1,4 +1,5 @@
 ---
+import { DISPUTED_NOTE } from "../lib/disputed.js";
 import { callOutcome, dayInWords } from "../lib/format.js";
 
 interface Props {
@@ -6,8 +7,10 @@ interface Props {
   date?: string | null;
   /** a prediction's status: printed as the call's outcome word ("right", "wrong", "open") */
   call?: boolean;
+  /** the verdict is under classification review (owner rulings 2026-11-03): printed as stored, with the note beside it */
+  disputed?: boolean;
 }
-const { status, date = null, call = false } = Astro.props;
+const { status, date = null, call = false, disputed = false } = Astro.props;
 ---
 
-<span class={`status ${status}`}>{call ? callOutcome(status) : status}{date && ` ${dayInWords(date, { short: true })}`}</span>
+<span class={`status ${status}`}>{call ? callOutcome(status) : status}{date && ` ${dayInWords(date, { short: true })}`}</span>{disputed && <span class="flag disputed">{DISPUTED_NOTE}</span>}

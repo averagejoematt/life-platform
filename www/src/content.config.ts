@@ -211,6 +211,9 @@ const predictions = defineCollection({
     retired: z.boolean(),
     metric_key: z.string().nullable(),
     claim_withheld: z.enum(["unsourced", "privacy"]).nullable(),
+    // Owner rulings 2026-11-03: the stored verdict, disputed pending classification — shown, never counted as verified.
+    classification_review: z.boolean(),
+    classification_review_reason: z.string().min(1).nullable(),
     corrections: z.array(correction),
     sealed: z.boolean(),
     confidence: z.number().min(0).max(1).nullable(),

@@ -576,6 +576,8 @@ def _live_ledger(ctx: LiveContext) -> None:
         sg = r.get("simple_guess") or None
         flags = [f for f in (r.get("quality_flags") or []) if isinstance(f, str)]
         corrections = [_correction_entry(e) for e in (r.get("corrections") or []) if isinstance(e, dict)]
+        review = r.get("classification_review") is True
+        review_reason = str(r.get("classification_review_reason") or "").strip() or "Disputed: under classification review."
         edges = [{"type": "coach", "id": pid, "rel": "made_by"}]
         if metric:
             edges.append({"type": "metric", "id": metric, "rel": "about"})
@@ -614,6 +616,10 @@ def _live_ledger(ctx: LiveContext) -> None:
                 simple_guess={"state": str(sg.get("state") or "unknown"), "right": sg.get("right"), "text": sg.get("text")} if sg else None,
                 quality_flags=flags,
                 corrections=corrections,
+                # Owner rulings 2026-11-03: the verdict under classification review travels as served — status stays
+                # the stored verdict; the page shows it disputed and counts it nowhere as verified.
+                classification_review=review,
+                classification_review_reason=review_reason if review else None,
                 sealed=bool(r.get("sealed")),
                 confidence=(
                     float(r["confidence"])
