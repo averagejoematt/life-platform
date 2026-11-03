@@ -362,7 +362,8 @@ export function scorePairs(pairs, nBins = 10) {
     score = 50;
   }
   // A positive label on nearly-one-band confidence is fragile: withheld as under_review (score, n, skill still served).
-  if (["developing", "reliable", "authoritative"].includes(label) && calibration === "not_measurable" && skilled === true) label = "under_review";
+  // "developing" is held for review outright; the stronger rungs only when their skill rests on one-band confidence.
+  if (label === "developing" || (["reliable", "authoritative"].includes(label) && calibration === "not_measurable" && skilled === true)) label = "under_review";
 
   return {
     n,
