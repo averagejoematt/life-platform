@@ -357,7 +357,8 @@ def test_ai_analysis_declares_the_stored_records_generated_at(monkeypatch):
     monkeypatch.setattr(coach, "table", FakeDdbTable(rows=[_expert_row()]))
     monkeypatch.setattr(coach, "_current_day_n", lambda: 30)
     body = _body(coach.handle_ai_analysis({"queryStringParameters": {"expert": "mind"}}))
-    assert body["analysis"].startswith("Sleep debt")
+    # #5607: the prose is withheld (owner register) — the record's vintage is still declared.
+    assert body["state"] == "withheld" and "analysis" not in body
     assert body["generated_at"] == EXPERT_GENERATED_AT
     assert body["_meta"]["content_as_of"] == EXPERT_GENERATED_AT, "the envelope must carry the record's instant, not the request's"
     assert body["_meta"]["generated_at"] == EXPERT_GENERATED_AT
@@ -370,7 +371,7 @@ def test_ai_analysis_honest_null_declares_no_vintage(monkeypatch):
     monkeypatch.setattr(coach, "table", FakeDdbTable(rows=[]))
     monkeypatch.setattr(coach, "_current_day_n", lambda: 30)
     body = _body(coach.handle_ai_analysis({"queryStringParameters": {"expert": "mind"}}))
-    assert body["analysis"] is None and body["generated_at"] is None
+    assert "analysis" not in body and body["generated_at"] is None  # #5607: never the prose key
     assert "content_as_of" not in body["_meta"]
 
 
@@ -381,5 +382,5 @@ def test_ai_analysis_withheld_stale_cycle_record_declares_no_vintage(monkeypatch
     monkeypatch.setattr(coach, "table", FakeDdbTable(rows=[_expert_row(days_in_experiment=99)]))
     monkeypatch.setattr(coach, "_current_day_n", lambda: 30)
     body = _body(coach.handle_ai_analysis({"queryStringParameters": {"expert": "mind"}}))
-    assert body["stale"] is True and body["analysis"] is None
+    assert body["stale"] is True and "analysis" not in body  # #5607: never the prose key
     assert "content_as_of" not in body["_meta"]

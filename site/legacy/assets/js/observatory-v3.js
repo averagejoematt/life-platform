@@ -198,7 +198,9 @@ function renderCoachAnalysis(container, expertKey, coachMeta) {
 
         proseEl.innerHTML = proseHtml;
       } else {
-        proseEl.innerHTML = '<p style="color:var(--text-faint)">Analysis generates daily. Check back soon.</p>';
+        // #5607: the /api/ai_analysis fallback is withheld — print its reason, never "check back".
+        proseEl.innerHTML = '<p style="color:var(--text-faint)"></p>';
+        proseEl.firstChild.textContent = (data.state === 'withheld' && data.reason) ? data.reason : 'Analysis generates daily. Check back soon.';
       }
 
       if (data.key_recommendation && data.data_availability !== 'observational_only') {
