@@ -46,6 +46,18 @@ STUBS = ("2026-10-28", "2026-10-29", "2026-10-30")
 FIXTURE = os.path.join(_REPO, "tests", "fixtures", "macrofactor_window_2026_11_02_5613.json")
 
 
+@pytest.fixture(autouse=True)
+def frozen_pacific_today(monkeypatch):
+    """#4848 / #2376: every call under test is handed its day, but any fallback to the clock is pinned to the
+    fixture's own TODAY — in `common.pacific_time` (the lazy importers) AND every module that bound the name
+    at import (a pin on the source alone leaks, the 10-31 lesson)."""
+    import common.pacific_time as pt
+    from coach import coach_domain_facts as cdf
+
+    for mod in (pt, cif, cdf):
+        monkeypatch.setattr(mod, "pacific_today", lambda *_a, **_k: TODAY)
+
+
 def _real_rows() -> list:
     rows = json.load(open(FIXTURE, encoding="utf-8"))["rows"]
     # The shape `fetch_macrofactor_window` returns: boto3 Decimals.
