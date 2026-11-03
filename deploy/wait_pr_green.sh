@@ -129,6 +129,10 @@ REPO="${WAIT_PR_GREEN_REPO:-averagejoematt/life-platform}"
 #     see deploy/github_posture.json's `main_required_checks_ruleset`). Its three
 #     jobs (fast-lane, full-suite, api-before-frontend) all fire unconditionally.
 #   - secret-scan.yml (gitleaks) likewise has no `paths:` filter.
+#   - web-gate.yml lost its `pull_request.paths:` filter when its verdict became REQUIRED:
+#     the `v9 web gate verdict (www build, required)` aggregator reports on EVERY PR (it is
+#     the build's result in scope, a seconds-long pass out of scope), so it moved here from
+#     the derived path-conditional half below, which no longer returns web-gate.yml at all.
 #   - codeql.yml's `pull_request:` trigger ALSO carries no `paths:` filter (only
 #     its `push:` trigger is path-scoped) — both CodeQL matrix legs fire on every PR.
 #
@@ -146,6 +150,7 @@ BASELINE_CHECKS=(
   "Full unit suite (pre-merge, issue 3025)"
   "API-before-frontend sequencing check (#2831)"
   "gitleaks (PR commit range only, not full history)"
+  "v9 web gate verdict (www build, required)"
   "CodeQL analysis (python)"
   "CodeQL analysis (javascript-typescript)"
 )
