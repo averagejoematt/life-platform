@@ -17,6 +17,7 @@ from common.strava_read_seam import strava_read_seam  # #4419: multi-device dupl
 from experiment.measurable_metrics import METRIC_SOURCES, base_metric
 from experiment.phase_filter import with_phase_filter
 
+from coach.grading_quality import is_zero_entry_day
 from coach.prediction_emission import point_tolerance_from_series
 
 logger = logging.getLogger(__name__)
@@ -84,3 +85,26 @@ def point_tolerance(table, user_id, metric_key, tolerance_cache, lookback_days):
     tol = point_tolerance_from_series(trailing_values(table, user_id, metric_key, lookback_days), lookback_days=lookback_days)
     tolerance_cache[metric_key] = tol
     return tol
+
+
+def window_readings(table, user_id, metric_key, start, end):
+    """[(day, value)] for `metric_key` over [start, end] — a KNOWN antecedent's window read at filing
+    (#5607). None on a read error: the antecedent is then left for the grader, never guessed."""
+    base = base_metric(metric_key or "")
+    source = METRIC_SOURCES.get(base)
+    if not source:
+        return None
+    try:
+        out = []
+        for item in source_items(table, user_id, source, start, end):
+            val = None if is_zero_entry_day(item) else item.get(base)  # #5533 (c): an unlogged day is no reading
+            if val is None:
+                continue
+            try:
+                out.append((str(item.get("sk", "")).replace("DATE#", "")[:10], float(val)))
+            except (TypeError, ValueError):
+                pass
+        return sorted(out)
+    except Exception as e:
+        logger.warning("Antecedent window read failed for %s (%s) — left for the grader: %s", metric_key, source, e)
+        return None

@@ -94,7 +94,9 @@ class TestCodeAdmitsOnlyFalsifiableClaims:
 
     def test_prose_metric_hint_is_normalized_not_guessed(self):
         ok, _, norm = dc.admit_claim(
-            _candidate(metric="heart rate variability", threshold=None, condition=None, direction="up"),
+            _candidate(
+                claim="my HRV will rise by Halloween", metric="heart rate variability", threshold=None, condition=None, direction="up"
+            ),
             SESSION_DATE,
             SOURCE_SK,
         )
@@ -114,7 +116,7 @@ class TestCodeAdmitsOnlyFalsifiableClaims:
 
     def test_direction_alone_routes_to_the_gradable_directional_spec(self):
         ok, _, norm = dc.admit_claim(
-            _candidate(claim="my HRV will recover once I'm sleeping again", metric="hrv", threshold=None, condition=None),
+            _candidate(claim="my HRV will recover by Halloween", metric="hrv", threshold=None, condition=None),
             SESSION_DATE,
             SOURCE_SK,
         )
@@ -122,10 +124,25 @@ class TestCodeAdmitsOnlyFalsifiableClaims:
         assert norm["evaluation"]["type"] == "directional"
         assert norm["evaluation"]["condition"] == "up"
 
+    def test_a_conditional_whose_condition_is_not_checkable_is_refused(self):
+        """#5607: 'my HRV will recover once I'm sleeping again' used to be admitted as an unconditional
+        HRV-up bet — the condition was never checked. Its condition names no threshold, so it is refused."""
+        ok, reason, _ = dc.admit_claim(
+            _candidate(claim="my HRV will recover once I'm sleeping again", metric="hrv", threshold=None, condition=None),
+            SESSION_DATE,
+            SOURCE_SK,
+        )
+        assert not ok
+        assert "filing rules" in reason and "condition" in reason
+
     def test_directional_spec_never_carries_a_dead_threshold(self):
         """C-3/#813: a threshold the evaluator will try and fail to compare against is
         what made 248/248 machine predictions permanently inconclusive."""
-        _, _, norm = dc.admit_claim(_candidate(metric="hrv", threshold=None, condition=None, direction="up"), SESSION_DATE, SOURCE_SK)
+        _, _, norm = dc.admit_claim(
+            _candidate(claim="my HRV will rise by Halloween", metric="hrv", threshold=None, condition=None, direction="up"),
+            SESSION_DATE,
+            SOURCE_SK,
+        )
         assert norm["evaluation"]["threshold"] is None
 
     def test_bad_condition_with_a_threshold_is_refused(self):

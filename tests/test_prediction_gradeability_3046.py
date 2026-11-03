@@ -31,7 +31,7 @@ from coach import (
 class TestEmissionContract:
     def test_a_directional_claim_is_emitted_pending_and_deterministic(self):
         spec = pe.build_prediction_eval_spec("hrv", "up", 14)
-        rec = pe.build_prediction_record("sleep_coach", "2026-08-23", "HRV will rise", spec, 0.7, "observational")
+        rec = pe.build_prediction_record("sleep_coach", "2026-08-23", "HRV will rise over the next two weeks", spec, 0.7, "observational")
         assert rec["status"] == "pending"
         assert rec["gradeable_by"] == pe.GRADEABLE_BY_DETERMINISTIC
 

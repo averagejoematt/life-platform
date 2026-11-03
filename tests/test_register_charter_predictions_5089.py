@@ -55,7 +55,9 @@ def test_record_shape_is_the_wire_shape():
     wire = _wire()
     # Every field the store's readers/evaluator key on is present with the same type; the only wire fields
     # we omit are the diary-entry pointers and consent stamps (not a diary claim) and the clock stamps.
-    omitted = {"source_pk", "source_sk", "consent", "consent_at", "created_at"}
+    # #5607: `filing`/`filing_rules_version` stamp a claim admitted as a GRADED call; these four rows are
+    # observations (qualitative spec) the block retro grades from their measurement block, so they carry neither.
+    omitted = {"source_pk", "source_sk", "consent", "consent_at", "created_at", "filing", "filing_rules_version"}
     for rec in rcp.build_records():
         assert set(wire) - omitted <= set(rec)
         for f in set(wire) - omitted - {"evaluation", "quote"}:
