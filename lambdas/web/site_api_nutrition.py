@@ -12,7 +12,6 @@ site_api_common (identical binding semantics to the pre-split facade).
 import os
 from datetime import datetime, timedelta
 
-from coach.grading_quality import is_zero_entry_day  # #5552: THE stub predicate (grader, coach inputs, engine, fact-checker)
 from common import (
     digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
@@ -270,19 +269,12 @@ def _mf(item, field, alt_field=None):
     return None
 
 
-def _complete(items: list) -> list:
-    """The rows that are a food log. A summary-only stub (no diary entries) is a missing day, not intake — the grader
-    (#5552), the coaches' inputs and the engine (#5603) and the fact-checker (#5613) read it so; this door's counts and
-    averages now do too (#5607, 2026-11-03). The trend keeps every row and flags the stubs; nothing is dropped silently."""
-    return [i for i in items if not is_zero_entry_day(i)]
-
-
 def _trend_row(i: dict) -> dict:
     """One `nutrition_trend` row — the chart's day. Shared with `edition_nutrition` (#4607)."""
     d = i.get("date") or i.get("sk", "").replace("DATE#", "")
     return {
         "date": d,
-        "logging_gap": is_zero_entry_day(i),
+        "logging_gap": nutrition_logging.is_stub(i),  # #5607: a stub stays in the trend, flagged
         "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
         "protein_g": (round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None),
         "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
@@ -468,8 +460,8 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     items.sort(key=lambda x: x.get("sk", ""))
     # #5607: every count, average, latest day and group below reads complete logs only; the trend (all rows, stubs
     # flagged) and `incomplete_days` say which days were stubs. A real low day is a log and stays in.
-    all_items, items = items, _complete(items)
-    incomplete_days = [i.get("date") or i.get("sk", "").replace("DATE#", "") for i in all_items if is_zero_entry_day(i)]
+    all_items, items = items, nutrition_logging.complete_logs(items)
+    incomplete_days = nutrition_logging.stub_days(all_items)
 
     cal_vals = [_mf(i, "calories") for i in items if _mf(i, "calories") is not None]
     pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
@@ -1311,7 +1303,7 @@ def edition_nutrition(*, _g) -> dict:
     protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
     all_items = _query_source("macrofactor", d30, today, projection=_EDITION_MF_FIELDS)
     all_items.sort(key=lambda x: x.get("sk", ""))
-    items = _complete(all_items)  # #5607: the route's own rule — counts over complete logs, the trend over every row
+    items = nutrition_logging.complete_logs(all_items)  # #5607: the route's own rule — counts over complete logs, the trend over every row
     pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
     log_rec = nutrition_logging.logging_record(items, today)
     return {
