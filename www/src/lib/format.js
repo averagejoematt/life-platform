@@ -69,3 +69,54 @@ export function domainWords(id) {
   if (!id) return "";
   return DOMAIN_WORDS[id] || String(id).replace(/_/g, " ");
 }
+
+// ── Verbatim quotations (#5609: the dates-in-words exception inside coach quotes) ────────────────
+// A coach's words are published exactly as said. An ISO date inside them is kept, wrapped in
+// <time datetime> (semantics only — the characters are untouched), and glossed in words AFTER the
+// quotation. Pure; nothing here alters the quoted string.
+const ISO_IN_QUOTE = /\b(20\d\d)-(\d\d)-(\d\d)\b/g;
+
+function isCalendarDay(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/** "night of 2026-09-09 baseline" -> [{text:"night of "}, {date:"2026-09-09"}, {text:" baseline"}]. Joined, the parts ARE the input. */
+export function quoteParts(text) {
+  const s = String(text ?? "");
+  const out = [];
+  let at = 0;
+  for (const m of s.matchAll(ISO_IN_QUOTE)) {
+    if (!isCalendarDay(m[0])) continue; // "2026-13-40" is not a date: left as plain quoted text, never glossed
+    if (m.index > at) out.push({ text: s.slice(at, m.index) });
+    out.push({ date: m[0] });
+    at = m.index + m[0].length;
+  }
+  if (at < s.length) out.push({ text: s.slice(at) });
+  return out;
+}
+
+/** The ISO dates a quotation carries, in order of first appearance, each in words: [{iso, words}]. */
+export function quoteGlosses(text) {
+  const seen = new Set();
+  const out = [];
+  for (const p of quoteParts(text)) {
+    if (!p.date || seen.has(p.date)) continue;
+    seen.add(p.date);
+    out.push({ iso: p.date, words: dayInWords(p.date, { weekday: true }) });
+  }
+  return out;
+}
+
+/** The quoted dates in words as one list ("Monday 14 September 2026 and Thursday 17 September 2026"), or "". Never the ISO form. */
+export function glossList(text) {
+  const g = quoteGlosses(text).map((x) => x.words);
+  return g.length <= 1 ? g[0] || "" : `${g.slice(0, -1).join(", ")} and ${g[g.length - 1]}`;
+}
+
+/** The block form: "The date quoted is …." / "The dates quoted are …."; "" when none. */
+export function glossText(text) {
+  const n = quoteGlosses(text).length;
+  return n ? `${n === 1 ? "The date quoted is" : "The dates quoted are"} ${glossList(text)}.` : "";
+}

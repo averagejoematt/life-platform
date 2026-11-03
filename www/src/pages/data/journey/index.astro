@@ -10,6 +10,7 @@
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
+import Quote from "../../../components/Quote.astro";
 import { heartChart, heartWeeks, journeyCaption, journeyChart, ladderRows, ordinal, paceBar, rungChapters, visceralBand } from "../../../lib/journey.js";
 import { callOutcome, clip, dayInWords, num } from "../../../lib/format.js";
 import { loadAll, loadJourney, loadSeries } from "../../../lib/snapshot.js";
@@ -481,7 +482,7 @@ const headline = ok
                       {callOutcome(p.status)} · {dayInWords(p.settled_date, { short: true })}
                       {coachName(p) ? ` · ${coachName(p)}` : ""}
                     </span>
-                    <span>{clip(p.title || p.claim, 100)}</span>
+                    <span>{p.claim_withheld ? clip(p.claim, 100) : <Quote text={clip(p.claim, 100)} said={p.logged_date} />}</span>
                   </a>
                 ))}
               </div>
