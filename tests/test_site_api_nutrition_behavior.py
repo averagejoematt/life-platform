@@ -478,7 +478,7 @@ def test_the_daily_trend_carries_one_row_per_logged_day_with_absent_macros_as_nu
     src = FakeSources(macrofactor=[mf("2026-05-06", total_calories_kcal=2000), mf("2026-05-07", total_protein_g=180)])
     trend = overview(src)["nutrition_trend"]
     assert len(trend) == 2
-    assert trend[0] == {"date": "2026-05-06", "calories": 2000, "protein_g": None, "carbs_g": None, "fat_g": None}
+    assert trend[0] == {"date": "2026-05-06", "logging_gap": False, "calories": 2000, "protein_g": None, "carbs_g": None, "fat_g": None}
     assert trend[1]["protein_g"] == 180.0
     assert trend[1]["calories"] is None
 

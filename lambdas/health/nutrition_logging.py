@@ -164,3 +164,21 @@ def protein_intake(items: Iterable[dict], today: str, experiment_start: str) -> 
     rows = [i for i in items or () if isinstance(i, dict) and not i.get("tombstone") and start <= row_date(i) <= end]
     win = protein_window(protein_series(rows))
     return {"avg_g": win["mean"] if win else None, "days": win["n"] if win else 0, "window_start": start}
+
+
+def is_stub(rec) -> bool:
+    """A summary-only MacroFactor row (no diary entries): a missing day, never intake. The ONE predicate is the
+    grader's (``coach.grading_quality.is_zero_entry_day``, #5552); readers outside ``coach`` reach it here."""
+    from coach.grading_quality import is_zero_entry_day  # noqa: PLC0415 — health must not import coach at module load
+
+    return is_zero_entry_day(rec)
+
+
+def complete_logs(items) -> list:
+    """The rows that are a food log (#5607): every count and average reads these; stubs stay in a trend, flagged."""
+    return [i for i in items or () if not is_stub(i)]
+
+
+def stub_days(items) -> list:
+    """The days whose row is a stub, in row order (``date`` or the ``DATE#`` sort key)."""
+    return [i.get("date") or str(i.get("sk", "")).replace("DATE#", "") for i in items or () if is_stub(i)]
