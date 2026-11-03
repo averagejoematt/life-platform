@@ -264,7 +264,11 @@ export function recentLine(row, who) {
   } else {
     text = `${name}’s call on ${metricWords(row.metric)}.`;
   }
-  return { verdict: right ? "right" : "wrong", text, rule, checked: checked ? `Checked ${checked}.` : "" };
+  // #5626: a corrected grade is served at its CURRENT verdict; the first one is named beside it, never hidden.
+  const g = row.grade_correction;
+  const first = g ? ({ confirmed: "right", refuted: "wrong" }[g.original_status] || String(g.original_status || "")) : "";
+  const fixed = g ? ` Corrected${g.corrected_at ? ` ${dayInWords(String(g.corrected_at).slice(0, 10))}` : ""}; first marked ${first}.` : "";
+  return { verdict: right ? "right" : "wrong", text, rule, checked: `${checked ? `Checked ${checked}.` : ""}${fixed}`.trim() };
 }
 export function recentLines(recent, who) {
   return (Array.isArray(recent) ? recent : []).map((r) => recentLine(r, who)).filter(Boolean);

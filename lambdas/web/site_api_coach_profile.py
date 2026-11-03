@@ -35,7 +35,10 @@ from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-
 from health import instrument_presence  # #4217: the absent coach — the same liveness /api/source_freshness serves
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
 
-from web import claim_sourcing  # #4673: dated words citing a sensor with no reading that day are not quoted
+from web import (
+    claim_sourcing,  # #4673: dated words citing a sensor with no reading that day are not quoted
+    trail_corrections,  # #5626: the learning trail read against the ledger's current verdicts
+)
 from web.site_api_common import (
     USER_PREFIX,
     _decimal_to_float,
@@ -143,6 +146,7 @@ def _track_record(coach_id, *, _g):
     table = _g["table"]
     record, comparison = coach_baseline.for_coach(table, coach_id, genesis=_g["EXPERIMENT_START"])  # #4585: one read, both
     recent = []
+    candidates = []
     seen = set()
     try:
         resp = table.query(
@@ -166,17 +170,22 @@ def _track_record(coach_id, *, _g):
             if st not in ("confirmed", "refuted") or not pid or pid in seen:
                 continue  # #4220: a graded call, named, once
             seen.add(pid)
-            if len(recent) < 6:
-                recent.append(
-                    {
-                        "date": it.get("date") or it.get("sk", "").replace("LEARNING#", "").split("#")[0],
-                        "status": st,
-                        "metric": it.get("metric"),
-                        "reason": _reader_reason(it.get("reason", "")),
-                    }
-                )
+            candidates.append(
+                {
+                    "date": it.get("date") or it.get("sk", "").replace("LEARNING#", "").split("#")[0],
+                    "status": st,
+                    "metric": it.get("metric"),
+                    "reason": _reader_reason(it.get("reason", "")),
+                    "prediction_id": pid,
+                }
+            )
+        # #5626: the trail is the grade AS FIRST WRITTEN; a correction lives on the PREDICTION# row. Each
+        # line is read against its row — the current verdict, the original beside it, a withheld row dropped.
+        served, _counts = trail_corrections.reconcile_until(candidates, 6, table, coach_id, chunk=8, translate=_reader_reason)
+        recent = [{k: v for k, v in e.items() if k != "prediction_id"} for e in served]
     except Exception as _e:
         logger.warning(f"[coaches] track_record {coach_id}: {_e}")
+        recent = []  # #5626: a trail that could not be checked against the ledger is not served
     confirmed = record["confirmed"] if record else None
     refuted = record["refuted"] if record else None
     decided = record["n"] if record else None
@@ -458,6 +467,7 @@ def _dossier_block(coach_id, *, _g):
     commitments.sort(key=lambda e: e.get("date") or "", reverse=True)
 
     learnings = []
+    trail_counts = {"corrected": 0, "withheld": 0, "unverified": 0}
     try:
         for it in _rows("LEARNING#", 60):
             entry, status = coach_dossier.learning_entry(it, reason_translator=_reader_reason)
@@ -465,8 +475,11 @@ def _dossier_block(coach_id, *, _g):
                 withheld += 1
             elif entry:
                 learnings.append(entry)
+        # #5626: read each learning against its prediction's CURRENT row (the LEARNING# row is never rewritten).
+        learnings, trail_counts = trail_corrections.reconcile_until(learnings, 25, table, coach_id, translate=_reader_reason)
     except Exception as _e:
         logger.warning(f"[dossier] learnings {coach_id}: {_e}")
+        learnings = []  # #5626: unchecked against the ledger — honest-empty, never the first grades unchecked
     learnings = learnings[:25]
 
     relationship = None
@@ -541,6 +554,8 @@ def _dossier_block(coach_id, *, _g):
         "commitments": commitments,
         "commitment_counts": coach_dossier.commitment_counts(commitments),
         "learnings": learnings,
+        # #5626: learnings shown at their corrected verdict, dropped as the ledger drops them, or unread.
+        "learning_corrections": trail_counts,
         "relationship": relationship,
         "docket_positions": docket_positions,
         "withheld": withheld,
