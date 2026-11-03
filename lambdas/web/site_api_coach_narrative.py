@@ -36,6 +36,7 @@ from coach.persona_registry import (  # coaching-team v2: names come from the re
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
+from web import derived_summary_freshness  # owner ruling 2026-11-03: a read a correction overtook is not current
 from web.site_api_common import (
     PT,
     USER_PREFIX,
@@ -279,6 +280,13 @@ def _reader_register(resp, output):
     ):
         if field in resp:
             resp[field] = audience_guard.reader_prose(resp.get(field))
+
+
+def _serve_registers(resp, output, table, coach_id):
+    """The reader register (#4213), then the owner ruling of 2026-11-03: a read a later grade correction overtook is
+    not served as current (``web.derived_summary_freshness``; as-of and derived_from ride the wire)."""
+    _reader_register(resp, output)
+    derived_summary_freshness.apply_to_analysis(resp, table, coach_id, output)
 
 
 def handle_coach_analysis(event, *, _g):
@@ -553,7 +561,7 @@ def handle_coach_analysis(event, *, _g):
         except Exception:
             pass
 
-        _reader_register(resp, output)
+        _serve_registers(resp, output, table, coach_id)
         # Strip None values for cleaner JSON
         resp = {k: v for k, v in resp.items() if v is not None}
         return _ok(resp, cache_seconds=300, content_as_of=content_vintage(*_vintage_stamps))

@@ -184,25 +184,32 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _track_record_block(coach_id: str) -> str:
-    """Summarize this coach's resolved LEARNING# verdicts for prompt injection.
+def _graded_record(coach_id: str) -> dict:
+    """The coach's resolved LEARNING# verdicts, READ AGAINST EACH CALL'S CURRENT GRADE (owner ruling 2026-11-03).
 
-    Counts by outcome + the two most recent resolved calls verbatim. Returns a
-    plain statement when nothing has resolved yet (post-reset normal). Failure
-    here must never block the narrative run.
+    LEARNING# rows are the grade as first written; a correction rewrites only the PREDICTION# row. So each
+    prediction-tied row is reconciled through ``coach.authoritative_grades`` before it reaches the brief: a corrected
+    call is shown at its current grade, and a call that is no longer decided leaves the right/wrong list. Returns
+    ``{block, cited, notes}`` — the prompt text, the prediction ids it was built from (``derived_from``), and one
+    dated note per corrected call (its recorded reason, verbatim). Failure never blocks the narrative run.
     """
     try:
         from datetime import timedelta as _td
 
         from boto3.dynamodb.conditions import Key as _Key
 
+        from coach import authoritative_grades as _ag
+        from coach.verdict_claims import correction_lines as _correction_lines
+
         cutoff = (pacific_now() - _td(days=60)).strftime("%Y-%m-%d")
         r = table.query(
             KeyConditionExpression=_Key("pk").eq(f"COACH#{coach_id}") & _Key("sk").gt(f"LEARNING#{cutoff}"),
         )
-        recs = [x for x in r.get("Items", []) if not x.get("tombstone")]
+        raw = [x for x in r.get("Items", []) if not x.get("tombstone") and str(x.get("sk", "")).startswith("LEARNING#")]
+        recs, notes, _rows = _ag.reconcile_from_table(table, coach_id, raw)
+        cited = sorted({str(x.get("prediction_id")) for x in recs if x.get("prediction_id")})
         if not recs:
-            return "Nothing resolved yet this cycle. Make calls; they will be scored."
+            return {"block": "Nothing resolved yet this cycle. Make calls; they will be scored.", "cited": [], "notes": notes}
         counts: dict[str, int] = {}
         for x in recs:
             st = str(x.get("status", "unknown"))
@@ -212,13 +219,33 @@ def _track_record_block(coach_id: str) -> str:
         resolved.sort(key=lambda x: str(x.get("date", "")), reverse=True)
         for x in resolved[:2]:
             lines.append(f"- {x.get('date', '?')}: {x.get('status')} — {str(x.get('condition') or x.get('reason') or '')[:160]}")
+        if notes:
+            lines.append("Corrected grades (the current grade stands; the recorded reason is the only explanation):")
+            lines.extend(_correction_lines(notes))
         lines.append(
             "When relevant, reference your own past calls in your narrative — "
-            "own the misses plainly; credibility here comes from being scored, not from being right."
+            "own the misses plainly; credibility here comes from being scored, not from being right. "
+            "Only a call graded refuted is a miss, and only a call graded confirmed is a hit."
         )
-        return "\n".join(lines)
+        return {"block": "\n".join(lines), "cited": cited, "notes": notes}
     except Exception:
-        return "Track record unavailable this run."
+        return {"block": "Track record unavailable this run.", "cited": [], "notes": []}
+
+
+def _track_record_text(state: dict, coach_id: str) -> str:
+    """The brief's track-record block: the one ``_gather_all_state`` read (``graded_record``), else a fresh read."""
+    gr = state.get("graded_record")
+    return gr["block"] if isinstance(gr, dict) and "block" in gr else _track_record_block(coach_id)
+
+
+def _track_record_block(coach_id: str) -> str:
+    """Summarize this coach's resolved verdicts for prompt injection — at their CURRENT grades (``_graded_record``).
+
+    Counts by outcome + the two most recent resolved calls verbatim. Returns a
+    plain statement when nothing has resolved yet (post-reset normal). Failure
+    here must never block the narrative run.
+    """
+    return _graded_record(coach_id)["block"]
 
 
 def _cycle_boundary_context(today: str):
@@ -543,7 +570,12 @@ def _gather_all_state(coach_id):
     # exposure into the message/brief is gated per-coach at the seam below, not here.
     journal_mood = _gather_journal_mood_signal()
 
+    # Owner ruling 2026-11-03: the track record at each call's CURRENT grade. In `state`, so the #3107 input
+    # digest moves when a grade is corrected — a correction regenerates the read instead of reusing it.
+    graded_record = _graded_record(coach_id)
+
     return {
+        "graded_record": graded_record,
         "target_compressed": target_compressed,
         "other_compressed": other_compressed,
         "ensemble_digest": ensemble_digest,
@@ -933,7 +965,7 @@ def _build_user_message(state, coach_id, today):
     # can reference past calls — and acknowledge misses — in its own voice.
     # Empty right after a reset; fills as the evaluator resolves predictions.
     parts.append("## Your Track Record (resolved predictions, last 60 days)")
-    parts.append(_track_record_block(coach_id))
+    parts.append(_track_record_text(state, coach_id))
     parts.append("")
 
     # Current stance (2026-06-29): the coach's evolving, evidence-derived read of
@@ -1224,6 +1256,22 @@ def lambda_handler(event, context):
         journal_mood = _journal_mood_for_brief(state.get("journal_mood"))
         if journal_mood and isinstance(brief.get("generation_brief"), dict):
             brief["generation_brief"]["journal_mood"] = journal_mood
+
+    # Owner ruling 2026-11-03: the grade contract and every corrected call's dated, recorded reason ride the
+    # brief DETERMINISTICALLY (every path, fallback included); `derived_from_predictions` is the provenance
+    # the state updater stamps on the OUTPUT# it writes from this brief.
+    _gr = state.get("graded_record") if isinstance(state.get("graded_record"), dict) else {}
+    if isinstance(brief.get("generation_brief"), dict):
+        from coach.verdict_claims import PROMPT_CONTRACT as _contract, correction_lines as _correction_lines
+
+        brief["generation_brief"]["grade_corrections"] = {
+            "contract": _contract,
+            "corrected_calls": _correction_lines(_gr.get("notes") or []),
+        }
+    brief["derived_from_predictions"] = sorted(
+        set(_gr.get("cited") or [])
+        | {str(p.get("prediction_id")) for p in state.get("active_predictions") or [] if isinstance(p, dict) and p.get("prediction_id")}
+    )
 
     # Cache the brief for fallback use
     _cache_brief(coach_id, brief, today)

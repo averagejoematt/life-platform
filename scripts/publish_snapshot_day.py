@@ -149,6 +149,7 @@ def day_objects(
     sample: bool = False,
     source: list[str] | None = None,
     detail: dict[str, dict] | None = None,
+    predictions: list[dict] | None = None,
 ) -> list[dict]:
     """The Day objects for the pulse rows (pure). A row without an ISO date or a day number is dropped
     and logged — never guessed. `detail` (date -> `day_detail(...)`) carries the M4 layers; a day
@@ -210,7 +211,8 @@ def day_objects(
                 **extra,
             )
         )
-    annotate_coach_lines(out)  # dated corrections beside the verbatim lines (the owner's acceptance ruling, 2026-11-02)
+    # dated corrections beside the verbatim lines (the owner's acceptance ruling, 2026-11-02; verdicts: ruling of 2026-11-03)
+    annotate_coach_lines(out, predictions)
     for o in out:
         check_day(o)
     return out
@@ -694,4 +696,5 @@ def live_days(ctx: Any, get: Callable[[str], Any] | None = None) -> None:
         windows=served_windows(ctx.fetched),
         source=["/api/pulse_history", "/api/chapters"] + (LAYER_SOURCES if get else []),
         detail=layers_for(ctx, get, rows) if get else None,
+        predictions=ctx.objs.get("prediction") or [],
     )

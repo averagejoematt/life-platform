@@ -41,6 +41,7 @@ import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment p
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 import { BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1995 — the one honest label for the morning brief's daily line
 import { daysOverdue, lateWords } from "/assets/js/entry_age.js"; // #4219 — an overdue ask says it is late
+import { summaryProvenanceHTML, trailCorrectionsHTML } from "/assets/js/summary_provenance.js"; // owner ruling 2026-11-03 — as-of, provenance, dated corrections
 import { rosterEntries, scorecardSeats, retiredSeatNote, rateText, rateWord } from "/assets/js/coach_roster.js"; // #3517 — the pre-start-gated roster mapping; #4215 retired seats apart
 import { callReasonText } from "/assets/js/scorecard_reason.js"; // #4220 — a graded call's reason in reader words
 import { coachAsOf, datableTensions, regenerationPaused, weeklyAsOf } from "/assets/js/coach_asof.js"; // #802/#1971/#2383 — the honest "as of / refresh paused" disclosure
@@ -203,6 +204,7 @@ function coachStanceHTML(st) {
   let h = `<section class="coach-stance"><p class="dx-kicker label">where I think he is · what I'm focused on</p>`;
   if (stage.label) h += `<h3 class="cs-headline">${esc(stage.label)}</h3>`;
   if (st.headline_read) h += `<p class="dx-prose">${esc(st.headline_read)}</p>`;
+  h += summaryProvenanceHTML(st, { cls: "cs" }); // owner ruling 2026-11-03: as-of, provenance, dated corrections
   if ((st.focused_on_now || []).length) h += `<p class="cs-care"><span class="label">focused on right now</span> ${list(st.focused_on_now)}</p>`;
   if ((st.set_aside_for_now || []).length) h += `<p class="cs-careless"><span class="label">set aside for now</span> ${list(st.set_aside_for_now)}</p>`;
   if (st.how_my_read_changed) h += `<p class="cs-evolve"><span class="label">how my read has changed</span> ${esc(st.how_my_read_changed)}</p>`;
@@ -410,11 +412,11 @@ function coachLiveRecordHTML(d) {
   if (trail.length) {
     h += `<p class="cl-trail-k label">how the read has moved</p><ol class="ce-trail">` + trail.slice(0, 6).map((s) =>
       `<li class="ce-item"><span class="ce-date label">${esc(String(s.as_of || "").slice(0, 10))}${s.stage && s.stage.label ? " · " + esc(s.stage.label) : ""}</span>` +
-      `<p class="ce-say">${esc(s.how_my_read_changed || s.headline_read)}</p></li>`).join("") + `</ol>`;
+      `<p class="ce-say">${esc(s.how_my_read_changed || s.headline_read)}</p>${trailCorrectionsHTML(s)}</li>`).join("") + `</ol>`;
   } else if (outs.length) {
     h += `<p class="cl-trail-k label">recent output trail</p><ol class="ce-trail">` + outs.slice(0, 6).map((o) =>
       `<li class="ce-item"><span class="ce-date label">${esc(String(o.date || "").slice(0, 10))}</span>` +
-      (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") +
+      (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") + trailCorrectionsHTML(o) +
       ((o.themes || []).length ? `<p class="ce-themes label">${(o.themes || []).slice(0, 4).map(esc).join(" · ")}</p>` : "") + `</li>`).join("") + `</ol>`;
   } else if (isLead) {
     h += `<p class="cl-empty dx-prose">No dated output trail of his own — the head coach's synthesis surfaces through the staff's weekly reads and the board's one call for the phase.</p>`;
@@ -584,6 +586,7 @@ async function renderToday(mount) {
       `${paused ? ` <span>· new reads are paused by the budget guard</span>` : ""}</p>` +
       `<p class="provenance ct-why"><span>${esc(pick.reason)}</span></p>` +
       `<div class="prose ct-text" data-verbatim><p>${esc(text)}</p></div>` +
+      (chosen.lead ? "" : summaryProvenanceHTML(chosen, { cls: "ct", ledgerHref: (id) => `/system/ledger/${chosen.coach_id}-${id}/` })) +
       `<p class="ct-full label"><a href="/coaching/by-coach/#${esc(pid)}">${clipped ? "full read" : "more from this coach"} →</a></p>` +
       glossHTML(text);
     const ask = pickAsk(d.open_actions, chosen.coach_id);
@@ -702,6 +705,7 @@ async function renderReadToday(read) {
         `<span class="rd-top"><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
         `<span class="rd-say">${esc(c.position_summary)}</span>` +
         (asOf ? `<span class="rd-asof label${regenPaused ? " rd-paused" : ""}">${esc(asOf)}</span>` : "") +
+        summaryProvenanceHTML(c, { cls: "rd", inline: true }) +
         `</span></button></li>`;
     }
     h += `</ul></section>`;
@@ -1021,7 +1025,7 @@ async function renderByCoach(read, id) {
         const stage = (s.stage && s.stage.label) ? " · " + esc(s.stage.label) : "";
         const say = s.how_my_read_changed || s.headline_read || "";
         return `<li class="ce-item"><span class="ce-date label">${esc(String(s.as_of || "").slice(0, 10))}${stage}</span>` +
-          (say ? `<p class="ce-say">${esc(say)}</p>` : "") + `</li>`;
+          (say ? `<p class="ce-say">${esc(say)}</p>` : "") + trailCorrectionsHTML(s) + `</li>`;
       }).join("")}</ol>`);
   } else {
     const ro = (coach.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
@@ -1029,7 +1033,7 @@ async function renderByCoach(read, id) {
       h += disclose(`how this read has evolved · ${ro.length} recent`,
         `<ol class="ce-trail">${ro.slice(0, 8).map((o) =>
           `<li class="ce-item"><span class="ce-date label">${esc(String(o.date || "").slice(0, 10))}</span>` +
-          (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") +
+          (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") + trailCorrectionsHTML(o) +
           ((o.themes || []).length ? `<p class="ce-themes label">${(o.themes || []).slice(0, 4).map(esc).join(" · ")}</p>` : "") +
           `</li>`).join("")}</ol>`);
     }

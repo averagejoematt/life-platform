@@ -73,6 +73,7 @@ AI_MODEL_HAIKU = model_for("coach_narrative.history_summary")
 # own copy.
 from coach import (
     audience_guard,  # #4213: the stance read is a public-audience slot
+    authoritative_grades,  # owner ruling 2026-11-03: LEARNING# read at each call's current grade
     coach_json_schemas as _schemas,  # #4276: structured-output schemas
     coach_presence_gate,  # #4217: the absent-coach gate's shared glue
 )
@@ -1192,7 +1193,8 @@ def _gather_learning(coach_id, limit=40):
     Shared by the stance engine's grounding (below) and, since #533, the main
     compression gather (_gather_coach_state) — same records, two callers.
     """
-    return _query_begins_with(f"COACH#{coach_id}", "LEARNING#", scan_forward=False, limit=limit)
+    raw = _query_begins_with(f"COACH#{coach_id}", "LEARNING#", scan_forward=False, limit=limit)
+    return authoritative_grades.reconcile_from_table(table, coach_id, raw)[0]  # owner ruling 2026-11-03: CURRENT grades
 
 
 def _summarize_track_record(learning, confidence_records):

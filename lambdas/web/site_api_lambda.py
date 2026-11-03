@@ -56,7 +56,10 @@ from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE 
 # bundled shared module
 from experiment.phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
-from web import day_window  # #5584 — the optional ?date= / ?from=&to= window on three read routes
+from web import (
+    day_window,  # #5584 — the optional ?date= / ?from=&to= window on three read routes
+    derived_summary_freshness as _cd_fresh,  # owner ruling 2026-11-03: a read a correction overtook is not current
+)
 from web.site_api_agents import handle_agent_activity
 from web.site_api_autonomic import (
     handle_autonomic_balance,
@@ -989,7 +992,8 @@ def _dispatch_route(event, path, method):
                         # `observatory_summary`/`content`, both written TO Matthew — the exact
                         # audience_violation the reader-truth oracle flagged. The response key
                         # keeps its historical name; the front-ends drop empty entries honestly.
-                        coach_entry["position_summary"] = audience_guard.public_blurb(_cd_out_item)
+                        # Owner ruling 2026-11-03: judged against later grade corrections (as-of + derived_from served).
+                        _cd_fresh.judge_into(coach_entry, table, _cd_out_item, audience_guard.public_blurb(_cd_out_item))
                         coach_entry["emotional_investment"] = _cd_out_item.get("emotional_investment", "neutral")
                         # #1226: as-of date for the digest card kicker. Prefer the
                         # OUTPUT# record's ISO timestamp (matches the observatory
