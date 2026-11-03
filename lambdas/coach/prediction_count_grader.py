@@ -342,6 +342,8 @@ def grade(
     if not is_count_shaped(sentence):
         return None
     if eval_spec.get("type") == "conditional":
+        if eval_spec.get("branches"):  # #5607: a filed conditional's own grader parses and tests the condition
+            return None
         return _not_graded("a conditional count claim — its precondition is not parsed by the count rule")
     claim, why = parse_count_claim(sentence, eval_spec.get("metric"))
     if claim is None:

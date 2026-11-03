@@ -463,7 +463,10 @@ def _fake_pk(kwargs):
 def _two_coach_routes():
     older = _graded(_emitted("sleep_coach", "2026-09-06", "Matthew's HRV average will trend up."), "refuted", "2026-09-13", 41.2)
     newest = _graded(
-        _emitted("sleep_coach", "2026-09-10", "Matthew's 7-day HRV average will reach 50 ms."), "confirmed", "2026-09-24", 51.73
+        _emitted("sleep_coach", "2026-09-10", "Matthew's 7-day HRV average will reach 50 ms within two weeks."),
+        "confirmed",
+        "2026-09-24",
+        51.73,
     )
     pending_newer = _emitted("sleep_coach", "2026-09-25", "Matthew's sleep will hold 7.5 hours.")
     nutrition_pending = _emitted("nutrition_coach", "2026-09-20", "Protein will average 180 g this week.", metric="protein_g")
@@ -480,7 +483,7 @@ def test_latest_checked_serves_the_most_recent_graded_call_and_null_otherwise(mo
     sleep = _body(api.handle_coach({"rawPath": "/api/coach/sleep_coach"}))["latest_checked"]
     assert sleep == {
         "prediction_id": routes["COACH#sleep_coach"][1]["prediction_id"],  # the producer's own id
-        "claim": "Matthew's 7-day HRV average will reach 50 ms.",
+        "claim": "Matthew's 7-day HRV average will reach 50 ms within two weeks.",
         "created_date": "2026-09-10",
         "pre_registered_at": None,
         "outcome_date": "2026-09-24",

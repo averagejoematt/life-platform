@@ -4356,6 +4356,31 @@ STRUCTURAL_HAND_PROOFS["structural::test_advice_links_5612.py"] = {
     "proved_on": "2026-11-02",
 }
 
+STRUCTURAL_HAND_PROOFS["structural::test_filing_rules_5607.py"] = {
+    "gate_name": "test_filing_rules_5607.py",
+    "command": "python3 -m pytest tests/test_filing_rules_5607.py -q -p no:randomly   # baseline 30 passed",
+    "mutation": (
+        "Five plants in the real tree, ONE AT A TIME, each restored from a byte copy: M1 a new lambdas/coach module building a "
+        "sort key with the PREDICTION# prefix (an unrouted writer); M2 an import of the filing-rules module appended to "
+        "lambdas/coach/grade_corrections.py (a correction path that could re-specify a stored row); M3 the judgement check in "
+        "coach/filing_rules.validate_filing disarmed (`if False:`); M4 the recorded-at-filing branch of "
+        "coach/conditional_branches.antecedent_verdict disarmed (a known antecedent re-derived at grading); M5 the updater's "
+        "`_validate_filing(` call renamed (the coach path skipping the rules)."
+    ),
+    "observed": (
+        "2026-11-03, this lane. BASELINE 30 passed. M1: 1 failed (test_every_prediction_writer_is_routed_or_named). M2: 1 failed "
+        "(test_only_filing_paths_import_the_rules). M3: 2 failed (the real misfiled wordings; the 15 October call). M4: 1 failed "
+        "(test_a_verdict_recorded_at_filing_is_never_re_derived). M5: 1 failed (test_the_updater_files_through_the_rules). "
+        "REVERTED 30 passed each time."
+    ),
+    "scope": (
+        "Repo-side only: the pure validator over real cycle-17 wordings, the branched-conditional grader over stubbed readers, and "
+        "os.walk sweeps of lambdas/ mcp/ scripts/ deploy/. NOT SEEN: a live coach run filing through the rules (the first "
+        "post-deploy PREDICTION# row carrying filing_rules_version is that proof)."
+    ),
+    "proved_on": "2026-11-03",
+}
+
 # The web gate made REQUIRED (owner ruling: the site build check is required before further implementation
 # merges). Three entrants, all from one router: scripts/check_web_gate_required.py + web-gate.yml's scope and
 # verdict steps. Proved offline on the lane export; the LIVE proof is the deliberately failing PR (PROPOSAL §6).
