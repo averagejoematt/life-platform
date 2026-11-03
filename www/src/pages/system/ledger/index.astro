@@ -4,6 +4,7 @@
 import Base from "../../../layouts/Base.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import Quote from "../../../components/Quote.astro";
+import { DISPUTED_NOTE, isDisputed, verified } from "../../../lib/disputed.js";
 import { callOutcome, dayInWords } from "../../../lib/format.js";
 import { loadAll, latestEdition } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
@@ -13,6 +14,10 @@ const edition = await latestEdition();
 const ORDER = ["pending", "confirmed", "refuted", "expired", "inconclusive", "observation"];
 const rows = [...all.byType.prediction].sort((a, b) => (a.logged_date < b.logged_date ? 1 : a.logged_date > b.logged_date ? -1 : a.id < b.id ? -1 : 1));
 const counts = Object.fromEntries(ORDER.map((s) => [s, rows.filter((r) => r.status === s).length]));
+// Owner rulings 2026-11-03: a verdict under classification review is shown, never counted as right or wrong.
+counts.confirmed = verified(rows, "confirmed").length;
+counts.refuted = verified(rows, "refuted").length;
+const disputed = rows.filter(isDisputed).length;
 const flagged = rows.filter((r) => r.quality_flags.length).length;
 const corrected = rows.filter((r) => r.corrections.length).length;
 const coaches = [...all.byType.coach].filter((c) => rows.some((r) => r.coach_id === c.id)).sort((a, b) => (a.name < b.name ? -1 : 1));
@@ -35,6 +40,7 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
         <div><span class="label">Open</span><span class="v num">{counts.pending}</span><span class="muted" style="font-size:12px">windows still open</span></div>
         <div><span class="label">Could not be checked</span><span class="v num">{counts.expired}</span><span class="muted" style="font-size:12px">too few readings</span></div>
         <div><span class="label">Observations</span><span class="v num">{counts.observation}</span><span class="muted" style="font-size:12px">not graded, by design</span></div>
+        {disputed > 0 && <div><span class="label">Disputed</span><span class="v num">{disputed}</span><span class="muted" style="font-size:12px">under classification review; verdict kept, not counted right or wrong</span></div>}
         <div><span class="label">Flagged · corrected</span><span class="v num">{flagged} <small>· {corrected}</small></span><span class="muted" style="font-size:12px">flags stay out of the clean rate; corrections keep the original</span></div>
       </div>
       <p class="muted" style="margin-top:12px;font-size:13px">
@@ -72,12 +78,13 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
                 <span class={p.claim_withheld ? "serif muted" : "mono"} style="font-size:13px;line-height:1.45">
                   {p.claim_withheld ? p.claim : <Quote text={p.claim} said={p.logged_date} />}
                 </span>
-                {(p.quality_flags.length > 0 || p.corrections.length > 0) && (
+                {(p.quality_flags.length > 0 || p.corrections.length > 0 || isDisputed(p)) && (
                   <span>
                     {p.quality_flags.map((f) => (
                       <span class={`flag ${f}`}>{f.replace("_", " ")}</span>
                     ))}
                     {p.corrections.length > 0 && <span class="flag">corrected · original kept</span>}
+                    {isDisputed(p) && <span class="flag disputed">{DISPUTED_NOTE}</span>}
                   </span>
                 )}
               </span>

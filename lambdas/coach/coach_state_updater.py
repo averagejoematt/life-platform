@@ -93,7 +93,10 @@ from experiment.measurable_metrics import (  # noqa: E402,F401
     normalize_metric_hint as _normalize_metric_hint,  # noqa: E402
 )
 
-from coach import commitment_grading  # noqa: E402  (#3553: the follow-through ledger's ONE vocabulary)
+from coach import (
+    classification_review as _classification_review,  # noqa: E402  (owner ruling 2026-11-03)
+    commitment_grading,  # noqa: E402  (#3553: the follow-through ledger's ONE vocabulary)
+)
 
 
 def _parse_confidence(raw) -> float:
@@ -1007,6 +1010,8 @@ def _gather_relationship_signals(coach_id, since_date):
             if not outcome_date or outcome_date <= since_date:
                 continue
             status = p.get("status")
+            if _classification_review.is_under_review(p):
+                continue  # owner ruling 2026-11-03: a disputed verdict is no signal of being right or wrong
             if status == "confirmed":
                 signals["confirmed_predictions"] += 1
             elif status == "refuted":

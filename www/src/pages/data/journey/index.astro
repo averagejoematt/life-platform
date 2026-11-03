@@ -7,6 +7,7 @@
 // PhenoAge, never an age beside it), resting heart rate and HRV since day one read within device eras,
 // and the coaches' checked calls on the weight. The heart captions are plain means of the readings
 // shown, computed at build and said as such; nothing else is computed here.
+import { isDisputed, verified } from "../../../lib/disputed.js";
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
@@ -40,8 +41,9 @@ const fc = (h: number) => (J.forecasts || []).find((f) => Number(f.horizon_days)
 const tomorrow = fc(1);
 const week = fc(7);
 const weightCalls = all.byType.prediction.filter((p) => p.metric_id === J.metric_id && p.status !== "observation");
-const right = weightCalls.filter((p) => p.status === "confirmed").length;
-const checked = weightCalls.filter((p) => ["confirmed", "refuted"].includes(p.status)).length;
+// Owner rulings 2026-11-03: a verdict under classification review is not a checked call.
+const right = verified(weightCalls, "confirmed").length;
+const checked = right + verified(weightCalls, "refuted").length;
 const pending = weightCalls.filter((p) => p.status === "pending").length;
 const unchecked = weightCalls.filter((p) => ["expired", "inconclusive"].includes(p.status));
 // The interval's own confidence, as served (weight_trend.weight_trajectory, 0.80) — never a hard-coded level.
@@ -91,7 +93,7 @@ const coachName = (p: any) => {
 };
 // Every call the K of N counts is listed — the summary and the list are the same set (acceptance item 1).
 const settled = weightCalls
-  .filter((p) => ["confirmed", "refuted"].includes(p.status))
+  .filter((p) => ["confirmed", "refuted"].includes(p.status) && !isDisputed(p))
   .sort((a, b) => String(b.settled_date || "").localeCompare(String(a.settled_date || "")) || a.id.localeCompare(b.id));
 const crossed = ok ? (J.rungs || []).filter((r: any) => r.date) : [];
 const gaps = crossed.map((r: any) => r.days).filter((n: any) => n != null);

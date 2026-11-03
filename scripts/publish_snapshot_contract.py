@@ -236,6 +236,10 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "metric_key": ("str", True),
         "corrections": ("list[obj]", False),
         "claim_withheld": ("enum:unsourced|privacy", True),
+        # Owner rulings 2026-11-03: a settled verdict under classification review — `status` stays the stored
+        # verdict; the page shows it disputed and no count treats it as verified. The reason is the API's public one.
+        "classification_review": ("bool", False),
+        "classification_review_reason": ("str", True),
     },
     "disagreement": {
         "topic": ("str", False),
@@ -440,6 +444,8 @@ def validate(obj: dict, type_: str) -> None:
             raise SchemaError(f"{type_} {obj.get('id')}: missing field {name}")
         _check(kind, nullable, obj[name], f"{type_} {obj.get('id')}.{name}")
     if type_ == "prediction":
+        if obj["classification_review"] != bool(obj["classification_review_reason"]):
+            raise SchemaError(f"prediction {obj['id']}: classification_review and its reason must come together")
         bad = [f for f in obj["quality_flags"] if f not in QUALITY_FLAGS]
         if bad:
             raise SchemaError(f"prediction {obj['id']}: unknown quality flag(s) {bad}")

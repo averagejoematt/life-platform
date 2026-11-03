@@ -32,6 +32,7 @@ import datetime as _dt
 import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
+from coach.classification_review import is_under_review  # owner ruling 2026-11-03: a disputed verdict is not a record
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
@@ -527,6 +528,8 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
             status = str(it.get("status") or "")
             od = str(it.get("outcome_date") or "")
             rec = record.setdefault(cid, {"right": 0, "wrong": 0})
+            if status in ("confirmed", "refuted") and is_under_review(it):
+                continue  # disputed pending classification — not part of any right/wrong tally (owner, 2026-11-03)
             if status in ("confirmed", "refuted") and od and od <= wk["end"]:
                 rec["right" if status == "confirmed" else "wrong"] += 1
                 if od >= wk["start"]:

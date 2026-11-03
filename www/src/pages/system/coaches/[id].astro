@@ -4,6 +4,7 @@ import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
 import Quote from "../../../components/Quote.astro";
 import StatusTag from "../../../components/StatusTag.astro";
+import { isDisputed, verified } from "../../../lib/disputed.js";
 import { dayInWords, domainWords, kOfN, clip } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
@@ -15,7 +16,9 @@ export async function getStaticPaths() {
 const { coach: c } = Astro.props;
 const all = await loadAll();
 const mine = all.byType.prediction.filter((p) => p.coach_id === c.id).sort((a, b) => (a.logged_date < b.logged_date ? 1 : -1));
-const by = (s: string) => mine.filter((p) => p.status === s).length;
+// Owner rulings 2026-11-03: a verdict under classification review is never counted right or wrong.
+const by = (s: string) => (s === "confirmed" || s === "refuted" ? verified(mine, s).length : mine.filter((p) => p.status === s).length);
+const disputed = mine.filter(isDisputed).length;
 ---
 
 <Base title={c.name} top="system" description={c.short_bio || `${c.name} · ${domainWords(c.domain)}`}>
@@ -44,7 +47,7 @@ const by = (s: string) => mine.filter((p) => p.status === s).length;
       </div>
       <div style="display:flex;flex-direction:column;gap:22px">
         <div>
-          <p class="label" style="margin-bottom:8px">Predictions in the snapshot · {mine.length} · {by("confirmed")} right, {by("refuted")} wrong, {by("pending")} open</p>
+          <p class="label" style="margin-bottom:8px">Predictions in the snapshot · {mine.length} · {by("confirmed")} right, {by("refuted")} wrong, {by("pending")} open{disputed ? `, ${disputed} disputed` : ""}</p>
           {
             mine.length ? (
               <div class="rows">
@@ -53,7 +56,7 @@ const by = (s: string) => mine.filter((p) => p.status === s).length;
                     <span class="mono" style="font-size:13px;line-height:1.45">
                       {p.claim_withheld ? clip(p.claim, 110) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
                     </span>
-                    <StatusTag status={p.status} date={p.settled_date} call />
+                    <StatusTag status={p.status} date={p.settled_date} call disputed={isDisputed(p)} />
                   </a>
                 ))}
               </div>

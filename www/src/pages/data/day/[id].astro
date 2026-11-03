@@ -7,6 +7,7 @@
 // Decision 8: changing the date swaps the day in place (islands/day.js) with the URL, the title and
 // the canonical kept in sync — and without JavaScript every control is a plain link to the day's page.
 // The marked parts ([data-day-part]) are what the island swaps; the scrubber and the live region stay.
+import { DISPUTED_NOTE, isDisputed } from "../../../lib/disputed.js";
 import Base from "../../../layouts/Base.astro";
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
@@ -111,6 +112,8 @@ const nearest = d.calls_settled.length ? null : nearestGraded(days, i);
 const predHref = (id: string) => (all.get("prediction", id) ? href(pathOf("prediction", id)) : null);
 // A withheld claim's chip carries the hold's own sentence ("Not quoted: …"), authored copy, never the coach's words (#5609).
 const heldWords = (id: string) => Boolean(all.get("prediction", id)?.claim_withheld);
+// Owner rulings 2026-11-03: a verdict under classification review is printed as graded, with the dispute beside it.
+const disputedNote = (id: string) => (isDisputed(all.get("prediction", id)) ? ` · ${DISPUTED_NOTE}` : "");
 const coachHref = (id: string) => (all.get("coach", id) ? href(pathOf("coach", id)) : null);
 const foodTile = food
   ? { value: food.calories != null ? num(food.calories, 0) : "—", unit: "kcal", d: food.logging_gap ? "a logging gap — entries not made; not counted as eaten" : `${food.protein_g != null ? `${num(food.protein_g, 0)} g protein` : "protein not logged"}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}` }
@@ -502,7 +505,10 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
               <div class="chips">
                 {d.calls_settled.map((c) => (
                   <a class="callchip solid" href={predHref(c.prediction_id)}>
-                    <span class="k">{callOutcome(c.verdict)}</span>
+                    <span class="k">
+                      {callOutcome(c.verdict)}
+                      {disputedNote(c.prediction_id)}
+                    </span>
                     <span>
                       {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}
                     </span>
@@ -520,6 +526,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                       <a class="callchip solid" href={predHref(c.prediction_id)}>
                         <span class="k">
                           {callOutcome(c.verdict)} · {short(nearest.date)}
+                          {disputedNote(c.prediction_id)}
                         </span>
                         <span>
                           {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}

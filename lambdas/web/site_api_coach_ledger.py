@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from boto3.dynamodb.conditions import Key
 from coach import (
+    classification_review,  # owner ruling 2026-11-03: a disputed verdict is out of every verified count, disclosed
     coach_baseline,  # #4585: the "nothing changes" rule served beside every coach count
     coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
     coach_record,  # #4220: the ONE per-coach record producer — K of N through <day>, one resolution per prediction
@@ -381,6 +382,9 @@ _PREDICTION_PROJECTION_FIELDS = (
     # `comparison` block served beside every count on this module's two endpoints.
     "baseline",
     "source",
+    # Owner ruling 2026-11-03: a verdict under classification review is out of every verified count and
+    # disclosed as `under_review` (coach.classification_review) — the flag must ride the sweep to be seen.
+    "classification_review",
 )
 
 
@@ -713,12 +717,15 @@ def handle_calibration(event, *, _g):
 
         per_coach = []
         season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set
+        season_under_review = 0  # owner ruling 2026-11-03: disputed verdicts, out of every score, disclosed
         platform_pairs = []  # season
         platform_career_pairs = []  # career (all cycles, #1376)
         for cid, name in _CALIB_COACH_NAMES.items():
             summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
             coach_decided = coach_record.decided_rows(fetched[cid], genesis=EXPERIMENT_START)
             season_decided.extend(coach_decided)
+            coach_under_review = len(coach_record.under_review_rows(fetched[cid], genesis=EXPERIMENT_START))
+            season_under_review += coach_under_review
             platform_pairs.extend(pairs)
             platform_career_pairs.extend(career_pairs)
             per_coach.append(
@@ -733,6 +740,8 @@ def handle_calibration(event, *, _g):
                     # #4585: the record never appears alone — the same rows, scored by a guess; #5533: and
                     # beside K of N, how many of the N the grader graded clean — never instead of it.
                     **_decided_blocks(coach_decided),
+                    # Owner ruling 2026-11-03: graded calls under classification review — not in n / Brier / record.
+                    "under_review": coach_under_review,
                     "lifetime": career_summary,
                 }
             )
@@ -797,6 +806,9 @@ def handle_calibration(event, *, _g):
                 # #4585 / epic #4580 rule 3: no coach count without what a simple guess would
                 # have scored — four separate records, never added together.
                 "comparison": coach_baseline.comparison_block(season_decided),
+                # Owner ruling 2026-11-03: this season's coach verdicts under classification review — excluded from
+                # every number above (record, Brier, comparison) and disclosed here so a headline can say so.
+                "under_review": season_under_review,
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
@@ -855,11 +867,17 @@ def _beats_simple_guess(rows) -> bool | None:
     return bool(skill > 0) if isinstance(skill, (int, float)) and not isinstance(skill, bool) else None
 
 
-def _record_extras(decided_rows, confirmed: int, decided: int) -> dict:
+def _record_extras(decided_rows, confirmed: int, decided: int, under_review: int = 0) -> dict:
     """What rides beside a record's counts: what they count (#4617) and, #4580 round 1, the exact rate a
     base-rate guess assigns every call (``web.record_words.baseline``) — the field behind the one sentence,
-    with the skill verdict the edition already passes (#5615)."""
-    return {**_counted_block(decided_rows), "baseline": record_words.baseline(confirmed, decided, _beats_simple_guess(decided_rows))}
+    with the skill verdict the edition already passes (#5615) — and ``under_review`` (owner ruling 2026-11-03):
+    how many graded calls are disputed under classification review and therefore NOT in ``decided`` or any
+    number beside it, so a headline can disclose them (``coach.classification_review``)."""
+    return {
+        **_counted_block(decided_rows),
+        "baseline": record_words.baseline(confirmed, decided, _beats_simple_guess(decided_rows)),
+        "under_review": int(under_review),
+    }
 
 
 def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
@@ -873,7 +891,7 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
     scoring the coaches' stratum without the hypothesis and forecast strata returns the same
     ``strata.coaches``. Returns ``{"predictions": {...}, "calibration": {...}}`` — each the
     subset of that route's body the record line reads, in the route's own shape."""
-    confirmed = refuted = 0
+    confirmed = refuted = under_review = 0
     coach_pairs: list = []
     season_all: list = []  # #4617: the rows the class counts are taken over — the same season
     for cid in _CALIB_COACH_NAMES:
@@ -882,7 +900,9 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
         season_all.extend(season)
         for rec in season:
             status = rec.get("status", "pending")  # the bucket key handle_predictions tallies
-            if status == "confirmed":
+            if status in ("confirmed", "refuted") and classification_review.is_under_review(rec):
+                under_review += 1  # owner ruling 2026-11-03: disputed — disclosed, never counted as verified
+            elif status == "confirmed":
                 confirmed += 1
             elif status == "refuted":
                 refuted += 1
@@ -894,7 +914,7 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
                 "refuted": refuted,
                 "decided": confirmed + refuted,
                 "due": {"as_of": today_pt},
-                **_record_extras(season_all, confirmed, confirmed + refuted),
+                **_record_extras(season_all, confirmed, confirmed + refuted, under_review),
             }
         },
         "calibration": {
@@ -1000,6 +1020,17 @@ def handle_voice_fidelity(event, *, _g):
         return _ok({"n": 0, "coaches": [], "confusion": {}, "verdict": "unavailable"}, cache_seconds=60, degraded=e)
 
 
+_TALLY_KEYS = ("total", "confirmed", "refuted", "pending", "inconclusive", "expired", "observational", "under_review")
+
+
+def _summed_tally(blocks) -> dict:
+    """The bucket counts summed over per-coach tallies, plus ``decided`` (confirmed + refuted — never a disputed
+    verdict, which tallies as ``under_review``; owner ruling 2026-11-03) and its ``accuracy_pct``."""
+    out = {k: sum(b[k] for b in blocks) for k in _TALLY_KEYS}
+    decided = out["confirmed"] + out["refuted"]
+    return {**out, "decided": decided, "accuracy_pct": round(out["confirmed"] / decided * 100, 1) if decided > 0 else None}
+
+
 def handle_predictions(event, *, _g):
     """GET /api/predictions"""
     _current_cycle = _g["_current_cycle"]
@@ -1083,6 +1114,9 @@ def handle_predictions(event, *, _g):
             "total": 0,
             "confirmed": 0,
             "refuted": 0,
+            # Owner ruling 2026-11-03: a graded call under classification review is its own bucket — never in
+            # confirmed / refuted / decided — while its served `status` stays the stored verdict.
+            "under_review": 0,
             "pending": 0,
             "inconclusive": 0,
             "expired": 0,
@@ -1128,18 +1162,20 @@ def handle_predictions(event, *, _g):
                         p_status = "observational"
                     elif p_status not in _BUCKETS:
                         p_status = "pending"
+                    _disputed = p_status in ("confirmed", "refuted") and classification_review.is_under_review(rec)
+                    _tally = "under_review" if _disputed else p_status
 
                     by_coach[cid]["lifetime"]["total"] += 1
-                    by_coach[cid]["lifetime"][p_status] += 1
-                    if p_status in ("confirmed", "refuted"):
+                    by_coach[cid]["lifetime"][_tally] += 1
+                    if _tally in ("confirmed", "refuted"):
                         by_coach[cid]["lifetime"]["decided"] += 1
 
                     if not coach_record.counts_this_cycle(rec, EXPERIMENT_START):  # archived cycle / pre-genesis — career-only
                         continue
 
                     by_coach[cid]["total"] += 1
-                    by_coach[cid][p_status] += 1
-                    if p_status in ("confirmed", "refuted"):
+                    by_coach[cid][_tally] += 1
+                    if _tally in ("confirmed", "refuted"):
                         by_coach[cid]["decided"] += 1
 
                     due = None
@@ -1204,6 +1240,8 @@ def handle_predictions(event, *, _g):
                             **({"unsourced": _held} if _held else {}),
                             # #4714: present only on a sealed bet in specialist words — the page labels it, never drops it.
                             **({"reader_plain": False} if _plain_label is False else {}),
+                            # Owner ruling 2026-11-03: the stored verdict, shown disputed — not counted as verified.
+                            **(classification_review.served_fields(rec, words_held=bool(_held)) if _disputed else {}),
                         }
                     )
             except Exception as _qe:
@@ -1245,6 +1283,7 @@ def handle_predictions(event, *, _g):
         inconclusive = sum(c["inconclusive"] for c in by_coach.values())
         expired = sum(c["expired"] for c in by_coach.values())
         observational = sum(c["observational"] for c in by_coach.values())
+        under_review = sum(c["under_review"] for c in by_coach.values())
         resolved = confirmed + refuted
         accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else None
 
@@ -1256,16 +1295,6 @@ def handle_predictions(event, *, _g):
             "due_now": sum(1 for d in _due_dates if d <= today_pt),
             "earliest_due": min(_due_dates) if _due_dates else None,
         }
-
-        l_total = sum(c["lifetime"]["total"] for c in by_coach.values())
-        l_confirmed = sum(c["lifetime"]["confirmed"] for c in by_coach.values())
-        l_refuted = sum(c["lifetime"]["refuted"] for c in by_coach.values())
-        l_pending = sum(c["lifetime"]["pending"] for c in by_coach.values())
-        l_inconclusive = sum(c["lifetime"]["inconclusive"] for c in by_coach.values())
-        l_expired = sum(c["lifetime"]["expired"] for c in by_coach.values())
-        l_observational = sum(c["lifetime"]["observational"] for c in by_coach.values())
-        l_resolved = l_confirmed + l_refuted
-        l_accuracy_pct = round(l_confirmed / l_resolved * 100, 1) if l_resolved > 0 else None
 
         return _ok(
             {
@@ -1280,18 +1309,8 @@ def handle_predictions(event, *, _g):
                     "decided": resolved,
                     "accuracy_pct": accuracy_pct,
                     "due": due,
-                    **_record_extras(season_decided, confirmed, resolved),  # #4617 counts + the #4580 base-rate guess's rate
-                    "lifetime": {
-                        "total": l_total,
-                        "confirmed": l_confirmed,
-                        "refuted": l_refuted,
-                        "pending": l_pending,
-                        "inconclusive": l_inconclusive,
-                        "expired": l_expired,
-                        "observational": l_observational,
-                        "decided": l_resolved,
-                        "accuracy_pct": l_accuracy_pct,
-                    },
+                    **_record_extras(season_decided, confirmed, resolved, under_review),  # #4617 counts + #4580 guess + disputed
+                    "lifetime": _summed_tally([c["lifetime"] for c in by_coach.values()]),  # career (#1376)
                 },
                 "by_coach": by_coach,
                 # #4585 / epic #4580 rule 3: the record never appears alone. The "nothing

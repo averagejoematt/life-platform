@@ -118,7 +118,9 @@
     "aggregate_impact": "the coach's record moves from 9 of 12 to 8 of 12"
    }
   ],
-  "claim_withheld": null
+  "claim_withheld": null,
+  "classification_review": true,
+  "classification_review_reason": "Disputed: graded on a proxy the call's frozen criteria did not establish; under classification review, verdict preserved."
  },
  {
   "absent_text": null,
@@ -175,7 +177,9 @@
   "retired": false,
   "metric_key": "weight_lbs",
   "corrections": [],
-  "claim_withheld": null
+  "claim_withheld": null,
+  "classification_review": false,
+  "classification_review_reason": null
  },
  {
   "absent_text": null,
@@ -232,7 +236,9 @@
   "retired": false,
   "metric_key": "weight_lbs",
   "corrections": [],
-  "claim_withheld": null
+  "claim_withheld": null,
+  "classification_review": false,
+  "classification_review_reason": null
  },
  {
   "absent_text": null,
@@ -280,7 +286,9 @@
   "retired": false,
   "metric_key": "total_protein_g",
   "corrections": [],
-  "claim_withheld": "unsourced"
+  "claim_withheld": "unsourced",
+  "classification_review": false,
+  "classification_review_reason": null
  },
  {
   "absent_text": null,
@@ -342,7 +350,9 @@
   "retired": false,
   "metric_key": "total_protein_g",
   "corrections": [],
-  "claim_withheld": null
+  "claim_withheld": null,
+  "classification_review": false,
+  "classification_review_reason": null
  },
  {
   "absent_text": "No sensor this cycle.",
@@ -390,7 +400,9 @@
   "retired": false,
   "metric_key": null,
   "corrections": [],
-  "claim_withheld": null
+  "claim_withheld": null,
+  "classification_review": false,
+  "classification_review_reason": null
  },
  {
   "absent_text": null,
@@ -447,7 +459,9 @@
   "retired": false,
   "metric_key": "weight_lbs",
   "corrections": [],
-  "claim_withheld": null
+  "claim_withheld": null,
+  "classification_review": false,
+  "classification_review_reason": null
  },
  {
   "absent_text": null,
@@ -484,6 +498,8 @@
   "retired": false,
   "metric_key": null,
   "corrections": [],
-  "claim_withheld": null
+  "claim_withheld": null,
+  "classification_review": false,
+  "classification_review_reason": null
  }
 ]

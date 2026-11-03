@@ -172,11 +172,14 @@ def test_write_first_grade_is_conditional_on_no_hold():
     )
     op, kw = t.calls[0]
     assert op == "update_item"
-    assert kw["ConditionExpression"] == "attribute_not_exists(evaluation_hold) AND #status = :prior"
+    # (+ the classification-review condition, owner ruling 2026-11-03 — tests/test_classification_review.py)
+    assert kw["ConditionExpression"] == (
+        "attribute_not_exists(evaluation_hold) AND attribute_not_exists(classification_review) AND #status = :prior"
+    )
     # A row with no stored status still carries the hold condition.
     t2 = _RecTable()
     grade_corrections.write_first_grade(t2, {"pk": "COACH#x", "sk": "PREDICTION#q"}, _EVAL, outcome_notes="{}", evaluator_version="1.1")
-    assert t2.calls[0][1]["ConditionExpression"] == "attribute_not_exists(evaluation_hold)"
+    assert t2.calls[0][1]["ConditionExpression"] == "attribute_not_exists(evaluation_hold) AND attribute_not_exists(classification_review)"
 
 
 # ── scripts/evaluation_hold.py ────────────────────────────────────────────────────────────

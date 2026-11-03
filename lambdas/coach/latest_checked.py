@@ -166,7 +166,8 @@ def _query_rows(table: Any, coach_id: str) -> list:
     kwargs: dict = with_phase_filter(
         {
             "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"),
-            "FilterExpression": "#st IN (:graded_confirmed, :graded_refuted)",
+            # Owner ruling 2026-11-03: a verdict under classification review is not a "checked" call.
+            "FilterExpression": "#st IN (:graded_confirmed, :graded_refuted) AND attribute_not_exists(classification_review)",
             "ExpressionAttributeNames": dict(_PROJECTION_NAMES),
             "ExpressionAttributeValues": {":graded_confirmed": "confirmed", ":graded_refuted": "refuted"},
             "ProjectionExpression": ", ".join(_PROJECTION_NAMES) + ", #phase",
