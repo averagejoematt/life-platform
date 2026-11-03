@@ -781,7 +781,11 @@ def _positions(table: Any, coach_ids: list) -> dict:
             if items:
                 text = audience_guard.public_blurb(items[0])  # the SAME blurb /api/coaching-dashboard serves
                 if text:
-                    out[cid] = {"text": text, "as_of": str(items[0].get("created_at") or items[0].get("sk", "")[7:17])[:10]}
+                    out[cid] = {
+                        "text": text,
+                        "as_of": str(items[0].get("created_at") or items[0].get("sk", "")[7:17])[:10],
+                        "provenance": items[0].get("provenance"),  # owner ruling 2026-11-03: a line inherits its context's sources
+                    }
         except Exception as e:  # noqa: BLE001
             logger.warning("[coach_moves] position read %s failed (omitted): %s", cid, e)
     return out

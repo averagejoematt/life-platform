@@ -216,6 +216,10 @@ CLAIM_NATURAL_READERS = {
         "speaking from an instrument; the hold is about a coach claim resting on a dark sensor, and his "
         "words are already gated by consent (visibility == public) and the #2206 dossier screen"
     ),
+    "narrative_publication.py": (
+        "exempt: the provenance chokepoint (owner ruling 2026-11-03) names `claim_natural` only as a key whose "
+        "words it withholds; it serves no claim and sits in front of the readers above, which apply the hold"
+    ),
 }
 
 

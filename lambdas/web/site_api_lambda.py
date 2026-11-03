@@ -50,13 +50,17 @@ from decimal import Decimal  # noqa: F401 — kept for backward-compat with hand
 # third-party
 import boto3  # noqa: F401 — kept for handlers that create clients
 from boto3.dynamodb.conditions import Key
-from common.journal_silence import guard_api_response  # #5131: the one public-surface guard
+from common.journal_silence import guard_api_response  # #5131: defence in depth behind the provenance gate
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE spelling, imported, never retyped
 
 # bundled shared module
 from experiment.phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
-from web import day_window  # #5584 — the optional ?date= / ?from=&to= window on three read routes
+from web import (
+    day_window,  # #5584 — the optional ?date= / ?from=&to= window on three read routes
+    narrative_publication,  # owner ruling 2026-11-03: the narrative publication chokepoint
+)
+from web.narrative_publication import servable as _np_servable, withheld_slot as _np_slot  # the dashboard's withheld slots
 from web.site_api_agents import handle_agent_activity
 from web.site_api_autonomic import (
     handle_autonomic_balance,
@@ -843,7 +847,7 @@ def _dispatch_route(event, path, method):
             try:
                 _cd_int = None if _cd_for_edition else _integrator_digest()  # #946: tombstone/phase-guarded
                 if _cd_int:
-                    _cd_priority["text"] = _cd_int.get("analysis", "")
+                    _np_slot(_cd_priority, _cd_int, "text", _cd_int.get("analysis", ""))  # owner ruling 2026-11-03
                     _cd_priority["generated_at"] = _cd_int.get("generated_at", "")
                     _cd_priority["as_of_day_n"] = _as_of_day_n(_cd_priority["generated_at"], EXPERIMENT_START)
                     _cd_priority["data_through"] = _cd_int.get("data_through")
@@ -879,7 +883,7 @@ def _dispatch_route(event, path, method):
                     for _cd_commit in _cd_dossier.get("commitments", []) or []:
                         # #4213: `text` is the commitment's PUBLIC twin (coach_dossier) — a
                         # commitment with none is not an ask a visitor can be shown.
-                        if _cd_commit.get("status") != "pending" or not _cd_commit.get("text"):
+                        if _cd_commit.get("status") != "pending" or not _np_servable(_cd_commit.get("text")):
                             continue
                         _cd_actions.append(
                             {
@@ -989,7 +993,8 @@ def _dispatch_route(event, path, method):
                         # `observatory_summary`/`content`, both written TO Matthew — the exact
                         # audience_violation the reader-truth oracle flagged. The response key
                         # keeps its historical name; the front-ends drop empty entries honestly.
-                        coach_entry["position_summary"] = audience_guard.public_blurb(_cd_out_item)
+                        # owner ruling 2026-11-03: a withheld read serves "" + the gate's neutral reason
+                        _np_slot(coach_entry, _cd_out_item, "position_summary", audience_guard.public_blurb(_cd_out_item))
                         coach_entry["emotional_investment"] = _cd_out_item.get("emotional_investment", "neutral")
                         # #1226: as-of date for the digest card kicker. Prefer the
                         # OUTPUT# record's ISO timestamp (matches the observatory
@@ -1015,7 +1020,7 @@ def _dispatch_route(event, path, method):
                         if isinstance(preds, list):
                             coach_entry["prediction_count"] = len(preds)
                             for _p in preds[-3:]:
-                                if isinstance(_p, dict):
+                                if isinstance(_p, dict) and str(_p.get("text", _p.get("prediction", "")) or "").strip():
                                     _cd_predictions.append(
                                         {
                                             "coach_id": _cd_domain,
@@ -1291,6 +1296,7 @@ def lambda_handler(event, context):
         _emit_route_log(200)
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
 
+    narrative_publication.begin_request()  # owner ruling 2026-11-03: count this request's withheld narrative rows
     try:
         result = _dispatch_route(event, path, method)
     except Exception as e:
@@ -1303,4 +1309,5 @@ def lambda_handler(event, context):
         return _error(404, "Not found")
 
     _emit_route_log(result.get("statusCode", 200))
-    return guard_api_response(result, logger)
+    # The provenance gate (web.narrative_publication) is the policy; the #5131 scrub stays as defence in depth.
+    return guard_api_response(narrative_publication.annotate(result), logger)

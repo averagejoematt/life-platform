@@ -61,6 +61,8 @@ import boto3
 from common.constants import EXPERIMENT_START_DATE
 from common.pacific_time import pacific_day_n, pacific_now, week_close_day
 
+from web import narrative_publication  # owner ruling 2026-11-03
+
 try:
     from common.platform_logger import get_logger
 
@@ -86,7 +88,9 @@ EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "")
 RECAP_SOURCE = "recap_cards"
 
 _ddb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-west-2"))
-_table = _ddb.Table(TABLE_NAME)
+# Owner ruling 2026-11-03: the public recap card quotes a coach read — read through the narrative
+# publication chokepoint, so a read whose sources are not recorded as publishable is never on a card.
+_table = narrative_publication.wrap(_ddb.Table(TABLE_NAME), strict=True)  # a card has no wire half: strict
 _s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
 
 
