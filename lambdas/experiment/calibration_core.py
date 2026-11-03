@@ -201,6 +201,11 @@ def pairs_from_forecast_resolution_rows(rows):
     return pairs
 
 
+#: #5615: when this share of a forecaster's resolved calls sits in ONE stated-confidence band, calibration
+#: across confidences cannot be read, so the positive verdict "well-calibrated" is withheld ("not_measurable").
+CONCENTRATED_SHARE = 0.9
+
+
 def score_pairs(pairs, n_bins=10):
     """Score a set of (confidence, outcome) pairs into a calibration summary.
 
@@ -263,6 +268,12 @@ def score_pairs(pairs, n_bins=10):
             calibration = "under-confident"
         elif skilled is False:
             calibration = "not_yet_skillful"
+        elif max(b["n"] for b in bins) >= CONCENTRATED_SHARE * total:
+            # #5615 (owner integrity item 5, 2026-11-02): every resolved call sits in ONE stated-confidence band (on
+            # 2026-11-03, 203 of the coaches' 211 were stated at exactly 0.5) — or nearly all of them (CONCENTRATED_SHARE). A gap in one band still shows over- or
+            # under-confidence, but "well-calibrated" claims confidence tracks outcomes ACROSS confidences, which one
+            # band cannot show — that verdict is withheld. A label rule only: no grade changes.
+            calibration = "not_measurable"
         else:
             calibration = "well-calibrated"
 
