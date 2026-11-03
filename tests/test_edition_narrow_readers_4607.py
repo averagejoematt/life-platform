@@ -81,6 +81,18 @@ def _macrofactor_rows():
         {"sk": f"DATE#{_day(4)}", "date": _day(4), "total_calories_kcal": 1600, "total_protein_g": 185, "tombstone": True},
         {"sk": f"DATE#{_day(3)}", "total_calories_kcal": 1755.5, "protein_g": 182.95, "total_protein_g": 1.0},  # no `date`
         {"sk": f"DATE#{_day(1)}", "date": _day(1), "calories": 0, "protein_g": 190, "total_fiber_g": 31, "food_log": food_log},
+        # #5607: a summary-only stub (no diary entries) is a missing day — counted nowhere, flagged in the trend — and a
+        # row with a zero count but a food log is a log. Dropping `entries_count` or `food_log` from the projection
+        # changes which is which, so the mutation below must notice either.
+        {"sk": f"DATE#{_day(2)}", "date": _day(2), "entries_count": 0, "total_calories_kcal": 80, "total_protein_g": 15},
+        {
+            "sk": f"DATE#{_day(10)}",
+            "date": _day(10),
+            "entries_count": 0,
+            "total_calories_kcal": 1500,
+            "total_protein_g": 175,
+            "food_log": food_log,
+        },
     ]
     for r in rows:
         r.update(pk=f"{_PREFIX}macrofactor", phase="experiment")
@@ -236,9 +248,12 @@ def _edition_nutrition_subset(body):
 def test_the_narrow_nutrition_reader_serves_the_routes_own_edition_fields(fake_table):
     whole = ed.body_of(obs.handle_nutrition_overview())
     assert whole is not None
-    # The fixture exercises the facts: 7 visible in-window rows (the tombstone and the 40-day
-    # row are not), a protein-floor hit count, and both macro field spellings.
-    assert whole["nutrition"]["days_logged"] == 7 and whole["nutrition"]["latest_date"] == _day(1), whole["nutrition"]
+    # The fixture exercises the facts: 8 logged in-window rows (the tombstone and the 40-day row are not; #5607: the
+    # stub is not a log, the zero-count row with a food log is), a protein-floor hit count, and both macro spellings.
+    assert whole["nutrition"]["days_logged"] == 8 and whole["nutrition"]["latest_date"] == _day(1), whole["nutrition"]
+    assert whole["nutrition"]["incomplete_days"] == [_day(2)]
+    stub = next(r for r in whole["nutrition_trend"] if r["date"] == _day(2))
+    assert stub["logging_gap"] is True and stub["protein_g"] == 15, "the trend keeps the stub, flagged"
     assert whole["nutrition"]["protein_floor_hit_days"] > 0
 
     del fake_table[:]

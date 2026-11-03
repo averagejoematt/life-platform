@@ -12,6 +12,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 import os
 from datetime import datetime, timedelta
 
+from coach.grading_quality import is_zero_entry_day  # #5552: THE stub predicate (grader, coach inputs, engine, fact-checker)
 from common import (
     digest_utils,  # bundled shared module — compute_confidence tiering (ADR-105)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
@@ -269,11 +270,19 @@ def _mf(item, field, alt_field=None):
     return None
 
 
+def _complete(items: list) -> list:
+    """The rows that are a food log. A summary-only stub (no diary entries) is a missing day, not intake — the grader
+    (#5552), the coaches' inputs and the engine (#5603) and the fact-checker (#5613) read it so; this door's counts and
+    averages now do too (#5607, 2026-11-03). The trend keeps every row and flags the stubs; nothing is dropped silently."""
+    return [i for i in items if not is_zero_entry_day(i)]
+
+
 def _trend_row(i: dict) -> dict:
     """One `nutrition_trend` row — the chart's day. Shared with `edition_nutrition` (#4607)."""
     d = i.get("date") or i.get("sk", "").replace("DATE#", "")
     return {
         "date": d,
+        "logging_gap": is_zero_entry_day(i),
         "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
         "protein_g": (round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None),
         "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
@@ -352,6 +361,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                     "protein_floor_hit_pct": None,
                     "protein_floor_hit_days": 0,
                     "days_logged": 0,
+                    "incomplete_days": [],
                     "tdee": None,
                     # #3931 box 4: the populated block carries the TDEE method and the
                     # impossibility basis, so the empty one must too — a field that
@@ -456,6 +466,10 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
         )
 
     items.sort(key=lambda x: x.get("sk", ""))
+    # #5607: every count, average, latest day and group below reads complete logs only; the trend (all rows, stubs
+    # flagged) and `incomplete_days` say which days were stubs. A real low day is a log and stays in.
+    all_items, items = items, _complete(items)
+    incomplete_days = [i.get("date") or i.get("sk", "").replace("DATE#", "") for i in all_items if is_zero_entry_day(i)]
 
     cal_vals = [_mf(i, "calories") for i in items if _mf(i, "calories") is not None]
     pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
@@ -549,7 +563,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     deficit_published = bool(trend_check.get("publish"))
 
     # Daily trend for chart
-    trend = [_trend_row(i) for i in items]
+    trend = [_trend_row(i) for i in all_items]
 
     # ── Weekday vs Weekend comparison ──
     weekday_items = []
@@ -968,6 +982,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                 "protein_floor_hit_pct": floor_hit_pct,
                 "protein_floor_hit_days": floor_hit_days,
                 "days_logged": _log_rec["days_logged"],
+                "incomplete_days": incomplete_days,  # #5607: stub rows (no diary entries) — not counted, not averaged
                 "tdee": round(tdee) if tdee else None,
                 "tdee_source": tdee_source,
                 # #3931 box 4: the method behind the number, and the impossibility verdict.
@@ -1262,7 +1277,16 @@ def deficit_sustainability(*, _g) -> dict:
 #: `_query_source`). Measured 2026-10-09: the whole route parsed ~670 KB of DynamoDB JSON
 #: over eleven reads (the food log, supplements, habits, three Withings, two Strava, Hevy,
 #: Whoop and the profile) for the five facts the front page prints.
-_EDITION_MF_FIELDS = ("date", "calories", "total_calories", "total_calories_kcal", "protein_g", "total_protein_g")
+_EDITION_MF_FIELDS = (
+    "date",
+    "calories",
+    "total_calories",
+    "total_calories_kcal",
+    "protein_g",
+    "total_protein_g",
+    "entries_count",
+    "food_log",
+)
 
 #: The `nutrition_trend` row keys the edition reads (``site_api_edition._week`` / ``_day_detail``).
 _EDITION_TREND_KEYS = ("date", "calories", "protein_g")
@@ -1285,8 +1309,9 @@ def edition_nutrition(*, _g) -> dict:
     today = datetime.now(PT).strftime("%Y-%m-%d")
     d30 = _g["_experiment_date"](30)
     protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
-    items = _query_source("macrofactor", d30, today, projection=_EDITION_MF_FIELDS)
-    items.sort(key=lambda x: x.get("sk", ""))
+    all_items = _query_source("macrofactor", d30, today, projection=_EDITION_MF_FIELDS)
+    all_items.sort(key=lambda x: x.get("sk", ""))
+    items = _complete(all_items)  # #5607: the route's own rule — counts over complete logs, the trend over every row
     pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
     log_rec = nutrition_logging.logging_record(items, today)
     return {
@@ -1297,6 +1322,6 @@ def edition_nutrition(*, _g) -> dict:
                 "days_logged": log_rec["days_logged"],
                 "latest_date": log_rec["latest_date"],
             },
-            "nutrition_trend": [{k: row[k] for k in _EDITION_TREND_KEYS} for row in (_trend_row(i) for i in items)],
+            "nutrition_trend": [{k: row[k] for k in _EDITION_TREND_KEYS} for row in (_trend_row(i) for i in all_items)],
         }
     }
