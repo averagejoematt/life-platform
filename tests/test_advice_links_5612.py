@@ -227,7 +227,8 @@ def test_replay_writes_nothing_and_a_changed_answer_keeps_the_first(table):
 def test_the_sk_is_deterministic_and_scoped_to_its_decision():
     sk = al.link_sk(DEC_A, "coach_output", "sleep_coach", OUTPUT)
     assert sk == f"ADVICELINK#2026-10-30T22:41:18.075Z#coach_output#sleep_coach#{OUTPUT}"
-    assert sk.startswith(al.links_prefix_for(DEC_A)) and not sk.startswith(al.links_prefix_for(DEC_B))
+    prefix = lambda dec: f"{al.SK_PREFIX}{dec[len(al.DECISION_SK_PREFIX):]}#"  # noqa: E731 — one decision's link prefix
+    assert sk.startswith(prefix(DEC_A)) and not sk.startswith(prefix(DEC_B))
 
 
 # ── DERIVATION GUARD: the copies equal the registry ─────────────────────────────────────
@@ -301,15 +302,6 @@ def test_a_stored_row_that_breaks_the_rule_reads_unknown(monkeypatch):
     b = next(d for d in res["decisions"] if d["sk"] == DEC_B)
     assert b["advice_links"][0]["state"] == "unknown"
     assert next(d for d in res["decisions"] if d["sk"] == DEC_A)["advice_links"] == [], "a wiped cycle's link must not read"
-
-
-def test_the_public_contract_is_counts_only():
-    links = {DEC_A: [{"state": "acted_on", "recorded_by": "owner", "evidence": {"text": "private words"}, "coach_id": "nutrition_coach"}]}
-    out = al.public_contract([DEC_A, DEC_B], links)
-    assert tuple(out) == al.PUBLIC_FIELDS
-    assert out["states"] == {"acted_on": 1, "declined": 0, "partially_followed": 0, "unknown": 1}
-    assert (out["decisions_n"], out["linked_n"]) == (2, 1)
-    assert "private words" not in repr(out) and "nutrition_coach" not in repr(out)
 
 
 # ── ONE-WRITER GUARD + NO BACKFILL + PARTITION ISOLATION (tree sweeps) ──────────────────

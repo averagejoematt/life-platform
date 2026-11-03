@@ -114,11 +114,6 @@ def link_sk(decision_sk: str, ref_kind: str, coach_id: str, ref_id: str) -> str:
     return f"{SK_PREFIX}{decision_sk[len(DECISION_SK_PREFIX):]}#{ref_kind}#{coach_id}#{ref_id}"
 
 
-def links_prefix_for(decision_sk: str) -> str:
-    """The sk prefix every link of ONE decision carries (trailing `#` so ts prefixes never collide)."""
-    return f"{SK_PREFIX}{decision_sk[len(DECISION_SK_PREFIX):]}#"
-
-
 def ref_key(ref_kind: str, coach_id: str, ref_id: str, user_id: str) -> dict:
     return REF_KINDS[ref_kind]["key"](coach_id, ref_id, user_id)
 
@@ -236,20 +231,3 @@ def state_counts(decision_sks: list[str], links_by_decision: dict[str, list[dict
         for link in links:
             counts[effective_state(link)] += 1
     return counts
-
-
-# ── the data contract for an EVENTUAL public surface (not wired to any route in #5612) ──
-# Counts only — no decision text, no evidence text, no coach line. A public consumer, when one
-# is authorised, renders THIS shape behind the existing privacy tiers; nothing else.
-PUBLIC_FIELDS: tuple[str, ...] = ("states", "decisions_n", "linked_n", "basis")
-
-
-def public_contract(decision_sks: list[str], links_by_decision: dict[str, list[dict]]) -> dict:
-    counts = state_counts(decision_sks, links_by_decision)
-    linked = sum(1 for d in decision_sks if links_by_decision.get(d))
-    return {
-        "states": counts,
-        "decisions_n": len(decision_sks),
-        "linked_n": linked,
-        "basis": "owner-asserted links only; a decision with no recorded evidence reads unknown — never inferred from behaviour",
-    }

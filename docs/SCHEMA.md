@@ -2535,9 +2535,9 @@ not converted). Registry, validator and the eventual public contract:
 | `recorded_by` | string | `owner` (the only allowed value) |
 | `previous` | list | Superseded assertions `{state, evidence, recorded_at, recorded_by}`, oldest first (max 20) |
 
-Public surface: none (Coaching Room UI is not authorised). The data contract an eventual
-one would render is `advice_links.public_contract` — per-state COUNTS only (`states`,
-`decisions_n`, `linked_n`, `basis`), no decision, evidence or coach text.
+Public surface: none (Coaching Room UI is not authorised), and no public shape ships before one is.
+When one is authorised it renders per-state COUNTS only (`states` from `advice_links.state_counts`,
+the decision count, the linked count and the basis sentence) — no decision, evidence or coach text.
 
 ---
 
