@@ -54,8 +54,10 @@ def test_emission_writes_a_jargon_call_unchanged_with_no_unread_flag():
     held = prediction_emission.build_prediction_record("sleep_coach", "2026-10-05", EWMA_CALL, SPEC, 0.6, "observational")
     ok = prediction_emission.build_prediction_record("sleep_coach", "2026-10-05", PLAIN_CALL, SPEC, 0.6, "observational")
     assert "reader_plain" not in held and "reader_plain" not in ok
-    assert (held["status"], held["gradeable_by"], held["evaluation"]) == (ok["status"], ok["gradeable_by"], SPEC)
-    assert held["status"] == "pending"
+    assert (held["claim_natural"], ok["claim_natural"]) == (EWMA_CALL, PLAIN_CALL)  # the words are written unchanged
+    # #5607: whether a call is graded is the filing rules' decision, never the plain-words lint's — the
+    # EWMA sentence's outcome ("a hypothesis could activate") is not a measurement, so it files as an observation.
+    assert held["filing"]["reason"] == "outcome_is_judgement"
 
 
 # A sealed bet in the shape of the two live cycle-17 rows: past 300 characters, plain words otherwise.

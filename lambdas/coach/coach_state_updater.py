@@ -129,7 +129,12 @@ def _parse_confidence(raw) -> float:
 # builder that decides status/gradeable_by (qualitative → "observation", never
 # "pending"). Re-exported because the suite pins the spec builder off this module.
 from coach import prediction_scope as _prediction_scope  # noqa: E402  (#5126: a coach predicts about its own domain)
-from coach.metric_trailing_series import point_tolerance as _point_tolerance, source_items as _source_items  # noqa: E402  (#3551, #4630)
+from coach.filing_rules import validate_filing as _validate_filing  # noqa: E402  (#5607: the filing-time rules)
+from coach.metric_trailing_series import (  # noqa: E402  (#3551, #4630)
+    point_tolerance as _point_tolerance,
+    source_items as _source_items,
+    window_readings as _window_readings,  # #5607
+)
 from coach.prediction_emission import (  # noqa: E402,F401  (F401: _build_prediction_eval_spec/_prediction_window_days are the #3046 contract's re-exports; the loop routes through _resolve_eval_spec since #3551)
     POINT_TYPE as _POINT_TYPE,  # #3551
     build_prediction_eval_spec as _build_prediction_eval_spec,
@@ -1167,6 +1172,10 @@ def lambda_handler(event, context):
     _liveness_cache = {}  # #813: one data-liveness read per source per run
     _tolerance_cache = {}  # #3551: one trailing-SD read per metric per run, for level claims only
     _tolerance_for = lambda m: _metric_point_tolerance(m, _tolerance_cache)  # noqa: E731
+
+    def _readings(m, start, end):  # #5607: a KNOWN antecedent's window, read at filing
+        return _window_readings(table, USER_ID, m, start, end)
+
     for pred in predictions_made:
         claim = pred.get("claim_natural", "")
         if not claim:
@@ -1208,7 +1217,14 @@ def lambda_handler(event, context):
         eval_spec, window_days, _shape = _resolve_eval_spec(claim, metric_hint, pred, generation_date, _tolerance_for, _infer_direction)
         if _shape == "level" and eval_spec.get("type") != _POINT_TYPE:
             logger.info("Level claim for %s: no derivable tolerance — emitted as observation (coach=%s)", metric_hint, coach_id)
-        if eval_spec.get("type") in ("directional", _POINT_TYPE):
+        # #5607 filing rules: measurable outcome, frozen window, a tested condition — else an observation.
+        _filed = _validate_filing(
+            claim, eval_spec, generation_date, timeframe_hint=pred.get("timeframe_hint"), antecedent_readings=_readings
+        )
+        eval_spec = _filed["eval_spec"]
+        if not _filed["gradeable"]:
+            logger.info("Filed as observation (coach=%s): %s", coach_id, _filed["filing"]["reason"])
+        if eval_spec.get("type") in ("directional", _POINT_TYPE, "conditional"):
             _gradable_n += 1
         else:
             _qualitative_n += 1
@@ -1223,6 +1239,7 @@ def lambda_handler(event, context):
             eval_spec,
             _parse_confidence(pred.get("confidence_stated")),
             (extraction.get("decision_classes_used", ["observational"])[0] if extraction.get("decision_classes_used") else "observational"),
+            filing=_filed["filing"],
         )
         _put_item(pred_record)
         logger.info("Created PREDICTION# %s for %s (%s)", pred_record["prediction_id"], coach_id, pred_record["status"])

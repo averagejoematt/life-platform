@@ -120,6 +120,7 @@ DIRECTIONAL_NOISE_THRESHOLD = 0.02
 from coach import (  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts; #5613 the settled-grade guard)
     coach_baseline,
     commitment_grading,
+    conditional_branches,  # #5607: a conditional filed with its antecedent as a frozen, checkable spec
     evaluation_hold,  # #5607: a held row is skipped by every grading/expiry step here
     grade_corrections,
     grading_quality,  # #5533: zero-entry days, the HR regime marker, the quality flags
@@ -741,6 +742,9 @@ def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
     If the precondition is not met, status remains 'pending' (re-evaluate later).
     If precondition met, evaluate Y normally.
     """
+    if eval_spec.get("branches"):  # #5607: the antecedent tested on its frozen window; only the branch that held is graded
+        graders = {"directional": _evaluate_directional, "point": _evaluate_point, "machine": _evaluate_machine}
+        return conditional_branches.grade(pred, eval_spec, data_cache, today_str, _get_source_data, _extract_metric_series, graders)
     # Check precondition X
     cond_metric = eval_spec.get("condition_metric")
     cond_threshold = eval_spec.get("condition_threshold")

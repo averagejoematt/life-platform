@@ -92,7 +92,7 @@ CONDITION_SYMBOL = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "eq": "="}
 # explicitly NOT admissible — the evaluator skips it, so admitting one would put a row in
 # the ledger that can never be graded (the exact v7.15.0 "504 predictions, 100%
 # inconclusive" failure `measurable_metrics` was created to end).
-GRADABLE_SPEC_TYPES = ("machine", "directional")
+GRADABLE_SPEC_TYPES = ("machine", "directional", "conditional")  # #5607: a filed conditional
 
 STATUS_PENDING = "pending"
 
@@ -262,12 +262,23 @@ def admit_claim(candidate, stated_date: str, source_sk: str):
         }
         criterion = f"{metric} trends {direction} by {grade_by}"
 
+    # 6) #5607 — the filing rules every graded call passes: the outcome clause itself measures the
+    #    metric, the window is frozen, a condition is stored and tested. A claim that fails them is
+    #    not admitted, and the reason is said on tape like every other refusal.
+    from coach.filing_rules import validate_filing  # bundled shared module (#781)
+
+    filed = validate_filing(claim_natural, spec, stated_date, stated_days=horizon_days)
+    if not filed["gradeable"]:
+        return False, f"not admitted under the filing rules: {filed['filing']['reason_text']}", None
+    spec = filed["eval_spec"]
+
     normalized = {
         "claim_natural": claim_natural,
         "metric": metric,
         "subdomain": metric_subdomain(metric),
         "evaluation": spec,
         "criterion": criterion,
+        "filing": filed["filing"],
         "horizon_days": horizon_days,
         "grade_by": grade_by,
         "confidence": parse_confidence(candidate.get("confidence")),
@@ -311,6 +322,8 @@ def build_claim_record(normalized, stated_date: str, source_sk: str, now_iso: st
         "metric": normalized["metric"],
         "subdomain": normalized["subdomain"],
         "evaluation": normalized["evaluation"],
+        "filing_rules_version": (normalized.get("filing") or {}).get("filing_rules_version"),
+        "filing": normalized.get("filing"),
         "horizon_days": normalized["horizon_days"],
         "grade_by": normalized["grade_by"],  # AC2 — frozen at admission
         "confidence": normalized["confidence"],

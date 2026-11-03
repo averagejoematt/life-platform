@@ -368,18 +368,31 @@ def infer_subdomain(metric_hint):
     return "general"
 
 
-def build_prediction_record(coach_id, generation_date, claim, eval_spec, confidence, decision_class):
+def build_prediction_record(coach_id, generation_date, claim, eval_spec, confidence, decision_class, filing=None):
     """The canonical PREDICTION# item for a coach claim — the ONE place emission
     status/gradeable_by are decided (emission_status above). Callers pass the
     already-built eval_spec so the gradable-vs-qualitative routing they metered
-    stays exactly what gets written."""
+    stays exactly what gets written.
+
+    #5607: every record passes the filing rules (coach.filing_rules). A caller that already ran
+    them passes the verdict as `filing` (its spec is then `eval_spec`); otherwise they run here,
+    so no PREDICTION# row this builder writes can skip them. The verdict and the rule version are
+    stamped on the row."""
+    emitted_spec = eval_spec  # the #4618 bound reads the spec as emitted, so its own reason survives the rules
+    if filing is None:
+        from coach.filing_rules import validate_filing  # local: filing_rules imports this module
+
+        verdict = validate_filing(claim, eval_spec, generation_date)
+        eval_spec, filing = verdict["eval_spec"], verdict["filing"]
     slug = re.sub(r"[^a-z0-9]+", "_", claim.lower()[:40]).strip("_")
     pred_id = f"pred_{generation_date.replace('-', '')}_{slug}"
     status, gradeable_by = emission_status(eval_spec)
     subdomain = infer_subdomain(eval_spec.get("metric"))
     # #4618: the write-time bound. A call due more than a year out is refused as a
     # pending call and filed as an observation, with the reason on the row.
-    refused = prediction_windows.refuse_due(generation_date, eval_spec, subdomain) if status == "pending" else None
+    refused = (
+        prediction_windows.refuse_due(generation_date, emitted_spec, subdomain) if emission_status(emitted_spec)[0] == "pending" else None
+    )
     if refused:
         status, gradeable_by = OBSERVATION_STATUS, GRADEABLE_BY_NONE
     record = {
@@ -404,4 +417,6 @@ def build_prediction_record(coach_id, generation_date, claim, eval_spec, confide
     }
     if refused:
         record["emission_refused"] = refused
+    record["filing_rules_version"] = filing.get("filing_rules_version")
+    record["filing"] = filing
     return record
