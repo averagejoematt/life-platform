@@ -37,7 +37,9 @@ def _public_shelf_item(state: dict) -> dict:
     book_id = state.get("bookId", "")
     book = reading_store.get_book(book_id) or {}
     public_book = rv.project_public(rv.BOOK, book) or {"bookId": book_id}
-    if "themes" in public_book:  # #4392: the one public theme-list seam, shared with /api/coach + /api/journal_analysis
+    if (
+        "themes" in public_book
+    ):  # #4392: the one public theme-list seam, shared with /api/coach (/api/journal_analysis is private since 2026-11-03)
         public_book["themes"] = audience_guard.public_themes(public_book["themes"])
     item = {
         "book": public_book,

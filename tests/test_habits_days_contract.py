@@ -53,6 +53,13 @@ def _fake_table(rows):
 
 
 def _habitify_row(date_str, statuses):
+    # Owner ruling 2026-11-03 (fail closed): only a CLASSIFIED habit is published — these synthetic
+    # habits borrow classified-public ids, one per name (opaque; the names are the fixture's own).
+    from common import activity_publication as AP
+
+    ids = sorted(AP.PUBLIC_HABIT_IDS)
+    for name, st in statuses.items():
+        st.setdefault("habit_id", ids[sum(map(ord, name)) % len(ids)])
     return {
         "pk": "USER#matthew#SOURCE#habitify",
         "sk": f"DATE#{date_str}",

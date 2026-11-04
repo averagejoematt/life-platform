@@ -369,6 +369,9 @@ def test_habits_endpoint_drops_a_blocked_habit_from_per_habit(monkeypatch):
     with a blocked name present at all."""
     _pin_content_filter(monkeypatch)
     blocked = _name_with_blocked_keyword("Avoid")
+    from common import activity_publication as AP
+
+    _PUB = sorted(AP.PUBLIC_HABIT_IDS)
     table = _pk_dispatch_table(
         {
             "habitify": [
@@ -377,8 +380,10 @@ def test_habits_endpoint_drops_a_blocked_habit_from_per_habit(monkeypatch):
                     "sk": "DATE#2026-06-01",
                     "date": "2026-06-01",
                     "habit_statuses": {
-                        "Read 20 min": {"status": "completed", "group": "Mind", "scheduled_today": True},
-                        blocked: {"status": "completed", "group": "Discipline", "scheduled_today": True},
+                        # Classified-public ids (owner ruling 2026-11-03: unclassified habits are not
+                        # published) — the blocked name carries one too, so the CONTENT filter drops it.
+                        "Read 20 min": {"status": "completed", "group": "Mind", "scheduled_today": True, "habit_id": _PUB[0]},
+                        blocked: {"status": "completed", "group": "Discipline", "scheduled_today": True, "habit_id": _PUB[1]},
                     },
                 }
             ],
@@ -406,8 +411,9 @@ def test_habit_registry_profile_fallback_drops_a_blocked_name(monkeypatch):
                 "pk": f"USER#{USER_ID}",
                 "sk": "PROFILE#v1",
                 "habit_registry": {
-                    "Cold plunge": {"group": "Recovery"},
-                    blocked: {"group": "Discipline"},
+                    # The owner's registry `publication` field classifies them (fail closed otherwise).
+                    "Cold plunge": {"group": "Recovery", "publication": "public"},
+                    blocked: {"group": "Discipline", "publication": "public"},
                 },
             }
         ]

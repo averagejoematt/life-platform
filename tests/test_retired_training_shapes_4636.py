@@ -296,6 +296,10 @@ PARTITION_NAMED: dict[str, tuple[int, str]] = {
     "lambdas/experiment/phase_taxonomy.py": (1, "SOURCE_CLASS classification (ADR-077)"),
     "lambdas/ingestion/source_registry.py": (1, "the unregistered-partition ledger entry (a frozen archive)"),
     "lambdas/web/site_api_status.py": (1, "the status board's freshness row — reads the newest key, never the row shape"),
+    "lambdas/common/activity_publication.py": (
+        1,
+        "the activity publication class of the status board's row — a classification, reads nothing",
+    ),
 }
 
 # Files that read a nested `workouts` key. Only the bridge reads it off a STORED retired row;

@@ -160,18 +160,23 @@ def fulfillment_index(*, _g) -> dict:
     def _date_of(it):
         return (it.get("date") or str(it.get("sk", "")).replace("DATE#", ""))[:10]
 
+    # Owner ruling 2026-11-03 — PUBLIC METHOD 2 (health.fulfillment_index.PUBLIC_*): the public index
+    # is composed over the public channels only. The journal partition and the journal-enrichment
+    # rows are not READ here at all, so no part of this response can move with journal activity;
+    # the full four-channel calculation is the owner's private read (the pure module, unchanged).
     ritual_by_date = {_date_of(it): it for it in _window("evening_ritual")}
     interactions_by_date: dict = {}
     for it in _window("interactions"):
         interactions_by_date.setdefault(_date_of(it), []).append(it)
-    journal_dates = {_date_of(it) for it in _window("notion")}
     todoist_by_date = {_date_of(it): it for it in _window("todoist")}
-    flourishing_by_date = {_date_of(it): it for it in _window("flourishing")}
+    # Read only if the policy ever classifies the journal public (today it never is).
+    _journal_public = "journal_presence" in fi.PUBLIC_CHANNEL_NAMES
+    journal_dates = {_date_of(it) for it in _window(fi.CHANNEL_SOURCES["journal_presence"])} if _journal_public else set()
 
     adoption = {
         "connection_tap": _adoption_date("evening_ritual"),
         "interactions": _adoption_date("interactions"),
-        "journal_presence": _adoption_date("notion"),
+        **({"journal_presence": _adoption_date(fi.CHANNEL_SOURCES["journal_presence"])} if _journal_public else {}),
         # values_todoist adoption is detected within the fetched window (there is
         # no cheap first-tagged-ever query). A convention adopted >90d ago and
         # untouched since reads as not-adopted — the FORGIVING direction: the
@@ -187,15 +192,15 @@ def fulfillment_index(*, _g) -> dict:
     end = datetime.strptime(today, "%Y-%m-%d")
     while cursor <= end:
         d = cursor.strftime("%Y-%m-%d")
-        adopted = {name: bool(adoption[name] and adoption[name] <= d) for name in fi.CHANNEL_NAMES}
+        adopted = {name: bool(adoption[name] and adoption[name] <= d) for name in fi.PUBLIC_CHANNEL_NAMES}
         scores = {
             "connection_tap": fi.score_connection_tap(ritual_by_date.get(d)),
             "interactions": fi.score_interactions(interactions_by_date.get(d)),
-            "journal_presence": fi.score_journal_presence(d in journal_dates),
             "values_todoist": fi.score_values_todoist(todoist_by_date.get(d)),
+            "journal_presence": fi.score_journal_presence(d in journal_dates),
         }
-        day = fi.compose_day(d, adopted, scores)
-        fi.attach_resolution(day, flourishing_by_date.get(d))
+        day = fi.compose_day(d, adopted, {k: v for k, v in scores.items() if k in fi.PUBLIC_CHANNEL_NAMES}, roster=fi.PUBLIC_CHANNELS)
+        day["method_version"] = fi.PUBLIC_METHOD_VERSION
         days.append(day)
         cursor += timedelta(days=1)
 
@@ -226,9 +231,14 @@ def fulfillment_index(*, _g) -> dict:
             # regardless of cycle age. Same computation `mean_7d`/`mean_30d` gate.
             "recent_week_mean": recent_week_mean,
             "recent_month_mean": recent_month_mean,
-            "channels_adopted": adoption,
+            "channels_adopted": {k: v for k, v in adoption.items() if k in fi.PUBLIC_CHANNEL_NAMES},
             "coverage_floor": fi.COVERAGE_FLOOR,
-            "disclosure": fi.DISCLOSURE,
+            "disclosure": fi.PUBLIC_DISCLOSURE,
+            # The calculation is versioned (owner ruling 2026-11-03): every day above is method 2,
+            # and the history says what method 1 was and why its scores are not republished.
+            "method_version": fi.PUBLIC_METHOD_VERSION,
+            "method_effective": fi.PUBLIC_METHOD_EFFECTIVE,
+            "method_history": [dict(m) for m in fi.PUBLIC_METHOD_HISTORY],
             "as_of_date": today,
         },
         cache_seconds=900,

@@ -111,7 +111,12 @@ def _module_literal(name):
     raise AssertionError(f"site_api_status.py no longer defines {name} as a literal — the tests derive from it")
 
 
-DATA_SOURCES = _module_literal("_DATA_SOURCES")
+# Owner ruling 2026-11-03: the module's table is the private AND public rows; the panel publishes the
+# PUBLIC rows only (common.activity_publication — the journal's row is private activity).
+from common import activity_publication as _AP  # noqa: E402
+
+ALL_DATA_SOURCES = _module_literal("_DATA_SOURCES")
+DATA_SOURCES = [r for r in ALL_DATA_SOURCES if _AP.source_is_public(r[0])]
 COMPUTE_SOURCES = _module_literal("_COMPUTE_SOURCES")
 EMAIL_LAMBDAS = _module_literal("_EMAIL_LAMBDAS")
 LAGGED_SOURCES = _module_literal("_LAGGED_SOURCES")
@@ -892,31 +897,68 @@ def test_a_cloudwatch_alarm_outranks_a_failed_health_check(monkeypatch):
     assert "health check" not in c["comment"]
 
 
+def _probe_results(passed, failed, private_failing=False):
+    """A probe run's per-function results: `passed` healthy + `failed` failing PUBLIC probes, plus the
+    journal's two probes (private activity — never counted, whichever way they went)."""
+    rows = [{"function_name": f"fn-{i}", "source_id": "whoop", "healthy": True} for i in range(passed)]
+    rows += [{"function_name": f"bad-{i}", "source_id": "withings", "healthy": False} for i in range(failed)]
+    rows += [
+        {"function_name": "notion-journal-ingestion", "source_id": "notion", "healthy": not private_failing},
+        {"function_name": "journal-enrichment", "source_id": "notion:enrichment", "healthy": not private_failing},
+    ]
+    return json.dumps(rows)
+
+
 def test_the_health_check_probe_summary_is_republished_for_the_reader(monkeypatch):
+    for private_failing in (False, True):
+        b = healthy_platform()
+        b.add(
+            "health_check",
+            days_ago(0),
+            checked_at="2026-08-05T06:00:00+00:00",
+            passed=Decimal("24"),
+            failed=Decimal("3"),
+            failures=json.dumps([]),
+            results=_probe_results(22, 3, private_failing),
+        )
+        hc = Harness(monkeypatch, b.build()).body()["health_check"]
+        assert hc == {"checked_at": "2026-08-05T06:00:00+00:00", "passed": 22, "failed": 3}
+
+
+def test_a_probe_run_without_per_function_results_publishes_no_tally(monkeypatch):
+    """Fail closed (owner ruling 2026-11-03): the stored totals count the journal's probes too."""
     b = healthy_platform()
-    b.add(
-        "health_check",
-        days_ago(0),
-        checked_at="2026-08-05T06:00:00+00:00",
-        passed=Decimal("22"),
-        failed=Decimal("3"),
-        failures=json.dumps([]),
-    )
-    hc = Harness(monkeypatch, b.build()).body()["health_check"]
-    assert hc == {"checked_at": "2026-08-05T06:00:00+00:00", "passed": 22, "failed": 3}
+    b.add("health_check", days_ago(0), checked_at="x", passed=Decimal("22"), failed=Decimal("0"), failures="[]")
+    assert Harness(monkeypatch, b.build()).body()["health_check"] == {"checked_at": "x"}
 
 
 def test_only_the_most_recent_health_check_run_is_published(monkeypatch):
     b = healthy_platform()
-    for n, passed in ((3, "5"), (0, "22")):
-        b.add("health_check", days_ago(n), checked_at=days_ago(n), passed=Decimal(passed), failed=Decimal("0"), failures="[]")
+    for n, passed in ((3, 5), (0, 22)):
+        b.add(
+            "health_check",
+            days_ago(n),
+            checked_at=days_ago(n),
+            passed=Decimal(passed),
+            failed=Decimal("0"),
+            failures="[]",
+            results=_probe_results(passed, 0),
+        )
     assert Harness(monkeypatch, b.build()).body()["health_check"]["passed"] == 22
 
 
 def test_a_malformed_failure_list_still_publishes_the_probe_counts(monkeypatch):
     """Half a probe result is better than none — and no source is falsely reddened."""
     b = healthy_platform()
-    b.add("health_check", days_ago(0), checked_at="x", passed=Decimal("20"), failed=Decimal("1"), failures="{not json")
+    b.add(
+        "health_check",
+        days_ago(0),
+        checked_at="x",
+        passed=Decimal("20"),
+        failed=Decimal("1"),
+        failures="{not json",
+        results=_probe_results(20, 1),
+    )
     body = Harness(monkeypatch, b.build()).body()
     assert body["health_check"]["passed"] == 20
     assert body["overall"] == "green"

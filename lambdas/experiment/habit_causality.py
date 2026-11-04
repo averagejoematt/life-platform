@@ -100,27 +100,39 @@ def slugify_habit(name: str | None) -> str:
 # door to the same group and reintroduce the double-counting this design prevents.
 CROSS_PAGE_SIGNALS: dict[str, dict] = {
     # evidence page   component on computed_metrics   habit group it feeds
-    "movement": {"component": "movement", "group": "Performance"},
-    "nutrition": {"component": "nutrition", "group": "Nutrition"},
-    "recovery": {"component": "sleep_quality", "group": "Recovery"},
-    "mind": {"component": "journal", "group": "Growth"},
+    # `source` = the source the component is computed from, classified by
+    # common.activity_publication: a signal from a PRIVATE source (the journal) never feeds a
+    # PUBLIC group score (owner ruling 2026-11-03) — `public_only=True` below.
+    "movement": {"component": "movement", "group": "Performance", "source": "computed_metrics"},
+    "nutrition": {"component": "nutrition", "group": "Nutrition", "source": "computed_metrics"},
+    "recovery": {"component": "sleep_quality", "group": "Recovery", "source": "computed_metrics"},
+    "mind": {"component": "journal", "group": "Growth", "source": "notion"},
 }
+
+
+def public_cross_page_signals() -> dict:
+    """The CROSS_PAGE_SIGNALS whose source is public (common.activity_publication)."""
+    from common import activity_publication
+
+    return {p: s for p, s in CROSS_PAGE_SIGNALS.items() if activity_publication.source_is_public(s.get("source"))}
+
 
 # Minimum component score for a page to count as a daily completion for its group.
 # A component present but near-zero is not a "completion" — it's an honest low day.
 _CROSS_PAGE_MIN_SCORE = 50.0
 
 
-def derive_cross_page_signals(component_scores: dict | None) -> dict:
+def derive_cross_page_signals(component_scores: dict | None, *, public_only: bool = False) -> dict:
     """Map ONE computed_metrics day's component scores → {group: score} cross-page signals.
 
     Only emits a group when its page's component is present AND clears the completion
-    floor. Missing/low components emit nothing (no fabricated completion).
+    floor. Missing/low components emit nothing (no fabricated completion). ``public_only``
+    (every public serializer) skips a signal computed from a private source.
     """
     out: dict[str, float] = {}
     if not component_scores:
         return out
-    for spec in CROSS_PAGE_SIGNALS.values():
+    for spec in (public_cross_page_signals() if public_only else CROSS_PAGE_SIGNALS).values():
         val = component_scores.get(spec["component"])
         if val is None:
             continue

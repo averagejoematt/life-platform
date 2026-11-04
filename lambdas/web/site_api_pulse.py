@@ -20,11 +20,13 @@ facade; no import cycle. Every other shared helper comes straight from
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as _activity_publication  # owner ruling 2026-11-03: private sources get no glyph
 from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.metric_truth import (
     steps_by_date as resolved_steps_by_date,  # #4630 — the ONE steps resolver
     steps_sources_by_date as resolved_steps_sources_by_date,  # #4980 — whose count it is
 )
+from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 from web import instruments  # #4980 — the watch's first day
 from web.baseline_change import with_baseline_change  # #5029 — the neutral public date of the HR baseline change
@@ -226,6 +228,33 @@ def _positive(value):
         return False
 
 
+def _journal_activity(table, today_pt: str, today_utc: str, q_end: str) -> tuple:
+    """(written_today, streak_days, gap_days) from the journal partition (single 30-day query).
+    Called only while the journal source is classified public — never today (owner ruling 2026-11-03)."""
+    journal_today, journal_streak, journal_gap_days = False, 0, None
+    try:
+        d30_ago = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
+        j_resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(f"DATE#{d30_ago}", f"DATE#{q_end}~"),
+            ProjectionExpression="sk",
+        )
+        j_dates = {item["sk"][:15] for item in j_resp.get("Items", [])}  # "DATE#YYYY-MM-DD"
+        # Check both PT and UTC dates for today's journal (entry may be stored under either)
+        journal_today = f"DATE#{today_pt}" in j_dates or f"DATE#{today_utc}" in j_dates
+        if journal_today:
+            journal_streak = 1
+            for days_back in range(1, 31):
+                if f"DATE#{(datetime.now(PT) - timedelta(days=days_back)).strftime('%Y-%m-%d')}" not in j_dates:
+                    break
+                journal_streak += 1
+        elif j_dates:
+            _last_j = max(d[5:] for d in j_dates)
+            journal_gap_days = max(0, (datetime.strptime(today_pt, "%Y-%m-%d").date() - datetime.strptime(_last_j, "%Y-%m-%d").date()).days)
+    except Exception:
+        pass
+    return journal_today, journal_streak, journal_gap_days
+
+
 def pulse(*, _g) -> dict:
     """
     GET /api/pulse
@@ -284,34 +313,13 @@ def pulse(*, _g) -> dict:
         ah = {}
     habitify = _latest_item("habit_scores") or {}
 
-    # Check for journal entry today + streak (single query for last 30 days)
-    journal_today = False
-    journal_streak = 0
-    journal_gap_days = None  # staleness honesty: days since the LAST entry, for the narrative
-    try:
-        d30_ago = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
-        j_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(f"DATE#{d30_ago}", f"DATE#{q_end}~"),
-            ProjectionExpression="sk",
-        )
-        j_dates = set()
-        for item in j_resp.get("Items", []):
-            j_dates.add(item["sk"][:15])  # "DATE#YYYY-MM-DD"
-        # Check both PT and UTC dates for today's journal (entry may be stored under either)
-        journal_today = f"DATE#{today_pt}" in j_dates or f"DATE#{today_utc}" in j_dates
-        if journal_today:
-            journal_streak = 1
-            for days_back in range(1, 31):
-                check_sk = f"DATE#{(datetime.now(PT) - timedelta(days=days_back)).strftime('%Y-%m-%d')}"
-                if check_sk in j_dates:
-                    journal_streak += 1
-                else:
-                    break
-        elif j_dates:
-            _last_j = max(d[5:] for d in j_dates)
-            journal_gap_days = max(0, (datetime.strptime(today_pt, "%Y-%m-%d").date() - datetime.strptime(_last_j, "%Y-%m-%d").date()).days)
-    except Exception:
-        pass
+    # Journal today + streak + gap — private activity (owner ruling 2026-11-03): `_journal_activity`
+    # does not read it, the glyph is dropped and the narrative never names it, while the journal
+    # source is not classified public (common.activity_publication).
+    _journal_public = _activity_publication.source_is_public("notion")
+    journal_today, journal_streak, journal_gap_days = (
+        _journal_activity(table, today_pt, today_utc, q_end) if _journal_public else (False, 0, None)
+    )
 
     # Also check apple_health for weight fallback
     w_val = float(withings.get("weight_lbs", 0)) if withings.get("weight_lbs") else None
@@ -371,7 +379,7 @@ def pulse(*, _g) -> dict:
                 KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}strava") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
                 Limit=1,
             )
-            _strava_items = _strava_today.get("Items", [])
+            _strava_items = strava_read_seam("strava", _strava_today.get("Items", []))  # #4419 (exposed when the journal read left pulse())
             if _strava_items:
                 # Only count strength-type activities for the lift glyph — not walks/runs/rides
                 _LIFT_TYPES = {"WeightTraining", "Crossfit", "Workout", "HIIT", "Yoga", "RockClimbing"}
@@ -613,6 +621,8 @@ def pulse(*, _g) -> dict:
         },
     }
 
+    if not _journal_public:
+        glyphs.pop("journal", None)
     signals_reporting = sum(1 for g in glyphs.values() if g.get("state") != "gray")
     amber_or_red = sum(1 for g in glyphs.values() if g.get("state") in ("amber", "red"))
     if signals_reporting == 0:
@@ -665,7 +675,9 @@ def pulse(*, _g) -> dict:
             narrative_parts.append(f"Recovery strong at {r_val}%.")
         else:
             narrative_parts.append(f"Recovery at {r_val}%.")
-    if journal_today:
+    if not _journal_public:
+        pass  # private activity: never narrated
+    elif journal_today:
         narrative_parts.append("Journal logged.")
     elif journal_gap_days is not None and journal_gap_days >= 2:
         # "yet" implies today is the exception — past the threshold, the gap is the fact.
@@ -798,7 +810,7 @@ def pulse(*, _g) -> dict:
                 "status": status,
                 "status_color": {"strong": "#22c55e", "green": "#22c55e", "mixed": "#f5a623", "quiet": "#3a5a48"}.get(status, "#3a5a48"),
                 "signals_reporting": signals_reporting,
-                "signals_total": 8,
+                "signals_total": len(glyphs),
                 "narrative": narrative,
                 "since_yesterday": since_yesterday,
                 "notable_signals": notable_signals,

@@ -32,6 +32,30 @@ STRESS_SCALE_MAX = 4  # the evening check-in's 0-4 scale (coach/evening_checkin.
 OWNER_ONLY_COMPONENTS = {"stress_management": "evening_checkin"}
 
 
+# component -> the source it is computed from, for every component whose source is NOT public by
+# the activity publication policy (common.activity_publication). Such a component is never NAMED on a
+# published surface (driver lists, level-up events) — owner ruling 2026-11-03: journal activity is
+# private, and "journal_consistency" dragging the Mind pillar says the journal went quiet. Whether
+# these components should also leave the published pillar ARITHMETIC (a score change, like
+# OWNER_ONLY_COMPONENTS above) is an open owner decision; this registry only governs naming.
+PRIVATE_SOURCE_COMPONENTS = {
+    "journal_consistency": "notion",  # entries in the last 14 days / 14
+    "values_alignment": "flourishing",  # values evidenced by the journal-enrichment pass
+}
+
+
+def component_is_publishable(name: str) -> bool:
+    """False for an owner-only component and for one computed from a non-public source."""
+    if name in OWNER_ONLY_COMPONENTS:
+        return False
+    src = PRIVATE_SOURCE_COMPONENTS.get(name)
+    if src is None:
+        return True
+    from common import activity_publication
+
+    return activity_publication.source_is_public(src)
+
+
 def stress_management_score(checkin: Optional[dict[str, Any]]) -> Optional[float]:
     """0-100 from the evening check-in's ``stress`` (0-4), inverted: 0 ("no stress") is 100, 4 is 0.
 
@@ -68,7 +92,7 @@ def is_private_detail(detail: Any) -> bool:
 def event_driver_score(name: str, detail: Any) -> Optional[float]:
     """The score a level-up event may name this component by, or None — private keys, non-dict
     entries, owner-only components and non-positive scores never drive an event line."""
-    if name.startswith("_") or not isinstance(detail, dict) or is_private_detail(detail):
+    if name.startswith("_") or not isinstance(detail, dict) or is_private_detail(detail) or not component_is_publishable(name):
         return None
     score = detail.get("score")
     return score if isinstance(score, (int, float)) and score > 0 else None

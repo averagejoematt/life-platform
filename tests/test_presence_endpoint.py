@@ -38,10 +38,9 @@ def _body(resp):
     return json.loads(resp["body"]) if isinstance(resp.get("body"), str) else resp["body"]
 
 
-# The full stored record — includes fields that must NOT reach the public surface.
-_STORED = {
-    "pk": "USER#matthew#SOURCE#engagement_state",
-    "sk": "STATE#current",
+# The PUBLIC projection the producer stores under `public` (owner ruling 2026-11-03: the site
+# serves it and nothing else) — includes fields that must NOT reach the public surface.
+_PUBLIC = {
     "date": "2026-06-30",
     "presence_class": "quiet",
     "gap_days": 3,
@@ -61,6 +60,19 @@ _STORED = {
         "hevy": {"label": "training", "last_log_date": "2026-06-26", "gap_days": 3, "dropout_streak_days": 3},
     },
     "passive_read": {"rhr": 64, "recovery_trend": "red"},
+}
+# The full stored record: its OWN top-level fields count the private journal channel and must
+# never be served — they carry different values here so a read of them would show.
+_STORED = {
+    "pk": "USER#matthew#SOURCE#engagement_state",
+    "sk": "STATE#current",
+    "date": "2026-06-30",
+    "presence_class": "dark",
+    "gap_days": 9,
+    "channels_quiet": ["journal"],
+    "channels_quiet_count": 4,
+    "channel_detail": {"notion": {"label": "journal", "last_log_date": "2026-06-01", "gap_days": 29}},
+    "public": _PUBLIC,
 }
 
 _PRIVATE_KEYS = ("channel_detail", "passive_read", "last_manual_log_date", "channels_quiet")
@@ -108,8 +120,19 @@ def test_channels_projection(monkeypatch):
     assert by_id["macrofactor"]["quiet"] is True
     assert by_id["hevy"]["quiet"] is False
     # A channel with nothing in the stored window: honest nulls, quiet (nothing seen).
-    assert by_id["notion"]["last_log_date"] is None
-    assert by_id["notion"]["quiet"] is True
+    assert by_id["withings"]["last_log_date"] is None
+    assert by_id["withings"]["quiet"] is True
+    # Owner ruling 2026-11-03: the private journal channel is never a public channel.
+    assert "notion" not in by_id
+    assert "29" not in json.dumps(chans) and "journal" not in json.dumps(chans)
+
+
+def test_a_record_without_a_public_projection_serves_nothing(monkeypatch):
+    """Fail closed: a record written before the projection existed is never read for its full fields."""
+    rec = {k: v for k, v in _STORED.items() if k != "public"}
+    monkeypatch.setattr(sad, "table", _FakeTable(rec))
+    body = _body(sad.handle_presence())
+    assert body["available"] is False and body["presence_class"] == "present" and body["gap_days"] is None
 
 
 def test_honest_null_before_first_compute(monkeypatch):
@@ -125,7 +148,7 @@ def test_honest_null_before_first_compute(monkeypatch):
 
 
 def test_surfaces_return(monkeypatch):
-    rec = dict(_STORED, presence_class="present", returned=True, resumed_after_days=5, weight_delta_over_gap=3.2)
+    rec = dict(_STORED, public=dict(_PUBLIC, presence_class="present", returned=True, resumed_after_days=5, weight_delta_over_gap=3.2))
     monkeypatch.setattr(sad, "table", _FakeTable(rec))
     body = _body(sad.handle_presence())
     assert body["returned"] is True

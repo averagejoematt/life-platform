@@ -984,10 +984,10 @@ def test_ai_analysis_never_serves_a_slug_as_its_recommendation(monkeypatch):
 # ["themes"] verbatim; /coaching/ (coaching.js ce-themes) printed up to four of them.
 # The set of public endpoints serving a theme list (grep lambdas/web for "themes"):
 #   /api/coach/<id>          recent_outputs[].themes   (site_api_coach_profile)
-#   /api/journal_analysis    daily_themes[].themes + top_themes[].theme (site_api_mind)
+#   /api/journal_analysis    retired 2026-11-03 (journal-derived; private — serves no themes)
 #   /api/reading_shelf + /api/reading_overview  book.themes (site_api_reading — pinned
 #                            in tests/test_site_api_reading.py)
-# All three go through audience_guard.public_themes.
+# The remaining two go through audience_guard.public_themes.
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -1044,19 +1044,15 @@ def _journal_body_4392(monkeypatch):
     return json.loads(resp["body"])
 
 
-def test_journal_analysis_serves_reader_labels_in_both_theme_lists(monkeypatch):
+def test_journal_analysis_serves_no_journal_derived_field(monkeypatch):
+    """Owner ruling 2026-11-03: /api/journal_analysis is journal-derived end to end (the per-day themes,
+    sentiment, word counts and analysed-entry dates), so it serves the same empty shape whatever the
+    journal holds — no theme list remains on it to humanise (#4392's two theme lists are gone)."""
     body = _journal_body_4392(monkeypatch)
-    daily = [t for d in body["daily_themes"] for t in d["themes"]]
-    top = [t["theme"] for t in body["top_themes"]]
-    assert daily == ["protein metabolism cognition link", "journaling silence", "journaling silence", "grief"], daily
-    assert top[0] == "journaling silence" and body["top_themes"][0]["count"] == 2, "counted by the reader label"
-    assert [t for t in daily + top if "_" in t] == []
-
-
-def test_mutation_control_journal_analysis_without_public_themes_serves_slugs(monkeypatch):
-    monkeypatch.setattr(audience_guard, "public_themes", lambda values: values or [])
-    body = _journal_body_4392(monkeypatch)
-    assert "protein_metabolism_cognition_link" in body["daily_themes"][0]["themes"]
+    assert body["daily_themes"] == [] and body["top_themes"] == [] and body["sentiment_trend"] == []
+    assert body["total_analyzed"] is None
+    raw = json.dumps(body)
+    assert "journaling" not in raw and "grief" not in raw and "2026-09-2" not in raw
 
 
 def test_coach_analysis_serves_the_output_rows_data_through_beside_generated_at(monkeypatch):

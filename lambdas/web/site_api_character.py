@@ -26,6 +26,7 @@ from datetime import date as _date, timedelta
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from health import character_privacy  # owner ruling 2026-11-03: private-source components never named
 
 from web.site_api_common import (
     PT,
@@ -64,7 +65,13 @@ def _attach_pillar_absence(pillars, *, table, now, window_start) -> None:
         logger.warning("[/api/character] absence derivation unavailable: %s", _e)
         return
 
-    needed = sorted({sid for names in PILLAR_SOURCES.values() for sid in names})
+    from common import activity_publication
+
+    # Owner ruling 2026-11-03: a PRIVATE source (the journal, Mind's evidence) is never read for a
+    # public absence state — no last-log date, no days dark — and a pillar whose evidence is only
+    # private sources carries no absence state at all.
+    needed = sorted({sid for names in PILLAR_SOURCES.values() for sid in names if activity_publication.source_is_public(sid)})
+    public_pillars = {name for name, names in PILLAR_SOURCES.items() if any(activity_publication.source_is_public(s) for s in names)}
     overrides = stale_hours_overrides()
     today = now.date()
     source_state: dict[str, dict] = {}
@@ -98,7 +105,7 @@ def _attach_pillar_absence(pillars, *, table, now, window_start) -> None:
 
     reference_date = today.isoformat()
     for p in pillars:
-        if not isinstance(p, dict):
+        if not isinstance(p, dict) or (p.get("name") in PILLAR_SOURCES and p.get("name") not in public_pillars):
             continue
         a = pillar_absence(
             p.get("name"),
@@ -271,11 +278,12 @@ def character(date: str | None = None, *, _g) -> dict:
                     if isinstance(pd.get("neglect_decay"), dict)
                     else None
                 ),
+                # Owner ruling 2026-11-03: a component computed from a private source (the journal's
+                # consistency, the journal-coded values read) is never NAMED as a driver — its place
+                # on a top/dragging/absent list would say how the journal went.
                 "drivers": {
-                    "top": [str(x) for x in (_drivers.get("top") or [])],
-                    "dragging": [str(x) for x in (_drivers.get("dragging") or [])],
-                    "absent": [str(x) for x in (_drivers.get("absent") or [])],
-                    "no_data": [str(x) for x in (_drivers.get("no_data") or [])],
+                    k: [str(x) for x in (_drivers.get(k) or []) if character_privacy.component_is_publishable(str(x))]
+                    for k in ("top", "dragging", "absent", "no_data")
                 },
             }
         )

@@ -154,7 +154,7 @@ SITE_RULINGS = {
     ("observatory_week", "_query_source", "'whoop'", "site_api_rollups.py"): EXPLICIT,
     ("observatory_week", "_query_source", "'macrofactor'", "site_api_rollups.py"): EXPLICIT,
     ("observatory_week", "_query_source", "'apple_health'", "site_api_rollups.py"): EXPLICIT,
-    ("observatory_week", "_query_source", "'journal'", "site_api_rollups.py"): EXPLICIT,
+    ("_mind_week", "_query_source", "'journal'", "site_api_rollups.py"): EXPLICIT,
     ("observatory_week", "_query_source", "'withings'", "site_api_rollups.py"): EXPLICIT,
     ("cycle_compare", "_query_source", "'withings'", "site_api_rollups.py"): EXPLICIT,
     ("cycle_compare", "_query_source", "'whoop'", "site_api_rollups.py"): EXPLICIT,

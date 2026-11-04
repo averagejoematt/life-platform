@@ -84,27 +84,13 @@
     "state": "ok",
     "as_of": "2026-10-31",
     "source": [
-     "/api/journal_analysis",
      "/api/mind_overview"
     ],
     "absent_text": null,
     "data": {
      "mind": {
-      "state": "ok",
-      "entries_total": 2,
-      "entries_30d": 0,
-      "first": "2026-09-06",
-      "last": "2026-09-09",
-      "weeks": [
-       2,
-       0,
-       0,
-       0,
-       0,
-       0,
-       0,
-       0
-      ]
+      "state": "private",
+      "text": "The journal is private: what is written, and whether or when, is not published."
      },
      "connection": {
       "state": "ok",

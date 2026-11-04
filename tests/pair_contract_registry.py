@@ -356,16 +356,15 @@ register(
 
 def _produce_engagement_state():
     from compute import adaptive_mode_lambda as amode
-    from content.engagement_core import compute_presence
+    from content.engagement_core import PUBLIC_PROJECTION_KEY, compute_presence, compute_public_presence
 
     day = _in_cycle_day(offset=12)
     quiet_since = (date.fromisoformat(day) - timedelta(days=9)).isoformat()
-    signal = compute_presence(
-        day,
-        {"nutrition": [quiet_since], "training_notes": [quiet_since]},
-        wearable_latest={"whoop": day},
-        experiment_start=_in_cycle_day(offset=0),
-    )
+    dates = {"macrofactor": [quiet_since], "hevy": [quiet_since], "notion": [day]}
+    kw = {"wearable_latest": {"whoop": day}, "experiment_start": _in_cycle_day(offset=0)}
+    signal = compute_presence(day, dates, **kw)
+    # Owner ruling 2026-11-03: the site reads the PUBLIC projection the producer stores beside it.
+    signal[PUBLIC_PROJECTION_KEY] = compute_public_presence(day, dates, **kw)
     table = CapturingTable()
     real_table = amode.table
     amode.table = table
@@ -396,26 +395,34 @@ def _consume_engagement_state(record):
 
 
 def _agree_engagement_state(produced, consumed):
+    pub = produced["public"]
     assert consumed["available"] is True, "the site could not see the record the compute lambda just wrote"
-    assert consumed["presence_class"] == produced["presence_class"]
-    assert consumed["gap_days"] == produced["gap_days"]
-    assert consumed["as_of"] == produced["date"]
+    assert consumed["presence_class"] == pub["presence_class"]
+    assert consumed["gap_days"] == pub["gap_days"]
+    assert consumed["as_of"] == pub["date"]
+    assert "notion" not in {c["id"] for c in consumed["channels"]}, "the private journal channel reached the wire"
 
 
 register(
     PairContract(
         name="engagement_state -> /api/presence",
-        producer="content.engagement_core::compute_presence",
+        producer="content.engagement_core::compute_public_presence",
         consumer="web.site_api_freshness::presence",
         partition="engagement_state",
         produce=_produce_engagement_state,
         consume=_consume_engagement_state,
         agree=_agree_engagement_state,
         mutations=(
-            Mutation(("presence_class",), "drop", why="the headline class; the reader DEFAULTS it to 'present' when absent"),
-            Mutation(("gap_days",), "drop", why="the canonical lag-adjusted quiet stretch"),
-            Mutation(("last_food_log_date",), "drop", why="published as `last_log_date` — a rename across the wire"),
-            Mutation(("date",), "rename", to="as_of", why="the reader publishes `as_of` FROM `date`; the two names must not swap"),
+            Mutation(("public", "presence_class"), "drop", why="the headline class; the reader DEFAULTS it to 'present' when absent"),
+            Mutation(("public", "gap_days"), "drop", why="the canonical lag-adjusted quiet stretch"),
+            Mutation(("public", "last_food_log_date"), "drop", why="published as `last_log_date` — a rename across the wire"),
+            Mutation(("public", "date"), "rename", to="as_of", why="the reader publishes `as_of` FROM `date`; the two names must not swap"),
+            Mutation(
+                ("public",),
+                "rename",
+                to="public_v0",
+                why="the site serves the public projection and nothing else (owner ruling 2026-11-03)",
+            ),
         ),
         note=(
             "The reader defaults `presence_class` to 'present' on an absent field — a producer rename "
@@ -427,81 +434,66 @@ register(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAIR 5 — adaptive_mode -> the /api/ask grounding reads
-#   compute.adaptive_mode_lambda.store_adaptive_mode
-#     -> web.site_api_ai_context._ask_fetch_computed_reads
+# PAIR 5 — RETIRED 2026-11-03: adaptive_mode -> the /api/ask grounding reads. The public ask
+#   surface no longer reads adaptive_mode at all (its engagement score weights the private
+#   journal at 25% and its factors name the journal's state — owner ruling 2026-11-03), so the
+#   pair is genuinely gone, not merely inconvenient to test. Its slot is taken by the seam the
+#   same change created: the ask surface's presence read now reads the PUBLIC projection.
+#
+# PAIR 5b — engagement_state public projection -> the /api/ask grounding presence read
+#   content.engagement_core.compute_public_presence (+ store_engagement_state)
+#     -> web.site_api_ai_context._ask_fetch_computed_reads["presence"]
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _produce_adaptive_mode():
-    from compute import adaptive_mode_lambda as amode
-
-    day = _in_cycle_day()
-    table = CapturingTable()
-    real_table = amode.table
-    amode.table = table
-    try:
-        amode.store_adaptive_mode(
-            day,
-            {
-                "engagement_score": 74,
-                "brief_mode": "standard",
-                "mode_label": "Steady",
-                "factors": {"logging": "5 of 7 days", "training": "3 sessions"},
-                "component_scores": {"logging": 40, "training": 34},
-            },
-        )
-    finally:
-        amode.table = real_table
-    assert table.items, "store_adaptive_mode refused the write — no payload to contract on"
-    return table.items[0]
-
-
-def _consume_adaptive_mode(item):
+def _consume_ask_presence(record):
     from web import site_api_ai_context as ctx, site_api_ai_lambda as ai
 
-    class _EmptyTable:
-        def get_item(self, **_kw):
-            return {}
+    class _Singleton:
+        def get_item(self, Key, **_kw):  # noqa: N803
+            return {"Item": dict(record)} if record.get("sk") == Key.get("sk") and record.get("pk") == Key.get("pk") else {}
 
         def query(self, **_kw):
             return {"Items": []}
 
     real_latest, real_table = ai._latest_item, ctx._table
-    ai._latest_item = lambda source, **_kw: dict(item) if source == "adaptive_mode" else {}
-    ctx._table = lambda: _EmptyTable()
+    ai._latest_item = lambda source, **_kw: {}
+    ctx._table = lambda: _Singleton()
     try:
-        return (ctx._ask_fetch_computed_reads() or {}).get("adaptive_mode")
+        return (ctx._ask_fetch_computed_reads() or {}).get("presence")
     finally:
         ai._latest_item, ctx._table = real_latest, real_table
 
 
-def _agree_adaptive_mode(produced, consumed):
-    assert consumed is not None, "the ask surface dropped the adaptive-mode read entirely"
-    assert consumed["label"] == produced["mode_label"]
-    assert consumed["score"] == produced["engagement_score"]
-    assert set(consumed["factors"]) == set(produced["factors"])
+def _agree_ask_presence(produced, consumed):
+    pub = produced["public"]
+    assert consumed is not None, "the ask surface dropped the presence read entirely"
+    assert consumed["class"] == pub["presence_class"]
+    assert consumed["gap_days"] == pub["gap_days"]
 
 
 register(
     PairContract(
-        name="adaptive_mode -> /api/ask grounding reads",
-        producer="compute.adaptive_mode_lambda::store_adaptive_mode",
+        name="engagement_state public projection -> /api/ask grounding presence",
+        producer="content.engagement_core::compute_public_presence",
         consumer="web.site_api_ai_context::_ask_fetch_computed_reads",
-        partition="adaptive_mode",
-        produce=_produce_adaptive_mode,
-        consume=_consume_adaptive_mode,
-        agree=_agree_adaptive_mode,
+        partition="engagement_state",
+        produce=_produce_engagement_state,
+        consume=_consume_ask_presence,
+        agree=_agree_ask_presence,
         mutations=(
-            Mutation(("mode_label",), "drop", why="the whole block is gated on this key's truthiness"),
-            Mutation(("factors",), "rename", to="reasons", why="the platform's own stated reasons, published verbatim"),
-            Mutation(("engagement_score",), "drop", why="the score beside the label"),
+            Mutation(("public", "presence_class"), "drop", why="the whole presence block is gated on this key's truthiness"),
+            Mutation(("public", "gap_days"), "drop", why="the quiet stretch the model is grounded on"),
+            Mutation(
+                ("public",),
+                "rename",
+                to="public_v0",
+                why="the ask surface reads the public projection and nothing else (owner ruling 2026-11-03)",
+            ),
         ),
         note=(
-            "The runtime `ingestion_validator` schema for adaptive_mode requires pk/sk/date/"
-            "engagement_score/brief_mode/computed_at — it does NOT require `mode_label` or `factors`, "
-            "and `mode_label` is the key the entire consumer block is gated on. Every AI answer "
-            "loses its precomputed 'what drove today' silently."
+            "Owner ruling 2026-11-03: the public AI surface is grounded on the presence state computed over PUBLIC "
+            "channels only; reading the full record would ground public answers on the private journal channel."
         ),
     )
 )
@@ -1173,7 +1165,7 @@ KNOWN_MUST_AGREE_PAIRS = (
     "send_ledger row -> replay guard + status page",
     "computed_metrics -> canonical facts",
     "engagement_state -> /api/presence",
-    "adaptive_mode -> /api/ask grounding reads",
+    "engagement_state public projection -> /api/ask grounding presence",
     "public_stats.json -> fingerprint broadcast projection",
     # #3172 — the two live mismatches found while seeding this registry (PR #3169),
     # now root-caused, fixed, and enrolled.

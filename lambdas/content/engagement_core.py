@@ -32,6 +32,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from common import activity_publication as _activity_publication  # noqa: E402 — pure registry, no I/O
+
 # ── Channels — DERIVED from source_registry (#914, the #498 drift cure) ─────
 # Manual channels that STOP when Matthew disengages. The channel set, labels,
 # staleness tolerances, and per-source presence predicates are the
@@ -55,6 +57,11 @@ _CHANNELS = engagement_channels()
 PRIMARY_CHANNEL = engagement_primary_channel()
 MANUAL_CHANNELS = {k: v["label"] for k, v in _CHANNELS.items()}
 CHANNEL_STALE_DAYS = {k: v["stale_days"] for k, v in _CHANNELS.items()}
+# Owner ruling 2026-11-03: the PUBLIC presence projection is computed over the public channels only
+# (common.activity_publication — the journal channel is private activity), so no public presence
+# field (class, quiet count, planned pause, the channel rows) moves with private activity.
+PUBLIC_CHANNELS = _activity_publication.public_mapping(MANUAL_CHANNELS)
+PUBLIC_PROJECTION_KEY = "public"
 
 # ── Presence predicates (#914) ──────────────────────────────────────────────
 # Does a DDB record for this source count as Matthew actually LOGGING that day?
@@ -91,6 +98,35 @@ def channel_counts_as_logged(source, item):
     source's registry-named predicate; sources without one count any record)."""
     name = (_CHANNELS.get(source) or {}).get("presence_predicate")
     pred = PRESENCE_PREDICATES.get(name)
+    return True if pred is None else bool(pred(item))
+
+
+# The public projection's predicates: a record counts as logged on a PUBLIC channel only through
+# public activity. Habitify's day counts only when a PUBLIC habit was completed (a day whose only
+# completion was a private habit is not a public "habits logged" day). A row with no per-habit
+# statuses cannot be filtered and does not count (fail closed).
+def _public_habitify_completed(item):
+    statuses = (item or {}).get("habit_statuses")
+    if not isinstance(statuses, dict):
+        return False
+    pub = _activity_publication.public_habit_statuses(statuses)
+    return any(isinstance(st, dict) and st.get("status") == "completed" for st in pub.values())
+
+
+PUBLIC_PRESENCE_PREDICATES = {"habitify_completed": _public_habitify_completed}
+PUBLIC_PRESENCE_PREDICATE_FIELDS = {"habitify_completed": ("habit_statuses",)}
+
+
+def public_presence_fields(source):
+    """Extra DDB attributes the source's PUBLIC presence predicate reads."""
+    name = (_CHANNELS.get(source) or {}).get("presence_predicate")
+    return PUBLIC_PRESENCE_PREDICATE_FIELDS.get(name, PRESENCE_PREDICATE_FIELDS.get(name, ()))
+
+
+def public_counts_as_logged(source, item):
+    """``channel_counts_as_logged`` for the public projection (private activity never counts)."""
+    name = (_CHANNELS.get(source) or {}).get("presence_predicate")
+    pred = PUBLIC_PRESENCE_PREDICATES.get(name) or PRESENCE_PREDICATES.get(name)
     return True if pred is None else bool(pred(item))
 
 
@@ -163,6 +199,7 @@ def compute_presence(
     sick_days=None,
     travel_days=None,
     experiment_start=None,
+    channels=None,
 ):
     """Compute the presence / quiet-stretch state.
 
@@ -191,6 +228,8 @@ def compute_presence(
             semantics self-maintain across every future reset. A first log
             after genesis is a fresh start, never a cross-cycle "return".
             None ⇒ unclamped (legacy behaviour).
+        channels: optional {source: label} subset of MANUAL_CHANNELS to compute
+            over (default: all). The public projection passes PUBLIC_CHANNELS.
 
     Returns a plain dict (the engagement_signal / presence record body). Always
     returns a well-formed record; honest defaults, never raises.
@@ -207,8 +246,9 @@ def compute_presence(
     genesis_gap_cap = _effective_gap(genesis, today) if genesis else None
 
     # Per-channel gap picture.
+    channel_set = MANUAL_CHANNELS if channels is None else channels
     channels = {}
-    for src, label in MANUAL_CHANNELS.items():
+    for src, label in channel_set.items():
         dates = sorted(
             {d for d in (channel_dates.get(src) or []) if _to_date(d) and (genesis is None or _to_date(d) >= genesis)},
             reverse=True,
@@ -287,6 +327,18 @@ def compute_presence(
         signal["passive_read"] = passive_metrics
 
     return signal
+
+
+def compute_public_presence(today, public_channel_dates, **kwargs):
+    """The PUBLIC projection of the presence state (owner ruling 2026-11-03): ``compute_presence``
+    over the public channels only, from dates the public predicates produced
+    (``public_counts_as_logged``). Private channels are absent from every field — the class, the
+    quiet list and count, the planned-pause window, the channel detail. ``passive_read`` (verbatim
+    coach grounding) is never part of it. Stored on the presence record under
+    ``PUBLIC_PROJECTION_KEY``; /api/presence serves nothing else."""
+    kwargs.pop("passive_metrics", None)
+    dates = {k: v for k, v in (public_channel_dates or {}).items() if k in PUBLIC_CHANNELS}
+    return compute_presence(today, dates, channels=PUBLIC_CHANNELS, **kwargs)
 
 
 # ── sub-computations ─────────────────────────────────────────────────────────

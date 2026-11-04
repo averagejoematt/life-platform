@@ -534,6 +534,46 @@ def _glyph_state(green_test, amber_test, has_data):
     return "red"
 
 
+def _journal_derived_glyphs(journal_data: dict | None, mood_data: dict | None, today: str) -> dict:
+    """The pulse's JOURNAL and MIND glyphs — both journal-derived (whether he wrote today, the streak,
+    the entry themes, and the journal's own mood read).
+
+    Owner ruling 2026-11-03: each is published only while its source is classified public
+    (common.activity_publication) — today neither is, so this returns {}: no glyph, no count in
+    `signals_reporting`, never named in the narrative. The inputs stay for the owner's brief."""
+    from common import activity_publication as _activity_publication
+
+    glyphs: dict = {}
+    if _activity_publication.source_is_public("notion"):
+        journal = journal_data or {}
+        written_today = bool(journal.get("entries") and journal["entries"] > 0)
+        glyphs["journal"] = {
+            "state": "green" if written_today else "gray",
+            "written_today": written_today,
+            "streak_days": journal.get("streak_days", 0),
+            "themes": (journal.get("themes") or [])[:3],
+            "binary_14d": [],
+            "as_of": today,
+        }
+    if _activity_publication.source_is_public("mood_read"):
+        mood = mood_data or {}
+        mood_score = mood.get("score") or mood.get("mood_avg")
+        mood_labels = {1: "Low", 2: "Below avg", 3: "Average", 4: "Good", 5: "Excellent"}
+        glyphs["mind"] = {
+            "state": _glyph_state(
+                green_test=(mood_score and float(mood_score) >= 4),
+                amber_test=(mood_score and float(mood_score) >= 3),
+                has_data=mood_score is not None,
+            ),
+            "score": round(float(mood_score)) if mood_score else None,
+            "max_score": 5,
+            "label": mood_labels.get(round(float(mood_score))) if mood_score else None,
+            "sparkline_7d": [],
+            "as_of": today,
+        }
+    return glyphs
+
+
 def _compute_pulse(
     vitals: dict,
     journey: dict,
@@ -654,33 +694,8 @@ def _compute_pulse(
         "as_of": today,
     }
 
-    # ── 7. JOURNAL ──
-    journal = journal_data or {}
-    written_today = bool(journal.get("entries") and journal["entries"] > 0)
-    glyphs["journal"] = {
-        "state": "green" if written_today else "gray",
-        "written_today": written_today,
-        "streak_days": journal.get("streak_days", 0),
-        "themes": (journal.get("themes") or [])[:3],
-        "binary_14d": [],
-        "as_of": today,
-    }
-
-    # ── 8. MIND ──
-    mood = mood_data or {}
-    mood_score = mood.get("score") or mood.get("mood_avg")
-    has_mood = mood_score is not None
-    mood_labels = {1: "Low", 2: "Below avg", 3: "Average", 4: "Good", 5: "Excellent"}
-    glyphs["mind"] = {
-        "state": _glyph_state(
-            green_test=(mood_score and float(mood_score) >= 4), amber_test=(mood_score and float(mood_score) >= 3), has_data=has_mood
-        ),
-        "score": round(float(mood_score)) if mood_score else None,
-        "max_score": 5,
-        "label": mood_labels.get(round(float(mood_score))) if mood_score else None,
-        "sparkline_7d": [],
-        "as_of": today,
-    }
+    # ── 7. JOURNAL / 8. MIND ── (journal-derived: published only while the source is public)
+    glyphs.update(_journal_derived_glyphs(journal_data, mood_data, today))
 
     # ── PULSE STATUS ──
     glyph_states = [g["state"] for g in glyphs.values()]
@@ -721,7 +736,7 @@ def _compute_pulse(
             "status_color": status_color,
             "narrative": narrative,
             "signals_reporting": reporting_count,
-            "signals_total": 8,
+            "signals_total": len(glyphs),
             "glyphs": glyphs,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }

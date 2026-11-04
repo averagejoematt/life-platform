@@ -536,6 +536,39 @@ def stamp_output(record: Dict[str, Any], source_id: str, *, table: Any = None) -
     return attach_input_manifest(record, current_run_manifest(compute_id, table=table))
 
 
+def public_manifest(manifest: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The manifest a PUBLIC surface may serve (owner ruling 2026-11-03): re-judged over the PUBLIC
+    sources only (``common.activity_publication``), by the same rule ``build_input_manifest`` applies.
+    A private source (the journal) is absent from ``sources``, ``degraded`` and ``unobserved`` and
+    cannot move ``status``/``complete`` or the reader note — a stale journal never makes a public
+    day "partial". The stored manifest is unchanged for the owner's surfaces. Same input shapes as
+    the stored record; None in, None out."""
+    if not isinstance(manifest, dict):
+        return None
+    from common import activity_publication
+
+    names = set(manifest.get("degraded") or []) | set(manifest.get("unobserved") or [])
+    names |= set(manifest.get("sources") or {}) if isinstance(manifest.get("sources"), dict) else set()
+    if all(activity_publication.source_is_public(n) for n in names):
+        return manifest  # nothing private was judged: the stored verdict stands as written
+    raw_rows = manifest.get("sources")
+    rows: Dict[str, Any] = {
+        k: v for k, v in (raw_rows if isinstance(raw_rows, dict) else {}).items() if activity_publication.source_is_public(k)
+    }
+    degraded = sorted(s for s in (manifest.get("degraded") or []) if activity_publication.source_is_public(s))
+    unobserved = sorted(s for s in (manifest.get("unobserved") or []) if activity_publication.source_is_public(s))
+    if degraded:
+        status = MANIFEST_PARTIAL
+    elif unobserved or not rows:
+        status = MANIFEST_UNKNOWN
+    else:
+        status = MANIFEST_COMPLETE
+    out = dict(manifest)
+    out.update({"status": status, "complete": status == MANIFEST_COMPLETE, "degraded": degraded, "unobserved": unobserved, "sources": rows})
+    out["input_count"] = len(rows)
+    return out
+
+
 def manifest_note(manifest: Optional[Dict[str, Any]]) -> Optional[str]:
     """One honest sentence for a reader surface, or ``None`` when there is nothing to say.
 

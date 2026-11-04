@@ -566,7 +566,9 @@ def test_the_derivations_find_the_known_call_sites():
     assert {"whoop", "withings", "computed_metrics", "habit_scores"} <= sources["insight"]
     assert {"whoop", "strava", "hevy", "withings", "macrofactor", "habitify"} <= sources["metrics"]
     assert {"withings", "strava", "hevy"} <= sources["dashboard"]
-    assert {"withings", "whoop", "computed_metrics", "computed_insights", "adaptive_mode"} <= sources["site_ai"]
+    # adaptive_mode left the public ask grounding (owner ruling 2026-11-03: it weights the private journal).
+    assert {"withings", "whoop", "computed_metrics", "computed_insights"} <= sources["site_ai"]
+    assert "adaptive_mode" not in sources["site_ai"]
     assert {"whoop", "withings"} <= sources["forecast"]
     assert {"whoop", "macrofactor", "notion", "labs"} <= sources["inventory"]
 

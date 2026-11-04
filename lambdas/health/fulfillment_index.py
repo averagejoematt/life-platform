@@ -38,7 +38,13 @@ ADR-104 semantics, encoded per channel via ADOPTION:
     renders the dignified insufficient state — never a fabricated number.
 
 Pure module: no I/O, no clock, no boto3. Callers fetch the rows.
+
+PUBLIC vs PRIVATE (owner ruling 2026-11-03): the public route serves METHOD 2 — the baseline over
+the public channels (``PUBLIC_CHANNELS``) with no journal input and no resolution layer. Everything
+above describes the full calculation, which stays the owner's private read.
 """
+
+from common import activity_publication as _activity_publication
 
 # (channel, weight). Weights sum to 1.0 over the full roster; the daily score
 # renormalizes over whatever subset is adopted. connection_tap deliberately
@@ -51,6 +57,53 @@ CHANNELS = (
     ("values_todoist", 0.15),
 )
 CHANNEL_NAMES = tuple(name for name, _ in CHANNELS)
+
+# Which source each channel reads — the classification below is the platform's activity
+# publication policy (common.activity_publication), never a list kept here.
+CHANNEL_SOURCES = {
+    "connection_tap": "evening_ritual",
+    "interactions": "interactions",
+    "journal_presence": "notion",
+    "values_todoist": "todoist",
+}
+
+# ── THE PUBLIC CALCULATION, versioned (owner ruling 2026-11-03) ──────────────
+# "Exclude private journal activity from public baseline calculations ... If excluding journal
+# activity changes the meaning of the Fulfillment Index, update its public methodology and version
+# the calculation. Do not silently change historical published scores."
+#
+# Method 1 (published until 2026-11-03) weighted `journal_presence` — whether a journal entry
+# existed that day — into the baseline, and attached the journal-enrichment `resolution` block per
+# day. Both disclose journal activity (the day's score, its coverage and its resolution level moved
+# with whether he wrote). Method 2 is the public calculation from 2026-11-03: the baseline over the
+# PUBLIC channels only, weights renormalised over that roster (connection tap 0.50/0.85, interactions
+# 0.20/0.85, values-tagged tasks 0.15/0.85) and coverage measured against the public roster's mass,
+# no resolution layer. The full four-channel calculation (method 1, `compose_day` with the default
+# roster, `attach_resolution`) is unchanged and stays the owner's private read.
+PUBLIC_METHOD_VERSION = 2
+PUBLIC_METHOD_EFFECTIVE = "2026-11-03"
+PRIVATE_CHANNELS = tuple(name for name in CHANNEL_NAMES if not _activity_publication.source_is_public(CHANNEL_SOURCES[name]))
+PUBLIC_CHANNELS = tuple((name, w) for name, w in CHANNELS if name not in PRIVATE_CHANNELS)
+PUBLIC_CHANNEL_NAMES = tuple(name for name, _ in PUBLIC_CHANNELS)
+PUBLIC_DISCLOSURE = (
+    "Method 2 (from 3 November 2026): the baseline from passive one-tap channels only (connection tap, "
+    "logged interactions, values-tagged task completions), weighted 0.50 : 0.20 : 0.15 and renormalised "
+    "over the channels in use. Journal activity is private and is not part of the public index. "
+    "Channels count only from the day they were first used; before that they are excluded, not zeroed (ADR-104)."
+)
+PUBLIC_METHOD_HISTORY = (
+    {
+        "version": 1,
+        "until": PUBLIC_METHOD_EFFECTIVE,
+        "summary": "Four channels, including whether a journal entry existed that day, plus a per-day journal-derived resolution layer.",
+        "status": "retired: it published private journal activity. Its scores are not republished; days shown here are computed by method 2.",
+    },
+    {
+        "version": 2,
+        "from": PUBLIC_METHOD_EFFECTIVE,
+        "summary": "Three public channels (connection tap, logged interactions, values-tagged tasks); no journal input of any kind.",
+    },
+)
 
 # Below this much adopted weight-mass the index refuses to produce a number:
 # with only journal_presence (0.15) or only the two low-weight channels, a
@@ -126,8 +179,13 @@ def score_values_todoist(todoist_row):
 # ── composition ──────────────────────────────────────────────────────────────
 
 
-def compose_day(date_str, adopted, channel_scores):
+def compose_day(date_str, adopted, channel_scores, roster=CHANNELS):
     """One day's index from the baseline layer alone (pure).
+
+    roster: the (channel, weight) set to compose over — the full CHANNELS (default, the private
+      read) or PUBLIC_CHANNELS (the public method 2). Weights are renormalised over the roster's
+      mass, and coverage is the adopted share OF THAT MASS, so a channel outside the roster can
+      move neither the score, nor the coverage, nor the state.
 
     adopted: {channel: bool} — is the channel adopted as of date_str.
     channel_scores: {channel: float 0–100} — that day's raw channel scores
@@ -137,8 +195,10 @@ def compose_day(date_str, adopted, channel_scores):
     or state "insufficient_signal" (coverage only — no score key at all, so a
     consumer cannot accidentally render a number that doesn't exist).
     """
-    adopted = {name: bool(adopted.get(name)) for name in CHANNEL_NAMES}
-    coverage = sum(w for name, w in CHANNELS if adopted[name])
+    mass = sum(w for _name, w in roster) or 1.0
+    roster = tuple((name, w / mass) for name, w in roster)
+    adopted = {name: bool(adopted.get(name)) for name, _w in roster}
+    coverage = sum(w for name, w in roster if adopted[name])
     day = {"date": date_str, "coverage": round(coverage, 2)}
     if coverage < COVERAGE_FLOOR:
         day["state"] = "insufficient_signal"
@@ -149,13 +209,13 @@ def compose_day(date_str, adopted, channel_scores):
         return day
     score = 0.0
     channels = {}
-    for name, w in CHANNELS:
+    for name, w in roster:
         if not adopted[name]:
             channels[name] = {"adopted": False}
             continue
         s = max(0.0, min(100.0, _f(channel_scores.get(name)) or 0.0))
         score += (w / coverage) * s
-        channels[name] = {"adopted": True, "score": round(s, 1), "weight": w}
+        channels[name] = {"adopted": True, "score": round(s, 1), "weight": round(w, 4)}
     day["state"] = "ok"
     day["score"] = round(score, 1)
     day["channels"] = channels

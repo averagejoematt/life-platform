@@ -387,19 +387,9 @@ def _ask_fetch_computed_reads() -> dict:
     except Exception as e:
         logger.warning(f"[ask reads] computed_insights skipped: {e}")
 
-    # Adaptive-mode read (the platform's own morning verdict + its reasons —
-    # this is the precomputed answer to "what drove today?").
-    try:
-        am = _hook("_latest_item")("adaptive_mode") or {}
-        if am.get("mode_label"):
-            factors = am.get("factors") or {}
-            reads["adaptive_mode"] = {
-                "label": str(am["mode_label"])[:60],
-                "score": am.get("engagement_score"),
-                "factors": {str(k)[:30]: str(v)[:120] for k, v in factors.items() if v},
-            }
-    except Exception as e:
-        logger.warning(f"[ask reads] adaptive_mode skipped: {e}")
+    # (Retired 2026-11-03) The adaptive-mode read: its engagement score weights the journal at 25%
+    # and its factors name the journal's state — private activity (owner ruling 2026-11-03), so it
+    # is not public grounding. The record stays for the owner's brief.
 
     # Monthly motion (what_changed SNAPSHOT#current — trailing-30d vs prior-30d,
     # written weekly; real deltas only, honest_null on a flat month).
@@ -466,6 +456,11 @@ def _ask_fetch_computed_reads() -> dict:
         # the wiped cycle's presence class would ground AI answers until the next
         # engagement compute overwrote it. Same #946 predicate as the stance reads.
         pres = _decimal_to_float(pres if singleton_visible(pres) else {})
+        # Owner ruling 2026-11-03: the PUBLIC projection only (the journal channel excluded), the
+        # same sub-record /api/presence serves; a record without one grounds nothing.
+        from content.engagement_core import PUBLIC_PROJECTION_KEY
+
+        pres = pres.get(PUBLIC_PROJECTION_KEY) if isinstance(pres.get(PUBLIC_PROJECTION_KEY), dict) else {}
         if pres.get("presence_class"):
             reads["presence"] = {
                 "class": str(pres["presence_class"])[:20],

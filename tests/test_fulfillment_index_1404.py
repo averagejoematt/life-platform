@@ -206,9 +206,14 @@ class TestEndpoint:
         # interactions/values never adopted → frozen out, not zeroed
         assert body["channels_adopted"]["interactions"] is None
         assert body["channels_adopted"]["values_todoist"] is None
-        assert body["today"]["coverage"] == 0.65
+        # Public METHOD 2 (owner ruling 2026-11-03): the journal is not a public channel — the tap
+        # alone is 0.50 of the public roster's 0.85 mass; a journal row today changes nothing.
+        assert body["today"]["coverage"] == 0.59
+        assert "journal_presence" not in body["today"]["channels"] and "journal_presence" not in body["channels_adopted"]
+        assert "resolution" not in body["today"]
+        assert body["method_version"] == 2 and body["today"]["method_version"] == 2
         assert body["coverage_floor"] == fi.COVERAGE_FLOOR
-        assert "journal text adds resolution" in body["disclosure"].replace("journal\ntext", "journal text") or body["disclosure"]
+        assert body["disclosure"] == fi.PUBLIC_DISCLOSURE
         # days before the (today-dated) adoption are insufficient — honest, not zeroed
         assert body["trend_7d"][0]["state"] == "insufficient_signal"
 

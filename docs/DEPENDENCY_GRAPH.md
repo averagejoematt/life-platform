@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-798 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+792 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -174,7 +174,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `field_notes` | field_notes_lambda.py, tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, field_notes_lambda.py, site_api_thirdwall.py, tools_lifestyle.py |
 | `field_notes_held` | field_notes_lambda.py | — |
 | `fitness_tests` | fitness_tests.py | — |
-| `flourishing` | flourishing.py | site_api_fulfillment.py, theme_river.py, tools_journal.py |
+| `flourishing` | flourishing.py | theme_river.py, tools_journal.py |
 | `food_delivery` | food_delivery_lambda.py | digest_utils.py, site_api_meals.py, site_api_nutrition.py |
 | `food_responses` | — | — |
 | `forecast` | forecast_engine_lambda.py | ai_calls.py, site_api_foresight.py, state_of_matthew_lambda.py |
@@ -192,7 +192,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `intelligence_quality` | — | site_api_foresight.py, tools_data.py |
 | `interactions` | — | site_api_fulfillment.py, site_api_mind.py, tools_social.py |
 | `journal` | — | site_api_rollups.py |
-| `journal_analysis` | — | ai_expert_analyzer_lambda.py, hypothesis_engine_lambda.py, site_api_mind.py |
+| `journal_analysis` | — | ai_expert_analyzer_lambda.py, hypothesis_engine_lambda.py |
 | `journal_quotes` | tools_journal.py | site_api_diary.py, site_api_thirdwall.py |
 | `labs` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py |
 | `ledger` | — | site_api_ledger.py |
@@ -204,7 +204,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `measurements` | measurements_ingestion_lambda.py | ai_expert_analyzer_lambda.py, calibration_cadence.py, site_api_physical.py |
 | `milestones` | — | — |
 | `morning_note` | site_api_social_note.py | morning_note.py |
-| `notion` | freshness_checker_lambda.py, notion_lambda.py | adaptive_mode_lambda.py, circadian_compliance_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, evening_nudge_lambda.py, field_notes_lambda.py, freshness_checker_lambda.py, intelligence_common.py, notion_lambda.py, recap_data.py, site_api_fulfillment.py, site_api_mind.py, site_api_pulse.py, story_dossier.py, tools_journal.py, tools_social_connection.py |
+| `notion` | freshness_checker_lambda.py, notion_lambda.py | adaptive_mode_lambda.py, circadian_compliance_lambda.py, daily_insight_compute_lambda.py, daily_metrics_compute_lambda.py, evening_nudge_lambda.py, field_notes_lambda.py, freshness_checker_lambda.py, intelligence_common.py, notion_lambda.py, recap_data.py, site_api_pulse.py, story_dossier.py, tools_journal.py, tools_social_connection.py |
 | `nutrition_review` | nutrition_review_lambda.py | nutrition_review_lambda.py |
 | `nutrition_titration` | — | titration.py |
 | `owner_words` | — | owner_words.py |
@@ -262,7 +262,6 @@ See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 
 | Pair | Producer | Consumer | Partition | Mutations | Floor | Enrolled |
 |------|----------|----------|-----------|-----------|-------|----------|
-| adaptive_mode -> /api/ask grounding reads | `compute.adaptive_mode_lambda::store_adaptive_mode` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `adaptive_mode` | 3 | yes | yes |
 | ai_analysis EXPERT# -> observatory card journaling prompt | `intelligence.ai_expert_analyzer_lambda::generate_and_cache` | `coach.coach_observatory_renderer::journaling_prompt_for_domain` | `ai_analysis` | 3 | yes | yes |
 | apple_workouts map -> /api/zone2 Apple leg | `ingestion.health_auto_export_workouts::write_apple_workouts` | `web.site_api_autonomic::_compute_zone2_breakdown` | `apple_health` | 4 | yes | yes |
 | apple_workouts map -> MCP get_zone2_breakdown Apple leg | `ingestion.health_auto_export_workouts::write_apple_workouts` | `mcp.tools_correlation::tool_get_zone2_breakdown` | `apple_health` | 3 | yes | yes |
@@ -272,7 +271,8 @@ See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 | coach grade correction -> the record, the Brier pair and the clean count read the corrected grade | `coach.grade_corrections::apply_correction` | `coach.coach_record::record_from_rows` | — | 3 | no | yes |
 | computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 | yes | yes |
 | computed_metrics -> site-stats-refresh tier0_streak | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `web.site_stats_refresh_lambda::resolve_tier0_streak` | `computed_metrics` | 3 | yes | yes |
-| engagement_state -> /api/presence | `content.engagement_core::compute_presence` | `web.site_api_freshness::presence` | `engagement_state` | 4 | yes | yes |
+| engagement_state -> /api/presence | `content.engagement_core::compute_public_presence` | `web.site_api_freshness::presence` | `engagement_state` | 5 | yes | yes |
+| engagement_state public projection -> /api/ask grounding presence | `content.engagement_core::compute_public_presence` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `engagement_state` | 3 | yes | yes |
 | input_manifest -> character page projection | `common.input_manifest::build_input_manifest` | `web.site_api_character::_public_input_manifest` | `computed_metrics` | 4 | yes | yes |
 | morning note row -> the coach fact | `web.site_api_social_note::_handle_morning_note` | `coach.morning_note::coach_fact` | `morning_note` | 6 | yes | yes |
 | public_stats.json -> fingerprint broadcast projection | `content.site_writer::write_public_stats` | `content.fingerprint_broadcast::project_public` | — | 4 | yes | yes |
@@ -583,7 +583,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1396 total · 1003 resolved · 393 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1390 total · 995 resolved · 395 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 145 literal-named declarations across three idioms, 4 composite; routing digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only

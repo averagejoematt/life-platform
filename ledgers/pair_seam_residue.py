@@ -172,7 +172,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "engagement_state::lambdas/emails/monthly_digest_lambda.py::read": SEED_DATE,
     "engagement_state::lambdas/emails/weekly_digest_lambda.py::read": SEED_DATE,
     "engagement_state::lambdas/intelligence/ai_expert_analyzer_lambda.py::read": SEED_DATE,
-    "engagement_state::lambdas/web/site_api_ai_context.py::read": SEED_DATE,
     "engagement_state::mcp/tools_coach_checkin.py::read": SEED_DATE,
     "experiments::lambdas/compute/daily_insight_compute_lambda.py::read": SEED_DATE,
     "experiments::lambdas/emails/chronicle_data.py::read": SEED_DATE,
@@ -192,7 +191,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "field_notes::mcp/tools_lifestyle.py::write": SEED_DATE,
     "flourishing::lambdas/content/theme_river.py::read": SEED_DATE,
     "flourishing::lambdas/health/flourishing.py::write": SEED_DATE,
-    "flourishing::lambdas/web/site_api_fulfillment.py::read": SEED_DATE,
     "flourishing::mcp/tools_journal.py::read": SEED_DATE,
     "food_delivery::lambdas/common/digest_utils.py::read": SEED_DATE,
     "food_delivery::lambdas/ingestion/food_delivery_lambda.py::write": SEED_DATE,
@@ -247,8 +245,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "notion::lambdas/ingestion/notion_lambda.py::write": SEED_DATE,
     "notion::lambdas/intelligence/field_notes_lambda.py::read": SEED_DATE,
     "notion::lambdas/intelligence/intelligence_common.py::read": SEED_DATE,
-    "notion::lambdas/web/site_api_fulfillment.py::read": SEED_DATE,
-    "notion::lambdas/web/site_api_mind.py::read": SEED_DATE,
     "notion::lambdas/web/site_api_pulse.py::read": SEED_DATE,
     "notion::mcp/tools_journal.py::read": SEED_DATE,
     "notion::mcp/tools_social_connection.py::read": SEED_DATE,
@@ -375,6 +371,14 @@ REASON_5387_HEVY = (
 )
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "adaptive_mode::lambdas/compute/adaptive_mode_lambda.py::write": (
+        "2026-11-03",
+        "Owner ruling 2026-11-03 retired the one enrolled PUBLIC reader (/api/ask grounding): the engagement score weights the "
+        "private journal at 25%. The remaining readers are the owner's MCP tools. tools_coach_checkin reads date/brief_mode/"
+        "mode_label/engagement_score, every one written by store_adaptive_mode (pinned by tests/test_adaptive_mode*.py). "
+        "tools_reading reads `mode`/`color`, which the writer does NOT write, so its capacity read always falls back to its "
+        "documented YELLOW default: a pre-existing owner-only mismatch, recorded here rather than contracted, for a follow-up.",
+    ),
     "measurements::lambdas/training/calibration_cadence.py::read": (
         "2026-10-19",
         "#5061: the cadence reads ONLY the `date` (falling back to the `sk` DATE# suffix) of each tape row, to find when a tape was "

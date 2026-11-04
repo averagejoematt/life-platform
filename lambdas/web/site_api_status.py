@@ -25,6 +25,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as _activity_publication  # owner ruling 2026-11-03: private sources off the board
 from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import anchor_day_key  # #3913: a DATE# day key is aged in the calendar that NAMED it — never a hardcoded tz
 from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
@@ -118,6 +119,47 @@ def _chronicle_send_label() -> str:
     return f"{weekday} {time_str} · Elena Voss"
 
 
+def _read_health_check(table) -> tuple:
+    """(the reader's probe summary, the set of source ids whose daily probe failed) from the newest
+    health_check row. Owner ruling 2026-11-03: the tally is recounted over PUBLIC sources — a private
+    source's probe (the journal pull and its enrichment) moves neither `passed` nor `failed`, and a
+    record without per-probe results cannot be recounted and serves no tally (fail closed)."""
+    info: dict = {}
+    failed_sources: set = set()
+    try:
+        hc_items = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}health_check"), ScanIndexForward=False, Limit=1).get(
+            "Items", []
+        )
+        if not hc_items:
+            return info, failed_sources
+        hc = hc_items[0]
+        results = hc.get("results")
+        if isinstance(results, str):
+            try:
+                results = json.loads(results)
+            except ValueError:
+                results = None
+        info = {"checked_at": hc.get("checked_at", "")}
+        if isinstance(results, list):
+            public = [
+                r for r in results if isinstance(r, dict) and not _activity_publication.is_private_activity_source(r.get("source_id"))
+            ]
+            info["passed"] = sum(1 for r in public if r.get("healthy") and not r.get("paused"))
+            info["failed"] = sum(1 for r in public if not r.get("healthy") and not r.get("paused"))
+        for f in json.loads(hc.get("failures", "[]")):
+            if _activity_publication.is_private_activity_source((f or {}).get("source_id")):
+                continue
+            # #4761: an enrichment probe failure is not its parent source's ingestion failing.
+            # New records carry "<parent>:enrichment"; the function_name test also covers a
+            # record written before that id existed. Stays in `health_check` counts only.
+            if str(f.get("function_name", "")).endswith("-enrichment") or ":" in str(f.get("source_id", "")):
+                continue
+            failed_sources.add(f.get("source_id", ""))
+    except Exception as e:
+        logger.warning(f"[status] Health check read failed (non-fatal): {e}")
+    return info, failed_sources
+
+
 def status(*, _g) -> dict:
     """
     GET /api/status — full system status for status page
@@ -137,32 +179,7 @@ def status(*, _g) -> dict:
     # cadence check that replaced it measures days of silence, not the weekday.)
 
     # ── Pipeline health check results (active probe) ──
-    health_check_failures = set()
-    health_check_info = {}
-    try:
-        hc_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}health_check"),
-            ScanIndexForward=False,
-            Limit=1,
-        )
-        hc_items = hc_resp.get("Items", [])
-        if hc_items:
-            hc = hc_items[0]
-            health_check_info = {
-                "checked_at": hc.get("checked_at", ""),
-                "passed": int(hc.get("passed", 0)),
-                "failed": int(hc.get("failed", 0)),
-            }
-            failures = json.loads(hc.get("failures", "[]"))
-            for f in failures:
-                # #4761: an enrichment probe failure is not its parent source's ingestion failing.
-                # New records carry "<parent>:enrichment"; the function_name test also covers a
-                # record written before that id existed. Stays in `health_check` counts only.
-                if str(f.get("function_name", "")).endswith("-enrichment") or ":" in str(f.get("source_id", "")):
-                    continue
-                health_check_failures.add(f.get("source_id", ""))
-    except Exception as e:
-        logger.warning(f"[status] Health check read failed (non-fatal): {e}")
+    health_check_info, health_check_failures = _read_health_check(table)
 
     # ── CloudWatch alarm check — detect pipeline errors ──
     cw_alarm_states = {}
@@ -684,7 +701,10 @@ def status(*, _g) -> dict:
     # Build data source components
     now = datetime.now(PT)
     ds_components = []
-    for row in _DATA_SOURCES:
+    # Owner ruling 2026-11-03: a PRIVATE source's sync state (the journal's last sync, its uptime
+    # bars, its status colour, its alarm) is private activity — the row is omitted, not marked, and
+    # so is its share of the rollup below (common.activity_publication; unclassified fails closed).
+    for row in [r for r in _DATA_SOURCES if _activity_publication.source_is_public(r[0])]:
         sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
         category = row[5] if len(row) > 5 else "auto"
         group = row[6] if len(row) > 6 else "API-Based"

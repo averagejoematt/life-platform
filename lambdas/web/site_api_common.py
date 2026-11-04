@@ -29,7 +29,7 @@ import boto3
 import experiment.phase_filter as _phase_filter  # #4088: the derived phase decision (module ref, so it stays patchable)
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
-from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024 / DIL-049
+from common.input_manifest import manifest_note as _manifest_note, public_manifest as _public_manifest  # #3049 DIL-024 / DIL-049
 from common.macrofactor_fields import latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
 from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, parse and day-index
@@ -321,6 +321,9 @@ def _public_input_manifest(record) -> "dict | None":
     manifest = record.get("input_manifest") if isinstance(record, dict) else None
     if not isinstance(manifest, dict):
         return None
+    # Owner ruling 2026-11-03: re-judged over the PUBLIC sources only — the journal's freshness is
+    # private activity and must not move the status, the degraded list or the note.
+    manifest = _public_manifest(manifest) or {}
     sources = manifest.get("sources")
     if not isinstance(sources, dict):
         sources = {}

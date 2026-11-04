@@ -39,6 +39,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as _activity_publication
 from experiment import habit_causality
 from ingestion.source_registry import (  # #392: canonical source classification (bundled lambdas/ tree)
     DEFAULT_STALE_HOURS as _FRESHNESS_DEFAULT_STALE_HOURS,
@@ -89,14 +90,17 @@ from web import (
 # Derived from the ONE canonical registry (source_registry.py). Kept on the facade
 # because tests read/patch them here (sad._FRESHNESS_SOURCES, …) and the split
 # freshness handlers read them back via the `_g` hand-off.
-_FRESHNESS_SOURCES = public_board_sources()
+# Owner ruling 2026-11-03: every public liveness pool is restricted to PUBLIC sources
+# (common.activity_publication) — the journal's freshness, sync and presence are private activity.
+_FRESHNESS_SOURCES = _activity_publication.public_mapping(public_board_sources())
 _FRESHNESS_STALE_HOURS = stale_hours_overrides(_FRESHNESS_SOURCES)
-_FRESHNESS_PAUSED = public_paused_sources()
-_MANUAL_CAPTURE = manual_capture_sources()
+_FRESHNESS_PAUSED = _activity_publication.public_mapping(public_paused_sources())
+_MANUAL_CAPTURE = _activity_publication.public_mapping(manual_capture_sources())
 
-# #975: the manual engagement channels (food / journal / training / habits) the
-# engine derives from — read by the cockpit presence row via the `_g` hand-off.
-_ENGAGEMENT_CHANNELS = engagement_channels()
+# #975: the manual engagement channels (food / training / habits) the engine derives
+# from — read by the cockpit presence row via the `_g` hand-off. The journal channel is
+# private activity and is not published (owner ruling 2026-11-03).
+_ENGAGEMENT_CHANNELS = _activity_publication.public_mapping(engagement_channels())
 
 # Genesis dates per cycle — the explicit record (SSM holds only the current cycle
 # number). Read by the rollup handlers (cycle_compare / survival) via the `_g` hand-off;
@@ -250,7 +254,8 @@ def _habits_from_habitify() -> list:
     items = _decimal_to_float(resp.get("Items", []))
     if not items:
         return []
-    statuses = items[0].get("habit_statuses") or {}
+    # Owner ruling 2026-11-03: a private habit (the journal, by Habitify id) is not a public habit.
+    statuses = _activity_publication.public_habit_statuses(items[0].get("habit_statuses") or {})
     out = []
     for name, st in statuses.items():
         if _is_blocked_vice(name):
