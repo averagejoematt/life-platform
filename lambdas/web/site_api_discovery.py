@@ -272,7 +272,9 @@ def pillar_coupling(*, _g) -> dict:
             }
         )
     )
-    recs = _decimal_to_float(resp.get("Items", []))
+    from health import character_privacy  # owner rulings 2026-11-03/04: private-source pillars are served held
+
+    recs = [character_privacy.public_sheet(r) for r in _decimal_to_float(resp.get("Items", []))]
     recs.sort(key=lambda r: str(r.get("sk", "")))  # chronological
     if len(recs) < _COUPLING_MIN_N:
         return _ok(

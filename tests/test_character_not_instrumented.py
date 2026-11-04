@@ -23,6 +23,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from health import character_privacy  # noqa: E402
 from web import site_api_vitals as vitals  # noqa: E402
 
 _GENESIS = "2026-06-08"  # pinned: fixture records at 2026-06-20 are in-experiment
@@ -78,7 +79,8 @@ def test_handle_character_passes_through_not_instrumented(monkeypatch):
 
     rel = by_name["relationships"]
     assert rel["not_instrumented"] is True
-    assert rel["not_instrumented_note"] == _NOTE
+    # owner rulings 2026-11-03/04: relationships reads only private sources, so its public note is the held one
+    assert rel["not_instrumented_note"] == character_privacy.PRIVATE_PILLAR_NOTE
 
     sleep = by_name["sleep"]
     assert sleep["not_instrumented"] is False
@@ -97,20 +99,22 @@ def test_handle_character_composite_excludes_not_instrumented_pillar(monkeypatch
 
 
 def test_handle_character_instrumented_pillar_unaffected(monkeypatch):
-    """Once relationships gets a real score, the flag/note are false/absent and
-    the score renders exactly as any other pillar — no special-casing needed
-    for the day a real data source starts flowing."""
+    """An instrumented pillar renders exactly as any other — no special-casing needed for the day a real
+    data source starts flowing. Owner rulings 2026-11-03/04: relationships is computed only from private
+    sources, so even a real relationships score is served held and stays out of the composite; a pillar
+    with a public source (metabolic here) passes through."""
     rec = _record("2026-06-20", _pillar(62.0, not_instrumented=False))
+    rec["pillar_metabolic"] = _pillar(62.0, not_instrumented=False)
     monkeypatch.setattr(vitals, "table", _FakeTable([rec]))
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     resp = vitals.handle_character()
     body = json.loads(resp["body"])
+    met = next(p for p in body["pillars"] if p["name"] == "metabolic")
+    assert met["not_instrumented"] is False and met["not_instrumented_note"] is None and met["raw_score"] == 62.0
     rel = next(p for p in body["pillars"] if p["name"] == "relationships")
-    assert rel["not_instrumented"] is False
-    assert rel["not_instrumented_note"] is None
-    assert rel["raw_score"] == 62.0
-    # with all 7 pillars real, the composite is the straight 7-way average
-    assert body["character"]["composite_score"] == round((70.0 * 6 + 62.0) / 7, 1)
+    assert rel["not_instrumented"] is True and rel["raw_score"] == 50.0
+    # six public pillars: the composite is their average
+    assert body["character"]["composite_score"] == round((70.0 * 5 + 62.0) / 6, 1)
 
 
 def test_handle_character_pre_genesis_record_serves_zeroed_sheet(monkeypatch):

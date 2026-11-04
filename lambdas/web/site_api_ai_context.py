@@ -236,7 +236,9 @@ def _ask_fetch_context() -> dict:
         cs_pk = f"{USER_PREFIX}character_sheet"
         for d in [today_str, yesterday_str]:
             resp = _table().get_item(Key={"pk": cs_pk, "sk": f"DATE#{d}"})
-            rec = _decimal_to_float(resp.get("Item"))
+            from health import character_privacy  # owner rulings 2026-11-03/04: private-source pillars are served held
+
+            rec = character_privacy.public_sheet(_decimal_to_float(resp.get("Item")))
             if rec:
                 ctx["character_level"] = float(rec.get("character_level", 1))
                 ctx["character_tier"] = rec.get("character_tier", "Foundation")

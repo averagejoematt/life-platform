@@ -178,11 +178,18 @@ def test_composite_discloses_when_a_pillar_is_excluded(monkeypatch):
 
 
 def test_composite_note_is_silent_once_every_pillar_is_instrumented(monkeypatch):
+    """Owner rulings 2026-11-03/04: relationships is computed only from private sources, so a public route serves
+    it held even on a day it was instrumented — the note keeps naming it. With the privacy hold lifted (control),
+    the note goes quiet once all seven pillars are real."""
+    from common import activity_publication
+
     rec = _sheet("2026-06-20", relationships_not_instrumented=False)
     monkeypatch.setattr(vitals, "table", _FakeTable([rec]))
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
-    body = json.loads(vitals.handle_character()["body"])
-    ch = body["character"]
+    ch = json.loads(vitals.handle_character()["body"])["character"]
+    assert (ch["composite_pillar_count"], ch["composite_pillar_total"]) == (6, 7) and ch["composite_note"]
+    monkeypatch.setattr(activity_publication, "source_is_public", lambda s: True)
+    ch = json.loads(vitals.handle_character()["body"])["character"]
     assert ch["composite_pillar_count"] == 7
     assert ch["composite_pillar_total"] == 7
     assert ch["composite_note"] is None
