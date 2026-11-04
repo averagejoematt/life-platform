@@ -33,7 +33,10 @@ from datetime import datetime, timezone
 import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
-from coach import coach_json_schemas as _schemas  # #4276: structured-output schemas
+from coach import (
+    coach_json_schemas as _schemas,  # #4276: structured-output schemas
+    coach_output_provenance as _cop,  # owner ruling 2026-11-03: the digest's source families
+)
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 
 # Structured logger
@@ -80,6 +83,7 @@ _CW_NAMESPACE = "LifePlatform/AI"
 # AWS clients
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
+_RUN: dict = {}  # this invocation's provenance record — set right after the gather, read by _put_item
 secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -232,6 +236,8 @@ def _put_item(item):
     """
     from experiment.phase_taxonomy import experiment_stamp_for
 
+    # Owner ruling 2026-11-03: every row this run writes is derived from the coaches' stored reads it gathered.
+    item = {**item, "provenance": _cop.merged(item.get("provenance"), _RUN.get("provenance") or _cop.digest_record(None))}
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp_for(item.get("pk", ""), item.get("sk", "")), **item}))
         return True
@@ -454,7 +460,7 @@ def _build_user_message(coach_data, cycle_date, expected_coach_ids=None):
         if compressed:
             parts.append("#### Compressed State")
             # Filter out pk/sk for cleaner prompt
-            filtered = {k: v for k, v in compressed.items() if k not in ("pk", "sk")}
+            filtered = {k: v for k, v in compressed.items() if k not in ("pk", "sk", "provenance")}  # records: not prompt text
             parts.append(json.dumps(filtered, indent=2, default=str))
         else:
             parts.append("#### Compressed State: None available")
@@ -1096,6 +1102,7 @@ def lambda_handler(event, context):
 
     # Step 1: Gather data from all coaches
     coach_data = _gather_coach_data(coach_ids)
+    _RUN["provenance"] = _cop.digest_record(coach_data)  # owner ruling 2026-11-03: the digest carries its inputs' sources
 
     if not coach_data:
         logger.warning(

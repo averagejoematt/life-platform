@@ -44,7 +44,10 @@ from common.constants import EXPERIMENT_START_DATE, day_n  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 from health import mood_read as _mood_read  # #5123: the one mood read (journal first; the check-in is owner-only)
 
-from coach import coach_brief_input_gate as _input_gate  # #3107 — system prompt + the upstream change-gate
+from coach import (
+    coach_brief_input_gate as _input_gate,  # #3107 — system prompt + the upstream change-gate
+    coach_output_provenance as _prov,  # owner ruling 2026-11-03: the brief's source families
+)
 
 # Structured logger
 try:
@@ -1162,9 +1165,10 @@ def lambda_handler(event, context):
         return {"coach_id": coach_id, _input_gate.FINGERPRINT_MODE: _input_gate.orchestrator_input_digest(state)}
 
     # Build the orchestrator prompt
-    user_message = _build_user_message(state, coach_id, today)
+    user_message = _build_user_message(_prov.without_records(state), coach_id, today)  # 2026-11-03: records never enter the prompt
 
     # Call Haiku to produce the generation brief
+    _fallback_record = None  # a stored brief served in the model's place carries ITS record (none -> unrecorded)
     try:
         # Budget guardrail: at Tier ≥ 1 skip the LLM and fall back to the cached/
         # default brief, so the coach pipeline keeps running with zero Bedrock spend.
@@ -1205,12 +1209,14 @@ def lambda_handler(event, context):
         else:
             logger.warning("LLM returned non-dict response for %s — attempting fallback", coach_id)
             brief = _load_fallback_brief(coach_id)
+            _fallback_record = (brief.get("provenance") or {}) if brief else None
             if not brief:
                 brief = _build_default_brief(coach_id, today)
 
     except Exception as e:
         logger.error("LLM call failed for %s: %s — attempting fallback", coach_id, e)
         brief = _load_fallback_brief(coach_id)
+        _fallback_record = (brief.get("provenance") or {}) if brief else None
         if not brief:
             logger.warning("No fallback brief available — using default for %s", coach_id)
             brief = _build_default_brief(coach_id, today)
@@ -1252,10 +1258,9 @@ def lambda_handler(event, context):
     # it reaches generation on every path including fallback/default — but only for the
     # coach(es) whose domain covers Matthew's inner state. Omitted for every other coach
     # and whenever the journal window is too thin to say anything honest.
-    if _coach_wants_journal_mood(coach_id):
-        journal_mood = _journal_mood_for_brief(state.get("journal_mood"))
-        if journal_mood and isinstance(brief.get("generation_brief"), dict):
-            brief["generation_brief"]["journal_mood"] = journal_mood
+    journal_mood = _journal_mood_for_brief(state.get("journal_mood")) if _coach_wants_journal_mood(coach_id) else None
+    if journal_mood and isinstance(brief.get("generation_brief"), dict):
+        brief["generation_brief"]["journal_mood"] = journal_mood
 
     # Owner ruling 2026-11-03: the grade contract and every corrected call's dated, recorded reason ride the
     # brief DETERMINISTICALLY (every path, fallback included); `derived_from_predictions` is the provenance
@@ -1271,6 +1276,14 @@ def lambda_handler(event, context):
     brief["derived_from_predictions"] = sorted(
         set(_gr.get("cited") or [])
         | {str(p.get("prediction_id")) for p in state.get("active_predictions") or [] if isinstance(p, dict) and p.get("prediction_id")}
+    )
+
+    # Owner ruling 2026-11-03: the brief's provenance — every state component as RENDERED for this coach (outside
+    # `generation_brief`, so it never enters the prompt). The coach read written from it merges this record.
+    brief["provenance"] = _prov.brief_provenance(
+        state,
+        rendered={"site_protocols": protocols, "engagement_signal": engagement, "journal_mood": journal_mood},
+        fallback=_fallback_record,
     )
 
     # Cache the brief for fallback use

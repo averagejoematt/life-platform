@@ -60,7 +60,9 @@ def test_the_coach_v2_prompt_renders_the_rules_not_a_copy():
     src = inspect.getsource(ai_calls._run_coach_v2_pipeline)
     assert "{_reader_rules}" in src and "_rc.prompt_reader_rules()" in src
     assert "Never: EWMA" not in src  # the retired hand-copied literal
-    assert "judge_blacklists(voice_spec)" in src and "{json.dumps(_forbidden[0])}" in src
+    # the FORBIDDEN lists are the judge's (extracted to `_forbidden_lists`, 2026-11-03 — the #4880 function ratchet)
+    assert "_forbidden = _forbidden_lists(coach_id, voice_spec, anti_patterns)" in src and "{json.dumps(_forbidden[0])}" in src
+    assert "judge_blacklists(voice_spec)" in inspect.getsource(ai_calls._forbidden_lists)
 
 
 def test_mutation_control_a_term_added_to_the_tuple_reaches_the_prompt(monkeypatch):

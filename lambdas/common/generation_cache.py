@@ -236,7 +236,16 @@ def load_entry(table, coach_id: str, output_type: str):
         return None
 
 
-def store_entry(table, coach_id: str, output_type: str, fingerprint: str, output: str, today: str, parts: dict | None = None) -> bool:
+def store_entry(
+    table,
+    coach_id: str,
+    output_type: str,
+    fingerprint: str,
+    output: str,
+    today: str,
+    parts: dict | None = None,
+    provenance: dict | None = None,
+) -> bool:
     """Persist a freshly generated, gate-passed output under its brief fingerprint.
     Reached only on a cache MISS, so `first_generated` resets the unchanged-since
     clock. Pass the same `parts` dict the fingerprint came from (#2889) and the
@@ -255,6 +264,8 @@ def store_entry(table, coach_id: str, output_type: str, fingerprint: str, output
         }
         if part_hashes:
             item["part_hashes"] = part_hashes
+        if provenance:
+            item["provenance"] = provenance  # owner ruling 2026-11-03: a reuse serves the text with ITS record
         table.put_item(Item=item)
         return True
     except Exception as e:  # noqa: BLE001

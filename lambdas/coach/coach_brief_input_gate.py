@@ -100,6 +100,8 @@ from typing import Any, Optional
 # freeze the original function and make every such test silently exercise the wrong one.
 from common import generation_cache as _gc
 
+from coach import coach_output_provenance as _cop  # owner ruling 2026-11-03: a reused read carries its own record
+
 # ── The orchestrator system prompt ──────────────────────────────────────────
 # Lives here rather than in coach_narrative_orchestrator.py for two reasons: the
 # orchestrator is at its #1665 module-size ceiling (extracting this is what paid
@@ -509,7 +511,8 @@ def record_output(lambda_client, coach_id: str, output_type: str, text: str, gen
             FunctionName="coach-state-updater",
             InvocationType="Event",
             Payload=json.dumps(
-                {"coach_id": coach_id, "output_text": text, "output_type": output_type, "generation_date": generation_date, **fields}
+                {"coach_id": coach_id, "output_text": text, "output_type": output_type, "generation_date": generation_date, **fields},
+                default=str,  # a provenance record read back from DynamoDB carries Decimal — never lose the record to it
             ).encode(),
         )
     except Exception as e:  # noqa: BLE001 — never block serving a coach read
@@ -530,6 +533,7 @@ def serve_reuse(
     surface: str,
     cache_output_type: Optional[str] = None,
     data_through: Optional[str] = None,
+    provenance: Optional[dict] = None,
 ) -> str:
     """Everything a cache HIT owes the rest of the platform, then return `text`.
 
@@ -546,7 +550,11 @@ def serve_reuse(
     _gc.record_reuse(table, coach_id, cache_output_type or output_type, today)
     _gc.emit_skip_metric(cw, namespace, coach_id, surface=surface)
     # #4185: a hit means today's inputs are unchanged, so today's data day is the reused read's too.
-    record_output(lambda_client, coach_id, output_type, text, today, data_through=data_through, unchanged_since=unchanged_since)
+    # Owner ruling 2026-11-03: the reused text's OWN record (stored with it); a row cached before the stamp has none,
+    # so the state updater stamps it unrecorded — withheld until a fresh generation records its sources.
+    record_output(
+        lambda_client, coach_id, output_type, text, today, data_through=data_through, unchanged_since=unchanged_since, provenance=provenance
+    )
     return text
 
 
@@ -589,6 +597,7 @@ class BriefCacheGate:
         if not reuse:
             return fingerprint, None
         print(f"[COACH-V2:{self.coach_id}] {surface}: inputs unchanged since {since} — reusing gated output, skipping generation")
+        record = _cop.portable((_gc.load_entry(self.table, self.coach_id, output_type) or {}).get("provenance"))
         text = serve_reuse(
             self.lambda_client,
             self.table,
@@ -602,6 +611,7 @@ class BriefCacheGate:
             surface=surface,
             cache_output_type=output_type,
             data_through=self.data_through,
+            provenance=record,
         )
         return fingerprint, text
 
@@ -645,7 +655,7 @@ class BriefCacheGate:
             self.down_fp = self.down_parts = None
             return None
 
-    def store(self, output: str, today: str) -> None:
+    def store(self, output: str, today: str, provenance: Optional[dict] = None) -> None:
         """Persist the fresh, gate-passed `output` under BOTH fingerprints.
 
         A row is written only where the corresponding gate actually ran. Writing a
@@ -659,4 +669,4 @@ class BriefCacheGate:
             (self.upstream_type, self.up_fp, self.up_parts),
         ):
             if fingerprint:
-                _gc.store_entry(self.table, self.coach_id, out_type, fingerprint, output, today, parts=parts)
+                _gc.store_entry(self.table, self.coach_id, out_type, fingerprint, output, today, parts=parts, provenance=provenance)
