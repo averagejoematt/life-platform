@@ -25,7 +25,10 @@ What varies, all SYNTHETIC (no real date, count or gap — the dates are relativ
   * the daily probe's journal rows (`notion`, `notion:enrichment`): healthy / healthy / failing;
   * the presence record — PRODUCED here by the real producer
     (`compute.adaptive_mode_lambda.compute_and_store_engagement`) from the varied rows, so the
-    producer half of /api/presence is under test too.
+    producer half of /api/presence is under test too;
+  * the circadian record — PRODUCED here by the real producer
+    (`compute.circadian_compliance_lambda`), whose morning-light and wind-down anchors read the
+    synthetic journal text, so /api/circadian's journal-free block is under test too.
 
 What is held fixed (and why): every public source's rows; the stored `character_sheet`,
 `computed_metrics` and `habit_scores` rows. Those three are written by producers that today fold
@@ -251,7 +254,17 @@ def _rows(variant: str) -> list:
         if d in jdays:
             for tmpl in ("morning",) if (variant == "gaps" and i % 2) else ("morning", "evening"):
                 rows.append(
-                    {"pk": P("notion"), "sk": f"DATE#{d}#journal#{tmpl}", "date": d, "template": tmpl, "word_count": Decimal("300")}
+                    {
+                        "pk": P("notion"),
+                        "sk": f"DATE#{d}#journal#{tmpl}",
+                        "date": d,
+                        "template": tmpl,
+                        "word_count": Decimal("300"),
+                        # Synthetic words that trip the circadian anchors read from the journal
+                        # (morning light, the evening wind-down), so the circadian producer below
+                        # sees journal-dependent inputs. Never real text.
+                        "raw_text": "synthetic sunlight walk" if tmpl == "morning" else "synthetic scrolling",
+                    }
                 )
             rows.append(
                 {
@@ -442,6 +455,14 @@ def _wire(variant: str, ungated: bool = False):
 
     AM.table = raw
     AM.compute_and_store_engagement()
+
+    # The circadian record, produced by the real producer: two of its anchors read the journal, and
+    # /api/circadian must serve only the journal-free block (owner ruling 2026-11-03).
+    from common.pacific_time import PACIFIC
+    from compute import circadian_compliance_lambda as CC
+
+    CC.table = raw
+    CC.store_circadian_score(CC.compute_circadian_score(FROZEN.astimezone(PACIFIC).date().isoformat()))
 
     from web import site_api_lambda as L
 

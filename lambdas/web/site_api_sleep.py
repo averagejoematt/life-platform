@@ -913,10 +913,14 @@ def circadian(*, _g) -> dict:
     _latest_item = _g["_latest_item"]
 
     item = _latest_item("circadian")
-    if not item:
+    # Owner ruling 2026-11-03: journal activity is private. The stored record's top level scores
+    # anchors read from the journal; the route serves ONLY the producer's journal-free ``public``
+    # block, and a record without one (written before it existed) is not served (fail closed).
+    public = (item or {}).get("public")
+    if not item or not isinstance(public, dict):
         return _ok({"available": False}, cache_seconds=900)
 
-    comps = item.get("components", {}) or {}
+    comps = public.get("components", {}) or {}
     components = {
         name: {
             "score": c.get("score"),
@@ -924,7 +928,6 @@ def circadian(*, _g) -> dict:
             "note": c.get("note"),
             # Staleness honesty (truth audit 2026-07-10): False = the lambda had no
             # real signal for this anchor — render "unknown", never a scored default.
-            # Legacy records predate the flag; absent means measured (old behavior).
             "measured": c.get("measured", True),
         }
         for name, c in comps.items()
@@ -936,11 +939,11 @@ def circadian(*, _g) -> dict:
             # Temporal frame (additive): this is a forward-looking forecast of how
             # tonight's sleep will turn out given today's behaviours — not a measurement.
             "frame": "tonight",
-            "score": item.get("score"),
-            "category": item.get("category"),
-            "prescription": item.get("prescription"),
-            "weakest_component": item.get("weakest_component"),
-            "measured_count": item.get("measured_count"),
+            "score": public.get("score"),
+            "category": public.get("category"),
+            "prescription": public.get("prescription"),
+            "weakest_component": public.get("weakest_component"),
+            "measured_count": public.get("measured_count"),
             "components": components,
         },
         cache_seconds=900,
