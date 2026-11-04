@@ -33,17 +33,30 @@ from web import (
 
 
 def test_circadian_populated_shape(monkeypatch):
+    # Owner ruling 2026-11-03: the route serves ONLY the producer's journal-free ``public`` block;
+    # the top-level fields (which score anchors read from the private journal) are never served.
     item = {
         "pk": "USER#matthew#SOURCE#circadian",
         "sk": "DATE#2026-06-15",
         "date": "2026-06-15",
-        "score": Decimal("78"),
-        "category": "good",
-        "prescription": "Get morning light before 9am.",
+        "score": Decimal("40"),
+        "category": "poor",
+        "prescription": "private top level",
         "weakest_component": "screen_wind_down",
         "components": {
-            "wake_light": {"score": Decimal("25"), "max": Decimal("25"), "note": "Logged AM sun"},
-            "screen_wind_down": {"score": Decimal("3"), "max": Decimal("25"), "note": "Late screens"},
+            "morning_light": {"score": Decimal("25"), "max": Decimal("25"), "note": "private top level"},
+            "screen_wind_down": {"score": Decimal("3"), "max": Decimal("25"), "note": "private top level"},
+        },
+        "public": {
+            "score": Decimal("78"),
+            "category": "good",
+            "prescription": "Get morning light before 9am.",
+            "weakest_component": "meal_timing",
+            "measured_count": Decimal("2"),
+            "components": {
+                "morning_light": {"score": Decimal("15"), "max": Decimal("25"), "note": "Early walk", "measured": True},
+                "meal_timing": {"score": Decimal("10"), "max": Decimal("25"), "note": "Late meal", "measured": True},
+            },
         },
         "run_id": "abc123",
     }
@@ -58,9 +71,10 @@ def test_circadian_populated_shape(monkeypatch):
     assert body["frame"] == "tonight"
     assert body["score"] == 78
     assert body["category"] == "good"
-    assert body["weakest_component"] == "screen_wind_down"
-    assert body["components"]["wake_light"]["score"] == 25
-    assert body["components"]["screen_wind_down"]["note"] == "Late screens"
+    assert body["weakest_component"] == "meal_timing"
+    assert body["components"]["morning_light"]["score"] == 15
+    assert "screen_wind_down" not in body["components"]
+    assert "private top level" not in resp["body"]
     # internal keys must not leak
     assert "pk" not in body and "sk" not in body and "run_id" not in body
 

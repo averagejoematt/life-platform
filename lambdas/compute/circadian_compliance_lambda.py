@@ -373,25 +373,51 @@ def score_sleep_consistency(today_str):
 # ==============================================================================
 
 
+# Anchors read from the private journal (owner ruling 2026-11-03: journal activity and anything
+# derived from it is private on public surfaces). The PUBLIC record omits ``screen_wind_down``
+# entirely and scores ``morning_light`` from its non-journal signal only, so no public score,
+# count, note or priority moves with whether or what he wrote. The full record (owner-facing:
+# the evening nudge, MCP) is unchanged.
+JOURNAL_ONLY_ANCHORS = frozenset({"screen_wind_down"})
+
+
 def compute_circadian_score(today_str):
-    """Compute all 4 components and return unified score + prescription.
+    """Compute all 4 components and return unified score + prescription, plus ``public``.
 
     Staleness honesty (truth audit 2026-07-10): the old composite summed a NO-DATA
     default for every unmeasured anchor (5+12+15+12 = a "44/100, at risk — act now"
     verdict scored almost entirely from absence). Now each scorer declares
     measured/unmeasured, the composite is normalized over MEASURED anchors only
     (0–100), and a day with zero measured anchors refuses to produce a score at all.
+
+    ``public`` is the same assembly over journal-free inputs: the scorers run with no journal
+    entries and the journal-only anchors are left out (omitted, never marked).
     """
     journal = fetch_journal_today(today_str)
+    meal = score_meal_timing(today_str)
+    consistency = score_sleep_consistency(today_str)
 
     components = [
         ("morning_light", *score_morning_light(today_str, journal)),
-        ("meal_timing", *score_meal_timing(today_str)),
+        ("meal_timing", *meal),
         ("screen_wind_down", *score_screen_windown(journal)),
-        ("sleep_consistency", *score_sleep_consistency(today_str)),
+        ("sleep_consistency", *consistency),
     ]
+    result = _assemble(today_str, components, "a meal log, a journal entry, or enough sleep history")
+    public_components = [
+        ("morning_light", *score_morning_light(today_str, [])),
+        ("meal_timing", *meal),
+        ("sleep_consistency", *consistency),
+    ]
+    result["public"] = _assemble(today_str, public_components, "a meal log or enough sleep history")
+    return result
+
+
+def _assemble(today_str, components, returns_when):
+    """The score, category, prescription and priority over ``components`` (name, score, note, measured)."""
     measured = [c for c in components if c[3]]
     measured_count = len(measured)
+    n = len(components)
 
     if measured_count:
         total = round(sum(c[1] for c in measured) / (25 * measured_count) * 100)
@@ -399,13 +425,13 @@ def compute_circadian_score(today_str):
         total = None
 
     anchors_note = (
-        f" ({measured_count} of 4 anchors measured — the rest carried no signal and are not scored.)" if measured_count < 4 else ""
+        f" ({measured_count} of {n} anchors measured — the rest carried no signal and are not scored.)" if measured_count < n else ""
     )
     if total is None:
         category = "unmeasured"
         prescription = (
             "No circadian anchor carried a real signal today — no forecast is scored from defaults. "
-            "It returns when a meal log, a journal entry, or enough sleep history lands."
+            f"It returns when {returns_when} lands."
         )
     elif total >= 85:
         category = "optimal"
@@ -444,6 +470,26 @@ def compute_circadian_score(today_str):
     }
 
 
+def _encode_public(public):
+    """The journal-free record the public route serves (``/api/circadian`` reads only this)."""
+    return {
+        "score": _to_dec(public["score"]),
+        "category": public["category"],
+        "prescription": public["prescription"],
+        "weakest_component": public["weakest_component"],
+        "measured_count": Decimal(str(public.get("measured_count", 0))),
+        "components": {
+            name: {
+                "score": _to_dec(c["score"]),
+                "max": Decimal(str(c["max"])),
+                "note": c["note"],
+                "measured": bool(c.get("measured", True)),
+            }
+            for name, c in public["components"].items()
+        },
+    }
+
+
 def store_circadian_score(result):
     """Write to SOURCE#circadian | DATE#<today>."""
     date_str = result["date"]
@@ -468,6 +514,9 @@ def store_circadian_score(result):
             "measured": bool(comp_data.get("measured", True)),
         }
     item["components"] = components_enc
+    public = result.get("public")
+    if public is not None:
+        item["public"] = _encode_public(public)
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at
     try:
         from common.compute_metadata import tag_record
