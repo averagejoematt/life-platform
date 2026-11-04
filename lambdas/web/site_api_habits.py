@@ -3,9 +3,10 @@
 capture helpers and the P1.1 taxonomy. Handlers read facade state via `_g` (see freshness)."""
 
 from datetime import datetime, timedelta
-from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as AP  # owner ruling 2026-11-03: private habits (the journal) never published
+from common.habit_registry import habit_tier
 from experiment import habit_causality
 from experiment.phase_filter import with_phase_filter
 
@@ -276,6 +277,35 @@ def vice_streaks(*, _g) -> dict:
     )
 
 
+def _history_day(item: dict, habitify_by_date: dict, public_by_date: dict, registry: dict, tier0_private: bool) -> dict:
+    """One /api/habits history day from its habit_scores row, over PUBLIC habits only.
+
+    Owner ruling 2026-11-03: when a private habit sits in tier 0 the stored tier-0 counts include it, so
+    the day is recounted over the public tier-0 habits (the owner's registry tiers). Each group's share
+    is the day's PUBLIC habits (the Habitify statuses); the habit_scores row's legacy flat group_* fields
+    counted every habit and cannot be filtered, so they are no longer read."""
+    date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
+    t0_done = int(item.get("tier0_done", 0) or 0)
+    t0_total = int(item.get("tier0_total", 1) or 1)
+    t01_done = int(item.get("tier01_done", t0_done) or t0_done)
+    t01_total = int(item.get("tier01_total", t0_total) or t0_total)
+    if tier0_private:
+        t0_done, t0_total = t01_done, t01_total = _public_tier0_counts(public_by_date.get(date_str), registry)
+    t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
+    day = {
+        "date": date_str,
+        "tier0_pct": t0_pct,
+        "tier01_pct": round(t01_done / t01_total * 100) if t01_total else 0,
+        "t0_done": t0_done,
+        "t0_total": t0_total,
+        "perfect": t0_pct == 100,
+    }
+    group_data = habitify_by_date.get(date_str) or {}
+    if group_data:
+        day["groups"] = group_data
+    return day
+
+
 def habits(*, _g) -> dict:
     """
     GET /api/habits
@@ -314,15 +344,29 @@ def habits(*, _g) -> dict:
     _habit_agg: dict = {}  # P0.5: per-habit window adherence for the state taxonomy
     _causality: dict = {}  # #422: per-habit captured drivers + why-missed (both channels)
     _habit_days: dict = {}  # #1107: per-habit per-date status for the 30-day dot strip
+    # Owner ruling 2026-11-03: a PRIVATE habit (Morning/Evening Journal — common.activity_publication,
+    # by Habitify id) is omitted from every per-habit row AND from every aggregate below, so no
+    # public number — a group share, a keystone, a correlation, a count — moves with it.
+    registry = _habit_registry(_g)
+    public_by_date: dict = {}  # date -> that day's PUBLIC habit_statuses (the tier-0 recompute reads it)
     for hi in _decimal_to_float(hab_resp.get("Items", [])):
         date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
         by_group = hi.get("by_group", {})
-        if by_group and isinstance(by_group, dict):
-            # by_group[Group] = {completed, possible, pct, habits_done}
-            # pct is 0.0–1.0, convert to 0–100
-            habitify_by_date[date_key] = {g: round(float(v.get("pct", 0) or 0) * 100) for g, v in by_group.items() if isinstance(v, dict)}
+        statuses = hi.get("habit_statuses") or {}
+        public_statuses = AP.public_habit_statuses(statuses, registry)
+        public_by_date[date_key] = public_statuses
+        if statuses:
+            # The ingest's by_group counts every habit in a group; recompute each group's share
+            # (0-100) over the public habits only (the ingest's own group set when it wrote one).
+            # A row with no per-habit statuses cannot be filtered and contributes no group share.
+            groups = (
+                by_group.keys()
+                if isinstance(by_group, dict) and by_group
+                else {(st or {}).get("group") or "Other" for st in statuses.values()}
+            )
+            habitify_by_date[date_key] = AP.public_group_pcts(statuses, groups, registry)
         # Aggregate per-habit completed/scheduled across the window (state taxonomy).
-        for hname, st in (hi.get("habit_statuses") or {}).items():
+        for hname, st in public_statuses.items():
             if _is_blocked_vice(hname):
                 continue
             st = st if isinstance(st, dict) else {}
@@ -349,38 +393,17 @@ def habits(*, _g) -> dict:
 
     # #422: fold in the Claude-sourced reflection layer (secondary channel). Never
     # overwrites Habitify-sourced triggers/rewards — both channels coexist per habit.
-    for _rec in _query_reflection_records(ninety_days_ago, today, _g=_g):
-        _absorb_reflection(_causality, _rec)
+    #
+    # Owner confirmation 2026-11-03: free text is private by default even on a public habit ("public
+    # classification ... doesn't automatically authorize publishing associated free-text responses or
+    # private notes"). The in-app notes are a private FIELD (common.activity_publication
+    # .HABIT_STATUS_FIELDS — the statuses above carry public fields only, so no note reaches
+    # `_absorb_habitify_notes`), and the reflection layer is the owner's own words through MCP, so it
+    # is not read here at all. `causality` therefore stays absent until a free-text field is approved
+    # for publication; the reflections stay stored for the coaches.
+    tier0_private = _private_tier0_habits(registry)
 
-    history = []
-    for item in items:
-        date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
-        t0_done = int(item.get("tier0_done", 0) or 0)
-        t0_total = int(item.get("tier0_total", 1) or 1)
-        t01_done = int(item.get("tier01_done", t0_done) or t0_done)
-        t01_total = int(item.get("tier01_total", t0_total) or t0_total)
-        t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
-        t01_pct = round(t01_done / t01_total * 100) if t01_total else 0
-        # Per-group breakdown: prefer flat group_* fields on habit_scores;
-        # fall back to habitify by_group data if present
-        group_data = {}
-        for key, val in item.items():
-            if key.startswith("group_") and isinstance(val, (int, float)):
-                group_data[key.replace("group_", "")] = val
-        if not group_data and date_str in habitify_by_date:
-            group_data = habitify_by_date[date_str]
-
-        day = {
-            "date": date_str,
-            "tier0_pct": t0_pct,
-            "tier01_pct": t01_pct,
-            "t0_done": t0_done,
-            "t0_total": t0_total,
-            "perfect": t0_pct == 100,
-        }
-        if group_data:
-            day["groups"] = group_data
-        history.append(day)
+    history = [_history_day(item, habitify_by_date, public_by_date, registry, tier0_private) for item in items]
 
     # ── #422 EVR-03: cross-page daily-completion signals feed habit GROUP scores ──────
     # ONE signal per evidence page (habit_causality.CROSS_PAGE_SIGNALS), sourced from the
@@ -402,7 +425,7 @@ def habits(*, _g) -> dict:
         cross_signals_by_date = {}
         for cm in _decimal_to_float(cp_resp.get("Items", [])):
             cm_date = cm.get("date") or cm.get("sk", "").replace("DATE#", "")
-            sig = habit_causality.derive_cross_page_signals(cm.get("component_scores") or {})
+            sig = habit_causality.derive_cross_page_signals(cm.get("component_scores") or {}, public_only=True)
             if sig:
                 cross_signals_by_date[cm_date] = sig
         if cross_signals_by_date:
@@ -423,9 +446,15 @@ def habits(*, _g) -> dict:
     # Latest record for current streak
     history[-1] if history else {}
     latest_streak = 0
-    if items:
+    if items and not tier0_private:
         last_item = _decimal_to_float(items[-1])
         latest_streak = int(last_item.get("t0_perfect_streak") or 0)
+    elif history:
+        # The stored streak counted the private tier-0 habit too: the public run of perfect days.
+        for _d in reversed(history):
+            if not _d.get("perfect"):
+                break
+            latest_streak += 1
 
     # ── Day-of-week analysis (0=Mon ... 6=Sun)
     dow_sums = [0.0] * 7
@@ -637,10 +666,44 @@ def habits(*, _g) -> dict:
             # #422 EVR-01/02/03: causality capture surface + cross-page provenance.
             "causality_captured": causality_captured,
             "cross_page_days": cross_page_days,
-            "cross_page_signals": {p: s["group"] for p, s in habit_causality.CROSS_PAGE_SIGNALS.items()},
+            "cross_page_signals": {p: s["group"] for p, s in habit_causality.public_cross_page_signals().items()},
         },
         cache_seconds=3600,
     )
+
+
+def _habit_registry(_g) -> dict:
+    """The owner's habit registry (PROFILE#v1) — read for each habit's ``publication`` field and tier.
+    Fail-soft to {}: identity classification (Habitify ids) does not need it."""
+    try:
+        resp = _g["table"].get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
+        reg = ((resp or {}).get("Item") or {}).get("habit_registry") or {}
+        return reg if isinstance(reg, dict) else {}
+    except Exception as e:  # pragma: no cover — live DDB only
+        logger.warning("[handle_habits] registry read failed (non-fatal): %s", e)
+        return {}
+
+
+def _private_tier0_habits(registry: dict) -> bool:
+    """True when an active PRIVATE habit is in tier 0 (then the stored tier-0 counts include it)."""
+    for name, meta in (registry or {}).items():
+        if not isinstance(meta, dict) or meta.get("status", "active") != "active":
+            continue
+        if habit_tier(meta) == 0 and not AP.habit_is_public(name, None, meta):
+            return True
+    return False
+
+
+def _public_tier0_counts(public_statuses, registry: dict) -> tuple:
+    """(done, total) over the day's PUBLIC tier-0 habits (registry tiers; scheduled habits only)."""
+    done = total = 0
+    for name, st in (public_statuses or {}).items():
+        meta = (registry or {}).get(name)
+        if not isinstance(meta, dict) or habit_tier(meta) != 0 or not isinstance(st, dict) or not st.get("scheduled_today", True):
+            continue
+        total += 1
+        done += 1 if st.get("status") == "completed" else 0
+    return done, total
 
 
 def habit_registry(*, _g) -> dict:
@@ -667,13 +730,12 @@ def habit_registry(*, _g) -> dict:
             resp = table.get_item(Key={"pk": f"USER#{USER_ID}", "sk": "PROFILE#v1"})
             registry = resp.get("Item", {}).get("habit_registry", {})
             for name, meta in registry.items():
-                if _is_blocked_vice(name):
+                if _is_blocked_vice(name) or not AP.habit_is_public(name, None, meta):
                     continue
-                h = {"name": name, "group": meta.get("group") if isinstance(meta, dict) else None}
-                if isinstance(meta, dict):
-                    for k, v in meta.items():
-                        h[k] = float(v) if isinstance(v, Decimal) else v
-                habits.append(h)
+                # Owner confirmation 2026-11-03: fields are published only when classified — the
+                # registry entry is owner data (science notes, "why", board member, ...), so the
+                # fallback serves the name and group and never spreads the entry.
+                habits.append({"name": name, "group": meta.get("group") if isinstance(meta, dict) else None})
             source = "profile"
 
         # Stable group ordering: known P40-ish groups first, then alpha, "Other" last.

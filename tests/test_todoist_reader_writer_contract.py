@@ -205,6 +205,9 @@ NON_RECORD_KEYS = {
 # Every module the scan classes as a todoist-record reader. Reviewed once, then
 # held: a module joining this set is a code change that must be looked at.
 READER_INVENTORY = {
+    # Owner ruling 2026-11-03: names `todoist` as a PUBLIC activity source (a classification);
+    # reads NO record fields.
+    "common/activity_publication.py",
     # #2438: queries the todoist partition (Limit-1 last-write probe via the
     # registry) for pillar-absence evidence; reads NO record fields (its one
     # flagged token is a source name — see NON_RECORD_KEYS).

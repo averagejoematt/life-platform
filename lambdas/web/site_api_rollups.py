@@ -4,7 +4,10 @@ observatory_week / cycle_compare / survival. Reads facade state via `_g`."""
 
 from datetime import datetime, timedelta, timezone
 
-from common import stats_core  # #3549: the ONE sanctioned interval for a served proportion (ADR-105)
+from common import (
+    activity_publication as _activity_publication,  # owner ruling 2026-11-03
+    stats_core,  # #3549: the ONE sanctioned interval for a served proportion (ADR-105)
+)
 from common.digest_utils import filter_day_rows
 
 from web.site_api_common import (
@@ -19,7 +22,9 @@ from web.site_api_common import (
     logger,
 )
 
-_ENGAGEMENT_SOURCES = ("withings", "macrofactor", "notion")
+# Owner ruling 2026-11-03: engagement runs, survival odds and the cycle tables are computed over
+# PUBLIC sources only (common.activity_publication) — a journal entry must not end or extend a run.
+_ENGAGEMENT_SOURCES = tuple(_activity_publication.public_sources(("withings", "macrofactor", "notion")))
 
 
 _COLLAPSE_GAP = 4
@@ -320,6 +325,38 @@ def changes_since(qs: dict = None, *, _g) -> dict:
     )
 
 
+def _mind_week(_query_source, start_date: str, end_date: str, ip: bool) -> tuple:
+    """(summary, notable) for the mind domain's week.
+
+    Owner ruling 2026-11-03: the week's journal entries and the journal's mood read are private
+    activity, so while the journal source is not classified public this is the same empty shape every
+    week and nothing is read."""
+    if not _activity_publication.source_is_public("journal"):
+        summary = {
+            "primary": {"label": "Avg Mood", "value": None, "unit": "", "delta": 0, "delta_label": "", "trend": "flat", "sparkline": []},
+            "highlight": {"label": "Journal", "value": "private", "detail": "not published"},
+            "lowlight": {"label": "Energy", "value": "—", "detail": ""},
+        }
+        return summary, "The journal is private and is not summarised here."
+    items = _query_source("journal", start_date, end_date, include_pilot=ip)
+    moods = [float(i.get("mood_valence", 0)) for i in items if i.get("mood_valence") is not None]
+    avg_mood = sum(moods) / len(moods) if moods else 0
+    summary = {
+        "primary": {
+            "label": "Avg Mood",
+            "value": round(avg_mood, 2),
+            "unit": "",
+            "delta": 0,
+            "delta_label": "",
+            "trend": "flat",
+            "sparkline": [round(m, 2) for m in moods],
+        },
+        "highlight": {"label": "Journal Entries", "value": str(len(items)), "detail": "this week"},
+        "lowlight": {"label": "Energy", "value": "—", "detail": ""},
+    }
+    return summary, f"{len(items)} journal entries this week"
+
+
 def observatory_week(qs: dict = None, *, _g) -> dict:
     """GET /api/observatory_week?domain=sleep[&date=YYYY-MM-DD] — 7-day domain summary.
 
@@ -565,24 +602,7 @@ def observatory_week(qs: dict = None, *, _g) -> dict:
             notable = f"Average time-in-range {round(avg_tir)}% this week"
 
         elif domain == "mind":
-            items = _query_source("journal", start_date, end_date, include_pilot=ip)
-            moods = [float(i.get("mood_valence", 0)) for i in items if i.get("mood_valence") is not None]
-            avg_mood = sum(moods) / len(moods) if moods else 0
-
-            summary = {
-                "primary": {
-                    "label": "Avg Mood",
-                    "value": round(avg_mood, 2),
-                    "unit": "",
-                    "delta": 0,
-                    "delta_label": "",
-                    "trend": "flat",
-                    "sparkline": [round(m, 2) for m in moods],
-                },
-                "highlight": {"label": "Journal Entries", "value": str(len(items)), "detail": "this week"},
-                "lowlight": {"label": "Energy", "value": "—", "detail": ""},
-            }
-            notable = f"{len(items)} journal entries this week"
+            summary, notable = _mind_week(_query_source, start_date, end_date, ip)
 
         elif domain == "physical":
             items = _query_source("withings", start_date, end_date, include_pilot=ip)
@@ -830,7 +850,7 @@ def survival(*, _g) -> dict:
                 "longest_run_days": odds["longest_run_days"],
                 "method": odds["method"],
                 "current_silent_days": silent_now,
-                "collapse_definition": f"{_COLLAPSE_GAP}+ consecutive days with no weigh-in, food log, or journal entry",
+                "collapse_definition": f"{_COLLAPSE_GAP}+ consecutive days with no weigh-in or food log",
                 "cycles": cycles,
                 "in_progress_note": in_progress_note,
                 # #3549: derived from the same counts served above — a literal
@@ -838,7 +858,7 @@ def survival(*, _g) -> dict:
                 "confidence": odds["confidence"],
                 "note": (
                     "The model handicapping its own human. Engagement counts only deliberate "
-                    "acts — weigh-ins, food logs, journal entries — never passive wearable data. "
+                    "acts — weigh-ins and food logs (the journal is private and is not counted) — never passive wearable data. "
                     "Treat the probability as a mirror, not a forecast."
                 ),
             },

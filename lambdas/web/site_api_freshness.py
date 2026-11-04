@@ -10,6 +10,7 @@ from common.pacific_time import (  # #1964/#3257: THE one Pacific frame + parser
     PACIFIC as PT,
     parse_iso_utc,
 )
+from content.engagement_core import PUBLIC_PROJECTION_KEY  # owner ruling 2026-11-03: /api/presence serves the public projection only
 from experiment.phase_filter import singleton_visible, with_phase_filter
 from health import instrument_presence  # #4217: the ONE liveness derivation — the coach absence gate reads these same functions
 from ingestion.source_registry import SOURCE_REGISTRY, availability_facet, caveated_source_ids  # #3615/#3516: one absence story
@@ -623,6 +624,13 @@ def presence(*, _g) -> dict:
         rec = {}
 
     rec = _decimal_to_float(rec)
+    # Owner ruling 2026-11-03: serve ONLY the record's public projection — the presence state computed
+    # over the public channels (content.engagement_core.compute_public_presence). The full record counts
+    # the journal channel (its gap, its quiet mark, its share of the quiet count and of the planned-pause
+    # window), so none of it is read here. A record written before the projection existed serves the
+    # honest "not available" state until the next engagement compute writes one (fail closed).
+    pub = rec.get(PUBLIC_PROJECTION_KEY) if rec else None
+    rec = pub if isinstance(pub, dict) else {}
     presence_class = rec.get("presence_class") or "present"
     returned = bool(rec.get("returned"))
     in_lull = presence_class in _PRESENCE_LOUD

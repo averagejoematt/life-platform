@@ -500,10 +500,15 @@ def compute_and_store_engagement():
     aborts the adaptive_mode run."""
     from content.engagement_core import (
         MANUAL_CHANNELS,
+        PUBLIC_CHANNELS,
+        PUBLIC_PROJECTION_KEY,
         WEARABLES,
         channel_counts_as_logged,
         channel_presence_fields,
         compute_presence,
+        compute_public_presence,
+        public_counts_as_logged,
+        public_presence_fields,
     )
 
     today = _engagement_reference_today()
@@ -550,6 +555,31 @@ def compute_and_store_engagement():
     signal = compute_presence(
         today,
         channel_dates,
+        wearable_latest=wearable_latest,
+        weight_series=weight_series,
+        sick_days=sick_days,
+        travel_days=travel_days,
+        experiment_start=experiment_start,
+    )
+    # Owner ruling 2026-11-03: the PUBLIC projection — the same computation over the public channels
+    # only, each counted by its public predicate (a private habit's completion never makes a public
+    # "habits logged" day). /api/presence serves this sub-record and nothing else; the full signal
+    # above stays for the coaches and the brief.
+    public_dates = {}
+    for src in PUBLIC_CHANNELS:
+        if public_presence_fields(src) == channel_presence_fields(src):
+            public_dates[src] = channel_dates.get(src) or []
+        else:
+            public_dates[src] = _log_dates(
+                src,
+                today,
+                attrs=public_presence_fields(src),
+                predicate=lambda item, _s=src: public_counts_as_logged(_s, item),
+                floor=experiment_start,
+            )
+    signal[PUBLIC_PROJECTION_KEY] = compute_public_presence(
+        today,
+        public_dates,
         wearable_latest=wearable_latest,
         weight_series=weight_series,
         sick_days=sick_days,

@@ -49,15 +49,20 @@ def test_blocked_vices_filtered_from_habit_names():
 
 
 def test_habits_from_habitify_filters_and_groups(monkeypatch):
+    from common import activity_publication as AP
+
+    _PUB = sorted(AP.PUBLIC_HABIT_IDS)
     _set_filter()
     item = {
         "pk": "USER#matthew#SOURCE#habitify",
         "sk": "DATE#2026-06-14",
         "habit_statuses": {
-            "Morning sunlight": {"group": "Wellbeing", "periodicity": "daily", "scheduled_today": True},
-            "Creatine 5g": {"group": "Supplements", "periodicity": "daily"},
-            "No fizzlewick": {"group": "Discipline", "periodicity": "daily"},
-            "No grumbleflax": {"group": "Discipline", "periodicity": "daily"},
+            # Classified-public ids (owner ruling 2026-11-03: an unclassified habit is not published) —
+            # the blocked names carry one too, so the CONTENT filter is what drops them.
+            "Morning sunlight": {"group": "Wellbeing", "periodicity": "daily", "scheduled_today": True, "habit_id": _PUB[0]},
+            "Creatine 5g": {"group": "Supplements", "periodicity": "daily", "habit_id": _PUB[1]},
+            "No fizzlewick": {"group": "Discipline", "periodicity": "daily", "habit_id": _PUB[2]},
+            "No grumbleflax": {"group": "Discipline", "periodicity": "daily", "habit_id": _PUB[3]},
         },
     }
     monkeypatch.setattr(data, "table", FakeDdbTable(rows=[item]))

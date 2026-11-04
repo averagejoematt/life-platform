@@ -74,18 +74,17 @@ const dims: Dim[] = [
     return f != null ? `Heart-rate variability. Week one averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
   }),
   {
+    // Owner ruling 2026-11-03: journal activity is private — whether, when and how often he writes.
+    // The tile carries no count, date or bar, and it never counts as a measured dimension.
     id: "mind",
     label: "Mind",
     instrument: "journal",
-    value: portrait.mind?.state === "ok" && portrait.mind.entries_total != null ? String(portrait.mind.entries_total) : null,
-    unit: portrait.mind?.entries_total === 1 ? "entry" : "entries",
-    bars: portrait.mind?.weeks || null,
-    note:
-      portrait.mind?.state === "ok"
-        ? `${edition?.day_n != null ? `in ${edition.day_n} days` : "so far"}${portrait.mind.last ? `, the last on ${dayInWords(portrait.mind.last, { short: true })}` : ""}. Counts only; the words stay private. The quietest signal, and the one the coaches guess at most.`
-        : "The journal's counts were not served at build time.",
+    value: null,
+    unit: "",
+    bars: null,
+    note: portrait.mind?.text || "The journal is private: what is written, and whether or when, is not published.",
     href: null,
-    measured: portrait.mind?.state === "ok" && (portrait.mind.entries_total || 0) > 0,
+    measured: false,
   },
   {
     id: "connection",
@@ -98,17 +97,15 @@ const dims: Dim[] = [
       portrait.connection?.state === "ok"
         ? portrait.connection.interactions_30d
           ? `${portrait.connection.interactions_30d} logged in the last thirty days; the depth of them is not published.`
-          : "None logged in the last thirty days. The journal went quiet; so did this."
+          : "None logged in the last thirty days."
         : "Not served at build time.",
     href: null,
     measured: false,
   },
   { id: "purpose", label: "Purpose", instrument: "not yet", value: null, unit: "", bars: null, note: portrait.purpose?.text || "No instrument for this yet. Deliberately an empty frame.", href: null, measured: false },
 ];
-// Mind counts as measured only when the journal has entries in the last thirty days; two entries
-// in fifty-six days is "barely" — the tile says so rather than implying a measured dimension.
-const barely = dims.filter((d) => d.id === "mind" && d.measured && !(portrait.mind?.entries_30d > 0)).length;
-const measured = dims.filter((d) => d.measured).length - barely;
+// The measured count never depends on the journal: Mind is never "measured" on a public page.
+const measured = dims.filter((d) => d.measured).length;
 const WORDS = ["none", "one", "two", "three", "four", "five", "six"];
 function barSvg(bars: (number | null)[] | null, faint = false) {
   const W = 96;
@@ -184,8 +181,8 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           }
         </div>
         <p class="serif muted" style="font-size:16px;line-height:1.5">
-          {WORDS[measured] ? WORDS[measured][0].toUpperCase() + WORDS[measured].slice(1) : measured} {measured === 1 ? "dimension" : "dimensions"} measured,{barely ? ` ${WORDS[barely]} barely,` : ""}{" "}
-          {WORDS[6 - measured - barely] || 6 - measured - barely} not yet. That ratio is the project: the body is the easy part to instrument.
+          {WORDS[measured] ? WORDS[measured][0].toUpperCase() + WORDS[measured].slice(1) : measured} {measured === 1 ? "dimension" : "dimensions"} measured,{" "}
+          {WORDS[6 - measured] || 6 - measured} not yet. That ratio is the project: the body is the easy part to instrument.
         </p>
       </figure>
     </div>

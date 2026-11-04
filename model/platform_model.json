@@ -925,16 +925,6 @@
   },
   "contracts": [
     {
-      "consumer": "web.site_api_ai_context::_ask_fetch_computed_reads",
-      "enrolled": true,
-      "floor": true,
-      "mutations": 3,
-      "name": "adaptive_mode -> /api/ask grounding reads",
-      "note": "The runtime `ingestion_validator` schema for adaptive_mode requires pk/sk/date/engagement_score/brief_mode/computed_at \u2014 it does NOT require `mode_label` or `factors`, and `mode_label` is the key the entire consumer block is gated on. Every AI answer loses its precomputed 'what drove today' silently.",
-      "partition": "adaptive_mode",
-      "producer": "compute.adaptive_mode_lambda::store_adaptive_mode"
-    },
-    {
       "consumer": "coach.coach_observatory_renderer::journaling_prompt_for_domain",
       "enrolled": true,
       "floor": true,
@@ -1028,11 +1018,21 @@
       "consumer": "web.site_api_freshness::presence",
       "enrolled": true,
       "floor": true,
-      "mutations": 4,
+      "mutations": 5,
       "name": "engagement_state -> /api/presence",
       "note": "The reader defaults `presence_class` to 'present' on an absent field \u2014 a producer rename reads as 'Matthew is fine' rather than as an error. Exactly the cycle-4 failure (#914: fourteen silent days no standing surface showed).",
       "partition": "engagement_state",
-      "producer": "content.engagement_core::compute_presence"
+      "producer": "content.engagement_core::compute_public_presence"
+    },
+    {
+      "consumer": "web.site_api_ai_context::_ask_fetch_computed_reads",
+      "enrolled": true,
+      "floor": true,
+      "mutations": 3,
+      "name": "engagement_state public projection -> /api/ask grounding presence",
+      "note": "Owner ruling 2026-11-03: the public AI surface is grounded on the presence state computed over PUBLIC channels only; reading the full record would ground public answers on the private journal channel.",
+      "partition": "engagement_state",
+      "producer": "content.engagement_core::compute_public_presence"
     },
     {
       "consumer": "web.site_api_character::_public_input_manifest",
@@ -5038,21 +5038,7 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_fulfillment.py",
-      "partition": "flourishing",
-      "via": "local-seam"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_fulfillment.py",
       "partition": "interactions",
-      "via": "local-seam"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_fulfillment.py",
-      "partition": "notion",
       "via": "local-seam"
     },
     {
@@ -5326,34 +5312,6 @@
       "lambda": null,
       "module": "lambdas/web/site_api_mind.py",
       "partition": "interactions",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_mind.py",
-      "partition": "journal_analysis",
-      "via": "pk"
-    },
-    {
-      "direction": "unknown",
-      "lambda": null,
-      "module": "lambdas/web/site_api_mind.py",
-      "partition": "journal_analysis",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_mind.py",
-      "partition": "notion",
-      "via": "pk"
-    },
-    {
-      "direction": "unknown",
-      "lambda": null,
-      "module": "lambdas/web/site_api_mind.py",
-      "partition": "notion",
       "via": "pk"
     },
     {
@@ -8323,7 +8281,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 798,
+      "edges": 792,
       "lambdas": 107,
       "mcp_tool_modules": 39,
       "mcp_tools": 90,
@@ -8337,9 +8295,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 393,
-        "sites_resolved": 1003,
-        "sites_total": 1396
+        "sites_dynamic": 395,
+        "sites_resolved": 995,
+        "sites_total": 1390
       },
       "schedule_resolution": {
         "dynamic": 0,

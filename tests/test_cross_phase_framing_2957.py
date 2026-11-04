@@ -208,13 +208,13 @@ class TestVitalsLifetimeGapCounters:
         assert lift["spans_cycles"] is False
         assert lift["label"] == "No training logged — 6 days"
 
-    def test_journal_gap_takes_the_same_frame_in_glyph_and_narrative(self, monkeypatch):
-        p, genesis = _pulse(monkeypatch, day_n=5, last_journal_days_ago=20, whoop=True)
-        j = p["glyphs"]["journal"]
-        assert j["spans_cycles"] is True
-        assert "lifetime" in j["label"] and genesis in j["label"]
-        # The prose narrative repeats the claim, so it repeats the frame.
-        assert "lifetime" in p["narrative"], p["narrative"]
+    def test_a_journal_gap_is_never_framed_because_it_is_never_published(self, monkeypatch):
+        """Owner ruling 2026-11-03: journal activity is private — the pulse carries no journal glyph and
+        its narrative never names a journal gap, so there is no frame to take (this test pinned the
+        #2957 lifetime frame on the journal gap until the gap stopped being public)."""
+        p, _genesis = _pulse(monkeypatch, day_n=5, last_journal_days_ago=20, whoop=True)
+        assert "journal" not in p["glyphs"]
+        assert "journal" not in p["narrative"].lower(), p["narrative"]
 
 
 # ── /coaching/lab-notes/: an archived reaction says which cycle it is from ───

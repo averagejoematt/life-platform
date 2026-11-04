@@ -309,7 +309,8 @@ export function mindInvitingAbsence(m) {
 // the pillar reads as honestly FORMING — shown with its inputs, never hidden behind a number.
 export function mindPillarDecomposed(m) {
   const inputs = [
-    { label: "reflection — journal entries", val: m.journal_entries_30d, has: (m.journal_entries_30d || 0) > 0 },
+    // Owner ruling 2026-11-03: journal activity is private — the row says so, with no count.
+    { label: "reflection — the journal", val: "private, not published", has: true },
     { label: "mood — daily check-ins", val: m.mood_entries_count, has: (m.mood_entries_count || 0) > 0 },
     { label: "restraint — temptations resisted", val: m.resist_rate_pct != null ? m.resist_rate_pct + "%" : null, has: m.resist_rate_pct != null },
     { label: "depth — meaningful conversation", val: m.meaningful_pct ? m.meaningful_pct + "%" : null, has: (m.meaningful_pct || 0) > 0 },

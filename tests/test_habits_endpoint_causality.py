@@ -17,8 +17,13 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from common import activity_publication as AP  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_data as data  # noqa: E402
+
+# Owner ruling 2026-11-03 (fail closed): a habit is published only when classified — these
+# synthetic habits borrow classified-public ids (opaque; the names are the fixture's own).
+_ID = dict(zip(("Protein Target", "Meditate", "Stretch"), sorted(AP.PUBLIC_HABIT_IDS)))
 
 
 def _yesterday():
@@ -66,11 +71,12 @@ def _rows():
                     "status": "completed",
                     "group": "Nutrition",
                     "scheduled_today": True,
+                    "habit_id": _ID["Protein Target"],
                     "notes": ["trigger: post-workout shake", "reward: felt full all morning"],
                     "note_channel": "habitify_note",
                 },
-                "Meditate": {"status": "failed", "group": "Growth", "scheduled_today": True},
-                "Stretch": {"status": "failed", "group": "Recovery", "scheduled_today": True},
+                "Meditate": {"status": "failed", "group": "Growth", "scheduled_today": True, "habit_id": _ID["Meditate"]},
+                "Stretch": {"status": "failed", "group": "Recovery", "scheduled_today": True, "habit_id": _ID["Stretch"]},
             },
         },
         # Claude-reflection record: the why for the missed Meditate day (Stretch stays empty)
@@ -101,19 +107,27 @@ def _call(monkeypatch):
     return json.loads(resp["body"])
 
 
-def test_captured_trigger_and_reward_render_verbatim(monkeypatch):
-    body = _call(monkeypatch)
-    by_name = {h["name"]: h for h in body["per_habit"]}
-    cz = by_name["Protein Target"]["causality"]
-    assert cz["trigger"] == {"text": "post-workout shake", "channel": "habitify_note"}
-    assert cz["reward"] == {"text": "felt full all morning", "channel": "habitify_note"}
+# Owner confirmation 2026-11-03: "Public classification ... doesn't automatically authorize publishing
+# associated free-text responses or private notes." The in-app notes and the reflection layer are free
+# text — private by default (common.activity_publication.HABIT_STATUS_FIELDS) — so the #422 causality
+# capture is no longer served publicly. These tests were its render contract; they now pin the hold.
 
 
-def test_why_missed_attaches_from_reflection_channel(monkeypatch):
+def test_in_app_note_text_is_not_served_even_on_a_public_habit(monkeypatch):
     body = _call(monkeypatch)
     by_name = {h["name"]: h for h in body["per_habit"]}
-    wm = by_name["Meditate"]["causality"]["why_missed"]
-    assert wm == [{"date": _yesterday(), "reason": "was traveling, red-eye flight", "channel": "claude_reflection"}]
+    assert set(by_name) == {"Protein Target", "Meditate", "Stretch"}  # the habits themselves stay public
+    assert "causality" not in by_name["Protein Target"]
+    raw = json.dumps(body)
+    assert "post-workout shake" not in raw and "felt full all morning" not in raw
+
+
+def test_the_reflection_layer_is_not_served(monkeypatch):
+    body = _call(monkeypatch)
+    by_name = {h["name"]: h for h in body["per_habit"]}
+    assert "causality" not in by_name["Meditate"]
+    assert "red-eye" not in json.dumps(body)
+    assert body["causality_captured"] == 0
 
 
 def test_uncaptured_habit_stays_honestly_empty(monkeypatch):
@@ -126,11 +140,14 @@ def test_uncaptured_habit_stays_honestly_empty(monkeypatch):
 def test_cross_page_fills_gap_but_never_double_counts(monkeypatch):
     body = _call(monkeypatch)
     day = next(h for h in body["history"] if h["date"] == _yesterday())
-    # Tracker's own Nutrition score untouched (nutrition component 90 must NOT replace 75).
-    assert day["groups"]["Nutrition"] == 75
+    # The tracker's own Nutrition share (its PUBLIC habits: Protein Target completed) is untouched —
+    # the nutrition component 90 must NOT replace it.
+    assert day["groups"]["Nutrition"] == 100
     # Movement page signal fills the empty Performance group-day, tagged as borrowed.
     assert day["groups"]["Performance"] == 82
     assert day["groups_cross_page"] == {"Performance": 82}
     assert body["cross_page_days"] == 1
-    # The wiring registry itself is served for transparency: one signal per page.
-    assert body["cross_page_signals"] == {p: s["group"] for p, s in data.habit_causality.CROSS_PAGE_SIGNALS.items()}
+    # The wiring registry itself is served for transparency: one signal per PUBLIC page (the journal's
+    # Mind signal is private activity, owner ruling 2026-11-03).
+    assert body["cross_page_signals"] == {p: s["group"] for p, s in data.habit_causality.public_cross_page_signals().items()}
+    assert "mind" not in body["cross_page_signals"]

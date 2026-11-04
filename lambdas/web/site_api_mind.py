@@ -10,10 +10,8 @@ site_api_common (identical binding semantics to the pre-split facade).
 """
 
 from datetime import datetime, timedelta
-from typing import cast
 
 from boto3.dynamodb.conditions import Key
-from coach import audience_guard  # #4392: public theme lists go through public_themes
 from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
@@ -24,76 +22,30 @@ from web.site_api_common import (
     _ok,
 )
 
+JOURNAL_PRIVATE_TEXT = "The journal is private: what is written, and whether or when, is not published."
+
 
 def journal_analysis(*, _g) -> dict:
     """
-    GET /api/journal_analysis
-    Returns 90-day journal theme analysis from cache partition.
+    GET /api/journal_analysis — PRIVATE since the owner's ruling of 2026-11-03.
+
+    "Treat journal activity and journal-derived metadata as private by default, including structured
+    data." Every field this route served was journal-derived: the per-day themes and sentiment, the
+    analysed-entry dates (whether and when he wrote), the entry count and the theme percentages over
+    it. ``journal_analysis`` is a private source family (``common.narrative_provenance``), so the
+    route reads nothing and serves the honest empty shape — the same body whatever the journal holds.
+    The analysis rows stay stored for the owner's own tools.
     Cache: 3600s.
     """
-    table = _g["table"]
-    _experiment_date = _g["_experiment_date"]
     today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
-    d90 = _experiment_date(90)
-
-    ja_pk = f"{USER_PREFIX}journal_analysis"
-    resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot journal analysis
-                "KeyConditionExpression": Key("pk").eq(ja_pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}"),
-                "ScanIndexForward": True,
-            }
-        )
-    )
-    items = _decimal_to_float(resp.get("Items", []))
-
-    # Build theme frequency counts
-    theme_counts: dict[str, int] = {}
-    for item in items:
-        for theme in audience_guard.public_themes(item.get("themes")):  # #4392: count the reader label
-            theme_counts[theme] = theme_counts.get(theme, 0) + 1
-
-    total = len(items)
-    top_themes = sorted(
-        [{"theme": k, "count": v, "pct": round(v / max(total, 1) * 100)} for k, v in theme_counts.items()],
-        key=lambda x: cast(int, x["count"]),
-        reverse=True,
-    )[:8]
-
-    # Sentiment trend — rolling 7-day average
-    sentiment_trend = []
-    daily_scores = [(item.get("date", ""), float(item.get("sentiment_score", 0))) for item in items]
-    for i, (date, _) in enumerate(daily_scores):
-        window = [s for _, s in daily_scores[max(0, i - 6) : i + 1]]
-        sentiment_trend.append(
-            {
-                "date": date,
-                "avg_sentiment": round(sum(window) / len(window), 3) if window else 0,
-            }
-        )
-
-    daily_themes = []
-    for item in items:
-        # J-8 (#504): one_line_summary is a per-day journal digest — never
-        # public. Aggregates (themes, sentiment) are the public surface.
-        daily_themes.append(
-            {
-                "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
-                "dominant_theme": item.get("dominant_theme", "other"),
-                "themes": audience_guard.public_themes(item.get("themes")),  # #4392
-                "sentiment_score": float(item.get("sentiment_score", 0)),
-                "sentiment_label": item.get("sentiment_label", "neutral"),
-                "word_count": item.get("word_count", 0),
-            }
-        )
-
     return _ok(
         {
-            "daily_themes": daily_themes,
-            "top_themes": top_themes,
-            "total_analyzed": total,
-            "date_range": {"start": d90, "end": today},
-            "sentiment_trend": sentiment_trend,
+            "daily_themes": [],
+            "top_themes": [],
+            "total_analyzed": None,
+            "date_range": {"start": None, "end": today},
+            "sentiment_trend": [],
+            "private": JOURNAL_PRIVATE_TEXT,
         },
         cache_seconds=3600,
     )
@@ -234,20 +186,8 @@ def mind_overview(*, _g) -> dict:
     resisted = sum(1 for t in temptations if t.get("resisted"))
     resist_rate = round(resisted / total_temptations * 100) if total_temptations else None
 
-    # ── 6. Journal entry count (as journaling progress signal) ──
-    journal_pk = f"{USER_PREFIX}notion"
-    try:
-        j_resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot journal records
-                    "KeyConditionExpression": Key("pk").eq(journal_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}~"),
-                    "Select": "COUNT",
-                }
-            )
-        )
-        journal_count = j_resp.get("Count", 0)
-    except Exception:
-        journal_count = 0
+    # ── 6. (retired) The journal entry count — journal activity is private (owner ruling 2026-11-03);
+    #    the partition is not read here.
 
     # ── 7. Meditation / breathwork (Apple Health) ──
     ah_mind = _query_source("apple_health", d30, today)
@@ -306,25 +246,8 @@ def mind_overview(*, _g) -> dict:
             day_entry["streaks"] = streaks
         vice_timeline.append(day_entry)
 
-    # ── 9. Energy level from journal analysis (latest entry) ──
-    energy_level = None
-    try:
-        ja_resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot journal analysis
-                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}journal_analysis")
-                    & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
-                    "ScanIndexForward": False,
-                    "Limit": 5,
-                }
-            )
-        )
-        ja_items = _decimal_to_float(ja_resp.get("Items", []))
-        energy_vals = [i.get("energy_level") for i in ja_items if i.get("energy_level")]
-        if energy_vals:
-            energy_level = energy_vals[0]  # Most recent
-    except Exception:
-        pass
+    # ── 9. (retired) The energy level read from the journal analysis — journal-derived, private
+    #    (owner ruling 2026-11-03); not read.
 
     return _ok(
         {
@@ -332,14 +255,12 @@ def mind_overview(*, _g) -> dict:
                 "mind_pillar": mind_pillar,
                 "avg_valence": avg_valence,
                 "mood_entries_count": len(mood_entries),
-                "journal_entries_30d": journal_count,
                 "resist_rate_pct": resist_rate,
                 "total_temptations_90d": total_temptations,
                 "resisted_90d": resisted,
                 "total_interactions_30d": total_interactions,
                 "meaningful_pct": meaningful_pct,
                 "depth_counts": depth_counts,
-                "energy_level": energy_level,
             },
             "vice_streaks": vice_data,
             "vice_timeline": vice_timeline,

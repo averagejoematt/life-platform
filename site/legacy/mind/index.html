@@ -597,7 +597,7 @@
       var vices = (payload.vice_streaks || []).filter(function(v){ return !isBlocked(v.name); });
       var holding = vices.filter(function(v){ return v.holding; }).length;
       var resist = m.resist_rate_pct;
-      var jc = m.journal_entries_30d || 0;
+      // Owner ruling 2026-11-03: journal activity is private — the API no longer serves a journal count.
 
       if (latest && latest.label) {
         narr = 'Mood read as ' + latest.label.toLowerCase() + '.';
@@ -609,7 +609,6 @@
       var addons = [];
       if (vices.length) addons.push(holding + ' of ' + vices.length + ' vice streaks holding');
       if (resist != null) addons.push('willpower resisting at ' + resist + '%');
-      if (jc) addons.push(jc + ' journal entries in 30 days');
       if (addons.length) narr += ' ' + addons.join(', ') + '.';
 
       document.getElementById('m-narrative').textContent = '"' + timePrefix() + narr + '"';
@@ -720,17 +719,7 @@
         });
       }
 
-      // Journal cadence
-      var jc = m.journal_entries_30d || 0;
-      rows.push({
-        name: 'Journal',
-        context: 'Entries in last 30 days',
-        value: jc,
-        unit: '/ 30',
-        spark: null,
-        state: jc >= 20 ? 'green' : jc >= 10 ? 'amber' : 'red',
-        href: '/chronicle/'
-      });
+      // Journal cadence: private (owner ruling 2026-11-03) — no row, no count.
 
       // Vice streaks holding
       if (vices.length) {

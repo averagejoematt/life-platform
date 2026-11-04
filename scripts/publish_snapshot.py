@@ -45,7 +45,6 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from datetime import date
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -153,8 +152,7 @@ LIVE_ENDPOINTS = {
     "chapters": "/api/chapters",  # the program-week states (PR #5538); optional until it is live
     "series_catalogue": "/api/series",  # the publishable metric keys (PR #5538)
     "pairs": "/api/pairs",  # the precomputed pair statistics for the data room (PR #5538)
-    "mind_overview": "/api/mind_overview",  # journal and interaction COUNTS (never text) for the portrait's Mind and Connection
-    "journal_analysis": "/api/journal_analysis",  # the analysed-entry dates, for the Mind tile's weekly bars
+    "mind_overview": "/api/mind_overview",  # the logged-interaction counts for the portrait's Connection tile
     "journey": "/api/journey",  # the weight story's published rate, interval and projection (#5579)
     "forecast": "/api/forecast",  # the platform's short forecasts and their coverage (#5579)
     "physical_overview": "/api/physical_overview",  # the Journey's body: the DEXA baseline, blood pressure, tape (#5583)
@@ -169,7 +167,6 @@ OPTIONAL_ENDPOINTS = (
     "series_catalogue",
     "pairs",
     "mind_overview",
-    "journal_analysis",
     "journey",
     "forecast",
     "physical_overview",
@@ -920,32 +917,20 @@ def _live_essays(ctx: LiveContext) -> None:
         )
 
 
+# Owner ruling 2026-11-03: journal activity is private — whether, when and how often he writes. The
+# portrait's Mind tile carries no journal number, date or bar, and the snapshot does not fetch one.
+MIND_PRIVATE_TEXT = "The journal is private: what is written, and whether or when, is not published."
+
+
 def _portrait_block(ctx: LiveContext, start: str | None) -> dict:
-    """The portrait's three un-instrumented dimensions (Stage 2 Fig. 1): Mind from the journal's
-    published COUNTS, Connection from the logged-interaction counts, Purpose with no instrument.
-    Body, Sleep and Recovery come from the series files. Counts only — the journal's text never
-    leaves the platform; a missing endpoint leaves the tile honestly absent."""
+    """The portrait's three un-instrumented dimensions (Stage 2 Fig. 1): Mind (the journal — private,
+    no figure of any kind), Connection from the logged-interaction counts, Purpose with no
+    instrument. Body, Sleep and Recovery come from the series files. ``start`` is kept for the
+    signature; no journal date is read (owner ruling 2026-11-03)."""
     mind = ((ctx.fetched.get("mind_overview") or {}).get("mind")) or {}
-    ja = ctx.fetched.get("journal_analysis") or {}
-    dates = sorted({str(d.get("date")) for d in (ja.get("daily_themes") or []) if ISO_DAY.match(str(d.get("date") or ""))})
-    weeks = [0] * 8
-    if start and dates:
-        s0 = date.fromisoformat(start)
-        for d in dates:
-            w = (date.fromisoformat(d) - s0).days // 7
-            if 0 <= w < 8:
-                weeks[w] += 1
-    total = ja.get("total_analyzed") if isinstance(ja.get("total_analyzed"), int) else (len(dates) or None)
     interactions = mind.get("total_interactions_30d") if isinstance(mind.get("total_interactions_30d"), int) else None
     data = {
-        "mind": {
-            "state": "ok" if total is not None else "absent",
-            "entries_total": total,
-            "entries_30d": mind.get("journal_entries_30d") if isinstance(mind.get("journal_entries_30d"), int) else None,
-            "first": dates[0] if dates else None,
-            "last": dates[-1] if dates else None,
-            "weeks": weeks if dates else None,
-        },
+        "mind": {"state": "private", "text": MIND_PRIVATE_TEXT},
         "connection": {
             "state": "ok" if interactions is not None else "absent",
             "interactions_30d": interactions,
@@ -953,12 +938,12 @@ def _portrait_block(ctx: LiveContext, start: str | None) -> dict:
         },
         "purpose": {"state": "absent", "text": "No instrument for this yet. Deliberately an empty frame."},
     }
-    ok = any(v.get("state") == "ok" for k, v in data.items() if k != "purpose")
+    ok = any(v.get("state") == "ok" for k, v in data.items() if k not in ("purpose", "mind"))
     return {
         "state": "ok" if ok else "absent",
         "as_of": ctx.as_of,
-        "source": ["/api/journal_analysis", "/api/mind_overview"],
-        "absent_text": None if ok else "The journal and interaction counts were not served at build time.",
+        "source": ["/api/mind_overview"],
+        "absent_text": None if ok else "The interaction counts were not served at build time.",
         "data": data,
     }
 
