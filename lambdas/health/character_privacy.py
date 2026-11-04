@@ -44,6 +44,75 @@ PRIVATE_SOURCE_COMPONENTS = {
 }
 
 
+# pillar -> the sources EVERY one of its components reads. A pillar whose sources are all non-public is
+# not published at all (owner rulings 2026-11-03/04: journal-derived values are private, and a public score
+# must not move when only private journal inputs change). Relationships reads only the journal and its
+# enrichment pass (character_engine: social quality, themes, the entry's mood read), so its value exists only
+# on days he wrote — publishing it would name those days. Public routes serve the HELD shape below instead,
+# the same on every day; the stored record keeps the real pillar for the owner's own tools.
+PRIVATE_SOURCE_PILLARS = {
+    "relationships": ("notion", "flourishing"),
+}
+
+PRIVATE_PILLAR_NOTE = "Not published: every input to this pillar is private."
+
+# The never-instrumented shape (a pillar with no data source): identical on every day, so it carries nothing.
+HELD_PILLAR: dict[str, Any] = {
+    "level": 1.0,
+    "raw_score": 50.0,
+    "level_score": 50.0,
+    "tier": "Foundation",
+    "data_coverage": 0.0,
+    "coverage_hold": True,
+    "not_instrumented": True,
+    "not_instrumented_note": PRIVATE_PILLAR_NOTE,
+    "xp_total": 0.0,
+    "xp_delta": 0.0,
+    "xp_earned": 0.0,
+    "xp_debt": 0.0,
+    "xp_buffer": 0.0,
+    "streak_above": 0.0,
+    "streak_below": 0.0,
+    "absent_behaviors": [],
+    "drivers": {"top": [], "dragging": [], "absent": [], "no_data": []},
+}
+
+
+def pillar_is_publishable(name: str) -> bool:
+    """False for a pillar every input of which is a non-public source (fail closed on an unclassified one)."""
+    srcs = PRIVATE_SOURCE_PILLARS.get(str(name))
+    if srcs is None:
+        return True
+    from common import activity_publication
+
+    return any(activity_publication.source_is_public(s) for s in srcs)
+
+
+def public_pillar(name: str, pillar: Any) -> Any:
+    """The pillar as a public surface may serve it: unchanged, or the constant held shape."""
+    if pillar_is_publishable(name):
+        return pillar
+    held = {k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v) for k, v in HELD_PILLAR.items()}
+    held["drivers"] = {"top": [], "dragging": [], "absent": [], "no_data": []}
+    if isinstance(pillar, dict) and pillar.get("tier_emoji") is not None:
+        held["tier_emoji"] = "🔨"
+    return held
+
+
+def public_sheet(record: Any) -> Any:
+    """A stored ``character_sheet`` record as every public route must read it: each unpublishable pillar
+    replaced by the held shape. Pure; the stored record is never changed. A route that reads the sheet for a
+    public answer reads it through here (``tests/test_character_private_pillars.py`` walks them)."""
+    if not isinstance(record, dict):
+        return record
+    out = dict(record)
+    for name in PRIVATE_SOURCE_PILLARS:
+        key = f"pillar_{name}"
+        if key in out:
+            out[key] = public_pillar(name, out[key])
+    return out
+
+
 def component_is_publishable(name: str) -> bool:
     """False for an owner-only component and for one computed from a non-public source."""
     if name in OWNER_ONLY_COMPONENTS:

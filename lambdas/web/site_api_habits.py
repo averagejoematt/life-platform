@@ -9,6 +9,7 @@ from common import activity_publication as AP  # owner ruling 2026-11-03: privat
 from common.habit_registry import habit_tier
 from experiment import habit_causality
 from experiment.phase_filter import with_phase_filter
+from health import character_privacy  # owner rulings 2026-11-03/04: private-source pillars are served held
 
 from web.site_api_common import (
     PT,
@@ -511,7 +512,7 @@ def habits(*, _g) -> dict:
                 }
             )
         )
-        cs_items = _decimal_to_float(cs_resp.get("Items", []))
+        cs_items = [character_privacy.public_sheet(i) for i in _decimal_to_float(cs_resp.get("Items", []))]
 
         # Build date → pillar sum (character health proxy)
         PILLARS_CS = [

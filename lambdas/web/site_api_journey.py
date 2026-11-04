@@ -28,6 +28,7 @@ from common.pacific_time import pacific_day_n  # #1955 — THE one PT day-index 
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058
 from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live
+    character_privacy,  # owner rulings 2026-11-03/04: private-source pillars are served held
     weight_trend,  # shared weekly-rate + projection
 )
 
@@ -297,7 +298,7 @@ def timeline(*, _g) -> dict:
     )
     level_events = []
     prev_level = 0
-    for item in _decimal_to_float(cs_resp.get("Items", [])):
+    for item in map(character_privacy.public_sheet, _decimal_to_float(cs_resp.get("Items", []))):
         lvl = int(float(item.get("character_level", 0)))
         if lvl > prev_level and prev_level > 0:
             level_events.append(
@@ -432,7 +433,7 @@ def journey_timeline(*, _g) -> dict:
         )
         seen_levels: set = set()
         _PILLAR_NAMES = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-        for item in _decimal_to_float(cs_resp.get("Items", [])):
+        for item in map(character_privacy.public_sheet, _decimal_to_float(cs_resp.get("Items", []))):
             level = item.get("character_level")
             date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
             if level and level not in seen_levels:
@@ -672,7 +673,7 @@ def journey_waveform(*, _g) -> dict:
             KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
             ScanIndexForward=True,
         )
-        items = resp.get("Items", [])
+        items = [character_privacy.public_sheet(i) for i in resp.get("Items", [])]
     except Exception:
         items = []
 

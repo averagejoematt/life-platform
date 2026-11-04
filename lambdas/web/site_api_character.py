@@ -224,7 +224,8 @@ def character(date: str | None = None, *, _g) -> dict:
             include_pilot=bool(date),
         )
     )
-    _recs = _decimal_to_float(_resp.get("Items", []))
+    # Owner rulings 2026-11-03/04: a pillar computed only from private sources is served held (character_privacy).
+    _recs = [character_privacy.public_sheet(r) for r in _decimal_to_float(_resp.get("Items", []))]
     record = _recs[0] if _recs else None
     prior_record = _recs[1] if len(_recs) > 1 else None
 
@@ -515,6 +516,30 @@ def character_config(*, _g) -> dict:
     )
 
 
+def _public_receipt(receipt: dict) -> dict:
+    """The receipt as the public may read it (owner rulings 2026-11-03/04). A receipt names the input rows a day
+    was computed from — and a journal row's sort key IS its date, template and entry id. So an input row from a
+    source the publication policy does not classify public (``common.activity_publication``; unclassified fails
+    closed) is OMITTED, and so is a pillar every input of which is private (``character_privacy``), from the
+    transitions as from the replay's mismatch list. Omit, never mark: no count of what was left out. The stored
+    receipt is unchanged and its digest still covers every row (the owner's replay verifies it)."""
+    from common import activity_publication
+
+    out = dict(receipt)
+    out["input_rows"] = [
+        r
+        for r in (receipt.get("input_rows") or [])
+        if isinstance(r, dict) and activity_publication.source_is_public(str(r.get("pk") or "").split("#SOURCE#")[-1])
+    ]
+    trans = receipt.get("transitions")
+    if isinstance(trans, dict) and isinstance(trans.get("pillars"), dict):
+        out["transitions"] = {
+            **trans,
+            "pillars": {k: v for k, v in trans["pillars"].items() if character_privacy.pillar_is_publishable(k)},
+        }
+    return out
+
+
 def character_receipt(date: str | None = None, verify: bool = False, *, _g) -> dict:
     """
     GET /api/character_receipt[?date=YYYY-MM-DD][&verify=1]
@@ -565,7 +590,7 @@ def character_receipt(date: str | None = None, verify: bool = False, *, _g) -> d
             cache_seconds=cache_s,
         )
 
-    receipt = _decimal_to_float({k: v for k, v in item.items() if k not in ("pk", "sk")})
+    receipt = _public_receipt(_decimal_to_float({k: v for k, v in item.items() if k not in ("pk", "sk")}))
     body = {"available": True, "receipt": receipt, "replay": None}
     if verify:
         try:
@@ -580,7 +605,12 @@ def character_receipt(date: str | None = None, verify: bool = False, *, _g) -> d
             from health import personal_baselines as _pb
 
             cfg = _pb.effective_character_config(cfg, table, USER_PREFIX)
-            body["replay"] = _pr.replay(item, cfg, engine=_ce)
+            replayed: dict = _pr.replay(item, cfg, engine=_ce)
+            if isinstance(replayed.get("mismatches"), list):  # a private pillar's fields are not named here either
+                replayed["mismatches"] = [
+                    m for m in replayed["mismatches"] if character_privacy.pillar_is_publishable((m or {}).get("pillar"))
+                ]
+            body["replay"] = replayed
         except Exception as e:  # verify is best-effort; the receipt itself still serves
             logger.warning("character_receipt: replay failed: %s", e)
             body["replay"] = {"available": False, "reason": "replay unavailable (config load or engine error)"}
@@ -605,7 +635,7 @@ def character_stats(*, _g) -> dict:
     record = None
     for date_str in [today, yesterday]:
         resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date_str}"})
-        record = _decimal_to_float(resp.get("Item"))
+        record = character_privacy.public_sheet(_decimal_to_float(resp.get("Item")))
         if record:
             break
     if not record:

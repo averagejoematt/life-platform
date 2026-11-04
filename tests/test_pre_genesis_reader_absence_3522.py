@@ -151,10 +151,12 @@ def test_a_real_sheet_is_untouched(monkeypatch):
         monkeypatch.setattr(mod, "EXPERIMENT_START", _iso(_today_pt() - timedelta(days=30)), raising=False)
     monkeypatch.setattr(vitals, "table", _Table(), raising=False)
     b = _body(vitals.handle_character())
-    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, 60, 65, 70]
+    # relationships (index 5) reads only private sources: served held (owner rulings 2026-11-03/04)
+    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, 60, 50, 70]
     for p in b["pillars"]:
-        assert p["not_instrumented"] is False
-        assert p["coverage_hold"] is False
+        held = p["name"] == "relationships"
+        assert p["not_instrumented"] is held
+        assert p["coverage_hold"] is held
 
 
 # ── #3523 · the pre-genesis training week ─────────────────────────────────────

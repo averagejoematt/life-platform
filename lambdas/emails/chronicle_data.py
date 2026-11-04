@@ -12,6 +12,7 @@ from common.digest_utils import d2f, safe_float
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from content import story_checks  # #4538: the off-record label is the story door's, not a second copy
 from experiment.phase_filter import singleton_visible
+from health import character_privacy  # owner rulings 2026-11-03/04: the chronicle is public — private-source pillars held
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 
@@ -672,7 +673,7 @@ def build_data_packet(data):
         packet.append("")
 
     # --- Character Sheet (gamification arc — narrative gold for Elena) ---
-    cs_data = data.get("character_sheet", {})
+    cs_data = {d: character_privacy.public_sheet(r) for d, r in (data.get("character_sheet", {}) or {}).items()}
     if cs_data:
         packet.append("=== CHARACTER SHEET (RPG gamification layer) ===")
         packet.append("The Character Sheet is Matthew's persistent gamified life score — an RPG-style")
