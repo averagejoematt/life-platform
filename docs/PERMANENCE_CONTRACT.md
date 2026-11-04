@@ -1,7 +1,7 @@
 # The Permanence Contract
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-11-04
-> **Contract version:** 1.1.0 · **Effective:** 2026-11-05 · **Issue:** #1400 (epic #1367)
+> **Contract version:** 1.1.0 · **Effective:** 2026-11-04 · **Issue:** #1400 (epic #1367)
 
 The question this document exists to answer is the one friends and family actually
 ask, and the one no wearable company has ever answered in writing: **what happens to
@@ -35,7 +35,7 @@ commitment stays honest in a repository that changes every day.
      A future public page (#1400's second PR) should lift this section verbatim;
      the gate test asserts no internal detail leaks into it. -->
 
-**Version 1.1.0 — effective 2026-11-05**
+**Version 1.1.0 — effective 2026-11-04**
 
 ### P1 · Nothing here is for sale
 
@@ -104,7 +104,7 @@ edition you are reading.
 
 ### P9 · Only published activity moves the clock
 
-Since 5 November 2026 the silence clock counts only sources whose activity is itself
+Since 4 November 2026 the silence clock counts only sources whose activity is itself
 part of the public record. A source kept private is never read by the clock, so
 private activity can neither keep the contract active nor make it look silent. Until
 then, the clock also counted two sources whose activity is private; the published
@@ -119,7 +119,7 @@ state names the method in force and the one before it.
 | Version | Date | Issue | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-08-10 | #1400 | First edition: the nightly public archive, its admission gate, and the continuity clock. |
-| 1.1.0 | 2026-11-05 | #5607 | P9 added: only sources whose activity is itself published count toward the continuity clock. |
+| 1.1.0 | 2026-11-04 | #5607 | P9 added: only sources whose activity is itself published count toward the continuity clock. |
 
 ---
 

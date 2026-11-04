@@ -71,12 +71,12 @@ ESCALATING_STATES = (STATE_NOTICE, STATE_WARNING, STATE_TRIGGERED)
 # The clock's methodology, published with every verdict (owner ruling 2026-11-04: "Update the clock's
 # methodology and disclosure accordingly. Preserve the original historical methodology").
 METHOD_VERSION = 2
-METHOD_EFFECTIVE = "2026-11-05"
+METHOD_EFFECTIVE = "2026-11-04"  # the first scheduled run under method 2 is 23:00 PT on 2026-11-04
 METHOD_HISTORY: tuple[dict, ...] = (
     {
         "version": 1,
         "from": "2026-08-10",
-        "to": "2026-11-04",
+        "to": "2026-11-04",  # the day both ran: each published document names its own method version
         "counted": "every source that only produces data when a person does something, including two whose activity is private",
     },
     {
