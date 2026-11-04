@@ -13,7 +13,7 @@ the presence semantics this needs, so the watched set is **derived** from the
 registry rather than hand-listed; a new behavioral source joins the clock the
 day it lands.
 
-Two corrections on top of the derived set:
+Three corrections on top of the derived set:
 
 * **Apple Health is watched on a value, not on the partition.** Its rows keep
   arriving from other automations even when nothing is moving (the DI-1.6 "413
@@ -24,6 +24,14 @@ Two corrections on top of the derived set:
   counted separately and, if nothing at all could be read, the verdict is
   ``unknown`` — never ``triggered``. An outage in this file must never be able
   to announce that somebody stopped living (ADR-104).
+* **Only PUBLIC sources count (method 2, owner ruling 2026-11-04).** The clock's
+  state is published, so a source whose activity is private (the journal,
+  progress photos — ``common.activity_publication``) must never decide whether
+  the archive reads as active. A behavioural source the publication policy does
+  not classify public is ``private`` here and is not read at all; an
+  unclassified one fails closed the same way. Method 1 (2026-08-10 → 2026-11-04)
+  counted every behavioural source; ``METHOD_HISTORY`` says so on the published
+  document rather than letting the old numbers silently change meaning.
 
 The thresholds escalate rather than act: 30 days notifies, 60 warns, 90 trips.
 Any new signal from any watched source moves the state back down — the switch
@@ -36,6 +44,7 @@ import logging
 from datetime import date, datetime
 from typing import Optional
 
+from common import activity_publication
 from common.macrofactor_fields import latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from ingestion.source_registry import SOURCE_REGISTRY
 
@@ -58,6 +67,25 @@ WARNING_DAYS = 60
 TRIGGER_DAYS = 90
 
 ESCALATING_STATES = (STATE_NOTICE, STATE_WARNING, STATE_TRIGGERED)
+
+# The clock's methodology, published with every verdict (owner ruling 2026-11-04: "Update the clock's
+# methodology and disclosure accordingly. Preserve the original historical methodology").
+METHOD_VERSION = 2
+METHOD_EFFECTIVE = "2026-11-05"
+METHOD_HISTORY: tuple[dict, ...] = (
+    {
+        "version": 1,
+        "from": "2026-08-10",
+        "to": "2026-11-04",
+        "counted": "every source that only produces data when a person does something, including two whose activity is private",
+    },
+    {
+        "version": 2,
+        "from": METHOD_EFFECTIVE,
+        "to": None,
+        "counted": "only those sources whose activity is itself published; private activity never moves the clock",
+    },
+)
 
 # Sources watched on a value rather than on partition freshness, because the
 # partition stays warm for reasons that have nothing to do with a person.
@@ -85,31 +113,48 @@ AMBIENT_REASONS: dict[str, str] = {
 }
 
 
+def _behavioral_live() -> set:
+    return {k for k, v in SOURCE_REGISTRY.items() if v.get("behavioral") and not v.get("paused")}
+
+
 def presence_sources() -> tuple[str, ...]:
     """The watched set, derived from the registry's ``behavioral`` facet.
 
     Paused sources are excluded: a source with no live schedule is silent for
     a reason that has nothing to do with the person, and counting it would let
-    a vendor lockout drag the clock.
+    a vendor lockout drag the clock. Private and unclassified sources are
+    excluded too (method 2): the publication policy decides, not this file.
     """
-    return tuple(sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("behavioral") and not v.get("paused")))
+    return tuple(sorted(k for k in _behavioral_live() if activity_publication.source_is_public(k)))
+
+
+def private_sources() -> tuple[str, ...]:
+    """Behavioural sources the clock deliberately does not read, because their activity is private."""
+    return tuple(sorted(_behavioral_live() - set(presence_sources()) - set(VALUE_GATED)))
 
 
 def watched_sources() -> tuple[str, ...]:
     """Everything the clock reads: the derived behavioural set plus the
     value-gated exceptions."""
-    return tuple(sorted(set(presence_sources()) | set(VALUE_GATED)))
+    return tuple(sorted(set(presence_sources()) | set(_value_gated_public())))
+
+
+def _value_gated_public() -> dict:
+    """``VALUE_GATED`` restricted to public sources (method 2) — a private source is never read, however it is gated."""
+    return {k: v for k, v in VALUE_GATED.items() if activity_publication.source_is_public(k)}
 
 
 def liveness_role(source: str) -> str:
-    """``presence`` | ``value_gated`` | ``ambient``. Raises on an unknown
-    source so a new registry entry cannot default into silence."""
+    """``presence`` | ``value_gated`` | ``private`` | ``ambient``. Raises on an
+    unknown source so a new registry entry cannot default into silence."""
     if source not in SOURCE_REGISTRY:
         raise KeyError(f"{source} is not in the source registry")
     if source in VALUE_GATED:
         return "value_gated"
     if source in presence_sources():
         return "presence"
+    if source in private_sources():
+        return "private"
     return "ambient"
 
 
@@ -204,7 +249,7 @@ def read_signals(table, user_id: str = "matthew") -> dict[str, tuple[str, Option
     out: dict[str, tuple[str, Optional[str]]] = {}
     for source in presence_sources():
         out[source] = _last_partition_day(table, user_id, source)
-    for source, (field, window) in sorted(VALUE_GATED.items()):
+    for source, (field, window) in sorted(_value_gated_public().items()):
         out[source] = _last_value_day(table, user_id, source, field, window)
     return out
 
@@ -242,6 +287,7 @@ def evaluate(signals: dict[str, tuple[str, Optional[str]]], today: date) -> dict
         "sources_readable": readable,
         "sources_unreadable": len(errors),
         "thresholds_days": {"notice": NOTICE_DAYS, "warning": WARNING_DAYS, "triggered": TRIGGER_DAYS},
+        "method": {"version": METHOD_VERSION, "effective": METHOD_EFFECTIVE, "history": [dict(m) for m in METHOD_HISTORY]},
     }
 
 

@@ -51,8 +51,9 @@ so such a row cannot be served at all — not even as a held row. Measured 2026-
 468 rows. The wire guard ran AFTER this handler had counted and paged, so ``total`` named rows
 no page could reach and a 100-row page came back with 97 (#5532). The handler now applies the
 SAME scrub to the item set BEFORE paging: ``total`` and ``pages`` count what is served, every
-page is whole, and ``withheld.journal_silence`` names how many rows the record counts that this
-ledger does not show — the coaches' record (`/api/predictions` ``overall``) still counts them.
+page is whole. Owner ruling 2026-11-04: the withheld rows are NOT counted on the wire — no
+``withheld.journal_silence``, no ``record_total`` beside ``total`` — because a count of rows that speak of
+the journal moves with the journal's activity. ``total`` is what is served; nothing else is named.
 
 THE READ. One concurrent, projected Query per coach partition — the `/api/predictions` sweep
 (``site_api_coach_ledger._query_partition`` / ``_parallel_fetch``), paginated to the end of
@@ -339,11 +340,11 @@ def handle_ledger_export(event, *, fetch: Callable = fetch_rows, today: str | No
         "pages": max(1, math.ceil(total / size)),
         "as_of": today,
         "source": SOURCE,
-        # The record counts `record_total` rows; `total` is what this ledger serves. The difference is named,
-        # never silent: rows the journal-silence guard keeps off every public surface (#5131).
-        "record_total": len(counted),
-        "withheld": {"journal_silence": withheld},
+        # Owner ruling 2026-11-04: no count of withheld rows and no `record_total` — either would publish how
+        # many rows speak of the journal (#5131), which moves with private activity. Logged, never served.
     }
+    if withheld:
+        logger.info(f"[ledger_export] {withheld} rows withheld by the journal-silence guard (not served, not counted)")
     degraded = {"partitions_failed": failed} if failed else None
     if failed:
         logger.error(f"[ledger_export] degraded — {len(failed)} partitions failed: {failed}")

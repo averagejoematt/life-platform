@@ -112,10 +112,6 @@
     "absent_text": null,
     "data": {
      "served": 7,
-     "record_total": 9,
-     "withheld": {
-      "journal_silence": 2
-     },
      "as_of": "2026-10-31"
     }
    }

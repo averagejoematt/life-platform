@@ -41,9 +41,9 @@
       "name": "Mind & Growth",
       "icon": "\u25c8",
       "protocols": [],
-      "habit_names": ["Morning Journal", "Evening Journal", "Deep Work Block", "Out Of Bed Before 5am"],
+      "habit_names": ["Deep Work Block", "Out Of Bed Before 5am"],
       "supplement_names": [],
-      "data_sources": ["Habitify", "Notion journal"],
+      "data_sources": ["Habitify"],
       "experiment_tags": ["mental", "journal", "cognitive"],
       "order": 4
     },

@@ -473,8 +473,9 @@ LEDGER_KIND = ("number", "direction", "yes_no", "sealed", "interval", "observati
 def _ledger_pages(ctx: LiveContext) -> list[dict]:
     """Every row of `/api/ledger_export`, page by page (the route serves at most 100 a page). A page
     that cannot be fetched is a hard failure — a partial ledger would read as a smaller record.
-    The route's own accounting (`total` served · `record_total` counted · `withheld`) is kept on the
-    context for the edition's `ledger` block, so the page can say what it does not show and why."""
+    The route's own accounting (`total` served) is kept on the context for the edition's `ledger` block.
+    Owner ruling 2026-11-04: the route no longer counts the rows it withholds (a count of rows that speak
+    of the journal moves with the journal's activity), so neither does the edition."""
     out: list[dict] = []
     page = 1
     while True:
@@ -482,8 +483,6 @@ def _ledger_pages(ctx: LiveContext) -> list[dict]:
         if page == 1:
             ctx.ledger_counts = {
                 "served": payload.get("total"),
-                "record_total": payload.get("record_total", payload.get("total")),
-                "withheld": dict(payload.get("withheld") or {}),
                 "as_of": payload.get("as_of"),
             }
         out.extend(r for r in payload.get("items") or [] if isinstance(r, dict))

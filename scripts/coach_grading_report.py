@@ -739,27 +739,9 @@ def reconcile(report: dict, api: dict, *, served_ids: set, local_items: dict) ->
     pages = api.get("ledger_export") or []
     first = pages[0] if pages else {}
     live_ids = {i.get("item_id") for p in pages for i in (p.get("items") or [])}
-    local_counted = report["ledger"]["record_total"]
-    _cmp(rows, "/api/ledger_export", "record_total", local_counted, first.get("record_total"), unexplained)
+    # Owner ruling 2026-11-04: the route serves `total` only — the counted-but-withheld rows (#5131) are no
+    # longer named on the wire, so the report keeps its own record_total/withheld locally and compares `total`.
     _cmp(rows, "/api/ledger_export", "total (served)", report["ledger"]["served"], first.get("total"), unexplained)
-    _cmp(
-        rows,
-        "/api/ledger_export",
-        "withheld.journal_silence",
-        report["ledger"]["withheld_journal_silence"],
-        (first.get("withheld") or {}).get("journal_silence"),
-        unexplained,
-    )
-    rows.append(
-        {
-            "surface": "/api/ledger_export",
-            "field": "record_total - total",
-            "report": local_counted - report["ledger"]["served"],
-            "api": (first.get("record_total") or 0) - (first.get("total") or 0),
-            "match": True,
-            "explanation": "not a mismatch: journal-silenced rows (#5131) are counted in every K of N but never listed on the ledger",
-        }
-    )
     missing_live = sorted(i for i in served_ids if i not in live_ids)
     extra_live = sorted(i for i in live_ids if i not in served_ids)
     _cmp(rows, "/api/ledger_export", "served item ids missing live", [], missing_live, unexplained)

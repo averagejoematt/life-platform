@@ -25,8 +25,8 @@ append-only — a superseded clause is marked superseded, never edited away.
 
 from __future__ import annotations
 
-TERMS_VERSION = "1.0.0"
-TERMS_EFFECTIVE = "2026-08-10"
+TERMS_VERSION = "1.1.0"
+TERMS_EFFECTIVE = "2026-11-05"
 
 # Append-only. Newest last. Mirrored by the amendment table in
 # docs/PERMANENCE_CONTRACT.md, which the gate test compares row for row.
@@ -36,6 +36,12 @@ AMENDMENTS: tuple[dict, ...] = (
         "date": "2026-08-10",
         "issue": 1400,
         "summary": "First edition: the nightly public archive, its admission gate, and the continuity clock.",
+    },
+    {
+        "version": "1.1.0",
+        "date": "2026-11-05",
+        "issue": 5607,
+        "summary": "P9 added: only sources whose activity is itself published count toward the continuity clock.",
     },
 )
 
@@ -150,6 +156,19 @@ CLAUSES: tuple[dict, ...] = (
             "you which edition you are reading."
         ),
         "mechanism": "operational.permanence_terms:public_terms",
+    },
+    {
+        "id": "P9",
+        "kind": MECHANISM,
+        "title": "Only published activity moves the clock",
+        "text": (
+            "Since 5 November 2026 the silence clock counts only sources whose activity is itself "
+            "part of the public record. A source kept private is never read by the clock, so "
+            "private activity can neither keep the contract active nor make it look silent. "
+            "Until then, the clock also counted two sources whose activity is private; the "
+            "published state names the method in force and the one before it."
+        ),
+        "mechanism": "operational.continuity_watch:presence_sources",
     },
 )
 
