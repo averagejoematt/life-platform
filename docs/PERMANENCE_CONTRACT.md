@@ -1,7 +1,7 @@
 # The Permanence Contract
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
-> **Contract version:** 1.0.0 · **Effective:** 2026-08-10 · **Issue:** #1400 (epic #1367)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-11-04
+> **Contract version:** 1.1.0 · **Effective:** 2026-11-04 · **Issue:** #1400 (epic #1367)
 
 The question this document exists to answer is the one friends and family actually
 ask, and the one no wearable company has ever answered in writing: **what happens to
@@ -35,7 +35,7 @@ commitment stays honest in a repository that changes every day.
      A future public page (#1400's second PR) should lift this section verbatim;
      the gate test asserts no internal detail leaks into it. -->
 
-**Version 1.0.0 — effective 2026-08-10**
+**Version 1.1.0 — effective 2026-11-04**
 
 ### P1 · Nothing here is for sale
 
@@ -102,6 +102,14 @@ This contract carries a version and a dated amendment history. Clauses are added
 superseded, never quietly rewritten, and the published version number tells you which
 edition you are reading.
 
+### P9 · Only published activity moves the clock
+
+Since 4 November 2026 the silence clock counts only sources whose activity is itself
+part of the public record. A source kept private is never read by the clock, so
+private activity can neither keep the contract active nor make it look silent. Until
+then, the clock also counted two sources whose activity is private; the published
+state names the method in force and the one before it.
+
 <!-- END READER TERMS -->
 
 ---
@@ -111,6 +119,7 @@ edition you are reading.
 | Version | Date | Issue | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-08-10 | #1400 | First edition: the nightly public archive, its admission gate, and the continuity clock. |
+| 1.1.0 | 2026-11-04 | #5607 | P9 added: only sources whose activity is itself published count toward the continuity clock. |
 
 ---
 
@@ -126,8 +135,9 @@ edition you are reading.
 | P6 | mechanism | `lambdas/operational/continuity_watch.py::apply_transition`, plus the freeze/seal branch in the handler. |
 | P7 | limit | No mechanism by definition — this clause exists to name what the mechanisms cannot do. |
 | P8 | mechanism | `lambdas/operational/permanence_terms.py::public_terms` + this document's amendment table. |
+| P9 | mechanism | `lambdas/operational/continuity_watch.py::presence_sources` — the behavioural set filtered through `common.activity_publication` (method 2; method 1's history is published in the clock's `method` block). |
 
-**Schedule and watchers.** `life-platform-permanence` is declared in `cdk/stacks/operational_stack.py` (the `schedule=` there is the nightly cadence; this page does not restate it). It carries a `permanence-errors` alarm and a separate dead-man alarm `permanence-heartbeat` on the `ArchiveBuilt` metric, because a Lambda that stops running errors nothing. Verified 2026-10-17: every file, function and test named in the table above exists, and `TERMS_VERSION` is still 1.0.0, so no amendment row is owed.
+**Schedule and watchers.** `life-platform-permanence` is declared in `cdk/stacks/operational_stack.py` (the `schedule=` there is the nightly cadence; this page does not restate it). It carries a `permanence-errors` alarm and a separate dead-man alarm `permanence-heartbeat` on the `ArchiveBuilt` metric, because a Lambda that stops running errors nothing. Verified 2026-11-04: every file, function and test named in the table above exists, and `TERMS_VERSION` is 1.1.0 with its amendment row.
 
 ### The admission rule, in full
 

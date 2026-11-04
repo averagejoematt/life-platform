@@ -7,6 +7,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as AP  # owner ruling 2026-11-04: private habits are not named publicly
 from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import (
@@ -371,12 +372,21 @@ def protocols(*, _g) -> dict:
         return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600, degraded=e)
 
 
+def _public_domain(domain: dict) -> dict:
+    """One domain with every habit the publication policy knows to be PRIVATE by identity removed (owner
+    ruling 2026-11-04: "Remove Morning Journal and Evening Journal from the public configuration").
+    The config itself no longer names them; this is the policy's own check on whatever the config says."""
+    if not isinstance(domain, dict) or not isinstance(domain.get("habit_names"), list):
+        return domain
+    return {**domain, "habit_names": [n for n in domain["habit_names"] if AP.NP.classify(AP.habit_family(n)) != AP.PRIVATE]}
+
+
 def domains() -> dict:
     """GET /api/domains — Return domain groupings from S3 config."""
     global _domains_cache
     if _domains_cache is None:
         _domains_cache = _load_s3_json("site/config/domains.json", "domains")
-    domains = _domains_cache.get("domains", [])
+    domains = [_public_domain(d) for d in _domains_cache.get("domains", [])]
     return _ok({"domains": domains, "count": len(domains)}, cache_seconds=3600)
 
 

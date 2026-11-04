@@ -23,9 +23,6 @@ const corrected = rows.filter((r) => r.corrections.length).length;
 const coaches = [...all.byType.coach].filter((c) => rows.some((r) => r.coach_id === c.id)).sort((a, b) => (a.name < b.name ? -1 : 1));
 const kinds = [...new Set(rows.map((r) => r.kind))].sort();
 const disagreements = all.byType.disagreement;
-const ledgerBlock = edition?.blocks?.ledger?.state === "ok" ? edition.blocks.ledger.data : null;
-const withheldJournal = ledgerBlock?.withheld?.journal_silence || 0;
-const recordTotal = ledgerBlock?.record_total ?? null;
 const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a direction", yes_no: "yes or no", sealed: "sealed", interval: "an interval", observation: "an observation", unknown: "unclassified" };
 ---
 
@@ -45,7 +42,6 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
       </div>
       <p class="muted" style="margin-top:12px;font-size:13px">
         Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page; the filter below only hides and shows.
-        {recordTotal != null && recordTotal !== rows.length && ` The coaches' record counts ${recordTotal}: ${withheldJournal ? `${withheldJournal} ${withheldJournal === 1 ? "row speaks" : "rows speak"} of the journal and ${withheldJournal === 1 ? "is" : "are"} kept off every public page by a standing rule; ` : ""}their grades still count in every K of N.`}
       </p>
     </div>
   </section>

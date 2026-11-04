@@ -14,6 +14,7 @@ the facet on a copied registry and watching the set move), not a copy of it.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from datetime import date
@@ -36,7 +37,7 @@ def test_every_registry_source_has_a_liveness_role():
     silence means anything. Unclassified is not a state this file allows."""
     for source in sorted(SOURCE_REGISTRY):
         role = watch.liveness_role(source)
-        assert role in ("presence", "value_gated", "ambient"), f"{source}: {role}"
+        assert role in ("presence", "value_gated", "private", "ambient"), f"{source}: {role}"
 
 
 def test_every_ambient_source_declares_why_it_cannot_be_a_presence_signal():
@@ -222,6 +223,62 @@ def test_read_signals_covers_the_whole_watched_set():
     signals = watch.read_signals(table, "matthew")
     assert set(signals) == set(watch.watched_sources())
     assert {s for s, _limit in table.queries} == set(watch.watched_sources())
+
+
+# ── method 2: only PUBLIC activity moves the clock (owner ruling 2026-11-04) ──
+def _all_watched_quiet_since(day: str) -> dict:
+    return {s: [{"sk": f"DATE#{day}", "steps": 5000}] for s in watch.watched_sources()}
+
+
+def test_private_sources_are_never_read():
+    """The journal and progress photos are behavioural but private: the clock must not even query them."""
+    assert "notion" in watch.private_sources() and "progress_photos" in watch.private_sources()
+    assert not set(watch.private_sources()) & set(watch.watched_sources())
+    table = _FakeTable({})
+    watch.read_signals(table, "matthew")
+    assert not {s for s, _limit in table.queries} & set(watch.private_sources())
+    assert watch.liveness_role("notion") == "private"
+
+
+@pytest.mark.parametrize("private_day", [None, "2026-08-10", "2026-07-01", "2026-05-01"])
+def test_the_published_verdict_is_byte_identical_whatever_private_activity_did(private_day):
+    """Invariance: vary ONLY the private partitions — a journal entry today, months ago, or never —
+    and the published document must not move by a byte. 40 days of public silence is `notice` either way."""
+    rows = _all_watched_quiet_since("2026-07-01")
+    if private_day:
+        for s in watch.private_sources():
+            rows[s] = [{"sk": f"DATE#{private_day}"}]
+    doc = watch.evaluate(watch.read_signals(_FakeTable(rows), "matthew"), TODAY)
+    baseline = watch.evaluate(watch.read_signals(_FakeTable(_all_watched_quiet_since("2026-07-01")), "matthew"), TODAY)
+    assert json.dumps(doc, sort_keys=True) == json.dumps(baseline, sort_keys=True)
+    assert doc["state"] == watch.STATE_NOTICE and doc["last_signal_date"] == "2026-07-01"
+
+
+def test_mutation_control_a_clock_that_reads_the_journal_would_move(monkeypatch):
+    """Negative control: put the journal back in the watched set (method 1) and the same journal row
+    turns a `notice` into `active` — so the invariance test above can fail."""
+    from common import activity_publication
+
+    rows = _all_watched_quiet_since("2026-07-01")
+    rows["notion"] = [{"sk": "DATE#2026-08-10"}]
+    monkeypatch.setattr(activity_publication, "source_is_public", lambda s: True)
+    doc = watch.evaluate(watch.read_signals(_FakeTable(rows), "matthew"), TODAY)
+    assert doc["state"] == watch.STATE_ACTIVE and doc["last_signal_date"] == "2026-08-10"
+
+
+def test_an_unclassified_behavioral_source_fails_closed(monkeypatch):
+    """A new behavioural source the publication policy has not classified is private until it is."""
+    monkeypatch.setitem(SOURCE_REGISTRY, "brand_new_logger", {"behavioral": True})
+    assert "brand_new_logger" not in watch.presence_sources()
+    assert watch.liveness_role("brand_new_logger") == "private"
+
+
+def test_the_verdict_publishes_its_method_and_the_one_before():
+    m = watch.evaluate({"hevy": ("ok", "2026-08-09")}, TODAY)["method"]
+    assert m["version"] == 2 and m["effective"] == watch.METHOD_EFFECTIVE
+    assert [h["version"] for h in m["history"]] == [1, 2]
+    assert m["history"][0]["to"] and m["history"][1]["to"] is None
+    assert "journal" not in json.dumps(m).lower()  # the method names no private source
 
 
 # ── transitions ─────────────────────────────────────────────────────────────

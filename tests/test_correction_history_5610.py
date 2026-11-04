@@ -167,7 +167,7 @@ def test_a_journal_silenced_row_and_its_corrections_are_not_served():
     resp = ledger.handle_ledger_export({"queryStringParameters": {"size": "200"}}, fetch=lambda: (rows, [], []), today=TODAY)
     body = json.loads(resp["body"])
     assert "pred_20261015_the_journaling_silence_x" not in {i["prediction_id"] for i in body["items"]}
-    assert body["withheld"]["journal_silence"] == 1 and body["record_total"] == body["total"] + 1
+    assert "withheld" not in body and "record_total" not in body  # owner ruling 2026-11-04: not counted on the wire
 
 
 def _production_rule_ids() -> set[str]:
