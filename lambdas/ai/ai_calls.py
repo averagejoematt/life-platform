@@ -1275,7 +1275,10 @@ def _quality_gate_correction_note(report, draft=None):
 # #4185: coach inputs read the served facts (logging record, PT sleep instants), and the gate
 # below folds the served-fact check into the judge's report (`_ci.gated`). A late import, like
 # the one after it, so the size-ratcheted top-of-module block stays one line per module.
-from coach import coach_input_facts as _ci  # noqa: E402
+from coach import (
+    coach_input_facts as _ci,  # noqa: E402
+    coach_output_provenance as _cop,  # noqa: E402 — owner ruling 2026-11-03: the read's source families
+)
 
 from ai import (  # noqa: E402
     regen_deadline as _deadline,  # #4343: a late coach is held, not regenerated past the budget
@@ -1581,6 +1584,17 @@ def _nightly_vitals_for(data):
     return out
 
 
+def _forbidden_lists(coach_id, voice_spec, anti_patterns):
+    """#4343: the FORBIDDEN lists the judge reads (judge_blacklists), else the coach's own lists, as before."""
+    try:
+        from coach.coach_quality_gate import judge_blacklists
+
+        return judge_blacklists(voice_spec)
+    except Exception as _bl_e:  # noqa: BLE001 — the coach's own lists stand in, as before
+        print(f"[COACH-V2:{coach_id}] judge blacklists unavailable (non-blocking): {_bl_e}")
+        return (anti_patterns.get("phrase_blacklist", []), anti_patterns.get("structural_blacklist", []))
+
+
 def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     """
     Generic Coach Intelligence pipeline for any coach.
@@ -1793,13 +1807,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         from coach import reader_checks as _rc
 
         _reader_rules = _rc.prompt_reader_rules()
-        _forbidden = (anti_patterns.get("phrase_blacklist", []), anti_patterns.get("structural_blacklist", []))
-        try:
-            from coach.coach_quality_gate import judge_blacklists
-
-            _forbidden = judge_blacklists(voice_spec)
-        except Exception as _bl_e:  # noqa: BLE001 — the coach's own lists stand in, as before
-            print(f"[COACH-V2:{coach_id}] judge blacklists unavailable (non-blocking): {_bl_e}")
+        _forbidden = _forbidden_lists(coach_id, voice_spec, anti_patterns)
 
         system_prompt = f"""You are {voice_spec['display_name']}, {voice_spec.get('domain', '')} specialist.
 
@@ -2055,7 +2063,9 @@ Write your {domain_label} coaching section now."""
         # #2815: Pacific frame — consistent with the reuse paths above and the OUTPUT#
         # write below, so first_generated/last_generated never disagrees with its sk.
         # #3107: writes BOTH rows (upstream + downstream) from this one gate-passed text.
-        _gate.store(output, pacific_today())
+        # Owner ruling 2026-11-03: the read's provenance, from the SAME variables the prompt interpolates (coach_output_provenance).
+        _prov = _cop.pipeline_provenance(coach_id, data, **_cop.prompt_blocks(locals()))
+        _gate.store(output, pacific_today(), provenance=_prov)
 
         # #1691 (epic #1687): baseline-freshness gate — ADVISORY. The DATA-grounding
         # gates above pass a brief that is digit-grounded yet cites a STALE cycle
@@ -2216,7 +2226,9 @@ Write your {domain_label} coaching section now."""
         # the reuse path share (it carries `data_through`). #2815: `generation_date` is the OUTPUT#
         # frame — `pacific_today()`, the SAME Pacific day coach_state_updater's own fallback,
         # inter_coach_dialogue_lambda's writer and coach_quality_gate's self-exclusion resolve.
-        _in_gate.record_output(lambda_client, coach_id, output_type, output, pacific_today(), data_through=_gate.data_through)
+        _in_gate.record_output(
+            lambda_client, coach_id, output_type, output, pacific_today(), data_through=_gate.data_through, provenance=_prov
+        )
 
         return output
 

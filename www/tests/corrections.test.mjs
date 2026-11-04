@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { correctionRows, instantInWords, ruleText } from "../src/lib/corrections.js";
+import { correctionRows, gradeNoteRows, instantInWords, ruleText } from "../src/lib/corrections.js";
 
 const ISO = /\b20\d\d-\d\d-\d\d\b/;
 const base = {
@@ -54,4 +54,15 @@ test("a moved target shows both days; an open call was not yet graded", () => {
   // the owner-ruled rule id carries a date: it reads in words, never as an ISO date (the live scan refused run 41581545049)
   assert.equal(ruleText({ rules: [{ id: "#5533:c+owner-2026-11-02", version: "1.1" }] }), "#5533:c+owner-2 November 2026, evaluator 1.1");
   assert.equal(instantInWords(null), null);
+});
+
+// Owner review of #5644 (2026-11-03): the specifics behind a Day-page correction note, on demand, in words.
+
+test("a coach line's grade correction reads in words: before, now, when recorded, the registered explanation", () => {
+  const rows = gradeNoteRows({ prediction_id: "p", coach_id: "mind", original_status: "refuted", corrected_status: "expired", corrected_at: "2026-11-03T18:55:07Z", explanation: "Registered words." });
+  assert.deepEqual(rows.map(([k]) => k), ["Grade before", "Grade now", "Correction recorded", "What changed"]);
+  assert.equal(rows[1][1], "could not be checked");
+  assert.ok(!rows.some(([, v]) => /\d{4}-\d{2}-\d{2}/.test(v)), "no ISO date on the page");
+  const none = gradeNoteRows({ prediction_id: null, coach_id: null, original_status: null, corrected_status: "observation", corrected_at: null, explanation: null });
+  assert.deepEqual(none, [["The ledger's grade", "not graded"]]);
 });

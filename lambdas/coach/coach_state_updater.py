@@ -29,6 +29,8 @@ from coach import (  # #2972 public frame; #2418 derived-prose SET; #2575 vitals
     audience_guard,
     coach_derived_prose,
     coach_json_schemas as _schemas,  # #4276: structured-output schemas
+    coach_output_provenance as _cop,  # owner ruling 2026-11-03: every row this run writes carries the read's sources
+    derived_text_guard,
     published_vitals,
 )
 from coach.reading_date_fidelity import guard_derived_summary  # #2343
@@ -62,6 +64,7 @@ AI_MODEL_HAIKU = model_for("coach_narrative.state_update")
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "coach-state-updater")
 _CW_NAMESPACE = "LifePlatform/AI"
+_RUN: dict = {}  # this invocation's provenance record — set first thing in lambda_handler, read by _put_item
 
 # #4279: no retry schedule here — `_call_haiku` routes through retry_utils.call_anthropic_raw
 # → ai.bedrock_client.invoke_with_retry, the one policy. (A dead 5/15/45 copy lived here.)
@@ -389,6 +392,10 @@ def _put_item(item):
     """
     from experiment.phase_taxonomy import experiment_stamp_for
 
+    # Owner ruling 2026-11-03: a row derived from this run's read carries the read's provenance (merged with a prior
+    # state's own record when rewritten from one). No run record -> unrecorded: withheld publicly.
+    if str(item.get("sk", "")).startswith(_cop.UPDATER_DERIVED_SK_PREFIXES):
+        item = {**item, "provenance": _cop.merged(item.get("provenance"), _RUN.get("provenance") or _cop.updater_record(None))}
     try:
         table.put_item(Item=floats_to_decimal({**experiment_stamp_for(item.get("pk", ""), item.get("sk", "")), **item}))
         return True
@@ -602,6 +609,8 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction, d
     published_vitals.stamp_published_vitals(item, table, f"USER#{USER_ID}#SOURCE#")
     if extraction.get("derived_prose_held"):
         item["derived_prose_held"] = True  # #2418: a grounding HOLD, not an empty extraction
+    # Owner ruling 2026-11-03: no verdict the current grade contradicts; `derived_from` + as_of stamped (derived_text_guard).
+    derived_text_guard.guard_output_item(item, table, coach_id, date, now=now_iso)
 
     success = _put_item(item)
     if success:
@@ -1086,6 +1095,8 @@ def lambda_handler(event, context):
     output_type = event.get("output_type", "weekly_email")
     generation_date = event.get("generation_date")
 
+    # Owner ruling 2026-11-03: the producer's record of the read's sources (absent -> unrecorded, withheld publicly).
+    _RUN["provenance"] = _cop.updater_record(event.get("provenance"))
     if not coach_id:
         raise ValueError("Missing required field: coach_id")
     if not output_text:

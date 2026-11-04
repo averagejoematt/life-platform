@@ -350,8 +350,31 @@ const engine = z
     pillars: z.array(z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean() }).strict()),
   })
   .strict();
+// One correction beside a quotation — the same served shape as the coach APIs' summary_corrections / grade_corrections
+// (lambdas/coach/authoritative_grades.CORRECTION_NOTE_FIELDS; owner review of #5644, 2026-11-03).
+const gradeCorrection = z
+  .object({
+    prediction_id: z.string().min(1).nullable(),
+    coach_id: z.string().min(1).nullable(),
+    original_status: z.string().min(1).nullable(),
+    corrected_status: z.string().min(1).nullable(),
+    corrected_at: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$/)
+      .nullable(),
+    explanation: z.string().min(1).nullable(),
+  })
+  .strict();
 const coachLine = z
-  .object({ coach: z.string().min(1), coach_id: z.string().regex(ID), move: z.string().min(1), move_label: z.string().min(1).nullable(), text: z.string().min(1), corrections: z.array(z.string().min(1)) })
+  .object({
+    coach: z.string().min(1),
+    coach_id: z.string().regex(ID),
+    move: z.string().min(1),
+    move_label: z.string().min(1).nullable(),
+    text: z.string().min(1),
+    corrections: z.array(z.string().min(1)),
+    grade_corrections: z.array(gradeCorrection),
+  })
   .strict();
 const callSettled = z.object({ prediction_id: z.string().regex(ID), coach_name: z.string().min(1), verdict: z.string().min(1), claim_short: z.string().min(1) }).strict();
 const callOpen = z.object({ prediction_id: z.string().regex(ID), coach_name: z.string().min(1), due_date: z.string().regex(ISO_DAY), text: z.string().min(1) }).strict();

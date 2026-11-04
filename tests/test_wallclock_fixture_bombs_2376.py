@@ -78,6 +78,11 @@ _LAMBDAS = _REPO / "lambdas"
 # files also use the constant for date arithmetic / row-building / assertion
 # text, which is what keeps them in the scan.
 EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
+    "test_narratives_follow_authoritative_grades.py": (
+        "every dated case compares STORED instants with each other (a read's created_at / derived_from.as_of against a "
+        "correction's corrected_at; a call's said_on against the text's as_of passed EXPLICITLY); the wall clock only "
+        "stamps summary_as_of on a records summary and no case asserts it; the writer case passes now= explicitly"
+    ),
     "test_portrait_bundle_5434.py": (
         "every dated case calls qa_check_coach_cards.assess_coach_cards(..., NOW) with NOW passed EXPLICITLY "
         "(2026-10-27T12:00Z) and every card age derived from NOW; no case reaches a handler clock"

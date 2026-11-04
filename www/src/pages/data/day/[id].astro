@@ -33,6 +33,7 @@ import {
   unservedText,
 } from "../../../lib/day.js";
 import { callOutcome, dayInWords, num } from "../../../lib/format.js";
+import { gradeNoteRows } from "../../../lib/corrections.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -468,6 +469,29 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                       {c}
                     </p>
                   ))}
+                  {l.grade_corrections.length > 0 && (
+                    <details class="correction-detail">
+                      <summary>What changed</summary>
+                      {l.grade_corrections.map((g) => (
+                        <dl class="kv">
+                          {gradeNoteRows(g).map(([k, v]) => (
+                            <>
+                              <dt>{k}</dt>
+                              <dd>{v}</dd>
+                            </>
+                          ))}
+                          {g.prediction_id && g.coach_id && all.get("prediction", `${g.coach_id}-${g.prediction_id}`) && (
+                            <>
+                              <dt>The call</dt>
+                              <dd>
+                                <a href={href(pathOf("prediction", `${g.coach_id}-${g.prediction_id}`))}>on the ledger</a>
+                              </dd>
+                            </>
+                          )}
+                        </dl>
+                      ))}
+                    </details>
+                  )}
                 </figure>
               ))
             ) : (
@@ -492,6 +516,21 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                         {c}
                       </p>
                     ))}
+                    {l.grade_corrections.length > 0 && (
+                      <details class="correction-detail">
+                        <summary>What changed</summary>
+                        {l.grade_corrections.map((g) => (
+                          <dl class="kv">
+                            {gradeNoteRows(g).map(([k, v]) => (
+                              <>
+                                <dt>{k}</dt>
+                                <dd>{v}</dd>
+                              </>
+                            ))}
+                          </dl>
+                        ))}
+                      </details>
+                    )}
                   </figure>
                 ))}
               </>
