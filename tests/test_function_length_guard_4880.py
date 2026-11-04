@@ -95,7 +95,7 @@ FUNCTION_LENGTH_COUNTS = {
     "deploy/restart_pipeline.py::main": 376,
     "deploy/restart_verify.py::main": 400,
     "deploy/sentinel_github.py::check_github_config": 183,
-    "lambdas/ai/ai_calls.py::_run_coach_v2_pipeline": 384,
+    "lambdas/ai/ai_calls.py::_run_coach_v2_pipeline": 381,
     "lambdas/ai/ai_calls.py::call_board_of_directors": 179,
     "lambdas/ai/ai_calls.py::call_tldr_and_guidance": 190,
     "lambdas/coach/coach_calibration.py::apply_conversation_calibration": 162,
