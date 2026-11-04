@@ -171,7 +171,8 @@
           "s3:prefix": [
             "remediation-log/*",
             "drift-log/*",
-            "raw/*"
+            "raw/*",
+            "config/*"
           ]
         }
       }
