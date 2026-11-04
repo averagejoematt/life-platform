@@ -454,8 +454,8 @@ export function daySaidHTML(iso, movesBody, base) {
       // The coach's page returns to this day by name (#4675).
       const name = l.coach_id ? `<a class="ck-link" href="${esc(withFrom(coachHref(base, l.coach_id), iso))}">${esc(l.coach)}</a>` : esc(l.coach);
       // A "call" with no date and no number in it cannot be checked, so it is labelled a note
-      // (#4580 D3: "38 days without a journal entry … I expect the silence continues" was served
-      // as "A call"). The engine's own relabelling is lane E's; this is the page's floor.
+      // (#4580 D3: an undated "I expect this continues" line was served as "A call"). The
+      // engine's own relabelling is lane E's; this is the page's floor.
       const label = l.move === "call" && !datedCall(l.text) ? "A note" : l.move_label;
       const kind = l.move === "reply" && l.replies_to ? `A reply to ${l.replies_to}` : [label, l.replies_to ? `replying to ${l.replies_to}` : ""].filter(Boolean).join(" · ");
       return `<li><span class="ck-coach__who">${name}${kind ? esc(` · ${kind}`) : ""}</span><span>“${esc(l.text)}”</span></li>`;
