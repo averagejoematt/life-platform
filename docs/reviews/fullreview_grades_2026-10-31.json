@@ -3176,7 +3176,7 @@
     {
      "clause_id": "integrations.A.2",
      "verdict": "MET",
-     "citation": "/api/status fetched 2026-10-31T22:41Z: notion 'yellow 52d ago', apple_health CGM 'yellow 65d ago', macrofactor_workouts 'yellow 238d ago', garmin 'yellow 138d ago ... A pause is a hole in the record, not a broken pipe'. Operator side: freshness-checker journal-dark sentinel ALERTSTATE#notion_journal_dark now exists in DDB (query returned it). Both surfaces give a real last-update plus an explicit dark duration. Operator checker output for the same source at the same moment was not fetched (no Lambda invoke allowed), so equivalence is by sentinel and code, not a side-by-side."
+     "citation": "/api/status fetched 2026-10-31T22:41Z: notion [recency withheld — private journal activity], apple_health CGM 'yellow 65d ago', macrofactor_workouts 'yellow 238d ago', garmin 'yellow 138d ago ... A pause is a hole in the record, not a broken pipe'. Operator side: freshness-checker journal-dark sentinel ALERTSTATE#notion_journal_dark now exists in DDB (query returned it). Both surfaces give a real last-update plus an explicit dark duration. Operator checker output for the same source at the same moment was not fetched (no Lambda invoke allowed), so equivalence is by sentinel and code, not a side-by-side."
     },
     {
      "clause_id": "integrations.A.3",

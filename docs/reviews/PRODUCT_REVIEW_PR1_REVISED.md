@@ -57,7 +57,7 @@ The site's primary weakness is not data or content — it's *information archite
 | **Nutrition** | `/nutrition/` | A- | The best observatory page. Real data: 1,375 cal, 146g protein. The autobiographical content about 2017, eating as coping, and MacroFactor making "the invisible visible" is exceptional. Full food log visible. | The editorial content carries the page regardless of data volume. Cross-reference with CGM data (carbs → glucose response) will be the killer feature once enough meals are tagged. |
 | **Training** | `/training/` | B+ | "Training for 80, not for 30" is a strong framing. Real data from Strava (4-mile walk), Whoop (strain, recovery), Garmin (steps, HR). The pull-quote about "the fall — how fast the void fills" is the kind of honesty that makes this site unique. | Zone 2 and strength charts need weeks to show trends. The training modality breakdown is well-designed but thin at Day 4. |
 | **Physical** | `/physical/` | B+ | "The scale isn't a confession — it's a pattern detector" is outstanding framing. Real data: 296.49 lbs (Withings), DEXA body comp (42.7% BF, ALMI 13.1), blood pressure tracking. Weight history since 2011 provides compelling context. | DEXA baseline data (March 30) is rich and should be surfaced more prominently — the body composition detail (133 lbs fat, 170 lbs lean) tells a nuanced story beyond the scale number. |
-| **Mind** | `/mind/` | A | The crown jewel. "The pillar I avoided building." The confessional about relapses that can't be explained, intellectualizing over feeling — this is the most differentiated content on the internet for a quantified self project. Day 1 journal entry exists and is raw. | Vice streaks showing 0/8 is honest. The temptation logging system needs usage to prove its value but the framework is compelling. |
+| **Mind** | `/mind/` | A | The crown jewel. "The pillar I avoided building." The confessional about relapses that can't be explained, intellectualizing over feeling — this is the most differentiated content on the internet for a quantified self project. [journal activity withheld — private, owner ruling 2026-11-05] | Vice streaks showing 0/8 is honest. The temptation logging system needs usage to prove its value but the framework is compelling. |
 
 ### THE SCIENCE
 
@@ -304,10 +304,10 @@ Cross-domain intelligence, public accountability with narrative, AI coaching lay
 "MacroFactor integration is solid — Matthew logged 1,375 cal with 146g protein yesterday. The nutrition page's honesty about emotional eating is refreshing and accurate. Methodology is sound."
 
 ### Dr. Paul Conti — Inner Life / Psychological Content
-"The Mind page avoids toxic positivity entirely. The Day 1 journal entry is psychologically honest — health anxiety, work anxiety, the test of no doom-scrolling. The temptation logging system (vice streaks at 0/8) is honest about where he's starting."
+"The Mind page avoids toxic positivity entirely. [journal activity withheld — private, owner ruling 2026-11-05] The temptation logging system (vice streaks at 0/8) is honest about where he's starting."
 
 ### Dr. Vivek Murthy — Social Connection & Accountability
-"The accountability framing is healthy. Partner partnership in challenges, the subscriber relationship — all point toward connection. The Day 1 journal's mention of work relationships and imposter syndrome shows Matthew is tracking social health, not just physical."
+"The accountability framing is healthy. Partner partnership in challenges, the subscriber relationship — all point toward connection. [journal activity withheld — private, owner ruling 2026-11-05]"
 
 ### Elena Voss — Editorial Voice
 "Voice is consistent. Three editorial rules maintained. The distinction between Elena's narrative and Matthew's first-person content is clear. The `/elena/` meta-page is elegant. Quality depends on underlying data — a bad week produces better narrative than a good week."

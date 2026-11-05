@@ -7,9 +7,9 @@
   "coach_id": "mind_coach",
   "date": "2026-09-26",
   "verbatim": false,
-  "verbatim_note": "the spec's {journal_gap_days} placeholder is filled with 6 and the same 6 is supplied as the served journal_gap_days",
+  "verbatim_note": "the spec's {journal_gap_days} placeholder is filled with a synthetic 4 (owner ruling 2026-11-05: journal activity is private) and the same 4 is supplied as the served journal_gap_days",
   "slot": "headline_read",
-  "text": "Matthew's body is recovering well — Whoop scored the night of Thursday, September 24 at 99 % — while his journal has been quiet for 6 days. I've asked him one thing: before he picks up the phone in the morning, notice whether he already felt rested. Whether the silence is tiredness or avoidance tells me more than any score.",
+  "text": "Matthew's body is recovering well — Whoop scored the night of Thursday, September 24 at 99 % — while his journal has been quiet for 4 days. I've asked him one thing: before he picks up the phone in the morning, notice whether he already felt rested. Whether the silence is tiredness or avoidance tells me more than any score.",
   "served_facts": {
     "days_logged": 20,
     "latest_date": "2026-09-25",
@@ -26,7 +26,7 @@
     "latest_recovery_pct": 99,
     "avg_recovery_window": 73.9,
     "avg_window_days": 21,
-    "journal_gap_days": 6
+    "journal_gap_days": 4
   },
   "served_facts_source": [
     "illustrative"

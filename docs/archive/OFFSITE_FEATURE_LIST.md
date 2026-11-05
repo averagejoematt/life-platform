@@ -617,7 +617,7 @@ Work through by page. Each decision maps to one page/component.
 ### 12c. Reframe data sparsity as the story
 - **Effort:** Low
 - [ ] Replace "Building this measurement" with honest framing
-- [ ] "The data gap IS the data. One journal entry. Zero logged connections."
+- [ ] "The data gap IS the data." [journal activity withheld — private, owner ruling 2026-11-05]
 
 ### 12d. Add cross-domain causal connections
 - **Effort:** Medium

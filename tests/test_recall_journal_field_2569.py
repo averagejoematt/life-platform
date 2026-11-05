@@ -4,8 +4,9 @@
 carried any of those three — `ingestion.notion_lambda.parse_page` writes `raw_text`
 (always) and `body_text` (when the page body fetched). Every entry therefore failed the
 `if not date or not text: continue` guard and semantic recall indexed **zero** journal
-entries. Measured against live DynamoDB on 2026-08-11: 60 `#journal#` rows, all 60 with
-`raw_text`, 53 with `body_text`, none with `content`/`body`/`text`; recall corpus 19
+entries. Measured against live DynamoDB on 2026-08-11: every `#journal#` row carried
+`raw_text`, most carried `body_text`, none carried `content`/`body`/`text` (the row counts are
+private journal activity and are withheld — owner ruling 2026-11-05); recall corpus 19
 rows, 100% `kind=chronicle`.
 
 `gather_coach_outputs` had the identical defect and a bigger blast radius: it read
