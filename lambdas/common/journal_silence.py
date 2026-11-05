@@ -2,8 +2,8 @@
 
 ONE pattern, read by two gates: the Story Desk (``content/story_desk.py``: journal presence is NOT a story, and
 the story-auditor's privacy class "journal content or journal-silence probing" is BLOCKING) and the daily
-coach-moves gate (``coach/coach_moves_sheet.py``). Live 2026-10-18 the front page served a coach line reading
-"... yet 39 days of journal silence. My read is the block was never nutritional ..." because only the desk applied it.
+coach-moves gate (``coach/coach_moves_sheet.py``). Live 2026-10-18 the front page served a coach line naming
+a count of journal-silence days, because only the desk applied it.
 """
 
 from __future__ import annotations

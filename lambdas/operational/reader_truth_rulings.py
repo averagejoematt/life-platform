@@ -1424,13 +1424,13 @@ def is_trailing_window_beside_day_counter(finding, start_date, today):
 # replayed verbatim in tests/test_reader_truth_portrait_signals_5596.py). The v9
 # Start page's Fig. 1 portrait renders, side by side:
 #
-#   Mind · journal 2 entries in 57 days, the last on 9 Sep. …
+#   Mind · journal <N> entries in <D> days, the last on <date>. …
 #   Connection · logged interactions — None logged in the last thirty days.
 #     The journal went quiet; so did this.
 #
 # The judge read the pair as "if the journal 'went quiet' in the last 30 days, the
 # last entry cannot be on Day 4". Both tiles are true (ground truth: /api/mind_overview
-# total_interactions_30d = 0; /api/journal_analysis last entry 2026-09-09). The Mind
+# total_interactions_30d = 0; /api/journal_analysis last entry <date>). The Mind
 # tile counts JOURNAL ENTRIES over the cycle; the Connection tile counts LOGGED
 # SOCIAL INTERACTIONS over a trailing thirty days, and its "the journal went quiet"
 # is TRUE exactly when the last journal entry predates that window — which is what
