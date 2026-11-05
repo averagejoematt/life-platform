@@ -39,6 +39,8 @@ from common.pacific_time import pacific_now  # #2811: THE Pacific day helper —
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 from health import (
     character_engine,
+    character_privacy,  # owner ruling 2026-11-05: character_stats.json is read through the public variant
+    character_public,  # owner ruling 2026-11-05: the public variant computed beside method 1
     personal_baselines,  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 )
 
@@ -710,6 +712,24 @@ def collect_input_rows(data, history_records, challenge_items=None):
     return rows
 
 
+def store_sheet(record, data, previous_state, history_records, config):
+    """Store the day's sheet: the method-1 record with its PUBLIC variant beside it (owner ruling 2026-11-05).
+
+    The public variant runs the same engine over public inputs only, chained from the previous record's public
+    variant (``health.character_public``). It is attached only when every record its chain reads has one — otherwise
+    the sheet stores without it and every public surface fails closed for the date until
+    ``scripts/backfill_public_variant.py`` fills the chain. A failure computing it never costs the method-1 store."""
+    try:
+        reason = character_public.attach_public_variant(record, data, previous_state, history_records, config)
+        if reason:
+            logger.error("[character][public] no public variant for %s — %s (public surfaces fail closed)", record.get("date"), reason)
+    except Exception as e:
+        record.pop(character_public.PUBLIC_KEY, None)
+        record.pop("public_progression_transitions", None)
+        logger.error("[character][public] public variant failed for %s (method 1 stored without it): %s", record.get("date"), e)
+    return character_engine.store_character_sheet(table, USER_PREFIX, record)
+
+
 def write_progression_receipt(record, config, data, history_records, challenge_items, yesterday_str):
     """Build + self-verify + store the day's progression receipt (#1373).
 
@@ -731,6 +751,9 @@ def write_progression_receipt(record, config, data, history_records, challenge_i
             return None
         verdict = pr.replay(receipt, config)
         receipt["replay_verified"] = bool(verdict.get("verified"))
+        # Owner ruling 2026-11-05: the public variant's own receipt rides in the same item (/api/character_receipt
+        # serves only it); None when the sheet carries no public variant.
+        receipt[character_public.PUBLIC_KEY] = character_public.public_receipt(record, config, input_rows)
         print(
             pr.emf_replay_metric_line(
                 date=yesterday_str,
@@ -769,7 +792,15 @@ def publish_site_stats(record, yesterday_str, history_depth):
     stale by days. Now every path that returns a 200 for a given date also
     republishes the served JSON from whatever record is authoritative at that
     moment. Non-fatal — a failure here never breaks the caller.
+
+    Owner ruling 2026-11-05: the file is public, so it is written from the record's PUBLIC variant
+    (``character_privacy.public_sheet``) and not at all when the record has none — the last good file stays,
+    never a method-1 one.
     """
+    record = character_privacy.public_sheet(record)
+    if not record:
+        logger.error("[character] site_writer: %s has no public variant — character_stats.json not written", yesterday_str)
+        return
     char_level = record.get("character_level", 1)
     char_tier = record.get("character_tier", "Foundation")
     char_emoji = record.get("character_tier_emoji", "🔨")
@@ -841,7 +872,7 @@ def publish_site_stats(record, yesterday_str, history_depth):
             from collections import defaultdict as _dd
 
             _hist_start = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=49)).strftime("%Y-%m-%d")
-            _hist_recs = fetch_range("character_sheet", _hist_start, yesterday_str)
+            _hist_recs = character_privacy.public_sheets(fetch_range("character_sheet", _hist_start, yesterday_str))  # public variants only
             _weeks = _dd(list)
             for _rec in _hist_recs:
                 _d = _rec.get("date") or _rec.get("sk", "").replace("DATE#", "")
@@ -1131,7 +1162,7 @@ def lambda_handler(event, context):
         logger.warning("[character][DATA-2] validate_item failed (proceeding): %s", ve)
 
     try:
-        character_engine.store_character_sheet(table, USER_PREFIX, record)
+        store_sheet(record, data, previous_state, history_records, config)
         logger.info(f"[character] Stored: {yesterday_str} — Level {char_level} ({char_emoji} {char_tier}) — {len(events)} events")
     except Exception as e:
         logger.error(f"[character] store_character_sheet failed: {e}")

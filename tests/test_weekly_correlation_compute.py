@@ -477,6 +477,15 @@ class TestAssembleDailySeries:
                         }
                     ],
                     "flourishing": [{"date": "2026-05-01", "values_lived_count": 3}],
+                    # Owner ruling 2026-11-05: the day_grade metric is the day_grade record's PUBLIC variant
+                    # (the method-1 total beside it, and computed_metrics' day_grade_score, are never read here).
+                    "day_grade": [
+                        {
+                            "date": "2026-05-01",
+                            "total_score": 63,
+                            "public": {"total_score": 84, "public_method_version": "day-grade-public-v1"},
+                        }
+                    ],
                 }
             ),
         )

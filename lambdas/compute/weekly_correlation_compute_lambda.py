@@ -58,7 +58,7 @@ from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
 from experiment.phase_filter import source_reads_cross_phase  # #3444/#2109: per-source cross-phase decision
-from health import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
+from health import day_grade_public, glycemic  # #1406: glycemic-variability features; 2026-11-05: the public day grade
 
 from compute import training_mins_series  # #5398: training_mins over THE session count, with its dated cut-over
 from compute.correlation_gloss import n_gate_gloss  # split out at the #1665 size ceiling (#1996)
@@ -240,6 +240,7 @@ def assemble_daily_series(start_date, end_date):
         "apple": fetch_range("apple_health", start_date, end_date),
         "habitify": fetch_range("habitify", start_date, end_date),
         "computed": fetch_range("computed_metrics", start_date, end_date),
+        "day_grade": fetch_range("day_grade", start_date, end_date),  # owner ruling 2026-11-05: the public day grade lives here
         # R17-14 / ADR-025: composite_scores partition removed — all fields consolidated
         # into computed_metrics since v3.7.28. No new data written to composite_scores.
         "cgm": fetch_range("apple_health", start_date, end_date),  # CGM is in apple_health
@@ -306,7 +307,7 @@ def assemble_daily_series(start_date, end_date):
         metrics["steps"] = resolve_steps({"whoop": w, "apple_health": ap}).value
 
         # ── Composite / Computed ──────────────────────────────────────────
-        metrics["day_grade"] = safe_float(cm, "day_grade_score")
+        metrics["day_grade"] = day_grade_public.public_score(src_map.get("day_grade"))  # owner ruling 2026-11-05: public variant only
         metrics["readiness"] = safe_float(cm, "readiness_score")
         metrics["tier0_streak"] = safe_float(cm, "tier0_streak")
         # #1843: video-diary/solo-recording session count — the diary-as-intervention

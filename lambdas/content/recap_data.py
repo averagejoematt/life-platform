@@ -64,6 +64,7 @@ from common.metric_truth import resolve_steps, steps_sources  # #4630 / ADR-163:
 from common.pacific_time import pacific_day_n
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
+from health import day_grade_public  # owner ruling 2026-11-05: the card's grade is the public variant
 
 logger = logging.getLogger(__name__)
 
@@ -417,9 +418,12 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         facts.tier0_streak = computed.get("tier0_streak")
         # The platform's own verdict on the day, and what earned it. 53 fields were sitting
         # here while the first cards drew four (#3741 rework).
-        facts.grade_letter = computed.get("day_grade_letter")
-        facts.grade_score = computed.get("day_grade_score")
-        facts.component_scores = {k: v for k, v in (computed.get("component_scores") or {}).items() if v is not None}
+        # Owner ruling 2026-11-05: the card is public, so the grade is the PUBLIC variant of the day_grade record
+        # (no journal component; habits over public habits) — none drawn when the record has none (fail closed).
+        _grade = day_grade_public.public_grade(_get_day(table, "day_grade", date)) or {}
+        facts.grade_letter = day_grade_public.public_letter({day_grade_public.PUBLIC_KEY: _grade})
+        facts.grade_score = _grade.get("total_score")
+        facts.component_scores = {k: v for k, v in (_grade.get("component_scores") or {}).items() if v is not None}
         facts.readiness = computed.get("readiness_score")
         facts.readiness_colour = computed.get("readiness_colour")
         facts.acwr = computed.get("acwr")
@@ -833,6 +837,7 @@ def cycle_series(table, start: str, end: str) -> tuple[list[float | None], list[
     descent through a single measurement would be the prettiest possible lie.
     """
     rows = {r.get("date"): r for r in _query_range(table, "computed_metrics", start, end) if r.get("date")}
+    graded = {r.get("date"): r for r in _query_range(table, "day_grade", start, end) if r.get("date")}  # public variant (2026-11-05)
     weights: list[float | None] = []
     grades: list[str | None] = []
     last_seen = None
@@ -846,7 +851,7 @@ def cycle_series(table, start: str, end: str) -> tuple[list[float | None], list[
             last_seen = w
         else:
             weights.append(None)
-        grades.append(row.get("day_grade_letter"))
+        grades.append(day_grade_public.public_letter(graded.get(day)))
     return weights, grades
 
 

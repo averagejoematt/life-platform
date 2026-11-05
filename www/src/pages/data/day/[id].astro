@@ -441,6 +441,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                 <p class="small" style="margin-top:10px">
                   Seven areas scored nightly from the record; an area with no instrument is shown as absent, never as a middling number.
                 </p>
+                {d.engine.method && <p class="small" data-engine-method>{d.engine.method}</p>}
               </>
             ) : (
               <div class="unavail">

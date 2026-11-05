@@ -989,7 +989,7 @@ def fetch_anomaly_record(date_str):
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================
-from health import habit_streaks, hr_regime  # noqa: E402 — #2221: the ADR-104 streak scan; #4999: the HR regime markers
+from health import character_privacy, day_grade_public, habit_streaks, hr_regime  # noqa: E402 — #2221; #4999; 2026-11-05 public variants
 from health.scoring_engine import (  # noqa: E402,F401
     COMPONENT_SCORERS,
     compute_day_grade,
@@ -1010,7 +1010,7 @@ from health.scoring_engine import (  # noqa: E402,F401
 # ==============================================================================
 
 
-def store_day_grade(date_str, total_score, grade, component_scores, weights, algo_version):
+def store_day_grade(date_str, total_score, grade, component_scores, weights, algo_version, public_inputs=None):
     try:
         item = {
             "pk": USER_PREFIX + "day_grade",
@@ -1026,6 +1026,7 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
+        item.update(day_grade_public.stored_fields(public_inputs))  # {} without inputs: public readers then fail closed
         # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
         # default-deny read filter as CURRENT (pre-genesis rows counted as experiment days).
         from common.compute_metadata import tag_record
@@ -1149,7 +1150,13 @@ def _regrade_handler(dates, profile):
             data = gather_daily_data(profile, date_str)
             score, grade, comp_scores, comp_details = compute_day_grade(data, profile)
             store_day_grade(
-                date_str, score, grade, comp_scores, profile.get("day_grade_weights", {}), profile.get("day_grade_algorithm_version", "1.1")
+                date_str,
+                score,
+                grade,
+                comp_scores,
+                profile.get("day_grade_weights", {}),
+                profile.get("day_grade_algorithm_version", "1.1"),
+                public_inputs=(data, profile),
             )
             hyd = comp_scores.get("hydration", "—")
             logger.info(f"[REGRADE] {date_str}: {score} ({grade}) hydration={hyd}")
@@ -1829,6 +1836,7 @@ def lambda_handler(event, context):
                     component_scores,
                     profile.get("day_grade_weights", {}),
                     profile.get("day_grade_algorithm_version", "1.1"),
+                    public_inputs=(data, profile),
                 )
             except Exception as e:
                 logger.warning("store_day_grade failed: " + str(e))
@@ -2256,7 +2264,7 @@ def lambda_handler(event, context):
             character_sheet=character_sheet,
         )
         output_writers.write_clinical_json(data, profile, yesterday)
-        output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_sheet)
+        output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_privacy.public_sheet(character_sheet))
         # BS-02: hero stats for averagejoematt.com homepage (Jordan: delta, not absolute)
         output_writers.write_public_stats_json(data, profile, streak_data=streak_data)
 

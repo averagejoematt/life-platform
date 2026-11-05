@@ -371,6 +371,14 @@ REASON_5387_HEVY = (
 )
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "day_grade::lambdas/content/recap_data.py::read": (
+        "2026-11-05",
+        "Owner ruling 2026-11-05: the recap card's grade is the day_grade record's PUBLIC variant, read ONLY through "
+        "health.day_grade_public.public_grade/public_letter — the same module whose stored_fields() both writers "
+        "(daily_metrics_compute_lambda.store_day_grade and the daily brief's fallback store_day_grade) store under "
+        "`public`. Reader and writers share the one shape by construction (tests/test_character_public_variant.py pins "
+        "the round trip); a record without the variant reads as no grade, never as method 1.",
+    ),
     "adaptive_mode::lambdas/compute/adaptive_mode_lambda.py::write": (
         "2026-11-03",
         "Owner ruling 2026-11-03 retired the one enrolled PUBLIC reader (/api/ask grounding): the engagement score weights the "

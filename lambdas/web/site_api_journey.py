@@ -298,7 +298,7 @@ def timeline(*, _g) -> dict:
     )
     level_events = []
     prev_level = 0
-    for item in map(character_privacy.public_sheet, _decimal_to_float(cs_resp.get("Items", []))):
+    for item in character_privacy.public_sheets(_decimal_to_float(cs_resp.get("Items", []))):
         lvl = int(float(item.get("character_level", 0)))
         if lvl > prev_level and prev_level > 0:
             level_events.append(
@@ -433,7 +433,7 @@ def journey_timeline(*, _g) -> dict:
         )
         seen_levels: set = set()
         _PILLAR_NAMES = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-        for item in map(character_privacy.public_sheet, _decimal_to_float(cs_resp.get("Items", []))):
+        for item in character_privacy.public_sheets(_decimal_to_float(cs_resp.get("Items", []))):
             level = item.get("character_level")
             date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
             if level and level not in seen_levels:
@@ -673,7 +673,7 @@ def journey_waveform(*, _g) -> dict:
             KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
             ScanIndexForward=True,
         )
-        items = [character_privacy.public_sheet(i) for i in resp.get("Items", [])]
+        items = character_privacy.public_sheets(resp.get("Items", []))
     except Exception:
         items = []
 

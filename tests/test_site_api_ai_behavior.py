@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from bundle_stubs import stub_bundled_module  # noqa: E402
 from fakes import FakeDdbTable, json_safe_put_hook, make_session_update_hook  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 
 
 def _ai():
@@ -1043,7 +1044,11 @@ def test_the_character_sheet_falls_back_to_yesterday_when_today_has_not_computed
     class _Sheet(FakeDdbTable):
         def get_item(self, Key=None, **_k):
             if Key and Key.get("sk") == f"DATE#{yday}":
-                return {"Item": {"character_level": 6, "character_tier": "Discipline", "pillar_sleep": {"level": 5, "raw_score": 80}}}
+                return {
+                    "Item": with_public(
+                        {"character_level": 6, "character_tier": "Discipline", "pillar_sleep": {"level": 5, "raw_score": 80}}
+                    )
+                }
             return {}
 
     monkeypatch.setattr(ai, "table", _Sheet(rows=[]))

@@ -35,6 +35,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from coach.classification_review import is_under_review  # owner ruling 2026-11-03: a disputed verdict is not a record
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
+from health import day_grade_public  # owner ruling 2026-11-05: day_grade_mean is the public variant's
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 USER = "matthew"
@@ -675,7 +676,7 @@ def _character(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 
 def _grades(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     days = _days(table, "day_grade", wk["start"], wk["end"])
-    scores = [_f(r.get("total_score")) for r in days.values()]
+    scores = [day_grade_public.public_score(r) for r in days.values()]  # owner ruling 2026-11-05: the public variant only
     return {
         "day_grade_mean": _mean(scores),
         "explain": "the platform scores each day 0-100 across sleep, training, food, recovery and habits",

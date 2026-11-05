@@ -31,11 +31,11 @@ What varies, all SYNTHETIC (no real date, count or gap — the dates are relativ
     synthetic journal text, so /api/circadian's journal-free block is under test too.
 
 What is held fixed (and why): every public source's rows; the stored `character_sheet`,
-`computed_metrics` and `habit_scores` rows. Those three are written by producers that today fold
-journal inputs into public scores (the Mind pillar's `journal_consistency`, the day grade's journal
-component, the tier-1 habit count); excluding them changes published scores, which is an open owner
-decision named in the PR — so this walk pins the SERVE-time contract and the presence producer, and
-says so rather than claiming more.
+`computed_metrics` and `habit_scores` rows. Their producers fold journal inputs into METHOD-1 scores; since
+the owner ruling of 2026-11-05 public readers serve the character sheet's and day grade's PUBLIC variants
+(`health.character_public`, `health.day_grade_public`), whose producer-side invariance — single days, the
+replayed multi-day chain, the downstream aggregates — is `tests/test_character_public_variant.py`'s. This
+walk pins the SERVE-time contract and the presence producer, and says so rather than claiming more.
 
 The clock is frozen at `--now` (one instant for all three variants) by replacing `datetime.datetime`
 before anything imports it, so a served age or a "generated_at" cannot differ between variants for a
@@ -296,6 +296,19 @@ def _rows(variant: str) -> list:
             "date": days[-2],
             "character_level": Decimal("5"),
             "pillar_mind": {"level": Decimal("4"), "raw_score": Decimal("50"), "tier": "Foundation", "drivers": {"top": ["vice_control"]}},
+            # Owner ruling 2026-11-05: public readers serve the record's public variant (held fixed here like the
+            # rest of the row; the variant's own invariance is tests/test_character_public_variant.py's).
+            "public": {
+                "public_method_version": "character-public-v1",
+                "origin": "recomputed",
+                "character_level": Decimal("5"),
+                "pillar_mind": {
+                    "level": Decimal("4"),
+                    "raw_score": Decimal("50"),
+                    "tier": "Foundation",
+                    "drivers": {"top": ["vice_control"]},
+                },
+            },
             "input_manifest": {
                 "status": "partial" if variant == "gaps" else "complete",
                 "complete": variant != "gaps",

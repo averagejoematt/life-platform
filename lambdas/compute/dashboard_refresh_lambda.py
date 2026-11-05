@@ -22,6 +22,7 @@ from common.macrofactor_fields import intake_window  # #5431: intake reads bound
 from common.max_hr import max_hr_from_profile  # #4624: the ONE fallback max HR
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
+from health import character_privacy  # owner ruling 2026-11-05: buddy/data.json reads the public variant
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
@@ -681,7 +682,7 @@ def refresh_buddy(profile, yesterday, today):
         pct_complete = round((lost_lbs / total_to_lose) * 100, 0) if total_to_lose > 0 else 0
 
         # --- Character sheet (read pre-computed) ---
-        character_sheet = fetch_date("character_sheet", yesterday)
+        character_sheet = character_privacy.public_sheet(fetch_date("character_sheet", yesterday))  # public variant only (2026-11-05)
 
         # --- Friendly timestamp ---
         try:
