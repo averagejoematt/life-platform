@@ -252,9 +252,8 @@ def _claims_by_entry():
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("PREDICTION#"),
             ScanIndexForward=False,
-            Limit=200,
         )
-        items = _decimal_to_float(resp.get("Items", []))
+        items = _decimal_to_float(resp.get("Items", []))  # not Limit-windowed: which public claims appear never depends on private ones
     except Exception as e:  # pragma: no cover — absent ledger ⇒ no claim counts
         logger.warning(f"[diary_shelf] diary_claims query failed: {e}")
         items = []
@@ -264,10 +263,10 @@ def _claims_by_entry():
         sk = str(item.get("source_sk") or "")
         if not sk:
             continue
+        if str(item.get("visibility") or "").strip().lower() != "public":
+            continue  # a private claim: graded privately, never counted on a public surface
         bucket = out.setdefault(sk, {"public": [], "count": 0})
         bucket["count"] += 1
-        if str(item.get("visibility") or "").strip().lower() != "public":
-            continue
         claim = {}
         for field in CLAIM_PUBLIC_FIELDS:
             value = item.get(field)

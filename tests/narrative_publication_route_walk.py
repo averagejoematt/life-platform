@@ -325,6 +325,12 @@ def _wire(variant: str, ungated: bool):
     import boto3
 
     NarrativeTable.rows = _rows(variant)
+    try:  # owner ruling 2026-11-05: the synthetic calls here are ordinary, publishable calls (reviewed public)
+        from call_publication_fixtures import register_reviewed_public
+
+        register_reviewed_public(NarrativeTable.rows)
+    except ImportError:  # a checkout from before the call policy (the negative control on origin/main)
+        pass
     raw = NarrativeTable()
     boto3.client = lambda *a, **k: rw._DeadClient()  # type: ignore[assignment]
 

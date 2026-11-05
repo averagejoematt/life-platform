@@ -294,7 +294,7 @@
   "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
-  "claim": "Protein recovery would lift the journaling silence.",
+  "claim": "Protein intake would climb back above 150 g within two weeks.",
   "coach_id": "nutrition_coach",
   "confidence": 0.5,
   "data_through": "2026-10-29",
@@ -317,7 +317,7 @@
    "outcome_notes": "98 → 15 (Δ −83, band ±46): trend down, predicted up",
    "tolerance_text": "±46 g"
   },
-  "id": "mind-20261015-journal01",
+  "id": "nutrition-20261015-protein01",
   "kind": "direction",
   "logged_date": "2026-10-15",
   "method_ids": [
@@ -341,8 +341,8 @@
   ],
   "state": "ok",
   "status": "refuted",
-  "summary": "Graded on protein, not on journaling.",
-  "title": "Protein recovery would lift the journaling silence",
+  "summary": "Graded on the protein reading.",
+  "title": "Protein intake would climb back above 150 g within two weeks",
   "type": "prediction",
   "verdict_text": "Wrong.",
   "visibility": "public",

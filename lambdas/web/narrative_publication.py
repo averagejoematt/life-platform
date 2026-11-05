@@ -48,7 +48,9 @@ import logging
 import re
 from typing import Any, Optional
 
-from common import narrative_provenance as NP
+from common import narrative_provenance as NP, prediction_publication as PP
+
+from web import call_publication  # owner ruling 2026-11-05: a non-eligible call's rows never reach a handler
 
 logger = logging.getLogger("site_api")
 
@@ -445,25 +447,41 @@ class PublicationTable:
             raise AttributeError(name)
         return getattr(self._npg_table, name)
 
+    def _calls_lookup(self) -> Any:
+        return call_publication.make_lookup(self._npg_table)
+
     def query(self, **kwargs: Any) -> Any:
         pk = _requested_pk(
             kwargs.get("KeyConditionExpression"), kwargs.get("ExpressionAttributeValues"), kwargs.get("ExpressionAttributeNames")
         )
-        if pk is not None and not is_narrative_partition(pk) and not is_mixed_partition(pk):
+        narrative = pk is None or is_narrative_partition(pk) or is_mixed_partition(pk)
+        governed = PP.governs_partition(pk)  # owner ruling 2026-11-05: calls, asks, bets and the rows that name them
+        if not narrative and not governed:
             return self._npg_table.query(**kwargs)
-        resp = self._npg_table.query(**_with_gate_projection(kwargs))
-        return _gate_response(resp, "Items", pk, self._npg_strict)
+        kw = _with_gate_projection(kwargs) if narrative else kwargs
+        if governed:
+            resp = call_publication.query(self._npg_table, kw, pk, self._calls_lookup())
+        else:
+            resp = self._npg_table.query(**kw)
+        return _gate_response(resp, "Items", pk, self._npg_strict) if narrative else resp
 
     def scan(self, **kwargs: Any) -> Any:
-        return _gate_response(self._npg_table.scan(**_with_gate_projection(kwargs)), "Items", None, self._npg_strict)
+        resp = call_publication.scan(self._npg_table, _with_gate_projection(kwargs), self._calls_lookup())
+        return _gate_response(resp, "Items", None, self._npg_strict)
 
     def get_item(self, **kwargs: Any) -> Any:
         key = kwargs.get("Key") or {}
         pk = key.get("pk")
-        if pk is not None and not is_narrative_row(pk, key.get("sk")):
+        narrative = pk is None or is_narrative_row(pk, key.get("sk"))
+        governed = PP.kind_of(pk, key.get("sk")) is not None
+        if not narrative and not governed:
             return self._npg_table.get_item(**kwargs)
-        resp = self._npg_table.get_item(**_with_gate_projection(kwargs))
-        if isinstance(resp, dict) and isinstance(resp.get("Item"), dict):
+        kw = _with_gate_projection(kwargs) if narrative else kwargs
+        if governed:
+            resp = call_publication.get_item(self._npg_table, kw, self._calls_lookup())
+        else:
+            resp = self._npg_table.get_item(**kw)
+        if narrative and isinstance(resp, dict) and isinstance(resp.get("Item"), dict):
             resp = {**resp, "Item": gate_item(resp["Item"], pk, strict=self._npg_strict)}
         return resp
 

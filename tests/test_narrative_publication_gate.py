@@ -299,12 +299,15 @@ def test_a_projection_cannot_hide_the_provenance_from_the_gate():
     item = {"pk": "COACH#sleep_coach", "sk": "PREDICTION#x", "claim_natural": "Deep sleep rises.", "provenance": _rec("whoop")}
     fake = _FakeTable([item])
     t = G.wrap(fake)
-    out = t.query(
-        KeyConditionExpression="pk = :p",
-        ExpressionAttributeValues={":p": "COACH#sleep_coach"},
-        ProjectionExpression="#a",
-        ExpressionAttributeNames={"#a": "claim_natural"},
-    )
+    from tests.call_publication_fixtures import registered  # owner ruling 2026-11-05: a reviewed-public synthetic call
+
+    with registered([item]):
+        out = t.query(
+            KeyConditionExpression="pk = :p",
+            ExpressionAttributeValues={":p": "COACH#sleep_coach"},
+            ProjectionExpression="#a",
+            ExpressionAttributeNames={"#a": "claim_natural"},
+        )
     assert "provenance" in fake.last["ProjectionExpression"] or "#npg_provenance" in fake.last["ProjectionExpression"]
     assert fake.last["ExpressionAttributeNames"]["#npg_provenance"] == "provenance"
     assert out["Items"][0]["claim_natural"] == "Deep sleep rises." and "provenance" not in out["Items"][0]
