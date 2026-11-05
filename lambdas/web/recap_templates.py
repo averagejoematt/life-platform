@@ -1,4 +1,4 @@
-"""recap_templates.py — six things a day can be about, and which one it was (#3745).
+"""recap_templates.py — five things a day can be about, and which one it was (#3745).
 
 THE BRIEF, VERBATIM
 
@@ -6,7 +6,7 @@ The owner asked for a daily card he can post, and then: *"so it's not just rinse
 repeat… any sort of new, unique, interesting things that would captivate me would
 captivate my readers about the story."*
 
-A fixed layout is a dashboard screenshot by day three. So the deck holds six templates and
+A fixed layout is a dashboard screenshot by day three. So the deck holds five templates and
 each day the one or two with the most SIGNAL are drawn. Signal is not "did we have the
 data" — it is "did something happen here that a reader would notice": a big move against
 his own trailing baseline, a first-in-N-days event, a streak boundary.
@@ -34,8 +34,11 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-# Ordered. Ties break toward the top — a weight move is more of a story than a journal tick.
-PRIORITY = ["weight_trend", "workout", "consistency_comeback", "habits", "nutrition", "journal"]
+# Ordered. Ties break toward the top — a weight move is more of a story than a protein day.
+# The JOURNAL template ("Wrote it down") is retired: whether he journaled is private activity
+# (owner rulings 2026-11-03/05 — "Remove the public recap-card 'JOURNAL' template and associated
+# journal-derived indicators"). It is not a candidate on any day, so no card can say he did or didn't.
+PRIORITY = ["weight_trend", "workout", "consistency_comeback", "habits", "nutrition"]
 
 #: A second card only earns its slot with real signal of its own.
 SECOND_SLOT_FLOOR = 0.4
@@ -124,13 +127,6 @@ def _nutrition_signal(facts, trailing) -> float | None:
     if facts.protein_target_g:
         return round(min(1.0, float(facts.protein_g) / float(facts.protein_target_g)), 3)
     return 0.3
-
-
-def _journal_signal(facts, trailing) -> float | None:
-    """A tie-breaker. Real, but rarely the headline."""
-    if not facts.journal_templates:
-        return None
-    return round(min(1.0, 0.35 + 0.1 * len(facts.journal_templates)), 3)
 
 
 def _comeback_signal(facts, trailing) -> float | None:
@@ -227,12 +223,6 @@ def _nutrition_copy(facts) -> dict[str, Any]:
     return {"hero": f"{protein:.0f} g", "label": "PROTEIN", "lines": lines}
 
 
-def _journal_copy(facts) -> dict[str, Any]:
-    if not facts.journal_templates:
-        raise RecapNullFact("no journal entries — this template should not have been picked")
-    return {"hero": "Wrote it down", "label": "JOURNAL", "lines": [", ".join(sorted(set(facts.journal_templates)))]}
-
-
 def _comeback_copy(facts) -> dict[str, Any]:
     pct = float(_require("tier0_pct", facts.tier0_pct))
     pct = pct / 100.0 if pct > 1 else pct
@@ -246,7 +236,6 @@ TEMPLATES: dict[str, Template] = {
     "workout": ("workout", _workout_signal, _workout_copy),
     "habits": ("habits", _habits_signal, _habits_copy),
     "nutrition": ("nutrition", _nutrition_signal, _nutrition_copy),
-    "journal": ("journal", _journal_signal, _journal_copy),
     "consistency_comeback": ("consistency_comeback", _comeback_signal, _comeback_copy),
 }
 

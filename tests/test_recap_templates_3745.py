@@ -54,7 +54,6 @@ def _rich(**over) -> DayFacts:
         protein_g=182,
         protein_target_g=180,
         calories=2100,
-        journal_templates=["Evening"],
     )
     base.update(over)
     return DayFacts(**base)
@@ -112,9 +111,16 @@ def test_nutrition_declines_without_protein_and_scores_against_target():
     assert rt._nutrition_signal(_rich(protein_g=90, protein_target_g=None), []) == 0.3
 
 
-def test_journal_declines_with_no_entries():
-    assert rt._journal_signal(_rich(journal_templates=[]), []) is None
-    assert rt._journal_signal(_rich(), []) is not None
+def test_the_journal_template_is_retired_and_no_card_can_draw_it():
+    """Owner ruling 2026-11-05: "Remove the public recap-card 'JOURNAL' template and associated
+    journal-derived indicators." Whether he journaled is private activity: no template, no signal,
+    no fact on the day, so no card on any day can say he did or didn't."""
+    assert "journal" not in rt.TEMPLATES and "journal" not in rt.PRIORITY
+    assert not hasattr(rt, "_journal_signal") and not hasattr(rt, "_journal_copy")
+    assert "journal_templates" not in DayFacts.__dataclass_fields__ and not hasattr(DayFacts, "journaled")
+    for picked in (rt.pick(_rich(), []), rt.pick(_rich(workouts=[], tier0_done=None, tier0_total=None, tier0_pct=None), [])):
+        drawn = " ".join(rt.all_strings([rt.copy_for(n, _rich()) for n in picked])).lower()
+        assert "journal" not in drawn and "wrote it down" not in drawn
 
 
 def test_comeback_needs_a_baseline_before_it_will_claim_one():
@@ -172,19 +178,18 @@ def test_ties_break_by_a_fixed_priority_not_by_dict_order():
 
 
 def test_a_weak_second_candidate_does_not_earn_a_slot():
-    """A protein number with no target scores 0.3 — real, but not a second card. (A journal
-    tick at 0.45 DOES earn one, deliberately: the owner asked for days that are not all
-    about the gym.)"""
-    facts = _rich(workouts=[], tier0_done=None, tier0_total=None, tier0_pct=None, journal_templates=[], protein_target_g=None)
+    """A protein number with no target scores 0.3 — real, but not a second card."""
+    facts = _rich(workouts=[], tier0_done=None, tier0_total=None, tier0_pct=None, protein_target_g=None)
     picked = rt.pick(facts, [])
     assert picked[0] == "weight_trend"
     assert len(picked) == 1, f"a 0.3 nutrition signal took the second slot: {picked}"
 
 
 def test_a_non_training_day_can_still_carry_a_second_card():
-    """'It might not all be about exercise and fitness' — the owner, 2026-09-13."""
-    facts = _rich(workouts=[], tier0_done=None, tier0_total=None, tier0_pct=None, protein_g=None)
-    assert rt.pick(facts, []) == ["weight_trend", "journal"]
+    """'It might not all be about exercise and fitness' — the owner, 2026-09-13. The journal tick
+    that used to fill this slot is retired (owner ruling 2026-11-05); nutrition carries it now."""
+    facts = _rich(workouts=[], tier0_done=None, tier0_total=None, tier0_pct=None)
+    assert rt.pick(facts, []) == ["weight_trend", "nutrition"]
 
 
 def test_a_strong_second_candidate_does_earn_one():
@@ -221,7 +226,7 @@ def test_the_confidence_interval_travels_with_the_rate():
 
 # ── 5. A missing fact raises rather than drawing a dash ───────────────────────
 def test_copy_raises_rather_than_drawing_an_em_dash():
-    for name in ("weight_trend", "workout", "habits", "nutrition", "journal", "consistency_comeback"):
+    for name in ("weight_trend", "workout", "habits", "nutrition", "consistency_comeback"):
         with pytest.raises(rt.RecapNullFact):
             rt.copy_for(name, DayFacts(date="2026-09-13"))
 
@@ -238,6 +243,43 @@ def test_item_labels_expose_every_name_a_card_could_draw():
     labels = _rich().item_labels()
     assert ("workout", "Legs") in labels
     assert ("workout", "Squat (Barbell)") in labels
+
+
+# ── 7. No journal-derived indicator reaches a card (owner ruling 2026-11-05) ──────────────────
+def test_a_days_card_facts_are_byte_identical_whatever_the_journal_did(monkeypatch):
+    """Vary ONLY the private journal: no entry / two entries that day, and the day grade's journal
+    component at 0 / 100 (all synthetic). The assembled day — every fact a card is drawn from — is
+    the same bytes, so no template, row or caption can carry it. Mutation control: with the policy's
+    component filter bypassed, the journal component DOES reach the facts."""
+    import dataclasses
+    import json as _json
+
+    from common import activity_publication
+    from content import recap_data
+
+    def facts_for(journal_on):
+        rows = {
+            "computed_metrics": {
+                "day_grade_letter": "B",
+                "day_grade_score": 80,
+                "component_scores": {"sleep_quality": 80, "journal": 100 if journal_on else 0},
+            },
+            "macrofactor": {"total_protein_g": 160, "total_calories_kcal": 2100},
+        }
+        journal = [
+            {"sk": "DATE#2026-09-13#journal#morning", "template": "Morning"},
+            {"sk": "DATE#2026-09-13#journal#evening", "template": "Evening"},
+        ]
+        monkeypatch.setattr(recap_data, "_get_day", lambda _t, source, _d: rows.get(source))
+        monkeypatch.setattr(recap_data, "_query_prefix", lambda _t, source, _p: journal if (source == "notion" and journal_on) else [])
+        monkeypatch.setattr(recap_data, "_query_range", lambda *_a, **_k: [])
+        return _json.dumps(dataclasses.asdict(recap_data.day_facts(None, "2026-09-13")), sort_keys=True, default=str)
+
+    off, on = facts_for(False), facts_for(True)
+    assert off == on
+    assert "journal" not in on.lower() and "notion" not in on
+    monkeypatch.setattr(activity_publication, "public_component_scores", lambda sc: dict(sc or {}))
+    assert facts_for(False) != facts_for(True), "the control could not see the journal — the invariance above is vacuous"
 
 
 if __name__ == "__main__":  # pragma: no cover

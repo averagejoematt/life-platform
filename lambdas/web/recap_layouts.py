@@ -409,8 +409,7 @@ _COMPONENT_NAMES = {
     "nutrition": "nutrition",
     "recovery": "recovery",
     "hydration": "hydration",
-    "journal": "journal",
-}
+}  # no "journal": the day grade's journal component is never drawn (owner rulings 2026-11-03/05)
 
 
 def _grade_strip(draw, grades: list, *, y: int, h: int = 74, weekdays=None) -> int:
@@ -854,7 +853,7 @@ def dayzero(facts, *, date_label: str):
     y += 40
     y = _fact_row(draw, "goal", f"{facts.goal_weight_lb:.0f} lb", y=y, size=32, floor=CONTENT_FLOOR)
     y = _fact_row(draw, "to lose", f"{facts.baseline_weight_lb - facts.goal_weight_lb:.0f} lb", y=y + 8, size=32, floor=CONTENT_FLOOR)
-    names = [v for k, v in _COMPONENT_NAMES.items() if k != "journal"]
+    names = list(_COMPONENT_NAMES.values())
     y += 30
     draw.text((M, y), "GRADED EVERY DAY ON", fill=ce.GREEN, font=ce.font(ce.FONT_MONO_BOLD, 22))
     y += 38

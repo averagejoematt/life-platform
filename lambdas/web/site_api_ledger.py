@@ -5,7 +5,10 @@ import json
 import os
 
 from boto3.dynamodb.conditions import Key
-from common import stats_core
+from common import (
+    activity_publication as _activity_publication,  # owner rulings 2026-11-03/05: private metrics off the wire
+    stats_core,
+)
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from web.site_api_common import S3_REGION, USER_PREFIX, _decimal_to_float, _is_blocked_vice, _ok, logger
@@ -128,11 +131,15 @@ def what_changed(*, _g) -> dict:
             cache_seconds=900,
         )
     item = _decimal_to_float(item)
+    # Owner rulings 2026-11-03/05: a newly-unlocked pair naming a private metric is omitted, and the
+    # honest-null flag is re-judged over what is served (common.activity_publication).
+    deltas = item.get("deltas", [])
+    unlocked = [u for u in item.get("newly_unlocked", []) or [] if _activity_publication.correlation_pair_is_public(u)]
     return _ok(
         {
-            "deltas": item.get("deltas", []),
-            "newly_unlocked": item.get("newly_unlocked", []),
-            "honest_null": bool(item.get("honest_null", False)),
+            "deltas": deltas,
+            "newly_unlocked": unlocked,
+            "honest_null": bool(item.get("honest_null", False)) or (not deltas and not unlocked),
             "window_start": item.get("window_start"),
             "window_end": item.get("window_end"),
             "week": item.get("week"),
@@ -364,10 +371,10 @@ def discoveries(*, _g) -> dict:
             # `continue` on every real record (structurally always []); a
             # hypothetical legacy flat-list record is still accepted, the same way
             # site_api_discovery.correlations() handles both shapes.
-            if isinstance(corrs, dict):
-                pairs = list(corrs.values())
+            if isinstance(corrs, dict):  # owner rulings 2026-11-03/05: public pairs, FDR re-run over them
+                pairs = list(_activity_publication.public_correlations(corrs).values())
             elif isinstance(corrs, list):
-                pairs = corrs
+                pairs = _activity_publication.public_correlations(corrs)
             else:
                 continue
             for c in pairs:

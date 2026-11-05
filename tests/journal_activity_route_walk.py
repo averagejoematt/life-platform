@@ -84,6 +84,12 @@ if __name__ == "__main__":
     _ap.add_argument("--variant", choices=("none", "daily", "gaps"), required=True)
     _ap.add_argument("--now", required=True)
     _ap.add_argument("--ungated", action="store_true", help="mutation control: the activity policy publishes everything")
+    _ap.add_argument(
+        "--axis",
+        choices=("journal", "mind"),
+        default="journal",
+        help="which private activity varies: the journal (2026-11-03) or State of Mind + the video diary (2026-11-05)",
+    )
     ARGS = _ap.parse_args()
     _freeze(ARGS.now)
 
@@ -384,6 +390,17 @@ def _match(sk: str, cond) -> bool:
     return {"=": sk == str(a), "<=": sk <= str(a), ">=": sk >= str(a), "<": sk < str(a), ">": sk > str(a)}[op]
 
 
+def _exists_field(fexpr):
+    """The attribute name of a bare `Attr(name).exists()` filter, else None."""
+    get_expr = getattr(fexpr, "get_expression", None)
+    if get_expr is None:
+        return None
+    expr = get_expr()
+    if expr.get("operator") == "attribute_exists" and expr.get("values"):
+        return getattr(expr["values"][0], "name", None)
+    return None
+
+
 class JournalTable(rw.RhythmTable):
     rows: list = []
 
@@ -405,6 +422,11 @@ class JournalTable(rw.RhythmTable):
             return {"Items": [], "Count": 0}
         cond = _sk_cond(KeyConditionExpression, ExpressionAttributeValues)
         items = sorted((r for r in self._rows(pk) if _match(str(r["sk"]), cond)), key=lambda r: str(r["sk"]))
+        # `Attr(field).exists()` is honoured (the status board tracks a shared partition's sub-stream by
+        # it); every other filter — the phase filter — is ignored, as before.
+        must_have = _exists_field(kw.get("FilterExpression"))
+        if must_have:
+            items = [r for r in items if must_have in r]
         if kw.get("ScanIndexForward") is False:
             items.reverse()
         if kw.get("Limit"):
@@ -429,9 +451,240 @@ def _ungate() -> None:
     AP.is_private_activity_source = lambda _s: False
     AP.habit_is_public = lambda *_a, **_k: True
     AP.public_status_fields = lambda st: dict(st or {})
+    # 2026-11-05: the field-level and derived-metric halves of the policy.
+    AP.field_is_public = lambda *_a: True
+    AP.public_hae_datatypes = lambda rows: rows
+    AP.correlation_pair_is_public = lambda _p: True
+    AP.public_correlations = lambda c, alpha=0.05: c
+    AP.hypothesis_is_public = lambda _h: True
+    AP.public_component_scores = lambda sc: dict(sc or {})
 
 
-def _wire(variant: str, ungated: bool = False):
+# ── the State-of-Mind + video-diary axis (owner rulings 2026-11-05) ───────────────────────────
+#
+# What varies on `--axis mind`, all SYNTHETIC (relative dates, invented values): the How We Feel
+# daily aggregates on the apple_health rows (every som_* field the ingest writes) and a
+# `state_of_mind` partition row; the HAE per-datatype liveness sentinel's State-of-Mind row; the
+# daily-metrics `diary_sessions` count; unconsented video-diary rows in the journal partition; and,
+# produced by the REAL producer (compute.weekly_correlation_compute_lambda) from a series whose
+# private metrics vary, the weekly correlation record and the what-changed snapshot; plus a
+# hypothesis (and its calibration row) on the diary-day metric. Everything public is held fixed:
+# the apple_health steps/water, the public correlation metrics, a public hypothesis. On this axis the
+# journal is held at the "gaps" pattern; on the journal axis these rows are held at "gaps".
+
+
+def _days() -> list:
+    from datetime import timedelta
+
+    from common.pacific_time import PACIFIC
+
+    today = FROZEN.astimezone(PACIFIC).date()
+    return [(today - timedelta(days=i)).isoformat() for i in range(21, -1, -1)]
+
+
+def _mind_days(variant: str, days: list) -> set:
+    if variant == "none":
+        return set()
+    if variant == "daily":
+        return set(days)
+    return {d for i, d in enumerate(days) if i % 4 in (0, 3)}
+
+
+def _mind_rows(variant: str) -> list:
+    days = _days()
+    mdays = _mind_days(variant, days)
+    U = "USER#matthew"
+    rows: list = []
+    for i, d in enumerate(days):
+        ah = {
+            "pk": f"{U}#SOURCE#apple_health",
+            "sk": f"DATE#{d}",
+            "date": d,
+            "steps": Decimal(str(7000 + 37 * i)),
+            "water_intake_ml": Decimal("2000"),
+            "mindful_minutes": Decimal("5"),
+            "webhook_ingested_at": f"{d}T15:00:00+00:00",
+        }
+        if d in mdays:
+            ah.update(
+                {
+                    "som_avg_valence": Decimal(str(round(0.1 * (i % 7) - 0.3, 2))),
+                    "som_min_valence": Decimal("-0.5"),
+                    "som_max_valence": Decimal("0.6"),
+                    "som_check_in_count": Decimal(1 + i % 3),
+                    "som_mood_count": Decimal(1),
+                    "som_emotion_count": Decimal(i % 3),
+                    "som_top_labels": "Synthetic, Labels",
+                    "som_top_associations": "Synthetic Association",
+                }
+            )
+            rows.append(
+                {
+                    "pk": f"{U}#SOURCE#state_of_mind",
+                    "sk": f"DATE#{d}",
+                    "date": d,
+                    "valence": Decimal("0.2"),
+                    "som_avg_valence": Decimal("3"),
+                }
+            )
+            # an unconsented video-diary session (no consent marker): private journal activity
+            rows.append(
+                {
+                    "pk": f"{U}#SOURCE#notion",
+                    "sk": f"DATE#{d}#journal#video_diary#s{i}",
+                    "date": d,
+                    "channel": "video_diary",
+                    "template": "Video Diary",
+                    "raw_text": "synthetic diary words",
+                }
+            )
+        rows.append(ah)
+    som_last = max(mdays) if mdays else None
+    rows.append(
+        {
+            "pk": f"{U}#SOURCE#apple_health",
+            "sk": "DATATYPE_LIVENESS",
+            "datatypes": [
+                {
+                    "key": "steps",
+                    "label": "Steps / activity",
+                    "last_seen": days[-1],
+                    "age_days": Decimal("0"),
+                    "dark": False,
+                    "stale_days": Decimal("2"),
+                    "manual": False,
+                },
+                {
+                    "key": "water",
+                    "label": "Water",
+                    "last_seen": days[-1],
+                    "age_days": Decimal("0"),
+                    "dark": False,
+                    "stale_days": Decimal("3"),
+                    "manual": True,
+                },
+                {
+                    "key": "state_of_mind",
+                    "label": "State of Mind",
+                    "last_seen": som_last,
+                    "age_days": Decimal(str(len(days) - 1 - days.index(som_last))) if som_last else None,
+                    "dark": som_last is None,
+                    "stale_days": Decimal("14"),
+                    "manual": True,
+                },
+            ],
+        }
+    )
+    n_diary = sum(1 for d in days if d in mdays)
+    spec_diary = {
+        "condition_metric": "diary_day",
+        "outcome_metric": "habit_pct",
+        "condition_op": ">=",
+        "condition_threshold": Decimal("1"),
+        "lag_days": Decimal("0"),
+        "direction": "higher",
+        "min_effect": Decimal("0.05"),
+    }
+    spec_public = {
+        "condition_metric": "hrv",
+        "outcome_metric": "recovery",
+        "condition_op": "median_split",
+        "lag_days": Decimal("1"),
+        "direction": "higher",
+        "min_effect": Decimal("0.05"),
+    }
+    for hid, spec, n_cond in (("hyp_synthetic_diary", spec_diary, n_diary), ("hyp_synthetic_public", spec_public, 11)):
+        rows.append(
+            {
+                "pk": f"{U}#SOURCE#hypotheses",
+                "sk": f"HYPOTHESIS#{hid}",
+                "hypothesis_id": hid,
+                "status": "pending" if hid.endswith("public") else ("archived" if n_cond else "pending"),
+                "confidence": "low",
+                "created_at": f"{days[0]}T12:00:00+00:00",
+                "test_spec": spec,
+                "deterministic_verdict": "inconclusive",
+                "n_condition": Decimal(n_cond),
+                "n_comparison": Decimal(len(days) - n_cond),
+                "days_observed": Decimal(len(days)),
+            }
+        )
+        rows.append(
+            {
+                "pk": f"{U}#SOURCE#calibration",
+                "sk": f"CALIB#{days[-3]}#{hid}",
+                "record_type": "hypothesis_resolution",
+                "hypothesis_id": hid,
+                "stated_confidence": "medium",
+                "outcome": "confirmed" if (hid.endswith("public") or n_cond) else "refuted",
+                "test_spec": spec,
+                "n_condition": Decimal(n_cond),
+                "resolved_at": f"{days[-3]}T12:00:00+00:00",
+                "pre_registered_at": f"{days[0]}T12:00:00+00:00",
+            }
+        )
+    return rows
+
+
+def _with_mind(rows: list, variant: str) -> list:
+    """The held-fixed computed_metrics rows, with the day's diary-session count varied (0 = an honest
+    no-session day, as the producer writes it)."""
+    mdays = _mind_days(variant, _days())
+    for r in rows:
+        if str(r.get("pk", "")).endswith("#SOURCE#computed_metrics"):
+            r["diary_sessions"] = Decimal(1 if r.get("date") in mdays else 0)
+            r["component_scores"] = dict(r.get("component_scores") or {}, journal=Decimal("100" if r.get("date") in mdays else "0"))
+    return rows
+
+
+def _corr_series(variant: str) -> dict:
+    """A daily series for the weekly correlation producer: the public metrics fixed (a few pairs near
+    the FDR bar, so a family change would show), the three private metrics varying."""
+    days = _days()
+    mdays = _mind_days(variant, days)
+    series = {}
+    for i, d in enumerate(days):
+        wave = ((i * 7) % 11) / 10.0
+        m = {
+            "hrv": 40 + 2.0 * i + 3 * wave,
+            "recovery_score": 50 + 1.5 * i + 8 * wave,
+            "sleep_duration": 7 + wave,
+            "sleep_score": 70 + 6 * wave,
+            "resting_hr": 60 - 0.2 * i + 2 * wave,
+            "strain": 10 + 3 * ((i * 5) % 7) / 7.0,
+            "tsb": float((i * 3) % 9 - 4),
+            "training_kj": 800 + 90 * ((i * 4) % 6),
+            "training_mins": 40 + 7 * ((i * 2) % 5),
+            "calories": 2100 + 40 * ((i * 3) % 7),
+            "protein_g": 150 + 5 * ((i * 5) % 6),
+            "carbs_g": 200 + 9 * ((i * 2) % 7),
+            "fat_g": 70.0,
+            "steps": 7000 + 37 * i,
+            "day_grade": 70 + 2 * wave + 0.4 * i,
+            "readiness": 60 + 5 * wave,
+            "tier0_streak": float(i % 4),
+            "habit_pct": 0.6 + 0.02 * ((i * 3) % 9),
+            "glucose_cv": 20 + ((i * 5) % 8),
+            "diary_sessions": 1.0 if d in mdays else 0.0,
+            "mood_valence": (0.05 * i - 0.4) if d in mdays else None,
+            "values_lived_count": float(i % 3) if d in mdays else None,
+        }
+        series[d] = m
+    return series
+
+
+def _produce_correlations(raw, variant: str) -> None:
+    from compute import weekly_correlation_compute_lambda as WC
+
+    WC.table = raw
+    days = _days()
+    corrs = WC.compute_correlations(_corr_series(variant))
+    WC.store_correlations("2026-W45", corrs, days[0], days[-1], FROZEN.isoformat())
+    unlocked, first = WC.diff_newly_unlocked(corrs, {}, days[-1])
+    WC.store_what_changed("2026-W45", [], unlocked, first, days[-1], FROZEN.isoformat())
+
+
+def _wire(variant: str, ungated: bool = False, axis: str = "journal"):
     import urllib.request
 
     import boto3
@@ -439,7 +692,8 @@ def _wire(variant: str, ungated: bool = False):
     if ungated:
         _ungate()
 
-    JournalTable.rows = _rows(variant)
+    journal_variant, mind_variant = (variant, "gaps") if axis == "journal" else ("gaps", variant)
+    JournalTable.rows = _with_mind(_rows(journal_variant), mind_variant) + _mind_rows(mind_variant)
     raw = JournalTable()
     boto3.client = lambda *a, **k: rw._DeadClient()  # type: ignore[assignment]
 
@@ -463,6 +717,9 @@ def _wire(variant: str, ungated: bool = False):
 
     CC.table = raw
     CC.store_circadian_score(CC.compute_circadian_score(FROZEN.astimezone(PACIFIC).date().isoformat()))
+
+    # The weekly correlation record + the what-changed snapshot, produced by the real producer.
+    _produce_correlations(raw, mind_variant)
 
     from web import site_api_lambda as L
 
@@ -500,8 +757,8 @@ def _normalise(node):
     return node
 
 
-def walk(variant: str, ungated: bool = False) -> dict:
-    L = _wire(variant, ungated)
+def walk(variant: str, ungated: bool = False, axis: str = "journal") -> dict:
+    L = _wire(variant, ungated, axis)
     out = {"variant": variant, "routes": 0, "answered": 0, "raised": {}, "bodies": {}}
     reqs = [(p, {}) for p in rw.route_paths(L)] + list(EXTRA_REQUESTS)
     for path, qs in reqs:
@@ -543,7 +800,7 @@ if __name__ == "__main__":
     _real_stdout = sys.stdout
     sys.stdout = io.StringIO()  # handlers print; keep stdout for the one JSON line
     try:
-        result = walk(ARGS.variant, ARGS.ungated)
+        result = walk(ARGS.variant, ARGS.ungated, ARGS.axis)
     finally:
         sys.stdout = _real_stdout
     print(json.dumps(result))

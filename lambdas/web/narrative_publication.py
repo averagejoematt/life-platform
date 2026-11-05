@@ -33,8 +33,8 @@ TWO HALVES, ONE DECISION. The row's provenance decides; two mechanisms enforce:
 
 The provenance record itself is removed from every narrative item, eligible or not — family names
 are not reader copy. The stored row is never touched: the owner's tools (MCP, Telegram) read the
-table directly. Per request, ``begin_request`` / ``annotate`` put the number of withheld rows on
-``_meta.withheld`` and the ``x-narrative-withheld`` header — counts, never a word or a source.
+table directly. Per request, ``begin_request`` / ``annotate`` count what was withheld and LOG it; the
+response carries no count (owner ruling 2026-11-05 — a served count moves with private writing).
 
 ``tests/test_narrative_publication_gate.py`` walks every public GET route against rows with
 private, unrecorded and public provenance and pins that the walk's public numbers are identical
@@ -53,7 +53,6 @@ from common import narrative_provenance as NP
 logger = logging.getLogger("site_api")
 
 PUBLICATION_KEY = "_publication"
-WITHHELD_HEADER = "x-narrative-withheld"
 WORDS_WITHHELD_KEY = "words_withheld"
 PUBLIC_WITHHELD_REASON = NP.PUBLIC_WITHHELD_REASON
 
@@ -515,36 +514,27 @@ def scrub_payload(node: Any) -> Any:
 
 
 def annotate(response: Any) -> Any:
-    """The public API Lambda's last step (the wire half): empty every tainted string in the body,
-    and when this request withheld anything say so — header ``x-narrative-withheld`` and, on a JSON
-    object body with ``_meta``, ``_meta.withheld``. Counts only; never a word or a source."""
+    """The public API Lambda's last step (the wire half): empty every tainted string in the body.
+
+    What this request withheld is LOGGED, never served (owner ruling 2026-11-05: "Remove _meta.withheld
+    counts from public responses"). A count of withheld rows on the wire moves with how much private
+    writing exists — the number of journal-grounded coach notes is itself journal activity — so the
+    response carries no count, no header and no flag of its own; the server log keeps the numbers."""
     if not isinstance(response, dict) or response.get("isBase64Encoded"):
         return response
     out = dict(response)
     body = response.get("body")
-    parsed = None
+    before = _STATE["scrubbed"]
     if isinstance(body, str) and _TAINT_EXACT and body.lstrip()[:1] in ("{", "["):
         try:
             parsed = json.loads(body)
         except ValueError:
             parsed = None
         if parsed is not None:
-            before = _STATE["scrubbed"]
             parsed = scrub_payload(parsed)
             if _STATE["scrubbed"] != before:
                 out["body"] = json.dumps(parsed, default=str)
     n = withheld_count()
-    if not n and not _STATE["scrubbed"]:
-        return out
-    headers = dict(response.get("headers") or {})
-    headers[WITHHELD_HEADER] = str(n)
-    out["headers"] = headers
-    if parsed is None and isinstance(body, str) and body.lstrip()[:1] == "{":
-        try:
-            parsed = json.loads(body)
-        except ValueError:
-            parsed = None
-    if isinstance(parsed, dict) and isinstance(parsed.get("_meta"), dict):
-        parsed["_meta"]["withheld"] = {"narrative_rows": n, "texts": int(_STATE["scrubbed"]), "reason": PUBLIC_WITHHELD_REASON}
-        out["body"] = json.dumps(parsed, default=str)
+    if n or _STATE["scrubbed"]:
+        logger.info("[narrative_publication] withheld this request: narrative_rows=%d texts=%d", n, int(_STATE["scrubbed"]))
     return out

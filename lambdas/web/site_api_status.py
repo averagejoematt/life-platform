@@ -93,6 +93,16 @@ def _absence_comment(facet: dict, rel: str) -> str:
     return f"PAUSED in the source registry — {facet.get('reason') or 'intentionally off'}. {duration} A pause is a hole in the record, not a broken pipe."
 
 
+def _status_row_is_public(row: tuple) -> bool:
+    """A data-source row is published when its source is public AND the field it is tracked by (the
+    tenth element, for a sub-stream of a shared partition) is public — common.activity_publication
+    (owner rulings 2026-11-03/05; unclassified fails closed)."""
+    if not _activity_publication.source_is_public(row[0]):
+        return False
+    field_check = row[9] if len(row) > 9 else None
+    return field_check is None or _activity_publication.field_is_public(row[0], field_check)
+
+
 # ── Module-owned cache state for /api/status ─────────────────────────────────
 # Originally globals in site_api_lambda.py, then on site_api_intelligence.py;
 # they live here (#1654) so the `global` declarations in status() and the reads
@@ -704,7 +714,9 @@ def status(*, _g) -> dict:
     # Owner ruling 2026-11-03: a PRIVATE source's sync state (the journal's last sync, its uptime
     # bars, its status colour, its alarm) is private activity — the row is omitted, not marked, and
     # so is its share of the rollup below (common.activity_publication; unclassified fails closed).
-    for row in [r for r in _DATA_SOURCES if _activity_publication.source_is_public(r[0])]:
+    # Owner ruling 2026-11-05: a row tracked by a PRIVATE FIELD of a public source (the State-of-Mind
+    # row's `som_avg_valence` inside apple_health) is that private sub-stream's sync state — omitted too.
+    for row in [r for r in _DATA_SOURCES if _status_row_is_public(r)]:
         sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
         category = row[5] if len(row) > 5 else "auto"
         group = row[6] if len(row) > 6 else "API-Based"

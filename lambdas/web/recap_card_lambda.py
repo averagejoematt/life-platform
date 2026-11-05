@@ -295,7 +295,7 @@ def render_for_date(date: str, *, deliver: bool = True, force: bool = False, dry
         # streaks — and the starting-line card draws none of them. They are cleared here
         # so the gate screens what the card says, not what the eve happened to hold: the
         # first render was held on a cycle-16 habit row the card never printed.
-        facts.workouts, facts.missed_tier0, facts.vice_streaks, facts.journal_templates = [], [], {}, []
+        facts.workouts, facts.missed_tier0, facts.vice_streaks = [], [], {}
     else:
         layout, why = recap_layouts.pick_beat(facts, trailing, recent_beats=recent)
     day_label = f"Day {facts.day_n}" if facts.day_n is not None else ""

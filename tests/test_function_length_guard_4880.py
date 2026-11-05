@@ -162,7 +162,6 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/web/site_api_physical.py::physical_overview": 231,
     "lambdas/web/site_api_pulse.py::pulse": 432,
     "lambdas/web/site_api_rollups.py::observatory_week": 249,
-    "lambdas/web/site_api_sleep.py::sleep_correlations": 169,
     "lambdas/web/site_api_sleep.py::sleep_detail": 225,
     "lambdas/web/site_api_status.py::status": 715,
     "lambdas/web/site_api_training.py::training_overview": 389,

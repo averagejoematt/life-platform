@@ -24,6 +24,7 @@ import hashlib  # stable-event-key hash for the achievements feed
 from datetime import date, timedelta
 
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as _activity_publication  # owner rulings 2026-11-03/05: private metrics off the wire
 from common.pacific_time import pacific_day_n  # #1955 — THE one PT day-index formula
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058
 from health import (
@@ -540,7 +541,7 @@ def journey_timeline(*, _g) -> dict:
         for item in _decimal_to_float(corr_resp.get("Items", [])):
             week = item.get("week", item.get("sk", "").replace("WEEK#", ""))
             end_d = item.get("end_date", "")
-            corrs = item.get("correlations", {})
+            corrs = _activity_publication.public_correlations(item.get("correlations", {}))
             if not isinstance(corrs, dict):
                 continue
             for label, data in corrs.items():
