@@ -6,6 +6,7 @@ facade's injectable/monkeypatched state via `_g["<name>"]` — same object the t
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as _activity_publication  # owner ruling 2026-11-05: private sub-streams off the board
 from common.pacific_time import (  # #1964/#3257: THE one Pacific frame + parser (the day-key anchor now runs inside instrument_presence.source_liveness)
     PACIFIC as PT,
     parse_iso_utc,
@@ -262,7 +263,9 @@ def source_freshness(*, _g) -> dict:
         # "fresh" hides a months-dark CGM/BP/SoM/workout stream. Surface the per-datatype
         # liveness the freshness-checker stores so the darkness is visible.
         if sid == "apple_health":
-            dts = _apple_health_datatypes(_g=_g)
+            # Owner ruling 2026-11-05: a PRIVATE sub-stream's liveness (State of Mind: its last check-in
+            # day, its days dark) is its activity — omitted, with its dark row (common.activity_publication).
+            dts = _activity_publication.public_hae_datatypes(_apple_health_datatypes(_g=_g))
             if dts:
                 entry["datatypes"] = dts
                 # #746: dark HAE streams now carry their days-dark + manual flag, so

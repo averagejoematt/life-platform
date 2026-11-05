@@ -32,6 +32,7 @@ import os
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from common import activity_publication as _activity_publication  # owner rulings 2026-11-03/05: private metrics off the wire
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 / #946 / #2109
@@ -432,7 +433,7 @@ def _ask_fetch_computed_reads() -> dict:
         )
         pairs: dict = {}
         for item in _decimal_to_float(resp.get("Items", [])):
-            corrs = item.get("correlations", {})
+            corrs = _activity_publication.public_correlations(item.get("correlations", {}))  # owner rulings 2026-11-03/05
             if not isinstance(corrs, dict):
                 continue
             for label, data in corrs.items():

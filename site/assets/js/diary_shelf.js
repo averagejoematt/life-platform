@@ -76,34 +76,24 @@ export function quotesHTML(entry) {
     .filter((q) => q && String(q.quote || "").trim())
     .map((q) => `<blockquote class="dsh-quote">&ldquo;${esc(q.quote)}&rdquo;</blockquote>`)
     .join("");
-  const held = Number(entry.quotes_withheld || 0);
-  const heldLine = held
-    ? `<p class="dsh-held label">${held} more line${held === 1 ? "" : "s"} from this entry stayed private.</p>`
-    : "";
   // No marked lines at all: say so plainly rather than leaving a silent gap —
-  // the card is the entry's receipt, the quotes are a separate consent.
+  // the card is the entry's receipt, the quotes are a separate consent. No count of
+  // the lines that stayed private (owner ruling 2026-11-05).
   const none = cards ? "" : `<p class="dsh-held label">No lines from this entry were marked for publication.</p>`;
-  return cards + none + heldLine;
+  return cards + none;
 }
 
 /* On-tape forecasts (#1841). Claims are private by default and grade privately;
-   only an explicitly public-marked claim carries text. The count is disclosed
-   either way — that he put N forecasts on the record is the signal. */
+   only an explicitly public-marked claim is listed. The private ones are neither
+   shown nor counted (owner ruling 2026-11-05). */
 export function claimsHTML(entry) {
   const claims = Array.isArray(entry.claims) ? entry.claims : [];
-  const total = Number(entry.claims_on_record || 0);
-  if (!total) return "";
   const listed = claims
     .filter((c) => c && c.claim_natural)
     .map((c) => `<li class="dsh-claim">${esc(c.claim_natural)}` +
       (c.grade_by ? ` <span class="label">&mdash; called by ${esc(c.grade_by)}</span>` : "") + `</li>`)
     .join("");
-  const list = listed ? `<ul class="dsh-claims">${listed}</ul>` : "";
-  const held = total - claims.filter((c) => c && c.claim_natural).length;
-  const heldLine = held > 0
-    ? `<p class="dsh-held label">${held} forecast${held === 1 ? "" : "s"} on the record from this entry, graded privately.</p>`
-    : "";
-  return list + heldLine;
+  return listed ? `<ul class="dsh-claims">${listed}</ul>` : "";
 }
 
 export function cardHTML(entry) {
@@ -125,18 +115,16 @@ export function cardHTML(entry) {
 }
 
 /* The whole shelf. An empty shelf is a real, reportable state — a quiet week
-   renders as quiet, and the withheld count is stated rather than implied. */
+   renders as quiet. No count of unpublished entries is shown: diary sessions are
+   private journal activity (owner ruling 2026-11-05 — omit, never mark). */
 export function shelfHTML(payload) {
   const shelf = (payload && payload.shelf) || null;
   if (!shelf) return "";
   const entries = Array.isArray(shelf.entries) ? shelf.entries : [];
-  const withheld = Number(shelf.withheld || 0);
   const cards = entries.map(cardHTML).filter(Boolean).join("");
 
   if (!cards) {
-    const line = withheld
-      ? `${withheld} diary entr${withheld === 1 ? "y is" : "ies are"} recorded and none are published yet.`
-      : `No diary entries have been published yet.`;
+    const line = `No diary entries have been published yet.`;
     // The standing policy sentence is the SERVER's copy (shelf.note) — one source
     // for the honesty statement, so editing it in the handler actually changes
     // the page. The literal is only a fallback for a payload without one.
@@ -144,11 +132,7 @@ export function shelfHTML(payload) {
     return `<p class="dsh-empty dx-prose">${esc(line)} ${esc(note)}</p>`;
   }
 
-  const foot = withheld
-    ? `<p class="dsh-foot label">${withheld} more entr${withheld === 1 ? "y" : "ies"} ` +
-      `${withheld === 1 ? "is" : "are"} recorded and not published.</p>`
-    : "";
-  return `<ul class="dsh-shelf">${cards}</ul>` + foot;
+  return `<ul class="dsh-shelf">${cards}</ul>`;
 }
 
 async function getJSON(path) {

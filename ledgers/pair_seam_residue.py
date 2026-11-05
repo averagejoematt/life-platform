@@ -77,7 +77,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "apple_health::lambdas/web/site_api_physical.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_pulse.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_rollups.py::read": SEED_DATE,
-    "apple_health::lambdas/web/site_api_sleep.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_api_training.py::read": SEED_DATE,
     "apple_health::lambdas/web/site_stats_refresh_lambda.py::read": SEED_DATE,
     "apple_health::mcp/tools_cgm.py::read": SEED_DATE,
@@ -501,10 +500,6 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         _RECAP_READ_REASON,
     ),
     "hevy::lambdas/content/recap_data.py::read": (
-        "2026-09-13",
-        _RECAP_READ_REASON,
-    ),
-    "notion::lambdas/content/recap_data.py::read": (
         "2026-09-13",
         _RECAP_READ_REASON,
     ),

@@ -32,6 +32,7 @@ from coach import (
     plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
+from common import activity_publication as _activity_publication  # owner rulings 2026-11-03/05: private metrics off the wire
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -713,7 +714,8 @@ def handle_calibration(event, *, _g):
         jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
         jobs["hypothesis-ledger"] = _fetch_hyp_ledger
         fetched = _parallel_fetch(jobs)
-        hyp_rows = fetched.pop("hypothesis-ledger")
+        # Owner rulings 2026-11-03/05: a graded bet on a private metric stays out of the public scores.
+        hyp_rows = [r for r in fetched.pop("hypothesis-ledger") if _activity_publication.hypothesis_is_public(r)]
 
         per_coach = []
         season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set

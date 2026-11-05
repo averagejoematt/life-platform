@@ -296,6 +296,9 @@ export function mindRestraint(vices, timeline) {
 // never a hollow "no data" axis. A one-tap entry affordance is present (the mechanic itself is
 // P1, gated). No nag, no guilt, no streak to keep.
 export function mindInvitingAbsence(m) {
+  // Owner ruling 2026-11-05: mood check-ins (State of Mind) are private — the API serves no count, so
+  // this panel can no longer say whether anything was logged, and says nothing.
+  if (m.mood_entries_count == null) return "";
   const moodN = Number(m.mood_entries_count) || 0;
   if (moodN >= 4) return ""; // once mood accrues, the sparkline (P1/P2) takes over
   return sec("How it felt — the layer the machine can't see",
@@ -311,7 +314,8 @@ export function mindPillarDecomposed(m) {
   const inputs = [
     // Owner ruling 2026-11-03: journal activity is private — the row says so, with no count.
     { label: "reflection — the journal", val: "private, not published", has: true },
-    { label: "mood — daily check-ins", val: m.mood_entries_count, has: (m.mood_entries_count || 0) > 0 },
+    // Owner ruling 2026-11-05: State-of-Mind check-ins are private — no count.
+    { label: "mood — daily check-ins", val: "private, not published", has: true },
     { label: "restraint — temptations resisted", val: m.resist_rate_pct != null ? m.resist_rate_pct + "%" : null, has: m.resist_rate_pct != null },
     { label: "depth — meaningful conversation", val: m.meaningful_pct ? m.meaningful_pct + "%" : null, has: (m.meaningful_pct || 0) > 0 },
   ];

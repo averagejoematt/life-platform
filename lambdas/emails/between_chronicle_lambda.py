@@ -35,6 +35,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
+from common import activity_publication  # owner rulings 2026-11-03/05: private metrics off public mail
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 
@@ -121,7 +122,8 @@ def gather_digest() -> dict:
         wc = _d2f(table.get_item(Key={"pk": f"{USER_PREFIX}what_changed", "sk": "SNAPSHOT#current"}).get("Item") or {})
         if not wc.get("honest_null"):
             digest["deltas"] = (wc.get("deltas") or [])[:6]
-            digest["unlocked"] = (wc.get("newly_unlocked") or [])[:4]
+            # Owner rulings 2026-11-03/05: the same public projection /api/what_changed serves.
+            digest["unlocked"] = [u for u in (wc.get("newly_unlocked") or []) if activity_publication.correlation_pair_is_public(u)][:4]
     except Exception as e:
         logger.warning("what_changed read skipped: %s", e)
 

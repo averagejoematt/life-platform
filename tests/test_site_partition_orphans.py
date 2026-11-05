@@ -55,9 +55,7 @@ ALLOWLIST_ORPHANS = {
     # allowlisted so the guard lands green; warrants its own follow-up.
     # (meal_responses was retired in one direction by #2327: the read, the route,
     # and the front-end fetch were deleted — no waiver survives it.)
-    "state_of_mind": "pre-existing orphan (out of #1218 scope): the reader queries SOURCE#state_of_mind, but HAE "
-    "merges State-of-Mind aggregates into SOURCE#apple_health (merge_day_to_dynamo), so the dedicated partition "
-    "has no writer",
+    # (state_of_mind left with its last site reader: State of Mind is private, owner ruling 2026-11-05.)
     # #4630: SOURCE#garmin's direct writer was retired (#4640, ADR-074 — paused); its stored
     # history is still read as the steps truth facet's last fallback. The only static pk-form
     # "writer" left was intelligence_common's garmin-only steps QUERY, which #4630 routed

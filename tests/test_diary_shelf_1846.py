@@ -4,10 +4,11 @@ The diary is the newest station of the loop's STORY arm and had no surface on th
 site it narrates. This suite pins the boundary that lets it have one:
 
   AC1  an entry with no explicit consent marker is INVISIBLE — no card, no
-       redacted row, no ghost — but it IS counted in `withheld`; a consented
-       entry renders as a card carrying only the lines Matthew separately marked
-       publishable, and a line that fails ANY serve-time screen is withheld
-       whole (never mangled) and counted.
+       redacted row, no ghost — and NOT counted (owner ruling 2026-11-05: diary
+       sessions are private journal activity); a consented entry renders as a
+       card carrying only the lines Matthew separately marked publishable, and a
+       line that fails ANY serve-time screen is withheld whole (never mangled),
+       logged, and not counted on the wire.
   AC2  the card's day-mark is the canonical daily fingerprint (`web.fingerprint`)
        — byte-identical to the cockpit masthead / wall / studio-HUD artifact.
   AC3  reset-aware (ADR-077): each card is stamped with the CYCLE it was recorded
@@ -143,15 +144,31 @@ def _flatten(obj):
 # ── AC1: consent decides visibility ──────────────────────────────────────────
 
 
-def test_unconsented_entry_is_invisible_but_counted(shelf):
+def test_unconsented_entry_is_invisible_and_uncounted(shelf):
     """The whole point. An entry with no marker produces NO card — not a redacted
-    one, not a locked one — and the reader still learns one exists."""
+    one, not a locked one — and, since the owner ruling of 2026-11-05 ("classify
+    video-diary sessions as private journal activity by default"), no count either:
+    the shelf is byte-identical whether zero or several private sessions exist."""
     sd, ft = shelf
+    empty = json.dumps(_call(sd), sort_keys=True)
     ft.put_item(Item=_entry())
     body = _call(sd)
-    assert body["entries"] == []
-    assert body["count"] == 0
-    assert body["withheld"] == 1
+    assert body["entries"] == [] and body["count"] == 0 and "withheld" not in body
+    assert json.dumps(body, sort_keys=True) == empty
+
+
+def test_private_sessions_beside_a_cleared_entry_never_move_the_shelf(shelf):
+    """Invariance with a published card present: vary ONLY the private sessions (none, one,
+    several, on other dates) and the served shelf — card, count, note — is the same bytes.
+    Mutation control: a consented entry DOES move it, so the comparison can fail."""
+    sd, ft = shelf
+    ft.put_item(Item=_entry(public_reaction_consent="allude"))
+    base = json.dumps(_call(sd), sort_keys=True)
+    for i, d in enumerate(("2026-07-20", "2026-07-21", "2026-07-22")):
+        ft.put_item(Item=_entry(date=d, suffix=f"private{i}"))
+        assert json.dumps(_call(sd), sort_keys=True) == base, f"the shelf moved with {i + 1} private session(s)"
+    ft.put_item(Item=_entry(date="2026-07-23", suffix="cleared2", public_reaction_consent="allude"))
+    assert json.dumps(_call(sd), sort_keys=True) != base
 
 
 @pytest.mark.parametrize("marker", [None, "", "public_ok", "PUBLIC", "yes", 1, "quote ", "  "])
@@ -165,7 +182,7 @@ def test_only_the_exact_opt_in_values_clear_an_entry(shelf, marker):
     if str(marker).strip().lower() in ("quote", "allude"):
         assert body["count"] == 1
     else:
-        assert body["count"] == 0 and body["withheld"] == 1
+        assert body["count"] == 0 and "withheld" not in body
 
 
 def test_consented_entry_renders_a_card_with_no_quotes_when_no_line_was_marked(shelf):
@@ -174,12 +191,12 @@ def test_consented_entry_renders_a_card_with_no_quotes_when_no_line_was_marked(s
     sd, ft = shelf
     ft.put_item(Item=_entry(public_reaction_consent="allude"))
     body = _call(sd)
-    assert body["count"] == 1 and body["withheld"] == 0
+    assert body["count"] == 1 and "withheld" not in body
     card = body["entries"][0]
     assert card["date"] == "2026-07-27"
     assert card["channel"] == "video_diary" and card["format"] == "video diary"
     assert card["tier"] == "allude"
-    assert card["quotes"] == [] and card["quotes_withheld"] == 0
+    assert card["quotes"] == [] and "quotes_withheld" not in card
 
 
 def test_a_marked_line_appears_verbatim_on_its_entrys_card(shelf):
@@ -188,7 +205,7 @@ def test_a_marked_line_appears_verbatim_on_its_entrys_card(shelf):
     ft.put_item(Item=_quote("2026-07-27", CLEAN_LINE))
     card = _call(sd)["entries"][0]
     assert [q["quote"] for q in card["quotes"]] == [CLEAN_LINE]
-    assert card["quotes_withheld"] == 0
+    assert "quotes_withheld" not in card
 
 
 def test_a_marked_line_never_appears_on_an_unconsented_entry(shelf):
@@ -198,7 +215,7 @@ def test_a_marked_line_never_appears_on_an_unconsented_entry(shelf):
     ft.put_item(Item=_entry())  # no marker
     ft.put_item(Item=_quote("2026-07-27", CLEAN_LINE))
     body = _call(sd)
-    assert body["entries"] == [] and body["withheld"] == 1
+    assert body["entries"] == [] and "withheld" not in body
     assert CLEAN_LINE.lower() not in _flatten(body)
 
 
@@ -209,7 +226,7 @@ def test_a_typed_journal_quote_never_lands_on_the_diary_shelf(shelf):
     ft.put_item(Item=_entry(public_reaction_consent="quote"))
     ft.put_item(Item=_quote("2026-07-27", CLEAN_LINE, channel="journal"))
     card = _call(sd)["entries"][0]
-    assert card["quotes"] == [] and card["quotes_withheld"] == 0
+    assert card["quotes"] == [] and "quotes_withheld" not in card
 
 
 def test_a_typed_journal_entry_is_never_a_diary_card(shelf):
@@ -226,7 +243,7 @@ def test_a_typed_journal_entry_is_never_a_diary_card(shelf):
         }
     )
     body = _call(sd)
-    assert body["count"] == 0 and body["withheld"] == 0
+    assert body["count"] == 0 and "withheld" not in body
 
 
 def test_a_line_the_current_taboo_vocabulary_refuses_is_withheld_and_counted(shelf):
@@ -248,7 +265,7 @@ def test_a_line_the_current_taboo_vocabulary_refuses_is_withheld_and_counted(she
     assert find_dossier_violations("Two beers in and I said the quiet part out loud.")
     card = _call(sd)["entries"][0]
     assert card["quotes"] == []
-    assert card["quotes_withheld"] == 1
+    assert "quotes_withheld" not in card
     assert "beers" not in _flatten(card)
 
 
@@ -287,7 +304,7 @@ def test_a_line_only_the_narrower_filter_would_alter_is_withheld_and_counted(she
     ft.put_item(Item=_quote("2026-07-27", text))
     card = _call(sd)["entries"][0]
     assert card["quotes"] == []
-    assert card["quotes_withheld"] == 1
+    assert "quotes_withheld" not in card
 
 
 def test_4377_a_revoked_line_is_neither_served_nor_counted_as_withheld(shelf):
@@ -299,7 +316,7 @@ def test_4377_a_revoked_line_is_neither_served_nor_counted_as_withheld(shelf):
     ft.put_item(Item=_entry(public_reaction_consent="quote"))
     ft.put_item(Item={**_quote("2026-07-27", CLEAN_LINE), "revoked_at": "2026-07-28T00:00:00Z"})
     card = _call(sd)["entries"][0]
-    assert card["quotes"] == [] and card["quotes_withheld"] == 0
+    assert card["quotes"] == [] and "quotes_withheld" not in card
 
 
 def test_a_line_whose_grounding_is_not_verified_is_withheld(shelf):
@@ -309,7 +326,7 @@ def test_a_line_whose_grounding_is_not_verified_is_withheld(shelf):
     ft.put_item(Item=_entry(public_reaction_consent="quote"))
     ft.put_item(Item=_quote("2026-07-27", CLEAN_LINE, grounding="pending_ingestion"))
     card = _call(sd)["entries"][0]
-    assert card["quotes"] == [] and card["quotes_withheld"] == 1
+    assert card["quotes"] == [] and "quotes_withheld" not in card
 
 
 @pytest.mark.parametrize("tier", ["quote", "allude"])
@@ -372,7 +389,6 @@ def test_an_empty_shelf_is_honest_not_padded(shelf):
     assert body == {
         "entries": [],
         "count": 0,
-        "withheld": 0,
         "label": sd.PUBLIC_LABEL,
         "note": sd.SHELF_NOTE,
     }
@@ -459,7 +475,7 @@ def test_claims_are_counted_but_never_quoted_without_their_own_marker(shelf):
         }
     )
     card = _call(sd)["entries"][0]
-    assert card["claims_on_record"] == 1
+    assert "claims_on_record" not in card
     assert card["claims"] == []
     assert "coast on the habits" not in _flatten(card)
 
@@ -484,7 +500,7 @@ def test_a_publicly_marked_claim_is_projected_from_the_allowlist_only(shelf):
         }
     )
     card = _call(sd)["entries"][0]
-    assert card["claims_on_record"] == 1
+    assert "claims_on_record" not in card
     claim = card["claims"][0]
     assert claim["claim_natural"] == "I will still be logging every day in sixty days."
     assert claim["grade_by"] == "2026-09-25"
