@@ -136,7 +136,7 @@ def test_generated_surface_is_derived_not_enumerated():
     for name in on_disk:
         assert f"scripts/{name}" in labels, name
     # The built pages the fix regenerated are swept too…
-    for page in ["site/method/eyeball/index.html", "site/story/theme-river/index.html", "site/gear/index.html"]:
+    for page in ["site/method/eyeball/index.html", "site/gear/index.html"]:  # theme-river unpublished 2026-11-05
         assert page in labels, page
     # …and site/legacy (the frozen pre-v4 site) is excluded by construction.
     assert not [x for x in labels if x.startswith("site/legacy/")]
