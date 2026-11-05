@@ -9,18 +9,26 @@
       "Resource": "arn:aws:s3:::matthew-life-platform/site/*"
     },
     {
-      "Sid": "PublicReadBlog",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::matthew-life-platform/blog/*"
-    },
-    {
       "Sid": "PublicReadGenerated",
       "Effect": "Allow",
       "Principal": "*",
       "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::matthew-life-platform/generated/*"
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/generated/podcast/*",
+        "arn:aws:s3:::matthew-life-platform/generated/panelcast/*",
+        "arn:aws:s3:::matthew-life-platform/generated/moments/*",
+        "arn:aws:s3:::matthew-life-platform/generated/board_answers/*",
+        "arn:aws:s3:::matthew-life-platform/generated/experiments/prereg/*",
+        "arn:aws:s3:::matthew-life-platform/generated/archive/*",
+        "arn:aws:s3:::matthew-life-platform/generated/public_stats.json",
+        "arn:aws:s3:::matthew-life-platform/generated/pulse.json",
+        "arn:aws:s3:::matthew-life-platform/generated/data/character_stats.json",
+        "arn:aws:s3:::matthew-life-platform/generated/journal/posts.json",
+        "arn:aws:s3:::matthew-life-platform/generated/journal/posts/week-*",
+        "arn:aws:s3:::matthew-life-platform/generated/assets/images/og-*",
+        "arn:aws:s3:::matthew-life-platform/generated/assets/images/editorial/*",
+        "arn:aws:s3:::matthew-life-platform/generated/covers/*"
+      ]
     },
     {
       "Sid": "ProtectDataFromDeployScripts",
@@ -76,8 +84,8 @@
       "Resource": "arn:aws:s3:::matthew-life-platform/cloudtrail/AWSLogs/205930651321/*",
       "Condition": {
         "StringEquals": {
-          "s3:x-amz-acl": "bucket-owner-full-control",
-          "aws:SourceArn": "arn:aws:cloudtrail:us-west-2:205930651321:trail/life-platform-trail"
+          "aws:SourceArn": "arn:aws:cloudtrail:us-west-2:205930651321:trail/life-platform-trail",
+          "s3:x-amz-acl": "bucket-owner-full-control"
         }
       }
     }

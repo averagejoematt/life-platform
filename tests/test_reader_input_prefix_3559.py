@@ -107,7 +107,10 @@ def _policy() -> dict:
 
 def test_the_bucket_policy_parse_is_not_vacuous():
     public = public_read_prefixes(_policy())
-    assert "generated/" in public and "site/" in public, f"the parse must find the two known public prefixes; got {sorted(public)}"
+    # Since 2026-11-04 the generated/ grant is the CloudFront-routed paths only (owner ruling).
+    assert (
+        any(p.startswith("generated/") for p in public) and "site/" in public
+    ), f"the parse must find the known public prefixes; got {sorted(public)}"
     assert "uploads/" in delete_protected_prefixes(_policy())
 
 

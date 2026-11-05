@@ -198,9 +198,11 @@ def test_the_card_prefix_is_not_anonymously_readable():
 def test_the_public_prefix_check_can_fail():
     """MUST-FAIL CONTROL: plant the real defect and watch the rule catch it."""
     public = _policy_prefixes("Allow", anonymous=True)
-    planted = "generated/recap/"
+    # Since 2026-11-04 only the CloudFront-routed generated/ paths are public, so the shipped defect's own
+    # prefix is private; plant it under a still-public path instead (the podcast feed) and watch it caught.
+    planted = "generated/podcast/recap/"
     hits = [p for p in public if planted.startswith(p)]
-    assert hits, "the shipped defect (generated/recap/) is NOT flagged by this rule — the rule is inert"
+    assert hits, "a card written under a public prefix is NOT flagged by this rule — the rule is inert"
 
 
 def test_a_card_can_still_be_purged():

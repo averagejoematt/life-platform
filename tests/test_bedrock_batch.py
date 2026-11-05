@@ -319,7 +319,9 @@ def test_projected_cost_is_an_upper_bound_at_the_batch_price():
 
 # ── the staging prefix is private ───────────────────────────────────────────
 def test_public_prefixes_match_the_bucket_policy():
-    """PUBLIC_PREFIXES must be exactly the prefixes deploy/bucket_policy.json grants anonymous GetObject on."""
+    """Every prefix deploy/bucket_policy.json grants anonymous GetObject on must sit under PUBLIC_PREFIXES (the
+    staging guard's refuse list). Since 2026-11-04 the policy grants only the CloudFront-routed generated/ paths and
+    no blog/ (owner ruling), so the guard's list is a conservative superset — it still refuses the whole trees."""
     with open(os.path.join(ROOT, "deploy", "bucket_policy.json"), encoding="utf-8") as fh:
         policy = json.load(fh)
     public = set()
@@ -327,8 +329,9 @@ def test_public_prefixes_match_the_bucket_policy():
         if st.get("Effect") == "Allow" and st.get("Principal") in ("*", {"AWS": "*"}):
             for res in st["Resource"] if isinstance(st["Resource"], list) else [st["Resource"]]:
                 public.add(res.split(":::", 1)[1].split("/", 1)[1].rstrip("*"))
-    assert public == set(bb.PUBLIC_PREFIXES)
+    assert public and all(any(p.startswith(pub) for pub in bb.PUBLIC_PREFIXES) for p in public), (public, bb.PUBLIC_PREFIXES)
     assert not any(bb.BATCH_PREFIX.startswith(p) for p in public)
+    assert not any(bb.BATCH_PREFIX.startswith(p) for p in bb.PUBLIC_PREFIXES)
 
 
 def test_staging_refuses_a_public_prefix():
