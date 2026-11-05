@@ -44,7 +44,11 @@ ROLE_FILES = sorted((REPO / "cdk" / "stacks").glob("role_policies*.py"))
 #: Write grants that land under an anonymously-readable prefix ON PURPOSE. The value is
 #: the reason the artifact is meant for strangers. Adding a row is the deliberate act.
 PUBLIC_BY_INTENT: dict[str, str] = {
-    "generated/*": "the broad serve grant for site-output producers (OG cards, public_stats, journal posts) — ADR-046's CloudFront-served output prefix",
+    "generated/*": (
+        "the broad serve grant for site-output producers (OG cards, public_stats, journal posts) — ADR-046's "
+        "output prefix. Since 2026-11-04 only the CloudFront-routed paths under it are anonymously readable "
+        "(owner ruling: private coach/QA material sat at the origin); the grant overlaps them, so it stays declared"
+    ),
     "generated/podcast/*": "the published podcast audio — anonymous readers ARE the feed's audience",
     "generated/podcast/debrief/*": "the debrief episodes of that same published feed",
     "generated/panelcast/*": "the published panelcast audio, same reasoning as the podcast feed",
@@ -55,11 +59,7 @@ PUBLIC_BY_INTENT: dict[str, str] = {
         "undeclared since WR-17, correct all along and never once reviewed as a public-write decision."
     ),
     "generated/assets/images/editorial/*": "editorial images embedded in published posts — they load for every reader",
-    "generated/coach_daily.json": "the coach surface the public site renders on every page load",
-    "generated/coach_memoirs.json": "published coach memoirs, served to readers on the coaching pages",
-    "generated/qa_archive/text/*": "the public Q&A archive — the answers are published deliberately",
     "generated/journal/*": "published journal posts — the writing the story pages serve to readers",
-    "blog/*": "the blog tree, anonymously readable by its own PublicReadBlog grant for the same reason",
     "site/*": "the static site itself — PublicReadSite exists so browsers can fetch it",
     "site/journal/*": "published journal pages inside that same static site",
 }
@@ -173,16 +173,25 @@ def declared_write_prefixes() -> dict[str, str]:
     return found
 
 
+def _overlaps(prefix: str, public: str) -> bool:
+    """A write prefix reaches a public key when either contains the other: `generated/podcast/x/*` sits
+    inside the public `generated/podcast/`, and the broad `generated/*` contains it (owner ruling 2026-11-04
+    narrowed the public grant to the routed paths, so containment must be read both ways)."""
+    p = prefix.rstrip("*")
+    return p.startswith(public) or public.startswith(p)
+
+
 def _public_writes(prefixes: dict[str, str]) -> dict[str, str]:
     public = anonymously_readable_prefixes()
-    return {p: where for p, where in prefixes.items() if any(p.startswith(pub) for pub in public)}
+    return {p: where for p, where in prefixes.items() if any(_overlaps(p, pub) for pub in public)}
 
 
 # ── the guard ─────────────────────────────────────────────────────────────────
 def test_the_policy_parser_sees_the_public_prefixes():
     """NEGATIVE CONTROL — a parser returning [] would make every test below vacuous."""
     public = anonymously_readable_prefixes()
-    assert "generated/" in public, f"the generated/ public grant is invisible to the parser: {public}"
+    assert any(x.startswith("generated/") for x in public), f"the generated/ public grants are invisible to the parser: {public}"
+    assert "generated/" not in public, "the whole generated/ tree is public again — private coach/QA material sits there (2026-11-04)"
     assert "site/" in public
 
 
@@ -206,7 +215,7 @@ def test_the_grant_scan_sees_a_bare_policy_statement_too(tmp_path):
         "BUCKET_ARN = 'arn:aws:s3:::b'\n"
         "def r():\n"
         "    return [iam.PolicyStatement(sid='S', actions=['s3:PutObject'],\n"
-        '        resources=[f"{BUCKET_ARN}/generated/sneaky/*"])]\n'
+        '        resources=[f"{BUCKET_ARN}/generated/podcast/sneaky/*"])]\n'
     )
     global ROLE_FILES
     saved, ROLE_FILES = ROLE_FILES, [fake]
@@ -214,7 +223,7 @@ def test_the_grant_scan_sees_a_bare_policy_statement_too(tmp_path):
         found = declared_write_prefixes()
     finally:
         ROLE_FILES = saved
-    assert "generated/sneaky/*" in found, "a bare PolicyStatement write is invisible to the scan"
+    assert "generated/podcast/sneaky/*" in found, "a bare PolicyStatement write is invisible to the scan"
     assert _public_writes(found), "and therefore would not be judged against PUBLIC_BY_INTENT"
 
 
@@ -246,14 +255,19 @@ def test_the_rule_catches_the_two_defects_it_was_written_for():
     """MUST-FAIL CONTROL, using the REAL historical prefixes rather than a synthetic one."""
     public = anonymously_readable_prefixes()
     for shipped in ("generated/recap/*", "generated/board_questions/*", "generated/findings/*"):
-        assert any(shipped.startswith(p) for p in public), f"{shipped} is not seen as public — the rule is inert"
+        # Under the pre-2026-11-04 broad grant the rule saw them; under today's routed grant they are private.
+        assert _overlaps(shipped, "generated/"), f"{shipped} is not seen under a broad grant — the rule is inert"
+        assert not any(_overlaps(shipped, p) for p in public), f"{shipped} is anonymously readable again"
         assert shipped not in PUBLIC_BY_INTENT, f"{shipped} must never be declared intentional — it was the defect"
+    for private in ("generated/coach_memoirs.json", "generated/coach_daily.json", "generated/qa_archive/text/*"):
+        assert not any(_overlaps(private, p) for p in public), f"{private} is anonymously readable again (owner ruling 2026-11-04)"
 
 
 def test_the_registry_has_no_dead_rows():
     """Shrink-only hygiene: a declared prefix nothing grants any more is stale."""
     granted = set(declared_write_prefixes())
-    dead = sorted(p for p in PUBLIC_BY_INTENT if p not in granted)
+    public = anonymously_readable_prefixes()
+    dead = sorted(p for p in PUBLIC_BY_INTENT if p not in granted or not any(_overlaps(p, pub) for pub in public))
     assert not dead, "PUBLIC_BY_INTENT names prefix(es) no role grants any more — prune them:\n  " + "\n  ".join(dead)
 
 

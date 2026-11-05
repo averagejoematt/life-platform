@@ -56,7 +56,8 @@ def test_bucket_policy_carries_both_cloudtrail_statements_exactly():
     by_sid = {s["Sid"]: s for s in doc["Statement"]}
 
     # The half that was there all along — the fix is additive, never a swap.
-    for sid in ("PublicReadSite", "PublicReadBlog", "PublicReadGenerated", "ProtectDataFromDeployScripts"):
+    # PublicReadBlog was removed on 2026-11-04 (owner ruling: private pilot material sat under blog/).
+    for sid in ("PublicReadSite", "PublicReadGenerated", "ProtectDataFromDeployScripts"):
         assert sid in by_sid, f"{sid} missing — the CloudTrail fix must not drop the public-read / delete-protection half"
 
     acl = by_sid.get("AWSCloudTrailAclCheck")
