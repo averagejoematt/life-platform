@@ -219,8 +219,8 @@ def test_pipeline_declares_journal_absent_when_no_entries(monkeypatch):
     """#2944 planted empty-input case: no journal entries → the pipeline must
     mark the absence explicitly (journal_coach_absent=True) so downstream
     validation/rendering treat it as a declared absence (ADR-104), never as a
-    blocked AI failure. Live shape: 2026-08-20 → 08-22, zero journal rows since
-    the cycle-14 reset, JOURNAL_COACH 'BLOCKED empty output' three days running."""
+    blocked AI failure. Live shape: an empty journal window, JOURNAL_COACH 'BLOCKED empty output' on
+    consecutive days (the dates are private journal activity and are withheld — owner ruling 2026-11-05)."""
     import daily_brief_lambda as m
 
     _mock_ai_calls(monkeypatch, m)

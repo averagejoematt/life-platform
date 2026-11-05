@@ -227,11 +227,11 @@
     "dark_sources": [
      "notion"
     ],
-    "last_log_date": "2026-09-09",
-    "days_dark": 39,
+    "last_log_date": "2026-10-01",
+    "days_dark": 16,
     "stale_hours": 336,
     "transition": "paused",
-    "days_since_last_log": 39,
+    "days_since_last_log": 16,
     "absent_behaviors": [
      "t0_habit_compliance",
      "t1_habit_compliance"
@@ -353,8 +353,8 @@
    },
    "notion": {
     "status": "stale",
-    "latest_day": "2026-09-09",
-    "age_hours": 921.51,
+    "latest_day": "2026-10-01",
+    "age_hours": 393.51,
     "stale_after_hours": 336.0
    },
    "strava": {

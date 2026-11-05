@@ -43,6 +43,7 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
+from common import activity_publication as ap  # noqa: E402
 from emails import chronicle_data as cd  # noqa: E402
 from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 from privacy import diary_consent  # noqa: E402
@@ -527,6 +528,14 @@ def test_packet_day_grades_and_habit_performance():
         },
         "2026-08-06": {"tier0_done": 5, "tier0_total": 5, "tier1_done": 4, "tier1_total": 4},
     }
+    # a missed habit is named only when the publication policy classifies it PUBLIC (by its Habitify id);
+    # habit-d carries no status, so it is unclassified and never named (owner ruling 2026-11-05)
+    public_ids = sorted(ap.PUBLIC_HABIT_IDS)[:3]
+    data["habitify"] = {
+        "2026-08-05": {
+            "habit_statuses": {n: {"habit_id": i, "status": "missed"} for n, i in zip(("habit-a", "habit-b", "habit-c"), public_ids)}
+        }
+    }
     text, _ = cd.build_data_packet(data)
 
     assert "2026-08-05: 87/100 (B+)" in text
@@ -585,66 +594,26 @@ def test_packet_nutrition_missing_protein_renders_calories_with_a_not_logged_mar
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_packet_journal_truncates_text_and_caps_each_signal_list():
+def test_packet_never_renders_the_journal_or_its_absence():
+    """Owner rulings 2026-11-03/05: the chronicle is public — no journal text, no signal, no entry count
+    and no "no entries" line. An older caller that still hands in journal_entries changes nothing."""
     data = _empty_data()
     data["journal_entries"] = [
         {
             "sk": "DATE#2026-08-06#journal#evening#uuid-1",
             "template": "evening",
-            "raw_text": "S" * 1500 + "TAIL-BEYOND-THE-CAP",
+            "raw_text": "SYNTHETIC-JOURNAL-TEXT",
             "enriched_mood": 3,
-            "enriched_energy": 2,
-            "enriched_stress": 4,
-            "enriched_themes": ["theme-1", "theme-2", "theme-3", "theme-4", "theme-5"],
-            "enriched_emotions": ["emo-1", "emo-2", "emo-3", "emo-4", "emo-5", "emo-6"],
-            "enriched_cognitive_patterns": ["pattern-1", "pattern-2", "pattern-3", "pattern-4"],
-            "enriched_avoidance_flags": ["flag-1", "flag-2"],
-            "enriched_social_quality": "synthetic-social-value",
-            "enriched_ownership": "synthetic-ownership-value",
+            "enriched_themes": ["SYNTHETIC-THEME"],
         }
     ]
     text, _ = cd.build_data_packet(data)
+    empty, _ = cd.build_data_packet(_empty_data())
 
-    # date falls back to the SK when no `date` field is present
-    assert "--- 2026-08-06 (evening) ---" in text
-    assert "TAIL-BEYOND-THE-CAP" not in text
-    assert "Text: " + "S" * 1500 in text
-    assert "Mood:3/5 | Energy:2/5 | Stress:4/5" in text
-    assert "Themes: theme-1, theme-2, theme-3, theme-4 |" in text
-    assert "theme-5" not in text
-    assert "Emotions: emo-1, emo-2, emo-3, emo-4, emo-5 |" in text
-    assert "emo-6" not in text
-    assert "Cognitive: pattern-1, pattern-2, pattern-3 |" in text
-    assert "pattern-4" not in text
-    assert "AVOIDANCE FLAGS: flag-1, flag-2" in text
-    assert "Social: synthetic-social-value" in text
-    assert "Ownership: synthetic-ownership-value" in text
-
-
-def test_packet_journal_entry_without_signals_renders_only_its_header():
-    data = _empty_data()
-    data["journal_entries"] = [{"date": "2026-08-07", "sk": "DATE#2026-08-07#journal#morning#uuid-2", "raw_text": ""}]
-    text, _ = cd.build_data_packet(data)
-
-    assert "--- 2026-08-07 (?) ---" in text  # template defaults to "?"
-    assert "Signals:" not in text
-    assert "Text:" not in text
-
-
-def test_packet_journal_entries_are_ordered_by_sort_key():
-    data = _empty_data()
-    data["journal_entries"] = [
-        {"sk": "DATE#2026-08-09#journal#evening#z", "template": "evening"},
-        {"sk": "DATE#2026-08-05#journal#morning#a", "template": "morning"},
-    ]
-    text, _ = cd.build_data_packet(data)
-
-    assert text.index("--- 2026-08-05 (morning) ---") < text.index("--- 2026-08-09 (evening) ---")
-
-
-def test_packet_journal_empty_branch():
-    text, _ = cd.build_data_packet(_empty_data())
-    assert "No journal entries this week." in text
+    for needle in ("SYNTHETIC-JOURNAL-TEXT", "SYNTHETIC-THEME", "Mood:", "JOURNAL", "No journal entries"):
+        assert needle not in text
+    assert "journal" not in empty.lower()
+    assert text == empty
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -708,29 +677,16 @@ def test_packet_no_conversation_block_on_a_quiet_week():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_packet_state_of_mind_renders_valence_with_optional_clauses():
+def test_packet_never_renders_the_mood_check_ins_or_their_absence():
+    """Owner ruling 2026-11-05: State of Mind is a private self-report — no values, no absence line."""
     data = _empty_data()
-    data["state_of_mind"] = {
-        "2026-08-06": {"som_avg_valence": 0.234, "som_top_labels": "calm, content", "som_top_associations": "work"},
-        "2026-08-07": {"som_avg_valence": Decimal("-0.5")},
-        # a SoM day whose valence did not survive normalization: skipped silently
-        # rather than rendered as a labels-only line
-        "2026-08-08": {"som_top_labels": "SYNTHETIC-LABEL"},
-    }
+    data["state_of_mind"] = {"2026-08-06": {"som_avg_valence": 0.234, "som_top_labels": "SYNTHETIC-LABEL"}}
     text, _ = cd.build_data_packet(data)
+    empty, _ = cd.build_data_packet(_empty_data())
 
-    lines = _section(text, "=== STATE OF MIND (How We Feel) ===", "=== WEATHER (Seattle) ===")
-    assert lines == [
-        "2026-08-06: valence 0.23 | emotions: calm, content | areas: work",
-        "2026-08-07: valence -0.50",
-    ]
-    assert "SYNTHETIC-LABEL" not in text
-    assert "No State of Mind check-ins this week." not in text
-
-
-def test_packet_state_of_mind_empty_branch():
-    text, _ = cd.build_data_packet(_empty_data())
-    assert "No State of Mind check-ins this week." in text
+    assert "STATE OF MIND" not in text and "SYNTHETIC-LABEL" not in text and "valence" not in text
+    assert "State of Mind" not in empty
+    assert text == empty
 
 
 def test_packet_active_experiments_section():
@@ -938,15 +894,14 @@ def test_packet_empty_week_still_renders_every_mandatory_section():
         "=== DAY GRADES ===",
         "=== HABIT PERFORMANCE ===",
         "=== NUTRITION ===",
-        cd.story_checks.OFF_RECORD_JOURNAL_HEADER,  # #4538: the story door's one label, not a second copy
-        "=== STATE OF MIND (How We Feel) ===",
         "=== WEATHER (Seattle) ===",
     ):
         assert header in text
     assert week_num == 1
     assert "No activities recorded this week." in text
-    assert "No journal entries this week." in text
-    assert "No State of Mind check-ins this week." in text
+    # owner rulings 2026-11-03/05: no journal or mood block, and no line about their absence
+    for gone in ("=== JOURNAL", "=== STATE OF MIND", "No journal entries this week.", "No State of Mind check-ins this week."):
+        assert gone not in text
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -976,44 +931,26 @@ def test_gather_derives_the_window_from_the_clock_and_widens_only_for_weight(mon
     assert calls["strava"] == (win["start"], win["end"])
     # withings alone reaches 30 days back so the journey trend has an anchor
     assert calls["withings"] == (win["weight_start"], win["end"])
-    assert calls["notion"] == (win["start"], win["end"])
+    # owner rulings 2026-11-03/05: the public chronicle never reads the journal partition
+    assert "notion" not in calls
 
 
-def test_gather_keeps_only_journal_records_from_the_notion_partition(monkeypatch):
+def test_gather_never_reads_the_journal_or_the_mood_check_ins(monkeypatch):
+    """Owner ruling 2026-11-05: the gather does not read the journal partition at all, and the State of
+    Mind aggregate is not split out of apple_health for the packet."""
     _freeze(monkeypatch)
+    apple = {"2026-08-06": {"steps": 9000, "som_avg_valence": Decimal("0.25")}}
     g = _make_g(
         profile={"journey_start_date": GENESIS},
-        lists={
-            "notion": [
-                {"sk": "DATE#2026-08-06#journal#evening#a", "raw_text": "SYNTHETIC-JOURNAL"},
-                {"sk": "DATE#2026-08-06#task#b"},
-                {"sk": "DATE#2026-08-07#journal#morning#c"},
-                {"sk": "DATE#2026-08-07"},
-            ]
-        },
+        ranges={"apple_health": apple},
+        lists={"notion": [{"sk": "DATE#2026-08-06#journal#evening#a", "raw_text": "SYNTHETIC-JOURNAL"}]},
     )
 
     out = cd.gather_chronicle_data(_g=g)
 
-    assert [e["sk"] for e in out["journal_entries"]] == [
-        "DATE#2026-08-06#journal#evening#a",
-        "DATE#2026-08-07#journal#morning#c",
-    ]
-
-
-def test_gather_state_of_mind_keeps_only_apple_health_days_with_a_valence(monkeypatch):
-    _freeze(monkeypatch)
-    apple = {
-        "2026-08-05": {"steps": 8000},
-        "2026-08-06": {"steps": 9000, "som_avg_valence": Decimal("0.25")},
-        "2026-08-07": {"som_avg_valence": None},
-    }
-    g = _make_g(profile={"journey_start_date": GENESIS}, ranges={"apple_health": apple})
-
-    out = cd.gather_chronicle_data(_g=g)
-
-    assert set(out["apple_health"]) == {"2026-08-05", "2026-08-06", "2026-08-07"}  # unfiltered
-    assert list(out["state_of_mind"]) == ["2026-08-06"]
+    assert all(src != "notion" for src, _s, _e in g["_range_calls"])
+    assert "journal_entries" not in out and "state_of_mind" not in out
+    assert "SYNTHETIC-JOURNAL" not in repr(out)
 
 
 def test_gather_experiments_and_previous_installments(monkeypatch):
@@ -1240,12 +1177,20 @@ def test_gather_output_feeds_build_data_packet_end_to_end(monkeypatch):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_load_engagement_signal_returns_the_state_record():
-    table = _StubTable(items_by_key={("USER#matthew#SOURCE#engagement_state", "STATE#current"): {"quiet_days": 3, "state": "quiet"}})
+def test_load_engagement_signal_returns_the_public_projection_only():
+    """Owner ruling 2026-11-05: the chronicle steers on the record's PUBLIC projection, never the full
+    record (whose quiet channels can include the journal)."""
+    rec = {"quiet_days": 3, "state": "quiet", "quiet_channels": ["SYNTHETIC-PRIVATE"], "public": {"quiet_days": 1, "state": "light"}}
+    table = _StubTable(items_by_key={("USER#matthew#SOURCE#engagement_state", "STATE#current"): rec})
     g = _make_g(table=table)
 
-    assert cd._load_engagement_signal(_g=g) == {"quiet_days": 3, "state": "quiet"}
+    assert cd._load_engagement_signal(_g=g) == {"quiet_days": 1, "state": "light"}
     assert table.get_keys == [{"pk": "USER#matthew#SOURCE#engagement_state", "sk": "STATE#current"}]
+
+
+def test_load_engagement_signal_is_empty_without_a_public_projection():
+    table = _StubTable(items_by_key={("USER#matthew#SOURCE#engagement_state", "STATE#current"): {"quiet_days": 3}})
+    assert cd._load_engagement_signal(_g=_make_g(table=table)) == {}
 
 
 def test_load_engagement_signal_returns_empty_dict_when_absent():

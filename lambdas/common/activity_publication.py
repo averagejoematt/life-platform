@@ -75,7 +75,10 @@ ACTIVITY_ONLY_SOURCES: dict[str, str] = {
 # narrative_provenance, so the set is pinned by test (never a journal family) and each entry carries
 # its reason. Removing an entry takes its row off the public surface.
 ACTIVITY_OVERRIDES: dict[str, str] = {
-    "genome": PUBLIC,  # the status board's one-time "imported" row: no date, no cadence, no count (owner to confirm)
+    # The status board's one-time "imported" row: no date, no cadence, no count, no result. Owner ruling
+    # 2026-11-05 ("keep it only if it reveals no private genomic results, attributes, interpretation or
+    # sensitive metadata"): verified constant whatever the partition holds (tests/test_site_api_status_behavior.py).
+    "genome": PUBLIC,
 }
 
 # HABITS, by IDENTITY (the Habitify id every stored status carries since #4632; a rename keeps it).
@@ -185,6 +188,207 @@ HABIT_STATUS_FIELDS: dict[str, str] = {
 }
 
 _IDS_BY_NAME = {name: hid for hid, (name, _fam) in HABIT_FAMILIES.items()}
+
+# ── FIELDS of a PUBLIC source that carry a PRIVATE sub-stream (owner rulings 2026-11-05) ───────────
+#
+# "Treat How We Feel / State of Mind as private. Remove its activity, last-sync date, status and other
+# revealing metadata from public surfaces, while preserving authorized internal access." State of Mind
+# arrives through Health Auto Export into the PUBLIC ``apple_health`` partition (steps, water, CGM ...),
+# so the source stays public and its State-of-Mind FIELDS do not: every daily aggregate
+# ``ingestion.health_auto_export_lambda.process_state_of_mind`` writes, the valence and the counts alike
+# (``tests/test_state_of_mind_diary_privacy.py`` holds this set equal to the writer's). Their family is
+# ``state_of_mind``, PRIVATE in narrative_provenance already (``privacy.field_tiers.SOURCE_TIERS``).
+#
+# "Classify video-diary sessions as private journal activity by default." The daily count
+# ``computed_metrics.diary_sessions`` (#1843, counted from the journal partition's diary rows) is the
+# journal's presence under another name: ``journal_presence``.
+#
+# A field not listed here takes its source's class — these are exceptions inside a public partition,
+# never a reclassification of the partition. Owner-only BIOMETRIC tiers stay in ``privacy.field_tiers``;
+# this table is about ACTIVITY (whether, when, how often). The owner's tools read the stored rows whole.
+STATE_OF_MIND_FIELDS: frozenset = frozenset(
+    {
+        "som_avg_valence",
+        "som_min_valence",
+        "som_max_valence",
+        "som_check_in_count",
+        "som_mood_count",
+        "som_emotion_count",
+        "som_top_labels",
+        "som_top_associations",
+    }
+)
+PRIVATE_SOURCE_FIELDS: dict[str, dict[str, str]] = {
+    "apple_health": {f: "state_of_mind" for f in sorted(STATE_OF_MIND_FIELDS)},
+    "computed_metrics": {"diary_sessions": "journal_presence"},
+}
+
+
+def field_family(source_id: Any, field: Any) -> str:
+    """The family a stored FIELD speaks for: its private sub-stream's family when it is one, else its source's id."""
+    sid = str(source_id or "").strip()
+    return PRIVATE_SOURCE_FIELDS.get(sid, {}).get(str(field or "").strip(), sid)
+
+
+def field_is_public(source_id: Any, field: Any) -> bool:
+    """True when ``source_id``'s stored ``field`` may feed a public surface: the source is public and the
+    field is not one of its private sub-streams. An unclassified source is not public (fail closed)."""
+    return source_is_public(source_id) and NP.classify(field_family(source_id, field)) == PUBLIC
+
+
+def hae_datatype_is_public(datatype: Any) -> bool:
+    """An Apple Health sub-stream (``SOURCE_REGISTRY['apple_health']['hae_datatypes']`` — the liveness rows
+    /api/source_freshness serves) is public only when EVERY field it is read from is public. A key the
+    registry does not declare is unclassified and is not published (fail closed)."""
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    key = datatype.get("key") if isinstance(datatype, Mapping) else datatype
+    for spec in SOURCE_REGISTRY.get("apple_health", {}).get("hae_datatypes") or ():
+        if spec.get("key") == key:
+            fields = list(spec.get("fields") or ())
+            return bool(fields) and all(field_is_public("apple_health", f) for f in fields)
+    return False
+
+
+def public_hae_datatypes(rows: Any) -> Any:
+    """The liveness rows with every private (or unclassified) sub-stream omitted; None passes through."""
+    if rows is None:
+        return None
+    return [r for r in rows if hae_datatype_is_public(r)]
+
+
+# ── DERIVED metrics: correlations, hypotheses, the day grade's components ─────────────────────────
+#
+# A derived metric speaks for the source it is computed from. Every metric the weekly correlation engine
+# (``compute.weekly_correlation_compute_lambda.assemble_daily_series``) and the hypothesis engine
+# (``compute.hypothesis_engine_lambda.SPEC_METRICS``) can name, and every day-grade component
+# (``health.scoring_engine.COMPONENT_SCORERS``), is mapped to its family here. A name in no table is
+# UNCLASSIFIED and is not published (fail closed); the tests hold each vocabulary equal to its table.
+CORRELATION_METRIC_FAMILIES: dict[str, str] = {
+    "hrv": "whoop",
+    "recovery_score": "whoop",
+    "sleep_duration": "whoop",
+    "sleep_score": "whoop",
+    "resting_hr": "whoop",
+    "strain": "whoop",
+    "tsb": "computed_metrics",
+    "training_kj": "strava",
+    "training_mins": "strava",
+    "calories": "macrofactor",
+    "protein_g": "macrofactor",
+    "carbs_g": "macrofactor",
+    "fat_g": "macrofactor",
+    "steps": "apple_health",  # steps-truth: a metric NAME's classification, not a read of a steps field
+    "day_grade": "computed_metrics",
+    "readiness": "computed_metrics",
+    "tier0_streak": "computed_metrics",
+    "habit_pct": "habitify",
+    "glucose_cv": "apple_health",
+    "mood_valence": "state_of_mind",  # State of Mind valence (owner ruling 2026-11-05)
+    "values_lived_count": "flourishing",  # coded from journal text (#1403; owner ruling 2026-11-03)
+    "diary_sessions": "journal_presence",  # video-diary sessions per day (owner ruling 2026-11-05)
+}
+HYPOTHESIS_METRIC_FAMILIES: dict[str, str] = {
+    **{m: "whoop" for m in ("recovery", "hrv", "rhr", "sleep_score", "sleep_efficiency", "deep_sleep_hrs", "rem_hrs", "total_sleep_hrs")},
+    **{m: "garmin" for m in ("stress", "body_battery")},
+    **{m: "macrofactor" for m in ("calories", "protein_g", "carbs_g", "fat_g")},
+    "weight_lbs": "withings",
+    **{m: "apple_health" for m in ("steps", "active_cal", "mindful_min", "glucose_avg", "walking_speed", "sleep_onset_min")},
+    **{m: "apple_health" for m in ("daylight_min", "cardio_recovery", "vo2max")},  # #4979 watch metrics
+    **{m: "strava" for m in ("workout", "training_load", "zone2_min", "zone2_7d_min", "cardio_7d_min")},
+    "habit_pct": "habitify",
+    # The journal's enrichment read (``enriched_mood`` / ``_energy`` / ``_stress``): journal-derived.
+    **{m: "journal" for m in ("mood", "energy", "journal_stress")},
+    "diary_day": "journal_presence",  # 1 on a video-diary day (owner ruling 2026-11-05)
+}
+DAY_GRADE_COMPONENT_FAMILIES: dict[str, str] = {
+    "sleep_quality": "whoop",
+    "recovery": "whoop",
+    "nutrition": "macrofactor",
+    "movement": "strava",
+    "habits_mvp": "habitify",
+    "hydration": "apple_health",
+    "glucose": "apple_health",
+    "journal": "journal_presence",  # whether he journaled that day (owner ruling 2026-11-03)
+}
+
+
+def _derived_is_public(families: Mapping[str, str], name: Any) -> bool:
+    fam = families.get(str(name or "").strip())
+    return fam is not None and NP.classify(fam) == PUBLIC
+
+
+def correlation_metric_is_public(metric: Any) -> bool:
+    return _derived_is_public(CORRELATION_METRIC_FAMILIES, metric)
+
+
+def hypothesis_metric_is_public(metric: Any) -> bool:
+    return _derived_is_public(HYPOTHESIS_METRIC_FAMILIES, metric)
+
+
+def day_grade_component_is_public(name: Any) -> bool:
+    return _derived_is_public(DAY_GRADE_COMPONENT_FAMILIES, name)
+
+
+def public_component_scores(scores: Any) -> dict:
+    """The day grade's ``component_scores`` with every component scored from a private source omitted."""
+    if not isinstance(scores, Mapping):
+        return {}
+    return {k: v for k, v in scores.items() if day_grade_component_is_public(k)}
+
+
+def hypothesis_is_public(item: Any) -> bool:
+    """A hypothesis is published only when every metric its frozen test spec names is public. A record
+    with no spec (v1 era) names no metric to classify and stays."""
+    spec = item.get("test_spec") if isinstance(item, Mapping) else None
+    if not isinstance(spec, Mapping):
+        return True
+    return all(hypothesis_metric_is_public(spec.get(k)) for k in ("condition_metric", "outcome_metric") if spec.get(k))
+
+
+def correlation_pair_is_public(pair: Any) -> bool:
+    """A stored correlation pair is published only when BOTH of its metrics are public."""
+    if not isinstance(pair, Mapping):
+        return False
+    return correlation_metric_is_public(pair.get("metric_a", pair.get("field_a"))) and correlation_metric_is_public(
+        pair.get("metric_b", pair.get("field_b"))
+    )
+
+
+def _pair_p_value(pair: Mapping) -> Optional[float]:
+    """The pair's stored two-tailed p, else the one the compute would have stored (on n_eff)."""
+    from common import stats_core
+
+    try:
+        if pair.get("p_value") is not None:
+            return float(pair["p_value"])
+        r = pair.get("pearson_r", pair.get("r"))
+        n = pair.get("n_eff") or pair.get("n_days", pair.get("n"))
+        return stats_core.pearson_p_value(float(r), float(n)) if r is not None and n is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def public_correlations(correlations: Any, alpha: float = 0.05) -> Any:
+    """A stored ``weekly_correlations.correlations`` value (the label-keyed map, or the legacy list) with
+    every pair that names a private metric omitted — and the Benjamini-Hochberg correction re-run over the
+    PUBLIC pairs only. BH ranks every p-value in its family, so without the re-run a public pair's
+    ``fdr_significant`` could move with a private pair's p-value. Same shape out; the stored row is untouched."""
+    from common import stats_core
+
+    if isinstance(correlations, Mapping):
+        items = [(k, dict(v)) for k, v in correlations.items() if correlation_pair_is_public(v)]
+    elif isinstance(correlations, list):
+        items = [(i, dict(v)) for i, v in enumerate(correlations) if correlation_pair_is_public(v)]
+    else:
+        return correlations
+    pvals = [_pair_p_value(v) for _k, v in items]
+    for (_k, v), adj in zip(items, stats_core.bh_fdr(pvals)):
+        v["p_value_fdr"] = None if adj is None else round(adj, 4)
+        v["fdr_significant"] = adj is not None and adj <= alpha
+    if isinstance(correlations, Mapping):
+        return dict(items)
+    return [v for _k, v in items]
 
 
 # ── sources ────────────────────────────────────────────────────────────────────────────────

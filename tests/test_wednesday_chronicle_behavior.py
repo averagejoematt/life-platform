@@ -1236,13 +1236,14 @@ def test_a_grounding_gate_error_fails_open_rather_than_losing_the_week(env):
 # lambda_handler — the #914 presence-acknowledgment gate
 # ══════════════════════════════════════════════════════════════════════════════
 
+_QUIET = {"presence_class": "quiet", "severity": "alarm", "days_since_last_log": 9, "quiet_days": 9}
+# Owner ruling 2026-11-05: the chronicle reads the record's PUBLIC projection (the journal channel excluded),
+# so the quiet stretch it steers on lives under the projection key.
 QUIET_SIGNAL = {
     "pk": f"USER#{m.USER_ID}#SOURCE#engagement_state",
     "sk": "STATE#current",
-    "presence_class": "quiet",
-    "severity": "alarm",
-    "days_since_last_log": 9,
-    "quiet_days": 9,
+    **_QUIET,
+    "public": dict(_QUIET),
 }
 
 
@@ -1250,6 +1251,14 @@ def test_a_quiet_stretch_is_named_in_the_prompt_before_elena_writes(env):
     env["table"].rows.append(dict(QUIET_SIGNAL))
     m.lambda_handler({}, None)
     assert "=== PRESENCE / QUIET STRETCH ===" in env["calls"]["ai"][0]["user"]
+
+
+def test_a_quiet_stretch_only_in_private_channels_never_reaches_the_prompt(env):
+    """Owner ruling 2026-11-05: a record whose PUBLIC projection is present (only a private channel is
+    quiet) steers nothing — the chronicle cannot say a private channel went quiet."""
+    env["table"].rows.append({**QUIET_SIGNAL, "public": {"presence_class": "present"}})
+    m.lambda_handler({}, None)
+    assert "=== PRESENCE / QUIET STRETCH ===" not in env["calls"]["ai"][0]["user"]
 
 
 def test_an_installment_held_by_the_presence_gate_is_not_published(env):

@@ -7,7 +7,9 @@ ENTRIES) against its "Connection · logged interactions" tile (logged SOCIAL INT
 as a temporal contradiction. Owner ruling 2026-11-02: both statements are factual and
 describe different signals; fix the QA rule, not the copy, and keep real defects
 flaggable. WIRE is the recorded judge output from `/aws/lambda/life-platform-qa-smoke`'s
-`[QA] DETAIL … full note (837 chars)` line; PARAPHRASE/MUTATION notes are the guards.
+`[QA] DETAIL … full note` line, with the tile's journal count, last-entry date and the day arithmetic that
+follows from them replaced by synthetic values (real journal-activity values replaced with synthetic ones for privacy (owner ruling 2026-11-05));
+PARAPHRASE/MUTATION notes are the guards.
 Every test passes `today` explicitly — no clock read (#4848).
 """
 
@@ -28,19 +30,19 @@ _START = "2026-09-06"
 _WIRE_DAY = "2026-11-01"  # Day 57, the wire frame (06:19Z on 11-02 is 11-01 Pacific)
 
 WIRE_539C6D = (
-    "Surface 1 states 'Mind · journal 2 entries in 57 days, the last on 9 Sep.' Day 1 of the experiment is "
-    "2026-09-06 (Saturday). September 9 is Day 4. The phrasing '2 entries in 57 days, the last on 9 Sep' "
-    "asserts that the most recent journal entry occurred on Day 4, with no entries in the intervening 53 days "
-    "(Days 5–57). However, Surface 1 also states 'Connection · logged interactions — None logged in the last "
+    "Surface 1 states 'Mind · journal 3 entries in 57 days, the last on 14 Sep.' Day 1 of the experiment is "
+    "2026-09-06 (Saturday). September 14 is Day 9. The phrasing '3 entries in 57 days, the last on 14 Sep' "
+    "asserts that the most recent journal entry occurred on Day 9, with no entries in the intervening 48 days "
+    "(Days 10–57). However, Surface 1 also states 'Connection · logged interactions — None logged in the last "
     "thirty days. The journal went quiet; so did this.' This creates an internal contradiction: if the journal "
-    "'went quiet' in the last 30 days, the last entry cannot be on Day 4 (57 days ago), because Day 4 is before "
-    "the 30-day window. The two statements are mutually incompatible on a 57-day timeline. The '2 entries in 57 "
-    "days, the last on 9 Sep' phrasing is impossible if interpreted as the final entry within the 57-day cycle."
+    "'went quiet' in the last 30 days, the last entry cannot be on Day 9 (48 days ago), because Day 9 is before "
+    "the 30-day window. The two statements are mutually incompatible on a 57-day timeline. The '3 entries in 57 "
+    "days, the last on 14 Sep' phrasing is impossible if interpreted as the final entry within the 57-day cycle."
 )
 
 # PARAPHRASE — the same objection with no tile prefixes and none of the wire's wording.
 PARAPHRASE = (
-    "The home page reports '2 entries in 57 days, the last on 9 Sep' yet the neighbouring tile reads "
+    "The home page reports '3 entries in 57 days, the last on 14 Sep' yet the neighbouring tile reads "
     "'None logged in the last thirty days' and 'The journal went quiet; so did this'. Day 57 makes these "
     "two timelines irreconcilable."
 )
@@ -74,8 +76,8 @@ def test_a_zero_journal_count_is_consistent_too():
 def test_one_signal_stated_two_incompatible_ways_still_gates():
     """The same tile (journal entries) with two different counts IS a contradiction."""
     note = (
-        "Surface 1 states 'Mind · journal 2 entries in 57 days, the last on 9 Sep.' but also "
-        "'Mind · journal 5 entries in 57 days, the last on 9 Sep.' beside 'Connection · logged interactions "
+        "Surface 1 states 'Mind · journal 3 entries in 57 days, the last on 14 Sep.' but also "
+        "'Mind · journal 5 entries in 57 days, the last on 14 Sep.' beside 'Connection · logged interactions "
         "— None logged in the last thirty days.' Two journal counts for one cycle cannot both be true."
     )
     assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
@@ -84,7 +86,7 @@ def test_one_signal_stated_two_incompatible_ways_still_gates():
 
 def test_two_incompatible_last_dates_still_gate():
     note = (
-        "'Mind · journal 2 entries in 57 days, the last on 9 Sep.' and '2 entries in 57 days, the last on 12 Sep' "
+        "'Mind · journal 3 entries in 57 days, the last on 14 Sep.' and '3 entries in 57 days, the last on 17 Sep' "
         "beside 'None logged in the last thirty days. The journal went quiet; so did this.'"
     )
     assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
@@ -92,7 +94,7 @@ def test_two_incompatible_last_dates_still_gate():
 
 def test_a_journal_entry_inside_the_window_beside_went_quiet_still_gates():
     """'The journal went quiet' is false when the last entry is inside the thirty days."""
-    note = WIRE_539C6D.replace("9 Sep", "28 Oct")
+    note = WIRE_539C6D.replace("14 Sep", "28 Oct")
     assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
 
 
@@ -102,7 +104,7 @@ def test_scoped_to_the_home_page_and_its_category():
 
 
 def test_needs_both_tiles_quoted():
-    note = "Surface 1 states 'Mind · journal 2 entries in 57 days, the last on 9 Sep.' but Day 57 is too long."
+    note = "Surface 1 states 'Mind · journal 3 entries in 57 days, the last on 14 Sep.' but Day 57 is too long."
     assert not R.is_portrait_distinct_signals(_f(note), _WIRE_DAY)
 
 

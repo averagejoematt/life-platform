@@ -112,11 +112,13 @@ def _module_literal(name):
 
 
 # Owner ruling 2026-11-03: the module's table is the private AND public rows; the panel publishes the
-# PUBLIC rows only (common.activity_publication — the journal's row is private activity).
+# PUBLIC rows only (common.activity_publication — the journal's row is private activity, and since the
+# owner ruling of 2026-11-05 so is a row tracked by a private FIELD of a public source: State of Mind).
 from common import activity_publication as _AP  # noqa: E402
+from web.site_api_status import _status_row_is_public  # noqa: E402
 
 ALL_DATA_SOURCES = _module_literal("_DATA_SOURCES")
-DATA_SOURCES = [r for r in ALL_DATA_SOURCES if _AP.source_is_public(r[0])]
+DATA_SOURCES = [r for r in ALL_DATA_SOURCES if _status_row_is_public(r)]
 COMPUTE_SOURCES = _module_literal("_COMPUTE_SOURCES")
 EMAIL_LAMBDAS = _module_literal("_EMAIL_LAMBDAS")
 LAGGED_SOURCES = _module_literal("_LAGGED_SOURCES")
@@ -1185,6 +1187,65 @@ def test_an_absent_onetime_import_is_blue_and_awaiting_rather_than_failed(monkey
     assert c["status"] == "blue"
     assert c["last_sync_relative"] == "not imported"
     assert "Awaiting" in c["comment"]
+
+
+def _board_bytes(monkeypatch, builder) -> str:
+    sas._status_cache = {}
+    sas._status_cache_ts = 0
+    body = Harness(monkeypatch, builder.build()).body()
+    body.pop("_meta", None)
+    return json.dumps(body, sort_keys=True)
+
+
+def test_the_state_of_mind_row_is_omitted_and_its_check_ins_never_move_the_board(monkeypatch):
+    """Owner ruling 2026-11-05: "Treat How We Feel / State of Mind as private. Remove its activity,
+    last-sync date, status and other revealing metadata from public surfaces." The row tracked by
+    `som_avg_valence` inside the PUBLIC apple_health partition is not published, and the board is
+    byte-identical whether no, some or every day carries a check-in (vary ONLY the som_* fields).
+
+    Mutation control: the same check-ins on the module's FULL table (the policy bypassed) publish a
+    State-of-Mind row whose status follows them — so the comparison can fail."""
+    som_rows = [r for r in ALL_DATA_SOURCES if len(r) > 9 and r[9] in _AP.STATE_OF_MIND_FIELDS]
+    assert len(som_rows) == 1 and som_rows[0] not in DATA_SOURCES
+    outs = set()
+    for days in ((), (0, 3, 9), tuple(range(14))):
+        b = healthy_platform()
+        if days:
+            b.add_days("apple_health", days, som_avg_valence=Decimal("0.3"), som_check_in_count=Decimal("2"), som_top_labels="Synthetic")
+        outs.add(_board_bytes(monkeypatch, b))
+    assert len(outs) == 1
+    assert "State of Mind" not in next(iter(outs)) and "som_" not in next(iter(outs))
+
+    monkeypatch.setattr(sas, "_status_row_is_public", lambda r: _AP.source_is_public(r[0]))  # the policy's field half removed
+    seen = set()
+    for days in ((), (0, 1, 2)):
+        b = healthy_platform()
+        if days:
+            b.add_days("apple_health", days, som_avg_valence=Decimal("0.3"))
+        body = json.loads(_board_bytes(monkeypatch, b))
+        seen.add(by_name(body, "data_sources", som_rows[0][1])["status"])
+    assert len(seen) == 2, "the control could not see State-of-Mind activity — the invariance above is vacuous"
+
+
+def test_the_genome_row_states_one_constant_fact_whatever_the_genome_holds(monkeypatch):
+    """Owner ruling 2026-11-05: keep the genome row only if it reveals no private genomic result,
+    attribute, interpretation or sensitive metadata. The row is the ACTIVITY_OVERRIDES entry; vary
+    the stored genome (one row or many, any dates, any fields) and it is the same bytes: a constant
+    "imported" fact — no date, count, cadence or content."""
+    row = pick_data_source(lambda r: r["category"] == "onetime", "a one-time import")
+    assert row["id"] == "genome" and set(_AP.ACTIVITY_OVERRIDES) == {"genome"}
+    cards = set()
+    for dates in (("2026-01-15",), ("2025-03-02", "2026-01-15", "2026-07-30")):
+        b = healthy_platform().clear("genome")
+        for i, d in enumerate(dates):
+            b.add("genome", d, synthetic_variant=f"rsSYNTH{i}", synthetic_risk="elevated" if i else "typical")
+        sas._status_cache = {}
+        sas._status_cache_ts = 0
+        cards.add(json.dumps(by_name(Harness(monkeypatch, b.build()).body(), "data_sources", row["name"]), sort_keys=True))
+    assert len(cards) == 1
+    card = json.loads(next(iter(cards)))
+    assert card["last_sync_relative"] == "imported" and card["uptime_90d"] == [] and card["status"] == "green"
+    assert not any(ch.isdigit() for ch in card["comment"] + card["last_sync_relative"]), card
 
 
 def test_a_onetime_import_is_never_aged_out(monkeypatch):

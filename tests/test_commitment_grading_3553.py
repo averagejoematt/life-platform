@@ -612,7 +612,10 @@ class TestRollup:
         pending, corpus = ev._fetch_commitments()
         stats = ev._evaluate_commitments(pending, TODAY, {})
         assert corpus[0]["status"] == "pending", "the fetched row is pre-verdict — that is the trap"
-        payload = cg.write_tally(table, corpus, stats["applied"], TODAY, ev.logger)
+        from tests.call_publication_fixtures import registered  # owner ruling 2026-11-05: a reviewed-public ask
+
+        with registered(corpus):
+            payload = cg.write_tally(table, corpus, stats["applied"], TODAY, ev.logger)
         assert payload["lifetime"]["kept"] == 1 and payload["lifetime"]["pending"] == 0
         assert payload["as_of"] == TODAY
         assert table.store[(cg.ROLLUP_PK, cg.ROLLUP_SK)]["as_of"] == TODAY

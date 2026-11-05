@@ -552,7 +552,18 @@ def compute_correlations(series, pairs=None):
     # alpha=0.05, naive thresholding yields ~1+ expected false positives; BH
     # controls the false discovery rate instead.
     # Adds p_value, p_value_fdr, and fdr_significant fields to each result.
-    results = apply_benjamini_hochberg(results, alpha=0.05)
+    #
+    # Owner rulings 2026-11-03/05: the PUBLIC pairs (both metrics public, common.activity_publication)
+    # and the pairs naming a private metric (State-of-Mind valence, the diary session count, the
+    # journal-coded values count) are corrected as TWO families. BH ranks every p in its family, so a
+    # single family would let a private pair's p-value move a public pair's published significance
+    # (and the "newly unlocked" ledger built from it). Each family is still BH-controlled at alpha.
+    from common import activity_publication
+
+    public_family = {k: v for k, v in results.items() if activity_publication.correlation_pair_is_public(v)}
+    private_family = {k: v for k, v in results.items() if k not in public_family}
+    apply_benjamini_hochberg(public_family, alpha=0.05)
+    apply_benjamini_hochberg(private_family, alpha=0.05)
     fdr_sig = sum(1 for v in results.values() if v.get("fdr_significant"))
     logger.info("[R13-F15] BH FDR correction applied: %d/%d pairs FDR-significant (alpha=0.05)", fdr_sig, len(results))
 

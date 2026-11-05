@@ -71,6 +71,7 @@ from typing import Any
 
 from coach import coach_baseline, coach_dossier, coach_record, prediction_windows
 from coach.persona_registry import plain_name
+from common import prediction_publication  # owner ruling 2026-11-05: the method the calls are listed under
 from common.pacific_time import day_in_words, pacific_date_of, shift_day_key
 from experiment.measurable_metrics import AGG_SUFFIXES, base_metric
 from experiment.phase_filter import singleton_visible
@@ -781,6 +782,8 @@ def compose(
         },
         "simple_guess_words": GUESS_WORDS,
         "next": next_block(today, open_dockets, pending, names),
+        # Owner ruling 2026-11-05: the calls here are publication-eligible calls only (common.prediction_publication).
+        "method": prediction_publication.method_block(),
     }
 
 

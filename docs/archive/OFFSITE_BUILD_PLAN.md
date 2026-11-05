@@ -595,9 +595,9 @@ _This document is updated live throughout the offsite. Each decision gets a numb
 
 **Current state:** 952-line observatory page with violet color scheme. Current editorial design pattern. Hero: "The pillar I avoided building" with 4 gauges (Mind pillar level, Resist rate, Journal 30d, Vice streaks active). 3 pull-quotes with evidence badges. Vice streak grid. Connection depth + Willpower bars. Mood chart (conditional). "Building this measurement" gap section. Narrative: "The fifth pillar everyone avoids." Cross-links. Methodology.
 
-**Data layer reality:** Journal entries (90d): 1. State-of-mind check-ins: 3 (all one day). Social interactions logged: 0. Mood trend: insufficient data. Vice streaks are the only domain with depth.
+**Data layer reality:** Journal entries (90d): [journal activity withheld — private, owner ruling 2026-11-05]. State-of-mind check-ins: 3 (all one day). Social interactions logged: 0. Mood trend: insufficient data. Vice streaks are the only domain with depth.
 
-**Core diagnosis:** The data sparsity IS the most honest data point on the site. The man who tracks every gram of protein has one journal entry. The page currently treats sparse data as something to apologize for. It should own that asymmetry as its thesis. Vice streaks carry 60% of the page weight — the emotional architecture needs to be the reverse. This is the causal root of the entire site: when inner life deteriorates, every other domain follows.
+**Core diagnosis:** The data sparsity IS the most honest data point on the site. The man who tracks every gram of protein: his journal [journal activity withheld — private, owner ruling 2026-11-05]. The page currently treats sparse data as something to apologize for. It should own that asymmetry as its thesis. Vice streaks carry 60% of the page weight — the emotional architecture needs to be the reverse. This is the causal root of the entire site: when inner life deteriorates, every other domain follows.
 
 **Matthew's stated position:** This is the center of the experiment. The weight he could do without the platform. The inner life — anxiety, imposter syndrome, social anxiety, self-esteem, people-pleasing — is what the platform exists to solve.
 

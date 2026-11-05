@@ -55,7 +55,6 @@ def mentions_journal_silence(text: Any) -> bool:
 _LEFT_BOUNDARY = re.compile(r"[.!?][\"'”’)\]]*\s+|[<>\n]")
 _RIGHT_BOUNDARY = re.compile(r"[.!?][\"'”’)\]]*(?=\s|$|<)|(?=[<>\n])")
 _MAX_PASSES = 200
-WITHHELD_HEADER = "x-journal-silence-withheld"
 
 
 def scrub_document(text: Any) -> str:
@@ -139,21 +138,21 @@ def public_body(body: Any, content_type: str = "") -> Any:
 
 def guard_api_response(response: Any, logger: Any = None) -> Any:
     """The public API Lambdas' last step before the wire. A base64 body (an image) and a non-dict result pass
-    through untouched. Header `x-journal-silence-withheld` carries the withheld count, so a scrub on the wire
-    is visible rather than silent."""
+    through untouched. The withheld count is LOGGED, never served: the former count header moved with how
+    much journal-silence copy existed — a count about private activity on a public response (owner ruling
+    2026-11-05: withheld counts off public responses)."""
     if not isinstance(response, dict) or response.get("isBase64Encoded"):
         return response
     body = response.get("body")
     if not isinstance(body, str):
         return response
-    headers = dict(response.get("headers") or {})
+    headers = response.get("headers") or {}
     new_body, hits = _scrub_text_body(body, str(headers.get("Content-Type") or headers.get("content-type") or ""))
     if not hits:
         return response
-    headers[WITHHELD_HEADER] = str(hits)
     if logger is not None:
         logger.warning("journal-silence copy withheld from a public response: %d span(s) (#5131)", hits)
-    return {**response, "headers": headers, "body": new_body}
+    return {**response, "body": new_body}
 
 
 def spoken_turns(turns: Any, key: str = "line") -> list:

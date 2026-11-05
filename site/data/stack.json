@@ -3,7 +3,7 @@
   "_meta": {
     "generated_by": "scripts/v4_build_stack_manifest.py — derived from source_registry.py + the public protocol/supplement catalogues (#1401); never hand-edit",
     "schema_version": "1.0.0",
-    "updated": "2026-10-25",
+    "updated": "2026-11-05",
     "framing": "Fork the architecture, not the data. This describes the instrument — what measures and how — and contains no health metrics, no personal records, and no account-specific identifiers.",
     "license": "The manifest is published for reuse. It is a description, not a guarantee."
   },
@@ -62,7 +62,7 @@
       "id": "apple_health",
       "name": "Apple Health",
       "category": "Wearables",
-      "measures": "Steps, active energy, CGM, blood pressure, state of mind",
+      "measures": "Steps, active energy, CGM, blood pressure",
       "method": "Health Auto Export webhook, near-real-time",
       "posture": "load-bearing",
       "ingest_pattern": "webhook_push",
@@ -352,17 +352,6 @@
       "method": "One-time import",
       "posture": "load-bearing",
       "ingest_pattern": "manual_entry",
-      "behavioral": false,
-      "paused": false
-    },
-    {
-      "id": "state_of_mind",
-      "name": "State of Mind",
-      "category": "Inputs",
-      "measures": "Affect self-reports (Apple State of Mind)",
-      "method": "Health Auto Export webhook",
-      "posture": "portfolio",
-      "ingest_pattern": "webhook_push",
       "behavioral": false,
       "paused": false
     },

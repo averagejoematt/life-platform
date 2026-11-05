@@ -29,6 +29,8 @@ from ingestion.source_registry import catalog_entries  # noqa: E402
 # `cadence_months` + the scripts/ingest_lab_report.py writer). genome stays: it has a dated
 # `UNREGISTERED_PARTITIONS` disposition rather than a registry entry (a one-off import has
 # no cadence to declare), so the catalogue is still its only public row.
+# State of Mind LEFT this list (owner ruling 2026-11-05): How We Feel check-ins are private activity,
+# so the public catalogue does not name them (common.activity_publication.STATE_OF_MIND_FIELDS).
 CLINICAL_AND_ARCHIVE = [
     {
         "id": "genome",
@@ -37,14 +39,6 @@ CLINICAL_AND_ARCHIVE = [
         "metrics": "SNP clinical interpretations",
         "method": "One-time import",
         "posture": "load-bearing",
-    },
-    {
-        "id": "state_of_mind",
-        "name": "State of Mind",
-        "category": "Inputs",
-        "metrics": "Affect self-reports (Apple State of Mind)",
-        "method": "Health Auto Export webhook",
-        "posture": "portfolio",
     },
     {
         "id": "macrofactor_workouts",

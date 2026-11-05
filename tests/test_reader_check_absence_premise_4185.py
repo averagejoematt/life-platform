@@ -40,5 +40,5 @@ def test_a_true_gap_of_the_served_length_passes():
 
 
 def test_journal_sentences_read_the_journal_gap_not_the_food_gap():
-    facts = {"lag_days": 1, "journal_gap_days": 6}
-    assert reader_checks.absence_premise("A six-day journaling silence.", facts=facts) == []
+    facts = {"lag_days": 1, "journal_gap_days": 4}  # synthetic journal gap (owner ruling 2026-11-05)
+    assert reader_checks.absence_premise("A four-day journaling silence.", facts=facts) == []

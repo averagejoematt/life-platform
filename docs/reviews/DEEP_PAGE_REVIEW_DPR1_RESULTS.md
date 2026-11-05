@@ -663,7 +663,7 @@ This is rare transparency in a health platform. It acknowledges that the buildin
 
 The "Five promises" section is a genuine accountability contract: journal daily, name feelings not just actions, invest in relationships, treat vice streaks as identity evidence, look at cognitive patterns.
 
-**Dr. Paul Conti's observations** are clinically perceptive: the clustering analysis of 3 journal entries showing "reflection, anxiety and stress, personal growth, and work ambition all appearing together, while mood tracking remains completely absent" is genuinely insightful. His suggestion — "two minutes simply noting his emotional state in a single word" — is therapeutically appropriate.
+**Dr. Paul Conti's observations** are clinically perceptive: the clustering analysis of the journal [journal activity withheld — private, owner ruling 2026-11-05] "while mood tracking remains completely absent" is genuinely insightful. His suggestion — "two minutes simply noting his emotional state in a single word" — is therapeutically appropriate.
 
 The "Naming what this actually is" section directly states: "Anxiety, social withdrawal, and imposter syndrome aren't character flaws. They're mental health patterns with established clinical frameworks." This is the most responsible content on the site.
 
@@ -675,7 +675,7 @@ The "What this page will become" roadmap at the bottom (Month 1-2 through Month 
 
 ### ③ Data & Widgets Audit
 
-Sparse by design: 1 journal entry in 30 days, 0 vice streaks, 0 connections tracked, 3 breathwork sessions. But the page frames this honesty as the data: *"The data gap is the data."* And *"One journal entry. Zero logged connections. That's not a bug in the measurement system — that's the measurement."*
+Sparse by design: journal [journal activity withheld — private, owner ruling 2026-11-05], 0 vice streaks, 0 connections tracked, 3 breathwork sessions. But the page frames this honesty as the data: *"The data gap is the data."* And *"[journal activity withheld — private, owner ruling 2026-11-05] Zero logged connections. That's not a bug in the measurement system — that's the measurement."*
 
 ### ④ Graphs & Analysis Audit
 

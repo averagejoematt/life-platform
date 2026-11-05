@@ -5,7 +5,7 @@ zero surface on averagejoematt.com: the entries existed only as local studio fil
 and a Notion journal page. This module is the ONE read-only door that lets a diary
 entry become visible to a reader — and it is built the same way every other
 private→public boundary in this repo is built: **fail-closed, projection-by-
-allowlist, withheld counted rather than hidden.**
+allowlist, private entries omitted and never counted** (owner ruling 2026-11-05).
 
 GET /api/diary_shelf[?limit=]
 
@@ -43,15 +43,15 @@ otherwise serve forever):
   · `_public_decision_note`              — the #1569 all-or-nothing content
     filter: a line the runtime filter would alter AT ALL is withheld entire,
     never served mangled.
-A line failing any screen is counted in `quotes_withheld`, not silently dropped.
+A line failing any screen is dropped and logged; no count of it is served (2026-11-05).
 
 HONEST NUMBERS (ADR-104)
 ────────────────────────
 Absence is absence. `duration` is emitted only when the entry actually carries
 `vocal_duration_s` (#1842, computed from the studio SRT) — never zeroed, never
 estimated. A quiet week renders as quiet: no cards, no padding, no manufactured
-"coming soon" rows. `withheld` reports how many diary entries exist but are not
-published, so the shelf never implies the diary is only what you can see.
+"coming soon" rows. No count of the unpublished entries is served (owner ruling
+2026-11-05: diary sessions are private journal activity; omit, never mark).
 
 RESET-AWARE (AC3, ADR-077)
 ──────────────────────────
@@ -74,9 +74,9 @@ CLAIMS ON TAPE (#1841)
 ──────────────────────
 `diary_claims` records are `visibility: "private"` by default and this endpoint
 keeps them that way: only a claim explicitly marked `visibility == "public"` is
-projected (field-by-field from an allowlist, never copied wholesale), and the
-rest are reported as a COUNT — "he put N forecasts on the record that day; they
-grade privately." No claim text crosses without its own marker.
+projected (field-by-field from an allowlist, never copied wholesale); the rest
+are neither shown nor counted (owner ruling 2026-11-05 — a count of private diary
+claims is diary activity). No claim crosses without its own marker.
 """
 
 import re
@@ -116,7 +116,7 @@ PUBLIC_LABEL = "the diary, where he cleared it"
 SHELF_NOTE = (
     "Nothing here publishes by default. An entry appears only when Matthew marked that entry "
     "publishable, and his words appear only where he marked that exact line. Everything else "
-    "stays in the studio — counted below, never shown."
+    "stays in the studio — never shown, never counted."
 )
 
 # The ONLY fields of a diary_claims record that may cross to a reader, and only
@@ -235,6 +235,8 @@ def _quotes_by_day():
         shaped = jq.shape_public(item)
         shaped["quote"] = screened
         served.setdefault(key, []).append(shaped)
+    if withheld:
+        logger.info("[diary_shelf] %d marked line(s) failed a serve-time screen (not served)", sum(withheld.values()))
     return served, withheld
 
 
@@ -243,16 +245,15 @@ def _claims_by_entry():
 
     Claims are `visibility: "private"` by default and stay that way: only an
     explicitly public-marked claim is projected, field-by-field from
-    `CLAIM_PUBLIC_FIELDS`. The count of the rest is disclosed — a reader learns
-    that forecasts were made, never what they were."""
+    `CLAIM_PUBLIC_FIELDS`. ``count`` (every claim on the entry) stays server-side:
+    the shelf serves ``public`` only (owner ruling 2026-11-05)."""
     pk = f"{USER_PREFIX}diary_claims"
     try:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("PREDICTION#"),
             ScanIndexForward=False,
-            Limit=200,
         )
-        items = _decimal_to_float(resp.get("Items", []))
+        items = _decimal_to_float(resp.get("Items", []))  # not Limit-windowed: which public claims appear never depends on private ones
     except Exception as e:  # pragma: no cover — absent ledger ⇒ no claim counts
         logger.warning(f"[diary_shelf] diary_claims query failed: {e}")
         items = []
@@ -262,10 +263,10 @@ def _claims_by_entry():
         sk = str(item.get("source_sk") or "")
         if not sk:
             continue
+        if str(item.get("visibility") or "").strip().lower() != "public":
+            continue  # a private claim: graded privately, never counted on a public surface
         bucket = out.setdefault(sk, {"public": [], "count": 0})
         bucket["count"] += 1
-        if str(item.get("visibility") or "").strip().lower() != "public":
-            continue
         claim = {}
         for field in CLAIM_PUBLIC_FIELDS:
             value = item.get(field)
@@ -296,7 +297,7 @@ def handle_diary_shelf(event):
     """GET /api/diary_shelf — the consent-gated diary shelf (#1846).
 
     Read-only. Optional `?limit=` (default 24, max 60). Serves shaped-empty
-    (`{"entries": [], "count": 0, "withheld": N}`) whenever nothing is cleared —
+    (`{"entries": [], "count": 0}`) whenever nothing is cleared —
     the shelf then renders as quiet, which is the honest state of a quiet week.
     """
     qs = event.get("queryStringParameters") or {}
@@ -311,18 +312,19 @@ def handle_diary_shelf(event):
         logger.warning(f"[diary_shelf] notion query failed: {e}")
         rows = []
 
-    # Split first, so `withheld` counts EVERY diary entry that exists and did not
-    # clear — the number is the point (AC1's "invisible, not redacted-looking" is
-    # about the card, not about pretending the entry never happened).
-    cleared, withheld_entries = [], 0
+    # Owner ruling 2026-11-05 ("classify video-diary sessions as private journal activity by default"):
+    # an entry he did not clear is omitted and NOT counted — the former `withheld` total moved with every
+    # private session he recorded. Logged server-side only.
+    cleared, private_entries = [], 0
     for item in rows:
         m = _ENTRY_SK_RE.match(str(item.get("sk") or ""))
         if not m:
             continue
         if diary_consent.resolve_consent(item) == diary_consent.TIER_PRIVATE:
-            withheld_entries += 1
+            private_entries += 1
             continue
         cleared.append((m.group(1), m.group(2), item))
+    logger.info("[diary_shelf] %d cleared, %d private (not served)", len(cleared), private_entries)
 
     if not cleared:
         return _ok(
@@ -330,7 +332,6 @@ def handle_diary_shelf(event):
                 "shelf": {
                     "entries": [],
                     "count": 0,
-                    "withheld": withheld_entries,
                     "label": PUBLIC_LABEL,
                     "note": SHELF_NOTE,
                 }
@@ -339,7 +340,7 @@ def handle_diary_shelf(event):
         )
 
     cleared = cleared[:limit]
-    quotes_by_day, quotes_withheld = _quotes_by_day()
+    quotes_by_day, _quotes_withheld = _quotes_by_day()  # the withheld tally is logged, never served
     claims_by_entry = _claims_by_entry()
 
     # One batched metrics read across the shelf's real date span, so every card's
@@ -379,9 +380,9 @@ def handle_diary_shelf(event):
                 "earned": mark["earned_score"],
             },
             "quotes": quotes_by_day.get(key, []),
-            "quotes_withheld": quotes_withheld.get(key, 0),
+            # Owner ruling 2026-11-05: no count of the lines that stayed private or of the private
+            # forecasts beside the cleared ones — only what he marked public is on the card.
             "claims": claims["public"],
-            "claims_on_record": claims["count"],
         }
         duration = _duration(item)
         if duration:  # ADR-104: absent stays absent
@@ -393,7 +394,6 @@ def handle_diary_shelf(event):
             "shelf": {
                 "entries": entries,
                 "count": len(entries),
-                "withheld": withheld_entries,
                 "label": PUBLIC_LABEL,
                 "note": SHELF_NOTE,
             }

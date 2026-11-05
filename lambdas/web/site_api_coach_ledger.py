@@ -32,6 +32,10 @@ from coach import (
     plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
 )
+from common import (
+    activity_publication as _activity_publication,  # owner rulings 2026-11-03/05: private metrics off the wire
+    prediction_publication,  # owner ruling 2026-11-05: the method every public count of calls is under
+)
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -485,6 +489,16 @@ def _commitment_block(*, _g):
         logger.info("[/api/predictions] commitment tally is archived (pre-genesis) — serving null, not a stale season")
         return None
     out = _decimal_to_float(item)
+    # Owner ruling 2026-11-05: a tally counted before the call publication rule included private asks — its totals
+    # would publish how many there were. Only a tally the grader counted under the current method is served; until
+    # its next daily run the block is null (the page renders nothing), never the old numbers.
+    try:
+        method = int(out.get("method") or 0)
+    except (TypeError, ValueError):
+        method = 0
+    if method != prediction_publication.METHOD_VERSION:
+        logger.info("[/api/predictions] commitment tally predates the call publication method — serving null")
+        return None
     return {"as_of": out.get("as_of"), "lifetime": out.get("lifetime") or {}, "season": out.get("season") or {}}
 
 
@@ -713,7 +727,8 @@ def handle_calibration(event, *, _g):
         jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
         jobs["hypothesis-ledger"] = _fetch_hyp_ledger
         fetched = _parallel_fetch(jobs)
-        hyp_rows = fetched.pop("hypothesis-ledger")
+        # Owner rulings 2026-11-03/05: a graded bet on a private metric stays out of the public scores.
+        hyp_rows = [r for r in fetched.pop("hypothesis-ledger") if _activity_publication.hypothesis_is_public(r)]
 
         per_coach = []
         season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set
@@ -821,6 +836,8 @@ def handle_calibration(event, *, _g):
                 # can name its own window instead of leaving it to proximity.
                 "cycle_start": EXPERIMENT_START,
                 "prereg_seal": seal,
+                # Owner ruling 2026-11-05: every coach number above is over publication-eligible calls only.
+                "method": prediction_publication.method_block(),
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
                     "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
@@ -1029,6 +1046,15 @@ def _summed_tally(blocks) -> dict:
     out = {k: sum(b[k] for b in blocks) for k in _TALLY_KEYS}
     decided = out["confirmed"] + out["refuted"]
     return {**out, "decided": decided, "accuracy_pct": round(out["confirmed"] / decided * 100, 1) if decided > 0 else None}
+
+
+def _due_block(due_dates, today_pt) -> dict:
+    """``{as_of, due_now, earliest_due}`` over the pending calls' due days (#3046)."""
+    return {
+        "as_of": today_pt,
+        "due_now": sum(1 for d in due_dates if d <= today_pt),
+        "earliest_due": min(due_dates) if due_dates else None,
+    }
 
 
 def handle_predictions(event, *, _g):
@@ -1289,12 +1315,7 @@ def handle_predictions(event, *, _g):
 
         # #3046: due-vs-pending context — "N pending" with no due date reads as a
         # stall on a fresh cycle when in truth nothing is due yet (DIL-007).
-        today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
-        due = {
-            "as_of": today_pt,
-            "due_now": sum(1 for d in _due_dates if d <= today_pt),
-            "earliest_due": min(_due_dates) if _due_dates else None,
-        }
+        due = _due_block(_due_dates, _g["datetime"].now(PT).strftime("%Y-%m-%d"))
 
         return _ok(
             {
@@ -1326,6 +1347,8 @@ def handle_predictions(event, *, _g):
                 "commitments": _commitment_block_safe(_g=_g),
                 "cycle": _current_cycle(),
                 "prereg_seal": seal,
+                # Owner ruling 2026-11-05: every count, denominator and accuracy here is over eligible calls only.
+                "method": prediction_publication.method_block(),
             },
             cache_seconds=300,
         )

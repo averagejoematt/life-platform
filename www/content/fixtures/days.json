@@ -2792,8 +2792,8 @@
    {
     "coach_name": "Marcus Webb",
     "due_date": "2026-10-29",
-    "prediction_id": "mind-20261015-journal01",
-    "text": "Protein recovery would lift the journaling silence."
+    "prediction_id": "nutrition-20261015-protein01",
+    "text": "Protein intake would climb back above 150 g within two weeks."
    }
   ],
   "calls_open_count": 3,
@@ -2820,7 +2820,7 @@
     "type": "prediction"
    },
    {
-    "id": "mind-20261015-journal01",
+    "id": "nutrition-20261015-protein01",
     "rel": "open",
     "type": "prediction"
    },
@@ -3020,8 +3020,8 @@
    {
     "coach_name": "Marcus Webb",
     "due_date": "2026-10-29",
-    "prediction_id": "mind-20261015-journal01",
-    "text": "Protein recovery would lift the journaling silence."
+    "prediction_id": "nutrition-20261015-protein01",
+    "text": "Protein intake would climb back above 150 g within two weeks."
    }
   ],
   "calls_open_count": 3,
@@ -3077,7 +3077,7 @@
     "type": "prediction"
    },
    {
-    "id": "mind-20261015-journal01",
+    "id": "nutrition-20261015-protein01",
     "rel": "open",
     "type": "prediction"
    },
@@ -3339,8 +3339,8 @@
    {
     "coach_name": "Marcus Webb",
     "due_date": "2026-10-29",
-    "prediction_id": "mind-20261015-journal01",
-    "text": "Protein recovery would lift the journaling silence."
+    "prediction_id": "nutrition-20261015-protein01",
+    "text": "Protein intake would climb back above 150 g within two weeks."
    }
   ],
   "calls_open_count": 2,
@@ -3389,7 +3389,7 @@
     "type": "prediction"
    },
    {
-    "id": "mind-20261015-journal01",
+    "id": "nutrition-20261015-protein01",
     "rel": "open",
     "type": "prediction"
    },

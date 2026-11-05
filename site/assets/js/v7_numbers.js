@@ -197,11 +197,12 @@ export function labRows(biomarkers) {
 // The five instruments the strip names, in the design order (CONCEPT §14 "the skips, in one
 // vocabulary"). Each row is stated as an absence with its served day count; none of them is
 // narrated as anyone going dark. `key` is the apple_health datatype key on /api/source_freshness.
+// State of mind is not a row: its check-ins are private activity (owner ruling 2026-11-05) and the
+// board no longer serves its liveness.
 const ABSENT = [
   { id: "journal", label: "Journal" },
   { id: "cgm", label: "Blood-sugar sensor", key: "cgm" },
   { id: "blood_pressure", label: "Blood pressure", key: "blood_pressure" },
-  { id: "state_of_mind", label: "State of mind", key: "state_of_mind" },
   { id: "garmin", label: "Garmin" },
 ];
 
@@ -242,7 +243,7 @@ export function absenceRows({ freshness, pulse } = {}) {
     const floor = dt.age_days == null && dt.age_floor_days != null ? `more than <span data-src="${src}.age_floor_days">${esc(dayCount(dt.age_floor_days))}</span>` : `<span data-src="${src}.age_days">${esc(dayCount(dt.age_days))}</span>`;
     if (!dt.dark) return { ...row, text: `being recorded; last reading ${esc(dayInWords(dt.last_seen) || "on record")}`, src };
     if (row.id === "cgm") return { ...row, text: `no sensor worn; ${floor} without a reading`, src };
-    return { ...row, text: `${floor} without ${row.id === "state_of_mind" ? "an entry" : "a reading"}`, src };
+    return { ...row, text: `${floor} without a reading`, src };
   });
 }
 

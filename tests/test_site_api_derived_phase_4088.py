@@ -107,7 +107,6 @@ SITE_RULINGS = {
     ("meal_glucose", "_query_source", "'macrofactor'", "site_api_meals.py"): CLAMPED,
     ("meal_glucose", "_query_source", "'apple_health'", "site_api_meals.py"): CLAMPED,
     ("food_delivery_overview", "_query_source", "'food_delivery'", "site_api_meals.py"): CLAMPED,
-    ("mind_overview", "_query_source", "'state_of_mind'", "site_api_mind.py"): CLAMPED,
     ("mind_overview", "_query_source", "'apple_health'", "site_api_mind.py"): CLAMPED,
     ("_latest_weight_lbs", "_query_source", "'withings'", "site_api_nutrition.py"): CLAMPED,  # callers pass _experiment_date
     ("nutrition_overview", "_query_source", "'macrofactor'", "site_api_nutrition.py"): CLAMPED,
@@ -162,7 +161,6 @@ SITE_RULINGS = {
     ("sleep_correlations", "_query_source", "'eightsleep'", "site_api_sleep.py"): CLAMPED,
     ("sleep_correlations", "_query_source", "'macrofactor'", "site_api_sleep.py"): CLAMPED,
     ("sleep_correlations", "_query_source", "'todoist'", "site_api_sleep.py"): CLAMPED,
-    ("sleep_correlations", "_query_source", "'apple_health'", "site_api_sleep.py"): CLAMPED,
     ("sleep_correlations", "_query_source", "'withings'", "site_api_sleep.py"): CLAMPED,
     ("sleep_detail", "_query_source", "'eightsleep'", "site_api_sleep.py"): CLAMPED,
     ("sleep_detail", "_query_source", "'whoop'", "site_api_sleep.py"): CLAMPED,

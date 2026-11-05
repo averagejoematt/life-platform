@@ -343,8 +343,9 @@ def _leaky_response() -> dict:
 
 def test_every_site_api_route_serves_no_journal_silence(monkeypatch):
     """Each route in the AST-derived registry, dispatched to a stub that answers with the incident's shapes (a
-    coach line, an open action, a standalone read), comes back off the real `lambda_handler` clean — with the
-    withheld count on the wire. One test, every offender reported."""
+    coach line, an open action, a standalone read), comes back off the real `lambda_handler` clean — and with NO
+    withheld count on the wire (owner ruling 2026-11-05: the count is logged, never served). One test, every
+    offender reported."""
     from web import site_api_lambda as L
 
     from deploy.endpoint_registry import discover_endpoint_paths
@@ -358,7 +359,7 @@ def test_every_site_api_route_serves_no_journal_silence(monkeypatch):
         if path == "/api/healthz":  # answered above the dispatch with a fixed, text-free health document
             continue
         resp = L.lambda_handler(_event(path), None)
-        if J.mentions_journal_silence(resp.get("body")) or resp["headers"].get(J.WITHHELD_HEADER) != "3":
+        if J.mentions_journal_silence(resp.get("body")) or any("withheld" in str(k).lower() for k in resp["headers"]):
             leaked.append(path)
     assert not leaked, f"{len(leaked)} route(s) served journal silence: {leaked[:20]}"
 
