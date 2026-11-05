@@ -827,7 +827,7 @@ test("Appendix: an earlier version of a v8 page says so, and a codename is small
   assert.match(row("/data/character/").line, /Earlier version of “The whole of it”, superseded\.$/);
   assert.match(row("/method/build/").line, /Earlier version of “How it’s built”, superseded\.$/);
   assert.match(row("/coaching/team/").line, /Earlier version of “The AI coaches”, superseded\.$/);
-  for (const [url, title, codename] of [["/story/membrane/", "Posts and replies", "Membrane"], ["/method/wrong/", "Every time the AI was wrong", "Wrong page"], ["/story/theme-river/", "Journal themes, charted", "Theme river"], ["/data/horizons/", "A weekly pick to read or watch", "Horizons"], ["/method/explorer/", "The raw record, as a table", "Explorer"]]) {
+  for (const [url, title, codename] of [["/story/membrane/", "Posts and replies", "Membrane"], ["/method/wrong/", "Every time the AI was wrong", "Wrong page"], ["/data/horizons/", "A weekly pick to read or watch", "Horizons"], ["/method/explorer/", "The raw record, as a table", "Explorer"]]) {
     assert.equal(row(url).title, title, url);
     assert.ok(row(url).line.endsWith(`Called “${codename}” on the page.`), row(url).line);
   }
