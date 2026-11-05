@@ -456,13 +456,6 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "the readers are coach_panel_podcast_lambda._desk_episode and chronicle_approve_lambda._commit_ledger. The pair is "
         "proven two-sided on the real row shape with mutation controls in tests/test_story_desk_wiring.py.",
     ),
-    "notion::lambdas/content/story_dossier.py::read": (
-        "2026-10-01",
-        "#4532: the story dossier COUNTS journal rows by key only (ProjectionExpression='sk', begins_with "
-        "'DATE#{d}#journal#') and reads no attribute. The writer's sk shape is pinned at "
-        "lambdas/ingestion/notion_lambda.py:598-599 (DATE#{date}#journal#{suffix}[#{stable}]), the same prefix "
-        "recap_data.py:509 and freshness_checker already count by; no field shape exists to disagree about.",
-    ),
     # #3900 (2026-09-20): the writer gained a write-time `phase`/`cycle` stamp via
     # experiment_stamp_for(); the reader (mcp/tools_coach_intelligence.py) never inspects
     # those keys — it selects rows through with_phase_filter, which IS the contract between

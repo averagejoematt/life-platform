@@ -2868,6 +2868,7 @@ Stores Wednesday Chronicle installments by Elena Voss. Also published to S3 blog
 | `installment_number` | number | Sequential installment number |
 | `board_interview` | boolean | Whether this installment includes a BoD interview |
 | `generated_at` | string | ISO timestamp |
+| `revisions` | list of maps | Publication revision records (owner ruling 2026-11-05), appended by `scripts/chronicle_revision_apply.py --apply` on every row (`DATE#`, `RECAP#`) it revised: `{at, reason, backup_ref, fields}` — `backup_ref` is the private `s3://…/backups/chronicle-revisions/<date>/ddb/…json` copy of the whole original item (DynamoDB JSON), `fields` the top-level attributes changed. No text. **Never served**: no public route or publisher reads it (`tests/test_chronicle_revision_apply.py` pins the readers) |
 
 ---
 

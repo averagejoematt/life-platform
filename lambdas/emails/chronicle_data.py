@@ -1,16 +1,26 @@
 """lambdas/emails/chronicle_data.py — the weekly data gather + narrative-ready
 packet builder, split out of wednesday_chronicle_lambda.py (#1654). Reads the
 facade's live (monkeypatchable) module state via the `_g` hand-off; does NOT
-import the facade (no import cycle)."""
+import the facade (no import cycle).
+
+THE PACKET IS A PUBLIC GENERATOR'S INPUT (owner rulings 2026-11-03 and 2026-11-05). Whatever enters
+it can reach a published installment, its excerpt, the RSS feed, the share kit, the recap and the
+Panel episode. So journal activity never enters it: the gather does not read the journal partition
+or the State of Mind check-ins (both PRIVATE in ``common.narrative_provenance``), the habit block
+names and counts only habits ``common.activity_publication`` classifies PUBLIC (the journal habits
+are private activity), and the presence block is the engagement record's PUBLIC projection — the
+one /api/presence serves. Private data stays stored for the owner's own tools; it is not read here.
+``tests/test_chronicle_journal_invariance.py`` holds the packet byte-identical when only journal
+inputs vary, with a mutation control that proves the check can fail."""
 
 import re
 from datetime import datetime, timedelta
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
+from common import activity_publication  # owner ruling 2026-11-05: only PUBLIC habits reach the public packet
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import d2f, safe_float
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
-from content import story_checks  # #4538: the off-record label is the story door's, not a second copy
 from experiment.phase_filter import singleton_visible
 from health import character_privacy  # owner rulings 2026-11-03/04: the chronicle is public — private-source pillars held
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
@@ -52,7 +62,6 @@ def strip_model_conjecture(text):
 def gather_chronicle_data(*, _g):
     """Gather all data Elena needs for this week's installment."""
     query_range = _g["query_range"]
-    query_range_list = _g["query_range_list"]
     fetch_profile = _g["fetch_profile"]
     table = _g["table"]
     USER_ID = _g["USER_ID"]
@@ -81,12 +90,9 @@ def gather_chronicle_data(*, _g):
     macrofactor = query_range("macrofactor", start, end)
     apple_health = query_range("apple_health", start, end)
 
-    # --- Journal entries (the soul of each installment) ---
-    # Journal entries use SK pattern: DATE#YYYY-MM-DD#journal#template#uuid
-    journal_entries = query_range_list("notion", start, end)
-    # Filter to only journal entries (not other notion records)
-    journal_entries = [e for e in journal_entries if "#journal#" in e.get("sk", "")]
-    logger.info(f"Journal entries: {len(journal_entries)}")
+    # --- Journal: NOT READ (owner rulings 2026-11-03/05) ---
+    # The chronicle is public; whether, when and what he writes in the journal is private. Neither
+    # the journal partition (notion) nor the State of Mind check-ins are read for this packet.
 
     # --- Day grades + habit scores ---
     day_grades = query_range("day_grade", start, end)
@@ -94,11 +100,6 @@ def gather_chronicle_data(*, _g):
 
     # --- Habits raw (for specific habit names) ---
     habitify = query_range("habitify", start, end)
-
-    # --- State of Mind ---
-    # SoM daily aggregates (som_avg_valence, som_top_labels/associations) live on
-    # the apple_health partition; keep only days that carry a SoM aggregate.
-    state_of_mind = {d: rec for d, rec in query_range("apple_health", start, end).items() if rec.get("som_avg_valence") is not None}
 
     # --- Supplements ---
     supplements = query_range("supplements", start, end)
@@ -254,11 +255,9 @@ def gather_chronicle_data(*, _g):
         "withings": withings,
         "macrofactor": macrofactor,
         "apple_health": apple_health,
-        "journal_entries": journal_entries,
         "day_grades": day_grades,
         "habit_scores": habit_scores,
         "habitify": habitify,
-        "state_of_mind": state_of_mind,
         "supplements": supplements,
         "experiments": experiments,
         "anomalies": anomalies,
@@ -300,6 +299,68 @@ def build_calendar_facts(start, end, genesis=None):
         tag = " (experiment genesis)" if genesis and ds == genesis else ""
         lines.append(f"- {ds} was a {days[ds].strftime('%A')}{tag}")
     return "\n".join(lines)
+
+
+def _week_statuses(data):
+    """{habit name: its latest stored status in the window} — the identity the publication policy reads."""
+    out = {}
+    for d in sorted((data.get("habitify") or {}).keys()):
+        for name, st in ((data["habitify"][d] or {}).get("habit_statuses") or {}).items():
+            out[name] = st
+    return out
+
+
+def _non_public_habits(data):
+    """Habit names the publication policy does not classify PUBLIC: any habit in the window's statuses
+    that is not public (by its Habitify id), plus every registry habit the policy names private
+    outright (the journal habits; an owner-declared private one). Decided by identity, never by words."""
+    registry = (data.get("profile") or {}).get("habit_registry") or {}
+    statuses = _week_statuses(data)
+    names = {n for n, st in statuses.items() if not activity_publication.habit_is_public(n, st, registry.get(n))}
+    for n, meta in registry.items():
+        fam = activity_publication.habit_family(n, statuses.get(n), meta)
+        if fam in ("journal_presence", activity_publication.OWNER_DECLARED_PRIVATE):
+            names.add(n)
+    return names, statuses, registry
+
+
+def _tier(meta):
+    try:
+        return int((meta or {}).get("tier"))
+    except (TypeError, ValueError):
+        return None
+
+
+def habit_performance_lines(data):
+    """The HABIT PERFORMANCE lines over PUBLIC habits only (owner ruling 2026-11-05).
+
+    A tier's done/total is printed only when no non-public habit sits in that tier (the stored counts
+    include every habit, so a tier holding a journal habit would move with journal activity — its
+    count is left out rather than recomputed). A missed habit is named only when the policy classifies
+    it PUBLIC; an unclassified name is not printed (fail closed)."""
+    private, statuses, registry = _non_public_habits(data)
+    private_tiers = {_tier(registry.get(n)) for n in private}
+    private_vice = any((statuses.get(n) or {}).get("group") == "Vice" for n in private)
+    lines = []
+    for d in sorted((data.get("habit_scores") or {}).keys()):
+        rec = data["habit_scores"][d]
+        parts = []
+        if 0 not in private_tiers:
+            parts.append(f"T0 {rec.get('tier0_done', 0)}/{rec.get('tier0_total', 0)}")
+        if 1 not in private_tiers:
+            parts.append(f"T1 {rec.get('tier1_done', 0)}/{rec.get('tier1_total', 0)}")
+        if not private_vice:
+            parts.append(f"Vices {rec.get('vices_held', 0)}/{rec.get('vices_total', 0)}")
+        line = f"{d}: " + (", ".join(parts) or "habit counts not published")
+        missed = [
+            h
+            for h in rec.get("missed_tier0", []) or []
+            if h not in private and activity_publication.habit_is_public(h, statuses.get(h), registry.get(h))
+        ]
+        if missed:
+            line += f" | MISSED T0: {', '.join(missed[:3])}"
+        lines.append(line)
+    return lines
 
 
 def build_data_packet(data):
@@ -490,21 +551,9 @@ def build_data_packet(data):
         packet.append(f"{d}: {score:.0f}/100 ({grade})")
     packet.append("")
 
-    # --- Habit scores (tier performance) ---
+    # --- Habit scores (tier performance) — PUBLIC habits only (owner ruling 2026-11-05) ---
     packet.append("=== HABIT PERFORMANCE ===")
-    for d in sorted(data["habit_scores"].keys()):
-        rec = data["habit_scores"][d]
-        t0_done = rec.get("tier0_done", 0)
-        t0_total = rec.get("tier0_total", 0)
-        t1_done = rec.get("tier1_done", 0)
-        t1_total = rec.get("tier1_total", 0)
-        vices_held = rec.get("vices_held", 0)
-        vices_total = rec.get("vices_total", 0)
-        missed = rec.get("missed_tier0", [])
-        line = f"{d}: T0 {t0_done}/{t0_total}, T1 {t1_done}/{t1_total}, Vices {vices_held}/{vices_total}"
-        if missed:
-            line += f" | MISSED T0: {', '.join(missed[:3])}"
-        packet.append(line)
+    packet.extend(habit_performance_lines(data))
     packet.append("")
 
     # --- Nutrition overview ---
@@ -521,51 +570,10 @@ def build_data_packet(data):
     packet.append(f"Targets: {target_phrase()}, {PLAN_DAILY_PROTEIN_MIN_G}g protein")
     packet.append("")
 
-    # --- Journal entries (DEEP BACKGROUND — never quote directly) ---
-    packet.append(story_checks.OFF_RECORD_JOURNAL_HEADER)  # #4538: one label, stated once, shared with the story door
-    for entry in sorted(data["journal_entries"], key=lambda e: e.get("sk", "")):
-        template = entry.get("template", "?")
-        date = entry.get("date", entry.get("sk", "").split("#")[1] if "#" in entry.get("sk", "") else "?")
-        raw = entry.get("raw_text", "")
-        mood = entry.get("enriched_mood")
-        energy = entry.get("enriched_energy")
-        stress = entry.get("enriched_stress")
-        themes = entry.get("enriched_themes", [])
-        emotions = entry.get("enriched_emotions", [])
-        cognitive = entry.get("enriched_cognitive_patterns", [])
-        avoidance = entry.get("enriched_avoidance_flags")  # J-3 (#503): plural list, not singular
-        social = entry.get("enriched_social_quality")
-        ownership = entry.get("enriched_ownership")  # J-3 (#503): _level variant never written
-
-        packet.append(f"--- {date} ({template}) ---")
-        if raw:
-            # Include full text — Elena needs the emotional texture
-            packet.append(f"Text: {raw[:1500]}")
-        signals = []
-        if mood is not None:
-            signals.append(f"Mood:{mood}/5")
-        if energy is not None:
-            signals.append(f"Energy:{energy}/5")
-        if stress is not None:
-            signals.append(f"Stress:{stress}/5")
-        if themes:
-            signals.append(f"Themes: {', '.join(themes[:4])}")
-        if emotions:
-            signals.append(f"Emotions: {', '.join(emotions[:5])}")
-        if cognitive:
-            signals.append(f"Cognitive: {', '.join(cognitive[:3])}")
-        if avoidance:
-            signals.append(f"AVOIDANCE FLAGS: {', '.join(str(a) for a in avoidance)}")
-        if social:
-            signals.append(f"Social: {social}")
-        if ownership:
-            signals.append(f"Ownership: {ownership}")
-        if signals:
-            packet.append("Signals: " + " | ".join(signals))
-        packet.append("")
-    if not data["journal_entries"]:
-        packet.append("No journal entries this week.")
-    packet.append("")
+    # --- Journal: no block at all (owner rulings 2026-11-03/05) ---
+    # Not its text, not its signals, not its presence or absence. A journal_entries key handed in by
+    # an older caller is ignored; there is no "no entries" line, because a constant absence would
+    # still be a statement about whether he writes.
 
     # --- Private conversations (#1483, ADR-142 tier 2 — allude only) ---
     # The block re-projects every item through diary_consent.conversation_reference,
@@ -576,27 +584,9 @@ def build_data_packet(data):
         packet.append(conv_block)
         packet.append("")
 
-    # --- State of Mind ---
-    # Aggregate fields are prefixed som_* on the apple_health record; top labels /
-    # associations are already comma-joined strings, not lists.
-    packet.append("=== STATE OF MIND (How We Feel) ===")
-    _som_days = sorted(data["state_of_mind"].keys())
-    if not _som_days:
-        packet.append("No State of Mind check-ins this week.")
-    for d in _som_days:
-        rec = data["state_of_mind"][d]
-        valence = safe_float(rec, "som_avg_valence")
-        if valence is None:
-            continue
-        labels = rec.get("som_top_labels") or ""
-        areas = rec.get("som_top_associations") or ""
-        parts = [f"{d}: valence {valence:.2f}"]
-        if labels:
-            parts.append(f"emotions: {labels}")
-        if areas:
-            parts.append(f"areas: {areas}")
-        packet.append(" | ".join(parts))
-    packet.append("")
+    # --- State of Mind: no block (owner rulings 2026-11-03/05) ---
+    # The mood check-ins are a private self-report (``state_of_mind`` is PRIVATE in
+    # common.narrative_provenance); neither their values nor their absence enter the public packet.
 
     # --- Active experiments ---
     if data["experiments"]:
@@ -776,13 +766,20 @@ def _load_engagement_signal(*, _g):
     """#914: the presence / quiet-stretch state (engagement_state STATE#current,
     written by adaptive_mode via engagement_core). Fail-soft → {}. The pure
     rendering + acknowledgment logic lives in engagement_core; only this read is
-    local (the callers-pass-the-read contract)."""
+    local (the callers-pass-the-read contract).
+
+    Owner ruling 2026-11-05: the chronicle is public, so it reads the record's PUBLIC projection
+    (``engagement_core.PUBLIC_PROJECTION_KEY`` — the journal channel excluded, the same sub-record
+    /api/presence serves), never the full record. A record without one steers nothing."""
+    from content.engagement_core import PUBLIC_PROJECTION_KEY
+
     table = _g["table"]
     USER_PREFIX = _g["USER_PREFIX"]
     logger = _g["logger"]
     try:
         resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
-        return resp.get("Item") or {}
+        pub = (resp.get("Item") or {}).get(PUBLIC_PROJECTION_KEY)
+        return pub if isinstance(pub, dict) else {}
     except Exception as e:  # pragma: no cover — defensive
         logger.warning(f"engagement signal read failed: {e}")
         return {}

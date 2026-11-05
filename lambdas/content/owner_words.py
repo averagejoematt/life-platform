@@ -2,7 +2,7 @@
 
 WHY
   The epic's second rule is that the person leads: his words sit above the AI's. The site had no steady source of
-  them (on 2026-10-03 its own absence fact read "Nothing in my journal for 24 days"). The owner ruled on 2026-10-04
+  them (its only stand-in was an absence fact about a private channel, since withdrawn). The owner ruled on 2026-10-04
   that he will supply his words "either via email or my claude chat program", so this is a store with two doors,
   not a new channel with its own schedule:
 
