@@ -1479,6 +1479,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/common/prediction_publication.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/common/send_ledger.py",
@@ -2210,13 +2217,6 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/content/recap_data.py",
-      "partition": "notion",
-      "via": "local-seam"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/content/recap_data.py",
       "partition": "strava",
       "via": "local-seam"
     },
@@ -2239,13 +2239,6 @@
       "lambda": null,
       "module": "lambdas/content/story_dossier.py",
       "partition": "insights",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/content/story_dossier.py",
-      "partition": "notion",
       "via": "pk"
     },
     {
@@ -5318,13 +5311,6 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_mind.py",
-      "partition": "state_of_mind",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_mind.py",
       "partition": "temptations",
       "via": "pk"
     },
@@ -5563,13 +5549,6 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_pulse.py",
-      "partition": "state_of_mind",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_pulse.py",
       "partition": "strava",
       "via": "pk"
     },
@@ -5648,13 +5627,6 @@
       "lambda": null,
       "module": "lambdas/web/site_api_rollups.py",
       "partition": "withings",
-      "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_sleep.py",
-      "partition": "apple_health",
       "via": "seam"
     },
     {
@@ -8281,7 +8253,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 792,
+      "edges": 788,
       "lambdas": 107,
       "mcp_tool_modules": 39,
       "mcp_tools": 90,
@@ -8295,9 +8267,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 396,
-        "sites_resolved": 995,
-        "sites_total": 1391
+        "sites_dynamic": 394,
+        "sites_resolved": 989,
+        "sites_total": 1383
       },
       "schedule_resolution": {
         "dynamic": 0,
