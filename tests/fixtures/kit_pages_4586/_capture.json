@@ -2,6 +2,7 @@
  "captured_at": "2026-10-18T07:15:07Z",
  "base": "https://averagejoematt.com",
  "by": "scripts/capture_kit_page_fixtures.py (#4671) \u2014 one pass, read-only GETs; re-run it, never hand-edit a file",
+ "_privacy": "Hand-edited once: real journal-activity values replaced with synthetic ones for privacy (owner ruling 2026-11-05). Every journal day count, last-entry date and the journal (notion) channel's absence/recency fields are synthetic, not the subject's; the remaining journal-silence wording is kept only as input for the journal-silence guards (common.journal_silence). A re-run of the capture replaces this note with live (already journal-scrubbed) output.",
  "files": {
   "achievements.json": "/api/achievements",
   "calls.json": "/api/calls",

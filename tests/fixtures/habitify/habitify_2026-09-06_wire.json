@@ -2,7 +2,7 @@
  "_source": "LIVE Habitify API, captured 2026-09-06 ~20:30 PT for #3666 (read-only GETs).",
  "_journal_query": "GET /journal?target_date=2026-09-06T00:00:00+00:00",
  "_logs_query": "GET /logs/{habit_id}?from=2026-08-31T00:00:00+00:00&to=2026-09-08T00:00:00+00:00",
- "_privacy": "Two habit NAMES are substituted ('Vice Habit (name withheld)', 'Vice Habit 2 (name withheld)') under the never-public content rule — in BOTH the journal entry and the logs key, which is keyed by habit name. Every timestamp, id, status, goal and value is verbatim wire.",
+ "_privacy": "Two habit NAMES are substituted ('Vice Habit (name withheld)', 'Vice Habit 2 (name withheld)') under the never-public content rule — in BOTH the journal entry and the logs key, which is keyed by habit name. Owner ruling 2026-11-05: real journal-activity values replaced with synthetic ones for privacy — the two journal habits' names AND ids are substituted the same way ('Withheld Habit A/B (name withheld)', synthetic ids), so no journal status is attributable. Every other timestamp, id, status, goal and value is verbatim wire.",
  "area_map": {
   "-P-Bq7K_2mUXjwtetrQp": "Core",
   "-P-Bq87ujL_d3KDcrA8b": "Optimize",
@@ -640,8 +640,8 @@
    }
   },
   {
-   "id": "99A94E6D-3D82-4BE9-85EF-8858CB4BA340",
-   "name": "Morning Journal",
+   "id": "00000000-0000-4000-8000-00000000000A",
+   "name": "Withheld Habit A (name withheld)",
    "is_archived": false,
    "goal": {
     "unit_type": "rep",
@@ -1228,8 +1228,8 @@
    }
   },
   {
-   "id": "A862488C-8219-48EB-AD1F-90CBFDC37788",
-   "name": "Evening Journal",
+   "id": "00000000-0000-4000-8000-00000000000B",
+   "name": "Withheld Habit B (name withheld)",
    "is_archived": false,
    "goal": {
     "unit_type": "rep",
@@ -1501,7 +1501,7 @@
   "Red Light Therapy On Face": [],
   "Morning Skincare": [],
   "Morning Sunlight / Luminette Glasses": [],
-  "Morning Journal": [],
+  "Withheld Habit A (name withheld)": [],
   "Daytime Glasses Blue Light Blocking": [],
   "Morning Breathwork": [],
   "Deep Work Block": [],
@@ -1529,7 +1529,7 @@
   "Read A Book (10+ Pages)": [],
   "Evening Skincare": [],
   "Body Skincare": [],
-  "Evening Journal": [],
+  "Withheld Habit B (name withheld)": [],
   "Evening Breathwork": [],
   "Vice Habit 2 (name withheld)": []
  }

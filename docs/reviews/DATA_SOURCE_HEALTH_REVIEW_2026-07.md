@@ -38,7 +38,7 @@ Stage 0 reconciled the open-issue ledger (13 open `area:data` stories/epics + pr
 | garmin | **73 consecutive throttles** | 2026-06-15 | paused | cron still ENABLED 4×/day into the throttle |
 | hevy | no sentinel | 2026-06-25 | behavioral-stale | failure invisible end-to-end; liveness alarm watches a metric hevy never emits |
 | macrofactor | no sentinel | 2026-06-24 | behavioral-stale | TDEE/deficit chain dead end-to-end; workouts partition dead since 03-07 |
-| notion (journal) | no sentinel | 2026-05-25 | MCP-only (monitored:False) | **all enrichment output wiped by re-ingestion clobber**; no raw archive |
+| notion (journal) | no sentinel | [withheld — private] | MCP-only (monitored:False) | **all enrichment output wiped by re-ingestion clobber**; no raw archive |
 | food_delivery | n/a (manual CSV) | 2026-03-28 | behavioral-stale | dormant by design; re-import semantics unsafe for the planned Monarch feed |
 | measurements | n/a (manual CSV) | 2026-03-29 | behavioral-stale | **ingestion orphaned — no S3 trigger, no invoker; next upload does nothing** |
 | sleep_unified (derived) | n/a | 2026-07-02 | — | merge rules reference nonexistent fields; effectively relabeled Whoop |

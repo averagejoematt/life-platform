@@ -382,7 +382,7 @@ def test_active_vs_passive_objection_spares_an_objection_carrying_real_evidence(
     since-date is evidence, and the finding survives — trigger words and all."""
     note = (
         "'active logging went silent across food, training, habits, and journal since August 17th' — but a "
-        "training session was logged on 2026-08-20 and two journal entries exist. Today is Day 9."
+        "training session was logged on 2026-08-20 and journal entries exist. Today is Day 9."
     )
     assert R.is_active_vs_passive_objection(_f(note, page="/method/board/"), _START, _day(9)) is False
 

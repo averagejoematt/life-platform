@@ -7,7 +7,7 @@
   "request_id": "3be97933e0414091"
  },
  "weekly_priority": {
-  "text": "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural adherence is working. What I'm tracking closely now is the gap between doing and logging\u2014his food logs stopped four days ago, and his journal entries have been silent for forty days. The wearables are still reporting (sleep locked, recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system. I've asked him to restart one of those two channels this week\u2014food log or journal entry\u2014because the goal isn't perfection in logging, it's seeing what's real so we can adjust before the momentum quiets.",
+  "text": "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural adherence is working. What I'm tracking closely now is the gap between doing and logging\u2014his food logs stopped four days ago, and his journal entries have been silent for twenty days. The wearables are still reporting (sleep locked, recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system. I've asked him to restart one of those two channels this week\u2014food log or journal entry\u2014because the goal isn't perfection in logging, it's seeing what's real so we can adjust before the momentum quiets.",
   "coach_name": "Eli Marsh",
   "coach_title": "Principal Investigator \u2014 Program Lead",
   "generated_at": "2026-10-18T04:38:17.763733+00:00",
@@ -111,7 +111,7 @@
     "name": "Nathan Reeves",
     "move": "call",
     "move_label": "A call",
-    "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 38 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
+    "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 12 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
     "date": "2026-10-17",
     "replies_to": null,
     "replies_to_name": null
@@ -343,7 +343,7 @@
    "title": "Psychiatrist \u2014 Behavioral Patterns",
    "color": "#a78bfa",
    "observatory_link": "/mind/",
-   "position_summary": "He hasn't written a journal entry in sixteen days. I predicted protein recovery would break the silence \u2014 protein has climbed to 150.9 g a day, yet the journal remains exactly as quiet.",
+   "position_summary": "He hasn't written a journal entry in five days. I predicted protein recovery would break the silence \u2014 protein has climbed to 150.9 g a day, yet the journal remains exactly as quiet.",
    "emotional_investment": "neutral",
    "prediction_count": 0,
    "data_phase": "established",

@@ -1250,7 +1250,7 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `updated_at` | string | ISO timestamp of ingestion write |
 | `body_text` | string | Page body content (fetched blocks), when present |
 
-**`channel` backfill posture (#1840, decided 2026-07-27):** the 62 `USER#matthew#SOURCE#notion`
+**`channel` backfill posture (#1840, decided 2026-07-27):** the `USER#matthew#SOURCE#notion`
 records that predate channel stamping (everything ingested before the 2026-07-26 Notion schema
 patch that added the Video Diary / Solo Recording select options) carry **no `channel` attribute
 at all** — not `channel: "journal"`, simply absent. This is **by design, not backfilled**:

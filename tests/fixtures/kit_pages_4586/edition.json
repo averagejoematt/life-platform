@@ -709,7 +709,7 @@
      {
       "coach": "Nathan Reeves",
       "domain": "mind",
-      "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 38 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
+      "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 12 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
       "as_of": "2026-10-17",
       "move": "call",
       "move_label": "A call",
@@ -1078,7 +1078,7 @@
         "coach": "Nathan Reeves",
         "move": "call",
         "move_label": "A call",
-        "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 38 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
+        "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 12 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
         "replies_to": null,
         "bet_settles": null
        }
@@ -1302,7 +1302,7 @@
         "coach": "Nathan Reeves",
         "move": "reply",
         "move_label": "A reply",
-        "text": "Marcus Webb is right to revise his call, and I was uneasy claiming victory \u2014 19.0 lb gone is real, protein held, yet 34 days of journaling silence remain. For now, I don't think this wall is metabolic; I think it's structural or emotional, and we still can't see inside it.",
+        "text": "Marcus Webb is right to revise his call, and I was uneasy claiming victory \u2014 19.0 lb gone is real, protein held, yet 9 days of journaling silence remain. For now, I don't think this wall is metabolic; I think it's structural or emotional, and we still can't see inside it.",
         "replies_to": "Marcus Webb",
         "bet_settles": null
        }
@@ -3241,7 +3241,7 @@
    "source": "/api/weekly_priority",
    "absent_text": "No weekly read from the lead coach yet.",
    "data": {
-    "weekly_priority": "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural adherence is working. What I'm tracking closely now is the gap between doing and logging\u2014his food logs stopped four days ago, and his journal entries have been silent for forty days. The wearables are still reporting (sleep locked, recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system. I've asked him to restart one of those two channels this week\u2014food log or journal entry\u2014because the goal isn't perfection in logging, it's seeing what's real so we can adjust before the momentum quiets.",
+    "weekly_priority": "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural adherence is working. What I'm tracking closely now is the gap between doing and logging\u2014his food logs stopped four days ago, and his journal entries have been silent for twenty days. The wearables are still reporting (sleep locked, recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, that visibility is the early warning system. I've asked him to restart one of those two channels this week\u2014food log or journal entry\u2014because the goal isn't perfection in logging, it's seeing what's real so we can adjust before the momentum quiets.",
     "data_through": "2026-10-17",
     "coach_name": "Eli Marsh"
    }

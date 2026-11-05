@@ -1,7 +1,7 @@
 """A character pillar computed only from private sources is never published (owner rulings 2026-11-03/04).
 
-Relationships reads only the journal and its enrichment pass, so its value exists only on days he wrote: the
-published 62 and 36 on the two journal days of this cycle named those days. And a progression receipt named
+Relationships reads only the journal and its enrichment pass, so its value exists only on days he wrote: a
+published value named such a day. And a progression receipt named
 the journal's own rows (a journal sort key is its date, template and entry id). Every public reader of the
 character sheet now reads it through ``character_privacy.public_sheet``, and the receipt route through
 ``_public_receipt``. These tests vary ONLY the private inputs and assert byte-identical public output, with
@@ -56,7 +56,7 @@ def _sheet(day, rel):
 
 
 # A journal day (relationships instrumented from the entry) and a quiet day (never instrumented).
-JOURNAL_DAY = _pillar(61.5, xp=1.93)
+JOURNAL_DAY = _pillar(55.0, xp=1.10)  # synthetic values and dates throughout (owner ruling 2026-11-05)
 QUIET_DAY = _pillar(50.0, cov=0.0, ni=True)
 
 
@@ -71,15 +71,15 @@ class _Table:
         return {"Item": copy.deepcopy(self.items[0])} if self.items else {}
 
 
-def _served(rel, monkeypatch, date="2026-09-09"):
-    monkeypatch.setattr(vitals, "table", _Table([_sheet("2026-09-09", rel), _sheet("2026-09-08", QUIET_DAY)]))
+def _served(rel, monkeypatch, date="2026-09-24"):
+    monkeypatch.setattr(vitals, "table", _Table([_sheet("2026-09-24", rel), _sheet("2026-09-23", QUIET_DAY)]))
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     body = json.loads(vitals.handle_character(date)["body"])
     body.pop("_meta", None)
     return json.dumps(body, sort_keys=True)
 
 
-@pytest.mark.parametrize("date", [None, "2026-09-09"])
+@pytest.mark.parametrize("date", [None, "2026-09-24"])
 def test_character_is_byte_identical_on_a_journal_day_and_a_quiet_day(monkeypatch, date):
     monkeypatch.setattr(C, "_attach_pillar_absence", lambda *a, **k: None)
     assert _served(JOURNAL_DAY, monkeypatch, date) == _served(QUIET_DAY, monkeypatch, date)
@@ -96,11 +96,11 @@ def test_mutation_control_a_published_relationships_pillar_would_move(monkeypatc
 
 
 def test_public_sheet_is_pure_and_holds_only_private_pillars():
-    rec = _sheet("2026-09-09", JOURNAL_DAY)
+    rec = _sheet("2026-09-24", JOURNAL_DAY)
     before = copy.deepcopy(rec)
     out = character_privacy.public_sheet(rec)
     assert rec == before, "the stored record is never changed"
-    assert out["pillar_relationships"] == character_privacy.public_sheet(_sheet("2026-09-08", QUIET_DAY))["pillar_relationships"]
+    assert out["pillar_relationships"] == character_privacy.public_sheet(_sheet("2026-09-23", QUIET_DAY))["pillar_relationships"]
     for p in _PUBLIC_PILLARS:
         assert out[f"pillar_{p}"] == rec[f"pillar_{p}"]
     assert character_privacy.pillar_is_publishable("mind") and not character_privacy.pillar_is_publishable("relationships")
@@ -108,18 +108,18 @@ def test_public_sheet_is_pure_and_holds_only_private_pillars():
 
 def _receipt(journal: bool):
     rows = [
-        {"pk": "USER#matthew#SOURCE#whoop", "sks": ["DATE#2026-09-09"]},
-        {"pk": "USER#matthew#SOURCE#character_sheet", "sks": ["DATE#2026-09-08"]},
-        {"pk": "USER#matthew#SOURCE#engagement_state", "sks": ["DATE#2026-09-09"]},
+        {"pk": "USER#matthew#SOURCE#whoop", "sks": ["DATE#2026-09-24"]},
+        {"pk": "USER#matthew#SOURCE#character_sheet", "sks": ["DATE#2026-09-23"]},
+        {"pk": "USER#matthew#SOURCE#engagement_state", "sks": ["DATE#2026-09-24"]},
     ]
     if journal:
         rows += [
-            {"pk": "USER#matthew#SOURCE#notion", "sks": ["DATE#2026-09-09#journal#evening#synthetic"]},
-            {"pk": "USER#matthew#SOURCE#flourishing", "sks": ["DATE#2026-09-09"]},
+            {"pk": "USER#matthew#SOURCE#notion", "sks": ["DATE#2026-09-24#journal#evening#synthetic"]},
+            {"pk": "USER#matthew#SOURCE#flourishing", "sks": ["DATE#2026-09-24"]},
         ]
     rel = {"inputs": {"raw_score": 35.5 if journal else 50.0, "data_coverage": 1.0 if journal else 0.0}, "outputs": {"level": 1.0}}
     return {
-        "date": "2026-09-09",
+        "date": "2026-09-24",
         "digest": "d",
         "input_rows": rows,
         "transitions": {
