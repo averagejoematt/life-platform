@@ -160,3 +160,27 @@ def test_every_public_reader_of_the_sheet_goes_through_public_sheet():
     missing = [name for name, ok in readers if not ok]
     assert readers, "the walk found no readers — the pattern is broken"
     assert not missing, f"these modules read character_sheet pillars without character_privacy.public_sheet: {missing}"
+
+
+def test_state_of_mind_component_is_never_named():
+    """Owner ruling 2026-11-05: How We Feel / State of Mind is private — its component is never named on a driver
+    list (no_data included), exactly like the journal's components."""
+    assert not character_privacy.component_is_publishable("state_of_mind_valence")
+    assert character_privacy.component_is_publishable("hrv_trend")  # an ordinary component stays nameable
+
+
+def test_coach_profile_names_public_sources_only():
+    """Owner rulings 2026-11-03/05: a coach's published source list names only public sources (journal and
+    State of Mind are private; an unclassified label fails closed). Mutation control: an open policy names them all."""
+    from common import activity_publication
+    from web import site_api_coach_profile as CP
+
+    board = {"members": {"k": {"title": "t", "data_sources": ["notion", "state_of_mind", "habitify", "journal", "whoop", "made_up"]}}}
+    g = {"_load_s3_json": lambda *a, **k: board}
+    assert CP._character({"board_persona_key": "k"}, _g=g)["data_sources"] == ["habitify", "whoop"]
+    real = activity_publication.source_is_public
+    try:
+        activity_publication.source_is_public = lambda s: True
+        assert len(CP._character({"board_persona_key": "k"}, _g=g)["data_sources"]) == 6
+    finally:
+        activity_publication.source_is_public = real

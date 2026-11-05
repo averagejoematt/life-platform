@@ -31,6 +31,7 @@ from coach import (
     latest_checked,  # E1 / #4182: the ledger line — the coach's most recent GRADED call, audience-guarded
     lead_daily_read,  # #4188: the head coach's daily grounded lead read (LEAD_DAILY# rows)
 )
+from common import activity_publication as _activity_publication  # owner rulings 2026-11-03/05
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 from health import instrument_presence  # #4217: the absent coach — the same liveness /api/source_freshness serves
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection (bundled module)
@@ -330,7 +331,9 @@ def _character(p, *, _g):
         "title": m.get("title"),
         # #1113 prompt transparency: the real source list this coach's prompt reads
         # (config-authored, public-safe source names — never values).
-        "data_sources": (m.get("data_sources") or [])[:8],
+        # Owner rulings 2026-11-03/05: only sources the publication policy classifies public are named
+        # (the journal and State of Mind are private; an unclassified label fails closed).
+        "data_sources": [s for s in (m.get("data_sources") or []) if _activity_publication.source_is_public(s)][:8],
         "principles": (m.get("principles") or [])[:5],
         "voice": {k: voice.get(k) for k in ("tone", "style", "catchphrase") if voice.get(k)},
         "tendencies": (persn.get("tendencies") or [])[:4],
