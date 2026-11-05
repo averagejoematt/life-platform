@@ -81,14 +81,20 @@ test("quotesHTML — says plainly when an entry carried no marked lines", () => 
   assert.match(quotesHTML(entry()), /No lines from this entry were marked for publication/);
 });
 
-test("quotesHTML — a withheld line is counted, never drawn as a redacted row", () => {
-  const html = quotesHTML(entry({ quotes: [], quotes_withheld: 2 }));
-  assert.match(html, /2 more lines from this entry stayed private/);
+// Owner ruling 2026-11-05: no count of the lines that stayed private — the server no longer sends one,
+// and the card must never print one even if a stale payload still carries it.
+test("quotesHTML — a withheld line is neither drawn as a redacted row nor counted", () => {
+  const html = quotesHTML(entry({ quotes: [] }));
   assert.doesNotMatch(html, /blockquote/);
+  assert.doesNotMatch(html, /stayed private|more lines?/);
 });
 
-test("quotesHTML — singular/plural of the withheld count reads correctly", () => {
-  assert.match(quotesHTML(entry({ quotes_withheld: 1 })), /1 more line from this entry/);
+test("quotesHTML — NEGATIVE CONTROL: a stale withheld count in the payload changes nothing on the card", () => {
+  for (const n of [1, 2, 7]) {
+    const html = quotesHTML(entry({ quotes: [{ quote: "I stopped calling it a failure." }], quotes_withheld: n }));
+    assert.equal(html, quotesHTML(entry({ quotes: [{ quote: "I stopped calling it a failure." }] })));
+    assert.doesNotMatch(html, new RegExp(`\\b${n} more`));
+  }
 });
 
 test("quotesHTML — an empty quote string is dropped, not rendered as empty quotes", () => {
@@ -98,10 +104,13 @@ test("quotesHTML — an empty quote string is dropped, not rendered as empty quo
 
 // ── claims: counted always, quoted only when marked ──────────────────────────
 
-test("claimsHTML — private claims are counted and never quoted", () => {
-  const html = claimsHTML(entry({ claims: [], claims_on_record: 3 }));
-  assert.match(html, /3 forecasts on the record from this entry, graded privately/);
-  assert.doesNotMatch(html, /<li/);
+test("claimsHTML — private claims are neither quoted nor counted (owner ruling 2026-11-05)", () => {
+  // NEGATIVE CONTROL: a stale `claims_on_record` must not resurrect a count line.
+  for (const n of [1, 3]) {
+    const html = claimsHTML(entry({ claims: [], claims_on_record: n }));
+    assert.equal(html, "");
+    assert.doesNotMatch(html, /forecasts? on the record|graded privately/);
+  }
 });
 
 test("claimsHTML — a publicly marked claim is listed with its called-by date", () => {
@@ -140,15 +149,25 @@ test("shelfHTML — a quiet shelf renders as quiet, never padded", () => {
   assert.doesNotMatch(html, /dsh-card/);
 });
 
-test("shelfHTML — an all-withheld shelf states the count instead of implying emptiness", () => {
-  const html = shelfHTML({ shelf: { entries: [], withheld: 4 } });
-  assert.match(html, /4 diary entries are recorded and none are published yet/);
+// Owner ruling 2026-11-05 ("classify video-diary sessions as private journal activity"): the shelf
+// never counts the private entries. The empty state stays TRUE without the count — it says nothing has
+// been PUBLISHED, never that nothing was recorded — and the server's note states the policy.
+test("shelfHTML — an all-private shelf says nothing is published, never that nothing exists, and no count", () => {
+  const html = shelfHTML({ shelf: { entries: [], note: "Everything else stays in the studio — never shown, never counted." } });
+  assert.match(html, /No diary entries have been published yet/);
+  assert.doesNotMatch(html, /recorded|\bno diary entries exist/i);
+  assert.match(html, /never shown, never counted/);
 });
 
-test("shelfHTML — published cards carry a footer with what is still held back", () => {
-  const html = shelfHTML({ shelf: { entries: [entry()], withheld: 9 } });
-  assert.match(html, /dsh-card/);
-  assert.match(html, /9 more entries are recorded and not published/);
+test("shelfHTML — NEGATIVE CONTROL: a stale `withheld` count renders exactly like no count", () => {
+  for (const shelf of [{ entries: [] }, { entries: [entry()] }]) {
+    const clean = shelfHTML({ shelf });
+    for (const n of [1, 4, 9]) {
+      const html = shelfHTML({ shelf: { ...shelf, withheld: n } });
+      assert.equal(html, clean);
+      assert.doesNotMatch(html, /dsh-foot|recorded and (none are|not) published/);
+    }
+  }
 });
 
 test("shelfHTML — no withheld entries means no footer nag", () => {
