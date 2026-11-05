@@ -446,7 +446,8 @@ def test_the_shelf_is_not_phase_filtered(shelf):
 # ── #1841: on-tape claims stay private unless separately marked ──────────────
 
 
-def test_claims_are_counted_but_never_quoted_without_their_own_marker(shelf):
+def test_private_claims_are_neither_counted_nor_quoted(shelf):
+    """Owner ruling 2026-11-05: a private on-tape forecast is not counted on the public shelf ("omit, never mark")."""
     sd, ft = shelf
     ft.put_item(Item=_entry(public_reaction_consent="allude"))
     ft.put_item(
@@ -459,7 +460,7 @@ def test_claims_are_counted_but_never_quoted_without_their_own_marker(shelf):
         }
     )
     card = _call(sd)["entries"][0]
-    assert card["claims_on_record"] == 1
+    assert card["claims_on_record"] == 0
     assert card["claims"] == []
     assert "coast on the habits" not in _flatten(card)
 

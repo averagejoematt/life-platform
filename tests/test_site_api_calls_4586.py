@@ -51,6 +51,9 @@ _KIT = os.path.join(_REPO, "tests", "fixtures", "kit_pages_4586", "calls.json") 
 #: #4580 round 1 (lane E): fields this route writes that the deployed route did not on the capture day. Emptied
 #: at the first recapture after the deploy (2026-10-18T07:15:07Z); a new served field goes here until the next one.
 ADDED_SINCE_CAPTURE: set = set()
+#: Top-level fields this route writes that the deployed route did not on the capture day, likewise emptied at the
+#: next recapture: `method` (owner ruling 2026-11-05 — the call publication method the list is under).
+TOP_ADDED_SINCE_CAPTURE: set = {"method"}
 NAMES = {
     "sleep": "Lisa Park",
     "training": "Sarah Chen",
@@ -402,7 +405,7 @@ def test_the_kit_page_capture_carries_the_fields_this_route_writes(monkeypatch):
     body = _body(_wire(monkeypatch).handle_calls({"queryStringParameters": None}))
     with open(_KIT, encoding="utf-8") as fh:
         kit = json.load(fh)
-    assert set(kit) == set(body), f"top-level fields differ: {sorted(set(kit) ^ set(body))}"
+    assert set(kit) | TOP_ADDED_SINCE_CAPTURE == set(body), f"top-level fields differ: {sorted(set(kit) ^ set(body))}"
     assert kit["state"] == "ok" and kit["count"] == len(kit["calls"]) > 0
     shape = {}
     for call in body["calls"]:

@@ -1,5 +1,5 @@
 {
-  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture. 2026-11-01: `record_total` + `withheld.journal_silence` added \u2014 the route now counts what the journal-silence guard lets through (#5131) and names the rest. 2026-11-04 (owner ruling): `record_total` + `withheld` removed \u2014 a count of rows that speak of the journal moves with private activity.",
+  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture. 2026-11-01: `record_total` + `withheld.journal_silence` added \u2014 the route now counts what the journal-silence guard lets through (#5131) and names the rest. 2026-11-04 (owner ruling): `record_total` + `withheld` removed \u2014 a count of rows that speak of the journal moves with private activity. 2026-11-05 (owner ruling): `method` added \u2014 the call publication method every public count of calls is under.",
   "captured_at": "2026-11-01T03:32:29.507818+00:00",
   "fetch_path": "/api/ledger_export",
   "is_prefix_sample": false,
@@ -117,6 +117,38 @@
         },
         "length_sample": 100,
         "type": "array"
+      },
+      "method": {
+        "type": "object",
+        "keys": {
+          "version": {
+            "type": "integer"
+          },
+          "effective": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "keys": {
+                "effective": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                }
+              }
+            },
+            "length_sample": 2
+          }
+        }
       },
       "page": {
         "type": "integer"

@@ -125,15 +125,25 @@ def gather_digest() -> dict:
     except Exception as e:
         logger.warning("what_changed read skipped: %s", e)
 
-    # 2. Freshly graded predictions — the /api/predictions records.
+    # 2. Freshly graded predictions — the /api/predictions records. Owner ruling 2026-11-05: through the call
+    # publication rule, as every public read is — a private call never reaches reader mail, and the newest 30 are
+    # the newest 30 ELIGIBLE calls (web.call_publication keeps `Limit` a count of what is served).
+    from web import call_publication
+
     cutoff = (pacific_now() - timedelta(days=DECIDED_WINDOW_DAYS)).strftime("%Y-%m-%d")
+    lookup = call_publication.make_lookup(table)
     for cid in COACH_IDS:
         try:
-            resp = table.query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :s)",
-                ExpressionAttributeValues={":pk": f"COACH#{cid}", ":s": "PREDICTION#"},
-                ScanIndexForward=False,
-                Limit=30,
+            resp = call_publication.query(
+                table,
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :s)",
+                    "ExpressionAttributeValues": {":pk": f"COACH#{cid}", ":s": "PREDICTION#"},
+                    "ScanIndexForward": False,
+                    "Limit": 30,
+                },
+                f"COACH#{cid}",
+                lookup,
             )
             for rec in (_d2f(i) for i in resp.get("Items", [])):
                 if rec.get("status") not in ("confirmed", "refuted"):

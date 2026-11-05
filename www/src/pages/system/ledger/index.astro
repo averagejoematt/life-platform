@@ -23,6 +23,8 @@ const corrected = rows.filter((r) => r.corrections.length).length;
 const coaches = [...all.byType.coach].filter((c) => rows.some((r) => r.coach_id === c.id)).sort((a, b) => (a.name < b.name ? -1 : 1));
 const kinds = [...new Set(rows.map((r) => r.kind))].sort();
 const disagreements = all.byType.disagreement;
+// Owner ruling 2026-11-05: the publication method the ledger is counted under, as the export route served it.
+const method = (edition?.blocks?.ledger?.data as { method?: { version?: number; effective?: string; note?: string } } | undefined)?.method;
 const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a direction", yes_no: "yes or no", sealed: "sealed", interval: "an interval", observation: "an observation", unknown: "unclassified" };
 ---
 
@@ -43,6 +45,11 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
       <p class="muted" style="margin-top:12px;font-size:13px">
         Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page; the filter below only hides and shows.
       </p>
+      {method && method.note && method.effective && (
+        <p class="muted" style="margin-top:8px;font-size:13px" data-method>
+          Method {method.version}, from {dayInWords(method.effective)}: {method.note}
+        </p>
+      )}
     </div>
   </section>
   <section class="wrap" style="padding-bottom:56px" data-ledger>

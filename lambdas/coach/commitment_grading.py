@@ -497,18 +497,22 @@ def build_tally(corpus, applied=None) -> dict:
     fire-and-forget per record, so the in-memory rows still carry their pre-run status
     and a tally built off them would be one day stale on the day it matters most.
     """
+    from common import prediction_publication  # owner ruling 2026-11-05: the public tally counts eligible asks only
     from experiment.phase_filter import singleton_visible
 
     applied = applied or {}
     career, season = [], []
     for rec in corpus or []:
         row = dict(rec or {})
+        if not prediction_publication.row_is_public(row.get("pk"), row):
+            continue  # a private ask is graded and kept on its row; it is never in the public tally
         if row.get("sk") in applied:
             row["status"] = applied[row["sk"]]
         career.append(row)
         if singleton_visible(row):
             season.append(row)
-    return {"lifetime": tally(career), "season": tally(season)}
+    # `method` names the publication rule the tally was counted under; the public read serves no other.
+    return {"lifetime": tally(career), "season": tally(season), "method": prediction_publication.METHOD_VERSION}
 
 
 def write_tally(table, corpus, applied, today_str, logger) -> dict:

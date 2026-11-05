@@ -243,14 +243,16 @@ def _claims_by_entry():
 
     Claims are `visibility: "private"` by default and stay that way: only an
     explicitly public-marked claim is projected, field-by-field from
-    `CLAIM_PUBLIC_FIELDS`. The count of the rest is disclosed — a reader learns
-    that forecasts were made, never what they were."""
+    `CLAIM_PUBLIC_FIELDS`. Owner ruling 2026-11-05 (journal-derived predictions,
+    counts included; "omit, never mark"): the rest are NOT counted — `count` is the
+    number of public-marked claims, so it never moves with a private forecast. The
+    read is not Limit-windowed, so which public claims appear never depends on how
+    many private ones sit beside them."""
     pk = f"{USER_PREFIX}diary_claims"
     try:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("PREDICTION#"),
             ScanIndexForward=False,
-            Limit=200,
         )
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as e:  # pragma: no cover — absent ledger ⇒ no claim counts
@@ -262,10 +264,10 @@ def _claims_by_entry():
         sk = str(item.get("source_sk") or "")
         if not sk:
             continue
+        if str(item.get("visibility") or "").strip().lower() != "public":
+            continue  # a private claim: graded privately, never counted on a public surface
         bucket = out.setdefault(sk, {"public": [], "count": 0})
         bucket["count"] += 1
-        if str(item.get("visibility") or "").strip().lower() != "public":
-            continue
         claim = {}
         for field in CLAIM_PUBLIC_FIELDS:
             value = item.get(field)

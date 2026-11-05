@@ -237,6 +237,38 @@
         },
         "type": "object"
       },
+      "method": {
+        "type": "object",
+        "keys": {
+          "version": {
+            "type": "integer"
+          },
+          "effective": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "keys": {
+                "effective": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                }
+              }
+            },
+            "length_sample": 2
+          }
+        }
+      },
       "next": {
         "keys": {
           "absent_text": {
@@ -293,5 +325,6 @@
     },
     "type": "object"
   },
-  "status": 200
+  "status": 200,
+  "_note": "2026-11-05 (owner ruling): `method` added \u2014 the call publication method every public count of calls is under."
 }

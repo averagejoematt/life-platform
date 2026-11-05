@@ -87,8 +87,8 @@ export function quotesHTML(entry) {
 }
 
 /* On-tape forecasts (#1841). Claims are private by default and grade privately;
-   only an explicitly public-marked claim carries text. The count is disclosed
-   either way — that he put N forecasts on the record is the signal. */
+   only an explicitly public-marked claim is served, and `claims_on_record` counts
+   those alone (owner ruling 2026-11-05: a private forecast is never counted). */
 export function claimsHTML(entry) {
   const claims = Array.isArray(entry.claims) ? entry.claims : [];
   const total = Number(entry.claims_on_record || 0);
