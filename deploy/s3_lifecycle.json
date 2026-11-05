@@ -95,6 +95,13 @@
       "Transitions": [{"Days": 30, "StorageClass": "STANDARD_IA"}],
       "Expiration": {"Days": 90},
       "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
+    },
+    {
+      "ID": "forensic-journal-privacy-expire-2027-05-03",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "backups/forensic/journal-privacy-20261104/"},
+      "Expiration": {"Date": "2027-05-03T00:00:00Z"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
     }
   ]
 }
