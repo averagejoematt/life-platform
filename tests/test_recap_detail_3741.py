@@ -87,7 +87,6 @@ def _full(**over) -> DayFacts:
         tier0_done=6,
         tier0_total=7,
         missed_tier0=["Walk 5k"],
-        journal_templates=["evening"],
         coach_line="The Garmin pause has created a data blind spot.",
     )
     base.update(over)

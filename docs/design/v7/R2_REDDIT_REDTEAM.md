@@ -122,7 +122,7 @@ Inner monologue: *Sleep good, exercise fine. "The engine scored it low" — is h
 **Where she bounces:** the chronicle byline. She texts him instead of reading further: "Who is Elena Voss?"
 
 **What she says on the phone (this is her comment):**
-> It's very impressive, honey. I couldn't find a picture of you. There's a lady called Elena writing about you and a lot of doctors with drawings. It says you haven't written anything in 17 days and the eating thing said "low". Are you eating? Call me.
+> It's very impressive, honey. I couldn't find a picture of you. There's a lady called Elena writing about you and a lot of doctors with drawings. It says you haven't written anything in [journal activity withheld — private, owner ruling 2026-11-05] and the eating thing said "low". Are you eating? Call me.
 
 **Score: 4/10 as "would I open it again".** She'd open it again if it showed his face and had a line from him. It has neither.
 
@@ -139,9 +139,9 @@ Then the good part: "How's the week? Down 13.5 lb since Sep 6, over 13 weigh-ins
 
 Inner monologue: *This is it. Three questions, three answers. I could stop here.* Then: "The one ask: 'Start logging the daily 1-to-5 subjective feeling scale before checking the app' — Dr. Lisa Park, Sep 12, due Sep 19." *That was due a week ago. It's still "the one ask". Nobody — not the coach, not the page — has said "you missed this." It just sits there like a Jira ticket.* And "Today?" doesn't say **when** or **what weight** — "4 exercises, 9 sets" is a count, not a plan; he still has to open Hevy.
 
-**First tap/scroll:** he scrolls for "is it working" and gets "THE DAILY LINE · YESTERDAY'S READ · FROM THE MORNING BRIEF: Recovery peaked at 99 and HRV hit 57ms — but only 1,565 steps and 13 missed habits signal the body is ready while the routine isn't." *That's the email I already got at 10 AM yesterday.* Then the full 400-word Webb/Reyes protein dialogue (the same one on `/coaching/`), then "WHERE THE TEAM STANDS" (seven one-liners: "Get enough hours, regularly." / "First, I just need to see what you eat." / "Felt-Sense Calibration Under Load" / "Data gate: awaiting synchronization"), then LAST NIGHT again as four gauges (recovery 77% · sleep 8.6 h — the same numbers as the "Last night?" paragraph three screens up), then THE LEVERS, THE INPUTS ("JOURNAL 17d"), THE FORECAST. Ten screens. The three-question block at the top was the whole answer and the page keeps going for 9 more screens of the same numbers restated.
+**First tap/scroll:** he scrolls for "is it working" and gets "THE DAILY LINE · YESTERDAY'S READ · FROM THE MORNING BRIEF: Recovery peaked at 99 and HRV hit 57ms — but only 1,565 steps and 13 missed habits signal the body is ready while the routine isn't." *That's the email I already got at 10 AM yesterday.* Then the full 400-word Webb/Reyes protein dialogue (the same one on `/coaching/`), then "WHERE THE TEAM STANDS" (seven one-liners: "Get enough hours, regularly." / "First, I just need to see what you eat." / "Felt-Sense Calibration Under Load" / "Data gate: awaiting synchronization"), then LAST NIGHT again as four gauges (recovery 77% · sleep 8.6 h — the same numbers as the "Last night?" paragraph three screens up), then THE LEVERS, THE INPUTS ("JOURNAL [journal activity withheld — private, owner ruling 2026-11-05]"), THE FORECAST. Ten screens. The three-question block at the top was the whole answer and the page keeps going for 9 more screens of the same numbers restated.
 
-**Taps to the thing he came for:** "what do I do today": 0 taps, but the answer is "4 exercises, 9 sets" — he must still open Hevy to know which. "Is it working": 0 taps — "provisional — three weeks is too few to trust it." *Honest, and also the answer every day for the next three weeks.* "What should I fix": the "one ask" is a week overdue and the page doesn't say so; "JOURNAL 17d" is the actual answer and it is a freshness chip 7 screens down.
+**Taps to the thing he came for:** "what do I do today": 0 taps, but the answer is "4 exercises, 9 sets" — he must still open Hevy to know which. "Is it working": 0 taps — "provisional — three weeks is too few to trust it." *Honest, and also the answer every day for the next three weeks.* "What should I fix": the "one ask" is a week overdue and the page doesn't say so; the journal chip [journal activity withheld — private, owner ruling 2026-11-05] is the actual answer and it is a freshness chip 7 screens down.
 
 **Where he bounces:** after the third paragraph. He goes to Hevy for the session. The morning-brief email already tells him the daily line. The site competes with his own email and loses, because the email has no chrome and no repeats.
 
@@ -218,7 +218,7 @@ The pattern: **every real signal is a number with a denominator or a dated admis
 | Mother | "is he okay" | 0 + 1 scroll | answered by five ambiguous chips |
 | Mother | his voice this week | ∞ | July 8 |
 | Matthew | today's session with loads | 0 tap + Hevy | set count only |
-| Matthew | "what did I miss" | 7 screens (JOURNAL 17d) | the overdue ask isn't marked overdue |
+| Matthew | "what did I miss" | 7 screens (the journal chip) | the overdue ask isn't marked overdue |
 
 ### (d) The return trigger — what would bring each one back
 
@@ -226,7 +226,7 @@ The pattern: **every real signal is a number with a denominator or a dated admis
 - **r/QS:** a new graded result. "RESOLVES BY CODE … on 2026-09-30" is a real return date; she'd come back Sep 30 **if** the site let her subscribe to the docket (RSS of resolutions). It doesn't; RSS is the chronicle.
 - **HN:** a build-log entry that admits a bug. He'd star the repo and never return to the site — unless the build log were the site.
 - **Mother:** his voice. A weekly 3-line note from Matthew, dated, with a photo. Not "Elena". Not the chips.
-- **Matthew:** the site telling him something the email didn't: "you missed Lisa's ask, 7 days"; "Thursday's session, loads filled in"; "journal: 17 days — the coaches can't see you". Today the cockpit repeats the 10 AM email and adds chrome.
+- **Matthew:** the site telling him something the email didn't: "you missed Lisa's ask, 7 days"; "Thursday's session, loads filled in"; "journal: [journal activity withheld — private, owner ruling 2026-11-05] — the coaches can't see you". Today the cockpit repeats the 10 AM email and adds chrome.
 
 Common to all five: **a dated promise in a human's voice.** The site has exactly one dated promise and it belongs to a fictional journalist.
 

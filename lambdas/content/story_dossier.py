@@ -23,7 +23,13 @@ Three rules the 2026-10-01 continuity review earned:
     team that wrote it.
 
 Privacy at the source: habit names from the Vice group never enter the dossier (only held
-counts), journal entries are counted, never read, and nothing here is a cycle count.
+counts), and nothing here is a cycle count. The journal does not enter it at all (owner rulings
+2026-11-03 and 2026-11-05: whether, when and how often he writes is private on every public
+surface, and the chronicle is one) — the dossier never reads the journal partition, carries no
+entry count, no absence caveat, and no habit that ``common.activity_publication`` does not
+classify PUBLIC (the journal habits are ``journal_presence``; an unclassified habit stays out
+until it is classified). ``tests/test_chronicle_journal_invariance.py`` holds the dossier
+byte-identical across journal-only variations.
 """
 
 from __future__ import annotations
@@ -33,6 +39,7 @@ import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
 from coach.classification_review import is_under_review  # owner ruling 2026-11-03: a disputed verdict is not a record
+from common import activity_publication  # owner ruling 2026-11-05: the public chronicle sees public habits only
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
 from health import day_grade_public  # owner ruling 2026-11-05: day_grade_mean is the public variant's
@@ -455,10 +462,20 @@ def _habits(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     raw = _days(table, "habitify", wk["start"], wk["end"])
     # (vice names are collected only to be excluded)
     vice_names = {n for r in raw.values() for n, st in (r.get("habit_statuses") or {}).items() if (st or {}).get("group") == "Vice"}
+    # Owner ruling 2026-11-05: a habit the publication policy does not classify PUBLIC (the journal habits,
+    # an owner-declared private one, an unclassified one) never enters the public chronicle's dossier by name
+    # or in a count. Classified by identity (the Habitify id on the stored status), never by its words.
+    statuses_by_name: Dict[str, Any] = {}
+    for r in raw.values():
+        for n, st in (r.get("habit_statuses") or {}).items():
+            statuses_by_name.setdefault(n, st)
+    non_public = {n for n, st in statuses_by_name.items() if not activity_publication.habit_is_public(n, st)}
     missed: Dict[str, int] = {}
     for r in scores.values():
         for h in r.get("missed_tier0") or []:
             if h in vice_names:  # a vice is reported only as a held count, never by name
+                continue
+            if h in non_public or (h not in statuses_by_name and not activity_publication.habit_is_public(h)):
                 continue
             missed[h] = missed.get(h, 0) + 1
     done: Dict[str, int] = {}
@@ -466,6 +483,8 @@ def _habits(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     for r in raw.values():
         for name, st in (r.get("habit_statuses") or {}).items():
             if (st or {}).get("group") == "Vice":  # vice names never enter the dossier
+                continue
+            if name in non_public:
                 continue
             if (st or {}).get("scheduled_today") is False:
                 continue
@@ -487,19 +506,6 @@ def _habits(table, wk: Dict[str, Any]) -> Dict[str, Any]:
         "rarely_or_never_done": [h for h, _ in rarely][:12],
         "note": "an all-seven-every-day streak is not a story; the per-habit picture is",
     }
-
-
-def _journal(table, wk: Dict[str, Any]) -> Dict[str, Any]:
-    from boto3.dynamodb.conditions import Key
-
-    n = 0
-    for d in _dates(wk["start"], wk["end"]):
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"USER#{USER}#SOURCE#notion") & Key("sk").begins_with(f"DATE#{d}#journal#"),
-            ProjectionExpression="sk",
-        )
-        n += len(resp.get("Items", []))
-    return {"entries_in_window": n, "privacy": "journal content is off the record; only its presence is a fact here"}
 
 
 def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str, Any]:
@@ -916,7 +922,6 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
         "recovery_and_sleep": _recovery(table, wk),
         "nutrition": nutrition,
         "habits": _habits(table, wk),
-        "journal": _journal(table, wk),
         "predictions": _predictions(table, wk, names),
         "coaches_this_week": _coaches(table, wk, names),
         "character_sheet": _character(table, wk),
@@ -955,6 +960,5 @@ def week_dossier(table, wk: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
             if s != "macrofactor" and w.get("not_yet_exported_dates")
         ],
         "steps undercount (phone only)",
-        "journal ingestion has been degraded since mid-September: an absent entry may simply be unlanded. Journal presence is NOT a story this experiment — at most one passing line in a season, never a lead or a coach's theme",
     ]
     return dossier, nye

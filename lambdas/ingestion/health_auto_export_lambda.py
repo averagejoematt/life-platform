@@ -916,7 +916,7 @@ def process_metrics_with_watch_presence(metrics):
 # ── DynamoDB Write ─────────────────────────────────────────────────────────────
 
 
-def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_guard=True, archived=()):
+def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_guard=True, archived=(), stamp_ingest=True):
     """
     Merge fields into existing DynamoDB record using update_item.
     Only updates specified fields — does NOT overwrite unrelated fields.
@@ -931,6 +931,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
       passes False to SET the recomputed-from-raw value authoritatively.
     archived: #4628 — fields whose value is the archived day sum
       (health_auto_export_additive.py); they are SET as computed, never guarded.
+    stamp_ingest: False on a State-of-Mind merge (private, 2026-11-05) — /api/last_sync publishes webhook_ingested_at.
 
     Concurrency (#3119 residual #3 — accepted in writing, not made
     conditional/versioned): still a plain read-modify-write, so two DIFFERENT
@@ -1040,10 +1041,9 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     if not set_parts:
         return
 
-    # Always update ingested_at
-    set_parts.append("#upd = :upd")
-    names["#upd"] = "webhook_ingested_at"
-    values[":upd"] = datetime.now(timezone.utc).isoformat()
+    if stamp_ingest:  # update ingested_at — never on a private sub-stream's merge (HAE: one automation per data type)
+        set_parts.append("#upd = :upd")
+        names["#upd"], values[":upd"] = "webhook_ingested_at", datetime.now(timezone.utc).isoformat()
 
     # Ensure base fields exist
     set_parts.append("#src = if_not_exists(#src, :src)")
@@ -1389,7 +1389,7 @@ def lambda_handler(event, context):
             som_entries_new += n
 
         for date_str, agg in som_daily_agg.items():
-            merge_day_to_dynamo(date_str, agg)
+            merge_day_to_dynamo(date_str, agg, stamp_ingest=False)  # a private sub-stream: no partition ingest stamp
             som_days += 1
 
         if som_entries_new:

@@ -28,7 +28,6 @@
     {"url": "/method/results/", "title": "Results", "line": "A short view of the weight trajectory so far.", "kind": "data", "earlier_of": "The trend"},
     {"url": "/data/sleep/", "title": "Sleep", "line": "Each night from two devices, and the trend over four weeks.", "kind": "data"},
     {"url": "/protocols/supplements/", "title": "Supplements", "line": "Each supplement taken, what it is meant to move and the evidence for it.", "kind": "data"},
-    {"url": "/story/theme-river/", "title": "Journal themes, charted", "line": "A chart of what the journal has been about, theme by theme.", "kind": "data", "codename": "Theme river"},
     {"url": "/story/timeline/", "title": "Timeline", "line": "Milestones and level changes as a dated list.", "kind": "data"},
     {"url": "/data/training/", "title": "Training", "line": "Gym sessions, strength progression and weekly volume by muscle.", "kind": "data"},
     {"url": "/data/vices/", "title": "Vice streaks", "line": "Days held on each tracked vice, with the longest run so far.", "kind": "data"},

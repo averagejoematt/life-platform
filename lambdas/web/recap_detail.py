@@ -196,8 +196,6 @@ def _band_rest(draw, facts, *, y: int) -> int:
         y += row_h * ((len(tiles) + 2) // 3) + 4
     if facts.missed_tier0:
         y = _fact_row(draw, "not checked in", " · ".join(facts.missed_tier0[:2]), y=y, colour=ce.AMBER, size=24)
-    if facts.journaled:
-        y = _fact_row(draw, "journal", "wrote it down", y=y, size=24)
     return y
 
 

@@ -384,11 +384,6 @@ ARTIFACTS: dict[str, dict] = {
             "can see the answer rather than infer it."
         ),
     ),
-    "scripts/v4_build_theme_river.py": _builder(
-        "scripts/v4_build_theme_river.py",
-        step="manual, per corpus pass",
-        reason="Builds theme-river data from a corpus analysis run — a deliberate act with a cost, not a reconciliation.",
-    ),
     "scripts/v4_build_stack_manifest.py": _builder(
         "scripts/v4_build_stack_manifest.py",
         step="manual, when pricing changes",

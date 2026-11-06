@@ -213,7 +213,31 @@ def build_artifact(live: bool) -> dict:
     return river
 
 
+def journal_is_publishable() -> bool:
+    """The exhibit is computed entirely from the journal's enrichment (themes per entry, weekly counts), so it
+    exists publicly only while the publication policy classifies the journal public. Owner rulings 2026-11-03/05:
+    journal activity and journal-derived metadata are private — even an "empty" river claims something about
+    entries — so the page and its artifact are NOT published (fail closed on any policy error)."""
+    try:
+        from common import activity_publication
+
+        return activity_publication.source_is_public("notion") and activity_publication.source_is_public("flourishing")
+    except Exception:  # noqa: BLE001 — unknown is private
+        return False
+
+
+def unpublish() -> int:
+    """Remove both outputs from the tree the site sync uploads; the live copies are removed with them."""
+    for path in (ROOT / "site" / "data" / "theme_river.json", ROOT / "site" / "story" / SLUG / "index.html"):
+        if path.exists():
+            path.unlink()
+    print(f"{CANONICAL}: NOT published — the journal is private (owner rulings 2026-11-03/05); no artifact written")
+    return 0
+
+
 def main() -> int:
+    if not journal_is_publishable():
+        return unpublish()
     live = "--live" in sys.argv[1:]
     artifact = build_artifact(live)
 

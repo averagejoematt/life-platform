@@ -762,7 +762,7 @@ def test_a_row_the_journal_silence_guard_would_drop_is_counted_as_withheld_not_a
     assert body["pages"] == math.ceil(len(served) / 5)
     # the wire guard then finds nothing left to withhold — the two scrubs agree
     guarded = journal_silence.guard_api_response(resp)
-    assert guarded is resp or guarded["headers"].get(journal_silence.WITHHELD_HEADER) is None
+    assert guarded is resp
     # every page concatenated is exactly the served set, once each
     seen = []
     for pg in range(1, body["pages"] + 1):

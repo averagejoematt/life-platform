@@ -35,6 +35,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
+from common import activity_publication  # owner rulings 2026-11-03/05: private metrics off public mail
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 
@@ -121,19 +122,30 @@ def gather_digest() -> dict:
         wc = _d2f(table.get_item(Key={"pk": f"{USER_PREFIX}what_changed", "sk": "SNAPSHOT#current"}).get("Item") or {})
         if not wc.get("honest_null"):
             digest["deltas"] = (wc.get("deltas") or [])[:6]
-            digest["unlocked"] = (wc.get("newly_unlocked") or [])[:4]
+            # Owner rulings 2026-11-03/05: the same public projection /api/what_changed serves.
+            digest["unlocked"] = [u for u in (wc.get("newly_unlocked") or []) if activity_publication.correlation_pair_is_public(u)][:4]
     except Exception as e:
         logger.warning("what_changed read skipped: %s", e)
 
-    # 2. Freshly graded predictions — the /api/predictions records.
+    # 2. Freshly graded predictions — the /api/predictions records. Owner ruling 2026-11-05: through the call
+    # publication rule, as every public read is — a private call never reaches reader mail, and the newest 30 are
+    # the newest 30 ELIGIBLE calls (web.call_publication keeps `Limit` a count of what is served).
+    from web import call_publication
+
     cutoff = (pacific_now() - timedelta(days=DECIDED_WINDOW_DAYS)).strftime("%Y-%m-%d")
+    lookup = call_publication.make_lookup(table)
     for cid in COACH_IDS:
         try:
-            resp = table.query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :s)",
-                ExpressionAttributeValues={":pk": f"COACH#{cid}", ":s": "PREDICTION#"},
-                ScanIndexForward=False,
-                Limit=30,
+            resp = call_publication.query(
+                table,
+                {
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :s)",
+                    "ExpressionAttributeValues": {":pk": f"COACH#{cid}", ":s": "PREDICTION#"},
+                    "ScanIndexForward": False,
+                    "Limit": 30,
+                },
+                f"COACH#{cid}",
+                lookup,
             )
             for rec in (_d2f(i) for i in resp.get("Items", [])):
                 if rec.get("status") not in ("confirmed", "refuted"):

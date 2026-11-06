@@ -101,14 +101,13 @@ def test_public_provenance_narrative_is_served(walks):
 @pytest.mark.parametrize("variant", ["private", "unrecorded"])
 def test_the_dashboard_serves_a_neutral_withheld_state(walks, variant):
     """The two live exposures (moves.lines[].text, coaches[].position_summary) read withheld, with
-    the same neutral reason everywhere and a count — never a word of the text or its sources."""
+    the same neutral reason everywhere — never a word of the text or its sources, and (owner ruling
+    2026-11-05) never a COUNT of what was withheld: no `_meta.withheld`, no count header."""
     dash = walks[variant]["dashboard"]
     assert set(dash["position_summaries"]) == {""}, dash
     assert dash["withheld_slots"] == len(dash["position_summaries"]) >= 7
     assert dash["moves_lines"] == 0 and dash["moves_withheld"] is True
-    meta = dash["meta_withheld"]
-    assert meta["narrative_rows"] == int(dash["header"]) > 0 and meta["reason"] == NP.PUBLIC_WITHHELD_REASON
-    assert set(meta) == {"narrative_rows", "texts", "reason"}
+    assert dash["meta_withheld"] is None and dash["header"] is None
     assert "journal" not in NP.PUBLIC_WITHHELD_REASON.lower() and "private" not in NP.PUBLIC_WITHHELD_REASON.lower()
 
 
@@ -283,7 +282,7 @@ def test_a_graded_record_row_is_carried_and_withheld_at_the_wire():
     resp = G.annotate({"statusCode": 200, "headers": {}, "body": json.dumps(body)})
     out = json.loads(resp["body"])
     assert out["calls"] == [{"claim": "", "n": 3, "called": "", "words_withheld": True}]  # the object keeps its place and its number
-    assert out["_meta"]["withheld"]["narrative_rows"] == 1 and out["_meta"]["withheld"]["texts"] == 2
+    assert out["_meta"] == {} and resp["headers"] == {}  # owner ruling 2026-11-05: no withheld count on the wire
     strict = G.gate_item(dict(row), strict=True)
     assert strict["claim_natural"] == "" and strict["status"] == "refuted"
 
@@ -300,12 +299,15 @@ def test_a_projection_cannot_hide_the_provenance_from_the_gate():
     item = {"pk": "COACH#sleep_coach", "sk": "PREDICTION#x", "claim_natural": "Deep sleep rises.", "provenance": _rec("whoop")}
     fake = _FakeTable([item])
     t = G.wrap(fake)
-    out = t.query(
-        KeyConditionExpression="pk = :p",
-        ExpressionAttributeValues={":p": "COACH#sleep_coach"},
-        ProjectionExpression="#a",
-        ExpressionAttributeNames={"#a": "claim_natural"},
-    )
+    from tests.call_publication_fixtures import registered  # owner ruling 2026-11-05: a reviewed-public synthetic call
+
+    with registered([item]):
+        out = t.query(
+            KeyConditionExpression="pk = :p",
+            ExpressionAttributeValues={":p": "COACH#sleep_coach"},
+            ProjectionExpression="#a",
+            ExpressionAttributeNames={"#a": "claim_natural"},
+        )
     assert "provenance" in fake.last["ProjectionExpression"] or "#npg_provenance" in fake.last["ProjectionExpression"]
     assert fake.last["ExpressionAttributeNames"]["#npg_provenance"] == "provenance"
     assert out["Items"][0]["claim_natural"] == "Deep sleep rises." and "provenance" not in out["Items"][0]
@@ -337,16 +339,31 @@ def test_a_generated_document_is_gated_by_its_own_record():
     assert G.gate_document({"text": "Deep sleep held.", "provenance": _rec("whoop")}) == {"text": "Deep sleep held."}
 
 
-def test_annotate_counts_without_words():
+def test_annotate_serves_no_withheld_count_and_logs_it(caplog):
+    """Owner ruling 2026-11-05: "Remove _meta.withheld counts from public responses." The response is
+    byte-identical whether this request withheld zero, one or three private rows (vary ONLY the private
+    rows); the counts go to the server log. Mutation control: a tainted STRING in the body is still
+    emptied, so annotate is live, and the log line does carry the number."""
+    import logging
+
     G = _gate()
+    resp_in = {"statusCode": 200, "headers": {}, "body": json.dumps({"a": 1, "_meta": {}})}
+    outs = []
+    for n in (0, 1, 3):
+        G.begin_request()
+        for i in range(n):
+            G.gate_item({"pk": "COACH#x", "sk": f"OUTPUT#{i}", "text": DISCLOSURE})
+        with caplog.at_level(logging.INFO, logger="site_api"):
+            caplog.clear()
+            outs.append(json.dumps(G.annotate(dict(resp_in)), sort_keys=True))
+        if n:
+            assert f"narrative_rows={n}" in caplog.text
+    assert len(set(outs)) == 1, outs
+    assert "withheld" not in outs[0] and "x-narrative-withheld" not in outs[0]
     G.begin_request()
-    G.gate_item({"pk": "COACH#x", "sk": "OUTPUT#1", "text": DISCLOSURE})
-    resp = G.annotate({"statusCode": 200, "headers": {}, "body": json.dumps({"a": 1, "_meta": {}})})
-    body = json.loads(resp["body"])
-    assert resp["headers"][G.WITHHELD_HEADER] == "1"
-    assert body["_meta"]["withheld"] == {"narrative_rows": 1, "texts": 0, "reason": NP.PUBLIC_WITHHELD_REASON}
-    G.begin_request()
-    assert G.annotate({"statusCode": 200, "body": "{}"}) == {"statusCode": 200, "body": "{}"}
+    G.gate_item({"pk": "COACH#mind_coach", "sk": "PREDICTION#2026-11-02#p1", "claim_natural": DISCLOSURE, "status": "refuted"})
+    tainted = G.annotate({"statusCode": 200, "headers": {}, "body": json.dumps({"t": DISCLOSURE, "_meta": {}})})
+    assert json.loads(tainted["body"])["t"] == "" and "withheld" not in json.loads(tainted["body"])["_meta"]
 
 
 # ── installation guards: every public table handle is behind the chokepoint ───────────────────

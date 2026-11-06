@@ -400,32 +400,9 @@ def pulse(*, _g) -> dict:
         except Exception:
             pass
 
-    # --- Mind glyph: State of Mind valence score ---
-    mind_score = None
-    try:
-        _som_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}state_of_mind") & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
-            ScanIndexForward=False,
-            Limit=1,
-        )
-        _som_items = _som_resp.get("Items", [])
-        if _som_items:
-            mind_score = float(_som_items[0].get("som_avg_valence", 0)) or None
-        if not mind_score:
-            # Fallback: apple_health partition
-            _ah_som = table.query(
-                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health")
-                & Key("sk").between(f"DATE#{today_pt}", f"DATE#{today_pt}~"),
-                ScanIndexForward=False,
-                Limit=1,
-            )
-            for _a in _ah_som.get("Items", []):
-                _sv = _a.get("som_avg_valence")
-                if _sv:
-                    mind_score = float(_sv)
-                    break
-    except Exception:
-        pass
+    # --- (retired) The mind glyph: it was the State-of-Mind valence of the day, private activity
+    #     (owner ruling 2026-11-05, common.activity_publication) — no glyph, no read, and so no share
+    #     of signals_reporting / signals_total either (omit, never mark).
 
     # --- N2: Nutrition logging check (last 7 days) ---
     nutrition_logged_7d = 0
@@ -484,13 +461,6 @@ def pulse(*, _g) -> dict:
         if sleep_hrs >= 7:
             return "green"
         return "amber" if sleep_hrs >= 6 else "red"
-
-    def _mind_state():
-        if mind_score is None or mind_score == 0:
-            return "gray"
-        if mind_score >= 4:
-            return "green"
-        return "amber" if mind_score >= 2 else "red"
 
     # #2957 (ADR-104 / phase rubric): the two gap counters below are LIFETIME memory —
     # they measure back from today to the last record of their kind, and neither the
@@ -613,11 +583,6 @@ def pulse(*, _g) -> dict:
                     else _lift_absence_label(days_since_workout, _last_workout_date, _lift_licensed, _pulse_day, EXPERIMENT_START)
                 )
             ),
-        },
-        "mind": {
-            "state": _mind_state(),
-            "score": mind_score,
-            "label": f"{mind_score:.1f}/5" if mind_score else None,
         },
     }
 

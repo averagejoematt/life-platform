@@ -1,15 +1,15 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-10-24",
-    "count": 21
+    "updated": "2026-11-05",
+    "count": 20
   },
   "sources": [
     {
       "id": "apple_health",
       "name": "Apple Health",
       "category": "Wearables",
-      "metrics": "Steps, active energy, CGM, blood pressure, state of mind",
+      "metrics": "Steps, active energy, CGM, blood pressure",
       "method": "Health Auto Export webhook, near-real-time",
       "posture": "load-bearing"
     },
@@ -148,14 +148,6 @@
       "metrics": "SNP clinical interpretations",
       "method": "One-time import",
       "posture": "load-bearing"
-    },
-    {
-      "id": "state_of_mind",
-      "name": "State of Mind",
-      "category": "Inputs",
-      "metrics": "Affect self-reports (Apple State of Mind)",
-      "method": "Health Auto Export webhook",
-      "posture": "portfolio"
     },
     {
       "id": "macrofactor_workouts",

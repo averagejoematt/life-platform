@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-11-05 (v8.6.0 — 90 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
+**Last updated:** 2026-11-06 (v8.6.0 — 90 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1250,7 +1250,7 @@ Notion journal uses multiple SK patterns per day (one per template type):
 | `updated_at` | string | ISO timestamp of ingestion write |
 | `body_text` | string | Page body content (fetched blocks), when present |
 
-**`channel` backfill posture (#1840, decided 2026-07-27):** the 62 `USER#matthew#SOURCE#notion`
+**`channel` backfill posture (#1840, decided 2026-07-27):** the `USER#matthew#SOURCE#notion`
 records that predate channel stamping (everything ingested before the 2026-07-26 Notion schema
 patch that added the Video Diary / Solo Recording select options) carry **no `channel` attribute
 at all** — not `channel: "journal"`, simply absent. This is **by design, not backfilled**:
@@ -2871,6 +2871,7 @@ Stores Wednesday Chronicle installments by Elena Voss. Also published to S3 blog
 | `installment_number` | number | Sequential installment number |
 | `board_interview` | boolean | Whether this installment includes a BoD interview |
 | `generated_at` | string | ISO timestamp |
+| `revisions` | list of maps | Publication revision records (owner ruling 2026-11-05), appended by `scripts/chronicle_revision_apply.py --apply` on every row (`DATE#`, `RECAP#`) it revised: `{at, reason, backup_ref, fields}` — `backup_ref` is the private `s3://…/backups/chronicle-revisions/<date>/ddb/…json` copy of the whole original item (DynamoDB JSON), `fields` the top-level attributes changed. No text. **Never served**: no public route or publisher reads it (`tests/test_chronicle_revision_apply.py` pins the readers) |
 
 ---
 

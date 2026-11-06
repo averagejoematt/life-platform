@@ -68,3 +68,36 @@ def test_build_script_wired_into_deploy_path():
     with open(sync_script, encoding="utf-8") as f:
         content = f.read()
     assert "v4_build_theme_river.py" in content, "theme-river build must run as part of the site deploy path"
+
+
+# ── owner rulings 2026-11-03/05: the exhibit is journal-derived, so it is not published ──
+def test_the_river_is_not_published_while_the_journal_is_private(tmp_path, monkeypatch):
+    """Fail closed: with the journal classified private the generator writes NOTHING (not even the empty
+    river, which would itself claim something about entries) and removes stale outputs from the sync tree."""
+    import importlib
+
+    mod = importlib.import_module("v4_build_theme_river")
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    (tmp_path / "site" / "data").mkdir(parents=True)
+    (tmp_path / "site" / "story" / "theme-river").mkdir(parents=True)
+    (tmp_path / "site" / "data" / "theme_river.json").write_text("{}")
+    (tmp_path / "site" / "story" / "theme-river" / "index.html").write_text("x")
+    monkeypatch.setattr(mod, "build_artifact", lambda live: (_ for _ in ()).throw(AssertionError("journal read while private")))
+    assert mod.journal_is_publishable() is False
+    assert mod.main() == 0
+    assert not (tmp_path / "site" / "data" / "theme_river.json").exists()
+    assert not (tmp_path / "site" / "story" / "theme-river" / "index.html").exists()
+
+
+def test_mutation_control_a_public_journal_would_publish_the_river(tmp_path, monkeypatch):
+    import importlib
+
+    from common import activity_publication
+
+    mod = importlib.import_module("v4_build_theme_river")
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    monkeypatch.setattr(activity_publication, "source_is_public", lambda s: True)
+    monkeypatch.setattr(mod.sys, "argv", ["v4_build_theme_river.py"])
+    assert mod.journal_is_publishable() is True
+    assert mod.main() == 0
+    assert (tmp_path / "site" / "data" / "theme_river.json").exists()

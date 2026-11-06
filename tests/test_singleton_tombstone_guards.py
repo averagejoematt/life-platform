@@ -639,7 +639,18 @@ def _what_changed_body(item):
 
 _WC_PILOT = {
     "deltas": [{"label": "sleep", "delta": 0.4, "direction": "up"}],
-    "newly_unlocked": [{"label": "habit_pct_vs_day_grade", "r": 0.8777, "n": 20, "first_seen": "2026-06-30"}],
+    # metric_a / metric_b as the producer writes them (diff_newly_unlocked): a pair is published by its
+    # metrics' classification, and one with no metrics is unclassified (owner rulings 2026-11-03/05).
+    "newly_unlocked": [
+        {
+            "label": "habit_pct_vs_day_grade",
+            "metric_a": "habit_pct",
+            "metric_b": "day_grade",
+            "r": 0.8777,
+            "n": 20,
+            "first_seen": "2026-06-30",
+        }
+    ],
     "honest_null": False,
     "window_start": "2026-06-05",
     "window_end": "2026-07-04",

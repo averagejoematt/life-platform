@@ -45,7 +45,7 @@ LEAD_READ_2026_10_18 = (
     "I'm watching Matthew execute at a steady clip: 54 logged training sessions in thirty days, consistent daily movement, "
     "and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42. The structural "
     "adherence is working. What I'm tracking closely now is the gap between doing and logging—his food logs stopped four "
-    "days ago, and his journal entries have been silent for forty days. The wearables are still reporting (sleep locked, "
+    "days ago, and his journal entries have been silent for twenty days. The wearables are still reporting (sleep locked, "
     "recovery stable), so the passive data shows the machine is humming, but without active logging, I can't see the "
     "decision-making underneath. For a twelve-month recomposition after a previous cycle that stalled in the final phase, "
     "that visibility is the early warning system. I've asked him to restart one of those two channels this week—food "
@@ -53,9 +53,9 @@ LEAD_READ_2026_10_18 = (
     "the momentum quiets."
 )
 # The labelled facts at write time: the served 30-day count, and the two gaps as the verifier re-derived them
-# (the food gap was real when written — rows for 10-11..10-17 were ingested 2h16m later; the journal's last
-# entry was 2026-09-09, 38-40 days before).
-FACTS_AT_WRITE = {"sessions_30d": 39, "food_lag_days": 4, "journal_gap_days": 40}
+# (the food gap was real when written — rows for 10-11..10-17 were ingested 2h16m later). The journal's gap in
+# this read and in these facts is synthetic: real journal-activity values replaced with synthetic ones for privacy (owner ruling 2026-11-05).
+FACTS_AT_WRITE = {"sessions_30d": 39, "food_lag_days": 4, "journal_gap_days": 20}
 
 
 def _metrics(findings):
@@ -115,7 +115,7 @@ def test_restart_as_a_verb_is_not_a_cycle_reference():
 # The same read with BOTH reader-surface defects removed: the cycle reference (#4580 A-X1) and the journal's
 # silence (#5131 — the read also narrated it, and reader_safe now refuses that class on its own).
 _CYCLE_PHRASE = " after a previous cycle that stalled in the final phase"
-_SILENCE_PHRASE = ", and his journal entries have been silent for forty days"
+_SILENCE_PHRASE = ", and his journal entries have been silent for twenty days"
 FIXED_READ = LEAD_READ_2026_10_18.replace(_CYCLE_PHRASE, "").replace(_SILENCE_PHRASE, "")
 
 

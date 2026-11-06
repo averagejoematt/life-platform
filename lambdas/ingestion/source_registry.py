@@ -736,7 +736,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "(vitals_resolver #3287 takes the newest day PT has actually reached; site_api_freshness and "
             "freshness_checker anchor the age at UTC midnight through day_key_frame_for), the rest inherit it."
         ),
-        "metrics": "Steps, active energy, CGM, blood pressure, state of mind",
+        # Owner ruling 2026-11-05: State of Mind is private activity — not named in the public catalogue
+        # (/data/data_sources.json, /data/stack.json, /gear/); it still lands here (hae_datatypes below).
+        "metrics": "Steps, active energy, CGM, blood pressure",
         # #3252: HAE pushes steps AND the `workouts` sub-datatype below — both are
         # passive captures, and both are evidence under the auto-sync ruling.
         "evidence_for": ("steps", "workout"),

@@ -55,7 +55,6 @@ def _facts(**over) -> DayFacts:
         protein_g=182,
         protein_target_g=180,
         calories=2100,
-        journal_templates=["Evening"],
     )
     base.update(over)
     return DayFacts(**base)
@@ -100,7 +99,6 @@ def test_a_single_template_day_still_produces_a_full_card():
         tier0_total=None,
         tier0_pct=None,
         protein_g=None,
-        journal_templates=[],
     )
     assert rt.pick(facts, []) == ["workout"]
     assert _render(facts).size == (1080, 1350)
@@ -147,7 +145,7 @@ def test_a_loss_is_green_and_a_gain_is_amber_not_green():
     `classify_delta`'s verdict — but this asserts the wiring, because "by construction"
     is exactly what was believed last time.
     """
-    lost = _render(_facts(tier0_done=None, tier0_total=None, tier0_pct=None, protein_g=None, journal_templates=[], workouts=[]))
+    lost = _render(_facts(tier0_done=None, tier0_total=None, tier0_pct=None, protein_g=None, workouts=[]))
     gained = _render(
         _facts(
             weight_lb=323.0,
@@ -157,7 +155,6 @@ def test_a_loss_is_green_and_a_gain_is_amber_not_green():
             tier0_total=None,
             tier0_pct=None,
             protein_g=None,
-            journal_templates=[],
             workouts=[],
         )
     )

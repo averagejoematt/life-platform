@@ -76,7 +76,7 @@ from coach import (
     evaluation_hold,
     prediction_windows,
 )
-from common import journal_silence
+from common import journal_silence, prediction_publication
 from common.pacific_time import pacific_date_of, pacific_today
 
 from web import claim_sourcing, correction_history, prediction_reason, site_api_calls
@@ -340,6 +340,8 @@ def handle_ledger_export(event, *, fetch: Callable = fetch_rows, today: str | No
         "pages": max(1, math.ceil(total / size)),
         "as_of": today,
         "source": SOURCE,
+        # Owner ruling 2026-11-05: the ledger is publication-eligible calls only, counted the same as /api/predictions.
+        "method": prediction_publication.method_block(),
         # Owner ruling 2026-11-04: no count of withheld rows and no `record_total` — either would publish how
         # many rows speak of the journal (#5131), which moves with private activity. Logged, never served.
     }

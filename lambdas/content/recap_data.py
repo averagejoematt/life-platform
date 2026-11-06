@@ -3,7 +3,8 @@
 WHAT THIS IS FOR
 
 The daily recap card needs a whole day in one shape: weight, the workout, habits,
-nutrition, whether he journaled, how far he walked. Six partitions, one date.
+nutrition, how far he walked. One date. (Whether he journaled is private activity and is not read,
+owner rulings 2026-11-03/05.)
 
 WHY A NEW MODULE AND NOT THE BRIEF'S READERS
 
@@ -25,9 +26,10 @@ missing, and the template layer refuses to render a field it does not have (#374
 WHAT IS DELIBERATELY NOT READ
 
 Food ITEM names (macrofactor is TIER_OWNER_ONLY; only rollup numbers cross this boundary)
-and journal BODY text (the template labels are enough to say "he journaled"). Both are
-enforced by the compensating control in `tests/test_recap_gate_3746.py`, because the
-cheapest place to stop a leak is before the value is ever loaded.
+and the journal — not its body text, and since the owner rulings of 2026-11-03/05 not its
+presence either (no template labels, no journal day-grade component). Both are enforced by
+the compensating control in `tests/test_recap_gate_3746.py`, because the cheapest place to
+stop a leak is before the value is ever loaded.
 
 THE ONE FREE-TEXT FIELD, AND WHY IT IS THE ONLY ONE (#3749)
 
@@ -83,7 +85,7 @@ def _get_day(table, source: str, date: str) -> dict[str, Any] | None:
 
 
 def _query_prefix(table, source: str, sk_prefix: str) -> list[dict[str, Any]]:
-    """Every row under a sort-key prefix (hevy workouts, journal entries)."""
+    """Every row under a sort-key prefix (hevy workouts)."""
     from boto3.dynamodb.conditions import Key
 
     try:
@@ -193,8 +195,6 @@ class DayFacts:
     steps: float | None = None
     water_oz: float | None = None
     water_target_oz: float | None = None
-    # mind
-    journal_templates: list[str] = field(default_factory=list)
     # the one free-text field on the card — SELECTED from a coach's public_summary,
     # never minted for the card. `coach_line_source` is the OUTPUT# record it came from,
     # so any line on any card can be traced back to the run that wrote it (#3749).
@@ -239,13 +239,6 @@ class DayFacts:
     grade_series: list[str | None] = field(default_factory=list)
     # provenance
     absent: list[str] = field(default_factory=list)
-
-    @property
-    def journaled(self) -> bool | None:
-        """None when the journal partition could not be read at all."""
-        if "notion" in self.absent:
-            return None
-        return bool(self.journal_templates)
 
     @property
     def total_lost_lb(self) -> float | None:
@@ -518,13 +511,6 @@ def day_facts(table, date: str, *, experiment_start: str | None = None) -> DayFa
         facts.goal_weight_lb = float(EXPERIMENT_GOAL_WEIGHT_LBS)
     except Exception:  # noqa: BLE001
         pass
-
-    journal = _query_prefix(table, "notion", f"DATE#{date}#journal#")
-    if not journal:
-        facts.absent.append("notion")
-    # Template LABELS only. The body is the entry; a public card says that he wrote, never
-    # what he wrote.
-    facts.journal_templates = [t for t in (j.get("template") for j in journal) if t]
 
     facts.met_by_measurement = [m for m in facts.missed_tier0 if measured_twin_met(m, facts)]
     facts.missed_tier0 = [m for m in facts.missed_tier0 if m not in facts.met_by_measurement]

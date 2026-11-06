@@ -103,7 +103,7 @@
 - **6.3 Retain verdict/regeneration pairs** — stop discarding the labeled dataset (S3, cycle-stamped). *no-LLM.*
 
 ### E4 — Fulfillment instrumentation (the differentiating half) — L
-**Thesis impact:** connection/mood/fulfillment currently has architecture and no data (0 social logs; 41-day journal silence; 1 datapoint/90d); the thesis's second half has no evidence stream.
+**Thesis impact:** connection/mood/fulfillment currently has architecture and no data (0 social logs; [journal activity withheld — private, owner ruling 2026-11-05]; 1 datapoint/90d); the thesis's second half has no evidence stream.
 **Success criteria:** a fulfillment signal that survived one bad week; relationships pillar no longer silently flat-50.
 
 - **4.1 Decision first:** choose the capture channel with the Ethicist's constraints (voice memo→HAE state-of-mind path exists; calendar/passive proxies; or an accepted ritual). *Matthew + Fable-chat. Blocks the rest.*

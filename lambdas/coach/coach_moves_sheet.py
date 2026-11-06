@@ -611,7 +611,7 @@ def check_line(
 
 def journal_silence_findings(text: str) -> list:
     """Journal silence is not reader copy (#4583): the Story Desk's rule, from the one shared pattern
-    (``common.journal_silence``). Live 2026-10-18: "... yet 39 days of journal silence. My read is ..."""
+    (``common.journal_silence``). Live 2026-10-18 a coach line naming a count of journal-silence days reached the front page."""
     from common import journal_silence
 
     return ["journal_silence"] if journal_silence.mentions_journal_silence(text) else []

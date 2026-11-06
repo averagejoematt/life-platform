@@ -1,7 +1,7 @@
 """A character pillar computed only from private sources is never published (owner rulings 2026-11-03/04).
 
-Relationships reads only the journal and its enrichment pass, so its value exists only on days he wrote: the
-published 62 and 36 on the two journal days of this cycle named those days. And a progression receipt named
+Relationships reads only the journal and its enrichment pass, so its value exists only on days he wrote: a
+published value named such a day. And a progression receipt named
 the journal's own rows (a journal sort key is its date, template and entry id). Every public reader of the
 character sheet now reads it through ``character_privacy.public_sheet``, and the receipt route through
 ``_public_receipt``. These tests vary ONLY the private inputs and assert byte-identical public output, with
@@ -61,7 +61,7 @@ def _sheet(day, rel):
 
 
 # A journal day (relationships instrumented from the entry) and a quiet day (never instrumented).
-JOURNAL_DAY = _pillar(61.5, xp=1.93)
+JOURNAL_DAY = _pillar(55.0, xp=1.10)  # synthetic values and dates throughout (owner ruling 2026-11-05)
 QUIET_DAY = _pillar(50.0, cov=0.0, ni=True)
 
 
@@ -76,15 +76,15 @@ class _Table:
         return {"Item": copy.deepcopy(self.items[0])} if self.items else {}
 
 
-def _served(rel, monkeypatch, date="2026-09-09"):
-    monkeypatch.setattr(vitals, "table", _Table([_sheet("2026-09-09", rel), _sheet("2026-09-08", QUIET_DAY)]))
+def _served(rel, monkeypatch, date="2026-09-24"):
+    monkeypatch.setattr(vitals, "table", _Table([_sheet("2026-09-24", rel), _sheet("2026-09-23", QUIET_DAY)]))
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     body = json.loads(vitals.handle_character(date)["body"])
     body.pop("_meta", None)
     return json.dumps(body, sort_keys=True)
 
 
-@pytest.mark.parametrize("date", [None, "2026-09-09"])
+@pytest.mark.parametrize("date", [None, "2026-09-24"])
 def test_character_is_byte_identical_on_a_journal_day_and_a_quiet_day(monkeypatch, date):
     monkeypatch.setattr(C, "_attach_pillar_absence", lambda *a, **k: None)
     assert _served(JOURNAL_DAY, monkeypatch, date) == _served(QUIET_DAY, monkeypatch, date)
@@ -101,11 +101,11 @@ def test_mutation_control_a_published_relationships_pillar_would_move(monkeypatc
 
 
 def test_public_sheet_is_pure_and_holds_only_private_pillars():
-    rec = _sheet("2026-09-09", JOURNAL_DAY)
+    rec = _sheet("2026-09-24", JOURNAL_DAY)
     before = copy.deepcopy(rec)
     out = character_privacy.public_sheet(rec)
     assert rec == before, "the stored record is never changed"
-    assert out["pillar_relationships"] == character_privacy.public_sheet(_sheet("2026-09-08", QUIET_DAY))["pillar_relationships"]
+    assert out["pillar_relationships"] == character_privacy.public_sheet(_sheet("2026-09-23", QUIET_DAY))["pillar_relationships"]
     for p in _PUBLIC_PILLARS:
         assert out[f"pillar_{p}"] == rec[f"pillar_{p}"]
     assert character_privacy.pillar_is_publishable("mind") and not character_privacy.pillar_is_publishable("relationships")
@@ -113,18 +113,18 @@ def test_public_sheet_is_pure_and_holds_only_private_pillars():
 
 def _receipt(journal: bool):
     rows = [
-        {"pk": "USER#matthew#SOURCE#whoop", "sks": ["DATE#2026-09-09"]},
-        {"pk": "USER#matthew#SOURCE#character_sheet", "sks": ["DATE#2026-09-08"]},
-        {"pk": "USER#matthew#SOURCE#engagement_state", "sks": ["DATE#2026-09-09"]},
+        {"pk": "USER#matthew#SOURCE#whoop", "sks": ["DATE#2026-09-24"]},
+        {"pk": "USER#matthew#SOURCE#character_sheet", "sks": ["DATE#2026-09-23"]},
+        {"pk": "USER#matthew#SOURCE#engagement_state", "sks": ["DATE#2026-09-24"]},
     ]
     if journal:
         rows += [
-            {"pk": "USER#matthew#SOURCE#notion", "sks": ["DATE#2026-09-09#journal#evening#synthetic"]},
-            {"pk": "USER#matthew#SOURCE#flourishing", "sks": ["DATE#2026-09-09"]},
+            {"pk": "USER#matthew#SOURCE#notion", "sks": ["DATE#2026-09-24#journal#evening#synthetic"]},
+            {"pk": "USER#matthew#SOURCE#flourishing", "sks": ["DATE#2026-09-24"]},
         ]
     rel = {"inputs": {"raw_score": 35.5 if journal else 50.0, "data_coverage": 1.0 if journal else 0.0}, "outputs": {"level": 1.0}}
     body = {
-        "date": "2026-09-09",
+        "date": "2026-09-24",
         "digest": "d",
         "input_rows": rows,
         "transitions": {
@@ -168,3 +168,27 @@ def test_every_public_reader_of_the_sheet_goes_through_public_sheet():
     missing = [name for name, ok in readers if not ok]
     assert readers, "the walk found no readers — the pattern is broken"
     assert not missing, f"these modules read character_sheet pillars without character_privacy.public_sheet: {missing}"
+
+
+def test_state_of_mind_component_is_never_named():
+    """Owner ruling 2026-11-05: How We Feel / State of Mind is private — its component is never named on a driver
+    list (no_data included), exactly like the journal's components."""
+    assert not character_privacy.component_is_publishable("state_of_mind_valence")
+    assert character_privacy.component_is_publishable("hrv_trend")  # an ordinary component stays nameable
+
+
+def test_coach_profile_names_public_sources_only():
+    """Owner rulings 2026-11-03/05: a coach's published source list names only public sources (journal and
+    State of Mind are private; an unclassified label fails closed). Mutation control: an open policy names them all."""
+    from common import activity_publication
+    from web import site_api_coach_profile as CP
+
+    board = {"members": {"k": {"title": "t", "data_sources": ["notion", "state_of_mind", "habitify", "journal", "whoop", "made_up"]}}}
+    g = {"_load_s3_json": lambda *a, **k: board}
+    assert CP._character({"board_persona_key": "k"}, _g=g)["data_sources"] == ["habitify", "whoop"]
+    real = activity_publication.source_is_public
+    try:
+        activity_publication.source_is_public = lambda s: True
+        assert len(CP._character({"board_persona_key": "k"}, _g=g)["data_sources"]) == 6
+    finally:
+        activity_publication.source_is_public = real

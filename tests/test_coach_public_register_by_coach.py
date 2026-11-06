@@ -47,11 +47,12 @@ from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_coach as C  # noqa: E402
 
 # ── The LIVE specimens (/api/coach/mind_coach, 2026-09-26 19:31Z) ───────────────────
+# The journal day count in _REEVES_HEADLINE is synthetic: real journal-activity values replaced with synthetic ones for privacy (owner ruling 2026-11-05).
 
 _REEVES_HEADLINE = (
     "You're still operating under significant structural load—grief, protein intake sliding well short of what I "
     "suspect you need for cognitive clarity—yet you're showing up and engaging with genuine curiosity about your own "
-    "signals. What's shifted in my read: the six-day journaling silence now feels like a more urgent signal than I "
+    "signals. What's shifted in my read: the four-day journaling silence now feels like a more urgent signal than I "
     "initially weighted it."
 )
 _REEVES_DAILY = (

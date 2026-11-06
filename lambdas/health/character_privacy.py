@@ -42,7 +42,7 @@ OWNER_ONLY_COMPONENTS = {"stress_management": "evening_checkin"}
 PRIVATE_SOURCE_COMPONENTS = {
     "journal_consistency": "notion",  # entries in the last 14 days / 14
     "values_alignment": "flourishing",  # values evidenced by the journal-enrichment pass
-    "state_of_mind_valence": "state_of_mind",  # How We Feel / State of Mind (private, owner ruling 2026-11-05)
+    "state_of_mind_valence": "state_of_mind",  # How We Feel taps — private (owner ruling 2026-11-05)
 }
 
 

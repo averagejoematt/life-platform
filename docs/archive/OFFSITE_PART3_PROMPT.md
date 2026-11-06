@@ -78,7 +78,7 @@ Summary of all decisions made:
 
 **Key decisions from Part 2:**
 - Inner Life is center of the entire experiment — more important than weight loss
-- "The data gap IS the data" — one journal entry vs weeks of biometric tracking is the thesis
+- "The data gap IS the data" — the journal [journal activity withheld — private, owner ruling 2026-11-05] vs weeks of biometric tracking is the thesis
 - Benchmarks page sequencing: reader self-check first → research library → Matthew's data
 - Data Explorer: curate first, browse second, query third
 - Discoveries: narrow to the action loop (Finding → Action → Outcome)

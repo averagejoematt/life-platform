@@ -94,6 +94,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [OPERATOR_SUBSTRATE_SPIKE.md](OPERATOR_SUBSTRATE_SPIKE.md) | The resident-operator substrate decision (#2849): composite — cloud routines for scheduled judgment, Actions+Bedrock for repo work, AgentCore declined per ADR-103; rent per leg, Architect leg live |
 | [NEW_SIGNAL_PLAYBOOK.md](NEW_SIGNAL_PLAYBOOK.md) | A new metric/device/source lands through one ordered checklist — absence semantics + privacy tier first (ADR-154, from the BodyScan 2 spike #2782) |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
+| [PUBLICATION_REGISTRY.md](PUBLICATION_REGISTRY.md) | Proposed: one publication registry for every public surface, and the staged migration from today's privacy modules (owner ruling 2026-11-05) |
 | [PERMANENCE_CONTRACT.md](PERMANENCE_CONTRACT.md) | **The written commitment** — nightly public archive, its admission gate, the continuity clock, and what none of it promises (#1400) |
 | [FRONTIER.md](FRONTIER.md) | **The parked quantified-life register** — the folded Roadmap vision (#3943) plus the variant-slot (#4423) and conditioning-stage (#4424) training programs, scores and acceptance verbatim; one promotion per cycle (ADR-099 amendment 2026-08-22) |
 | [PROPORTIONALITY.md](PROPORTIONALITY.md) | The complexity-posture ledger — posture, rent, demote trigger per subsystem (ADR-103/144) |

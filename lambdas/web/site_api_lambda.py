@@ -1026,7 +1026,9 @@ def _dispatch_route(event, path, method):
                         if isinstance(_cd_pub_vitals, dict) and _cd_pub_vitals:
                             coach_entry["published_vitals"] = _cd_pub_vitals
                         # Count predictions
-                        preds = _cd_out_item.get("predictions", [])
+                        # Owner ruling 2026-11-05: a withheld read's calls are not counted either — the number
+                        # of calls in a read made from private sources is metadata about them.
+                        preds = [] if narrative_publication.is_withheld(_cd_out_item) else _cd_out_item.get("predictions", [])
                         if isinstance(preds, list):
                             coach_entry["prediction_count"] = len(preds)
                             for _p in preds[-3:]:

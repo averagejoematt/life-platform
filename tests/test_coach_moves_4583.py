@@ -3,9 +3,10 @@
 Offline. The fixtures are the WIRE: the lead read's `cited` block and the per-pillar
 absence records are copied from the live `/api/coaching-dashboard` and `/api/character`
 bodies of 2026-10-03, and the three refused specimens are the coach texts those same
-routes served that day (the journal "silent for eleven days" beside a served 24; "food
+routes served that day (the journal "silent for three days" beside a served 15; "food
 logging has been quiet for four days" beside a food log written that morning; a
-four-figure recitation).
+four-figure recitation). The journal figures (the gap, its last date, the coaches' day counts) are
+synthetic: real journal-activity values replaced with synthetic ones for privacy (owner ruling 2026-11-05).
 """
 
 import json
@@ -90,7 +91,7 @@ PILLARS = [
     },
     {
         "name": "mind",
-        "absence": {"state": "dark", "last_log_date": "2026-09-09", "days_dark": 24, "transition": "paused", "days_since_last_log": 24},
+        "absence": {"state": "dark", "last_log_date": "2026-09-18", "days_dark": 15, "transition": "paused", "days_since_last_log": 15},
     },
 ]
 
@@ -145,7 +146,7 @@ GRADED = [
 ]
 
 POSITIONS = {
-    "mind_coach": {"text": "His journal has been silent for eleven days.", "as_of": "2026-10-03"},
+    "mind_coach": {"text": "His journal has been silent for three days.", "as_of": "2026-10-03"},
     "nutrition_coach": {"text": "Logging resumed on October 1st with 166g protein.", "as_of": "2026-10-03"},
 }
 
@@ -176,7 +177,7 @@ def sheet():
 
 def test_the_sheet_carries_the_served_values_once(sheet):
     by = {f["key"]: f["value"] for f in sheet["facts"]}
-    assert by["journal.days_since"] == "24", "the journal gap is the /api/character value, not a coach's"
+    assert by["journal.days_since"] == "15", "the journal gap is the /api/character value, not a coach's"
     assert by["food_log.state"] == "logged" and by["food_log.days_since"] == "0"
     assert by["withings.weight_lbs"] == "311.0" and by["whoop.recovery_score"] == "98"
     assert by["nutrition.days_logged"] == "28" and by["nutrition.protein_avg_g"] == "148.4"
@@ -187,7 +188,7 @@ def test_the_sheet_carries_the_served_values_once(sheet):
 
 def test_context_masks_every_figure(sheet):
     ctx = S.context_text(sheet, NAMES)
-    assert "eleven" not in ctx and "166" not in ctx, ctx
+    assert "three" not in ctx and "166" not in ctx, ctx
     assert "[n] days" in ctx
     assert "Amara Patel" in ctx and "no sensor since" in ctx
 
@@ -201,9 +202,9 @@ def test_a_lead_read_older_than_a_day_is_not_on_the_sheet():
 # ── the specimens: the served 2026-10-03 texts are each refused ───────────────
 
 SPECIMENS = {
-    "mind_eleven_days": (
+    "mind_three_days": (
         "I think his recovery on the night of October 1st reached 98%—the highest yet—but his deep sleep is declining "
-        "and his journal has been silent for eleven days.",
+        "and his journal has been silent for three days.",
         "call",
     ),
     "physical_food_quiet": ("I expect more of the same: food logging has been quiet for four days and I doubt that changes.", "call"),
@@ -218,7 +219,7 @@ SPECIMENS = {
 def test_every_served_specimen_is_refused(sheet):
     held = {name: S.check_line(text, move, sheet, today=TODAY) for name, (text, move) in SPECIMENS.items()}
     assert all(held.values()), held
-    assert any("journal" in r or "11" in r for r in held["mind_eleven_days"]), held["mind_eleven_days"]
+    assert any("journal" in r or "3" in r for r in held["mind_three_days"]), held["mind_three_days"]
     assert any(r.startswith("absence_state:food_log") for r in held["physical_food_quiet"]), held["physical_food_quiet"]
     assert any(r.startswith("restates_numbers") for r in held["sleep_recitation"]), held["sleep_recitation"]
 
@@ -293,7 +294,7 @@ def test_a_move_not_made_is_refused(sheet):
 
 def test_two_lines_may_not_tie_two_values_to_one_metric(sheet):
     sh = dict(sheet, facts=sheet["facts"])
-    first = "I think the journal has been quiet 24 days and it will stay quiet."
+    first = "I think the journal has been quiet 15 days and it will stay quiet."
     second = "I expect the journal, quiet 12 days, to open again soon."
     assert S.cross_line_findings(second, [first], sh) == ["cross_line:journal.days_since"]
     assert S.cross_line_findings(first, [first], sh) == []
@@ -692,7 +693,7 @@ WIRE = {
         "framing it right now."
     ),
     ("2026-10-07", "mind_coach", "question"): (
-        "Does Matthew see the 28-day journal silence as a deliberate choice, or has it quietly become the path of least "
+        "Does Matthew see the 8-day journal silence as a deliberate choice, or has it quietly become the path of least "
         "resistance — and I wonder if even he knows which one it is yet?"
     ),
     ("2026-10-08", "labs_coach", "reply"): (
@@ -700,7 +701,7 @@ WIRE = {
         "the intake concern is weaker than the lab draw absence, which is now the clearest blocker I see."
     ),
     ("2026-10-08", "mind_coach", "question"): (
-        "Is the 29-day journal silence something Matthew chose, or something that simply accumulated while he was busy with "
+        "Is the 9-day journal silence something Matthew chose, or something that simply accumulated while he was busy with "
         "everything the logged data shows he's been doing well?"
     ),
     ("2026-10-09", "explorer_coach", "reaction"): (
@@ -709,7 +710,7 @@ WIRE = {
         "recovery architecture."
     ),
     ("2026-10-09", "labs_coach", "call"): (
-        "I think Matthew will keep deferring the lab draw as long as the symptom baseline stays uncollected — so far, 30 "
+        "I think Matthew will keep deferring the lab draw as long as the symptom baseline stays uncollected — so far, 10 "
         "days of journal silence makes it nearly impossible to build that case, and I expect that gap, not protein, is what "
         "stalls clinical progress next."
     ),
@@ -838,7 +839,7 @@ def _run_round8(monkeypatch, cast, lines, yesterday):
     return out, table.puts[-1], inv
 
 
-# The 10-08 wire question's shape on the test sheet (2026-10-03: journal quiet 24 days). The wire text itself also
+# The 10-08 wire question's shape on the test sheet (2026-10-03: journal quiet 15 days, synthetic). The wire text itself also
 # trips today's absence binding on this sheet ("logged"), so the run tests use this form, which only the repeat refuses.
 _AGAIN = "Is the journal something Matthew set aside on purpose, or something that simply slipped away from him this month?"
 _NEW_QUESTION = "Does Matthew plan his dinners ahead, or take them as they come each night?"
@@ -1040,8 +1041,9 @@ def test_both_public_surfaces_carry_absent_beside_the_lines():
 
 # ── journal silence is not reader copy (#4583, #4580) ─────────────────────────
 
-# served on the public front page 2026-10-18 (/api/edition blocks.coach_lines, Nathan Reeves)
-SERVED_JOURNAL_SILENCE = "Intake held steady, yet 39 days of journal silence. My read is the block was never nutritional."
+# the shape served on the public front page 2026-10-18 (/api/edition blocks.coach_lines, Nathan Reeves); the day
+# count is synthetic (real journal-activity values replaced with synthetic ones for privacy (owner ruling 2026-11-05))
+SERVED_JOURNAL_SILENCE = "Intake held steady, yet 13 days of journal silence. My read is the block was never nutritional."
 
 
 @pytest.mark.parametrize(

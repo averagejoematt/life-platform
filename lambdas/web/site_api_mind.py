@@ -55,7 +55,7 @@ def journal_analysis(*, _g) -> dict:
 def mind_overview(*, _g) -> dict:
     """
     GET /api/mind_overview
-    Returns: mood/energy/stress trends, vice streaks, social connection quality,
+    Returns: vice streaks, social connection quality,
     mind pillar score, cognitive patterns (when journal data is available).
     Cache: 3600s.
     """
@@ -82,37 +82,9 @@ def mind_overview(*, _g) -> dict:
             }
             break
 
-    # ── 2. State of mind / mood data (Apple Health How We Feel) ──
-    som_items = _query_source("state_of_mind", d30, today)
-    mood_entries = []
-    for s in som_items:
-        valence = s.get("valence")
-        if valence is not None:
-            mood_entries.append(
-                {
-                    "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
-                    "valence": float(valence),
-                    "label": s.get("label", ""),
-                }
-            )
-    # Fallback: check apple_health partition for som_avg_valence (HAE writes here)
-    if not mood_entries:
-        ah_som = _query_source("apple_health", d30, today)
-        for s in ah_som:
-            valence = s.get("som_avg_valence")
-            if valence is not None:
-                mood_entries.append(
-                    {
-                        "date": s.get("date") or s.get("sk", "").replace("DATE#", ""),
-                        "valence": float(valence),
-                        "label": "",
-                    }
-                )
-    mood_entries.sort(key=lambda x: x["date"])
-    avg_valence = None
-    if mood_entries:
-        vals = [m["valence"] for m in mood_entries]
-        avg_valence = round(sum(vals) / len(vals), 2)
+    # ── 2. (retired) The State-of-Mind mood read (How We Feel check-ins) — private activity (owner
+    #    ruling 2026-11-05: its entries, average and count are omitted, common.activity_publication's
+    #    STATE_OF_MIND_FIELDS); the owner's own tools read the rows directly. Not read here.
 
     # ── 3. Vice streaks from habit_scores ──
     # Stage0 Fix 1 (2026-05-30): use _is_blocked_vice (matches both
@@ -254,8 +226,6 @@ def mind_overview(*, _g) -> dict:
         {
             "mind": {
                 "mind_pillar": mind_pillar,
-                "avg_valence": avg_valence,
-                "mood_entries_count": len(mood_entries),
                 "resist_rate_pct": resist_rate,
                 "total_temptations_90d": total_temptations,
                 "resisted_90d": resisted,
@@ -265,7 +235,6 @@ def mind_overview(*, _g) -> dict:
             },
             "vice_streaks": vice_data,
             "vice_timeline": vice_timeline,
-            "mood_trend": mood_entries[-30:],
             "meditation": meditation_data,
         },
         cache_seconds=3600,

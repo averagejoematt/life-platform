@@ -485,6 +485,9 @@ def _ledger_pages(ctx: LiveContext) -> list[dict]:
                 "served": payload.get("total"),
                 "as_of": payload.get("as_of"),
             }
+            # Owner ruling 2026-11-05: the publication method the count is under, shown on the ledger page.
+            if isinstance(payload.get("method"), dict):
+                ctx.ledger_counts["method"] = {k: payload["method"].get(k) for k in ("version", "effective", "note")}
         out.extend(r for r in payload.get("items") or [] if isinstance(r, dict))
         pages = int(payload.get("pages") or 1)
         if page >= pages:

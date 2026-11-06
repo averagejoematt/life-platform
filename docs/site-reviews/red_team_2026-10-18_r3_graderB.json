@@ -22,7 +22,7 @@
      "id": "B-01",
      "severity": "high",
      "claim": "The lead coach's weekly read states the starting weight, a session count, a food-log gap and a journal gap, all four wrong against the data served on the same page",
-     "served": "“54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42.” (full served text continues: “his food logs stopped four days ago, and his journal entries have been silent for forty days”)",
+     "served": "“54 logged training sessions in thirty days, consistent daily movement, and a weight loss rate holding at 3.3 pounds per week from his starting weight of 302.2 pounds on day 42.” (full served text continues: “his food logs stopped four days ago, and his journal entries have been silent [journal activity withheld — private, owner ruling 2026-11-05]”)",
      "source": "/api/edition blocks.lead_read (as_of 2026-10-17, /api/weekly_priority). Same response: blocks.today start_weight_lbs 327.3, weight_lbs 302.2 (302.2 is the CURRENT weight); /api/training_overview training.workouts_30d 39 (Hevy /api/workouts count 22); blocks.week.measures.food values logged 10-12..10-17 (6 of 7 days, /api/nutrition_overview nutrition_trend last date 2026-10-17 = the day before as_of); blocks.his_words as_of 2026-09-23 = 25 days, not forty; 25.1 lb / 6 weeks = 4.2 lb/wk, the scorecard's own 7-day drop is 3.4",
      "fix": "Run weekly_priority through the grounded-generation number gate with the canonical facts block (ADR-104 arm 2) and fail-closed on a number that labels a served fact wrongly (302.2 is in the input, so the allow-list passes it — add a labelled-fact check: 'starting weight' must equal start_weight_lbs); until then do not quote the lead on the week page, or quote only the sentence with no numbers.",
      "fixture_bound": false
@@ -83,8 +83,8 @@
      "id": "B-07",
      "severity": "medium",
      "claim": "Two journals, two silences, one word — unresolved from round 2",
-     "served": "“25.1 lbs down, protein climbing, yet 39 days of journal silence.” (Nathan Reeves, Oct 18) beside the week page's “Nothing new in his own words since Wednesday, September 23.” (25 days)",
-     "source": "/api/edition blocks.coach_lines (coaching-dashboard, Notion journal gap) vs blocks.his_words as_of 2026-09-23 (/api/decisions); day 2026-10-17 prints “38 days”, so the Notion gap counts from 2026-09-09/10",
+     "served": "“25.1 lbs down, protein climbing, yet [journal activity withheld — private, owner ruling 2026-11-05].” (Nathan Reeves, Oct 18) beside the week page's “Nothing new in his own words since Wednesday, September 23.” (25 days)",
+     "source": "/api/edition blocks.coach_lines (coaching-dashboard, Notion journal gap) vs blocks.his_words as_of 2026-09-23 (/api/decisions); the Notion gap's length and start are [journal activity withheld — private, owner ruling 2026-11-05]",
      "fix": "Name the record in the coach line's gloss (“39 days without a Notion journal entry”) or make the his_words block read the same journal; one sentence on the page saying which is which.",
      "fixture_bound": false
     },

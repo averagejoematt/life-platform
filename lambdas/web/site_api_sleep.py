@@ -471,29 +471,8 @@ def sleep_correlations(*, _g) -> dict:
             _g=_g,
         )
     )
-    # B2 — mood/journal → sleep (bidirectional). State-of-Mind valence as the mood proxy;
-    # empty (n=0 → watching) when mood/journal logging is stale.
-    mood = {}
-    # SoM daily valence lands on the apple_health partition as som_avg_valence
-    # (there is no separate state_of_mind partition).
-    for sm in _query_source("apple_health", d30, today):
-        dt = sm.get("date") or sm.get("sk", "").replace("DATE#", "")[:10]
-        v = _f(sm.get("som_avg_valence"))
-        if v is not None and dt:
-            mood[dt] = v
-    cards.append(
-        _corr_card(
-            "B2",
-            "Mood → sleep score",
-            "mood / valence",
-            "sleep score",
-            mood,
-            sleep_score,
-            lag=0,
-            note="Mood and sleep move together both ways — gated on active mood/journal logging; empty until entries accrue.",
-            _g=_g,
-        )
-    )
+    # B2 (retired) — mood → sleep read the State-of-Mind valence, private activity (owner ruling
+    # 2026-11-05, common.activity_publication): the card is omitted, not served empty.
     # B3 — day-of-week best duration. Not a Pearson pair; n=1/day at week one = noise.
     durations = {d: v["hours"] for d, v in wd.items() if v["hours"] is not None}
     dow: dict[int, list[float]] = {}

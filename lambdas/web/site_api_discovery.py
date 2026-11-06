@@ -20,7 +20,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
-from common import stats_core  # #1240: sanctioned stats implementation (ADR-105) — correlations
+from common import (
+    activity_publication as _activity_publication,  # owner rulings 2026-11-03/05: private metrics off the wire
+    stats_core,  # #1240: sanctioned stats implementation (ADR-105) — correlations
+)
 from common.metric_truth import steps_label  # #4630: the steps precedence label, from the registry facet
 from experiment import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
 from experiment.phase_filter import with_phase_filter  # ADR-058 / #946 / #1197
@@ -71,6 +74,10 @@ def hypotheses(*, _g) -> dict:
         # Hide explicitly-private hypotheses. Default is public for hypotheses
         # written by the IC-18 engine, which produces user-visible findings.
         if it.get("public") is False:
+            continue
+        # Owner rulings 2026-11-03/05: a hypothesis whose frozen spec names a private metric (a diary
+        # day, the journal's mood read) is omitted — its arm sizes count private days.
+        if not _activity_publication.hypothesis_is_public(it):
             continue
         hypotheses.append(
             {
@@ -163,7 +170,7 @@ def intelligence_summary(*, _g) -> dict:
             )
         )
         items = _decimal_to_float(resp.get("Items", []))
-        public_items = [it for it in items if it.get("public") is not False]
+        public_items = [it for it in items if it.get("public") is not False and _activity_publication.hypothesis_is_public(it)]
         summary["hypotheses"]["count"] = len(public_items)
         by_status: dict[str, int] = {}
         for it in public_items:
@@ -187,7 +194,7 @@ def intelligence_summary(*, _g) -> dict:
         items = _decimal_to_float(resp.get("Items", []))
         if items:
             record = items[0]
-            corrs = record.get("correlations", {})
+            corrs = _activity_publication.public_correlations(record.get("correlations", {}))
             summary["correlations"]["count"] = len(corrs) if isinstance(corrs, (dict, list)) else 0
             summary["correlations"]["last_week"] = record.get("sk", "").replace("WEEK#", "")
     except Exception as e:
@@ -442,7 +449,10 @@ def correlations(event: dict = None, *, _g) -> dict:
 
     # The compute lambda stores correlations as a dict (label → data).
     # Convert to list for the public API. Also supports legacy "pairs" list format.
-    raw_corrs = record.get("correlations", {})
+    # Owner rulings 2026-11-03/05: a pair naming a private metric (State-of-Mind valence, the diary
+    # session count, the journal-coded values count) is omitted, and the FDR correction re-run over the
+    # public pairs only (common.activity_publication.public_correlations).
+    raw_corrs = _activity_publication.public_correlations(record.get("correlations", {}))
     if isinstance(raw_corrs, list):
         # Legacy format: already a list
         pairs = raw_corrs

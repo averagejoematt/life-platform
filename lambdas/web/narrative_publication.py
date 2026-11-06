@@ -33,8 +33,8 @@ TWO HALVES, ONE DECISION. The row's provenance decides; two mechanisms enforce:
 
 The provenance record itself is removed from every narrative item, eligible or not — family names
 are not reader copy. The stored row is never touched: the owner's tools (MCP, Telegram) read the
-table directly. Per request, ``begin_request`` / ``annotate`` put the number of withheld rows on
-``_meta.withheld`` and the ``x-narrative-withheld`` header — counts, never a word or a source.
+table directly. Per request, ``begin_request`` / ``annotate`` count what was withheld and LOG it; the
+response carries no count (owner ruling 2026-11-05 — a served count moves with private writing).
 
 ``tests/test_narrative_publication_gate.py`` walks every public GET route against rows with
 private, unrecorded and public provenance and pins that the walk's public numbers are identical
@@ -48,12 +48,13 @@ import logging
 import re
 from typing import Any, Optional
 
-from common import narrative_provenance as NP
+from common import narrative_provenance as NP, prediction_publication as PP
+
+from web import call_publication  # owner ruling 2026-11-05: a non-eligible call's rows never reach a handler
 
 logger = logging.getLogger("site_api")
 
 PUBLICATION_KEY = "_publication"
-WITHHELD_HEADER = "x-narrative-withheld"
 WORDS_WITHHELD_KEY = "words_withheld"
 PUBLIC_WITHHELD_REASON = NP.PUBLIC_WITHHELD_REASON
 
@@ -446,25 +447,41 @@ class PublicationTable:
             raise AttributeError(name)
         return getattr(self._npg_table, name)
 
+    def _calls_lookup(self) -> Any:
+        return call_publication.make_lookup(self._npg_table)
+
     def query(self, **kwargs: Any) -> Any:
         pk = _requested_pk(
             kwargs.get("KeyConditionExpression"), kwargs.get("ExpressionAttributeValues"), kwargs.get("ExpressionAttributeNames")
         )
-        if pk is not None and not is_narrative_partition(pk) and not is_mixed_partition(pk):
+        narrative = pk is None or is_narrative_partition(pk) or is_mixed_partition(pk)
+        governed = PP.governs_partition(pk)  # owner ruling 2026-11-05: calls, asks, bets and the rows that name them
+        if not narrative and not governed:
             return self._npg_table.query(**kwargs)
-        resp = self._npg_table.query(**_with_gate_projection(kwargs))
-        return _gate_response(resp, "Items", pk, self._npg_strict)
+        kw = _with_gate_projection(kwargs) if narrative else kwargs
+        if governed:
+            resp = call_publication.query(self._npg_table, kw, pk, self._calls_lookup())
+        else:
+            resp = self._npg_table.query(**kw)
+        return _gate_response(resp, "Items", pk, self._npg_strict) if narrative else resp
 
     def scan(self, **kwargs: Any) -> Any:
-        return _gate_response(self._npg_table.scan(**_with_gate_projection(kwargs)), "Items", None, self._npg_strict)
+        resp = call_publication.scan(self._npg_table, _with_gate_projection(kwargs), self._calls_lookup())
+        return _gate_response(resp, "Items", None, self._npg_strict)
 
     def get_item(self, **kwargs: Any) -> Any:
         key = kwargs.get("Key") or {}
         pk = key.get("pk")
-        if pk is not None and not is_narrative_row(pk, key.get("sk")):
+        narrative = pk is None or is_narrative_row(pk, key.get("sk"))
+        governed = PP.kind_of(pk, key.get("sk")) is not None
+        if not narrative and not governed:
             return self._npg_table.get_item(**kwargs)
-        resp = self._npg_table.get_item(**_with_gate_projection(kwargs))
-        if isinstance(resp, dict) and isinstance(resp.get("Item"), dict):
+        kw = _with_gate_projection(kwargs) if narrative else kwargs
+        if governed:
+            resp = call_publication.get_item(self._npg_table, kw, self._calls_lookup())
+        else:
+            resp = self._npg_table.get_item(**kw)
+        if narrative and isinstance(resp, dict) and isinstance(resp.get("Item"), dict):
             resp = {**resp, "Item": gate_item(resp["Item"], pk, strict=self._npg_strict)}
         return resp
 
@@ -515,36 +532,27 @@ def scrub_payload(node: Any) -> Any:
 
 
 def annotate(response: Any) -> Any:
-    """The public API Lambda's last step (the wire half): empty every tainted string in the body,
-    and when this request withheld anything say so — header ``x-narrative-withheld`` and, on a JSON
-    object body with ``_meta``, ``_meta.withheld``. Counts only; never a word or a source."""
+    """The public API Lambda's last step (the wire half): empty every tainted string in the body.
+
+    What this request withheld is LOGGED, never served (owner ruling 2026-11-05: "Remove _meta.withheld
+    counts from public responses"). A count of withheld rows on the wire moves with how much private
+    writing exists — the number of journal-grounded coach notes is itself journal activity — so the
+    response carries no count, no header and no flag of its own; the server log keeps the numbers."""
     if not isinstance(response, dict) or response.get("isBase64Encoded"):
         return response
     out = dict(response)
     body = response.get("body")
-    parsed = None
+    before = _STATE["scrubbed"]
     if isinstance(body, str) and _TAINT_EXACT and body.lstrip()[:1] in ("{", "["):
         try:
             parsed = json.loads(body)
         except ValueError:
             parsed = None
         if parsed is not None:
-            before = _STATE["scrubbed"]
             parsed = scrub_payload(parsed)
             if _STATE["scrubbed"] != before:
                 out["body"] = json.dumps(parsed, default=str)
     n = withheld_count()
-    if not n and not _STATE["scrubbed"]:
-        return out
-    headers = dict(response.get("headers") or {})
-    headers[WITHHELD_HEADER] = str(n)
-    out["headers"] = headers
-    if parsed is None and isinstance(body, str) and body.lstrip()[:1] == "{":
-        try:
-            parsed = json.loads(body)
-        except ValueError:
-            parsed = None
-    if isinstance(parsed, dict) and isinstance(parsed.get("_meta"), dict):
-        parsed["_meta"]["withheld"] = {"narrative_rows": n, "texts": int(_STATE["scrubbed"]), "reason": PUBLIC_WITHHELD_REASON}
-        out["body"] = json.dumps(parsed, default=str)
+    if n or _STATE["scrubbed"]:
+        logger.info("[narrative_publication] withheld this request: narrative_rows=%d texts=%d", n, int(_STATE["scrubbed"]))
     return out
