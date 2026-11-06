@@ -457,10 +457,19 @@ def _publish(date_str: str, narrative: str, excerpt: str) -> dict:
     return {"statusCode": 200, "body": json.dumps({"date": date_str, "published": True, "bytes": len(audio)})}
 
 
+# Owner ruling 2026-11-06: "Audit the daily-debrief MP3s ... before authorizing publication." The debrief has no
+# approval step, so nothing airs until the owner authorises it: `force` does not lift this, only a reviewed change.
+PUBLICATION_HELD = True
+
+
 def lambda_handler(event: dict, context) -> dict:
     event = event or {}
     force = bool(event.get("force"))
     dry_run = bool(event.get("dry_run"))
+
+    if PUBLICATION_HELD and not dry_run:
+        logger.info("[debrief] publication held pending owner review — nothing generated or published")
+        return {"statusCode": 200, "body": json.dumps({"skipped": "publication_held"})}
 
     date_str = event.get("date") or _latest_computed_date()
     if not date_str:
