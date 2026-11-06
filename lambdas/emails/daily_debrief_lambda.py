@@ -151,9 +151,10 @@ def gather_facts(date_str: str) -> dict:
     if hs.get("tier0_total"):
         put("core_habits_done", _int(hs.get("tier0_done")))
         put("core_habits_total", _int(hs.get("tier0_total")))
-    if hs.get("tier1_total"):
-        put("stretch_habits_done", _int(hs.get("tier1_done")))
-        put("stretch_habits_total", _int(hs.get("tier1_total")))
+    # Owner rulings 2026-11-03/06: the tier-1 ("stretch") count is NOT voiced. The stored tier totals
+    # include the journal habits, which are private activity (common.activity_publication), so a
+    # published episode saying "N of M stretch habits" would move with whether he journaled. Tier 0
+    # holds no private habit and is kept.
     return facts
 
 
@@ -163,11 +164,18 @@ def _presence_signal() -> dict:
     record's `channel_detail` carries a real per-day `last_log_date` per manual channel,
     which is the honest per-generation-date availability map the #1699 gate needs — so
     the ONE read now feeds both the prompt block and the gate, with no second query."""
+    # Owner rulings 2026-11-03/06: the debrief is a public episode, so it steers on the record's PUBLIC
+    # projection (the journal channel excluded — the same sub-record /api/presence serves), never the
+    # full record. A record without one steers nothing.
+    from content.engagement_core import PUBLIC_PROJECTION_KEY
+
     try:
-        return table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        item = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
     except Exception as e:
         logger.warning("presence signal read failed (non-fatal): " + str(e))
         return {}
+    pub = item.get(PUBLIC_PROJECTION_KEY)
+    return pub if isinstance(pub, dict) else {}
 
 
 def _presence_block(sig: dict | None = None) -> str:

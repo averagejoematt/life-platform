@@ -76,11 +76,13 @@ def _sig(**kw):
 
 
 def _table_with_signal(sig):
-    """Serves STATE#current for the engagement_state partition, {} otherwise."""
+    """Serves STATE#current for the engagement_state partition, {} otherwise. The record carries the signal both at
+    the top level and as its PUBLIC projection (``public``) — the shape adaptive_mode writes — because the public
+    daily debrief steers on the projection only (owner rulings 2026-11-03/06)."""
 
     def _hook(_table, key, **_kw):
         if key.get("pk", "").endswith("SOURCE#engagement_state") and key.get("sk") == "STATE#current":
-            return {"Item": sig} if sig else {}
+            return {"Item": {**sig, "public": dict(sig)}} if sig else {}
         return {}
 
     return FakeDdbTable(get_item_hook=_hook)

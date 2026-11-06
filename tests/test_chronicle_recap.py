@@ -126,11 +126,11 @@ def test_a_verbatim_title_carrying_a_figure_is_not_a_raw_vital_4537(monkeypatch)
             "status": "published",
             "content_markdown": "Week two.",
         },
-        {"date": "2026-09-13", "week_number": 1, "title": "76% on Day Two", "status": "published", "content_markdown": "Week one."},
+        {"date": "2026-09-13", "week_number": 1, "title": "76% and 2/10", "status": "published", "content_markdown": "Week one."},
     ]
     ok = {
-        "story_so_far": 'Week 1, "76% on Day Two", is where the numbers first disagreed.',
-        "recent_beats": [{"week": 1, "date": "2026-09-13", "beat": 'The installment "76% on Day Two" set the tone.'}],
+        "story_so_far": 'Week 1, "76% and 2/10", is where the numbers first disagreed.',
+        "recent_beats": [{"week": 1, "date": "2026-09-13", "beat": 'The installment "76% and 2/10" set the tone.'}],
         "where_we_are_now": "",
         "threads_to_watch": [],
     }
@@ -138,11 +138,9 @@ def test_a_verbatim_title_carrying_a_figure_is_not_a_raw_vital_4537(monkeypatch)
     r = chron.build_recap(_data(prev=prev))
     assert r is not None and len(r["recent_beats"]) == 1
     # mutation control: a figure OUTSIDE the title still trips both guards, even beside a title
-    _mock_llm(monkeypatch, dict(ok, story_so_far='"76% on Day Two" came with recovery at 76%.'))
+    _mock_llm(monkeypatch, dict(ok, story_so_far='"76% and 2/10" came with recovery at 76%.'))
     assert chron.build_recap(_data(prev=prev)) is None
-    _mock_llm(
-        monkeypatch, dict(ok, story_so_far="Clean.", recent_beats=[dict(ok["recent_beats"][0], beat='"76% on Day Two" and 232 lbs.')])
-    )
+    _mock_llm(monkeypatch, dict(ok, story_so_far="Clean.", recent_beats=[dict(ok["recent_beats"][0], beat='"76% and 2/10" and 232 lbs.')]))
     assert chron.build_recap(_data(prev=prev))["recent_beats"] == []
     # a title that is NOT in the installment list gets no exemption
     _mock_llm(monkeypatch, dict(ok, story_so_far='Week 1, "81% and 3/10", landed.'))

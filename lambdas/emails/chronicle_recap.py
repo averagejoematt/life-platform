@@ -64,7 +64,7 @@ def _recap_contains_raw_vitals(text):
 
 def _mask_titles(text, titles):
     """#4537: blank out verbatim installment titles before the raw-vital check. A title is reader-approved, audited text
-    (the story-auditor passes it), so "76% on Day Two" quoted as a title is a name, not a vital. Only EXACT title strings
+    (the story-auditor passes it), so "76% and 2/10" quoted as a title is a name, not a vital. Only EXACT title strings
     from the installment list are masked, longest first; a figure anywhere else in the text still trips the guard."""
     out = text or ""
     for t in sorted({t for t in titles if t and len(t) > 2}, key=len, reverse=True):
