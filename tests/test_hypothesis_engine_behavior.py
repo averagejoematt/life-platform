@@ -38,6 +38,7 @@ from decimal import Decimal
 
 import pytest
 from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
+from public_variant_fixtures import public_habitify  # noqa: E402 — 2026-11-06: habit_pct counts public habits
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS = os.path.join(ROOT, "lambdas")
@@ -649,7 +650,7 @@ WRITER_TRUTH = {
     },
     "notion": {"enriched_mood": 7, "enriched_energy": 6, "enriched_stress": 3, "enriched_social_quality": "good"},
     "eightsleep": {"time_to_sleep_min": 14},
-    "habitify": {"habits": {"a": True, "b": True, "c": True, "d": False, "e": False}},
+    "habitify": public_habitify({"a": True, "b": True, "c": True, "d": False, "e": False}),
     "computed_metrics": {"diary_sessions": 1},
 }
 
@@ -767,7 +768,7 @@ class TestDataNarrative:
         assert rest["workout"] is False
 
     def test_habit_pct_is_the_completed_fraction_and_is_absent_when_nothing_is_tracked(self):
-        row = eng.build_data_narrative(_data({"habitify": {"habits": {"a": True, "b": True, "c": True, "d": False, "e": False}}}))[0]
+        row = eng.build_data_narrative(_data({"habitify": public_habitify({"a": True, "b": True, "c": True, "d": False, "e": False})}))[0]
         assert row["habit_pct"] == 0.6  # 3 of 5
         # No tracked habits is an absence, not a 0% adherence day (ADR-104).
         empty = eng.build_data_narrative(_data({"habitify": {"habits": {}}, "whoop": {"hrv": 70}}))[0]

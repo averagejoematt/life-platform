@@ -81,7 +81,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific
 from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibration ledger carries no provenance
-from health import eating_window  # #5099: THE eating window (charter nutrition.eating_window)
+from health import eating_window, habit_pct_public  # #5099: THE eating window; 2026-11-06: the public habit_pct
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from training import session_count  # #5387: THE session count + THE Zone 2 computation, per day
 
@@ -471,11 +471,11 @@ def build_data_narrative(data):
         # habit_pct calc (0-1 fraction) so the same concept means the same number
         # on both engines.
         hab = next((i for i in data.get("habitify", []) if i.get("date") == date), {})
-        if hab:
-            habits = hab.get("habits", {})
-            total = len(habits)
-            if total > 0:
-                row["habit_pct"] = sum(1 for v in habits.values() if v) / total
+        # Owner ruling 2026-11-06: over PUBLIC habits only (health.habit_pct_public, habit-pct-public-v1) — the
+        # Morning/Evening Journal habits never count; a day with no public habit has no value, never a 0.
+        _hab_pct = habit_pct_public.public_habit_pct(hab) if hab else None
+        if _hab_pct is not None:
+            row["habit_pct"] = _hab_pct
 
         # #1843: diary-day flag, from the daily-metrics-compute diary_sessions count.
         # Only set when the field is present (post-#1843 dates) — safe_float returns

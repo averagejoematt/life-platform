@@ -2232,6 +2232,7 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `pillar_relationships` | map | Relationships pillar (same structure) |
 | `pillar_consistency` | map | Consistency meta-pillar (same structure) |
 | `public` | map | **The PUBLIC variant** (owner ruling 2026-11-05, `lambdas/health/character_public.py`, method `character-public-v1`): the same record shape (`character_level`, `character_xp`, `character_mood`, `active_effects`, `level_events`, every `pillar_*`) computed by the same engine over PUBLIC inputs only, chained from the previous record's `public` (its own EMA/XP/streak/level state), plus `public_method_version`, `effective_from` (2026-09-06), `method_history`, `origin` (`live` \| `recomputed`), `computed_at`. Sleep/Movement/Nutrition/Metabolic carry method 1's raw score + components verbatim; Mind holds every non-public component out of sum and coverage; Relationships has no reading. Written beside the method-1 fields, never over them; absent when the chain it needs has no public variant (the live compute then fails closed). Every public reader reads it through `character_privacy.public_sheet` — never the method-1 fields, which stay the owner's (MCP, emails, coaches) |
+| `habit_scores_seen` | bool | Owner ruling 2026-11-06 (the computation-order defect): whether the compute saw the day's `habit_scores` record (Mind's habit components). Absent on records written before the fix |
 
 **Pillar sub-fields (each `pillar_*` map):**
 
@@ -2330,6 +2331,7 @@ Pearson correlations between 20 key metric pairs computed weekly over a 90-day r
 | `start_date` | string | Window start YYYY-MM-DD |
 | `end_date` | string | Window end YYYY-MM-DD |
 | `lookback_days` | number | Lookback window (default: 90) |
+| `metric_methods` | map | Owner rulings 2026-11-05/06: the versioned method behind each derived metric — `day_grade` (`day-grade-public-v1`, the day_grade record's public variant) and `habit_pct` (`habit-pct-public-v1`, public habits only, `lambdas/health/habit_pct_public.py`) |
 | `n_pairs` | number | Number of correlation pairs computed |
 | `correlations` | map | Per-pair results (see below) |
 | `computed_at` | string | ISO timestamp |

@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common import activity_publication  # owner ruling 2026-11-06: per-challenge public eligibility
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
@@ -316,6 +317,37 @@ def merge_journal_view(entries):
     return view or None
 
 
+# Owner ruling 2026-11-06 — the computation-order defect. Until then this compute ran at 09:30 PT and
+# daily-metrics-compute (the ONLY writer of the day's habit_scores) at 09:40 PT, so on every stored date of
+# the cycle Mind's habit components read a habit_scores record that did not exist yet and scored as
+# behavioral absence. The schedule now runs this compute at 09:43 PT (config/schedules.json, an owner CDK
+# deploy); this guard makes the order a checked dependency rather than a timing assumption: a missing
+# record is re-read for up to HABIT_SCORES_WAIT_S (the writer takes ~10 s) before the compute proceeds.
+HABIT_SCORES_WAIT_S = 30
+HABIT_SCORES_POLL_S = 5
+
+
+def await_habit_scores(date_str, *, wait_s=None, poll_s=None, sleep=time.sleep):
+    """The day's habit_scores record, waiting briefly for daily-metrics to write it. None after the wait
+    (logged as an error: the Mind habit components then score as absent — never silently)."""
+    if wait_s is None:  # only the scheduled run (yesterday's Pacific day, in the Lambda runtime) can be ahead of its writer
+        is_scheduled_day = date_str == (pacific_now().date() - timedelta(days=1)).isoformat()
+        wait_s = HABIT_SCORES_WAIT_S if is_scheduled_day and os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else 0
+    poll_s = HABIT_SCORES_POLL_S if poll_s is None else poll_s
+    waited = 0
+    while True:
+        rec = fetch_date("habit_scores", date_str)
+        if rec or waited >= wait_s:
+            break
+        sleep(poll_s)
+        waited += poll_s
+    if rec is None:
+        logger.error(f"[character] habit_scores for {date_str} absent after {waited}s — daily-metrics has not written it (order defect)")
+    elif waited:
+        logger.info(f"[character] habit_scores for {date_str} arrived after {waited}s")
+    return rec
+
+
 def _safe_float(rec, field):
     """Extract a float from a record, returning None on failure."""
     if rec and field in rec:
@@ -352,7 +384,7 @@ def assemble_data(yesterday_str):
     # dict-shaped journal view from the day's entries instead.
     data["journal_entries"] = fetch_journal_entries(yesterday_str)
     data["journal"] = merge_journal_view(data["journal_entries"])
-    data["habit_scores"] = fetch_date("habit_scores", yesterday_str)
+    data["habit_scores"] = await_habit_scores(yesterday_str)  # 2026-11-06: the order defect — see await_habit_scores
     # #962: daily_metrics_compute writes vice_streaks INSIDE the habit_scores
     # record; the engine's vice_control component and the Vice Shield effect
     # read a top-level key — lift it (it was never wired, permanently dead).
@@ -609,6 +641,10 @@ CHALLENGE_DOMAIN_TO_PILLAR = {
 }
 
 
+# date -> {pillar: xp} of the public-eligible challenges credited that date (read by store_sheet, same invocation)
+PUBLIC_CHALLENGE_BONUS: dict = {}
+
+
 def collect_challenge_bonus(yesterday_str):
     """Challenges completed on the target date, not yet XP-consumed.
 
@@ -619,6 +655,7 @@ def collect_challenge_bonus(yesterday_str):
     to AFTER the record store succeeds (a failed store no longer eats the XP).
     """
     bonus = {}
+    public_bonus = {}  # owner ruling 2026-11-06: only public-eligible challenges' XP enters the public variant
     items = []
     try:
         from boto3.dynamodb.conditions import Key as _Key
@@ -640,11 +677,14 @@ def collect_challenge_bonus(yesterday_str):
                 xp = int(d2f(ch.get("character_xp_awarded", 0)))
                 pillar = CHALLENGE_DOMAIN_TO_PILLAR.get(ch.get("domain", "general"), "consistency")
                 bonus[pillar] = bonus.get(pillar, 0) + xp
+                if activity_publication.challenge_is_public(ch):
+                    public_bonus[pillar] = public_bonus.get(pillar, 0) + xp
                 items.append(ch)
                 logger.info(f"[character]   CHALLENGE XP: +{xp} to {pillar} from '{ch.get('name', '?')}' ({ch.get('domain', '?')})")
     except Exception as _ch_err:
         logger.warning(f"[character] Challenge XP collection failed (non-fatal): {_ch_err}")
         return {}, []
+    PUBLIC_CHALLENGE_BONUS[yesterday_str] = public_bonus
     return bonus, items
 
 
@@ -720,6 +760,7 @@ def store_sheet(record, data, previous_state, history_records, config):
     the sheet stores without it and every public surface fails closed for the date until
     ``scripts/backfill_public_variant.py`` fills the chain. A failure computing it never costs the method-1 store."""
     try:
+        data = dict(data, public_challenge_bonus_xp=PUBLIC_CHALLENGE_BONUS.get(record.get("date"), {}))
         reason = character_public.attach_public_variant(record, data, previous_state, history_records, config)
         if reason:
             logger.error("[character][public] no public variant for %s — %s (public surfaces fail closed)", record.get("date"), reason)
@@ -727,6 +768,7 @@ def store_sheet(record, data, previous_state, history_records, config):
         record.pop(character_public.PUBLIC_KEY, None)
         record.pop("public_progression_transitions", None)
         logger.error("[character][public] public variant failed for %s (method 1 stored without it): %s", record.get("date"), e)
+    record["habit_scores_seen"] = bool(data.get("habit_scores"))  # 2026-11-06: did Mind see the day's habit scores
     return character_engine.store_character_sheet(table, USER_PREFIX, record)
 
 
@@ -825,6 +867,7 @@ def publish_site_stats(record, yesterday_str, history_depth):
                 "level": float(record.get(f"pillar_{p}", {}).get("level", 1)),
                 "raw_score": float(record.get(f"pillar_{p}", {}).get("raw_score", 0)),
                 "tier": record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
+                "not_instrumented": bool(record.get(f"pillar_{p}", {}).get("not_instrumented", False)),  # 2026-11-06
                 "xp_delta": float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
                 "challenge_bonus_xp": float(record.get(f"pillar_{p}", {}).get("challenge_bonus_xp", 0)),
                 "trend": "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",

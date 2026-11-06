@@ -2196,6 +2196,13 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/content/recap_data.py",
+      "partition": "day_grade",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
       "partition": "habit_scores",
       "via": "local-seam"
     },
@@ -6755,7 +6762,7 @@
       "module": "lambdas/compute/character_sheet_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 9 * * ? *)",
+          "expr": "cron(43 9 * * ? *)",
           "key": "character-sheet-compute",
           "resolution": "table",
           "tz": "America/Los_Angeles"
@@ -8253,7 +8260,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 788,
+      "edges": 789,
       "lambdas": 107,
       "mcp_tool_modules": 39,
       "mcp_tools": 90,
@@ -8267,9 +8274,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 394,
-        "sites_resolved": 989,
-        "sites_total": 1383
+        "sites_dynamic": 395,
+        "sites_resolved": 991,
+        "sites_total": 1386
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -9279,9 +9286,9 @@
       "utc": null
     },
     {
-      "expr": "cron(30 9 * * ? *)",
+      "expr": "cron(43 9 * * ? *)",
       "lambda": "character-sheet-compute",
-      "local": "09:30",
+      "local": "09:43",
       "resolution": "table",
       "stack": "compute_stack",
       "tz": "America/Los_Angeles",

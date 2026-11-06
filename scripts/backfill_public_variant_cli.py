@@ -19,6 +19,7 @@ from typing import Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import backfill_public_variant as B  # noqa: E402
+import backfill_public_variant_report as R  # noqa: E402
 from common.numeric import decimals_to_float  # noqa: E402
 from health import character_privacy, character_public  # noqa: E402
 
@@ -177,8 +178,11 @@ def character_rows(snap: dict, char: dict) -> list:
                 "presence": char[d].get("presence"),
                 "method1_replay_mismatches": char[d].get("fidelity"),
                 "sick_day_frozen_from": char[d].get("sick_day_frozen_from"),
+                "order_fix": char[d].get("order_fix"),
             }
         )
+        changed = any(rows[-1][f][0] != rows[-1][f][1] for f in ("character_level", "character_xp", "mind_level", "consistency_level"))
+        rows[-1]["reasons"] = R.character_reasons(m1, pub, char[d].get("order_fix"), changed)
     return rows
 
 
@@ -212,6 +216,7 @@ def grade_rows(snap: dict, grades: dict) -> list:
                     pub.get("letter_grade") if pub.get("total_score") is not None else None,
                 ],
                 "notes": g["notes"],
+                "reasons": R.grade_reasons(item, g["habits"]),
             }
         )
     return rows
@@ -286,6 +291,17 @@ def _with_public_grades(series: dict, grades: dict) -> dict:
     return series
 
 
+def _as_method1(series: dict, snap: dict, habitify: dict) -> dict:
+    """The series as method 1 computed it: the stored method-1 day grade and the all-habits habit_pct."""
+    from health import habit_pct_public
+
+    for d, m in series.items():
+        cm = snap["computed"].get(d) or {}
+        m["day_grade"] = float(cm["day_grade_score"]) if cm.get("day_grade_score") is not None else None
+        m["habit_pct"] = habit_pct_public.method1_habit_pct(habitify.get(d)) if habitify.get(d) else None
+    return series
+
+
 def correlation_aggregates(table, snap: dict, grades: dict) -> dict:
     """/api/correlations' day-grade pairs and /api/what_changed's day-grade monthly delta, recomputed over the stored
     window both ways (method-1 series vs public series), beside the stored (served) values."""
@@ -300,12 +316,10 @@ def correlation_aggregates(table, snap: dict, grades: dict) -> dict:
     }
     if not (start and end):
         return out
+    habitify = _dated(query_all(table, B.PFX + "habitify", f"DATE#{B.shift(end, -150)}", f"DATE#{end}~"))
     series_pub = _with_public_grades(wcc.assemble_daily_series(start, end), grades)
-    series_m1 = copy.deepcopy(series_pub)
-    for d, m in series_m1.items():
-        cm = snap["computed"].get(d) or {}
-        m["day_grade"] = float(cm["day_grade_score"]) if cm.get("day_grade_score") is not None else None
-    pairs = [p for p in wcc.CORRELATION_PAIRS if "day_grade" in (p[0], p[1])]
+    series_m1 = _as_method1(copy.deepcopy(series_pub), snap, habitify)
+    pairs = [p for p in wcc.CORRELATION_PAIRS if {"day_grade", "habit_pct"} & {p[0], p[1]}]
     a, b = wcc.compute_correlations(series_m1), wcc.compute_correlations(series_pub)
     served = latest.get("correlations") or {}
     out["pairs"] = {
@@ -318,16 +332,13 @@ def correlation_aggregates(table, snap: dict, grades: dict) -> dict:
     }
     wc = decimals_to_float(table.get_item(Key={"pk": B.PFX + "what_changed", "sk": "SNAPSHOT#current"}).get("Item") or {})
     wc_end = wc.get("window_end") or end
-    metric = [m for m in wcc._MONTH_DELTA_METRICS if m[0] == "day_grade"]
+    metric = [m for m in wcc._MONTH_DELTA_METRICS if m[0] in ("day_grade", "habit_pct")]
     lo = B.shift(wc_end, -60)
     s_pub = _with_public_grades(wcc.assemble_daily_series(lo, wc_end), grades)
-    s_m1 = copy.deepcopy(s_pub)
-    for d, m in s_m1.items():
-        cm = snap["computed"].get(d) or {}
-        m["day_grade"] = float(cm["day_grade_score"]) if cm.get("day_grade_score") is not None else None
+    s_m1 = _as_method1(copy.deepcopy(s_pub), snap, habitify)
     out["what_changed_day_grade"] = {
         "window_end": wc_end,
-        "served": [x for x in wc.get("deltas") or [] if x.get("metric") == "day_grade"],
+        "served": [x for x in wc.get("deltas") or [] if x.get("metric") in ("day_grade", "habit_pct")],
         "recomputed_method1": wcc.compute_month_deltas(s_m1, wc_end, metrics=metric),
         "recomputed_public": wcc.compute_month_deltas(s_pub, wc_end, metrics=metric),
     }
@@ -529,6 +540,15 @@ def main(argv: list) -> int:
     }
     manifest["correlations_and_what_changed"] = correlation_aggregates(table, snap, grades)
     manifest["latest_surfaces"] = latest_surfaces(snap, char)
+    h_rows = R.habit_pct_rows(snap["habitify"], snap["profile"].get("habit_registry") or {})
+    manifest["habit_pct"] = {"method_version": R.habit_pct_public.METHOD_VERSION, "rows": h_rows}
+    manifest["reasons_legend"] = R.REASONS
+    manifest["historical_invariance"] = R.historical_invariance(snap, config, run_ts)
+    manifest["public_habit_evidence"] = R.habit_evidence(snap, char, config)
+    ledger = R.ledger_rows(c_rows, g_rows, h_rows, snap, run_ts)
+    with open(os.path.join(args.out, "correction_ledger.jsonl"), "w", encoding="utf-8") as fh:
+        fh.writelines(json.dumps(row, sort_keys=True, default=str) + "\n" for row in ledger)
+    manifest["correction_ledger"] = {"rows": len(ledger), "file": "correction_ledger.jsonl", "format": R.LEDGER_VERSION}
     if not args.skip_routes:
         manifest["routes"] = route_outputs(table, snap, char, receipts)
     plan = B.plan_writes(char, grades, set(snap["receipts"]), receipts)

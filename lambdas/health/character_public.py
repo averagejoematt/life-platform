@@ -77,19 +77,60 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
     mind = ((cfg.get("pillars") or {}).get("mind") or {}).get("components")
     if isinstance(mind, dict):
         cfg["pillars"]["mind"]["components"] = {k: v for k, v in mind.items() if mind_component_is_public(k)}
+        cfg["pillars"]["mind"]["not_instrumented_note"] = UNAVAILABLE_NOTE
     return cfg
 
 
+# Owner ruling 2026-11-06: "Missing data must not be represented as a genuine zero score. If no public-eligible Mind
+# measurements are available, use an explicit unavailable/insufficient-data state rather than reporting a misleading
+# 0.0." The unavailable state is the engine's existing no-signal state (`not_instrumented`): no XP judgment, levels
+# frozen, out of the route composite, and out of the headline mean while the pillar has never earned a level.
+UNAVAILABLE_NOTE = "Insufficient public data: no public-eligible Mind measurement was recorded for this day."
+# Habit components whose `absent` flag means their INPUT RECORD was missing (no habit_scores record, or no known
+# core habit) — missing data, never a behavioral zero, in the public method.
+RECORD_BACKED_COMPONENTS = ("t0_habit_compliance", "t1_habit_compliance")
+# A component whose zero is an EMPTY LOG (no reading session in the window): counted inside a measured day, but on
+# its own it is no measurement.
+EMPTY_LOG_COMPONENTS = ("reading_practice",)
+
+
+def habit_components_public(habit_method: Optional[str]) -> bool:
+    """Habit compliance may enter a public score only when the day's habit score came from the core-12 set and every
+    core basis reads a public family (owner ruling 2026-11-06: the evening check-in's PRESENCE is classified
+    `evening_checkin_presence`, public) — fail closed otherwise."""
+    from health import core_habits
+
+    return habit_method == CORE_SET_METHOD and all(activity_publication.core_basis_is_public(b) for b in core_habits.BASES)
+
+
+def _is_measurement(name: str, score: Any) -> bool:
+    return score is not None and (name not in EMPTY_LOG_COMPONENTS or float(score) > 0)
+
+
 def public_mind(method1_details: Optional[dict[str, Any]], habit_method: Optional[str], cfg_public: dict[str, Any]) -> tuple:
-    """Mind's (raw, details) from the day's method-1 component scores, public components only (config order)."""
-    comps = ((cfg_public.get("pillars") or {}).get("mind") or {}).get("components") or {}
+    """Mind's (raw, details) from the day's component scores, public components only (config order). A habit
+    component whose input record was missing is missing data (out of the sum, still in the coverage denominator),
+    not a zero; with no public measurement at all the pillar is UNAVAILABLE (the engine's no-signal shape)."""
+    comps = dict(((cfg_public.get("pillars") or {}).get("mind") or {}).get("components") or {})
     scores: dict[str, Any] = {}
-    for name in comps:
-        if name in CORE_SET_ONLY_COMPONENTS and habit_method != CORE_SET_METHOD:
+    for name in list(comps):
+        if name in CORE_SET_ONLY_COMPONENTS and not habit_components_public(habit_method):
             continue
+        if name in RECORD_BACKED_COMPONENTS and habit_method == CORE_SET_METHOD and not habit_components_public(habit_method):
+            continue  # a core-set day whose bases are not all public: no habit share in a public score
         d = (method1_details or {}).get(name)
-        if isinstance(d, dict):  # a component method 1 did not compute that day stays out, as it did there
+        if not isinstance(d, dict):  # a component method 1 did not compute that day stays out, as it did there
+            continue
+        if d.get("absent") and name in RECORD_BACKED_COMPONENTS:
+            scores[name] = None
+            comps[name] = dict(comps[name], behavioral=False) if isinstance(comps[name], dict) else comps[name]
+        else:
             scores[name] = None if d.get("absent") else d.get("score")
+    if not any(_is_measurement(n, s) for n, s in scores.items()):
+        comps = {n: (dict(c, behavioral=False) if isinstance(c, dict) else c) for n, c in comps.items()}
+        raw, details = character_engine._weighted_pillar_score({n: None for n in scores}, comps)
+        details["_insufficient_data"] = True
+        return raw, details
     return character_engine._weighted_pillar_score(scores, comps)
 
 
@@ -121,11 +162,13 @@ def public_histories(public_history: list) -> dict[str, list]:
     return out
 
 
-def public_challenge_bonus(method1: dict[str, Any]) -> dict[str, Any]:
-    """The day's challenge XP when challenges are a public source, else nothing."""
+def public_challenge_bonus(challenge_bonus: Optional[dict[str, Any]]) -> dict[str, Any]:
+    """The day's PUBLIC challenge XP ({pillar: xp} of the challenges ``activity_publication.challenge_is_public``
+    passed — owner ruling 2026-11-06), when challenges are a public source. The stored method-1 aggregate is never
+    used: it does not say which challenges it came from (fail closed)."""
     if not activity_publication.source_is_public(CHALLENGES_SOURCE):
         return {}
-    return dict(method1.get("challenge_bonus_xp") or {})
+    return {k: v for k, v in (challenge_bonus or {}).items() if v}
 
 
 def public_presence(rec: Any) -> tuple:
@@ -192,6 +235,7 @@ def compute_public_variant(
     engagement: Optional[dict[str, Any]] = None,
     habit_method: Optional[str] = None,
     vice_streaks: Optional[dict[str, Any]] = None,
+    challenge_bonus: Optional[dict[str, Any]] = None,
     origin: str = "live",
     computed_at: Optional[str] = None,
 ) -> tuple:
@@ -217,7 +261,7 @@ def compute_public_variant(
     prev_cs = (m1.get("pillar_consistency") or {}).get("components")
     data: dict[str, Any] = {"date": date, "precomputed_pillars": pre, "engagement_state": engagement, "vice_streaks": vice_streaks}
     data.update(consistency_inputs(prev_cs, hist, date))
-    bonus = public_challenge_bonus(m1)
+    bonus = public_challenge_bonus(challenge_bonus)
     if bonus:
         data["challenge_bonus_xp"] = bonus
     prev = character_engine._from_decimal(prev_public) if prev_public else None
@@ -271,6 +315,7 @@ def attach_public_variant(
         engagement=engagement,
         habit_method=hs.get("scoring_method") if isinstance(hs, dict) else None,
         vice_streaks=data.get("vice_streaks"),
+        challenge_bonus=data.get("public_challenge_bonus_xp"),
         origin="live",
     )
     record[PUBLIC_KEY] = block

@@ -67,9 +67,9 @@ def test_every_producer_runs_before_the_brief_on_both_sides_of_the_change():
     wall clock in the one platform zone since ADR-165, so producers and the brief move together and
     the 30-minute lead holds in both halves of the year."""
     producers = {
-        "character-sheet-compute": "cron(30 9 * * ? *)",
         "adaptive-mode-compute": "cron(35 9 * * ? *)",
         "daily-metrics-compute": "cron(40 9 * * ? *)",
+        "character-sheet-compute": "cron(43 9 * * ? *)",  # 2026-11-06: after daily-metrics (it reads the day's habit_scores)
         "daily-insight-compute": "cron(45 9 * * ? *)",
     }
     brief = schedule_rows.rows()["daily-brief"]

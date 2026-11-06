@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 import weekly_correlation_compute_lambda as wc  # noqa: E402
 from common import compute_metadata, stats_core  # noqa: E402
 from experiment import experiment_gates  # noqa: E402
+from public_variant_fixtures import public_habitify  # noqa: E402 — 2026-11-06: habit_pct counts public habits
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Hand-written fakes (no MagicMock anywhere — see module docstring)
@@ -465,7 +466,7 @@ class TestAssembleDailySeries:
                         {"date": "2026-05-01", "total_calories_kcal": 2400, "total_protein_g": 190, "total_carbs_g": 250, "total_fat_g": 80}
                     ],
                     "apple_health": [{"date": "2026-05-01", "steps": 11000, "blood_glucose_cv": 17.5, "som_avg_valence": 0.4}],
-                    "habitify": [{"date": "2026-05-01", "habits": {"a": True, "b": True, "c": False, "d": False}}],
+                    "habitify": [public_habitify({"a": True, "b": True, "c": False, "d": False}, date="2026-05-01")],
                     "computed_metrics": [
                         {
                             "date": "2026-05-01",

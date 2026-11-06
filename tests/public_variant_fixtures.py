@@ -29,3 +29,13 @@ def with_public(record, origin="recomputed"):
 
 def all_with_public(records):
     return [with_public(r) for r in records]
+
+
+def public_habitify(habits, **extra):
+    """A Habitify day row whose habits are all classified PUBLIC by identity (owner ruling 2026-11-06: habit_pct counts
+    public habits only, and a habit is public by its stored Habitify id). Synthetic names, real public ids."""
+    from common import activity_publication
+
+    ids = sorted(activity_publication.PUBLIC_HABIT_IDS)
+    statuses = {name: {"habit_id": ids[i]} for i, name in enumerate(habits)}
+    return dict(extra, habits=dict(habits), habit_statuses=statuses)

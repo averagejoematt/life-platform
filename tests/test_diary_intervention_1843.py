@@ -41,6 +41,7 @@ with mock.patch("boto3.resource"), mock.patch("boto3.client"):
 
 import weekly_correlation_compute_lambda as wc  # noqa: E402
 from common import compute_metadata  # noqa: E402
+from public_variant_fixtures import public_habitify  # noqa: E402 — 2026-11-06: habit_pct counts public habits
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AC1 — compute_diary_sessions() + store_computed_metrics()
@@ -219,7 +220,7 @@ def test_gather_data_sources_include_computed_metrics():
 
 
 def test_build_data_narrative_extracts_habit_pct():
-    data = {"habitify": [{"date": "2026-07-20", "habits": {"a": True, "b": True, "c": False, "d": True}}]}
+    data = {"habitify": [public_habitify({"a": True, "b": True, "c": False, "d": True}, date="2026-07-20")]}
     rows = eng.build_data_narrative(data)
     row = next(r for r in rows if r["date"] == "2026-07-20")
     assert row["habit_pct"] == 0.75
@@ -233,8 +234,8 @@ def test_build_data_narrative_extracts_diary_day_including_honest_zero():
         ],
         # A second source so both dates clear the "more than just date" row filter.
         "habitify": [
-            {"date": "2026-07-20", "habits": {"a": True}},
-            {"date": "2026-07-21", "habits": {"a": True}},
+            public_habitify({"a": True}, date="2026-07-20"),
+            public_habitify({"a": True}, date="2026-07-21"),
         ],
     }
     rows = eng.build_data_narrative(data)
@@ -247,7 +248,7 @@ def test_build_data_narrative_diary_day_absent_pre_1843():
     """A date with no computed_metrics row at all (pre-#1843, or the field genuinely
     wasn't computed) must NOT get a fabricated diary_day — it's an unmeasured gap,
     distinct from an honest 0-session day."""
-    data = {"habitify": [{"date": "2026-07-20", "habits": {"a": True}}]}
+    data = {"habitify": [public_habitify({"a": True}, date="2026-07-20")]}
     rows = eng.build_data_narrative(data)
     row = next(r for r in rows if r["date"] == "2026-07-20")
     assert "diary_day" not in row

@@ -79,6 +79,10 @@ def as_stored(obj: Any, precision: Optional[int] = 4) -> Any:
     return decimals_to_float(floats_to_decimal(obj, precision=precision))
 
 
+def _r(x: Any) -> Optional[float]:
+    return None if x is None else round(float(x), 4)
+
+
 def shift(d: str, days: int) -> str:
     return (date.fromisoformat(d) + timedelta(days=days)).isoformat()
 
@@ -123,6 +127,38 @@ def _engine_inputs(m1: dict, habit_scores: dict) -> tuple:
     return habit_method, vice
 
 
+ORDER_FIX_COMPONENTS = ("t0_habit_compliance", "t1_habit_compliance", "vice_control")
+
+
+def order_fixed_inputs(m1: dict, habit_scores: dict, config: dict) -> tuple:
+    """(m1 with Mind's habit components as the FIXED order would have scored them, habit_method, vice_streaks, info).
+
+    Owner ruling 2026-11-06: the compute ran 10 minutes before daily-metrics wrote the day's habit_scores, so every
+    stored Mind scored its habit components as absent. The fixed order reads the record daily-metrics writes at 09:40
+    PT. That exact write is NOT stored: daily-metrics re-runs at 17:00 PT and overwrites it (and a later recompute can
+    overwrite again), so the reconstruction reads the record AS STORED — the same day's habits, possibly with check-ins
+    logged between 09:40 and the overwrite. The engine's own compute_mind_raw scores it (never a re-implementation);
+    with no stored record the components stay absent, as the fixed order would also have seen."""
+    d = day_of(m1)
+    hs = habit_scores.get(d)
+    info = {
+        "habit_scores_present": bool(hs),
+        "habit_scores_computed_at": (hs or {}).get("computed_at"),
+        "scoring_method": (hs or {}).get("scoring_method"),
+    }
+    if not hs:
+        return m1, None, None, info
+    vice = hs.get("vice_streaks") or None
+    _raw, det = character_engine.compute_mind_raw({"habit_scores": hs, "vice_streaks": vice}, config)
+    out = copy.deepcopy(m1)
+    comps = ((out.get("pillar_mind") or {}).get("components")) or {}
+    for name in ORDER_FIX_COMPONENTS:
+        if name in det:
+            comps[name] = det[name]
+    info["restored"] = {n: (det.get(n) or {}).get("score") for n in ORDER_FIX_COMPONENTS if n in det}
+    return out, hs.get("scoring_method"), vice, info
+
+
 def method1_replay(m1: dict, records: dict, engagement: dict, habit_scores: dict, config: dict) -> list:
     """FIDELITY CONTROL: the stored method-1 pillars through the same chain from the stored method-1 state. Returns
     the fields where the replay does not reproduce the stored record ([] = the replay machinery is faithful)."""
@@ -147,7 +183,7 @@ def method1_replay(m1: dict, records: dict, engagement: dict, habit_scores: dict
     return diffs
 
 
-def replay_character(records: dict, engagement: dict, habit_scores: dict, config: dict, run_ts: str) -> dict:
+def replay_character(records: dict, engagement: dict, habit_scores: dict, config: dict, run_ts: str, order_fix: bool = True) -> dict:
     """{date: {"public": block-as-stored, "transitions": ..., "presence": ..., "fidelity": [...]}} oldest first.
 
     ``records`` holds every VISIBLE stored method-1 record by date (floats). The public chain lives in its own map: a
@@ -173,9 +209,12 @@ def replay_character(records: dict, engagement: dict, habit_scores: dict, config
         prev_public = character_privacy.public_view(public_records.get(day_of(prev))) if prev else None
         hist = [character_privacy.public_view(public_records.get(day_of(r))) for r in window_records(records, d)]
         presence, exact, why = character_public.public_presence(engagement.get(d))
-        habit_method, vice = _engine_inputs(m1, habit_scores)
+        if order_fix:
+            m1_in, habit_method, vice, order_info = order_fixed_inputs(m1, habit_scores, config)
+        else:
+            (habit_method, vice), m1_in, order_info = _engine_inputs(m1, habit_scores), m1, None
         block, transitions = character_public.compute_public_variant(
-            m1,
+            m1_in,
             prev_public,
             [h for h in hist if h],
             config,
@@ -193,6 +232,7 @@ def replay_character(records: dict, engagement: dict, habit_scores: dict, config
             "presence": {"exact": exact, "reason": why, "class": (presence or {}).get("presence_class")},
             "fidelity": method1_replay(m1, records, engagement, habit_scores, config),
             "chain_gaps": len(hist) - len([h for h in hist if h]),
+            "order_fix": order_info,
         }
     return out
 

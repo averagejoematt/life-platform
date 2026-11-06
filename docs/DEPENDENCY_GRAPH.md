@@ -23,7 +23,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `anomaly-detector` | compute_stack | `cron(5 8 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `between-chronicle` | email_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
 | `challenge-generator` | compute_stack | `cron(0 15 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
-| `character-sheet-compute` | compute_stack | `cron(30 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `character-sheet-compute` | compute_stack | `cron(43 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `chronicle-approve` | email_stack | `cron(0 11 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `chronicle-email-sender` | email_stack | `cron(10 8 ? * WED *)` (America/Los_Angeles, not UTC) | table |
 | `circadian-compliance` | compute_stack | `cron(0 19 * * ? *)` (America/Los_Angeles, not UTC) | table |
@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-788 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+789 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -150,7 +150,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `coach_vision` | — | coach_vision.py |
 | `computed_insights` | daily_brief_lambda.py, daily_insight_compute_lambda.py | daily_insight_compute_lambda.py, weekly_signal_lambda.py |
 | `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_discovery.py, site_api_habits.py, site_stats_refresh_lambda.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
-| `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py |
+| `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py |
 | `decisions` | — | site_api_thirdwall.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
 | `dexa` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
@@ -582,7 +582,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1383 total · 989 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1386 total · 991 resolved · 395 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 145 literal-named declarations across three idioms, 4 composite; routing digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only

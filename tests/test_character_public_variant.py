@@ -91,7 +91,13 @@ def _engagement(records):
 
 
 def _habit_scores(records):
-    return {d: {"scoring_method": "core_set_v1", "vice_streaks": {"No alcohol": 1.0}} for d in records}
+    """The habit_scores records the method-1 compute read (the same public inputs), as stored."""
+    out = {}
+    for i, d in enumerate(_days()):
+        if d in records:
+            pub = _public_inputs(i, d)
+            out[d] = dict(pub["habit_scores"], vice_streaks=pub["vice_streaks"])
+    return out
 
 
 def _replay(records):
@@ -372,11 +378,8 @@ def test_live_attach_matches_the_backfill_and_fails_closed_without_a_chain(histo
     rec = copy.deepcopy(private[d])
     prev = _stored(B.previous_record(private, d), p[days[14]]["public"])
     hist = [_stored(private[h], p[h]["public"]) for h in sorted(private) if B.shift(d, -21) <= h <= B.shift(d, -1)]
-    data = {
-        "engagement_state": _public_inputs(0, d)["engagement_state"],
-        "habit_scores": {"scoring_method": "core_set_v1"},
-        "vice_streaks": {"No alcohol": 1.0},
-    }
+    pub = _public_inputs(days.index(d), d)
+    data = {"engagement_state": pub["engagement_state"], "habit_scores": pub["habit_scores"], "vice_streaks": pub["vice_streaks"]}
     assert character_public.attach_public_variant(rec, data, prev, hist, CONFIG) is None
     live, back = dict(rec[B.PUBLIC]), dict(p[d]["public"])
     for k in ("computed_at", "origin"):

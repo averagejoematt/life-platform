@@ -80,6 +80,14 @@ def mind_overview(*, _g) -> dict:
                 "raw_score": float(mp.get("raw_score", 0)),
                 "tier": mp.get("tier", "Foundation"),
             }
+            if mp.get("not_instrumented"):  # owner ruling 2026-11-06: insufficient public data is a state, never a 0.0
+                mind_pillar = {
+                    "level": None,
+                    "raw_score": None,
+                    "tier": None,
+                    "state": "unavailable",
+                    "note": mp.get("not_instrumented_note"),
+                }
             break
 
     # ── 2. (retired) The State-of-Mind mood read (How We Feel check-ins) — private activity (owner

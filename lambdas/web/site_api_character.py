@@ -673,8 +673,10 @@ def character_stats(*, _g) -> dict:
         pd = record.get(f"pillar_{p}", {})
         pillars[p] = {
             "level": float(pd.get("level", 1)),
-            "raw_score": float(pd.get("raw_score", 0)),
+            # owner ruling 2026-11-06: an unavailable pillar (no measurement) serves no score, never a placeholder
+            "raw_score": None if pd.get("not_instrumented") else float(pd.get("raw_score", 0)),
             "tier": pd.get("tier", "Foundation"),
+            "not_instrumented": bool(pd.get("not_instrumented", False)),
         }
 
     # Pre-experiment: zeroed character

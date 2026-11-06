@@ -58,7 +58,7 @@ from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
 from experiment.phase_filter import source_reads_cross_phase  # #3444/#2109: per-source cross-phase decision
-from health import day_grade_public, glycemic  # #1406: glycemic-variability features; 2026-11-05: the public day grade
+from health import day_grade_public, glycemic, habit_pct_public  # #1406; 2026-11-05/06: the public day grade + habit_pct
 
 from compute import training_mins_series  # #5398: training_mins over THE session count, with its dated cut-over
 from compute.correlation_gloss import n_gate_gloss  # split out at the #1665 size ceiling (#1996)
@@ -316,13 +316,9 @@ def assemble_daily_series(start_date, end_date):
         metrics["diary_sessions"] = safe_float(cm, "diary_sessions")
 
         # ── Habits ────────────────────────────────────────────────────────
-        if hab:
-            habits = hab.get("habits", {})
-            done = sum(1 for v in habits.values() if v)
-            total = len(habits)
-            metrics["habit_pct"] = (done / total) if total > 0 else None
-        else:
-            metrics["habit_pct"] = None
+        # Owner ruling 2026-11-06: over PUBLIC habits only (health.habit_pct_public, habit-pct-public-v1) — the
+        # Morning/Evening Journal habits never count; a day with no public habit has no value, never a 0.
+        metrics["habit_pct"] = habit_pct_public.public_habit_pct(hab) if hab else None
 
         # ── Cross-domain (#1406) ──────────────────────────────────────────
         # Glucose variability = %CV. Prefer the ingestion-persisted CV (computed
@@ -602,6 +598,8 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
         "start_date": start_date,
         "end_date": end_date,
         "lookback_days": Decimal(str(LOOKBACK_DAYS)),
+        # Owner rulings 2026-11-05/06: the versioned methods behind the two derived metrics (the correction record)
+        "metric_methods": {"day_grade": day_grade_public.METHOD_VERSION, "habit_pct": habit_pct_public.METHOD_VERSION},
         "n_pairs": Decimal(str(len(correlations))),
         "correlations": _dec_correlations(correlations),
         "computed_at": computed_at,
