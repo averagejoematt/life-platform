@@ -405,7 +405,8 @@ def test_a_claim_the_dossier_filter_withholds_keeps_its_place_without_its_words(
     rows["sleep"].insert(0, row)
     body = _body(ledger.handle_ledger_export(_event(size=200), fetch=lambda: (rows, [], []), today=TODAY))
     got = next(i for i in body["items"] if i["prediction_id"] == "pred_20261030_withheld")
-    assert got["claim"] == "" and got["withheld"] is True and got["status"]
+    # Owner ruling 2026-11-06: the row reads like a row with no words — no `withheld` flag.
+    assert got["claim"] == "" and "withheld" not in got and got["status"]
     assert "fizzlewick" not in json.dumps(body)
 
 

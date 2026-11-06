@@ -252,19 +252,20 @@ def handle_coach_docket(event, *, _g):
     except Exception as _e:
         logger.warning(f"[coach_docket] {_e}")
     open_entries.sort(key=lambda e: (e.get("resolution_date") or "", e.get("topic_slug") or ""))
+    if withheld:  # owner ruling 2026-11-06: logged, never served — the count moves with private activity
+        logger.info(f"[coach_docket] {withheld} entr(ies) privacy-held (not served, not counted)")
     return _ok(
         {
             "open": open_entries,
             "resolved": resolved,
             "counts": {"open": len(open_entries), "resolved": len(resolved)},
-            "withheld": withheld,
             "disclosure": (
                 "Standing disagreements between AI coaches, each with skin in the game: the stake is the "
                 "coach's own Brier record, frozen when the docket opened. The resolution criterion and date "
                 "are agreed at open and graded by deterministic code against real data — no AI writes the "
                 "verdict, and lost disputes stay on the record next to the wins. Claims and concessions cross "
                 "the same standing privacy filter as the coach dossier before publishing; any hit withholds "
-                "the whole entry and this payload counts it."
+                "the whole entry, and withheld entries are not counted."
             ),
         },
         cache_seconds=300,

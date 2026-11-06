@@ -1423,6 +1423,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
     "notion": {
         "label": "Notion",
         "checker_label": "Notion journal",
+        # Owner ruling 2026-11-06: "Remove the Notion Journal source from public data_sources.json." The journal
+        # is private activity; the public catalogue (data_sources.json, stack.json, /gear/, the method page)
+        # does not name it. It is still ingested, frozen-checked and read by the owner's tools.
+        "catalog": False,
         "oauth": True,  # #1960: credentialed pull — auth can die, routes through auth_breaker
         "desc": "Journal entries",
         "category": "Inputs",

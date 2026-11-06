@@ -431,12 +431,13 @@ def test_a_read_whose_context_carried_a_private_family_is_withheld(dashboard):
 
     record = cop.updater_record(cop.pipeline_provenance("sleep_coach", SLEEP_DATA, **_blocks(data_inventory=data_inventory({}))))
     entry = dashboard(record)
-    assert entry["position_summary"] == "" and entry["position_summary_withheld"] == NP.PUBLIC_WITHHELD_REASON
+    # Owner ruling 2026-11-06: emptied, never marked — no `position_summary_withheld` beside it.
+    assert entry["position_summary"] == "" and "position_summary_withheld" not in entry
 
 
 def test_negative_control_the_same_read_without_a_stamp_is_withheld(dashboard):
     entry = dashboard(None)
-    assert entry["position_summary"] == "" and entry["position_summary_withheld"] == NP.PUBLIC_WITHHELD_REASON
+    assert entry["position_summary"] == "" and "position_summary_withheld" not in entry
 
 
 def test_a_read_from_an_unknown_block_is_withheld(dashboard):

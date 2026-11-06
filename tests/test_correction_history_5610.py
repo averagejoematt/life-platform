@@ -152,7 +152,9 @@ def test_a_held_row_holds_its_corrections(monkeypatch):
             r["claim_natural"] = "A call."
     monkeypatch.setattr(ledger.coach_dossier, "dossier_safe", lambda text: False)
     item = _by_pid(_items(rows))[pid]
-    assert item["withheld"] is True and item["corrections"] == [] and item["corrections_withheld"] == 1
+    # Owner ruling 2026-11-06: a privacy-held row's corrections travel with its words (not at all) and are
+    # not counted — no `withheld` flag, no `corrections_withheld`.
+    assert item["corrections"] == [] and "withheld" not in item and "corrections_withheld" not in item
 
 
 def test_a_journal_silenced_row_and_its_corrections_are_not_served():

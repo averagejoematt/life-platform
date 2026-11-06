@@ -537,6 +537,10 @@ def _retired_coach(ctx: LiveContext, pid: str, short: str, name: str) -> None:
     ctx.coach_ids.add(pid)
 
 
+# The one sentence every ledger row without words carries (owner ruling 2026-11-06: never a reason, never a mark).
+NO_WORDS_SENTENCE = "The words of this call are not published."
+
+
 def _live_ledger(ctx: LiveContext) -> None:
     """The whole prediction ledger from `/api/ledger_export` (Phase 3, #5537): one Prediction per
     row, id = coach · prediction_id (a prediction_id repeats across coaches). The grade, the
@@ -556,11 +560,11 @@ def _live_ledger(ctx: LiveContext) -> None:
             hold = r.get("unsourced") if isinstance(r.get("unsourced"), dict) else None
             if hold and isinstance(hold.get("text"), str) and hold["text"].strip():
                 claim_text, withheld = hold["text"].strip(), "unsourced"
-            elif r.get("withheld") or r.get("words_withheld"):  # words_withheld: the API's provenance gate (2026-11-03)
-                claim_text, withheld = "Not quoted: the words did not clear the privacy filter.", "privacy"
             else:
-                log(f"  ledger row {coach}:{pred} served with no claim text and no hold — not a publishable record, skipped")
-                continue
+                # Owner ruling 2026-11-06: the API no longer marks WHY a row has no words (no `withheld` /
+                # `words_withheld`), and neither does the page — every row without words reads the same,
+                # whatever kept them off the wire. The row keeps its place, its grade and its count.
+                claim_text, withheld = NO_WORDS_SENTENCE, "no_words"
         pid = _persona(coach)
         if pid not in ctx.coach_ids:
             if not r.get("retired"):

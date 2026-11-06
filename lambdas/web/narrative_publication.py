@@ -55,7 +55,6 @@ from web import call_publication  # owner ruling 2026-11-05: a non-eligible call
 logger = logging.getLogger("site_api")
 
 PUBLICATION_KEY = "_publication"
-WORDS_WITHHELD_KEY = "words_withheld"
 PUBLIC_WITHHELD_REASON = NP.PUBLIC_WITHHELD_REASON
 
 # ── which partitions hold AI-written narrative ─────────────────────────────────────────────
@@ -361,12 +360,10 @@ def gate_document(doc: Any) -> Any:
 
 
 def withheld_slot(entry: dict, item: Any, key: str, value: Any) -> None:
-    """Serve ``value`` (built from ``item``) as ``entry[key]`` — unless the gate withheld the row: then the
-    slot is "" and ``entry[key + "_withheld"]`` carries the neutral reason, the explicit withheld state."""
-    entry[key] = value
-    if is_withheld(item):
-        entry[key] = ""
-        entry[f"{key}_withheld"] = PUBLIC_WITHHELD_REASON
+    """Serve ``value`` (built from ``item``) as ``entry[key]`` — unless the gate withheld the row: then the slot
+    is "", exactly as a row with no words reads. No ``{key}_withheld`` marker (owner ruling 2026-11-06:
+    "Remove the per-item words_withheld flag" — a withheld item is never marked)."""
+    entry[key] = "" if is_withheld(item) else value
 
 
 def servable(text: Any) -> Any:
@@ -515,17 +512,10 @@ def scrub_payload(node: Any) -> Any:
             return ""
         return node
     if isinstance(node, dict):
-        out = {}
-        withheld_here = False
-        for k, v in node.items():
-            nv = v if (k in WIRE_SKIP_KEYS and isinstance(v, str)) else scrub_payload(v)
-            withheld_here = withheld_here or (isinstance(v, str) and v and nv == "")
-            out[k] = nv
-        if withheld_here and WORDS_WITHHELD_KEY not in out:
-            # The object keeps its place, numbers and grade; this flag tells a consumer its words
-            # were withheld on purpose (not missing), so it can print a hold instead of skipping it.
-            out[WORDS_WITHHELD_KEY] = True
-        return out
+        # The object keeps its place, numbers and grade; its emptied words read exactly like an object with
+        # no words. No flag says they were withheld (owner ruling 2026-11-06: "Remove the per-item
+        # words_withheld flag") — a mark would say which items rest on private or unrecorded sources.
+        return {k: (v if (k in WIRE_SKIP_KEYS and isinstance(v, str)) else scrub_payload(v)) for k, v in node.items()}
     if isinstance(node, list):
         return [scrub_payload(v) for v in node]
     return node
