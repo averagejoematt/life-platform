@@ -211,7 +211,7 @@ def running_inputs(sunday: str, strava: Optional[list], hevy: Optional[list], di
     from mcp import shared_quantities
 
     def _slice(source: str, start: str, end: str) -> list:
-        rows = strava if source == "strava" else hevy
+        rows = {"strava": strava, "hevy": hevy}.get(source)
         if rows is None:
             raise LookupError(f"{source} unread")
         return _rows_in(rows, start, end)
