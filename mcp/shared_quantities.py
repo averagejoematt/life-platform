@@ -30,6 +30,8 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
     sources  Strava Walk/Hike/Ride UNION Hevy treadmill/walking/cycling blocks
              (`training.walking_volume`, #3930);
     de-dup   in TIME, across devices and against Hevy sessions (`walking_volume.dedup_strava`).
+    gaps     a WHOOP walk workout or a completed walk habit with no counted walk is REPORTED
+             (`completeness.gaps`) and makes the total a floor — a signal, never hours.
     A longer window (get_benchmark's 28-day chronic read, which its bands are measured in) is
     the SAME definition over more days, divided by weeks — never a different source set.
 
@@ -168,6 +170,7 @@ def walking_layer(
         strava_items=_read("strava"),
         hevy_workouts=_read("hevy"),
         apple_items=_read_apple(read, start, end),  # #5369: the watch backstop
+        completeness_inputs={"whoop": _read("whoop"), "habitify": _read("habitify")},
     )
     layer["window"] = {"start": start, "end": end, "days": days}
     total = layer.get("total_hr")
@@ -212,6 +215,7 @@ def walking_layer_for_day(
         strava_items=_read("strava"),
         hevy_workouts=_read("hevy"),
         apple_items=_read_apple(read, day, day) if with_apple else walking_volume.NOT_WIRED,
+        completeness_inputs={"whoop": _read("whoop"), "habitify": _read("habitify")},
     )
     layer["window"] = {"start": day, "end": day, "days": 1}
     layer["hr_wk"] = None
