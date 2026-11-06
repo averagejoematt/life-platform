@@ -35,6 +35,8 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+from common import prediction_publication  # owner ruling 2026-11-06: private activity never publishes itself
+
 from content import story_checks
 
 # The literal the sweep logs when it refuses; a CloudWatch MetricFilter on it pages (cdk/stacks/monitoring_silence_alarms.py,
@@ -165,4 +167,7 @@ def blocking_items(item: Dict[str, Any]) -> List[str]:
         out.append("no stored text to audit")
     out += [f"reader surface: {f}" for f in story_checks.reader_surface(text)]
     out += weekday_mismatches(text, item.get("date") or str(item.get("sk", "")).replace("DATE#", ""))
+    if prediction_publication.words_name_private_activity(text):
+        # Owner ruling 2026-11-06: a draft that names private activity waits for him; it never publishes itself.
+        out.append("names private activity (journal, a self-report or an unnamed logging gap)")
     return out
