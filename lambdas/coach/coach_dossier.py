@@ -387,7 +387,8 @@ def apply_corrections(entries: list, corrections: list):
             if c.get("action") != "correct":
                 continue
             note_ok = dossier_safe(c.get("note"))
-            notes.append({"date": c.get("date"), "note": c.get("note") if note_ok else None, "note_withheld": not note_ok})
+            # A note the filter refuses reads like a correction with no note — never marked (owner ruling 2026-11-06).
+            notes.append({"date": c.get("date"), "note": (c.get("note") or None) if note_ok else None})
         if notes:
             e = {**e, "corrections": notes}
         kept.append(e)

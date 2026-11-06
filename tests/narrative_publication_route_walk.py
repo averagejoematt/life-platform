@@ -480,7 +480,7 @@ def walk(variant: str, ungated: bool = False) -> dict:
                 "position_summaries": [c.get("position_summary") for c in body.get("coaches") or []],
                 "withheld_slots": sum(1 for c in body.get("coaches") or [] if c.get("position_summary_withheld")),
                 "moves_lines": len(((body.get("moves") or {}).get("lines")) or []),
-                "moves_withheld": bool((body.get("moves") or {}).get("withheld")),
+                "moves_withheld": bool((body.get("moves") or {}).get("withheld")),  # owner ruling 2026-11-06: always False now
                 "meta_withheld": (body.get("_meta") or {}).get("withheld"),
                 "header": (resp.get("headers") or {}).get("x-narrative-withheld"),
             }

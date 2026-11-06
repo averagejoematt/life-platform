@@ -25,8 +25,8 @@ entries and the older writers' ``verdict_correction`` / ``respecified_*`` trails
 (``web.correction_history``, #5610, owner decision D 2026-11-02): original and corrected grade, the
 day each names, the recorded instant of the correction, a null publication day (never recorded),
 the stored reason verbatim and a plain-words explanation (``web.correction_rules``). A row with
-none is an empty list, not a missing key; a row whose words are held serves ``[]`` and
-``corrections_withheld: N``.
+none is an empty list, not a missing key; a row whose words are held serves ``[]`` (and, only when the
+hold is the public instrument hold ``unsourced``, ``corrections_withheld: N``).
 
     {items: [{prediction_id, coach_id, coach_name, retired, metric, claim, logged_date,
               due_date, settled_date, kind, status, confidence, sealed,
@@ -41,8 +41,9 @@ STORED status (e.g. ``refuted``) and carries ``classification_review: true`` + a
 verified count (``coach.classification_review``) and the page shows it as disputed beside the verdict.
 
 PRIVACY. A claim is served only when the dossier filter clears it (``coach_dossier.dossier_safe``,
-the same gate `/api/calls` and the docket apply); a withheld claim is ``""`` with
-``withheld: true`` — the row keeps its place and its grade, its words do not travel.
+the same gate `/api/calls` and the docket apply); a withheld claim is ``""`` and the row reads like a
+row with no words — no ``withheld`` flag and no count of its held corrections (owner ruling 2026-11-06).
+The row keeps its place and its grade; its words do not travel.
 
 THE JOURNAL'S SILENCE (#5131). The Lambda's last step before the wire drops every list element
 whose subtree speaks of the journal's silence (``common.journal_silence.guard_api_response``), and
@@ -242,13 +243,12 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
     corrections = corrections_of(row, logged)
     if withheld or held:
         # A row whose words are held keeps its place and its grade; its correction history is held with the
-        # words (the stored reasons and notes describe the claim) — counted, never silently absent.
-        if corrections:
+        # words (the stored reasons and notes describe the claim). Counted only beside the PUBLIC instrument
+        # hold; a privacy-held row carries no flag and no count (owner ruling 2026-11-06).
+        if corrections and held and not withheld:
             item["corrections_withheld"] = len(corrections)
     else:
         item["corrections"] = corrections
-    if withheld:
-        item["withheld"] = True
     if held:
         item["unsourced"] = held  # the same note shape /api/predictions, /api/calls and the docket serve
     if evaluation_hold.is_grading_held(row):

@@ -261,7 +261,7 @@ function coachDossierHTML(coach) {
   const dateLine = (date, extra) => `<span class="ce-date label">${esc(String(date || "").slice(0, 10))}${extra ? " · " + extra : ""}</span>`;
   const evLink = (e) => (e && e.evidence_link ? ` <a class="label" href="${esc(e.evidence_link)}">evidence ↗</a>` : "");
   const corrNotes = (e) => ((e && e.corrections) || []).map((c) =>
-    `<p class="cd-corr label">corrected by Matthew · ${esc(String(c.date || "").slice(0, 10))}${c.note ? ` — ${esc(c.note)}` : c.note_withheld ? " — note withheld by the privacy filter" : ""}</p>`).join("");
+    `<p class="cd-corr label">corrected by Matthew · ${esc(String(c.date || "").slice(0, 10))}${c.note ? ` — ${esc(c.note)}` : ""}</p>`).join("");
 
   let h = `<section class="bc-dossier"><p class="dx-kicker label">the dossier · what ${esc(first.toLowerCase())} knows — verbatim from memory</p>`;
 
@@ -319,9 +319,9 @@ function coachDossierHTML(coach) {
     h += `</ul>`;
   }
 
-  // The honesty ledger: withheld + retracted are disclosed, never silent.
+  // The honesty ledger: retractions are disclosed, never silent. Lines the privacy filter held are
+  // not counted here (owner ruling 2026-11-06: a count of them moves with private activity).
   const audit = [];
-  if (d.withheld) audit.push(`${d.withheld} line${d.withheld === 1 ? "" : "s"} withheld by the privacy filter`);
   if (d.retracted) audit.push(`${d.retracted} record${d.retracted === 1 ? "" : "s"} retracted by Matthew (each retraction is itself logged)`);
   if (audit.length) h += `<p class="cd-audit label">${esc(audit.join(" · "))}</p>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;

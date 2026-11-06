@@ -363,12 +363,21 @@ def test_apply_corrections_correct_attaches_dated_note():
 
 
 def test_apply_corrections_violating_note_is_withheld_but_dated():
-    kept, _ = cd.apply_corrections(
-        [{"record_id": "COMMITMENT#a", "date": "2026-07-20", "text": "x"}],
-        cd.dossier_corrections([_ledger_row("COMMITMENT#a", "correct", note="actually it was about fizzlewick")], "sleep_coach"),
-    )
-    n = kept[0]["corrections"][0]
-    assert n["note"] is None and n["note_withheld"] is True and n["date"]
+    """Owner ruling 2026-11-06: a refused note reads exactly like a correction with no note — dated, never
+    marked. Invariance: the violating note and an absent note give the same bytes (mutation control: a
+    clean note does show)."""
+
+    def corrected(note):
+        kept, _ = cd.apply_corrections(
+            [{"record_id": "COMMITMENT#a", "date": "2026-07-20", "text": "x"}],
+            cd.dossier_corrections([_ledger_row("COMMITMENT#a", "correct", note=note)], "sleep_coach"),
+        )
+        return kept[0]["corrections"][0]
+
+    n = corrected("actually it was about fizzlewick")
+    assert n["note"] is None and n["date"] and "note_withheld" not in n
+    assert json.dumps(n, sort_keys=True) == json.dumps(corrected(None), sort_keys=True)
+    assert corrected("the baseline cited was stale")["note"] == "the baseline cited was stale"
 
 
 def test_apply_corrections_retracts_the_relationship_singleton():
@@ -542,7 +551,7 @@ def test_site_dossier_withholds_seeded_violation_and_counts_it(monkeypatch):
     d = _dossier_via_api(monkeypatch)
     blob = json.dumps(d)
     assert "fizzlewick" not in blob
-    assert d["withheld"] >= 1
+    assert "withheld" not in d  # owner ruling 2026-11-06: held lines are not counted on the wire
 
 
 def test_site_dossier_withholds_a_pii_carrying_record_and_counts_it(monkeypatch):
@@ -562,7 +571,33 @@ def test_site_dossier_withholds_a_pii_carrying_record_and_counts_it(monkeypatch)
     )
     blob = json.dumps(d)
     assert "555-867-5309" not in blob
-    assert d["withheld"] >= 2  # the seeded vice row + this one
+    assert "withheld" not in d
+
+
+def test_site_dossier_is_byte_identical_however_many_lines_the_privacy_filter_holds(monkeypatch):
+    """Owner ruling 2026-11-06 ("eliminate values that disclose private activity"): vary ONLY the number of
+    commitments the privacy filter refuses (0, 1, 3 extra) and the served dossier is the same bytes.
+    Mutation control: one extra CLEAN commitment does move it."""
+
+    def held(i):
+        return {
+            "pk": "COACH#sleep_coach",
+            "sk": f"COMMITMENT#commit_2026072{i}_held",
+            "created_date": f"2026-07-2{i}",
+            "commitment_natural": f"text the partner at 555-867-530{i} every Sunday",
+            "status": "pending",
+        }
+
+    outs = {json.dumps(_dossier_via_api(monkeypatch, extra_commitments=[held(i) for i in range(n)]), sort_keys=True) for n in (0, 1, 3)}
+    assert len(outs) == 1
+    clean = {
+        "pk": "COACH#sleep_coach",
+        "sk": "COMMITMENT#commit_20260729_clean",
+        "created_date": "2026-07-29",
+        "commitment_natural": "lights out by 10:30 on weeknights",
+        "status": "pending",
+    }
+    assert json.dumps(_dossier_via_api(monkeypatch, extra_commitments=[clean]), sort_keys=True) not in outs
 
 
 def test_site_dossier_excludes_conversation_learnings_structurally(monkeypatch):
@@ -613,7 +648,7 @@ def test_site_dossier_zero_state_is_honest(monkeypatch):
     assert d["commitments"] == [] and d["learnings"] == [] and d["docket_positions"] == []
     assert d["relationship"] is None
     assert d["commitment_counts"]["held"] == 0
-    assert d["withheld"] == 0 and d["retracted"] == 0
+    assert "withheld" not in d and d["retracted"] == 0
 
 
 # ══════════════════════════════════════════════════════════════════════════════

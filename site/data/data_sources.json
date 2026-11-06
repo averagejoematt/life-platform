@@ -1,8 +1,8 @@
 {
   "_meta": {
     "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
-    "updated": "2026-11-05",
-    "count": 20
+    "updated": "2026-11-06",
+    "count": 19
   },
   "sources": [
     {
@@ -91,14 +91,6 @@
       "category": "Wearables",
       "metrics": "Sleep stages, HR/HRV, restlessness",
       "method": "API pull, 4x daily mornings",
-      "posture": "portfolio"
-    },
-    {
-      "id": "notion",
-      "name": "Notion",
-      "category": "Inputs",
-      "metrics": "Journal entries — the subjective layer",
-      "method": "API pull (journal database), 3x daily",
       "posture": "portfolio"
     },
     {

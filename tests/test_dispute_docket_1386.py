@@ -516,8 +516,13 @@ class TestAC4PublicSurface:
         body = self._body(sac.handle_coach_docket({}))
         assert body["open"] == []
         assert body["counts"]["open"] == 0
-        assert body["withheld"] == 1
+        assert "withheld" not in body  # owner ruling 2026-11-06: not counted on the wire
         assert "rs429358" not in json.dumps(body)
+        # Invariance: the payload with the held entry is the payload with no entry at all (the only
+        # difference between the two tables is the privately-held entry).
+        t.delete_item(Key={"pk": item["pk"], "sk": item["sk"]})
+        empty = self._body(sac.handle_coach_docket({}))
+        assert {k: v for k, v in empty.items() if k != "_meta"} == {k: v for k, v in body.items() if k != "_meta"}
 
     def test_docket_resolved_concession_violation_is_withheld_and_counted(self, api):
         # Same fail-closed floor on the RESOLVED side — a violating concession
@@ -542,7 +547,7 @@ class TestAC4PublicSurface:
         t.put_item(Item=item)
         body = self._body(sac.handle_coach_docket({}))
         assert body["resolved"] == []
-        assert body["withheld"] == 1
+        assert "withheld" not in body  # owner ruling 2026-11-06: not counted on the wire
         assert "rs429358" not in json.dumps(body)
 
     def test_lost_disputes_render_in_the_same_shape_as_wins(self, api, monkeypatch):

@@ -550,9 +550,16 @@ def _dossier_block(coach_id, *, _g):
     disclosure = (
         "Rendered verbatim from this coach's memory records — deterministic build, no AI in the "
         "render path. Every line carries its date. Lines that fail the standing privacy filter are "
-        "withheld and counted; records Matthew has retracted are removed and counted — the "
+        "not shown; records Matthew has retracted are removed and counted — the "
         "retraction itself is a logged correction, never a silent edit."
     )
+    # Owner ruling 2026-11-06 ("eliminate values that disclose private activity"): how many lines the
+    # privacy filter held, and how many learnings rest on calls that are not publication-eligible, move
+    # with private activity — logged here, never served.
+    if withheld or trail_counts.get("withheld"):
+        logger.info(
+            f"[dossier] {coach_id}: {withheld} line(s) privacy-held, {trail_counts.get('withheld', 0)} learning(s) not eligible (not served)"
+        )
     if degraded:
         disclosure += (
             " The corrections ledger could not be read for this request, so commitments, learnings, "
@@ -566,10 +573,9 @@ def _dossier_block(coach_id, *, _g):
         "commitment_counts": coach_dossier.commitment_counts(commitments),
         "learnings": learnings,
         # #5626: learnings shown at their corrected verdict, dropped as the ledger drops them, or unread.
-        "learning_corrections": trail_counts,
+        "learning_corrections": {k: v for k, v in trail_counts.items() if k != "withheld"},
         "relationship": relationship,
         "docket_positions": docket_positions,
-        "withheld": withheld,
         "retracted": retracted,
         "degraded": degraded,
         "disclosure": disclosure,
