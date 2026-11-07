@@ -38,6 +38,7 @@ os.environ.setdefault("USER_ID", "matthew")
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # noqa: E402
 from compute import dashboard_refresh_lambda as drl  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 
 TODAY = date(2026, 6, 17)  # a Wednesday: weekday()==2, so the ISO week starts 2026-06-15
 YESTERDAY = "2026-06-16"
@@ -773,6 +774,7 @@ BUDDY_SHEET = {
     "pillar_relationships": {"level": 42},
     "pillar_consistency": {"level": 70},
 }
+with_public(BUDDY_SHEET)  # owner ruling 2026-11-05: the buddy page reads the public variant
 
 
 def _green_buddy_rows():

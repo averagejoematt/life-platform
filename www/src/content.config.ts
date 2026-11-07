@@ -348,6 +348,8 @@ const engine = z
     composite: n,
     delta: n,
     pillars: z.array(z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean() }).strict()),
+    // owner ruling 2026-11-05: which method computed the score (character_privacy.PUBLIC_METHOD_LABELS), or null
+    method: z.string().min(1).nullable(),
   })
   .strict();
 // One correction beside a quotation — the same served shape as the coach APIs' summary_corrections / grade_corrections

@@ -376,11 +376,13 @@ def _ask_fetch_computed_reads() -> dict:
     # moving which way + habit strengths/weaknesses.
     try:
         ins = _hook("_latest_item")("computed_insights") or {}
-        if ins.get("momentum_signal"):
-            reads["momentum"] = str(ins["momentum_signal"])[:300]
+        # Owner ruling 2026-11-05: the momentum signal and a day-grade trend are computed from the METHOD-1 day grade
+        # (its journal component, its tier-weighted habits) — public grounding reads neither; the public day grade
+        # is health.day_grade_public's and these insight fields are the owner brief's.
         for src_key, out_key in (("improving_metrics", "improving"), ("declining_metrics", "declining")):
             raw = ins.get(src_key)
             vals = json.loads(raw) if isinstance(raw, str) else raw
+            vals = [v for v in vals or [] if "day_grade" not in str((v or {}).get("metric") if isinstance(v, dict) else v)]
             if vals:
                 reads[out_key] = [str(v)[:80] for v in vals][:4]
         if ins.get("strongest_habits"):

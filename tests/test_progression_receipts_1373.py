@@ -373,7 +373,11 @@ def _endpoint(monkeypatch, items_by_sk):
 
 
 def _stored_receipt_item(cfg):
+    from health import character_public
+
     receipt = _receipt(config=cfg)
+    # Owner ruling 2026-11-05: the route serves (and verifies) the PUBLIC variant's receipt, stored in the item.
+    receipt["public"] = _receipt(config=character_public.public_config(cfg))
     item = pr.store_receipt(_FakeTable(), "USER#matthew#SOURCE#character_receipt", receipt)
     return item
 

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from health import character_privacy  # owner ruling 2026-11-05: the Mind pillar served is the public variant
 
 from web.site_api_common import (
     PT,
@@ -71,7 +72,7 @@ def mind_overview(*, _g) -> dict:
     cs_pk = f"{USER_PREFIX}character_sheet"
     for date_str in [today, yesterday]:
         resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{date_str}"})
-        record = _decimal_to_float(resp.get("Item"))
+        record = character_privacy.public_sheet(_decimal_to_float(resp.get("Item")))  # the public variant only (2026-11-05)
         if record:
             mp = record.get("pillar_mind", {})
             mind_pillar = {
@@ -79,6 +80,14 @@ def mind_overview(*, _g) -> dict:
                 "raw_score": float(mp.get("raw_score", 0)),
                 "tier": mp.get("tier", "Foundation"),
             }
+            if mp.get("not_instrumented"):  # owner ruling 2026-11-06: insufficient public data is a state, never a 0.0
+                mind_pillar = {
+                    "level": None,
+                    "raw_score": None,
+                    "tier": None,
+                    "state": "unavailable",
+                    "note": mp.get("not_instrumented_note"),
+                }
             break
 
     # ── 2. (retired) The State-of-Mind mood read (How We Feel check-ins) — private activity (owner

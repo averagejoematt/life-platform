@@ -47,6 +47,7 @@ from common import activity_publication as ap  # noqa: E402
 from emails import chronicle_data as cd  # noqa: E402
 from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 from privacy import diary_consent  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 
 # The genesis every packet fixture is anchored to. Explicit — never read off the
 # wall clock, never off constants (a re-anchor must not silently move these
@@ -779,6 +780,10 @@ def test_packet_omits_the_supplement_stack_when_nothing_was_logged():
 
 
 def _character_sheet_week():
+    return {d: with_public(r) for d, r in _character_sheet_week_m1().items()}
+
+
+def _character_sheet_week_m1():
     return {
         "2026-08-05": {"character_level": 11, "pillar_sleep": {"level": 3, "tier": "Foundation"}},
         "2026-08-11": {
@@ -830,7 +835,7 @@ def test_packet_character_sheet_level_events_are_typed_by_tier_change():
 
 def test_packet_character_sheet_single_day_week_is_stable_with_no_events():
     data = _empty_data()
-    data["character_sheet"] = {"2026-08-11": {"character_level": 9, "character_tier": "Foundation", "character_xp": 1200}}
+    data["character_sheet"] = {"2026-08-11": with_public({"character_level": 9, "character_tier": "Foundation", "character_xp": 1200})}
     text, _ = cd.build_data_packet(data)
 
     assert "(stable) | XP: 1200" in text

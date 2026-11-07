@@ -512,7 +512,7 @@ def habits(*, _g) -> dict:
                 }
             )
         )
-        cs_items = [character_privacy.public_sheet(i) for i in _decimal_to_float(cs_resp.get("Items", []))]
+        cs_items = character_privacy.public_sheets(_decimal_to_float(cs_resp.get("Items", [])))
 
         # Build date → pillar sum (character health proxy)
         PILLARS_CS = [

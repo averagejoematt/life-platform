@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-11-05 (v8.6.0 — 90 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
+**Last updated:** 2026-11-06 (v8.6.0 — 90 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2161,6 +2161,7 @@ One item per day. Written by the Daily Brief Lambda after computing the weighted
 | `component_hydration` | number | 0-100 |
 | `component_journal` | number | 0-100 |
 | `component_glucose` | number | 0-100 |
+| `public` | map | **The PUBLIC variant** (owner ruling 2026-11-05, `lambdas/health/day_grade_public.py`, method `day-grade-public-v1`): `total_score`, `letter_grade`, `component_scores` (no `journal`; on a tier-weighted day no `habits_mvp`), `weights` (renormalised, no `journal`), `public_method_version`, `effective_from` (2026-09-06), `origin` (`live` \| `recomputed`), `computed_at`, optional `notes`. Written BESIDE the method-1 fields above, never over them — by `daily_metrics_compute_lambda.store_day_grade` live, by `scripts/backfill_public_variant.py --apply` for history. Every public reader reads it through `day_grade_public.public_grade` and gets nothing when it is absent (fail closed); MCP/emails keep the method-1 fields |
 
 Retrocompute: Weight changes → instant recompute from stored components. Component formula changes → recompute from raw source data using `retrocompute_day_grades.py --write --force`.
 
@@ -2230,6 +2231,8 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `pillar_mind` | map | Mind pillar (same structure) |
 | `pillar_relationships` | map | Relationships pillar (same structure) |
 | `pillar_consistency` | map | Consistency meta-pillar (same structure) |
+| `public` | map | **The PUBLIC variant** (owner ruling 2026-11-05, `lambdas/health/character_public.py`, method `character-public-v1`): the same record shape (`character_level`, `character_xp`, `character_mood`, `active_effects`, `level_events`, every `pillar_*`) computed by the same engine over PUBLIC inputs only, chained from the previous record's `public` (its own EMA/XP/streak/level state), plus `public_method_version`, `effective_from` (2026-09-06), `method_history`, `origin` (`live` \| `recomputed`), `computed_at`. Sleep/Movement/Nutrition/Metabolic carry method 1's raw score + components verbatim; Mind holds every non-public component out of sum and coverage; Relationships has no reading. Written beside the method-1 fields, never over them; absent when the chain it needs has no public variant (the live compute then fails closed). Every public reader reads it through `character_privacy.public_sheet` — never the method-1 fields, which stay the owner's (MCP, emails, coaches) |
+| `habit_scores_seen` | bool | Owner ruling 2026-11-06 (the computation-order defect): whether the compute saw the day's `habit_scores` record (Mind's habit components). Absent on records written before the fix |
 
 **Pillar sub-fields (each `pillar_*` map):**
 
@@ -2278,6 +2281,7 @@ One item per character-sheet compute day — the audit-grade receipt for that da
 | `digest` | string | sha256 over the canonical JSON of (date, engine_version, receipt_schema_version, config_hash, input_rows, transitions) — the deterministic replay digest |
 | `replay_verified` | bool | Write-time self-verify verdict (replay under the same config must reproduce the digest; `false` = nondeterminism, also emitted as the `ReceiptReplayMismatch` EMF metric in `LifePlatform/Character`) |
 | `computed_at`, `run_id`, `phase` | — | Standard compute provenance via `tag_record` |
+| `public` | map | The PUBLIC variant's own receipt (owner ruling 2026-11-05): the same fields over the public variant's transitions, digested and self-replayed against the public config (`character_public.public_config`), input rows restricted to public sources, plus `public_method_version`. The ONLY receipt `/api/character_receipt` serves (absent → `available: false`) |
 
 Drift alarm: `qa_smoke_lambda.check_receipt_replay` replays the last 7 receipts nightly against the live engine + config — a mismatch with an **unchanged** config hash + engine version reds the QA report (real drift); config/engine changes since a receipt read as a labeled warning (`config_drift` / `engine_drift`), never silently re-rendered.
 
@@ -2327,6 +2331,7 @@ Pearson correlations between 20 key metric pairs computed weekly over a 90-day r
 | `start_date` | string | Window start YYYY-MM-DD |
 | `end_date` | string | Window end YYYY-MM-DD |
 | `lookback_days` | number | Lookback window (default: 90) |
+| `metric_methods` | map | Owner rulings 2026-11-05/06: the versioned method behind each derived metric — `day_grade` (`day-grade-public-v1`, the day_grade record's public variant) and `habit_pct` (`habit-pct-public-v1`, public habits only, `lambdas/health/habit_pct_public.py`) |
 | `n_pairs` | number | Number of correlation pairs computed |
 | `correlations` | map | Per-pair results (see below) |
 | `computed_at` | string | ISO timestamp |

@@ -341,6 +341,8 @@ def engine_of(payload: Any, day: str) -> dict | None:
         "composite": _num(c.get("composite_score")),
         "delta": _num(c.get("composite_delta_1d")),
         "pillars": pillars,
+        # owner ruling 2026-11-05: the served method label (live vs recomputed under the public method), as served
+        "method": ((c.get("method") or {}).get("label") or None) if isinstance(c.get("method"), dict) else None,
     }
 
 
@@ -505,7 +507,9 @@ def check_layers(o: dict, where: str) -> None:
             raise SchemaError(f"{where}.food.logging_gap: a boolean")
     e = o["engine"]
     if e is not None:
-        _keys(e, {"level", "composite", "delta", "pillars"}, f"{where}.engine")
+        _keys(e, {"level", "composite", "delta", "pillars", "method"}, f"{where}.engine")
+        if e["method"] is not None and not (isinstance(e["method"], str) and e["method"]):
+            raise SchemaError(f"{where}.engine.method: a sentence or null")
         for p in e["pillars"]:
             _keys(p, {"name", "score", "not_instrumented"}, f"{where}.engine.pillar")
             if p["not_instrumented"] and p["score"] is not None:

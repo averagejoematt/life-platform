@@ -275,7 +275,7 @@ def character_calibration(*, _g) -> dict:
     probes = _query_source("felt_probe", EXPERIMENT_START, today)
     from health import character_privacy  # owner rulings 2026-11-03/04: private-source pillars are served held
 
-    sheets = [character_privacy.public_sheet(r) for r in _query_source("character_sheet", EXPERIMENT_START, today)]
+    sheets = character_privacy.public_sheets(_query_source("character_sheet", EXPERIMENT_START, today))
 
     # pillar level_score by date (fall back raw_score; skip absent — never zero-fill)
     level_by_date: dict[str, dict[str, float]] = {}

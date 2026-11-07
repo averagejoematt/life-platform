@@ -24,6 +24,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from health import character_privacy  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 from web import site_api_vitals as vitals  # noqa: E402
 
 _GENESIS = "2026-06-08"  # pinned: fixture records at 2026-06-20 are in-experiment
@@ -58,7 +59,7 @@ def _record(date_str, relationships_pillar):
     for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "consistency"]:
         rec[f"pillar_{p}"] = _pillar(70.0)
     rec["pillar_relationships"] = relationships_pillar
-    return rec
+    return with_public(rec)
 
 
 class _FakeTable:
@@ -105,6 +106,7 @@ def test_handle_character_instrumented_pillar_unaffected(monkeypatch):
     with a public source (metabolic here) passes through."""
     rec = _record("2026-06-20", _pillar(62.0, not_instrumented=False))
     rec["pillar_metabolic"] = _pillar(62.0, not_instrumented=False)
+    with_public(rec)
     monkeypatch.setattr(vitals, "table", _FakeTable([rec]))
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     resp = vitals.handle_character()

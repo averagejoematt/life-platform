@@ -663,7 +663,7 @@ def build_data_packet(data):
         packet.append("")
 
     # --- Character Sheet (gamification arc — narrative gold for Elena) ---
-    cs_data = {d: character_privacy.public_sheet(r) for d, r in (data.get("character_sheet", {}) or {}).items()}
+    cs_data = {d: v for d, r in (data.get("character_sheet", {}) or {}).items() if (v := character_privacy.public_sheet(r))}
     if cs_data:
         packet.append("=== CHARACTER SHEET (RPG gamification layer) ===")
         packet.append("The Character Sheet is Matthew's persistent gamified life score — an RPG-style")
