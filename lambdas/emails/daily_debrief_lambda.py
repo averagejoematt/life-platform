@@ -151,9 +151,10 @@ def gather_facts(date_str: str) -> dict:
     if hs.get("tier0_total"):
         put("core_habits_done", _int(hs.get("tier0_done")))
         put("core_habits_total", _int(hs.get("tier0_total")))
-    if hs.get("tier1_total"):
-        put("stretch_habits_done", _int(hs.get("tier1_done")))
-        put("stretch_habits_total", _int(hs.get("tier1_total")))
+    # Owner rulings 2026-11-03/06: the tier-1 ("stretch") count is NOT voiced. The stored tier totals
+    # include the journal habits, which are private activity (common.activity_publication), so a
+    # published episode saying "N of M stretch habits" would move with whether he journaled. Tier 0
+    # holds no private habit and is kept.
     return facts
 
 
@@ -163,11 +164,18 @@ def _presence_signal() -> dict:
     record's `channel_detail` carries a real per-day `last_log_date` per manual channel,
     which is the honest per-generation-date availability map the #1699 gate needs — so
     the ONE read now feeds both the prompt block and the gate, with no second query."""
+    # Owner rulings 2026-11-03/06: the debrief is a public episode, so it steers on the record's PUBLIC
+    # projection (the journal channel excluded — the same sub-record /api/presence serves), never the
+    # full record. A record without one steers nothing.
+    from content.engagement_core import PUBLIC_PROJECTION_KEY
+
     try:
-        return table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        item = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
     except Exception as e:
         logger.warning("presence signal read failed (non-fatal): " + str(e))
         return {}
+    pub = item.get(PUBLIC_PROJECTION_KEY)
+    return pub if isinstance(pub, dict) else {}
 
 
 def _presence_block(sig: dict | None = None) -> str:
@@ -449,10 +457,19 @@ def _publish(date_str: str, narrative: str, excerpt: str) -> dict:
     return {"statusCode": 200, "body": json.dumps({"date": date_str, "published": True, "bytes": len(audio)})}
 
 
+# Owner ruling 2026-11-06: "Audit the daily-debrief MP3s ... before authorizing publication." The debrief has no
+# approval step, so nothing airs until the owner authorises it: `force` does not lift this, only a reviewed change.
+PUBLICATION_HELD = True
+
+
 def lambda_handler(event: dict, context) -> dict:
     event = event or {}
     force = bool(event.get("force"))
     dry_run = bool(event.get("dry_run"))
+
+    if PUBLICATION_HELD and not dry_run:
+        logger.info("[debrief] publication held pending owner review — nothing generated or published")
+        return {"statusCode": 200, "body": json.dumps({"skipped": "publication_held"})}
 
     date_str = event.get("date") or _latest_computed_date()
     if not date_str:

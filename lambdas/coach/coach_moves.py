@@ -626,9 +626,9 @@ def served(item: Optional[dict]) -> Optional[dict]:
         if isinstance(ln.get("bet"), dict):
             out["bet"] = {k: str(ln["bet"].get(k) or "") for k in ("description", "resolution_date")}
         lines.append(out)
-    out_withheld = {"withheld": dict(item["_publication"])} if isinstance(item.get("_publication"), dict) else {}
+    # Owner ruling 2026-11-06: a day the publication gate withheld reads like a day with no words — its
+    # emptied lines, no `withheld` state beside them (a mark would say the day rested on private sources).
     return {
-        **out_withheld,  # owner ruling 2026-11-03: the publication gate's neutral withheld state, when it withheld the day
         "date": str(item["date"]),
         "generated_at": str(item.get("generated_at") or ""),
         "lines": lines,

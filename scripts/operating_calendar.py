@@ -241,7 +241,14 @@ CALENDAR: dict[str, dict] = {
         grace_days=3,
         attendance=AUTONOMOUS,
         probe=(NEWEST_DATED_FILE, "docs/reviews", r"^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partial)?\.json$"),
-        obligations=(),
+        obligations=(
+            # Owner ruling 2026-11-06: a scheduled, REVIEW-ONLY classification review riding this clock rather than
+            # a schedule of its own. The script writes the proposal privately (never the repo, never public) and
+            # approves nothing; approval stays the owner's `approve` registry edit, landed by PR.
+            "Run `python3 scripts/prediction_publication_registry.py review` (read-only) and hand the owner the "
+            "private proposed-manifest path it prints — the calls, asks and bets waiting for publication review. "
+            "Approve nothing, and never copy the proposal's ids, words or size into the repo, a PR or the grades file",
+        ),
         reason=(
             "The one review family that was still alive at #2832's filing — weekly-ish and "
             "shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to "

@@ -210,7 +210,7 @@ const predictions = defineCollection({
     coach_name: z.string().min(1),
     retired: z.boolean(),
     metric_key: z.string().nullable(),
-    claim_withheld: z.enum(["unsourced", "privacy"]).nullable(),
+    claim_withheld: z.enum(["unsourced", "no_words"]).nullable(),
     // Owner rulings 2026-11-03: the stored verdict, disputed pending classification — shown, never counted as verified.
     classification_review: z.boolean(),
     classification_review_reason: z.string().min(1).nullable(),

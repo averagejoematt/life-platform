@@ -76,7 +76,7 @@ from typing import Any
 from common.pacific_time import pacific_date_of, pacific_weekday, parse_iso_utc
 
 WALKING_VOLUME_VERSION = (
-    "walking-volume@1.2.0"  # 1.1.0 (#4068): time de-dup across Strava devices and against Hevy sessions; 1.2.0 (#5369): the watch backstop
+    "walking-volume@1.3.0"  # 1.1.0 (#4068): time de-dup; 1.2.0 (#5369): the watch backstop; 1.3.0: walk-signal completeness gaps
 )
 
 # ── what counts ──────────────────────────────────────────────────────────────────────
@@ -472,6 +472,115 @@ def derived_steps_estimate(walking_hours: float | None, cadence_spm: int = ASSUM
     }
 
 
+# ── completeness: a walk the layer did not count (the 2026-10-20 specimen) ───────────
+# On 2026-10-20 a WHOOP-detected outdoor walk reached Strava (activity 20669407754), was
+# ingested, then vanished from Strava's list the next morning; the #4638 reconciler wrote the
+# day as an explicit empty tombstone and every reader of this layer counted 0 for it — the
+# 10-16..22 week read 7.95 h with `total_is_floor: False` and no honesty line, while the WHOOP
+# workout and a completed "Walk Outdoor >2mi" habit both said he walked. Since 2026-10-26 WHOOP
+# no longer shares to Strava, so a walk only WHOOP saw reaches no counted source at all.
+# These are SIGNALS, never hours: a WHOOP auto-detect over-runs (that one spans 16:09–19:03 PT;
+# the Apple gait samples stop at 16:58), so its span is not a walking measurement. A signal
+# with no counted walk turns the total into a FLOOR and names the day.
+WHOOP_WALK_SPORTS = frozenset({"walking", "hiking", "rucking"})
+# The habit's current name and the alias Habitify rows still carry (#4362).
+WALK_HABIT_NAMES = frozenset({"Walk Outdoor >2mi", "Walk 5k"})
+
+
+def _row_day(r: dict[str, Any]) -> str:
+    return str(r.get("date") or str(r.get("sk", ""))[5:15])[:10]
+
+
+def _whoop_walks(rows: list[dict[str, Any]], window_start: str, window_end: str) -> list[dict[str, Any]]:
+    out = []
+    for r in rows or []:
+        if "#WORKOUT#" not in str(r.get("sk", "")):
+            continue
+        sport = str(r.get("sport_name") or r.get("vendor_sport_name") or "").strip().lower()
+        day = _row_day(r)
+        if sport not in WHOOP_WALK_SPORTS or not (window_start <= day <= window_end):
+            continue
+        start, end = _parse_utc(r.get("start_time")), _parse_utc(r.get("end_time"))
+        out.append(
+            {
+                "date": day,
+                "workout_id": r.get("workout_id"),
+                "start": start,
+                "end": end,
+                "span_minutes": round((end - start).total_seconds() / 60.0, 1) if start and end and end > start else None,
+                "zone_1_5_minutes": round(sum(_float(r.get(f"zone_{z}_minutes")) for z in range(1, 6)), 1),
+            }
+        )
+    return out
+
+
+def _walk_habit_days(rows: list[dict[str, Any]], window_start: str, window_end: str) -> list[str]:
+    days = set()
+    for r in rows or []:
+        day = _row_day(r)
+        if not (window_start <= day <= window_end):
+            continue
+        for name, st in (r.get("habit_statuses") or {}).items():
+            if not isinstance(st, dict) or st.get("status") != "completed":
+                continue
+            if name in WALK_HABIT_NAMES or WALK_HABIT_NAMES.intersection(st.get("aliases") or []):
+                days.add(day)
+    return sorted(days)
+
+
+def completeness(
+    *,
+    window_start: str,
+    window_end: str,
+    counted: list[dict[str, Any]],
+    hevy_intervals: list[tuple[datetime, datetime]],
+    inputs: dict[str, list[dict[str, Any]] | None] | None,
+) -> dict[str, Any]:
+    """Days a walk SIGNAL says he walked but the layer counted no walk.
+
+    `inputs` maps `whoop` (WHOOP rows, workouts read off their `#WORKOUT#` keys) and `habitify`
+    (day rows) to their rows, None for a source that could not be read. A WHOOP walk is a gap
+    when NO counted walk (any source) or Hevy cardio session overlaps it at all — any overlap is
+    the same walk, even when the auto-detect over-ran past it; a completed walk habit is a gap
+    when the day has no counted walking. `inputs=None` is a caller that did not ask: `not_checked`."""
+    if inputs is None:
+        return {"status": "not_checked", "gaps": []}
+    walks = [c for c in counted if c["modality"] == "walking"]
+    claimed = [(c["start"], c["end"]) for c in walks if c.get("start") and c.get("end")] + list(hevy_intervals)
+    walked_days = {c["date"] for c in walks if c["seconds"] > 0}
+    gaps: list[dict[str, Any]] = []
+    for w in _whoop_walks(inputs.get("whoop") or [], window_start, window_end):
+        if w["start"] is None or w["end"] is None or w["end"] <= w["start"]:
+            overlapped = w["date"] in walked_days  # untimed: the day is the only place to look
+        else:
+            overlapped = _uncovered_seconds(w["start"], w["end"], claimed) < (w["end"] - w["start"]).total_seconds()
+        if not overlapped:
+            gaps.append(
+                {
+                    "date": w["date"],
+                    "signal": "whoop_walk_workout",
+                    "workout_id": w["workout_id"],
+                    "start": w["start"].isoformat() if w["start"] else None,
+                    "end": w["end"].isoformat() if w["end"] else None,
+                    "span_minutes": w["span_minutes"],
+                    "zone_1_5_minutes": w["zone_1_5_minutes"],
+                    "counted": False,
+                }
+            )
+    for day in _walk_habit_days(inputs.get("habitify") or [], window_start, window_end):
+        if day not in walked_days:
+            gaps.append({"date": day, "signal": "walk_habit_completed", "counted": False})
+    return {
+        "status": "checked",
+        "unreadable": sorted(k for k, rows in inputs.items() if rows is None),
+        "gaps": sorted(gaps, key=lambda g: (g["date"], g["signal"])),
+        "rule": (
+            "a WHOOP walking/hiking workout no counted walk or Hevy cardio session overlaps, or a completed walk habit on a "
+            "day with no counted walking — reported, never counted (a WHOOP auto-detect's span is not a walking duration)"
+        ),
+    }
+
+
 #: `apple_items` default: the caller did not wire the watch backstop (distinct from None = the read failed).
 NOT_WIRED: Any = object()
 
@@ -483,6 +592,7 @@ def build(
     strava_items: list[dict[str, Any]] | None,
     hevy_workouts: list[dict[str, Any]] | None,
     apple_items: Any = NOT_WIRED,
+    completeness_inputs: dict[str, list[dict[str, Any]] | None] | None = None,
 ) -> dict[str, Any]:
     """The derived walking-volume layer: Strava UNION Hevy cardio blocks, in HOURS.
 
@@ -495,6 +605,9 @@ def build(
     time de-dup. Unlike Strava and Hevy, an Apple read with nothing counted is ordinary (a watch
     workout only adds what no other source holds) and never makes the total a floor; a FAILED
     Apple read (None) does, because a walk only the watch recorded could be missing.
+
+    `completeness_inputs` (WHOOP + Habitify rows) adds the walk-signal check: a signalled walk
+    no source counted makes the total a floor too, with the day named under `completeness.gaps`.
     """
     s_raw, s_skipped = strava_sessions(strava_items or [])
     h_counted, h_skipped = hevy_sessions(hevy_workouts or [])
@@ -505,6 +618,13 @@ def build(
     else:
         s_counted, dedup = dedup_strava(s_raw, hevy_cardio_intervals(hevy_workouts or []))
         a_counted = []
+    complete = completeness(
+        window_start=window_start,
+        window_end=window_end,
+        counted=s_counted + h_counted + a_counted,
+        hevy_intervals=hevy_cardio_intervals(hevy_workouts or []),
+        inputs=completeness_inputs,
+    )
 
     def _source_block(raw: list[dict[str, Any]] | None, counted: list[dict[str, Any]], skipped: list[str]) -> dict:
         if raw is None:
@@ -558,6 +678,12 @@ def build(
             f"{dedup['untimed']} Strava activit{'y' if dedup['untimed'] == 1 else 'ies'} carried no start timestamp — the "
             "cross-device de-dup could not place them in time, so they are counted whole"
         )
+    for gap in complete["gaps"]:
+        what = "a WHOOP walking workout" if gap["signal"] == "whoop_walk_workout" else "the walk habit was completed"
+        honesty.append(
+            f"{gap['date']}: {what} but no counted walk activity — that walk is missing from this total, which is a floor, "
+            "not a zero for the day"
+        )
 
     return {
         "layer": "walking_volume",
@@ -565,7 +691,7 @@ def build(
         "unit": "hours",
         "window": {"start": window_start, "end": window_end, "days": 7},
         "total_hr": total_hr,
-        "total_is_floor": bool(silent and contributing),
+        "total_is_floor": bool(silent and contributing) or bool(contributing and complete["gaps"]),
         "by_source": by_source,
         "by_modality": {m: v for m, v in by_modality.items() if v},
         "counted_modalities": list(MODALITIES),
@@ -582,6 +708,7 @@ def build(
             "Hevy treadmill sessions)."
         ),
         "dedup": dedup,
+        "completeness": complete,
         "excluded_proxies": [dict(STEPS_EXCLUSION)],
         "derived_steps_estimate": derived_steps_estimate(by_modality.get("walking") if contributing else None),
         "honesty": honesty,

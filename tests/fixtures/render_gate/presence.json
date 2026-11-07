@@ -15,7 +15,6 @@
   "channels": [
     {"id": "macrofactor", "label": "food", "last_log_date": "2026-07-01", "gap_days": 0, "quiet": false, "primary": true},
     {"id": "habitify", "label": "habits", "last_log_date": "2026-07-01", "gap_days": 0, "quiet": false, "primary": false},
-    {"id": "hevy", "label": "training", "last_log_date": "2026-06-29", "gap_days": 1, "quiet": false, "primary": false},
-    {"id": "notion", "label": "journal", "last_log_date": "2026-06-25", "gap_days": 5, "quiet": true, "primary": false}
+    {"id": "hevy", "label": "training", "last_log_date": "2026-06-29", "gap_days": 1, "quiet": false, "primary": false}
   ]
 }

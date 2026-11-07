@@ -39,7 +39,11 @@ import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
 from coach.classification_review import is_under_review  # owner ruling 2026-11-03: a disputed verdict is not a record
-from common import activity_publication  # owner ruling 2026-11-05: the public chronicle sees public habits only
+from common import (  # owner ruling 2026-11-06: one publication decision, the API's
+    activity_publication,  # owner ruling 2026-11-05: the public chronicle sees public habits only
+    narrative_provenance,
+    prediction_publication,
+)
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
 from health import day_grade_public  # owner ruling 2026-11-05: day_grade_mean is the public variant's
@@ -528,6 +532,8 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
         for it in items:
             if str(it.get("cycle") or "") not in ("17", "") or it.get("tombstone"):
                 continue
+            if not prediction_publication.row_is_public(f"COACH#{cid}", it):
+                continue  # owner rulings 2026-11-05/06: a private call reaches no public writer — claim, record or count
             created = str(it.get("created_date") or "")
             if not created or created < GENESIS or created > wk["end"]:
                 continue
@@ -641,12 +647,16 @@ def _coaches(table, wk: Dict[str, Any], roster: Dict[str, str]) -> List[Dict[str
         items = resp.get("Items", [])
         if not items:
             continue
-        latest = items[0]
+        # Owner rulings 2026-11-03/06: the public chronicle reads the same publication decision the public API does. A
+        # coach text whose sources are not all publishable never reaches a public writer, and the entry reads the same
+        # whether the text was withheld or never written (no count, no mark).
+        latest = next((i for i in items if narrative_provenance.is_publishable(i)), None)
+        if latest is None:
+            continue
         out.append(
             {
                 "coach_id": cid,
                 "name": roster.get(cid, cid),
-                "outputs_this_week": len(items),
                 "latest_date": latest["sk"].split("#")[1],
                 "latest_public_summary": str(latest.get("public_summary") or "")[:1400],
                 "summary_caveat": "a coach summary may cite the profile's stale 190 g / 1,800 kcal targets (#4540); the plan's targets are in nutrition.targets_from_plan — never quote a target figure from a summary",

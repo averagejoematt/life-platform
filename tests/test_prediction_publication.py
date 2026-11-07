@@ -112,10 +112,14 @@ def test_every_metric_in_a_conditional_spec_must_be_public(monkeypatch):
     assert PP.classify(PK, row) == (PP.PRIVATE, "private_metric")
 
 
-def test_a_new_docket_call_is_classified_by_its_criterion():
+def test_a_new_bet_side_is_private_until_reviewed():
+    """Owner ruling 2026-11-06: one side cannot show whether the other side is private, so a bet filed after the registry
+    — its sides included — waits for the owner's review, whatever its criterion and words."""
     side = {"pk": PK, "sk": "PREDICTION#docket-x-2026-11-06", "prediction_id": "docket-x-2026-11-06", "created_at": NEW}
-    assert PP.row_is_public(PK, {**side, "source": "dispute_docket", "metric": "recovery_score_7day_avg", "claim_natural": "It holds."})
-    assert not PP.row_is_public(PK, {**side, "source": "dispute_docket", "metric": "recovery_score", "claim_natural": "The diary returns."})
+    clean = {**side, "source": "dispute_docket", "metric": "recovery_score_7day_avg", "claim_natural": "It holds."}
+    assert PP.classify(PK, clean) == (PP.PRIVATE, PP.UNREVIEWED_BET)
+    with registered([clean]):
+        assert PP.classify(PK, clean) == (PP.PUBLIC, "registry")  # the owner's approval
 
 
 def test_asks_and_bets():
@@ -136,9 +140,10 @@ def test_asks_and_bets():
         "criterion": {"metric": "hrv"},
         "claims": {"a": "HRV rises."},
     }
-    assert PP.row_is_public(PP.DOCKET_PK, bet)
-    assert not PP.row_is_public(PP.DOCKET_PK, {**bet, "claims": {"a": "The journal stays shut."}})
-    assert not PP.row_is_public(PP.DOCKET_PK, {**bet, "opened_at": "2026-09-01T00:00:00+00:00"})  # legacy, unlisted
+    assert PP.classify(PP.DOCKET_PK, bet) == (PP.PRIVATE, PP.UNREVIEWED_BET)  # a new bet waits for review
+    with registered([bet]):
+        assert PP.row_is_public(PP.DOCKET_PK, bet)
+    assert PP.classify(PP.DOCKET_PK, {**bet, "opened_at": "2026-09-01T00:00:00+00:00"}) == (PP.PRIVATE, "registry_not_public")
 
 
 # ── rows that name a call follow it ───────────────────────────────────────────────────────

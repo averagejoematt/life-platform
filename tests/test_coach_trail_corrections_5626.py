@@ -206,7 +206,8 @@ def test_dossier_learnings_serve_the_current_verdict_with_the_original_and_the_c
     assert "grade_correction" not in learn[UNCHANGED] and learn[UNCHANGED]["status"] == "confirmed"
     assert learn[NO_ROW]["status"] == "confirmed"  # no stored row: nothing contradicts the trail
 
-    assert body["dossier"]["learning_corrections"] == {"corrected": 2, "withheld": 1, "unverified": 0}
+    # Owner ruling 2026-11-06: the learnings dropped with their non-eligible calls are not counted on the wire.
+    assert body["dossier"]["learning_corrections"] == {"corrected": 2, "unverified": 0}
 
 
 def test_a_journal_silenced_prediction_is_absent_from_both_trails(monkeypatch):

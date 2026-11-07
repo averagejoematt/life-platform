@@ -80,7 +80,10 @@ queue before filing or shipping.
 4. Pull the live backlog (`gh issue list --state open`) → the **do-not-refile list**, and this
    lens's review-batch idempotency set. The label scheme and the exact reconcile query are the
    `issue-filer` contract's, not this file's — read them there and run the reconcile in Phase 0,
-   so a duplicate filing is impossible by the time Phase 4 starts.
+   so a duplicate filing is impossible by the time Phase 4 starts. Then run any standing obligation the
+   calendar attaches to this lens's clock (`docs/OPERATING_CALENDAR.md`) — for `full`, the review-only
+   call-publication review (`python3 scripts/prediction_publication_registry.py review`; its proposal is
+   private and approves nothing).
 5. **Freeze the anchors, and say what you froze (#3603).** Load the previous run's artifact for
    this lens (the rubric names the filename), then load the **sealed anchor artifact** — the
    anchors are no longer prose a run retypes out of the last artifact (#3607):

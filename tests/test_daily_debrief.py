@@ -22,6 +22,8 @@ import os
 import sys
 from decimal import Decimal
 
+import pytest
+
 os.environ.setdefault("TABLE_NAME", "life-platform-test")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
@@ -273,6 +275,10 @@ class TestIndexes:
 
 
 class TestHandler:
+    @pytest.fixture(autouse=True)
+    def _publication_authorised(self, monkeypatch):
+        monkeypatch.setattr(dd, "PUBLICATION_HELD", False)  # these test the pipeline behind the owner's hold
+
     def test_skips_when_no_computed_facts(self, monkeypatch):
         monkeypatch.setattr(dd, "table", _FakeTable({}, latest_date="2026-07-07"))
         monkeypatch.setattr(dd, "s3", _FakeS3(mp3_exists=False))
@@ -419,3 +425,17 @@ class TestGatherFactsFieldContract:
         reads = _gather_facts_read_keys()["hs"]
         missing = reads - emitted
         assert not missing, f"gather_facts reads {missing} off habit_scores, but the writer never emits it (dead read — #2804 class)"
+
+
+def test_publication_is_held_until_the_owner_authorises_it(monkeypatch):
+    """Owner ruling 2026-11-06: nothing airs before his review, `force` included. Control: lifting the hold reaches the
+    pipeline (the first step after the hold is the date lookup)."""
+    reached = []
+    monkeypatch.setattr(dd, "_latest_computed_date", lambda: reached.append(1) or None)
+    monkeypatch.setattr(dd, "PUBLICATION_HELD", True)
+    for event in ({}, {"force": True}):
+        assert json.loads(dd.lambda_handler(event, None)["body"]) == {"skipped": "publication_held"}
+    assert not reached
+    monkeypatch.setattr(dd, "PUBLICATION_HELD", False)
+    assert json.loads(dd.lambda_handler({}, None)["body"]) == {"skipped": "no computed_metrics"}
+    assert reached

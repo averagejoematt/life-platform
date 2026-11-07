@@ -36,6 +36,19 @@ NEW CALLS. Classification is a pure function of the stored row (``row_is_public`
 is written — there is no window in which it waits unclassified in public, and no producer has to remember to stamp it.
 The decision is reproducible from the row and versioned by ``METHOD``.
 
+THE OWNER'S APPROVED CLASSIFICATIONS (2026-11-06, verbatim): "Mood, felt-sense and self-report calls remain private,
+including those referring to a public morning note. Unnamed logging-gap predictions remain private where their meaning
+or evaluation could reveal private activity. The fuel–cognition bet's private cognition component makes that combined
+prediction ineligible for public release. A separately filed, independently evaluable nutrition prediction may remain
+public if it does not reveal the private component. Thyroid predictions evaluated against public-eligible laboratory
+measurements may remain public; requests to log symptoms remain private. New free-text observations remain private
+until explicitly reviewed." The registry carries the legacy decisions; for a call filed after it the words screen
+(``SELF_REPORT_WORDS``, ``LOGGING_GAP_WORDS`` without a ``NAMED_PUBLIC_LOG``) keeps the first, second and symptom lines;
+a bet filed after it is private until reviewed (``UNREVIEWED_BET``) — a separately filed call is decided on its own;
+an observation stays unclassified. "Explicitly reviewed" is the owner's registry edit (``approve``): a listed digest is
+public whenever the row was filed. The scheduled review (``scripts/prediction_publication_registry.py review``) only
+PROPOSES; it never edits the registry.
+
 WHAT IT GOVERNS (``kind_of``): ``PREDICTION#`` and ``COMMITMENT#`` rows under a coach, docket entries
 (``ENSEMBLE#docket`` ``OPEN#``/``RESOLVED#``), and every row that NAMES a call — a coach's ``LEARNING#`` and
 ``CORRECTION#`` rows and the calibration ledger's ``prediction_void`` rows — which follow the call they name. A private
@@ -210,15 +223,41 @@ def _spec_metrics(spec: Any) -> list:
 
 
 JOURNAL_WORDS = re.compile(r"\b(?:journal\w*|diar(?:y|ies)|notion)\b", re.I)
+#: Owner ruling 2026-11-06: "Mood, felt-sense and self-report calls remain private, including those referring to a
+#: public morning note ... requests to log symptoms remain private." Words naming a self-report (a symptom, a
+#: feeling, a rating he gives) — the cognition component of the fuel-cognition bet included.
+SELF_REPORT_WORDS = re.compile(
+    r"\b(?:moods?|felt|feel(?:s|ing)?|subjective\w*|self[- ]report\w*|morning[- ]notes?|check[- ]ins?|valence|"
+    r"emotion\w*|symptoms?|fatigue|cold (?:intolerance|sensitivity|tolerance)|interocept\w*|cogniti\w*)\b",
+    re.I,
+)
+#: Owner ruling 2026-11-06: "Unnamed logging-gap predictions remain private where their meaning or evaluation could
+#: reveal private activity." A logging gap is UNNAMED unless the words name a public log (food, a meal, a weigh-in,
+#: a workout, steps, glucose).
+LOGGING_GAP_WORDS = re.compile(
+    r"\blogging (?:gaps?|silence|pause)|\b(?:resum\w*|stop\w*|start\w*|return\w* to) logging\b|\blogging resumes\b|\bunlogged\b",
+    re.I,
+)
+NAMED_PUBLIC_LOG = re.compile(
+    r"\b(?:food|meals?|dinners?|lunch|breakfast|snacks?|calori\w*|protein|nutrition|macrofactor|weigh\w*|workouts?|hevy|steps?|glucose|cgm)\b",
+    re.I,
+)
+
+
+def _text(t: Any) -> str:
+    return t if isinstance(t, str) else ("" if t is None else str(t))
 
 
 def words_name_private_activity(*texts: Any) -> bool:
-    """Defence in depth only (never what makes a call public): the words name the journal or its silence."""
-    for t in texts:
-        s = t if isinstance(t, str) else ("" if t is None else str(t))
-        if s and (JOURNAL_WORDS.search(s) or journal_silence.mentions_journal_silence(s)):
+    """Defence in depth only (never what makes a call public): the words name the journal or its silence, a
+    self-report, or a logging gap without naming a public log."""
+    for s in (_text(t) for t in texts):
+        if not s:
+            continue
+        if JOURNAL_WORDS.search(s) or journal_silence.mentions_journal_silence(s) or SELF_REPORT_WORDS.search(s):
             return True
-    return False
+    joined = " ".join(_text(t) for t in texts)
+    return bool(LOGGING_GAP_WORDS.search(joined) and not NAMED_PUBLIC_LOG.search(joined))
 
 
 def _structural(metrics: Iterable[Any], *texts: Any) -> tuple:
@@ -240,16 +279,35 @@ def _map(value: Any) -> Mapping:
     return value if isinstance(value, Mapping) else {}
 
 
+def _reviewed(kind: str, filed_at: Any, pk: Any, key: Any) -> Optional[tuple]:
+    """The registry's word on a row, or None when its structure decides. Listed = approved by the owner's review (a
+    legacy row, or a newer one approved through ``scripts/prediction_publication_registry.py approve``); a legacy row
+    that is not listed was reviewed and is private."""
+    if _listed(pk, key):
+        return PUBLIC, "registry"
+    if _legacy(kind, filed_at):
+        return PRIVATE, "registry_not_public"
+    return None
+
+
+#: Owner ruling 2026-11-06: a bet whose sides are free text ("The fuel-cognition bet's private cognition component
+#: makes that combined prediction ineligible ... A separately filed, independently evaluable nutrition prediction may
+#: remain public"). One side cannot show whether the OTHER side is private, so a bet — the docket entry, each side's
+#: call, each side's docket learning — filed after the registry is private until the owner's review approves it. A
+#: separately filed call is not a bet side and is decided on its own.
+UNREVIEWED_BET = "unreviewed_bet"
+
+
 def classify_call(pk: Any, row: Mapping) -> tuple:
     """``(PUBLIC | PRIVATE, internal_reason)`` for one PREDICTION# row. Reasons are for logs and owner tooling only."""
     row = _map(row)
-    if _legacy(CALL, row.get("created_at")):
-        return (PUBLIC, "registry") if _listed(pk, call_key(row.get("sk"), row)) else (PRIVATE, "registry_not_public")
+    decided = _reviewed(CALL, row.get("created_at"), pk, call_key(row.get("sk"), row))
+    if decided:
+        return decided
+    if row.get("source") == "dispute_docket":
+        return PRIVATE, UNREVIEWED_BET
     ev = _map(row.get("evaluation"))
     texts = (row.get("claim_natural"), row.get("prediction_id"), row.get("sk"))
-    if row.get("source") == "dispute_docket":
-        metric = ev.get("metric") or row.get("metric")  # the criterion frozen at open (a docket row stores it flat)
-        return _structural([metric] if metric else [], *texts)
     if str(_map(row.get("filing")).get("verdict") or "") != "gradeable":
         return (PRIVATE, "private_words") if words_name_private_activity(*texts) else (PRIVATE, "unclassified_subject")
     return _structural(_spec_metrics(ev), *texts)
@@ -257,25 +315,15 @@ def classify_call(pk: Any, row: Mapping) -> tuple:
 
 def classify_ask(pk: Any, row: Mapping) -> tuple:
     row = _map(row)
-    if _legacy(ASK, row.get("created_at")):
-        return (PUBLIC, "registry") if _listed(pk, row.get("sk")) else (PRIVATE, "registry_not_public")
+    decided = _reviewed(ASK, row.get("created_at"), pk, row.get("sk"))
+    if decided:
+        return decided
     return _structural(_spec_metrics(_map(row.get("action_check"))), row.get("commitment_natural"), row.get("sk"))
 
 
 def classify_docket(row: Mapping) -> tuple:
     row = _map(row)
-    if _legacy(DOCKET, row.get("opened_at")):
-        return (PUBLIC, "registry") if _listed(DOCKET_PK, row.get("sk")) else (PRIVATE, "registry_not_public")
-    crit = _map(row.get("criterion"))
-    claims = _map(row.get("claims"))
-    return _structural(
-        [crit.get("metric")] if crit.get("metric") else [],
-        row.get("topic"),
-        row.get("concession"),
-        crit.get("description"),
-        row.get("sk"),
-        *claims.values(),
-    )
+    return _reviewed(DOCKET, row.get("opened_at"), DOCKET_PK, row.get("sk")) or (PRIVATE, UNREVIEWED_BET)
 
 
 _ID_DAY = re.compile(r"^pred_(\d{4})(\d{2})(\d{2})_")
@@ -303,11 +351,8 @@ def classify_reference(pk: Any, row: Mapping, lookup: Optional[Lookup] = None) -
     if ref is None:
         if not str((row or {}).get("docket_ref") or "").strip():
             return PUBLIC, "names_no_call"  # e.g. a conversation-sourced learning (ADR-141): not a call's row
-        # A docket learning names its bet by the docket, not by an id: reviewed as itself, else by its structure.
-        if _legacy(CALL, row.get("created_at")):
-            return (PUBLIC, "registry") if _listed(pk, row.get("sk")) else (PRIVATE, "registry_not_public")
-        metric = row.get("metric")
-        return _structural([metric] if metric else [], row.get("claim"), row.get("concession"), row.get("sk"))
+        # A docket learning names its bet by the docket, not by an id: reviewed as itself, like its bet.
+        return _reviewed(CALL, row.get("created_at"), pk, row.get("sk")) or (PRIVATE, UNREVIEWED_BET)
     call_pk, key = ref
     if _listed(call_pk, key):
         return PUBLIC, "registry"

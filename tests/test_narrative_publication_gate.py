@@ -105,8 +105,9 @@ def test_the_dashboard_serves_a_neutral_withheld_state(walks, variant):
     2026-11-05) never a COUNT of what was withheld: no `_meta.withheld`, no count header."""
     dash = walks[variant]["dashboard"]
     assert set(dash["position_summaries"]) == {""}, dash
-    assert dash["withheld_slots"] == len(dash["position_summaries"]) >= 7
-    assert dash["moves_lines"] == 0 and dash["moves_withheld"] is True
+    # Owner ruling 2026-11-06: emptied slots carry no `_withheld` marker and the moves day no `withheld` state.
+    assert dash["withheld_slots"] == 0 and len(dash["position_summaries"]) >= 7
+    assert dash["moves_lines"] == 0 and dash["moves_withheld"] is False
     assert dash["meta_withheld"] is None and dash["header"] is None
     assert "journal" not in NP.PUBLIC_WITHHELD_REASON.lower() and "private" not in NP.PUBLIC_WITHHELD_REASON.lower()
 
@@ -281,7 +282,12 @@ def test_a_graded_record_row_is_carried_and_withheld_at_the_wire():
     body = {"calls": [{"claim": claim, "n": 3, "called": f"She said: {claim[:60]}"}], "_meta": {}}
     resp = G.annotate({"statusCode": 200, "headers": {}, "body": json.dumps(body)})
     out = json.loads(resp["body"])
-    assert out["calls"] == [{"claim": "", "n": 3, "called": "", "words_withheld": True}]  # the object keeps its place and its number
+    # The object keeps its place and its number; its words read like no words — never marked (owner ruling 2026-11-06).
+    assert out["calls"] == [{"claim": "", "n": 3, "called": ""}]
+    blank = G.annotate(
+        {"statusCode": 200, "headers": {}, "body": json.dumps({"calls": [{"claim": "", "n": 3, "called": ""}], "_meta": {}})}
+    )
+    assert json.loads(blank["body"]) == out, "a withheld object must read exactly like an object with no words"
     assert out["_meta"] == {} and resp["headers"] == {}  # owner ruling 2026-11-05: no withheld count on the wire
     strict = G.gate_item(dict(row), strict=True)
     assert strict["claim_natural"] == "" and strict["status"] == "refuted"

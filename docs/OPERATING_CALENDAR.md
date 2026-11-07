@@ -33,6 +33,7 @@ dated artifact, and the dead-man reds when a window closes empty.
 ## Standing obligations (re-homed onto entries — they die with sessions otherwise)
 
 - **emf-series-census**: Run `python3 deploy/emf_series_census.py --strict`; resolve any over-budget or unregistered namespace in deploy/emf_namespace_ledger.py BEFORE appending the dated line the probe reads — a line appended over a red records a number nobody acted on
+- **fullreview-delta**: Run `python3 scripts/prediction_publication_registry.py review` (read-only) and hand the owner the private proposed-manifest path it prints — the calls, asks and bets waiting for publication review. Approve nothing, and never copy the proposal's ids, words or size into the repo, a PR or the grades file
 - **managed-where-reverify**: Walk every ledger row against LIVE state (gh api for the GitHub rows, read-only aws for the AWS rows); update each probed row's Verified cell and append the dated log line the probe reads
 - **preview-fixture-recapture**: Run `python3 scripts/capture_kit_page_fixtures.py` (read-only GETs of the live site: the kit pages and the edition wire in one pass), then re-pin whatever a changed served shape reds to BEHAVIOUR, never to the new capture's literal (the #4862 pattern), regenerate tests/fixtures/edition_contract_4582/editions.json and the scorecard fixture, and change the 'Last recaptured' line in the script's docstring
 - **proportionality-reread**: Walk the whole ledger: every posture either re-earns its keep or gets its demote trigger pulled (the ADR-129 worked precedent)
