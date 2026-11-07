@@ -235,7 +235,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "retired": ("bool", False),
         "metric_key": ("str", True),
         "corrections": ("list[obj]", False),
-        "claim_withheld": ("enum:unsourced|privacy", True),
+        "claim_withheld": ("enum:unsourced|no_words", True),
         # Owner rulings 2026-11-03: a settled verdict under classification review — `status` stays the stored
         # verdict; the page shows it disputed and no count treats it as verified. The reason is the API's public one.
         "classification_review": ("bool", False),

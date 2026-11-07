@@ -91,3 +91,15 @@ def test_a_draft_naming_private_activity_never_publishes_itself():
     reason = "names private activity"
     assert not any(reason in b for b in autopublish_audit.blocking_items(clean))
     assert any(reason in b for b in autopublish_audit.blocking_items(named))
+
+
+def test_the_snapshot_contract_and_the_site_schema_agree_on_claim_withheld():
+    """#5667 added `no_words` to the site schema only: fixtures never hit it, and the live root build refused the snapshot."""
+    import re
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    contract = open(os.path.join(root, "scripts", "publish_snapshot_contract.py"), encoding="utf-8").read()
+    schema = open(os.path.join(root, "www", "src", "content.config.ts"), encoding="utf-8").read()
+    served = set(re.search(r'"claim_withheld": \("enum:([^"]+)"', contract).group(1).split("|"))
+    assert served == set(re.findall(r'"(\w+)"', re.search(r"claim_withheld: z\.enum\(\[([^\]]+)\]", schema).group(1)))
+    assert "no_words" in served
