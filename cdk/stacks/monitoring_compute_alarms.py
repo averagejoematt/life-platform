@@ -56,6 +56,7 @@ from aws_cdk import (
     Duration,
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
+    aws_logs as logs,
 )
 
 GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
@@ -175,4 +176,28 @@ def add_compute_alarms(scope, digest) -> None:
         "compute-outputs-heartbeat",
         "LifePlatform/Pipeline",
         "ComputeOutputsMissing",
+    )
+
+    # Owner 2026-11-07 (#5656 follow-up): the character compute's PUBLIC variant degrades rather than fails — habit
+    # inputs not ready at 09:50 PT (public Mind reads them as missing, never zero), or no/failed public variant (the
+    # public surfaces fail closed for the date). Each logs PUBLIC_DEGRADED_MARKER at ERROR and the Lambda still
+    # succeeds, so no error-rate or heartbeat alarm sees it. ≥1 in a day = digest; the fix is a same-morning re-run
+    # for the date (docs/RUNBOOK.md). Token twin-pinned by tests/test_character_public_degraded_alarm.py.
+    cpd_lg = logs.LogGroup.from_log_group_name(scope, "CharacterPublicDegradedLg", "/aws/lambda/character-sheet-compute")
+    logs.MetricFilter(
+        scope,
+        "CharacterPublicDegradedFilter",
+        log_group=cpd_lg,
+        filter_pattern=logs.FilterPattern.literal('"CHARACTER-PUBLIC-INPUTS-DEGRADED"'),
+        metric_name="CharacterPublicInputsDegraded",
+        metric_namespace="LifePlatform/Compute",
+        metric_value="1",
+    )
+    _compute_problem_alarm(
+        scope,
+        digest,
+        "CharacterPublicDegraded",
+        "character-public-inputs-degraded",
+        "LifePlatform/Compute",
+        "CharacterPublicInputsDegraded",
     )
