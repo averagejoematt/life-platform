@@ -336,7 +336,8 @@ def kind_of_performed(machine_key: str, note: str | None, served_kind: str | Non
     if served_kind in KINDS and not _EASY_ONLY_WORD.search(text) and fits_machine(served_kind, machine_key):
         return str(served_kind)
     rpe = logged_rpe(text)
-    if swap_kind in HARD and rpe is not None and wire_band(str(swap_kind)) and rpe >= wire_band(str(swap_kind))[0]:
+    band = wire_band(str(swap_kind)) if swap_kind in HARD else None
+    if band is not None and rpe is not None and rpe >= band[0]:
         return str(swap_kind)
     if machine_key == TREADMILL:
         return "incline_treadmill_walk"
