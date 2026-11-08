@@ -111,6 +111,12 @@ from publish_snapshot_day import DAY_ENDPOINTS, live_days  # noqa: E402 — the 
 from publish_snapshot_journey import (
     live_journey,
 )  # noqa: E402 — the Journey's data file (#5579), kept out of this module's 1000-line ceiling
+from publish_snapshot_lab import (  # noqa: E402 — the Laboratory's data file, WEB_LAB=1 only (L1)
+    fixture_lab,
+    lab_enabled,
+    live_lab,
+    resolve_and_validate as resolve_lab,  # noqa: E402
+)
 
 
 # ── live mode ────────────────────────────────────────────────────────────────────────────
@@ -1043,6 +1049,12 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
         cal = fixture_calibration(fixtures_dir) if mode == "fixture" else live_calibration(lambda p: _get(base_url, p, timeout), log)
         try:
             data_files["calibration"] = resolve_and_validate(cal, public)
+        except ValueError as exc:
+            raise SchemaError(str(exc)) from exc
+    if lab_enabled():  # the Laboratory, built dark (L1): off = not fetched, not written, snapshot byte-identical
+        lab = fixture_lab(fixtures_dir) if mode == "fixture" else live_lab(lambda p: _get(base_url, p, timeout), log)
+        try:
+            data_files["lab"] = resolve_lab(lab, public, set((data_files.get("series") or {}).keys()))
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)

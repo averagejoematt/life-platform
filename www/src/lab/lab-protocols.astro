@@ -1,0 +1,118 @@
+---
+// /data/lab/protocols/ — the protocol objects (L1). BUILT DARK: outside src/pages/, injected only when WEB_LAB=1.
+// Each protocol as /api/supplements serves it: the dose, the timing, why, whether it is paused (and why), and the
+// evidence split by the stance its sources were filed under — set beside adherence, which no public route serves.
+// Nothing is computed here.
+import Base from "../layouts/Base.astro";
+import LabBanner from "../components/LabBanner.astro";
+import { dayInWords, num } from "../lib/format.js";
+import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import { evidenceSplit, prose } from "../lib/laboratory.js";
+import { loadLab } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+if (!labEnabled()) throw new Error("src/lab/lab-protocols.astro rendered with WEB_LAB off — the Lab route must not be injected");
+
+const lab = await loadLab();
+const prot = lab.lab_protocols || { groups: [], served_protocols: null };
+const groups = (prot.groups || []) as any[];
+const experimentIds = new Set(((lab.lab_experiments || []) as any[]).map((x) => x.id));
+const asOf = lab.as_of ? dayInWords(lab.as_of) : null;
+const noindex = process.env.WEB_NOINDEX === "1";
+const mark = { [LAB_MARKER]: "protocols" };
+---
+
+<Base title="The protocols" top="data" description="What he takes, when, why — and what the evidence says." status={asOf}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <LabBanner />
+  <section class="section" {...mark} style="padding-bottom:20px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:1100px">
+      <p class="label"><a href={href("/data/lab/")}>The Laboratory</a> · protocols</p>
+      <h1 style="font-size:clamp(30px,5vw,48px);line-height:1.08">The protocols</h1>
+      <p class="dek" style="font-size:18px;max-width:70ch">
+        The dose, the timing and the reason for each, and what the literature says for and against. Evidence is not adherence: whether he took it on a given day
+        is not served by any public route, so no day is marked here.
+      </p>
+    </div>
+  </section>
+  {
+    groups.length ? (
+      groups.map((g) => (
+        <section class="section" id={g.id} style="padding-top:8px">
+          <div class="wrap" style="max-width:1100px">
+            <p class="label" style="margin-bottom:4px">
+              {g.name} · {num(g.items.length)}
+            </p>
+            {g.desc && (
+              <p class="muted" style="font-size:14px;max-width:70ch;margin-bottom:10px">
+                {prose(g.desc)}
+              </p>
+            )}
+            <div style="display:flex;flex-direction:column;gap:12px">
+              {g.items.map((p: any) => {
+                const ev = evidenceSplit(p.sources);
+                return (
+                  <article id={p.id} style="border-top:1px solid var(--ink);padding-top:12px;display:flex;flex-direction:column;gap:8px">
+                    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+                      <h2 style="font-size:22px">{p.name}</h2>
+                      <span class={`status${p.paused ? " held" : ""}`}>{p.paused ? "paused" : "in the stack"}</span>
+                    </div>
+                    <div class="rows" style="max-width:720px">
+                      <div><span>Dose</span><span class="mono">{p.dose || "—"}</span></div>
+                      <div><span>Timing</span><span>{p.timing || "—"}</span></div>
+                      <div><span>Evidence</span><span>{p.evidence_tier || "—"} · {num(ev.supports.length)} sources for, {num(ev.challenges.length)} against</span></div>
+                      <div><span>Adherence</span><span>not served</span></div>
+                      {p.experiment && (
+                        <div>
+                          <span>Experiment</span>
+                          <span>{experimentIds.has(p.experiment) ? <a href={href(`/data/lab/experiments/${p.experiment}/`)}>{p.experiment.replace(/-/g, " ")}</a> : p.experiment.replace(/-/g, " ")}</span>
+                        </div>
+                      )}
+                    </div>
+                    {p.why && <p style="font-size:15px;max-width:70ch"><b>Why:</b> {prose(p.why)}</p>}
+                    {p.paused && p.paused_reason && <p style="font-size:15px;max-width:70ch"><b>Paused:</b> {prose(p.paused_reason)}</p>}
+                    {(ev.supports.length > 0 || ev.challenges.length > 0) && (
+                      <details>
+                        <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">
+                          <b>The sources</b>
+                        </summary>
+                        <div class="grid cols2" style="gap:24px;margin-top:8px">
+                          {[["For", ev.supports], ["Against", ev.challenges]].map(([label, list]: any) => (
+                            <div>
+                              <p class="label" style="margin-bottom:6px">{label} · {num(list.length)}</p>
+                              <div class="rows">
+                                {list.map((s: any) => (
+                                  <div>
+                                    <span style="font-size:14px">{s.url ? <a href={s.url} rel="noopener">{prose(s.title)}</a> : prose(s.title)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      ))
+    ) : (
+      <section class="section">
+        <div class="wrap">
+          <div class="empty">
+            <span>No protocol was served for this snapshot.</span>
+          </div>
+        </div>
+      </section>
+    )
+  }
+  <section class="section" style="padding-top:0">
+    <div class="wrap" style="max-width:1100px">
+      {prot.served_protocols === 0 && <p class="muted" style="font-size:13px;margin-bottom:10px">The platform's separate protocol list (/api/protocols) served none for this snapshot; these are the supplement protocols.</p>}
+      <p><a class="btn ghost sm" href={href("/data/lab/")}>Back to the Laboratory</a></p>
+    </div>
+  </section>
+</Base>

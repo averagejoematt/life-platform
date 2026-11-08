@@ -1,0 +1,36 @@
+---
+// The Laboratory's entry on /data/ (L1, built dark). SELF-GATING: with WEB_LAB off (src/lib/lab.js) this component
+// renders nothing and reads nothing — not even the Lab's data file — so /data/ is byte-identical to a build without
+// it. No <style>, no <script>: it adds no asset to the build either way.
+import { num } from "../lib/format.js";
+import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import { labCounts } from "../lib/laboratory.js";
+import { loadLab } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+const on = labEnabled();
+const lab = on ? await loadLab() : null;
+const c = lab && lab.state === "ok" ? labCounts(lab) : null;
+const mark = { [LAB_MARKER]: "entry" };
+---
+
+{
+  on && (
+    <section class="wrap" {...mark} style="padding-bottom:28px" aria-label="The Laboratory">
+      <div class="rows" style="max-width:760px">
+        <a href={href("/data/lab/")}>
+          <span>
+            <b>The Laboratory · private build, not published</b>
+            <br />
+            <span class="muted" style="font-size:13px">
+              {c
+                ? `${num(c.testsOpen)} pre-registered tests being checked · ${num(c.running)} running · ${num(c.ready)} ready · ${num(c.backlog)} in the backlog`
+                : "The experiments were not served for this snapshot."}
+            </span>
+          </span>
+          <span class="mono muted" style="font-size:12px">→</span>
+        </a>
+      </div>
+    </section>
+  )
+}
