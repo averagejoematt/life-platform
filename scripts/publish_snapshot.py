@@ -111,6 +111,12 @@ from publish_snapshot_day import DAY_ENDPOINTS, live_days  # noqa: E402 — the 
 from publish_snapshot_journey import (
     live_journey,
 )  # noqa: E402 — the Journey's data file (#5579), kept out of this module's 1000-line ceiling
+from publish_snapshot_story import (  # noqa: E402 — HS1, WEB_STORY=1 only
+    fixture_story,
+    live_story,
+    story_enabled,
+    validate as validate_story,
+)
 
 
 # ── live mode ────────────────────────────────────────────────────────────────────────────
@@ -1043,6 +1049,12 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
         cal = fixture_calibration(fixtures_dir) if mode == "fixture" else live_calibration(lambda p: _get(base_url, p, timeout), log)
         try:
             data_files["calibration"] = resolve_and_validate(cal, public)
+        except ValueError as exc:
+            raise SchemaError(str(exc)) from exc
+    if story_enabled():  # the Human Story, built dark (HS1): off = not fetched, not written, snapshot byte-identical
+        story = fixture_story(fixtures_dir, public) if mode == "fixture" else live_story(lambda p: _get(base_url, p, timeout), public, log)
+        try:
+            data_files["story"] = validate_story(story, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)

@@ -674,6 +674,20 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
         files["calibration.json"] = {"count": n_coaches, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
     elif os.path.exists(cal_path):
         os.remove(cal_path)  # a flag-off export over a room export's directory leaves no room file behind
+    # story.json — the Human Story's data file, present ONLY on a WEB_STORY=1 export (HS1, built dark;
+    # scripts/publish_snapshot_story.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
+    story_path = os.path.join(out_dir, "story.json")
+    story = data_files.get("story")
+    if story is not None:
+        text = _dump(story)
+        with open(story_path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        files["story.json"] = {
+            "count": len(story.get("installments_index") or []),
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        }
+    elif os.path.exists(story_path):
+        os.remove(story_path)  # a flag-off export over a story export's directory leaves no story file behind
 
 
 ABSENT_JOURNEY = {

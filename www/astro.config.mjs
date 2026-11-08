@@ -12,6 +12,8 @@ import sitemap from "@astrojs/sitemap";
 
 // The Coaching Room, built dark (CR1): routes injected only when WEB_ROOM=1 (src/lib/room.js). Off = no route at all.
 import { notRoomPage, roomIntegration } from "./src/lib/room.js";
+// The Human Story, built dark (HS1): routes injected only when WEB_STORY=1 (src/lib/story_dark.js). Off = no route at all.
+import { notStoryPage, storyIntegration } from "./src/lib/story_dark.js";
 
 const base = process.env.WEB_BASE || "/";
 const noindex = process.env.WEB_NOINDEX === "1";
@@ -44,5 +46,7 @@ export default defineConfig({
       assetsInlineLimit: 0,
     },
   },
-  integrations: noindex ? [roomIntegration()] : [roomIntegration(), sitemap({ filter: notRoomPage })],
+  integrations: noindex
+    ? [roomIntegration(), storyIntegration()]
+    : [roomIntegration(), storyIntegration(), sitemap({ filter: (url) => notRoomPage(url) && notStoryPage(url) })],
 });
