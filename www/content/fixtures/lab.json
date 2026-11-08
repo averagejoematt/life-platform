@@ -1,0 +1,686 @@
+{
+  "absent_text": null,
+  "as_of": null,
+  "lab_experiments": [
+    {
+      "citation_status": "verified",
+      "difficulty": "medium",
+      "evidence_citation": "Leidy et al., American Journal of Clinical Nutrition 2015",
+      "evidence_tier": "strong",
+      "group": "backlog",
+      "hypothesis": "40g protein at breakfast for 30 days will reduce total daily caloric intake and support weight loss trajectory.",
+      "id": "40g-protein-breakfast",
+      "name": "40g Protein at Breakfast",
+      "origin": "library",
+      "pillar": "nutrition",
+      "pitch": "Front-loading protein changes the entire day. You eat less later without trying.",
+      "planned_duration_days": 30,
+      "protocol_detail": null,
+      "run": null,
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/25926512/",
+      "status": "backlog",
+      "tags": [
+        "nutrition",
+        "protein",
+        "breakfast",
+        "satiety",
+        "beginner"
+      ]
+    },
+    {
+      "citation_status": "verified",
+      "difficulty": "easy",
+      "evidence_citation": "Yin et al., Metabolism 2008",
+      "evidence_tier": "strong",
+      "group": "ready",
+      "hypothesis": "500mg Berberine before high-carb meals will reduce CGM peaks above 140 mg/dL by ≥20%.",
+      "id": "berberine-glucose",
+      "name": "Berberine — Glucose Attenuation",
+      "origin": "library",
+      "pillar": "supplements",
+      "pitch": "Nature's metformin. The glucose data on this compound is hard to argue with.",
+      "planned_duration_days": 84,
+      "protocol_detail": {
+        "active_since": "2026-02-09",
+        "carried_over": true,
+        "duration_days": 84,
+        "evidence_against": [
+          {
+            "stance": "challenges",
+            "summary": "Up to 35% of users report nausea, diarrhea, or cramping. GI tolerance is a significant adherence barrier.",
+            "title": "GI side effects are common",
+            "url": null
+          },
+          {
+            "stance": "challenges",
+            "summary": "Benefits in metabolically healthy individuals are less clear. May be solving a problem that doesn't exist.",
+            "title": "Most positive studies are in diabetic/pre-diabetic populations",
+            "url": null
+          },
+          {
+            "stance": "challenges",
+            "summary": "Berberine inhibits CYP3A4 and CYP2D6. Can amplify effects of statins, SSRIs, and other medications.",
+            "title": "Drug interactions with CYP enzymes",
+            "url": null
+          }
+        ],
+        "evidence_for": [
+          {
+            "stance": "supports",
+            "summary": "Comparable glucose-lowering effects to metformin in diabetic patients. HbA1c reduction of 0.9%.",
+            "title": "Berberine vs metformin for type 2 diabetes",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/18442638/"
+          },
+          {
+            "stance": "supports",
+            "summary": null,
+            "title": "Open question — no verified study found for: Berberine activates AMPK pathway (the citation previously here did not resolve to a supporting paper; withdrawn 2026-08-02, #1892)",
+            "url": null
+          }
+        ],
+        "metrics": [
+          "cgm_spikes",
+          "fasting_glucose"
+        ],
+        "protocol": "500mg Berberine 20 min before high-carb meals. Track post-meal glucose via CGM. Compare with non-berberine control days.",
+        "protocol_kind": "unconfirmed_protocol",
+        "rationale": "CGM data provides direct, daily validation. If glucose disposal doesn't improve measurably within 30 days, the experiment ends.",
+        "why": "Nature's metformin. The glucose data on this compound is hard to argue with."
+      },
+      "run": null,
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/18442638/",
+      "status": "available",
+      "tags": [
+        "supplements",
+        "glucose",
+        "metabolic"
+      ]
+    },
+    {
+      "citation_status": "verified",
+      "difficulty": "easy",
+      "evidence_citation": "Zaccaro et al., Frontiers in Human Neuroscience 2018",
+      "evidence_tier": "strong",
+      "group": "backlog",
+      "hypothesis": "5 minutes of box breathing daily for 14 days will increase morning HRV by ≥5%.",
+      "id": "box-breathing-5min",
+      "name": "Box Breathing 5 Minutes Daily",
+      "origin": "library",
+      "pillar": "discipline",
+      "pitch": "Five minutes. No equipment. Direct parasympathetic lever. The simplest measurable intervention for stress.",
+      "planned_duration_days": 14,
+      "protocol_detail": null,
+      "run": null,
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/30245619/",
+      "status": "backlog",
+      "tags": [
+        "discipline",
+        "breathwork",
+        "stress",
+        "hrv",
+        "beginner"
+      ]
+    },
+    {
+      "citation_status": "verified",
+      "difficulty": "easy",
+      "evidence_citation": "Kreider et al., J Int Soc Sports Nutrition 2017",
+      "evidence_tier": "strong",
+      "group": "ready",
+      "hypothesis": "5g daily creatine for 56 days will produce ≥8% increase in major lift 1RMs vs pre-supplementation baseline.",
+      "id": "creatine-strength",
+      "name": "Creatine Monohydrate — Strength",
+      "origin": "library",
+      "pillar": "supplements",
+      "pitch": "The most evidence-backed supplement in existence. If you're lifting and not taking creatine, you're leaving gains on the table.",
+      "planned_duration_days": 56,
+      "protocol_detail": {
+        "active_since": "2026-02-14",
+        "carried_over": true,
+        "duration_days": 56,
+        "evidence_against": [
+          {
+            "stance": "challenges",
+            "summary": "Case reports of kidney stress exist, though systematic reviews in healthy populations show no risk. Monitoring recommended for pre-existing conditions.",
+            "title": "Creatine and kidney function concerns",
+            "url": null
+          },
+          {
+            "stance": "challenges",
+            "summary": "Initial weight gain is primarily water, not muscle. DEXA can differentiate but scale weight is misleading.",
+            "title": "Water retention confounds body composition claims",
+            "url": null
+          }
+        ],
+        "evidence_for": [
+          {
+            "stance": "supports",
+            "summary": "Most extensively studied ergogenic aid in history. Consistent benefits for strength, power, and lean mass across hundreds of studies.",
+            "title": "ISSN Position Stand on Creatine",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/28615996/"
+          },
+          {
+            "stance": "supports",
+            "summary": "Emerging evidence for neuroprotective effects and cognitive benefits, particularly under stress or sleep deprivation.",
+            "title": "Creatine supplementation and cognitive function",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/29704637/"
+          }
+        ],
+        "metrics": [
+          "strength",
+          "lean_mass"
+        ],
+        "protocol": "5g creatine monohydrate daily (no loading phase). With any meal. Track major lift progression. Measure body composition.",
+        "protocol_kind": "ongoing_protocol",
+        "rationale": "Most evidence-backed supplement in existence with 500+ studies. Counter-arguments are well-addressed in the literature — kidney concerns debunked for healthy individuals.",
+        "why": "The most evidence-backed supplement in existence. If you're lifting and not taking creatine, you're leaving gains on the table."
+      },
+      "run": null,
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/28615996/",
+      "status": "available",
+      "tags": [
+        "supplements",
+        "strength",
+        "body-composition"
+      ]
+    },
+    {
+      "citation_status": "verified",
+      "difficulty": "medium",
+      "evidence_citation": "Wilkinson et al., Cell Metabolism 2020",
+      "evidence_tier": "strong",
+      "group": "backlog",
+      "hypothesis": "16:8 fasting for 30 days will reduce fasting glucose by ≥5 mg/dL and support weight loss trend.",
+      "id": "intermittent-fasting-16-8",
+      "name": "16:8 Intermittent Fasting",
+      "origin": "library",
+      "pillar": "nutrition",
+      "pitch": "The simplest dietary intervention — you don't change what you eat, just when. The 16-hour fast does the rest.",
+      "planned_duration_days": 30,
+      "protocol_detail": null,
+      "run": null,
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/31813824/",
+      "status": "backlog",
+      "tags": [
+        "nutrition",
+        "fasting",
+        "glucose",
+        "metabolic",
+        "intermediate"
+      ]
+    },
+    {
+      "citation_status": "verified",
+      "difficulty": "moderate",
+      "evidence_citation": "Bull et al., British Journal of Sports Medicine 2020 (WHO physical-activity guidelines)",
+      "evidence_tier": "strong",
+      "group": "backlog",
+      "hypothesis": "150+ min/week Zone 2 for 8 weeks will improve cardiac efficiency (pace-at-HR) by >5%",
+      "id": "zone2-150-min-week",
+      "name": "Zone 2 Cardio 150+ min/Week",
+      "origin": "library",
+      "pillar": "movement",
+      "pitch": "Sustained Zone 2 base building for 8 weeks",
+      "planned_duration_days": 56,
+      "protocol_detail": null,
+      "run": null,
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/33239350/",
+      "status": "backlog",
+      "tags": [
+        "zone2",
+        "cardio",
+        "longevity"
+      ]
+    }
+  ],
+  "lab_findings": [
+    {
+      "ci95_high": 0.612,
+      "ci95_low": 0.123,
+      "fdr_corrected": true,
+      "id": "2026-w45-training-mins-recovery",
+      "level": "high",
+      "metric_a": "training_mins",
+      "metric_b": "Recovery",
+      "n": 68,
+      "n_eff": 47.3,
+      "r": 0.4,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.434,
+      "ci95_low": 0.039,
+      "fdr_corrected": true,
+      "id": "2026-w45-steps-sleep-score",
+      "level": "high",
+      "metric_a": "Steps",
+      "metric_b": "Sleep Score",
+      "n": 90,
+      "n_eff": 87.8,
+      "r": 0.25,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.45,
+      "ci95_low": 0.058,
+      "fdr_corrected": true,
+      "id": "2026-w45-steps-recovery",
+      "level": "high",
+      "metric_a": "Steps",
+      "metric_b": "Recovery",
+      "n": 90,
+      "n_eff": 87.2,
+      "r": 0.26,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.448,
+      "ci95_low": 0.056,
+      "fdr_corrected": true,
+      "id": "2026-w45-steps-hrv",
+      "level": "high",
+      "metric_a": "Steps",
+      "metric_b": "HRV",
+      "n": 90,
+      "n_eff": 87.6,
+      "r": 0.26,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.538,
+      "ci95_low": 0.06,
+      "fdr_corrected": true,
+      "id": "2026-w45-sleep-score-recovery",
+      "level": "high",
+      "metric_a": "Sleep Score",
+      "metric_b": "Recovery",
+      "n": 90,
+      "n_eff": 55.5,
+      "r": 0.32,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.508,
+      "ci95_low": 0.103,
+      "fdr_corrected": true,
+      "id": "2026-w45-sleep-duration-recovery",
+      "level": "high",
+      "metric_a": "Sleep Duration",
+      "metric_b": "Recovery",
+      "n": 90,
+      "n_eff": 77,
+      "r": 0.32,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": -0.442,
+      "ci95_low": -0.812,
+      "fdr_corrected": true,
+      "id": "2026-w45-resting-hr-recovery",
+      "level": "high",
+      "metric_a": "Resting HR",
+      "metric_b": "Recovery",
+      "n": 90,
+      "n_eff": 38.5,
+      "r": -0.67,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.679,
+      "ci95_low": 0.121,
+      "fdr_corrected": true,
+      "id": "2026-w45-readiness-day-grade",
+      "level": "high",
+      "metric_a": "readiness",
+      "metric_b": "Day Grade",
+      "n": 53,
+      "n_eff": 33.9,
+      "r": 0.44,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.708,
+      "ci95_low": 0.19,
+      "fdr_corrected": true,
+      "id": "2026-w45-protein-recovery",
+      "level": "high",
+      "metric_a": "Protein",
+      "metric_b": "Recovery",
+      "n": 81,
+      "n_eff": 35.2,
+      "r": 0.49,
+      "week": "2026-W45"
+    },
+    {
+      "ci95_high": 0.64,
+      "ci95_low": 0.234,
+      "fdr_corrected": true,
+      "id": "2026-w45-hrv-sleep-score",
+      "level": "high",
+      "metric_a": "HRV",
+      "metric_b": "Sleep Score",
+      "n": 90,
+      "n_eff": 59.8,
+      "r": 0.46,
+      "week": "2026-W45"
+    }
+  ],
+  "lab_protocols": {
+    "groups": [
+      {
+        "desc": "The compounds that protect the master variable. Circadian support, GABA modulation, and core temperature regulation.",
+        "id": "sleep",
+        "items": [
+          {
+            "dose": "144mg elemental",
+            "evidence_tier": "moderate",
+            "experiment": "sleep-stack",
+            "id": "l_threonate",
+            "name": "Magnesium L-Threonate",
+            "paused": false,
+            "paused_reason": null,
+            "sources": [
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Magnesium L-threonate enhances learning and memory (original rodent study)",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/20152124/"
+              },
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Magnesium and sleep quality (systematic review)",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/35184264/"
+              },
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Suboptimal magnesium status in the US — NHANES: about 48% consume less magnesium than the estimated requirement",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/22364157/"
+              },
+              {
+                "stance": "challenges",
+                "summary": null,
+                "title": "Open question — no direct study found for a cost-effectiveness or human brain-uptake advantage of L-threonate over standard magnesium forms",
+                "url": null
+              },
+              {
+                "stance": "challenges",
+                "summary": null,
+                "title": "Most magnesium sleep benefits apply to deficient populations",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/33865376/"
+              }
+            ],
+            "timing": "PM",
+            "why": "Sleep stack anchor. Combined with Apigenin and Glycine, this is the recommended pre-sleep protocol. Under the training volume ahead, magnesium loss through sweat is a real risk."
+          },
+          {
+            "dose": "2-3g",
+            "evidence_tier": "moderate",
+            "experiment": null,
+            "id": "glycine",
+            "name": "Glycine",
+            "paused": false,
+            "paused_reason": null,
+            "sources": [
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Open question — no verified study found for: Glycine ingestion improves subjective sleep quality (original RCT) (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+                "url": null
+              },
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Glycine-induced hypothermia and sleep regulation",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/22293292/"
+              },
+              {
+                "stance": "challenges",
+                "summary": null,
+                "title": "Open question — no verified study found for: Effect size on sleep is modest in non-deficient populations (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+                "url": null
+              }
+            ],
+            "timing": "PM",
+            "why": "Beautiful synergy with Eight Sleep — both work by lowering core temperature. Collagen synthesis bonus for joint health during heavy training."
+          }
+        ],
+        "name": "Sleep Architecture"
+      },
+      {
+        "desc": "Protecting lean mass through the deficit ahead. Every gram of muscle preserved is metabolic insurance.",
+        "id": "muscle",
+        "items": [
+          {
+            "dose": "5g",
+            "evidence_tier": "strong",
+            "experiment": "creatine-cognitive",
+            "id": "creatine",
+            "name": "Creatine Monohydrate",
+            "paused": false,
+            "paused_reason": null,
+            "sources": [
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "ISSN Position Stand: Creatine Supplementation",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/28615996/"
+              },
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Creatine and creatinine metabolism (physiological review)",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/10731009/"
+              },
+              {
+                "stance": "challenges",
+                "summary": null,
+                "title": "Long-term safety concerns and kidney function (review)",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/21399917/"
+              }
+            ],
+            "timing": "AM with food",
+            "why": "During deficit, creatine is protective — helps preserve the muscle you're working to keep. 5g/day, no loading, no cycling."
+          },
+          {
+            "dose": "30g whey/casein",
+            "evidence_tier": "strong",
+            "experiment": null,
+            "id": "protein",
+            "name": "Protein Supplement",
+            "paused": false,
+            "paused_reason": null,
+            "sources": [
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Protein supplementation and lean mass (meta-analysis)",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/28698222/"
+              },
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Dietary protein and muscle mass in older adults",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/25926512/"
+              },
+              {
+                "stance": "challenges",
+                "summary": null,
+                "title": "Whole food protein sources superior to supplements for muscle protein synthesis",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/28978542/"
+              }
+            ],
+            "timing": "Post-training",
+            "why": "On a calorie deficit with a high daily protein target, protein has to make up a large share of the day's calories — and a shake is often the only way to close the gap."
+          }
+        ],
+        "name": "Muscle & Performance"
+      },
+      {
+        "desc": "Neuroplasticity, focus, and the cognitive infrastructure.",
+        "id": "cognitive",
+        "items": [
+          {
+            "dose": "500mg",
+            "evidence_tier": "emerging",
+            "experiment": null,
+            "id": "cordyceps",
+            "name": "Cordyceps",
+            "paused": true,
+            "paused_reason": "Not in the starting stack — emerging evidence only, held until adherence can be tracked",
+            "sources": [
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Cordyceps supplementation improves exercise performance (systematic review)",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/27408987/"
+              },
+              {
+                "stance": "supports",
+                "summary": null,
+                "title": "Cordyceps militaris improves tolerance to high-intensity exercise",
+                "url": "https://pubmed.ncbi.nlm.nih.gov/20804368/"
+              },
+              {
+                "stance": "challenges",
+                "summary": null,
+                "title": "Open question — no verified study found for: Human trials show inconsistent results for aerobic performance (the citation previously here did not resolve to a paper supporting this claim; withdrawn 2026-08-02, #1892)",
+                "url": null
+              }
+            ],
+            "timing": "AM",
+            "why": "Theoretically supports the aerobic engine during Zone 2. Evidence is thin. Good N=1 candidate."
+          }
+        ],
+        "name": "Cognitive Support"
+      }
+    ],
+    "served_protocols": 0
+  },
+  "lab_tests": [
+    {
+      "actionable": null,
+      "check_count": 1,
+      "ci95_high": null,
+      "ci95_low": null,
+      "condition_series": "total_protein_g",
+      "confidence": "medium",
+      "criterion": null,
+      "days_observed": 5,
+      "effect_size": null,
+      "id": "hyp_protein_deficit_recovery_lag",
+      "last_checked": "2026-11-08",
+      "min_days_per_arm": 5,
+      "monitoring_window_days": 21,
+      "n_comparison": 0,
+      "n_condition": 0,
+      "outcome_series": "recovery_score",
+      "pre_registered": "2026-11-01",
+      "spec": {
+        "baseline_n": 29,
+        "baseline_sd": 13.641,
+        "baseline_statistic": "sd_of_successive_differences_over_sqrt2",
+        "baseline_window_days": 30,
+        "condition_metric": "protein_g",
+        "condition_op": "<=",
+        "condition_threshold": 120,
+        "direction": "lower",
+        "lag_days": 1,
+        "min_days_per_arm": 5,
+        "min_effect": 6.82,
+        "min_effect_kind": "personal_derivation",
+        "min_effect_unit": "points",
+        "outcome_metric": "recovery"
+      },
+      "statement": null,
+      "status": "pending",
+      "verdict": "inconclusive"
+    },
+    {
+      "actionable": null,
+      "check_count": 3,
+      "ci95_high": null,
+      "ci95_low": null,
+      "condition_series": null,
+      "confidence": "low",
+      "criterion": null,
+      "days_observed": 19,
+      "effect_size": null,
+      "id": "hyp_carb_load_sleep_lag",
+      "last_checked": "2026-11-08",
+      "min_days_per_arm": 5,
+      "monitoring_window_days": 21,
+      "n_comparison": 16,
+      "n_condition": 3,
+      "outcome_series": null,
+      "pre_registered": "2026-10-18",
+      "spec": {
+        "baseline_n": 29,
+        "baseline_sd": 4.845,
+        "baseline_statistic": "sd_of_successive_differences_over_sqrt2",
+        "baseline_window_days": 30,
+        "condition_metric": "carbs_g",
+        "condition_op": ">=",
+        "condition_threshold": 150,
+        "direction": "higher",
+        "lag_days": 1,
+        "min_days_per_arm": 5,
+        "min_effect": 2.42,
+        "min_effect_kind": "personal_derivation",
+        "min_effect_unit": "points",
+        "outcome_metric": "sleep_efficiency"
+      },
+      "statement": null,
+      "status": "pending",
+      "verdict": "inconclusive"
+    },
+    {
+      "actionable": null,
+      "check_count": 4,
+      "ci95_high": 5.291,
+      "ci95_low": -10.731,
+      "condition_series": "total_protein_g",
+      "confidence": "medium",
+      "criterion": null,
+      "days_observed": 27,
+      "effect_size": -1.396,
+      "id": "hyp_protein_recovery_lag",
+      "last_checked": "2026-11-01",
+      "min_days_per_arm": 5,
+      "monitoring_window_days": 21,
+      "n_comparison": 13,
+      "n_condition": 14,
+      "outcome_series": "recovery_score",
+      "pre_registered": "2026-10-04",
+      "spec": {
+        "baseline_n": null,
+        "baseline_sd": null,
+        "baseline_statistic": null,
+        "baseline_window_days": null,
+        "condition_metric": "protein_g",
+        "condition_op": "<=",
+        "condition_threshold": 140,
+        "direction": "lower",
+        "lag_days": 1,
+        "min_days_per_arm": 5,
+        "min_effect": 10,
+        "min_effect_kind": "model_proposed",
+        "min_effect_unit": null,
+        "outcome_metric": "recovery"
+      },
+      "statement": null,
+      "status": "archived",
+      "verdict": "inconclusive"
+    }
+  ],
+  "notice": "N=1 personal-platform observations — not population claims.",
+  "source": [
+    "/api/experiments",
+    "/api/hypotheses",
+    "/api/discoveries",
+    "/api/supplements",
+    "/api/protocols"
+  ],
+  "state": "ok"
+}

@@ -119,6 +119,16 @@ export async function loadCalibration() {
   return _calibration;
 }
 
+let _lab = null;
+/** The Laboratory's data file (L1, built dark): written by the producer ONLY on a WEB_LAB=1 export and read only by
+ *  Lab pages, which exist only on a Lab build. Throws when absent — a Lab build over a flag-off snapshot is a setup
+ *  error, not an empty Lab (re-export with WEB_LAB=1). */
+export async function loadLab() {
+  if (_lab) return _lab;
+  _lab = JSON.parse(await readFile(join(SNAPSHOT_DIR, "lab.json"), "utf8"));
+  return _lab;
+}
+
 let _story = null;
 /** The Human Story's data file (HS1, built dark): written by the producer ONLY on a WEB_STORY=1 export and read only by
  *  story pages and the self-gating entry, which exist only on a story build. Throws when absent — re-export with

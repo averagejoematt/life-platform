@@ -30,6 +30,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { roomEnabled } from "../src/lib/room.js";
+import { labEnabled } from "../src/lib/lab.js";
 import { storyEnabled } from "../src/lib/story_dark.js";
 
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,8 +46,11 @@ const ASSET_PREFIX_ROOTS = ["_astro", "assets"];
 const rawBase = process.env.WEB_BASE || "/";
 // A Coaching Room build (WEB_ROOM=1, src/lib/room.js) is private and local: it must never rewrite the two committed
 // artifacts the deploy reads, so they are left exactly as committed and the build says so.
+// A Laboratory build (WEB_LAB=1, src/lib/lab.js, L1) is private in the same way and held to the same rule.
 // A Human Story build (WEB_STORY=1, src/lib/story_dark.js, HS1) is private and local in exactly the same way.
-const room = roomEnabled() || storyEnabled();
+const lab = labEnabled();
+const story = storyEnabled();
+const room = roomEnabled() || lab || story;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
 function walk(dir, out = []) {
@@ -196,7 +200,7 @@ if (!room) writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
 
 if (room) {
   console.log(
-    `postbuild: WEB_ROOM=1 / WEB_STORY=1 — a private dark build (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
+    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : "WEB_ROOM=1 — a private Coaching Room build"} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
   );
 } else {
   console.log(

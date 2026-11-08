@@ -1,0 +1,289 @@
+---
+// /data/lab/ — the Laboratory's index (L1). BUILT DARK: this file lives outside src/pages/ and is injected as a route
+// ONLY when WEB_LAB=1 (src/lib/lab.js, astro.config.mjs). With the switch off it is not in the build at all.
+// Simple on arrival (what he is trying on purpose, in four numbers), deep on demand (the tests, what was learned, the
+// protocols, the backlog). Every figure is carried from the snapshot's lab.json; nothing is computed here.
+// No challenge check-in, vote or suggestion control: reader writes stay out of the Lab (owner brief 2026-11-08).
+import Base from "../layouts/Base.astro";
+import LabBanner from "../components/LabBanner.astro";
+import { dayInWords, num } from "../lib/format.js";
+import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import { GROUP_WORDS, byPillar, findingText, labCounts, latestFindings, pillarWords, testSentence, verdictOf, weekWords, prose } from "../lib/laboratory.js";
+import { loadLab } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+if (!labEnabled()) throw new Error("src/lab/lab-index.astro rendered with WEB_LAB off — the Lab route must not be injected");
+
+const lab = await loadLab();
+const ok = lab.state === "ok";
+const c = labCounts(lab);
+const tests = (lab.lab_tests || []) as any[];
+const open = tests.filter((t) => t.status !== "archived");
+const retired = tests.filter((t) => t.status === "archived");
+const xs = (lab.lab_experiments || []) as any[];
+const running = xs.filter((x) => x.group === "running");
+const ready = xs.filter((x) => x.group === "ready");
+const done = xs.filter((x) => x.group === "done");
+const backlog = byPillar(xs.filter((x) => x.group === "backlog"));
+const learned = latestFindings(lab.lab_findings);
+const groups = ((lab.lab_protocols || {}).groups || []) as any[];
+const inUse = groups.reduce((s, g) => s + g.items.filter((i: any) => !i.paused).length, 0);
+const paused = groups.reduce((s, g) => s + g.items.filter((i: any) => i.paused).length, 0);
+const asOf = lab.as_of ? dayInWords(lab.as_of) : null;
+const noindex = process.env.WEB_NOINDEX === "1";
+const mark = { [LAB_MARKER]: "index" };
+const VCLASS: Record<string, string> = { supported: "confirmed", contradicted: "refuted" };
+const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? one : many}`;
+---
+
+<Base title="The Laboratory" top="data" description="What he is trying on purpose, what it should move, what it moved, and how sure anyone can be." status={asOf}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <LabBanner />
+  {
+    !ok ? (
+      <section class="section" {...mark}>
+        <div class="wrap">
+          <h1>The Laboratory</h1>
+          <div class="empty" style="margin-top:18px">
+            <span>{lab.absent_text || "The experiments were not served for this snapshot."}</span>
+          </div>
+        </div>
+      </section>
+    ) : (
+      <>
+        <section class="section" {...mark} style="padding-bottom:24px">
+          <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
+            <p class="label">Data · the Laboratory{asOf ? ` · through ${asOf}` : ""}</p>
+            <h1 style="font-size:clamp(32px,6vw,52px);line-height:1.05">What he is trying on purpose</h1>
+            <p class="dek" style="font-size:19px;max-width:70ch">
+              {plural(c.testsOpen, "pre-registered test is", "pre-registered tests are")} checked every week against the data.{" "}
+              {c.running ? `${plural(c.running, "experiment is", "experiments are")} running` : "No experiment is running"}; {plural(c.ready, "is", "are")} ready to start and{" "}
+              {num(c.backlog)} wait in the backlog.
+            </p>
+            {lab.notice && <p class="muted" style="font-size:14px">{prose(lab.notice)}</p>}
+          </div>
+        </section>
+
+        <section class="wrap" style="padding-bottom:32px" aria-label="The Laboratory in numbers">
+          <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))">
+            <a class="tile" href="#tests">
+              <span class="label">Tests being checked</span>
+              <span class="v num" style="font-size:30px">{num(c.testsOpen)}</span>
+              <span class="muted" style="font-size:13px">pre-registered, graded by code</span>
+            </a>
+            <div class="tile">
+              <span class="label">Experiments running</span>
+              <span class="v num" style="font-size:30px">{num(c.running)}</span>
+              <span class="muted" style="font-size:13px">{c.running ? "with a logged first day" : "none has a logged first day"}</span>
+            </div>
+            <a class="tile" href="#ready">
+              <span class="label">Ready to start</span>
+              <span class="v num" style="font-size:30px">{num(c.ready)}</span>
+              <span class="muted" style="font-size:13px">protocol written, not started</span>
+            </a>
+            <a class="tile" href="#backlog">
+              <span class="label">Backlog</span>
+              <span class="v num" style="font-size:30px">{num(c.backlog)}</span>
+              <span class="muted" style="font-size:13px">ideas from the library</span>
+            </a>
+            <a class="tile" href={href("/data/lab/protocols/")}>
+              <span class="label">Protocols</span>
+              <span class="v num" style="font-size:30px">{num(inUse)}</span>
+              <span class="muted" style="font-size:13px">in the stack{paused ? ` · ${num(paused)} paused` : ""}</span>
+            </a>
+          </div>
+        </section>
+
+        <section class="section" id="tests" style="padding-top:8px">
+          <div class="wrap" style="max-width:1100px">
+            <p class="label" style="margin-bottom:6px">The tests being checked · {num(open.length)}</p>
+            <p class="muted" style="font-size:14px;max-width:70ch;margin-bottom:12px">
+              Each was written down before the data that grades it. What it expects, the smallest difference that would count, and the verdict the weekly check
+              gave it.
+            </p>
+            {open.length ? (
+              <div class="rows">
+                {open.map((t) => {
+                  const v = verdictOf(t);
+                  return (
+                    <a href={href(`/data/lab/tests/${t.id}/`)}>
+                      <span style="font-size:15px">
+                        <b>{testSentence(t)}</b>
+                        <br />
+                        <span class="muted" style="font-size:13px">
+                          written {dayInWords(t.pre_registered, { short: true })}
+                          {t.days_observed != null ? ` · ${plural(t.days_observed, "paired day", "paired days")} so far` : ""}
+                          {v.reason ? ` · ${v.reason}` : ""}
+                        </span>
+                      </span>
+                      <span class={`status ${VCLASS[v.key] || "inconclusive"}`}>{v.word}</span>
+                    </a>
+                  );
+                })}
+              </div>
+            ) : (
+              <div class="empty">
+                <span>No pre-registered test is open in this snapshot.</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section class="section" id="ready" style="padding-top:8px">
+          <div class="wrap" style="max-width:1100px">
+            <p class="label" style="margin-bottom:6px">Running · {num(running.length)} — Ready to start · {num(ready.length)}</p>
+            {!running.length && (
+              <div class="empty" style="margin-bottom:12px">
+                <b style="color:var(--ink)">No experiment is running.</b>
+                <span>An experiment becomes real when its first day is logged; none has been in this snapshot.</span>
+              </div>
+            )}
+            {[...running, ...ready].length > 0 && (
+              <div class="rows">
+                {[...running, ...ready].map((x) => (
+                  <a href={href(`/data/lab/experiments/${x.id}/`)}>
+                    <span style="font-size:15px">
+                      <b>{x.name}</b>
+                      <br />
+                      <span class="muted" style="font-size:13px">{prose(x.hypothesis) || "No hypothesis served."}</span>
+                    </span>
+                    <span class="status">{GROUP_WORDS[x.group]}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section class="section" id="learned" style="padding-top:8px">
+          <div class="wrap" style="max-width:1100px">
+            <p class="label" style="margin-bottom:6px">What was learned{learned.week ? ` · ${weekWords(learned.week)}` : ""}</p>
+            <p class="muted" style="font-size:14px;max-width:70ch;margin-bottom:12px">
+              Pairs of readings that moved together, found by the weekly correlation run after correcting for how many pairs it tried. A correlation, not an
+              experiment: it says two things travel together, not that one causes the other.
+            </p>
+            {learned.items.length ? (
+              <>
+                <div class="rows">
+                  {learned.items.slice(0, 6).map((f) => (
+                    <div>
+                      <span style="font-size:14px">{findingText(f)}</span>
+                      <span class="mono" style="font-size:12px">
+                        listed {num(f.seen)} of {num(learned.weeks)} weeks
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {learned.items.length > 6 && (
+                  <details style="margin-top:10px">
+                    <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">
+                      <b>The other {num(learned.items.length - 6)} from that week</b>
+                    </summary>
+                    <div class="rows" style="margin-top:8px">
+                      {learned.items.slice(6).map((f) => (
+                        <div>
+                          <span style="font-size:14px">{findingText(f)}</span>
+                          <span class="mono" style="font-size:12px">
+                            listed {num(f.seen)} of {num(learned.weeks)} weeks
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </>
+            ) : (
+              <div class="empty">
+                <span>No finding was served for this snapshot.</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section class="section" style="padding-top:8px">
+          <div class="wrap" style="max-width:1100px">
+            <p class="label" style="margin-bottom:6px">Protocols · {num(groups.length)} groups</p>
+            <div class="rows">
+              {groups.map((g) => (
+                <a href={href(`/data/lab/protocols/#${g.id}`)}>
+                  <span style="font-size:15px">
+                    <b>{g.name}</b>
+                    {g.desc && (
+                      <>
+                        <br />
+                        <span class="muted" style="font-size:13px">{prose(g.desc)}</span>
+                      </>
+                    )}
+                  </span>
+                  <span class="mono" style="font-size:12px">
+                    {num(g.items.filter((i: any) => !i.paused).length)} in use{g.items.some((i: any) => i.paused) ? ` · ${num(g.items.filter((i: any) => i.paused).length)} paused` : ""}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="backlog" style="padding-top:8px">
+          <div class="wrap" style="max-width:1100px;display:flex;flex-direction:column;gap:10px">
+            <details>
+              <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">
+                <b style="font-size:18px">The backlog — {plural(c.backlog, "experiment", "experiments")} from the library, by pillar</b>
+              </summary>
+              <div style="display:flex;flex-direction:column;gap:18px;margin-top:12px">
+                {backlog.map((g) => (
+                  <div>
+                    <p class="label" style="margin-bottom:6px">
+                      {pillarWords(g.pillar)} · {num(g.items.length)}
+                    </p>
+                    <div class="rows">
+                      {g.items.map((x: any) => (
+                        <a href={href(`/data/lab/experiments/${x.id}/`)}>
+                          <span style="font-size:14px">
+                            <b>{x.name}</b>
+                          </span>
+                          <span class="mono" style="font-size:12px">
+                            {x.planned_duration_days ? `${num(x.planned_duration_days)} days` : "—"}
+                            {x.evidence_tier ? ` · ${x.evidence_tier} evidence` : ""}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+            {(retired.length > 0 || done.length > 0) && (
+              <details>
+                <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">
+                  <b style="font-size:18px">Retired and finished · {num(retired.length + done.length)}</b>
+                </summary>
+                <div class="rows" style="margin-top:12px">
+                  {retired.map((t) => (
+                    <a href={href(`/data/lab/tests/${t.id}/`)}>
+                      <span style="font-size:14px">
+                        <b>{testSentence(t)}</b>
+                      </span>
+                      <span class="status inconclusive">{verdictOf(t).word}</span>
+                    </a>
+                  ))}
+                  {done.map((x) => (
+                    <a href={href(`/data/lab/experiments/${x.id}/`)}>
+                      <span style="font-size:14px">
+                        <b>{x.name}</b>
+                      </span>
+                      <span class="status">{GROUP_WORDS.done}</span>
+                    </a>
+                  ))}
+                </div>
+              </details>
+            )}
+            <p class="muted" style="font-size:13px;max-width:70ch">
+              Challenges, votes and suggestions are not part of this build: nothing on these pages writes a record.
+            </p>
+          </div>
+        </section>
+      </>
+    )
+  }
+</Base>
