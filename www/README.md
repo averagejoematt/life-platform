@@ -122,3 +122,18 @@ WEB_ROOM=1 npm run snapshot:live && WEB_ROOM=1 npm run build      # dist/ now ho
 python3 ../tests/web_preview_gate.py --dist dist --base / --skip-control --out /tmp/room-gate
 npm run snapshot:fixture && npm run build                          # back to a publishable, room-free dist
 ```
+
+## The Laboratory — built dark (L1)
+
+Owner brief 2026-11-08: private Laboratory prototypes from the existing public-safe experiments, hypotheses and findings; interactive challenge actions stay disabled until their record-writing is safe. The same pattern as the Coaching Room, as a **separate** switch: **`WEB_LAB=1`**, read through `src/lib/lab.js` (Python twin `scripts/publish_snapshot_lab.py::lab_enabled`). With the switch off the build is **byte-identical** to a build without the Lab.
+
+* **Where it lives:** pages in `src/lab/` (`lab-*.astro`, so every chunk they make is named for the Lab), injected under `/data/lab/` only when the switch is on (`labIntegration`); the sitemap filter drops them even then. The one piece on an existing page, `components/LabEntry.astro` on `/data/`, is self-gating. The data file `lab.json` (`/api/experiments`, `/api/hypotheses`, `/api/discoveries`, `/api/supplements`, `/api/protocols`, as served) is written only on a `WEB_LAB=1` export.
+* **What it shows:** the index (tests being checked, running / ready / backlog, what was learned, protocol groups); a page per pre-registered test (the frozen spec in words, the minimum effect and where it came from, baseline → window over the snapshot's series with `islands/inspect.js`, the served verdict with its interval, days against the pre-registered line linking to the Day pages); a page per experiment (pre-registration, window, result and compliance — each saying "not yet" or "not served" where that is the truth — and the protocol with evidence for and against); the protocols (dose, timing, why, paused, evidence vs adherence). No challenge, vote or suggestion control.
+* **Privacy:** anything whose subject or measurement is a mood, journal, State-of-Mind, diary or self-reported read is excluded by the producer — its text, its id and any count of it — and the export log names it for the operator; a test is also excluded unless `common.activity_publication` classifies each spec metric public.
+* **Never deployed, and the proofs:** as for the room — `postbuild.mjs` leaves `owned_paths.json` / `reach.json` as committed, `check_www_build.py`'s scan refuses a dist with a Lab page, `lab.json` or the `data-lab` marker; `tests/lab.test.mjs` + `scripts/lab_audit.mjs` (each check with its planted control) and `tests/test_www_laboratory_dark_l1.py`; the master proof is the recursive diff of `dist/` against main from the same snapshot.
+
+```bash
+WEB_LAB=1 npm run snapshot:live && WEB_LAB=1 npm run build        # dist/ now holds /data/lab/ — do not sync it
+python3 ../tests/web_preview_gate.py --dist dist --base / --skip-control
+npm run snapshot:fixture && npm run build                          # back to a publishable, Lab-free dist
+```

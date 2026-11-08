@@ -687,6 +687,17 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
         }
     elif os.path.exists(room_path):
         os.remove(room_path)
+    # lab.json — the Laboratory's data file, present ONLY on a WEB_LAB=1 export (L1, built dark;
+    # scripts/publish_snapshot_lab.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
+    lab_path = os.path.join(out_dir, "lab.json")
+    lab = data_files.get("lab")
+    if lab is not None:
+        text = _dump(lab)
+        with open(lab_path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        files["lab.json"] = {"count": len(lab.get("lab_experiments") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    elif os.path.exists(lab_path):
+        os.remove(lab_path)  # a flag-off export over a Lab export's directory leaves no Lab file behind
 
 
 ABSENT_JOURNEY = {
