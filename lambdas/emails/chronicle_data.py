@@ -22,7 +22,7 @@ from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_
 from common.digest_utils import d2f, safe_float
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from experiment.phase_filter import singleton_visible
-from health import character_privacy  # owner rulings 2026-11-03/04: the chronicle is public — private-source pillars held
+from health import character_privacy, day_grade_public  # owner rulings 2026-11-03/06: the chronicle is public — private-source pillars held
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 
@@ -538,7 +538,7 @@ def build_data_packet(data):
     # --- Day grades ---
     packet.append("=== DAY GRADES ===")
     for d in sorted(data["day_grades"].keys()):
-        rec = data["day_grades"][d]
+        rec = day_grade_public.public_grade(data["day_grades"][d]) or {}  # the public variant (2026-11-06)
         score = safe_float(rec, "total_score")
         # #2177: a missing total_score is ADR-104 absence, not zero — a partial
         # day-grade record must degrade this one line, not crash the whole
@@ -663,7 +663,7 @@ def build_data_packet(data):
         packet.append("")
 
     # --- Character Sheet (gamification arc — narrative gold for Elena) ---
-    cs_data = {d: character_privacy.public_sheet(r) for d, r in (data.get("character_sheet", {}) or {}).items()}
+    cs_data = {d: v for d, r in (data.get("character_sheet", {}) or {}).items() if (v := character_privacy.public_sheet(r))}
     if cs_data:
         packet.append("=== CHARACTER SHEET (RPG gamification layer) ===")
         packet.append("The Character Sheet is Matthew's persistent gamified life score — an RPG-style")

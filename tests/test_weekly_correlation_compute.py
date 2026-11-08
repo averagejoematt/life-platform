@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 import weekly_correlation_compute_lambda as wc  # noqa: E402
 from common import compute_metadata, stats_core  # noqa: E402
 from experiment import experiment_gates  # noqa: E402
+from public_variant_fixtures import public_habitify  # noqa: E402 — 2026-11-06: habit_pct counts public habits
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Hand-written fakes (no MagicMock anywhere — see module docstring)
@@ -465,7 +466,7 @@ class TestAssembleDailySeries:
                         {"date": "2026-05-01", "total_calories_kcal": 2400, "total_protein_g": 190, "total_carbs_g": 250, "total_fat_g": 80}
                     ],
                     "apple_health": [{"date": "2026-05-01", "steps": 11000, "blood_glucose_cv": 17.5, "som_avg_valence": 0.4}],
-                    "habitify": [{"date": "2026-05-01", "habits": {"a": True, "b": True, "c": False, "d": False}}],
+                    "habitify": [public_habitify({"a": True, "b": True, "c": False, "d": False}, date="2026-05-01")],
                     "computed_metrics": [
                         {
                             "date": "2026-05-01",
@@ -477,6 +478,15 @@ class TestAssembleDailySeries:
                         }
                     ],
                     "flourishing": [{"date": "2026-05-01", "values_lived_count": 3}],
+                    # Owner ruling 2026-11-05: the day_grade metric is the day_grade record's PUBLIC variant
+                    # (the method-1 total beside it, and computed_metrics' day_grade_score, are never read here).
+                    "day_grade": [
+                        {
+                            "date": "2026-05-01",
+                            "total_score": 63,
+                            "public": {"total_score": 84, "public_method_version": "day-grade-public-v1"},
+                        }
+                    ],
                 }
             ),
         )

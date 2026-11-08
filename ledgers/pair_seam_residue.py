@@ -122,7 +122,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "computed_metrics::mcp/tools_training.py::read": SEED_DATE,
     "day_grade::lambdas/compute/adaptive_mode_lambda.py::read": SEED_DATE,
     "day_grade::lambdas/compute/daily_metrics_compute_lambda.py::write": SEED_DATE,
-    "day_grade::lambdas/compute/failure_pattern_compute_lambda.py::read": SEED_DATE,
     "day_grade::lambdas/emails/daily_brief_lambda.py::write": SEED_DATE,
     "day_grade::lambdas/emails/monday_compass_lambda.py::read": SEED_DATE,
     "day_grade::lambdas/operational/coherence_sentinel_lambda.py::read": SEED_DATE,
@@ -177,7 +176,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "experiments::lambdas/emails/coach_nudge_lambda.py::read": SEED_DATE,
     "experiments::lambdas/intelligence/ai_expert_analyzer_lambda.py::read": SEED_DATE,
     "experiments::lambdas/web/site_api_discovery.py::read": SEED_DATE,
-    "experiments::lambdas/web/site_api_journey.py::read": SEED_DATE,
     "experiments::lambdas/web/site_api_protocols.py::read": SEED_DATE,
     "experiments::lambdas/web/site_api_rollups.py::read": SEED_DATE,
     "experiments::mcp/tools_lifestyle.py::write": SEED_DATE,
@@ -369,6 +367,14 @@ REASON_5387_HEVY = (
 )
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "day_grade::lambdas/content/recap_data.py::read": (
+        "2026-11-05",
+        "Owner ruling 2026-11-05: the recap card's grade is the day_grade record's PUBLIC variant, read ONLY through "
+        "health.day_grade_public.public_grade/public_letter — the same module whose stored_fields() both writers "
+        "(daily_metrics_compute_lambda.store_day_grade and the daily brief's fallback store_day_grade) store under "
+        "`public`. Reader and writers share the one shape by construction (tests/test_character_public_variant.py pins "
+        "the round trip); a record without the variant reads as no grade, never as method 1.",
+    ),
     "adaptive_mode::lambdas/compute/adaptive_mode_lambda.py::write": (
         "2026-11-03",
         "Owner ruling 2026-11-03 retired the one enrolled PUBLIC reader (/api/ask grounding): the engagement score weights the "

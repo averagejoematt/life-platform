@@ -109,6 +109,7 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
         <div class="ch-emblem">${tierEmblem(tier, level)}</div>
         <p class="ch-class label">${tt}${esc(tier)} · Level ${level} of 100${ch.as_of_date ? ` · written ${esc(String(ch.as_of_date))}` : ""}</p>
         ${moodLine}
+        ${ch.method && ch.method.notice ? `<p class="ch-idnote" data-method-notice>${esc(String(ch.method.notice))}</p>` : ""}
         <p class="ch-idnote">One character, seven areas — scored nightly from the same data every other page reads. The silhouette is the real weight; the ring is today's area scores; the emblem evolves with the tier.</p>
         ${
           // DIL-049 D4 (score-transparency, cheap half): composite_score renders

@@ -34,11 +34,14 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common import activity_publication  # owner ruling 2026-11-06: per-challenge public eligibility
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 from health import (
     character_engine,
+    character_privacy,  # owner ruling 2026-11-05: character_stats.json is read through the public variant
+    character_public,  # owner ruling 2026-11-05: the public variant computed beside method 1
     personal_baselines,  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 )
 
@@ -314,6 +317,42 @@ def merge_journal_view(entries):
     return view or None
 
 
+# Owner rulings 2026-11-06 — the computation-order defect. Until then this compute ran at 09:30 PT and
+# daily-metrics-compute (the ONLY writer of the day's habit_scores) at 09:40 PT, so on every stored date of
+# the cycle Mind's habit components read a habit_scores record that did not exist yet and scored as
+# behavioral absence. The schedule now runs this compute at 09:50 PT (config/schedules.json, an owner CDK
+# deploy): the writer's measured worst case is 3 m 26 s (a failing run and its two Lambda retries), and its
+# theoretical worst (a 120 s timeout and two retries) ends at 09:49. The schedule is WHEN the check runs;
+# the check is character_public.habit_scores_readiness: for this day, written after the day closed, Habitify
+# reached this day. A record that is not ready is re-read for up to HABIT_SCORES_WAIT_S; after that the
+# compute proceeds fail-closed: public Mind treats the habit inputs as missing (unavailable, never a zero,
+# nothing carried from an earlier day), the sheet records the status, and the error log names it.
+HABIT_SCORES_WAIT_S = 30
+HABIT_SCORES_POLL_S = 5
+
+
+def await_habit_scores(date_str, *, wait_s=None, poll_s=None, sleep=time.sleep):
+    """(record, readiness) for the day's habit_scores, waiting briefly for daily-metrics to finish it. A record that
+    is still not ready after the wait is logged as an error, never silently."""
+    if wait_s is None:  # only the scheduled run (yesterday's Pacific day, in the Lambda runtime) can be ahead of its writer
+        is_scheduled_day = date_str == (pacific_now().date() - timedelta(days=1)).isoformat()
+        wait_s = HABIT_SCORES_WAIT_S if is_scheduled_day and os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else 0
+    poll_s = HABIT_SCORES_POLL_S if poll_s is None else poll_s
+    waited = 0
+    while True:
+        rec = fetch_date("habit_scores", date_str)
+        status = character_public.habit_scores_readiness(rec, date_str)
+        if status == character_public.READY or waited >= wait_s:
+            break
+        sleep(poll_s)
+        waited += poll_s
+    if status != character_public.READY:
+        logger.error(f"[character] habit_scores for {date_str} not ready ({status}) after {waited}s — public Mind reads them as missing")
+    elif waited:
+        logger.info(f"[character] habit_scores for {date_str} ready after {waited}s")
+    return rec, status
+
+
 def _safe_float(rec, field):
     """Extract a float from a record, returning None on failure."""
     if rec and field in rec:
@@ -350,7 +389,7 @@ def assemble_data(yesterday_str):
     # dict-shaped journal view from the day's entries instead.
     data["journal_entries"] = fetch_journal_entries(yesterday_str)
     data["journal"] = merge_journal_view(data["journal_entries"])
-    data["habit_scores"] = fetch_date("habit_scores", yesterday_str)
+    data["habit_scores"], data["habit_scores_status"] = await_habit_scores(yesterday_str)  # 2026-11-06: see await_habit_scores
     # #962: daily_metrics_compute writes vice_streaks INSIDE the habit_scores
     # record; the engine's vice_control component and the Vice Shield effect
     # read a top-level key — lift it (it was never wired, permanently dead).
@@ -607,6 +646,10 @@ CHALLENGE_DOMAIN_TO_PILLAR = {
 }
 
 
+# date -> {pillar: xp} of the public-eligible challenges credited that date (read by store_sheet, same invocation)
+PUBLIC_CHALLENGE_BONUS: dict = {}
+
+
 def collect_challenge_bonus(yesterday_str):
     """Challenges completed on the target date, not yet XP-consumed.
 
@@ -617,6 +660,7 @@ def collect_challenge_bonus(yesterday_str):
     to AFTER the record store succeeds (a failed store no longer eats the XP).
     """
     bonus = {}
+    public_bonus = {}  # owner ruling 2026-11-06: only public-eligible challenges' XP enters the public variant
     items = []
     try:
         from boto3.dynamodb.conditions import Key as _Key
@@ -638,11 +682,14 @@ def collect_challenge_bonus(yesterday_str):
                 xp = int(d2f(ch.get("character_xp_awarded", 0)))
                 pillar = CHALLENGE_DOMAIN_TO_PILLAR.get(ch.get("domain", "general"), "consistency")
                 bonus[pillar] = bonus.get(pillar, 0) + xp
+                if activity_publication.challenge_is_public(ch):
+                    public_bonus[pillar] = public_bonus.get(pillar, 0) + xp
                 items.append(ch)
                 logger.info(f"[character]   CHALLENGE XP: +{xp} to {pillar} from '{ch.get('name', '?')}' ({ch.get('domain', '?')})")
     except Exception as _ch_err:
         logger.warning(f"[character] Challenge XP collection failed (non-fatal): {_ch_err}")
         return {}, []
+    PUBLIC_CHALLENGE_BONUS[yesterday_str] = public_bonus
     return bonus, items
 
 
@@ -710,6 +757,26 @@ def collect_input_rows(data, history_records, challenge_items=None):
     return rows
 
 
+def store_sheet(record, data, previous_state, history_records, config):
+    """Store the day's sheet: the method-1 record with its PUBLIC variant beside it (owner ruling 2026-11-05).
+
+    The public variant runs the same engine over public inputs only, chained from the previous record's public
+    variant (``health.character_public``). It is attached only when every record its chain reads has one — otherwise
+    the sheet stores without it and every public surface fails closed for the date until
+    ``scripts/backfill_public_variant.py`` fills the chain. A failure computing it never costs the method-1 store."""
+    try:
+        data = dict(data, public_challenge_bonus_xp=PUBLIC_CHALLENGE_BONUS.get(record.get("date"), {}))
+        reason = character_public.attach_public_variant(record, data, previous_state, history_records, config)
+        if reason:
+            logger.error("[character][public] no public variant for %s — %s (public surfaces fail closed)", record.get("date"), reason)
+    except Exception as e:
+        record.pop(character_public.PUBLIC_KEY, None)
+        record.pop("public_progression_transitions", None)
+        logger.error("[character][public] public variant failed for %s (method 1 stored without it): %s", record.get("date"), e)
+    record["habit_scores_status"] = data.get("habit_scores_status")  # 2026-11-06: ready, or why not
+    return character_engine.store_character_sheet(table, USER_PREFIX, record)
+
+
 def write_progression_receipt(record, config, data, history_records, challenge_items, yesterday_str):
     """Build + self-verify + store the day's progression receipt (#1373).
 
@@ -731,6 +798,9 @@ def write_progression_receipt(record, config, data, history_records, challenge_i
             return None
         verdict = pr.replay(receipt, config)
         receipt["replay_verified"] = bool(verdict.get("verified"))
+        # Owner ruling 2026-11-05: the public variant's own receipt rides in the same item (/api/character_receipt
+        # serves only it); None when the sheet carries no public variant.
+        receipt[character_public.PUBLIC_KEY] = character_public.public_receipt(record, config, input_rows)
         print(
             pr.emf_replay_metric_line(
                 date=yesterday_str,
@@ -769,7 +839,15 @@ def publish_site_stats(record, yesterday_str, history_depth):
     stale by days. Now every path that returns a 200 for a given date also
     republishes the served JSON from whatever record is authoritative at that
     moment. Non-fatal — a failure here never breaks the caller.
+
+    Owner ruling 2026-11-05: the file is public, so it is written from the record's PUBLIC variant
+    (``character_privacy.public_sheet``) and not at all when the record has none — the last good file stays,
+    never a method-1 one.
     """
+    record = character_privacy.public_sheet(record)
+    if not record:
+        logger.error("[character] site_writer: %s has no public variant — character_stats.json not written", yesterday_str)
+        return
     char_level = record.get("character_level", 1)
     char_tier = record.get("character_tier", "Foundation")
     char_emoji = record.get("character_tier_emoji", "🔨")
@@ -794,6 +872,7 @@ def publish_site_stats(record, yesterday_str, history_depth):
                 "level": float(record.get(f"pillar_{p}", {}).get("level", 1)),
                 "raw_score": float(record.get(f"pillar_{p}", {}).get("raw_score", 0)),
                 "tier": record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
+                "not_instrumented": bool(record.get(f"pillar_{p}", {}).get("not_instrumented", False)),  # 2026-11-06
                 "xp_delta": float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
                 "challenge_bonus_xp": float(record.get(f"pillar_{p}", {}).get("challenge_bonus_xp", 0)),
                 "trend": "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",
@@ -841,7 +920,7 @@ def publish_site_stats(record, yesterday_str, history_depth):
             from collections import defaultdict as _dd
 
             _hist_start = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=49)).strftime("%Y-%m-%d")
-            _hist_recs = fetch_range("character_sheet", _hist_start, yesterday_str)
+            _hist_recs = character_privacy.public_sheets(fetch_range("character_sheet", _hist_start, yesterday_str))  # public variants only
             _weeks = _dd(list)
             for _rec in _hist_recs:
                 _d = _rec.get("date") or _rec.get("sk", "").replace("DATE#", "")
@@ -1131,7 +1210,7 @@ def lambda_handler(event, context):
         logger.warning("[character][DATA-2] validate_item failed (proceeding): %s", ve)
 
     try:
-        character_engine.store_character_sheet(table, USER_PREFIX, record)
+        store_sheet(record, data, previous_state, history_records, config)
         logger.info(f"[character] Stored: {yesterday_str} — Level {char_level} ({char_emoji} {char_tier}) — {len(events)} events")
     except Exception as e:
         logger.error(f"[character] store_character_sheet failed: {e}")

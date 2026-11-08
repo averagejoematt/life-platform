@@ -26,6 +26,7 @@ from datetime import date, timedelta
 from boto3.dynamodb.conditions import Key
 from common import activity_publication as _activity_publication  # owner rulings 2026-11-03/05: private metrics off the wire
 from common.pacific_time import pacific_day_n  # #1955 — THE one PT day-index formula
+from common.query_pages import query_pages  # #5656: whole-history reads follow every page
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058
 from health import (
     achievement_rules,  # #1624: the ONE place badge thresholds live
@@ -256,8 +257,8 @@ def timeline(*, _g) -> dict:
     # survive a reset; the weight series above is already genesis-anchored via
     # `start = EXPERIMENT_START`, so only the narrative annotations were truncating)
     life_pk = f"USER#{USER_ID}#SOURCE#life_events"
-    le_resp = table.query(
-        **with_phase_filter({"KeyConditionExpression": Key("pk").eq(life_pk)}, include_pilot=source_reads_cross_phase("life_events"))
+    le_resp = query_pages(
+        table, **with_phase_filter({"KeyConditionExpression": Key("pk").eq(life_pk)}, include_pilot=source_reads_cross_phase("life_events"))
     )
     life_events = [
         {
@@ -273,8 +274,8 @@ def timeline(*, _g) -> dict:
     # resolves False here, so behaviour is unchanged, but the call is now derived rather
     # than hard-coded blind, matching the taxonomy contract explicitly)
     exp_pk = f"USER#{USER_ID}#SOURCE#experiments"
-    exp_resp = table.query(
-        **with_phase_filter({"KeyConditionExpression": Key("pk").eq(exp_pk)}, include_pilot=source_reads_cross_phase("experiments"))
+    exp_resp = query_pages(
+        table, **with_phase_filter({"KeyConditionExpression": Key("pk").eq(exp_pk)}, include_pilot=source_reads_cross_phase("experiments"))
     )
     # #2240: the timeline publishes experiment NAMES — same never-public-vocabulary
     # screen the challenge routes apply, on name AND id (ER-06).
@@ -288,20 +289,25 @@ def timeline(*, _g) -> dict:
     # Character level history (#2150: EXPERIMENT_SCOPED — stays current-cycle;
     # source_reads_cross_phase resolves False here too, so behaviour is unchanged)
     cs_pk = f"{USER_PREFIX}character_sheet"
-    cs_resp = table.query(
+    cs_resp = query_pages(
+        table,
         **with_phase_filter(
             {
                 "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").begins_with("DATE#"),
                 "ScanIndexForward": True,
             },
             include_pilot=source_reads_cross_phase("character_sheet"),
-        )
+        ),
     )
     level_events = []
     prev_level = 0
-    for item in map(character_privacy.public_sheet, _decimal_to_float(cs_resp.get("Items", []))):
+    # A level-up is drawn only on a day that may carry an event (a recalculation is not an achievement, owner ruling
+    # 2026-11-06), measured from the public level the day before — so the first real rise after the correction shows.
+    cs_items = _decimal_to_float(cs_resp.get("Items", []))
+    event_days = {v.get("sk") for v in character_privacy.public_event_sheets(cs_items)}
+    for item in character_privacy.public_sheets(cs_items):
         lvl = int(float(item.get("character_level", 0)))
-        if lvl > prev_level and prev_level > 0:
+        if lvl > prev_level and prev_level > 0 and item.get("sk") in event_days:
             level_events.append(
                 {
                     "date": item.get("sk", "").replace("DATE#", ""),
@@ -428,13 +434,11 @@ def journey_timeline(*, _g) -> dict:
     # ── 3. Level-up events from character_sheet ──────────────────────────────
     cs_pk = f"{USER_PREFIX}character_sheet"
     try:
-        cs_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{today}"),
-            ScanIndexForward=True,
-        )
+        _cs_key = Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{today}")
+        cs_resp = query_pages(table, KeyConditionExpression=_cs_key, ScanIndexForward=True)
         seen_levels: set = set()
         _PILLAR_NAMES = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-        for item in map(character_privacy.public_sheet, _decimal_to_float(cs_resp.get("Items", []))):
+        for item in character_privacy.public_event_sheets(_decimal_to_float(cs_resp.get("Items", []))):
             level = item.get("character_level")
             date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
             if level and level not in seen_levels:
@@ -467,7 +471,8 @@ def journey_timeline(*, _g) -> dict:
     # ── 4. Experiment starts ─────────────────────────────────────────────────
     exp_pk = f"{USER_PREFIX}experiments"
     try:
-        exp_resp = table.query(
+        exp_resp = query_pages(
+            table,
             KeyConditionExpression=Key("pk").eq(exp_pk),
             ScanIndexForward=False,
             Limit=20,
@@ -670,11 +675,12 @@ def journey_waveform(*, _g) -> dict:
 
     cs_pk = f"{USER_PREFIX}character_sheet"
     try:
-        resp = table.query(
+        resp = query_pages(
+            table,
             KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
             ScanIndexForward=True,
         )
-        items = [character_privacy.public_sheet(i) for i in resp.get("Items", [])]
+        items = character_privacy.public_sheets(resp.get("Items", []))
     except Exception:
         items = []
 

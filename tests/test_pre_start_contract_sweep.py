@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from coach import persona_registry  # noqa: E402  (#1986 — the byline's single source)
 from fakes import FakeDdbTable  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 from web import (  # noqa: E402
     site_api_coach as coach,
     site_api_common as common,
@@ -456,7 +457,7 @@ def test_character_stats_pre_start_agrees_with_character(monkeypatch):
     # in PT, matching handle_character's PT-based as_of), not UTC — keying the fixture
     # off UTC drifts a day out of reach whenever PT and UTC straddle midnight.
     today_pt = _iso(_today_pt())
-    stale = {"pk": f"{vitals.USER_PREFIX}character_sheet", "sk": f"DATE#{today_pt}", "character_level": 13}
+    stale = with_public({"pk": f"{vitals.USER_PREFIX}character_sheet", "sk": f"DATE#{today_pt}", "character_level": 13})
     monkeypatch.setattr(vitals, "table", FakeDdbTable(rows=[stale]))
     b = _body(vitals.handle_character_stats())
     cs = b["character_stats"]
@@ -494,6 +495,7 @@ def test_character_stats_normal_when_genesis_past(monkeypatch):
         "character_tier": "Momentum",
         "character_xp": 120,
     }
+    with_public(row)
     monkeypatch.setattr(vitals, "table", FakeDdbTable(rows=[row]))
     b = _body(vitals.handle_character_stats())
     cs = b["character_stats"]

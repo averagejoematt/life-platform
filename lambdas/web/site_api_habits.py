@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from boto3.dynamodb.conditions import Key
 from common import activity_publication as AP  # owner ruling 2026-11-03: private habits (the journal) never published
 from common.habit_registry import habit_tier
+from common.query_pages import query_pages  # #5656: whole-history reads follow every page
 from experiment import habit_causality
 from experiment.phase_filter import with_phase_filter
 from health import character_privacy  # owner rulings 2026-11-03/04: private-source pillars are served held
@@ -504,15 +505,9 @@ def habits(*, _g) -> dict:
 
         # Fetch character_sheet records for same window
         cs_pk = f"{USER_PREFIX}character_sheet"
-        cs_resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot character sheets
-                    "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
-                    "ScanIndexForward": True,
-                }
-            )
-        )
-        cs_items = [character_privacy.public_sheet(i) for i in _decimal_to_float(cs_resp.get("Items", []))]
+        _cs_key = Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}")
+        cs_resp = query_pages(table, **with_phase_filter({"KeyConditionExpression": _cs_key, "ScanIndexForward": True}))  # ADR-058
+        cs_items = character_privacy.public_sheets(_decimal_to_float(cs_resp.get("Items", [])))
 
         # Build date → pillar sum (character health proxy)
         PILLARS_CS = [

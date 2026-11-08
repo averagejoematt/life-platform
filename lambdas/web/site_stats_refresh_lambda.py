@@ -23,6 +23,7 @@ from common.constants import EXPERIMENT_START_DATE  # ADR-058
 from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from health import character_privacy  # owner ruling 2026-11-05: the published level is the public variant's
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 
 from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
@@ -162,7 +163,7 @@ def lambda_handler(event, context):
     withings = _get_latest(table, "withings")
     computed_metrics = _get_latest(table, "computed_metrics")
     apple_health = _get_latest(table, "apple_health")
-    character = _get_latest(table, "character_sheet")
+    character = character_privacy.public_sheet(_get_latest(table, "character_sheet")) or {}  # the public variant only (2026-11-05)
 
     # ── 3. Read existing public_stats.json to preserve non-vitals sections ───
     try:

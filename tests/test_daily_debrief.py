@@ -129,6 +129,19 @@ def _computed_metrics():
     }
 
 
+def _day_grade(letter="B", score=81):
+    """Owner ruling 2026-11-06: the public episode reads the day_grade record's PUBLIC variant (method 1 differs)."""
+    pub = {"total_score": Decimal(str(score)), "letter_grade": letter, "public_method_version": "day-grade-public-v1"}
+    return {
+        "pk": dd.USER_PREFIX + "day_grade",
+        "sk": "DATE#2026-07-07",
+        "date": "2026-07-07",
+        "total_score": Decimal("40"),
+        "letter_grade": "F",
+        "public": pub,
+    }
+
+
 def _habit_scores():
     return {
         "pk": dd.USER_PREFIX + "habit_scores",
@@ -164,7 +177,9 @@ def _full_facts():
 
 class TestGatherFacts:
     def test_assembles_present_fields(self, monkeypatch):
-        monkeypatch.setattr(dd, "table", _FakeTable({"computed_metrics": _computed_metrics(), "habit_scores": _habit_scores()}))
+        monkeypatch.setattr(
+            dd, "table", _FakeTable({"computed_metrics": _computed_metrics(), "habit_scores": _habit_scores(), "day_grade": _day_grade()})
+        )
         facts = dd.gather_facts("2026-07-07")
         assert facts["day_grade"] == "B"
         assert facts["recovery_pct"] == 62
@@ -175,7 +190,7 @@ class TestGatherFacts:
 
     def test_drops_absent_fields_no_zero_fill(self, monkeypatch):
         # Only a grade present — recovery/hrv/habits genuinely missing → omitted, not 0.
-        monkeypatch.setattr(dd, "table", _FakeTable({"computed_metrics": {"day_grade_letter": "A", "date": "2026-07-07"}}))
+        monkeypatch.setattr(dd, "table", _FakeTable({"computed_metrics": {"date": "2026-07-07"}, "day_grade": _day_grade("A", 92)}))
         facts = dd.gather_facts("2026-07-07")
         assert facts["day_grade"] == "A"
         assert "recovery_pct" not in facts
@@ -300,7 +315,9 @@ class TestHandler:
 
     def test_dry_run_writes_nothing(self, monkeypatch):
         fake = _FakeS3(mp3_exists=False)
-        monkeypatch.setattr(dd, "table", _FakeTable({"computed_metrics": _computed_metrics(), "habit_scores": _habit_scores()}))
+        monkeypatch.setattr(
+            dd, "table", _FakeTable({"computed_metrics": _computed_metrics(), "habit_scores": _habit_scores(), "day_grade": _day_grade()})
+        )
         monkeypatch.setattr(dd, "s3", fake)
         monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)  # force template, no bedrock
         out = dd.lambda_handler({"dry_run": True}, None)

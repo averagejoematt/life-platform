@@ -2196,6 +2196,13 @@
       "direction": "read",
       "lambda": null,
       "module": "lambdas/content/recap_data.py",
+      "partition": "day_grade",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/recap_data.py",
       "partition": "habit_scores",
       "via": "local-seam"
     },
@@ -6748,7 +6755,7 @@
       "module": "lambdas/compute/character_sheet_lambda.py",
       "schedules": [
         {
-          "expr": "cron(30 9 * * ? *)",
+          "expr": "cron(50 9 * * ? *)",
           "key": "character-sheet-compute",
           "resolution": "table",
           "tz": "America/Los_Angeles"
@@ -8246,11 +8253,11 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 787,
+      "edges": 788,
       "lambdas": 107,
       "mcp_tool_modules": 39,
       "mcp_tools": 90,
-      "partitions": 124,
+      "partitions": 125,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 25,
@@ -8260,9 +8267,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 393,
-        "sites_resolved": 988,
-        "sites_total": 1381
+        "sites_dynamic": 396,
+        "sites_resolved": 990,
+        "sites_total": 1386
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8830,6 +8837,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "public_corrections": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
     "qa_hook_matrix": {
       "class": "system_state",
       "ingestion": false,
@@ -9272,9 +9284,9 @@
       "utc": null
     },
     {
-      "expr": "cron(30 9 * * ? *)",
+      "expr": "cron(50 9 * * ? *)",
       "lambda": "character-sheet-compute",
-      "local": "09:30",
+      "local": "09:50",
       "resolution": "table",
       "stack": "compute_stack",
       "tz": "America/Los_Angeles",

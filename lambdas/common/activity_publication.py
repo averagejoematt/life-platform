@@ -68,6 +68,84 @@ ACTIVITY_ONLY_SOURCES: dict[str, str] = {
     "x": PUBLIC,
     "instagram": PUBLIC,
     "tiktok": PUBLIC,
+    # Owner ruling 2026-11-06: the evening check-in's PRESENCE (done / missed / unknown) is an eligible public core
+    # habit "provided it is independently classified as public and does not disclose private journal activity". It is
+    # a family of its own: health.core_habits.read_inputs derives it from the check-in row's completeness and the
+    # prompt ledger ONLY (no journal partition is read), and it never carries an answer — the answers stay
+    # `evening_checkin`, owner-only (narrative_provenance). Pinned by tests/test_character_public_variant.py.
+    "evening_checkin_presence": PUBLIC,
+    # Owner ruling 2026-11-06: challenge XP is public "provided the underlying challenge and evidence sources are
+    # public-eligible". The catalogue and its screened check-ins are served by /api/challenges; per challenge,
+    # `challenge_is_public` checks its origin, the pillar it credits and every source its targets read.
+    "challenges": PUBLIC,
+    "challenge_checkins": PUBLIC,  # a challenge's own self-reported check-ins, served screened (#2238)
+}
+
+# Owner ruling 2026-11-06: the family each core-12 BASIS (health.core_habits.BASES) reads. A basis whose family is not
+# public makes the core-set habit score ineligible for a public score (callers fail closed). The habitify basis is
+# additionally classified per member habit by identity (habit_is_public).
+CORE_BASIS_FAMILIES: dict[str, str] = {
+    "habitify": "habitify",
+    "steps": "apple_health",  # steps-truth: a core-12 basis NAME's family classification, not a read of a steps field
+    "evening_checkin": "evening_checkin_presence",
+    "wake_consistency": "whoop",
+}
+
+# Owner ruling 2026-11-06 — challenges. A challenge is public-eligible only when its ORIGIN, the pillar its DOMAIN
+# credits and EVERY metric target it reads are public. Each key is classified explicitly; an unlisted origin or
+# target key is unclassified and fails closed.
+CHALLENGE_ORIGIN_FAMILIES: dict[str, str] = {
+    "data_signal": "computed_metrics",  # proposed from the platform's measured signals
+    "science_scan": "experiments",  # proposed from the literature
+    "hypothesis_graduate": "experiments",  # a graduated public hypothesis
+    "manual": "challenges",  # entered by the owner as a challenge
+    "journal_mining": "journal",  # mined from the journal: PRIVATE
+}
+CHALLENGE_PRIVATE_DOMAINS = frozenset({"social"})  # credits Relationships, every input of which is private
+CHALLENGE_TARGET_FAMILIES: dict[str, str] = {
+    **{
+        k: "challenge_checkins"
+        for k in (
+            "adherence_days",
+            "clean_days",
+            "completion_rate",
+            "compliant_nights_minimum",
+            "consecutive_clean_days",
+            "days_logged",
+            "days_on_target_minimum",
+            "duration_days",
+            "min_duration_minutes",
+            "minimum_exposure_minutes",
+            "sessions_completed",
+            "streak_days",
+            "target_days",
+            "tolerance",
+            "total_days",
+            "weekly_sessions",
+            "window_minutes_after_waking",
+            "zero_tolerance_days",
+        )
+    },
+    **{k: "apple_health" for k in ("daily_hydration_liters", "daily_water_litres", "daily_steps", "daily_steps_min")},
+    **{k: "macrofactor" for k in ("days_with_protein", "days_with_vegetable")},
+    **{k: "whoop" for k in ("hrv_delta", "hrv_trend", "sleep_quality_avg")},
+    "distance_km": "strava",
+    "consistency_level": "character_sheet",
+    **{
+        k: "habitify"
+        for k in (
+            "primary_exercise_completion",
+            "phone_free_bedtime_nights",
+            "phone_free_dinners",
+            "phone_free_nights",
+            "scroll_free_days",
+            "scrolling_days_clean",
+            "porn_days_clean",
+            "solo_takeout_days",
+        )
+    },
+    **{k: "state_of_mind" for k in ("avg_mood_post_light", "mood_stability")},  # How We Feel / State of Mind: PRIVATE
+    **{k: "journal" for k in ("urge_logs", "trigger_logs")},  # reflective logs of urges and triggers: PRIVATE
 }
 
 # Activity-only OVERRIDES of a narrative classification: a source whose DATA is owner-only but whose
@@ -403,6 +481,30 @@ def source_class(source_id: Any) -> Optional[str]:
 def source_is_public(source_id: Any) -> bool:
     """True only for a source classified PUBLIC. Private and unclassified sources are not published."""
     return source_class(source_id) == PUBLIC
+
+
+def core_basis_is_public(basis: Any) -> bool:
+    """True when a core-12 basis reads a public family (``CORE_BASIS_FAMILIES``; an unlisted basis fails closed)."""
+    fam = CORE_BASIS_FAMILIES.get(str(basis or ""))
+    return fam is not None and source_is_public(fam)
+
+
+def challenge_evidence_families(challenge: Any) -> list:
+    """Every family a challenge's XP depends on: its origin and each metric target key (None = unclassified)."""
+    ch = challenge if isinstance(challenge, Mapping) else {}
+    fams = [CHALLENGE_ORIGIN_FAMILIES.get(str(ch.get("source") or ""))]
+    targets = ch.get("metric_targets")
+    fams += [CHALLENGE_TARGET_FAMILIES.get(str(k)) for k in (targets.keys() if isinstance(targets, Mapping) else [])]
+    return fams
+
+
+def challenge_is_public(challenge: Any) -> bool:
+    """Owner ruling 2026-11-06: a challenge's XP may enter a public score only when its origin, the pillar its domain
+    credits and every source its targets read are public (an unclassified origin or target fails closed)."""
+    ch = challenge if isinstance(challenge, Mapping) else {}
+    if str(ch.get("domain") or "") in CHALLENGE_PRIVATE_DOMAINS:
+        return False
+    return all(f is not None and source_is_public(f) for f in challenge_evidence_families(ch))
 
 
 def is_private_activity_source(source_id: Any) -> bool:

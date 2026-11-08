@@ -148,6 +148,17 @@ def test_every_snapshot_row_fires_at_the_same_instants_as_pacific_daylight_wall_
 # ── 3. the migration, re-derived ──────────────────────────────────────────────────────────────
 
 
+# Rows deliberately moved AFTER the migration, each with its expression and its reason. A row here is compared with its
+# recorded expression instead of the migration's output; an unrecorded move still fails below.
+POST_MIGRATION_MOVES = {
+    "character-sheet-compute": (
+        "cron(50 9 * * ? *)",
+        "owner ruling 2026-11-06 (PR 5656): after daily-metrics-compute (09:40) - the computation-order defect, Mind read "
+        "the day's habit_scores before they were written",
+    ),
+}
+
+
 def test_every_row_is_the_converter_applied_to_the_frozen_utc_snapshot():
     snap = json.loads(SNAPSHOT.read_text(encoding="utf-8"))["expressions_utc"]
     raw = json.loads((ROOT / "config" / "schedules.json").read_text(encoding="utf-8"))
@@ -161,6 +172,8 @@ def test_every_row_is_the_converter_applied_to_the_frozen_utc_snapshot():
             expect = utc_expr
         else:
             (expect,) = conv.shift_cron(utc_expr, conv.PDT_OFFSET_HOURS)
+        if key in POST_MIGRATION_MOVES:
+            expect = POST_MIGRATION_MOVES[key][0]
         if row["expression"] != expect:
             wrong.append(f"{key}: table {row['expression']} != converted {expect} (from {utc_expr} UTC)")
     assert not wrong, "rows that are not the migration's output:\n  " + "\n  ".join(wrong)

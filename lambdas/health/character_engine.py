@@ -23,6 +23,7 @@ v1.3.0 — 2026-07-10  (#913 neglect honesty: up-gate compares raw to the TARGET
                       instead of a silent 0-floor, deterministic character_mood)
 """
 
+import copy
 import json
 import logging
 import math
@@ -1700,6 +1701,21 @@ PILLAR_COMPUTERS = {
     "relationships": compute_relationships_raw,
 }
 
+# Keys a computed record carries that the sheet item never stores: the #1373 fire-time transition capture (it persists
+# to the receipt partition) and the public variant's own capture (owner ruling 2026-11-05, health.character_public).
+_UNSTORED_KEYS = ("progression_transitions", "public_progression_transitions")
+
+
+def _pillar_raw_and_details(name, compute_fn, data, config, *extra):
+    """A pillar's (raw_score, details) for the day: ``compute_fn``'s, or the caller's when ``data["precomputed_pillars"]``
+    names the pillar. The public variant (owner ruling 2026-11-05) hands in pillars it already scored from public inputs
+    so the SAME state chain below (EMA, effects, levels, XP, headline) runs over them — never a second engine."""
+    pre = (data.get("precomputed_pillars") or {}).get(name)
+    if pre is None:
+        return compute_fn(data, config, *extra)
+    raw_score, details = pre
+    return raw_score, copy.deepcopy(details)  # a copy: the engine annotates details in place
+
 
 def compute_character_sheet(
     data: dict[str, Any], previous_day_state: Optional[dict[str, Any]], raw_score_histories: dict[str, list[float]], config: dict[str, Any]
@@ -1736,7 +1752,7 @@ def compute_character_sheet(
     pillar_raw_scores = {}
     pillar_details = {}
     for pillar_name, compute_fn in PILLAR_COMPUTERS.items():
-        raw_score, details = compute_fn(data, config)
+        raw_score, details = _pillar_raw_and_details(pillar_name, compute_fn, data, config)
         mod = raw_modifiers.get(pillar_name)
         if mod and raw_score is not None:
             try:
@@ -1759,7 +1775,7 @@ def compute_character_sheet(
         _attach_not_instrumented_note(pillar_name, details)
 
     # Step 2: Consistency meta-pillar
-    consistency_raw, consistency_details = compute_consistency_raw(data, config, pillar_raw_scores)
+    consistency_raw, consistency_details = _pillar_raw_and_details("consistency", compute_consistency_raw, data, config, pillar_raw_scores)
     pillar_raw_scores["consistency"] = consistency_raw
     pillar_details["consistency"] = consistency_details
     _attach_not_instrumented_note("consistency", consistency_details)
@@ -2095,7 +2111,7 @@ def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[st
     # #1373: the fire-time transition capture persists to the RECEIPT partition
     # (SOURCE#character_receipt, full float precision for digest replay) — the
     # sheet item never carries it.
-    item.update(floats_to_decimal({k: v for k, v in record.items() if k != "progression_transitions"}, precision=4))
+    item.update(floats_to_decimal({k: v for k, v in record.items() if k not in _UNSTORED_KEYS}, precision=4))
     if record.get("date", "") < EXPERIMENT_START_DATE:
         item["phase"] = "pilot"
     try:
