@@ -1,0 +1,242 @@
+---
+// /data/lab/experiments/<id>/ — one experiment (L1). BUILT DARK: outside src/pages/, injected only when WEB_LAB=1.
+// The pre-registration, the baseline → window, the result and compliance by day — each section states plainly when
+// /api/experiments did not serve it (a catalogue entry has no run, so no window, no result, no compliance). Then the
+// protocol (dose, timing, why, evidence for and against) when one is served. Nothing is computed here.
+import Base from "../layouts/Base.astro";
+import LabBanner from "../components/LabBanner.astro";
+import { dayInWords, num } from "../lib/format.js";
+import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import { GROUP_WORDS, pillarWords, prose } from "../lib/laboratory.js";
+import { loadLab } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+export async function getStaticPaths() {
+  if (!labEnabled()) return [];
+  const lab = await loadLab();
+  return (lab.lab_experiments || []).map((x: any) => ({ params: { id: x.id }, props: { x } }));
+}
+
+if (!labEnabled()) throw new Error("src/lab/lab-experiment.astro rendered with WEB_LAB off — the Lab route must not be injected");
+
+const { x } = Astro.props as any;
+const lab = await loadLab();
+const run = x.run || null;
+const started = Boolean(run && run.start_date);
+const detail = x.protocol_detail || null;
+const protocols = ((lab.lab_protocols || {}).groups || []).flatMap((g: any) => g.items.filter((i: any) => i.experiment === x.id).map((i: any) => ({ ...i, group: g.name })));
+const asOf = lab.as_of ? dayInWords(lab.as_of) : null;
+const noindex = process.env.WEB_NOINDEX === "1";
+const mark = { [LAB_MARKER]: "experiment" };
+// a served value in words: objects flattened, every ISO date written in words (an ISO date on a page is a defect)
+const words = (v: any) =>
+  v == null || v === ""
+    ? "—"
+    : (typeof v === "object" ? JSON.stringify(v) : String(v)).replace(/\d{4}-\d{2}-\d{2}(?:T[\d:.+-]+Z?)?/g, (m) => dayInWords(m.slice(0, 10)) || m);
+const KINDS: Record<string, string> = {
+  ongoing_protocol: "on the protocol, without a pre-registered test",
+  unconfirmed_protocol: "a protocol whose adherence is not confirmed by any served record",
+};
+---
+
+<Base title={x.name} top="data" description={prose(x.hypothesis) || x.name} status={asOf}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <LabBanner />
+  <section class="section" {...mark} style="padding-bottom:20px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
+      <p class="label">
+        <a href={href("/data/lab/")}>The Laboratory</a> · experiment · {GROUP_WORDS[x.group]}
+      </p>
+      <h1 style="font-size:clamp(28px,5vw,44px);line-height:1.1">{x.name}</h1>
+      {x.hypothesis && <p class="dek" style="font-size:19px;max-width:70ch">{prose(x.hypothesis)}</p>}
+      <div class="rows" style="max-width:720px">
+        <div><span>Status</span><span class="status">{GROUP_WORDS[x.group]}</span></div>
+        <div><span>Pillar</span><span>{pillarWords(x.pillar)}</span></div>
+        <div><span>Planned length</span><span class="mono">{x.planned_duration_days ? `${num(x.planned_duration_days)} days` : "—"}</span></div>
+        <div><span>Evidence</span><span>{x.evidence_tier ? `${x.evidence_tier}` : "—"}{x.citation_status ? ` · citation ${x.citation_status}` : ""}</span></div>
+        {x.evidence_citation && (
+          <div>
+            <span>Source</span>
+            <span style="text-align:right">{x.source_url ? <a href={x.source_url} rel="noopener">{prose(x.evidence_citation)}</a> : prose(x.evidence_citation)}</span>
+          </div>
+        )}
+        {x.difficulty && <div><span>Difficulty</span><span>{x.difficulty}</span></div>}
+      </div>
+      {x.pitch && (
+        <p class="muted" style="font-size:14px;max-width:70ch">
+          <b style="color:var(--ink)">The library's note, not a result:</b> {prose(x.pitch)}
+        </p>
+      )}
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:8px">
+    <div class="wrap grid cols2" style="gap:40px;align-items:start;max-width:1100px">
+      <div>
+        <p class="label" style="margin-bottom:8px">The pre-registration</p>
+        {
+          run && (run.pre_registered_at || run.design) ? (
+            <div class="rows">
+              {run.pre_registered_at && <div><span>Written</span><span class="mono">{dayInWords(String(run.pre_registered_at).slice(0, 10)) || "—"}</span></div>}
+              {run.design && typeof run.design === "object"
+                ? Object.entries(run.design).map(([k, v]) => (
+                    <div>
+                      <span>{k.replace(/_/g, " ")}</span>
+                      <span class="mono wraps">{words(v)}</span>
+                    </div>
+                  ))
+                : null}
+              {run.pre_registration_url && (
+                <div>
+                  <span>Frozen record</span>
+                  <span><a href={run.pre_registration_url} rel="noopener">the timestamped pre-registration</a></span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div class="empty">
+              <b style="color:var(--ink)">Not pre-registered yet.</b>
+              <span>
+                {x.origin === "library"
+                  ? "A catalogue entry. The claim above is the library's wording. The criterion, minimum effect, baseline, washout and stopping rule are frozen when a run starts; none has."
+                  : "The run's frozen design was not served."}
+              </span>
+            </div>
+          )
+        }
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div>
+          <p class="label" style="margin-bottom:8px">Baseline → window</p>
+          {started ? (
+            <div class="rows">
+              <div><span>Started</span><span class="mono">{dayInWords(run.start_date)}</span></div>
+              <div><span>Ends</span><span class="mono">{run.end_date ? dayInWords(run.end_date) : "open"}</span></div>
+              {run.days_in != null && <div><span>Day</span><span class="mono">{num(run.days_in)}{x.planned_duration_days ? ` of ${num(x.planned_duration_days)}` : ""}</span></div>}
+              {run.primary_metric && <div><span>Primary measure</span><span>{String(run.primary_metric).replace(/_/g, " ")}</span></div>}
+            </div>
+          ) : (
+            <div class="empty">
+              <span>No window: this experiment has not started, so there is no baseline and no day to draw.</span>
+            </div>
+          )}
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:8px">The result</p>
+          {run && (run.analysis || run.result_value != null || run.key_finding) ? (
+            <div class="rows">
+              {run.baseline_value != null && <div><span>Baseline</span><span class="mono">{words(run.baseline_value)}</span></div>}
+              {run.result_value != null && <div><span>Result</span><span class="mono">{words(run.result_value)}</span></div>}
+              {run.hypothesis_confirmed != null && <div><span>Verdict</span><span>{run.hypothesis_confirmed ? "confirmed" : "not confirmed"}</span></div>}
+              {run.analysis && typeof run.analysis === "object"
+                ? Object.entries(run.analysis).map(([k, v]) => (
+                    <div>
+                      <span>{k.replace(/_/g, " ")}</span>
+                      <span class="mono wraps">{words(v)}</span>
+                    </div>
+                  ))
+                : null}
+              {run.key_finding && <div><span>Finding</span><span>{run.key_finding}</span></div>}
+            </div>
+          ) : (
+            <div class="empty">
+              <b style="color:var(--ink)">No result yet.</b>
+              <span>{started ? "The run has not been analysed." : "Nothing has run, so there is nothing to grade."}</span>
+            </div>
+          )}
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:8px">Compliance by day</p>
+          <div class="empty">
+            <span>
+              {started
+                ? run.compliance_pct != null
+                  ? `Overall compliance as served: ${num(run.compliance_pct)}%. No per-day record is served, so no day can be marked.`
+                  : "No compliance record is served for this run, so no day can be marked."
+                : "No days yet."}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {
+    detail && (
+      <section class="section" style="padding-top:8px">
+        <div class="wrap" style="max-width:1100px;display:flex;flex-direction:column;gap:14px">
+          <p class="label">The protocol</p>
+          {detail.protocol && <p style="font-size:18px;max-width:70ch;line-height:1.45">{prose(detail.protocol)}</p>}
+          <div class="rows" style="max-width:720px">
+            {detail.metrics.length > 0 && <div><span>What it should move</span><span>{detail.metrics.map((m: string) => m.replace(/_/g, " ")).join(", ")}</span></div>}
+            {detail.duration_days != null && <div><span>Length</span><span class="mono">{num(detail.duration_days)} days</span></div>}
+            {detail.protocol_kind && <div><span>Standing</span><span style="text-align:right">{KINDS[detail.protocol_kind] || detail.protocol_kind.replace(/_/g, " ")}</span></div>}
+            {detail.active_since && (
+              <div>
+                <span>On it since</span>
+                <span class="mono wraps">{dayInWords(detail.active_since)}{detail.carried_over ? " · carried over from an earlier cycle" : ""}</span>
+              </div>
+            )}
+          </div>
+          {detail.why && (
+            <p style="font-size:15px;max-width:70ch"><b>Why:</b> {prose(detail.why)}</p>
+          )}
+          {detail.rationale && (
+            <p style="font-size:15px;max-width:70ch"><b>Rationale:</b> {prose(detail.rationale)}</p>
+          )}
+          <details>
+            <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">
+              <b>The evidence · {num(detail.evidence_for.length)} for, {num(detail.evidence_against.length)} against</b>
+            </summary>
+            <div class="grid cols2" style="gap:24px;margin-top:10px">
+              {[["For", detail.evidence_for], ["Against", detail.evidence_against]].map(([label, list]: any) => (
+                <div>
+                  <p class="label" style="margin-bottom:6px">{label}</p>
+                  <div class="rows">
+                    {list.map((s: any) => (
+                      <div>
+                        <span style="font-size:14px">
+                          {s.url ? <a href={s.url} rel="noopener"><b>{prose(s.title)}</b></a> : <b>{prose(s.title)}</b>}
+                          {s.summary && (
+                            <>
+                              <br />
+                              <span class="muted" style="font-size:13px">{prose(s.summary)}</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    protocols.length > 0 && (
+      <section class="section" style="padding-top:8px">
+        <div class="wrap" style="max-width:1100px">
+          <p class="label" style="margin-bottom:6px">In the stack for this experiment</p>
+          <div class="rows">
+            {protocols.map((p: any) => (
+              <a href={href(`/data/lab/protocols/#${p.id}`)}>
+                <span style="font-size:14px"><b>{p.name}</b> <span class="muted">· {p.group}</span></span>
+                <span class="mono" style="font-size:12px">{[p.dose, p.timing].filter(Boolean).join(" · ") || "—"}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section" style="padding-top:0">
+    <div class="wrap" style="max-width:1100px">
+      <p><a class="btn ghost sm" href={href("/data/lab/")}>Back to the Laboratory</a></p>
+    </div>
+  </section>
+</Base>

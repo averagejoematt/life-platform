@@ -128,6 +128,16 @@ export async function loadCoachRoom() {
   return _coachRoom;
 }
 
+let _lab = null;
+/** The Laboratory's data file (L1, built dark): written by the producer ONLY on a WEB_LAB=1 export and read only by
+ *  Lab pages, which exist only on a Lab build. Throws when absent — a Lab build over a flag-off snapshot is a setup
+ *  error, not an empty Lab (re-export with WEB_LAB=1). */
+export async function loadLab() {
+  if (_lab) return _lab;
+  _lab = JSON.parse(await readFile(join(SNAPSHOT_DIR, "lab.json"), "utf8"));
+  return _lab;
+}
+
 let _asOf = null;
 /** The snapshot's as-of day (the manifest's `as_of`), read once per build: the "this month" of the room's ledger view
  *  (CR3). Never the wall clock. Read only by room pages. */
@@ -136,4 +146,3 @@ export async function snapshotAsOf() {
   _asOf = JSON.parse(await readFile(join(SNAPSHOT_DIR, "manifest.json"), "utf8")).as_of || null;
   return _asOf;
 }
-
