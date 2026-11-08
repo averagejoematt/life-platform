@@ -434,11 +434,8 @@ def journey_timeline(*, _g) -> dict:
     # ── 3. Level-up events from character_sheet ──────────────────────────────
     cs_pk = f"{USER_PREFIX}character_sheet"
     try:
-        cs_resp = query_pages(
-            table,
-            KeyConditionExpression=Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{today}"),
-            ScanIndexForward=True,
-        )
+        _cs_key = Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{today}")
+        cs_resp = query_pages(table, KeyConditionExpression=_cs_key, ScanIndexForward=True)
         seen_levels: set = set()
         _PILLAR_NAMES = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
         for item in character_privacy.public_event_sheets(_decimal_to_float(cs_resp.get("Items", []))):

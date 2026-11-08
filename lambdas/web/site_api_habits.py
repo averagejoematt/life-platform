@@ -505,15 +505,8 @@ def habits(*, _g) -> dict:
 
         # Fetch character_sheet records for same window
         cs_pk = f"{USER_PREFIX}character_sheet"
-        cs_resp = query_pages(
-            table,
-            **with_phase_filter(
-                {  # ADR-058: hide pilot character sheets
-                    "KeyConditionExpression": Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
-                    "ScanIndexForward": True,
-                }
-            ),
-        )
+        _cs_key = Key("pk").eq(cs_pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}")
+        cs_resp = query_pages(table, **with_phase_filter({"KeyConditionExpression": _cs_key, "ScanIndexForward": True}))  # ADR-058
         cs_items = character_privacy.public_sheets(_decimal_to_float(cs_resp.get("Items", [])))
 
         # Build date → pillar sum (character health proxy)
