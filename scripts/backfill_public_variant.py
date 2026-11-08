@@ -346,6 +346,20 @@ def build_export(get_item: Callable[[dict], Optional[dict]], plan: list, run_ts:
     return {"export_version": EXPORT_VERSION, "taken_at": run_ts, "attribute": PUBLIC, "entries": entries}
 
 
+# The release runs in two phases (owner review 2026-11-07). The pre-#5656 /api/character_receipt passes an unknown item
+# attribute through, so a receipt's `public` written BEFORE the merge would be served early by the old code; the sheet
+# and day-grade variants and the ledger item are ignored by the old code on every route. So: pre-merge writes the sheets,
+# the day grades and the ledger; post-merge (once the new code is deployed) writes the receipts.
+PHASE_PARTITIONS = {"pre-merge": (SHEET_PK, GRADE_PK), "post-merge": (RECEIPT_PK,), "all": (SHEET_PK, GRADE_PK, RECEIPT_PK)}
+PHASE_WRITES_LEDGER = {"pre-merge": True, "post-merge": False, "all": True}
+
+
+def plan_for_phase(plan: list, phase: str) -> list:
+    """The planned writes one release phase may make (``PHASE_PARTITIONS``)."""
+    keep = PHASE_PARTITIONS[phase]
+    return [w for w in plan if w["pk"] in keep]
+
+
 def apply_plan(table: Any, plan: list, export: dict) -> dict:
     """SET ``public`` on each planned item — conditional on the item existing and its method-1 fingerprint matching the
     export (an item that changed since the export is skipped and reported, never written)."""

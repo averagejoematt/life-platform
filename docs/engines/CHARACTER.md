@@ -294,7 +294,9 @@ emails, coaches — with its original timestamps, and is never overwritten.
   digested and replayed against `character_public.public_config`).
 - **History.** `scripts/backfill_public_variant.py` replays the method over the stored inputs from genesis (dry run by
   default; `--apply` writes only the `public` attribute after exporting the pre-image; `--rollback` restores it) and
-  replays method 1 the same way as a fidelity control.
+  replays method 1 the same way as a fidelity control. An `--apply` names its phase: `pre-merge` writes the sheets, the
+  day grades and the correction ledger (the pre-#5656 code serves none of them); `post-merge` writes the receipts, which
+  the pre-#5656 receipt route would have passed through early.
 
 ## Outputs / config surface
 

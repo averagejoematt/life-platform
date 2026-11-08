@@ -503,7 +503,15 @@ def main(argv: list) -> int:
     ap.add_argument("--apply", action="store_true", help="WRITE: export the pre-image, then SET `public` (owner act)")
     ap.add_argument("--rollback", help="an export file: restore its pre-image (dry run unless --apply)")
     ap.add_argument("--skip-routes", action="store_true", help="skip the route-handler before/after evaluation")
+    ap.add_argument(
+        "--phase",
+        choices=sorted(B.PHASE_PARTITIONS),
+        default="all",  # dry runs plan everything; an --apply must name its phase (below)
+        help="pre-merge: sheets + day grades + the ledger (inert on the old code); post-merge: the receipts (after the deploy)",
+    )
     args = ap.parse_args(argv)
+    if args.apply and not args.rollback and args.phase == "all":
+        ap.error("--apply needs --phase pre-merge or post-merge: a receipt written before the merge is served early by the old code")
 
     import boto3
 
@@ -566,20 +574,29 @@ def main(argv: list) -> int:
         # idempotency: planned values that differ from a public variant already stored (0 after an apply + re-run)
         "differs_from_stored_public": B.differs_from_stored(plan, stored),
     }
+    phase_plan = B.plan_for_phase(plan, args.phase)
+    manifest["plan"]["phase"] = {
+        "name": args.phase,
+        "writes": len(phase_plan),
+        "writes_ledger": B.PHASE_WRITES_LEDGER[args.phase],
+    }
     _write(os.path.join(args.out, "manifest.json"), manifest)
     write_csv(os.path.join(args.out, "manifest_character.csv"), c_rows)
     write_csv(os.path.join(args.out, "manifest_day_grade.csv"), g_rows)
     _write(os.path.join(args.out, "plan.json"), plan)
     print(json.dumps(manifest["summary"], indent=1, default=str))
     if not args.apply:
-        print(f"DRY RUN — nothing written. {len(plan)} planned writes; manifest in {args.out}")
+        print(f"DRY RUN — nothing written. {len(plan)} planned writes, {len(phase_plan)} in phase {args.phase}; manifest in {args.out}")
         return 0
-    export = B.build_export(lambda key: table.get_item(Key=key).get("Item"), plan, run_ts)
-    export_path = os.path.join(args.out, f"export_{run_ts.replace(':', '')}.json")
-    B.record_ledger_preimage(table, export)
+    export = B.build_export(lambda key: table.get_item(Key=key).get("Item"), phase_plan, run_ts)
+    export["phase"] = args.phase
+    export_path = os.path.join(args.out, f"export_{args.phase}_{run_ts.replace(':', '')}.json")
+    if B.PHASE_WRITES_LEDGER[args.phase]:
+        B.record_ledger_preimage(table, export)
     _write(export_path, export)  # the pre-image exists on disk BEFORE the first write
-    result = B.apply_plan(table, plan, export)
-    B.put_public_ledger(table, ledger_item)
+    result = B.apply_plan(table, phase_plan, export)
+    if B.PHASE_WRITES_LEDGER[args.phase]:
+        B.put_public_ledger(table, ledger_item)
     _write(os.path.join(args.out, "apply_result.json"), result)
     print(json.dumps({"written": result["written"], "skipped": len(result["skipped"]), "export": export_path}, indent=1))
     return 0 if not result["skipped"] else 2
