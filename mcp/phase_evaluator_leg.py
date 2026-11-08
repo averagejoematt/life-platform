@@ -70,7 +70,7 @@ def weight_checkpoints(rows: Optional[list], checkpoints: list[str]) -> list[dic
     from mcp.shared_quantities import _weighins
 
     series = _weighins(rows) if rows is not None else []
-    out = []
+    out: list[dict[str, Any]] = []
     for cp in checkpoints:
         if rows is None:
             out.append({"as_of": cp, "mean_lbs": None, "n": None, "state": "read_failed"})

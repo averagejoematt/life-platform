@@ -64,7 +64,7 @@ def tool_manage_training_phase(args: Optional[dict[str, Any]] = None) -> dict[st
     stored = read_state(table)
     if stored is None:
         return mcp_error(
-            "no phase state is stored yet; nothing to veto or override until the first weekly evaluation", error_code="NO_STATE"
+            "no phase state is stored yet; nothing to veto or override until the first weekly evaluation", error_code="NOT_FOUND"
         )
     state, today, now, words = _state_of(stored), pacific_today(), _now_iso(), args.get("words")
     try:
@@ -75,8 +75,8 @@ def tool_manage_training_phase(args: Optional[dict[str, Any]] = None) -> dict[st
             target = target if target in pe.order(charter) else (pe.phase_id_for_title(charter, target) or target)
             moved = sm.override(pe.order(charter), state, to=target, on=today, words=words)
             new_state, transition = moved["state"], moved["transition"]
-    except ValueError as e:
-        return mcp_error(str(e), error_code="REFUSED")
+    except ValueError as e:  # nothing pending to veto (no such record), or an override that is not forward
+        return mcp_error(str(e), error_code="NOT_FOUND" if action == "veto" else "INVALID_ARG")
     if transition:
         _put(table, pe.transition_row(charter, transition, recorded_at=now))
     _put(table, pe.state_row(charter, new_state, updated_at=now))

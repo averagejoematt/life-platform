@@ -446,7 +446,8 @@ def transition_row(
 def seed_state(charter: Mapping[str, Any], title_phase: Any, title_started: Any) -> dict[str, Any]:
     """The first STATE: the Hevy title's hand-set phase (`config/training_phases.json` `current`, ADR-067) when it names a
     charter phase, else the first phase in the order. `since` is that file's `current_started` (None when unknown)."""
-    pid = phase_id_for_title(charter, title_phase) or (order(charter) or [None])[0]
+    first = order(charter)[0] if order(charter) else None
+    pid = phase_id_for_title(charter, title_phase) or first
     return {"stage": pid, "since": str(title_started)[:10] if title_started else None, "pending": None, "origin": sm.ORIGIN_SEED}
 
 

@@ -500,7 +500,7 @@ def test_the_tool_overrides_forward_by_title_and_refuses_backwards(monkeypatch):
 
 def test_the_tool_refuses_a_write_before_any_state_exists(monkeypatch):
     leg, t = _tool_env(monkeypatch, None)
-    assert "NO_STATE" in json.dumps(leg.tool_manage_training_phase({"action": "veto"}))
+    assert "NOT_FOUND" in json.dumps(leg.tool_manage_training_phase({"action": "veto"}))
     assert leg.tool_manage_training_phase({})["stored"] is False and t.puts == []
 
 

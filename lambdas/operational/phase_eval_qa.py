@@ -24,8 +24,9 @@ week keys, never a gate, a verdict or a weight. Read-only: one Query; the qa-smo
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
+from common.pacific_time import parse_day_key
 from training.phase_evaluator import SK_EVAL, pk
 
 CHECK_NAME = "phase_eval_liveness"
@@ -35,7 +36,10 @@ ARMED_ON = "2026-11-17"
 
 def expected_week(today: str) -> str:
     """The Monday of the newest week whose EVAL row must exist on `today` (a Pacific YYYY-MM-DD)."""
-    d = date.fromisoformat(today) - timedelta(days=1)
+    day = parse_day_key(today)
+    if day is None:
+        raise ValueError(f"not a YYYY-MM-DD day key: {today!r}")
+    d = day - timedelta(days=1)
     return (d - timedelta(days=d.weekday() + 7)).isoformat()  # the Monday of the week before d's week
 
 
