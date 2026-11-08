@@ -138,3 +138,11 @@ export async function loadLab() {
   return _lab;
 }
 
+let _asOf = null;
+/** The snapshot's as-of day (the manifest's `as_of`), read once per build: the "this month" of the room's ledger view
+ *  (CR3). Never the wall clock. Read only by room pages. */
+export async function snapshotAsOf() {
+  if (_asOf) return _asOf;
+  _asOf = JSON.parse(await readFile(join(SNAPSHOT_DIR, "manifest.json"), "utf8")).as_of || null;
+  return _asOf;
+}

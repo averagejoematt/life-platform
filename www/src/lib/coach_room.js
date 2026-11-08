@@ -182,6 +182,7 @@ export function docketRows(entry, id, nameOf = (x) => x) {
       else result = d.outcome ? String(d.outcome).replace(/_/g, " ") : "settled without a winner";
     }
     return {
+      id: d.id || null, // CR3: the docket entry's room page (/system/docket/<id>/), when the producer assigned one
       status: d.status,
       versus: nameOf(other),
       opened: dayInWords(d.opened_date),

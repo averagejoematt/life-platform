@@ -1,0 +1,213 @@
+---
+// /system/docket/<id>/ — one standing disagreement in the Coaching Room (CR3). BUILT DARK: this file lives outside
+// src/pages/ and is injected as a route ONLY when WEB_ROOM=1 (src/lib/room.js). Off, it is not built.
+//
+// Simple on arrival: the question, who won (or when the data decides), the dates. Deep on demand: each side's bet, its
+// words and its stake; the frozen test; the live measure beside an open test; the result; a concession only where the
+// API served one, quoted exactly; and what the platform does not publish, named with its field. Nothing is written in
+// a coach's place: no position is paraphrased, no concession or motive composed, no withheld word reconstructed.
+import Base from "../layouts/Base.astro";
+import Quote from "../components/Quote.astro";
+import {
+  DOCKET_NOT_PUBLISHED,
+  concessionOf,
+  datesOf,
+  docketEntries,
+  gapsOf,
+  liveMeasure,
+  questionOf,
+  resultOf,
+  sidesOf,
+  testWords,
+} from "../lib/docket.js";
+import { datesInWords } from "../lib/coach_room.js";
+import { dayInWords } from "../lib/format.js";
+import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { loadAll, loadCoachRoom, loadSeries } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+if (!roomEnabled()) throw new Error("src/room/docket-entry.astro rendered with WEB_ROOM off — the room route must not be injected");
+
+export async function getStaticPaths() {
+  const file = await loadCoachRoom();
+  return docketEntries(file).map((e: any) => ({ params: { id: e.id }, props: { e } }));
+}
+
+const { e } = Astro.props as any;
+const all = await loadAll();
+const file = await loadCoachRoom();
+const series = await loadSeries();
+const nameOf = (id: string) => (all.get("coach", id) || {}).name || String(id).replace(/_coach$/, "").replace(/_/g, " ");
+const q = questionOf(e);
+const dates = datesOf(e);
+const sides = sidesOf(e, nameOf);
+const result = resultOf(e, nameOf);
+const concession = concessionOf(e);
+const metricId = e.criterion && e.criterion.metric;
+const live = liveMeasure(e, metricId ? all.get("metric", metricId) : null, metricId ? series[metricId] : null);
+const gaps = gapsOf(e, nameOf);
+const test = testWords(e.criterion);
+const description = e.criterion && typeof e.criterion.description === "string" && e.criterion.description.trim() ? datesInWords(e.criterion.description) : null;
+const isOpen = e.status === "open";
+const noindex = process.env.WEB_NOINDEX === "1";
+const fetched = file && file.fetched_at ? dayInWords(file.fetched_at) : null;
+const room = { [ROOM_MARKER]: "docket-entry" };
+const h2 = "font-size:28px;line-height:1.15";
+const title = q.text || `${nameOf(e.coach_a)} v ${nameOf(e.coach_b)}`;
+---
+
+<Base title={`${nameOf(e.coach_a)} v ${nameOf(e.coach_b)} — the docket`} top="system" description={`${nameOf(e.coach_a)} and ${nameOf(e.coach_b)} on one frozen test.`} status={fetched}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <div {...room} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+    Coaching Room · private build (WEB_ROOM=1) · not published
+  </div>
+
+  <section class="section" {...room} style="padding-bottom:24px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
+      <p class="label"><a href={href("/system/docket/")}>The docket</a> · {isOpen ? "open" : "settled"} · {nameOf(e.coach_a)} v {nameOf(e.coach_b)}</p>
+      <h1 style="font-size:clamp(28px,5vw,48px);line-height:1.08">{title}</h1>
+      {q.from === "test" && <p class="muted" style="font-size:13px;max-width:72ch" data-withheld>{DOCKET_NOT_PUBLISHED.topic} The line above is the test the two coaches agreed when it opened.</p>}
+      <p class="dek" style="font-size:21px;max-width:60ch" data-result>{result.headline} {result.measured}</p>
+    </div>
+  </section>
+
+  <section class="hair" {...room} style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 24px">
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">Opened</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px">{dates.opened}</p>
+      </div>
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">{isOpen ? "The data decides" : "Settled"}</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px">{isOpen ? dates.settles : dates.settled}</p>
+        {!isOpen && dates.settles !== dates.settled && <p class="muted" style="font-size:13px;margin-top:4px">agreed settle day {dates.settles}</p>}
+      </div>
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">{isOpen ? "Measure now" : "Came in at"}</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px">{isOpen ? (live && live.value ? `${live.value}${live.unit ? ` ${live.unit}` : ""}` : "not served") : result.value || "not served"}</p>
+        <p class="muted" style="font-size:13px;margin-top:4px">{isOpen ? (live && live.day ? `latest reading, ${live.day}` : "") : result.held || ""}</p>
+      </div>
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">The line</p>
+        <p style="font-size:16px;font-weight:700;margin-top:6px;line-height:1.3">{test || "no measure served"}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="sides">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:1100px">
+      <p class="label">1 · The two sides</p>
+      <h2 style={h2}>Who bet which way, and what they put on the line</h2>
+      <div class="grid cols2" style="gap:0 40px;border-top:1px solid var(--ink)">
+        {
+          sides.map((s: any) => (
+            <article style="padding:16px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:8px" data-side={s.id}>
+              <p style="font-size:20px;font-weight:700">
+                <a href={href(pathOf("coach", s.id))}>{s.name}</a>
+                {s.won && <span class="status confirmed" style="margin-left:8px">won</span>}
+                {s.lost && <span class="status refuted" style="margin-left:8px">lost</span>}
+              </p>
+              <p style="font-size:15px">{s.side}</p>
+              <div class="serif" style="font-size:18px;line-height:1.5">
+                {s.text ? <Quote text={s.text} said={e.opened_date} block /> : <div class="empty" data-withheld><span>{s.message}</span></div>}
+              </div>
+              {s.text && <p class="muted" style="font-size:12px">Its words when the docket opened, {dates.opened}.</p>}
+              {s.apiMessage && <p class="muted" style="font-size:12px">The platform's own note on why it is held back.</p>}
+              <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px;margin:0">
+                <dt class="muted">its stake</dt><dd style="margin:0">{s.stake}</dd>
+              </dl>
+              <a href={href(`/system/coaches/${s.id}/record/`)} style="font-size:13px">{s.name}'s full record →</a>
+            </article>
+          ))
+        }
+      </div>
+      <p class="muted" style="font-size:13px;max-width:72ch">The stake is each coach's own Brier score — how far its stated confidence has sat from what came true; lower is better — frozen on the day the docket opened.</p>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="test" style="border-top:1px solid var(--ink)">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <p class="label">2 · The frozen test</p>
+        <h2 style={h2}>{test ? `${test.charAt(0).toUpperCase()}${test.slice(1)}` : "No measure served"}</h2>
+        <p style="font-size:14px;max-width:62ch;line-height:1.5">Agreed when the docket opened on {dates.opened} and not changed after. Code reads it against the data on {dates.settles}.</p>
+        {description ? <p style="font-size:15px;line-height:1.5"><span class="muted">In the criterion's words: </span>{description}</p> : <p class="muted" style="font-size:13px" data-withheld>{DOCKET_NOT_PUBLISHED.criterion}</p>}
+        {
+          e.criterion && e.criterion.metric && (
+            <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px;margin:0">
+              <dt class="muted">measure</dt><dd class="mono" style="margin:0">{e.criterion.metric}</dd>
+              <dt class="muted">condition</dt><dd class="mono" style="margin:0">{e.criterion.condition || "not served"}</dd>
+              <dt class="muted">line</dt><dd class="mono" style="margin:0">{typeof e.criterion.threshold === "number" ? e.criterion.threshold : "not served"}</dd>
+            </dl>
+          )
+        }
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        {
+          isOpen ? (
+            <>
+              <p class="label">3 · Where the measure stands</p>
+              {live && live.value ? (
+                <>
+                  <p style="font-size:34px;font-weight:700" class="num" data-live>{live.value}{live.unit && <small style="font-size:16px"> {live.unit}</small>}</p>
+                  <p style="font-size:14px">{live.label}, latest daily reading the site serves: {live.day}.</p>
+                  <p class="muted" style="font-size:13px;max-width:60ch">A reading beside the test, not the verdict. The grader checks the test itself on {dates.settles}.</p>
+                </>
+              ) : (
+                <div class="empty" data-live-missing><span>{(live && live.missing) || "No live measure is served."}</span></div>
+              )}
+            </>
+          ) : (
+            <>
+              <p class="label">3 · The result</p>
+              <p style="font-size:24px;font-weight:700;line-height:1.25" data-result>{result.headline}</p>
+              {result.measured && <p style="font-size:16px">{result.measured}</p>}
+              {test && result.value && <p class="muted" style="font-size:13px">Against the line: {test}.</p>}
+              <p class="muted" style="font-size:13px">Graded by code on {dates.settled}. The outcome is the grader's: {e.outcome ? String(e.outcome).replace(/_/g, " ") : "not recorded"}.</p>
+            </>
+          )
+        }
+      </div>
+    </div>
+  </section>
+
+  {
+    !isOpen && (
+      <section class="section" {...room} id="concession" style="border-top:1px solid var(--ink)">
+        <div class="wrap" style="display:flex;flex-direction:column;gap:10px;max-width:900px">
+          <p class="label">4 · The concession</p>
+          {concession && concession.text ? (
+            <>
+              <div class="serif" style="font-size:20px;line-height:1.5"><Quote text={concession.text} block /></div>
+              <p class="muted" style="font-size:13px">Served with the settled entry, {dates.settled}. Quoted exactly.</p>
+            </>
+          ) : concession && concession.message ? (
+            <div class="empty" data-withheld><span>{concession.message}</span></div>
+          ) : (
+            <div class="empty"><span>{DOCKET_NOT_PUBLISHED.concession}</span></div>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section" {...room} id="unpublished" style="border-top:1px solid var(--ink)">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <details style="font-size:14px">
+        <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">What this page cannot show</summary>
+        <p class="muted" style="margin-top:6px;line-height:1.5">The platform's docket feed does not publish these, so nothing stands in their place:</p>
+        <ul style="margin:6px 0 0 18px;line-height:1.6" data-gaps>
+          {gaps.map((g: string) => <li>{g}</li>)}
+        </ul>
+      </details>
+      {
+        file && file.docket_disclosure && (
+          <details style="font-size:14px">
+            <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">How the docket works, in the platform's words</summary>
+            <p class="muted" style="margin-top:6px;line-height:1.55">{file.docket_disclosure}</p>
+          </details>
+        )
+      }
+    </div>
+  </section>
+</Base>

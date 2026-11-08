@@ -373,7 +373,8 @@ const num1 = "font-size:15px;line-height:1.5";
                   {d.actual && (<><dt class="muted">came in at</dt><dd class="mono" style="margin:0">{d.actual}</dd></>)}
                 </dl>
                 <p style="font-size:13px">{d.mine.text ? <Quote text={clip(d.mine.text, 160)} said={null} /> : <span class="muted" data-withheld>{d.mine.message}</span>}</p>
-                {d.concession && <p class="muted" style="font-size:13px">Conceded: {d.concession}</p>}
+                {d.concession && <p class="muted" style="font-size:13px">A concession is on the record: <Quote text={clip(d.concession, 160)} said={null} /></p>}
+                {d.id && <a href={href(`/system/docket/${d.id}/`)} style="font-size:13px;font-weight:700">Both sides and the result →</a>}
               </article>
             ))}
           </div>

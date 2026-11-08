@@ -13,7 +13,9 @@ chokepoint, the claim-sourcing scrub and the dossier privacy filter), never reco
     (commitments) with the producer's own ``commitment_counts``, the dossier's open docket positions, the authored
     voice (tone, style, decision style, uncertainty style) and the coach's ``report_card`` record line;
   * ``/api/coach_docket`` — each standing disagreement's structure (sides, criterion, dates, stakes, verdict), filed
-    under both coaches;
+    under both coaches; and (CR3) once more as ``docket_entries``, each under a room id built from its open day and
+    its two seats, with the API's own tally, disclosure and withheld messages (``unsourced`` / ``absent`` /
+    ``concession_unsourced``);
   * ``/api/voice_fidelity`` — the self-measured blind voice test, platform line and per-coach line.
 
 What it never carries, by design:
@@ -325,7 +327,34 @@ def _docket_entry(d: dict) -> dict | None:
         "outcome": verdict.get("outcome") if isinstance(verdict.get("outcome"), str) else None,
         "actual_value": _num(verdict.get("actual_value")) if metric else None,
         "concession": _text(d.get("concession")),
+        # CR3: the API's OWN words for what it held back, carried as served: a side's claim held by the claim-sourcing
+        # rule (`unsourced[coach].text`) or by a dark instrument on an open item (`absent[coach].reason`), and a held
+        # concession (`concession_unsourced.text`). Never reconstructed: a missing key means the API said nothing.
+        "withheld": {k: w for k in (a, b) if (w := _side_withheld(d, k))},
+        "concession_withheld": _withheld({"unsourced": d.get("concession_unsourced")}),
+        "loser": (
+            verdict.get("loser") if isinstance(verdict.get("loser"), str) else d.get("loser") if isinstance(d.get("loser"), str) else None
+        ),
+        "holds": verdict.get("holds") if isinstance(verdict.get("holds"), bool) else None,
     }
+
+
+def _side_withheld(d: dict, coach: str) -> str | None:
+    """The API's own message for one side's held claim, or None (CR3)."""
+    uns = d.get("unsourced") if isinstance(d.get("unsourced"), dict) else {}
+    got = _withheld({"unsourced": uns.get(coach)})
+    if got:
+        return got
+    absent = d.get("absent") if isinstance(d.get("absent"), dict) else {}
+    side = absent.get(coach) if isinstance(absent.get(coach), dict) else {}
+    return _text(side.get("reason")) or None
+
+
+def docket_id(e: dict) -> str:
+    """A docket entry's room id: its open day and its two seats. Never built from the topic, whose slug spells out words
+    the API may withhold. Lower-case letters, digits and hyphens only."""
+    raw = f"{e.get('opened_date') or 'undated'}-{e['coach_a']}-{e['coach_b']}"
+    return re.sub(r"[^a-z0-9]+", "-", raw.lower()).strip("-")
 
 
 def shape_coach(payload: Any) -> dict | None:
@@ -359,13 +388,21 @@ def shape(coaches: dict[str, Any], docket: Any, fidelity: Any, fetched_at: str |
             entries[pid] = e
     if not entries:
         return dict(ABSENT_COACH_ROOM)
+    docket_entries: list[dict] = []
     if isinstance(docket, dict):
+        seen: set[str] = set()
         for status in ("open", "resolved"):
             for d in docket.get(status) or []:
                 e = _docket_entry(d) if isinstance(d, dict) else None
                 if not e:
                     continue
                 e["status"] = status
+                eid = docket_id(e)
+                if eid in seen:  # the same seats opened twice on one day: the settle day tells them apart
+                    eid = f"{eid}-{re.sub(r'[^0-9]+', '', e.get('resolution_date') or '') or len(seen)}"
+                seen.add(eid)
+                e["id"] = eid
+                docket_entries.append(e)
                 for side in (e["coach_a"], e["coach_b"]):
                     if side in entries:
                         entries[side]["docket"].append(e)
@@ -398,6 +435,15 @@ def shape(coaches: dict[str, Any], docket: Any, fidelity: Any, fetched_at: str |
         "fetched_at": _instant(fetched_at),
         "coaches": entries,
         "voice_fidelity": vf,
+        # CR3: the docket itself, one entry per disagreement (the same entries filed under each coach above), with the
+        # API's own tally and disclosure. A privacy-held entry is neither served nor counted by the API (owner 2026-11-06).
+        "docket_entries": docket_entries,
+        "docket_counts": (
+            {k: v for k, v in docket["counts"].items() if k in ("open", "resolved") and isinstance(v, int) and not isinstance(v, bool)}
+            if isinstance(docket, dict) and isinstance(docket.get("counts"), dict)
+            else None
+        ),
+        "docket_disclosure": (_text(docket.get("disclosure")) or None) if isinstance(docket, dict) else None,
     }
 
 
@@ -458,6 +504,16 @@ def resolve_and_validate(payload: dict, public: dict[str, list[dict]]) -> dict:
         raise ValueError("coach_room.json: an ok file needs a coaches object")
     public_ids = {o["id"] for o in public.get("coach", [])}
     payload["coaches"] = {k: v for k, v in coaches.items() if k in public_ids}
+    # CR3: a docket entry is kept only when BOTH seats are public coaches in this snapshot (the ledger's own rule for a
+    # disagreement): a seat with no public page has no name to print. A file without the key (pre-CR3) reads as none.
+    entries = payload.get("docket_entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("coach_room.json: docket_entries must be a list")
+    payload["docket_entries"] = [
+        d
+        for d in entries
+        if isinstance(d, dict) and isinstance(d.get("id"), str) and d.get("coach_a") in public_ids and d.get("coach_b") in public_ids
+    ]
     for pid, c in payload["coaches"].items():
         counts = (c.get("asks") or {}).get("commitment_counts")
         if counts is not None and not all(isinstance(counts.get(k), int) for k in counts):
