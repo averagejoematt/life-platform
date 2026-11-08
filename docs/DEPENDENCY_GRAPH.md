@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-788 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+783 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -137,7 +137,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `centenarian_progress` | weekly_correlation_compute_lambda.py | — |
 | `challenges` | challenge_generator_lambda.py, character_sheet_lambda.py, site_api_social_challenges.py | challenge_generator_lambda.py, site_api_social_challenges.py |
 | `character_receipt` | — | qa_smoke_lambda.py, site_api_character.py |
-| `character_sheet` | — | challenge_generator_lambda.py, coherence_sentinel_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_character.py, site_api_discovery.py, site_api_fulfillment.py, site_api_habits.py, site_api_journey.py, site_api_mind.py, site_api_rollups.py, site_stats_refresh_lambda.py, spiral_breaker.py |
+| `character_sheet` | — | challenge_generator_lambda.py, coherence_sentinel_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, site_api_ai_context.py, site_api_character.py, site_api_fulfillment.py, site_api_mind.py, site_api_rollups.py, site_stats_refresh_lambda.py, spiral_breaker.py |
 | `checkin_intake_pairs` | — | checkin_intake_pairs.py, nudge_ledger_qa.py |
 | `chronicle` | chronicle_approve_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, wednesday_chronicle_lambda.py | ask_retrieval.py, chronicle_approve_lambda.py, chronicle_data.py, chronicle_email_sender_lambda.py, chronicle_podcast_lambda.py, chronicle_store.py, coach_panel_podcast_lambda.py, panelcast_desk.py, site_api_coach_narrative.py, site_writer.py, wednesday_chronicle_lambda.py |
 | `circadian` | circadian_compliance_lambda.py | — |
@@ -150,7 +150,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `coach_vision` | — | coach_vision.py |
 | `computed_insights` | daily_brief_lambda.py, daily_insight_compute_lambda.py | daily_insight_compute_lambda.py, weekly_signal_lambda.py |
 | `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_discovery.py, site_api_habits.py, site_stats_refresh_lambda.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
-| `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py |
+| `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, monday_compass_lambda.py, recap_data.py |
 | `decisions` | — | site_api_thirdwall.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
 | `dexa` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
@@ -167,7 +167,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `evening_checkin` | evening_checkin.py | evening_checkin.py |
 | `evening_ritual` | — | site_api_fulfillment.py |
 | `experiment_suggestions` | site_api_social_experiments.py | — |
-| `experiments` | tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, site_api_discovery.py, site_api_journey.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
+| `experiments` | tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, site_api_discovery.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
 | `exposures` | — | — |
 | `eyeball_estimate` | — | — |
 | `felt_probe` | — | site_api_fulfillment.py |
@@ -196,7 +196,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `journal_quotes` | tools_journal.py | site_api_diary.py, site_api_thirdwall.py |
 | `labs` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py |
 | `ledger` | — | site_api_ledger.py |
-| `life_events` | — | site_api_journey.py |
+| `life_events` | — | — |
 | `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, nutrition_micronutrients.py, protein_nudge_runner.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
 | `macrofactor_meals` | — | — |
 | `macrofactor_workouts` | — | — |
@@ -582,7 +582,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1386 total · 990 resolved · 396 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1376 total · 982 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 145 literal-named declarations across three idioms, 4 composite; routing digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
