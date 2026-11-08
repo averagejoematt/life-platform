@@ -249,3 +249,111 @@ distTest("CR2 · 6 · no coach-record chunk, no coach-entry marker (control: bot
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── CR3: the docket (/system/docket/, /system/docket/<id>/), "wrong this month" (/system/ledger/refuted/) and the
+// entry on each disagreement page ─────────────────────────────────────────────────────────────────────────────────
+const CR3 = ["/system/docket/", "/system/docket/[id]/", "/system/ledger/refuted/"];
+/** The disagreement page a planted marker goes on — or, in a dist with none (a live snapshot serves none today), the ledger. */
+const someDisagreementPage = (dir) => {
+  const parent = join(dir, "system", "ledger", "disagreements");
+  const id = existsSync(parent) ? readdirSync(parent).find((d) => existsSync(join(parent, d, "index.html"))) : null;
+  return id ? join(parent, id, "index.html") : join(dir, "system", "ledger", "index.html");
+};
+
+test("CR3 · the three routes are room routes; a near miss is not (control: the live ledger and disagreement paths stay public)", () => {
+  for (const p of CR3) assert.ok(ROOM_ROUTES.some((r) => r.path === p), `${p} is a room route`);
+  for (const p of ["/system/docket/", "/system/docket/2026-10-02-nutrition-coach-sleep-coach/", "/system/ledger/refuted/", "/next/v9/system/docket/x/"]) assert.equal(isRoomPath(p), true, p);
+  for (const p of ["/system/ledger/", "/system/ledger/sleep-20261005-deepsleep01/", "/system/ledger/disagreements/x/", "/system/docket/a/b/", "/system/dockets/"]) assert.equal(isRoomPath(p), false, p);
+  assert.equal(notRoomPage("https://averagejoematt.com/system/ledger/refuted/"), false);
+  assert.equal(notRoomPage("https://averagejoematt.com/system/ledger/"), true);
+});
+
+test("CR3 · the disagreement page's entry is self-gating and flush; every CR3 room page refuses to render with the switch off", () => {
+  const page = readFileSync(join(WWW, "src", "pages", "system", "ledger", "disagreements", "[id].astro"), "utf8");
+  assert.match(page, /import DisagreementRoomEntry from "..\/..\/..\/..\/components\/DisagreementRoomEntry.astro"/);
+  assert.match(page, /<\/section>\{\/\*[^]*?\*\/\}<DisagreementRoomEntry d=\{d\} \/>\n<\/Base>/, "the entry sits flush, so the flag-off bytes do not move");
+  const entry = readFileSync(join(WWW, "src", "components", "DisagreementRoomEntry.astro"), "utf8");
+  assert.match(entry, /const on = roomEnabled\(\);/);
+  assert.match(entry, /on && \(/);
+  assert.match(entry, /const entry = on \? /, "the room's data file is read only when the switch is on");
+  assert.doesNotMatch(entry.split("\n---\n")[1], /<style|<script/, "the entry's template adds no asset");
+  for (const r of ROOM_ROUTES.filter((x) => CR3.includes(x.path))) {
+    assert.match(readFileSync(join(WWW, r.entrypoint), "utf8"), /if \(!roomEnabled\(\)\) throw new Error/, r.entrypoint);
+  }
+  // RefutedMonth is imported by the room only — no page under src/pages reaches it
+  const pages = walk(join(WWW, "src", "pages")).map((p) => readFileSync(p, "utf8"));
+  assert.ok(!pages.some((t) => t.includes("RefutedMonth")), "no public page imports the room's ledger rows");
+});
+
+distTest("CR3 · 1 · every docket, entry and refuted path is a 404 (control: each planted page answers 200)", async () => {
+  const probes = roomPaths(DIST);
+  assert.ok(probes.includes("/system/docket/") && probes.includes("/system/ledger/refuted/") && probes.includes("/system/docket/room-probe/"), `${probes}`);
+  assert.deepEqual(await gatedPaths(DIST), []);
+  const dir = plantedCopy();
+  try {
+    for (const rel of ["system/docket", "system/docket/2026-10-02-a-b", "system/ledger/refuted"]) {
+      mkdirSync(join(dir, rel), { recursive: true });
+      writeFileSync(join(dir, rel, "index.html"), "<!doctype html><p>planted</p>");
+    }
+    const leaks = await gatedPaths(dir);
+    for (const p of ["/system/docket/ ", "/system/docket/2026-10-02-a-b/ ", "/system/ledger/refuted/ "]) {
+      assert.ok(leaks.some((l) => l.startsWith(p) && l.includes("200")), `the control must red for ${p.trim()}: ${leaks}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+distTest("CR3 · 2 · no CR3 room key in any JSON (control: each planted key)", () => {
+  const dir = plantedCopy();
+  try {
+    const pairs = join(dir, "data", "pairs.json");
+    assert.ok(existsSync(pairs), "a declared JSON endpoint to plant into");
+    writeFileSync(pairs, readFileSync(pairs, "utf8").replace(/^\{/, '{"docket_entries":[],"docket_counts":{},"concession_withheld":null,'));
+    const leaks = jsonFiles(dir);
+    for (const k of ["docket_entries", "docket_counts", "concession_withheld"]) assert.ok(leaks.some((l) => l.includes(`"${k}"`)), `${k} must red: ${leaks}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+distTest("CR3 · 3+4 · no sitemap or feed names a docket or refuted path (control: a planted <loc> and a planted feed)", () => {
+  for (const loc of ["https://averagejoematt.com/system/docket/x/", "https://averagejoematt.com/system/ledger/refuted/"]) {
+    const dir = plantedCopy();
+    try {
+      writeFileSync(join(dir, "sitemap-0.xml"), `<urlset><url><loc>${loc}</loc></url></urlset>`);
+      assert.ok(sitemaps(dir).length > 0, `${loc} in a sitemap must red`);
+      writeFileSync(join(dir, "feed.xml"), `<rss><item><link>${loc}</link></item></rss>`);
+      assert.ok(feeds(dir).some((l) => l.includes("names a room path")), `${loc} in a feed must red`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("CR3 · 5 · owned_paths.json names no CR3 path (control: planted routes; the ledger's own pattern stays clean)", () => {
+  const owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"));
+  assert.deepEqual(ownedPaths(owned), []);
+  const planted = {
+    ...owned,
+    routes: [...owned.routes, "/system/docket/", "/system/ledger/refuted/"],
+    files: [...owned.files, "system/docket/2026-10-02-a-b/index.html"],
+  };
+  assert.ok(ownedPaths(planted).length >= 3, `the control must red: ${ownedPaths(planted)}`);
+});
+
+distTest("CR3 · 6 · no docket/refuted chunk, no disagreement-entry marker (control: each planted)", () => {
+  const dir = plantedCopy();
+  try {
+    for (const n of ["docket.Zz9PLANT.js", "docket-entry.Zz9PLANT.css", "refuted.Zz9PLANT.js"]) writeFileSync(join(dir, "_astro", n), "x");
+    const page = someDisagreementPage(dir);
+    writeFileSync(page, readFileSync(page, "utf8").replace("</main>", `<section ${ROOM_MARKER}="disagreement-entry"></section></main>`));
+    const leaks = orphanChunks(dir);
+    for (const n of ["docket.Zz9PLANT.js", "docket-entry.Zz9PLANT.css", "refuted.Zz9PLANT.js"]) {
+      assert.ok(leaks.some((l) => l.includes(`${n}: an asset named for the room`)), `${n} must red: ${leaks}`);
+    }
+    assert.ok(leaks.some((l) => l.includes("room marker")), `the disagreement-entry marker must red: ${leaks}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

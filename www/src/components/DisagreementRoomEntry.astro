@@ -1,0 +1,46 @@
+---
+// The Coaching Room's entry on each disagreement page (CR3, built dark). SELF-GATING: with WEB_ROOM off (src/lib/room.js)
+// this component renders nothing and reads nothing — not even the room's data file — so
+// /system/ledger/disagreements/<id>/ is byte-identical to a build without it. No <style>, no <script>: no asset either way.
+// Simple on arrival: the frozen test, the dates and the result as the docket serves them; the way into the full entry.
+import { datesOf, docketEntries, entryForDisagreement, resultOf, testWords } from "../lib/docket.js";
+import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { loadAll, loadCoachRoom } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  d: { id: string; coach_a: string; coach_b: string; status: string; resolved_date?: string | null };
+}
+const { d } = Astro.props;
+const on = roomEnabled();
+const entry = on ? entryForDisagreement(docketEntries(await loadCoachRoom()), d) : null;
+const all = on ? await loadAll() : null;
+const nameOf = (id: string) => (all && all.get("coach", id)?.name) || String(id).replace(/_coach$/, "").replace(/_/g, " ");
+const result = on && entry ? resultOf(entry, nameOf) : null;
+const dates = on && entry ? datesOf(entry) : null;
+const room = { [ROOM_MARKER]: "disagreement-entry" };
+---
+
+{
+  on && (
+    <section class="section" {...room} style="border-top:1px solid var(--ink)">
+      <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:960px">
+        <p class="label">The Coaching Room · private build, not published</p>
+        {entry ? (
+          <>
+            <h2 style="font-size:26px;line-height:1.2">{result!.headline} {result!.measured}</h2>
+            <p class="mono" style="font-size:13px">
+              the test: {testWords(entry.criterion) || "no measure served"} · opened {dates!.opened} · {entry.status === "open" ? `the data decides on ${dates!.settles}` : `settled ${dates!.settled}`}
+            </p>
+            <a class="btn ghost sm" href={href(`/system/docket/${entry.id}/`)} style="align-self:flex-start">Both sides, the stakes and the result</a>
+          </>
+        ) : (
+          <>
+            <p style="font-size:15px">The docket feed serves no matching entry for this disagreement.</p>
+            <a class="btn ghost sm" href={href("/system/docket/")} style="align-self:flex-start">The whole docket</a>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}

@@ -120,6 +120,13 @@ def verbatim_strings(snapshot_dir: str) -> set[str]:
         texts += [a.get("text") for a in (c.get("asks") or {}).get("rows") or []]
         texts += [p.get("my_claim") for p in c.get("docket_positions") or []]
         texts += [v for d in c.get("docket") or [] for v in (d.get("claims") or {}).values()]
+        texts += [d.get("concession") for d in c.get("docket") or []]
+        out.update(_norm(t) for t in texts if isinstance(t, str) and t.strip())
+    # CR3: the docket's own entries — each side's words and a served concession, quoted on /system/docket/<id>/
+    for d in (room or {}).get("docket_entries") or [] if isinstance(room, dict) else []:
+        if not isinstance(d, dict):
+            continue
+        texts = list((d.get("claims") or {}).values()) + [d.get("concession")]
         out.update(_norm(t) for t in texts if isinstance(t, str) and t.strip())
     return out
 

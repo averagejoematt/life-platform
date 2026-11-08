@@ -1,0 +1,74 @@
+---
+// /system/ledger/refuted/ — "wrong this month", the room's preset over the ledger (CR3; the old Wrong Feed). BUILT
+// DARK: this file lives outside src/pages/ and is injected as a route ONLY when WEB_ROOM=1 (src/lib/room.js).
+//
+// Built from the served statuses of the ledger's own prediction objects — nothing re-graded, nothing estimated:
+//   * a call graded wrong and settled in the snapshot's month, as first graded (none is published as re-verified);
+//   * a call under classification review is shown apart and never counted wrong (lib/disputed.js);
+//   * a grade corrected to or from wrong shows its correction (lib/corrections.js).
+// "This month" is the snapshot's as-of month (manifest.json), never the wall clock. The month before sits folded.
+import Base from "../layouts/Base.astro";
+import RefutedMonth from "../components/RefutedMonth.astro";
+import { monthOf, previousMonth, refutedLedger } from "../lib/docket.js";
+import { dayInWords } from "../lib/format.js";
+import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { loadAll, snapshotAsOf } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+if (!roomEnabled()) throw new Error("src/room/refuted.astro rendered with WEB_ROOM off — the room route must not be injected");
+
+const all = await loadAll();
+const asOf = await snapshotAsOf();
+const month = monthOf(asOf);
+const nameOf = (id: string) => (all.get("coach", id) || {}).name || String(id).replace(/_coach$/, "").replace(/_/g, " ");
+const preds = all.byType.prediction;
+const now = refutedLedger(preds, month);
+const before = refutedLedger(preds, previousMonth(month));
+const n = now.wrong.length;
+const noindex = process.env.WEB_NOINDEX === "1";
+const through = dayInWords(asOf);
+const room = { [ROOM_MARKER]: "refuted" };
+const h2 = "font-size:28px;line-height:1.15";
+---
+
+<Base title="Wrong this month" top="system" description="Every call the coaches got wrong this month, as first graded." status={through}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <div {...room} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+    Coaching Room · private build (WEB_ROOM=1) · not published
+  </div>
+
+  <section class="section" {...room} style="padding-bottom:24px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
+      <p class="label"><a href={href("/system/ledger/")}>The ledger</a> · wrong this month</p>
+      <h1 style="font-size:clamp(30px,5.5vw,52px);line-height:1.05" data-refuted-headline>
+        {n === 0 ? `No call graded wrong in ${now.words} so far` : `${n} ${n === 1 ? "call" : "calls"} graded wrong in ${now.words}`}
+      </h1>
+      <p class="dek" style="font-size:19px;max-width:62ch">
+        The misses are kept in plain view, with the call's own words where the platform publishes them.{through ? ` Through ${through}.` : ""}
+      </p>
+      <p class="muted" style="font-size:13px;max-width:72ch;border-left:3px solid var(--ink);padding-left:12px" data-verification>
+        As first graded. These are the grades as the grader first wrote them; the platform does not yet publish which were re-verified under the current rules, so this is the recorded history, not a validated count. A call under classification review is listed apart and counted neither right nor wrong.
+      </p>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="this-month" style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+      <p class="label">{now.words}</p>
+      <h2 style={h2}>{n ? "Each miss, newest first" : "Nothing graded wrong yet this month"}</h2>
+      <RefutedMonth view={now} nameOf={nameOf} />
+    </div>
+  </section>
+
+  <section class="section" {...room} id="last-month" style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+      <details>
+        <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center;font-size:18px">
+          {before.words}: {before.wrong.length} graded wrong, as first graded{before.disputed.length ? `, ${before.disputed.length} under review` : ""}
+        </summary>
+        <div style="margin-top:12px"><RefutedMonth view={before} nameOf={nameOf} /></div>
+      </details>
+      <p style="font-size:13px;margin-top:8px"><a href={href("/system/docket/")}>The docket: where two coaches bet against each other →</a></p>
+    </div>
+  </section>
+</Base>

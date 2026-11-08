@@ -2,7 +2,8 @@
 // publication, but that should not prevent private implementation, prototyping or testing").
 //
 // ONE helper, read by every gated piece: the route injection in astro.config.mjs, the room entries on /system/
-// (components/RoomEntry.astro) and on each coach page (components/CoachRoomEntry.astro, CR2), the room pages under
+// (components/RoomEntry.astro), on each coach page (components/CoachRoomEntry.astro, CR2) and on each disagreement
+// page (components/DisagreementRoomEntry.astro, CR3), the room pages under
 // src/room/, scripts/postbuild.mjs (which refuses to rewrite the committed owned_paths.json / reach.json from a room
 // build) and the snapshot producers' Python twin (scripts/publish_snapshot_calibration.py::room_enabled — the same
 // variable, the same literal "1"; scripts/publish_snapshot_coach_room.py reads it from there).
@@ -22,6 +23,10 @@ export const ROOM_ENV = "WEB_ROOM";
 export const ROOM_ROUTES = [
   { pattern: "/system/calibration", entrypoint: "./src/room/calibration.astro", path: "/system/calibration/" },
   { pattern: "/system/coaches/[id]/record", entrypoint: "./src/room/coach-record.astro", path: "/system/coaches/[id]/record/" },
+  // CR3: the docket (every standing disagreement), one page per entry, and the "refuted this month" ledger preset
+  { pattern: "/system/docket", entrypoint: "./src/room/docket.astro", path: "/system/docket/" },
+  { pattern: "/system/docket/[id]", entrypoint: "./src/room/docket-entry.astro", path: "/system/docket/[id]/" },
+  { pattern: "/system/ledger/refuted", entrypoint: "./src/room/refuted.astro", path: "/system/ledger/refuted/" },
 ];
 
 /** The attribute every room-rendered element carries; the dist scans look for it (and for ROOM_DATA_KEYS). */
@@ -38,6 +43,9 @@ export const ROOM_DATA_KEYS = [
   "commitment_counts",
   "docket_positions",
   "voice_fidelity",
+  "docket_entries",
+  "docket_counts",
+  "concession_withheld",
 ];
 
 /** The room's data files in the snapshot — written by the producers ONLY on a WEB_ROOM=1 export, never in a dist. */

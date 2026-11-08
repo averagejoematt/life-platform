@@ -258,7 +258,8 @@ def _room_dirs(dist: str, path: str) -> list[str]:
     it becomes a glob `*`, with every glob metacharacter in the literal parts escaped."""
     parts = re.split(r"(\[[^\]]+\])", path.strip("/"))
     pattern = "".join("*" if re.fullmatch(r"\[[^\]]+\]", s) else glob.escape(s) for s in parts)
-    return sorted(glob.glob(os.path.join(glob.escape(dist), pattern)))
+    # directories only: `system/docket/[id]/` must not read the docket's own index.html as an entry (CR3)
+    return sorted(d for d in glob.glob(os.path.join(glob.escape(dist), pattern)) if os.path.isdir(d))
 
 
 def room_leaks(dist: str, room_js: str = ROOM_JS) -> list[str]:
