@@ -133,7 +133,14 @@ def test_the_walk_is_not_vacuous(walks):
 
 def test_mutation_control_ungated_policy_moves_the_routes(ungated):
     moved = _moved(ungated)
-    for route in ("/api/habits", "/api/presence", "/api/status", "/api/fulfillment_index", "/api/pulse", "/api/survival", "/api/character"):
+    for route in (
+        "/api/habits",
+        "/api/presence",
+        "/api/status",
+        "/api/fulfillment_index",
+        "/api/survival",
+        "/api/character",
+    ):  # /api/pulse: no journal code left to ungate (2026-11-06)
         assert route in moved, (route, moved)
 
 
@@ -317,9 +324,7 @@ def test_journal_derived_character_components_are_never_named():
 def test_pulse_json_carries_no_journal_or_journal_mood_glyph():
     from content import site_writer
 
-    p = site_writer._compute_pulse(
-        vitals={}, journey={}, training={}, journal_data={"entries": 3, "themes": ["x"]}, mood_data={"mood_avg": 4}
-    )
+    p = site_writer._compute_pulse(vitals={}, journey={}, training={})
     glyphs = p["pulse"]["glyphs"]
     assert "journal" not in glyphs and "mind" not in glyphs and p["pulse"]["signals_total"] == len(glyphs)
 

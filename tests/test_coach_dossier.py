@@ -600,6 +600,37 @@ def test_site_dossier_is_byte_identical_however_many_lines_the_privacy_filter_ho
     assert json.dumps(_dossier_via_api(monkeypatch, extra_commitments=[clean]), sort_keys=True) not in outs
 
 
+def test_the_retracted_count_cannot_reveal_private_source_activity(monkeypatch):
+    """Owner ruling 2026-11-06: keep `retracted` "provided it cannot reveal private-source activity". It counts only
+    a record a reader could have been served. A retraction aimed at a privacy-held line, a conversation learning, a
+    line the wire guard would drop (the journal's silence) or an unknown record moves nothing — byte-identical,
+    and the silent line moves no commitment count either. Mutation control: retracting a served record counts."""
+    silent = {
+        "pk": "COACH#sleep_coach",
+        "sk": "COMMITMENT#commit_20260724_silent",
+        "created_date": "2026-07-24",
+        "commitment_natural": "Write something down this week.",
+        "public_ask": "I've asked him to dim the lights by nine.",
+        "outcome_notes": "There was no journal entry this week.",
+        "status": "pending",
+    }
+    base_rows = [_ledger_row("COMMITMENT#commit_20260720_stale", "retract")]
+
+    def dossier(rows, extra=()):
+        return _dossier_via_api(monkeypatch, corrections_rows=rows, extra_commitments=list(extra))
+
+    base = json.dumps(dossier(base_rows), sort_keys=True)
+    for sk in (
+        "COMMITMENT#commit_20260721_vice",
+        "LEARNING#conversation_x",
+        "COMMITMENT#commit_20260724_silent",
+        "COMMITMENT#no_such_record",
+    ):
+        assert json.dumps(dossier(base_rows + [_ledger_row(sk, "retract")], [silent]), sort_keys=True) == base, sk
+    assert json.dumps(dossier(base_rows, [silent]), sort_keys=True) == base, "a line the wire guard drops moved a count"
+    assert dossier([])["retracted"] == 0 and json.loads(base)["retracted"] == 1
+
+
 def test_site_dossier_excludes_conversation_learnings_structurally(monkeypatch):
     d = _dossier_via_api(monkeypatch)
     blob = json.dumps(d)
