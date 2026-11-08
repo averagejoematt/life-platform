@@ -59,9 +59,11 @@ v1.0.0 — 2026-07-26 (#1387)
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Callable, Iterable, Optional
 
+from common import journal_silence  # the wire guard's own predicate (#5131)
 from content import journal_quotes  # the house taboo gate (#1568/ADR-142) — reused, not forked
 from privacy import broadcast_sensitivity_gate  # the house PII detector (#1673) — reused, not forked
 
@@ -359,6 +361,14 @@ def dossier_corrections(ledger_rows: Iterable[dict], coach_id: str) -> list:
         )
     out.sort(key=lambda c: c.get("date") or "", reverse=True)
     return out
+
+
+def wire_servable(entries: list) -> list:
+    """The entries the public wire guard would let through (``common.journal_silence``). Applied before any
+    count, so ``commitment_counts`` and ``retracted`` can only ever count a record a reader could have been
+    served: a line about the journal's silence, retracted or not, moves no public number (owner ruling
+    2026-11-06: the retracted count may not reveal private-source activity)."""
+    return [e for e in entries or [] if not journal_silence.mentions_journal_silence(json.dumps(e, default=str))]
 
 
 def apply_corrections(entries: list, corrections: list):

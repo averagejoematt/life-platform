@@ -211,7 +211,9 @@ test("also on the record: two counts that disagree are both left up; the skips a
   assert.match(text, /Marcus Webb, the nutrition coach: 0 of 5 checked calls right so far, by one of the site’s two counts\. The other says 20 of 25\. The two disagree, and both are left up\./);
   assert.doesNotMatch(text, /Lisa Park/, "a coach whose two counts agree is not on the record");
   assert.match(text, /468 asks expired .* Of the 49 that were checked, he kept 37\./);
-  assert.match(text, /What he skips, counted: journal 17 days · blood-sugar sensor 30 days · Garmin 103 days, paused by the platform, not by him\./);
+  // NEGATIVE CONTROL (owner ruling 2026-11-06): the fixture still hands in a stale journal glyph; the page ignores it.
+  assert.match(text, /What he skips, counted: blood-sugar sensor 30 days · Garmin 103 days, paused by the platform, not by him\./);
+  assert.doesNotMatch(text, /journal/i);
 });
 
 test("every number carries its served field, dates are words not ISO, and the ruled words are absent", () => {
@@ -237,7 +239,7 @@ test("every number carries its served field, dates are words not ISO, and the ru
   }
   assert.match(all, /data-src="receipts\.month_to_date_usd"/);
   assert.match(all, /data-src="sub_count\.count"/);
-  assert.match(all, /data-src="pulse\.glyphs\.journal\.gap_days"/);
+  assert.doesNotMatch(all, /pulse\.glyphs\.journal|His journal|in his journal/);  // the stale glyph handed to wordsBlock is ignored
   // R5 #2 residue: the note stamps, the eating span, the device count, the 30-day window and the
   // When column each name a field too — no numeral on Home sits outside a data-src element.
   assert.match(all, /<p class="v7h-dated" data-src="decisions\[0\]\.note_at">/);

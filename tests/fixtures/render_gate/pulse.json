@@ -73,11 +73,6 @@
     "label": "7.8h",
     "as_of": "2026-07-04"
    },
-   "journal": {
-    "state": "gray",
-    "label": null,
-    "as_of": "2026-07-04"
-   },
    "lift": {
     "state": "green",
     "label": "Push day \u00b7 42 sets",

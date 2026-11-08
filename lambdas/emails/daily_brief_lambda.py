@@ -2607,14 +2607,6 @@ def lambda_handler(event, context):
             try:
                 from content.site_writer import write_pulse_json
 
-                _journal_pulse = {
-                    "entries": len(data.get("journal_entries") or []),
-                    "themes": (data.get("journal") or {}).get("themes", []),
-                    "streak_days": 0,
-                }
-                _mood_pulse = {
-                    "mood_avg": (data.get("journal") or {}).get("mood_avg"),
-                }
                 write_pulse_json(
                     s3_client=s3,
                     vitals={
@@ -2638,8 +2630,6 @@ def lambda_handler(event, context):
                         "zone2_this_week_min": round(_z2_this_week),
                         "today_activity": None,
                     },
-                    journal_data=_journal_pulse,
-                    mood_data=_mood_pulse,
                     trends=_trends,
                     brief_excerpt=_brief_excerpt,
                     table_client=table,

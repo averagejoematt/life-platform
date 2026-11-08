@@ -20,7 +20,6 @@ facade; no import cycle. Every other shared helper comes straight from
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
-from common import activity_publication as _activity_publication  # owner ruling 2026-11-03: private sources get no glyph
 from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.metric_truth import (
     steps_by_date as resolved_steps_by_date,  # #4630 — the ONE steps resolver
@@ -228,33 +227,6 @@ def _positive(value):
         return False
 
 
-def _journal_activity(table, today_pt: str, today_utc: str, q_end: str) -> tuple:
-    """(written_today, streak_days, gap_days) from the journal partition (single 30-day query).
-    Called only while the journal source is classified public — never today (owner ruling 2026-11-03)."""
-    journal_today, journal_streak, journal_gap_days = False, 0, None
-    try:
-        d30_ago = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
-        j_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}notion") & Key("sk").between(f"DATE#{d30_ago}", f"DATE#{q_end}~"),
-            ProjectionExpression="sk",
-        )
-        j_dates = {item["sk"][:15] for item in j_resp.get("Items", [])}  # "DATE#YYYY-MM-DD"
-        # Check both PT and UTC dates for today's journal (entry may be stored under either)
-        journal_today = f"DATE#{today_pt}" in j_dates or f"DATE#{today_utc}" in j_dates
-        if journal_today:
-            journal_streak = 1
-            for days_back in range(1, 31):
-                if f"DATE#{(datetime.now(PT) - timedelta(days=days_back)).strftime('%Y-%m-%d')}" not in j_dates:
-                    break
-                journal_streak += 1
-        elif j_dates:
-            _last_j = max(d[5:] for d in j_dates)
-            journal_gap_days = max(0, (datetime.strptime(today_pt, "%Y-%m-%d").date() - datetime.strptime(_last_j, "%Y-%m-%d").date()).days)
-    except Exception:
-        pass
-    return journal_today, journal_streak, journal_gap_days
-
-
 def pulse(*, _g) -> dict:
     """
     GET /api/pulse
@@ -312,14 +284,6 @@ def pulse(*, _g) -> dict:
     except Exception:
         ah = {}
     habitify = _latest_item("habit_scores") or {}
-
-    # Journal today + streak + gap — private activity (owner ruling 2026-11-03): `_journal_activity`
-    # does not read it, the glyph is dropped and the narrative never names it, while the journal
-    # source is not classified public (common.activity_publication).
-    _journal_public = _activity_publication.source_is_public("notion")
-    journal_today, journal_streak, journal_gap_days = (
-        _journal_activity(table, today_pt, today_utc, q_end) if _journal_public else (False, 0, None)
-    )
 
     # Also check apple_health for weight fallback
     w_val = float(withings.get("weight_lbs", 0)) if withings.get("weight_lbs") else None
@@ -479,7 +443,6 @@ def pulse(*, _g) -> dict:
     # #3268's question is "can this pipe speak for the window", and an Apple Health that
     # reports daily and shows no workout minutes has spoken.
     _lift_licensed = _absence_licensed(_WORKOUT_CATEGORY, _workout_consulted, _workout_liveness, EXPERIMENT_START)
-    _journal_spans = spans_cycle(journal_gap_days, _pulse_day)
 
     # #3293: the scale glyph's direction, from the shared ruling rather than from a
     # two-way test with a falsy collapse. `null` is the honest value when there is no
@@ -544,22 +507,6 @@ def pulse(*, _g) -> dict:
             "as_of": _vr["sleep_as_of"],
             "night_of": night_of_for(_vr["sleep_as_of"]),  # #1968, same frame
         },
-        "journal": {
-            "state": "green" if journal_today else "gray",
-            "written_today": journal_today,
-            "streak_days": journal_streak,
-            "gap_days": journal_gap_days,
-            "spans_cycles": _journal_spans,  # #2957
-            "label": (
-                "Journaled"
-                if journal_today
-                else (
-                    label_with_span(f"No entry in {journal_gap_days} days", journal_gap_days, _pulse_day, EXPERIMENT_START)
-                    if journal_gap_days is not None and journal_gap_days >= 2
-                    else "No entry yet"
-                )
-            ),
-        },
         "lift": {
             "state": "green" if trained_today else "gray",
             "trained_today": trained_today,
@@ -586,8 +533,6 @@ def pulse(*, _g) -> dict:
         },
     }
 
-    if not _journal_public:
-        glyphs.pop("journal", None)
     signals_reporting = sum(1 for g in glyphs.values() if g.get("state") != "gray")
     amber_or_red = sum(1 for g in glyphs.values() if g.get("state") in ("amber", "red"))
     if signals_reporting == 0:
@@ -640,19 +585,6 @@ def pulse(*, _g) -> dict:
             narrative_parts.append(f"Recovery strong at {r_val}%.")
         else:
             narrative_parts.append(f"Recovery at {r_val}%.")
-    if not _journal_public:
-        pass  # private activity: never narrated
-    elif journal_today:
-        narrative_parts.append("Journal logged.")
-    elif journal_gap_days is not None and journal_gap_days >= 2:
-        # "yet" implies today is the exception — past the threshold, the gap is the fact.
-        # #2957: and past Day 1 the gap is a LIFETIME fact — say so, or the sentence
-        # asserts a history the cycle it sits in cannot contain.
-        narrative_parts.append(
-            label_with_span(f"No journal entry in {journal_gap_days} days", journal_gap_days, _pulse_day, EXPERIMENT_START) + "."
-        )
-    else:
-        narrative_parts.append("No journal entry yet.")
     if nutrition_logged_7d > 0:
         narrative_parts.append(f"Nutrition: {nutrition_logged_7d}/7 days logged.")
     if not narrative_parts or signals_reporting == 0:

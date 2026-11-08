@@ -244,7 +244,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "notion::lambdas/ingestion/notion_lambda.py::write": SEED_DATE,
     "notion::lambdas/intelligence/field_notes_lambda.py::read": SEED_DATE,
     "notion::lambdas/intelligence/intelligence_common.py::read": SEED_DATE,
-    "notion::lambdas/web/site_api_pulse.py::read": SEED_DATE,
     "notion::mcp/tools_journal.py::read": SEED_DATE,
     "notion::mcp/tools_social_connection.py::read": SEED_DATE,
     "panelcast::lambdas/emails/coach_panel_podcast_lambda.py::read": SEED_DATE,

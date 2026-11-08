@@ -233,11 +233,6 @@ export function wordsBlock(decisions, pulse) {
       out.push(`<blockquote${src(`decisions[${latest.i}].note`)}>“${esc(latest.note)}”</blockquote>`);
     }
   }
-  const jg = pulse && pulse.pulse && pulse.pulse.glyphs && pulse.pulse.glyphs.journal;
-  if (jg && jg.written_today) out.push(`<p class="v7h-note"${src("pulse.glyphs.journal.written_today")}>He wrote in his journal today.</p>`);
-  else if (jg && num(jg.gap_days) !== null && jg.gap_days > 0) {
-    out.push(`<p class="v7h-note">His journal has been silent for ${span("pulse.glyphs.journal.gap_days", String(jg.gap_days))} days. Nothing from him there this week.</p>`);
-  }
   return out.join("");
 }
 
@@ -391,8 +386,6 @@ export function recordBlock(calibration, wrong, predictions, freshness, pulse) {
   }
   // What he skips, counted.
   const skips = [];
-  const jg = pulse && pulse.pulse && pulse.pulse.glyphs && pulse.pulse.glyphs.journal;
-  if (jg && num(jg.gap_days) !== null && jg.gap_days > 0) skips.push(`journal ${span("pulse.glyphs.journal.gap_days", String(jg.gap_days))} days`);
   const sources = (freshness && freshness.sources) || [];
   const plain = { cgm: "blood-sugar sensor", blood_pressure: "blood pressure", state_of_mind: "state of mind" };
   // The order is C's: what he skips himself first (the dark data types), then what the

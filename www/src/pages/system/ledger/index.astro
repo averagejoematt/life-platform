@@ -45,6 +45,11 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
       <p class="muted" style="margin-top:12px;font-size:13px">
         Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page; the filter below only hides and shows.
       </p>
+      {rows.some((p) => p.claim_withheld === "no_words") && (
+        <p class="muted" style="margin-top:8px;font-size:13px" data-no-words-note>
+          Some records carry no publishable commentary. Each still shows its coach, date, measure and grade.
+        </p>
+      )}
       {method && method.note && method.effective && (
         <p class="muted" style="margin-top:8px;font-size:13px" data-method>
           Method {method.version}, from {dayInWords(method.effective)}: {method.note}
@@ -67,7 +72,7 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
       rows.length ? (
         <div class="rows">
           {rows.map((p) => (
-            <a href={href(pathOf("prediction", p.id))} data-row data-coach={p.coach_id} data-status={p.status} data-kind={p.kind} data-text={`${p.claim} ${p.coach_name} ${p.metric_key || ""}`.toLowerCase()}>
+            <a href={href(pathOf("prediction", p.id))} data-row data-coach={p.coach_id} data-status={p.status} data-kind={p.kind} data-text={`${p.claim_withheld === "no_words" ? "" : p.claim} ${p.coach_name} ${p.metric_key || ""}`.toLowerCase()}>
               <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
                 <span style="font-size:14px;line-height:1.35">
                   <b>{p.coach_name}</b>
@@ -78,9 +83,11 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
                     {p.sealed && " · sealed"}
                   </span>
                 </span>
-                <span class={p.claim_withheld ? "serif muted" : "mono"} style="font-size:13px;line-height:1.45">
-                  {p.claim_withheld ? p.claim : <Quote text={p.claim} said={p.logged_date} />}
-                </span>
+                {p.claim_withheld !== "no_words" && (
+                  <span class={p.claim_withheld ? "serif muted" : "mono"} style="font-size:13px;line-height:1.45">
+                    {p.claim_withheld ? p.claim : <Quote text={p.claim} said={p.logged_date} />}
+                  </span>
+                )}
                 {(p.quality_flags.length > 0 || p.corrections.length > 0 || isDisputed(p)) && (
                   <span>
                     {p.quality_flags.map((f) => (
