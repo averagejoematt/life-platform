@@ -276,7 +276,96 @@
      "outcome": "graded",
      "actual_value": 74.4,
      "concession": "",
-     "status": "resolved"
+     "status": "resolved",
+     "id": "2026-10-02-nutrition-coach-sleep-coach",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": "nutrition_coach",
+     "holds": true
+    },
+    {
+     "topic": "",
+     "claims": {
+      "sleep_coach": "Sample claim for the fixture build, sleep side.",
+      "training_coach": "Sample claim for the fixture build, training side, said on 2026-10-27."
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score",
+      "condition": "gte",
+      "threshold": 60.0
+     },
+     "sides": {
+      "sleep_coach": true,
+      "training_coach": false
+     },
+     "stakes": {
+      "sleep_coach": {
+       "brier": 0.2507,
+       "brier_n": 20.0
+      },
+      "training_coach": {
+       "brier": 0.24,
+       "brier_n": 12.0
+      }
+     },
+     "winner": null,
+     "outcome": null,
+     "actual_value": null,
+     "concession": "",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": null,
+     "holds": null,
+     "resolved_date": null,
+     "id": "2026-10-27-sleep-coach-training-coach",
+     "status": "open",
+     "coach_a": "sleep_coach",
+     "coach_b": "training_coach",
+     "opened_date": "2026-10-27",
+     "resolution_date": "2026-11-10"
+    },
+    {
+     "topic": "",
+     "claims": {
+      "sleep_coach": "Sample claim for the fixture build, sleep side, second entry.",
+      "training_coach": "Sample claim for the fixture build, training side, second entry."
+     },
+     "criterion": {
+      "description": "Sample criterion description for the fixture build.",
+      "metric": "resting_hr",
+      "condition": "lte",
+      "threshold": 58.0
+     },
+     "sides": {
+      "sleep_coach": false,
+      "training_coach": true
+     },
+     "stakes": {
+      "sleep_coach": {
+       "brier": 0.2507,
+       "brier_n": 18.0
+      },
+      "training_coach": {
+       "brier": 0.24,
+       "brier_n": 9.0
+      }
+     },
+     "winner": "training_coach",
+     "outcome": "graded",
+     "actual_value": 56.2,
+     "concession": "Sample concession text for the fixture build.",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": "sleep_coach",
+     "holds": true,
+     "resolved_date": "2026-10-13",
+     "id": "2026-10-06-sleep-coach-training-coach",
+     "status": "resolved",
+     "coach_a": "sleep_coach",
+     "coach_b": "training_coach",
+     "opened_date": "2026-10-06",
+     "resolution_date": "2026-10-13"
     }
    ],
    "voice": {
@@ -412,7 +501,56 @@
      "outcome": "graded",
      "actual_value": 74.4,
      "concession": "",
-     "status": "resolved"
+     "status": "resolved",
+     "id": "2026-10-02-nutrition-coach-sleep-coach",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": "nutrition_coach",
+     "holds": true
+    },
+    {
+     "topic": "",
+     "claims": {
+      "glucose_coach": "",
+      "nutrition_coach": "Sample claim for the fixture build, nutrition side."
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score",
+      "condition": "lt",
+      "threshold": 70.0
+     },
+     "sides": {
+      "glucose_coach": false,
+      "nutrition_coach": true
+     },
+     "stakes": {
+      "glucose_coach": {
+       "brier": 0.25,
+       "brier_n": 3.0
+      },
+      "nutrition_coach": {
+       "brier": 0.25,
+       "brier_n": 10.0
+      }
+     },
+     "winner": "nutrition_coach",
+     "outcome": "graded",
+     "actual_value": 59.0,
+     "concession": null,
+     "withheld": {
+      "glucose_coach": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+     },
+     "concession_withheld": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.",
+     "loser": "glucose_coach",
+     "holds": true,
+     "resolved_date": "2026-09-30",
+     "id": "2026-09-23-glucose-coach-nutrition-coach",
+     "status": "resolved",
+     "coach_a": "glucose_coach",
+     "coach_b": "nutrition_coach",
+     "opened_date": "2026-09-23",
+     "resolution_date": "2026-09-30"
     }
    ],
    "voice": null,
@@ -455,7 +593,52 @@
     "disclosure": null
    },
    "docket_positions": [],
-   "docket": [],
+   "docket": [
+    {
+     "topic": "",
+     "claims": {
+      "glucose_coach": "",
+      "nutrition_coach": "Sample claim for the fixture build, nutrition side."
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score",
+      "condition": "lt",
+      "threshold": 70.0
+     },
+     "sides": {
+      "glucose_coach": false,
+      "nutrition_coach": true
+     },
+     "stakes": {
+      "glucose_coach": {
+       "brier": 0.25,
+       "brier_n": 3.0
+      },
+      "nutrition_coach": {
+       "brier": 0.25,
+       "brier_n": 10.0
+      }
+     },
+     "winner": "nutrition_coach",
+     "outcome": "graded",
+     "actual_value": 59.0,
+     "concession": null,
+     "withheld": {
+      "glucose_coach": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+     },
+     "concession_withheld": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.",
+     "loser": "glucose_coach",
+     "holds": true,
+     "resolved_date": "2026-09-30",
+     "id": "2026-09-23-glucose-coach-nutrition-coach",
+     "status": "resolved",
+     "coach_a": "glucose_coach",
+     "coach_b": "nutrition_coach",
+     "opened_date": "2026-09-23",
+     "resolution_date": "2026-09-30"
+    }
+   ],
    "voice": null,
    "fidelity": null,
    "record_card": null,
@@ -473,5 +656,182 @@
   "run_month": "2026-10",
   "updated_at": "2026-10-01T16:00:49+00:00",
   "disclosure": "Self-measured (sample disclosure for layout): judges read a blinded sample of each coach's own output and guess which coach wrote it."
- }
+ },
+ "docket_entries": [
+  {
+   "coach_a": "nutrition_coach",
+   "coach_b": "sleep_coach",
+   "opened_date": "2026-10-02",
+   "resolution_date": "2026-10-16",
+   "resolved_date": "2026-10-16",
+   "topic": "",
+   "claims": {
+    "nutrition_coach": "",
+    "sleep_coach": ""
+   },
+   "criterion": {
+    "description": "",
+    "metric": "recovery_score_7day_avg",
+    "condition": "gte",
+    "threshold": 70.0
+   },
+   "sides": {
+    "nutrition_coach": false,
+    "sleep_coach": true
+   },
+   "stakes": {
+    "nutrition_coach": {
+     "brier": 0.25,
+     "brier_n": 6.0
+    },
+    "sleep_coach": {
+     "brier": 0.2507,
+     "brier_n": 20.0
+    }
+   },
+   "winner": "sleep_coach",
+   "outcome": "graded",
+   "actual_value": 74.4,
+   "concession": "",
+   "status": "resolved",
+   "id": "2026-10-02-nutrition-coach-sleep-coach",
+   "withheld": {},
+   "concession_withheld": null,
+   "loser": "nutrition_coach",
+   "holds": true
+  },
+  {
+   "topic": "",
+   "claims": {
+    "glucose_coach": "",
+    "nutrition_coach": "Sample claim for the fixture build, nutrition side."
+   },
+   "criterion": {
+    "description": "",
+    "metric": "recovery_score",
+    "condition": "lt",
+    "threshold": 70.0
+   },
+   "sides": {
+    "glucose_coach": false,
+    "nutrition_coach": true
+   },
+   "stakes": {
+    "glucose_coach": {
+     "brier": 0.25,
+     "brier_n": 3.0
+    },
+    "nutrition_coach": {
+     "brier": 0.25,
+     "brier_n": 10.0
+    }
+   },
+   "winner": "nutrition_coach",
+   "outcome": "graded",
+   "actual_value": 59.0,
+   "concession": null,
+   "withheld": {
+    "glucose_coach": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+   },
+   "concession_withheld": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.",
+   "loser": "glucose_coach",
+   "holds": true,
+   "resolved_date": "2026-09-30",
+   "id": "2026-09-23-glucose-coach-nutrition-coach",
+   "status": "resolved",
+   "coach_a": "glucose_coach",
+   "coach_b": "nutrition_coach",
+   "opened_date": "2026-09-23",
+   "resolution_date": "2026-09-30"
+  },
+  {
+   "topic": "",
+   "claims": {
+    "sleep_coach": "Sample claim for the fixture build, sleep side.",
+    "training_coach": "Sample claim for the fixture build, training side, said on 2026-10-27."
+   },
+   "criterion": {
+    "description": "",
+    "metric": "recovery_score",
+    "condition": "gte",
+    "threshold": 60.0
+   },
+   "sides": {
+    "sleep_coach": true,
+    "training_coach": false
+   },
+   "stakes": {
+    "sleep_coach": {
+     "brier": 0.2507,
+     "brier_n": 20.0
+    },
+    "training_coach": {
+     "brier": 0.24,
+     "brier_n": 12.0
+    }
+   },
+   "winner": null,
+   "outcome": null,
+   "actual_value": null,
+   "concession": "",
+   "withheld": {},
+   "concession_withheld": null,
+   "loser": null,
+   "holds": null,
+   "resolved_date": null,
+   "id": "2026-10-27-sleep-coach-training-coach",
+   "status": "open",
+   "coach_a": "sleep_coach",
+   "coach_b": "training_coach",
+   "opened_date": "2026-10-27",
+   "resolution_date": "2026-11-10"
+  },
+  {
+   "topic": "",
+   "claims": {
+    "sleep_coach": "Sample claim for the fixture build, sleep side, second entry.",
+    "training_coach": "Sample claim for the fixture build, training side, second entry."
+   },
+   "criterion": {
+    "description": "Sample criterion description for the fixture build.",
+    "metric": "resting_hr",
+    "condition": "lte",
+    "threshold": 58.0
+   },
+   "sides": {
+    "sleep_coach": false,
+    "training_coach": true
+   },
+   "stakes": {
+    "sleep_coach": {
+     "brier": 0.2507,
+     "brier_n": 18.0
+    },
+    "training_coach": {
+     "brier": 0.24,
+     "brier_n": 9.0
+    }
+   },
+   "winner": "training_coach",
+   "outcome": "graded",
+   "actual_value": 56.2,
+   "concession": "Sample concession text for the fixture build.",
+   "withheld": {},
+   "concession_withheld": null,
+   "loser": "sleep_coach",
+   "holds": true,
+   "resolved_date": "2026-10-13",
+   "id": "2026-10-06-sleep-coach-training-coach",
+   "status": "resolved",
+   "coach_a": "sleep_coach",
+   "coach_b": "training_coach",
+   "opened_date": "2026-10-06",
+   "resolution_date": "2026-10-13"
+  }
+ ],
+ "docket_counts": {
+  "open": 1,
+  "resolved": 3
+ },
+ "docket_disclosure": "Standing disagreements between AI coaches, each with skin in the game: the stake is the coach's own Brier record, frozen when the docket opened. The resolution criterion and date are agreed at open and graded by deterministic code against real data — no AI writes the verdict, and lost disputes stay on the record next to the wins."
 }

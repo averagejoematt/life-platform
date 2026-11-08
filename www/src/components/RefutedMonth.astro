@@ -1,0 +1,91 @@
+---
+// One month of the room's "refuted this month" ledger view (CR3, built dark). Imported ONLY by src/room/refuted.astro,
+// which exists only on a WEB_ROOM=1 build — so with the switch off nothing renders or reads this. No <style>, no
+// <script>. Every row is a served call; the words are the call's own (quoted) or the exporter's withheld message.
+import Quote from "./Quote.astro";
+import StatusTag from "./StatusTag.astro";
+import { correctionArrow } from "../lib/coach_room.js";
+import { DISPUTED_NOTE } from "../lib/disputed.js";
+import { refutedRow } from "../lib/docket.js";
+import { correctionRows } from "../lib/corrections.js";
+import { href, pathOf } from "../lib/url.js";
+
+interface Props {
+  view: { month: string; words: string; wrong: any[]; disputed: any[]; corrected: { p: any; c: any }[] };
+  nameOf: (id: string) => string;
+}
+const { view, nameOf } = Astro.props;
+const wrong = view.wrong.map((p) => refutedRow(p, nameOf));
+const disputed = view.disputed.map((p) => refutedRow(p, nameOf));
+---
+
+<div style="display:flex;flex-direction:column;gap:14px" data-refuted-month={view.month}>
+  {
+    wrong.length > 0 ? (
+      <div class="rows" data-refuted-wrong>
+        {wrong.map((r) => (
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch">
+            <span style="font-size:15px;line-height:1.45">
+              <b>{r.coach}</b> <span class="muted">· made {r.made} · graded wrong {r.settled}</span>
+            </span>
+            <span class="serif" style="font-size:17px;line-height:1.45">{r.text ? <Quote text={r.text} said={r.said} /> : <span class="muted" data-withheld>{r.message}</span>}</span>
+            {(r.how || r.notes) && <span class="mono" style="font-size:12px;line-height:1.5">{[r.how, r.notes].filter(Boolean).join(" · ")}</span>}
+            {r.guess && <span class="muted" style="font-size:12px">{r.guess}</span>}
+            {
+              r.corrections.length > 0 && (
+                <details style="font-size:13px">
+                  <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">This call's grade record was corrected</summary>
+                  {r.corrections.map((c) => (
+                    <dl style="display:grid;grid-template-columns:minmax(0,11em) minmax(0,1fr);gap:3px 12px;margin:6px 0 0">
+                      {c.rows.map(([k, v]) => (<><dt class="muted">{k}</dt><dd style="margin:0">{v}</dd></>))}
+                    </dl>
+                  ))}
+                </details>
+              )
+            }
+            <a href={href(pathOf("prediction", r.id))} style="font-size:13px">The call in the ledger →</a>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div class="empty"><span>No call was graded wrong in {view.words} in this snapshot.</span></div>
+    )
+  }
+  {
+    disputed.length > 0 && (
+      <div style="display:flex;flex-direction:column;gap:8px" data-refuted-disputed>
+        <p class="label">Graded wrong, now under review · counted neither right nor wrong</p>
+        <div class="rows">
+          {disputed.map((r) => (
+            <a href={href(pathOf("prediction", r.id))}>
+              <span style="font-size:14px;line-height:1.45">
+                <b>{r.coach}</b> {r.text ? <Quote text={r.text} said={r.said} /> : <span class="muted">{r.message}</span>}
+                {r.disputedReason && <span class="muted"> · {r.disputedReason}</span>}
+              </span>
+              <StatusTag status="refuted" call disputed />
+            </a>
+          ))}
+        </div>
+        <p class="muted" style="font-size:12px">The stored verdict is kept and shown; until the review ends it is {DISPUTED_NOTE}.</p>
+      </div>
+    )
+  }
+  {
+    view.corrected.length > 0 && (
+      <div style="display:flex;flex-direction:column;gap:8px" data-refuted-corrected>
+        <p class="label">Grades corrected to or from wrong in {view.words}</p>
+        {view.corrected.map(({ p, c }) => (
+          <details style="font-size:14px;border-top:1px solid var(--rule);padding-top:6px">
+            <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px">
+              <b>{p.coach_name || nameOf(p.coach_id)}</b> <span class="mono">{correctionArrow(c)}</span>
+            </summary>
+            <dl style="display:grid;grid-template-columns:minmax(0,11em) minmax(0,1fr);gap:3px 12px;margin:6px 0 0">
+              {correctionRows(c).map(([k, v]) => (<><dt class="muted">{k}</dt><dd style="margin:0">{v}</dd></>))}
+            </dl>
+            <a href={href(pathOf("prediction", p.id))} style="font-size:13px">The call in the ledger →</a>
+          </details>
+        ))}
+      </div>
+    )
+  }
+</div>

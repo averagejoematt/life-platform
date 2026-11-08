@@ -27,9 +27,11 @@ const room = { [ROOM_MARKER]: "entry" };
             <span>The calibration figures were not served for this snapshot.</span>
           </div>
         )}
-        <a class="btn ghost sm" href={href("/system/calibration/")} style="align-self:flex-start">
-          How sure they were, and how often they were right
-        </a>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <a class="btn ghost sm" href={href("/system/calibration/")}>How sure they were, and how often they were right</a>
+          <a class="btn ghost sm" href={href("/system/docket/")}>Where they disagreed, and what the data said</a>
+          <a class="btn ghost sm" href={href("/system/ledger/refuted/")}>Wrong this month</a>
+        </div>
       </div>
     </section>
   )
