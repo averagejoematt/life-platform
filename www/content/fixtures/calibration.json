@@ -1,0 +1,248 @@
+{
+  "absent_text": null,
+  "as_of": "2026-10-31",
+  "calibration": {
+    "as_of": "2026-10-31",
+    "coaches": [
+      {
+        "accuracy_ci95": [27.0, 53.4],
+        "accuracy_pct": 39.6,
+        "brier": 0.2471,
+        "brier_skill": -0.0102,
+        "calibration": "not_yet_skillful",
+        "coach_id": "sleep",
+        "coach_name": "Lisa Park",
+        "comparison": {
+          "rule_words": "a guess that nothing changes",
+          "records": {
+            "direction": {"coach_right_on_scored": 3, "rule_right": 6, "scored": 21, "verdict": "no_clear_difference"},
+            "number": {"coach_right_on_scored": 12, "rule_right": 9, "scored": 22, "verdict": "no_clear_difference"},
+            "sealed": {"coach_right_on_scored": 1, "rule_right": 1, "scored": 2, "verdict": "too_few"},
+            "yes_no": {"coach_right_on_scored": 1, "rule_right": 1, "scored": 2, "verdict": "too_few"}
+          },
+          "skill": {"brier_skill": -0.0102, "n": 48, "sentence": "Across 48 checked calls, so far they do not beat a simple guess."}
+        },
+        "confirmed": 19,
+        "label": "not_yet_skillful",
+        "lifetime": {"accuracy_ci95": [28.1, 51.0], "accuracy_pct": 38.9, "confirmed": 21, "n": 54},
+        "n": 48,
+        "persona": "sleep_coach",
+        "quality": {"by_flag": {"logging_gap": 1, "low_power": 0, "proxy_metric": 0}, "clean": 4, "flagged": 1, "n": 48, "unassessed": 43},
+        "record": {"confirmed": 19, "n": 48, "refuted": 29, "through": "2026-10-31"},
+        "refuted": 29,
+        "reliability_bins": [
+          {"hi": 0.5, "lo": 0.4, "mean_confidence": 0.444, "n": 1, "observed_rate": 0.0},
+          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 46, "observed_rate": 0.413},
+          {"hi": 0.7, "lo": 0.6, "mean_confidence": 0.6, "n": 1, "observed_rate": 0.0}
+        ],
+        "retired": false,
+        "skilled": false,
+        "under_review": 0
+      },
+      {
+        "accuracy_ci95": [16.6, 40.3],
+        "accuracy_pct": 27.1,
+        "brier": 0.2502,
+        "brier_skill": -0.0431,
+        "calibration": "over-confident",
+        "coach_id": "nutrition",
+        "coach_name": "Marcus Webb",
+        "comparison": {
+          "rule_words": "a guess that nothing changes",
+          "records": {
+            "direction": {"coach_right_on_scored": 10, "rule_right": 10, "scored": 36, "verdict": "no_clear_difference"},
+            "number": {"coach_right_on_scored": 1, "rule_right": 6, "scored": 7, "verdict": "too_few"},
+            "sealed": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 1, "verdict": "too_few"},
+            "yes_no": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 1, "verdict": "too_few"}
+          },
+          "skill": {"brier_skill": -0.0431, "n": 48, "sentence": "Across 48 checked calls, so far they do not beat a simple guess."}
+        },
+        "confirmed": 13,
+        "label": "not_yet_skillful",
+        "lifetime": {"accuracy_ci95": [16.6, 40.3], "accuracy_pct": 27.1, "confirmed": 13, "n": 48},
+        "n": 48,
+        "persona": "nutrition_coach",
+        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 2, "flagged": 0, "n": 48, "unassessed": 46},
+        "record": {"confirmed": 13, "n": 48, "refuted": 35, "through": "2026-10-31"},
+        "refuted": 35,
+        "reliability_bins": [
+          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 47, "observed_rate": 0.255},
+          {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.85, "n": 1, "observed_rate": 1.0}
+        ],
+        "retired": false,
+        "skilled": false,
+        "under_review": 0
+      },
+      {
+        "accuracy_ci95": [34.1, 65.9],
+        "accuracy_pct": 50.0,
+        "brier": 0.2433,
+        "brier_skill": 0.0122,
+        "calibration": "not_measurable",
+        "coach_id": "physical",
+        "coach_name": "Max Reyes",
+        "comparison": {
+          "rule_words": "a guess that nothing changes",
+          "records": {
+            "direction": {"coach_right_on_scored": 7, "rule_right": 6, "scored": 19, "verdict": "too_few"},
+            "number": {"coach_right_on_scored": 8, "rule_right": 8, "scored": 12, "verdict": "too_few"},
+            "sealed": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 2, "verdict": "too_few"},
+            "yes_no": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 1, "verdict": "too_few"}
+          },
+          "skill": {"brier_skill": 0.0122, "n": 34, "sentence": "Across 34 checked calls, so far they beat a simple guess."}
+        },
+        "confirmed": 17,
+        "label": "under_review",
+        "lifetime": {"accuracy_ci95": [34.1, 65.9], "accuracy_pct": 50.0, "confirmed": 17, "n": 34},
+        "n": 34,
+        "persona": "physical_coach",
+        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 3, "flagged": 0, "n": 34, "unassessed": 31},
+        "record": {"confirmed": 17, "n": 34, "refuted": 17, "through": "2026-10-31"},
+        "refuted": 17,
+        "reliability_bins": [
+          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 33, "observed_rate": 0.485},
+          {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.85, "n": 1, "observed_rate": 1.0}
+        ],
+        "retired": false,
+        "skilled": true,
+        "under_review": 0
+      },
+      {
+        "accuracy_ci95": [2.6, 51.3],
+        "accuracy_pct": 14.3,
+        "brier": 0.2301,
+        "brier_skill": -0.8794,
+        "calibration": "over-confident",
+        "coach_id": "glucose",
+        "coach_name": "Amara Patel",
+        "comparison": {
+          "rule_words": "a guess that nothing changes",
+          "records": {
+            "direction": {"coach_right_on_scored": 0, "rule_right": 2, "scored": 3, "verdict": "too_few"},
+            "number": {"coach_right_on_scored": 1, "rule_right": 2, "scored": 3, "verdict": "too_few"},
+            "sealed": {"coach_right_on_scored": 0, "rule_right": 0, "scored": 0, "verdict": "none_scored"},
+            "yes_no": {"coach_right_on_scored": 0, "rule_right": 0, "scored": 1, "verdict": "too_few"}
+          },
+          "skill": {"brier_skill": -0.8794, "n": 7, "sentence": "Too few checked calls yet (7) to compare them with a simple guess."}
+        },
+        "confirmed": 1,
+        "label": "not_yet_skillful",
+        "lifetime": {"accuracy_ci95": [2.0, 43.5], "accuracy_pct": 11.1, "confirmed": 1, "n": 9},
+        "n": 7,
+        "persona": "glucose_coach",
+        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 0, "flagged": 0, "n": 7, "unassessed": 7},
+        "record": {"confirmed": 1, "n": 7, "refuted": 6, "through": "2026-10-31"},
+        "refuted": 6,
+        "reliability_bins": [
+          {"hi": 0.4, "lo": 0.3, "mean_confidence": 0.333, "n": 1, "observed_rate": 0.0},
+          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 6, "observed_rate": 0.167}
+        ],
+        "retired": false,
+        "skilled": false,
+        "under_review": 1
+      },
+      {
+        "accuracy_ci95": [9.5, 90.5],
+        "accuracy_pct": 50.0,
+        "brier": 0.2,
+        "brier_skill": null,
+        "calibration": "insufficient_data",
+        "coach_id": "training",
+        "coach_name": "Sarah Chen",
+        "comparison": {
+          "rule_words": "a guess that nothing changes",
+          "records": {},
+          "skill": {"brier_skill": null, "n": 2, "sentence": "Too few checked calls yet (2) to compare them with a simple guess."}
+        },
+        "confirmed": 1,
+        "label": "nascent",
+        "lifetime": {"accuracy_ci95": [9.5, 90.5], "accuracy_pct": 50.0, "confirmed": 1, "n": 2},
+        "n": 2,
+        "persona": "training_coach",
+        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 0, "flagged": 0, "n": 2, "unassessed": 2},
+        "record": {"confirmed": 1, "n": 2, "refuted": 1, "through": "2026-09-20"},
+        "refuted": 1,
+        "reliability_bins": [
+          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 1, "observed_rate": 1.0},
+          {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.85, "n": 1, "observed_rate": 0.0}
+        ],
+        "retired": true,
+        "skilled": null,
+        "under_review": 0
+      }
+    ],
+    "comparison": {
+      "method": "Sample method text, for layout only. Each graded call is also scored by a rule that predicts nothing changes, graded by the same grader against the same tolerance.",
+      "min_n_for_rate": 20,
+      "records": {
+        "direction": {"coach_right_on_scored": 36, "rule_right": 33, "scored": 118, "verdict": "no_clear_difference"},
+        "number": {"coach_right_on_scored": 35, "rule_right": 37, "scored": 61, "verdict": "no_clear_difference"},
+        "sealed": {"coach_right_on_scored": 8, "rule_right": 1, "scored": 13, "verdict": "too_few"},
+        "yes_no": {"coach_right_on_scored": 3, "rule_right": 2, "scored": 6, "verdict": "too_few"}
+      },
+      "rule_words": "a guess that nothing changes",
+      "skill": {"brier_skill": -0.0264, "n": 214, "sentence": "Across 214 checked calls, so far they do not beat a simple guess."}
+    },
+    "cycle": 17,
+    "cycle_start": "2026-09-06",
+    "hypotheses": {"accuracy_ci95": null, "accuracy_pct": null, "brier_skill": null, "calibration": "insufficient_data", "confirmed": 0, "n": 0, "reliability_bins": []},
+    "interval_forecasts": {
+      "accuracy_ci95": [84.4, 91.0],
+      "accuracy_pct": 88.1,
+      "brier_skill": -0.0627,
+      "calibration": "not_yet_skillful",
+      "confirmed": 326,
+      "n": 370,
+      "refuted": 44,
+      "reliability_bins": [{"hi": 0.9, "lo": 0.8, "mean_confidence": 0.8, "n": 370, "observed_rate": 0.881}]
+    },
+    "method": {"effective": "2026-11-05", "note": "Sample method note, for layout only.", "version": 2},
+    "platform": {
+      "accuracy_ci95": [68.1, 75.4],
+      "accuracy_pct": 71.9,
+      "brier": 0.1588,
+      "brier_skill": -0.0427,
+      "calibration": "not_yet_skillful",
+      "confirmed": 422,
+      "n": 592,
+      "refuted": 170,
+      "reliability_bins": [
+        {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 208, "observed_rate": 0.409},
+        {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.8, "n": 384, "observed_rate": 0.88}
+      ],
+      "strata": {
+        "coaches": {"base_rate": 0.411, "brier": 0.2487, "brier_skill": -0.0264, "calibration": "not_yet_skillful", "confirmed": 88, "n": 214, "skilled": false},
+        "hypotheses": {"base_rate": null, "brier": null, "brier_skill": null, "calibration": "insufficient_data", "confirmed": 0, "n": 0, "skilled": null},
+        "interval_forecasts": {"base_rate": 0.881, "brier": 0.1114, "brier_skill": -0.0627, "calibration": "not_yet_skillful", "confirmed": 326, "n": 370, "skilled": false},
+        "weekly_prescriptions": {"base_rate": 0.875, "brier": 0.115, "brier_skill": -0.0514, "calibration": "not_yet_skillful", "confirmed": 7, "n": 8, "skilled": false}
+      }
+    },
+    "prereg_seal": {
+      "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json",
+      "genesis": "2026-09-06",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "stamped_at": "2026-09-06T02:13:38+00:00",
+      "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256"
+    },
+    "under_review": 1,
+    "voided": {"by_reset": {"2026-07-13": 1287, "2026-08-03": 143, "2026-09-06": 23}, "hypotheses": 57, "n": 1453, "predictions": 1396},
+    "weekly_prescriptions": null
+  },
+  "record": {
+    "accuracy_pct": 41.1,
+    "baseline": {"rate": 0.411, "rate_pct": 41, "rule": "base_rate", "text": "A guess that every call has a 41% chance of coming true does about as well."},
+    "confirmed": 88,
+    "counted_text": "Sample counts, for layout only.",
+    "decided": 214,
+    "expired": 16,
+    "inconclusive": 2,
+    "lifetime": {"accuracy_pct": 38.6, "confirmed": 97, "decided": 251, "total": 3133},
+    "observational": 230,
+    "pending": 21,
+    "refuted": 126,
+    "total": 484,
+    "under_review": 1
+  },
+  "source": ["/api/calibration", "/api/predictions"],
+  "state": "ok"
+}

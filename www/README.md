@@ -106,3 +106,18 @@ Two objects beyond the eleven collections, both from the publication snapshot, b
 * **The day** — a `day` collection (`scripts/publish_snapshot_day.py`), one object per date since the start: readings and their 7/30-day normals (computed at export), the session, the night, the food with the platform's gap flag, the engine's score, the coaches' lines (as `/api/coach_moves` serves them) and the calls, each block with its served / unavailable state. Page `/data/day/<date>/` (one sampled tier-3 row); island `islands/day.js` swaps days in place and keeps the URL, title, canonical and history in sync. Reached from the weight page and chapter pages, never from `/`.
 
 Every chart carries `data-points`; `islands/inspect.js` answers pointer, touch and keyboard, and `tests/web_preview_gate.py` treats a chart with points and no inspector as a defect. On a phone a chart's viewBox is its container's width, so SVG text keeps its size (the 11 px floor, #1210; #5597 moves that check into the web gate).
+
+## The Coaching Room — built dark (CR1)
+
+Owner ruling 2026-11-08: the Coaching Room is **NO-GO for publication**; private implementation and testing are allowed. So the room is behind one build-time switch, **`WEB_ROOM=1`**, read through one helper (`src/lib/room.js`; its Python twin is `scripts/publish_snapshot_calibration.py::room_enabled`). With the switch off (every CI build and every deploy) the build is **byte-identical** to a build without the room.
+
+* **Where it lives:** the room's pages sit in `src/room/`, outside `src/pages/` — Astro and `postbuild.mjs` never see them. `astro.config.mjs` injects them as routes only when the switch is on (`roomIntegration`), and the sitemap filter drops them even then. The one piece on an existing page, `components/RoomEntry.astro` on `/system/`, is self-gating and renders nothing when off. The room's data file `calibration.json` (`/api/calibration` + `/api/predictions` `overall`, as served) is written by the producer only on a `WEB_ROOM=1` export.
+* **Never deployed:** `postbuild.mjs` leaves `owned_paths.json` / `reach.json` as committed on a room build, and `scripts/check_www_build.py`'s scan (which the deploy runs with `--scan-only`) refuses a dist carrying a room page, the room's data file or the `data-room` marker.
+* **The proofs (switch off):** `tests/room.test.mjs` + `scripts/room_audit.mjs` — every room path 404s, no undeclared JSON or room-only key, no sitemap entry, no feed or search index, no owned path, no orphan or room-named chunk, no marker — each check with its planted mutation control; `tests/test_www_coaching_room_dark_cr1.py` for the producer and the deploy scan. The master proof is a recursive diff of `dist/` against a build of `main` from the same snapshot.
+* **A private look (local only — never `web-preview-deploy.yml`, never `www_preview_sync.sh`, never `/next/v9/`):**
+
+```bash
+WEB_ROOM=1 npm run snapshot:live && WEB_ROOM=1 npm run build      # dist/ now holds /system/calibration/ — do not sync it
+python3 ../tests/web_preview_gate.py --dist dist --base / --skip-control --out /tmp/room-gate
+npm run snapshot:fixture && npm run build                          # back to a publishable, room-free dist
+```

@@ -12,7 +12,8 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
   dangling       add one edge to a non-existent object → `astro build` MUST fail
   scan           the clean build carries no fixture sentinel, no inline <script>, no ISO date
                  outside a verbatim coach quotation (scripts/www_verbatim.py — the render gate's rule,
-                 static, so the LIVE root deploy holds it too), and (on the preview base) `noindex`
+                 static, so the LIVE root deploy holds it too), no Coaching Room output (CR1 is built dark:
+                 a WEB_ROOM=1 dist is refused), and (on the preview base) `noindex`
   owned-paths    (#5534) the build's committed route manifest www/owned_paths.json and the reach
                  census www/reach.json equal what the clean build just emitted (drift = someone
                  changed a route and did not commit the artifact the deploy excludes by), the
@@ -226,7 +227,38 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     if pages == 0:
         issues.append("no html pages in dist")
     issues.extend(heart_coverage(dist, fixture=snapshot_mode(snapshot_dir) == "fixture"))
+    issues.extend(room_leaks(dist))
     return issues
+
+
+ROOM_JS = os.path.join(WWW, "src", "lib", "room.js")
+
+
+def room_paths(room_js: str = ROOM_JS) -> list[str]:
+    """The Coaching Room's routes, read off www/src/lib/room.js (ROOM_ROUTES' `path:` values) — never a hand list."""
+    try:
+        text = open(room_js, encoding="utf-8").read()
+    except OSError:
+        return []
+    return re.findall(r'\bpath:\s*"(/[^"]+/)"', text)
+
+
+def room_leaks(dist: str, room_js: str = ROOM_JS) -> list[str]:
+    """CR1 (built dark, owner ruling 2026-11-08): the Coaching Room is NEVER deployed. A dist that holds a room page, the
+    room's data file or the room marker is a WEB_ROOM=1 build; this scan runs on every deploy (`--scan-only`), so such a
+    dist is refused before it can reach S3. www/tests/room.test.mjs holds the finer flag-off checks."""
+    out = []
+    for p in room_paths(room_js):
+        if os.path.exists(os.path.join(dist, p.strip("/"))):
+            out.append(f"{p.strip('/')}/: a Coaching Room page in the dist — a WEB_ROOM=1 build is private and is never deployed")
+    for dirpath, _d, files in os.walk(dist):
+        for name in files:
+            rel = os.path.relpath(os.path.join(dirpath, name), dist)
+            if name == "calibration.json":
+                out.append(f"{rel}: the Coaching Room's data file in the dist")
+            elif name.endswith(".html") and 'data-room="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read():
+                out.append(f"{rel}: carries the Coaching Room marker data-room — a WEB_ROOM=1 build is never deployed")
+    return out
 
 
 HEART_CHARTS = ("Resting heart rate", "Heart-rate variability")

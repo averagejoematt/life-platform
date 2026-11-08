@@ -662,6 +662,18 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
     with open(os.path.join(out_dir, "journey.json"), "w", encoding="utf-8") as fh:
         fh.write(text)
     files["journey.json"] = {"count": len(journey.get("rungs") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    # calibration.json — the Coaching Room's data file, present ONLY on a WEB_ROOM=1 export (CR1, built dark;
+    # scripts/publish_snapshot_calibration.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
+    cal_path = os.path.join(out_dir, "calibration.json")
+    calibration = data_files.get("calibration")
+    if calibration is not None:
+        text = _dump(calibration)
+        with open(cal_path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        n_coaches = len((calibration.get("calibration") or {}).get("coaches") or [])
+        files["calibration.json"] = {"count": n_coaches, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    elif os.path.exists(cal_path):
+        os.remove(cal_path)  # a flag-off export over a room export's directory leaves no room file behind
 
 
 ABSENT_JOURNEY = {

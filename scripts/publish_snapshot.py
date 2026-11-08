@@ -48,6 +48,12 @@ import urllib.request
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from publish_snapshot_calibration import (  # noqa: E402 — the Coaching Room's data file, WEB_ROOM=1 only (CR1)
+    fixture_calibration,
+    live_calibration,
+    resolve_and_validate,
+    room_enabled,
+)
 from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
@@ -1033,6 +1039,12 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
     if bad:
         raise LookupError("dangling edge(s): " + "; ".join(bad[:12]) + (f" (+{len(bad) - 12})" if len(bad) > 12 else ""))
     validate_data_files(data_files, public)
+    if room_enabled():  # the Coaching Room, built dark (CR1): off = not fetched, not written, snapshot byte-identical
+        cal = fixture_calibration(fixtures_dir) if mode == "fixture" else live_calibration(lambda p: _get(base_url, p, timeout), log)
+        try:
+            data_files["calibration"] = resolve_and_validate(cal, public)
+        except ValueError as exc:
+            raise SchemaError(str(exc)) from exc
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
 
 

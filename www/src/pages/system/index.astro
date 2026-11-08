@@ -2,6 +2,7 @@
 // System — three depths on one page (Stage 3 `#system`). Depth 1 plain English; depth 2 the
 // record, from the edition's one producer; depth 3 the sources and methods.
 import Base from "../../layouts/Base.astro";
+import RoomEntry from "../../components/RoomEntry.astro"; // the Coaching Room (CR1): renders nothing unless WEB_ROOM=1
 import { dayInWords, domainWords, kOfN } from "../../lib/format.js";
 import { loadAll, latestEdition } from "../../lib/snapshot.js";
 import { href, pathOf } from "../../lib/url.js";
@@ -94,7 +95,7 @@ const steps = [
     </div>
   </section>
 
-  <a href="#system-hood" class="inv" style="display:block;text-decoration:none;color:var(--paper)">
+  {/* the Coaching Room entry (CR1) sits flush against the next tag: with WEB_ROOM off the page's bytes are unchanged */}<RoomEntry /><a href="#system-hood" class="inv" style="display:block;text-decoration:none;color:var(--paper)">
     <div class="wrap between" style="padding:16px var(--pad)">
       <b style="font-size:15px">↓ Depth 3 · Under the hood — sources, methods, the build</b>
       <span class="mono" style="font-size:12px;color:var(--inkmuted)">for the builder</span>
