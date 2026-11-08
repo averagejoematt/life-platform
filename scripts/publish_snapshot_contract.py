@@ -674,6 +674,19 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
         files["calibration.json"] = {"count": n_coaches, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
     elif os.path.exists(cal_path):
         os.remove(cal_path)  # a flag-off export over a room export's directory leaves no room file behind
+    # coach_room.json — CR2's coach profiles, the same rule (scripts/publish_snapshot_coach_room.py).
+    room_path = os.path.join(out_dir, "coach_room.json")
+    coach_room = data_files.get("coach_room")
+    if coach_room is not None:
+        text = _dump(coach_room)
+        with open(room_path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        files["coach_room.json"] = {
+            "count": len(coach_room.get("coaches") or {}),
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        }
+    elif os.path.exists(room_path):
+        os.remove(room_path)
     # lab.json — the Laboratory's data file, present ONLY on a WEB_LAB=1 export (L1, built dark;
     # scripts/publish_snapshot_lab.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
     lab_path = os.path.join(out_dir, "lab.json")

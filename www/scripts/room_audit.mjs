@@ -20,7 +20,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ROOM_DATA_KEYS, ROOM_MARKER, ROOM_ROUTES } from "../src/lib/room.js";
+import { ROOM_DATA_KEYS, ROOM_MARKER, ROOM_ROUTES, roomPathPattern } from "../src/lib/room.js";
 
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const posix = (p) => p.split(sep).join("/");
@@ -35,8 +35,30 @@ export function walk(dir, out = []) {
   return out;
 }
 const files = (dist) => walk(dist).map((p) => posix(relative(dist, p)));
-const roomPaths = () => ROOM_ROUTES.map((r) => r.path);
-const namesRoom = (text) => roomPaths().some((p) => text.includes(p) || text.includes(p.slice(0, -1) + '"'));
+
+/**
+ * The concrete room paths to request from a dist. A literal path is itself; a `[param]` path (CR2's per-coach record,
+ * `/system/coaches/[id]/record/`) is expanded over every directory the dist holds at the param's place (each coach page
+ * the build emitted) plus one probe id, so a dist with no coach pages is still asked.
+ */
+export function roomPaths(dist) {
+  const out = [];
+  for (const r of ROOM_ROUTES) {
+    const m = /^(.*?)\[[^\]]+\](.*)$/.exec(r.path);
+    if (!m) {
+      out.push(r.path);
+      continue;
+    }
+    const parent = dist ? join(dist, m[1]) : null;
+    const ids = parent && existsSync(parent) ? readdirSync(parent).filter((d) => statSync(join(parent, d)).isDirectory()) : [];
+    for (const id of [...ids, "room-probe"]) out.push(`${m[1]}${id}${m[2]}`);
+  }
+  return out;
+}
+
+/** One RegExp per room path (a `[param]` = one segment), matching the path with or without its trailing slash. */
+const roomRx = () => ROOM_ROUTES.map((r) => new RegExp(`${roomPathPattern(r.path.slice(0, -1))}(/|")`));
+const namesRoom = (text) => roomRx().some((rx) => rx.test(text));
 
 /** Serve dist as the S3 website origin does (`/x/` → `x/index.html`, a missing object → 404) and GET each room path. */
 export async function gatedPaths(dist) {
@@ -56,7 +78,7 @@ export async function gatedPaths(dist) {
   const { port } = server.address();
   const leaks = [];
   try {
-    for (const path of roomPaths()) {
+    for (const path of roomPaths(dist)) {
       for (const variant of [path, path.slice(0, -1), `${path}index.html`]) {
         const r = await fetch(`http://127.0.0.1:${port}${variant}`);
         if (r.status !== 404) leaks.push(`${variant} answered ${r.status} (expected 404)`);
@@ -111,10 +133,18 @@ export function feeds(dist) {
 export function ownedPaths(owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"))) {
   const leaks = [];
   for (const key of ["routes", "static_routes", "route_patterns", "files"]) {
-    for (const v of owned[key] || []) if (roomPaths().some((p) => v === p || v.startsWith(p) || v === p.slice(1) || v.startsWith(p.slice(1)))) leaks.push(`owned_paths.json ${key}: ${v}`);
+    // a room path, or anything under one, with or without its leading slash (`[param]` = one segment)
+    const rxs = ROOM_ROUTES.map((r) => new RegExp(`^/?${roomPathPattern(r.path.slice(1))}`));
+    for (const v of owned[key] || []) if (rxs.some((rx) => rx.test(v))) leaks.push(`owned_paths.json ${key}: ${v}`);
   }
   return leaks;
 }
+
+/** An asset named for the room: "room", or any room page's entrypoint name (calibration, coach-record), read off ROOM_ROUTES. */
+const ROOM_ASSET_NAMES = new RegExp(
+  ["room", ...ROOM_ROUTES.map((r) => r.entrypoint.replace(/^.*\//, "").replace(/\.astro$/, ""))].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
+  "i"
+);
 
 export function orphanChunks(dist) {
   const all = files(dist);
@@ -140,7 +170,7 @@ export function orphanChunks(dist) {
   while (queue.length) scanText(readFileSync(join(dist, queue.shift()), "utf8"));
   for (const a of assets) {
     if (!seen.has(a)) leaks.push(`${a}: an asset no built page reaches (built for a page that is not in this dist)`);
-    if (/calibration|room/i.test(a)) leaks.push(`${a}: an asset named for the room`);
+    if (ROOM_ASSET_NAMES.test(a)) leaks.push(`${a}: an asset named for the room`);
   }
   return leaks;
 }

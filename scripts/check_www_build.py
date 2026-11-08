@@ -245,18 +245,38 @@ def room_paths(room_js: str = ROOM_JS) -> list[str]:
     return re.findall(r'\bpath:\s*"(/[^"]+/)"', text)
 
 
+def room_data_files(room_js: str = ROOM_JS) -> list[str]:
+    """The room's data-file names, read off www/src/lib/room.js (ROOM_DATA_FILES) — never a hand list."""
+    try:
+        text = open(room_js, encoding="utf-8").read()
+    except OSError:
+        return []
+    m = re.search(r"ROOM_DATA_FILES\s*=\s*\[([^\]]*)\]", text)
+    return re.findall(r'"([^"]+\.json)"', m.group(1)) if m else []
+
+
+def _room_dirs(dist: str, path: str) -> list[str]:
+    """The dist directories one room path names. A `[param]` segment (CR2's per-coach record) is one directory level:
+    it becomes a glob `*`, with every glob metacharacter in the literal parts escaped."""
+    parts = re.split(r"(\[[^\]]+\])", path.strip("/"))
+    pattern = "".join("*" if re.fullmatch(r"\[[^\]]+\]", s) else glob.escape(s) for s in parts)
+    return sorted(glob.glob(os.path.join(glob.escape(dist), pattern)))
+
+
 def room_leaks(dist: str, room_js: str = ROOM_JS) -> list[str]:
     """CR1 (built dark, owner ruling 2026-11-08): the Coaching Room is NEVER deployed. A dist that holds a room page, the
     room's data file or the room marker is a WEB_ROOM=1 build; this scan runs on every deploy (`--scan-only`), so such a
     dist is refused before it can reach S3. www/tests/room.test.mjs holds the finer flag-off checks."""
     out = []
+    data_files = set(room_data_files(room_js))
     for p in room_paths(room_js):
-        if os.path.exists(os.path.join(dist, p.strip("/"))):
-            out.append(f"{p.strip('/')}/: a Coaching Room page in the dist — a WEB_ROOM=1 build is private and is never deployed")
+        for d in _room_dirs(dist, p):
+            rel = os.path.relpath(d, dist)
+            out.append(f"{rel}/: a Coaching Room page in the dist — a WEB_ROOM=1 build is private and is never deployed")
     for dirpath, _d, files in os.walk(dist):
         for name in files:
             rel = os.path.relpath(os.path.join(dirpath, name), dist)
-            if name == "calibration.json":
+            if name in data_files:
                 out.append(f"{rel}: the Coaching Room's data file in the dist")
             elif name.endswith(".html") and 'data-room="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read():
                 out.append(f"{rel}: carries the Coaching Room marker data-room — a WEB_ROOM=1 build is never deployed")
