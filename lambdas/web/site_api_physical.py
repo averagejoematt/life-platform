@@ -148,6 +148,15 @@ def weekly_physical_summary(*, _g) -> dict:
     return _ok({"days": days}, cache_seconds=3600)
 
 
+def _public_measurer(value) -> str:
+    """Who took the tape, as a public page may say it: him, unrecorded, or "someone else". Another person's name is
+    stored for the owner's tools and never served (owner ruling 2026-11-07)."""
+    v = str(value or "").strip()
+    if not v:
+        return "unrecorded"
+    return v if v.lower().startswith("matthew") else "someone else"
+
+
 def physical_overview(*, _g) -> dict:
     """
     GET /api/physical_overview
@@ -323,7 +332,7 @@ def physical_overview(*, _g) -> dict:
         # SHRINKS while weight rises 20lb is a measurer artifact, not anatomy, and a
         # surface differencing the two sessions must say so (ADR-104/ADR-105: a
         # comparison whose stated method can't support it is the failure this closes).
-        measured_by = m.get("measured_by") or "unrecorded"
+        measured_by = _public_measurer(m.get("measured_by"))
         tape = {
             "session_date": m.get("date", m.get("sk", "").replace("DATE#", "")),
             "session_number": m.get("session_number", 1),
@@ -335,8 +344,8 @@ def physical_overview(*, _g) -> dict:
             },
         }
         if previous is not None:
-            previous_measured_by = previous.get("measured_by") or "unrecorded"
-            measurer_changed = previous_measured_by != measured_by
+            previous_measured_by = _public_measurer(previous.get("measured_by"))
+            measurer_changed = previous.get("measured_by") != m.get("measured_by")
             tape["previous_session"] = {
                 "session_date": previous.get("date", previous.get("sk", "").replace("DATE#", "")),
                 "measured_by": previous_measured_by,

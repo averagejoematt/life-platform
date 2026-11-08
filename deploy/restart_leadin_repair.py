@@ -42,6 +42,7 @@ Usage:
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -49,6 +50,9 @@ from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
+
+# A private person's name never sits in this public repo (owner ruling 2026-11-07); a re-run supplies it.
+_PRIVATE_NAME = os.environ.get("LEADIN_PRIVATE_NAME", "")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -107,7 +111,7 @@ REPAIRS = {
             ),
             (
                 "privacy: exact age + named private person",
-                "Matthew is thirty-seven. He lives with his girlfriend, Brittany, in Seattle.",
+                f"Matthew is thirty-seven. He lives with his girlfriend, {_PRIVATE_NAME}, in Seattle.",
                 "Matthew is in his late thirties. He lives with his girlfriend in Seattle.",
             ),
             (
@@ -191,7 +195,7 @@ _FORBIDDEN_AFTER_VET = [
     "Attia",
     "Huberman",
     "Norton",
-    "Brittany",
+    *([_PRIVATE_NAME] if _PRIVATE_NAME else []),
     "alcohol",
     "genome",
     "gene ",

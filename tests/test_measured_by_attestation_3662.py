@@ -144,13 +144,13 @@ def test_lambda_handler_missing_column_is_unrecorded_not_partner(monkeypatch):
 def test_multi_row_csv_preserves_each_rows_own_measurer(monkeypatch):
     payload = csv_bytes(
         [
-            {"date": "2026-03-29", "waist_narrowest_in": "49.5", "waist_navel_in": "52.0", "measured_by": "brittany"},
+            {"date": "2026-03-29", "waist_narrowest_in": "49.5", "waist_navel_in": "52.0", "measured_by": "synthetic helper"},
             {"date": "2026-09-06", "waist_narrowest_in": "49.0", "waist_navel_in": "55.5", "measured_by": "matthew (self)"},
         ]
     )
     response, table = invoke(monkeypatch, payload)
     assert response["statusCode"] == 200
-    assert table.items[(mi.PK, "DATE#2026-03-29")]["measured_by"] == "brittany"
+    assert table.items[(mi.PK, "DATE#2026-03-29")]["measured_by"] == "synthetic helper"
     assert table.items[(mi.PK, "DATE#2026-09-06")]["measured_by"] == "matthew (self)"
 
 
@@ -224,24 +224,24 @@ def _call_physical_overview(measurement_items):
 
 def test_physical_overview_serves_measured_by():
     # descending order (ScanIndexForward=False) — latest first
-    items = [_session("2026-09-06", "matthew (self)", 49.0, 2), _session("2026-03-29", "brittany", 49.5, 1)]
+    items = [_session("2026-09-06", "matthew (self)", 49.0, 2), _session("2026-03-29", "synthetic helper", 49.5, 1)]
     resp = _call_physical_overview(items)
     tape = resp["tape_measurements"]
     assert tape["measured_by"] == "matthew (self)"
 
 
 def test_physical_overview_flags_a_measurer_change_between_sessions():
-    items = [_session("2026-09-06", "matthew (self)", 49.0, 2), _session("2026-03-29", "brittany", 49.5, 1)]
+    items = [_session("2026-09-06", "matthew (self)", 49.0, 2), _session("2026-03-29", "synthetic helper", 49.5, 1)]
     resp = _call_physical_overview(items)
     tape = resp["tape_measurements"]
     assert tape["measurer_changed"] is True
     assert "matthew (self)" in tape["measurer_change_note"]
-    assert "brittany" in tape["measurer_change_note"]
-    assert tape["previous_session"]["measured_by"] == "brittany"
+    assert "someone else" in tape["measurer_change_note"] and "synthetic helper" not in json.dumps(tape)
+    assert tape["previous_session"]["measured_by"] == "someone else"
 
 
 def test_physical_overview_does_not_flag_when_measurer_is_unchanged():
-    items = [_session("2026-09-06", "brittany", 49.0, 2), _session("2026-03-29", "brittany", 49.5, 1)]
+    items = [_session("2026-09-06", "synthetic helper", 49.0, 2), _session("2026-03-29", "synthetic helper", 49.5, 1)]
     resp = _call_physical_overview(items)
     tape = resp["tape_measurements"]
     assert tape["measurer_changed"] is False
