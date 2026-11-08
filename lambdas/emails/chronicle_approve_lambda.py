@@ -704,6 +704,23 @@ def _handle(event: dict) -> dict:
             "Use the link from the preview email.</p>",
         )
 
+    # ── The link must be for THIS revision (owner ruling 2026-11-06) ─────────
+    # The token proves the link came from a preview email; the revision id proves the text is the one that email showed.
+    # Recomputed from the row, so an edit since the link was minted — or a link minted before ids existed — is refused.
+    from content import chronicle_revision
+
+    link_rev = qs.get(chronicle_revision.REVISION_PARAM, "").strip()
+    if not hmac.compare_digest(link_rev, chronicle_revision.revision_id(item)):
+        logger.warning("chronicle-approve: revision mismatch for %s — the row changed since this link was minted", date_str)
+        return _html_response(
+            409,
+            "Revision Changed",
+            '<div class="icon">🔒</div>'
+            "<h1>This link is for a different revision</h1>"
+            f"<p>Week {week_num} has changed since this link was sent, or the link predates revision checks. "
+            "Nothing was published. Review the current text and use a fresh preview.</p>",
+        )
+
     # ── Perform action ───────────────────────────────────────────────────────
     if action == "approve":
         logger.info("chronicle-approve: APPROVING Week %s (%s)", week_num, date_str)

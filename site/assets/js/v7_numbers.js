@@ -200,7 +200,6 @@ export function labRows(biomarkers) {
 // State of mind is not a row: its check-ins are private activity (owner ruling 2026-11-05) and the
 // board no longer serves its liveness.
 const ABSENT = [
-  { id: "journal", label: "Journal" },
   { id: "cgm", label: "Blood-sugar sensor", key: "cgm" },
   { id: "blood_pressure", label: "Blood pressure", key: "blood_pressure" },
   { id: "garmin", label: "Garmin" },
@@ -216,19 +215,12 @@ const dayCount = (n) => (Number.isFinite(Number(n)) ? `${num(Math.round(Number(n
  *  feed did not answer says "not served right now"; a served feed with no row for the instrument
  *  says "nothing on record" (R7 fix 9 — two different facts, and neither is "the payload"); a row
  *  that is being recorded says that. */
-export function absenceRows({ freshness, pulse } = {}) {
+export function absenceRows({ freshness } = {}) {
   const sources = (freshness && freshness.sources) || [];
   const ah = sources.find((s) => s && s.id === "apple_health") || null;
   const dts = (ah && Array.isArray(ah.datatypes)) ? ah.datatypes : null;
   const garmin = sources.find((s) => s && s.id === "garmin") || null;
-  const journal = pulse && pulse.pulse && pulse.pulse.glyphs && pulse.pulse.glyphs.journal;
   return ABSENT.map((row) => {
-    if (row.id === "journal") {
-      if (!journal) return { ...row, text: pulse ? NO_ROW : NOT_SERVED, src: "api_pulse.pulse.glyphs.journal" };
-      if (journal.written_today) return { ...row, text: "an entry today", src: "api_pulse.pulse.glyphs.journal.written_today" };
-      const gap = Number(journal.gap_days);
-      return { ...row, text: Number.isFinite(gap) && gap > 0 ? `nothing written for <span data-src="api_pulse.pulse.glyphs.journal.gap_days">${esc(dayCount(gap))}</span>` : "no entry on record", src: "api_pulse.pulse.glyphs.journal.gap_days" };
-    }
     if (row.id === "garmin") {
       if (!garmin) return { ...row, text: freshness ? NO_ROW : NOT_SERVED, src: "api_source_freshness.sources[garmin]" };
       const dk = garmin.days_dark;

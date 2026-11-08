@@ -51,6 +51,7 @@ for _p in (
 approve = importlib.import_module("chronicle_approve_lambda")
 sp = importlib.import_module("season_promote")
 cel = importlib.import_module("chronicle_email_sender_lambda")
+revision_id = importlib.import_module("content.chronicle_revision").revision_id  # owner ruling 2026-11-06
 
 _APPROVE_SRC = os.path.join(_REPO, "lambdas", "emails", "chronicle_approve_lambda.py")
 _PROMOTE_SRC = os.path.join(_REPO, "scripts", "season_promote.py")
@@ -131,7 +132,9 @@ def rec(monkeypatch):
 def test_approve_runs_every_side_effect_in_order(rec, monkeypatch):
     row = {"sk": "DATE#2026-10-06", "date": "2026-10-06", "status": "draft", "approval_token": "t" * 64, "week_number": 5}
     monkeypatch.setattr(approve, "_get_draft", lambda d: row)
-    resp = approve._handle({"queryStringParameters": {"date": "2026-10-06", "token": "t" * 64, "action": "approve"}})
+    resp = approve._handle(
+        {"queryStringParameters": {"date": "2026-10-06", "token": "t" * 64, "action": "approve", "rev": revision_id(row)}}
+    )
     assert resp["statusCode"] == 200
     assert rec == [
         "_publish_to_s3",

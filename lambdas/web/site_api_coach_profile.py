@@ -522,6 +522,7 @@ def _dossier_block(coach_id, *, _g):
         logger.warning(f"[dossier] docket {coach_id}: {_e}")
     docket_positions.sort(key=lambda e: e.get("resolution_date") or "")
 
+    commitments, learnings, docket_positions = map(coach_dossier.wire_servable, (commitments, learnings, docket_positions))
     retracted = 0
     degraded = False
     try:

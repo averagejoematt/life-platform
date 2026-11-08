@@ -92,10 +92,8 @@ test("the last three mornings with a recovery reading, oldest first, nulls skipp
   assert.equal(W.joinNumbers([77]), "77");
 });
 
-test("the journal line from the pulse glyph", () => {
-  assert.equal(W.journalLine({ pulse: { glyphs: { journal: { written_today: false, gap_days: 17 } } } }), "nothing in the journal for 17 days");
-  assert.equal(W.journalLine({ pulse: { glyphs: { journal: { written_today: true, gap_days: 0 } } } }), "a journal entry today");
-  assert.equal(W.journalLine({}), "");
+test("no journal line: the pulse journal glyph is retired (owner ruling 2026-11-06)", () => {
+  assert.equal(W.journalLine, undefined);
 });
 
 test("his testimony is honest-empty when has_matthew_response is false everywhere", () => {

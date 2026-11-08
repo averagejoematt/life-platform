@@ -131,14 +131,15 @@ const FRESH = {
 };
 const PULSE = { pulse: { glyphs: { journal: { written_today: false, gap_days: 17 } } } };
 
-test("absenceRows — the four, in order, each an absence with its served count; never 'went dark'", () => {
-  // Owner ruling 2026-11-05: State of Mind is private activity — it is not an instrument on this strip.
+test("absenceRows — the three, in order, each an absence with its served count; never 'went dark'", () => {
+  // Owner rulings 2026-11-05/06: State of Mind and the journal are private — neither is an instrument on this
+  // strip. NEGATIVE CONTROL: PULSE still hands in a stale journal glyph, and no row names or counts it.
   const rows = M.absenceRows({ freshness: FRESH, pulse: PULSE });
-  assert.deepEqual(rows.map((r) => r.id), ["journal", "cgm", "blood_pressure", "garmin"]);
-  assert.match(rows[0].text, /^nothing written for <span data-src="api_pulse.pulse.glyphs.journal.gap_days">17 days<\/span>$/);
-  assert.match(rows[1].text, /^no sensor worn; <span[^>]*age_days">30 days<\/span> without a reading$/);
-  assert.match(rows[2].text, /17 days<\/span> without a reading$/);
-  assert.match(rows[3].text, /^paused — <span[^>]*garmin\]\.days_dark">103 days<\/span> without a record; it cannot report, so the gap is a hole in the record, not a fact about him$/);
+  assert.deepEqual(rows.map((r) => r.id), ["cgm", "blood_pressure", "garmin"]);
+  assert.doesNotMatch(rows.map((r) => `${r.label} ${r.text} ${r.src}`).join(" "), /journal|written/i);
+  assert.match(rows[0].text, /^no sensor worn; <span[^>]*age_days">30 days<\/span> without a reading$/);
+  assert.match(rows[1].text, /17 days<\/span> without a reading$/);
+  assert.match(rows[2].text, /^paused — <span[^>]*garmin\]\.days_dark">103 days<\/span> without a record; it cannot report, so the gap is a hole in the record, not a fact about him$/);
   for (const r of rows) assert.doesNotMatch(visible(r.text), /dark|glucose|cycle|reset|attempt/i, r.id);
 });
 
@@ -155,18 +156,15 @@ test("absenceRows — a missing breakdown says so; a recorded stream says so; th
   // R7 fix 9: a feed that did not answer is "not served right now"; a served feed with no row is
   // "nothing on record" — and neither names "the payload" (a builder word)
   const none = M.absenceRows({ freshness: { sources: [] }, pulse: null });
-  assert.equal(none[0].text, "not served right now");
-  assert.equal(none[1].text, "nothing on record");
-  assert.equal(none[3].text, "nothing on record");
+  assert.equal(none[0].text, "nothing on record");
+  assert.equal(none[2].text, "nothing on record");
   const down = M.absenceRows({ freshness: null, pulse: null });
-  assert.deepEqual(down.map((r) => r.text), Array(4).fill("not served right now"));
-  assert.equal(M.absenceRows({ freshness: { sources: [] }, pulse: { pulse: { glyphs: {} } } })[0].text, "nothing on record");
+  assert.deepEqual(down.map((r) => r.text), Array(3).fill("not served right now"));
   for (const r of [...none, ...down]) assert.doesNotMatch(r.text, /payload/);
   const fr = { sources: [{ id: "apple_health", datatypes: [{ key: "cgm", dark: false, last_seen: "2026-09-25" }, { key: "blood_pressure", dark: true, age_days: null, age_floor_days: 400 }] }] };
-  const rows = M.absenceRows({ freshness: fr, pulse: { pulse: { glyphs: { journal: { written_today: true } } } } });
-  assert.equal(rows[0].text, "an entry today");
-  assert.equal(rows[1].text, "being recorded; last reading Friday, September 25");
-  assert.match(rows[2].text, /^more than <span[^>]*age_floor_days">400 days<\/span> without a reading$/);
+  const rows = M.absenceRows({ freshness: fr });
+  assert.equal(rows[0].text, "being recorded; last reading Friday, September 25");
+  assert.match(rows[1].text, /^more than <span[^>]*age_floor_days">400 days<\/span> without a reading$/);
 });
 
 test("engineKey — the plain key names the day, the k of n areas, the level; areas without an instrument say so", () => {

@@ -121,7 +121,8 @@ def test_repair_produces_wellformed_vetted_content():
     body = repair.extract_prose_body(_fixture_page())
     assert "trailing duplicated shell" not in body
     vetted, applied = repair.apply_vet_edits(body, repair.REPAIRS["DATE#2026-02-28"]["vet_edits"])
-    assert len(applied) == len(repair.REPAIRS["DATE#2026-02-28"]["vet_edits"])
+    # an edit whose private find-text is not supplied (LEADIN_PRIVATE_*, never in the public repo) is skipped
+    assert len(applied) == len([e for e in repair.REPAIRS["DATE#2026-02-28"]["vet_edits"] if e[1]])
     repair.assert_vetted(vetted)  # no real names, no named vices, no months/seasons
     html, md, wc = repair.build_content_fields(repair.REPAIRS["DATE#2026-02-28"], vetted)
     # content_html shape matches the DATE#2026-02-22 record: h1 + byline + hr + prose

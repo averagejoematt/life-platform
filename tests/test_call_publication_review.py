@@ -71,7 +71,7 @@ def _call(pid, claim, metric="total_protein_g", at=NEW, verdict="gradeable", **e
     ],
 )
 def test_a_self_report_call_is_private_even_when_graded_on_a_public_metric(claim):
-    assert PP.classify(PK, _call("pred_20261107_sr", claim)) == (PP.PRIVATE, "private_words")
+    assert PP.classify(PK, _call("pred_20261107_sr", claim))[0] == PP.PRIVATE
 
 
 # ── 2. unnamed logging gaps ─────────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ def test_a_separately_filed_nutrition_call_is_public_only_without_the_private_co
     clean = _call("pred_20261107_n1", "Protein will climb above 150 g within two weeks.")
     assert PP.classify(PK, clean) == (PP.PUBLIC, "structured_public")
     reveals = _call("pred_20261107_n2", "Protein above 150 g will lift cognitive capacity.")
-    assert PP.classify(PK, reveals) == (PP.PRIVATE, "private_words")
+    assert PP.classify(PK, reveals) == (PP.PRIVATE, PP.PERSONAL_COGNITION)
 
 
 # ── 4. thyroid: lab-graded public after review; symptom logging private ────────────────────
@@ -129,7 +129,7 @@ def test_thyroid_lab_calls_wait_for_review_and_symptom_requests_stay_private():
     ):
         ask = {"pk": PK, "sk": "COMMITMENT#c_t", "created_at": NEW, "commitment_natural": words, "action_check": {"metric": "steps"}}
         assert not PP.row_is_public(PK, ask), words
-    assert not PP.row_is_public(PK, _call("pred_20261107_t2", "Fatigue will emerge before the next panel.", "steps"))
+    assert not PP.row_is_public(PK, _call("pred_20261107_t2", "Fatigue will emerge before the next panel.", None, verdict="observation"))
 
 
 # ── 5. new free-text observations ───────────────────────────────────────────────────────────
@@ -140,6 +140,98 @@ def test_a_new_free_text_observation_is_private_until_explicitly_reviewed():
     assert PP.classify(PK, obs) == (PP.PRIVATE, "unclassified_subject")
     with registered([obs]):
         assert PP.classify(PK, obs) == (PP.PUBLIC, "registry")
+
+
+# ── 6. source and content, not keywords alone (second ruling of 2026-11-06) ──────────────────
+# "Training fatigue and RPE may be public when sourced from public-eligible physiology or training data. Calls concerning
+# personal cognition remain private by default. Classify according to the actual source and content, not keywords alone."
+
+
+@pytest.mark.parametrize(
+    "claim, metric",
+    [
+        ("Resting heart rate will fall as training fatigue clears over the deload week.", "resting_heart_rate"),
+        ("Recovery will rise above 60 once accumulated fatigue from the heavy block clears.", "recovery_score"),
+        ("HRV will rise as session RPE stays at 7 or below.", "hrv_7day_avg"),
+        ("Steps will drop on days after a hard session, reading as training fatigue.", "steps"),
+        ("Recovery will dip after the cognitive demand of heavy compound lifts.", "recovery_score"),
+        ("Weight will fall 2 lb before the next check-in.", "weight_lbs"),
+    ],
+)
+def test_a_word_the_structure_explains_does_not_make_a_call_private(claim, metric):
+    assert PP.classify(PK, _call("pred_20261107_s1", claim, metric)) == (PP.PUBLIC, "structured_public")
+
+
+def test_the_same_word_without_a_physiology_source_waits_for_a_reader():
+    """Graded on the food log, "fatigue" is a read of how a restriction feels: private, and reviewable — not final."""
+    row = _call("pred_20261107_s2", "Calories will fall as restriction fatigue builds.", "total_calories_kcal")
+    assert PP.classify(PK, row) == (PP.PRIVATE, PP.AMBIGUOUS_WORDS)
+    assert S.pending({PK: [row]})[0]["reason"] == PP.AMBIGUOUS_WORDS
+
+
+@pytest.mark.parametrize(
+    "claim, metric",
+    [
+        ("HRV will rise as his cognition sharpens.", "hrv"),
+        ("Recovery will rise, restoring executive function.", "recovery_score"),
+        ("Sleep duration above 7 hours will bring mental clarity.", "sleep_duration_hours"),
+        ("Protein above 150 g will lift cognitive capacity.", "total_protein_g"),
+    ],
+)
+def test_personal_cognition_stays_private_by_default_even_on_a_public_metric(claim, metric):
+    row = _call("pred_20261107_c1", claim, metric)
+    assert PP.classify(PK, row) == (PP.PRIVATE, PP.PERSONAL_COGNITION)
+    with registered([row]):
+        assert PP.row_is_public(PK, row)  # by default: the owner's reviewed approval can publish it
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        "Log a fatigue rating and keep steps up.",
+        "Report any fatigue you notice and walk daily.",
+        "Track your fatigue level with your steps.",
+        "Flag unexplained fatigue.",
+    ],
+)
+def test_fatigue_he_reports_stays_private_whatever_the_check_metric(words):
+    ask = {"pk": PK, "sk": "COMMITMENT#c_f", "created_at": NEW, "commitment_natural": words, "action_check": {"metric": "steps"}}
+    assert PP.classify(PK, ask) == (PP.PRIVATE, PP.PRIVATE_WORDS)
+
+
+def test_a_training_fatigue_ask_on_a_training_check_is_public():
+    words = "Take the deload week so training fatigue clears; keep steps above 6,000."
+    ask = {"pk": PK, "sk": "COMMITMENT#c_d", "created_at": NEW, "commitment_natural": words, "action_check": {"metric": "steps"}}
+    assert PP.classify(PK, ask) == (PP.PUBLIC, "structured_public")
+
+
+def test_a_word_can_hold_a_call_for_review_but_a_named_private_source_cannot_be_approved():
+    held = {"pk": PK, "key": "x", "kind": "call", "reason": PP.PRIVATE_WORDS, "approve": True}
+    with pytest.raises(ValueError):
+        S.approve({"entries": [held]})
+    for reason in (PP.AMBIGUOUS_WORDS, PP.PERSONAL_COGNITION):
+        assert S.approve({"entries": [{**held, "reason": reason}]})
+
+
+def test_the_physiology_sources_are_derived_from_the_registry():
+    """Body and training sources come from the source registry; the food log is not one of them."""
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    got = PP.physiology_training_sources()
+    assert got <= set(SOURCE_REGISTRY) and {"whoop", "hevy", "withings"} <= got
+    assert "macrofactor" not in got and "notion" not in got and "habitify" not in got
+
+
+def test_prose_with_no_structure_keeps_the_broad_screen():
+    """A chronicle draft has no graded metric, so the word holds it for the owner, as before."""
+    assert PP.words_name_private_activity("The week's fatigue was heavy.")
+    assert PP.words_name_private_activity("His cognition sharpened.")
+    assert not PP.words_name_private_activity("Recovery rose above 60 this week.")
+
+
+def test_the_journal_silence_guard_still_outranks_structure():
+    row = _call("pred_20261107_j1", "Recovery will rise despite the journaling silence.", "recovery_score")
+    assert PP.classify(PK, row) == (PP.PRIVATE, PP.PRIVATE_WORDS)
 
 
 # ── the review: review-only, private, approves nothing ──────────────────────────────────────

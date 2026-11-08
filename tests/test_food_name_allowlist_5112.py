@@ -95,6 +95,35 @@ def test_the_shipped_list_publishes_no_unapproved_name_on_any_endpoint():
     assert not offenders, offenders
 
 
+def test_names_withheld_says_only_that_names_were_omitted_never_which_kind(monkeypatch):
+    """Owner ruling 2026-11-06: keep `names_withheld` "unless it discloses the presence of private data rather than
+    simply indicating intentionally omitted food names". Verified: it is a count of distinct unapproved names in the
+    public food log and nothing else. WHICH name it is cannot move the payload (a sensitive-sounding name and a plain
+    one are the same bytes), and private partitions are never read. Mutation control: one more distinct name does
+    move it, so the comparison can fail."""
+    read = []
+
+    def g(names):
+        base = _g(names)["_query_source"]
+
+        def query(source, start, end):
+            read.append(source)
+            return base(source, start, end)
+
+        return {"_query_source": query, "_experiment_date": sac._experiment_date}
+
+    def bytes_for(fn, names):
+        body = json.loads(fn(_g=g(names))["body"])
+        body.pop("_meta", None)
+        return json.dumps(body, sort_keys=True)
+
+    for label, (fn, _rows, _name) in _ENDPOINTS.items():
+        plain = bytes_for(fn, ["Plain Oats", "Plain Rice"])
+        assert bytes_for(fn, [SECRET, "Delivery from a private place"]) == plain, label
+        assert bytes_for(fn, ["Plain Oats", "Plain Rice", "Plain Beans"]) != plain, label
+    assert set(read) <= {"macrofactor", "apple_health", "whoop"}, sorted(set(read))
+
+
 def test_an_approved_name_is_published_and_a_longer_name_that_starts_with_it_is_not(monkeypatch):
     monkeypatch.setattr(food_names, "APPROVED_FOOD_NAMES", frozenset({APPROVED}))
     offenders = []

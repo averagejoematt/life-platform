@@ -314,6 +314,9 @@ deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build be
   a new free-text observation wait for review. The review is REVIEW-ONLY and rides the weekly `fullreview-delta`
   clock (`docs/OPERATING_CALENDAR.md`): `scripts/prediction_publication_registry.py review` writes a PROPOSED manifest
   to a private file outside the repo and approves nothing; approval is the owner's `approve` registry edit, by PR.
+  Classification follows the actual source and content, not keywords alone (same day): training fatigue and RPE are
+  public when the call is graded on physiology or training data; fatigue he rates or reports is a self-report; calls
+  about personal cognition are private by default. A word the source does not explain holds a call for review.
 
 ## Scope note: the PII guard vs the repo itself
 

@@ -131,7 +131,8 @@ def test_the_www_schema_and_page_name_no_privacy_hold():
     schema = (ROOT / "www/src/content.config.ts").read_text()
     assert 'claim_withheld: z.enum(["unsourced", "no_words"])' in schema
     page = (ROOT / "www/src/pages/system/ledger/[id].astro").read_text()
-    assert "privacy filter" not in page and "No words published" in page
+    # Owner ruling 2026-11-06: no per-row "No words published" chip either; the ledger index carries one sentence.
+    assert "privacy filter" not in page and "No words published" not in page
 
 
 # ── 3. the public catalogue no longer names the journal ─────────────────────────────────────────

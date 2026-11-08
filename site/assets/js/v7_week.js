@@ -113,16 +113,6 @@ export function joinNumbers(list) {
   return `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 }
 
-/** The journal line from /api/pulse's journal glyph. "" when the glyph is absent. */
-export function journalLine(pulse) {
-  const g = pulse && pulse.pulse && pulse.pulse.glyphs && pulse.pulse.glyphs.journal;
-  if (!g) return "";
-  if (g.written_today) return "a journal entry today";
-  const gap = Number(g.gap_days);
-  if (Number.isFinite(gap) && gap > 0) return `nothing in the journal for ${gap} day${gap === 1 ? "" : "s"}`;
-  return "";
-}
-
 /** His testimony from /api/field_notes: the weeks he answered, or the honest empty. A null
  *  payload is a fetch that failed — "not served right now", never a fact about him (R7 fix 9). */
 export function testimonyLine(fieldNotes) {
@@ -276,8 +266,6 @@ function renderSoFar({ latest, weights, training, sleep, pulse, today, served = 
   else if (training && Array.isArray(training.weekly_trend)) bits.push("no workouts logged this calendar week yet");
   const mornings = lastMornings(sleep && sleep.sleep_trend, 3);
   if (mornings.length) bits.push(`recovery ran <span data-src="api_sleep_detail.sleep_trend[].recovery_score">${esc(joinNumbers(mornings.map((m) => m.recovery_score)))}</span> on the last ${mornings.length === 1 ? "morning" : `${["", "", "two", "three"][mornings.length] || mornings.length} mornings`}`);
-  const jl = journalLine(pulse);
-  if (jl) bits.push(`<span data-src="api_pulse.pulse.glyphs.journal">${esc(jl)}</span>`);
   // R7 fix 9: an empty entry is "nothing on the record" only when its feeds answered.
   if (!bits.length) return fill(sec, `<p class="wk-note">${served ? "Nothing is on the record for this week yet." : "This week’s figures are not served right now."}</p>`);
   fill(sec, `<p class="wk-small">${bits.join(" · ")}.</p>`);
