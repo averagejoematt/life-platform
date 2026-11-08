@@ -31,6 +31,7 @@ _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "lambdas"))
 
 from content import autopublish_audit  # noqa: E402
+from content.chronicle_revision import revision_id  # noqa: E402 — owner ruling 2026-11-06: a link binds to its revision
 
 WEEK5_DESK_FINDINGS = {
     "post": [
@@ -196,7 +197,9 @@ def test_the_approve_click_is_still_the_owner_s_way_through(approve):
         mock.patch.object(approve, "_invoke_elena_state_updater"),
         mock.patch.object(approve, "_invoke_coach_panel_podcast"),
     ):
-        resp = approve._handle({"queryStringParameters": {"date": "2026-10-06", "token": "t" * 64, "action": "approve"}})
+        resp = approve._handle(
+            {"queryStringParameters": {"date": "2026-10-06", "token": "t" * 64, "action": "approve", "rev": revision_id(row)}}
+        )
     assert resp["statusCode"] == 200
     pub.assert_called_once_with(row, failures=[])
     markp.assert_called_once_with("2026-10-06")

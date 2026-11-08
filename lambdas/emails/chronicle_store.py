@@ -296,7 +296,9 @@ def dry_run_response(week_num, date_str, title, stats_line, raw_markdown, conf_l
     }
 
 
-def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback="", craft=(), *, _g):
+def _send_preview_email(
+    title, week_num, date_str, approval_token, email_html, kit_block="", desk_fallback="", craft=(), revision=None, *, _g
+):
     """Send preview email to RECIPIENT with Approve / Request Changes links.
 
     The approve link goes to APPROVE_LAMBDA_URL with ?date=, token=, action=approve.
@@ -311,7 +313,17 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
 
     #4545 (owner ruling "b"): `craft` is story_craft's residual verdict on the final desk texts. The banner lists every
     finding and the subject says CRAFT HOLD: the 48 h sweep will not publish this draft, only the approve link does.
+
+    Owner ruling 2026-11-06: `revision` is the stored row's revision id (content.chronicle_revision). Both links carry it
+    and chronicle-approve refuses a link whose id no longer matches the row, so a link approves only the text it showed.
+    The preview is sent only after the draft row (and its desk artifacts) are stored, so by default the id is read from
+    the row as stored; a failed read gives "" — a link the approve path refuses, never one that approves unseen text.
     """
+    if revision is None:
+        from content import chronicle_revision
+
+        _row = existing_installment(date_str, _g=_g)
+        revision = chronicle_revision.revision_id(_row) if _row else ""
     APPROVE_LAMBDA_URL = _g["APPROVE_LAMBDA_URL"]
     ses = _g["ses"]
     SENDER = _g["SENDER"]
@@ -321,8 +333,8 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
         logger.warning("FEAT-12: APPROVE_LAMBDA_URL not set — preview email links will be dead")
 
     base_url = APPROVE_LAMBDA_URL.rstrip("/")
-    approve_url = f"{base_url}?date={date_str}&token={approval_token}&action=approve"
-    changes_url = f"{base_url}?date={date_str}&token={approval_token}&action=request_changes"
+    approve_url = f"{base_url}?date={date_str}&token={approval_token}&action=approve&rev={revision}"
+    changes_url = f"{base_url}?date={date_str}&token={approval_token}&action=request_changes&rev={revision}"
 
     fallback_html = ""
     if desk_fallback:
