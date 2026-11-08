@@ -1870,7 +1870,7 @@
       "via": "pk"
     },
     {
-      "direction": "read",
+      "direction": "unknown",
       "lambda": "failure-pattern-compute",
       "module": "lambdas/compute/failure_pattern_compute_lambda.py",
       "partition": "day_grade",
@@ -2890,13 +2890,6 @@
       "module": "lambdas/emails/monday_compass_lambda.py",
       "partition": "whoop",
       "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "monthly-digest",
-      "module": "lambdas/emails/monthly_digest_lambda.py",
-      "partition": "character_sheet",
-      "via": "pk"
     },
     {
       "direction": "unknown",
@@ -4894,7 +4887,7 @@
       "via": "pk"
     },
     {
-      "direction": "read",
+      "direction": "unknown",
       "lambda": null,
       "module": "lambdas/web/site_api_discovery.py",
       "partition": "character_sheet",
@@ -5055,13 +5048,6 @@
       "via": "local-seam"
     },
     {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_habits.py",
-      "partition": "character_sheet",
-      "via": "pk"
-    },
-    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/web/site_api_habits.py",
@@ -5118,13 +5104,6 @@
       "via": "seam"
     },
     {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_journey.py",
-      "partition": "character_sheet",
-      "via": "pk"
-    },
-    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/web/site_api_journey.py",
@@ -5146,24 +5125,10 @@
       "via": "pk"
     },
     {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_journey.py",
-      "partition": "experiments",
-      "via": "pk"
-    },
-    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/web/site_api_journey.py",
       "partition": "experiments",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_journey.py",
-      "partition": "life_events",
       "via": "pk"
     },
     {
@@ -8259,7 +8224,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 788,
+      "edges": 783,
       "lambdas": 107,
       "mcp_tool_modules": 39,
       "mcp_tools": 90,
@@ -8273,9 +8238,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 396,
-        "sites_resolved": 990,
-        "sites_total": 1386
+        "sites_dynamic": 394,
+        "sites_resolved": 982,
+        "sites_total": 1376
       },
       "schedule_resolution": {
         "dynamic": 0,
