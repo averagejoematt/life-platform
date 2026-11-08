@@ -259,11 +259,13 @@ def test_the_eval_counts_a_packet_call_carrying_history_and_leaves_the_captured_
     rows = ev.evaluate_real(ev.load_fixtures(), ev.load_fixtures(ev.AFTER_DIR), projected=True)
     s = ev.summarize(rows)
     assert (s["before"]["with_violations"], s["before"]["context_sources_reached"]) == (3, "0/15")
-    assert (s["after"]["with_violations"], s["after"]["context_sources_reached"]) == (4, "13/20")
-    assert s["after"]["per_member"]["exercise_history"] == 0 and s["after"]["per_member"]["exercise_notes"] == 1
+    # the four pre-#5501 AFTER conversations score as on main; the fifth (2026-11-01, captured with the packet's
+    # lift_history state) is the live proof and reads no violation
+    assert (s["after"]["with_violations"], s["after"]["context_sources_reached"]) == (4, "18/25")
+    assert s["after"]["per_member"]["exercise_history"] == 1 and s["after"]["per_member"]["exercise_notes"] == 2
     p = s[ev.PROJECTED]
-    assert (p["conversations"], p["with_violations"], p["context_sources_reached"]) == (4, 0, "20/20")
-    assert all(r["phase"] == ev.PROJECTED for r in rows[-4:])
+    assert (p["conversations"], p["with_violations"], p["context_sources_reached"]) == (5, 0, "25/25")
+    assert all(r["phase"] == ev.PROJECTED for r in rows[-5:])
     # to_contract still inserts the dedicated tools, never the pseudo-token
     synth = ev.to_contract(["plan_next_session"])
     assert [c["tool"] for c in synth[:-1]] == ["get_exercise_history", "get_exercise_notes", "get_coach_session_packet"]

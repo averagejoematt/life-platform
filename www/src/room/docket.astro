@@ -1,0 +1,120 @@
+---
+// /system/docket/ — every standing disagreement between the coaches, in the Coaching Room (CR3). BUILT DARK: this file
+// lives outside src/pages/ and is injected as a route ONLY when WEB_ROOM=1 (src/lib/room.js). Off, it is not built.
+//
+// The owner's brief (2026-11-08): "make disagreements compelling without inventing concessions, motives or outcomes."
+// Simple on arrival: what is still open and when the data decides it; what settled and who the data sided with. Deep on
+// demand: one page per entry (src/room/docket-entry.astro). Every value is carried from coach_room.json
+// (/api/coach_docket as served); a withheld word shows the API's own message or that it is not published.
+import Base from "../layouts/Base.astro";
+import { datesOf, docketEntries, questionOf, resultOf, sidesOf, tallyText, testWords } from "../lib/docket.js";
+import { dayInWords } from "../lib/format.js";
+import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { loadAll, loadCoachRoom } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+if (!roomEnabled()) throw new Error("src/room/docket.astro rendered with WEB_ROOM off — the room route must not be injected");
+
+const all = await loadAll();
+const file = await loadCoachRoom();
+const nameOf = (id: string) => (all.get("coach", id) || {}).name || String(id).replace(/_coach$/, "").replace(/_/g, " ");
+const entries = docketEntries(file);
+const open = entries.filter((e: any) => e.status === "open");
+const settled = entries.filter((e: any) => e.status !== "open");
+const tally = tallyText(file && file.docket_counts);
+const noindex = process.env.WEB_NOINDEX === "1";
+const fetched = file && file.fetched_at ? dayInWords(file.fetched_at) : null;
+const room = { [ROOM_MARKER]: "docket" };
+const h2 = "font-size:28px;line-height:1.15";
+---
+
+<Base title="The docket" top="system" description="Where the coaches disagreed, what they bet, and what the data said." status={fetched}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <div {...room} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+    Coaching Room · private build (WEB_ROOM=1) · not published
+  </div>
+
+  <section class="section" {...room} style="padding-bottom:24px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
+      <p class="label"><a href={href("/system/")}>System</a> · the docket</p>
+      <h1 style="font-size:clamp(30px,5.5vw,52px);line-height:1.05">Where the coaches disagreed, and what the data said</h1>
+      <p class="dek" style="font-size:19px;max-width:62ch">
+        Two coaches take opposite sides of one test, fixed on the day it opens. Each puts its own track record on the line. On the settle day, code checks the data and names a winner. No AI writes the verdict.
+      </p>
+      <p class="mono" style="font-size:14px">{tally ? `${tally}, as the platform counts them` : "No tally served."}{fetched ? ` · read on ${fetched}` : ""}</p>
+      {!entries.length && <div class="empty"><span>{(file && file.absent_text) || "The platform served no docket entry for this snapshot."}</span></div>}
+    </div>
+  </section>
+
+  <section class="section" {...room} id="open" style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+      <p class="label">Still open</p>
+      <h2 style={h2}>{open.length ? "Waiting on the data" : "Nothing is open right now"}</h2>
+      {
+        open.length > 0 && (
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:0 28px;border-top:1px solid var(--ink)" data-docket-open>
+            {open.map((e: any) => {
+              const q = questionOf(e);
+              const d = datesOf(e);
+              return (
+                <article style="padding:16px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:8px">
+                  <p style="font-size:18px;font-weight:700;line-height:1.3">{q.text || "The question is not published."}</p>
+                  <ul style="list-style:none;padding:0;margin:0;font-size:14px;display:flex;flex-direction:column;gap:2px">
+                    {sidesOf(e, nameOf).map((s: any) => <li><b>{s.name}</b> <span class="muted">{s.side}</span></li>)}
+                  </ul>
+                  <p class="mono" style="font-size:13px">opened {d.opened} · the data decides on {d.settles}</p>
+                  <a href={href(`/system/docket/${e.id}/`)} style="font-size:14px;font-weight:700">Both sides, the test and the stakes →</a>
+                </article>
+              );
+            })}
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="section" {...room} id="settled" style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+      <p class="label">Settled</p>
+      <h2 style={h2}>{settled.length ? "What the data said" : "Nothing has settled yet"}</h2>
+      <p class="muted" style="font-size:13px;max-width:72ch">Lost disputes stay on the record next to the wins, in the same shape.</p>
+      {
+        settled.length > 0 && (
+          <div class="rows" data-docket-settled>
+            {settled.map((e: any) => {
+              const r = resultOf(e, nameOf);
+              const d = datesOf(e);
+              const q = questionOf(e);
+              return (
+                <a href={href(`/system/docket/${e.id}/`)}>
+                  <span style="font-size:15px;line-height:1.45">
+                    <b>{r.headline}</b> {q.from === "test" ? <span class="muted">The test: {testWords(e.criterion)}.</span> : q.text ? <span class="muted">{q.text}</span> : ""} {r.measured && <span>{r.measured}</span>}
+                  </span>
+                  <span class="mono" style="font-size:12px">settled {d.settled}</span>
+                </a>
+              );
+            })}
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="section" {...room} style="border-top:1px solid var(--ink)">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <p class="label">The calls, not the disputes</p>
+        <p style="font-size:17px;line-height:1.45">Each call graded wrong this month, as first graded, beside the grades that were corrected and the calls still under review.</p>
+        <a class="btn ghost sm" href={href("/system/ledger/refuted/")} style="align-self:flex-start">Wrong this month</a>
+      </div>
+      {
+        file && file.docket_disclosure && (
+          <details style="font-size:14px">
+            <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">How the docket works, in the platform's words</summary>
+            <p class="muted" style="margin-top:6px;line-height:1.55">{file.docket_disclosure}</p>
+          </details>
+        )
+      }
+    </div>
+  </section>
+</Base>
