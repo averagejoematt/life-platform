@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-06 (v8.6.0 — 90 tools, 86-module MCP package, 20 data sources, 107 Lambdas, 26 secrets, 141 alarms, 10 CDK stacks deployed).
+Last updated: 2026-11-08 (v8.6.0 — 90 tools, 86-module MCP package, 20 data sources, 107 Lambdas, 26 secrets, 141 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **165 ADRs** (ADR-001 → ADR-167 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -139,7 +139,7 @@ The headline set; the full inventory (every function, handler, schedule, alarm) 
 | Daily Insight Compute (IC-8) | `daily-insight-compute` | `cron(45 9 * * ? *)` | 09:45 AM |
 | Daily Metrics Compute | `daily-metrics-compute` | `cron(40 9 * * ? *)` | 09:40 AM |
 | Adaptive Mode Compute | `adaptive-mode-compute` | `cron(35 9 * * ? *)` | 09:35 AM |
-| Character Sheet Compute | `character-sheet-compute` | `cron(43 9 * * ? *)` | 09:43 AM |
+| Character Sheet Compute | `character-sheet-compute` | `cron(50 9 * * ? *)` | 09:50 AM |
 | Anomaly Detector | `anomaly-detector` | `cron(5 8 * * ? *)` | 08:05 AM |
 | Daily Brief | `daily-brief` | `cron(0 10 * * ? *)` | 10:00 AM |
 | Monday Compass | `monday-compass` | `cron(0 8 ? * MON *)` | Mon 08:00 AM |

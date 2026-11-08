@@ -17,7 +17,7 @@ from health import character_privacy  # noqa: E402
 _ENVELOPE = ("pk", "sk", "date", "phase", "input_manifest", "input_status")
 
 
-def with_public(record, origin="recomputed"):
+def with_public(record, origin="live"):
     """``record`` with a public variant carrying its own score fields (returns the same dict, mutated, for chaining)."""
     if not isinstance(record, dict) or record.get("character_level") is None:
         return record

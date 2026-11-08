@@ -133,10 +133,23 @@ PUBLIC_METHOD_HISTORY = (
 # (a live compute vs. a recomputation of the past) — never on whether a private input existed that day, so it is the
 # same sentence on a journal day and on a quiet day.
 PUBLIC_METHOD_LABELS = {
-    "live": "Computed under the public method (v1): private inputs are left out.",
-    "recomputed": "Recomputed under the public method (v1), which leaves private inputs out. "
-    "The value shown on this date at the time was computed under an earlier method and is not republished.",
+    "live": "Computed that morning under the public method (v1), from the records available then. Private inputs are left out.",
+    "recomputed": "Recalculated later under the public method (v1), from the records available when it was recalculated, "
+    "not from what was available on this date. Private inputs are left out. The score shown on this date at the time came "
+    "from an earlier method and is not republished.",
 }
+# Owner ruling 2026-11-06: the difference between a score recalculated from today's records and a score actually
+# available on the date, as data. `origin` is the field; `basis` says what it means.
+PUBLIC_METHOD_BASIS = {"live": "records_available_at_compute", "recomputed": "records_available_at_recalculation"}
+# Owner ruling 2026-11-06: the jump in the recalculated scores is a correction, not a change in behaviour. Printed beside
+# recalculated values; the same words on every date.
+PUBLIC_CORRECTION_NOTICE = (
+    "These scores were recalculated. Two things changed how they are worked out, and neither is a change in what he did. "
+    "Private inputs were taken out of the public scores. And a timing fault was fixed: habit results used to reach the "
+    "Mind score too late to count, so habits he had logged were being read as not done. With those results now counted, "
+    "Mind and the overall level read higher across the whole experiment. That is the record being corrected, not a sudden "
+    "improvement."
+)
 
 # The record keys a public view carries from the stored record's envelope (identity, phase, the input manifest — which
 # public routes re-judge over public sources themselves). Every score comes from the public variant.
@@ -169,13 +182,81 @@ def public_method_label(record: Any) -> Optional[dict[str, Any]]:
         pv = record
     if pv is None:
         return None
-    origin = str(pv.get("origin")) if pv.get("origin") in PUBLIC_METHOD_LABELS else "recomputed"
+    origin = _origin(pv)
     return {
         "version": pv.get("public_method_version"),
         "effective_from": pv.get("effective_from", PUBLIC_METHOD_EFFECTIVE_FROM),
         "origin": origin,
+        "basis": PUBLIC_METHOD_BASIS[origin],
+        "recalculated_on": str(pv.get("computed_at") or "")[:10] or None if origin == "recomputed" else None,
         "label": PUBLIC_METHOD_LABELS[origin],
+        "notice": PUBLIC_CORRECTION_NOTICE if origin == "recomputed" else None,
     }
+
+
+# Owner ruling 2026-11-06 (item 10): the correction is explained to a reader who saw the old number. A recomputed date
+# carries the notice always; the live page carries it for this many days after the recalculation, so the first live
+# morning does not read as a jump that nobody explained.
+CORRECTION_NOTICE_DAYS = 60
+
+
+def correction_notice(recalculated_on: Any, today: Any) -> Optional[str]:
+    """The reader notice while a recorded correction is recent (``CORRECTION_NOTICE_DAYS``), else None. Depends only
+    on the two dates — never on any input, private or public."""
+    from datetime import datetime
+
+    try:  # two calendar days (YYYY-MM-DD), no instant: strptime, not an ISO-instant parse (#3609)
+        age = (datetime.strptime(str(today)[:10], "%Y-%m-%d") - datetime.strptime(str(recalculated_on)[:10], "%Y-%m-%d")).days
+    except ValueError:
+        return None
+    return PUBLIC_CORRECTION_NOTICE if 0 <= age <= CORRECTION_NOTICE_DAYS else None
+
+
+def _origin(pv: Any) -> str:
+    """``live`` or ``recomputed`` for a public variant (anything unstated reads as recomputed: the weaker claim)."""
+    origin = pv.get("origin") if isinstance(pv, dict) else None
+    return str(origin) if origin in PUBLIC_METHOD_LABELS else "recomputed"
+
+
+def _level(value: Any) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 1
+
+
+def public_event_sheets(records: Any) -> list[dict[str, Any]]:
+    """The public views that may carry an EVENT (owner ruling 2026-11-06: a recalculation is not an achievement). A
+    recomputed record never does, and neither does a live record until its level passes the highest recalculated level —
+    otherwise the first live day would read as a level-up from the old published number. Oldest first, as given."""
+    views = public_sheets(records)
+    floor = max((_level(v.get("character_level")) for v in views if _origin(v) != "live"), default=0)
+    return [v for v in views if _origin(v) == "live" and _level(v.get("character_level")) > floor]
+
+
+def event_level_series(records: Any) -> list[tuple[str, int]]:
+    """``[(date, level)]`` the level badges and milestones may credit, oldest first: the level actually reached on a
+    recalculated date is the historical fact (the stored method-1 level, frozen — it cannot move again), and a live
+    public level counts once it passes the highest recalculated level. A level reached only by recalculation is never
+    credited, so the correction fires no badge and no milestone."""
+    out: list[tuple[str, int]] = []
+    event_days = {str(v.get("date")) for v in public_event_sheets(records)}
+    for rec in records or []:
+        if not isinstance(rec, dict):
+            continue
+        d = str(rec.get("date") or str(rec.get("sk", "")).replace("DATE#", ""))[:10]
+        pv = public_variant(rec)
+        if pv is None or _origin(pv) != "live":
+            out.append((d, _level(rec.get("character_level"))))
+        elif d in event_days:
+            out.append((d, _level(pv.get("character_level"))))
+    return out
+
+
+def event_level(records: Any) -> int:
+    """The latest level the record set may credit (``event_level_series``); 1 with nothing to credit."""
+    series = event_level_series(records)
+    return series[-1][1] if series else 1
 
 
 def public_sheet(record: Any) -> Any:
@@ -193,6 +274,9 @@ def public_sheet(record: Any) -> Any:
         key = f"pillar_{name}"
         if key in out:
             out[key] = public_pillar(name, out[key])
+    if _origin(out) != "live":  # owner ruling 2026-11-06: a recalculation is not an event — no reader can celebrate it
+        out["recalculated_level_events"] = out.get("level_events") or []
+        out["level_events"] = []
     return out
 
 

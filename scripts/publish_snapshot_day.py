@@ -342,7 +342,7 @@ def engine_of(payload: Any, day: str) -> dict | None:
         "delta": _num(c.get("composite_delta_1d")),
         "pillars": pillars,
         # owner ruling 2026-11-05: the served method label (live vs recomputed under the public method), as served
-        "method": ((c.get("method") or {}).get("label") or None) if isinstance(c.get("method"), dict) else None,
+        "method": " ".join(filter(None, ((c.get("method") or {}).get(k) for k in ("label", "notice")))) or None,
     }
 
 

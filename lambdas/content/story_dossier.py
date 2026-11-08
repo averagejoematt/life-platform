@@ -46,7 +46,7 @@ from common import (  # owner ruling 2026-11-06: one publication decision, the A
 )
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
-from health import day_grade_public  # owner ruling 2026-11-05: day_grade_mean is the public variant's
+from health import character_privacy, day_grade_public  # owner rulings 2026-11-05/06: the chronicle reads the public variants
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 USER = "matthew"
@@ -668,7 +668,9 @@ def _coaches(table, wk: Dict[str, Any], roster: Dict[str, str]) -> List[Dict[str
 
 
 def _character(table, wk: Dict[str, Any]) -> Dict[str, Any]:
-    days = _days(table, "character_sheet", wk["start"], wk["end"])
+    # Owner ruling 2026-11-06: the chronicle's character facts are the public variant's; a recalculated week carries no
+    # level event (character_privacy.public_sheet) and a record without a variant is not read.
+    days = {d: v for d, r in _days(table, "character_sheet", wk["start"], wk["end"]).items() if (v := character_privacy.public_sheet(r))}
     if not days:
         return {}
     last = days[max(days)]

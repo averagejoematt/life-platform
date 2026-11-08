@@ -317,19 +317,23 @@ def merge_journal_view(entries):
     return view or None
 
 
-# Owner ruling 2026-11-06 — the computation-order defect. Until then this compute ran at 09:30 PT and
+# Owner rulings 2026-11-06 — the computation-order defect. Until then this compute ran at 09:30 PT and
 # daily-metrics-compute (the ONLY writer of the day's habit_scores) at 09:40 PT, so on every stored date of
 # the cycle Mind's habit components read a habit_scores record that did not exist yet and scored as
-# behavioral absence. The schedule now runs this compute at 09:43 PT (config/schedules.json, an owner CDK
-# deploy); this guard makes the order a checked dependency rather than a timing assumption: a missing
-# record is re-read for up to HABIT_SCORES_WAIT_S (the writer takes ~10 s) before the compute proceeds.
+# behavioral absence. The schedule now runs this compute at 09:50 PT (config/schedules.json, an owner CDK
+# deploy): the writer's measured worst case is 3 m 26 s (a failing run and its two Lambda retries), and its
+# theoretical worst (a 120 s timeout and two retries) ends at 09:49. The schedule is WHEN the check runs;
+# the check is character_public.habit_scores_readiness: for this day, written after the day closed, Habitify
+# reached this day. A record that is not ready is re-read for up to HABIT_SCORES_WAIT_S; after that the
+# compute proceeds fail-closed: public Mind treats the habit inputs as missing (unavailable, never a zero,
+# nothing carried from an earlier day), the sheet records the status, and the error log names it.
 HABIT_SCORES_WAIT_S = 30
 HABIT_SCORES_POLL_S = 5
 
 
 def await_habit_scores(date_str, *, wait_s=None, poll_s=None, sleep=time.sleep):
-    """The day's habit_scores record, waiting briefly for daily-metrics to write it. None after the wait
-    (logged as an error: the Mind habit components then score as absent — never silently)."""
+    """(record, readiness) for the day's habit_scores, waiting briefly for daily-metrics to finish it. A record that
+    is still not ready after the wait is logged as an error, never silently."""
     if wait_s is None:  # only the scheduled run (yesterday's Pacific day, in the Lambda runtime) can be ahead of its writer
         is_scheduled_day = date_str == (pacific_now().date() - timedelta(days=1)).isoformat()
         wait_s = HABIT_SCORES_WAIT_S if is_scheduled_day and os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else 0
@@ -337,15 +341,16 @@ def await_habit_scores(date_str, *, wait_s=None, poll_s=None, sleep=time.sleep):
     waited = 0
     while True:
         rec = fetch_date("habit_scores", date_str)
-        if rec or waited >= wait_s:
+        status = character_public.habit_scores_readiness(rec, date_str)
+        if status == character_public.READY or waited >= wait_s:
             break
         sleep(poll_s)
         waited += poll_s
-    if rec is None:
-        logger.error(f"[character] habit_scores for {date_str} absent after {waited}s — daily-metrics has not written it (order defect)")
+    if status != character_public.READY:
+        logger.error(f"[character] habit_scores for {date_str} not ready ({status}) after {waited}s — public Mind reads them as missing")
     elif waited:
-        logger.info(f"[character] habit_scores for {date_str} arrived after {waited}s")
-    return rec
+        logger.info(f"[character] habit_scores for {date_str} ready after {waited}s")
+    return rec, status
 
 
 def _safe_float(rec, field):
@@ -384,7 +389,7 @@ def assemble_data(yesterday_str):
     # dict-shaped journal view from the day's entries instead.
     data["journal_entries"] = fetch_journal_entries(yesterday_str)
     data["journal"] = merge_journal_view(data["journal_entries"])
-    data["habit_scores"] = await_habit_scores(yesterday_str)  # 2026-11-06: the order defect — see await_habit_scores
+    data["habit_scores"], data["habit_scores_status"] = await_habit_scores(yesterday_str)  # 2026-11-06: see await_habit_scores
     # #962: daily_metrics_compute writes vice_streaks INSIDE the habit_scores
     # record; the engine's vice_control component and the Vice Shield effect
     # read a top-level key — lift it (it was never wired, permanently dead).
@@ -768,7 +773,7 @@ def store_sheet(record, data, previous_state, history_records, config):
         record.pop(character_public.PUBLIC_KEY, None)
         record.pop("public_progression_transitions", None)
         logger.error("[character][public] public variant failed for %s (method 1 stored without it): %s", record.get("date"), e)
-    record["habit_scores_seen"] = bool(data.get("habit_scores"))  # 2026-11-06: did Mind see the day's habit scores
+    record["habit_scores_status"] = data.get("habit_scores_status")  # 2026-11-06: ready, or why not
     return character_engine.store_character_sheet(table, USER_PREFIX, record)
 
 

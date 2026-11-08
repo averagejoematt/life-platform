@@ -6762,7 +6762,7 @@
       "module": "lambdas/compute/character_sheet_lambda.py",
       "schedules": [
         {
-          "expr": "cron(43 9 * * ? *)",
+          "expr": "cron(50 9 * * ? *)",
           "key": "character-sheet-compute",
           "resolution": "table",
           "tz": "America/Los_Angeles"
@@ -9286,9 +9286,9 @@
       "utc": null
     },
     {
-      "expr": "cron(43 9 * * ? *)",
+      "expr": "cron(50 9 * * ? *)",
       "lambda": "character-sheet-compute",
-      "local": "09:43",
+      "local": "09:50",
       "resolution": "table",
       "stack": "compute_stack",
       "tz": "America/Los_Angeles",

@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from common import activity_publication
+from common.pacific_time import PACIFIC, parse_iso_utc
 
 from health import character_engine, character_privacy
 
@@ -273,6 +274,7 @@ def compute_public_variant(
             "effective_from": EFFECTIVE_FROM,
             "method_history": [dict(m) for m in character_privacy.PUBLIC_METHOD_HISTORY],
             "origin": origin,
+            "basis": character_privacy.PUBLIC_METHOD_BASIS.get(origin),
             "computed_at": computed_at or datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -307,20 +309,58 @@ def attach_public_variant(
         return reason
     engagement, _exact, _why = public_presence(data.get("engagement_state"))
     hs = data.get("habit_scores") or {}
+    ready = data.get("habit_scores_status", habit_scores_readiness(hs, str(record.get("date")))) == READY
     block, transitions = compute_public_variant(
-        record,
+        record if ready else without_habit_inputs(record),
         prev_public,
         hist or [],
         config,
         engagement=engagement,
-        habit_method=hs.get("scoring_method") if isinstance(hs, dict) else None,
-        vice_streaks=data.get("vice_streaks"),
+        habit_method=hs.get("scoring_method") if ready else None,
+        vice_streaks=data.get("vice_streaks") if ready else None,
         challenge_bonus=data.get("public_challenge_bonus_xp"),
         origin="live",
     )
     record[PUBLIC_KEY] = block
     record["public_progression_transitions"] = transitions
     return None
+
+
+READY = "ready"
+
+
+def habit_scores_readiness(hs: Any, date: str) -> str:
+    """Owner ruling 2026-11-06: an explicit dependency check, not a timing assumption. ``ready`` only when the record is
+    for this day, was written after the day closed (a record written during the day is not the day), and its own input
+    manifest says the Habitify data reached this day. Only the PUBLIC input is consulted: the manifest's journal rows
+    are always degraded and must not gate a public score."""
+    if not isinstance(hs, dict) or not hs:
+        return "missing"
+    if str(hs.get("date") or str(hs.get("sk", "")).replace("DATE#", ""))[:10] != date:
+        return "wrong_day"
+    stamp = parse_iso_utc(hs.get("computed_at"))  # the canonical parser (#1964): naive == UTC, never runner-local
+    if stamp is None:
+        return "unverified"
+    if stamp.astimezone(PACIFIC).date().isoformat() <= date:
+        return "before_day_closed"
+    latest = (((hs.get("input_manifest") or {}).get("sources") or {}).get("habitify") or {}).get("latest_day")
+    if not latest:
+        return "unverified"
+    return READY if str(latest) >= date else "habitify_behind"
+
+
+def without_habit_inputs(method1: dict[str, Any]) -> dict[str, Any]:
+    """The record with Mind's habit-backed components as missing data: a day whose habit scores were not ready is
+    never scored from a stale or partial record, and never carries the previous day's forward."""
+    out = copy.deepcopy(method1)
+    comps = (out.get("pillar_mind") or {}).get("components")
+    if isinstance(comps, dict):
+        for name in RECORD_BACKED_COMPONENTS:
+            if name in comps:
+                comps[name] = {"score": 0.0, "absent": True}
+        if "vice_control" in comps:
+            comps["vice_control"] = {"score": None}
+    return out
 
 
 def public_input_rows(input_rows: Any) -> list:

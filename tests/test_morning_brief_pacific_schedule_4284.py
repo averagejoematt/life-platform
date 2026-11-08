@@ -69,7 +69,7 @@ def test_every_producer_runs_before_the_brief_on_both_sides_of_the_change():
     producers = {
         "adaptive-mode-compute": "cron(35 9 * * ? *)",
         "daily-metrics-compute": "cron(40 9 * * ? *)",
-        "character-sheet-compute": "cron(43 9 * * ? *)",  # 2026-11-06: after daily-metrics (it reads the day's habit_scores)
+        "character-sheet-compute": "cron(50 9 * * ? *)",  # 2026-11-06: after daily-metrics and its retries
         "daily-insight-compute": "cron(45 9 * * ? *)",
     }
     brief = schedule_rows.rows()["daily-brief"]

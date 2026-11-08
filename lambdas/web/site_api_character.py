@@ -25,7 +25,7 @@ import re as _re
 from datetime import date as _date, timedelta
 
 from boto3.dynamodb.conditions import Key
-from experiment.phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 from health import character_privacy  # owner ruling 2026-11-03: private-source components never named
 
 from web.site_api_common import (
@@ -368,7 +368,7 @@ def character(date: str | None = None, *, _g) -> dict:
                 "composite_pillar_total": _composite_pillar_total,
                 "composite_note": composite_note,
                 "time_travel": bool(date),
-                "method": character_privacy.public_method_label(record),  # which method computed this value (2026-11-05)
+                "method": _method_label(table, record, datetime.now(PT).date()),  # which method computed this value (2026-11-05/06)
                 # #590: the engine's designed cross-pillar couplings that are ACTIVE
                 # right now (rare gameplay thresholds — e.g. Sleep Drag). The home
                 # constellation lights these as directional overlay edges. Additive.
@@ -427,6 +427,43 @@ _CHAR_CONFIG_LEVELING_KEYS = (
     "neglect_decay",  # #913: atrophy knobs (n_grace_days/rate/floor/min_behavioral_share)
     "tier_streak_overrides",
 )
+
+
+def _correction_item(table):
+    """The stored public correction ledger (health.public_corrections), or None — absent, tombstoned or unreadable."""
+    from health import public_corrections
+
+    try:
+        got = table.get_item(Key={"pk": f"{USER_PREFIX}{public_corrections.SOURCE}", "sk": public_corrections.correction_sk()}).get("Item")
+        return _decimal_to_float(got) if singleton_visible(got) else None
+    except Exception as e:  # the ledger must not take the method contract down
+        logger.warning("character: correction ledger read failed: %s", e)
+        return None
+
+
+def _method_label(table, record, today) -> "dict | None":
+    """``character_privacy.public_method_label`` plus, on a live date, the correction notice while the recorded
+    correction is recent (owner ruling 2026-11-06 item 10) — a reader who saw the old level is told why it moved."""
+    label = character_privacy.public_method_label(record)
+    if label and not label.get("notice"):
+        item = _correction_item(table)
+        label["notice"] = character_privacy.correction_notice((item or {}).get("recalculated_on"), today)
+    return label
+
+
+def _public_method(table) -> dict:
+    """The versioned public method and its correction ledger (owner rulings 2026-11-05/06). The ledger holds only
+    public-method values and one list of reasons (health.public_corrections), so it cannot identify private activity;
+    ``correction`` is None until a correction is recorded."""
+    from health import public_corrections
+
+    item = _correction_item(table)
+    return {
+        "version": character_privacy.PUBLIC_METHOD_VERSION,
+        "effective_from": character_privacy.PUBLIC_METHOD_EFFECTIVE_FROM,
+        "history": [dict(m) for m in character_privacy.PUBLIC_METHOD_HISTORY],
+        "correction": public_corrections.served_ledger(item),
+    }
 
 
 def character_config(*, _g) -> dict:
@@ -512,6 +549,7 @@ def character_config(*, _g) -> dict:
             "tiers": tiers,
             "cross_pillar_effects": effects,
             "updated_at": (cfg.get("_meta") or {}).get("last_updated"),
+            "public_method": _public_method(table),
         },
         cache_seconds=3600,
     )

@@ -511,11 +511,16 @@ def test_packet_training_empty_branch_states_no_activities():
     assert "No activities recorded this week." in text
 
 
+def _pub_grade(fields):
+    """A stored day_grade record whose public variant carries ``fields`` (method 1 deliberately different)."""
+    return {"total_score": 12, "letter_grade": "F", "public": dict(fields, public_method_version="day-grade-public-v1")}
+
+
 def test_packet_day_grades_and_habit_performance():
     data = _empty_data()
-    data["day_grades"] = {
-        "2026-08-05": {"total_score": 87.4, "letter_grade": "B+"},
-        "2026-08-06": {"total_score": 91},  # no letter grade → "?"
+    data["day_grades"] = {  # owner ruling 2026-11-06: the packet reads the day grade's PUBLIC variant
+        "2026-08-05": _pub_grade({"total_score": 87.4, "letter_grade": "B+"}),
+        "2026-08-06": _pub_grade({"total_score": 91}),  # no letter grade → "?"
     }
     data["habit_scores"] = {
         "2026-08-05": {
@@ -567,8 +572,8 @@ def test_packet_day_grades_missing_total_score_renders_no_grade_instead_of_crash
     and f"{None:.0f}" is a TypeError. The row degrades to an honest line."""
     data = _empty_data()
     data["day_grades"] = {
-        "2026-08-05": {"letter_grade": "B"},  # no total_score — partial record
-        "2026-08-06": {"total_score": 91},  # unaffected sibling day still grades
+        "2026-08-05": _pub_grade({"letter_grade": "B"}),  # no total_score — partial record
+        "2026-08-06": _pub_grade({"total_score": 91}),  # unaffected sibling day still grades
     }
     text, _ = cd.build_data_packet(data)  # must not raise
 

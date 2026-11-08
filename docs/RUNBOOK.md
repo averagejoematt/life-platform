@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-06 (v8.6.0 — 90 MCP tools, 86-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-08 (v8.6.0 — 90 MCP tools, 86-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -171,8 +171,8 @@ hourly (INGEST_HOURLY)  INGESTION   API pulls from Whoop, Withings, Strava, etc.
 15:05 UTC           anomaly-detector        (08:05 PDT)
 16:35 UTC           adaptive-mode-compute   (09:35 PDT)
 16:40 UTC           daily-metrics-compute   (09:40 PDT — writes the day's habit_scores)
-16:43 UTC           character-sheet-compute (09:43 PDT — AFTER daily-metrics: Mind reads that day's habit_scores, 2026-11-06)
 16:45 UTC           daily-insight-compute   (09:45 PDT)
+16:50 UTC           character-sheet-compute (09:50 PDT — AFTER daily-metrics and its retries; checks readiness, 2026-11-06)
 17:00 UTC (18:00 after 2026-11-01)  daily-brief  (10:00 Pacific — zoned schedule, #4284; 10:00 PDT — reads computed results → email → public_stats.json)
 19:30 UTC           og-image-generator      (12:30 PDT — reads public_stats.json → generates share images)
 ```

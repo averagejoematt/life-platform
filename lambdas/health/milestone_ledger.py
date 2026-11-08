@@ -101,7 +101,10 @@ from common.macrofactor_fields import intake_window  # #5431: intake reads bound
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from training import session_count  # #5387: its zone2_by_date reads THE Zone 2 computation
 
-from health import process_milestones  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
+from health import (
+    character_privacy,  # owner ruling 2026-11-06: level milestones credit the public method, never a recalculation
+    process_milestones,  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
+)
 
 # ── DDB coordinates ───────────────────────────────────────────────────────────
 MILESTONES_SOURCE = "milestones"
@@ -638,7 +641,7 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     tier0_streak = int(_f(latest_habit.get("t0_perfect_streak")) or 0)
 
     chars_sorted = sorted(chars, key=lambda i: str(i.get("sk") or ""))
-    character_level = int(_f((chars_sorted[-1] if chars_sorted else {}).get("character_level")) or 1)
+    character_level = character_privacy.event_level(chars_sorted)  # owner ruling 2026-11-06: public, never by recalculation
 
     # Training days + strength volume: hevy workout sub-records (DATE#d#WORKOUT#id)
     # union strava activity days (the spiral_breaker convention).

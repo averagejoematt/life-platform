@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+from datetime import date, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -26,6 +27,12 @@ from health import character_engine, character_public, core_habits, habit_pct_pu
 
 histories = T.histories  # the module-scoped fixture
 CONFIG = T.CONFIG
+
+
+def _ready_hs(day, **fields):
+    nxt = (date.fromisoformat(day) + timedelta(days=1)).isoformat()
+    base = {"scoring_method": "core_set_v1", "date": day, "computed_at": f"{nxt}T17:40:10+00:00"}
+    return dict(base, input_manifest={"sources": {"habitify": {"latest_day": day}}}, **fields)
 
 
 def test_the_character_compute_runs_after_daily_metrics_writes_the_habit_scores():
@@ -50,28 +57,29 @@ def test_the_compute_waits_for_and_sees_the_days_habit_scores(monkeypatch):
     os.environ.setdefault("S3_BUCKET", "test-bucket")
     from compute import character_sheet_lambda as L
 
-    hs = {"scoring_method": "core_set_v1", "core_pct": 0.75}
-    reads, sleeps = iter([None, None, hs]), []
+    hs = _ready_hs("2026-11-04", core_pct=0.75)
+    premature = dict(hs, computed_at="2026-11-04T20:00:00+00:00")  # written before the day closed: not the day
+    reads, sleeps = iter([None, premature, hs]), []
     monkeypatch.setattr(L, "fetch_date", lambda source, d: next(reads) if source == "habit_scores" else None)
-    got = L.await_habit_scores("2026-11-04", wait_s=30, poll_s=5, sleep=sleeps.append)
-    assert got == hs and sleeps == [5, 5]
+    got, status = L.await_habit_scores("2026-11-04", wait_s=30, poll_s=5, sleep=sleeps.append)
+    assert got == hs and status == "ready" and sleeps == [5, 5]
     _raw, det = character_engine.compute_mind_raw({"habit_scores": got}, CONFIG)
     assert det["t0_habit_compliance"]["score"] == 75.0 and not det["t0_habit_compliance"].get("absent")
     monkeypatch.setattr(L, "fetch_date", lambda source, d: None)
     sleeps.clear()
-    assert L.await_habit_scores("2026-11-04", wait_s=10, poll_s=5, sleep=sleeps.append) is None and sleeps == [5, 5]
+    assert L.await_habit_scores("2026-11-04", wait_s=10, poll_s=5, sleep=sleeps.append) == (None, "missing") and sleeps == [5, 5]
 
 
-def test_the_stored_sheet_records_whether_the_habit_scores_were_seen(monkeypatch):
+def test_the_stored_sheet_records_the_habit_scores_readiness(monkeypatch):
     os.environ.setdefault("S3_BUCKET", "test-bucket")
     from compute import character_sheet_lambda as L
 
     stored = []
     monkeypatch.setattr(L.character_engine, "store_character_sheet", lambda t, p, r: stored.append(dict(r)))
     monkeypatch.setattr(L.character_public, "attach_public_variant", lambda *a: "no chain")
-    L.store_sheet({"date": "2026-11-04", "character_level": 3}, {"habit_scores": {"core_pct": 0.5}}, None, [], CONFIG)
-    L.store_sheet({"date": "2026-11-05", "character_level": 3}, {}, None, [], CONFIG)
-    assert [s["habit_scores_seen"] for s in stored] == [True, False]
+    L.store_sheet({"date": "2026-11-04", "character_level": 3}, {"habit_scores_status": "ready"}, None, [], CONFIG)
+    L.store_sheet({"date": "2026-11-05", "character_level": 3}, {"habit_scores_status": "missing"}, None, [], CONFIG)
+    assert [s["habit_scores_status"] for s in stored] == ["ready", "missing"]
 
 
 def _mind(details, method="core_set_v1"):
@@ -217,10 +225,11 @@ def test_the_published_habit_pct_readers_use_the_public_method(monkeypatch):
 
 def test_the_backfill_reconstructs_the_fixed_order_from_the_stored_habit_scores():
     m1 = {"date": "2026-10-30", "pillar_mind": {"components": {"t0_habit_compliance": {"score": 0.0, "absent": True}}}}
-    hs = {"2026-10-30": {"scoring_method": "core_set_v1", "core_pct": 0.6, "vice_streaks": {"No alcohol": 10.0}, "computed_at": "t"}}
+    hs = {"2026-10-30": _ready_hs("2026-10-30", core_pct=0.6, vice_streaks={"No alcohol": 10.0})}
     fixed, method, vice, info = B.order_fixed_inputs(m1, hs, CONFIG)
     assert method == "core_set_v1" and vice == {"No alcohol": 10.0} and info["habit_scores_present"]
     assert fixed["pillar_mind"]["components"]["t0_habit_compliance"]["score"] == 60.0
     assert m1["pillar_mind"]["components"]["t0_habit_compliance"]["absent"] is True  # method 1 untouched
     same, method2, _v, info2 = B.order_fixed_inputs(m1, {}, CONFIG)
-    assert same is m1 and method2 is None and not info2["habit_scores_present"]
+    assert method2 is None and not info2["habit_scores_present"] and info2["readiness"] == "missing"
+    assert same["pillar_mind"]["components"]["t0_habit_compliance"]["absent"] is True

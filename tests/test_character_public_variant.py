@@ -40,7 +40,13 @@ def _public_inputs(i, d):
     return {
         "date": d,
         "sleep": {"sleep_duration_hours": 6.0 + (i % 5) * 0.5, "sleep_efficiency_percentage": 80 + (i % 7) * 2},
-        "habit_scores": {"scoring_method": "core_set_v1", "core_pct": round(0.4 + (i % 6) * 0.1, 3)},
+        "habit_scores": {
+            "scoring_method": "core_set_v1",
+            "core_pct": round(0.4 + (i % 6) * 0.1, 3),
+            "date": d,  # ready (owner ruling 2026-11-06): this day's, written after it closed, Habitify reached it
+            "computed_at": f"{(date.fromisoformat(d) + timedelta(days=1)).isoformat()}T17:40:10+00:00",
+            "input_manifest": {"sources": {"habitify": {"latest_day": d}}},
+        },
         "vice_streaks": {"No alcohol": float(i + 1)},
         "reading_session_days_7d": [d] * (i % 4),
         "data_completeness_pct": 60.0 + (i % 3) * 20,
@@ -382,7 +388,7 @@ def test_live_attach_matches_the_backfill_and_fails_closed_without_a_chain(histo
     data = {"engagement_state": pub["engagement_state"], "habit_scores": pub["habit_scores"], "vice_streaks": pub["vice_streaks"]}
     assert character_public.attach_public_variant(rec, data, prev, hist, CONFIG) is None
     live, back = dict(rec[B.PUBLIC]), dict(p[d]["public"])
-    for k in ("computed_at", "origin"):
+    for k in ("computed_at", "origin", "basis"):
         live.pop(k), back.pop(k)
     assert _canon(B.as_stored(live)) == _canon(back)
     rec2 = copy.deepcopy(private[d])

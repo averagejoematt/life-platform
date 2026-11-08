@@ -299,9 +299,13 @@ def timeline(*, _g) -> dict:
     )
     level_events = []
     prev_level = 0
-    for item in character_privacy.public_sheets(_decimal_to_float(cs_resp.get("Items", []))):
+    # A level-up is drawn only on a day that may carry an event (a recalculation is not an achievement, owner ruling
+    # 2026-11-06), measured from the public level the day before — so the first real rise after the correction shows.
+    cs_items = _decimal_to_float(cs_resp.get("Items", []))
+    event_days = {v.get("sk") for v in character_privacy.public_event_sheets(cs_items)}
+    for item in character_privacy.public_sheets(cs_items):
         lvl = int(float(item.get("character_level", 0)))
-        if lvl > prev_level and prev_level > 0:
+        if lvl > prev_level and prev_level > 0 and item.get("sk") in event_days:
             level_events.append(
                 {
                     "date": item.get("sk", "").replace("DATE#", ""),
@@ -434,7 +438,7 @@ def journey_timeline(*, _g) -> dict:
         )
         seen_levels: set = set()
         _PILLAR_NAMES = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
-        for item in character_privacy.public_sheets(_decimal_to_float(cs_resp.get("Items", []))):
+        for item in character_privacy.public_event_sheets(_decimal_to_float(cs_resp.get("Items", []))):
             level = item.get("character_level")
             date_str = item.get("date") or item.get("sk", "").replace("DATE#", "")
             if level and level not in seen_levels:

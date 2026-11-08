@@ -414,6 +414,7 @@ SOURCE_CLASS: dict[str, str] = {
     "anomalies": EXPERIMENT_SCOPED,
     "weekly_correlations": EXPERIMENT_SCOPED,
     "scenarios": EXPERIMENT_SCOPED,  # #550: nightly what-followed distributions — recomputed daily
+    "public_corrections": CROSS_PHASE,  # owner rulings 2026-11-05/06: the public correction ledger of the scoring methods
     "what_changed": EXPERIMENT_SCOPED,  # SS-08 monthly delta + first-seen ledger; resets with cycle
     "centenarian_progress": EXPERIMENT_SCOPED,
     "nutrition_review": EXPERIMENT_SCOPED,

@@ -61,7 +61,7 @@
     "character-sheet-compute": {
       "function": "character-sheet-compute",
       "stack": "LifePlatformCompute",
-      "expression": "cron(43 9 * * ? *)",
+      "expression": "cron(50 9 * * ? *)",
       "facing": "internal",
       "purpose": "Character Sheet Compute Lambda — v1.1.0"
     },

@@ -52,7 +52,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # noqa: E402,F401 — the CLI reads B.EXPERIMENT_START_DATE
 from common.numeric import decimals_to_float, floats_to_decimal  # noqa: E402
-from health import character_engine, character_privacy, character_public, day_grade_public, scoring_engine  # noqa: E402
+from health import character_engine, character_privacy, character_public, day_grade_public, public_corrections, scoring_engine  # noqa: E402
 
 USER = os.environ["USER_ID"]
 PFX = f"USER#{USER}#SOURCE#"
@@ -146,8 +146,9 @@ def order_fixed_inputs(m1: dict, habit_scores: dict, config: dict) -> tuple:
         "habit_scores_computed_at": (hs or {}).get("computed_at"),
         "scoring_method": (hs or {}).get("scoring_method"),
     }
-    if not hs:
-        return m1, None, None, info
+    info["readiness"] = character_public.habit_scores_readiness(hs, d)
+    if info["readiness"] != character_public.READY:
+        return character_public.without_habit_inputs(m1), None, None, info
     vice = hs.get("vice_streaks") or None
     _raw, det = character_engine.compute_mind_raw({"habit_scores": hs, "vice_streaks": vice}, config)
     out = copy.deepcopy(m1)
@@ -367,6 +368,21 @@ def apply_plan(table: Any, plan: list, export: dict) -> dict:
     return {"written": done, "skipped": skipped}
 
 
+def _ledger_key() -> dict:
+    return {"pk": PFX + public_corrections.SOURCE, "sk": public_corrections.correction_sk()}
+
+
+def record_ledger_preimage(table: Any, export: dict) -> None:
+    """Record in the export what the public correction ledger item holds now (the rollback restores it)."""
+    prev = (table.get_item(Key=_ledger_key()) or {}).get("Item")
+    export["public_ledger"] = {"key": _ledger_key(), "previous": decimals_to_float(prev) if prev else None}
+
+
+def put_public_ledger(table: Any, item: dict) -> None:
+    """Write the public correction ledger: the ONE item the backfill creates (reasons and public values only)."""
+    table.put_item(Item=floats_to_decimal({**_ledger_key(), **item}))
+
+
 def rollback(table: Any, export: dict, *, apply: bool) -> dict:
     """Restore exactly the export's pre-image of the ``public`` attribute: REMOVE it where the item had none, SET the
     previous value where it had one. Refuses an item whose method-1 fields no longer match the export. Dry run unless
@@ -392,6 +408,13 @@ def rollback(table: Any, export: dict, *, apply: bool) -> dict:
             )
         else:
             table.update_item(Key={"pk": e["pk"], "sk": e["sk"]}, UpdateExpression="REMOVE #p", ExpressionAttributeNames={"#p": PUBLIC})
+    led = export.get("public_ledger")
+    if led:
+        ops.append({"pk": led["key"]["pk"], "sk": led["key"]["sk"], "op": "RESTORE_ITEM" if led["previous"] else "DELETE_ITEM"})
+        if apply and led["previous"]:
+            table.put_item(Item=floats_to_decimal(led["previous"]))
+        elif apply:
+            table.delete_item(Key=led["key"])
     return {"applied": apply, "operations": ops, "refused": refused}
 
 

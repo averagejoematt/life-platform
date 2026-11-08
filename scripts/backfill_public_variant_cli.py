@@ -552,6 +552,11 @@ def main(argv: list) -> int:
     if not args.skip_routes:
         manifest["routes"] = route_outputs(table, snap, char, receipts)
     plan = B.plan_writes(char, grades, set(snap["receipts"]), receipts)
+    without_habits = B.replay_character(snap["sheets"], snap["engagement"], snap["habit_scores"], config, run_ts, order_fix=False)
+    ledger_item = B.public_corrections.build_ledger(
+        {d: r["public"] for d, r in without_habits.items()}, {d: r["public"] for d, r in char.items()}, run_ts[:10]
+    )
+    _write(os.path.join(args.out, "public_correction_ledger.json"), ledger_item)
     stored = {(B.SHEET_PK, f"DATE#{d}"): r for d, r in snap["sheets"].items()}
     stored.update({(B.RECEIPT_PK, f"DATE#{d}"): r for d, r in snap["receipts"].items()})
     stored.update({(B.GRADE_PK, f"DATE#{d}"): r for d, r in snap["grades"].items()})
@@ -571,8 +576,10 @@ def main(argv: list) -> int:
         return 0
     export = B.build_export(lambda key: table.get_item(Key=key).get("Item"), plan, run_ts)
     export_path = os.path.join(args.out, f"export_{run_ts.replace(':', '')}.json")
+    B.record_ledger_preimage(table, export)
     _write(export_path, export)  # the pre-image exists on disk BEFORE the first write
     result = B.apply_plan(table, plan, export)
+    B.put_public_ledger(table, ledger_item)
     _write(os.path.join(args.out, "apply_result.json"), result)
     print(json.dumps({"written": result["written"], "skipped": len(result["skipped"]), "export": export_path}, indent=1))
     return 0 if not result["skipped"] else 2

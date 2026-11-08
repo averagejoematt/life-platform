@@ -219,7 +219,7 @@ class ComputeStack(Stack):
             handler="compute.character_sheet_lambda.lambda_handler",
             source_file="lambdas/compute/character_sheet_lambda.py",
             # schedule: config/schedules.json (#4284) — Phase 3.1 (2026-05-16): 17:35→16:30 (9:30 AM PT) so character_sheet completes BEFORE daily-brief at 17:00 UTC. Was reading yesterday's sheet.
-            # 2026-11-06 (owner ruling): 09:30→09:43 PT, AFTER daily-metrics (09:40, ~10 s) — at 09:30 Mind read the day's habit_scores before they existed.
+            # 2026-11-06 (owner rulings): 09:30→09:50 PT, AFTER daily-metrics and its retries — at 09:30 Mind read the day's habit_scores before they existed.
             timeout_seconds=60,
             memory_mb=512,
             custom_policies=rp.compute_character_sheet(),

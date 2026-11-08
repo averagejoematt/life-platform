@@ -23,7 +23,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `anomaly-detector` | compute_stack | `cron(5 8 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `between-chronicle` | email_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
 | `challenge-generator` | compute_stack | `cron(0 15 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
-| `character-sheet-compute` | compute_stack | `cron(43 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `character-sheet-compute` | compute_stack | `cron(50 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `chronicle-approve` | email_stack | `cron(0 11 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `chronicle-email-sender` | email_stack | `cron(10 8 ? * WED *)` (America/Los_Angeles, not UTC) | table |
 | `circadian-compliance` | compute_stack | `cron(0 19 * * ? *)` (America/Los_Angeles, not UTC) | table |

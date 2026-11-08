@@ -152,7 +152,7 @@ def test_every_snapshot_row_fires_at_the_same_instants_as_pacific_daylight_wall_
 # recorded expression instead of the migration's output; an unrecorded move still fails below.
 POST_MIGRATION_MOVES = {
     "character-sheet-compute": (
-        "cron(43 9 * * ? *)",
+        "cron(50 9 * * ? *)",
         "owner ruling 2026-11-06 (PR 5656): after daily-metrics-compute (09:40) - the computation-order defect, Mind read "
         "the day's habit_scores before they were written",
     ),
