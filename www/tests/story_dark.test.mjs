@@ -65,7 +65,7 @@ test("the story's pages live outside src/pages (no static route, no page imports
   assert.match(entry, /on \? soFar\(await loadStory\(\)/, "the data file is read only when the switch is on");
   assert.match(entry, /on && \(/);
   const markup = entry.split(/^---$/m).slice(2).join("---"); // the template after the frontmatter
-  assert.ok(markup.length > 0 && !/<style[\s>]|<script[\s>]/.test(markup), "the entry adds no asset");
+  assert.ok(markup.length > 0 && !/<\s*(style|script)\b/i.test(markup), "the entry adds no asset");
 });
 
 test("the sitemap filter drops every story path and keeps everything else", () => {
