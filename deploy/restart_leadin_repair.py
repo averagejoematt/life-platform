@@ -163,6 +163,8 @@ def apply_vet_edits(body: str, vet_edits: list[tuple[str, str, str]]) -> tuple[s
     exactly once (a changed source needs human re-review, not a silent partial vet)."""
     applied = []
     for name, old, new in vet_edits:
+        if not old:
+            continue  # private find-text not supplied (LEADIN_PRIVATE_*): nothing to vet against, never a match-everything edit
         n = body.count(old)
         if n != 1:
             raise RuntimeError(f"vet edit {name!r}: expected exactly 1 occurrence, found {n} — archive source changed, re-review needed")
