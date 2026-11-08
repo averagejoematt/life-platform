@@ -229,6 +229,31 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
         ),
         ("a {n}-day ramp", "the ramp over the trailing {n} days"),
     ),
+    # #5574: the phase rules' own numbers (every gate VALUE in `phases` is a reference, so it has no leaf here).
+    "phases.advance.consecutive_evaluations": (
+        (
+            r"\bconsecutive_evaluations\"?\s*[:=]\s*{n}",
+            r"{n}\s+consecutive\s+(?:weekly\s+)?evaluations?",
+            r"{n}\s+weekly\s+evaluations?\s+in\s+a\s+row",
+        ),
+        ("{n} consecutive weekly evaluations", "held for {n} weekly evaluations in a row"),
+    ),
+    "phases.every_transition.consistency.min_sessions_per_wk": (
+        (r"\bmin_sessions_per_wk\"?\s*[:=]\s*{n}", r"(?:>=|≥|at\s+least)\s*{n}\s+performed\s+sessions?"),
+        ("at least {n} performed sessions", '"min_sessions_per_wk": {n}'),
+    ),
+    "phases.every_transition.consistency.weeks_meeting": (
+        (r"\bweeks_meeting\"?\s*[:=]\s*{n}", r"\b{n}\s+of\s+the\s+last\s+\w+\s+weeks\b"),
+        ("in {n} of the last four weeks",),
+    ),
+    "phases.every_transition.consistency.of_last_weeks": (
+        (r"\bof_last_weeks\"?\s*[:=]\s*{n}", r"\b\w+\s+of\s+the\s+last\s+{n}\s+weeks\b"),
+        ("in three of the last {n} weeks",),
+    ),
+    "phases.every_transition.no_pain_flag.pain_lookback_weeks": (
+        (r"\bpain_lookback_weeks\"?\s*[:=]\s*{n}", r"\bpain\s+flag[^\n]{0,30}?\blast\s+{n}\s+weeks\b"),
+        ("no pain flag in the last {n} weeks",),
+    ),
     "cardio_menu.conditioning_sessions_per_wk": (
         (r"\bconditioning_sessions_per_wk\"?\s*[:=]\s*{n}", r"{n}\s+(?:hard\s+)?conditioning\s+sessions?", r"\bconditioning\s+{times}"),
         ("{n} conditioning sessions", "conditioning {times} a week"),

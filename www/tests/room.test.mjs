@@ -12,8 +12,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ROOM_ENV, ROOM_MARKER, ROOM_ROUTES, notRoomPage, roomEnabled, roomIntegration } from "../src/lib/room.js";
-import { feeds, gatedPaths, jsonFiles, orphanChunks, ownedPaths, sitemaps, walk } from "../scripts/room_audit.mjs";
+import { ROOM_DATA_FILES, ROOM_ENV, ROOM_MARKER, ROOM_ROUTES, isRoomPath, notRoomPage, roomEnabled, roomIntegration, roomPathPattern } from "../src/lib/room.js";
+import { feeds, gatedPaths, jsonFiles, orphanChunks, ownedPaths, roomPaths, sitemaps, walk } from "../scripts/room_audit.mjs";
 
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = resolve(process.env.ROOM_AUDIT_DIST || join(WWW, "dist"));
@@ -146,6 +146,106 @@ distTest("6 · no CSS/JS chunk exists only for a gated page, no room marker on a
 });
 
 distTest("the flag-off dist holds no room route directory at all", () => {
-  for (const r of ROOM_ROUTES) assert.ok(!existsSync(join(DIST, r.path)), `${r.path} must not exist in a flag-off dist (was this dist built with WEB_ROOM=1?)`);
-  assert.ok(!readdirSync(DIST).includes("calibration.json"));
+  for (const p of roomPaths(DIST)) assert.ok(!existsSync(join(DIST, p)), `${p} must not exist in a flag-off dist (was this dist built with WEB_ROOM=1?)`);
+  for (const f of ROOM_DATA_FILES) assert.ok(!walk(DIST).some((x) => x.endsWith(`/${f}`)), `${f} must not be in a flag-off dist`);
+});
+
+// ── CR2: the per-coach record (/system/coaches/<id>/record/) and the entry on each coach page ──────────────────────
+const RECORD = ROOM_ROUTES.find((r) => r.entrypoint.endsWith("coach-record.astro"));
+/** A coach id the flag-off dist has a page for (the planted record sits beside a real coach page). */
+const someCoach = () => readdirSync(join(DIST, "system", "coaches")).find((d) => existsSync(join(DIST, "system", "coaches", d, "index.html")));
+
+test("CR2 · a [param] room path matches exactly one segment, literally elsewhere (control: a near miss does not match)", () => {
+  assert.ok(RECORD, "the per-coach record is a room route");
+  assert.equal(RECORD.path, "/system/coaches/[id]/record/");
+  for (const p of ["/system/coaches/sleep_coach/record/", "/next/v9/system/coaches/eli_marsh/record/"]) assert.equal(isRoomPath(p), true, p);
+  for (const p of ["/system/coaches/sleep_coach/", "/system/coaches/a/b/record/", "/system/coaches//record/", "/system/coachesX/sleep_coach/record/"]) assert.equal(isRoomPath(p), false, p);
+  // every metacharacter is escaped, backslash included: a pattern built from a path matches only that path
+  const rx = new RegExp(`^${roomPathPattern("/a.b+c(d)\\e/[x]/")}$`);
+  assert.equal(rx.test("/a.b+c(d)\\e/one/"), true);
+  assert.equal(rx.test("/aXb+c(d)\\e/one/"), false, "an unescaped dot would match any character");
+  assert.equal(notRoomPage("https://averagejoematt.com/system/coaches/sleep_coach/record/"), false);
+  assert.equal(notRoomPage("https://averagejoematt.com/system/coaches/sleep_coach/"), true);
+});
+
+test("CR2 · the coach page's entry is self-gating and the record page refuses to render with the switch off", () => {
+  const page = readFileSync(join(WWW, "src", "pages", "system", "coaches", "[id].astro"), "utf8");
+  assert.match(page, /import CoachRoomEntry from "..\/..\/..\/components\/CoachRoomEntry.astro"/);
+  assert.match(page, /<\/section>\{\/\*[^]*?\*\/\}<CoachRoomEntry coach=\{c\} \/>\n<\/Base>/, "the entry sits flush, so the flag-off bytes do not move");
+  const entry = readFileSync(join(WWW, "src", "components", "CoachRoomEntry.astro"), "utf8");
+  assert.match(entry, /const on = roomEnabled\(\);/);
+  assert.match(entry, /on && \(/);
+  assert.match(entry, /const entry = on \? /, "the room's data file is read only when the switch is on");
+  assert.doesNotMatch(entry.split("\n---\n")[1], /<style|<script/, "the entry's template adds no asset");
+  const record = readFileSync(join(WWW, RECORD.entrypoint), "utf8");
+  assert.match(record, /if \(!roomEnabled\(\)\) throw new Error/);
+});
+
+distTest("CR2 · 1 · every coach's record path is a 404 (control: a planted record page answers 200)", async () => {
+  const probes = roomPaths(DIST).filter((p) => p.endsWith("/record/"));
+  assert.ok(probes.length >= 2, `the audit expands [id] over the dist's coach pages: ${probes}`);
+  assert.deepEqual(await gatedPaths(DIST), []);
+  const dir = plantedCopy();
+  try {
+    const id = someCoach();
+    mkdirSync(join(dir, "system", "coaches", id, "record"), { recursive: true });
+    writeFileSync(join(dir, "system", "coaches", id, "record", "index.html"), "<!doctype html><p>planted</p>");
+    const leaks = await gatedPaths(dir);
+    assert.ok(leaks.some((l) => l.includes(`/system/coaches/${id}/record/`) && l.includes("200")), `the control must red: ${leaks}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+distTest("CR2 · 2 · no coach_room.json, no CR2 room key (control: a planted file and a planted key)", () => {
+  const dir = plantedCopy();
+  try {
+    writeFileSync(join(dir, "coach_room.json"), JSON.stringify({ ok: true }));
+    const pairs = join(dir, "data", "pairs.json");
+    const declaredOne = existsSync(pairs);
+    if (declaredOne) writeFileSync(pairs, readFileSync(pairs, "utf8").replace(/^\{/, '{"stance_history":[],"commitment_counts":{},'));
+    const leaks = jsonFiles(dir);
+    assert.ok(leaks.some((l) => l.startsWith("coach_room.json: a JSON file")), `undeclared JSON must red: ${leaks}`);
+    if (declaredOne) {
+      assert.ok(leaks.some((l) => l.includes('"stance_history"')), `a CR2 key must red: ${leaks}`);
+      assert.ok(leaks.some((l) => l.includes('"commitment_counts"')), `a CR2 key must red: ${leaks}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+distTest("CR2 · 3+4 · no sitemap or feed names a record path (control: a planted <loc> and a planted feed)", () => {
+  const dir = plantedCopy();
+  try {
+    const loc = `https://averagejoematt.com/system/coaches/${someCoach()}/record/`;
+    writeFileSync(join(dir, "sitemap-0.xml"), `<urlset><url><loc>${loc}</loc></url></urlset>`);
+    assert.ok(sitemaps(dir).length > 0, "a record <loc> must red the sitemap check");
+    writeFileSync(join(dir, "feed.xml"), `<rss><item><link>${loc}</link></item></rss>`);
+    assert.ok(feeds(dir).some((l) => l.includes("names a room path")), "a record link in a feed must red");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CR2 · 5 · owned_paths.json names no record path (control: a planted record route; the coach pattern itself stays clean)", () => {
+  const owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"));
+  assert.ok((owned.route_patterns || []).includes("/system/coaches/*/"), "the existing coach pattern is present — and must not be read as a room path");
+  assert.deepEqual(ownedPaths(owned), []);
+  const planted = { ...owned, routes: [...owned.routes, "/system/coaches/sleep_coach/record/"], files: [...owned.files, "system/coaches/sleep_coach/record/index.html"] };
+  assert.ok(ownedPaths(planted).length >= 2, `the control must red: ${ownedPaths(planted)}`);
+});
+
+distTest("CR2 · 6 · no coach-record chunk, no coach-entry marker (control: both planted)", () => {
+  const dir = plantedCopy();
+  try {
+    writeFileSync(join(dir, "_astro", "coach-record.Zz9PLANT.js"), "export const x = 1;");
+    const page = join(dir, "system", "coaches", someCoach(), "index.html");
+    writeFileSync(page, readFileSync(page, "utf8").replace("</main>", `<section ${ROOM_MARKER}="coach-entry"></section></main>`));
+    const leaks = orphanChunks(dir);
+    assert.ok(leaks.some((l) => l.includes("coach-record.Zz9PLANT.js: an asset named for the room")), `a coach-record chunk must red: ${leaks}`);
+    assert.ok(leaks.some((l) => l.includes("room marker")), `the coach-entry marker must red: ${leaks}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

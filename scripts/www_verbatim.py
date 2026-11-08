@@ -107,6 +107,20 @@ def verbatim_strings(snapshot_dir: str) -> set[str]:
     for e in load("editions.json"):
         lines = ((((e.get("blocks") or {}).get("coach_lines") or {}).get("data")) or {}).get("lines") or []
         out.update(_norm(x["text"]) for x in lines if isinstance(x, dict) and x.get("text"))
+    # CR2 (built dark): the Coaching Room's coach profiles — present ONLY in a WEB_ROOM=1 snapshot, so a flag-off
+    # snapshot's set is unchanged. The coach's own words as served: the latest read, the stances, the asks, the docket.
+    try:
+        with open(os.path.join(snapshot_dir, "coach_room.json"), encoding="utf-8") as fh:
+            room = json.load(fh)
+    except (OSError, ValueError):
+        room = None
+    for c in ((room or {}).get("coaches") or {}).values() if isinstance(room, dict) else []:
+        texts = [(c.get("latest_read") or {}).get("text"), (c.get("stance") or {}).get("headline_read")]
+        texts += [h.get("headline_read") for h in c.get("stance_history") or []]
+        texts += [a.get("text") for a in (c.get("asks") or {}).get("rows") or []]
+        texts += [p.get("my_claim") for p in c.get("docket_positions") or []]
+        texts += [v for d in c.get("docket") or [] for v in (d.get("claims") or {}).values()]
+        out.update(_norm(t) for t in texts if isinstance(t, str) and t.strip())
     return out
 
 

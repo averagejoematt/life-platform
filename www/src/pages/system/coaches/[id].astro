@@ -1,5 +1,6 @@
 ---
 import Base from "../../../layouts/Base.astro";
+import CoachRoomEntry from "../../../components/CoachRoomEntry.astro"; // the Coaching Room (CR2): renders nothing unless WEB_ROOM=1
 import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
 import Quote from "../../../components/Quote.astro";
@@ -71,5 +72,5 @@ const disputed = mine.filter(isDisputed).length;
         <Connected type="coach" id={c.id} cap={5} />
       </div>
     </div>
-  </section>
+  </section>{/* the Coaching Room entry (CR2) sits flush against the closing tag: with WEB_ROOM off the page's bytes are unchanged */}<CoachRoomEntry coach={c} />
 </Base>

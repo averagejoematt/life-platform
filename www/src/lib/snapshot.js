@@ -119,6 +119,15 @@ export async function loadCalibration() {
   return _calibration;
 }
 
+let _coachRoom = null;
+/** The Coaching Room's coach profiles (CR2, built dark): written ONLY on a WEB_ROOM=1 export, read only by room pieces,
+ *  which render nothing with the switch off. Throws when absent — re-export with WEB_ROOM=1. */
+export async function loadCoachRoom() {
+  if (_coachRoom) return _coachRoom;
+  _coachRoom = JSON.parse(await readFile(join(SNAPSHOT_DIR, "coach_room.json"), "utf8"));
+  return _coachRoom;
+}
+
 let _lab = null;
 /** The Laboratory's data file (L1, built dark): written by the producer ONLY on a WEB_LAB=1 export and read only by
  *  Lab pages, which exist only on a Lab build. Throws when absent — a Lab build over a flag-off snapshot is a setup
