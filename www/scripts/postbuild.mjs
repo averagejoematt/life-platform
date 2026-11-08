@@ -29,6 +29,8 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { roomEnabled } from "../src/lib/room.js";
+
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(WWW, "dist");
 const PAGES = join(WWW, "src", "pages");
@@ -40,6 +42,9 @@ const REACH_SINKS = ["/system/everything-else/"];
 const ASSET_PREFIX_ROOTS = ["_astro", "assets"];
 
 const rawBase = process.env.WEB_BASE || "/";
+// A Coaching Room build (WEB_ROOM=1, src/lib/room.js) is private and local: it must never rewrite the two committed
+// artifacts the deploy reads, so they are left exactly as committed and the build says so.
+const room = roomEnabled();
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
 function walk(dir, out = []) {
@@ -121,7 +126,7 @@ const owned = {
   routes: [...routes].sort(),
   static_routes: [...staticRoutes].sort(),
 };
-writeFileSync(OWNED_OUT, JSON.stringify(owned, null, 2) + "\n");
+if (!room) writeFileSync(OWNED_OUT, JSON.stringify(owned, null, 2) + "\n");
 
 // ── 3b. reach ─────────────────────────────────────────────────────────────────────────────
 function pagePath(route) {
@@ -185,9 +190,15 @@ const reach = {
   transitive,
   transitive_count: transitive.length,
 };
-writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
+if (!room) writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
 
-console.log(
-  `postbuild: ${routes.size} routes, ${files.size} files, ${prefixes.size} asset prefixes → owned_paths.json; ` +
-    `reach depth1=${depth1.length} transitive=${transitive.length} → reach.json`
-);
+if (room) {
+  console.log(
+    `postbuild: WEB_ROOM=1 — a private Coaching Room build (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
+  );
+} else {
+  console.log(
+    `postbuild: ${routes.size} routes, ${files.size} files, ${prefixes.size} asset prefixes → owned_paths.json; ` +
+      `reach depth1=${depth1.length} transitive=${transitive.length} → reach.json`
+  );
+}

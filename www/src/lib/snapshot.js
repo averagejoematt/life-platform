@@ -109,3 +109,13 @@ export async function loadJourney() {
   return _journey;
 }
 
+let _calibration = null;
+/** The Coaching Room's data file (CR1, built dark): written by the producer ONLY on a WEB_ROOM=1 export and read only
+ *  by room pages, which exist only on a room build. Throws when absent — a room build over a flag-off snapshot is a
+ *  setup error, not an empty room (re-export with WEB_ROOM=1). */
+export async function loadCalibration() {
+  if (_calibration) return _calibration;
+  _calibration = JSON.parse(await readFile(join(SNAPSHOT_DIR, "calibration.json"), "utf8"));
+  return _calibration;
+}
+
