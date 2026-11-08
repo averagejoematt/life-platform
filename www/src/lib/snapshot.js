@@ -119,3 +119,12 @@ export async function loadCalibration() {
   return _calibration;
 }
 
+let _coachRoom = null;
+/** The Coaching Room's coach profiles (CR2, built dark): written ONLY on a WEB_ROOM=1 export, read only by room pieces,
+ *  which render nothing with the switch off. Throws when absent — re-export with WEB_ROOM=1. */
+export async function loadCoachRoom() {
+  if (_coachRoom) return _coachRoom;
+  _coachRoom = JSON.parse(await readFile(join(SNAPSHOT_DIR, "coach_room.json"), "utf8"));
+  return _coachRoom;
+}
+

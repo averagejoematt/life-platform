@@ -100,7 +100,7 @@ def _dist(tmp_path, html: str = "<!doctype html><p>ok</p>"):
 
 
 def test_the_deploy_scan_refuses_room_output_and_passes_a_clean_dist(tmp_path):
-    assert check_www_build.room_paths() == ["/system/calibration/"]  # read off www/src/lib/room.js
+    assert check_www_build.room_paths()[0] == "/system/calibration/"  # read off www/src/lib/room.js (CR2 adds the per-coach record)
     clean = _dist(tmp_path)
     assert check_www_build.room_leaks(str(clean)) == []
     # the controls: a room page, the data file, the marker — each must red the scan the deploy runs

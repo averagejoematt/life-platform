@@ -1,0 +1,462 @@
+---
+// /system/coaches/<id>/record/ — one coach's record in the Coaching Room (CR2). BUILT DARK: this file lives outside
+// src/pages/ and is injected as a route ONLY when WEB_ROOM=1 (src/lib/room.js, astro.config.mjs). With the switch off
+// it is not in the build at all.
+//
+// The owner's brief (2026-11-08): "make each coach's evolution understandable: what they believed, what changed, what
+// they advised, and what I demonstrably did or didn't do." Simple on arrival (four facts), deep on demand (seven
+// sections, the long lists folded). Every value is carried from the snapshot — coach_room.json (/api/coach/<id>,
+// /api/coach_docket, /api/voice_fidelity), calibration.json and the ledger's prediction objects — and nothing is
+// computed here. Withheld words show the API's own message or that they are not published, and nothing more.
+import Base from "../layouts/Base.astro";
+import Quote from "../components/Quote.astro";
+import StatusTag from "../components/StatusTag.astro";
+import { DISPUTED_NOTE } from "../lib/disputed.js";
+import { correctionRows, gradeNoteRows, ruleText } from "../lib/corrections.js";
+import { KIND_WORDS, verdictWords, versusGuess } from "../lib/calibration.js";
+import {
+  WHAT_MATT_DID_NOTE,
+  askCountsText,
+  askRows,
+  callsByDay,
+  coachRecord,
+  correctionArrow,
+  currentStance,
+  datesInWords,
+  docketRows,
+  fidelityText,
+  latestRead,
+  roomCoach,
+  stanceTimeline,
+  voiceRows,
+} from "../lib/coach_room.js";
+import { clip, dayInWords, domainWords, kOfN } from "../lib/format.js";
+import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { loadAll, loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+if (!roomEnabled()) throw new Error("src/room/coach-record.astro rendered with WEB_ROOM off — the room route must not be injected");
+
+export async function getStaticPaths() {
+  const all = await loadAll();
+  return all.byType.coach.map((c: any) => ({ params: { id: c.id }, props: { coach: c } }));
+}
+
+const { coach: c } = Astro.props as any;
+const all = await loadAll();
+const file = await loadCoachRoom();
+const cal = await loadCalibration();
+const entry = roomCoach(file, c.id);
+const calCoach = (((cal && cal.calibration) || {}).coaches || []).find((x: any) => x.persona === c.id) || null;
+const nameOf = (id: string) => (all.get("coach", id) || {}).name || String(id).replace(/_coach$/, "").replace(/_/g, " ");
+
+const read = latestRead(entry);
+const stance = currentStance(entry);
+const timeline = stanceTimeline(entry);
+const asks = askRows(entry);
+const askCounts = askCountsText(entry && entry.asks && entry.asks.commitment_counts);
+const positions = (entry && entry.docket_positions) || [];
+const docket = docketRows(entry, c.id, nameOf);
+const voice = voiceRows(entry && entry.voice);
+const fidelity = fidelityText(entry && entry.fidelity);
+const vf = file && file.voice_fidelity;
+const record = coachRecord(calCoach, entry && entry.record_card);
+const mine = all.byType.prediction.filter((p: any) => p.coach_id === c.id);
+const days = callsByDay(mine);
+const DAYS_SHOWN = 8;
+const ASKS_SHOWN = 10;
+const kinds = ["direction", "number", "yes_no", "sealed"];
+const noindex = process.env.WEB_NOINDEX === "1";
+const fetched = file && file.fetched_at ? dayInWords(file.fetched_at) : null;
+const room = { [ROOM_MARKER]: "coach-record" };
+const h2 = "font-size:28px;line-height:1.15";
+const num1 = "font-size:15px;line-height:1.5";
+---
+
+<Base title={`${c.name} — the record`} top="system" description={`${c.name}: what they believed, what changed, what they advised.`} status={fetched}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <div {...room} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+    Coaching Room · private build (WEB_ROOM=1) · not published
+  </div>
+
+  <section class="section" {...room} style="padding-bottom:24px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
+      <p class="label"><a href={href(pathOf("coach", c.id))}>{c.name}</a> · {domainWords(c.domain)} · the record</p>
+      <h1 style="font-size:clamp(30px,5.5vw,52px);line-height:1.05">What {c.name} believed, what changed, what they advised</h1>
+      <p class="muted" style="font-size:13px;max-width:72ch">
+        An AI character: software built with Claude, not a person. Everything below is the platform's own record, as its public API serves it{fetched ? `, read on ${fetched}` : ""}. Where the platform does not publish a coach's words, this page says so and shows nothing in their place.
+      </p>
+      {!entry && <div class="empty"><span>{(file && file.absent_text) || "The platform did not serve this coach's profile for this snapshot."}</span></div>}
+    </div>
+  </section>
+
+  <section class="hair" {...room} style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 24px">
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">The latest read</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px">{read ? read.day || "undated" : "none served"}</p>
+        <p class="muted" style="font-size:13px;margin-top:4px">{read ? (read.text ? read.who.toLowerCase() : "its words are not published") : c.tier === "lead" ? "no daily read served" : "no written read served"}</p>
+      </div>
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">Where they stand</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px;line-height:1.25">{stance ? (stance.absent ? "instrument not reporting" : stance.stage || "no stage served") : "no stance served"}</p>
+        <p class="muted" style="font-size:13px;margin-top:4px">{stance && !stance.absent ? (stance.authored ? "the stage the author set; no written stance" : stance.asOf ? `stance of ${stance.asOf}` : "undated") : ""}</p>
+      </div>
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">The record</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px">{record ? record.line : c.tier === "lead" ? "no calls of its own" : "no record served"}</p>
+        <p class="muted" style="font-size:13px;margin-top:4px">{record ? `${record.interval} · not re-verified` : ""}</p>
+      </div>
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
+        <p class="label">The asks</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px;line-height:1.25">{askCounts || "none served"}</p>
+        <p class="muted" style="font-size:13px;margin-top:4px">what Matt did: not recorded</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="latest-read">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <p class="label">1 · The latest read</p>
+        <h2 style={h2}>{read ? `${read.who}, ${read.day || "undated"}` : "No read served"}</h2>
+        {
+          read && (
+            <dl style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:0">
+              <dt class="muted">written</dt><dd style="margin:0">{read.written || "time not recorded"}</dd>
+              <dt class="muted">data through</dt><dd style="margin:0">{read.through || "not recorded"}</dd>
+              <dt class="muted">source</dt><dd class="mono" style="margin:0;font-size:12px;word-break:break-word">{read.source}</dd>
+            </dl>
+          )
+        }
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        {stance && stance.absent && <div class="empty"><span>{stance.reason}</span></div>}
+        {read && read.text && <div class="serif" style="font-size:19px;line-height:1.5"><Quote text={read.text} said={read.said} block /></div>}
+        {read && read.message && <div class="empty" data-withheld><span>{read.message}</span></div>}
+        {!read && !(stance && stance.absent) && <div class="empty"><span>The platform served no dated read for this coach.</span></div>}
+        {
+          read && read.cited.length > 0 && (
+            <details>
+              <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">The figures it cites ({read.cited.length})</summary>
+              <div class="rows" style="margin-top:6px">
+                {read.cited.map((x: any) => (
+                  <div><span style="font-size:13px">{x.metric}{x.asOf ? <span class="muted"> · {x.asOf}</span> : ""}</span><span class="mono">{x.value}</span></div>
+                ))}
+              </div>
+            </details>
+          )
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="stance" style="border-top:1px solid var(--ink)">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p class="label">2 · How the stance changed</p>
+        <h2 style={h2}>{stance && !stance.absent ? stance.stage || "Where they stand now" : "No current stance"}</h2>
+        {
+          stance && !stance.absent && (
+            <>
+              {stance.text && <div class="serif" style="font-size:18px;line-height:1.5">{stance.superseded ? <p>{stance.text}</p> : <Quote text={stance.text} said={null} block />}</div>}
+              {stance.message && !stance.authored && <div class="empty" data-withheld><span>{stance.message}</span></div>}
+              {stance.authored && <p class="muted" style="font-size:13px">This coach has no written stance served; the stage below is the plan its author set for this point in the experiment.</p>}
+              {stance.changed && <p style={num1}><b>What changed: </b>{stance.changed}</p>}
+              {stance.focused.length > 0 && <p style={num1}><b>Focused on now: </b>{stance.focused.join(" · ")}</p>}
+              {stance.aside.length > 0 && <p style={num1}><b>Set aside for now: </b>{stance.aside.join(" · ")}</p>}
+              {stance.gate && <p class="muted" style="font-size:13px">{stance.gate}</p>}
+              {
+                stance.superseded && stance.corrections.length > 0 && (
+                  <div style="border-left:3px solid var(--ink);padding-left:12px;display:flex;flex-direction:column;gap:8px">
+                    <p class="label">Overtaken by a grade correction</p>
+                    {stance.corrections.map((g: any) => (
+                      <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px;margin:0">
+                        {gradeNoteRows(g).map(([k, v]) => (<><dt class="muted">{k}</dt><dd style="margin:0">{v}</dd></>))}
+                      </dl>
+                    ))}
+                  </div>
+                )
+              }
+            </>
+          )
+        }
+        {
+          stance && stance.rung && (
+            <details>
+              <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">The stage plan the author wrote</summary>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;font-size:14px;line-height:1.5">
+                <p class="muted" style="font-size:13px">Authored configuration, not a read of the data: what this coach is set to care about at Matt's current stage.</p>
+                {stance.rung.read_of_him && <p>{stance.rung.read_of_him}</p>}
+                {stance.rung.cares_most.length > 0 && <p><b>Cares most: </b>{stance.rung.cares_most.join(" · ")}</p>}
+                {stance.rung.cares_less_right_now.length > 0 && <p><b>Cares less right now: </b>{stance.rung.cares_less_right_now.join(" · ")}</p>}
+                {stance.rung.plan && <p><b>Plan: </b>{stance.rung.plan}</p>}
+                {stance.ladder.length > 0 && <p class="muted" style="font-size:13px">The stages, in order: {stance.ladder.join(" → ")}</p>}
+              </div>
+            </details>
+          )
+        }
+      </div>
+      <div>
+        <p class="label" style="margin-bottom:8px">Every dated stance, newest first</p>
+        {
+          timeline.length ? (
+            <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-stance-timeline>
+              {timeline.map((t: any) => (
+                <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px">
+                  <p style="font-size:14px"><b>{t.day}</b>{t.stage ? <span class="muted"> · {t.stage}</span> : ""}</p>
+                  {t.text ? <p style="font-size:14px;line-height:1.5"><Quote text={clip(t.text, 220)} said={t.date} /></p> : <p class="muted" style="font-size:13px" data-withheld>{t.message}</p>}
+                  {t.changed && <p style="font-size:13px;line-height:1.5"><span class="muted">What changed: </span>{t.changed}</p>}
+                  {t.corrections.map((g: any) => (
+                    <details style="font-size:13px">
+                      <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">A grade it rests on was corrected: {correctionArrow(g)}</summary>
+                      <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:4px 0 0">
+                        {gradeNoteRows(g).map(([k, v]) => (<><dt class="muted">{k}</dt><dd style="margin:0">{v}</dd></>))}
+                      </dl>
+                    </details>
+                  ))}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div class="empty"><span>No dated stance served for this coach.</span></div>
+          )
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="calls" style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+      <p class="label">3 · The calls, by day</p>
+      <h2 style={h2}>{days.length ? `What ${c.name} called, and how each came out` : "No calls in the ledger"}</h2>
+      <p class="muted" style="font-size:13px;max-width:72ch">
+        Each call with its own verdict: right, wrong, open, could not be checked, or not graded. A verdict under classification review keeps its word and is marked {DISPUTED_NOTE}; it is counted neither right nor wrong. A corrected grade shows the original, the correction, the dates and the reason.
+      </p>
+      {
+        days.length > 0 && (
+          <>
+            <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-calls>
+              {days.slice(0, DAYS_SHOWN).map((d: any) => (
+                <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:6px 18px">
+                  <p style="font-size:14px;font-weight:700;flex:0 0 11em">{d.day}</p>
+                  <div style="display:flex;flex-direction:column;gap:8px;flex:1 1 260px;min-width:0">
+                    {d.calls.map((x: any) => (
+                      <div style="display:flex;flex-direction:column;gap:4px">
+                        <a href={href(pathOf("prediction", x.p.id))} style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;text-decoration:none;color:inherit">
+                          <StatusTag status={x.p.status} date={x.p.settled_date} call disputed={x.disputed} />
+                          <span style="font-size:13px">{x.p.claim_withheld ? x.p.claim : <Quote text={clip(x.p.claim, 120)} said={x.p.logged_date} />}</span>
+                          <span class="muted" style="font-size:12px">{[x.p.kind, x.p.metric_key ? String(x.p.metric_key).replace(/_/g, " ") : null].filter(Boolean).join(" · ")}</span>
+                        </a>
+                        {x.corrected && (
+                          <details style="font-size:13px" data-correction>
+                            <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">Corrected: {x.p.corrections.map((k: any) => correctionArrow(k)).join("; ")}</summary>
+                            {x.p.corrections.map((k: any) => (
+                              <div style="border-left:2px solid var(--rule);padding-left:10px;margin-top:6px">
+                                <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0">
+                                  {correctionRows(k).map(([kk, v]) => (<><dt class="muted">{kk}</dt><dd style="margin:0">{v}</dd></>))}
+                                </dl>
+                                {ruleText(k) && <p class="muted mono" style="font-size:11px;margin-top:4px">{ruleText(k)}</p>}
+                              </div>
+                            ))}
+                          </details>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ol>
+            {days.length > DAYS_SHOWN && (
+              <details>
+                <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Earlier days ({days.length - DAYS_SHOWN})</summary>
+                <ol style="list-style:none;padding:0;margin:0">
+                  {days.slice(DAYS_SHOWN).map((d: any) => (
+                    <li style="padding:8px 0;border-bottom:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:6px 18px">
+                      <p style="font-size:13px;font-weight:700;flex:0 0 11em">{d.day}</p>
+                      <div style="display:flex;flex-wrap:wrap;gap:6px 12px;flex:1 1 260px;min-width:0">
+                        {d.calls.map((x: any) => (
+                          <a href={href(pathOf("prediction", x.p.id))} style="text-decoration:none;color:inherit;font-size:13px">
+                            <StatusTag status={x.p.status} date={x.p.settled_date} call disputed={x.disputed} />{x.corrected ? <span class="muted"> · corrected</span> : ""}
+                          </a>
+                        ))}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+          </>
+        )
+      }
+      <p style="font-size:13px"><a href={`${href("/system/ledger/")}?coach=${c.id}`}>Every call in the ledger →</a></p>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="asks" style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+      <p class="label">4 · What they asked, and what happened</p>
+      <h2 style={h2}>{askCounts || "No asks served"}</h2>
+      <p style="font-size:14px;max-width:72ch;line-height:1.5">
+        An ask is advice with a due date. The grader checks each one against the data when it falls due: kept, broken, or unresolved when the check could not settle it. That is the grader's word on the data, not a record of what Matt chose to do.
+      </p>
+      <p class="muted" style="font-size:13px;max-width:72ch;border-left:3px solid var(--ink);padding-left:12px" data-what-matt-did>{WHAT_MATT_DID_NOTE}</p>
+      {entry && entry.asks && entry.asks.degraded && <div class="empty"><span>The platform could not check this coach's asks against its corrections ledger for this snapshot, so it served none.</span></div>}
+      {
+        asks.length > 0 && (
+          <div class="scroll" tabindex="0" role="region" aria-label="The asks, newest first (scrolls sideways)">
+            <table style="min-width:720px" data-asks>
+              <thead><tr><th>Asked</th><th>The ask</th><th>Due</th><th>Checked against</th><th>Grader's outcome</th><th>What Matt did</th></tr></thead>
+              <tbody>
+                {asks.slice(0, ASKS_SHOWN).map((a: any) => (
+                  <tr>
+                    <td>{a.asked}</td>
+                    <td style="font-size:13px">{a.text ? <Quote text={clip(a.text, 120)} said={null} /> : <span class="muted">{a.message}</span>}</td>
+                    <td>{a.due}</td>
+                    <td class="mono" style="font-size:12px">{a.checked}</td>
+                    <td><span class="status">{a.outcome}</span>{a.settled ? <span class="muted" style="font-size:12px"> · {a.settled}</span> : ""}</td>
+                    <td class="muted">{a.did}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+      {
+        asks.length > ASKS_SHOWN && (
+          <details>
+            <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Earlier asks ({asks.length - ASKS_SHOWN})</summary>
+            <div class="rows" style="margin-top:6px">
+              {asks.slice(ASKS_SHOWN).map((a: any) => (
+                <div><span style="font-size:13px">{a.asked} · due {a.due}{a.checked !== "not recorded" ? ` · ${a.checked}` : ""}</span><span class="mono" style="font-size:12px">{a.outcome} · Matt: {a.did}</span></div>
+              ))}
+            </div>
+          </details>
+        )
+      }
+      {entry && entry.asks && entry.asks.disclosure && <p class="muted" style="font-size:12px;max-width:72ch">{entry.asks.disclosure}</p>}
+    </div>
+  </section>
+
+  <section class="section" {...room} id="docket" style="border-top:1px solid var(--ink)">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+      <p class="label">5 · Docket positions</p>
+      <h2 style={h2}>{docket.length || positions.length ? "Where they put their record on the line" : "No docket position served"}</h2>
+      <p style="font-size:14px;max-width:72ch;line-height:1.5">
+        A docket entry is a standing disagreement with another coach, settled by code against the data on a date agreed at the open. The stake is each coach's own Brier score, frozen when it opened. Lost disputes stay on the record.
+      </p>
+      {
+        positions.length > 0 && (
+          <div class="rows">
+            {positions.map((p: any) => (
+              <div>
+                <span style="font-size:14px"><b>Open since {dayInWords(p.date)}</b> · against {nameOf(p.versus)}{p.my_claim ? <>: <Quote text={clip(p.my_claim, 140)} said={p.date} /></> : ""}</span>
+                <span class="mono" style="font-size:12px">{p.resolution_date ? `settles ${dayInWords(p.resolution_date)}` : "settle date not served"}</span>
+              </div>
+            ))}
+          </div>
+        )
+      }
+      {
+        docket.length > 0 && (
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:0 28px;border-top:1px solid var(--ink)" data-docket>
+            {docket.map((d: any) => (
+              <article style="padding:14px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
+                <p style="font-size:16px;font-weight:700">Against {d.versus} · {d.result}</p>
+                <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px;margin:0">
+                  <dt class="muted">opened</dt><dd style="margin:0">{d.opened || "not recorded"}</dd>
+                  <dt class="muted">the test</dt><dd style="margin:0">{d.criterion}</dd>
+                  <dt class="muted">its side</dt><dd style="margin:0">{d.side}</dd>
+                  {d.stake && (<><dt class="muted">its stake</dt><dd style="margin:0">{d.stake}</dd></>)}
+                  <dt class="muted">{d.status === "resolved" ? "settled" : "settles"}</dt><dd style="margin:0">{(d.status === "resolved" ? d.settled : d.settles) || "not recorded"}</dd>
+                  {d.actual && (<><dt class="muted">came in at</dt><dd class="mono" style="margin:0">{d.actual}</dd></>)}
+                </dl>
+                <p style="font-size:13px">{d.mine.text ? <Quote text={clip(d.mine.text, 160)} said={null} /> : <span class="muted" data-withheld>{d.mine.message}</span>}</p>
+                {d.concession && <p class="muted" style="font-size:13px">Conceded: {d.concession}</p>}
+              </article>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="section" {...room} id="voice" style="border-top:1px solid var(--ink)">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p class="label">6 · How the voice is built</p>
+        <h2 style={h2}>{voice.length ? "The voice it is written to" : "No voice spec served"}</h2>
+        <p class="muted" style="font-size:13px;max-width:62ch">The authored rules a coach's writing is generated within, as served. The spec's sample passages are not shown: they are illustrations, not this coach's record.</p>
+        {
+          voice.length > 0 && (
+            <dl style="display:grid;grid-template-columns:minmax(0,10em) minmax(0,1fr);gap:8px 14px;font-size:14px;margin:0;line-height:1.45">
+              {voice.map(([k, v]) => (<><dt class="muted">{k}</dt><dd style="margin:0">{v}</dd></>))}
+            </dl>
+          )
+        }
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p class="label">Does it sound like itself?</p>
+        <p style="font-size:17px;line-height:1.45">{fidelity || "No blind voice test is served for this coach."}</p>
+        {vf && typeof vf.n === "number" && <p class="muted" style="font-size:13px">Across the team: {vf.correct} of {vf.n} blind reads attributed correctly{vf.chance_accuracy_pct ? `, against ${vf.chance_accuracy_pct}% by chance` : ""}{vf.scope ? `, ${vf.scope}` : ""}{vf.updated_at ? `; measured ${dayInWords(vf.updated_at)}` : ""}.</p>}
+        {vf && vf.disclosure && <details style="font-size:13px"><summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">How the test is run</summary><p class="muted" style="margin-top:6px;line-height:1.5">{vf.disclosure}</p></details>}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="record" style="border-top:1px solid var(--ink)">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <p class="label">7 · The record, with its uncertainty, beside a simple guess</p>
+        <h2 style={h2}>{record ? record.line : c.tier === "lead" ? "The lead makes no calls of its own" : "No record served"}</h2>
+        {
+          record && (
+            <>
+              <p class="mono" style="font-size:14px">{[record.pct, record.interval].filter(Boolean).join(" · ")}</p>
+              <p class="muted" style="font-size:13px;max-width:62ch;border-left:3px solid var(--ink);padding-left:12px" data-verification>
+                These are the grades as the grader first wrote them. The platform does not yet publish which were re-verified under the current rules, so this is the recorded history, not a validated score. A wide interval means the record could still move a long way.
+              </p>
+              {record.skill && <p style={num1}>{record.skill}</p>}
+              {record.label && <p style="font-size:13px"><span class="muted">Calibration: </span>{record.label}</p>}
+              {record.underReview > 0 && <p style="font-size:13px"><span class="flag disputed">{record.underReview} {DISPUTED_NOTE}</span> · counted neither way</p>}
+            </>
+          )
+        }
+      </div>
+      <div>
+        {
+          record && record.records && (
+            <>
+              <p class="label" style="margin-bottom:8px">Against a guess that nothing changes, by kind of call</p>
+              <div class="rows">
+                {kinds.map((k) => {
+                  const v = versusGuess(record.records, k);
+                  return v ? (
+                    <div>
+                      <span style="font-size:14px"><b>{KIND_WORDS[k]}</b> <span class="muted">· {verdictWords(v.verdict)}</span></span>
+                      <span class="mono">coach {v.coach} · guess {v.guess} · of {v.of}</span>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+              <p class="muted" style="font-size:12px;margin-top:8px">Kinds of call are never added together. On the grades as first written.</p>
+            </>
+          )
+        }
+        {
+          record && record.quality && (
+            <details style="margin-top:12px;font-size:13px">
+              <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Grade quality and the career record</summary>
+              <p style="margin-top:6px;line-height:1.5">{record.quality.unassessed} of {record.quality.n} graded before the grader's quality checks existed · {record.quality.clean} clean · {record.quality.flagged} flagged.</p>
+              {record.lifetime && <p class="muted" style="margin-top:6px">Career, across earlier cycles: {kOfN(record.lifetime.confirmed, record.lifetime.n)}. History, not this cycle's score.</p>}
+            </details>
+          )
+        }
+        <p style="margin-top:16px;font-size:13px"><a href={href("/system/calibration/")}>Every coach, graded together →</a></p>
+      </div>
+    </div>
+  </section>
+
+  {entry && entry.absent_reason && !(stance && stance.absent) && <p class="wrap muted" {...room} style="font-size:12px">{datesInWords(entry.absent_reason)}</p>}
+</Base>

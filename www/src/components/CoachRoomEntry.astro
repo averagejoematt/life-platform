@@ -1,0 +1,52 @@
+---
+// The Coaching Room's entry on each coach page (CR2, built dark). SELF-GATING: with WEB_ROOM off (src/lib/room.js)
+// this component renders nothing and reads nothing — not even the room's data files — so /system/coaches/<id>/ is
+// byte-identical to a build without it. No <style>, no <script>: it adds no asset to the build either way.
+// Simple on arrival: the latest read's date, the record as first graded with its interval, the asks' tally — each
+// carried, none computed — and the way into the full record (src/room/coach-record.astro).
+import { askCountsText, coachRecord, latestRead, roomCoach } from "../lib/coach_room.js";
+import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  coach: { id: string; name: string; tier?: string };
+}
+const { coach } = Astro.props;
+const on = roomEnabled();
+const entry = on ? roomCoach(await loadCoachRoom(), coach.id) : null;
+const cal = on ? await loadCalibration() : null;
+const calCoach = on ? (((cal && cal.calibration) || {}).coaches || []).find((x: any) => x.persona === coach.id) || null : null;
+const read = on ? latestRead(entry) : null;
+const record = on ? coachRecord(calCoach, entry && entry.record_card) : null;
+const asks = on ? askCountsText(entry && entry.asks && entry.asks.commitment_counts) : null;
+const room = { [ROOM_MARKER]: "coach-entry" };
+---
+
+{
+  on && (
+    <section class="section" {...room} style="border-top:1px solid var(--ink)">
+      <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:1000px">
+        <p class="label">The Coaching Room · private build, not published</p>
+        <h2 style="font-size:28px;line-height:1.15">What {coach.name} believed, what changed, what they advised</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 28px;border-top:1px solid var(--rule);padding-top:12px">
+          <div>
+            <p class="label">The latest read</p>
+            <p style="font-size:15px;margin-top:4px">{read ? `${read.day || "undated"}${read.text ? "" : " · its words are not published"}` : "none served"}</p>
+          </div>
+          <div>
+            <p class="label">The record</p>
+            <p style="font-size:15px;margin-top:4px">{record ? `${record.line} · ${record.interval}` : coach.tier === "lead" ? "makes no calls of its own" : "no record served"}</p>
+          </div>
+          <div>
+            <p class="label">The asks</p>
+            <p style="font-size:15px;margin-top:4px">{asks || "none served"}</p>
+          </div>
+        </div>
+        <a class="btn ghost sm" href={href(`/system/coaches/${coach.id}/record/`)} style="align-self:flex-start">
+          The full record: stances, calls, asks, docket, voice
+        </a>
+      </div>
+    </section>
+  )
+}

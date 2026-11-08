@@ -59,6 +59,11 @@ from publish_snapshot_chapters import (
     apply_week_intervals,
     clean_excerpt,
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
+from publish_snapshot_coach_room import (  # noqa: E402 — the Coaching Room's coach profiles, WEB_ROOM=1 only (CR2)
+    fixture_coach_room,
+    live_coach_room,
+    resolve_and_validate as resolve_coach_room,
+)
 from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the contract is one module, reached through this one
     _ISO_IN_TEXT,
     _MONTHS,
@@ -1043,6 +1048,15 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
         cal = fixture_calibration(fixtures_dir) if mode == "fixture" else live_calibration(lambda p: _get(base_url, p, timeout), log)
         try:
             data_files["calibration"] = resolve_and_validate(cal, public)
+        except ValueError as exc:
+            raise SchemaError(str(exc)) from exc
+        # CR2: the coach profiles (stance, asks, docket, voice) — the same switch, the same off-is-absent rule
+        coach_ids = [o["id"] for o in public.get("coach", [])]
+        room = (
+            fixture_coach_room(fixtures_dir) if mode == "fixture" else live_coach_room(lambda p: _get(base_url, p, timeout), coach_ids, log)
+        )
+        try:
+            data_files["coach_room"] = resolve_coach_room(room, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
