@@ -328,6 +328,10 @@ def merge_journal_view(entries):
 # compute proceeds fail-closed: public Mind treats the habit inputs as missing (unavailable, never a zero,
 # nothing carried from an earlier day), the sheet records the status, and the error log names it.
 HABIT_SCORES_WAIT_S = 30
+# The one token every degraded public compute logs: habit inputs not ready, or no/failed public variant. A CloudWatch
+# metric filter on it pages the digest (cdk/stacks/monitoring_compute_alarms.py, owner 2026-11-07); the twin test pins
+# both literals (tests/test_character_public_degraded_alarm.py).
+PUBLIC_DEGRADED_MARKER = "CHARACTER-PUBLIC-INPUTS-DEGRADED"
 HABIT_SCORES_POLL_S = 5
 
 
@@ -347,7 +351,9 @@ def await_habit_scores(date_str, *, wait_s=None, poll_s=None, sleep=time.sleep):
         sleep(poll_s)
         waited += poll_s
     if status != character_public.READY:
-        logger.error(f"[character] habit_scores for {date_str} not ready ({status}) after {waited}s — public Mind reads them as missing")
+        logger.error(
+            f"[character] {PUBLIC_DEGRADED_MARKER} habit_scores for {date_str} not ready ({status}) after {waited}s — public Mind reads them as missing"
+        )
     elif waited:
         logger.info(f"[character] habit_scores for {date_str} ready after {waited}s")
     return rec, status
@@ -768,11 +774,21 @@ def store_sheet(record, data, previous_state, history_records, config):
         data = dict(data, public_challenge_bonus_xp=PUBLIC_CHALLENGE_BONUS.get(record.get("date"), {}))
         reason = character_public.attach_public_variant(record, data, previous_state, history_records, config)
         if reason:
-            logger.error("[character][public] no public variant for %s — %s (public surfaces fail closed)", record.get("date"), reason)
+            logger.error(
+                "[character][public] %s no public variant for %s — %s (public surfaces fail closed)",
+                PUBLIC_DEGRADED_MARKER,
+                record.get("date"),
+                reason,
+            )
     except Exception as e:
         record.pop(character_public.PUBLIC_KEY, None)
         record.pop("public_progression_transitions", None)
-        logger.error("[character][public] public variant failed for %s (method 1 stored without it): %s", record.get("date"), e)
+        logger.error(
+            "[character][public] %s public variant failed for %s (method 1 stored without it): %s",
+            PUBLIC_DEGRADED_MARKER,
+            record.get("date"),
+            e,
+        )
     record["habit_scores_status"] = data.get("habit_scores_status")  # 2026-11-06: ready, or why not
     return character_engine.store_character_sheet(table, USER_PREFIX, record)
 
