@@ -42,6 +42,7 @@ Usage:
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -49,6 +50,12 @@ from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
+
+# A private person's name never sits in this public repo (owner ruling 2026-11-07); a re-run supplies it.
+_PRIVATE_NAME = os.environ.get("LEADIN_PRIVATE_NAME", "")
+_PRIVATE_AGE = os.environ.get("LEADIN_PRIVATE_AGE", "")
+_PRIVATE_LEADIN_SENTENCE = os.environ.get("LEADIN_PRIVATE_SENTENCE", "")
+_PRIVATE_VICES_SENTENCE = os.environ.get("LEADIN_PRIVATE_VICES_SENTENCE", "")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -107,12 +114,12 @@ REPAIRS = {
             ),
             (
                 "privacy: exact age + named private person",
-                "Matthew is thirty-seven. He lives with his girlfriend, Brittany, in Seattle.",
+                _PRIVATE_LEADIN_SENTENCE,
                 "Matthew is in his late thirties. He lives with his girlfriend in Seattle.",
             ),
             (
                 "privacy: named vices",
-                "It even tracks vices: alcohol, late-night screens, processed food. Each vice held is a streak extended.",
+                _PRIVATE_VICES_SENTENCE,
                 "It even tracks vices — a personal short list he is trying to hold the line on. Each vice held is a streak extended.",
             ),
             (
@@ -156,6 +163,8 @@ def apply_vet_edits(body: str, vet_edits: list[tuple[str, str, str]]) -> tuple[s
     exactly once (a changed source needs human re-review, not a silent partial vet)."""
     applied = []
     for name, old, new in vet_edits:
+        if not old:
+            continue  # private find-text not supplied (LEADIN_PRIVATE_*): nothing to vet against, never a match-everything edit
         n = body.count(old)
         if n != 1:
             raise RuntimeError(f"vet edit {name!r}: expected exactly 1 occurrence, found {n} — archive source changed, re-review needed")
@@ -191,11 +200,11 @@ _FORBIDDEN_AFTER_VET = [
     "Attia",
     "Huberman",
     "Norton",
-    "Brittany",
+    *([_PRIVATE_NAME] if _PRIVATE_NAME else []),
     "alcohol",
     "genome",
     "gene ",
-    "thirty-seven",
+    *([_PRIVATE_AGE] if _PRIVATE_AGE else []),
 ]
 
 
