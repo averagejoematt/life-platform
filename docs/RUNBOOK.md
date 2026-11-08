@@ -806,6 +806,28 @@ aws lambda invoke --function-name <name> --payload '{}' \
   --cli-binary-format raw-in-base64-out /tmp/x.json && cat /tmp/x.json
 ```
 
+#### `character-public-inputs-degraded` (the public character variant degraded, the Lambda still succeeded)
+
+The 09:50 PT character compute logged `CHARACTER-PUBLIC-INPUTS-DEGRADED`. Either the day's `habit_scores` were not
+ready (the public Mind shows its habit inputs as missing, never zero), or the record has no public variant (every
+public character surface fails closed for that date). The stored record's `habit_scores_status` says which.
+
+```bash
+aws logs filter-log-events --log-group-name /aws/lambda/character-sheet-compute \
+  --start-time $(( ($(date +%s) - 86400) * 1000 )) --filter-pattern '"CHARACTER-PUBLIC-INPUTS-DEGRADED"'
+```
+
+Fix the upstream cause first: a daily-metrics-compute failure, or Habitify behind. Then re-run the date the same
+morning, before the next 09:50 run reads it as its previous state:
+
+```bash
+aws lambda invoke --function-name character-sheet-compute --payload '{"date": "YYYY-MM-DD"}' \
+  --cli-binary-format raw-in-base64-out /tmp/x.json && cat /tmp/x.json
+```
+
+A "no public variant" line means the chain broke: the previous record has no public variant. Fill it with
+`scripts/backfill_public_variant.py` (dry run first), never a bare re-run.
+
 ---
 
 ## DynamoDB TTL Policy (R17-17)

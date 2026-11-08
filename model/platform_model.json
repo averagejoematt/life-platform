@@ -138,6 +138,12 @@
       "stack": "operational_stack",
       "via": "declaration"
     },
+    "character-public-inputs-degraded": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_compute_alarms",
+      "via": "factory:_compute_problem_alarm"
+    },
     "chronicle-autopublish-held": {
       "kind": "metric",
       "routing": "digest",
@@ -1087,7 +1093,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 145,
+    "alarms": 146,
     "emf_namespaces": 34,
     "schedules": 96,
     "secrets": 30
@@ -8239,9 +8245,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 145,
+      "alarms": 146,
       "alarms_by_routing": {
-        "digest": 100,
+        "digest": 101,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
