@@ -2605,6 +2605,17 @@ Reasoning: the experiment is the anchor that gives N and Y their meaning. Per-ph
 
 `count_phase_archetype_routines` → renamed `count_experiment_archetype_routines`. `count_total_performed_workouts` → renamed `count_performed_workouts_since(start_date)` with the experiment date pinned in `build_title_context`. Tests updated accordingly. Layer v69 → v70.
 
+### ADR-067 Amendment (2026-11-08): the phase is computed from charter gates, not hand-advanced (#5574)
+
+The owner delegated the call on 2026-11-01. The ruling, recorded on #5574 on 2026-11-02 after a red-team with the coach and board personas, replaces the "manually advanced by Matthew — no auto/milestone-driven transitions" rule:
+
+- **Names stay** `Foundation / Build / Forge / Sustain` (already on the Hevy history). The retired coach stage ladder's `foundation/build/develop/refine` vocabulary is not adopted.
+- **Each boundary is a charter unlock, referenced, not copied** (`config/training_charter.json` `phases`, charter 1.38.0): Foundation → Build when the 7-day weight trend is at or under `gated_movements.conventional_deadlift.gate_lb`; Build → Forge when `gated_movements.running` is open; Forge → Sustain when `governing_goal.target_date` arrives or the owner-only goal weight is reached first. Every transition also requires the `phases.every_transition` consistency and pain-flag rules.
+- **Advance rule:** gates are evaluated weekly (#5575); a weight gate must hold for `phases.advance.consecutive_evaluations` evaluations; when every gate is met a proposal appears in the coach packet and the phase changes **automatically at the next block start unless the owner vetoes**. An owner override stays available. Missing data is `unknown` and never passes.
+- **No regression.** The label never moves backwards; the per-movement gates in `gated_movements` stay the safety mechanism, evaluated independently of the phase.
+
+Until the evaluator (#5575) and the title wiring (#5576) ship, `config/training_phases.json` `current` remains the title's phase and is still hand-set; #5576 retires it. The contract test is `tests/test_training_phases_charter_5574.py`; the section's own numbers are swept by `tests/test_training_charter_derivation_5068.py`.
+
 ## ADR-068: Per-Exercise Notes — Deterministic History Cues, LLM Never Computes
 
 **Date:** 2026-05-31
