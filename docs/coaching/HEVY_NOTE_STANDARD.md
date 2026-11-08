@@ -212,7 +212,7 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
   - **A set cap on a capped exposure** (a gap over 90 days, or unknown) takes the capped treatment: line 1 becomes `RPE 7`, and the clause is the lift's one `No jumps` line, `No jumps: 3 sets today, 19 weeks off.` (one phone line, so the W line and the cue still fit).
   - The clause takes the lift's one reason slot (§3.2): a computed reason already there (`New: replaces …`, `Heavier: …`) gives way and stays on the stored record. A `No jumps` line and an earlier critic clause keep their lines.
 - **Minimum / travel:** the session line's `‹Day›`, then each lift as in §3.2.
-- **Fitness test:** line 1 is `Test · ‹protocol›`.
+- **Fitness test:** line 1 is `Test · ‹protocol›`, then the charter's protocol, one sentence per line, words unchanged (`fitness_tests.test_note`). There's no effort grammar, because the protocol is the effort (the bike test is "at RPE 6"). The cardio composer never writes over a test block. Lint: every line within the 120-character limit, and at most `TEST_MAX_LINES` (6) phone lines. That limit was chosen by the platform to fit the longest charter protocol (the assisted pull-up). A longer protocol gets shortened in the charter, never cut on the wire (#5428, 2026-11-08: the 11-01 and 11-07 predrafts linted the test blocks as lifts, and the six-minute walk went out as an incline menu dose).
 
 ## 4. Cue table (first exercise of each family per session)
 

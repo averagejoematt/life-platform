@@ -39,6 +39,7 @@ THREE PURE PIECES (the DDB read and write take an injected table; the MCP side i
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Iterable, Mapping, Optional
 
 from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
@@ -553,6 +554,11 @@ def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]]
     return isinstance(week, int) and week >= 1 and week % n == 0  # the week that closes a block (block_model's week_in_block == n)
 
 
+# A test block's rationale tag prefix: every block that must keep its protocol note (cardio_cues skips it).
+FITNESS_TEST_TAG_PREFIX = "fitness_test:"
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+
+
 def test_note(row: Mapping[str, Any]) -> str:
     """A test block's Hevy note (#5428, HEVY_NOTE_STANDARD §3.8): line 1 `Test · ‹the test›`, then the charter's protocol —
     no issue number, no version id (those stay on the rationale tag and the stored battery record)."""
@@ -560,7 +566,10 @@ def test_note(row: Mapping[str, Any]) -> str:
 
     head = fitness_test_line(str(row.get("label")))
     proto = str(row.get("protocol") or "").strip()
-    return f"{head}\n{proto}" if proto else head
+    # one protocol sentence per line (#5428, 2026-11-08): the charter's words unchanged, but no line over the phone's
+    # three-line limit — the pull-up protocol as one 166-char line was an L7 on every test-day predraft
+    sentences = [x for x in _SENTENCE_BREAK.split(proto) if x]
+    return "\n".join([head, *sentences])
 
 
 def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, Any]) -> Any:
@@ -581,7 +590,7 @@ def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, An
         notes=test_note(row),
         joint_friendly_score=int(m.get("joint_friendly_score", 3)),
         skill_tier=int(m.get("skill_tier", 1)),
-        rationale_tag=f"fitness_test:{test_id}",
+        rationale_tag=f"{FITNESS_TEST_TAG_PREFIX}{test_id}",
     )
 
 

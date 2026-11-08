@@ -121,6 +121,11 @@ def attach_cardio_cues(
     movements = (catalog or {}).get("movements", {})
     targets = [ex for ex in exercises if cardio_note.machine_for(str(getattr(ex, "movement_key", "") or ""))]
     targets = [ex for ex in targets if sum(int(getattr(s, "duration_seconds", 0) or 0) for s in getattr(ex, "sets", None) or [])]
+    from training.fitness_tests import FITNESS_TEST_TAG_PREFIX
+
+    # #5428 (2026-11-08): a fitness-test block's note IS the charter's protocol (fitness_tests.test_note). Composing a
+    # menu dose over it sent the 11-01 and 11-07 six-minute walk out as "Treadmill · 8% · RPE 4–5" — the wrong test.
+    targets = [ex for ex in targets if not str(getattr(ex, "rationale_tag", "") or "").startswith(FITNESS_TEST_TAG_PREFIX)]
     if not targets:
         return 0
     if cardio_index is None:
