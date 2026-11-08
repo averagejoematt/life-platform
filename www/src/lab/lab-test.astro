@@ -1,0 +1,235 @@
+---
+// /data/lab/tests/<id>/ — one pre-registered test (L1). BUILT DARK: outside src/pages/, injected only when WEB_LAB=1.
+// Four questions, simple on arrival and deep below: what it expects (the sentence), what would count (the
+// pre-registration), what the readings did (baseline → window), what the check found (the verdict and its interval),
+// and which side of the line each day fell on (linking to the Day pages). Every number is carried from lab.json and
+// the snapshot's series files; the engine's verdict, effect, interval and arm sizes are never recomputed here.
+import Base from "../layouts/Base.astro";
+import LabBanner from "../components/LabBanner.astro";
+import { dayInWords, num } from "../lib/format.js";
+import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import {
+  conditionWords,
+  daysBySide,
+  intervalFigure,
+  intervalText,
+  metricUnit,
+  metricWords,
+  minEffectText,
+  prose,
+  ruleText,
+  testDates,
+  testSentence,
+  verdictOf,
+  windowChart,
+  windowChartOptions,
+} from "../lib/laboratory.js";
+import { loadAll, loadLab, loadSeries } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+export async function getStaticPaths() {
+  if (!labEnabled()) return [];
+  const lab = await loadLab();
+  return (lab.lab_tests || []).map((t: any) => ({ params: { id: t.id }, props: { t } }));
+}
+
+if (!labEnabled()) throw new Error("src/lab/lab-test.astro rendered with WEB_LAB off — the Lab route must not be injected");
+
+const { t } = Astro.props as any;
+const lab = await loadLab();
+const all = await loadAll();
+const series = await loadSeries();
+const spec = t.spec || {};
+const v = verdictOf(t);
+const dates = testDates(t);
+const outcome = t.outcome_series ? series[t.outcome_series] : null;
+const condition = t.condition_series ? series[t.condition_series] : null;
+const outOpts = windowChartOptions(t, outcome, "outcome");
+const condOpts = windowChartOptions(t, condition, "condition");
+const strip = daysBySide(t, condition);
+const interval = intervalText(t);
+const fig = intervalFigure(t);
+const VCLASS: Record<string, string> = { supported: "confirmed", contradicted: "refuted" };
+const asOf = lab.as_of ? dayInWords(lab.as_of) : null;
+const noindex = process.env.WEB_NOINDEX === "1";
+const mark = { [LAB_MARKER]: "test" };
+const unit = metricUnit(spec.condition_metric);
+const payload = (o: any) => JSON.stringify(o ? { ...o, labelDay: undefined } : null);
+const sideWords: Record<string, string> = { test: "on the test side of the line", other: "on the other side" };
+const dataThrough = outcome && outcome.window ? outcome.window.to : condition && condition.window ? condition.window.to : null;
+---
+
+<Base title="A pre-registered test" top="data" description={testSentence(t)} status={asOf}>
+  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <LabBanner />
+  <section class="section" {...mark} style="padding-bottom:20px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
+      <p class="label">
+        <a href={href("/data/lab/")}>The Laboratory</a> · a pre-registered test · written {dayInWords(t.pre_registered)}
+      </p>
+      <h1 style="font-size:clamp(28px,5vw,44px);line-height:1.1">{testSentence(t)}</h1>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span class={`status ${VCLASS[v.key] || "inconclusive"}`}>{v.word}</span>
+        <span style="font-size:16px">{v.reason}</span>
+      </div>
+      {interval && <p style="font-size:16px">Difference as served: <b class="mono">{interval}</b></p>}
+      {lab.notice && <p class="muted" style="font-size:14px">{prose(lab.notice)}</p>}
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:8px">
+    <div class="wrap grid cols2" style="gap:40px;align-items:start;max-width:1100px">
+      <div>
+        <p class="label" style="margin-bottom:8px">The pre-registration</p>
+        <div class="rows">
+          <div><span>Written</span><span class="mono">{dayInWords(t.pre_registered)}</span></div>
+          <div><span>Test side</span><span style="text-align:right">{spec.condition_metric ? conditionWords(spec) : "—"}</span></div>
+          <div><span>Outcome</span><span style="text-align:right">{spec.outcome_metric ? `${metricWords(spec.outcome_metric)}, expected ${spec.direction || "—"}` : "—"}</span></div>
+          <div>
+            <span>Baseline</span>
+            <span style="text-align:right">
+              {dates && dates.baselineFrom ? `${dayInWords(dates.baselineFrom, { short: true })} to ${dayInWords(dates.preRegistered, { short: true })}` : "not served"}
+            </span>
+          </div>
+          <div><span>Window</span><span style="text-align:right">{dates && dates.windowEnd ? `${dayInWords(dates.preRegistered, { short: true })} to ${dayInWords(dates.windowEnd, { short: true })}` : "not served"}</span></div>
+          <div><span>Washout</span><span style="text-align:right">none — an observational split of ordinary days, not an on/off protocol</span></div>
+          <div><span>Weekly checks so far</span><span class="mono">{t.check_count != null ? num(t.check_count) : "—"}</span></div>
+          <div><span>Confidence when written</span><span class="mono">{t.confidence || "—"}</span></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <p class="label" style="margin-bottom:6px">Minimum effect</p>
+          <p style="font-size:15px;line-height:1.5">{minEffectText(t)}</p>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:6px">Criterion and stopping rule</p>
+          <p style="font-size:15px;line-height:1.5">{prose(t.criterion) || ruleText(t)}</p>
+        </div>
+        {t.criterion && <p class="muted" style="font-size:13px">{ruleText(t)}</p>}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:8px">
+    <div class="wrap" style="max-width:1100px">
+      <p class="label" style="margin-bottom:6px">Baseline → window · {metricWords(spec.outcome_metric)}</p>
+      {
+        outOpts ? (
+          <figure class="chart" data-lab-chart data-payload={payload(outOpts)} data-aria={outOpts.aria} style="margin:0">
+            <Fragment set:html={windowChart(outOpts)} />
+          </figure>
+        ) : (
+          <div class="empty">
+            <span>
+              {t.outcome_series
+                ? "No reading of this series falls inside the baseline and window yet."
+                : `The ${metricWords(spec.outcome_metric)} series is not in the publication snapshot, so its readings cannot be drawn here.`}
+            </span>
+          </div>
+        )
+      }
+      <p class="muted" style="font-size:13px;margin-top:6px">
+        Daily readings as served; the dashed rule is the day the test was written.
+        {dates && dates.baselineFrom
+          ? " Left of it, the baseline its minimum effect was set from; right of it, the window the check grades."
+          : " No baseline window was served for this test, so the figure starts the day it was written; what follows is the window the check grades."}
+        {dataThrough && dates && dates.windowEnd && dataThrough < dates.windowEnd
+          ? ` The readings so far run through ${dayInWords(dataThrough)}; the window ends ${dayInWords(dates.windowEnd)}.`
+          : ""}
+      </p>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:8px">
+    <div class="wrap" style="max-width:1100px">
+      <p class="label" style="margin-bottom:6px">The result</p>
+      {
+        fig ? (
+          <figure class="chart" data-lab-interval data-payload={JSON.stringify(t)} style="margin:0;max-width:720px">
+            <Fragment set:html={fig} />
+          </figure>
+        ) : (
+          <div class="empty">
+            <b style="color:var(--ink)">{v.key === "none" ? "No result yet." : "Insufficient data."}</b>
+            <span>{v.reason || "No difference or interval was served."}</span>
+          </div>
+        )
+      }
+      <div class="rows" style="margin-top:12px;max-width:720px">
+        <div><span>Days on the test side</span><span class="mono">{t.n_condition != null ? num(t.n_condition) : "—"}</span></div>
+        <div><span>Days on the other side</span><span class="mono">{t.n_comparison != null ? num(t.n_comparison) : "—"}</span></div>
+        <div><span>Each side needs at least</span><span class="mono">{t.min_days_per_arm != null ? num(t.min_days_per_arm) : "—"}</span></div>
+        <div><span>Paired days observed</span><span class="mono">{t.days_observed != null ? num(t.days_observed) : "—"}</span></div>
+        <div><span>Last checked</span><span class="mono">{t.last_checked ? dayInWords(t.last_checked) : "not yet"}</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:8px">
+    <div class="wrap" style="max-width:1100px">
+      <details open>
+        <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">
+          <b style="font-size:18px">Day by day · {metricWords(spec.condition_metric)} against the line</b>
+        </summary>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
+          {
+            condOpts ? (
+              <figure class="chart" data-lab-chart data-payload={payload(condOpts)} data-aria={condOpts.aria} style="margin:0">
+                <Fragment set:html={windowChart(condOpts)} />
+              </figure>
+            ) : (
+              <div class="empty">
+                <span>
+                  {t.condition_series
+                    ? "No reading of this series falls inside the window yet."
+                    : `The ${metricWords(spec.condition_metric)} series is not in the publication snapshot, so the days cannot be laid against the line here.`}
+                </span>
+              </div>
+            )
+          }
+          {strip.length > 0 && (
+            <div>
+              <p class="muted" style="font-size:13px;max-width:75ch;margin-bottom:8px">
+                Each day of the window, its served reading and which side of the pre-registered line it fell on. Open a day for everything recorded on it. These are
+                not the check's own counts: it pairs each day with the outcome {spec.lag_days ? `${num(spec.lag_days)} day${spec.lag_days === 1 ? "" : "s"} later` : "of the same day"} and counts only days with both.
+              </p>
+              <ol style="list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px">
+                {strip.map((d) => {
+                  const day = all.get("day", d.date);
+                  const label = `${dayInWords(d.date, { weekday: true })} · ${d.value != null ? `${num(d.value)} ${unit}` : d.gap ? "a logging gap" : "no reading"}${d.side ? ` · ${sideWords[d.side]}` : ""}`;
+                  const style = `display:flex;flex-direction:column;gap:2px;min-height:44px;padding:6px 8px;border:1px solid var(--ink);font-size:12px;${d.side === "test" ? "background:var(--ink);color:var(--paper);" : ""}${d.value == null ? "border-style:dashed;" : ""}`;
+                  return (
+                    <li>
+                      {day ? (
+                        <a href={href(pathOf("day", d.date))} aria-label={label} style={`${style}text-decoration:none;${d.side === "test" ? "" : "color:var(--ink);"}`}>
+                          <span class="mono">{dayInWords(d.date, { short: true })}</span>
+                          <b class="mono">{d.value != null ? num(d.value) : "—"}</b>
+                        </a>
+                      ) : (
+                        <span aria-label={label} role="img" style={style}>
+                          <span class="mono">{dayInWords(d.date, { short: true })}</span>
+                          <b class="mono">{d.value != null ? num(d.value) : "—"}</b>
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+              <p class="muted" style="font-size:12px;margin-top:6px">
+                {spec.condition_op === "median_split"
+                  ? "A median split: the check divides the window's days at their middle value, which is not served, so no day is marked."
+                  : `Filled: at or ${spec.condition_op === "<=" ? "below" : "above"} the line of ${num(spec.condition_threshold)} ${unit}. Dashed: no reading that day.`}
+              </p>
+            </div>
+          )}
+        </div>
+      </details>
+      <p style="margin-top:22px"><a class="btn ghost sm" href={href("/data/lab/")}>Back to the Laboratory</a></p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../islands/lab.js";
+</script>

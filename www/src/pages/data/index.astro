@@ -4,6 +4,7 @@
 // experiments. Nothing here is computed beyond a mean of the week's readings for a bar.
 import Base from "../../layouts/Base.astro";
 import Provenance from "../../components/Provenance.astro";
+import LabEntry from "../../components/LabEntry.astro"; // the Laboratory (L1): renders nothing unless WEB_LAB=1
 import { headline, weeklyBars } from "../../lib/chart.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
@@ -98,7 +99,7 @@ function bars(days: any[]) {
       </section>
     )
   }
-  <section class="wrap" style="padding-bottom:40px">
+  {/* the Laboratory entry (L1) sits flush against the next tag: with WEB_LAB off the page's bytes are unchanged */}<LabEntry /><section class="wrap" style="padding-bottom:40px">
     <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))">
       {
         metrics.map((m) => {
