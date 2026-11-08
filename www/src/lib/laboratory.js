@@ -142,22 +142,22 @@ export function intervalFigure(t, { width = 600 } = {}) {
   const me = t.spec && t.spec.min_effect != null ? Math.abs(t.spec.min_effect) : 0;
   const span = Math.max(Math.abs(t.ci95_low), Math.abs(t.ci95_high), me) * 1.15 || 1;
   const W = width;
-  const H = 74;
+  const H = 84;
   const pad = 16;
   const x = (v) => pad + ((v + span) / (2 * span)) * (W - 2 * pad);
   const fs = 12.5;
   const lab = (v, text, anchor, y) =>
     `<text x="${x(v).toFixed(1)}" y="${y}" text-anchor="${anchor}" font-family="IBM Plex Mono,monospace" font-size="${fs}" fill="#5C5C58">${text}</text>`;
-  let g = `<line x1="${pad}" y1="36" x2="${W - pad}" y2="36" stroke="#C9C9C3" stroke-width="1"/>`;
-  g += `<line x1="${x(0).toFixed(1)}" y1="14" x2="${x(0).toFixed(1)}" y2="52" stroke="#121212" stroke-width="1"/>` + lab(0, "0", "middle", 68);
+  let g = `<line x1="${pad}" y1="44" x2="${W - pad}" y2="44" stroke="#C9C9C3" stroke-width="1"/>`;
+  g += `<line x1="${x(0).toFixed(1)}" y1="24" x2="${x(0).toFixed(1)}" y2="62" stroke="#121212" stroke-width="1"/>` + lab(0, "0", "middle", 78);
   if (me) {
     const side = t.spec.direction === "lower" ? -me : me;
-    g += `<line x1="${x(side).toFixed(1)}" y1="18" x2="${x(side).toFixed(1)}" y2="52" stroke="#121212" stroke-width="1" stroke-dasharray="3 4"/>`;
+    g += `<line x1="${x(side).toFixed(1)}" y1="24" x2="${x(side).toFixed(1)}" y2="62" stroke="#121212" stroke-width="1" stroke-dasharray="3 4"/>`;
     // the label reads toward zero, so it never leaves the frame (the bar's span is padded past the needed mark)
-    g += lab(side, `${signed(side, 1)} needed`, side < 0 ? "start" : "end", 12);
+    g += lab(side, `${signed(side, 1)} needed`, side < 0 ? "start" : "end", 18);
   }
-  g += `<line x1="${x(t.ci95_low).toFixed(1)}" y1="36" x2="${x(t.ci95_high).toFixed(1)}" y2="36" stroke="#1B3FD6" stroke-width="6" stroke-linecap="round"/>`;
-  g += `<circle cx="${x(t.effect_size).toFixed(1)}" cy="36" r="6" fill="#F4F4F0" stroke="#1B3FD6" stroke-width="2"/>`;
+  g += `<line x1="${x(t.ci95_low).toFixed(1)}" y1="44" x2="${x(t.ci95_high).toFixed(1)}" y2="44" stroke="#1B3FD6" stroke-width="6" stroke-linecap="round"/>`;
+  g += `<circle cx="${x(t.effect_size).toFixed(1)}" cy="44" r="6" fill="#F4F4F0" stroke="#1B3FD6" stroke-width="2"/>`;
   const aria = `Difference ${signed(t.effect_size, 1)}, 95% interval ${signed(t.ci95_low, 1)} to ${signed(t.ci95_high, 1)}${me ? `, minimum effect ${num(me, 2)}` : ""}`;
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}">${g}</svg>`;
 }

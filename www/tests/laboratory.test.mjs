@@ -76,7 +76,7 @@ test("an interval is shown only when served — never invented", () => {
   const t = { ...T, effect_size: -1.396, ci95_low: -10.731, ci95_high: 5.291 };
   assert.equal(intervalText(t), "−1.4 points (95% interval −10.7 to +5.3)");
   const svg = intervalFigure(t, { width: 350 });
-  assert.match(svg, /^<svg viewBox="0 0 350 74"/);
+  assert.match(svg, /^<svg viewBox="0 0 350 84"/);
   assert.match(svg, /−6\.8 needed/);
 });
 
