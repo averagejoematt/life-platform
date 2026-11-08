@@ -102,7 +102,7 @@ test("the chart: one dot per coach per served band, points in x order, a prewrit
   assert.equal(dots.length, served);
   const svg = calibrationChart(coaches);
   assert.doesNotMatch(svg, /<path/, "dots, never a curve");
-  const pts = JSON.parse(svg.match(/data-points="([^"]*)"/)[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&#39;/g, "'"));
+  const pts = JSON.parse(svg.match(/data-points="([^"]*)"/)[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&"));
   assert.equal(pts.length, served);
   for (let i = 1; i < pts.length; i++) assert.ok(pts[i].x >= pts[i - 1].x, "points ordered on x for the keyboard");
   assert.match(pts[0].label, /stated \d+% · \d+ calls? · \d+% came true/);

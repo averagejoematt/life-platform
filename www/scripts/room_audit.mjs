@@ -73,7 +73,11 @@ export function declaredJson(pagesDir = join(WWW, "src", "pages")) {
   return walk(pagesDir)
     .map((p) => posix(relative(pagesDir, p)))
     .filter((r) => /\.json\.(ts|js|mjs)$/.test(r))
-    .map((r) => new RegExp("^" + r.replace(/\.(ts|js|mjs)$/, "").replace(/[.]/g, "\\.").replace(/\[[^\]]+\]/g, "[^/]+") + "$"));
+    .map((r) => {
+      // `[x]` → one segment; every other character escaped (backslash included), so a path is matched literally.
+      const parts = r.replace(/\.(ts|js|mjs)$/, "").split(/(\[[^\]]+\])/);
+      return new RegExp("^" + parts.map((s) => (/^\[[^\]]+\]$/.test(s) ? "[^/]+" : s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("") + "$");
+    });
 }
 
 export function jsonFiles(dist, declared = declaredJson()) {
