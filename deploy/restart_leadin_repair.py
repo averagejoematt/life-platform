@@ -53,6 +53,9 @@ from botocore.exceptions import ClientError
 
 # A private person's name never sits in this public repo (owner ruling 2026-11-07); a re-run supplies it.
 _PRIVATE_NAME = os.environ.get("LEADIN_PRIVATE_NAME", "")
+_PRIVATE_AGE = os.environ.get("LEADIN_PRIVATE_AGE", "")
+_PRIVATE_LEADIN_SENTENCE = os.environ.get("LEADIN_PRIVATE_SENTENCE", "")
+_PRIVATE_VICES_SENTENCE = os.environ.get("LEADIN_PRIVATE_VICES_SENTENCE", "")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -111,12 +114,12 @@ REPAIRS = {
             ),
             (
                 "privacy: exact age + named private person",
-                f"Matthew is thirty-seven. He lives with his girlfriend, {_PRIVATE_NAME}, in Seattle.",
+                _PRIVATE_LEADIN_SENTENCE,
                 "Matthew is in his late thirties. He lives with his girlfriend in Seattle.",
             ),
             (
                 "privacy: named vices",
-                "It even tracks vices: alcohol, late-night screens, processed food. Each vice held is a streak extended.",
+                _PRIVATE_VICES_SENTENCE,
                 "It even tracks vices — a personal short list he is trying to hold the line on. Each vice held is a streak extended.",
             ),
             (
@@ -199,7 +202,7 @@ _FORBIDDEN_AFTER_VET = [
     "alcohol",
     "genome",
     "gene ",
-    "thirty-seven",
+    *([_PRIVATE_AGE] if _PRIVATE_AGE else []),
 ]
 
 
