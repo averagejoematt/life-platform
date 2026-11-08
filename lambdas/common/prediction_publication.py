@@ -42,8 +42,11 @@ or evaluation could reveal private activity. The fuel–cognition bet's private 
 prediction ineligible for public release. A separately filed, independently evaluable nutrition prediction may remain
 public if it does not reveal the private component. Thyroid predictions evaluated against public-eligible laboratory
 measurements may remain public; requests to log symptoms remain private. New free-text observations remain private
-until explicitly reviewed." The registry carries the legacy decisions; for a call filed after it the words screen
-(``SELF_REPORT_WORDS``, ``LOGGING_GAP_WORDS`` without a ``NAMED_PUBLIC_LOG``) keeps the first, second and symptom lines;
+until explicitly reviewed." And (the same day): "Deep-sleep bet remains private. Training fatigue and RPE may be public
+when sourced from public-eligible physiology or training data. Calls concerning personal cognition remain private by
+default. Classify according to the actual source and content, not keywords alone." The registry carries the legacy
+decisions; for a call filed after it the screen (``word_reason``) keeps the first, second and symptom lines, and follows
+the call's graded source wherever structure exists;
 a bet filed after it is private until reviewed (``UNREVIEWED_BET``) — a separately filed call is decided on its own;
 an observation stays unclassified. "Explicitly reviewed" is the owner's registry edit (``approve``): a listed digest is
 public whenever the row was filed. The scheduled review (``scripts/prediction_publication_registry.py review``) only
@@ -224,13 +227,56 @@ def _spec_metrics(spec: Any) -> list:
 
 JOURNAL_WORDS = re.compile(r"\b(?:journal\w*|diar(?:y|ies)|notion)\b", re.I)
 #: Owner ruling 2026-11-06: "Mood, felt-sense and self-report calls remain private, including those referring to a
-#: public morning note ... requests to log symptoms remain private." Words naming a self-report (a symptom, a
-#: feeling, a rating he gives) — the cognition component of the fuel-cognition bet included.
+#: public morning note ... requests to log symptoms remain private." Words that name a self-report itself.
 SELF_REPORT_WORDS = re.compile(
-    r"\b(?:moods?|felt|feel(?:s|ing)?|subjective\w*|self[- ]report\w*|morning[- ]notes?|check[- ]ins?|valence|"
-    r"emotion\w*|symptoms?|fatigue|cold (?:intolerance|sensitivity|tolerance)|interocept\w*|cogniti\w*)\b",
+    r"\b(?:moods?|felt[- ]sense|subjective\w*|self[- ]report\w*|morning[- ]notes?|morning check[- ]ins?|valence|"
+    r"emotion\w*|symptoms?|cold (?:intolerance|sensitivity|tolerance)|interocept\w*)\b",
     re.I,
 )
+#: Fatigue as something he rates, logs or reports is a self-report whatever the call is graded on.
+SELF_REPORTED_FATIGUE = re.compile(
+    r"\bfatigue (?:ratings?|scores?|scales?|levels?|logs?|logging|baselines?)\b|\bunexplained fatigue\b|"
+    r"(?<!heart )\b(?:log|report|rate|record|flag|track|note|collect|provide|monitor)\w*\b(?:\W+\w+){0,3}?\W+fatigue\b",
+    re.I,
+)
+#: Owner ruling 2026-11-06 (second): "Training fatigue and RPE may be public when sourced from public-eligible physiology
+#: or training data. Calls concerning personal cognition remain private by default. Classify according to the actual
+#: source and content, not keywords alone." So these words do not decide by themselves:
+#:   * SOURCE_DECIDED_WORDS — a call graded only on physiology or training sources is about that data. RPE needs no
+#:     entry at all: it is a Hevy field, already public, and no screen names it.
+#:   * COGNITION_WORDS — personal by default; public only when the words tie it to a training session
+#:     (``TRAINING_COGNITION``) AND the graded source is physiology or training.
+#:   * FELT_WORDS — never public on a word match, but a reader decides, not the match.
+#: What they leave undecided is private with a REVIEWABLE reason (``AMBIGUOUS_WORDS``, ``PERSONAL_COGNITION``): the
+#: owner's review reads the call. ``PRIVATE_WORDS`` (a named private source) is not reviewable.
+SOURCE_DECIDED_WORDS = re.compile(r"\b(?:fatigue|check[- ]ins?)\b", re.I)
+FELT_WORDS = re.compile(r"\b(?:felt|feel(?:s|ing)?)\b", re.I)
+COGNITION_WORDS = re.compile(r"\b(?:cogniti\w*|executive (?:function|capacity)|mental clarity|brain fog)\b", re.I)
+_TRAINING_NOUNS = r"(?:training|workouts?|sessions?|lifts?|lifting|sets?|reps?|cardio|zone[- ]?2|drills?)"
+TRAINING_COGNITION = re.compile(
+    rf"\bcogniti\w*(?:\W+\w+){{0,5}}?\W+{_TRAINING_NOUNS}\b|\b{_TRAINING_NOUNS}(?:\W+\w+){{0,5}}?\W+cogniti\w*",
+    re.I,
+)
+#: Sources of body and training measurements, DERIVED from the source registry (never a copied list): its device and
+#: clinical categories, plus the log that is the training coach's instrument. The food log is not one — "fatigue" beside
+#: a calorie count is a read of how a restriction feels, not a measurement of load.
+PHYSIOLOGY_CATEGORIES = ("Wearables", "Clinical")
+TRAINING_INSTRUMENT_FOR = "physical_coach"
+
+
+def physiology_training_sources() -> frozenset:
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    return frozenset(
+        sid
+        for sid, facet in SOURCE_REGISTRY.items()
+        if facet.get("category") in PHYSIOLOGY_CATEGORIES or TRAINING_INSTRUMENT_FOR in (facet.get("instrument_for") or ())
+    )
+
+
+PRIVATE_WORDS = "private_words"
+AMBIGUOUS_WORDS = "ambiguous_words"
+PERSONAL_COGNITION = "personal_cognition"
 #: Owner ruling 2026-11-06: "Unnamed logging-gap predictions remain private where their meaning or evaluation could
 #: reveal private activity." A logging gap is UNNAMED unless the words name a public log (food, a meal, a weigh-in,
 #: a workout, steps, glucose).
@@ -244,26 +290,39 @@ NAMED_PUBLIC_LOG = re.compile(
 )
 
 
-def _text(t: Any) -> str:
-    return t if isinstance(t, str) else ("" if t is None else str(t))
+def _graded_on_physiology(metrics: Iterable[Any]) -> bool:
+    """True when the call has graded metrics and every one is read from a body or training source."""
+    ms = list(metrics)
+    allowed = physiology_training_sources()
+    return bool(ms) and all(set(_metric_sources(m) or ("",)) <= allowed for m in ms)
+
+
+def word_reason(metrics: Iterable[Any], *texts: Any) -> Optional[str]:
+    """Defence in depth only (never what makes a call public): why the words keep a call private given what it is
+    graded on, or None. ``metrics`` is the call's structure; a word the structure explains is not a reason."""
+    s = "\n".join(t if isinstance(t, str) else ("" if t is None else str(t)) for t in texts)
+    if JOURNAL_WORDS.search(s) or journal_silence.mentions_journal_silence(s) or SELF_REPORT_WORDS.search(s):
+        return PRIVATE_WORDS
+    if SELF_REPORTED_FATIGUE.search(s) or (LOGGING_GAP_WORDS.search(s) and not NAMED_PUBLIC_LOG.search(s)):
+        return PRIVATE_WORDS
+    physiology = _graded_on_physiology(metrics)
+    if COGNITION_WORDS.search(s) and not (physiology and TRAINING_COGNITION.search(s)):
+        return PERSONAL_COGNITION
+    if FELT_WORDS.search(s) or (SOURCE_DECIDED_WORDS.search(s) and not physiology):
+        return AMBIGUOUS_WORDS
+    return None
 
 
 def words_name_private_activity(*texts: Any) -> bool:
-    """Defence in depth only (never what makes a call public): the words name the journal or its silence, a
-    self-report, or a logging gap without naming a public log."""
-    for s in (_text(t) for t in texts):
-        if not s:
-            continue
-        if JOURNAL_WORDS.search(s) or journal_silence.mentions_journal_silence(s) or SELF_REPORT_WORDS.search(s):
-            return True
-    joined = " ".join(_text(t) for t in texts)
-    return bool(LOGGING_GAP_WORDS.search(joined) and not NAMED_PUBLIC_LOG.search(joined))
+    """For prose with no graded structure (a chronicle draft): any word the screen would hold."""
+    return word_reason((), *texts) is not None
 
 
 def _structural(metrics: Iterable[Any], *texts: Any) -> tuple:
-    if words_name_private_activity(*texts):
-        return PRIVATE, "private_words"
     ms = list(metrics)
+    reason = word_reason(ms, *texts)
+    if reason:
+        return PRIVATE, reason
     if not ms:
         return PRIVATE, "unclassified_subject"
     for m in ms:
@@ -309,7 +368,8 @@ def classify_call(pk: Any, row: Mapping) -> tuple:
     ev = _map(row.get("evaluation"))
     texts = (row.get("claim_natural"), row.get("prediction_id"), row.get("sk"))
     if str(_map(row.get("filing")).get("verdict") or "") != "gradeable":
-        return (PRIVATE, "private_words") if words_name_private_activity(*texts) else (PRIVATE, "unclassified_subject")
+        reason = word_reason((), *texts)
+        return PRIVATE, (reason if reason in (PRIVATE_WORDS, PERSONAL_COGNITION) else "unclassified_subject")
     return _structural(_spec_metrics(ev), *texts)
 
 

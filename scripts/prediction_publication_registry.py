@@ -134,7 +134,7 @@ def cmd_audit(show_private: bool) -> int:
 # ── review-only: the proposed publication manifest (owner ruling 2026-11-06) ─────────────────────────
 #: What a review may PROPOSE for approval: the reasons the rules leave to the owner. Everything else private is decided
 #: by a rule (journal or self-report words, a private metric) or by the legacy review, and is never approvable.
-REVIEWABLE = frozenset({"unclassified_subject", "unclassified_metric", "unreviewed_bet"})
+REVIEWABLE = frozenset({"unclassified_subject", "unclassified_metric", "unreviewed_bet", "ambiguous_words", "personal_cognition"})
 DEFAULT_REVIEW_DIR = Path.home() / ".life-platform" / "private" / "call_review"
 
 

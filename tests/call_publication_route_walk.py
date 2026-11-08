@@ -308,6 +308,29 @@ def public_rows() -> list:
         rows.append(
             _ask(cid, f"commit_20261106_synthetic_public_new_{cid}", NEW_AT, "Synthetic structured ask: steps up.", "pending", "steps")
         )
+    # Source and content, not keywords alone (owner ruling 2026-11-06): the word is explained by the graded source.
+    rows.append(
+        _call(
+            "sleep",
+            "pred_20261106_synthetic_public_fatigue",
+            NEW_AT,
+            "Synthetic: HRV rises as training fatigue clears.",
+            "pending",
+            "hrv",
+            filing=GRADEABLE,
+        )
+    )
+    rows.append(
+        _call(
+            "sleep",
+            "pred_20261106_synthetic_public_rpe",
+            NEW_AT,
+            "Synthetic: recovery holds at session RPE 7.",
+            "pending",
+            "recovery_score",
+            filing=GRADEABLE,
+        )
+    )
     rows.append(_correction("sleep", "pred_20261020_synthetic_public_sleep_0", "2026-10-28"))
     rows.append(_void("sleep", "pred_20261020_synthetic_public_sleep_2"))
     rows += _bet(
@@ -369,6 +392,14 @@ def private_rows(n: int) -> list:
                 )
             )
             rows.append(_learning(cid, words, NEW_DAY, "confirmed", "recovery_score"))  # names a call filed after the registry
+            cog = f"pred_20261106_synthetic_private_cognition_{cid}_{k}"
+            rows.append(
+                _call(cid, cog, NEW_AT, f"{PRIVATE_TOKEN} {k}: HRV rises as his cognition sharpens.", "pending", "hrv", filing=GRADEABLE)
+            )
+            rate = f"pred_20261106_synthetic_private_rating_{cid}_{k}"
+            rows.append(
+                _call(cid, rate, NEW_AT, f"{PRIVATE_TOKEN} {k}: log a fatigue rating as HRV rises.", "pending", "hrv", filing=GRADEABLE)
+            )
             unres = f"pred_20261106_synthetic_private_metric_{cid}_{k}"
             rows.append(
                 _call(cid, unres, NEW_AT, f"{PRIVATE_TOKEN} {k}: valence will settle.", "pending", "mood_valence", filing=GRADEABLE)

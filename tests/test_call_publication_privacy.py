@@ -134,6 +134,8 @@ def test_the_walk_is_not_vacuous(walks):
     out = walks["none"]
     ids = {i["prediction_id"] for i in _body(out, "/api/ledger_export")["items"]}
     assert "pred_20261020_synthetic_public_sleep_0" in ids and "pred_20261106_synthetic_public_new_sleep" in ids
+    # Owner ruling 2026-11-06: a word the graded source explains does not take a call off the public record.
+    assert {"pred_20261106_synthetic_public_fatigue", "pred_20261106_synthetic_public_rpe"} <= ids
     assert any("public-bet" in json.dumps(r) for r in _body(out, "/api/coach_docket")["resolved"])
     assert _body(out, "/api/predictions")["commitments"] is not None
 
