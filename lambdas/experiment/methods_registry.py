@@ -49,7 +49,7 @@ from coach.coach_prediction_evaluator import _get_ewma_trend  # #3448: the direc
 from coach.prediction_direction_window import measure as _direction_window_measure  # #4617: the window grade's source
 from common import stats_core
 
-from experiment import bsts_lite, calibration_core
+from experiment import bsts_lite, calibration_core, calibration_v2  # calibration_v2: the adopted verdict (owner 2026-11-09)
 
 
 def _referenced_names(code):
@@ -204,6 +204,17 @@ SOURCE_MODULES = {
             "The one prediction-calibration scorer (#538, ADR-105) — grades every forecast the "
             "platform makes against what actually happened, so the public calibration scoreboard, "
             "/api/coach_team, and the coach track-record tool all read the same numbers."
+        ),
+    },
+    "calibration_v2": {
+        "title": "calibration_v2.py",
+        "path": "lambdas/experiment/calibration_v2.py",
+        "description": (
+            "The calibration verdict, adopted by the owner on 2026-11-09 (docs/methods/CALIBRATION_V2.md). Three "
+            "separate questions, each with its own test and interval: can calibration across confidence levels be "
+            "estimated; is there statistically supported over- or under-confidence at an observed level; does a "
+            "coach beat the same-call guess that nothing changes. Not detecting a problem is never read as proof of "
+            "good calibration. It replaced calibration_core's single label per forecaster on every page."
         ),
     },
     "conversation_enrichment": {
@@ -601,8 +612,8 @@ REGISTRY = {
         "Calibration",
         "Composes brier_score + brier_skill_score + reliability_bins over the same " "(confidence, outcome) pairs into one summary dict",
         "Every resolved prediction for the coach/surface being scored, to date.",
-        "Needs at least 1 resolved pair to report accuracy_pct; the calibration verdict "
-        "(over/under-confident) needs ≥ 5. Below those thresholds the relevant field is None "
+        "Needs at least 1 resolved pair to report accuracy_pct; the v1 verdict field "
+        "(deprecated 2026-11-09 — see calibration_v2_*) needs ≥ 5. Below those thresholds the relevant field is None "
         "rather than a guess dressed as a number. Also reports `skilled` (Brier skill > 0?) — "
         "calibrated (reliability: stated confidence tracks observed rates) and skilled (beats "
         "the base rate) are different claims, and the summary carries both so no surface can "
@@ -624,13 +635,14 @@ REGISTRY = {
         "Every resolved pair on the platform, partitioned by stratum (coach calls · hypothesis bets · " "interval forecasts), to date.",
         "Pooling strata with different base rates and scoring the pool against ONE pooled base rate can "
         "manufacture a positive skill no stratum has (the pooled reference is worse than either stratum's "
-        "own, so knowing the stratum beats it) — the 2026-09-05 lifetime card read skilled / well-calibrated "
-        "while both strata were unskilled (#3550). Against the stratified reference, pooled skill > 0 is "
+        "own, so knowing the stratum beats it) — the 2026-09-05 lifetime card read skilled with a favourable "
+        "verdict while both strata were unskilled (#3550). Against the stratified reference, pooled skill > 0 is "
         "impossible unless a stratum beats its own climatology; `skilled` is additionally forced False when "
         "no stratum is skilled, and each stratum's own n / Brier / skill / gap is served on the card. Same "
         "n ≥ 5 verdict floor and the same fixed ±0.15 gap trip as calibration_verdict (a documented ADR-105 "
         "exception). A stratum with n < 2 or every outcome identical contributes no reference — unknown, "
-        "never counted as unskilled.",
+        "never counted as unskilled. The pooled verdict field is deprecated since 2026-11-09: calibration-v2 "
+        "assesses each stratum separately and never pools them.",
         "20068039a956",
         min_n=5,
         used_by="/api/calibration's platform + platform.lifetime cards; the State of Matthew calibration section.",
@@ -714,45 +726,84 @@ REGISTRY = {
     ),
     "calibration_verdict": _entry(
         "calibration_verdict",
-        "Over/under-confident verdict",
+        "Calibration verdict v1 (RETIRED from every page 2026-11-09)",
         calibration_core.score_pairs,
         "Calibration",
-        "Weighted mean gap = Σ(bin_n · (bin_mean_confidence - bin_observed_rate)) / Σ(bin_n); "
-        "gap > 0.15 → over-confident, gap < -0.15 → under-confident; otherwise well-calibrated "
-        "only when Brier skill > 0 — a skill ≤ 0 surface reads not-yet-skillful instead (#1370)",
+        "Weighted mean gap = Σ(bin_n · (bin_mean_confidence - bin_observed_rate)) / Σ(bin_n); one word per "
+        "forecaster from a fixed ±0.15 trip on that gap, a Brier-skill gate and a one-band withhold rule",
         "Same reliability bins as reliability_bins for that surface.",
-        "Requires n ≥ 5 resolved predictions AND at least one non-empty bin, else "
-        "'insufficient_data'. The ±0.15 threshold is a fixed editorial choice (not derived "
-        "from this platform's own variance) — a documented exception to the ADR-105 'thresholds "
-        "from personal variance' rule, tracked as a candidate for future recalibration once "
-        "more predictions resolve. 'Well-calibrated' asserts reliability AND skill: a forecaster "
-        "whose stated confidence tracks observed rates but whose Brier skill is ≤ 0 (worse than "
-        "always guessing the base rate) reads 'not_yet_skillful' — reliability alone never earns "
-        "the flattering verdict (ADR-104/105, #1370). An undefined skill (degenerate base rate) "
-        "is treated as unknown, not as unskilled. #5615 (2026-11-03): when ≥ CONCENTRATED_SHARE (0.9) of the "
-        "resolved calls sit in ONE stated-confidence bin, 'well-calibrated' is withheld and the verdict reads "
-        "'not_measurable' — one band cannot show confidence tracking outcomes ACROSS confidences (on 2026-11-03, "
-        "203 of the coaches' 211 checked calls were stated at exactly 0.5). Over-/under-confident and "
-        "not-yet-skillful still stand; Brier, skill and every grade are unchanged.",
+        "RETIRED (owner ruling 2026-11-09): replaced on every page by calibration-v2 (calibration_v2_*), because "
+        "one fixed threshold answered three different questions — can calibration be estimated, is there over- or "
+        "under-confidence, is there skill — at once. The ±0.15 trip was a fixed editorial choice with no "
+        "uncertainty statement. The field is still computed and served on /api/calibration for API compatibility "
+        "only, listed as deprecated in its `calibration_method` block; no page renders it.",
         "4481a5efb5d7",
         min_n=5,
+        used_by="Nothing on the site since 2026-11-09 — a deprecated API field.",
     ),
     "credibility_label": _entry(
         "credibility_label",
-        "Coarse credibility label (nascent / not-yet-skillful / developing / reliable / authoritative)",
+        "Coarse credibility ladder v1 (RETIRED from every page 2026-11-09)",
         calibration_core.score_pairs,
         "Calibration",
-        "n < 3 → nascent. Brier skill ≤ 0 → not-yet-skillful. Brier ≤ 0.15 AND n ≥ 12 → "
-        "authoritative. Brier ≤ 0.20 → reliable. Else → developing",
+        "A five-rung word and a 0–100 score from n, the Brier score (0.15 / 0.20 cut points) and the sign of the " "Brier skill",
         "Same pair set as the Brier score for that surface.",
-        "A coarse, backward-compatible label kept for surfaces that pre-date the Brier-based "
-        "scorer — always shown alongside the underlying Brier score and n, never as a "
-        "substitute for them. The 0.15/0.20 cut points are fixed, not personal-variance-"
-        "derived. A negative Brier skill (worse than the base rate) can never render the "
-        "reliable/authoritative rungs, however good the raw Brier looks against an extreme "
-        "base rate — it reads not-yet-skillful (#1370). #5615 (2026-11-03): 'developing' is withheld as under_review outright pending the owner's review, and reliable / authoritative on POSITIVE skill are withheld as 'under_review' when the calibration verdict is not_measurable (>= CONCENTRATED_SHARE of the calls in one stated-confidence bin): its skill rests on a handful of calls off that bin; the score, n and skill stay served beside it.",
+        "RETIRED (owner ruling 2026-11-09) with the v1 calibration verdict: its cut points were fixed rather than "
+        "derived, and a single at-a-glance word cannot carry an interval. Still served on /api/calibration for API "
+        "compatibility only (deprecated in `calibration_method`); no page renders it.",
         "4481a5efb5d7",
-        used_by="Coach cards that need a single at-a-glance credibility word.",
+        used_by="Nothing on the site since 2026-11-09 — a deprecated API field.",
+    ),
+    "calibration_v2_estimability": _entry(
+        "calibration_v2_estimability",
+        "Calibration v2, question 1 — can calibration across confidence levels be estimated?",
+        calibration_v2.estimability,
+        "Calibration",
+        "Per stated-confidence level (the reliability curve's ten bands): hits of n with an exact (Clopper-Pearson) "
+        "95% interval. Across levels: estimable only with ≥ 2 levels of ≥ 17 calls (17 = the fewest calls whose "
+        "exact interval is ≤ 0.5 wide at any hit count, derived not typed) and ≥ 20 calls of the rarer outcome "
+        "(10 events per parameter × 2); then the logistic recalibration slope (Cox 1958) with a Wald 95% interval",
+        "This season's publication-eligible decided calls of one forecaster, or one platform stratum (never pooled).",
+        "Answers only whether an across-level number can be reported — no label depends on it. Calls that share a "
+        "metric and a window are not independent, so the interval is optimistic. Constants fixed before any "
+        "per-coach output was computed (docs/methods/CALIBRATION_V2.md).",
+        "825f23726320",
+        min_n=17,
+        used_by="/api/calibration assessment_v2; /method/calibration/; /api/coach_team; /method/grade-your-coach/ (browser port).",
+    ),
+    "calibration_v2_confidence_direction": _entry(
+        "calibration_v2_confidence_direction",
+        "Calibration v2, question 2 — over- or under-confidence at an observed confidence level",
+        calibration_v2.confidence_direction,
+        "Calibration",
+        "At every level with a resolved call: an exact two-sided binomial test of its hits against its mean stated "
+        "confidence; Holm-adjusted across the levels tested, family-wise α = 0.05 per forecaster. A rejecting "
+        "level reads over-confident (came true less often than stated) or under-confident; both directions read "
+        "mixed; otherwise 'consistent with stated confidence (not established)', or 'insufficient evidence' "
+        "when no level could have rejected at its most extreme result",
+        "This season's publication-eligible decided calls of one forecaster, or one platform stratum (never pooled).",
+        "A finding names its level and is never a statement about calibration across levels. Not detecting a "
+        "departure is never proof of good calibration. Mixed stated values inside a level make the test "
+        "conservative; shared metrics and windows make the p-values optimistic.",
+        "3e096cce7d05",
+        min_n=1,
+        used_by="/api/calibration assessment_v2; /method/calibration/; /api/coach_team; /method/grade-your-coach/ (browser port).",
+    ),
+    "calibration_v2_skill": _entry(
+        "calibration_v2_skill",
+        "Calibration v2, question 3 — skill against the same-call baseline",
+        calibration_v2.skill_vs_baseline,
+        "Calibration",
+        "Paired against the guess that nothing changes, scored on the SAME calls by the same grader: exact sign "
+        "test on the calls only one of the two got right; estimate = hit-rate difference (coach − guess), its "
+        "interval exact conditional on the disagreements (Clopper-Pearson), Bonferroni-adjusted across the "
+        "number / direction / yes-no / sealed records, which are never added together",
+        "This season's publication-eligible decided calls of one coach that the guess could also score.",
+        "'Advantage' only when the interval is wholly above 0; 'the guess did better' only when wholly below; "
+        "otherwise 'no demonstrated advantage'. Strata with no baseline (hypotheses, interval forecasts) answer "
+        "'no baseline'. Unscorable and not-yet-scored calls are counted and shown, never dropped.",
+        "b0c27e26ae69",
+        used_by="/api/calibration assessment_v2; /method/calibration/; /api/coach_team.",
     ),
     "conversational_enrichment_scope": _entry(
         "conversational_enrichment_scope",

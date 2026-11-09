@@ -199,7 +199,8 @@ def test_the_performed_tempo_counts_and_the_week_moves_to_its_intervals(monkeypa
     line1, line2 = block.notes.split("\n")[:2]
     # #5428: the dose is the easy/hard levels and the hard RPE (no bike speed); line 2 is the ride clock with every start
     assert re.match(r"^Recumbent · L\d+/L\d+ · hard RPE 8 \(a few words\)$", line1) and "mph" not in block.notes
-    assert line2.startswith("⌚ ride clock: L") and " min at min " in line2
+    # (#5428 re-grade #6, 2026-11-08: the rep length comes first, then its level — `2 min at L13 from min 6, …`)
+    assert re.match(r"^⌚ ride clock: \d+ min at L\d+ from min \d+, ", line2), line2
     # the route's why leaves the wire (the corpus dropped it) and stays on the audit, with its charter key
     assert "Intervals is conditioning" not in block.notes
     assert "Intervals is conditioning, which the menu runs on the bike, air bike, rower or elliptical" in audit["why"]

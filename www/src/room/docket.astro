@@ -7,7 +7,7 @@
 // demand: one page per entry (src/room/docket-entry.astro). Every value is carried from coach_room.json
 // (/api/coach_docket as served); a withheld word shows the API's own message or that it is not published.
 import Base from "../layouts/Base.astro";
-import { datesOf, docketEntries, questionOf, resultOf, sidesOf, tallyText, testWords } from "../lib/docket.js";
+import { datesOf, docketEntries, incompleteEntries, incompleteText, questionOf, resultOf, sidesOf, tallyText, testWords } from "../lib/docket.js";
 import { dayInWords } from "../lib/format.js";
 import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
 import { loadAll, loadCoachRoom } from "../lib/snapshot.js";
@@ -22,6 +22,9 @@ const entries = docketEntries(file);
 const open = entries.filter((e: any) => e.status === "open");
 const settled = entries.filter((e: any) => e.status !== "open");
 const tally = tallyText(file && file.docket_counts);
+// Owner, 2026-11-09: an entry without its question, both sides' words and the test's own words gets no row and no
+// page — one compact line says how many are incomplete (lib/docket.js::isPublishable).
+const incomplete = incompleteText(incompleteEntries(file));
 const noindex = process.env.WEB_NOINDEX === "1";
 const fetched = file && file.fetched_at ? dayInWords(file.fetched_at) : null;
 const room = { [ROOM_MARKER]: "docket" };
@@ -42,10 +45,12 @@ const h2 = "font-size:28px;line-height:1.15";
         Two coaches take opposite sides of one test, fixed on the day it opens. Each puts its own track record on the line. On the settle day, code checks the data and names a winner. No AI writes the verdict.
       </p>
       <p class="mono" style="font-size:14px">{tally ? `${tally}, as the platform counts them` : "No tally served."}{fetched ? ` · read on ${fetched}` : ""}</p>
-      {!entries.length && <div class="empty"><span>{(file && file.absent_text) || "The platform served no docket entry for this snapshot."}</span></div>}
+      {incomplete && <p class="muted" style="font-size:14px;max-width:72ch;border-left:3px solid var(--rule2);padding-left:12px" data-docket-incomplete>{incomplete}</p>}
+      {!entries.length && !incomplete && <div class="empty"><span>{(file && file.absent_text) || "The platform served no docket entry for this snapshot."}</span></div>}
     </div>
   </section>
 
+  {entries.length > 0 && (<>
   <section class="section" {...room} id="open" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
       <p class="label">Still open</p>
@@ -99,6 +104,7 @@ const h2 = "font-size:28px;line-height:1.15";
       }
     </div>
   </section>
+  </>)}
 
   <section class="section" {...room} style="border-top:1px solid var(--ink)">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">

@@ -140,7 +140,7 @@ degraded_reason   null                             # #3699: "<code>: <ExcClass>:
                                                    # ABSENT (not null) on records written before #3699 —
                                                    # consumers report those as `unrecorded`, never re-derived.
 extracted_by      "deterministic" | "haiku" | "hybrid"
-algo_version      "note-extractor@1.1.0"          # 1.1.0 = per-block merge + calibration + readiness join (#3817)
+algo_version      "note-extractor@1.2.0"          # 1.1.0 = per-block merge + calibration + readiness join (#3817); 1.2.0 = owner_request (#5573)
 extracted_at      <ts>
 ```
 
@@ -259,6 +259,37 @@ cites both numbers without re-deriving either.
 makes every stored record a **forced** change under `certain_change_reason` — so the re-extraction
 goes through #3816's versioned write (prior archived at `ARCHIVE#…`, head stamped `supersedes`)
 and no improved record is mistakable for an original one.
+
+### §5d. Taxonomy amendment — `owner_request` (dated 2026-11-08, #5573)
+
+The second amendment since the lock. **New class — `owner_request`** — *the note ASKS the platform for
+something.* Every other class describes the session; this is the only one that expects a reply. Value:
+`{"subtype": "form_guidance" | "question" | "rule_request", "matched": [the phrases that decided it]}`.
+
+**Detection rule (deterministic, `training_notes.owner_request_of`), in precedence order:**
+
+* `rule_request` — "create / make / add / set up / write a rule", "need / want a rule".
+* `form_guidance` — an **ask** (`may need`, `I need`, `email(ed) me`, `send me`, `show me`, `can you`,
+  `please`, `would like`) **and** a guidance **medium** (`youtube`, `video`, `clip`, `tutorial`, `research`,
+  `guidance`, `email`, `link`) **and** a form **topic** (the `form_technique` words, or `how to`). All three:
+  *"watched a youtube video on form"* has a medium and a topic and asks for nothing.
+* `question` — a question mark after a word (`L9?` is a logging shrug, not a question), `not sure
+  how/if/whether…`, `should I/we`, `is this a good/better…`.
+
+**Measured** over every stored Hevy exercise note (633 noted exercise-sessions, 149 distinct texts,
+2021-04 → 2026-11-01, read 2026-11-08): exactly the three requests #5573 quotes fire, nothing else —
+Lateral Raise (Machine) 2026-11-01 → `form_guidance`, Triceps Rope Pushdown 2026-11-01 → `question`,
+Farmers Walk 2026-10-25 → `rule_request`. **Negative control:** *"felt off on rep 6"* is a form note
+(`form_technique` fires) and raises no request.
+
+The Haiku tail may add the class (its system line names it and the subtype); a model-only signal raises a
+request row only with a valid subtype at confidence ≥ 0.7 (`note_requests.LLM_MIN_CONFIDENCE`).
+`MAX_TOKENS` was re-derived for the extra element (640 → 768, `MAX_TOKENS_DERIVATION`).
+
+**What a detected request becomes** is `training/note_requests.py`, not this layer: a write-once request row
+(`training_constraints` / `REQUEST#…`, owner-only — `docs/SCHEMA.md`), one reply (a form cue sheet or a
+drafted story at raise time; a question is the coach chat's), and an `answered` / `declined` status with its
+channel and UTC instant. `ALGO_VERSION` moves `1.1.0` → `1.2.0`.
 
 ---
 

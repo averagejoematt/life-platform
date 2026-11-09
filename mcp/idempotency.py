@@ -283,6 +283,10 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     # ── Already replay-safe before this change (census §5) ────────────────────
     "archive_horizon": (DETERMINISTIC_KEY, "writes PICK#{week} and its retrospective in place — one row per ISO week"),
     "create_experiment": (READ_BEFORE_WRITE, "pre-reads and RAISES on a duplicate rather than upserting"),
+    "manage_training_phase": (
+        READ_BEFORE_WRITE,
+        "#5575: veto/override read PHASE#STATE first; a replayed veto finds nothing pending and a replayed override is not forward — both refused",
+    ),
     "delete_platform_memory": (DETERMINISTIC_KEY, "delete of a caller-named (category, key); a second delete removes nothing"),
     "end_experiment": (DETERMINISTIC_KEY, "sets terminal fields on the caller-named experiment row; converging, not appending"),
     "evaluate_prediction": (DETERMINISTIC_KEY, "grades the caller-named prediction row in place; the grade is a function of the row"),
@@ -321,7 +325,8 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
     "get_exercise_notes": (
         DETERMINISTIC_KEY,
-        "action=dismiss puts training_constraints sk=dismissal_sk(site, dismissed_on); action=deload puts sk=deload_sk(start_date) — a replay rewrites the same record",
+        "action=dismiss puts training_constraints sk=dismissal_sk(site, dismissed_on); action=deload puts sk=deload_sk(start_date) — a replay rewrites the same record; "
+        "action=answer_request/decline_request is a put conditional on the REQUEST# row still being open (#5573) — a replay is refused",
     ),
     "get_coach_checkin_queue": (
         READ_BEFORE_WRITE,

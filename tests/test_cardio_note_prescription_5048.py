@@ -169,11 +169,14 @@ def test_no_hr_reaches_the_wire_with_or_without_a_constraint():
 
 def test_every_number_the_note_acts_on_is_labelled_and_the_label_stays_off_the_wire():
     """ADR-105: the interval steps, the hill climb and the tempo check-ins are platform-chosen; the audit says so, the
-    note does not (#5428: engine words never reach Hevy)."""
-    assert set(cn.LABELS.values()) == {"platform-chosen"}
+    note does not (#5428: engine words never reach Hevy). The interval's hard step is owner-ruled since 2026-11-08
+    (#5428 re-grade #6: steady + 2), and its label says so."""
+    assert set(cn.LABELS.values()) == {"platform-chosen", "owner-ruled 2026-11-08 (#5428)"}
+    assert cn.LABELS["interval_level_step"] == "owner-ruled 2026-11-08 (#5428)" and cn.INTERVAL_LEVEL_STEP == 2
     for kind in ("easy", "tempo", "intervals", "hills"):
         note, audit = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-28", kind=kind, facts={"last_level": 11})
-        assert "platform-chosen" not in note and audit["labels"]["interval_level_step"] == "platform-chosen"
+        assert "platform-chosen" not in note and "owner-ruled" not in note
+        assert audit["labels"]["interval_level_step"] == "owner-ruled 2026-11-08 (#5428)"
 
 
 # ── box 3: the default is easy; the harder kinds are the menu's placement (#5076) ─────────

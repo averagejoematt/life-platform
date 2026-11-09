@@ -343,7 +343,7 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
 
     action = GET_EXERCISE_NOTES_INPUT["properties"]["action"]
     # #5070 adds the deload word; #5088 the disruption-mode switch; #5104 the travel food kit read; #5078 the fitness battery;
-    # #5103 the weekly menu read
+    # #5103 the weekly menu read; #5573 the Hevy-note requests (a read + the chat's answer / decline)
     assert set(action["enum"]) == {
         "read",
         "dismiss",
@@ -357,6 +357,9 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
         "weekly_menu",
         "fitness_test",
         "fitness_tests",
+        "note_requests",
+        "answer_request",
+        "decline_request",
     }
     for field in ("site", "words", "flag_note_date", "dismissed_on"):
         assert field in GET_EXERCISE_NOTES_INPUT["properties"], f"{field} is not documented on the tool that writes it"
@@ -376,6 +379,9 @@ def test_the_write_is_wired_on_the_tool_that_owns_the_pain_flag_surface():
         "weekly_menu",
         "fitness_test",
         "fitness_tests",
+        "note_requests",
+        "answer_request",
+        "decline_request",
     ]
 
     # a dismissal that cannot name its instance is refused BEFORE any read or write.

@@ -77,7 +77,10 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "each day's fit verdict and the cook days' grocery list (optional week_start, a Monday; default the coming week). "
     "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
     "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
-    "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due."
+    "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due. "
+    "action='note_requests' (#5573, OWNER-ONLY READ): what he ASKED for in a Hevy note (form guidance, a question, a "
+    "rule) — open requests, the overdue count, recent replies; action='answer_request' / 'decline_request' (request_id, "
+    "reply / reason) records the ONE reply given in chat."
 )
 
 # ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
@@ -106,6 +109,9 @@ GET_EXERCISE_NOTES_INPUT = {
                 "weekly_menu",
                 "fitness_test",
                 "fitness_tests",
+                "note_requests",
+                "answer_request",
+                "decline_request",
             ],
             "description": (
                 "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
@@ -116,7 +122,9 @@ GET_EXERCISE_NOTES_INPUT = {
                 "travel_kit = the travel food kit (#5104, read): day plan, grocery list, packing list, hotel/restaurant playbook. "
                 "weekly_menu = the week's menu built by code from his anchor foods (#5103, read): per-day fit, feedings, grocery list. "
                 "fitness_test = record fitness-battery results (#5078, OWNER-ONLY WRITE; `results`, optional `notes`, `date`). "
-                "fitness_tests = the batteries, trend and due state."
+                "fitness_tests = the batteries, trend and due state. "
+                "note_requests = his Hevy-note requests (#5573, read); answer_request / decline_request = record the one "
+                "reply or the reason (OWNER-ONLY WRITE; `request_id`, `reply` / `reason`)."
             ),
         },
         "exercise": {
@@ -179,6 +187,9 @@ GET_EXERCISE_NOTES_INPUT = {
         },
         "notes": {"type": "object", "description": "action='fitness_test': {test: note} — e.g. which bike, the grip."},
         "date": {"type": "string", "description": "action='fitness_test': YYYY-MM-DD of the battery. Defaults to today (Pacific)."},
+        "request_id": {"type": "string", "description": "action='answer_request'/'decline_request': the id note_requests lists."},
+        "reply": {"type": "string", "description": "action='answer_request': the reply given in this conversation, as told to him."},
+        "reason": {"type": "string", "description": "action='decline_request': why the request is not being answered."},
     },
     "required": [],
 }
@@ -238,6 +249,23 @@ GET_TRAINING_DESCRIPTION = (
     "Use for: 'how fit am I?', 'am I overtraining?', 'training load', 'CTL', 'TSB', 'form', "
     "'am I in a deload?', 'periodization', 'what should I do today?', 'training recommendation', 'ready to train?', 'VO2 max trend', 'cardio recovery'."
 )
+
+# #5575: get_training's input table, moved out of mcp/registry.py (the #1665 ceiling) beside its description.
+GET_TRAINING_INPUT = {
+    "type": "object",
+    "properties": {
+        "view": {
+            "type": "string",
+            "description": "load (default), periodization, recommendation, or cardio_fitness (the Apple Watch's VO2 max arc + cardio signals).",
+            "enum": ["load", "periodization", "recommendation", "cardio_fitness"],
+        },
+        "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
+        "end_date": {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
+        "date": {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
+        "weeks": {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
+    },
+    "required": [],
+}
 
 GET_DAILY_METRICS_DESCRIPTION = (
     "Unified daily activity metrics. "

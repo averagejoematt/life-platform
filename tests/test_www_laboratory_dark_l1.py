@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 import check_www_build  # noqa: E402
 import publish_snapshot  # noqa: E402
+import publish_snapshot_lab  # noqa: E402
 from publish_snapshot_lab import (  # noqa: E402
     ABSENT_LAB,
     SERIES_OF,
@@ -37,6 +38,7 @@ FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
 
 
 def _export(tmp_path, name, env_on: bool, monkeypatch):
+    monkeypatch.setattr(publish_snapshot_lab, "lab_live", lambda: False)  # the DARK contract, whatever LAB_LIVE says
     monkeypatch.delenv("WEB_ROOM", raising=False)
     if env_on:
         monkeypatch.setenv("WEB_LAB", "1")
@@ -48,11 +50,12 @@ def _export(tmp_path, name, env_on: bool, monkeypatch):
 
 
 def test_only_the_literal_one_turns_the_lab_on():
-    assert lab_enabled({}) is False
+    assert lab_enabled({}, live=False) is False
     for v in ("", "0", "true", "yes", " 1"):
-        assert lab_enabled({"WEB_LAB": v}) is False
-    assert lab_enabled({"WEB_ROOM": "1"}) is False  # the Coaching Room's switch is not the Lab's
-    assert lab_enabled({"WEB_LAB": "1"}) is True
+        assert lab_enabled({"WEB_LAB": v}, live=False) is False
+    assert lab_enabled({"WEB_ROOM": "1"}, live=False) is False  # the Coaching Room's switch is not the Lab's
+    assert lab_enabled({"WEB_LAB": "1"}, live=False) is True
+    assert lab_enabled({}, live=True) is True  # the go-live switch (LAB_LIVE) turns it on with no env
 
 
 def test_switch_off_writes_no_lab_file_and_on_writes_it(tmp_path, monkeypatch):
@@ -185,13 +188,13 @@ def _dist(tmp_path, html: str = "<!doctype html><p>ok</p>"):
 def test_the_deploy_scan_refuses_lab_output_and_passes_a_clean_dist(tmp_path):
     assert "/data/lab/" in check_www_build.room_paths(check_www_build.LAB_JS)  # read off www/src/lib/lab.js
     clean = _dist(tmp_path)
-    assert check_www_build.lab_leaks(str(clean)) == []
+    assert check_www_build.lab_leaks(str(clean), live=False) == []
     # the controls: a Lab page, the data file, the marker — each must red the scan the deploy runs
     (clean / "data" / "lab" / "tests" / "x").mkdir(parents=True)
     (clean / "data" / "lab" / "tests" / "x" / "index.html").write_text("<p>lab</p>")
     (clean / "data" / "lab.json").write_text("{}")
     (clean / "data" / "index.html").write_text('<section data-lab="entry"></section>')
-    leaks = check_www_build.lab_leaks(str(clean))
+    leaks = check_www_build.lab_leaks(str(clean), live=False)
     assert any("a Laboratory page" in x for x in leaks)
     assert any("data file" in x for x in leaks)
     assert any("marker" in x for x in leaks)

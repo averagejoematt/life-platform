@@ -43,6 +43,8 @@ from web import (
     claim_sourcing,  # #4673: a dated claim citing a sensor with no reading that day is not quoted
     prediction_reason,  # #4220: a graded call's reason in reader words
     record_words,  # #4580 round 1: the base-rate guess's exact rate, beside the counts
+    site_api_calibration_v2,  # owner requirement 2026-11-09: calibration-v2, dark and additive
+    verification_fields,  # owner 2026-11-09: versions + the verification record's pointer, additive
 )
 from web.site_api_common import (
     PT,
@@ -390,6 +392,8 @@ _PREDICTION_PROJECTION_FIELDS = (
     # Owner ruling 2026-11-03: a verdict under classification review is out of every verified count and
     # disclosed as `under_review` (coach.classification_review) — the flag must ride the sweep to be seen.
     "classification_review",
+    # Owner 2026-11-09: the verification record's pointer (coach.verification_record) — served as `verification`.
+    "latest_verification",
 )
 
 
@@ -733,6 +737,7 @@ def handle_calibration(event, *, _g):
 
         per_coach = []
         season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set
+        decided_by_coach = {}  # calibration-v2 (owner 2026-11-09): the same rows, per coach
         season_under_review = 0  # owner ruling 2026-11-03: disputed verdicts, out of every score, disclosed
         platform_pairs = []  # season
         platform_career_pairs = []  # career (all cycles, #1376)
@@ -740,6 +745,7 @@ def handle_calibration(event, *, _g):
             summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
             coach_decided = coach_record.decided_rows(fetched[cid], genesis=EXPERIMENT_START)
             season_decided.extend(coach_decided)
+            decided_by_coach[cid] = coach_decided
             coach_under_review = len(coach_record.under_review_rows(fetched[cid], genesis=EXPERIMENT_START))
             season_under_review += coach_under_review
             platform_pairs.extend(pairs)
@@ -758,6 +764,7 @@ def handle_calibration(event, *, _g):
                     **_decided_blocks(coach_decided),
                     # Owner ruling 2026-11-03: graded calls under classification review — not in n / Brier / record.
                     "under_review": coach_under_review,
+                    "verified": verification_fields.verified_block(coach_decided),  # owner 2026-11-09; null until recorded
                     "lifetime": career_summary,
                 }
             )
@@ -798,11 +805,13 @@ def handle_calibration(event, *, _g):
         # #3712: the forecast strata are now plural and data-derived, so a second
         # interval-forecasting model is scored against its OWN base rate from its
         # first graded week rather than after someone notices the blend.
-        platform = calibration_core.score_strata({"coaches": platform_pairs, "hypotheses": hyp_pairs, **forecast_strata})
+        season_strata = {"coaches": platform_pairs, "hypotheses": hyp_pairs, **forecast_strata}
+        platform = calibration_core.score_strata(season_strata)
         platform_lifetime = calibration_core.score_strata(
             {"coaches": platform_career_pairs, "hypotheses": hyp_career_pairs, **forecast_career_strata}
         )
         platform["lifetime"] = platform_lifetime
+        verification_fields.attach_stratum_extras(platform, season_strata, season_decided)  # owner 2026-11-09: additive per-stratum fields
 
         # #1893: the void ledger stops being write-only. Every reset stamps one
         # voided_at_reset row per still-open pre-registered bet into this SAME
@@ -828,6 +837,10 @@ def handle_calibration(event, *, _g):
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
+                # Owner ruling 2026-11-09: calibration-v2 is ADOPTED — the authority for every calibration verdict.
+                "assessment_v2": site_api_calibration_v2.assessment_v2(decided_by_coach, {"hypotheses": hyp_pairs, **forecast_strata}),
+                # …and the v1 `calibration` / `label` / `score` fields above are deprecated: kept for API compatibility only.
+                "calibration_method": site_api_calibration_v2.method_block(),
                 "cycle": _current_cycle(),
                 # #2957: the season card said "THIS SEASON · CYCLE 14" beside a career
                 # forecast count and the reader-truth judge read the pair as one claim —
@@ -842,17 +855,19 @@ def handle_calibration(event, *, _g):
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
                     "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
-                    "always-say-50% baseline, lower is better. Calibrated and skilled are different claims: "
-                    "calibrated means stated confidence matches how often calls turn out right (reliability); "
-                    "skilled means beating the base rate (Brier skill > 0). A surface can be reliable without "
-                    "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
-                    "Calibrated. The platform-wide card scores skill against a STRATIFIED base rate — coach "
+                    "always-say-50% baseline, lower is better. The calibration verdict is calibration-v2 "
+                    "(`assessment_v2`, adopted 2026-11-09): three separate questions, each with its own test and "
+                    "interval — can calibration across confidence levels be estimated; is there statistically "
+                    "supported over- or under-confidence at an observed confidence level (exact binomial test, "
+                    "Holm-corrected); does a coach beat the same-call guess that nothing changes. Failing to detect "
+                    "a problem is never proof of good calibration. The older `calibration` / `label` / `score` "
+                    "fields are deprecated (see `calibration_method`). The platform-wide card scores skill against a STRATIFIED base rate — coach "
                     "calls, hypothesis bets and each forecasting MODEL's interval forecasts separately, every "
                     "one against its own climatology (the daily metric engine and the weekly training "
                     "prescription are different models and are never counted as one number) — so "
-                    "pooling strata with different base rates cannot manufacture a skill no stratum has; its "
-                    "over/under-confidence verdict is driven by the worst stratum's gap, and each stratum's own "
-                    "n, Brier and skill are served beside it. Voided bets: a reset voids — never grades — every still-open pre-registered "
+                    "pooling strata with different base rates cannot manufacture a skill no stratum has, and each "
+                    "stratum's own n, Brier and skill are served beside it; calibration-v2 assesses each stratum "
+                    "separately and never pools them. Voided bets: a reset voids — never grades — every still-open pre-registered "
                     "bet; each is recorded in the ledger and counted in `voided` so the graded denominator "
                     "is honest. They are excluded from Brier because they never resolved. Every hit rate here "
                     "carries its 95% Wilson interval (`accuracy_ci95`) alongside `n` — a hit rate off a small "
@@ -882,7 +897,7 @@ def _beats_simple_guess(rows) -> bool | None:
     to make it yet" at any N (211 checked calls on 2026-11-03)."""
     stratum = calibration_core.score_strata({"coaches": calibration_core.pairs_from_prediction_records(rows)})["strata"]["coaches"]
     skill = stratum.get("brier_skill")
-    return bool(skill > 0) if isinstance(skill, (int, float)) and not isinstance(skill, bool) else None
+    return record_words.claimable_advantage(skill)  # owner 2026-11-09: a point estimate alone never claims a win
 
 
 def _record_extras(decided_rows, confirmed: int, decided: int, under_review: int = 0) -> dict:
@@ -912,7 +927,9 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
     confirmed = refuted = under_review = 0
     coach_pairs: list = []
     season_all: list = []  # #4617: the rows the class counts are taken over — the same season
+    decided_all: list = []  # owner 2026-11-09: the decided rows the coaches stratum's `verified` block is taken over
     for cid in _CALIB_COACH_NAMES:
+        decided_all.extend(coach_record.decided_rows(rows_by_cid.get(cid, []), genesis=genesis))
         records = coach_record.resolved_once(rows_by_cid.get(cid, []))
         season = [r for r in records if coach_record.counts_this_cycle(r, genesis)]
         season_all.extend(season)
@@ -925,6 +942,8 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
             elif status == "refuted":
                 refuted += 1
         coach_pairs.extend(calibration_core.pairs_from_prediction_records(season))
+    platform = {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}}
+    verification_fields.attach_stratum_extras(platform, {"coaches": coach_pairs}, decided_all)  # the same fields /api/calibration serves
     return {
         "predictions": {
             "overall": {
@@ -936,7 +955,7 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
             }
         },
         "calibration": {
-            "platform": {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}},
+            "platform": platform,
             "as_of": today_pt,
         },
     }
@@ -1154,6 +1173,7 @@ def handle_predictions(event, *, _g):
         # #3046: due-date context for the pending set, from the evaluator's OWN
         # domain-clamped window (coach.prediction_windows — single source, no copy).
         _due_dates = []
+        _verifications = []  # owner 2026-11-09: one per season row `overall.total` counts
 
         for cid in scan_coaches:
             by_coach[cid] = dict(_LIFETIME_ZERO)
@@ -1202,6 +1222,7 @@ def handle_predictions(event, *, _g):
 
                     by_coach[cid]["total"] += 1
                     by_coach[cid][_tally] += 1
+                    _verifications.append(verification_fields.item_fields(rec)["verification"])
                     if _tally in ("confirmed", "refuted"):
                         by_coach[cid]["decided"] += 1
 
@@ -1269,6 +1290,7 @@ def handle_predictions(event, *, _g):
                             **({"reader_plain": False} if _plain_label is False else {}),
                             # Owner ruling 2026-11-03: the stored verdict, shown disputed — not counted as verified.
                             **(classification_review.served_fields(rec, words_held=bool(_held)) if _disputed else {}),
+                            **verification_fields.item_fields(rec),  # owner 2026-11-09: versions + verification (or null)
                         }
                     )
             except Exception as _qe:
@@ -1302,38 +1324,13 @@ def handle_predictions(event, *, _g):
         # sealed set degrades to "sealed rows only" rather than silently dropping some.
         all_predictions = admit_sealed(all_predictions, limit)
 
-        # Compute overall stats — season (unchanged shape) + career (#1376).
-        total = sum(c["total"] for c in by_coach.values())
-        confirmed = sum(c["confirmed"] for c in by_coach.values())
-        refuted = sum(c["refuted"] for c in by_coach.values())
-        pending = sum(c["pending"] for c in by_coach.values())
-        inconclusive = sum(c["inconclusive"] for c in by_coach.values())
-        expired = sum(c["expired"] for c in by_coach.values())
-        observational = sum(c["observational"] for c in by_coach.values())
-        under_review = sum(c["under_review"] for c in by_coach.values())
-        resolved = confirmed + refuted
-        accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else None
-
         # #3046: due-vs-pending context — "N pending" with no due date reads as a
         # stall on a fresh cycle when in truth nothing is due yet (DIL-007).
         due = _due_block(_due_dates, _g["datetime"].now(PT).strftime("%Y-%m-%d"))
 
         return _ok(
             {
-                "overall": {
-                    "total": total,
-                    "confirmed": confirmed,
-                    "refuted": refuted,
-                    "pending": pending,
-                    "inconclusive": inconclusive,
-                    "expired": expired,
-                    "observational": observational,
-                    "decided": resolved,
-                    "accuracy_pct": accuracy_pct,
-                    "due": due,
-                    **_record_extras(season_decided, confirmed, resolved, under_review),  # #4617 counts + #4580 guess + disputed
-                    "lifetime": _summed_tally([c["lifetime"] for c in by_coach.values()]),  # career (#1376)
-                },
+                "overall": _overall_block(by_coach, season_decided, due),
                 "by_coach": by_coach,
                 # #4585 / epic #4580 rule 3: the record never appears alone. The "nothing
                 # changes" rule's right / scored / unscorable counts per record (number calls,
@@ -1343,6 +1340,8 @@ def handle_predictions(event, *, _g):
                 # #4220: below this many decided calls a rendered record prints counts, not a %.
                 "percent_floor": coach_record.PERCENT_FLOOR,
                 "predictions": all_predictions,
+                # Owner 2026-11-09: counts by verification outcome over the season rows `overall.total` counts.
+                "verification_summary": verification_fields.summary(_verifications),
                 # #3553: the follow-through half of the same record. Fail-soft — the
                 # prediction scorecard must not go dark because the commitment read did.
                 "commitments": _commitment_block_safe(_g=_g),
@@ -1364,6 +1363,35 @@ def handle_predictions(event, *, _g):
         # either one being given up.
         logger.error(f"[/api/predictions] {_e}", exc_info=True)
         return _error(500, "Prediction ledger temporarily unavailable", prereg_seal=seal)
+
+
+def _overall_block(by_coach: dict, season_decided: list, due) -> dict:
+    """``/api/predictions`` ``overall`` — season (unchanged shape) + career (#1376), summed over ``by_coach``.
+    Extracted from ``handle_predictions`` unchanged (#4880 function-length ratchet, owner 2026-11-09)."""
+    total = sum(c["total"] for c in by_coach.values())
+    confirmed = sum(c["confirmed"] for c in by_coach.values())
+    refuted = sum(c["refuted"] for c in by_coach.values())
+    pending = sum(c["pending"] for c in by_coach.values())
+    inconclusive = sum(c["inconclusive"] for c in by_coach.values())
+    expired = sum(c["expired"] for c in by_coach.values())
+    observational = sum(c["observational"] for c in by_coach.values())
+    under_review = sum(c["under_review"] for c in by_coach.values())
+    resolved = confirmed + refuted
+    accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else None
+    return {
+        "total": total,
+        "confirmed": confirmed,
+        "refuted": refuted,
+        "pending": pending,
+        "inconclusive": inconclusive,
+        "expired": expired,
+        "observational": observational,
+        "decided": resolved,
+        "accuracy_pct": accuracy_pct,
+        "due": due,
+        **_record_extras(season_decided, confirmed, resolved, under_review),  # #4617 counts + #4580 guess + disputed
+        "lifetime": _summed_tally([c["lifetime"] for c in by_coach.values()]),  # career (#1376)
+    }
 
 
 def _commitment_block_safe(*, _g):
