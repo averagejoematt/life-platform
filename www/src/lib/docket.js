@@ -43,8 +43,21 @@ export function testWords(c) {
   return rest ? `${m}${m.includes(",") ? "," : ""} ${rest}` : m;
 }
 
-/** The room's docket entries, open first (soonest to settle), then settled (newest first). [] when none served. */
-export function docketEntries(file) {
+const served = (s) => typeof s === "string" && s.trim() !== "";
+
+/**
+ * Is this entry complete enough to have an argument page (owner, 2026-11-09: "rather than publishing empty argument
+ * pages")? Its question (`topic`), BOTH sides' words (`claims`) and the test's own words (`criterion.description`)
+ * must all be served. A side withheld by the privacy filter is not served. Anything less is incomplete: no page, no
+ * row, only the compact line from incompleteText().
+ */
+export function isPublishable(e) {
+  if (!e || !served(e.topic) || !served((e.criterion || {}).description)) return false;
+  return [e.coach_a, e.coach_b].every((id) => served((e.claims || {})[id]));
+}
+
+/** Every served entry, complete or not, in docket order. Used to MATCH a disagreement, never to render a page. */
+export function allDocketEntries(file) {
   if (!file || file.state !== "ok" || !Array.isArray(file.docket_entries)) return [];
   const open = file.docket_entries.filter((e) => e && e.status === "open");
   const done = file.docket_entries.filter((e) => e && e.status !== "open");
@@ -53,9 +66,33 @@ export function docketEntries(file) {
   return [...open, ...done];
 }
 
-/** One entry by id, or null. */
+/** The entries not yet cleared for publication (incomplete), in docket order. */
+export function incompleteEntries(file) {
+  return allDocketEntries(file).filter((e) => !isPublishable(e));
+}
+
+/** The ONE compact line for the incomplete entries, or null when there are none. Counts are of served list items. */
+export function incompleteText(list) {
+  const n = (list || []).length;
+  if (!n) return null;
+  const open = list.filter((e) => e.status === "open").length;
+  const parts = [open ? `${open} open` : null, n - open ? `${n - open} settled` : null].filter(Boolean).join(" and ");
+  return `${parts} ${n === 1 ? "entry is" : "entries are"} incomplete — not yet cleared for publication. The platform does not yet serve ${n === 1 ? "its" : "their"} question, both sides' words and the test in its own words, so ${n === 1 ? "it has" : "they have"} no page here.`;
+}
+
+/** The room's PUBLISHABLE docket entries (isPublishable), open first (soonest to settle), then settled (newest first). */
+export function docketEntries(file) {
+  if (!file || file.state !== "ok" || !Array.isArray(file.docket_entries)) return [];
+  const open = file.docket_entries.filter((e) => e && e.status === "open" && isPublishable(e));
+  const done = file.docket_entries.filter((e) => e && e.status !== "open" && isPublishable(e));
+  open.sort((a, b) => String(a.resolution_date || "").localeCompare(String(b.resolution_date || "")) || a.id.localeCompare(b.id));
+  done.sort((a, b) => String(b.resolved_date || b.resolution_date || "").localeCompare(String(a.resolved_date || a.resolution_date || "")) || a.id.localeCompare(b.id));
+  return [...open, ...done];
+}
+
+/** One served entry by id (complete or not), or null. Whether it may have a page is isPublishable's call. */
 export function docketEntry(file, id) {
-  return docketEntries(file).find((e) => e.id === id) || null;
+  return allDocketEntries(file).find((e) => e.id === id) || null;
 }
 
 /** "1 open · 3 settled" — the API's own tally, carried; null when it served none. */
@@ -223,7 +260,7 @@ export function previousMonth(month) {
 const inMonth = (iso, month) => Boolean(month) && monthOf(iso) === month;
 
 /** The call's words for a row: a quotation, or the exporter's withheld message (never a paraphrase). */
-const CALL_NOT_PUBLISHED = "The words of this call are not published."; // the exporter's own phrase for a call
+export const CALL_NOT_PUBLISHED = "The words of this call are not published."; // the exporter's own phrase for a call
 export function callWords(p) {
   if (!p) return { text: null, message: CALL_NOT_PUBLISHED };
   if (p.claim_withheld) return { text: null, message: p.claim || CALL_NOT_PUBLISHED };

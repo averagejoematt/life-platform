@@ -106,13 +106,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "#5428 note grammar builder, fixture-tested in tests/test_hevy_note_lint_5428.py; lane C landed its own line-1 composer in `cardio_note` (it shares the grammar's TALK_WORDS, CLOCK_PREFIX and AFTER_LINE). "
         "Point that producer at this builder (the #5428 notes follow-up lane), then delete this entry."
     ),
-    "lambdas/training/training_charter.py:load_charter": (
-        "The loader's documented merged-charter read (ADR-164, the module docstring), held by the charter tests "
-        "(test_training_charter_derivation_5068, test_training_charter_privacy_5087, test_disruption_mode_5088). Its "
-        "one live caller was `charter_value`, which since #5313 reads the cache in place instead of deep-copying the "
-        "WHOLE charter per value (~2,900 copies per plan_next_session stage 2). Delete this entry when a live caller "
-        "needs the whole merged object again."
-    ),
     "lambdas/training/cardio_menu.py:performed_movement_minutes": (
         "#5076's performed side of `movement_minutes` (the gym cardio minutes a performed day adds to the "
         "steps/movement goal, charter `steps.gym_cardio_minutes_count_toward_movement`), landed fixture-tested "
@@ -486,9 +479,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     "lambdas/training/routine_repo.py:lookup_hevy_id": (
         "#3609 box 2 widen: exercised only by tests/test_routine_repo.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
-    "lambdas/training/training_notes.py:compute_deviation": (
-        "#3609 box 2 widen: exercised only by tests/test_training_notes.py (also named in docs/BACKLOG.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
     "lambdas/web/card_engine.py:draw_uncertainty": (
         "#3609 box 2 widen: exercised by tests/test_card_engine.py; named only in a COMMENT in scripts/doc_facts_og.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."

@@ -7,12 +7,22 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  assessmentWords,
   blendRow,
   calibrationChart,
+  coachVerified,
+  excludedAccounting,
+  methodChangeText,
+  qualifyText,
+  sameCalls,
+  verifiedRecord,
   calibrationDots,
   concentrationText,
   intervalText,
-  labelWords,
+  v2Answers,
+  v2MethodText,
+  v2Short,
+  v2Stratum,
   recordHeadline,
   strataRows,
   versusGuess,
@@ -63,13 +73,39 @@ test("absent data file → no headline (the page says so)", () => {
   assert.equal(recordHeadline(null), null);
 });
 
-test("calibration labels: inadequate evidence reads as such; the API's label is rendered, no threshold invented", () => {
-  assert.match(labelWords("not_measurable"), /^not measurable/);
-  assert.equal(labelWords("insufficient_data"), "insufficient evidence");
-  assert.equal(labelWords("nascent"), "insufficient evidence");
-  assert.equal(labelWords("over-confident"), "came true less often than stated");
-  assert.equal(labelWords("some_new_label"), "some new label");
-  assert.equal(labelWords(null), "no label served");
+test("calibration-v2 (owner 2026-11-09): three answers in the served words, in order; nothing invented", () => {
+  const nutrition = FIXTURE.calibration.coaches.find((c) => c.coach_id === "nutrition");
+  const xs = v2Answers(nutrition.assessment_v2);
+  assert.deepEqual(xs.map((x) => x.key), ["estimability", "confidence_direction", "skill"]);
+  assert.match(xs[1].words, /^Over-confident at its 50% calls \(\d+ of \d+ came true, 95% CI \d+%–\d+%; Holm-adjusted p [\d.]+\)/);
+  assert.match(xs[1].words, /not about calibration across confidence levels/);
+  assert.equal(xs[1].short, "over-confident at its 50% calls");
+  assert.match(v2Short(nutrition.assessment_v2), /^not estimable across confidence levels · over-confident at its 50% calls · /);
+  assert.deepEqual(v2Answers(null), []);
+  assert.deepEqual(v2Answers({ confidence_direction: { label: "over_confident" } }), [], "a bare label is never turned into words");
+  assert.equal(v2Short(undefined), null);
+  assert.equal(v2Stratum(FIXTURE.calibration, "coaches").method_version, "calibration-v2");
+  assert.equal(v2Stratum(FIXTURE.calibration, "nope"), null);
+  assert.equal(v2MethodText(FIXTURE.calibration), "calibration-v2, adopted 9 November 2026");
+  assert.equal(v2MethodText({}), null);
+});
+
+test("no v1 calibration label reaches the words: the served v1 fields are never read (sentinel + mutation control)", () => {
+  const SENT = "V1SENTINEL_LABEL";
+  const cal = clone(FIXTURE.calibration);
+  for (const c of cal.coaches) Object.assign(c, { calibration: SENT, label: SENT });
+  for (const s of Object.values(cal.platform.strata)) Object.assign(s, { calibration: SENT, label: SENT });
+  Object.assign(cal.platform, { calibration: SENT, label: SENT });
+  const file = { ...clone(FIXTURE), calibration: cal };
+  const out = JSON.stringify([
+    strataRows(file),
+    blendRow(file),
+    cal.coaches.map((c) => [v2Answers(c.assessment_v2), v2Short(c.assessment_v2)]),
+    recordHeadline(file),
+  ]);
+  assert.ok(!out.includes(SENT), "a v1 label reached a reader-facing value");
+  // mutation control: the detector does see the sentinel where it IS present
+  assert.ok(JSON.stringify(cal).includes(SENT));
 });
 
 test("stated confidence: the largest served band beside the coach's n, both carried", () => {
@@ -113,4 +149,66 @@ test("on a phone the viewBox is the container's width, so SVG text stays at or a
   assert.match(svg, /viewBox="0 0 342 /);
   const sizes = [...svg.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1]));
   assert.ok(sizes.length && sizes.every((s) => s >= 11), `font sizes ${sizes}`);
+});
+
+// ── launch-readiness (2026-11-09): the verified-only headline, same-call baseline, which calls qualify, exclusions ──
+
+test("verified record: read from strata.coaches.verified, else verification_summary.verified; malformed → not served", () => {
+  const f = clone(FIXTURE);
+  assert.equal(verifiedRecord(f.calibration), null, "the control: nothing served today");
+  f.calibration.verification_summary = { verified: { n: 30, right: 12, accuracy_pct: 40.0 } };
+  assert.deepEqual([verifiedRecord(f.calibration).n, verifiedRecord(f.calibration).confirmed], [30, 12]);
+  f.calibration.platform.strata.coaches.verified = { n: 40, confirmed: 17 };
+  assert.equal(verifiedRecord(f.calibration).n, 40, "the stratum's own split wins");
+  assert.equal(verifiedRecord({ verification_summary: { verified: { n: "40", confirmed: 17 } } }), null);
+});
+
+test("the baseline beside the verified record is over the SAME calls or not shown (control: a mismatched n is refused)", () => {
+  assert.deepEqual(sameCalls({ n: 40, text: "x" }, 40), { n: 40, text: "x" });
+  assert.deepEqual(sameCalls({ text: "x" }, 40), { text: "x" }, "served on the verified object, no n of its own");
+  assert.equal(sameCalls({ n: 214, text: "x" }, 40), null);
+  const f = clone(FIXTURE);
+  f.calibration.platform.strata.coaches.verified = { n: 40, confirmed: 17, accuracy_pct: 42.5, baseline: { n: 214, text: "A guess on other calls." } };
+  const h = recordHeadline(f);
+  assert.doesNotMatch(h.dek, /other calls/, "a baseline over other calls never reaches the headline");
+  assert.equal(h.baselineSameCalls, false);
+  assert.match(h.dek, /No comparison with a simple guess is published for these same calls yet/);
+  f.calibration.platform.strata.coaches.verified.baseline = { n: 40, text: "A guess on these calls does about as well." };
+  assert.match(recordHeadline(f).dek, /A guess on these calls does about as well\./);
+  assert.doesNotMatch(recordHeadline(f).dek, /every call has a/, "the as-graded baseline never stands in");
+});
+
+test("the denominator change reads as which calls qualify, never as improvement", () => {
+  const f = clone(FIXTURE);
+  assert.equal(qualifyText(recordHeadline(f)), null, "the control: no verified split, no sentence");
+  f.calibration.platform.strata.coaches.verified = { n: 40, confirmed: 17 };
+  const q = qualifyText(recordHeadline(f));
+  assert.match(q, /the 40 calls that qualify .* 214 calls were first graded/);
+  assert.match(q, /which calls qualify to be evaluated, not a change in how well the coaches called them/);
+  for (const s of [q, recordHeadline(f).caveat]) assert.doesNotMatch(s, /improv|better score|more accurate|gain/i);
+  assert.match(methodChangeText({ effective: "2026-11-05", history: [{}, {}] }), /^Since 5 November 2026, only calls about publishable data qualify/);
+  assert.equal(methodChangeText({ effective: "2026-11-05", history: [{}] }), null, "one method, no change to explain");
+});
+
+test("the excluded-calls accounting: nothing until the producer serves it; carried, never summed; private families never shown", () => {
+  assert.equal(excludedAccounting(FIXTURE.calibration), null, "the control: not served → the component shows nothing");
+  const dict = excludedAccounting({ verification_summary: { excluded_by_category: { unassessed: 120, logging_gap: 4, low_power: 2 } } });
+  assert.deepEqual(dict.rows.map((r) => [r.key, r.n]), [["unassessed", 120], ["logging_gap", 4], ["low_power", 2]]);
+  assert.equal(dict.total, null, "no total is computed when none is served");
+  const list = excludedAccounting({ verification_summary: { excluded: [{ category: "proxy_metric", count: 3 }, { key: "x_y", n: 1, label: "Served words" }], excluded_total: 4 } });
+  assert.deepEqual(list.rows.map((r) => r.words), ["graded on a stand-in measure, not the one it named", "Served words"]);
+  assert.equal(list.total, 4);
+  const priv = excludedAccounting({ verification_summary: { excluded_by_category: { journal_calls: 9, mood: 3, state_of_mind: 1, low_power: 2 } } });
+  assert.deepEqual(priv.rows.map((r) => r.key), ["low_power"], "a private family is dropped, fail closed");
+  assert.equal(excludedAccounting({ verification_summary: { excluded_by_category: { mood: 3 } } }), null);
+  assert.equal(excludedAccounting({ verification_summary: { excluded_by_category: { low_power: "2" } } }), null, "a non-integer count is not served");
+});
+
+test("per-coach verification and assessment_v2: shown when served, absent otherwise", () => {
+  assert.equal(coachVerified(FIXTURE.calibration.coaches[0]), null);
+  assert.deepEqual(coachVerified({ verification: { n: 15, confirmed: 6, accuracy_pct: 40, accuracy_ci95: [19.8, 64.3] } }), { k: 6, n: 15, pct: "40.0%", ci: "95% interval 19.8–64.3%" });
+  assert.equal(assessmentWords(null), null);
+  assert.equal(assessmentWords({ sentence: "Not the v2 shape." }), null);
+  assert.equal(assessmentWords({ label: "insufficient_data" }), null, "a bare label is never rendered");
+  assert.equal(assessmentWords({ estimability: { wording: "A." }, skill: { wording: "C." } }), "A. C.");
 });

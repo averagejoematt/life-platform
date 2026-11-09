@@ -460,7 +460,14 @@ def test_every_path_lints_clean_and_the_lint_fires_on_the_old_copy():
         paths[f"disruption, {pool}"] = disruption.to_routine(
             rx, target_date="2026-12-22", variant="ideal", mode={"template": "travel"}, catalog=CATALOG
         )
-    assert {k: v for k, v in ((k, _lint(ir)) for k, ir in paths.items()) if v} == {}
+    # #5428 re-grade #6 (2026-11-08): the offline 10-26 render has no history for its machine row, so its rows carry no
+    # load and the note asks him to find one — the 11-06 Romanian deadlift's class, which now fails (the real path's
+    # positive control); every other line of every path is clean
+    assert {k: v for k, v in ((k, _lint(ir)) for k, ir in paths.items()) if v} == {
+        "generator, 10-26 rotated": [
+            "L4 [2] Seated Row (Machine): a machine compound with no load on any working row asks him to 'find the load.' (§3.3)"
+        ]
+    }
     # mutation control: the engine's own rotation line (its slot id and week arithmetic) on the wire reds the lint
     ir = _generate_10_26()
     fly = next(b for b in ir.exercises if b.movement_key == "chest_fly_machine")

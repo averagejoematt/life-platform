@@ -7,12 +7,25 @@
 import Base from "../layouts/Base.astro";
 import LabBanner from "../components/LabBanner.astro";
 import { dayInWords, num } from "../lib/format.js";
-import { LAB_MARKER, labEnabled } from "../lib/lab.js";
-import { GROUP_WORDS, byPillar, findingText, labCounts, latestFindings, pillarWords, testSentence, verdictOf, weekWords, prose } from "../lib/laboratory.js";
+import { LAB_MARKER, labEnabled, labPrivate } from "../lib/lab.js";
+import {
+  GROUP_WORDS,
+  byPillar,
+  experimentHasPage,
+  findingText,
+  labCounts,
+  latestFindings,
+  pillarWords,
+  testHasPage,
+  testSentence,
+  verdictOf,
+  weekWords,
+  prose,
+} from "../lib/laboratory.js";
 import { loadLab } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
-if (!labEnabled()) throw new Error("src/lab/lab-index.astro rendered with WEB_LAB off — the Lab route must not be injected");
+if (!labEnabled()) throw new Error("src/lab/lab-index.astro rendered with the Lab switched off — the Lab route must not be injected");
 
 const lab = await loadLab();
 const ok = lab.state === "ok";
@@ -37,7 +50,7 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
 ---
 
 <Base title="The Laboratory" top="data" description="What he is trying on purpose, what it should move, what it moved, and how sure anyone can be." status={asOf}>
-  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <Fragment slot="head">{!noindex && labPrivate() && <meta name="robots" content="noindex, nofollow" />}</Fragment>
   <LabBanner />
   {
     !ok ? (
@@ -133,10 +146,9 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
           <div class="wrap" style="max-width:1100px">
             <p class="label" style="margin-bottom:6px">Running · {num(running.length)} — Ready to start · {num(ready.length)}</p>
             {!running.length && (
-              <div class="empty" style="margin-bottom:12px">
-                <b style="color:var(--ink)">No experiment is running.</b>
-                <span>An experiment becomes real when its first day is logged; none has been in this snapshot.</span>
-              </div>
+              <p class="muted" style="font-size:14px;max-width:70ch;margin-bottom:12px">
+                None is running: an experiment starts when its first day is logged.{ready.length ? " These are written and ready:" : ""}
+              </p>
             )}
             {[...running, ...ready].length > 0 && (
               <div class="rows">
@@ -237,17 +249,27 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                       {pillarWords(g.pillar)} · {num(g.items.length)}
                     </p>
                     <div class="rows">
-                      {g.items.map((x: any) => (
-                        <a href={href(`/data/lab/experiments/${x.id}/`)}>
-                          <span style="font-size:14px">
-                            <b>{x.name}</b>
-                          </span>
-                          <span class="mono" style="font-size:12px">
-                            {x.planned_duration_days ? `${num(x.planned_duration_days)} days` : "—"}
-                            {x.evidence_tier ? ` · ${x.evidence_tier} evidence` : ""}
-                          </span>
-                        </a>
-                      ))}
+                      {g.items.map((x: any) => {
+                        // a library card with no run has no page of its own (experimentHasPage): its claim sits here instead
+                        const body = (
+                          <>
+                            <span style="font-size:14px">
+                              <b>{x.name}</b>
+                              {x.hypothesis && (
+                                <>
+                                  <br />
+                                  <span class="muted" style="font-size:13px">{prose(x.hypothesis)}</span>
+                                </>
+                              )}
+                            </span>
+                            <span class="mono" style="font-size:12px">
+                              {x.planned_duration_days ? `${num(x.planned_duration_days)} days` : "—"}
+                              {x.evidence_tier ? ` · ${x.evidence_tier} evidence` : ""}
+                            </span>
+                          </>
+                        );
+                        return experimentHasPage(x) ? <a href={href(`/data/lab/experiments/${x.id}/`)}>{body}</a> : <div>{body}</div>;
+                      })}
                     </div>
                   </div>
                 ))}
@@ -259,14 +281,23 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                   <b style="font-size:18px">Retired and finished · {num(retired.length + done.length)}</b>
                 </summary>
                 <div class="rows" style="margin-top:12px">
-                  {retired.map((t) => (
-                    <a href={href(`/data/lab/tests/${t.id}/`)}>
-                      <span style="font-size:14px">
-                        <b>{testSentence(t)}</b>
-                      </span>
-                      <span class="status inconclusive">{verdictOf(t).word}</span>
-                    </a>
-                  ))}
+                  {retired.map((t) => {
+                    const body = (
+                      <>
+                        <span style="font-size:14px">
+                          <b>{testSentence(t)}</b>
+                          {!testHasPage(t) && (
+                            <>
+                              <br />
+                              <span class="muted" style="font-size:13px">{verdictOf(t).reason}</span>
+                            </>
+                          )}
+                        </span>
+                        <span class="status inconclusive">{verdictOf(t).word}</span>
+                      </>
+                    );
+                    return testHasPage(t) ? <a href={href(`/data/lab/tests/${t.id}/`)}>{body}</a> : <div>{body}</div>;
+                  })}
                   {done.map((x) => (
                     <a href={href(`/data/lab/experiments/${x.id}/`)}>
                       <span style="font-size:14px">
@@ -279,7 +310,7 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
               </details>
             )}
             <p class="muted" style="font-size:13px;max-width:70ch">
-              Challenges, votes and suggestions are not part of this build: nothing on these pages writes a record.
+              Challenges, votes and suggestions are not open here: nothing on these pages writes a record.
             </p>
           </div>
         </section>

@@ -206,7 +206,10 @@ _MINIMUM_LINE_RE = re.compile(r"^(?:Minimum|Travel) · ", re.M)
 # #5083/#5428: a rotated accessory's reason line (`lift_note.rotation_line`)
 _ROTATION_RE = re.compile(r"^New: replaces ", re.M)
 # #5428: the standard's reason grammar (`lift_note.reason_line`, the chat path's step line) — line 2, after the effort line
-_STANDARD_REASON_RE = re.compile(r"^(?:Heavier|Lighter|Volume day|Now aiming \d+–\d+|No jumps(?: today)?|Step due): ", re.M)
+# (re-grade #6, 2026-11-08: the capped exposure's line is `Same load all sets: …`; the retired `No jumps` still reads)
+_STANDARD_REASON_RE = re.compile(
+    r"^(?:Heavier|Lighter|Volume day|Now aiming \d+–\d+|Same load all sets|No jumps(?: today)?|Step due): ", re.M
+)
 _EFFORT_LINE_RE = re.compile(r"^RPE \d")
 
 
