@@ -897,7 +897,7 @@ def _beats_simple_guess(rows) -> bool | None:
     to make it yet" at any N (211 checked calls on 2026-11-03)."""
     stratum = calibration_core.score_strata({"coaches": calibration_core.pairs_from_prediction_records(rows)})["strata"]["coaches"]
     skill = stratum.get("brier_skill")
-    return bool(skill > 0) if isinstance(skill, (int, float)) and not isinstance(skill, bool) else None
+    return record_words.claimable_advantage(skill)  # owner 2026-11-09: a point estimate alone never claims a win
 
 
 def _record_extras(decided_rows, confirmed: int, decided: int, under_review: int = 0) -> dict:
