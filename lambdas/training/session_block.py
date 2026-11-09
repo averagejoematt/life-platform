@@ -331,7 +331,7 @@ def change_reason(verdict: dict[str, Any] | None, gap_days: Any = None) -> str |
 def layoff_capped(gap_days: int | None, note: str | None) -> bool:
     """OD1 (owner ruling 2026-09-30, `layoff_tiers`): exposures 1–3 after a gap of more than 90 days, or a novel-again
     lift, run at RPE ≤ 7 — the effort treatment `lift_note` gives a capped exposure. True when the gap is over that line
-    or unknown, or the lift's note already carries the composer's `No jumps` line."""
+    or unknown, or the lift's note already carries the composer's layoff line (`Same load all sets: …`)."""
     from training.layoff_tiers import REENTRY_MAX_GAP_DAYS
 
     if any(ln.startswith(hevy_note_grammar.NO_JUMPS) for ln in split(note)[1].split("\n")):
@@ -340,18 +340,15 @@ def layoff_capped(gap_days: int | None, note: str | None) -> bool:
 
 
 def capped_clause(working_sets: int, gap_days: Any = None, existing: str | None = None) -> str:
-    """A critic's set cap on a capped exposure, as the lift's ONE `No jumps` line (≤ one phone line, so the pick-load W
-    line and the family cue still fit): `No jumps: 3 sets today, 19 weeks off.` The gap is the composer's own `No jumps`
-    line's when there is one (`existing`), so the two never disagree."""
-    head = f"{hevy_note_grammar.NO_JUMPS}: {working_sets} set{'' if working_sets == 1 else 's'} today"
-    m = re.search(r"session (\d+) back", existing or "")
-    if m:
-        return f"{head}, session {m.group(1)} back."
-    m = re.search(r"first time in (.+?)\.$", existing or "")
-    gap = m.group(1) if m else hevy_note_grammar.gap_text(gap_days)
-    if gap:
-        return f"{head}, {gap} off."
-    return f"{head}, {NEW_TO_LOG_WORDS}." if gap_days is None else f"{head}, {BREAK_WORDS}."
+    """A critic's set cap on a capped exposure, as the lift's ONE layoff line (re-grade #6, 2026-11-08: one grammar,
+    `hevy_note_grammar.layoff_line`): `Same load all sets: first time in 18 months.` The composer's own layoff line
+    (`existing`) is kept as it is, so the two never disagree; else the gap from `gap_days` (`layoff_gap`), else
+    `back after a break`. No set count — the rows show it (the 11-06 draft read `No jumps: 3 sets today, 18 months off.`).
+    `working_sets` stays in the signature for the critic pass that calls it."""
+    del working_sets
+    if existing and hevy_note_grammar.LAYOFF_RE.match(existing.strip()):
+        return existing.strip()
+    return hevy_note_grammar.layoff_line(hevy_note_grammar.layoff_gap_words(gap_days, 1))
 
 
 def applied_clause(kind: str, *, working_sets: int | None = None, lighter: bool | None = None, reason: str | None = None) -> str | None:
@@ -371,11 +368,11 @@ def applied_clause(kind: str, *, working_sets: int | None = None, lighter: bool 
 
 
 # what a critic clause opens with (`applied_clause`): one is never displaced by another — each is a safety change (§6.3)
-CLAUSE_RE = re.compile(r"^(?:\d+ sets? today|Lighter today|Heavier today|Fewer reps today)[:.]|^No jumps: \d+ sets? today, ")
+CLAUSE_RE = re.compile(r"^(?:\d+ sets? today|Lighter today|Heavier today|Fewer reps today)[:.]")
 
 
 def _displaceable(line: str) -> bool:
-    """A computed reason that yields the one reason slot to a critic clause. A capped exposure's `No jumps` line opts the
+    """A computed reason that yields the one reason slot to a critic clause. A capped exposure's layoff line opts the
     lift out of the load rule (a safety cap after a break), so it keeps its line, as does an earlier critic clause."""
     return bool(hevy_note_grammar.REASON_RE.match(line)) and not CLAUSE_RE.match(line) and not line.startswith(hevy_note_grammar.NO_JUMPS)
 
@@ -412,7 +409,7 @@ def add_reason(note: str | None, clause: str | None) -> str:
     One reason per lift (standard §3.2, whose reason list includes the critic clause) and the clause is a safety change
     that is never dropped (§6.3), so it takes the reason slot: a computed reason already there (`New: replaces …`,
     `Heavier: …`, `Volume day: …`) gives way to it — the displaced line stays on the stored record
-    (`inputs_snapshot["lift_notes"]`). A capped exposure's `No jumps` line and an earlier critic clause keep their
+    (`inputs_snapshot["lift_notes"]`). A capped exposure's layoff line and an earlier critic clause keep their
     lines, and the clause goes in after line 1 (the effort line). #5428 replay, 2026-10-29: the joints critic's
     `3 sets today: …` stacked on a seated calf raise's rotation line, pick-load line and cue — 5 phone lines > 4. A
     clause that still pushes the note over budget drops the optional prep clause from the cue line (`_fit`)."""
@@ -428,10 +425,12 @@ def add_reason(note: str | None, clause: str | None) -> str:
 
 def add_capped_reason(note: str | None, clause: str, rpe_max: Any) -> str:
     """A critic's set cap on a capped exposure (`layoff_capped`): line 1 becomes the cap's effort (`RPE 7` — the
-    "last set RPE 9–10" of the band would contradict it) and `clause` (`capped_clause`) takes the `No jumps` line's
+    "last set RPE 9–10" of the band would contradict it) and `clause` (`capped_clause`) takes the layoff line's
     slot, else a displaceable computed reason's, else goes in after line 1 — the same effort treatment `lift_note`
     gives a capped exposure (the 2026-10-30 re-grade: a capped seated calf raise kept RPE 9–10 and the +10 lb rule).
-    An earlier critic clause keeps its line. Idempotent."""
+    An earlier critic clause keeps its line. Re-grade #6 (2026-11-08, 4 of 4 voices): the capped exposure HOLDS its
+    load, so the pick-load W step line (`W at RPE 5 or less → one step, no more.`) leaves the note — the 11-06 standing
+    calf raise read "No jumps" and then "one step" on the next line. Idempotent."""
     text = note or ""
     block, own = split(text)
     lines = _own_lines(block, own)
@@ -439,6 +438,7 @@ def add_capped_reason(note: str | None, clause: str, rpe_max: Any) -> str:
         return text
     if hevy_note_grammar.EFFORT_RE.match(lines[0]):
         lines[0] = hevy_note_grammar.effort_line(rpe_max)
+    lines = [lines[0]] + [ln for ln in lines[1:] if not hevy_note_grammar.PICK_LOAD_RESULT_RE.match(ln)]
     if clause not in lines:
         slot = next(
             (i for i, ln in enumerate(lines[1:], start=1) if ln.startswith(hevy_note_grammar.NO_JUMPS)),
