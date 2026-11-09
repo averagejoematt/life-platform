@@ -60,7 +60,7 @@ from common.pacific_time import shift_day_key
 from experiment.measurable_metrics import METRIC_SOURCES, base_metric
 from experiment.phase_taxonomy import experiment_stamp_for
 
-from coach import classification_review, grade_corrections
+from coach import classification_review, grade_corrections, repeat_family
 from coach.grading_quality import window_end
 from coach.prediction_point_grader import POINT_GRACE_DAYS
 from coach.prediction_windows import effective_window_days
@@ -129,16 +129,29 @@ def original_verdict(row: dict) -> dict:
     return {"status": src.get("status"), "outcome_date": src.get("outcome_date")}
 
 
-def classification_of(entry: dict | None) -> dict:
+def classification_of(entry: dict | None, row: dict | None = None) -> dict:
     """The owner's classification for this call, from a verification manifest entry. Only an APPROVED value with a
-    ruling reference is a ruling; a proposed value is recorded as proposed and validates nothing."""
+    ruling reference is a ruling; a proposed value is recorded as proposed and validates nothing.
+
+    ``family`` (owner ruling 2026-11-09, B): the call's repeat family — the ``repeat_family`` marker stored on the row
+    (``coach.repeat_family``), which the entry may restate but never contradict (``ValueError``). An entry naming a
+    family the row does not carry is refused too: the family is the row's stored record, not the manifest's say-so."""
     entry = entry or {}
     approved = entry.get("approved_classification")
     ruling_ref = str(entry.get("classification_ruling_ref") or "").strip() or None
     if approved and ruling_ref:
-        return {"value": str(approved), "approved": True, "ruling_ref": ruling_ref}
-    proposed = entry.get("proposed_classification")
-    return {"value": str(proposed) if proposed else None, "approved": False, "ruling_ref": None}
+        out = {"value": str(approved), "approved": True, "ruling_ref": ruling_ref}
+    else:
+        proposed = entry.get("proposed_classification")
+        out = {"value": str(proposed) if proposed else None, "approved": False, "ruling_ref": None}
+    marker = (row or {}).get(repeat_family.ATTR) if row is not None else None
+    stored = str(marker.get("family_id") or "").strip() if isinstance(marker, dict) else ""
+    named = str(entry.get("family") or "").strip()
+    if named and named != stored:
+        raise ValueError(f"the entry names family {named!r} but the row carries {stored or 'no family marker'!r}")
+    if stored:
+        out["family"] = stored
+    return out
 
 
 def outcome_of(row: dict, rerun: dict | None) -> tuple[str, str]:

@@ -104,14 +104,22 @@ def plan_entry(entry: dict, row: dict | None, *, ev, today: str, at: str) -> tup
     """``(verdict, record, writes)`` for one entry. ``writes`` is ``[put_item, update_item]``, empty when skipped."""
     if row is None:
         return "skip: no such PREDICTION# row", None, []
-    if str(row.get("status") or "") not in grade_corrections.TERMINAL_STATUSES:
+    status = str(row.get("status") or "")
+    # An "observation" an owner ruling moved a graded call to (a recorded correction) is recorded too, so its
+    # classification — not a forecast, a look back — is on the record that /api/calibration reads (owner 2026-11-09).
+    ruled_observation = status == "observation" and grade_corrections.has_correction_history(row)
+    if status not in grade_corrections.TERMINAL_STATUSES and not ruled_observation:
         return f"skip: status {row.get('status')!r} is not a graded verdict", None, []
+    try:
+        classification = vr.classification_of(entry, row)
+    except ValueError as exc:
+        return f"skip: {exc}", None, []
     graded = rerun(ev, row, today)
     record = vr.build_record(
         row,
         graded,
         evidence_entries=vr.evidence(row, graded, today, series_reader(ev)),
-        classification=vr.classification_of(entry),
+        classification=classification,
         ruleset_version=str(ev.ALGO_VERSION),
         verified_at=at,
     )

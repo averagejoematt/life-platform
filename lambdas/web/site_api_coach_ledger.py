@@ -387,6 +387,8 @@ _PREDICTION_PROJECTION_FIELDS = (
     # docket marker that makes a docket position a yes/no bet — both read by the
     # `comparison` block served beside every count on this module's two endpoints.
     "baseline",
+    # Owner ruling 2026-11-09 (A): recorded re-scores of the frozen verdict (coach_baseline.effective reads them).
+    "baseline_corrections",
     "source",
     # Owner ruling 2026-11-03: a verdict under classification review is out of every verified count and
     # disclosed as `under_review` (coach.classification_review) — the flag must ride the sweep to be seen.
