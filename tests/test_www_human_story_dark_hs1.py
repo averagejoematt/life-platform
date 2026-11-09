@@ -23,12 +23,14 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 import check_www_build  # noqa: E402
 import publish_snapshot  # noqa: E402
+import publish_snapshot_story  # noqa: E402
 from publish_snapshot_story import ABSENT_STORY, compose, exclusion_reason, story_enabled, validate  # noqa: E402
 
 FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
 
 
 def _export(tmp_path, name, env_on: bool, monkeypatch):
+    monkeypatch.setattr(publish_snapshot_story, "story_live", lambda: False)  # the DARK contract, whatever STORY_LIVE says
     monkeypatch.delenv("WEB_ROOM", raising=False)
     if env_on:
         monkeypatch.setenv("WEB_STORY", "1")
@@ -40,11 +42,12 @@ def _export(tmp_path, name, env_on: bool, monkeypatch):
 
 
 def test_only_the_literal_one_turns_the_story_on():
-    assert story_enabled({}) is False
+    assert story_enabled({}, live=False) is False
     for v in ("", "0", "true", "yes", " 1"):
-        assert story_enabled({"WEB_STORY": v}) is False
-    assert story_enabled({"WEB_ROOM": "1"}) is False
-    assert story_enabled({"WEB_STORY": "1"}) is True
+        assert story_enabled({"WEB_STORY": v}, live=False) is False
+    assert story_enabled({"WEB_ROOM": "1"}, live=False) is False
+    assert story_enabled({"WEB_STORY": "1"}, live=False) is True
+    assert story_enabled({}, live=True) is True  # the go-live switch (STORY_LIVE) turns it on with no env
 
 
 def test_switch_off_writes_no_story_file_and_on_writes_it(tmp_path, monkeypatch):
@@ -183,18 +186,20 @@ def _dist(tmp_path, html: str = "<!doctype html><p>ok</p>"):
 
 
 def test_the_deploy_scan_refuses_story_output_and_passes_a_clean_dist(tmp_path):
-    assert check_www_build.room_paths(check_www_build.STORY_JS) == ["/story/timeline/", "/story/episodes/"]  # read off story_dark.js
+    assert check_www_build.room_paths(check_www_build.STORY_JS) == [
+        "/story/so-far/"
+    ]  # read off story_dark.js — never /story/timeline/ (the kept v8 page)
     clean = _dist(tmp_path)
     (clean / "story").mkdir()
     (clean / "story" / "index.html").write_text("<p>the chapters</p>")
-    assert check_www_build.story_leaks(str(clean)) == []
+    assert check_www_build.story_leaks(str(clean), live=False) == []
     assert check_www_build.room_leaks(str(clean)) == []
     # the controls: a story page, the data file, the marker — each must red the scan the deploy runs
-    (clean / "story" / "timeline").mkdir()
-    (clean / "story" / "timeline" / "index.html").write_text("<p>timeline</p>")
+    (clean / "story" / "so-far").mkdir()
+    (clean / "story" / "so-far" / "index.html").write_text("<p>timeline</p>")
     (clean / "story.json").write_text("{}")
     (clean / "story" / "index.html").write_text('<section data-story-dark="entry"></section>')
-    leaks = check_www_build.story_leaks(str(clean))
+    leaks = check_www_build.story_leaks(str(clean), live=False)
     assert any("a Human Story page" in x for x in leaks)
     assert any("data file" in x for x in leaks)
     assert any("marker" in x for x in leaks)

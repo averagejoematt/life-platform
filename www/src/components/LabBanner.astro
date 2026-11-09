@@ -1,11 +1,17 @@
 ---
-// The Laboratory's private-build banner (L1, built dark — src/lib/lab.js). Rendered only by Lab pages, which exist only
-// on a WEB_LAB=1 build. It carries the Lab marker, so a dist that holds it is refused by the deploy scan.
-import { LAB_MARKER } from "../lib/lab.js";
+// The Laboratory's private-build banner (L1, built dark — src/lib/lab.js). Rendered only by Lab pages, and only on a
+// PRIVATE build (WEB_LAB=1 while LAB_LIVE is false): once the owner's go sets LAB_LIVE, the public pages carry no banner.
+// It carries the Lab marker, so a private dist that holds it is refused by the deploy scan.
+import { LAB_MARKER, labPrivate } from "../lib/lab.js";
 
+const show = labPrivate();
 const lab = { [LAB_MARKER]: "banner" };
 ---
 
-<div {...lab} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
-  Laboratory · private build (WEB_LAB=1) · not published
-</div>
+{
+  show && (
+    <div {...lab} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+      Laboratory · private build (WEB_LAB=1) · not published
+    </div>
+  )
+}
