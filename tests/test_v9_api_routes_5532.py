@@ -294,6 +294,10 @@ ITEM_KEYS = {
     "simple_guess",
     "quality_flags",
     "corrections",
+    # owner 2026-11-09 (web.verification_fields): additive — null on every captured row (no record, no stamp read as one)
+    "evaluator_version",
+    "algo_version",
+    "verification",
 }
 GRADING_KEYS = {"how", "actual_text", "tolerance_text", "outcome_notes"}
 KINDS = {"number", "direction", "yes_no", "sealed", "observation"}
@@ -362,6 +366,7 @@ def test_every_item_is_pinned_to_the_shape_on_every_real_row():
         assert item["kind"] in KINDS and item["status"] in ledger.BUCKETS
         assert isinstance(item["sealed"], bool) and isinstance(item["retired"], bool)
         assert item["quality_flags"] == [] and item["corrections"] == []  # rows captured before the grader stamped them (#5533)
+        assert item["verification"] is None, "no verification record → null, never inferred"
         assert item["simple_guess"]["state"] in ("scored", "unscorable", "not_yet_scored")
         assert item["logged_date"] and len(item["logged_date"]) == 10  # a docket row's is the day its id says the bet opened
         if item["status"] in ("confirmed", "refuted"):

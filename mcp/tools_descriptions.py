@@ -239,6 +239,23 @@ GET_TRAINING_DESCRIPTION = (
     "'am I in a deload?', 'periodization', 'what should I do today?', 'training recommendation', 'ready to train?', 'VO2 max trend', 'cardio recovery'."
 )
 
+# #5575: get_training's input table, moved out of mcp/registry.py (the #1665 ceiling) beside its description.
+GET_TRAINING_INPUT = {
+    "type": "object",
+    "properties": {
+        "view": {
+            "type": "string",
+            "description": "load (default), periodization, recommendation, or cardio_fitness (the Apple Watch's VO2 max arc + cardio signals).",
+            "enum": ["load", "periodization", "recommendation", "cardio_fitness"],
+        },
+        "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
+        "end_date": {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
+        "date": {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
+        "weeks": {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
+    },
+    "required": [],
+}
+
 GET_DAILY_METRICS_DESCRIPTION = (
     "Unified daily activity metrics. "
     "'movement' (default) = NEAT analysis, movement score 0-100, step target tracking, sedentary day flags. "

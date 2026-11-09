@@ -108,7 +108,7 @@ def method_block() -> dict:
 CALL = "call"  # a coach PREDICTION# row
 ASK = "ask"  # a coach COMMITMENT# row
 DOCKET = "docket"  # an ENSEMBLE#docket OPEN#/RESOLVED# entry
-REFERENCE = "reference"  # a row that names a call: LEARNING#, CORRECTION#, a calibration prediction_void
+REFERENCE = "reference"  # a row that names a call: LEARNING#, CORRECTION#, VERIFY#, a calibration prediction_void
 
 CALL_ROW_PREFIX = "PREDICTION#"
 DOCKET_PK = "ENSEMBLE#docket"
@@ -131,7 +131,7 @@ def kind_of(pk: Any, sk: Any) -> Optional[str]:
             return CALL
         if sk.startswith("COMMITMENT#"):
             return ASK
-        if sk.startswith(("LEARNING#", "CORRECTION#")):
+        if sk.startswith(("LEARNING#", "CORRECTION#", "VERIFY#")):  # VERIFY#: owner 2026-11-09, follows its call
             return REFERENCE
         return None
     if pk == DOCKET_PK and sk.startswith(("OPEN#", "RESOLVED#")):
@@ -159,7 +159,7 @@ def attrs_for_prefix(sk_prefix: Any) -> tuple:
             (CALL, ("PREDICTION#",)),
             (ASK, ("COMMITMENT#",)),
             (DOCKET, ("OPEN#", "RESOLVED#")),
-            (REFERENCE, ("LEARNING#", "CORRECTION#", "CALIB#")),
+            (REFERENCE, ("LEARNING#", "CORRECTION#", "VERIFY#", "CALIB#")),
         )
         if not p or any(x.startswith(p) or p.startswith(x) for x in prefixes)
     ]
