@@ -117,7 +117,9 @@ SECTION_GUIDE: dict[str, str] = {
         "the gate counts. A movement whose gate is not met must not appear in a plan; propose the "
         "stated substitute instead. A carve-out (an explicit list of permitted exceptions to an "
         "exclusion) is limited to exactly its list: everything not on the list stays excluded. "
-        "An entry marked available now is open and is prescribed by RPE or talk test."
+        "An entry marked available now is open and is prescribed by RPE or talk test. An entry whose "
+        "`status` is `open` was opened by an owner ruling: prescribe it, never substitute for it, and read "
+        "a weight it still carries only where another section references that weight."
     ),
     "governing_goal": (
         "governing_goal — the frame every other section serves: a time-bound, must-hit target "

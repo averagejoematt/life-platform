@@ -211,23 +211,22 @@ ANCHORS: dict[str, dict[str, Any]] = {
         ),
     },
     "hinge": {
-        "pattern": "hip hinge — TRAP BAR until ≤ 275 lb; the conventional pull is gated by bodyweight",
+        "pattern": "hip hinge — the conventional deadlift is the heavy pull, the Romanian deadlift the volume hinge (#5694)",
         "frequency_per_week": _frequency("each_major_muscle_per_wk"),
-        # #4108: the catalog key is `deadlift_trap_bar` (Deadlift (Trap bar) ×14); §3 keeps the trap bar until <= 275 lb.
-        "catalog_keys": ["deadlift_trap_bar", "machine_hip_thrust", "leg_curl"],
-        # #4147 v0.4 (owner 2026-09-23): the RDL is allowed as the MODERATE hinge — it is what the committed first v0.4
-        # session (Lower-heavy, 2026-09-25) carries. A moderate hinge exposure tries these first, then `catalog_keys`.
+        # #5694 (owner ruling 2026-11-08): the conventional pull is open (pulled since 2026-09-09); the trap bar stays listed.
+        "catalog_keys": ["deadlift_barbell", "deadlift_trap_bar", "machine_hip_thrust", "leg_curl"],
+        # #4147 v0.4 (owner 2026-09-23): the RDL is allowed as a MODERATE hinge. A moderate hinge exposure tries these first,
+        # then `catalog_keys`. Both lower roles pin their hinge (`SESSION_TEMPLATES[...]["anchor_keys"]`, #5694).
         "moderate_catalog_keys": ["romanian_deadlift_barbell", "romanian_deadlift_dumbbell"],
         "hevy_title_hints": ["deadlift", "romanian deadlift", "rdl", "good morning", "back extension", "hip thrust", "trap bar"],
         "primary_muscles": ["hamstrings", "glutes"],
-        "conventional_pull_gate_lb": 275,
         "provenance": "owner",
-        "stated": "2026-09-21",
+        "stated": "2026-11-08",
         "note": (
-            "v0.3 anchor. `owner_redlines.REDLINES['load_anchoring']['trap_bar_until_lb']` is the one home for the 275 gate — the "
-            "250–289 conventional pull in his record was set at 260-lb geometry. `deadlift_trap_bar` (tier 3) resolves first because "
-            "the hinge anchor is EXEMPT from the skill_ceiling of 2 (owner ruling 2026-09-23, #4080 — "
-            "`program_conflicts.ANCHOR_SKILL_CEILING_RULING`); `machine_hip_thrust` / `leg_curl` stay listed as the fallbacks."
+            "v0.3 anchor; #5694 (owner ruling 2026-11-08): the conventional deadlift is the heavy pull, the Romanian deadlift the "
+            "volume hinge (8–10); the trap-bar gate is retired (the charter entry is open, its weight only a phase boundary). Tier-3 "
+            "bars resolve because the hinge is EXEMPT from skill_ceiling 2 (#4080, `program_conflicts.ANCHOR_SKILL_CEILING_RULING`); "
+            "`machine_hip_thrust` / `leg_curl` stay listed as the fallbacks a non-exempt ceiling reaches."
         ),
     },
     "bench": {
@@ -611,7 +610,11 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     },
     "lower_heavy": {
         "archetype": "lower",
-        "anchors": [["squat", "heavy"], ["hinge", "moderate"]],
+        # #5694 (owner ruling 2026-11-08): the conventional deadlift, the heavy pull; pinned so an in-block RDL / trap bar never takes
+        # the slot. Fallback: the hip thrust (the tier-1 floor's hinge) — never `leg_curl`, an accessory he curls on lower days that
+        # #4409 rule 1 would otherwise serve as the in-block hinge
+        "anchors": [["squat", "heavy"], ["hinge", "heavy"]],
+        "anchor_keys": {"hinge": ["deadlift_barbell", "machine_hip_thrust"]},
         "accessories": ["leg_press", "leg_curl", "calf_raise_machine"],
         "accessory_sets": {"calf_raise_machine": 4},  # #5053: calves at their MEV floor (8/wk) across the two lower days
     },
@@ -650,6 +653,10 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "lower_volume": {
         "archetype": "lower",
         "anchors": [["hinge", "volume"], ["squat", "volume"]],
+        # #5694 (owner ruling 2026-11-08): the Romanian deadlift (barbell), 8–10, replaces the trap bar (the retired gate's hinge).
+        # No `leg_curl` fallback (see lower_heavy): his 10-13 / 10-19 lower-volume curls would become the in-block hinge
+        "anchor_keys": {"hinge": ["romanian_deadlift_barbell", "romanian_deadlift_dumbbell", "machine_hip_thrust"]},
+        "anchor_reps": {"hinge": [8, 10]},
         # #5053: core and calves reach their MEV floors (4 and 8 sets/wk) here; the second leg curl is the week's trade — the
         # redline's 75-set week is full (`owner_redlines` total_hard_sets_wk) and hamstrings still sit at the 8-set floor
         "accessories": ["calf_raise_machine", "machine_crunch"],
@@ -666,7 +673,7 @@ work. Every big redline muscle group sits inside its weekly band and each group'
 role for the block (`ROTATION_RULE`). `anchor_sets` overrides an exposure's set count for one pattern: vertical pull runs
 2 sets so back (row + pulldown, twice) sits at 10. `anchor_keys` pins a pattern's slot to named members (#5318, owner ruling
 B2: upper-volume's bench slot is the incline dumbbell press only; upper-heavy keeps the barbell bench, the strength anchor).
-`accessory_shapes` names a distance-dosed accessory (#5318, ruling B3: the shoulders+arms farmer's carry; #5372: distance-typed, `CARRY_EXPOSURE`). v0.4's four roles were unchanged (#4147) until #5162 moved the press
+`anchor_reps` narrows one pattern's reps (#5694: both lower hinges are pinned; the volume day's RDL runs 8–10). `accessory_shapes` names a distance-dosed accessory (#5318, ruling B3: the shoulders+arms farmer's carry; #5372: distance-typed, `CARRY_EXPOSURE`). v0.4's four roles were unchanged (#4147) until #5162 moved the press
 off the two upper days; v0.3's are `program_v03.SESSION_TEMPLATES`."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
@@ -686,8 +693,8 @@ SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     "note": (
         "The owner fixed the SPLIT and its ORDER (the charter's `split.sequence`, ruling 5), the heavy scheme (top set + 2 back-offs "
         f"at −10 %), the volume reps (8–12), each major muscle {charter_value('split.frequency.each_major_muscle_per_wk')}x/wk and "
-        f"delts {charter_value('split.frequency.delts_per_wk')}x/wk, the trap bar until the charter's gate and the "
-        "RDL as the moderate hinge. `lower_heavy` is the session he committed on 2026-09-23 (routine b1b9960468f374e30dcdeca8630dd18f). "
+        f"delts {charter_value('split.frequency.delts_per_wk')}x/wk, and the hinges (owner ruling 2026-11-08, #5694: the "
+        "conventional deadlift on the heavy lower day, the Romanian deadlift on the volume lower day; the trap-bar rule is retired). `lower_heavy` is the session he committed on 2026-09-23 (routine b1b9960468f374e30dcdeca8630dd18f). "
         "Three v0.4 placements are the platform's, owner-ratified unchanged on 2026-09-25. The `shoulders_arms` day's movements "
         "(overhead press, lateral raise, face pull, curl, pushdown) are the platform's choice from his logged history under the "
         "contents ruling 5 names; its farmer's carry (in place of the dumbbell shrug) and the upper_volume role's incline dumbbell press "
@@ -898,6 +905,7 @@ def session_prescription_for_role(
     exposures: list[dict[str, Any]] = []
     for pattern, intensity in tmpl["anchors"]:
         spec = EXPOSURES[intensity]
+        reps = list((tmpl.get("anchor_reps") or {}).get(pattern) or spec["reps"])  # #5694: a role may narrow one pattern's reps
         # #5318: a role may pin a pattern's slot to named members (upper_volume's bench slot is the incline DB press only)
         override = (tmpl.get("anchor_keys") or {}).get(pattern)
         keys = list(override or ANCHORS[pattern]["catalog_keys"])
@@ -917,13 +925,12 @@ def session_prescription_for_role(
         if key:
             taken.add(key)
         if intensity == "heavy":
-            sets = [{"kind": "top", "reps": list(spec["reps"]), "rpe": list(_EFFORT[spec["effort"]])}] + [
-                {"kind": "back_off", "reps": list(spec["reps"]), "pct_of_top": 100 + spec["back_off_pct"]}
-                for _ in range(spec["back_off_sets"])
+            sets = [{"kind": "top", "reps": list(reps), "rpe": list(_EFFORT[spec["effort"]])}] + [
+                {"kind": "back_off", "reps": list(reps), "pct_of_top": 100 + spec["back_off_pct"]} for _ in range(spec["back_off_sets"])
             ]
         else:
             n_sets = int((tmpl.get("anchor_sets") or {}).get(pattern, spec["sets"]))
-            sets = [{"kind": "working", "reps": list(spec["reps"])} for _ in range(n_sets)]
+            sets = [{"kind": "working", "reps": list(reps)} for _ in range(n_sets)]
         exposures.append(
             {
                 "kind": "anchor",

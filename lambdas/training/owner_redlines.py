@@ -428,16 +428,19 @@ REDLINES: dict[str, dict[str, Any]] = {
         "detraining_discount_provenance": "owner ruling 2026-09-23 (#4107): 10 %, not the lane's conservative 15 %",
         "detraining_discount_pct_stated_2026_09_08": [10, 15],
         "entry_pct_of_band_best": [85, 90],
-        "trap_bar_until_lb": 275,
+        # #5694 (owner ruling 2026-11-08): the trap-bar-until-a-bodyweight hinge rule is RETIRED — he has pulled conventional
+        # since 2026-09-09. The weight it named lives once, in the charter (`gated_movements.conventional_deadlift.gate_lb`),
+        # read only as the Foundation -> Build phase boundary
+        "trap_bar_rule": "retired 2026-11-08 by owner ruling (#5694): the heavy lower day pulls the conventional deadlift, the volume lower day the RDL",
         "provenance": "owner",
         "stated": "2026-09-08",
         "note": (
             "'Prescribe strength loads against BODYWEIGHT-BAND-MATCHED history, not recent history… TWO axes: (1) "
             "matched bodyweight band tells you what his frame handled, (2) weeks since last consistent block tells you "
             "what his connective tissue is ready for NOW. Matching on weight alone will over-prescribe.' Observed "
-            "discount that was correct in practice: ~10-15% under last performed after a ~10 week layoff. Unchanged in v3, "
-            "plus: the hinge is the TRAP BAR until ≤ 275 lb — the 250–289 conventional pull in his record was set at 260-lb "
-            "geometry, so the conventional bar is gated by bodyweight, not by preference. Connective tissue at 316 lb lags "
+            "discount that was correct in practice: ~10-15% under last performed after a ~10 week layoff. Unchanged in v3. "
+            "(v3 also kept the hinge on the trap bar until a bodyweight gate; retired 2026-11-08, #5694 — see `trap_bar_rule`.) "
+            "Connective tissue at 316 lb lags "
             "muscle by 8–12 weeks (Kubo 2010): weekly axial tonnage and walking hours each +≤ 10 %/wk."
         ),
     },

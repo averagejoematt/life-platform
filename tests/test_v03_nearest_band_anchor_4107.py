@@ -331,7 +331,7 @@ def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which):
     assert gate["load_floors"]["load_rule"]["week"] == 1
     gen = ideal.inputs_snapshot["load_floors"]["movements"]
     keys = {
-        "lower_heavy": ("squat_barbell", "romanian_deadlift_barbell"),
+        "lower_heavy": ("squat_barbell", "deadlift_barbell"),  # #5694 (owner ruling 2026-11-08): the conventional pull
         "upper_heavy": ("barbell_bench_press", "machine_row", "lat_pulldown"),
     }
     for key in keys[which]:
