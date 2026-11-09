@@ -8,7 +8,7 @@ import Base from "../layouts/Base.astro";
 import { DISPUTED_NOTE, isDisputed } from "../lib/disputed.js";
 import {
   KIND_WORDS,
-  assessmentWords,
+  v2Answers,
   blendRow,
   coachVerified,
   excludedAccounting,
@@ -17,7 +17,9 @@ import {
   calibrationChart,
   concentrationText,
   intervalText,
-  labelWords,
+  v2MethodText,
+  v2Short,
+  v2Stratum,
   pct,
   recordHeadline,
   skillText,
@@ -53,7 +55,9 @@ const asOf = file.as_of ? dayInWords(file.as_of) : null;
 const qualify = qualifyText(head);
 const methodChange = methodChangeText(cal.method);
 const excluded = excludedAccounting(cal);
-const stratumAssessment = assessmentWords((cal.platform?.strata?.coaches || {}).assessment_v2) || assessmentWords(cal.assessment_v2);
+// calibration-v2 (owner ruling 2026-11-09): the coaches' stratum's three answers, as served — never a v1 label.
+const stratumAnswers = v2Answers(v2Stratum(cal, "coaches"));
+const methodText = v2MethodText(cal);
 const funnel = [
   ["calls in the public ledger this cycle", rec.total, "ink"],
   ["observations — not graded, by design", rec.observational, "rule"],
@@ -92,7 +96,14 @@ const room = { [ROOM_MARKER]: "calibration" };
             <p class="muted" style="font-size:13px;max-width:70ch">
               Graded by code, never by the coaches. A call under classification review keeps its verdict and is counted neither right nor wrong.
             </p>
-            {stratumAssessment && <p style="font-size:15px;max-width:70ch" data-assessment>{stratumAssessment}</p>}
+            {stratumAnswers.length > 0 && (
+              <dl style="font-size:15px;max-width:70ch;margin:0;display:flex;flex-direction:column;gap:8px" data-assessment>
+                {stratumAnswers.map((x) => (
+                  <div><dt style="font-weight:700">{x.ask}</dt><dd style="margin:0">{x.words}</dd></div>
+                ))}
+                {methodText && <p class="muted" style="font-size:13px">Three separate tests, each with its own interval ({methodText}). Not detecting a problem is not proof of good calibration.</p>}
+              </dl>
+            )}
           </div>
         </section>
 
@@ -228,7 +239,7 @@ const room = { [ROOM_MARKER]: "calibration" };
                 const dir = versusGuess(c.comparison?.records, "direction");
                 const numb = versusGuess(c.comparison?.records, "number");
                 const cv = coachVerified(c);
-                const assess = assessmentWords(c.assessment_v2);
+                const answers = v2Answers(c.assessment_v2);
                 return (
                   <article style="padding:16px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px" data-coach={c.coach_id}>
                     <p style="font-size:17px;font-weight:700">
@@ -246,12 +257,19 @@ const room = { [ROOM_MARKER]: "calibration" };
                         <p class="mono muted" style="font-size:12px">{intervalText(c.accuracy_ci95) || "no interval served"}</p>
                       </>
                     )}
-                    <p style="font-size:13px">{assess || c.comparison?.skill?.sentence}</p>
+                    {answers.length > 0 ? (
+                      <dl style="font-size:13px;margin:0;display:flex;flex-direction:column;gap:4px" data-calibration-v2>
+                        {answers.map((x) => (
+                          <div><dt class="muted" style="font-size:12px">{x.ask}</dt><dd style="margin:0">{x.words}</dd></div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p style="font-size:13px">{c.comparison?.skill?.sentence || "No calibration assessment served."}</p>
+                    )}
                     <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px;margin:4px 0 0">
                       {dir && (<><dt class="muted">direction v guess</dt><dd class="mono" style="margin:0">{dir.text}</dd></>)}
                       {numb && (<><dt class="muted">number v guess</dt><dd class="mono" style="margin:0">{numb.text}</dd></>)}
                       <dt class="muted">stated</dt><dd class="mono" style="margin:0">{concentrationText(c)}</dd>
-                      <dt class="muted">calibration</dt><dd style="margin:0">{labelWords(c.calibration)}</dd>
                       {c.under_review > 0 && (<><dt class="muted">disputed</dt><dd class="mono" style="margin:0">{c.under_review}, counted neither way</dd></>)}
                     </dl>
                     {obj && <a href={href(`/system/coaches/${obj.id}/record/`)} style="font-size:13px;font-weight:700;margin-top:4px">{c.coach_name}'s full record →</a>}
@@ -283,7 +301,7 @@ const room = { [ROOM_MARKER]: "calibration" };
                       <td class="mono">{s.n ? (s.pct || "not published") : "none settled"}</td>
                       <td class="mono">{s.n ? (s.ci ? s.ci.replace("95% interval ", "") : "not published") : "—"}</td>
                       <td class="mono">{s.n ? skillText(s.skill).split(" — ")[0] : "—"}</td>
-                      <td>{s.n ? labelWords(s.label) : "insufficient evidence"}</td>
+                      <td>{s.n ? (v2Short(s.assessment) || "no assessment served") : "no resolved calls"}</td>
                     </tr>
                   ))}
                   {blend && (
@@ -294,7 +312,7 @@ const room = { [ROOM_MARKER]: "calibration" };
                       <td class="mono">{blend.pct || "—"}</td>
                       <td class="mono">{blend.ci ? blend.ci.replace("95% interval ", "") : "—"}</td>
                       <td class="mono">{skillText(blend.skill).split(" — ")[0]}</td>
-                      <td>{labelWords(blend.label)}</td>
+                      <td>not assessed — strata are never pooled</td>
                     </tr>
                   )}
                 </tbody>

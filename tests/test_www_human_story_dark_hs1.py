@@ -23,12 +23,14 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 import check_www_build  # noqa: E402
 import publish_snapshot  # noqa: E402
+import publish_snapshot_story  # noqa: E402
 from publish_snapshot_story import ABSENT_STORY, compose, exclusion_reason, story_enabled, validate  # noqa: E402
 
 FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
 
 
 def _export(tmp_path, name, env_on: bool, monkeypatch):
+    monkeypatch.setattr(publish_snapshot_story, "story_live", lambda: False)  # the DARK contract, whatever STORY_LIVE says
     monkeypatch.delenv("WEB_ROOM", raising=False)
     if env_on:
         monkeypatch.setenv("WEB_STORY", "1")
@@ -40,11 +42,12 @@ def _export(tmp_path, name, env_on: bool, monkeypatch):
 
 
 def test_only_the_literal_one_turns_the_story_on():
-    assert story_enabled({}) is False
+    assert story_enabled({}, live=False) is False
     for v in ("", "0", "true", "yes", " 1"):
-        assert story_enabled({"WEB_STORY": v}) is False
-    assert story_enabled({"WEB_ROOM": "1"}) is False
-    assert story_enabled({"WEB_STORY": "1"}) is True
+        assert story_enabled({"WEB_STORY": v}, live=False) is False
+    assert story_enabled({"WEB_ROOM": "1"}, live=False) is False
+    assert story_enabled({"WEB_STORY": "1"}, live=False) is True
+    assert story_enabled({}, live=True) is True  # the go-live switch (STORY_LIVE) turns it on with no env
 
 
 def test_switch_off_writes_no_story_file_and_on_writes_it(tmp_path, monkeypatch):
@@ -126,8 +129,8 @@ def test_an_approved_published_program_week_is_included_and_its_controls_exclude
 @pytest.mark.parametrize(
     "chapter",
     [
-        _chapter("week-05", 2, "Eight Pounds and a Flag", "/journal/posts/week-05/"),  # the Week 2 installment
         _chapter("week-02", 0, "Prologue II", "/journal/posts/week-02/"),  # the unlisted page
+        _chapter("pilot-0721", 1, "The Night Before Everything", "/journal/posts/p/", date="2026-07-21"),  # the pilot by date key
         _chapter("week-02-alias", 1, "x", "/journal/posts/week-02/"),  # the unlisted page under any id
         _chapter("program-week-08", 8, "Week 8", "/journal/posts/week-11/"),  # the Week 8 draft, even if "published"
         _chapter("program-week-09", 9, "Week 9", "/journal/posts/week-12/"),  # the Week 9 draft
@@ -145,7 +148,7 @@ def test_compose_excludes_and_records_only_ids_and_reasons():
         "chapter": [
             _chapter("week-04", 1, "76% on Day Two", "/journal/posts/week-04/"),
             _chapter("week-05", 2, "Eight Pounds and a Flag", "/journal/posts/week-05/"),
-            _chapter("program-week-08", 8, "Week 8", None, status="held", approved=None),
+            _chapter("program-week-08", 8, "A Draft Title", None, status="held", approved=None),
         ]
     }
     api = _api(
@@ -153,12 +156,51 @@ def test_compose_excludes_and_records_only_ids_and_reasons():
         _week(2, title="Eight Pounds and a Flag", url="/journal/posts/week-05/"),
     )
     out = compose(api, public)
-    assert [i["chapter_id"] for i in out["installments_index"]] == ["week-04"]
-    assert {e["ref"] for e in out["story_exclusions"]} == {"week-05", "program-week-08"}
+    assert [i["chapter_id"] for i in out["installments_index"]] == ["week-04", "week-05"]
+    assert {e["ref"] for e in out["story_exclusions"]} == {"program-week-08"}
     assert all(set(e) == {"ref", "reason"} for e in out["story_exclusions"])
-    assert "Eight Pounds" not in json.dumps(out["story_exclusions"])
-    assert [w["chapter_id"] for w in out["story_weeks"]] == ["week-04", None]
+    assert "A Draft Title" not in json.dumps(out["story_exclusions"]), "an exclusion records an id and a reason, never a title"
+    assert [w["chapter_id"] for w in out["story_weeks"]] == ["week-04", "week-05"]
     assert validate(copy.deepcopy(out), public) == out
+
+
+# ── "Week 2" is a RECORD, not a label (owner clarification 2026-11-09) ────────────────────────────────────────────────
+# The held "Week 2" is the PILOT instalment "The Night Before Everything" (/journal/posts/week-02/, chronicle
+# DATE#2026-07-21). Program week 2 ("Eight Pounds and a Flag", /journal/posts/week-05/) is published and approved.
+PROGRAM_WEEK_2 = _chapter("week-05", 2, "Eight Pounds and a Flag", "/journal/posts/week-05/", date="2026-09-15")
+SERVED_WEEK_2 = {2: {"week": 2, "status": "published", "title": "Eight Pounds and a Flag", "url": "/journal/posts/week-05/"}}
+
+
+def test_program_week_2_is_included_and_the_control_shows_the_exclusion_machinery_is_live_for_it():
+    assert exclusion_reason(PROGRAM_WEEK_2, SERVED_WEEK_2) is None, "program week 2 is published and approved: included"
+    # the controls: give the SAME program-week-2 record one piece of the pilot's identity — each alone must exclude it
+    for planted in ({"url_legacy": "/journal/posts/week-02/"}, {"id": "week-02"}, {"date": "2026-07-21"}):
+        c = {**PROGRAM_WEEK_2, **planted}
+        served = {2: {**SERVED_WEEK_2[2], "url": c["url_legacy"]}}
+        assert exclusion_reason(c, served) is not None, planted
+
+
+def test_the_pilot_week_02_stays_excluded_even_planted_as_a_published_program_week_and_the_control_includes_its_twin():
+    # the pilot, planted with every condition of an includable installment: program week 2, published, the owner's
+    # approval, /api/chapters serving it as published under the same url and title
+    pilot = _chapter("week-02", 2, "The Night Before Everything", "/journal/posts/week-02/", date="2026-07-21")
+    served = {2: {"week": 2, "status": "published", "title": pilot["title"], "url": pilot["url_legacy"]}}
+    assert "pilot" in exclusion_reason(pilot, served)
+    for key, value in (("id", "week-02"), ("url_legacy", "/journal/posts/week-02/"), ("date", "2026-07-21")):
+        # each identity key alone is enough (the others moved off the pilot's values)
+        lone = {**pilot, "id": "elsewhere", "url_legacy": "/journal/posts/elsewhere/", "date": "2026-09-15", key: value}
+        assert "pilot" in (exclusion_reason(lone, {2: {**served[2], "url": lone["url_legacy"]}}) or ""), key
+    # the control: the identical record with NONE of the pilot's identity is included — the exclusion is by identity
+    twin = {**pilot, "id": "elsewhere", "url_legacy": "/journal/posts/elsewhere/", "date": "2026-09-15"}
+    assert exclusion_reason(twin, {2: {**served[2], "url": twin["url_legacy"]}}) is None
+
+
+def test_no_exclusion_is_keyed_by_a_week_label():
+    import publish_snapshot_story as pss
+
+    assert not hasattr(pss, "EXCLUDED_WEEKS"), "a week number is a label, not a record: exclude by id / url / date key"
+    for c in (PROGRAM_WEEK_2, {**PROGRAM_WEEK_2, "title": "Week 2"}):
+        assert exclusion_reason(c, {2: {**SERVED_WEEK_2[2], "title": c["title"]}}) is None
 
 
 def test_an_unserved_or_malformed_week_list_includes_nothing():
@@ -183,18 +225,20 @@ def _dist(tmp_path, html: str = "<!doctype html><p>ok</p>"):
 
 
 def test_the_deploy_scan_refuses_story_output_and_passes_a_clean_dist(tmp_path):
-    assert check_www_build.room_paths(check_www_build.STORY_JS) == ["/story/timeline/", "/story/episodes/"]  # read off story_dark.js
+    assert check_www_build.room_paths(check_www_build.STORY_JS) == [
+        "/story/so-far/"
+    ]  # read off story_dark.js — never /story/timeline/ (the kept v8 page)
     clean = _dist(tmp_path)
     (clean / "story").mkdir()
     (clean / "story" / "index.html").write_text("<p>the chapters</p>")
-    assert check_www_build.story_leaks(str(clean)) == []
+    assert check_www_build.story_leaks(str(clean), live=False) == []
     assert check_www_build.room_leaks(str(clean)) == []
     # the controls: a story page, the data file, the marker — each must red the scan the deploy runs
-    (clean / "story" / "timeline").mkdir()
-    (clean / "story" / "timeline" / "index.html").write_text("<p>timeline</p>")
+    (clean / "story" / "so-far").mkdir()
+    (clean / "story" / "so-far" / "index.html").write_text("<p>timeline</p>")
     (clean / "story.json").write_text("{}")
     (clean / "story" / "index.html").write_text('<section data-story-dark="entry"></section>')
-    leaks = check_www_build.story_leaks(str(clean))
+    leaks = check_www_build.story_leaks(str(clean), live=False)
     assert any("a Human Story page" in x for x in leaks)
     assert any("data file" in x for x in leaks)
     assert any("marker" in x for x in leaks)

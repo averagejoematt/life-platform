@@ -181,9 +181,10 @@ def _gather_facts(table, coach_id: str, quarter: str):
         "by_outcome": by_outcome,
         "decided_count": decided,
         "hit_rate_pct": hit_rate_pct,
+        # Owner ruling 2026-11-09: the calibration-v1 verdict word is retired from every reader surface, and a memoir
+        # is one — only the Brier score and its n travel to the prompt and the published record.
         "calibration": {
             "brier": calibration.get("brier"),
-            "calibration": calibration.get("calibration"),
             "scored_n": calibration.get("n"),
         },
         "misses": misses,
@@ -219,7 +220,7 @@ def _render_facts_for_prompt(facts):
         lines.append(f"Hit rate this quarter: {facts['hit_rate_pct']}% (n={facts['decided_count']})")
     cal = facts.get("calibration") or {}
     if cal.get("scored_n"):
-        lines.append(f"Career-to-date calibration: Brier {cal.get('brier')}, verdict '{cal.get('calibration')}' (n={cal.get('scored_n')})")
+        lines.append(f"Career-to-date Brier score: {cal.get('brier')} (n={cal.get('scored_n')})")
     if facts["misses"]:
         lines.append("Calls that were REFUTED (wrong) this quarter:")
         for m in facts["misses"]:

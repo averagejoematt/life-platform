@@ -11,7 +11,8 @@
 // that the record is as first graded and not re-verified, and the career / unverified detail sits in an archive.
 //
 // Calibration is drawn to the data's resolution: one dot per coach per stated-confidence band as the API served
-// the band, sized by n — never a curve — and the label is the API's own, in words (no threshold is invented here).
+// the band, sized by n — never a curve — and the verdict is calibration-v2's three answers in the API's own words
+// (no threshold is invented here).
 import { esc } from "./chart.js";
 import { dayInWords, num } from "./format.js";
 
@@ -35,20 +36,48 @@ export function skillText(v) {
   return v > 0 ? `${s} — better than its base rate` : `${s} — no better than its base rate`;
 }
 
-/** The API's calibration label, in words. Inadequate evidence reads as such; nothing favourable is implied. */
-const LABEL_WORDS = {
-  not_measurable: "not measurable — nearly every call was stated at one confidence",
-  insufficient_data: "insufficient evidence",
-  nascent: "insufficient evidence",
-  "over-confident": "came true less often than stated",
-  "under-confident": "came true more often than stated",
-  not_yet_skillful: "not yet skillful — no better than its base rate",
-  "well-calibrated": "stated confidence matched what came true",
-  under_review: "under review",
-};
-export function labelWords(label) {
-  if (!label) return "no label served";
-  return LABEL_WORDS[label] || String(label).replace(/[_-]+/g, " ");
+// ── the calibration verdict: calibration-v2 (owner ruling 2026-11-09) ─────────────────────────────────────────
+// Three separate questions, each answered in the producer's own words (`wording`, and `short` for a dense cell) —
+// carried, never computed or relabelled here. The v1 fields (`calibration`, `label`, `score`) are deprecated on the
+// API and are never read by this module: no v1 label reaches a page.
+export const V2_QUESTIONS = [
+  { key: "estimability", ask: "Can calibration be estimated across confidence levels?" },
+  { key: "confidence_direction", ask: "Over- or under-confident at an observed confidence level?" },
+  { key: "skill", ask: "Better than the same-call guess that nothing changes?" },
+];
+
+/** A served assessment's three answers: [{key, ask, words, short}], only those served; [] when none was served. */
+export function v2Answers(a) {
+  if (!a || typeof a !== "object") return [];
+  return V2_QUESTIONS.map(({ key, ask }) => {
+    const q = a[key];
+    if (!q || typeof q !== "object") return null;
+    const words = typeof q.wording === "string" && q.wording.trim() ? q.wording : null;
+    const short = typeof q.short === "string" && q.short.trim() ? q.short : words;
+    return words || short ? { key, ask, words: words || short, short } : null;
+  }).filter(Boolean);
+}
+
+/** The assessment of a platform stratum ("coaches", "hypotheses", …) as served on `assessment_v2.strata`, or null. */
+export function v2Stratum(cal, key) {
+  const s = ((cal || {}).assessment_v2 || {}).strata || {};
+  return s[key] && typeof s[key] === "object" ? s[key] : null;
+}
+
+/** The three short answers in one line, " · "-separated (a dense cell); null when no assessment was served. */
+export function v2Short(a) {
+  const xs = v2Answers(a);
+  return xs.length ? xs.map((x) => x.short).join(" · ") : null;
+}
+
+/** "calibration-v2, adopted 9 November 2026" — the method and its version, as served; null when not served. */
+export function v2MethodText(cal) {
+  const a = (cal || {}).assessment_v2 || {};
+  const m = (cal || {}).calibration_method || {};
+  const v = a.method_version || m.version;
+  if (!v) return null;
+  const when = a.adopted || m.adopted;
+  return `${v}${when ? `, adopted ${dayInWords(when) || when}` : ""}`;
 }
 
 /** The band a stated confidence was served in, in words: 0.5 → "50%". */
@@ -180,11 +209,10 @@ export function coachVerified(c) {
   return { k, n, pct: pct(v.accuracy_pct), ci: intervalText(v.accuracy_ci95) };
 }
 
-/** A served `assessment_v2` in words (its own sentence first, else its label), or null when not served. */
+/** A served calibration-v2 assessment in words: its three answers' sentences in order, or null when not served. */
 export function assessmentWords(a) {
-  if (!a || typeof a !== "object") return null;
-  for (const k of ["sentence", "text", "summary"]) if (typeof a[k] === "string" && a[k].trim()) return a[k];
-  return typeof a.label === "string" && a.label ? labelWords(a.label) : null;
+  const xs = v2Answers(a);
+  return xs.length ? xs.map((x) => x.words).join(" ") : null;
 }
 
 export function recordHeadline(file) {
@@ -251,7 +279,7 @@ export function strataRows(file) {
     pct: pct((top || {}).accuracy_pct),
     ci: intervalText((top || {}).accuracy_ci95),
     skill: (s || {}).brier_skill,
-    label: (s || {}).calibration,
+    assessment: v2Stratum(cal, key), // calibration-v2: each stratum assessed on its own, never pooled
   });
   return [
     row("coaches", "Coach calls", st.coaches, { accuracy_pct: rec.accuracy_pct, accuracy_ci95: (st.coaches || {}).accuracy_ci95 }),
@@ -261,11 +289,12 @@ export function strataRows(file) {
   ];
 }
 
-/** The platform card — the blend of every stratum — as served. Never presented as the coaches' record. */
+/** The platform card — the blend of every stratum — as served. Never presented as the coaches' record, and never
+ *  given a calibration verdict: calibration-v2 does not pool strata. */
 export function blendRow(file) {
   const p = ((file && file.calibration) || {}).platform || {};
   if (!isNum(p.n)) return null;
-  return { n: p.n, right: p.confirmed, pct: pct(p.accuracy_pct), ci: intervalText(p.accuracy_ci95), skill: p.brier_skill, label: p.calibration };
+  return { n: p.n, right: p.confirmed, pct: pct(p.accuracy_pct), ci: intervalText(p.accuracy_ci95), skill: p.brier_skill };
 }
 
 /** The bets a reset voided, newest reset first, dates in words. */

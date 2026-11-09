@@ -5,8 +5,13 @@ all. Whether the sample supports a claim of overconfidence or underconfidence. W
 skill relative to the baseline. These are different questions and shouldn't share one arbitrary threshold."
 
 This module answers each with its own evidence test and its own uncertainty statement (``docs/methods/CALIBRATION_V2.md``).
-It is DARK and ADDITIVE: served beside the v1 fields on ``/api/calibration`` as ``assessment_v2``; no v1 field or label
-reads from it. Pure and deterministic, stdlib only.
+ADOPTED by the owner on 2026-11-09: it is the authority for every calibration verdict the platform shows or serves
+(``/api/calibration`` → ``assessment_v2``). The v1 labels of ``calibration_core`` stay in the API only as deprecated
+fields; no reader surface renders them. Pure and deterministic, stdlib only.
+
+The words never praise a forecaster for passing a test: failing to detect a problem is never proof of good calibration
+("consistent with stated confidence (not established)", "insufficient evidence", "no demonstrated advantage"). An
+over- or under-confidence finding names the confidence level it was found at and is never a verdict across levels.
 
 THE CONSTANTS BELOW WERE FIXED BEFORE ANY PER-COACH OUTPUT WAS COMPUTED (see the methods note's "order of work"). None
 is chosen by which forecaster it flips; each is a convention or is derived from one.
@@ -196,6 +201,17 @@ def _ci_words(ci: list) -> str:
     return f"95% CI {_pct(ci[0])}–{_pct(ci[1])}"
 
 
+def _level_name(t: dict) -> str:
+    """A tested level by its mean stated confidence: "50%"."""
+    return _pct(t["stated"])
+
+
+def _found_words(t: dict) -> str:
+    """One level's finding with its interval and multiplicity-corrected p: "12 of 43 came true, 95% CI 15%–44%; Holm-adjusted p 0.0108"."""
+    p = "< 0.0001" if t["p_holm"] < 0.0001 else t["p_holm"]  # the served p is rounded to 4 places: never print "p 0"
+    return f"{t['hits']} of {t['n']} came true, {_ci_words(t['ci95'])}; Holm-adjusted p {p}"
+
+
 # ── question 1: can calibration be estimated? ────────────────────────────────────────────
 
 
@@ -280,14 +296,16 @@ def estimability(pairs) -> dict:
             reasons.append("the recalibration fit is degenerate on these calls")
     estimable = not reasons
     if n == 0:
-        wording = "No resolved calls."
+        wording, short = "No resolved calls.", "no resolved calls"
     elif slope is not None:
         wording = (
             f"Calibration across confidence levels is estimable over {n} calls: recalibration slope {slope['estimate']} "
             f"(95% CI {slope['ci95'][0]} to {slope['ci95'][1]}; 1 means stated confidence tracks outcomes)."
         )
+        short = f"estimable: slope {slope['estimate']} (95% CI {slope['ci95'][0]} to {slope['ci95'][1]})"
     else:
         wording = "Calibration across confidence levels not estimable: " + "; ".join(reasons) + "."
+        short = "not estimable across confidence levels"
     return {
         "result": "estimable" if estimable else "not_estimable",
         "n": n,
@@ -299,6 +317,7 @@ def estimability(pairs) -> dict:
         "minority_outcome_n": minority,
         "reasons": reasons,
         "wording": wording,
+        "short": short,
         "method": (
             f"Levels are the {LEVEL_BINS} stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. "
             f"Across levels is estimable with at least {MIN_LEVELS} levels of at least {need_n} calls (exact interval "
@@ -330,6 +349,7 @@ def confidence_direction(pairs, alpha: float = ALPHA) -> dict:
             "ci95": None,
             "tests": [],
             "wording": "No resolved calls.",
+            "short": "no resolved calls",
         }
     ps = [binomial_two_sided_p(lv["hits"], lv["n"], lv["stated"]) for lv in levels]
     adjusted = holm_adjusted(ps)
@@ -363,25 +383,32 @@ def confidence_direction(pairs, alpha: float = ALPHA) -> dict:
         )
     lead = min(tests, key=lambda t: (t["p_holm"], -t["n"]))
     dirs = {t["direction"] for t in tests if t["direction"]}
-    lead_words = (
-        f"calls stated at about {_pct(lead['stated'])} came true {lead['hits']} of {lead['n']} "
-        f"({_ci_words(lead['ci95'])}), Holm-adjusted p {lead['p_holm']}"
-    )
+    # A finding is about the level it was found at (owner ruling 2026-11-09): the words name each rejecting level and
+    # never generalise it to calibration across confidence levels.
+    found = [t for t in tests if t["direction"]]
+    scope = " — a finding about calls at that confidence level, not about calibration across confidence levels."
+    if len(found) > 1:
+        scope = " — findings about calls at those confidence levels, not about calibration across confidence levels."
     if dirs == {"over", "under"}:
         result = label = "mixed"
-        wording = "Mixed: calls came true less often than stated at some confidence levels and more often at others."
-    elif dirs == {"over"}:
-        result = label = "over_confident"
-        wording = f"Over-confident (calls came true less often than stated): {lead_words}."
-    elif dirs == {"under"}:
-        result = label = "under_confident"
-        wording = f"Under-confident (calls came true more often than stated): {lead_words}."
+        parts = [f"{t['direction']}-confident at its {_level_name(t)} calls ({_found_words(t)})" for t in found]
+        wording = "Mixed: " + "; ".join(parts) + scope
+        short = "mixed: " + ", ".join(f"{t['direction']}-confident at its {_level_name(t)} calls" for t in found)
+    elif dirs in ({"over"}, {"under"}):
+        d = next(iter(dirs))
+        result = label = f"{d}_confident"
+        levels = " and ".join(_level_name(t) for t in found)
+        detail = "; ".join(f"{_level_name(t)}: {_found_words(t)}" for t in found) if len(found) > 1 else _found_words(found[0])
+        wording = f"{d.capitalize()}-confident at its {levels} calls ({detail}){scope}"
+        short = f"{d}-confident at its {levels} calls"
     elif not could_reject:
         result, label = "insufficient_evidence", None
         wording = f"Insufficient evidence: with {n} calls, no confidence level could have shown a departure at alpha {alpha}."
+        short = "insufficient evidence"
     else:
         result, label = "consistent_not_established", None
         wording = f"Consistent with stated confidence (not established): no level departs at alpha {alpha} over {n} calls."
+        short = "consistent with stated confidence (not established)"
     return {
         **base,
         "result": result,
@@ -391,6 +418,7 @@ def confidence_direction(pairs, alpha: float = ALPHA) -> dict:
         "estimate_level": [lead["lo"], lead["hi"]],
         "tests": tests,
         "wording": wording,
+        "short": short,
     }
 
 
@@ -408,7 +436,15 @@ def skill_vs_baseline(paired: dict | None, alpha: float = ALPHA) -> dict:
     )
     base = {"baseline": SKILL_RULE if paired is not None else None, "significance": alpha, "method": method}
     if paired is None:
-        return {**base, "result": "no_baseline", "label": None, "records": {}, "n": 0, "wording": "No baseline for this stratum."}
+        return {
+            **base,
+            "result": "no_baseline",
+            "label": None,
+            "records": {},
+            "n": 0,
+            "wording": "No baseline for this stratum.",
+            "short": "no baseline for this stratum",
+        }
     present = [r for r in SKILL_RECORDS if (paired.get(r) or {}).get("pairs")]
     conf = 1.0 - alpha / max(1, len(present))
     records: dict[str, dict[str, Any]] = {}
@@ -451,6 +487,7 @@ def skill_vs_baseline(paired: dict | None, alpha: float = ALPHA) -> dict:
     if not n_all:
         result, label = "not_comparable", None
         wording = "Not comparable: no call could also be scored by the guess that nothing changes."
+        short = "not comparable"
     elif labels:
         parts = []
         for rec, lab in labels.items():
@@ -463,10 +500,15 @@ def skill_vs_baseline(paired: dict | None, alpha: float = ALPHA) -> dict:
         kinds = set(labels.values())
         result = label = kinds.pop() if len(kinds) == 1 else "mixed"
         wording = "; ".join(parts) + "."
+        short = {
+            "advantage": "advantage over the guess that nothing changes",
+            "baseline_better": "the guess that nothing changes did better",
+        }.get(result, "mixed against the guess that nothing changes")
     else:
         result, label = "no_demonstrated_advantage", None
         wording = f"No demonstrated advantage over the guess that nothing changes ({n_all} calls compared)."
-    return {**base, "result": result, "label": label, "records": records, "n": n_all, "wording": wording}
+        short = "no demonstrated advantage"
+    return {**base, "result": result, "label": label, "records": records, "n": n_all, "wording": wording, "short": short}
 
 
 # ── the assessment ───────────────────────────────────────────────────────────────────────
