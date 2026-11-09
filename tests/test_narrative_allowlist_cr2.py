@@ -14,6 +14,7 @@ The lead reads' words are private until CR2 ships, so their gate tests use a syn
 words are already public in ``deploy/generated/genesis_preregistration.json``, so those tests use the real entries.
 """
 
+# premerge-gate: CR2 historical words (owner 2026-11-09 D): reads the frozen pre-registration artifact and rglobs lambdas/ for a route opening the CR2 scope — a diff that regenerates the artifact or wires a route must red before merge, not after.
 from __future__ import annotations
 
 import hashlib
@@ -91,14 +92,15 @@ def test_the_approved_set_is_keys_and_hashes_with_public_families():
     assert len(NA.INDEX) == len(NA.APPROVED), "a duplicated key"
     for e in NA.APPROVED:
         assert re.fullmatch(r"[0-9a-f]{64}", e.text_sha256), e
-        assert e.families and NP.is_publishable({"v": NP.SCHEMA_VERSION, "families": list(e.families)}), e
         assert all(NP.classify(f) == NP.PUBLIC for f in e.families), e
     for e in _leads():
         assert e.pk == "COACH#eli_marsh" and e.field == "text"
+        assert e.families == NA.DERIVED_FROM_CITED, "a lead read's families come from its own cited block, never a list"
         day = e.sk.split("#", 1)[1]
         assert "2026-10-01" <= day <= "2026-11-03" and day not in EXCLUDED_LEAD_DAYS, e.sk
     for e in _calls():
         assert e.field == "claim_natural" and e.sk.startswith("PREDICTION#pred_20260906_"), e
+        assert NP.is_publishable({"v": NP.SCHEMA_VERSION, "families": list(e.families)}), e
         assert set(e.families) == {"experiments", "persona"}, e
 
 
@@ -225,9 +227,17 @@ def test_a_listed_row_whose_words_changed_is_not_the_approved_row(cr2_on):
         assert G.withheld_count() == 1
 
 
-def _synthetic_lead(monkeypatch, text: str) -> dict:
-    row = {"pk": "COACH#eli_marsh", "sk": "LEAD_DAILY#2026-10-05", "text": text, "generated_at": "2026-10-05T17:07:05Z", "cited": []}
-    e = NA.Entry(row["pk"], row["sk"], "text", _sha(text), ("experiments", "persona", "whoop", "withings"))
+_PUBLIC_CITED = [
+    {"metric": "hrv", "value": "50", "as_of": "2026-10-05", "source_field": "whoop.hrv"},
+    {"metric": "weight", "value": "250.0", "as_of": "2026-10-04", "source_field": "withings.weight_lbs"},
+    {"metric": "start", "value": "Sunday, September 6", "as_of": "2026-09-06", "source_field": "profile.journey_start_date"},
+]
+
+
+def _synthetic_lead(monkeypatch, text: str, cited=None) -> dict:
+    cited = _PUBLIC_CITED if cited is None else cited
+    row = {"pk": "COACH#eli_marsh", "sk": "LEAD_DAILY#2026-10-05", "text": text, "generated_at": "2026-10-05T17:07:05Z", "cited": cited}
+    e = NA.Entry(row["pk"], row["sk"], "text", _sha(text), NA.DERIVED_FROM_CITED)
     monkeypatch.setattr(NA, "INDEX", {**NA.INDEX, (e.pk, e.sk): e})
     return row
 
@@ -257,3 +267,19 @@ def test_only_the_cr2_scope_is_honoured(cr2_on):
         assert NA.record_for(row) is None
     with NA.serving(NA.SCOPE_CR2):
         assert NA.record_for(row)["producer"] == NA.PRODUCER
+
+
+def test_a_listed_lead_read_takes_its_families_from_its_own_cited_block(cr2_on, monkeypatch):
+    row = _synthetic_lead(monkeypatch, "A synthetic dated lead read: weight down and recovery steady this morning.")
+    with NA.serving(NA.SCOPE_CR2):
+        assert set(NA.record_for(row)["families"]) == {"whoop", "withings", "experiments", "persona"}
+
+
+@pytest.mark.parametrize("field", ["journal.days_since_last_entry", "state_of_mind.valence", "a_source_nobody_classified.x"])
+def test_a_listed_lead_read_whose_cited_block_names_a_private_field_fails_closed(cr2_on, monkeypatch, field):
+    cited = _PUBLIC_CITED + [{"metric": "m", "value": "3", "as_of": "2026-10-05", "source_field": field}]
+    row = _synthetic_lead(monkeypatch, "A synthetic dated lead read: weight down and recovery steady this morning.", cited)
+    with NA.serving(NA.SCOPE_CR2):
+        G.begin_request()
+        out = G.gate_item(dict(row))
+        assert out["text"] == "" and out[G.PUBLICATION_KEY]["state"] == "withheld"
