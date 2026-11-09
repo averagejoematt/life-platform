@@ -191,9 +191,12 @@ def _pointer(pid, outcome):
     }
 
 
-def _verify_row(cid, pid, outcome, status):
-    """The append-only VERIFY# audit row that names the call (it follows the call's publication class)."""
+def _verify_row(cid, pid, outcome, status, value="keep"):
+    """The append-only VERIFY# audit row that names the call (it follows the call's publication class). Owner
+    2026-11-09 (CR1): it carries the approved classification the verified headline counts by — a private call's
+    record says "keep" too, so the ungated control's private calls enter the headline and move it."""
     return {
+        "classification": {"value": value, "approved": True, "ruling_ref": "SYNTHETIC-RULING"},
         "pk": _pk(cid),
         "sk": f"VERIFY#{pid}#{VERIFIED_AT}",
         "record_type": "verification",
@@ -343,7 +346,8 @@ def public_rows() -> list:
             )
             if od:
                 rows.append(_learning(cid, pid, "2026-10-27", status, metric))
-                rows.append(_verify_row(cid, pid, outcome, status))
+                # one public call is classified an opinion, so the exclusions carry two categories (CR1)
+                rows.append(_verify_row(cid, pid, outcome, status, "noc_interpretation" if (cid, j) == ("mind", 1) else "keep"))
         rows.append(_call(cid, f"pred_20261020_synthetic_obs_{cid}", LEGACY_AT, f"Synthetic public observation {i}.", "observation", None))
         new_pid = f"pred_20261106_synthetic_public_new_{cid}"
         rows.append(
