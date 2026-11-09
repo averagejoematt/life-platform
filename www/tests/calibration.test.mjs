@@ -7,8 +7,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  assessmentWords,
   blendRow,
   calibrationChart,
+  coachVerified,
+  excludedAccounting,
+  methodChangeText,
+  qualifyText,
+  sameCalls,
+  verifiedRecord,
   calibrationDots,
   concentrationText,
   intervalText,
@@ -113,4 +120,65 @@ test("on a phone the viewBox is the container's width, so SVG text stays at or a
   assert.match(svg, /viewBox="0 0 342 /);
   const sizes = [...svg.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1]));
   assert.ok(sizes.length && sizes.every((s) => s >= 11), `font sizes ${sizes}`);
+});
+
+// ── launch-readiness (2026-11-09): the verified-only headline, same-call baseline, which calls qualify, exclusions ──
+
+test("verified record: read from strata.coaches.verified, else verification_summary.verified; malformed → not served", () => {
+  const f = clone(FIXTURE);
+  assert.equal(verifiedRecord(f.calibration), null, "the control: nothing served today");
+  f.calibration.verification_summary = { verified: { n: 30, right: 12, accuracy_pct: 40.0 } };
+  assert.deepEqual([verifiedRecord(f.calibration).n, verifiedRecord(f.calibration).confirmed], [30, 12]);
+  f.calibration.platform.strata.coaches.verified = { n: 40, confirmed: 17 };
+  assert.equal(verifiedRecord(f.calibration).n, 40, "the stratum's own split wins");
+  assert.equal(verifiedRecord({ verification_summary: { verified: { n: "40", confirmed: 17 } } }), null);
+});
+
+test("the baseline beside the verified record is over the SAME calls or not shown (control: a mismatched n is refused)", () => {
+  assert.deepEqual(sameCalls({ n: 40, text: "x" }, 40), { n: 40, text: "x" });
+  assert.deepEqual(sameCalls({ text: "x" }, 40), { text: "x" }, "served on the verified object, no n of its own");
+  assert.equal(sameCalls({ n: 214, text: "x" }, 40), null);
+  const f = clone(FIXTURE);
+  f.calibration.platform.strata.coaches.verified = { n: 40, confirmed: 17, accuracy_pct: 42.5, baseline: { n: 214, text: "A guess on other calls." } };
+  const h = recordHeadline(f);
+  assert.doesNotMatch(h.dek, /other calls/, "a baseline over other calls never reaches the headline");
+  assert.equal(h.baselineSameCalls, false);
+  assert.match(h.dek, /No comparison with a simple guess is published for these same calls yet/);
+  f.calibration.platform.strata.coaches.verified.baseline = { n: 40, text: "A guess on these calls does about as well." };
+  assert.match(recordHeadline(f).dek, /A guess on these calls does about as well\./);
+  assert.doesNotMatch(recordHeadline(f).dek, /every call has a/, "the as-graded baseline never stands in");
+});
+
+test("the denominator change reads as which calls qualify, never as improvement", () => {
+  const f = clone(FIXTURE);
+  assert.equal(qualifyText(recordHeadline(f)), null, "the control: no verified split, no sentence");
+  f.calibration.platform.strata.coaches.verified = { n: 40, confirmed: 17 };
+  const q = qualifyText(recordHeadline(f));
+  assert.match(q, /the 40 calls that qualify .* 214 calls were first graded/);
+  assert.match(q, /which calls qualify to be evaluated, not a change in how well the coaches called them/);
+  for (const s of [q, recordHeadline(f).caveat]) assert.doesNotMatch(s, /improv|better score|more accurate|gain/i);
+  assert.match(methodChangeText({ effective: "2026-11-05", history: [{}, {}] }), /^Since 5 November 2026, only calls about publishable data qualify/);
+  assert.equal(methodChangeText({ effective: "2026-11-05", history: [{}] }), null, "one method, no change to explain");
+});
+
+test("the excluded-calls accounting: nothing until the producer serves it; carried, never summed; private families never shown", () => {
+  assert.equal(excludedAccounting(FIXTURE.calibration), null, "the control: not served → the component shows nothing");
+  const dict = excludedAccounting({ verification_summary: { excluded_by_category: { unassessed: 120, logging_gap: 4, low_power: 2 } } });
+  assert.deepEqual(dict.rows.map((r) => [r.key, r.n]), [["unassessed", 120], ["logging_gap", 4], ["low_power", 2]]);
+  assert.equal(dict.total, null, "no total is computed when none is served");
+  const list = excludedAccounting({ verification_summary: { excluded: [{ category: "proxy_metric", count: 3 }, { key: "x_y", n: 1, label: "Served words" }], excluded_total: 4 } });
+  assert.deepEqual(list.rows.map((r) => r.words), ["graded on a stand-in measure, not the one it named", "Served words"]);
+  assert.equal(list.total, 4);
+  const priv = excludedAccounting({ verification_summary: { excluded_by_category: { journal_calls: 9, mood: 3, state_of_mind: 1, low_power: 2 } } });
+  assert.deepEqual(priv.rows.map((r) => r.key), ["low_power"], "a private family is dropped, fail closed");
+  assert.equal(excludedAccounting({ verification_summary: { excluded_by_category: { mood: 3 } } }), null);
+  assert.equal(excludedAccounting({ verification_summary: { excluded_by_category: { low_power: "2" } } }), null, "a non-integer count is not served");
+});
+
+test("per-coach verification and assessment_v2: shown when served, absent otherwise", () => {
+  assert.equal(coachVerified(FIXTURE.calibration.coaches[0]), null);
+  assert.deepEqual(coachVerified({ verification: { n: 15, confirmed: 6, accuracy_pct: 40, accuracy_ci95: [19.8, 64.3] } }), { k: 6, n: 15, pct: "40.0%", ci: "95% interval 19.8–64.3%" });
+  assert.equal(assessmentWords(null), null);
+  assert.equal(assessmentWords({ sentence: "Served sentence." }), "Served sentence.");
+  assert.equal(assessmentWords({ label: "insufficient_data" }), "insufficient evidence");
 });

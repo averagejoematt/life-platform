@@ -745,13 +745,13 @@
    "resolution_date": "2026-09-30"
   },
   {
-   "topic": "",
+   "topic": "Sample topic for the fixture build, open entry.",
    "claims": {
     "sleep_coach": "Sample claim for the fixture build, sleep side.",
     "training_coach": "Sample claim for the fixture build, training side, said on 2026-10-27."
    },
    "criterion": {
-    "description": "",
+    "description": "Sample criterion description for the fixture build, open entry.",
     "metric": "recovery_score",
     "condition": "gte",
     "threshold": 60.0
@@ -787,7 +787,7 @@
    "resolution_date": "2026-11-10"
   },
   {
-   "topic": "",
+   "topic": "Sample topic for the fixture build, second entry.",
    "claims": {
     "sleep_coach": "Sample claim for the fixture build, sleep side, second entry.",
     "training_coach": "Sample claim for the fixture build, training side, second entry."

@@ -9,10 +9,10 @@
 // "This month" is the snapshot's as-of month (manifest.json), never the wall clock. The month before sits folded.
 import Base from "../layouts/Base.astro";
 import RefutedMonth from "../components/RefutedMonth.astro";
-import { monthOf, previousMonth, refutedLedger } from "../lib/docket.js";
+import { docketEntries, monthOf, previousMonth, refutedLedger } from "../lib/docket.js";
 import { dayInWords } from "../lib/format.js";
 import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
-import { loadAll, snapshotAsOf } from "../lib/snapshot.js";
+import { loadAll, loadCoachRoom, snapshotAsOf } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
 if (!roomEnabled()) throw new Error("src/room/refuted.astro rendered with WEB_ROOM off — the room route must not be injected");
@@ -25,6 +25,9 @@ const preds = all.byType.prediction;
 const now = refutedLedger(preds, month);
 const before = refutedLedger(preds, previousMonth(month));
 const n = now.wrong.length;
+// early in a month the current list is short: the month before opens by default so the page is never a lone row
+const openBefore = n < 5 && before.wrong.length > 0;
+const docketOpen = docketEntries(await loadCoachRoom()).length > 0;
 const noindex = process.env.WEB_NOINDEX === "1";
 const through = dayInWords(asOf);
 const room = { [ROOM_MARKER]: "refuted" };
@@ -62,13 +65,13 @@ const h2 = "font-size:28px;line-height:1.15";
 
   <section class="section" {...room} id="last-month" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
-      <details>
+      <details open={openBefore}>
         <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center;font-size:18px">
           {before.words}: {before.wrong.length} graded wrong, as first graded{before.disputed.length ? `, ${before.disputed.length} under review` : ""}
         </summary>
         <div style="margin-top:12px"><RefutedMonth view={before} nameOf={nameOf} /></div>
       </details>
-      <p style="font-size:13px;margin-top:8px"><a href={href("/system/docket/")}>The docket: where two coaches bet against each other →</a></p>
+      {docketOpen && <p style="font-size:13px;margin-top:8px"><a href={href("/system/docket/")}>The docket: where two coaches bet against each other →</a></p>}
     </div>
   </section>
 </Base>
