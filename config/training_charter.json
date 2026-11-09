@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.39.0",
+  "version": "1.40.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -263,6 +263,13 @@
     },
     {
       "version": "1.39.0",
+      "date": "2026-11-08",
+      "by": "owner ruling 2026-11-08 (attended) on #5505",
+      "what": "cardio_menu.placement gains missed_reoffers_per_wk (1) and counting_rule: a substituted machine at the prescribed effort (his note's RPE at or above the served kind's band) counts toward the week's conditioning; a missed hard block is re-offered at most once a week and every later miss is dropped, so a week of substituted or skipped blocks no longer re-places 'conditioning 1 of 2' every day.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.40.0",
       "date": "2026-11-08",
       "by": "owner ruling 2026-11-08 (#5694, attended, delegated: \"just tell me what i should lift for my program and goals, ican do all the deadlifts\")",
       "what": "Retired the conventional-deadlift movement gate: `gated_movements.conventional_deadlift` is open by owner ruling (`status: open`), and its trap-bar `until_then` is gone. He has pulled conventional since 2026-09-09 (10 sessions, 195 to 225 lb). The Lower-heavy hinge is the conventional deadlift (the heavy pull) and the Lower-volume hinge is the Romanian deadlift (barbell, 8 to 10 reps). The numeric `gate_lb` stays where it is, read ONLY as the Foundation to Build weight boundary (`phases.definitions.build.entry_gates[0].value_ref`, the #5574 ruling); what that boundary becomes is a separate owner ruling. Foundation's `until_then` and Build's conventional-deadlift unlock are removed (nothing is held back any more); the power-clean revisit is unchanged.",
@@ -595,7 +602,9 @@
       ],
       "recumbent_after_rule": "the recumbent serves a conditioning block (tempo, hills, intervals) only when the previous PERFORMED lifting session (the Hevy sequence's last credited session and its role: training.session_sequence.next_session advanced_by) was recumbent_after_session and was performed the day before; an easy day after it stays on the incline treadmill walk; on fresh legs a conditioning block takes the treadmill when its block lists it (hills), else the menu's first machine for it (tempo, intervals: the treadmill is not among them)",
       "never_consecutive": "the same hard shape",
-      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent for a conditioning block the day after a heavy lower session, or after a heavy walking weekend; never the same hard shape on consecutive days"
+      "rule": "conditioning 2x/wk (one tempo-or-hills, one intervals), every other block easy; the recumbent for a conditioning block the day after a heavy lower session, or after a heavy walking weekend; never the same hard shape on consecutive days",
+      "missed_reoffers_per_wk": 1,
+      "counting_rule": "a week's conditioning counts (1) every block he PERFORMED as a hard kind, (2) a block he did on another machine than the one served when his own note logs an RPE at or above the served kind's band (a swap at the prescribed effort counts; a swap with no logged effort is not evidence), and (3) a missed offer beyond missed_reoffers_per_wk: an offered hard block (a routine pushed to Hevy) with no hard block performed that day is re-offered at most that many times a week, every later miss is dropped for the week (owner ruling 2026-11-08, #5505)"
     },
     "movement_minutes": "gym cardio minutes count toward the daily steps/movement goal (steps.gym_cardio_minutes_count_toward_movement)"
   },

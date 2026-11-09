@@ -74,12 +74,36 @@ def previous_of(spec: Any, target_date: str) -> dict[str, Any] | None:
     return cardio_menu.previous_performed((cal or {}).get("advanced_by") if isinstance(cal, dict) else None, target_date)
 
 
+def week_routines(target_date: str, supplied: list[Any] | None = None) -> list[Any] | None:
+    """This Mon-start week's routine records before `target_date` (#5505: the offers a missed block is counted from).
+    `supplied` wins (tests, replays); else one fail-soft read — None on a failure, so the count is the performed kinds
+    alone (named in the log), never a guessed miss."""
+    if supplied is not None:
+        return supplied
+    from common.pacific_time import parse_day_key
+
+    day = parse_day_key(str(target_date or "")[:10])
+    if day is None:
+        return None
+    start = day.fromordinal(day.toordinal() - day.weekday()).isoformat()
+    if start >= day.isoformat():
+        return []  # Monday: no earlier day this week
+    try:
+        from training.routine_repo import list_by_date_range
+
+        return list_by_date_range(start, day.isoformat())
+    except Exception as e:  # noqa: BLE001 — the count then reads the performed blocks alone
+        logger.warning(f"cardio cue: this week's routine read failed ({type(e).__name__}: {e}); missed offers not counted")
+        return None
+
+
 def attach_cardio_cues(
     spec: Any,
     catalog: dict[str, Any] | None = None,
     cardio_index: dict[str, list] | None = None,
     whoop_index: dict[str, list] | None = None,
     aerobic_block: dict[str, Any] | None = None,
+    routines_this_week: list[Any] | None = None,
 ) -> int:
     """Write the prescription-first note onto every cardio block of a RoutineSpec (#3700, #5048).
 
@@ -159,8 +183,9 @@ def attach_cardio_cues(
         return movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
 
     # #5076: the week's placement reads every cardio machine's history, not only this block's
-    hist = cardio_menu.history_context(cardio_index, catalog, target_date)
-    prior_kinds = hist["week_kinds"]
+    hist = cardio_menu.history_context(cardio_index, catalog, target_date, routines=week_routines(target_date, routines_this_week))
+    # #5505: the count reads performed kinds plus the missed offers beyond the week's re-offer allowance
+    prior_kinds = hist["counted_kinds"]
     loaded, _why = recent_aerobic.legs_loaded(aerobic_block)
     replaced: list[dict[str, Any]] = []
     audits: list[dict[str, Any]] = []
@@ -224,7 +249,10 @@ def attach_cardio_cues(
         "version": cardio_menu.CARDIO_MENU_VERSION,
         "charter_version": audits[0].get("charter_version") if audits else None,
         "kinds": placed,
-        "week_kinds_before": prior_kinds,
+        "week_kinds_before": hist["week_kinds"],
+        # #5505: the offers he missed this week and the ones dropped past the re-offer allowance (counted as done)
+        "missed_kinds": hist["missed_kinds"],
+        "dropped_kinds": hist["dropped_kinds"],
         # the gym cardio minutes this routine adds to the day's steps/movement goal (#5076 -> #5056)
         "movement_minutes": cardio_menu.movement_minutes(exercises),
     }
