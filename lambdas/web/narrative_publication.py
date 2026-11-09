@@ -48,7 +48,7 @@ import logging
 import re
 from typing import Any, Optional
 
-from common import narrative_provenance as NP, prediction_publication as PP
+from common import narrative_allowlist as NA, narrative_provenance as NP, prediction_publication as PP
 
 from web import call_publication  # owner ruling 2026-11-05: a non-eligible call's rows never reach a handler
 
@@ -305,7 +305,7 @@ def _taint(row: dict) -> None:
 
 def is_tainted(text: Any) -> bool:
     """True when ``text`` is, or carries a ``SHINGLE``-word run of, a withheld row's text."""
-    if not isinstance(text, str) or not _TAINT_EXACT:
+    if not isinstance(text, str) or not _TAINT_EXACT or NA.is_approved_text(text):
         return False
     words = _norm_words(text)
     if len(words) < EXACT_MIN_WORDS:
@@ -328,6 +328,13 @@ def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
     if not is_narrative_row(pk, item.get("sk")):
         return item
     ok, reason = NP.eligibility(item)
+    if not ok and reason == NP.R_UNRECORDED:
+        # Owner ruling 2026-11-09 (D): a historical row approved BY RECORD KEY, unchanged, with no record of its own,
+        # inside the CR2 scope with the CR2 switch on — published under the allowlist's public record. Everything
+        # else (the switch off, any other scope, any row carrying a record) is decided exactly as before.
+        approved = NA.record_for(item, pk)
+        if approved is not None:
+            ok, reason = NP.eligibility(approved)
     out = {k: v for k, v in item.items() if k != NP.PROVENANCE_KEY}
     if ok:
         _STATE["served"] += 1

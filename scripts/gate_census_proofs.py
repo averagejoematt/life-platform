@@ -4484,6 +4484,29 @@ STRUCTURAL_HAND_PROOFS["structural::test_calibration_v1_labels_retired.py"] = {
 }
 
 
+# Owner ruling 2026-11-09 (D): the CR2 historical-words allowlist — dark (switch off, no route in the scope), fail closed.
+STRUCTURAL_HAND_PROOFS["structural::test_narrative_allowlist_cr2.py"] = {
+    "gate_name": "test_narrative_allowlist_cr2.py",
+    "command": "python3 -m pytest tests/test_narrative_allowlist_cr2.py -q -p no:randomly   # baseline 23 passed",
+    "mutation": (
+        "Three plants in the real tree, ONE AT A TIME, each restored from a byte copy: M1 narrative_allowlist.record_for stops "
+        "refusing a row that carries its own provenance record; M2 narrative_publication.gate_item ignores the allowlist "
+        "(`approved = None`); M3 narrative_allowlist.active() drops the CR2 scope check (the switch alone would publish on "
+        "every live route)."
+    ),
+    "observed": (
+        "2026-11-09, this lane. BASELINE 23 passed. M1: 6 failed (the private / unrecorded / malformed / empty record cases "
+        "and the missing-record case). M2: 2 failed (the in-scope serve tests). M3: 4 failed (switch-on-outside-the-scope, "
+        "only-the-cr2-scope and the out-of-scope halves). REVERTED 23 passed each time (also observed identically at the 19-test stage)."
+    ),
+    "scope": (
+        "Repo-side: the allowlist module, the gate's read and wire halves, the frozen pre-registration artifact and the call "
+        "registry. NOT SEEN: the stored rows themselves (their words are private until CR2 ships; the record-level check that "
+        "pinned each hash is the owner's private provenance_v2_cr2 record) and the live API (the post-deploy sweep is that proof)."
+    ),
+    "proved_on": "2026-11-09",
+}
+
 # #5573 — Hevy notes that ask the platform for something: the owner_request class, the write-once REQUEST# row,
 # the once-only resolution and the owner-only surface. ONE structural entrant (the file carries a premerge-gate sweep
 # of lambdas/web/), proved by five plants in the real tree, one at a time, each restored from a byte copy.
