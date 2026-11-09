@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-03
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-03 | **Total tools:** 90
+**Version:** v8.6.0 | **Last updated:** 2026-11-03 | **Total tools:** 91
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 90 Tools — by module
+## All 91 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -30,6 +30,7 @@
 | `mcp/tools_coach_intelligence.py` | 5 |
 | `mcp/tools_coach_vision.py` | 1 |
 | `mcp/tools_may_tracker.py` | 1 |
+| `mcp/tools_training_phase.py` | 1 |
 | `mcp/tools_training.py` | 2 |
 | `mcp/tools_health.py` | 3 |
 | `mcp/tools_benchmark.py` | 1 |
@@ -101,6 +102,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_may_tracker` | weeks= | OWNER-ONLY. The weekly May tracker (#5073): for each completed Monday-Sunday week, the loss rate vs the charter band (lb/wk AND % of bodyweight), weeks to the target date and the projected weight there, waist, steps vs the floor and target, the four core anchors' e1RM trends, priority-muscle weekly sets, fitness tests and the distance to the running gate — every value labelled measured / absent / read_failed with its source — plus AMBER/RED triggers, each naming the lever to pull. Computed live from the sanctioned reads; `stored` says whether the nightly row is current. Never quoted on the site or in an email. |
+
+### mcp.tools_training_phase (`mcp/tools_training_phase.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `manage_training_phase` | action=, to=, words= | OWNER-ONLY. The training phase (Foundation -> Build -> Forge -> Sustain) computed from the charter's phase gates (#5574/#5575). action='status' (default): the current phase and since when, the pending proposal if any, the newest weekly evaluation — every gate as met / not_met / unknown with its measured value, and the ONE gate that stands between him and the next phase — plus the transitions so far. action='veto' (optional words): refuse the pending proposal; the phase then stays put through the next block start, after which the evaluator may propose again. action='override' with `to` (a phase id or title, later than the current one; optional words): move the phase now. The phase never moves backwards. Only veto or override on his explicit say-so. Never quoted on the site or in an email. |
 
 ### Training Intelligence (`mcp/tools_training.py`)
 

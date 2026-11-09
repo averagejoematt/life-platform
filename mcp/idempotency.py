@@ -283,6 +283,10 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     # ── Already replay-safe before this change (census §5) ────────────────────
     "archive_horizon": (DETERMINISTIC_KEY, "writes PICK#{week} and its retrospective in place — one row per ISO week"),
     "create_experiment": (READ_BEFORE_WRITE, "pre-reads and RAISES on a duplicate rather than upserting"),
+    "manage_training_phase": (
+        READ_BEFORE_WRITE,
+        "#5575: veto/override read PHASE#STATE first; a replayed veto finds nothing pending and a replayed override is not forward — both refused",
+    ),
     "delete_platform_memory": (DETERMINISTIC_KEY, "delete of a caller-named (category, key); a second delete removes nothing"),
     "end_experiment": (DETERMINISTIC_KEY, "sets terminal fields on the caller-named experiment row; converging, not appending"),
     "evaluate_prediction": (DETERMINISTIC_KEY, "grades the caller-named prediction row in place; the grade is a function of the row"),

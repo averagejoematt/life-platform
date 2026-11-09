@@ -36,7 +36,7 @@ from training import hevy_note_grammar as g
 
 logger = logging.getLogger(__name__)
 
-LINT_VERSION = "hevy-note-lint@1.3.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes (see each rule's comment)
+LINT_VERSION = "hevy-note-lint@1.4.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes; 1.4.0: test blocks (see each rule's comment)
 MODE_ENV = "HEVY_NOTE_LINT_MODE"
 MODES = ("off", "warn", "enforce")
 DEFAULT_MODE = "warn"
@@ -51,7 +51,7 @@ RULES = {
     "start load (on its rows) and adjust rule, a feeler W line's result rule)",
     "L5": "loadable steps; W rows ascend below the work",
     "L6": "one effort expression on a lift's line 1; exercise 1 does not repeat the session line's",
-    "L7": "phone-line budgets (an interval ride's note 7 with its escape line)",
+    "L7": "phone-line budgets (an interval ride's note 7 with its escape line; a fitness-test block's 6)",
     "L8": "safety facts present (family cue, cardio effort leads, no HR lead target)",
     "L9": "clock lines: minutes, at most 3 levels, interval start minutes; intervals: easy = hard − 1 on every other minute "
     "with its talk words, an escape checked as rep 1 ends (full sentences one level up; can't talk shorter reps at the hard level)",
@@ -322,6 +322,14 @@ def _lint_previous(ex: LintExercise, lines: list[str], where: str, out: list[Pro
             return
 
 
+def _lint_test(body: str, where: str, out: list[Problem]) -> None:
+    """A fitness-test block (§3.8): line 1 `Test · ‹protocol›`, then the protocol one sentence per line within the phone
+    budget. No effort grammar: the protocol is the effort (the charter's own bike test is "at RPE 6"). Every line's
+    length and the banned scan run for it as for any note."""
+    if g.phone_lines(body) > g.TEST_MAX_LINES:
+        out.append(Problem("L7", where, f"test note {g.phone_lines(body)} phone lines > {g.TEST_MAX_LINES}"))
+
+
 def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> None:
     lines = body.split("\n")
     l1 = lines[0]
@@ -564,7 +572,10 @@ def lint_routine(rt: LintRoutine) -> LintResult:
         total += len(note)
         _banned(note, where, out)
         _lint_set_words(ex, note, where, out)
-        if ex.kind == "cardio":
+        if g.is_test_note(body):
+            # a fitness-test block (§3.8): its own grammar, whatever the movement's kind (#5428, 2026-11-08)
+            _lint_test(body, where, out)
+        elif ex.kind == "cardio":
             followed = any(e.kind != "cardio" for e in exs[i + 1 :])
             _lint_cardio(body, where, followed, out)
         elif ex.kind == "mobility":

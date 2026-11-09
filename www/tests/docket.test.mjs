@@ -9,7 +9,11 @@ import { fileURLToPath } from "node:url";
 
 import {
   DOCKET_NOT_PUBLISHED,
+  allDocketEntries,
   callWords,
+  incompleteEntries,
+  incompleteText,
+  isPublishable,
   concessionOf,
   datesOf,
   docketEntries,
@@ -39,13 +43,20 @@ const NAMES = { sleep_coach: "Lisa Park", nutrition_coach: "Nathan Reeves", gluc
 const nameOf = (id) => NAMES[id] || id;
 
 test("the docket: open first (soonest to settle), then settled newest first; an absent file is no entry", () => {
-  const ids = docketEntries(FILE).map((e) => e.id);
-  assert.deepEqual(ids, [
-    "2026-10-27-sleep-coach-training-coach", // open, settles 10 November
-    "2026-10-02-nutrition-coach-sleep-coach", // settled 16 October
-    "2026-10-06-sleep-coach-training-coach", // settled 13 October
-    "2026-09-23-glucose-coach-nutrition-coach", // settled 30 September
-  ]);
+  assert.deepEqual(
+    allDocketEntries(FILE).map((e) => e.id),
+    [
+      "2026-10-27-sleep-coach-training-coach", // open, settles 10 November
+      "2026-10-02-nutrition-coach-sleep-coach", // settled 16 October
+      "2026-10-06-sleep-coach-training-coach", // settled 13 October
+      "2026-09-23-glucose-coach-nutrition-coach", // settled 30 September
+    ]
+  );
+  // only the complete entries get a row and a page (owner, 2026-11-09), in the same order
+  assert.deepEqual(
+    docketEntries(FILE).map((e) => e.id),
+    ["2026-10-27-sleep-coach-training-coach", "2026-10-06-sleep-coach-training-coach"]
+  );
   assert.deepEqual(docketEntries({ state: "absent" }), []);
   assert.deepEqual(docketEntries(null), []);
   assert.equal(docketEntry(FILE, "nope"), null);
@@ -60,7 +71,8 @@ test("the question: the topic's words when served, else the criterion's, else th
   assert.equal(q.text, "Recovery score, 7-day average, at or above 70?");
   assert.deepEqual(questionOf({ ...e, topic: "Does protein help recovery?" }), { text: "Does protein help recovery?", from: "topic" });
   const c = docketEntry(FILE, "2026-10-06-sleep-coach-training-coach");
-  assert.equal(questionOf(c).from, "criterion");
+  assert.equal(questionOf(c).from, "topic");
+  assert.equal(questionOf({ ...c, topic: "" }).from, "criterion");
   assert.equal(questionOf({ ...e, criterion: {} }).text, null, "no topic, no description, no measure: nothing is invented");
   assert.equal(measureWords("recovery_score_7day_avg"), "recovery score, 7-day average");
   assert.equal(testWords({ metric: "resting_hr", condition: "lte", threshold: 58 }), "resting hr at or below 58");
@@ -126,10 +138,29 @@ test("what the page cannot show is named with its field; the disagreement page f
   assert.ok(gaps.includes("the criterion's own words (criterion.description)"));
   assert.ok(gaps.some((g) => g.startsWith("an integrator's call")));
   assert.ok(!gaps.join(" ").includes("sleep_coach"), "a raw persona id is never page text");
-  const entries = docketEntries(FILE);
+  const entries = allDocketEntries(FILE);
   assert.equal(entryForDisagreement(entries, { coach_a: "sleep_coach", coach_b: "nutrition_coach", status: "resolved", resolved_date: "2026-10-16" }).id, "2026-10-02-nutrition-coach-sleep-coach");
   assert.equal(entryForDisagreement(entries, { coach_a: "sleep_coach", coach_b: "nutrition_coach", status: "open" }), null, "the control: same seats, wrong status");
   assert.equal(entryForDisagreement(entries, { coach_a: "sleep_coach", coach_b: "nutrition_coach", status: "resolved", resolved_date: "2026-10-17" }), null);
+});
+
+test("an incomplete entry gets no page: topic, BOTH sides' words and the criterion's words must all be served (each a control)", () => {
+  const full = docketEntry(FILE, "2026-10-06-sleep-coach-training-coach");
+  assert.equal(isPublishable(full), true, "the control: a complete entry is publishable");
+  assert.equal(isPublishable({ ...full, topic: "  " }), false, "no topic");
+  assert.equal(isPublishable({ ...full, criterion: { ...full.criterion, description: "" } }), false, "no criterion words");
+  assert.equal(isPublishable({ ...full, claims: { ...full.claims, sleep_coach: "" } }), false, "one side's words missing");
+  assert.equal(isPublishable({ ...full, claims: {} }), false, "no side's words");
+  assert.equal(isPublishable(docketEntry(FILE, "2026-09-23-glucose-coach-nutrition-coach")), false, "a side withheld by the API is not served");
+  assert.equal(isPublishable(null), false);
+  const inc = incompleteEntries(FILE);
+  assert.deepEqual(inc.map((e) => e.id), ["2026-10-02-nutrition-coach-sleep-coach", "2026-09-23-glucose-coach-nutrition-coach"]);
+  const line = incompleteText(inc);
+  assert.match(line, /^2 settled entries are incomplete — not yet cleared for publication\./);
+  assert.match(line, /no page here\.$/);
+  assert.equal(incompleteText([]), null, "nothing incomplete → no line");
+  assert.match(incompleteText([{ status: "open" }]), /^1 open entry is incomplete/);
+  assert.match(incompleteText([{ status: "open" }, { status: "resolved" }]), /^1 open and 1 settled entries are incomplete/);
 });
 
 test("wrong this month: served statuses only, disputed never wrong, corrections shown, every grade as first graded", () => {

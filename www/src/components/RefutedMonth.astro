@@ -6,7 +6,7 @@ import Quote from "./Quote.astro";
 import StatusTag from "./StatusTag.astro";
 import { correctionArrow } from "../lib/coach_room.js";
 import { DISPUTED_NOTE } from "../lib/disputed.js";
-import { refutedRow } from "../lib/docket.js";
+import { CALL_NOT_PUBLISHED, refutedRow } from "../lib/docket.js";
 import { correctionRows } from "../lib/corrections.js";
 import { href, pathOf } from "../lib/url.js";
 
@@ -28,7 +28,7 @@ const disputed = view.disputed.map((p) => refutedRow(p, nameOf));
             <span style="font-size:15px;line-height:1.45">
               <b>{r.coach}</b> <span class="muted">· made {r.made} · graded wrong {r.settled}</span>
             </span>
-            <span class="serif" style="font-size:17px;line-height:1.45">{r.text ? <Quote text={r.text} said={r.said} /> : <span class="muted" data-withheld>{r.message}</span>}</span>
+            {r.text ? <span class="serif" style="font-size:17px;line-height:1.45"><Quote text={r.text} said={r.said} /></span> : r.message !== CALL_NOT_PUBLISHED && <span class="serif muted" style="font-size:17px;line-height:1.45" data-withheld>{r.message}</span>}
             {(r.how || r.notes) && <span class="mono" style="font-size:12px;line-height:1.5">{[r.how, r.notes].filter(Boolean).join(" · ")}</span>}
             {r.guess && <span class="muted" style="font-size:12px">{r.guess}</span>}
             {
@@ -59,7 +59,7 @@ const disputed = view.disputed.map((p) => refutedRow(p, nameOf));
           {disputed.map((r) => (
             <a href={href(pathOf("prediction", r.id))}>
               <span style="font-size:14px;line-height:1.45">
-                <b>{r.coach}</b> {r.text ? <Quote text={r.text} said={r.said} /> : <span class="muted">{r.message}</span>}
+                <b>{r.coach}</b> {r.text ? <Quote text={r.text} said={r.said} /> : r.message !== CALL_NOT_PUBLISHED && <span class="muted">{r.message}</span>}
                 {r.disputedReason && <span class="muted"> · {r.disputedReason}</span>}
               </span>
               <StatusTag status="refuted" call disputed />

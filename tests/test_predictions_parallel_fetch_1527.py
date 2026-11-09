@@ -244,6 +244,10 @@ class TestProjectionCarriesEveryEmittedField:
             # keep their real byline), and the scorecard used to render them beside the
             # live cast with nothing to say so. The flag is registry-derived.
             "retired": False,
+            # owner 2026-11-09 (web.verification_fields): additive — the row carries no stamp and no verification record.
+            "evaluator_version": None,
+            "algo_version": None,
+            "verification": None,
         }
         assert body["by_coach"]["sleep"]["lifetime"]["confirmed"] == 1
 
