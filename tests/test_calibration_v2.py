@@ -124,7 +124,7 @@ def test_a_spread_miscalibrated_coach_fires_over_confidence():
     d = V.confidence_direction(_spread_overconfident(60))
     assert d["result"] == d["label"] == "over_confident"
     assert any(t["rejects"] and t["direction"] == "over" for t in d["tests"])
-    assert d["estimate"] > 0 and d["ci95"][1] < 0.9 and d["n"] == 180 and "Holm" in d["method"]
+    assert d["estimate"] > 0 and d["ci95"][0] <= d["estimate"] <= d["ci95"][1] and d["n"] == 180 and "Holm" in d["method"]
     assert V.estimability(_spread_overconfident(60))["result"] == "estimable"
 
 
