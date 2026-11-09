@@ -164,6 +164,17 @@ def test_the_verification_fields_are_served_and_count_only_public_calls(walks):
     assert preds["verification_summary"] == ledger["verification_summary"]
     verified = calib["platform"]["strata"]["coaches"]["verified"]
     assert verified["n"] == n and verified["confirmed"] == n, verified
+    # CR1 (owner 2026-11-09): the headline, its exclusions and the archive — over the public calls only (the identity
+    # tests above hold every byte of it fixed across the variants; the ungated control below moves it).
+    vs = calib["verification_summary"]
+    assert vs["verified"] == verified, "the stratum's verified block is the headline's own object"
+    sides = 2  # the public bet's two graded docket sides: no verification record, so "could not be verified"
+    assert vs["eligible_total"] == 2 * n + sides == vs["verified"]["n"] + vs["excluded_total"]
+    assert {e["key"]: e["n"] for e in vs["excluded_by_category"]} == {"opinion": 1, "could_not_verify": n - 1 + sides}
+    assert sum(e["n"] for e in vs["excluded_by_category"]) == vs["excluded_total"]
+    assert len(vs["counted_calls"]) == verified["n"] and not [c for c in vs["counted_calls"] if "private" in c]
+    assert vs["archive"]["n"] == 2 * n + sides and vs["archive"]["confirmed"] == n + 1
+    assert vs["verified"]["baseline"]["n"] == vs["verified"]["n"], "the baseline is scored on exactly the same calls"
     assert calib["platform"]["strata"]["hypotheses"]["verified"] is None
     stratum = calib["platform"]["strata"]["coaches"]
     assert stratum["n"] > 0 and stratum["accuracy_ci95"] is not None and stratum["accuracy_pct"] is not None
@@ -197,3 +208,9 @@ def test_negative_control_the_ungated_policy_leaks(ungated):
     assert _body(some, "/api/ledger_export")["verification_summary"] != _body(ungated["none"], "/api/ledger_export")["verification_summary"]
     s_ver = _body(some, "/api/calibration")["platform"]["strata"]["coaches"]["verified"]
     assert s_ver != _body(ungated["none"], "/api/calibration")["platform"]["strata"]["coaches"]["verified"]
+    # CR1: ungated, the private calls enter the headline's N, its exclusions and its counted ids — so the identity
+    # of verification_summary across the gated variants is not vacuous.
+    s_vs = _body(some, "/api/calibration")["verification_summary"]
+    n_vs = _body(ungated["none"], "/api/calibration")["verification_summary"]
+    assert s_vs["eligible_total"] > n_vs["eligible_total"] and s_vs["verified"]["n"] > n_vs["verified"]["n"]
+    assert any("private" in c for c in s_vs["counted_calls"])
