@@ -2,9 +2,11 @@
 """scripts/publish_snapshot_calibration.py — the Coaching Room's data file (CR1), written ONLY for a dark build.
 
 The owner's ruling of 2026-11-08: the Coaching Room stays NO-GO for publication but may be implemented and tested
-privately. So this data file exists only when ``WEB_ROOM=1`` (the same switch as ``www/src/lib/room.js``): with the
-switch off, the producer neither fetches it nor writes it, and the snapshot — manifest included — is byte-identical
-to a snapshot made without this module. The deploy workflow never sets the switch.
+privately; on 2026-11-09 he ruled that CR1 launches ahead of CR2/CR3. So this data file exists only when the room's
+scope is on (``room_scope`` below, the twin of ``www/src/lib/room.js``): ``WEB_ROOM=1`` / ``WEB_ROOM=cr1`` for a private
+look, or the committed ``room_public: "cr1"`` in ``www/owned_paths.json`` — the one-line launch merge, which the deploy
+reads. With both off the producer neither fetches it nor writes it, and the snapshot — manifest included — is
+byte-identical to a snapshot made without this module. The deploy workflow never sets WEB_ROOM.
 
 What it carries, never recomputed (README requirement A — the snapshot is the only source of a published statistic):
   * ``/api/calibration`` as served, minus its ``_meta`` clock — the platform card and its strata, each coach's
@@ -54,9 +56,40 @@ _RECORD_KEYS = (
 )
 
 
-def room_enabled(env: dict | None = None) -> bool:
-    """The Python twin of www/src/lib/room.js::roomEnabled — only the literal "1" turns the room on."""
-    return (os.environ if env is None else env).get(ROOM_ENV) == "1"
+OWNED_PATHS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "www", "owned_paths.json")
+ROOM_PUBLIC_KEY = "room_public"
+
+
+def committed_room_public(path: str = OWNED_PATHS) -> str:
+    """The committed production switch in www/owned_paths.json (www/src/lib/room.js::committedRoomPublic's twin):
+    "cr1", else "off" — a missing file, an unreadable one or any other value is off (fail closed)."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return "cr1" if json.load(fh).get(ROOM_PUBLIC_KEY) == "cr1" else "off"
+    except (OSError, ValueError, AttributeError):
+        return "off"
+
+
+def room_scope(env: dict | None = None, committed: str | None = None) -> str:
+    """The Python twin of www/src/lib/room.js::roomScope: "all" (WEB_ROOM=1, private), "cr1" (WEB_ROOM=cr1, private —
+    or the committed `room_public: "cr1"`, published) or "off". WEB_ROOM wins when it is "1" or "cr1"."""
+    v = (os.environ if env is None else env).get(ROOM_ENV)
+    if v == "1":
+        return "all"
+    if v == "cr1":
+        return "cr1"
+    return "cr1" if (committed_room_public() if committed is None else committed) == "cr1" else "off"
+
+
+def room_enabled(env: dict | None = None, committed: str | None = None) -> bool:
+    """Is CR1 (at least) on? calibration.json is written exactly then."""
+    return room_scope(env, committed) != "off"
+
+
+def room_all(env: dict | None = None, committed: str | None = None) -> bool:
+    """Is the WHOLE room on (CR2 + CR3)? Only WEB_ROOM=1. coach_room.json is written exactly then — never on a CR1
+    build, private or published."""
+    return room_scope(env, committed) == "all"
 
 
 def _persona(short: str) -> str:

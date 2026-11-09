@@ -29,7 +29,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { roomEnabled } from "../src/lib/room.js";
+import { ROOM_ENV, roomScope, scopeRoutes } from "../src/lib/room.js";
 import { LAB_ROUTES, labEnabled, labPrivate } from "../src/lib/lab.js";
 import { STORY_ROUTES, storyEnabled, storyPrivate } from "../src/lib/story_dark.js";
 
@@ -44,15 +44,17 @@ const REACH_SINKS = ["/system/everything-else/"];
 const ASSET_PREFIX_ROOTS = ["_astro", "assets"];
 
 const rawBase = process.env.WEB_BASE || "/";
-// A Coaching Room build (WEB_ROOM=1, src/lib/room.js) is private and local: it must never rewrite the two committed
-// artifacts the deploy reads, so they are left exactly as committed and the build says so.
+// A PRIVATE Coaching Room build (WEB_ROOM=1 or WEB_ROOM=cr1, src/lib/room.js) is local: it must never rewrite the two
+// committed artifacts the deploy reads, so they are left exactly as committed and the build says so. A PUBLISHED CR1
+// build (the committed `room_public: "cr1"`, no WEB_ROOM) is an ordinary build: its pages are owned and counted.
 // A Laboratory build (WEB_LAB=1, src/lib/lab.js, L1) is private in the same way and held to the same rule.
 // A Human Story build (WEB_STORY=1, src/lib/story_dark.js, HS1) is private and local in exactly the same way.
 // Only a PRIVATE build (the env switch while the go-live constant is false) is held back; once LAB_LIVE / STORY_LIVE is
 // committed true the Lab / the story is ordinary build output and is owned, mapped and deployed like every page.
 const lab = labPrivate();
 const story = storyPrivate();
-const room = roomEnabled() || lab || story;
+const privateRoom = roomScope() !== "off" && ["1", "cr1"].includes(process.env[ROOM_ENV]);
+const room = privateRoom || lab || story;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
 function walk(dir, out = []) {
@@ -124,6 +126,11 @@ for (const [on, list] of [
   }
 }
 
+// A PUBLISHED CR1 build (the committed `room_public: "cr1"`): the room's CR1 pages live outside src/pages/ and are
+// injected (src/lib/room.js), so they are added to the static routes here — each is written by a template. Never on a
+// private build (which does not write this file) and never while the switch is off (no route is injected).
+if (!privateRoom && roomScope() === "cr1") for (const r of scopeRoutes("cr1")) staticRoutes.add(r.path);
+
 let previous = {};
 if (existsSync(OWNED_OUT)) {
   try {
@@ -138,12 +145,15 @@ const owned = {
     "Every path the v9 build (www/) writes for the production base `/`, emitted by www/scripts/postbuild.mjs on every build and " +
     "drift-checked by scripts/check_www_build.py. deploy/sync_site_to_s3.sh and deploy/rollback_site.sh exclude exactly these " +
     "through deploy/www_owned_paths.py — one owner per path (#5534). `live_at_root` is the cut-over switch, not build output: " +
-    "false = the build is served at /next/v9/ only; true = the build owns `/` and every `www/**` merge deploys there.",
+    "false = the build is served at /next/v9/ only; true = the build owns `/` and every `www/**` merge deploys there. " +
+    "`room_public` is the Coaching Room's committed publication switch, not build output: \"off\" = no room page is built; " +
+    "\"cr1\" = every build publishes CR1 (/system/calibration/, /system/ledger/refuted/, the /system/ entry) and never CR2/CR3.",
   base: "/",
   files: [...files].sort(),
   flipped_on: previous.flipped_on ?? null,
   live_at_root: previous.live_at_root === true,
   prefixes: [...prefixes].sort(),
+  room_public: previous.room_public === "cr1" ? "cr1" : "off",
   route_patterns: [...routePatterns].sort(),
   routes: [...routes].sort(),
   static_routes: [...staticRoutes].sort(),
@@ -216,7 +226,7 @@ if (!room) writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
 
 if (room) {
   console.log(
-    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : "WEB_ROOM=1 — a private Coaching Room build"} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
+    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : `WEB_ROOM=${process.env[ROOM_ENV]} — a private Coaching Room build`} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
   );
 } else {
   console.log(
