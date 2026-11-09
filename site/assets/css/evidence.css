@@ -1148,3 +1148,13 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .wrong-ob-perma { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.06em;
   color: var(--ink-faint); text-decoration: none; }
 .wrong-ob-perma:hover { color: var(--ember); text-decoration: underline; }
+
+/* Owner ruling 2026-11-09: calibration-v2 — three separate answers per coach / stratum (calibration_v2_words.js). */
+.cv2-answers { margin: var(--sp-2) 0 0; }
+.cv2-row { margin: 0 0 var(--sp-2); }
+.cv2-answers dt { font-weight: 600; color: var(--ink); }
+.cv2-answers dd { margin: 2px 0 0; color: var(--ink-muted); }
+.cv2-stratum, .cv2-coach { margin-top: var(--sp-3); }
+.cv2-details { margin-top: var(--sp-3); }
+.cv2-details summary { cursor: pointer; color: var(--ink); }
+.cv2-short { display: inline-block; }

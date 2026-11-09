@@ -11,7 +11,7 @@ THE NOTE (≤ 4 lines; `HEVY_NOTE_STANDARD.md` §3.7)
 
     line 1   <Machine> · <levels> · [hard ]RPE <a[–b]> (<talk words>)                  always (`LINE1_RE`)
     line 2   ⌚ ride clock: <rule>   (`⌚ walk clock:` on the treadmill)                  tempo / hills / intervals
-    line 3   As rep 1 ends: full sentences → L<hard+1>; can't talk → 1 min at L<hard>.     intervals (the escape)
+    line 3   As rep 1 ends: full sentences → reps at L<hard+1>; can't talk → reps at L<hard−1>.   intervals (the escape)
     line 4   <one why>                                                                   optional, a route choice only
     line 4   After: end watch cardio, restart Hevy.                                       when a Hevy block follows
 
@@ -23,12 +23,13 @@ THE NOTE (≤ 4 lines; `HEVY_NOTE_STANDARD.md` §3.7)
     callers' signature and never printed.
   * The clock rule is read off the session clock from 0 in whole minutes, `min` on every time, at most three levels,
     ≤ `CLOCK_LINE_MAX` characters (the owner's wrist-clock rule, 2026-10-25: an iPad covers the console and the watch
-    does not alert). Intervals list every start minute, put every other minute at his steady level with its talk words,
-    and carry the escape on its own line, checked as rep 1 ends: full sentences one level up, can't talk 1-min reps at the
-    same level (never down to the recovery level).
+    does not alert). Intervals name the rep length and its level before the start minutes (`2 min at L13 from min 6, …`),
+    put every other minute at his steady level with its talk words, and carry the escape on its own line, checked as rep 1
+    ends: full sentences the reps one level up, can't talk the reps one level down — still over his steady level, never the
+    recovery level.
   * Levels come from HIS log (`steady_level`: the median of his last single-level rides), never from the top of a ramp:
-    easy = steady, tempo = steady + 1, intervals = steady before / between / after and steady + 1 hard (an escape one
-    more), hills climb from steady. A treadmill hill starts no steeper than his steepest logged grade.
+    easy = steady, tempo = steady + 1, intervals = steady before / between / after and steady + 2 hard (owner ruling
+    2026-11-08; the escape one level either way), hills climb from steady. A treadmill hill starts no steeper than his steepest logged grade.
   * `After:` (owner protocol 2026-10-27): the watch's cardio workout and Hevy's watch workout cannot run together, so a
     cardio block a Hevy block follows reminds him to restart Hevy's (`apply_after_lines`, idempotent).
 
@@ -48,7 +49,9 @@ from typing import Any
 
 from training import hevy_note_grammar, wrist_clock
 
-CARDIO_NOTE_VERSION = "cardio-note@4.4.0"  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
+CARDIO_NOTE_VERSION = "cardio-note@4.5.0"  # 4.0.0 = the #5428 standard: level · effort line, ⌚ ride clock, After line
+# 4.5.0 = re-grade #6 + owner ruling 2026-11-08: intervals hard = steady + 2, the clock names the rep length first, and
+# the escape names the level the reps move to either way
 # 4.3.0 = re-grade #3: the easy minutes' talk words; 4.4.0 = re-grade #4: the escape never drops below the hard level
 # 4.1.0 = the 2026-10-30 re-grade: ≤ 3 levels on a bike hill, the talk words' band on line 1, `walk clock` on a treadmill
 # 4.2.0 = the 2026-10-31 re-grade #2: intervals ride his steady level before / between / after, a one-level escape on its
@@ -68,10 +71,14 @@ BIKES = ("cycling", "air_bike")
 WALKS = ("treadmill",)
 
 # ── the thresholds this note acts on, each labelled (ADR-105) ─────────────────────────
-# PLATFORM-CHOSEN (panel, #5428): an interval's hard minutes sit one level over his steady level. Re-grade #2
+# OWNER RULING 2026-11-08 (#5428, re-grade #6): an interval's hard minutes sit TWO levels over his steady level (was one,
+# platform-chosen by the panel: steady + 1 was the L12 his tempo rides hold for 30 min at RPE 6–7). Re-grade #2
 # (2026-10-31): its easy minutes — before, between and after the reps — ARE his steady level (standard §3.7: "between" =
 # his steady L11; it was one under, L10), and the escape (full sentences as rep 1 ends) is ONE level, not two.
-INTERVAL_LEVEL_STEP = 1
+INTERVAL_LEVEL_STEP = hevy_note_grammar.INTERVAL_HARD_STEP
+INTERVAL_LEVEL_STEP_BEFORE_2026_11_08 = 1  # what a note composed before the ruling was built with (history reads it back)
+# the 4.5.0 interval clock (`2 min at L13 from min …`) marks a note composed with the ruled step
+_INTERVAL_CLOCK_4_5 = re.compile(r"⌚ ride clock: \d{1,2} min (?:at L\d{1,2}|hard) from min ")
 INTERVAL_EASY_STEP = 0
 INTERVAL_ESCAPE_STEP = hevy_note_grammar.INTERVAL_ESCAPE_STEP
 # PLATFORM-CHOSEN (#5374): a hill climbs this many steps of `HILL_LEVEL_STEP` levels and back down. #5428 re-grade
@@ -91,7 +98,7 @@ STEADY_RIDES = 5
 CLOCK_LINE_MAX = 110
 ROUTE_WHY_MAX = 60
 LABELS = {
-    "interval_level_step": "platform-chosen",
+    "interval_level_step": "owner-ruled 2026-11-08 (#5428)",
     "interval_easy_step": "platform-chosen",
     "interval_escape_step": "platform-chosen",
     "hill_climb_steps": "platform-chosen",
@@ -178,7 +185,11 @@ def read_line1(note: str | None) -> dict[str, Any] | None:
         lv = int(m.group("level")) if m.group("level") else None
         if m.group("level_hard"):
             hard = int(m.group("level_hard"))
-            out.update(kind="intervals", level=hard, base_level=hard - INTERVAL_LEVEL_STEP, easy_level=lv, top=None)
+            # the steady level the dose was built on: hard − the step the note was composed with. Line 1 alone cannot tell
+            # `L11/L13` (4.5.0, steady + 2) from `L10/L12` (4.0.0, easy one under steady, hard steady + 1); the 4.5.0
+            # clock line can (`2 min at L13 from min …`), so a note without it reads with the step before 2026-11-08
+            step = INTERVAL_LEVEL_STEP if _INTERVAL_CLOCK_4_5.search(str(note or "")) else INTERVAL_LEVEL_STEP_BEFORE_2026_11_08
+            out.update(kind="intervals", level=hard, base_level=hard - step, easy_level=lv, top=None)
         elif m.group("level_top"):
             out.update(kind="hills", level=lv, base_level=lv, top=int(m.group("level_top")))
         elif m.group("hard"):
@@ -261,9 +272,11 @@ def shape_of(note: str | None) -> str:
 # ── reading a composed note back as its clock (adherence grades against it) ───────────
 _RE_TEMPO_CLOCK = re.compile(r"^at min (?P<pts>[\d, and]+), full sentences → one level up, a few words → one down$")
 _RE_INTERVAL_CLOCK = re.compile(
-    r"^(?:L(?P<hard>\d{1,2})|hard) (?P<work>\d{1,2}) min at min (?P<starts>[\d, ]+); "
+    # 4.5.0 `2 min at L13 from min 6, 10, …; else L11 (full sentences)`; before it `L12 2 min at min 6, 10, …; …`
+    r"^(?:(?P<work2>\d{1,2}) min (?:at L(?P<hard2>\d{1,2})|hard) from min|(?:L(?P<hard>\d{1,2})|hard) (?P<work>\d{1,2}) min at min)"
+    r" (?P<starts>[\d, ]+); "
     # 4.3.0 `else L11 (full sentences).`; 4.2.0 `L11 before, between, after.`; 4.1.0 `L10 between.` — all still read
-    r"(?:else (?:L(?P<easy3>\d{1,2})|easy) \([a-z ]+\)|(?:L(?P<easy>\d{1,2})|easy) (?:before, between, after|between))\."
+    r"(?:else (?:L(?P<easy3>\d{1,2})|easy) \([a-z ]+\)|(?:L(?P<easy>\d{1,2})|easy) (?:before, between, after|between))\.?"
     r"(?: Full sentences at min \d{1,3} → L\d{1,2} from min \d{1,3}\.)?$"
 )
 _RE_HILL_CLOCK = re.compile(
@@ -300,8 +313,9 @@ def clock_of(note: str | None, total_min: int | None = None) -> dict[str, Any] |
     clauses: list[dict[str, Any]]
     if (m := _RE_INTERVAL_CLOCK.match(clock)) is not None:
         starts = _numbers(m.group("starts"))
-        work = int(m.group("work"))
-        hard: Any = int(m.group("hard")) if m.group("hard") else "base+1"
+        work = int(m.group("work") or m.group("work2"))
+        hard_txt = m.group("hard") or m.group("hard2")
+        hard: Any = int(hard_txt) if hard_txt else f"base+{INTERVAL_LEVEL_STEP}"
         easy_txt = m.group("easy") or m.group("easy3")
         easy: Any = int(easy_txt) if easy_txt else "base"
         every = (starts[1] - starts[0]) if len(starts) > 1 else work * 2
@@ -341,11 +355,8 @@ def clock_of(note: str | None, total_min: int | None = None) -> dict[str, Any] |
     return shape
 
 
-def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[str]:
-    """The menu kinds of this week's performed cardio blocks in [week_start, target_date), oldest first.
-
-    `sessions_by_machine` is movement_key -> its `cardio_index` entry (each `{date, note, ...}`, plus `served_kind`
-    when `cardio_menu.annotate_served` matched the routine he performed — #5076: his empty-note rides)."""
+def week_rows(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[tuple[str, str]]:
+    """(date, menu kind) of this week's performed cardio blocks in [week_start, target_date), oldest first (#5505)."""
     from training import cardio_menu
 
     rows: list[tuple[str, str]] = []
@@ -353,9 +364,17 @@ def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week
         for s in sessions or []:
             d = str(s.get("date") or "")[:10]
             if week_start <= d < target_date:
-                rows.append((d, cardio_menu.kind_of_performed(key, s.get("note"), s.get("served_kind"))))
+                rows.append((d, cardio_menu.kind_of_performed(key, s.get("note"), s.get("served_kind"), s.get("served_swap_kind"))))
     rows.sort()
-    return [k for _, k in rows]
+    return rows
+
+
+def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[str]:
+    """The menu kinds of this week's performed cardio blocks in [week_start, target_date), oldest first.
+
+    `sessions_by_machine` is movement_key -> its `cardio_index` entry (each `{date, note, ...}`, plus `served_kind`
+    when `cardio_menu.annotate_served` matched the routine he performed — #5076: his empty-note rides)."""
+    return [k for _, k in week_rows(sessions_by_machine, week_start, target_date)]
 
 
 def performed_shape(note_text: str | None, total_min: int | None = None, machine: str | None = None) -> dict[str, Any]:
@@ -555,7 +574,11 @@ def clock_shape(kind: str, minutes: int, dose: dict[str, Any], *, walk: bool) ->
         easy_txt = f"L{easy}" if isinstance(easy, int) else "easy"
         # re-grade #2: the easy level is named for the warm-up and the cool-down too; the escape is its own line
         # (`interval_escape`), so the talk check reads as the END of rep 1, not a minute that is also the easy start
-        line = f"{hard_txt} {work} min at min {', '.join(str(s) for s in starts)}; {INTERVAL_EASY_WORDS} {easy_txt} ({g_easy_talk()})."
+        # re-grade #6 (2026-11-08): `L12 2 min at min 6, …` set two numbers side by side; the rep length now comes
+        # first and the level is named as one (`2 min at L13 from min 6, …`). No closing period, as on the tempo clock:
+        # the line stays inside two phone lines on a 30-min ride.
+        rep_txt = f"at {hard_txt}" if isinstance(hard, int) else "hard"
+        line = f"{work} min {rep_txt} from min {', '.join(str(s) for s in starts)}; {INTERVAL_EASY_WORDS} {easy_txt} ({g_easy_talk()})"
         return clauses, unit, line
     clauses, _every = wrist_clock.steady(base, total)
     if kind == "tempo" and not walk:
@@ -575,8 +598,9 @@ def g_easy_talk() -> str:
 
 
 def interval_escape(kind: str, dose: dict[str, Any], minutes: int, *, walk: bool) -> str | None:
-    """An interval ride's escape line (`hevy_note_grammar.interval_escape_line`): one level over the hard level, checked
-    as rep 1 ends; None off a bike interval, with no steady level, or with fewer than two reps (nothing after rep 1)."""
+    """An interval ride's escape line (`hevy_note_grammar.interval_escape_line`): one level over the hard level on full
+    sentences, one under it on can't talk (never down to his steady level), checked as rep 1 ends; None off a bike interval, with no steady level, or with fewer than two reps (nothing after rep 1).
+    """
     steady = dose.get("steady")
     if kind != "intervals" or walk or not isinstance(steady, int):
         return None
@@ -584,7 +608,9 @@ def interval_escape(kind: str, dose: dict[str, Any], minutes: int, *, walk: bool
     if plan is None or len(plan["starts"]) < 2:
         return None
     hard = steady + INTERVAL_LEVEL_STEP
-    return hevy_note_grammar.interval_escape_line(hard + INTERVAL_ESCAPE_STEP, hard)
+    # re-grade #6 / owner ruling 2026-11-08: one level up on full sentences, one level down on can't talk — the down
+    # level stays over his steady level (INTERVAL_LEVEL_STEP >= 2), so the reps never fall to the recovery level
+    return hevy_note_grammar.interval_escape_line(hard + INTERVAL_ESCAPE_STEP, max(steady + 1, hard - INTERVAL_ESCAPE_STEP))
 
 
 def levels_text(kind: str, dose: dict[str, Any], *, walk: bool, usual: dict[str, Any] | None = None, top: Any = None) -> str:
