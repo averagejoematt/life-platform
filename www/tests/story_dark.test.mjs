@@ -36,7 +36,7 @@ test("only the literal WEB_STORY=1 turns the story on, and it is a separate swit
   for (const v of ["", "0", "true", "yes", " 1", "1 "]) assert.equal(storyEnabled({ WEB_STORY: v }, false), false, `WEB_STORY=${JSON.stringify(v)}`);
   assert.equal(storyEnabled({ WEB_STORY: "1" }, false), true);
   assert.equal(storyEnabled({ WEB_ROOM: "1" }, false), false, "the room's switch does not turn the story on");
-  assert.equal(roomEnabled({ WEB_STORY: "1" }), false, "the story's switch does not turn the room on");
+  assert.equal(roomEnabled({ WEB_STORY: "1" }, "off"), false, "the story's switch does not turn the room on");
 });
 
 test("switch off: the integration injects no route (control: switch on injects every story route)", () => {

@@ -1,0 +1,41 @@
+{
+ "_comment": "#5573: field-projected copies of the live USER#matthew#SOURCE#hevy rows (read 2026-11-08, read-only): only the three exercises whose notes the issue quotes verbatim \u2014 every other exercise and every set dropped. The wire shape (exercises[].notes, template_id, exercise_index) is the stored one.",
+ "rows": [
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-25#WORKOUT#15a2ac5c-eb99-4325-995f-f3d9dccb5626",
+   "date": "2026-10-25",
+   "title": "Foundation - Upper - 11 - 38",
+   "workout_uid": "hevy:15a2ac5c-eb99-4325-995f-f3d9dccb5626",
+   "exercises": [
+    {
+     "exercise_index": 7,
+     "name": "Farmers Walk",
+     "template_id": "50C613D0",
+     "notes": "Yards for me equals steps so we should create a rule for that\n\nI log this as the sum of two dumbbells rather than what is in each hand"
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-01#WORKOUT#4b137083-8c34-49b3-8609-bbef1a39f689",
+   "date": "2026-11-01",
+   "title": "Foundation - Upper - 14 - 43",
+   "workout_uid": "hevy:4b137083-8c34-49b3-8609-bbef1a39f689",
+   "exercises": [
+    {
+     "exercise_index": 1,
+     "name": "Lateral Raise (Machine)",
+     "template_id": "D5D0354D",
+     "notes": "Plate loaded lat raise. Added more sets as i was getting used to the machine.  I may need research or youtube emailed me on form."
+    },
+    {
+     "exercise_index": 4,
+     "name": "Triceps Rope Pushdown",
+     "template_id": "94B7239B",
+     "notes": "I have seen people suggesting this is not one of the better tricep exercises? Not sure how true that is but cable extensions overhead have been recommended to me more.  Also today i went lighter to really focus on form."
+    }
+   ]
+  }
+ ]
+}

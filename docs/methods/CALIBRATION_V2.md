@@ -116,13 +116,17 @@ depends on it.
 Disclosure: the author had already seen v1 labels and per-coach call counts (from the v3 proposal's table) before step 2.
 No constant here is tied to a count, and none was revisited after step 4.
 
-## What the results say at adoption (2026-11-09)
+## What the results said at the ruling (`/api/calibration`, 2026-11-09 04:10 UTC)
 
-- **Nutrition** is over-confident at its 50% calls: 12 of 43 came true (95% CI 15%–44%; Holm-adjusted p 0.0108). That
-  is evidence about its 50% calls only. It is not proof of poor calibration across confidence levels, which is not
+These answers are a dated snapshot. They move whenever calls are graded or grades are corrected, so read the live
+answers on `/api/calibration` or /method/calibration/. After that night's grade corrections, Nutrition had 7 decided
+calls this season and read "insufficient evidence".
+
+- **Nutrition** was over-confident at its 50% calls: 12 of 43 came true (95% CI 15%–44%; Holm-adjusted p 0.0108). That
+  was evidence about its 50% calls only, not proof of poor calibration across confidence levels, which was not
   estimable for any coach yet.
-- **Every other coach:** no level departs from its stated confidence ("consistent with stated confidence (not
+- **Every other coach:** no level departed from its stated confidence ("consistent with stated confidence (not
   established)"), or there are too few calls for the test to fire ("insufficient evidence"). Neither is proof of good
   calibration.
-- **Skill:** no coach shows a demonstrated advantage over the same-call guess that nothing changes.
+- **Skill:** no coach showed a demonstrated advantage over the same-call guess that nothing changes.
 - No constant was changed at adoption, and none will be changed to suit a coach's outcome.

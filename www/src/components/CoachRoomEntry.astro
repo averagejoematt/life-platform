@@ -5,7 +5,7 @@
 // Simple on arrival: the latest read's date, the record as first graded with its interval, the asks' tally — each
 // carried, none computed — and the way into the full record (src/room/coach-record.astro).
 import { askCountsText, coachRecord, latestRead, roomCoach } from "../lib/coach_room.js";
-import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { ROOM_MARKER, roomAll } from "../lib/room.js";
 import { loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
@@ -13,7 +13,7 @@ interface Props {
   coach: { id: string; name: string; tier?: string };
 }
 const { coach } = Astro.props;
-const on = roomEnabled();
+const on = roomAll();
 const entry = on ? roomCoach(await loadCoachRoom(), coach.id) : null;
 const cal = on ? await loadCalibration() : null;
 const calCoach = on ? (((cal && cal.calibration) || {}).coaches || []).find((x: any) => x.persona === coach.id) || null : null;

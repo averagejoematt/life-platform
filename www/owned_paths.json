@@ -1,5 +1,5 @@
 {
-  "_about": "Every path the v9 build (www/) writes for the production base `/`, emitted by www/scripts/postbuild.mjs on every build and drift-checked by scripts/check_www_build.py. deploy/sync_site_to_s3.sh and deploy/rollback_site.sh exclude exactly these through deploy/www_owned_paths.py — one owner per path (#5534). `live_at_root` is the cut-over switch, not build output: false = the build is served at /next/v9/ only; true = the build owns `/` and every `www/**` merge deploys there.",
+  "_about": "Every path the v9 build (www/) writes for the production base `/`, emitted by www/scripts/postbuild.mjs on every build and drift-checked by scripts/check_www_build.py. deploy/sync_site_to_s3.sh and deploy/rollback_site.sh exclude exactly these through deploy/www_owned_paths.py — one owner per path (#5534). `live_at_root` is the cut-over switch, not build output: false = the build is served at /next/v9/ only; true = the build owns `/` and every `www/**` merge deploys there. `room_public` is the Coaching Room's committed publication switch, not build output: \"off\" = no room page is built; \"cr1\" = every build publishes CR1 (/system/calibration/, /system/ledger/refuted/, the /system/ entry) and never CR2/CR3.",
   "base": "/",
   "files": [
     "404.html",
@@ -19,6 +19,7 @@
     "_astro/",
     "assets/fonts/v9/"
   ],
+  "room_public": "off",
   "route_patterns": [
     "/data/*/",
     "/data/day/*/",
