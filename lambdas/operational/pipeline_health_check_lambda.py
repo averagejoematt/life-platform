@@ -20,7 +20,7 @@ Writes results to DynamoDB for status page consumption.
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.pacific_time import pacific_today  # #2798: the DATE# rows this writes name Pacific days
@@ -105,6 +105,20 @@ CLOUDTRAIL_TRAIL_ARN = os.environ.get(
 CLOUDTRAIL_DELIVERY_MAX_AGE_HOURS = 24
 CLOUDTRAIL_STALE_METRIC = "CloudTrailDeliveryStale"  # 0/1 — the alarmed gauge
 CLOUDTRAIL_AGE_METRIC = "CloudTrailDeliveryAgeHours"  # the measurement behind it
+
+# ── #5522: the post-deploy sensor self-test's dead-man ──────────────────────
+# deploy/sensor_self_test.py (#4034) runs as the last step of every attended
+# `deploy/cdk_deploy.sh` and writes LifePlatform/SelfTest SelfTestWrite (the
+# dimensionless run-level stream). It is an attended path, so nothing ELSE notices
+# when it stops: on 2026-10-31 the namespace held no metric at all while three stacks
+# had deployed that day. A 35-day absence cannot be one alarm window (CloudWatch caps
+# evaluation_periods x period at 7 days), so this daily run reads the stream and emits
+# a 0/1 gauge the sensor-self-test-stale alarm watches. Fail-loud like #5512: an
+# unreadable stream is reported stale.
+SELF_TEST_NAMESPACE = "LifePlatform/SelfTest"  # deploy/sensor_self_test.py SCRATCH_NAMESPACE
+SELF_TEST_METRIC = "SelfTestWrite"  # deploy/sensor_self_test.py SCRATCH_METRIC
+SELF_TEST_MAX_AGE_DAYS = 35
+SELF_TEST_STALE_METRIC = "SensorSelfTestStale"  # 0/1 — the alarmed gauge
 
 try:
     from ingestion.ingest_health import SYSTEM_PK, evaluate_source_health
@@ -271,6 +285,9 @@ def _check_ingest_liveness(now: datetime, day: str | None = None) -> dict:
     cloudtrail = _check_cloudtrail_delivery(now)
     if cloudtrail["stale"]:
         logger.warning(f"CLOUDTRAIL DELIVERY STALE: {cloudtrail['reason']}")
+    self_test = _check_sensor_self_test(now)  # #5522
+    if self_test["stale"]:
+        logger.warning(f"SENSOR SELF-TEST STALE: {self_test['reason']}")
 
     # Emit the metrics the ingest-liveness and cloudtrail-delivery-stale alarms watch.
     try:
@@ -278,6 +295,7 @@ def _check_ingest_liveness(now: datetime, day: str | None = None) -> dict:
         metric_data = [
             {"MetricName": "UnhealthySourceCount", "Value": unhealthy_count, "Unit": "Count"},
             {"MetricName": CLOUDTRAIL_STALE_METRIC, "Value": 1 if cloudtrail["stale"] else 0, "Unit": "Count"},
+            {"MetricName": SELF_TEST_STALE_METRIC, "Value": 1 if self_test["stale"] else 0, "Unit": "Count"},  # #5522
         ]
         if cloudtrail["age_hours"] is not None:
             metric_data.append({"MetricName": CLOUDTRAIL_AGE_METRIC, "Value": cloudtrail["age_hours"], "Unit": "None"})
@@ -368,6 +386,34 @@ def _check_cloudtrail_delivery(now: datetime) -> dict:
         reasons.append(f"last delivery {verdict['age_hours']}h ago (> {CLOUDTRAIL_DELIVERY_MAX_AGE_HOURS}h)")
     verdict["stale"] = bool(reasons)
     verdict["reason"] = "; ".join(reasons) or "delivering"
+    return verdict
+
+
+def _check_sensor_self_test(now: datetime) -> dict:
+    """#5522: has the post-deploy sensor self-test written SelfTestWrite in the last 35 days?
+
+    Reads the dimensionless run-level stream (daily Sum buckets). Stale when no bucket in the
+    window holds a datapoint above zero, or the read fails (fail-loud, never skipped)."""
+    verdict: dict = {"stale": True, "last_write_day": None, "reason": None}
+    try:
+        resp = boto3.client("cloudwatch", region_name=REGION).get_metric_statistics(
+            Namespace=SELF_TEST_NAMESPACE,
+            MetricName=SELF_TEST_METRIC,
+            StartTime=now - timedelta(days=SELF_TEST_MAX_AGE_DAYS),
+            EndTime=now,
+            Period=86400,
+            Statistics=["Sum"],
+        )
+    except Exception as e:  # fail-loud: an unreadable stream is a blind dead-man, reported stale
+        verdict["reason"] = f"get_metric_statistics failed: {type(e).__name__}: {e}"
+        return verdict
+    written = sorted(d["Timestamp"] for d in resp.get("Datapoints", []) if (d.get("Sum") or 0) > 0)
+    if not written:
+        verdict["reason"] = f"no {SELF_TEST_METRIC} in {SELF_TEST_MAX_AGE_DAYS} days — no attended cdk_deploy.sh ran its sensor self-test"
+        return verdict
+    verdict["stale"] = False
+    verdict["last_write_day"] = written[-1].date().isoformat() if hasattr(written[-1], "date") else str(written[-1])
+    verdict["reason"] = f"last self-test write {verdict['last_write_day']}"
     return verdict
 
 
