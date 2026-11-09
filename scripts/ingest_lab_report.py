@@ -21,6 +21,9 @@ THE CONTRACT (the issue's acceptance boxes, in order)
      table and writes nothing; only `--apply` writes.
 
 USAGE
+  python3 scripts/ingest_lab_report.py labs ~/Downloads/standard_panel.pdf [~/Downloads/cardio_iq.pdf ...] \
+      --draw-date YYYY-MM-DD --lab-provider function_health --lab-network quest_diagnostics
+      (a Quest result PDF is read directly AND archived as a document — no CSV to type; #4639)
   python3 scripts/ingest_lab_report.py labs <report.csv|report.json> --draw-date YYYY-MM-DD \
       --lab-provider function_health --lab-network quest_diagnostics \
       --document ~/Downloads/standard_panel.pdf [--document ...] [--fasting] [--physician NAME]
@@ -32,6 +35,11 @@ USAGE
   · --document-unavailable "<reason>" (a back-fill with no document to archive).
 
 INPUT SHAPES (the stored wire shapes, so the fixture IS the wire — SCHEMA.md `labs`/`dexa`)
+  labs PDF   a Quest "Quest Result" print from the Health Gorilla network (what a Function Health
+             draw delivers) — text via `pdftotext -layout` (poppler; `brew install poppler`), read
+             by `health.quest_report`; a `.txt` of that text is accepted too. A test name the
+             reader's map does not know REFUSES the draw by name (the map grows by PR). Every
+             vendor field on the line is kept on the marker (capture-all, epic #4625).
   labs CSV   columns: marker,value,unit,ref_text,flag[,category,panel,note]  (one row per marker)
   labs JSON  {"biomarkers": {"<marker_key>": {"value","unit","ref_text","flag",...}}, ...}
   dexa CSV   columns: field,value[,unit]   (field = dotted leaf path, e.g. body_composition.body_fat_pct)
@@ -50,6 +58,8 @@ import json
 import mimetypes
 import os
 import re
+import shutil
+import subprocess
 import sys
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -59,7 +69,7 @@ from typing import Any, Dict, List, Optional, Tuple
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
-from health import labs_schema  # noqa: E402
+from health import labs_schema, quest_report  # noqa: E402
 from health.lab_units import (  # noqa: E402
     DEXA_FIELDS,
     DEXA_REQUIRED,
@@ -86,6 +96,22 @@ _RANGE = re.compile(rf"^\s*({_NUM})\s*(?:-|–|to)\s*({_NUM})")
 _LT = re.compile(rf"^\s*(?:<|≤|<=)\s*({_NUM})")
 _GT = re.compile(rf"^\s*(?:>|≥|>=)\s*({_NUM})")
 _NUMERIC_VALUE = re.compile(rf"^\s*{_NUM}\s*$")
+
+#: The per-marker vendor fields a report reader may hand over, kept on the stored marker as read (capture-all).
+VENDOR_MARKER_FIELDS = (
+    "vendor_name",
+    "vendor_flag",
+    "vendor_reference",
+    "vendor_previous_value",
+    "vendor_previous_date",
+    "vendor_previous_flag",
+    "lab_code",
+    "collected",
+    "ige_class",
+    "report_note",
+)
+#: Where pdftotext lives when the shell PATH is not inherited (Homebrew on Apple silicon).
+PDFTOTEXT_FALLBACK = "/opt/homebrew/bin/pdftotext"
 
 
 class Refusal(ValueError):
@@ -241,6 +267,51 @@ def read_lab_rows(path: str) -> Tuple[List[Dict[str, Any]], str]:
     return rows, "csv"
 
 
+def pdf_text(path: str) -> str:
+    """`pdftotext -layout <pdf> -` — the column layout the Quest reader depends on. Refuses when the tool is absent."""
+    tool = shutil.which("pdftotext") or (PDFTOTEXT_FALLBACK if os.path.exists(PDFTOTEXT_FALLBACK) else None)
+    if not tool:
+        raise Refusal("pdftotext not found — `brew install poppler`, or pass the report as CSV/JSON")
+    done = subprocess.run([tool, "-layout", path, "-"], capture_output=True, text=True, timeout=120)
+    if done.returncode != 0:
+        raise Refusal(f"pdftotext failed on {os.path.basename(path)}: {done.stderr.strip()[:200]}")
+    return done.stdout
+
+
+def read_lab_report(path: str) -> Tuple[List[Dict[str, Any]], str, Dict[str, Any]]:
+    """(rows, extraction method, report metadata) off one report — a Quest PDF/text print, or the CSV/JSON wire shape."""
+    local = os.path.expanduser(path)
+    suffix = Path(local).suffix.lower()
+    if suffix not in (".pdf", ".txt"):
+        rows, method = read_lab_rows(local)
+        return rows, method, {"file": os.path.basename(local)}
+    if not os.path.isfile(local):
+        raise Refusal(f"report not found: {path}")
+    text = pdf_text(local) if suffix == ".pdf" else Path(local).read_text(encoding="utf-8")
+    if not quest_report.is_quest_print(text):
+        raise Refusal(
+            f"{os.path.basename(local)}: not a Quest result print (no {list(quest_report.FORMAT_MARKERS)} header) — "
+            "the only PDF format read today; export the report as CSV instead"
+        )
+    parsed = quest_report.parse(text)
+    if parsed["unmapped"]:
+        names = "; ".join(f"{name!r} ({panel})" for panel, name in parsed["unmapped"])
+        raise Refusal(f"{os.path.basename(local)}: test names not in health.quest_report.QUEST_TEST_NAMES — add them by PR: {names}")
+    if not parsed["rows"]:
+        raise Refusal(f"{os.path.basename(local)}: no result lines read")
+    meta = {
+        "file": os.path.basename(local),
+        "format": "quest_health_gorilla_print",
+        **parsed["report"],
+        "collected_dates": parsed["collected_dates"],
+        "not_reported": [
+            {k: r[k] for k in ("marker", "vendor_name", "panel", "value", "report_note") if r.get(k)} for r in parsed["not_reported"]
+        ],
+        "panel_notes": parsed["panel_notes"],
+    }
+    return parsed["rows"], ("quest-pdf (pdftotext -layout)" if suffix == ".pdf" else "quest-text"), meta
+
+
 def validate_marker(row: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     """One report row -> (marker_key, marker object in the SCHEMA.md shape). Refuses off-schema input."""
     key = canonical_marker(marker_key(row.get("marker") or row.get("name") or ""))
@@ -260,7 +331,10 @@ def validate_marker(row: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         raise Refusal(f"{key}: numeric marker but value {raw_value!r} is not a number (a '<x'/'>x' censored result is allowed)")
     ref_text = str(row.get("ref_text") or "")
     ref_low, ref_high = parse_ref_text(ref_text)
-    flag = str(row.get("flag") or "").strip().lower() or derive_flag(value_numeric, ref_low, ref_high)
+    flag = str(row.get("flag") or "").strip().lower()
+    if not flag and "vendor_flag" in row and value_numeric is not None and (ref_low is not None or ref_high is not None):
+        flag = "normal"  # a vendor print flags every out-of-range result (H/L); unflagged against a printed range IS in range
+    flag = flag or derive_flag(value_numeric, ref_low, ref_high)
     if flag not in LAB_FLAGS:
         raise Refusal(f"{key}: flag {flag!r} not one of {list(LAB_FLAGS)}")
     entry: Dict[str, Any] = {
@@ -273,7 +347,7 @@ def validate_marker(row: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         "flag": flag,
         "category": str(row.get("category") or category),
     }
-    for extra in ("panel", "note", "fh_category"):
+    for extra in ("panel", "note", "fh_category") + VENDOR_MARKER_FIELDS:
         if row.get(extra):
             entry[extra] = str(row[extra])
     return key, entry
@@ -293,8 +367,15 @@ def build_labs_item(
     physician: Optional[str] = None,
     previous: Optional[Dict[str, Any]] = None,
     now: Optional[str] = None,
+    reports: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """The draw record (SCHEMA.md `labs`), Decimal-typed, with `provenance`. Pure."""
+    """The draw record (SCHEMA.md `labs`), Decimal-typed, with `provenance`. Pure.
+
+    `reports` is the per-report metadata a PDF reader returned (accession, status, time
+    reported, fasting, collection dates, results the lab did not report, panel notes); it is
+    stored as read. A CSV/JSON report contributes only its file name.
+    """
+    reports = reports or []
     if not _DATE.match(draw_date):
         raise Refusal(f"--draw-date {draw_date!r} is not YYYY-MM-DD")
     now = now or datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -339,8 +420,21 @@ def build_labs_item(
             drawn_date=draw_date,
         ),
     }
+    if fasting is None and reports and all(r.get("fasting") is True for r in reports):
+        fasting = True  # every report printed FASTING: YES
     if fasting is not None:
         item["fasting"] = fasting
+    accessions = [r["accession_number"] for r in reports if r.get("accession_number")]
+    if accessions:
+        item["accession_numbers"] = accessions
+    not_reported = [nr for r in reports for nr in r.get("not_reported") or []]
+    if not_reported:
+        item["not_reported"] = not_reported  # the lab printed no result ("SEE NOTE:") — kept, never stored as a value
+    panel_notes = {k: v for r in reports for k, v in (r.get("panel_notes") or {}).items()}
+    if panel_notes:
+        item["panel_notes"] = panel_notes
+    if reports:
+        item["provenance"]["reports"] = [{k: v for k, v in r.items() if k not in ("not_reported", "panel_notes")} for r in reports]
     if physician:
         item["physician"] = physician
     return to_dynamo(item)
@@ -486,6 +580,12 @@ def review_lines(item: Dict[str, Any], documents: List[Dict[str, Any]]) -> List[
         lines.append(
             f"  {item['total_biomarkers']} markers, {item['out_of_range_count']} out of range: {', '.join(item['out_of_range']) or '-'}"
         )
+        for nr in item.get("not_reported") or []:
+            lines.append(f"  not reported by the lab: {nr.get('vendor_name')} ({nr.get('panel')}) — {nr.get('value')}")
+        for rep_meta in item["provenance"].get("reports") or []:
+            other = [d for d in rep_meta.get("collected_dates") or [] if d != item["draw_date"]]
+            note = f"  NOTE collected {', '.join(other)} — not the draw date" if other else ""
+            lines.append(f"  report   {rep_meta.get('file')}  accession {rep_meta.get('accession_number', '-')}{note}")
     else:
         for path, value in sorted(_flatten({k: v for k, v in item.items() if isinstance(v, dict) and k != "provenance"}).items()):
             lines.append(f"  {path:44} {value!s:>12} {dexa_unit_for(path) or ''}")
@@ -558,7 +658,7 @@ def _parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="source", required=True)
     for name in ("labs", "dexa"):
         sp = sub.add_parser(name)
-        sp.add_argument("report", help="the exported CSV or JSON")
+        sp.add_argument("report", nargs="+", help="labs: Quest result PDF(s) (or their pdftotext .txt) or ONE CSV/JSON; dexa: ONE CSV/JSON")
         sp.add_argument("--document", action="append", default=[], help="source document to archive first (repeatable)")
         sp.add_argument("--document-unavailable", default=None, help="a back-fill with no document: say why, it is recorded on the row")
         sp.add_argument("--reviewer", default=USER_ID)
@@ -580,6 +680,10 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parser().parse_args(argv)
+    pdf_reports = [r for r in args.report if r.lower().endswith(".pdf")]
+    for pdf in pdf_reports:  # a PDF report IS a source document: archived first, like any --document
+        if os.path.expanduser(pdf) not in {os.path.expanduser(d) for d in args.document}:
+            args.document.append(pdf)
     if not args.document and not args.document_unavailable:
         print("REFUSING: no --document to archive and no --document-unavailable reason — the archive comes first (#4639 box 2)")
         return 2
@@ -588,7 +692,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         documents = plan_documents(args.source, event_date, args.document)
         common = dict(documents=documents, unavailable_reason=args.document_unavailable, reviewer=args.reviewer)
         if args.source == "labs":
-            rows, method = read_lab_rows(args.report)
+            if len(args.report) > 1 and any(Path(r).suffix.lower() not in (".pdf", ".txt") for r in args.report):
+                raise Refusal("several reports in one draw are read only as Quest PDF/text prints; a CSV/JSON report is one file")
+            rows, methods, reports = [], [], []
+            for report_path in args.report:
+                r_rows, r_method, r_meta = read_lab_report(report_path)
+                rows.extend(r_rows)
+                methods.append(r_method)
+                reports.append(r_meta)
+            method = methods[0] if len(set(methods)) == 1 else " + ".join(methods)
             previous = None if args.no_previous else fetch_previous("labs")
             item = build_labs_item(
                 rows,
@@ -599,10 +711,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                 fasting=args.fasting,
                 physician=args.physician,
                 previous=previous,
+                reports=reports if any(r.get("format") for r in reports) else None,
                 **common,
             )
         else:
-            leaves, method = read_dexa_leaves(args.report)
+            if len(args.report) != 1:
+                raise Refusal("dexa takes ONE scan CSV/JSON")
+            leaves, method = read_dexa_leaves(args.report[0])
             item = build_dexa_item(
                 leaves,
                 scan_date=args.scan_date,
