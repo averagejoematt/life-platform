@@ -179,10 +179,5 @@ def write_marker(table: Any, row: dict, marker: dict, audit: dict) -> dict:
     return marker
 
 
-def marker_of(row: dict) -> dict | None:
-    m = (row or {}).get(ATTR)
-    return m if isinstance(m, dict) and m.get("family_id") else None
-
-
 def now_iso(now: datetime | None = None) -> str:
     return grade_corrections.now_iso(now)
