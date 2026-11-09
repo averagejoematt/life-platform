@@ -666,7 +666,10 @@ def test_what_changed_shaped_empty_when_tombstoned():
     assert body["newly_unlocked"] == [] and body["deltas"] == []
     # the wiped payload must not leak in any field
     assert body["window_start"] is None and body["window_end"] is None and body["week"] is None
-    assert "0.8777" not in json.dumps(body)
+    # the payload minus _meta: _meta.generated_at is the REAL wall clock, and a stamp like
+    # "...:20.877712" contains "0.8777" (the time-bomb class test_site_api_reading and
+    # test_coach_ensemble_digest_behavior each went red on)
+    assert "0.8777" not in json.dumps({k: v for k, v in body.items() if k != "_meta"})
 
 
 def test_what_changed_shaped_empty_on_non_current_phase():
