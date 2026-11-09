@@ -222,3 +222,78 @@ def test_the_retired_scripts_refuse_apply_before_any_aws_call(monkeypatch):
         except TypeError:  # main() reads sys.argv
             rc = mod.main()
         assert rc == 2, rel
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# VERIFY# — the verification record has ONE writer (owner 2026-11-09, coach/verification_record.py)
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+#: The only function that may write a ``VERIFY#`` audit row or a call's ``latest_verification`` pointer.
+VERIFY_WRITERS = {("lambdas/coach/verification_record.py", "write_verification")}
+_VERIFY_CONSTS = ("VERIFY#", "latest_verification")
+_VERIFY_NAMES = ("VERIFY_PREFIX", "POINTER_ATTR")
+_ANY_WRITE_CALLS = {"put_item", "update_item", "transact_write_items", "batch_write_item", "delete_item"}
+
+
+def _calls_a_write(fnode: ast.AST) -> bool:
+    return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in _ANY_WRITE_CALLS for n in ast.walk(fnode))
+
+
+def _names_verify(fnode: ast.AST) -> bool:
+    if any(any(m in c for m in _VERIFY_CONSTS) for c in _consts(fnode)):
+        return True
+    for n in ast.walk(fnode):
+        if isinstance(n, ast.Name) and n.id in _VERIFY_NAMES:
+            return True
+        if isinstance(n, ast.Attribute) and n.attr in _VERIFY_NAMES:
+            return True
+    return False
+
+
+def verify_writers(root: str = _REPO) -> set:
+    """``{(path, function)}`` for every function that issues a DynamoDB write AND names a VERIFY# row or the pointer."""
+    out = set()
+    for top in ROOTS:
+        for dirpath, dirnames, filenames in os.walk(os.path.join(root, top)):
+            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+            for fname in filenames:
+                if not fname.endswith(".py"):
+                    continue
+                path = os.path.join(dirpath, fname)
+                try:
+                    tree = ast.parse(open(path, encoding="utf-8").read())
+                except (SyntaxError, UnicodeDecodeError):
+                    continue
+                rel = os.path.relpath(path, root).replace(os.sep, "/")
+                for fnode in ast.walk(tree):
+                    if isinstance(fnode, (ast.FunctionDef, ast.AsyncFunctionDef)) and _calls_a_write(fnode) and _names_verify(fnode):
+                        out.add((rel, fnode.name))
+    return out
+
+
+def test_verify_rows_and_the_pointer_have_exactly_one_writer():
+    """Population floor and ratchet in one: the sanctioned writer is seen (the sweep is not blind), and nothing else
+    writes a VERIFY# row or ``latest_verification`` — a second writer could overwrite the append-only audit trail."""
+    assert verify_writers() == VERIFY_WRITERS
+
+
+def test_the_verify_detector_catches_a_planted_writer(tmp_path):
+    """Mutation: a function that puts a VERIFY# row directly, and one that SETs the pointer through the module's name,
+    are both caught — and a planner with no write call is not."""
+    pkg = tmp_path / "scripts"
+    pkg.mkdir(parents=True)
+    (pkg / "rogue_verify.py").write_text(
+        "def overwrite(table, row):\n"
+        "    table.put_item(Item={'pk': row['pk'], 'sk': 'VERIFY#' + row['id'] + '#2026'})\n"
+        "def repoint(table, row, vr):\n"
+        "    table.update_item(Key={'pk': row['pk'], 'sk': row['sk']}, UpdateExpression=f'SET {vr.POINTER_ATTR} = :p')\n"
+        "def plan_only(row):\n"
+        "    return {'sk': 'VERIFY#' + row['id']}\n",
+        encoding="utf-8",
+    )
+    assert verify_writers(str(tmp_path)) == {("scripts/rogue_verify.py", "overwrite"), ("scripts/rogue_verify.py", "repoint")}
+
+
+def test_the_verification_writer_sets_no_grade_field():
+    """The sanctioned VERIFY# writer is not a grade writer: the grade sweep above does not see it."""
+    assert not [k for k in grade_writers() if k[0] == "lambdas/coach/verification_record.py"]

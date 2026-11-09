@@ -67,7 +67,7 @@ UH, LH, SA, UV, LV = "upper_heavy", "lower_heavy", "shoulders_arms", "upper_volu
 # `tmpl:` machines (leg_press / leg_curl / calf_raise_machine).
 COMMITTED_LOWER_HEAVY = [
     ("squat_barbell", 3),
-    ("romanian_deadlift_barbell", 3),
+    ("deadlift_barbell", 3),  # #5694 (owner ruling 2026-11-08): the conventional pull replaced the committed RDL
     ("leg_press", 2),
     ("leg_curl", 2),
     ("calf_raise_machine", 4),  # #5053: calves at their MEV floor (8/wk) across the two lower days
@@ -139,7 +139,8 @@ def test_heavy_days_are_a_top_set_plus_two_back_offs_and_volume_days_are_8_to_12
     for role in (UV, LV):
         anchors = [e for e in _rx(role)["exposures"] if e["kind"] == "anchor"]
         assert anchors and all(e["intensity"] == "volume" for e in anchors), role
-        assert all(s["reps"] == [8, 12] for e in anchors for s in e["sets"]), role
+        # #5694 (owner ruling 2026-11-08): Lower-volume's RDL runs 8–10, inside the volume band (`anchor_reps`)
+        assert all(s["reps"] == ([8, 10] if (role, e["pattern"]) == (LV, "hinge") else [8, 12]) for e in anchors for s in e["sets"]), role
 
 
 def test_exposure_numbers_match_the_redline_rep_scheme_prose():
@@ -232,15 +233,27 @@ def test_sessions_fit_the_ceiling_and_the_week_total_sits_in_the_redline_band():
             assert 2 <= len(tmpl["accessories"]) <= 3, role
 
 
-def test_the_hinge_is_the_trap_bar_and_the_rdl_only_as_the_moderate_hinge():
+def test_5694_the_hinges_are_the_conventional_deadlift_heavy_and_the_rdl_on_the_volume_day():
+    """#5694 (owner ruling 2026-11-08): Lower-heavy pulls the conventional deadlift as its heavy hinge, Lower-volume the
+    Romanian deadlift (barbell) for 8–10; the trap-bar-until-a-bodyweight rule is retired (charter
+    `gated_movements.conventional_deadlift` is open by owner ruling; the trap bar stays a listed family member only)."""
     lh = {e["pattern"]: e for e in _rx(LH)["exposures"] if e["kind"] == "anchor"}
     lv = {e["pattern"]: e for e in _rx(LV)["exposures"] if e["kind"] == "anchor"}
-    assert (lh["hinge"]["intensity"], lh["hinge"]["movement_key"]) == ("moderate", "romanian_deadlift_barbell")
-    assert (lv["hinge"]["intensity"], lv["hinge"]["movement_key"]) == ("volume", "deadlift_trap_bar")
-    assert owner_redlines.REDLINES["load_anchoring"]["trap_bar_until_lb"] == 275
-    assert program_structure.ANCHORS["hinge"]["catalog_keys"][0] == "deadlift_trap_bar"
-    # the RDL is never a non-moderate hinge: it is not in the family's general keys
+    assert (lh["hinge"]["intensity"], lh["hinge"]["movement_key"]) == ("heavy", "deadlift_barbell")
+    assert [s["kind"] for s in lh["hinge"]["sets"]] == ["top", "back_off", "back_off"] and lh["hinge"]["sets"][0]["reps"] == [4, 6]
+    assert (lv["hinge"]["intensity"], lv["hinge"]["movement_key"]) == ("volume", "romanian_deadlift_barbell")
+    assert [s["reps"] for s in lv["hinge"]["sets"]] == [[8, 10]] * 3
+    assert "trap_bar_until_lb" not in owner_redlines.REDLINES["load_anchoring"]
+    assert "#5694" in owner_redlines.REDLINES["load_anchoring"]["trap_bar_rule"]
+    assert program_structure.ANCHORS["hinge"]["catalog_keys"][0] == "deadlift_barbell"
+    assert charter_value("gated_movements.conventional_deadlift.status") == "open"
+    assert charter_value("gated_movements.conventional_deadlift.until_then") is None
+    # the RDL is still never a GENERAL hinge key: it reaches a slot only as a moderate member or through a role's pin
     assert not any("romanian" in k for k in program_structure.ANCHORS["hinge"]["catalog_keys"])
+    # no pin lists the trap bar or the leg curl: either would be taken as the slot's in-block variant (#4409 rule 1)
+    for role in (LH, LV):
+        pin = program_structure.SESSION_TEMPLATES[role]["anchor_keys"]["hinge"]
+        assert "deadlift_trap_bar" not in pin and "leg_curl" not in pin, role
 
 
 def test_no_plyometrics_and_no_max_effort_singles():
@@ -328,8 +341,9 @@ def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
     cap = charter_value("split.session_minutes.lifting_ceiling")
     assert program_structure.lifting_minutes_cap() == cap == 75
     got = {r: _rx(r)["session_minutes"]["lifting_minutes"] for r in program_structure.SESSION_TEMPLATES}
-    # #5162: were 67.5 / 51.5 / 39 / 57.5 / 45.5 (#5053: 63 / 47 / 39 / 57.5 / 41)
-    assert got == {UH: 63.2, LH: 51.5, SA: 38.0, UV: 53.2, LV: 45.5}
+    # #5162: were 67.5 / 51.5 / 39 / 57.5 / 45.5 (#5053: 63 / 47 / 39 / 57.5 / 41). #5694: Lower-heavy's hinge became a
+    # heavy pull (top set + 2 back-offs at 180 s rest, not 3 moderate sets at 120 s): 51.5 -> 55.5
+    assert got == {UH: 63.2, LH: 55.5, SA: 38.0, UV: 53.2, LV: 45.5}
     for role in program_structure.SESSION_TEMPLATES:
         rx = _rx(role)
         assert rx["time_trim"] is None and rx["session_minutes"]["within_cap"] and rx["session_minutes"]["cap"] == cap, role
@@ -560,7 +574,7 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
 
 def test_red_recovery_drops_accessories_not_anchors():
     ideal = _generate("2026-09-25", recovery_tier="red")[0]
-    assert [b.movement_key for b in ideal.exercises] == ["squat_barbell", "romanian_deadlift_barbell"]
+    assert [b.movement_key for b in ideal.exercises] == ["squat_barbell", "deadlift_barbell"]  # #5694: the conventional pull
 
 
 @pytest.mark.parametrize("archetype, folder", [("upper", "Upper"), ("lower", "Lower")])
@@ -670,7 +684,7 @@ def test_plan_next_session_through_the_mcp_handler_serves_lower_heavy_first():
     assert rx["hevy_folder"] == "Lower"
     assert [(e["pattern"], e["intensity"], e["movement_key"]) for e in rx["exposures"] if e["kind"] == "anchor"] == [
         ("squat", "heavy", "squat_barbell"),
-        ("hinge", "moderate", "romanian_deadlift_barbell"),
+        ("hinge", "heavy", "deadlift_barbell"),  # #5694 (owner ruling 2026-11-08)
     ]
     assert rx["total_sets"] == 14
     assert out["constraint_block"]["program"]["program_version"] == "1.0"
@@ -744,14 +758,21 @@ def test_4409_mutation_control_without_the_block_record_the_catalog_default_swap
 
 
 def test_4409_the_same_role_slot_wins_over_the_pattern_most_recently_performed():
-    """Rule 1 before rule 2: lower-heavy's moderate hinge stays the RDL it was on 09-24 although
-    the trap bar was pulled more recently (09-28, lower-volume) — and lower-volume keeps the trap
-    bar. A heavy pull never takes the owner's RDL-as-moderate-hinge slot (#4147)."""
+    """Rule 1 before rule 2, on the block-1 wire (09-24 lower-heavy: squat, RDL; 09-28 lower-volume: trap bar, squat, leg
+    curl). Since #5694 both lower hinges are PINNED (`anchor_keys`), so only a pinned member is ever a candidate: neither
+    the 09-24 RDL nor the 09-28 trap bar can take Lower-heavy's conventional-deadlift slot, and Lower-volume takes the RDL by
+    rule 2 (performed 09-24) — not the trap bar it pulled itself, and not the 09-28 leg curl, which a pin that listed
+    `leg_curl` would have served as the hinge (rule 1: Lower-volume no longer carries the curl as an accessory)."""
     perf = _performed()
     lh = {e["pattern"]: e for e in _rx(LH, in_block=perf)["exposures"] if e["kind"] == "anchor"}
-    assert lh["hinge"]["movement_key"] == "romanian_deadlift_barbell" and lh["hinge"]["in_block"]["basis"] == "same_role"
+    assert lh["hinge"]["movement_key"] == "deadlift_barbell" and "in_block" not in lh["hinge"]
     lv = {e["pattern"]: e for e in _rx(LV, in_block=perf)["exposures"] if e["kind"] == "anchor"}
-    assert lv["hinge"]["movement_key"] == "deadlift_trap_bar" and lv["hinge"]["in_block"]["role"] == LV
+    assert lv["hinge"]["movement_key"] == "romanian_deadlift_barbell"
+    assert (lv["hinge"]["in_block"]["basis"], lv["hinge"]["in_block"]["role"]) == ("same_pattern", LH)
+    # mutation control: a pin that lists the leg curl serves the 09-28 curl as Lower-volume's hinge
+    with patch.dict(program_structure.SESSION_TEMPLATES[LV]["anchor_keys"], {"hinge": ["romanian_deadlift_barbell", "leg_curl"]}):
+        bad = {e["pattern"]: e for e in _rx(LV, in_block=perf)["exposures"] if e["kind"] == "anchor"}
+    assert bad["hinge"]["movement_key"] == "leg_curl"
 
 
 def test_4409_a_variant_change_inside_the_block_is_only_the_listed_swap_and_says_so():
