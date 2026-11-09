@@ -207,6 +207,9 @@ def test_owned_paths_json_is_consistent_with_src_pages_and_the_switch_is_on():
                 continue
             route = "/" if rel == "index" else ("/" + rel[: -len("/index")] + "/" if rel.endswith("/index") else "/" + rel + "/")
             (patterns if "[" in route else static).add(re.sub(r"\[[^\]]+\]", "*", route))
+    if OWNED.get("room_public") == "cr1":  # the Coaching Room's published CR1 pages: injected templates, read off room.js
+        room_js = open(os.path.join(REPO, "www", "src", "lib", "room.js"), encoding="utf-8").read()
+        static |= set(re.findall(r'path:\s*"(/[^"\[]+/)",\s*release:\s*"cr1"', room_js))
     assert set(OWNED["static_routes"]) == static
     assert set(OWNED["route_patterns"]) == patterns
     assert set(OWNED["static_routes"]) <= set(OWNED["routes"])

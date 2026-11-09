@@ -22,11 +22,11 @@ import {
 } from "../lib/docket.js";
 import { datesInWords } from "../lib/coach_room.js";
 import { dayInWords } from "../lib/format.js";
-import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { ROOM_MARKER, roomAll } from "../lib/room.js";
 import { loadAll, loadCoachRoom, loadSeries } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
 
-if (!roomEnabled()) throw new Error("src/room/docket-entry.astro rendered with WEB_ROOM off — the room route must not be injected");
+if (!roomAll()) throw new Error("src/room/docket-entry.astro rendered without WEB_ROOM=1 — a CR2/CR3 route must not be injected");
 
 export async function getStaticPaths() {
   const file = await loadCoachRoom();
@@ -58,7 +58,7 @@ const title = q.text || `${nameOf(e.coach_a)} v ${nameOf(e.coach_b)}`;
 
 <Base title={`${nameOf(e.coach_a)} v ${nameOf(e.coach_b)} — the docket`} top="system" description={`${nameOf(e.coach_a)} and ${nameOf(e.coach_b)} on one frozen test.`} status={fetched}>
   <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
-  <div {...room} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+  <div {...room} data-room-private="" class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
     Coaching Room · private build (WEB_ROOM=1) · not published
   </div>
 

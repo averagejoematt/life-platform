@@ -21,10 +21,18 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 import check_www_build  # noqa: E402
 import publish_snapshot  # noqa: E402
+import publish_snapshot_calibration  # noqa: E402
 import www_verbatim  # noqa: E402
 from publish_snapshot_coach_room import ABSENT_COACH_ROOM, live_coach_room, resolve_and_validate, shape, shape_coach  # noqa: E402
 
 FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
+
+
+@pytest.fixture(autouse=True)
+def _committed_switch_off(monkeypatch):
+    """These proofs are about the PRIVATE switch (WEB_ROOM): the committed `room_public` is pinned off, so they hold the
+    same before and after the CR1 launch merge (tests/test_www_coaching_room_cr1_public.py pins it on)."""
+    monkeypatch.setattr(publish_snapshot_calibration, "committed_room_public", lambda path=None: "off")
 
 
 def _export(tmp_path, name, env_on: bool, monkeypatch):
@@ -192,12 +200,12 @@ def test_the_deploy_scan_refuses_a_record_page_and_the_data_file(tmp_path):
     d = tmp_path / "dist"
     (d / "system" / "coaches" / "sleep_coach").mkdir(parents=True)
     (d / "system" / "coaches" / "sleep_coach" / "index.html").write_text("<p>coach</p>")
-    assert check_www_build.room_leaks(str(d)) == []  # a coach page is not a room page
+    assert check_www_build.room_leaks(str(d), published="off") == []  # a coach page is not a room page
     # the controls
     (d / "system" / "coaches" / "sleep_coach" / "record").mkdir()
     (d / "system" / "coaches" / "sleep_coach" / "record" / "index.html").write_text("<p>room</p>")
     (d / "coach_room.json").write_text("{}")
-    leaks = check_www_build.room_leaks(str(d))
+    leaks = check_www_build.room_leaks(str(d), published="off")
     assert any(x.startswith("system/coaches/sleep_coach/record/: a Coaching Room page") for x in leaks), leaks
     assert any(x.startswith("coach_room.json: the Coaching Room's data file") for x in leaks), leaks
 
