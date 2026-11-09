@@ -72,7 +72,7 @@ public chokepoint and left out of the API; the producer also refuses to make the
 - No backfill: only the cycle that contains today, and never one before `FIRST_CYCLE` (2026-11-16). No historical
   advice is written, and no older conversation is reconstructed.
 - One Haiku call through `bedrock_client.invoke`, plus one regeneration only if the reply is not usable JSON.
-- Item checks. Every number in the coach's words must appear in the facts or in the item's own structure. No
+- Item checks. Every number in the coach's words must appear in the facts or in the item's own structure. The text must also pass the registered grounding surface (`public_brief._grounding_findings`: numbers, dates and freshness against exactly what the model was shown). No
   private-activity words (`prediction_publication.words_name_private_activity`). No words about a partner, family or
   any other person. Nothing the deterministic sensitivity spine flags (`privacy/broadcast_sensitivity_gate.py`). Cites
   must be real observation ids. A call must be on one of the coach's inputs and must file as gradeable. A failing item

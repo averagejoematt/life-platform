@@ -1588,6 +1588,10 @@ def lambda_handler(event, context):
     """
     if event.get("mode") == "event_stance_refresh":
         return _handle_event_stance_refresh(event)
+    if event.get("mode") == "public_brief":  # owner ruling 2026-11-09 (third, E): its own Monday schedule, its own inputs
+        from coach import public_brief
+
+        return public_brief.run(table, coach_ids=event.get("coach_ids"), persist=not event.get("dry_run"))
 
     try:
         coach_ids = event.get("coach_ids", ALL_COACH_IDS)

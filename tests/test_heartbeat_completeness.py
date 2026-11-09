@@ -812,7 +812,9 @@ COVERAGE = {
     "coach-history-summarizer": (
         CENSUS,
         "2026-07-19",
-        "Context compaction only; a missed run means coaches read slightly longer raw history — no correctness impact.",
+        "Context compaction only; a missed run means coaches read slightly longer raw history — no correctness impact. "
+        "Its Monday public-brief schedule (2026-11-09 E) is a budget-pause class AI narrative: a missed week is a dated "
+        "gap in /api/coach_brief's cycles and is never backfilled.",
     ),
     "weekly-digest": (
         CENSUS,

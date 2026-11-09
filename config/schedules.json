@@ -100,6 +100,13 @@
       "facing": "internal",
       "purpose": "Coach Intelligence: Weekly History Compressor"
     },
+    "coach-history-summarizer#PublicBrief": {
+      "function": "coach-history-summarizer",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 9 ? * MON *)",
+      "facing": "internal",
+      "purpose": "Owner ruling 2026-11-09 (third, E): the weekly public-safe coaching brief (coach.public_brief); dark until public_brief_policy.PUBLICATION_LIVE"
+    },
     "coach-memoir": {
       "function": "coach-memoir",
       "stack": "LifePlatformCompute",
