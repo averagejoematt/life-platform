@@ -28,7 +28,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `chronicle-email-sender` | email_stack | `cron(10 8 ? * WED *)` (America/Los_Angeles, not UTC) | table |
 | `circadian-compliance` | compute_stack | `cron(0 19 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-daily-reflection` | compute_stack | `cron(0 12 * * ? *)` (America/Los_Angeles, not UTC) | table |
-| `coach-history-summarizer` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `coach-history-summarizer` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) + `cron(0 9 ? * MON *)` (America/Los_Angeles, not UTC) | table, table |
 | `coach-memoir` | compute_stack | `cron(0 8 1 1,4,7,10 ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-nudge` | email_stack | `cron(10 8-22 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-panel-podcast` | email_stack | `cron(0 11 ? * MON,WED *)` (America/Los_Angeles, not UTC) | table |
@@ -590,7 +590,7 @@ Field-level rulings (only non-default fields are declared):
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 149 literal-named declarations across three idioms, 4 composite; routing digest 104 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 96 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
+- Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -607,7 +607,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
 | alarms | 149 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 34 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 96 | this model's schedules plane (CDK AST) |
+| schedules | 97 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

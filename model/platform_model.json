@@ -1113,7 +1113,7 @@
     "ai_features": 30,
     "alarms": 149,
     "emf_namespaces": 34,
-    "schedules": 96,
+    "schedules": 97,
     "secrets": 30
   },
   "edges": [
@@ -6883,6 +6883,12 @@
           "key": "coach-history-summarizer",
           "resolution": "table",
           "tz": "America/Los_Angeles"
+        },
+        {
+          "expr": "cron(0 9 ? * MON *)",
+          "key": "coach-history-summarizer#PublicBrief",
+          "resolution": "table",
+          "tz": "America/Los_Angeles"
         }
       ],
       "stack": "compute_stack",
@@ -8280,7 +8286,7 @@
       "privacy_sources_owner_only": 25,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 80,
-      "schedules": 96
+      "schedules": 97
     },
     "coverage": {
       "edge_sites": {
@@ -9349,6 +9355,15 @@
       "expr": "cron(0 10 ? * SUN *)",
       "lambda": "coach-history-summarizer",
       "local": "10:00",
+      "resolution": "table",
+      "stack": "compute_stack",
+      "tz": "America/Los_Angeles",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 9 ? * MON *)",
+      "lambda": "coach-history-summarizer",
+      "local": "09:00",
       "resolution": "table",
       "stack": "compute_stack",
       "tz": "America/Los_Angeles",
