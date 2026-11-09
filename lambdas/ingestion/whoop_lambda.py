@@ -1067,13 +1067,14 @@ _STORE_VENDOR_TIME_TOLERANCE_SECONDS = 1
 
 
 def _fetch_stored_workouts(table, start_date: str, end_date: str) -> list:
-    """The stored whoop workout sub-records across [start_date, end_date] (inclusive),
-    with the fields the store → vendor pass compares."""
+    """The stored whoop workout sub-records across [start_date, end_date] (inclusive), WHOLE.
+
+    #5669: no projection — an emptied day's tombstone keeps the row it replaces (`emptied_record`,
+    `whoop_empty_day`), so the read carries every vendor field, not only the compared ones."""
     pk = f"USER#{USER_ID}#SOURCE#whoop"
     out: list = []
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}￿"),
-        "ProjectionExpression": "sk, workout_id, sport_id, start_time, end_time, tombstone",
     }
     while True:
         resp = table.query(**kwargs)
