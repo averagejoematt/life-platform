@@ -341,11 +341,8 @@ def clock_of(note: str | None, total_min: int | None = None) -> dict[str, Any] |
     return shape
 
 
-def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[str]:
-    """The menu kinds of this week's performed cardio blocks in [week_start, target_date), oldest first.
-
-    `sessions_by_machine` is movement_key -> its `cardio_index` entry (each `{date, note, ...}`, plus `served_kind`
-    when `cardio_menu.annotate_served` matched the routine he performed — #5076: his empty-note rides)."""
+def week_rows(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[tuple[str, str]]:
+    """(date, menu kind) of this week's performed cardio blocks in [week_start, target_date), oldest first (#5505)."""
     from training import cardio_menu
 
     rows: list[tuple[str, str]] = []
@@ -353,9 +350,17 @@ def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week
         for s in sessions or []:
             d = str(s.get("date") or "")[:10]
             if week_start <= d < target_date:
-                rows.append((d, cardio_menu.kind_of_performed(key, s.get("note"), s.get("served_kind"))))
+                rows.append((d, cardio_menu.kind_of_performed(key, s.get("note"), s.get("served_kind"), s.get("served_swap_kind"))))
     rows.sort()
-    return [k for _, k in rows]
+    return rows
+
+
+def week_kinds(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str) -> list[str]:
+    """The menu kinds of this week's performed cardio blocks in [week_start, target_date), oldest first.
+
+    `sessions_by_machine` is movement_key -> its `cardio_index` entry (each `{date, note, ...}`, plus `served_kind`
+    when `cardio_menu.annotate_served` matched the routine he performed — #5076: his empty-note rides)."""
+    return [k for _, k in week_rows(sessions_by_machine, week_start, target_date)]
 
 
 def performed_shape(note_text: str | None, total_min: int | None = None, machine: str | None = None) -> dict[str, Any]:

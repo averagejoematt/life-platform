@@ -1,0 +1,120 @@
+---
+// /story/timeline/ — the Human Story's timeline (HS1). BUILT DARK: this file lives outside src/pages/ and is injected as
+// a route ONLY when WEB_STORY=1 (src/lib/story_dark.js, astro.config.mjs). With the switch off it is not in the build.
+// Simple on arrival, deep on demand: one row per program week the platform serves (/api/chapters), its span in words,
+// its installment when one was approved and published (scripts/publish_snapshot_story.py — fail closed), and, folded,
+// the week's days as links to the existing Day pages. No audio, no excerpt, no journal / State of Mind / diary field:
+// a week without an installment says only that.
+import Base from "../layouts/Base.astro";
+import { dayInWords } from "../lib/format.js";
+import { timelineRows, soFar } from "../lib/story.js";
+import { STORY_MARKER, storyEnabled } from "../lib/story_dark.js";
+import { latestEdition, loadAll, loadStory } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+if (!storyEnabled()) throw new Error("src/story/timeline.astro rendered with WEB_STORY off — the story route must not be injected");
+
+const file = await loadStory();
+const all = await loadAll();
+const edition = await latestEdition();
+const ok = file.state === "ok";
+const rows = timelineRows(file, all.byType.day);
+const so = soFar(file, edition);
+const genesisWords = file.genesis ? dayInWords(file.genesis) : null;
+const genesisDay = file.genesis ? all.get("day", file.genesis) : null;
+const asOf = file.as_of ? dayInWords(file.as_of) : null;
+const story = { [STORY_MARKER]: "timeline" };
+---
+
+<Base title="The timeline" top="story" description="The experiment week by week: each week's days and its published installment." status={asOf}>
+  <section class="section" {...story}>
+    <div class="wrap" style="max-width:900px">
+      <p class="label">Story · the timeline · private build, not published</p>
+      <h1 style="margin-top:10px">Week by week</h1>
+      <p class="dek" style="margin-top:14px;max-width:720px">
+        {so && so.sentence ? `${so.sentence} ` : ""}Each week below lists its seven days, and the installment written about it when one was approved and published.
+      </p>
+      <div class="row" style="margin-top:18px;gap:10px">
+        <a class="btn ghost sm" href={href("/story/episodes/")}>Every installment</a>
+        <a class="btn ghost sm" href={href("/story/")}>All chapters</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section hair" {...story}>
+    <div class="wrap" style="max-width:900px">
+      {
+        !ok ? (
+          <div class="empty">
+            <b style="color:var(--ink)">The week list was not served for this snapshot.</b>
+            <span>{file.absent_text || ""}</span>
+          </div>
+        ) : (
+          <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+            {genesisWords && (
+              <li style="display:flex;gap:18px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--rule)">
+                <span class="mono cobalt" style="font-size:14px;flex:0 0 56px">Day 1</span>
+                <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                  <b style="font-size:18px">The experiment begins</b>
+                  {genesisDay ? (
+                    <a href={href(pathOf("day", genesisDay.id))} class="muted" style="font-size:15px">
+                      {genesisWords}
+                    </a>
+                  ) : (
+                    <span class="muted" style="font-size:15px">{genesisWords}</span>
+                  )}
+                </span>
+              </li>
+            )}
+            {rows.map((r) => (
+              <li style="display:flex;gap:18px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--rule)" id={`week-${r.week}`}>
+                <span class={`mono ${r.installment ? "cobalt" : "faint"}`} style="font-size:14px;flex:0 0 56px;padding-top:3px">
+                  {String(r.week).padStart(2, "0")}
+                </span>
+                <span style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 auto">
+                  <span class="label">
+                    {r.weekLabel}
+                    {r.span ? ` · ${r.span}` : ""}
+                  </span>
+                  {r.installment ? (
+                    <a href={href(pathOf("chapter", r.installment.id))} style="text-decoration:none">
+                      <b style="font-size:20px;letter-spacing:-.02em;line-height:1.2">{r.installment.title}</b>
+                      <span class="muted" style="font-size:14px;display:block">
+                        Published {r.installment.dateWords}
+                      </span>
+                    </a>
+                  ) : (
+                    <span class="muted" style="font-size:15px">
+                      No installment for this week in the index.
+                    </span>
+                  )}
+                  {r.days.length > 0 && (
+                    <details class="more">
+                      <summary>
+                        The days of {r.weekLabel.toLowerCase()} <span class="mono muted" style="font-size:12px">{r.days.length}</span>
+                      </summary>
+                      <nav class="rows" aria-label={`The days of ${r.weekLabel}`}>
+                        {r.days.map((d) => (
+                          <a href={href(pathOf("day", d.id))}>
+                            <b>{d.words}</b>
+                            <span class="mono muted" style="font-size:12px">
+                              the day →
+                            </span>
+                          </a>
+                        ))}
+                      </nav>
+                    </details>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )
+      }
+      <p class="muted" style="font-size:13px;margin-top:24px;max-width:70ch">
+        The weeks are the platform's own seven-day program weeks. An installment is listed only when the platform records it as approved and
+        published; drafts and held installments are not part of this timeline.
+      </p>
+    </div>
+  </section>
+</Base>
