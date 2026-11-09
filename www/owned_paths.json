@@ -19,7 +19,7 @@
     "_astro/",
     "assets/fonts/v9/"
   ],
-  "room_public": "off",
+  "room_public": "cr1",
   "route_patterns": [
     "/data/*/",
     "/data/day/*/",
@@ -66,6 +66,7 @@
     "/story/week-07/",
     "/story/week-08/",
     "/system/",
+    "/system/calibration/",
     "/system/coaches/eli_marsh/",
     "/system/coaches/glucose_coach/",
     "/system/coaches/nutrition_coach/",
@@ -79,6 +80,7 @@
     "/system/ledger/nutrition-20261029-carbcut01/",
     "/system/ledger/physical-20261015-weight01/",
     "/system/ledger/physical-20261016-weight02/",
+    "/system/ledger/refuted/",
     "/system/ledger/sealed-20260906-genesis01/",
     "/system/ledger/sleep-20261005-deepsleep01/",
     "/system/methods/directional_window_verdict/",
@@ -99,8 +101,10 @@
     "/privacy/",
     "/story/",
     "/system/",
+    "/system/calibration/",
     "/system/everything-else/",
     "/system/ledger/",
+    "/system/ledger/refuted/",
     "/system/sources/"
   ]
 }
