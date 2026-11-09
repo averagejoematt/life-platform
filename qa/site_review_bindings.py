@@ -649,6 +649,18 @@ PAGE_BINDINGS.append(
         "endpoints": [{"url": "/api/pulse_history", "role": "primary", "metrics": []}],
     }
 )
+# The Laboratory (L1, LAB_LIVE — owner GO 2026-11-09): /data/lab/ binds through the evidence-topic derivation above;
+# its protocols page sits one level deeper, so it binds here. A static build from the publication snapshot.
+PAGE_BINDINGS.append(
+    {
+        "path": "/data/lab/protocols/",
+        "name": "Data · the Laboratory's protocols (v9)",
+        "door": "data",
+        "narrative_order": 108,
+        "story_intent": "the supplement protocols: dose, timing, why, paused, and the evidence for and against each",
+        "endpoints": [{"url": "/api/supplements", "role": "primary", "metrics": []}],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/privacy/",
