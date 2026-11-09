@@ -523,8 +523,7 @@ def test_edition_record_never_serializes_the_count_without_the_comparison():
     served = wire["predictions"]["overall"]
     count_text = f"{served['confirmed']} of {served['confirmed'] + served['refuted']} checked calls right."
     assert ok["data"]["count_text"] == count_text
-    skill = wire["calibration"]["platform"]["strata"]["coaches"]["brier_skill"]
-    beats = skill > 0
+    beats = False  # owner 2026-11-09: an untested point estimate never claims a win (record_words.claimable_advantage)
     assert ok["data"]["beats_simple_guess"] is beats
     assert ok["data"]["comparison_text"] == (_record_words.GUESS_BEATS if beats else _record_words.GUESS_NOT_YET)
     assert ok["data"]["baseline"]["rule"] == "base_rate" and 0 < ok["data"]["baseline"]["rate"] < 1

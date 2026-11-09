@@ -15,7 +15,7 @@
 import { callOutcome, dayInWords, kOfN, num } from "./format.js";
 import { instantInWords } from "./corrections.js";
 import { isDisputed } from "./disputed.js";
-import { intervalText, labelWords, pct } from "./calibration.js";
+import { intervalText, pct, v2Answers } from "./calibration.js";
 
 /** The words a page prints for a read, a stance or an ask whose words the platform does not publish. The same phrase
  *  the exporter uses for a call ("The words of this call are not published."), so the site speaks one vocabulary. */
@@ -261,7 +261,7 @@ export function coachRecord(calCoach, card) {
       interval: intervalText(calCoach.accuracy_ci95) || "no interval served",
       skill: (((calCoach.comparison || {}).skill) || {}).sentence || null,
       records: (calCoach.comparison || {}).records || null,
-      label: labelWords(calCoach.calibration),
+      calibration: v2Answers(calCoach.assessment_v2), // calibration-v2 (owner 2026-11-09): three answers, never the v1 label
       underReview: Number.isInteger(calCoach.under_review) ? calCoach.under_review : 0,
       quality: calCoach.quality || null,
       lifetime: calCoach.lifetime || null,
@@ -275,7 +275,7 @@ export function coachRecord(calCoach, card) {
       interval: "no interval served",
       skill: card.skill_sentence || null,
       records: card.records || null,
-      label: null,
+      calibration: [],
       underReview: 0,
       quality: null,
       lifetime: null,

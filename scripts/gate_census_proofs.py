@@ -4455,3 +4455,30 @@ GUARD_PROOFS["guard::scripts/check_coach_verdict_agreement.py"] = {
     ),
     "proved_on": "2026-11-03",
 }
+
+
+# Owner ruling 2026-11-09: calibration-v2 adopted; no reader surface shows a calibration-v1 label.
+STRUCTURAL_HAND_PROOFS["structural::test_calibration_v1_labels_retired.py"] = {
+    "gate_name": "test_calibration_v1_labels_retired.py",
+    "command": "python3 -m pytest tests/test_calibration_v1_labels_retired.py -q -p no:randomly   # baseline 7 passed",
+    "mutation": (
+        'Six plants in the real tree, ONE AT A TIME, each restored from a byte copy: M1 a `"Well Calibrated"` string appended '
+        "to site/assets/js/evidence_intelligence.js; M2 a read of `s.calibration` appended to grade_your_coach.js; M3 a read of "
+        "`c.calibration` appended to evidence_intelligence.js; M4 `score` dropped from site_api_calibration_v2.DEPRECATED_V1_FIELDS; "
+        "M5 calibration_v2's non-rejection wording replaced by `Well calibrated`; M6 a `not yet skillful` comment appended to "
+        "www/src/room/calibration.astro."
+    ),
+    "observed": (
+        "2026-11-09, this lane. BASELINE 7 passed. M1: 1 failed (test_no_v1_label_in_served_pages_or_scripts). M2: 1 failed "
+        "(test_grade_your_coach_never_reads_the_v1_fields). M3: 1 failed (test_the_legacy_calibration_page_reads_only_v2_for_its_verdict). "
+        "M4: 1 failed (test_the_api_keeps_v1_fields_only_as_deprecated). M5: 1 failed (test_v2_words_never_praise). M6: 1 failed "
+        "(test_no_v1_label_in_served_pages_or_scripts). REVERTED 7 passed each time."
+    ),
+    "scope": (
+        "Repo-side only: the committed site/ tree (HTML, JS, JSON; /legacy and /next archives excepted) and www/src sources, two "
+        "renderer sources read as text, the served method block, and calibration_v2 words over 300 synthetic ledgers. NOT SEEN: "
+        "HTML a page builds at runtime from a live payload (tests/js/calibration_v2_reader_surfaces.test.mjs renders that with a "
+        "sentinel) and the live pages themselves (the post-deploy curl is that proof)."
+    ),
+    "proved_on": "2026-11-09",
+}

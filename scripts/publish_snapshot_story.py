@@ -15,7 +15,7 @@ WHAT COUNTS AS APPROVED AND PUBLISHED — fail closed. An installment is in the 
     approval state for it — unknown is excluded;
   * ``/api/chapters`` (lambdas/web/site_api_chapters.py — the platform's own per-week state, read from the chronicle
     partition and the manifest) serves that week as ``published`` with the SAME url and the same title;
-  * it is not on the owner's exclusion list below (EXCLUDED_WEEKS / EXCLUDED_IDS / EXCLUDED_DATES).
+  * it is not on the owner's exclusion list below (EXCLUDED_IDS / EXCLUDED_URL_PARTS / EXCLUDED_DATES — by identity, never a label).
 Anything else — held, draft, changes requested, skipped, pending, tombstoned, pre-genesis, a route that did not answer —
 is excluded, and only its id and the reason are recorded (never a title, excerpt or body).
 
@@ -39,20 +39,23 @@ CHAPTERS_PATH = "/api/chapters"
 FIXTURE_NAME = "story_chapters_api.json"  # the committed sample of the /api/chapters payload (fixture mode)
 ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-# The owner's exclusions (brief 2026-11-08), held even if the platform's state ever reads otherwise.
-EXCLUDED_WEEKS = {
-    2: "owner brief 2026-11-08: the Week 2 installment is excluded",
-    8: "owner brief 2026-11-08: the Week 8 draft is excluded",
-    9: "owner brief 2026-11-08: the Week 9 draft is excluded",
-}
+# The owner's exclusions (brief 2026-11-08, clarified 2026-11-09), held even if the platform's state ever reads otherwise.
+# Keyed by the RECORD's identity — its chapter id, its URL, its chronicle date key — never by a "Week N" label: the
+# "Week 2" the owner held is the PILOT instalment "The Night Before Everything" (/journal/posts/week-02/, chronicle
+# DATE#2026-07-21), NOT program week 2 ("Eight Pounds and a Flag", /journal/posts/week-05/), which is published,
+# approved and included like any other program week (tests/test_www_human_story_dark_hs1.py pins both).
+PILOT_WEEK_02 = "owner 2026-11-09: the pilot instalment at /journal/posts/week-02/ (chronicle DATE#2026-07-21) is held"
 EXCLUDED_IDS = {
-    "week-02": "owner brief 2026-11-08: the unlisted /journal/posts/week-02/ is excluded",
+    "week-02": PILOT_WEEK_02,
+    "program-week-08": "owner brief 2026-11-08: the Week 8 draft is excluded",
+    "program-week-09": "owner brief 2026-11-08: the Week 9 draft is excluded",
 }
 EXCLUDED_DATES = {
+    "2026-07-21": PILOT_WEEK_02,
     "2026-05-16": "owner brief 2026-11-08: a held, non-current-phase draft",
     "2026-09-01": "owner brief 2026-11-08: a held, non-current-phase draft",
 }
-EXCLUDED_URL_PARTS = ("/journal/posts/week-02/",)
+EXCLUDED_URL_PARTS = {"/journal/posts/week-02/": PILOT_WEEK_02}
 
 ABSENT_STORY = {
     "state": "absent",
@@ -102,16 +105,16 @@ def exclusion_reason(c: dict, served: dict[int, dict]) -> str | None:
     url = c.get("url_legacy")
     if cid in EXCLUDED_IDS:
         return EXCLUDED_IDS[cid]
-    if isinstance(url, str) and any(part in url for part in EXCLUDED_URL_PARTS):
-        return EXCLUDED_IDS["week-02"]
-    if week in EXCLUDED_WEEKS:
-        return EXCLUDED_WEEKS[week]
+    if isinstance(url, str):
+        for part, reason in EXCLUDED_URL_PARTS.items():
+            if part in url:
+                return reason
     if str(c.get("date") or "")[:10] in EXCLUDED_DATES:
         return EXCLUDED_DATES[str(c.get("date"))[:10]]
     if c.get("visibility") not in (None, "public"):
         return "not a public object"
     if c.get("status") != "published":
-        return f"status {c.get('status')!r}: not a published installment"
+        return "not a published installment"  # the state itself (held / skipped / pending) is never recorded
     if not _approved_by_owner(c):
         return "no owner approval recorded (chronicle-approve)"
     if week is None or week < 1:

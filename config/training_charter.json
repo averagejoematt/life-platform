@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.39.0",
+  "version": "1.40.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -266,6 +266,13 @@
       "date": "2026-11-08",
       "by": "owner ruling 2026-11-08 (attended) on #5505",
       "what": "cardio_menu.placement gains missed_reoffers_per_wk (1) and counting_rule: a substituted machine at the prescribed effort (his note's RPE at or above the served kind's band) counts toward the week's conditioning; a missed hard block is re-offered at most once a week and every later miss is dropped, so a week of substituted or skipped blocks no longer re-places 'conditioning 1 of 2' every day.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.40.0",
+      "date": "2026-11-08",
+      "by": "owner ruling 2026-11-08 (#5694, attended, delegated: \"just tell me what i should lift for my program and goals, ican do all the deadlifts\")",
+      "what": "Retired the conventional-deadlift movement gate: `gated_movements.conventional_deadlift` is open by owner ruling (`status: open`), and its trap-bar `until_then` is gone. He has pulled conventional since 2026-09-09 (10 sessions, 195 to 225 lb). The Lower-heavy hinge is the conventional deadlift (the heavy pull) and the Lower-volume hinge is the Romanian deadlift (barbell, 8 to 10 reps). The numeric `gate_lb` stays where it is, read ONLY as the Foundation to Build weight boundary (`phases.definitions.build.entry_gates[0].value_ref`, the #5574 ruling); what that boundary becomes is a separate owner ruling. Foundation's `until_then` and Build's conventional-deadlift unlock are removed (nothing is held back any more); the power-clean revisit is unchanged.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -726,7 +733,10 @@
   "gated_movements": {
     "conventional_deadlift": {
       "gate_lb": 275,
-      "until_then": "trap bar"
+      "status": "open",
+      "opened": "2026-11-08",
+      "opened_by": "owner ruling #5694",
+      "reading": "open: the conventional deadlift is prescribed now (the Lower-heavy hinge) and nothing substitutes for it. `gate_lb` is no longer a movement gate; it is kept only as the Foundation to Build weight boundary that `phases.definitions.build.entry_gates[0]` references, pending its own owner ruling"
     },
     "power_clean": {
       "revisit_at_lb": 250
@@ -930,17 +940,15 @@
     "definitions": {
       "foundation": {
         "title": "Foundation",
-        "intent": "the habit, the tissue and the technique at the heaviest weights: the trap-bar hinge, walking as the base, every session logged",
+        "intent": "the habit, the tissue and the technique at the heaviest weights: the conventional deadlift and the Romanian deadlift as the hinges, walking as the base, every session logged",
         "entry_gates": [],
         "entry_note": "the starting phase (since 2026-09-06); it has no entry gate",
         "unlocks": [],
-        "until_then": [
-          "gated_movements.conventional_deadlift.until_then"
-        ]
+        "until_then": []
       },
       "build": {
         "title": "Build",
-        "intent": "load progression becomes the main lever: the conventional deadlift opens, and the power clean comes into reach on its own gate",
+        "intent": "load progression becomes the main lever, and the power clean comes into reach on its own gate",
         "entry_gates": [
           {
             "id": "weight_at_deadlift_gate",
@@ -948,11 +956,11 @@
             "metric_source": "the canonical 7-day weight trend (get_weight_loss_progress)",
             "comparator": "<=",
             "value_ref": "gated_movements.conventional_deadlift.gate_lb",
+            "value_note": "the number the retired conventional-deadlift gate carried (#5694 opened the movement on 2026-11-08); kept as this phase boundary until the owner rules what Build's weight gate becomes",
             "held_for": "advance.consecutive_evaluations"
           }
         ],
         "unlocks": [
-          "gated_movements.conventional_deadlift",
           "gated_movements.power_clean"
         ]
       },
