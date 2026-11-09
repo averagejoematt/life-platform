@@ -315,9 +315,9 @@ def test_a_call_without_a_stored_stamp_makes_the_baseline_unavailable_not_mismat
     pairs, _ = _owner_set()
     pairs[0][0].pop("baseline")  # mutation: one counted call has no stored verdict for the simple prediction
     v = _headline(pairs)["verified"]
-    assert v["baseline"] == {"available": False, "n": 75, "text": vf.NO_BASELINE}
+    assert v["baseline"] == {"available": False, "n": 75, "text": vf.NO_SAME_CALL_COMPARISON}
     assert v["sign_test"] is None and v["comparison"] is None
-    assert v["sentence"].endswith(vf.NO_BASELINE) and "advantage" not in v["sentence"]
+    assert v["sentence"].endswith(vf.NO_SAME_CALL_COMPARISON) and "advantage" not in v["sentence"]
     # control: an unversioned stamp is refused the same way
     pairs2, _ = _owner_set()
     pairs2[0][0]["baseline"].pop("version")

@@ -54,7 +54,7 @@ def summary(verifications: Iterable[Any]) -> dict:
     return out
 
 
-def attach_stratum_extras(platform: dict, strata_pairs: dict, coach_decided: list, verified: dict | None = None) -> None:
+def attach_stratum_extras(platform: dict, strata_pairs: dict, verified: dict | None = None) -> None:
     """Owner 2026-11-09, additive — changes no existing field. Each season stratum gains:
 
     * ``accuracy_pct`` / ``accuracy_ci95`` (95% Wilson) — ``calibration_core.score_pairs`` over the stratum's OWN
@@ -65,8 +65,7 @@ def attach_stratum_extras(platform: dict, strata_pairs: dict, coach_decided: lis
       which have no verification record.
 
     Computed here, not in ``experiment.calibration_core``, so the scorer, its OSS parity vectors and its methods
-    fingerprint are untouched. ``coach_decided`` is kept for the call shape."""
-    del coach_decided
+    fingerprint are untouched."""
     for name, stratum in (platform.get("strata") or {}).items():
         scored = calibration_core.score_pairs(strata_pairs.get(name) or [])
         stratum["accuracy_pct"] = scored["accuracy_pct"]
@@ -271,7 +270,7 @@ def _rule_scored(row: dict) -> bool:
     return isinstance(bl, dict) and bl.get("rule") == coach_baseline.RULE_ID and isinstance(bl.get("right"), bool)
 
 
-NO_BASELINE = "No same-call comparison with a simple prediction that nothing would change is published for these calls yet."
+NO_SAME_CALL_COMPARISON = "No same-call comparison with a simple prediction that nothing would change is published for these calls yet."
 
 
 def stored_rule_versions(rows: list[dict]) -> dict | None:
@@ -299,7 +298,7 @@ def headline_sentence(n: int, k: int, rule_right: int | None, verdict: str | Non
     calls = "forecast" if n == 1 else "forecasts"
     s = f"Of {n} {calls} that could be checked under the current rules, the coaches got {k} right ({_pct_whole(k, n)}%). "
     if rule_right is None:
-        return s + NO_BASELINE
+        return s + NO_SAME_CALL_COMPARISON
     s += f"A simple prediction that nothing would change got {rule_right} right ({_pct_whole(rule_right, n)}%). "
     if verdict == "coaches_better":
         return s + "The coaches did better than that baseline, by more than chance would explain."
@@ -328,10 +327,10 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
     versions = stored_rule_versions(rows)
     if versions is None:
         # A call without a stored "nothing changes" stamp: no same-call comparison can be guaranteed, so none is served.
-        out.update(baseline_pct_rounded=None, sign_test=None, baseline={"available": False, "n": n, "text": NO_BASELINE})
+        out.update(baseline_pct_rounded=None, sign_test=None, baseline={"available": False, "n": n, "text": NO_SAME_CALL_COMPARISON})
         if with_sentence:
             out["sentence"] = headline_sentence(n, k, None, None)
-            out["skill"] = {"n": n, "sentence": NO_BASELINE}
+            out["skill"] = {"n": n, "sentence": NO_SAME_CALL_COMPARISON}
             out["comparison"] = None
         return out
     rule = sum(1 for r in rows if _rule_right(r))
@@ -395,6 +394,18 @@ def add_verify_jobs(jobs: dict, coach_pks: dict, query) -> None:
     same governed table, so a private call's record never arrives; a record is joined only through a public pointer."""
     for cid, pk in coach_pks.items():
         jobs[VERIFY_JOB + cid] = lambda pk=pk: query(pk, verification_record.VERIFY_PREFIX, VERIFY_PROJECTION, paginate=True)
+
+
+def fetch_with_headline(jobs: dict, coach_ids: dict, _g: dict) -> tuple[dict, dict | None]:
+    """``/api/calibration``'s ONE concurrent fetch, plus each coach's VERIFY# read: ``(fetched, headline)`` with the
+    VERIFY# results popped out of ``fetched`` (the route's own jobs come back exactly as before). ``coach_ids`` =
+    {short id: partition coach id}; ``_g`` = the route's injectable globals (its fetch, query and genesis)."""
+    parallel_fetch, query, genesis = _g["_parallel_fetch"], _g["_query_partition"], _g["EXPERIMENT_START"]
+    coach_pks = {cid: f"COACH#{full}" for cid, full in coach_ids.items()}
+    add_verify_jobs(jobs, coach_pks, query)
+    failed: list = []
+    fetched = parallel_fetch(jobs, failures=failed)
+    return fetched, headline_of(fetched, failed, list(coach_pks), genesis=genesis)
 
 
 def headline_of(fetched: dict, failed: list, cids: list, *, genesis: str | None) -> dict | None:
