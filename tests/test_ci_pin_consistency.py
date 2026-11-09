@@ -129,6 +129,8 @@ _GATED_TOOLS = (
     "pytest",
     "pytest-cov",
     "pytest-xdist",
+    "pytest-timeout",  # #5514
+    "pip",  # #5514: the installer itself, resolved via scripts/ci_pins.py
     "boto3",
     "botocore",
     "pyyaml",
@@ -644,11 +646,12 @@ _PIP_VALUE_FLAGS = {
 
 # Package names allowed to install unpinned, each with why. An entry here is a debt
 # unless its reason argues otherwise (same contract as _KNOWN_STALE_DECLARATIONS).
-_UNPINNED_INSTALL_EXCEPTIONS = {
-    # `python -m pip install --upgrade pip` is installer self-hygiene, deliberately
-    # latest: pip is not a gate tool, its version gates nothing, and pinning the
-    # installer would only relocate this class into bootstrap failures.
-    "pip": "installer self-upgrade hygiene line — deliberately latest",
+_UNPINNED_INSTALL_EXCEPTIONS: dict = {
+    # (#5514 removed `pip`: the workflows' `pip install --upgrade pip` floated to whatever PyPI
+    # served; the 2026-10-31 CI audit asked for every CI input pinned, so pip is a
+    # requirements-dev.txt pin resolved through scripts/ci_pins.py like the gate tools. The
+    # composite .github/actions/playwright-browser still upgrades unpinned — it is outside this
+    # workflow scan and is used by the site-deploy/web-preview workflows, left for their owner.)
 }
 
 
@@ -701,12 +704,14 @@ def test_unpinned_install_guard_fires_on_a_synthetic_bare_install():
     stay clean, or the fix is unshippable."""
     bad = _unpinned_workflow_installs({"x.yml": "        run: pip install boto3 pytest --quiet\n"})
     assert bad == [("x.yml", "boto3"), ("x.yml", "pytest")], bad
+    # #5514: the floating installer upgrade is a finding now (pip is a requirements-dev.txt pin).
+    assert _unpinned_workflow_installs({"x.yml": "          python -m pip install --upgrade pip\n"}) == [("x.yml", "pip")]
     ok = "\n".join(
         [
             f"          PINS=$(python3 {_RESOLVER_SCRIPT} boto3 botocore)",
             "          pip install --quiet $PINS",
             "          pip install -r requirements-dev.txt",
-            "          python -m pip install --upgrade pip",
+            f"          PINS=$(python3 {_RESOLVER_SCRIPT} pip) && python -m pip install $PINS",
             '          pip install -q -r "$req" || true',
         ]
     )

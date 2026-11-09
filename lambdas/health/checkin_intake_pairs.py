@@ -1,6 +1,6 @@
 """health/checkin_intake_pairs.py — does stress move what he eats? (#5106, epic #5093)
 
-The evening check-in (``coach.evening_checkin``: hunger, stress, cravings 0-4 and one word) joined with
+The evening check-in (``coach.evening_checkin``: hunger, stress, cravings, optional mood 0-4 and one word) joined with
 the same day's intake, and tested weekly by the correlation engine with its ADR-105 rigor.
 
 WHY THE JOIN IS READ-SIDE (computed inside the weekly run, not a row written each night). The check-in
@@ -17,7 +17,12 @@ ONE JOINED DAY (``join_day``):
     ``complete_log_kcal``, a redline) is an unfinished log: its intake fields are None, never a low day.
   * ``protein_hit`` — THE protein hit (``health.protein_engine.hit``) as 1/0, None when unlogged.
   * ``last_meal_min`` — minutes after midnight of the last timed food-log row (late eating), None untimed.
-  * ``mood_valence`` — the State-of-Mind daily valence when he logged one (``apple_health.som_avg_valence``).
+  * ``mood`` — the check-in's OWN mood rating (0-4, 0 = rough, 4 = great; evening-checkin@1.1.0, #5123), None when
+    the evening's answer left it out. From checkin-intake-pairs@1.1.0 the family pairs it with intake directly, so
+    the mood->intake question is answered from this channel alone (#5106: "mood/stress->intake pairs").
+  * ``mood_valence`` — the State-of-Mind daily valence when he logged one (``apple_health.som_avg_valence``). Kept
+    as it shipped in 1.0.0; whether the family should keep joining a second channel is an open owner question on
+    #5106, not a default this module changes.
 
 THE TEST (``PAIRS``) runs through the weekly engine's OWN ``compute_correlations`` (injected): Pearson r,
 the Pyper-Peterman effective n, the moving-block bootstrap CI, p on n_eff, Benjamini-Hochberg across THIS
@@ -45,7 +50,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Mapping, Optional
 
-ENGINE_VERSION = "checkin-intake-pairs@1.0.0"
+ENGINE_VERSION = "checkin-intake-pairs@1.1.0"  # 1.1.0: + the check-in's own mood rating in the join and the family
 SOURCE = "checkin_intake_pairs"
 PK = f"USER#matthew#SOURCE#{SOURCE}"
 SK_PREFIX = "WEEK#"
@@ -60,8 +65,13 @@ PAIRS = [
     ("stress", "last_meal_min", "stress_vs_last_meal_time", 0),
     ("stress", "kcal_over_target", "stress_predicts_next_day_kcal_over_target", 1),
     ("mood_valence", "kcal_over_target", "mood_vs_kcal_over_target", 0),
+    ("mood", "kcal_over_target", "checkin_mood_vs_kcal_over_target", 0),  # 1.1.0: the check-in's own 0-4 mood
 ]
+# The three ratings a COMPLETE check-in carries (= coach.evening_checkin.COMPLETE_FIELDS, contract test). ``has_checkin``
+# and ``n_checkin_days`` count on these, so the optional mood rating never changes what an "answered evening" is — the
+# partner letter's one count (health.checkin_partner_view) reads the same definition it was ruled on.
 CHECKIN_FIELDS = ("hunger", "stress", "cravings")
+MOOD_FIELD = "mood"  # the optional fourth rating (= coach.evening_checkin.FIELDS[3]); joined and paired, never counted
 
 
 def _num(v: Any) -> Optional[float]:
@@ -91,6 +101,7 @@ def join_day(
     """One day's pair row. Every absent input is None (ADR-104) — an unlogged day is never a zero."""
     ci, food, apple = checkin or {}, food or {}, apple or {}
     row: dict[str, Any] = {f: _num(ci.get(f)) for f in CHECKIN_FIELDS}
+    row[MOOD_FIELD] = _num(ci.get(MOOD_FIELD))
     row["mood_valence"] = _num(apple.get("som_avg_valence"))
     kcal = _num(food.get("total_calories_kcal"))
     complete = kcal is not None and (complete_log_kcal is None or kcal >= complete_log_kcal)

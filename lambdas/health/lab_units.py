@@ -26,7 +26,8 @@ SHAPE
                scan records hold. The unit of a DEXA number is carried by the path's own
                suffix (`_lb`, `_pct`, `_g`, `_kg_m2`, `t_score`...) — `dexa_unit_for()`.
 
-Consumers: `scripts/ingest_lab_report.py` (the writer), `tests/test_lab_report_ingest_4639.py`.
+Consumers: `scripts/ingest_lab_report.py` (the writer), `health/quest_report.py` (the Quest-print reader,
+2026-11-08), `tests/test_lab_report_ingest_4639.py`, `tests/test_quest_report_4639.py`.
 Bundled with the rest of `health/` (#781); no lambda imports it today.
 """
 
@@ -228,6 +229,19 @@ LAB_UNITS: Dict[str, LabRow] = {
     "vldl": (("mg/dL",), "lipids", "numeric"),
     "wbc": (("x10E3/uL", "K/uL", "Thousand/uL"), "cbc", "numeric"),
     "zinc": (("mcg/dL",), "minerals", "numeric"),
+    # ── added 2026-11-08 (#4639, the Quest-print reader `health/quest_report.py`) ──────────
+    # Results the archived 2026-04 Quest prints carry that the hand-extracted 2026-04-03 row
+    # dropped (capture-all, epic #4625). Names and units are read off the print; no value is.
+    "egfr_cystatin_c": (("mL/min/1.73m2",), "kidney", "numeric"),
+    "oxidized_ldl": (("U/L",), "lipids_advanced", "numeric"),
+    "urine_bacteria": (("/HPF",), "urinalysis", "qualitative"),
+    "urine_bilirubin": (("",), "urinalysis", "qualitative"),
+    "urine_hyaline_casts": (("/LPF",), "urinalysis", "qualitative"),
+    "urine_leukocyte_esterase": (("",), "urinalysis", "qualitative"),
+    "urine_nitrite": (("",), "urinalysis", "qualitative"),
+    "urine_rbc": (("/HPF",), "urinalysis", "qualitative"),
+    "urine_squamous_epithelial_cells": (("/HPF",), "urinalysis", "qualitative"),
+    "urine_wbc": (("/HPF",), "urinalysis", "qualitative"),
 }
 
 #: Every leaf path a live DEXA scan record holds, with the value kind it stores.
