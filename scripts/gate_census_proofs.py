@@ -4482,3 +4482,30 @@ STRUCTURAL_HAND_PROOFS["structural::test_calibration_v1_labels_retired.py"] = {
     ),
     "proved_on": "2026-11-09",
 }
+
+
+# #5573 — Hevy notes that ask the platform for something: the owner_request class, the write-once REQUEST# row,
+# the once-only resolution and the owner-only surface. ONE structural entrant (the file carries a premerge-gate sweep
+# of lambdas/web/), proved by five plants in the real tree, one at a time, each restored from a byte copy.
+STRUCTURAL_HAND_PROOFS["structural::test_note_requests_5573.py"] = {
+    "gate_name": "test_note_requests_5573.py",
+    "command": "python3 -m pytest tests/test_note_requests_5573.py -q -p no:randomly   # baseline 23 passed",
+    "mutation": (
+        "M1 a planted lambdas/web/ module importing training.note_requests (a reader surface); M2 `owner_request` removed "
+        "from training_notes.TAXONOMY (merge_signals drops every request signal); M3 raise_requests' attribute_not_exists "
+        "condition replaced by None (a re-run rewrites the row); M4 resolve()'s `status = open` store condition removed (a "
+        "racing second answer lands); M5 the overdue test `age > OVERDUE_DAYS` made `>=`."
+    ),
+    "observed": (
+        "2026-11-08, this lane. BASELINE 23 passed. M1: 1 failed (test_no_reader_surface_reads_the_requests_and_the_requests_"
+        "read_no_private_source). M2: 14 failed (the taxonomy pin, the three live fixtures, every raise/resolve/view test). "
+        "M3: 1 failed (test_a_request_is_raised_once_and_never_rewritten). M4: 1 failed (test_the_store_refuses_a_racing_"
+        "second_answer). M5: 1 failed (test_view_counts_open_requests_past_seven_days_as_overdue). REVERTED 23 passed."
+    ),
+    "scope": (
+        "Repo-side only: the extractor over the field-projected live Hevy rows, a FakeTable that evaluates the two real "
+        "condition shapes, the MCP packet/capture/action seams, and the hevy_backfill on-ingest hook. NOT SEEN: a live "
+        "REQUEST# row (the first one, on the next owner request in a Hevy note, is the issue's live proof)."
+    ),
+    "proved_on": "2026-11-08",
+}
