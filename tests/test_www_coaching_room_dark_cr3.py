@@ -17,15 +17,27 @@ import json
 import os
 import sys
 
+import pytest
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 import check_www_build  # noqa: E402
 import publish_snapshot  # noqa: E402
+import publish_snapshot_calibration  # noqa: E402
 import www_verbatim  # noqa: E402
 from publish_snapshot_coach_room import docket_id, resolve_and_validate, shape  # noqa: E402
 
 FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
+
+
+@pytest.fixture(autouse=True)
+def _committed_switch_off(monkeypatch):
+    """These proofs are about the PRIVATE switch (WEB_ROOM): the committed `room_public` is pinned off, so they hold the
+    same before and after the CR1 launch merge (tests/test_www_coaching_room_cr1_public.py pins it on)."""
+    monkeypatch.setattr(publish_snapshot_calibration, "committed_room_public", lambda path=None: "off")
+
+
 HELD = "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
 
 
@@ -143,11 +155,11 @@ def test_the_deploy_scan_refuses_a_docket_page_and_the_refuted_preset(tmp_path):
     (d / "system" / "ledger" / "sleep-20261005-deepsleep01" / "index.html").write_text("<p>call</p>")
     (d / "system" / "ledger" / "disagreements" / "x").mkdir(parents=True)
     (d / "system" / "ledger" / "disagreements" / "x" / "index.html").write_text("<p>disagreement</p>")
-    assert check_www_build.room_leaks(str(d)) == []  # a ledger page and a disagreement page are not room pages
+    assert check_www_build.room_leaks(str(d), published="off") == []  # a ledger page and a disagreement page are not room pages
     for rel in ("system/docket/2026-09-23-a-b", "system/ledger/refuted"):  # the controls
         (d / rel).mkdir(parents=True)
         (d / rel / "index.html").write_text("<p>room</p>")
-    leaks = check_www_build.room_leaks(str(d))
+    leaks = check_www_build.room_leaks(str(d), published="off")
     assert any(x.startswith("system/docket/: a Coaching Room page") for x in leaks), leaks
     assert any(x.startswith("system/docket/2026-09-23-a-b/: a Coaching Room page") for x in leaks), leaks
     assert any(x.startswith("system/ledger/refuted/: a Coaching Room page") for x in leaks), leaks

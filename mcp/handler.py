@@ -21,7 +21,11 @@ security boundary; it implements a real OAuth 2.1 + PKCE flow, see below):
   compare) OR a live session Bearer, fail-closed with no API key configured
   (R13-F05 — see `_get_bearer_token`/`_validate_bearer` below).
 - Local bridge: AWS IAM/SigV4 on the direct `boto3` Lambda invoke — no HTTP,
-  no Bearer token, a completely different mechanism from the remote path above.
+  no Bearer token, a completely different mechanism from the remote path above —
+  plus the `x-api-key` header, constant-time compared and fail-closed when the
+  key cannot be read (#5540).
+- Privileged branches (the scheduled warmer and the constant-input jobs) run only
+  on the warmer function, checked before any of them (#5540, mcp/invoke_gate.py).
 """
 
 import base64
@@ -39,7 +43,10 @@ from typing import Any, cast
 
 from common.text_guards import residue_fragments  # #4190 — shared, bundled (#781)
 
-from mcp import audit as mcp_audit
+from mcp import (
+    audit as mcp_audit,
+    invoke_gate,  # #5540 — privileged branches gated before they run
+)
 from mcp.config import __version__, logger
 from mcp.core import (
     SESSION_TOKEN_TTL_SECS,
@@ -1149,11 +1156,14 @@ def handle_remote_mcp(event, method):
 # ── Bridge transport (direct Lambda invoke via boto3) ─────────────────────────
 def handle_bridge_invoke(event):
     """Handle local bridge invocations (mcp_bridge.py via boto3 lambda.invoke)."""
+    # #5540: fail CLOSED — an unreadable key rejects every request (it used to skip the check),
+    # and the compare is constant-time.
     expected_key = get_api_key()
-    if expected_key:
-        provided_key = (event.get("headers") or {}).get("x-api-key", "")
-        if provided_key != expected_key:
-            return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"}), "headers": {"Content-Type": "application/json"}}
+    provided_key = (event.get("headers") or {}).get("x-api-key", "")
+    if not expected_key or not isinstance(provided_key, str) or not hmac.compare_digest(provided_key.encode(), expected_key.encode()):
+        if not expected_key:
+            logger.warning("[Bridge] Rejected: API key unavailable — failing closed (#5540)")
+        return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"}), "headers": {"Content-Type": "application/json"}}
 
     try:
         body = json.loads(event.get("body") or "{}")
@@ -1174,18 +1184,28 @@ def handle_bridge_invoke(event):
 
 # ── Lambda handler (entry point) ─────────────────────────────────────────────
 def lambda_handler(event, context):
-    # 0. #4084: the nightly pre-draft's own rule (constant input, no `source` key) on the warmer
-    if isinstance(event, dict) and event.get("job") == "nightly_predraft":
+    # 0. #5540: the privileged, no-request branches (two constant-input jobs + the scheduled
+    # warmer) are gated BEFORE any of them runs — warmer function only, and a scheduled event must
+    # name one of the MCP stack's schedules (mcp/invoke_gate.py). A refused invoke reaches no job.
+    kind = invoke_gate.privileged_kind(event)
+    if kind is not None:
+        reason = invoke_gate.refusal_reason(kind, event, context)
+        if reason is not None:
+            logger.warning("[lambda_handler] Rejected privileged invoke: %s; event=%s", reason, invoke_gate.describe(event))
+            _emit_auth_failure_metric()
+            return invoke_gate.refusal_response(reason)
+    # 0a. #4084: the nightly pre-draft's own schedule (constant input, no `source` key) on the warmer
+    if kind == "nightly_predraft":
         from mcp.nightly_predraft import lambda_entry
 
         return lambda_entry(event)
-    # 0b. #5072: the weekly panel-rubric grade of the committed plan (constant input; its rule is an owner CDK apply)
-    if isinstance(event, dict) and event.get("job") == "panel_weekly_grade":
+    # 0b. #5072: the weekly panel-rubric grade of the committed plan (constant input)
+    if kind == "panel_weekly_grade":
         from mcp.panel_weekly_grade import lambda_entry as panel_entry
 
         return panel_entry(event)
-    # 1. EventBridge scheduled rule — nightly cache warmer, no auth
-    if event.get("source") == "aws.events" or event.get("detail-type") == "Scheduled Event":
+    # 1. The warmer's own scheduled envelope — nightly cache warmer
+    if kind == invoke_gate.SCHEDULED:
         logger.info("[lambda_handler] EventBridge trigger — running nightly cache warmer")
         result = nightly_cache_warmer()
         return {"statusCode": 200, "body": json.dumps(result), "headers": {"Content-Type": "application/json"}}

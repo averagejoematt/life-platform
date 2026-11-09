@@ -74,6 +74,16 @@ def live_at_root(data: dict | None = None) -> bool:
     return data.get("live_at_root") is True
 
 
+#: The Coaching Room's committed publication switch (owner ruling 2026-11-09: CR1 launches ahead of CR2/CR3).
+ROOM_PUBLIC_VALUES = ("off", "cr1")
+
+
+def room_public(data: dict | None = None) -> str:
+    """`room_public`: "cr1" publishes CR1 on every build (www/src/lib/room.js reads the same bit); anything else is off."""
+    data = data if data is not None else load()
+    return "cr1" if data.get("room_public") == "cr1" else "off"
+
+
 def owned_relpaths(data: dict | None = None) -> list[str]:
     """Every exact site/-relative path the build owns (routes as `<dir>/index.html`, plus files)."""
     data = data if data is not None else load()

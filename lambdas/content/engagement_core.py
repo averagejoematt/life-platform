@@ -63,20 +63,35 @@ CHANNEL_STALE_DAYS = {k: v["stale_days"] for k, v in _CHANNELS.items()}
 PUBLIC_CHANNELS = _activity_publication.public_mapping(MANUAL_CHANNELS)
 PUBLIC_PROJECTION_KEY = "public"
 
+
 # ── Presence predicates (#914) ──────────────────────────────────────────────
 # Does a DDB record for this source count as Matthew actually LOGGING that day?
 # Default: any record. habitify's hourly pull writes a record EVERY day even at
 # total_completed=0, so a 14-day zero-completion stall read as gap_days=0 — its
 # predicate counts a day only when at least one habit was completed. Predicates
 # are pure item→bool; the registry facet names them, this dict resolves them.
+def _macrofactor_logged(item):
+    """#5519: a MacroFactor row is a food-log day only when it holds diary entries. A summary-only
+    stub (`entries_count` 0, no `food_log`) — the app's pre-filled scheduled item written from an
+    export, or an emptied #4638 record — reached every presence surface as a logged day. The ONE
+    stub predicate is `health.nutrition_logging.is_stub`; the projection below carries
+    `entries_count` only, so an unprojected `food_log` reads as empty, which is the stub rule.
+    A row without the field (legacy, pre-entries_count) is not judged and still counts."""
+    from health.nutrition_logging import is_stub  # noqa: PLC0415 — keeps this module's import graph lean
+
+    return not is_stub(item or {})
+
+
 PRESENCE_PREDICATES = {
     "habitify_completed": lambda item: _as_float((item or {}).get("total_completed")) > 0,
+    "macrofactor_logged": _macrofactor_logged,
 }
 
 # Extra DDB attributes a predicate needs (the caller's query projects sk only by
 # default — it must widen the projection for these sources).
 PRESENCE_PREDICATE_FIELDS = {
     "habitify_completed": ("total_completed",),
+    "macrofactor_logged": ("entries_count",),
 }
 
 
