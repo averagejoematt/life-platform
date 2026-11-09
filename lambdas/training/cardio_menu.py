@@ -38,7 +38,7 @@ from typing import Any
 
 from training import training_charter
 
-CARDIO_MENU_VERSION = "cardio-menu@1.0.0"
+CARDIO_MENU_VERSION = "cardio-menu@1.1.0"  # 1.1.0: #5505 counting (swaps at the logged effort, missed offers past the re-offer allowance)
 
 KINDS = ("incline_treadmill_walk", "easy", "tempo", "hills", "intervals")
 HARD = ("tempo", "hills", "intervals")
@@ -301,14 +301,28 @@ def _previous_words(previous: dict[str, Any] | None) -> str:
 
 
 # ── placement ─────────────────────────────────────────────────────────────────────────
-def kind_of_performed(machine_key: str, note: str | None, served_kind: str | None = None) -> str:
+_RPE_IN_NOTE = re.compile(r"\bRPE\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
+
+
+def logged_rpe(note: str | None) -> float | None:
+    """The highest RPE his own note logs ("RPE 7", "rpe 6.5"), or None when it logs none — an unlogged RPE is not evidence."""
+    vals = [float(m.group(1)) for m in _RPE_IN_NOTE.finditer(note or "")]
+    return max(vals) if vals else None
+
+
+def kind_of_performed(machine_key: str, note: str | None, served_kind: str | None = None, swap_kind: str | None = None) -> str:
     """The menu kind a performed block was, read from its machine, its own note and the routine it was served.
 
     His own note wins when it names a kind (intervals / hill / tempo / hard, or easy / steady). Otherwise the
     kind the served routine prescribed for that machine (`served_kind`, `annotate_served`) — #5076: he logs the
     menu's rides with an EMPTY note, so a performed tempo read from the note alone counted as easy, the week's
     conditioning never registered, and every draft re-placed "conditioning 1 of 2" tempo on the bike (the live
-    2026-10-21/22/23/24 drafts). With neither, the machine's easy kind."""
+    2026-10-21/22/23/24 drafts). With neither, the machine's easy kind.
+
+    `swap_kind` (#5505, owner ruling 2026-11-08): the HARD kind the same routine served on ANOTHER machine. It counts
+    when he did the block on this machine at the prescribed effort — his note logs an RPE at or above the kind's band
+    (`wire_band`); a swap with no logged effort stays the machine's easy kind (an incline walk instead of a bike tempo
+    is not the tempo)."""
     from training import cardio_note
 
     text = cardio_note.strip_negated(note)  # #5312: "No intervals" never names intervals
@@ -321,6 +335,10 @@ def kind_of_performed(machine_key: str, note: str | None, served_kind: str | Non
         return "tempo"
     if served_kind in KINDS and not _EASY_ONLY_WORD.search(text) and fits_machine(served_kind, machine_key):
         return str(served_kind)
+    rpe = logged_rpe(text)
+    band = wire_band(str(swap_kind)) if swap_kind in HARD else None
+    if band is not None and rpe is not None and rpe >= band[0]:
+        return str(swap_kind)
     if machine_key == TREADMILL:
         return "incline_treadmill_walk"
     return "easy"
@@ -411,7 +429,14 @@ def annotate_served(
             hid = str(s.get("hevy_routine_id") or "")
             kind = (served.get(hid) or {}).get(key or "")
             rx = ((levels or {}).get(hid) or {}).get(key or "")
-            extra = {**({"served_kind": kind} if kind else {}), **({"served_level": dict(rx)} if rx else {})}
+            # #5505: the routine served its one hard block on another machine — the swap candidate (kind_of_performed)
+            others = {k for m, k in (served.get(hid) or {}).items() if m != key and k in HARD}
+            swap = next(iter(others)) if not kind and len(others) == 1 else None
+            extra = {
+                **({"served_kind": kind} if kind else {}),
+                **({"served_swap_kind": swap} if swap else {}),
+                **({"served_level": dict(rx)} if rx else {}),
+            }
             rows.append({**s, **extra} if extra else s)
         out[tid] = rows
     return out
@@ -498,7 +523,8 @@ def choose_kind(
                 cand = "hills" if last_tempo_or_hills == "tempo" else "tempo"
             if cand == prior_day_kind:  # never the same hard shape on consecutive days
                 continue
-            kind, why = cand, f"conditioning {len(done) + 1} of {len(order)} this week"
+            # the slot's ordinal, not len(done) + 1: a dropped miss or a surplus hard block never prints "3 of 2" (#5505)
+            kind, why = cand, f"conditioning {len(order) - len(needed) + 1} of {len(order)} this week"
             break
         if kind is None:
             why = f"yesterday was {prior_day_kind}: never the same hard shape twice running"
@@ -612,12 +638,69 @@ def place_week(
     return out
 
 
+def reoffers_per_wk() -> int:
+    """How many missed hard blocks a week are re-offered before later misses are dropped (charter, #5505)."""
+    return int(placement().get("missed_reoffers_per_wk") or 0)
+
+
+def offered_hard(routines: list[Any] | None, week_start: str, target_date: str) -> list[tuple[str, str]]:
+    """(date, kind) of every HARD cardio block a routine PUSHED to Hevy offered on a day in [week_start, target_date),
+    oldest first. Per day the newest non-archived pushed version; a draft never pushed was never offered. Pure."""
+    from training import cardio_note
+
+    best: dict[str, Any] = {}
+    for ir in routines or []:
+        d = str(getattr(ir, "target_date", "") or "")[:10]
+        if not (week_start <= d < target_date) or not getattr(ir, "hevy_routine_id", None) or getattr(ir, "status", "") == "archived":
+            continue
+        if d not in best or int(getattr(ir, "version", 0) or 0) > int(getattr(best[d], "version", 0) or 0):
+            best[d] = ir
+    out: list[tuple[str, str]] = []
+    for d in sorted(best):
+        for ex in getattr(best[d], "exercises", None) or []:
+            if str(getattr(ex, "movement_key", "") or "") not in cardio_note.MACHINES:
+                continue
+            if str(getattr(ex, "rationale_tag", "") or "").startswith("fitness_test:"):
+                continue  # a test block is not a conditioning offer
+            tag = str(getattr(ex, "rationale_tag", "") or "").split(":")
+            kind = (
+                tag[3] if len(tag) >= 4 and tag[0] == "cardio" and tag[2] == "menu" else cardio_note.composed_kind(getattr(ex, "notes", ""))
+            )
+            if kind in HARD:
+                out.append((d, str(kind)))
+    return out
+
+
+def missed_offers(offered: list[tuple[str, str]], performed: list[tuple[str, str]]) -> list[str]:
+    """The kinds of the offered hard blocks with no hard block performed that day (one performed hard block meets one
+    offer), oldest first. Pure."""
+    done: dict[str, int] = {}
+    for d, k in performed:
+        if k in HARD:
+            done[d] = done.get(d, 0) + 1
+    out: list[str] = []
+    for d, k in offered:
+        if done.get(d, 0) > 0:
+            done[d] -= 1
+        else:
+            out.append(k)
+    return out
+
+
 def history_context(
-    cardio_index: dict[str, list[dict[str, Any]]] | None, catalog: dict[str, Any] | None, target_date: str
+    cardio_index: dict[str, list[dict[str, Any]]] | None,
+    catalog: dict[str, Any] | None,
+    target_date: str,
+    routines: list[Any] | None = None,
 ) -> dict[str, Any]:
     """What the placement reads from his performed cardio (`exercise_history.load_history_indexes()[1]`):
     every cardio machine's sessions, this week's kinds before today, yesterday's last kind and the last
-    tempo-or-hills. Pure over the index it is handed."""
+    tempo-or-hills. Pure over the index it is handed.
+
+    #5505 (owner ruling 2026-11-08): `counted_kinds` is what the week's conditioning count reads — the performed kinds
+    plus every MISSED offer beyond the charter's `missed_reoffers_per_wk` (a missed hard block is re-offered that many
+    times a week, every later miss is dropped). `routines` are this week's routine records; None = not read, so
+    `counted_kinds` is the performed kinds alone (the pre-#5505 count, never a guessed miss)."""
     from common.pacific_time import parse_day_key
 
     from training import cardio_note
@@ -631,9 +714,18 @@ def history_context(
         by_machine[key] = list((cardio_index or {}).get(tid) or [])
     before = cardio_note.week_kinds(by_machine, "0000-00-00", target_date)
     yday = cardio_note.week_kinds(by_machine, yesterday, target_date)
+    week = cardio_note.week_kinds(by_machine, week_start, target_date)
+    missed: list[str] = []
+    if routines is not None:
+        performed = cardio_note.week_rows(by_machine, week_start, target_date)
+        missed = missed_offers(offered_hard(routines, week_start, target_date), performed)
+    dropped = missed[reoffers_per_wk() :]
     return {
         "by_machine": by_machine,
-        "week_kinds": cardio_note.week_kinds(by_machine, week_start, target_date),
+        "week_kinds": week,
+        "missed_kinds": missed,
+        "dropped_kinds": dropped,
+        "counted_kinds": week + dropped,
         "prior_day_kind": yday[-1] if yday else None,
         "last_tempo_or_hills": next((k for k in reversed(before) if k in ("tempo", "hills")), None),
     }

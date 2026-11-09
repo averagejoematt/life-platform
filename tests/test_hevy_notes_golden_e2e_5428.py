@@ -60,7 +60,19 @@ def test_freshly_rendered_routines_lint_clean():
         # the linter read every kind and PREVIOUS (lane B writes it); nothing was skipped silently
         assert not [n for n in res.not_checked if n.startswith(("kinds", "L4 PREVIOUS"))], (name, res.not_checked)
         assert [e.kind for e in hevy_note_lint.from_wire(body, ir).exercises][-2:] == ["cardio", "mobility"]
-    assert offenders == {}, offenders
+    # #5428 re-grade #6 (2026-11-08): the offline 09-25 render reads NO history, so its barbell and machine compounds go out
+    # with no load on any row and the pick-load note asks him to find one — the 11-06 Romanian deadlift's class (4 of 4
+    # voices). That now fails L4 on exactly those lifts: the rule's positive control on the real generator path. With no
+    # basis for a start load the draft is not ready; the linter says so instead of shipping the open form.
+    no_load = "compound with no load on any working row asks him to 'find the load.' (§3.3)"
+    assert offenders == {
+        "09-25 v0.4 lower heavy": [
+            f"L4 [1] Squat (Barbell): a barbell {no_load}",
+            # #5694 (owner ruling 2026-11-08): Lower-heavy's hinge is the conventional deadlift, no longer the RDL
+            f"L4 [2] Deadlift (Barbell): a barbell {no_load}",
+            f"L4 [3] Leg Press (Machine): a machine {no_load}",
+        ]
+    }, offenders
 
 
 def _block_count(body: dict) -> int:

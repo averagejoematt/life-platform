@@ -149,8 +149,9 @@ class TestStateOfMatthewIsStratified:
 
         card = cc.score_strata({"coaches": COACHES, "hypotheses": []})
         section = som.gather_calibration_section(card)
-        assert set(section) == {"n", "confirmed", "refuted", "accuracy_pct", "brier", "brier_skill", "calibration", "label"}
-        assert section["label"] == "not_yet_skillful"
+        # Owner ruling 2026-11-09: the calibration-v1 verdict (`calibration` / `label`) is retired from the brief.
+        assert set(section) == {"n", "confirmed", "refuted", "accuracy_pct", "brier", "brier_skill"}
+        assert section["brier_skill"] == card["brier_skill"]
 
 
 class TestPooledCardInvariantAcrossShapes:

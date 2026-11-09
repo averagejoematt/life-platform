@@ -103,6 +103,7 @@ from mcp.tools_descriptions import (
     GET_SOURCES_DESCRIPTION,
     GET_TODOIST_SNAPSHOT_DESCRIPTION,
     GET_TRAINING_DESCRIPTION,
+    GET_TRAINING_INPUT,
     GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION,
     GET_WORKOUT_DETAIL_DESCRIPTION,
     GET_WORKOUTS_DESCRIPTION,
@@ -201,6 +202,7 @@ from mcp.tools_surfaces import (  # #4584: the two input schemas moved beside th
 from mcp.tools_todoist import PRIORITY_DESCRIPTION, close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
 from mcp.tools_training import tool_get_acwr_status, tool_get_training
 from mcp.tools_training_notes import tool_get_exercise_notes
+from mcp.tools_training_phase import MANAGE_TRAINING_PHASE_DESCRIPTION, MANAGE_TRAINING_PHASE_INPUT, tool_manage_training_phase  # #5575
 
 # Vacation fund tracker ($1/workout-mile since experiment start).
 
@@ -348,6 +350,14 @@ TOOLS = {
         "fn": tool_get_may_tracker,
         "schema": {"name": "get_may_tracker", "description": GET_MAY_TRACKER_DESCRIPTION, "inputSchema": GET_MAY_TRACKER_INPUT},
     },
+    "manage_training_phase": {  # #5575: the computed phase — status, the owner's veto and override
+        "fn": tool_manage_training_phase,
+        "schema": {
+            "name": "manage_training_phase",
+            "description": MANAGE_TRAINING_PHASE_DESCRIPTION,
+            "inputSchema": MANAGE_TRAINING_PHASE_INPUT,
+        },
+    },
     "get_predictions": {
         "fn": tool_get_predictions,
         "schema": {
@@ -463,21 +473,7 @@ TOOLS = {
         "schema": {
             "name": "get_training",
             "description": GET_TRAINING_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "view": {
-                        "type": "string",
-                        "description": "load (default), periodization, recommendation, or cardio_fitness (the Apple Watch's VO2 max arc + cardio signals).",
-                        "enum": ["load", "periodization", "recommendation", "cardio_fitness"],
-                    },
-                    "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
-                    "end_date": {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
-                    "date": {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
-                    "weeks": {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
-                },
-                "required": [],
-            },
+            "inputSchema": GET_TRAINING_INPUT,  # #5575: moved beside its description (pays for manage_training_phase)
         },
     },
     "get_daily_metrics": {

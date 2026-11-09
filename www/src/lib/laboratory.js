@@ -317,3 +317,17 @@ export function prose(s) {
 
 /** The status word of an experiment group. */
 export const GROUP_WORDS = { running: "Running", ready: "Ready to start", backlog: "In the backlog", done: "Finished" };
+
+/**
+ * Does this experiment earn a page of its own? (2026-11-09 readiness review: no empty shells.) A backlog entry that has
+ * never run is a library card — its name, claim, evidence and source sit in the index's backlog list, and a page would
+ * only repeat "not yet" four times. Running, ready and finished experiments, and anything with a served run, get one.
+ */
+export function experimentHasPage(x) {
+  return Boolean(x) && (x.group !== "backlog" || Boolean(x.run));
+}
+
+/** Does this test earn a page? A test retired before any check was recorded has nothing to show beyond its sentence. */
+export function testHasPage(t) {
+  return Boolean(t) && !(t.status === "archived" && !t.verdict && !(t.check_count > 0));
+}

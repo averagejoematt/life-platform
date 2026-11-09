@@ -254,6 +254,11 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
         (r"\bpain_lookback_weeks\"?\s*[:=]\s*{n}", r"\bpain\s+flag[^\n]{0,30}?\blast\s+{n}\s+weeks\b"),
         ("no pain flag in the last {n} weeks",),
     ),
+    # #5505: the week's re-offer allowance for a missed hard block (read only by cardio_menu.reoffers_per_wk)
+    "cardio_menu.placement.missed_reoffers_per_wk": (
+        (r"\bmissed_reoffers_per_wk\"?\s*[:=]\s*{n}", r"\bre-?offered\s+(?:at\s+most\s+)?{times}"),
+        ('"missed_reoffers_per_wk": {n}', "re-offered at most {times} a week"),
+    ),
     "cardio_menu.conditioning_sessions_per_wk": (
         (r"\bconditioning_sessions_per_wk\"?\s*[:=]\s*{n}", r"{n}\s+(?:hard\s+)?conditioning\s+sessions?", r"\bconditioning\s+{times}"),
         ("{n} conditioning sessions", "conditioning {times} a week"),

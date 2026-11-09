@@ -147,12 +147,14 @@ OLD_DRAFT_PROBLEMS = [
     "(what moves it?)",
     "L4 [5] Triceps Rope Pushdown: held at PREVIOUS 50 lb, which reached the top of 15 reps at RPE 8.5, with no reason (what moves it?)",
     "L4 [6] Farmers Walk: a carry with no adjust rule after set 1",
-    "L9 [7] Cycling: interval levels L10/L12: between is his steady level, one under the hard level",
+    # (lint 1.5.0, owner ruling 2026-11-08: hard = steady + 2, so line 1's L10/L12 no longer reads as a wrong pair — its
+    # warm-up level, talk words, bare-minute check and escape still fail, and its clock sets L12 beside its 2 min)
     "L9 [7] Cycling: interval clock names no level before and after the reps (warm-up, cool-down)",
     "L9 [7] Cycling: interval talk check at a bare minute; it lands as a hard rep ends",
     "L9 [7] Cycling: interval clock gives the easy minutes no talk words",
+    "L9 [7] Cycling: interval clock sets a level and the rep length side by side ('L12 2 min')",
     "L9 [7] Cycling: interval escape L12 → L14 is more than one level",
-    "L9 [7] Cycling: interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level",
+    "L9 [7] Cycling: interval escape is not full sentences → reps one level up, can't talk → reps one level down (over the easy level)",
 ]
 
 
@@ -214,8 +216,12 @@ ROUND_1_PROBLEMS = [
     "move it up.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the step on later sets)",
     "L4 [6] Farmers Walk: a carry with no adjust rule after set 1",
     "L4 [6] Farmers Walk: a carry with his last load on file (60 lb per hand) names no start",
+    # lint 1.5.0 (re-grade #6, owner ruling 2026-11-08): steady + 1 is now the wrong hard level, and `L12 2 min` sets two
+    # numbers side by side
+    "L9 [7] Cycling: interval levels L11/L12: the hard level is his steady level + 2 (owner ruling 2026-11-08)",
     "L9 [7] Cycling: interval clock gives the easy minutes no talk words",
-    "L9 [7] Cycling: interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level",
+    "L9 [7] Cycling: interval clock sets a level and the rep length side by side ('L12 2 min')",
+    "L9 [7] Cycling: interval escape is not full sentences → reps one level up, can't talk → reps one level down (over the easy level)",
 ]
 
 
@@ -271,7 +277,9 @@ ROUND_2_PROBLEMS = [
     "set 1 at RPE 8.5 or less → next plate.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the step on "
     "later sets)",
     "L4 [6] Farmers Walk: the carry's start load is in the note but not on its rows",
-    "L9 [7] Cycling: interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level",
+    "L9 [7] Cycling: interval levels L11/L12: the hard level is his steady level + 2 (owner ruling 2026-11-08)",
+    "L9 [7] Cycling: interval clock sets a level and the rep length side by side ('L12 2 min')",
+    "L9 [7] Cycling: interval escape is not full sentences → reps one level up, can't talk → reps one level down (over the easy level)",
 ]
 
 
@@ -289,7 +297,7 @@ def test_the_round_3_rendering_fails_the_round_4_rules(monkeypatch):
 # second step open under "Once per lift"
 ROUND_3_CHANGED = {
     "db_shoulder_press": (
-        "Under 40 lb: one step. Stack: next plate at any load. Once per lift.",
+        "Dumbbells under 40 lb or a machine: next step only. One load change per lift.",
         "Under 40 lb: +5 lb max. Stack: next plate. Once per lift.",
     ),
     "lateral_raise_machine": ("W at RPE 5 or less → one step, no more.", "W set at RPE 5 or less → next plate."),
@@ -316,7 +324,8 @@ SESSION = (
     "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\n"
     # re-grade #4: the press has one set, but the session's multi-set lifts still get the in-session rule, addressed to them
     "Other lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\n"
-    "Under 40 lb: one step. Stack: next plate at any load. Once per lift."
+    # re-grade #6 (2026-11-08): line 4 in plain words (was "Under 40 lb: one step. Stack: next plate at any load. Once per lift.")
+    "Dumbbells under 40 lb or a machine: next step only. One load change per lift."
 )
 NEW_NOTES = {
     "db_shoulder_press": SESSION
@@ -331,10 +340,12 @@ NEW_NOTES = {
         "RPE 8–9 · 60 lb per hand to start\nTall, ribs down, bells off your legs.\nSet 1 at RPE 7 or less: +10 lb per hand.\n"
         "Steps go in the yards box."
     ),
+    # owner ruling 2026-11-08 (re-grade #6): hard = steady + 2; the rep length before its level; the escape names the
+    # level the reps move to either way, never down to the steady L11
     "cycling": (
-        "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
-        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\n"
-        "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12."
+        "Recumbent · L11/L13 · hard RPE 8 (a few words)\n"
+        "⌚ ride clock: 2 min at L13 from min 6, 10, 14, 18, 22; else L11 (full sentences)\n"
+        "As rep 1 ends: full sentences → reps at L14; can't talk → reps at L12."
     ),
 }
 
