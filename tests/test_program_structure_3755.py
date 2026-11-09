@@ -30,7 +30,7 @@ What these tests hold:
      `training_context_registry` carries. Flipping ACTIVE back to False reds the pin.
   7. v0.3 IS THE GRID (#3753 approval): three full-body sessions on non-consecutive days,
      an optional fourth flagged `optional`, every anchor pattern reachable 2x/wk on the
-     required days, the trap-bar gate recorded once, loads that HOLD; the accessory check
+     required days, the retired trap-bar gate held to no second home (#5694), loads that HOLD; the accessory check
      now measures DRIFT (accessories added mid-block), because v0.3 fixes them per block.
 """
 
@@ -223,17 +223,18 @@ def test_every_anchor_pattern_is_reachable_twice_a_week_on_the_required_days():
     assert set(program_structure.CORE_ANCHORS) == {"bench", "row", "squat", "hinge"}
 
 
-def test_the_trap_bar_gate_and_the_load_hold_rule_have_one_home_each():
-    """The hinge is the trap bar until ≤ 275 lb; loads HOLD. Both numbers live in owner_redlines
-    and the program points at them rather than restating a different value."""
+def test_the_retired_trap_bar_gate_has_no_second_home_and_the_load_hold_rule_has_one():
+    """#5694 (owner ruling 2026-11-08) retired the trap-bar-until-a-bodyweight hinge rule: the program carries no gate weight
+    of its own (the charter's `gated_movements.conventional_deadlift` is open by owner ruling and its `gate_lb` is read only
+    as a phase boundary), and owner_redlines records the retirement instead of the number. Loads HOLD — one home."""
     from training import owner_redlines
+    from training.training_charter import charter_value
 
     hinge = program_structure.ANCHORS["hinge"]
-    assert hinge["conventional_pull_gate_lb"] == owner_redlines.REDLINES["load_anchoring"]["trap_bar_until_lb"] == 275
-    # #4080: the trap bar is the hinge's FIRST key, under the #4108 catalog's spelling — first,
-    # because `_resolve_movement` returns the first listed key the ceiling admits and the hinge
-    # family is exempt from skill_ceiling 2, so the tier-3 trap bar is what the generator serves.
-    assert "trap bar" in hinge["pattern"].lower() and hinge["catalog_keys"][0] == "deadlift_trap_bar"
+    assert "conventional_pull_gate_lb" not in hinge and "trap_bar_until_lb" not in owner_redlines.REDLINES["load_anchoring"]
+    assert charter_value("gated_movements.conventional_deadlift.status") == "open"
+    # #4080: the hinge's FIRST key is what `_resolve_movement` serves when no role pins it — the conventional bar since #5694
+    assert "conventional deadlift" in hinge["pattern"].lower() and hinge["catalog_keys"][0] == "deadlift_barbell"
     lifting = owner_redlines.REDLINES["lifting_sessions_per_wk"]
     assert lifting["load_rule"].startswith("hold")
     assert lifting["load_entry"]["then"] == "hold" and lifting["load_entry"]["max_pct_of_band_e1rm_until_week_8"] == 85

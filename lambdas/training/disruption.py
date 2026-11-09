@@ -403,15 +403,17 @@ def role_archetype(role: str) -> str:
     return str(tmpl["archetype"]) if tmpl else FALLBACK_ROLE_ARCHETYPE.get(role, "upper")
 
 
-def _pool_keys(pattern: str, intensity: str, pool: str) -> tuple[list[str], int | None]:
-    """(catalog keys in order, the skill ceiling override) for one slot."""
+def _pool_keys(pattern: str, intensity: str, pool: str, role: str | None = None) -> tuple[list[str], int | None]:
+    """(catalog keys in order, the skill ceiling override) for one slot. At the club a role's own pin wins (`anchor_keys`:
+    #5318's incline press, #5694's two hinges), so the short session pulls the same bar the full one does."""
     from training import program_conflicts, program_structure
 
     if pool == "gym_minimum":
         anchor = program_structure.ANCHORS.get(pattern)
         if anchor:
-            keys = list(anchor["catalog_keys"])
-            if intensity == "moderate":
+            pin = ((program_structure.SESSION_TEMPLATES.get(role or "") or {}).get("anchor_keys") or {}).get(pattern)
+            keys = list(pin or anchor["catalog_keys"])
+            if intensity == "moderate" and not pin:
                 keys = list(anchor.get("moderate_catalog_keys") or []) + keys
             ruling = program_conflicts.ANCHOR_SKILL_CEILING_RULING
             return keys, (int(ruling["effective_ceiling"]) if pattern in ruling["exempt_families"] else None)
@@ -470,7 +472,7 @@ def session(role: str, pool: str, movements: dict[str, Any], skill_ceiling: int 
     for pattern, intensity, kind in slots:
         if len(exposures) >= cap:
             break
-        keys, ceiling = _pool_keys(pattern, intensity, pool)
+        keys, ceiling = _pool_keys(pattern, intensity, pool, role)
         key, why = resolve(keys, movements, max(skill_ceiling, ceiling or 0), taken)
         if key is None:
             if kind == "anchor":
