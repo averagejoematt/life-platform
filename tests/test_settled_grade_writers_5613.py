@@ -64,6 +64,14 @@ OTHER_ROW_FAMILIES = {
         "OPEN-ONLY: the block retro's first grade of an open charter prediction, conditional on `#s = :open` — "
         "it cannot change a settled grade (asserted below)"
     ),
+    ("lambdas/coach/grade_corrections.py", "apply_baseline_correction"): (
+        "CONDITION-ONLY (owner ruling 2026-11-09, A): names `status` only in its condition; it SETs nothing but the "
+        "`baseline_corrections` overlay (tests/test_baseline_corrections_and_families.py asserts the grade is untouched)"
+    ),
+    ("lambdas/coach/repeat_family.py", "write_marker"): (
+        "CONDITION-ONLY (owner ruling 2026-11-09, B): names `status` only in its condition; it SETs nothing but the "
+        "`repeat_family` marker (tests/test_baseline_corrections_and_families.py asserts nothing else moves)"
+    ),
     ("scripts/regrade_tomorrow_calls_4618.py", "_write"): "RETIRED (#5613): pre-ledger run-once PREDICTION# correction; --apply refused",
     ("scripts/regrade_level_claims_3551.py", "apply"): "RETIRED (#5613): pre-ledger run-once PREDICTION# correction; --apply refused",
     ("scripts/regrade_count_claims_4541.py", "apply"): "RETIRED (#5613): pre-ledger run-once PREDICTION# correction; --apply refused",

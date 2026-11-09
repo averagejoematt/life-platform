@@ -354,6 +354,134 @@ def apply_correction(
     return e
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# THE "NOTHING CHANGES" VERDICT, RE-SCORED (owner ruling 2026-11-09, third, A — verbatim intent):
+# "Correct the historical 'nothing changes' baseline verdicts under the current direction rule. Use the original
+# frozen prediction, observation window and underlying evidence. Apply the current rule consistently to every affected
+# call, whether it benefits the coaches or the baseline. Preserve original verdicts; record each correction with
+# ruleset version, reason, timestamp. Do NOT rewrite the historical baseline as though the new verdict had been the
+# original verdict."
+#
+# So a baseline correction is an OVERLAY. ``apply_baseline_correction`` writes, in this order:
+#   1. the ledger row ``CORRECTION#BASELINE#{prediction_id}#{corrected_at}`` on the call's own partition (append-only,
+#      ``attribute_not_exists(sk)``) — the entry plus its evidence;
+#   2. ONE conditional ``list_append`` of the same entry to the row's ``baseline_corrections[]``.
+# The frozen ``baseline`` map, ``status`` / ``outcome*``, ``corrections[]`` and ``original_grade`` are never touched,
+# so the first verdict stays readable as the first verdict. Readers take ``coach_baseline.effective`` (the latest
+# entry's ``corrected_baseline``, else the frozen stamp). The coach's own grade is not this function's to change.
+# ══════════════════════════════════════════════════════════════════════════════
+
+BASELINE_PREFIX = "CORRECTION#BASELINE#"
+
+
+def baseline_correction_entry(
+    row: dict,
+    corrected_baseline: dict,
+    *,
+    reason: str,
+    ruleset_version: str,
+    corrected_at: str,
+    ruled_by: str,
+    ruling_ref: str,
+    cause: str,
+) -> dict:
+    """One baseline correction entry — the verdict as it stood (the effective one), the re-scored verdict, and why."""
+    from coach import coach_baseline
+
+    if not isinstance(corrected_baseline, dict) or corrected_baseline.get("rule") != coach_baseline.RULE_ID:
+        raise ValueError(f"a baseline correction carries a {coach_baseline.RULE_ID!r} stamp")
+    if not isinstance(corrected_baseline.get("right"), bool) and not corrected_baseline.get("unscorable"):
+        raise ValueError("a corrected baseline is right/wrong (a bool) or names why it is unscorable")
+    if not (reason and ruleset_version and ruled_by and ruling_ref and cause):
+        raise ValueError("a baseline correction names its reason, ruleset version, ruler, ruling and cause")
+    before = coach_baseline.effective(row)
+    if not isinstance(before, dict):
+        raise ValueError(f"{row.get('pk')} / {row.get('sk')} has no frozen 'nothing changes' verdict to correct")
+    if before.get("right") == corrected_baseline.get("right") and before.get("unscorable") == corrected_baseline.get("unscorable"):
+        raise ValueError(f"{row.get('pk')} / {row.get('sk')}: the re-scored verdict equals the one it would correct")
+    return {
+        "original_baseline": dict(before),
+        "corrected_baseline": dict(corrected_baseline),
+        "original_right": before.get("right"),
+        "corrected_right": corrected_baseline.get("right"),
+        "corrected_at": corrected_at,
+        "reason": reason,
+        "ruleset_version": str(ruleset_version),
+        "cause": cause,
+        "basis": RULING,
+        "ruled_by": ruled_by,
+        "ruling_ref": ruling_ref,
+        "verdict_changed": before.get("right") != corrected_baseline.get("right"),
+    }
+
+
+def baseline_correction_row(row: dict, e: dict, evidence: dict | None = None) -> dict:
+    """The ledger row for one baseline correction, on the prediction's own partition."""
+    pk, sk = str(row["pk"]), f"{BASELINE_PREFIX}{prediction_id(row)}#{e['corrected_at']}"
+    out = {
+        **experiment_stamp_for(pk, sk),
+        "pk": pk,
+        "sk": sk,
+        "kind": "baseline",
+        "prediction_id": prediction_id(row),
+        "prediction_sk": row.get("sk"),
+        "coach_id": row.get("coach_id") or "",
+        **e,
+    }
+    if evidence:
+        out["evidence"] = evidence
+    return out
+
+
+def apply_baseline_correction(
+    table: Any,
+    row: dict,
+    corrected_baseline: dict,
+    *,
+    reason: str,
+    ruleset_version: str,
+    ruled_by: str,
+    ruling_ref: str,
+    cause: str,
+    evidence: dict | None = None,
+    now: datetime | None = None,
+) -> dict:
+    """Record one re-scored "nothing changes" verdict as an overlay (see the block comment above). Conditional on the row
+    still carrying the frozen stamp, the grade and the number of earlier baseline corrections the plan read — a stale
+    plan or a second run writes nothing. Only an owner ruling may do this (``basis="ruling"``). Returns the entry."""
+    from coach import coach_baseline
+
+    if str(row.get("status") or "") not in ("confirmed", "refuted"):
+        raise ValueError(f"{row.get('pk')} / {row.get('sk')} is not graded right or wrong: no served verdict to correct")
+    at = now_iso(now)
+    e = baseline_correction_entry(
+        row,
+        corrected_baseline,
+        reason=reason,
+        ruleset_version=ruleset_version,
+        corrected_at=at,
+        ruled_by=ruled_by,
+        ruling_ref=ruling_ref,
+        cause=cause,
+    )
+    table.put_item(Item=floats_to_decimal(baseline_correction_row(row, e, evidence)), ConditionExpression="attribute_not_exists(sk)")
+    prior = len(coach_baseline.baseline_corrections(row))
+    attr = coach_baseline.CORRECTIONS_ATTR
+    table.update_item(
+        Key={"pk": row["pk"], "sk": row["sk"]},
+        UpdateExpression=f"SET {attr} = list_append(if_not_exists({attr}, :empty), :entry)",
+        ConditionExpression=(
+            f"attribute_exists(sk) AND #status = :st AND baseline = :frozen AND "
+            f"({'attribute_not_exists(' + attr + ')' if not prior else 'size(' + attr + ') = :n'})"
+        ),
+        ExpressionAttributeNames={"#status": "status"},
+        ExpressionAttributeValues=floats_to_decimal(
+            {":empty": [], ":entry": [e], ":st": row.get("status"), ":frozen": row.get("baseline"), **({":n": prior} if prior else {})}
+        ),
+    )
+    return e
+
+
 def classification_review_resolution_row(row: dict, review: dict, e: dict, *, ruled_by: str | None) -> dict:
     """The ``CLASSREVIEW#`` audit row an owner ruling writes when it resolves a classification review — the
     review it resolves, the verdict as it stood and the verdict the ruling sets, at the correction's instant."""

@@ -93,6 +93,15 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/coach/grade_corrections.py:apply_baseline_correction": (
+        "Owner ruling 2026-11-09 (third, A): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_A.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."
+    ),
+    "lambdas/coach/repeat_family.py:plan_family": (
+        "Owner ruling 2026-11-09 (third, B): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_B.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."
+    ),
+    "lambdas/coach/repeat_family.py:write_marker": (
+        "Owner ruling 2026-11-09 (third, B): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_B.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."
+    ),
     "lambdas/health/fulfillment_index.py:attach_resolution": (
         "The fulfillment index's PRIVATE method-1 resolution layer (journal-enrichment components). The owner ruling of 2026-11-03 "
         "took it off the public route (method 2) and kept the private calculation for authorized analysis; pinned by "

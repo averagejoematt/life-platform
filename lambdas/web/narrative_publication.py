@@ -279,7 +279,19 @@ def _prose_strings(value: Any, key: Any = None):
 # the evaluation spec, the grader's flags, the frozen stakes): deterministic text the engine also
 # prints elsewhere, never the coach's words — not tainted, or every copy of the method would go.
 TAINT_SKIP_KEYS = frozenset(
-    {"baseline", "evaluation", "quality_flags", "stakes", "sides", "verdict_correction", "grade_correction", "corrections", "pk", "sk"}
+    {
+        "baseline",
+        "baseline_corrections",
+        "evaluation",
+        "quality_flags",
+        "stakes",
+        "sides",
+        "verdict_correction",
+        "grade_correction",
+        "corrections",
+        "pk",
+        "sk",
+    }
 )
 
 

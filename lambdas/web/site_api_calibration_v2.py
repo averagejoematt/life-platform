@@ -70,7 +70,7 @@ def baseline_paired(decided) -> dict:
         if key is None:
             continue
         rec = out.setdefault(key, {"pairs": [], "unscorable": 0, "not_yet_scored": 0})
-        bl = row.get("baseline")
+        bl = coach_baseline.effective(row)  # owner ruling 2026-11-09 (A): a recorded re-score overlays the frozen stamp
         if not isinstance(bl, dict) or bl.get("rule") != coach_baseline.RULE_ID:
             rec["not_yet_scored"] += 1
         elif bl.get("right") is None:

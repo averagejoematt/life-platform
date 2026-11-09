@@ -509,7 +509,7 @@ def build_call(short_id: str, name: str, row: dict, record: dict, dark: list | N
         called_short = f"{name} called {plain} to go {direction}."
     sealed = bool(row.get("pre_registered"))
     logged = (pacific_date_of(row.get("pre_registered_at")) if sealed else None) or _iso_day(row.get("created_date"))
-    guess = simple_guess(row.get("baseline"), kind, coach_right=coach_right, metric=metric)
+    guess = simple_guess(coach_baseline.effective(row), kind, coach_right=coach_right, metric=metric)  # owner 2026-11-09 (A)
     return (
         {
             "id": cid,

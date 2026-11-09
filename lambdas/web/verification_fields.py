@@ -260,13 +260,14 @@ def _wilson(k: int, n: int) -> list | None:
 
 def _rule_right(row: dict) -> bool:
     """Was "nothing changes" right on this call? A call it could not be scored on counts as its miss (the owner's
-    headline: "they count as guess misses")."""
-    bl = (row or {}).get("baseline")
+    headline: "they count as guess misses"). Read through ``coach_baseline.effective``: a recorded re-score under the
+    current rule (owner ruling 2026-11-09, A) overlays the frozen stamp, which itself is never rewritten."""
+    bl = coach_baseline.effective(row or {})
     return isinstance(bl, dict) and bl.get("rule") == coach_baseline.RULE_ID and bl.get("right") is True
 
 
 def _rule_scored(row: dict) -> bool:
-    bl = (row or {}).get("baseline")
+    bl = coach_baseline.effective(row or {})
     return isinstance(bl, dict) and bl.get("rule") == coach_baseline.RULE_ID and isinstance(bl.get("right"), bool)
 
 
@@ -278,7 +279,7 @@ def stored_rule_versions(rows: list[dict]) -> dict | None:
     rule with a version (then a same-call comparison as stored cannot be guaranteed, and none is served)."""
     out: dict = {}
     for r in rows:
-        bl = (r or {}).get("baseline")
+        bl = coach_baseline.effective(r or {})
         if not isinstance(bl, dict) or bl.get("rule") != coach_baseline.RULE_ID or bl.get("version") is None:
             return None
         v = str(bl["version"]).split(".")[0] if isinstance(bl["version"], (int, float, Decimal)) else str(bl["version"])
@@ -286,10 +287,25 @@ def stored_rule_versions(rows: list[dict]) -> dict | None:
     return out
 
 
-def stored_rule_words(versions: dict) -> str:
+def corrected_rows(rows: list[dict]) -> list[dict]:
+    """The calls whose frozen "nothing changes" verdict carries a recorded re-score (owner ruling 2026-11-09, A)."""
+    return [r for r in rows if coach_baseline.baseline_corrections(r or {})]
+
+
+def stored_rule_words(versions: dict, corrected: list[dict] | None = None) -> str:
     vs = sorted(versions)
     which = f"version {vs[0]}" if len(vs) == 1 else "versions " + ", ".join(vs)
-    return f"Scored by the rule's {which}, as stored when each call was graded; earlier verdicts have not been restated."
+    if not corrected:
+        return f"Scored by the rule's {which}, as stored when each call was graded; earlier verdicts have not been restated."
+    n = len(corrected)
+    days = sorted({str(coach_baseline.baseline_corrections(r)[-1].get("corrected_at") or "")[:10] for r in corrected} - {""})
+    when = f" on {days[0]}" if len(days) == 1 else ""
+    calls = "call" if n == 1 else "calls"
+    return (
+        f"Scored by the rule's {which}, as stored when each call was graded, except {n} {calls} whose stored verdict was"
+        f" frozen under an earlier rule: those were re-scored under the current rule{when}, and the original verdicts are kept"
+        " on the record."
+    )
 
 
 def headline_sentence(n: int, k: int, rule_right: int | None, verdict: str | None) -> str:
@@ -348,7 +364,8 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
     base_text = f"A simple prediction that nothing would change got {rule} of the same {n} right ({_pct_whole(rule, n)}%)."
     if unscored:
         base_text += f" It could not be scored on {unscored} of them, which count as its misses."
-    base_text += f" {stored_rule_words(versions)}"
+    corrected = corrected_rows(rows)
+    base_text += f" {stored_rule_words(versions, corrected)}"
     out.update(
         {
             "baseline_pct_rounded": _pct_whole(rule, n),
@@ -357,7 +374,10 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
                 "rule": coach_baseline.RULE_ID,
                 # Coordinator 2026-11-09: the comparison is the verdicts AS STORED at grading time (never restated here),
                 # with the stored rule version(s) named; restating them waits on an owner decision.
-                "basis": "stored",
+                # Owner ruling 2026-11-09 (A): the stored verdicts, with any recorded re-score under the current rule
+                # overlaid ("stored" when there is none); the frozen stamps themselves are never rewritten.
+                "basis": "stored_with_corrections" if corrected else "stored",
+                "corrected": len(corrected),
                 "rule_versions": versions,
                 "current_rule_version": coach_baseline.RULE_VERSION,
                 "n": n,

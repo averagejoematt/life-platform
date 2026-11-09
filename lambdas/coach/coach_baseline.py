@@ -68,6 +68,11 @@ RULE_ID = "nothing_changes"
 RULE_VERSION = 1
 RULE_WORDS = "a guess that nothing changes"
 
+#: Owner ruling 2026-11-09 (third, A): a frozen verdict re-scored under the current rule is an OVERLAY — the row keeps
+#: ``baseline`` exactly as frozen, and ``baseline_corrections[]`` (written only by
+#: ``grade_corrections.apply_baseline_correction``) records each re-score with its reason, ruleset and instant.
+CORRECTIONS_ATTR = "baseline_corrections"
+
 #: Never a percentage — and never a "better" — on fewer than this many scored calls.
 MIN_N_FOR_RATE = 20
 #: The sign test's two-sided threshold for "did better".
@@ -320,6 +325,22 @@ def write_stamp(table, pk: str, sk: str, baseline: dict | None, *, only_if_absen
         return False
 
 
+# ── the effective verdict (frozen stamp + recorded corrections) ─────────────────────────
+
+
+def baseline_corrections(row: dict) -> list[dict]:
+    """The recorded re-scores of the frozen verdict, oldest first (a malformed entry is skipped)."""
+    raw = (row or {}).get(CORRECTIONS_ATTR)
+    return [e for e in raw or [] if isinstance(e, dict) and isinstance(e.get("corrected_baseline"), dict)] if isinstance(raw, list) else []
+
+
+def effective(row: dict) -> Any:
+    """The verdict every served comparison reads: the LATEST recorded correction's ``corrected_baseline``, else the
+    frozen ``baseline`` as stamped at grading. The frozen stamp itself is never rewritten (owner 2026-11-09, A)."""
+    corr = baseline_corrections(row)
+    return corr[-1]["corrected_baseline"] if corr else (row or {}).get("baseline")
+
+
 # ── the served comparison ────────────────────────────────────────────────────────────────
 
 
@@ -407,7 +428,7 @@ def comparison_block(decided: Iterable[dict]) -> dict:
         coach_right = coach_record.graded_status(row) == "confirmed"
         rec["graded"] += 1
         rec["coach_right"] += coach_right
-        bl = row.get("baseline")
+        bl = effective(row)
         if not isinstance(bl, dict) or bl.get("rule") != RULE_ID:
             rec["not_yet_scored"] += 1
             continue
