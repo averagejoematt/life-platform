@@ -65,6 +65,7 @@ _BEFORE_4770 = {
     "coach_narrative.quality_gate": _H45,
     "coach_narrative.state_update": _H45,
     "coach_narrative.lead_read": _H45,
+    "coach_narrative.public_brief": _H45,  # owner ruling 2026-11-09 (third, E): a NEW route for a new caller — no model moved
     "coach_narrative.moves_cast": _H45,
     "coach_narrative.moves_line": _S46,
     "coach_narrative.memoir": _S46,

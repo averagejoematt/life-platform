@@ -210,6 +210,11 @@ def _metric_sources(metric: Any) -> Optional[list]:
     return [str(src)]
 
 
+def metric_sources(metric: Any) -> Optional[list]:
+    """The sources a measured metric is read from, or None (the public name ``common.public_brief_policy`` derives from)."""
+    return _metric_sources(metric)
+
+
 def _spec_metrics(spec: Any) -> list:
     """Every ``metric`` a stored spec names, at any depth (a conditional's antecedent, a two-branch forecast's arms)."""
     out: list = []
@@ -356,6 +361,18 @@ def _reviewed(kind: str, filed_at: Any, pk: Any, key: Any) -> Optional[tuple]:
 #: separately filed call is not a bet side and is decided on its own.
 UNREVIEWED_BET = "unreviewed_bet"
 
+#: Owner ruling 2026-11-09 (third, E): a call filed by the public-safe coaching brief is graded like any other but stays
+#: out of every public list and number until the brief's switch (``common.public_brief_policy.PUBLICATION_LIVE``) is on.
+#: Once on, the brief's calls are decided by their structure like every other call filed after the registry.
+PUBLIC_BRIEF_SOURCE = "public_brief"
+PUBLIC_BRIEF_DARK = "public_brief_dark"
+
+
+def _public_brief_live() -> bool:
+    from common import public_brief_policy
+
+    return bool(public_brief_policy.PUBLICATION_LIVE)
+
 
 def classify_call(pk: Any, row: Mapping) -> tuple:
     """``(PUBLIC | PRIVATE, internal_reason)`` for one PREDICTION# row. Reasons are for logs and owner tooling only."""
@@ -365,6 +382,8 @@ def classify_call(pk: Any, row: Mapping) -> tuple:
         return decided
     if row.get("source") == "dispute_docket":
         return PRIVATE, UNREVIEWED_BET
+    if row.get("source") == PUBLIC_BRIEF_SOURCE and not _public_brief_live():
+        return PRIVATE, PUBLIC_BRIEF_DARK
     ev = _map(row.get("evaluation"))
     texts = (row.get("claim_natural"), row.get("prediction_id"), row.get("sk"))
     if str(_map(row.get("filing")).get("verdict") or "") != "gradeable":

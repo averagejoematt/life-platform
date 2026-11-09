@@ -751,6 +751,11 @@ def _dispatch_route(event, path, method):
     # stakes; open positions + resolved history (losses never buried).
     if path == "/api/coach_docket":
         return handle_coach_docket(event)
+    # Owner ruling 2026-11-09 (third, E): the public-safe coaching brief — 404 until its switch is on (dark).
+    if path == "/api/coach_brief":
+        from web.site_api_coach_brief import handle_coach_brief
+
+        return handle_coach_brief(event)
     if path == "/api/calls":
         return handle_calls(event)
     if path == "/api/coach_moves":
