@@ -149,6 +149,28 @@ def test_the_method_is_served_beside_every_count(walks):
         assert "journal" in method["note"] and "not counted" in method["note"], key
 
 
+def test_the_verification_fields_are_served_and_count_only_public_calls(walks):
+    """Owner 2026-11-09: the additive verification fields are on the wire (so the identity tests above cover them, not
+    vacuously): the public calls' pointers are counted, the private VERIFIED calls are not, and every count is the
+    same across the three variants (asserted for every body above)."""
+    out = walks["many"]
+    ledger = _body(out, "/api/ledger_export")
+    preds = _body(out, "/api/predictions")
+    calib = _body(out, "/api/calibration")
+    n = len(("sleep", "mind", "nutrition", "physical"))  # each public coach: one reproduced and one could-not-verify call
+    assert ledger["verification_summary"]["reproduced"] == n and ledger["verification_summary"]["could_not_verify"] == n
+    assert ledger["verification_summary"]["corrected"] == 0, "the private calls' 'corrected' pointers never count"
+    assert sum(ledger["verification_summary"].values()) == ledger["total"]
+    assert preds["verification_summary"] == ledger["verification_summary"]
+    verified = calib["platform"]["strata"]["coaches"]["verified"]
+    assert verified["n"] == n and verified["confirmed"] == n, verified
+    assert calib["platform"]["strata"]["hypotheses"]["verified"] is None
+    stratum = calib["platform"]["strata"]["coaches"]
+    assert stratum["n"] > 0 and stratum["accuracy_ci95"] is not None and stratum["accuracy_pct"] is not None
+    item = next(i for i in ledger["items"] if i.get("verification"))
+    assert set(item["verification"]) == {"outcome", "verified_at", "ruleset_version", "classification_validated"}
+
+
 # ── negative control ──────────────────────────────────────────────────────────────────────
 
 
@@ -171,3 +193,7 @@ def test_negative_control_the_ungated_policy_leaks(ungated):
     assert any(t in body for body in some["bodies"].values() for t in PRIVATE_MARKS)
     assert any(t in some["pages"] for t in PRIVATE_MARKS)
     assert _body(some, "/api/predictions")["overall"]["total"] > _body(ungated["none"], "/api/predictions")["overall"]["total"]
+    # Owner 2026-11-09: ungated, the private verified calls move the new counts too — the identity above is not vacuous.
+    assert _body(some, "/api/ledger_export")["verification_summary"] != _body(ungated["none"], "/api/ledger_export")["verification_summary"]
+    s_ver = _body(some, "/api/calibration")["platform"]["strata"]["coaches"]["verified"]
+    assert s_ver != _body(ungated["none"], "/api/calibration")["platform"]["strata"]["coaches"]["verified"]
