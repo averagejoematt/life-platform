@@ -138,3 +138,13 @@ WEB_LAB=1 npm run snapshot:live && WEB_LAB=1 npm run build        # dist/ now ho
 python3 ../tests/web_preview_gate.py --dist dist --base / --skip-control
 npm run snapshot:fixture && npm run build                          # back to a publishable, Lab-free dist
 ```
+
+## The Human Story — built dark (HS1)
+
+Owner brief 2026-11-08: "Proceed with the Human Story timeline and episode index using only already-approved published material. Held installments and audio remain excluded." The same dark pattern as the room, as a **separate** switch, **`WEB_STORY=1`** (`src/lib/story_dark.js`; Python twin `scripts/publish_snapshot_story.py::story_enabled`). Off — every CI build and every deploy — the build is **byte-identical** to a build without it.
+
+* **What it adds (switch on only):** `/story/timeline/` (every program week, its span, its installment when one is in the index, its days as links to the Day pages) and `/story/episodes/` (every installment in the index: week, date, title), both in `src/story/`; and "the story so far" on `/story/` (`components/StoryEntry.astro`, self-gating). The data file `story.json` is written by the producer only on a `WEB_STORY=1` export.
+* **What counts as approved and published — fail closed:** a public chapter object with `status: published` and the owner's `chronicle-approve` record, in a program week, that `/api/chapters` also serves as `published` with the same url and title; minus the owner's exclusions (the Week 2 installment and the unlisted `/journal/posts/week-02/`, the Week 8 and Week 9 drafts, the held drafts dated 16 May and 1 September). The prologue has no approval state on `/api/chapters`, so it is excluded. The file carries no audio, excerpt, body, week state or draft clock, and nothing about the journal, State of Mind or the video diary.
+* **Never deployed:** `postbuild.mjs` leaves `owned_paths.json` / `reach.json` as committed on a story build; `scripts/check_www_build.py`'s scan refuses a dist carrying a story page, `story.json` or the `data-story-dark` marker.
+* **The proofs (switch off):** `tests/story_dark.test.mjs` + `scripts/story_audit.mjs` (the six checks, each with its planted control), `tests/story.test.mjs` (the helpers), `tests/test_www_human_story_dark_hs1.py` (the producer, the approval rule, the deploy scan). The master proof is a recursive diff of `dist/` against a build of `main` from the same snapshot.
+* **A private look (local only — never a preview deploy, never `/next/v9/`):** as for the room, with `WEB_STORY=1` in place of `WEB_ROOM=1`, then `npm run snapshot:fixture && npm run build` to return to a publishable dist.

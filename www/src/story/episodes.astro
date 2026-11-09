@@ -1,0 +1,74 @@
+---
+// /story/episodes/ — the Human Story's episode index (HS1). BUILT DARK: this file lives outside src/pages/ and is injected
+// as a route ONLY when WEB_STORY=1 (src/lib/story_dark.js, astro.config.mjs). With the switch off it is not in the build.
+// Every chronicle installment the platform records as approved and published (scripts/publish_snapshot_story.py — fail
+// closed), with its week, its publication date in words and its title, linking to the existing chapter page. Text only:
+// no audio, no transcript, no excerpt.
+import Base from "../layouts/Base.astro";
+import { dayInWords } from "../lib/format.js";
+import { installmentRows } from "../lib/story.js";
+import { STORY_MARKER, storyEnabled } from "../lib/story_dark.js";
+import { loadStory } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+if (!storyEnabled()) throw new Error("src/story/episodes.astro rendered with WEB_STORY off — the story route must not be injected");
+
+const file = await loadStory();
+const ok = file.state === "ok";
+const rows = installmentRows(file);
+const asOf = file.as_of ? dayInWords(file.as_of) : null;
+const story = { [STORY_MARKER]: "episodes" };
+---
+
+<Base title="Every installment" top="story" description="Every published installment of the experiment's story, by week." status={asOf}>
+  <section class="section" {...story}>
+    <div class="wrap" style="max-width:900px">
+      <p class="label">Story · every installment · private build, not published</p>
+      <h1 style="margin-top:10px">Every installment</h1>
+      <p class="dek" style="margin-top:14px;max-width:720px">
+        The installments in the order they were written. Each was written by the platform's narrator from that week's data and published after
+        Matthew approved it.
+      </p>
+      <div class="row" style="margin-top:18px;gap:10px">
+        <a class="btn ghost sm" href={href("/story/timeline/")}>The timeline, week by week</a>
+        <a class="btn ghost sm" href={href("/story/")}>All chapters</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section hair" {...story}>
+    <div class="wrap" style="max-width:900px">
+      {
+        !ok ? (
+          <div class="empty">
+            <b style="color:var(--ink)">The week list was not served for this snapshot.</b>
+            <span>{file.absent_text || ""}</span>
+          </div>
+        ) : rows.length === 0 ? (
+          <div class="empty">
+            <span>No installment is in the index yet.</span>
+          </div>
+        ) : (
+          <nav class="rows" aria-label="Every installment">
+            {rows.map((r) => (
+              <a href={href(pathOf("chapter", r.id))}>
+                <span style="display:flex;gap:18px;align-items:baseline;min-width:0">
+                  <span class="mono cobalt" style="font-size:14px;white-space:nowrap">
+                    {String(r.week).padStart(2, "0")}
+                  </span>
+                  <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                    <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{r.title}</b>
+                    <span class="muted" style="font-size:14px">{r.weekLabel}</span>
+                  </span>
+                </span>
+                <span class="mono muted" style="font-size:12px;white-space:nowrap">
+                  {r.dateWords}
+                </span>
+              </a>
+            ))}
+          </nav>
+        )
+      }
+    </div>
+  </section>
+</Base>
