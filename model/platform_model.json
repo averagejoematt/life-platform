@@ -660,7 +660,19 @@
       "stack": "monitoring_stack",
       "via": "declaration"
     },
+    "mcp-auth-failures": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
     "mcp-server-duration-high": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
+    "mcp-throttles": {
       "kind": "metric",
       "routing": "digest",
       "stack": "mcp_stack",
@@ -1093,7 +1105,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 146,
+    "alarms": 148,
     "emf_namespaces": 34,
     "schedules": 96,
     "secrets": 30
@@ -4582,6 +4594,13 @@
       "direction": "write",
       "lambda": null,
       "module": "lambdas/training/variant_rotation.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/walking_volume.py",
       "partition": "training_constraints",
       "via": "pk"
     },
@@ -8231,9 +8250,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 146,
+      "alarms": 148,
       "alarms_by_routing": {
-        "digest": 101,
+        "digest": 103,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
@@ -8245,7 +8264,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 786,
+      "edges": 787,
       "lambdas": 107,
       "mcp_tool_modules": 40,
       "mcp_tools": 91,
@@ -8260,8 +8279,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 394,
-        "sites_resolved": 986,
-        "sites_total": 1380
+        "sites_resolved": 987,
+        "sites_total": 1381
       },
       "schedule_resolution": {
         "dynamic": 0,

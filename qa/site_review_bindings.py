@@ -649,6 +649,30 @@ PAGE_BINDINGS.append(
         "endpoints": [{"url": "/api/pulse_history", "role": "primary", "metrics": []}],
     }
 )
+# The Laboratory (L1, LAB_LIVE — owner GO 2026-11-09): /data/lab/ binds through the evidence-topic derivation above;
+# its protocols page sits one level deeper, so it binds here. A static build from the publication snapshot.
+PAGE_BINDINGS.append(
+    {
+        "path": "/data/lab/protocols/",
+        "name": "Data · the Laboratory's protocols (v9)",
+        "door": "data",
+        "narrative_order": 108,
+        "story_intent": "the supplement protocols: dose, timing, why, paused, and the evidence for and against each",
+        "endpoints": [{"url": "/api/supplements", "role": "primary", "metrics": []}],
+    }
+)
+# The Human Story (HS1, STORY_LIVE — owner GO 2026-11-09): the week-by-week timeline, a static build from the
+# publication snapshot's approved, published installments. Never /story/timeline/ (the kept v8 page, bound above).
+PAGE_BINDINGS.append(
+    {
+        "path": "/story/so-far/",
+        "name": "Story · the story so far, week by week (v9)",
+        "door": "story",
+        "narrative_order": 109,
+        "story_intent": "every program week with its days, and its installment where one was approved and published",
+        "endpoints": [{"url": "/api/chapters", "role": "primary", "metrics": []}],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/privacy/",

@@ -244,7 +244,7 @@ jobs:
           # Resolve into the same envs pip-audit scans, then report license per package.
           for req in requirements-dev.txt cdk/requirements.txt; do
             echo "::group::pip-licenses $req"
-            pip install -q -r "$req" || true
+            pip install -q -r "$req" || echo "::warning title=pip-licenses inventory incomplete (#5514)::pip install -r $req failed — the license report below omits whatever did not resolve"
             echo "::endgroup::"
           done
           pip-licenses --format=markdown --with-authors --order=license \

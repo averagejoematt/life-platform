@@ -1010,6 +1010,40 @@ def test_an_empty_cycle_marks_itself_the_same_way_every_other_fallback_does(tabl
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+# The digest fields a MODEL authors — where a fabricated figure would land and what
+# /api/coach_analysis and the Friday Panel serve. The #2419 check reads these and only
+# these: `json.dumps(stored)` also carries bookkeeping stamped from the REAL wall clock
+# (`provenance.stamped_at`, written by common.narrative_provenance, which this file's
+# frozen clock does not reach), and a microsecond run like ".013386" contains "133" —
+# that is exactly how CI run 42570628436 went red on a PR that never touched the digest.
+_MODEL_AUTHORED_FIELDS = ("coach_summaries", "active_disagreements", "unanimous_flags", "note")
+
+
+def _model_authored_text(stored):
+    """Every string (keys included) under the model-authored fields, newline-joined."""
+    out = []
+
+    def walk(value):
+        if isinstance(value, str):
+            out.append(value)
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                walk(str(k))
+                walk(v)
+        elif isinstance(value, (list, tuple)):
+            for v in value:
+                walk(v)
+        elif value is not None and not isinstance(value, bool):
+            out.append(str(value))
+
+    for field in _MODEL_AUTHORED_FIELDS:
+        walk(stored.get(field))
+    return "\n".join(out)
+
+
+_FABRICATED_TOPIC = "HRV sat at 133 all week — hold or push"
+
+
 def test_a_fabricated_number_in_the_disagreement_topic_holds_the_digest(table, monkeypatch):
     """The #2419 class end to end: the LLM writes a figure its inputs never
     contained into the disagreement topic — the field /api/coach_analysis serves
@@ -1022,7 +1056,7 @@ def test_a_fabricated_number_in_the_disagreement_topic_holds_the_digest(table, m
         monkeypatch,
         {
             "coach_summaries": [],
-            "active_disagreements": [disagreement(topic="HRV sat at 133 all week — hold or push")],
+            "active_disagreements": [disagreement(topic=_FABRICATED_TOPIC)],
             "unanimous_flags": [],
         },
     )
@@ -1030,7 +1064,7 @@ def test_a_fabricated_number_in_the_disagreement_topic_holds_the_digest(table, m
     stored = table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")]
     assert stored.get("_fallback") is True, "a gated-out digest must persist as the honest fallback, never the model text"
     assert stored.get("_grounding_hold") is True, "a grounding HOLD must be distinguishable from a budget/LLM-failure fallback"
-    assert "133" not in json.dumps(stored, default=str), "the fabricated number reached the stored digest (#2419)"
+    assert "133" not in _model_authored_text(stored), "the fabricated number reached the stored digest (#2419)"
     assert result.get("_grounding_hold") is True
     assert not any(pk == "ENSEMBLE#disagreements" for (pk, _sk) in table.store), "an ungrounded topic must not seed a disagreement row"
 
@@ -1042,7 +1076,7 @@ def test_one_corrective_regen_can_save_the_digest(table, monkeypatch):
     payloads = [
         {
             "coach_summaries": [],
-            "active_disagreements": [disagreement(topic="HRV sat at 133 all week — hold or push")],
+            "active_disagreements": [disagreement(topic=_FABRICATED_TOPIC)],
             "unanimous_flags": [],
         },
         {
@@ -1062,7 +1096,50 @@ def test_one_corrective_regen_can_save_the_digest(table, monkeypatch):
     assert result.get("_fallback") is None and result.get("_grounding_hold") is None
     stored = table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")]
     assert stored["active_disagreements"][0]["topic"] == "Protein timing"
-    assert "133" not in json.dumps(stored, default=str)
+    assert "133" not in _model_authored_text(stored)
+
+
+def _hold_scenario(table, monkeypatch):
+    _seed_one_coach(table)
+    _llm(
+        monkeypatch,
+        {"coach_summaries": [], "active_disagreements": [disagreement(topic=_FABRICATED_TOPIC)], "unanimous_flags": []},
+    )
+    monkeypatch.setattr(dispute_docket, "open_from_disagreements", lambda d, c: {"opened": [], "skipped": []})
+    ced.lambda_handler({"coach_ids": ["sleep_coach"]}, None)
+    return table.store[("ENSEMBLE#digest", f"CYCLE#{FROZEN_TODAY}")]
+
+
+def test_a_wall_clock_stamp_containing_133_cannot_trip_the_fabricated_number_check(table, monkeypatch):
+    """The CI-run-42570628436 flake, reproduced on purpose: pin the provenance clock to
+    the failing run's own stamp (06:05:54.013386). The digest is correct — HELD, the
+    fallback persisted — yet the old whole-row check sees "133" in the timestamp. The
+    field-scoped check does not."""
+    from common import narrative_provenance as NP
+
+    pinned = datetime(2026, 11, 9, 6, 5, 54, 13386, tzinfo=timezone.utc)
+
+    class _PinnedClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return pinned if tz else pinned.replace(tzinfo=None)
+
+    monkeypatch.setattr(NP, "datetime", _PinnedClock)
+    stored = _hold_scenario(table, monkeypatch)
+    assert stored.get("_grounding_hold") is True and stored.get("_fallback") is True
+    assert stored["provenance"]["stamped_at"] == "2026-11-09T06:05:54.013386+00:00"
+    assert "133" in json.dumps(stored, default=str), "the old whole-row substring check would have failed this correct digest"
+    assert "133" not in _model_authored_text(stored)
+
+
+def test_the_fabricated_number_check_still_fails_when_the_number_reaches_the_topic(table, monkeypatch):
+    """Negative control: disarm the grounding gate and the fabricated topic persists
+    verbatim — the field-scoped check must see it, or it guards nothing."""
+    monkeypatch.setattr(ced, "grounding_findings", lambda *a, **k: [])
+    stored = _hold_scenario(table, monkeypatch)
+    assert stored.get("_grounding_hold") is None, "the gate was meant to be disarmed for this control"
+    assert stored["active_disagreements"][0]["topic"] == _FABRICATED_TOPIC
+    assert "133" in _model_authored_text(stored), "the #2419 check is blind to a fabricated number in the topic"
 
 
 def test_a_grounded_digest_passes_without_a_second_model_call(table, monkeypatch):

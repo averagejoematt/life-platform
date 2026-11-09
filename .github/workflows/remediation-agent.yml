@@ -85,7 +85,7 @@ jobs:
           # Versions from requirements-dev.txt via ci_pins.py (#2760) —
           # claude-agent-sdk floated to latest with no Dependabot leg until then;
           # it is pinned there now and bumped weekly like every other CI tool.
-          PINS=$(python3 scripts/ci_pins.py boto3 botocore claude-agent-sdk pytest flake8)
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore claude-agent-sdk pytest pytest-timeout flake8)
           pip install --quiet $PINS
           # claude-code CLI: the version of record is remediation/package.json's
           # devDependency (#2759) — Dependabot's npm ecosystem bumps it and this
