@@ -68,7 +68,8 @@ def test_freshly_rendered_routines_lint_clean():
     assert offenders == {
         "09-25 v0.4 lower heavy": [
             f"L4 [1] Squat (Barbell): a barbell {no_load}",
-            f"L4 [2] Romanian Deadlift (Barbell): a barbell {no_load}",
+            # #5694 (owner ruling 2026-11-08): Lower-heavy's hinge is the conventional deadlift, no longer the RDL
+            f"L4 [2] Deadlift (Barbell): a barbell {no_load}",
             f"L4 [3] Leg Press (Machine): a machine {no_load}",
         ]
     }, offenders
