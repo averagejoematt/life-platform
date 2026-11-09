@@ -73,7 +73,7 @@ def metric_is_eligible(metric: Any) -> bool:
 
     if not isinstance(metric, str) or base_metric(metric) not in METRIC_SOURCES or metric != base_metric(metric):
         return False
-    srcs = metric_sources(metric)
+    srcs = metric_sources(metric) or []
     return bool(srcs) and all(AP.source_class(s) == NP.PUBLIC for s in srcs)
 
 

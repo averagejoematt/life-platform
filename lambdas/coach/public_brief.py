@@ -148,7 +148,7 @@ def observe(metrics: Iterable[str], cycle: str, readings: Callable) -> list:
     """One observation per metric with enough readings: means over the 7 days before the cycle, the 7 before that and
     the 28 before the cycle, each with its n, plus the latest reading. ``readings(metric, start, end)`` ->
     ``[(day, value)]`` or None (a read error: the metric is left out, never guessed)."""
-    out = []
+    out: list = []
     end = _day(cycle, -1)
     last_start, prior_start, prior_end, base_start = (
         _day(cycle, -LAST_DAYS),
@@ -708,7 +708,7 @@ def run_coach(
         return {"status": "held", "reason": "unparseable", **_cost(usages), "evidence_written": evidence_n}
     obs_metrics = [o["metric"] for o in obs]
     sections, dropped = check_draft(draft, obs, obs_metrics, [m for m in actions if m in obs_metrics], allowed, prior)
-    calls = []
+    calls: list = []
     for pred in sections["predictions"]:
         item_id = f"p{len(calls) + 1}"
         row = file_call(coach_id, cycle, item_id, pred, tolerance_for, provenance)
@@ -727,7 +727,7 @@ def run_coach(
         if not _put_new(table, brief):
             return {"status": "exists", "evidence_written": evidence_n}
         for n, change in enumerate(sections["position_changes"]):
-            _put_new(table, revision_row(coach_id, prior["brief_cycle"], cycle, change, provenance, n))
+            _put_new(table, revision_row(coach_id, (prior or {})["brief_cycle"], cycle, change, provenance, n))
     return {
         "status": "written" if persist else "dry_run",
         "sk": brief["sk"],

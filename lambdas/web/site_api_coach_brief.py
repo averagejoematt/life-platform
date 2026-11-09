@@ -61,7 +61,9 @@ def _owner_action(rec: dict, evidence: Optional[dict], cycle: str, today: str) -
 
 def serve(rows: list, get_call: Callable[[str, str], Optional[dict]], today: str) -> list:
     """The served briefs, newest first, from the gated rows of one coach's ``PUBLIC_BRIEF#`` range."""
-    briefs, evidence, revisions = {}, {}, {}
+    briefs: dict = {}
+    evidence: dict = {}
+    revisions: dict = {}
     for r in rows or []:
         sk = str((r or {}).get("sk") or "")
         if not sk.startswith(POL.BRIEF_SK_PREFIX) or _withheld(r):
