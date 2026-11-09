@@ -4455,3 +4455,28 @@ GUARD_PROOFS["guard::scripts/check_coach_verdict_agreement.py"] = {
     ),
     "proved_on": "2026-11-03",
 }
+
+# #5540: the MCP function's privileged (no-request) branches — the two constant-input jobs and the scheduled
+# cache warmer — run only on the warmer, and a scheduled event must name one of the MCP stack's schedules.
+GUARD_PROOFS["guard::mcp/invoke_gate.py"] = {
+    "gate_name": "mcp/invoke_gate.py",
+    "command": "python3 -m pytest tests/test_mcp_invoke_gate_5540.py -q -p no:cacheprovider   # baseline 9 passed",
+    "mutation": (
+        "Four plants, ONE AT A TIME (md5 a39ebf6acf761e31f4287dc88f0d3f68 before and after): M1 is_warmer returns True "
+        "for any function; M2 the scheduled-event `resources` check disarmed (`if False and kind == SCHEDULED ...`); M3 "
+        "the LifePlatformMcp- name-prefix check dropped (any stack's schedule accepted); M4 panel_weekly_grade dropped "
+        "from PRIVILEGED_JOBS. Plus the whole fix reverted (mcp/handler.py from origin/main) → 7 failed / 2 passed."
+    ),
+    "observed": (
+        "2026-11-08, branch issue-5540-mcp-auth-before-jobs: M1 → 1 failed / 8 passed "
+        "(test_no_privileged_payload_reaches_a_job_path_off_the_warmer); M2 → 1 failed / 8 passed "
+        "(test_scheduled_event_on_the_warmer_needs_a_known_schedule); M3 → 1 failed / 8 passed (same); M4 → 3 failed / "
+        "6 passed (the unauthenticated sweep, the live-payloads test, the handler job-set contract); RESTORED 9 passed."
+    ),
+    "scope": (
+        "In-process, through the real lambda_handler with a fake Lambda context. NOT a cryptographic boundary: a caller "
+        "holding lambda:InvokeFunction on the warmer can forge the envelope (IAM is the boundary). The job events carry "
+        "no `resources` yet, so they are gated on the function name only (the #5540 residual)."
+    ),
+    "proved_on": "2026-11-08",
+}
