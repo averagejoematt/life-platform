@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from typing import Optional, Union
 
-GRAMMAR_VERSION = "hevy-note-grammar@1.3.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4 (see each builder)
+GRAMMAR_VERSION = "hevy-note-grammar@1.4.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4; 1.4.0: the test-block grammar (see each builder)
 
 Rpe = Union[float, int, tuple[float, float], list[float]]
 
@@ -85,6 +85,20 @@ def low_energy_line(cardio_kinds: Optional[list[str]] = None) -> str:
 
 
 TEST_DAY = "Test"
+# #5428 (2026-11-08): a fitness-test block's note is §3.8's `Test · ‹protocol›` line, then the charter's protocol one
+# sentence per line. Its effort is the protocol's own (no effort grammar) and it is linted by its own grammar, never the lift's —
+# the 11-01 and 11-07 nightly predrafts logged 6 false L3/L6 problems on the dead-hang and pull-up test blocks.
+# The budget is platform-chosen to fit the longest charter protocol (the assisted pull-up: 6 phone lines); a longer
+# protocol is a lint problem to shorten in the charter, never a note cut.
+TEST_LINE1_RE = re.compile(r"^" + re.escape(TEST_DAY) + r" · \S.*$")
+TEST_MAX_LINES = 6
+
+
+def is_test_note(note: str) -> bool:
+    """True when a note's line 1 is a fitness-test block's (§3.8)."""
+    return bool(TEST_LINE1_RE.match((note or "").split("\n", 1)[0]))
+
+
 # R3's small-load safeguard: under this load a lift moves one step at most (two steps on a 15 lb raise is +67 %).
 SMALL_LOAD_LB = 40
 
