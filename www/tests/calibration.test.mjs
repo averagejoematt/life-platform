@@ -24,10 +24,20 @@ import {
   strataRows,
   versusGuess,
   voidedRows,
+  archiveRecord,
+  countedCalls,
+  signTestText,
+  verifiedLead,
+  whyChanged,
 } from "../src/lib/calibration.js";
 
-const FIXTURE = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "content", "fixtures", "calibration.json"), "utf8"));
+// SERVED = the committed fixture as the producer serves it today (with the verified block and verification_summary,
+// owner 2026-11-09); FIXTURE = the same file with both removed — the "nothing served yet" case the earlier tests pin.
+const SERVED = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "content", "fixtures", "calibration.json"), "utf8"));
 const clone = (o) => JSON.parse(JSON.stringify(o));
+const FIXTURE = clone(SERVED);
+delete FIXTURE.calibration.verification_summary;
+delete FIXTURE.calibration.platform.strata.coaches.verified;
 
 test("headline, no verified split served: as first graded, labelled unverified, interval said to be unpublished", () => {
   const h = recordHeadline(FIXTURE);
@@ -181,4 +191,74 @@ test("per-coach verification and assessment_v2: shown when served, absent otherw
   assert.equal(assessmentWords(null), null);
   assert.equal(assessmentWords({ sentence: "Served sentence." }), "Served sentence.");
   assert.equal(assessmentWords({ label: "insufficient_data" }), "insufficient evidence");
+});
+
+// ── the CR1 launch (owner ruling 2026-11-09): the producer's verified lead, why it changed, uncertainty, exclusions ──
+
+test("the lead is the producer's own sentence, carried verbatim; every figure beside it is carried (control: no sentence → no lead)", () => {
+  const lead = verifiedLead(SERVED.calibration);
+  assert.equal(lead.sentence, SERVED.calibration.platform.strata.coaches.verified.sentence);
+  assert.deepEqual([lead.k, lead.n, lead.pct, lead.ci], [34, 71, "47.9%", "95% interval 37.2–58.6%"]);
+  assert.deepEqual([lead.baseline.right, lead.baseline.n, lead.baseline.pct, lead.baseline.ci], [37, 71, "52.1%", "95% interval 40.7–63.4%"]);
+  const h = recordHeadline(SERVED);
+  assert.equal(h.h1, lead.sentence);
+  assert.equal(h.sentence, lead.sentence, "the /system/ entry repeats the producer's sentence, nothing composed");
+  // controls: no sentence served → no lead (the page keeps its labelled fallback); a baseline over other calls is refused
+  const f = clone(SERVED);
+  delete f.calibration.platform.strata.coaches.verified.sentence;
+  delete f.calibration.verification_summary.verified.sentence;
+  assert.equal(verifiedLead(f.calibration), null);
+  assert.equal(verifiedLead(FIXTURE.calibration), null);
+  const g = clone(SERVED);
+  g.calibration.platform.strata.coaches.verified.baseline.n = 214;
+  assert.equal(verifiedLead(g.calibration).baseline, null, "a baseline on a different set of calls never stands beside the lead");
+});
+
+test("never hard-coded: a different served verified block changes every figure on the lead (mutation control)", () => {
+  const f = clone(SERVED);
+  const v = f.calibration.platform.strata.coaches.verified;
+  Object.assign(v, { n: 75, confirmed: 38, accuracy_pct: 50.7, sentence: "Of 75 forecasts … 38 right (51%)." });
+  const lead = verifiedLead(f.calibration);
+  assert.deepEqual([lead.k, lead.n, lead.pct, lead.sentence], [38, 75, "50.7%", "Of 75 forecasts … 38 right (51%)."]);
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "room", "calibration.astro"), "utf8");
+  assert.doesNotMatch(src, /\b(38|75|51%|53%)\b/, "the page never writes the launch figures itself");
+});
+
+test("the sign test in plain words, carried (control: no sign test served → no sentence)", () => {
+  const t = signTestText(verifiedLead(SERVED.calibration));
+  assert.equal(t, "The coaches alone were right on 14 of these calls and the simple prediction alone on 17. On those calls an exact two-sided sign test gives p = 0.72: no detectable difference.");
+  const f = clone(SERVED);
+  delete f.calibration.platform.strata.coaches.verified.sign_test;
+  assert.equal(signTestText(verifiedLead(f.calibration)), null);
+});
+
+test("why the record changed: the producer's sentence beside the archived original grading; never framed as improvement", () => {
+  const w = whyChanged(SERVED.calibration);
+  assert.match(w.text, /not because the coaches improved/);
+  assert.deepEqual([w.archive.k, w.archive.n, w.archive.pct], [88, 214, "41.1%"]);
+  assert.deepEqual([archiveRecord(SERVED.calibration).ci], ["95% interval 34.7–47.8%"]);
+  assert.equal(whyChanged(FIXTURE.calibration), null, "the control: not served → nothing");
+  assert.deepEqual([recordHeadline(SERVED).archive.k, recordHeadline(SERVED).archive.n], [88, 214]);
+});
+
+test("the served accounting reconciles: rows add to the total and eligible = left out + counted (control: a broken sum is not shown)", () => {
+  const ex = excludedAccounting(SERVED.calibration);
+  assert.equal(ex.reconciles, true);
+  assert.equal(ex.rows.reduce((a, r) => a + r.n, 0), ex.total);
+  assert.equal(ex.eligible, ex.total + ex.counted);
+  assert.equal(ex.rows.length, 11);
+  assert.ok(ex.rows.every((r) => r.words === SERVED.calibration.verification_summary.excluded_by_category.find((x) => x.key === r.key).label), "the producer's label, never composed");
+  const broken = clone(SERVED);
+  broken.calibration.verification_summary.excluded_by_category[0].n += 1;
+  assert.equal(excludedAccounting(broken.calibration), null, "a sum that does not reconcile is withheld, not shown");
+  const priv = clone(SERVED);
+  priv.calibration.verification_summary.excluded_by_category.push({ key: "journal_calls", label: "x", n: 0 });
+  assert.equal(excludedAccounting(priv.calibration).rows.some((r) => r.key === "journal_calls"), false, "a private-named category never renders");
+});
+
+test("the counted calls: a Set from the producer's list; absent or malformed → null (nothing may stand in)", () => {
+  const s = countedCalls(SERVED.calibration);
+  assert.ok(s.has("nutrition-20261015-protein01") && !s.has("sleep-20261005-deepsleep01"));
+  assert.equal(countedCalls(FIXTURE.calibration), null);
+  assert.equal(countedCalls({ verification_summary: { counted_calls: [1, 2] } }), null);
 });

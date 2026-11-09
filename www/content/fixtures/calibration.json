@@ -211,7 +211,7 @@
         {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.8, "n": 384, "observed_rate": 0.88}
       ],
       "strata": {
-        "coaches": {"base_rate": 0.411, "brier": 0.2487, "brier_skill": -0.0264, "calibration": "not_yet_skillful", "confirmed": 88, "n": 214, "skilled": false},
+        "coaches": {"base_rate": 0.411, "brier": 0.2487, "brier_skill": -0.0264, "calibration": "not_yet_skillful", "confirmed": 88, "n": 214, "skilled": false, "verified": {"accuracy_ci95": [37.2, 58.6], "accuracy_pct": 47.9, "baseline": {"n": 71, "right": 37, "right_ci95": [40.7, 63.4], "right_pct": 52.1, "text": "A prediction that nothing would change got 37 of the same 71 right.", "unscorable": 2}, "baseline_pct_rounded": 52, "comparison": {"n": 71, "records": {"direction": {"coach_right_on_scored": 36, "rule_right": 33, "scored": 118, "verdict": "no_clear_difference"}, "number": {"coach_right_on_scored": 35, "rule_right": 37, "scored": 61, "verdict": "no_clear_difference"}, "sealed": {"coach_right_on_scored": 8, "rule_right": 1, "scored": 13, "verdict": "too_few"}, "yes_no": {"coach_right_on_scored": 3, "rule_right": 2, "scored": 6, "verdict": "too_few"}}}, "confirmed": 34, "n": 71, "pct_rounded": 48, "sentence": "Of 71 forecasts that could be checked under the current rules, the coaches got 34 right (48%). A simple prediction that nothing would change got 37 right (52%). The coaches have not demonstrated an advantage over that baseline.", "sign_test": {"coach_only": 14, "k": 14, "n": 31, "p": 0.7201, "rule_only": 17, "verdict": "no_clear_difference"}, "skill": {"n": 71, "sentence": "Against a prediction that nothing changes, on the same 71 calls: no detectable difference."}}},
         "hypotheses": {"base_rate": null, "brier": null, "brier_skill": null, "calibration": "insufficient_data", "confirmed": 0, "n": 0, "skilled": null},
         "interval_forecasts": {"base_rate": 0.881, "brier": 0.1114, "brier_skill": -0.0627, "calibration": "not_yet_skillful", "confirmed": 326, "n": 370, "skilled": false},
         "weekly_prescriptions": {"base_rate": 0.875, "brier": 0.115, "brier_skill": -0.0514, "calibration": "not_yet_skillful", "confirmed": 7, "n": 8, "skilled": false}
@@ -225,6 +225,28 @@
       "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256"
     },
     "under_review": 1,
+    "verification_summary": {
+      "archive": {"accuracy_ci95": [34.7, 47.8], "accuracy_pct": 41.1, "confirmed": 88, "label": "as first graded, before eligibility and verification were corrected", "n": 214},
+      "counted_calls": ["nutrition-20261015-protein01", "physical-20261015-weight01", "physical-20261016-weight02", "sealed-20260906-genesis01"],
+      "eligible_total": 214,
+      "excluded_by_category": [
+        {"key": "not_a_forecast", "label": "Not a forecast: the outcome was already on the record when the call was made", "n": 17},
+        {"key": "past_period", "label": "About a past period whose data arrived later", "n": 9},
+        {"key": "opinion", "label": "Opinion, explanation or hedge: not a measurable forecast", "n": 33},
+        {"key": "different_claim", "label": "The stored test checks a different claim from the words", "n": 9},
+        {"key": "stand_in_measure", "label": "Graded on a stand-in measure that cannot show the claim", "n": 8},
+        {"key": "either_outcome", "label": "Either outcome satisfies the words", "n": 1},
+        {"key": "condition_not_measured", "label": "Depends on a condition that was never measured", "n": 23},
+        {"key": "condition_never_happened", "label": "Its condition never happened, so it was never tested", "n": 13},
+        {"key": "docket", "label": "Head-to-head bets settled by their own rule", "n": 7},
+        {"key": "could_not_verify", "label": "Could not be verified under the current rules", "n": 8},
+        {"key": "repeat", "label": "The same forecast repeated: counted once", "n": 15}
+      ],
+      "excluded_total": 143,
+      "outcomes": {"corrected": 31, "could_not_verify": 23, "none": 0, "reproduced": 160},
+      "verified": {"accuracy_ci95": [37.2, 58.6], "accuracy_pct": 47.9, "baseline": {"n": 71, "right": 37, "right_ci95": [40.7, 63.4], "right_pct": 52.1, "text": "A prediction that nothing would change got 37 of the same 71 right.", "unscorable": 2}, "baseline_pct_rounded": 52, "comparison": {"n": 71, "records": {"direction": {"coach_right_on_scored": 36, "rule_right": 33, "scored": 118, "verdict": "no_clear_difference"}, "number": {"coach_right_on_scored": 35, "rule_right": 37, "scored": 61, "verdict": "no_clear_difference"}, "sealed": {"coach_right_on_scored": 8, "rule_right": 1, "scored": 13, "verdict": "too_few"}, "yes_no": {"coach_right_on_scored": 3, "rule_right": 2, "scored": 6, "verdict": "too_few"}}}, "confirmed": 34, "n": 71, "pct_rounded": 48, "sentence": "Of 71 forecasts that could be checked under the current rules, the coaches got 34 right (48%). A simple prediction that nothing would change got 37 right (52%). The coaches have not demonstrated an advantage over that baseline.", "sign_test": {"coach_only": 14, "k": 14, "n": 31, "p": 0.7201, "rule_only": 17, "verdict": "no_clear_difference"}, "skill": {"n": 71, "sentence": "Against a prediction that nothing changes, on the same 71 calls: no detectable difference."}},
+      "why_changed": "The count changed because the rules for which calls are eligible and how a grade is verified were corrected, not because the coaches improved. Calls that were not forecasts, could not be checked as written, depended on a condition that never happened or repeated an earlier call are now listed separately with the reason, and every remaining grade was re-run under the current rules."
+    },
     "voided": {"by_reset": {"2026-07-13": 1287, "2026-08-03": 143, "2026-09-06": 23}, "hypotheses": 57, "n": 1453, "predictions": 1396},
     "weekly_prescriptions": null
   },

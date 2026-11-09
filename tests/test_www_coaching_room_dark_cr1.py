@@ -20,9 +20,17 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 
 import check_www_build  # noqa: E402
 import publish_snapshot  # noqa: E402
+import publish_snapshot_calibration  # noqa: E402
 from publish_snapshot_calibration import ABSENT_CALIBRATION, resolve_and_validate, room_enabled, shape  # noqa: E402
 
 FIXTURES = os.path.join(REPO, "www", "content", "fixtures")
+
+
+@pytest.fixture(autouse=True)
+def _committed_switch_off(monkeypatch):
+    """These proofs are about the PRIVATE switch (WEB_ROOM): the committed `room_public` is pinned off, so they hold the
+    same before and after the CR1 launch merge (tests/test_www_coaching_room_cr1_public.py pins it on)."""
+    monkeypatch.setattr(publish_snapshot_calibration, "committed_room_public", lambda path=None: "off")
 
 
 def _export(tmp_path, name, env_on: bool, monkeypatch):
@@ -102,13 +110,13 @@ def _dist(tmp_path, html: str = "<!doctype html><p>ok</p>"):
 def test_the_deploy_scan_refuses_room_output_and_passes_a_clean_dist(tmp_path):
     assert check_www_build.room_paths()[0] == "/system/calibration/"  # read off www/src/lib/room.js (CR2 adds the per-coach record)
     clean = _dist(tmp_path)
-    assert check_www_build.room_leaks(str(clean)) == []
+    assert check_www_build.room_leaks(str(clean), published="off") == []
     # the controls: a room page, the data file, the marker — each must red the scan the deploy runs
     (clean / "system" / "calibration").mkdir(parents=True)
     (clean / "system" / "calibration" / "index.html").write_text("<p>room</p>")
     (clean / "calibration.json").write_text("{}")
     (clean / "system" / "index.html").write_text('<section data-room="entry"></section>')
-    leaks = check_www_build.room_leaks(str(clean))
+    leaks = check_www_build.room_leaks(str(clean), published="off")
     assert any("a Coaching Room page" in x for x in leaks)
     assert any("data file" in x for x in leaks)
     assert any("marker" in x for x in leaks)
