@@ -192,5 +192,7 @@ test("live dist: the Lab is built, owned, mapped and public — no private banne
   assert.ok(owned.routes.includes(LAB_ROOT) && owned.static_routes.includes(LAB_ROOT), "owned_paths.json owns /data/lab/");
   const html = readFileSync(join(DIST, LAB_ROOT, "index.html"), "utf8");
   assert.ok(!html.includes("private build"), "no private banner on a live page");
-  assert.ok(!html.includes('content="noindex, nofollow"'), "no private-build robots tag (the preview base's own noindex is the base's, not the Lab's)");
+  // no robots tag of the Lab's own: exactly as many as an ordinary page of the same build (the preview base stamps one)
+  const robots = (h) => (h.match(/<meta name="robots"/g) || []).length;
+  assert.equal(robots(html), robots(readFileSync(join(DIST, "data", "index.html"), "utf8")), "no private-build robots tag on a live Lab page");
 });
