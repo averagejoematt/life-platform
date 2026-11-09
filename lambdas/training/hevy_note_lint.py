@@ -36,7 +36,9 @@ from training import hevy_note_grammar as g
 
 logger = logging.getLogger(__name__)
 
-LINT_VERSION = "hevy-note-lint@1.4.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes; 1.4.0: test blocks (see each rule's comment)
+LINT_VERSION = "hevy-note-lint@1.5.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes; 1.4.0: test blocks;
+# 1.5.0: the 2026-11-08 re-grade #6 classes (a pick-load compound with no load, a W step on a capped lift, the one layoff
+# line, intervals at steady + 2 with a two-way one-level escape) — see each rule's comment
 MODE_ENV = "HEVY_NOTE_LINT_MODE"
 MODES = ("off", "warn", "enforce")
 DEFAULT_MODE = "warn"
@@ -48,13 +50,15 @@ RULES = {
     "over a 2+ set exercise 1)",
     "L4": "text agrees with the rows and PREVIOUS (set count, W reps, a reason for a move past one step or a held top-of-range, "
     "New only with no PREVIOUS, find-the-load only over unloaded rows, a held-top reason that is the load rule's step, a carry's "
-    "start load (on its rows) and adjust rule, a feeler W line's result rule)",
+    "start load (on its rows) and adjust rule, a feeler W line's result rule; a barbell or machine compound never asks him to "
+    "find the load over unloaded rows; a capped lift's one layoff line, and no W step line beside it)",
     "L5": "loadable steps; W rows ascend below the work",
     "L6": "one effort expression on a lift's line 1; exercise 1 does not repeat the session line's",
     "L7": "phone-line budgets (an interval ride's note 7 with its escape line; a fitness-test block's 6)",
     "L8": "safety facts present (family cue, cardio effort leads, no HR lead target)",
-    "L9": "clock lines: minutes, at most 3 levels, interval start minutes; intervals: easy = hard − 1 on every other minute "
-    "with its talk words, an escape checked as rep 1 ends (full sentences one level up; can't talk shorter reps at the hard level)",
+    "L9": "clock lines: minutes, at most 3 levels on the ride (the escape swaps the hard level, it adds none), interval start "
+    "minutes; intervals: easy = hard − 2 on every other minute with its talk words, an escape checked as rep 1 ends (full "
+    "sentences the reps one level up; can't talk the reps one level down, still over the easy level)",
     "L10": "an After line exactly when a Hevy block follows the cardio",
     "L11": "per hand on dumbbell and carry loads only; no pins on a dumbbell; no 'later sets' on a one-set lift; a carry row "
     "is whole steps and its note names no metres; no speed off the treadmill",
@@ -353,6 +357,23 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
     if ex.kind != "carry" and any(r[1] is not None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
         # #5428 re-grade #2: "find the load" over rows that carry the start load reads as "ignore the rows"
         out.append(Problem("L4", where, f"the W line says {g.PICK_LOAD_OPEN_TAIL!r} but the working rows carry a load"))
+    if ex.kind in ("barbell", "machine") and ex.compound and work and all(r[1] is None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
+        # #5428 re-grade #6 (2026-11-08, 4 of 4 voices): the 11-06 Romanian deadlift asked him to "find the load" at RPE 8–9
+        # after heavy squats, with no load on any row. A barbell or machine compound carries the engine's start load
+        # (§3.3); with no basis for one, the draft is not ready — this fails it rather than shipping the open form
+        out.append(
+            Problem("L4", where, f"a {ex.kind} compound with no load on any working row asks him to {g.PICK_LOAD_OPEN_TAIL!r} (§3.3)")
+        )
+    layoff = [ln for ln in lines[1:] if ln.startswith(g.LAYOFF_HEAD)]
+    for ln in layoff:
+        if not g.LAYOFF_RE.match(ln):
+            # re-grade #6: one layoff grammar — the gap (or `back after a break`), never a set count or a bare ordinal
+            out.append(Problem("L4", where, f"the layoff line is not the standard's `Same load all sets: ‹gap›.`: {ln!r}"))
+    capped = layoff or [ln for ln in lines[1:] if g.RETIRED_LAYOFF_RE.match(ln)]  # the retired wording caps the lift too
+    if capped and any(g.PICK_LOAD_RESULT_RE.match(ln) for ln in lines):
+        # re-grade #6 (4 of 4 voices): `No jumps: 3 sets today, 18 months off.` then `W at RPE 5 or less → one step` —
+        # one line said hold, the next said add. The capped exposure holds its load.
+        out.append(Problem("L4", where, "a capped lift (same load all sets) carries the W step line: it holds its load"))
     w_line = next((ln for ln in body.split("\n") if ln.startswith(("W set", "W at "))), None)
     if w_line and any(r[1] is not None for r in work) and not g.PICK_LOAD_RESULT_RE.match(w_line):
         # #5428 re-grade #4: "test the load." — a test with no result rule has nothing to act on
@@ -435,11 +456,18 @@ def _lint_set_words(ex: LintExercise, note: str, where: str, out: list[Problem])
 
 def _lint_intervals(m: "re.Match[str]", lines: list[str], clock: list[str], where: str, out: list[Problem]) -> None:
     """L9 on an interval ride (#5428 re-grade #2, standard §3.7): line 1's `La/Lb` is his steady level and the hard level
-    one over it; the clock names the easy level before, between and after the reps; the escape is one level, checked as
-    rep 1 ends, never at a bare minute (that minute is also where the easy minutes start)."""
+    `INTERVAL_HARD_STEP` over it (owner ruling 2026-11-08: two; was one); the clock names the easy level before, between
+    and after the reps; the escape is checked as rep 1 ends, never at a bare minute (that minute is also where the easy
+    minutes start), and moves the reps one level either way — never down to the easy level."""
     pair = re.fullmatch(r"L(\d+)/L(\d+)", m["levels"].strip())
-    if pair and int(pair.group(2)) - int(pair.group(1)) != 1:
-        out.append(Problem("L9", where, f"interval levels {m['levels'].strip()}: between is his steady level, one under the hard level"))
+    if pair and int(pair.group(2)) - int(pair.group(1)) != g.INTERVAL_HARD_STEP:
+        out.append(
+            Problem(
+                "L9",
+                where,
+                f"interval levels {m['levels'].strip()}: the hard level is his steady level + {g.INTERVAL_HARD_STEP} (owner ruling 2026-11-08)",
+            )
+        )
     for c in clock:
         if " between" in c and "before" not in c:
             out.append(Problem("L9", where, "interval clock names no level before and after the reps (warm-up, cool-down)"))
@@ -448,18 +476,30 @@ def _lint_intervals(m: "re.Match[str]", lines: list[str], clock: list[str], wher
         # #5428 re-grade #3: the warm-up, recoveries and cool-down carry their talk words
         if not re.search(rf"L\d+ \(({'|'.join(g.TALK_WORDS)})\)", c):
             out.append(Problem("L9", where, "interval clock gives the easy minutes no talk words"))
+        if re.search(r"\bL\d+ \d+ min\b", c):
+            # re-grade #6: `L12 2 min at min 6` read as one number pair; the rep length comes first, then its level
+            out.append(Problem("L9", where, "interval clock sets a level and the rep length side by side ('L12 2 min')"))
+    easy = int(pair.group(1)) if pair else None
     hard = int(pair.group(2)) if pair else None
     for ln in lines[1:]:
-        for esc in re.findall(r"→ L(\d+)", ln):
+        for esc in re.findall(r"→ (?:reps at )?L(\d+)", ln):
             if hard is not None and abs(int(esc) - hard) > g.INTERVAL_ESCAPE_STEP:
                 out.append(Problem("L9", where, f"interval escape L{hard} → L{esc} is more than one level"))
     if hard is not None and not any(
-        (mm := g.INTERVAL_ESCAPE_RE.match(ln)) and int(mm["up"]) == hard + 1 and int(mm["hard"]) == hard for ln in lines
+        (mm := g.INTERVAL_ESCAPE_RE.match(ln))
+        and int(mm["up"]) == hard + g.INTERVAL_ESCAPE_STEP
+        and int(mm["down"]) == hard - g.INTERVAL_ESCAPE_STEP
+        and int(mm["down"]) > int(easy or 0)
+        for ln in lines
     ):
-        # #5428 re-grade #4: up one level on full sentences; on "can't talk" shorter reps at the SAME level, never the
-        # recovery level (`none → L11` cancelled the intervals) — the standard's talk words, checked as rep 1 ends
+        # #5428 re-grade #4: never the recovery level on "can't talk" (`none → L11` cancelled the intervals). Re-grade #6:
+        # each branch names the level the reps move to (`can't talk → 1 min at L12` could not be parsed mid-rep)
         out.append(
-            Problem("L9", where, "interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level")
+            Problem(
+                "L9",
+                where,
+                "interval escape is not full sentences → reps one level up, can't talk → reps one level down (over the easy level)",
+            )
         )
 
 
@@ -497,11 +537,12 @@ def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> N
                 continue
             out.append(Problem("L9", where, f"clock number {mt.group(1)} has no 'min' unit"))
             break
-        escape = " ".join(ln for ln in lines if g.INTERVAL_ESCAPE_RE.match(ln))
-        levels = _levels(lines[0], c + " " + escape)
+        # re-grade #6 (owner ruling 2026-11-08, hard = steady + 2): the escape's levels are not counted — it swaps the hard
+        # level for one beside it, so the ride as ridden still uses at most three; the escape is checked on its own below
+        levels = _levels(lines[0], c)
         if len(levels) > g.CLOCK_MAX_LEVELS:
             out.append(Problem("L9", where, f"{len(levels)} levels > {g.CLOCK_MAX_LEVELS}"))
-    if hard and not any(re.search(r"at min \d+(?:, \d+)+", c) for c in clock):
+    if hard and not any(re.search(r"(?:at|from) min \d+(?:, \d+)+", c) for c in clock):
         out.append(Problem("L9", where, "intervals without their start minutes"))
     if hard and m:
         _lint_intervals(m, lines, clock, where, out)
@@ -592,7 +633,13 @@ def lint_routine(rt: LintRoutine) -> LintResult:
                 out.append(Problem("L4", where, f"the W text says {said} reps, the W rows hold {sorted(str(w) for w in wreps)}"))
         w = [r[1] for r in ex.rows if r[0] == "W" and r[1] is not None]
         work = [r[1] for r in _working(ex.rows) if r[1] is not None]
-        feeler = len(w) == 1 and work and w[0] == max(work) and any(g.PICK_LOAD_RESULT_RE.match(ln) for ln in body.split("\n"))
+        # a capped lift's feeler keeps its row but not its step line (re-grade #6): its layoff line says the load holds
+        feeler = (
+            len(w) == 1
+            and work
+            and w[0] == max(work)
+            and any(g.PICK_LOAD_RESULT_RE.match(ln) or g.LAYOFF_RE.match(ln) for ln in body.split("\n"))
+        )
         if w and not feeler and (w != sorted(w) or (work and w[-1] >= work[0])):
             # (#5428 re-grade #4: the pick-load feeler is a W row AT the start load — it is the test of that load)
             out.append(Problem("L5", where, "warm-up rows do not ascend below the work"))
