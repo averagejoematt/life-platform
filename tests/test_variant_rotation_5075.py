@@ -25,7 +25,11 @@ from training.training_charter import charter_value  # noqa: E402
 
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
 ROLES = program_structure.SPLIT_ROLES
-GATED = ("deadlift_barbell", "power_clean", "clean")  # charter gated_movements: the conventional pull (275 lb), power clean
+GATED = (
+    "deadlift_barbell",
+    "power_clean",
+    "clean",
+)  # the conventional pull (an anchor since #5694, never a rotation slot), power clean (gated)
 
 
 def _entry(week: int, role: str = "upper_heavy", date: str = "2026-11-02") -> dict:
