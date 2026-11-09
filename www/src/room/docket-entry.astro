@@ -96,7 +96,7 @@ const title = q.text || `${nameOf(e.coach_a)} v ${nameOf(e.coach_b)}`;
 
   <section class="section" {...room} id="sides">
     <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:1100px">
-      <p class="label">1 · The two sides</p>
+      <p class="label">The two sides</p>
       <h2 style={h2}>Who bet which way, and what they put on the line</h2>
       <div class="grid cols2" style="gap:0 40px;border-top:1px solid var(--ink)">
         {
@@ -128,7 +128,7 @@ const title = q.text || `${nameOf(e.coach_a)} v ${nameOf(e.coach_b)}`;
   <section class="section" {...room} id="test" style="border-top:1px solid var(--ink)">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:10px">
-        <p class="label">2 · The frozen test</p>
+        <p class="label">The frozen test</p>
         <h2 style={h2}>{test ? `${test.charAt(0).toUpperCase()}${test.slice(1)}` : "No measure served"}</h2>
         <p style="font-size:14px;max-width:62ch;line-height:1.5">Agreed when the docket opened on {dates.opened} and not changed after. Code reads it against the data on {dates.settles}.</p>
         {description ? <p style="font-size:15px;line-height:1.5"><span class="muted">In the criterion's words: </span>{description}</p> : <p class="muted" style="font-size:13px" data-withheld>{DOCKET_NOT_PUBLISHED.criterion}</p>}
@@ -146,7 +146,7 @@ const title = q.text || `${nameOf(e.coach_a)} v ${nameOf(e.coach_b)}`;
         {
           isOpen ? (
             <>
-              <p class="label">3 · Where the measure stands</p>
+              <p class="label">Where the measure stands</p>
               {live && live.value ? (
                 <>
                   <p style="font-size:34px;font-weight:700" class="num" data-live>{live.value}{live.unit && <small style="font-size:16px"> {live.unit}</small>}</p>
@@ -159,7 +159,7 @@ const title = q.text || `${nameOf(e.coach_a)} v ${nameOf(e.coach_b)}`;
             </>
           ) : (
             <>
-              <p class="label">3 · The result</p>
+              <p class="label">The result</p>
               <p style="font-size:24px;font-weight:700;line-height:1.25" data-result>{result.headline}</p>
               {result.measured && <p style="font-size:16px">{result.measured}</p>}
               {test && result.value && <p class="muted" style="font-size:13px">Against the line: {test}.</p>}
@@ -175,7 +175,7 @@ const title = q.text || `${nameOf(e.coach_a)} v ${nameOf(e.coach_b)}`;
     !isOpen && (
       <section class="section" {...room} id="concession" style="border-top:1px solid var(--ink)">
         <div class="wrap" style="display:flex;flex-direction:column;gap:10px;max-width:900px">
-          <p class="label">4 · The concession</p>
+          <p class="label">The concession</p>
           {concession && concession.text ? (
             <>
               <div class="serif" style="font-size:20px;line-height:1.5"><Quote text={concession.text} block /></div>

@@ -13,8 +13,10 @@ import Quote from "../components/Quote.astro";
 import StatusTag from "../components/StatusTag.astro";
 import { DISPUTED_NOTE } from "../lib/disputed.js";
 import { correctionRows, gradeNoteRows, ruleText } from "../lib/corrections.js";
-import { KIND_WORDS, verdictWords, versusGuess } from "../lib/calibration.js";
+import { KIND_WORDS, coachVerified, verdictWords, versusGuess } from "../lib/calibration.js";
+import { CALL_NOT_PUBLISHED, docketEntries } from "../lib/docket.js";
 import {
+  NOT_PUBLISHED,
   WHAT_MATT_DID_NOTE,
   askCountsText,
   askRows,
@@ -61,11 +63,22 @@ const voice = voiceRows(entry && entry.voice);
 const fidelity = fidelityText(entry && entry.fidelity);
 const vf = file && file.voice_fidelity;
 const record = coachRecord(calCoach, entry && entry.record_card);
+const verified = coachVerified(calCoach); // the per-row verified record, when /api/calibration serves it
 const mine = all.byType.prediction.filter((p: any) => p.coach_id === c.id);
 const days = callsByDay(mine);
 const DAYS_SHOWN = 8;
 const ASKS_SHOWN = 10;
 const kinds = ["direction", "number", "yes_no", "sealed"];
+// Folding (launch-readiness, 2026-11-09): a list in which EVERY row would print the same "not published" line says so
+// once, above the list, instead of on each row. A specific served message (e.g. the API's "Not quoted: …") always shows.
+const genericCall = (p: any) => !(typeof p.claim === "string" && p.claim.trim()) || (Boolean(p.claim_withheld) && p.claim === CALL_NOT_PUBLISHED);
+const callsAllGeneric = mine.length > 0 && mine.every(genericCall);
+const bareStance = (t: any) => !t.text && !t.changed && !t.corrections.length && t.message === NOT_PUBLISHED.stance;
+const timelineBare = timeline.length > 0 && timeline.every(bareStance);
+const asksAllGeneric = asks.length > 0 && asks.every((a: any) => !a.text && a.message === NOT_PUBLISHED.ask);
+const readBare = Boolean(read && !read.text && read.message === NOT_PUBLISHED.read);
+// a docket card links to its entry page only when that entry is complete enough to have one (lib/docket.js)
+const publishable = new Set(docketEntries(file).map((e: any) => e.id));
 const noindex = process.env.WEB_NOINDEX === "1";
 const fetched = file && file.fetched_at ? dayInWords(file.fetched_at) : null;
 const room = { [ROOM_MARKER]: "coach-record" };
@@ -115,10 +128,69 @@ const num1 = "font-size:15px;line-height:1.5";
     </div>
   </section>
 
-  <section class="section" {...room} id="latest-read">
+  <section class="section" {...room} id="record">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:10px">
-        <p class="label">1 · The latest read</p>
+        <p class="label">The record, with its uncertainty, beside a simple guess</p>
+        <h2 style={h2}>{record ? record.line : c.tier === "lead" ? "The lead makes no calls of its own" : "No record served"}</h2>
+        {
+          record && (
+            <>
+              <p class="mono" style="font-size:14px">{[record.pct, record.interval].filter(Boolean).join(" · ")}</p>
+              {verified ? (
+                <p style="font-size:14px;max-width:62ch;border-left:3px solid var(--ink);padding-left:12px" data-verification data-coach-verified>
+                  <b class="mono">{kOfN(verified.k, verified.n)}</b>{verified.pct ? ` · ${verified.pct}` : ""}{verified.ci ? ` · ${verified.ci}` : ""} on the calls that pass the current checks. A smaller set, not a better or worse score: the difference is which calls qualify to be evaluated.
+                </p>
+              ) : (
+                <p class="muted" style="font-size:13px;max-width:62ch;border-left:3px solid var(--ink);padding-left:12px" data-verification>
+                  These are the grades as the grader first wrote them. The platform does not yet publish which were re-verified under the current rules, so this is the recorded history, not a validated score. A wide interval means the record could still move a long way.
+                </p>
+              )}
+              {record.skill && <p style={num1}>{record.skill}</p>}
+              {record.label && <p style="font-size:13px"><span class="muted">Calibration: </span>{record.label}</p>}
+              {record.underReview > 0 && <p style="font-size:13px"><span class="flag disputed">{record.underReview} {DISPUTED_NOTE}</span> · counted neither way</p>}
+            </>
+          )
+        }
+      </div>
+      <div>
+        {
+          record && record.records && (
+            <>
+              <p class="label" style="margin-bottom:8px">Against a guess that nothing changes, by kind of call</p>
+              <div class="rows">
+                {kinds.map((k) => {
+                  const v = versusGuess(record.records, k);
+                  return v ? (
+                    <div>
+                      <span style="font-size:14px"><b>{KIND_WORDS[k]}</b> <span class="muted">· {verdictWords(v.verdict)}</span></span>
+                      <span class="mono">coach {v.coach} · guess {v.guess} · of {v.of}</span>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+              <p class="muted" style="font-size:12px;margin-top:8px">Kinds of call are never added together. On the grades as first written.</p>
+            </>
+          )
+        }
+        {
+          record && record.quality && (
+            <details style="margin-top:12px;font-size:13px">
+              <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Grade quality and the career record</summary>
+              <p style="margin-top:6px;line-height:1.5">{record.quality.unassessed} of {record.quality.n} graded before the grader's quality checks existed · {record.quality.clean} clean · {record.quality.flagged} flagged.</p>
+              {record.lifetime && <p class="muted" style="margin-top:6px">Career, across earlier cycles: {kOfN(record.lifetime.confirmed, record.lifetime.n)}. History, not this cycle's score.</p>}
+            </details>
+          )
+        }
+        <p style="margin-top:16px;font-size:13px"><a href={href("/system/calibration/")}>Every coach, graded together →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" {...room} id="latest-read" style="border-top:1px solid var(--ink)">
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <p class="label">The latest read</p>
         <h2 style={h2}>{read ? `${read.who}, ${read.day || "undated"}` : "No read served"}</h2>
         {
           read && (
@@ -133,7 +205,8 @@ const num1 = "font-size:15px;line-height:1.5";
       <div style="display:flex;flex-direction:column;gap:12px">
         {stance && stance.absent && <div class="empty"><span>{stance.reason}</span></div>}
         {read && read.text && <div class="serif" style="font-size:19px;line-height:1.5"><Quote text={read.text} said={read.said} block /></div>}
-        {read && read.message && <div class="empty" data-withheld><span>{read.message}</span></div>}
+        {read && read.message && !readBare && <div class="empty" data-withheld><span>{read.message}</span></div>}
+        {readBare && <p class="muted" style="font-size:14px" data-withheld>{read!.message} When it was written, the data it read and its source are listed with it.</p>}
         {!read && !(stance && stance.absent) && <div class="empty"><span>The platform served no dated read for this coach.</span></div>}
         {
           read && read.cited.length > 0 && (
@@ -154,13 +227,13 @@ const num1 = "font-size:15px;line-height:1.5";
   <section class="section" {...room} id="stance" style="border-top:1px solid var(--ink)">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:12px">
-        <p class="label">2 · How the stance changed</p>
+        <p class="label">How the stance changed</p>
         <h2 style={h2}>{stance && !stance.absent ? stance.stage || "Where they stand now" : "No current stance"}</h2>
         {
           stance && !stance.absent && (
             <>
               {stance.text && <div class="serif" style="font-size:18px;line-height:1.5">{stance.superseded ? <p>{stance.text}</p> : <Quote text={stance.text} said={null} block />}</div>}
-              {stance.message && !stance.authored && <div class="empty" data-withheld><span>{stance.message}</span></div>}
+              {stance.message && !stance.authored && (stance.message === NOT_PUBLISHED.stance ? <p class="muted" style="font-size:14px" data-withheld>{stance.message}</p> : <div class="empty" data-withheld><span>{stance.message}</span></div>)}
               {stance.authored && <p class="muted" style="font-size:13px">This coach has no written stance served; the stage below is the plan its author set for this point in the experiment.</p>}
               {stance.changed && <p style={num1}><b>What changed: </b>{stance.changed}</p>}
               {stance.focused.length > 0 && <p style={num1}><b>Focused on now: </b>{stance.focused.join(" · ")}</p>}
@@ -200,7 +273,12 @@ const num1 = "font-size:15px;line-height:1.5";
       <div>
         <p class="label" style="margin-bottom:8px">Every dated stance, newest first</p>
         {
-          timeline.length ? (
+          timelineBare ? (
+            <p style="font-size:14px;line-height:1.5;border-top:1px solid var(--ink);padding-top:12px" data-stance-timeline data-withheld>
+              {timeline.length} dated {timeline.length === 1 ? "stance" : "stances"}, the newest {timeline[0].day}, the oldest {timeline[timeline.length - 1].day}.
+              <span class="muted"> Their words are not published.</span>
+            </p>
+          ) : timeline.length ? (
             <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-stance-timeline>
               {timeline.map((t: any) => (
                 <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px">
@@ -228,11 +306,12 @@ const num1 = "font-size:15px;line-height:1.5";
 
   <section class="section" {...room} id="calls" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
-      <p class="label">3 · The calls, by day</p>
+      <p class="label">The calls, by day</p>
       <h2 style={h2}>{days.length ? `What ${c.name} called, and how each came out` : "No calls in the ledger"}</h2>
       <p class="muted" style="font-size:13px;max-width:72ch">
         Each call with its own verdict: right, wrong, open, could not be checked, or not graded. A verdict under classification review keeps its word and is marked {DISPUTED_NOTE}; it is counted neither right nor wrong. A corrected grade shows the original, the correction, the dates and the reason.
       </p>
+      {callsAllGeneric && <p class="muted" style="font-size:14px;max-width:72ch" data-withheld>The words of these calls are not published. Each row shows its verdict, its kind and the measure it was checked against; open a call for the grader's notes.</p>}
       {
         days.length > 0 && (
           <>
@@ -245,7 +324,7 @@ const num1 = "font-size:15px;line-height:1.5";
                       <div style="display:flex;flex-direction:column;gap:4px">
                         <a href={href(pathOf("prediction", x.p.id))} style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;text-decoration:none;color:inherit">
                           <StatusTag status={x.p.status} date={x.p.settled_date} call disputed={x.disputed} />
-                          <span style="font-size:13px">{x.p.claim_withheld ? x.p.claim : <Quote text={clip(x.p.claim, 120)} said={x.p.logged_date} />}</span>
+                          {!genericCall(x.p) && <span style="font-size:13px">{x.p.claim_withheld ? x.p.claim : <Quote text={clip(x.p.claim, 120)} said={x.p.logged_date} />}</span>}
                           <span class="muted" style="font-size:12px">{[x.p.kind, x.p.metric_key ? String(x.p.metric_key).replace(/_/g, " ") : null].filter(Boolean).join(" · ")}</span>
                         </a>
                         {x.corrected && (
@@ -295,7 +374,7 @@ const num1 = "font-size:15px;line-height:1.5";
 
   <section class="section" {...room} id="asks" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
-      <p class="label">4 · What they asked, and what happened</p>
+      <p class="label">What they asked, and what happened</p>
       <h2 style={h2}>{askCounts || "No asks served"}</h2>
       <p style="font-size:14px;max-width:72ch;line-height:1.5">
         An ask is advice with a due date. The grader checks each one against the data when it falls due: kept, broken, or unresolved when the check could not settle it. That is the grader's word on the data, not a record of what Matt chose to do.
@@ -305,17 +384,17 @@ const num1 = "font-size:15px;line-height:1.5";
       {
         asks.length > 0 && (
           <div class="scroll" tabindex="0" role="region" aria-label="The asks, newest first (scrolls sideways)">
-            <table style="min-width:720px" data-asks>
-              <thead><tr><th>Asked</th><th>The ask</th><th>Due</th><th>Checked against</th><th>Grader's outcome</th><th>What Matt did</th></tr></thead>
+            {asksAllGeneric && <p class="muted" style="font-size:14px;margin-bottom:8px" data-withheld>The words of these asks are not published; each row shows when it was asked, when it fell due, what the grader checked it against and what the check found.</p>}
+            <table style={`min-width:${asksAllGeneric ? 520 : 640}px`} data-asks>
+              <thead><tr><th>Asked</th>{!asksAllGeneric && <th>The ask</th>}<th>Due</th><th>Checked against</th><th>Grader's outcome</th></tr></thead>
               <tbody>
                 {asks.slice(0, ASKS_SHOWN).map((a: any) => (
                   <tr>
                     <td>{a.asked}</td>
-                    <td style="font-size:13px">{a.text ? <Quote text={clip(a.text, 120)} said={null} /> : <span class="muted">{a.message}</span>}</td>
+                    {!asksAllGeneric && <td style="font-size:13px">{a.text ? <Quote text={clip(a.text, 120)} said={null} /> : <span class="muted">{a.message}</span>}</td>}
                     <td>{a.due}</td>
                     <td class="mono" style="font-size:12px">{a.checked}</td>
                     <td><span class="status">{a.outcome}</span>{a.settled ? <span class="muted" style="font-size:12px"> · {a.settled}</span> : ""}</td>
-                    <td class="muted">{a.did}</td>
                   </tr>
                 ))}
               </tbody>
@@ -329,7 +408,7 @@ const num1 = "font-size:15px;line-height:1.5";
             <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Earlier asks ({asks.length - ASKS_SHOWN})</summary>
             <div class="rows" style="margin-top:6px">
               {asks.slice(ASKS_SHOWN).map((a: any) => (
-                <div><span style="font-size:13px">{a.asked} · due {a.due}{a.checked !== "not recorded" ? ` · ${a.checked}` : ""}</span><span class="mono" style="font-size:12px">{a.outcome} · Matt: {a.did}</span></div>
+                <div><span style="font-size:13px">{a.asked} · due {a.due}{a.checked !== "not recorded" ? ` · ${a.checked}` : ""}</span><span class="mono" style="font-size:12px">{a.outcome}</span></div>
               ))}
             </div>
           </details>
@@ -341,7 +420,7 @@ const num1 = "font-size:15px;line-height:1.5";
 
   <section class="section" {...room} id="docket" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
-      <p class="label">5 · Docket positions</p>
+      <p class="label">Docket positions</p>
       <h2 style={h2}>{docket.length || positions.length ? "Where they put their record on the line" : "No docket position served"}</h2>
       <p style="font-size:14px;max-width:72ch;line-height:1.5">
         A docket entry is a standing disagreement with another coach, settled by code against the data on a date agreed at the open. The stake is each coach's own Brier score, frozen when it opened. Lost disputes stay on the record.
@@ -374,7 +453,8 @@ const num1 = "font-size:15px;line-height:1.5";
                 </dl>
                 <p style="font-size:13px">{d.mine.text ? <Quote text={clip(d.mine.text, 160)} said={null} /> : <span class="muted" data-withheld>{d.mine.message}</span>}</p>
                 {d.concession && <p class="muted" style="font-size:13px">A concession is on the record: <Quote text={clip(d.concession, 160)} said={null} /></p>}
-                {d.id && <a href={href(`/system/docket/${d.id}/`)} style="font-size:13px;font-weight:700">Both sides and the result →</a>}
+                {d.id && publishable.has(d.id) && <a href={href(`/system/docket/${d.id}/`)} style="font-size:13px;font-weight:700">Both sides and the result →</a>}
+                {d.id && !publishable.has(d.id) && <p class="muted" style="font-size:13px" data-docket-incomplete>The full entry is incomplete — not yet cleared for publication.</p>}
               </article>
             ))}
           </div>
@@ -386,7 +466,7 @@ const num1 = "font-size:15px;line-height:1.5";
   <section class="section" {...room} id="voice" style="border-top:1px solid var(--ink)">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:12px">
-        <p class="label">6 · How the voice is built</p>
+        <p class="label">How the voice is built</p>
         <h2 style={h2}>{voice.length ? "The voice it is written to" : "No voice spec served"}</h2>
         <p class="muted" style="font-size:13px;max-width:62ch">The authored rules a coach's writing is generated within, as served. The spec's sample passages are not shown: they are illustrations, not this coach's record.</p>
         {
@@ -406,58 +486,6 @@ const num1 = "font-size:15px;line-height:1.5";
     </div>
   </section>
 
-  <section class="section" {...room} id="record" style="border-top:1px solid var(--ink)">
-    <div class="wrap grid cols2" style="gap:48px;align-items:start">
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <p class="label">7 · The record, with its uncertainty, beside a simple guess</p>
-        <h2 style={h2}>{record ? record.line : c.tier === "lead" ? "The lead makes no calls of its own" : "No record served"}</h2>
-        {
-          record && (
-            <>
-              <p class="mono" style="font-size:14px">{[record.pct, record.interval].filter(Boolean).join(" · ")}</p>
-              <p class="muted" style="font-size:13px;max-width:62ch;border-left:3px solid var(--ink);padding-left:12px" data-verification>
-                These are the grades as the grader first wrote them. The platform does not yet publish which were re-verified under the current rules, so this is the recorded history, not a validated score. A wide interval means the record could still move a long way.
-              </p>
-              {record.skill && <p style={num1}>{record.skill}</p>}
-              {record.label && <p style="font-size:13px"><span class="muted">Calibration: </span>{record.label}</p>}
-              {record.underReview > 0 && <p style="font-size:13px"><span class="flag disputed">{record.underReview} {DISPUTED_NOTE}</span> · counted neither way</p>}
-            </>
-          )
-        }
-      </div>
-      <div>
-        {
-          record && record.records && (
-            <>
-              <p class="label" style="margin-bottom:8px">Against a guess that nothing changes, by kind of call</p>
-              <div class="rows">
-                {kinds.map((k) => {
-                  const v = versusGuess(record.records, k);
-                  return v ? (
-                    <div>
-                      <span style="font-size:14px"><b>{KIND_WORDS[k]}</b> <span class="muted">· {verdictWords(v.verdict)}</span></span>
-                      <span class="mono">coach {v.coach} · guess {v.guess} · of {v.of}</span>
-                    </div>
-                  ) : null;
-                })}
-              </div>
-              <p class="muted" style="font-size:12px;margin-top:8px">Kinds of call are never added together. On the grades as first written.</p>
-            </>
-          )
-        }
-        {
-          record && record.quality && (
-            <details style="margin-top:12px;font-size:13px">
-              <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Grade quality and the career record</summary>
-              <p style="margin-top:6px;line-height:1.5">{record.quality.unassessed} of {record.quality.n} graded before the grader's quality checks existed · {record.quality.clean} clean · {record.quality.flagged} flagged.</p>
-              {record.lifetime && <p class="muted" style="margin-top:6px">Career, across earlier cycles: {kOfN(record.lifetime.confirmed, record.lifetime.n)}. History, not this cycle's score.</p>}
-            </details>
-          )
-        }
-        <p style="margin-top:16px;font-size:13px"><a href={href("/system/calibration/")}>Every coach, graded together →</a></p>
-      </div>
-    </div>
-  </section>
 
   {entry && entry.absent_reason && !(stance && stance.absent) && <p class="wrap muted" {...room} style="font-size:12px">{datesInWords(entry.absent_reason)}</p>}
 </Base>
