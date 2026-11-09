@@ -370,6 +370,8 @@ When a significant decision is made — a design pattern chosen, an approach rej
 
 **Outcome:** Reserved concurrency = 10. Application-level HMAC Bearer auth on remote MCP. No WAF.
 
+**Note (#5541, 2026-11-08):** the reservation was never live — the 2026-06-17 quota raise adopted site-api/site-api-ai only, and `get-function-concurrency` on `life-platform-mcp` was empty on 2026-10-31. It is now declared in CDK (`MCP_RESERVED_CONCURRENCY` in `cdk/stacks/mcp_stack.py`, pinned to this Outcome line by `tests/test_mcp_auth_alarm_concurrency_5541.py`) and live from the next `cdk deploy LifePlatformMcp`. 10 sits above the measured peak (ConcurrentExecutions daily Max 1–4 over 14 days); `mcp-throttles` makes a binding cap visible, and `mcp-auth-failures` (LifePlatformMonitoring) alarms the AuthFailures metric this ADR's auth leg emits.
+
 ---
 
 ## ADR-011 — Whoop as Sleep SOT over Eight Sleep

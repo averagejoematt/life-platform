@@ -36,6 +36,7 @@ Other reservations (small, not traffic-sized; grep `ReservedConcurrentExecutions
 | Function | Reserved | Why | Where |
 |----------|----------|-----|-------|
 | `telegram-coach-worker` | 2 | A chatty evening must not starve the site; sequential model calls, one user. | `serve_stack.py` |
+| `life-platform-mcp` | 10 | ADR-010's abuse cap on the MCP Function URL (WAF cannot front a Function URL). Above the measured peak (ConcurrentExecutions daily Max 1–4, 14 days to 2026-11-08); `mcp-throttles` (≥5/15 min → digest) shows it binding. The warmer is not capped. **Declared in CDK by #5541; live only after `cdk deploy LifePlatformMcp`** — until then `get-function-concurrency` is empty and the unreserved pool stays 72 (62 after). | `mcp_stack.py` |
 | `whoop-data-ingestion`, `withings-data-ingestion`, `strava-data-ingestion`, `eightsleep-data-ingestion` | 1 each | OAuth race prevention — one concurrent invocation per OAuth Lambda (ADR-036). | `ingestion_stack.py` |
 
 Live values confirmed read-only with `aws lambda get-function-concurrency` on all
