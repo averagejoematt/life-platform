@@ -14,6 +14,14 @@ pytest-cov==7.1.0
 # tests/test_suite_parallel_safety_3025.py. Version MUST equal the CI gate's pin
 # (CQ-01, #1963) — resolved by scripts/ci_pins.py, not quoted in the workflow.
 pytest-xdist==3.8.0
+# pytest-timeout — the per-test ceiling in pytest.ini (`timeout`, #5514). Before it, only a
+# job's `timeout-minutes: 60` bounded a hung test: the hang cost an hour and named nothing.
+# Every CI lane that installs pytest resolves this pin through scripts/ci_pins.py (CQ-01).
+pytest-timeout==2.4.0
+# pip itself — CI's `pip install --upgrade pip` floated to whatever PyPI served that
+# minute (#5514). Workflows install this pin instead (scripts/ci_pins.py pip); Dependabot
+# bumps it like every other line here.
+pip==26.3
 # Property-based testing (Hypothesis @given) — pure calculators + AI grounding
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,

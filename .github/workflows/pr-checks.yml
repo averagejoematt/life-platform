@@ -111,7 +111,7 @@ jobs:
         # written back by deploy/write_lane_posture.py.
         run: |
           echo "LANE_START=$(date +%s)" >> "$GITHUB_ENV"
-          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore black hypothesis pyyaml mypy ruff pillow pytest-xdist)
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-timeout boto3 botocore black hypothesis pyyaml mypy ruff pillow pytest-xdist)
           pip install $PINS
 
       # `if: always()` from here down — the #749 lesson, applied to this lane. Sequential
@@ -317,7 +317,7 @@ jobs:
         # pytest-cov (no coverage here). Versions read from requirements-dev.txt
         # (CQ-01, #2609). tests/test_full_suite_premerge_3025.py asserts parity.
         run: |
-          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml pillow pytest-xdist)
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-timeout boto3 botocore hypothesis pyyaml pillow pytest-xdist)
           pip install $PINS
 
       # The doc-sync literals (test_count et al.) are DRIVER-reconciled on main by
