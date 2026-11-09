@@ -54,7 +54,7 @@ RULES = {
     "find the load over unloaded rows; a capped lift's one layoff line, and no W step line beside it)",
     "L5": "loadable steps; W rows ascend below the work",
     "L6": "one effort expression on a lift's line 1; exercise 1 does not repeat the session line's",
-    "L7": "phone-line budgets (an interval ride's note 7 with its escape line; a fitness-test block's 6)",
+    "L7": "phone-line budgets (an interval ride's note 8 with its escape line and rep-first clock; a fitness-test block's 6)",
     "L8": "safety facts present (family cue, cardio effort leads, no HR lead target)",
     "L9": "clock lines: minutes, at most 3 levels on the ride (the escape swaps the hard level, it adds none), interval start "
     "minutes; intervals: easy = hard − 2 on every other minute with its talk words, an escape checked as rep 1 ends (full "
