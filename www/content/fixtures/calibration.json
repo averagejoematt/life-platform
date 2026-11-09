@@ -1326,11 +1326,11 @@
             "baseline": {
               "n": 71,
               "right": 37,
-              "right_ci95": [
+              "accuracy_ci95": [
                 40.7,
                 63.4
               ],
-              "right_pct": 52.1,
+              "accuracy_pct": 52.1,
               "text": "A prediction that nothing would change got 37 of the same 71 right.",
               "unscorable": 2
             },
@@ -2693,11 +2693,11 @@
         "baseline": {
           "n": 71,
           "right": 37,
-          "right_ci95": [
+          "accuracy_ci95": [
             40.7,
             63.4
           ],
-          "right_pct": 52.1,
+          "accuracy_pct": 52.1,
           "text": "A prediction that nothing would change got 37 of the same 71 right.",
           "unscorable": 2
         },

@@ -271,13 +271,36 @@ def _rule_scored(row: dict) -> bool:
     return isinstance(bl, dict) and bl.get("rule") == coach_baseline.RULE_ID and isinstance(bl.get("right"), bool)
 
 
-def headline_sentence(n: int, k: int, rule_right: int, verdict: str) -> str:
-    """The one sentence a reader could repeat, generated from the numbers (the owner's wording, 2026-11-09)."""
+NO_BASELINE = "No same-call comparison with a simple prediction that nothing would change is published for these calls yet."
+
+
+def stored_rule_versions(rows: list[dict]) -> dict | None:
+    """``{version: calls}`` of the STORED "nothing changes" stamps on ``rows`` — None when any call has no stamp of the
+    rule with a version (then a same-call comparison as stored cannot be guaranteed, and none is served)."""
+    out: dict = {}
+    for r in rows:
+        bl = (r or {}).get("baseline")
+        if not isinstance(bl, dict) or bl.get("rule") != coach_baseline.RULE_ID or bl.get("version") is None:
+            return None
+        v = str(bl["version"]).split(".")[0] if isinstance(bl["version"], (int, float, Decimal)) else str(bl["version"])
+        out[v] = out.get(v, 0) + 1
+    return out
+
+
+def stored_rule_words(versions: dict) -> str:
+    vs = sorted(versions)
+    which = f"version {vs[0]}" if len(vs) == 1 else "versions " + ", ".join(vs)
+    return f"Scored by the rule's {which}, as stored when each call was graded; earlier verdicts have not been restated."
+
+
+def headline_sentence(n: int, k: int, rule_right: int | None, verdict: str | None) -> str:
+    """The one sentence a reader could repeat, generated from the numbers (the owner's wording, 2026-11-09). An
+    advantage is claimed only from the tested comparison (the sign test), never from a point estimate."""
     calls = "forecast" if n == 1 else "forecasts"
-    s = (
-        f"Of {n} {calls} that could be checked under the current rules, the coaches got {k} right ({_pct_whole(k, n)}%). "
-        f"A simple prediction that nothing would change got {rule_right} right ({_pct_whole(rule_right, n)}%). "
-    )
+    s = f"Of {n} {calls} that could be checked under the current rules, the coaches got {k} right ({_pct_whole(k, n)}%). "
+    if rule_right is None:
+        return s + NO_BASELINE
+    s += f"A simple prediction that nothing would change got {rule_right} right ({_pct_whole(rule_right, n)}%). "
     if verdict == "coaches_better":
         return s + "The coaches did better than that baseline, by more than chance would explain."
     if verdict == "rule_better":
@@ -295,6 +318,22 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
     if not n:
         return None
     k = sum(1 for r in rows if now_status(r) == "confirmed")
+    out: dict = {
+        "n": n,
+        "confirmed": k,
+        "accuracy_pct": _pct(k, n),
+        "accuracy_ci95": _wilson(k, n),
+        "pct_rounded": _pct_whole(k, n),
+    }
+    versions = stored_rule_versions(rows)
+    if versions is None:
+        # A call without a stored "nothing changes" stamp: no same-call comparison can be guaranteed, so none is served.
+        out.update(baseline_pct_rounded=None, sign_test=None, baseline={"available": False, "n": n, "text": NO_BASELINE})
+        if with_sentence:
+            out["sentence"] = headline_sentence(n, k, None, None)
+            out["skill"] = {"n": n, "sentence": NO_BASELINE}
+            out["comparison"] = None
+        return out
     rule = sum(1 for r in rows if _rule_right(r))
     scored = sum(1 for r in rows if _rule_scored(r))
     coach_only = sum(1 for r in rows if now_status(r) == "confirmed" and not _rule_right(r))
@@ -310,38 +349,61 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
     base_text = f"A simple prediction that nothing would change got {rule} of the same {n} right ({_pct_whole(rule, n)}%)."
     if unscored:
         base_text += f" It could not be scored on {unscored} of them, which count as its misses."
-    out: dict = {
-        "n": n,
-        "confirmed": k,
-        "accuracy_pct": _pct(k, n),
-        "accuracy_ci95": _wilson(k, n),
-        "pct_rounded": _pct_whole(k, n),
-        "baseline_pct_rounded": _pct_whole(rule, n),
-        "baseline": {
-            "rule": coach_baseline.RULE_ID,
-            "n": n,
-            "right": rule,
-            "right_pct": _pct(rule, n),
-            "right_ci95": _wilson(rule, n),
-            "unscorable": unscored,
-            "text": base_text,
-        },
-        "sign_test": {
-            "coach_only": coach_only,
-            "rule_only": rule_only,
-            "n": coach_only + rule_only,
-            "k": coach_only,
-            "p": round(p, 4) if p is not None else None,
-            "verdict": verdict,
-            "test": "exact two-sided sign test on the calls only one of the two got right (McNemar's exact test)",
-        },
-    }
+    base_text += f" {stored_rule_words(versions)}"
+    out.update(
+        {
+            "baseline_pct_rounded": _pct_whole(rule, n),
+            "baseline": {
+                "available": True,
+                "rule": coach_baseline.RULE_ID,
+                # Coordinator 2026-11-09: the comparison is the verdicts AS STORED at grading time (never restated here),
+                # with the stored rule version(s) named; restating them waits on an owner decision.
+                "basis": "stored",
+                "rule_versions": versions,
+                "current_rule_version": coach_baseline.RULE_VERSION,
+                "n": n,
+                "right": rule,
+                "accuracy_pct": _pct(rule, n),
+                "accuracy_ci95": _wilson(rule, n),
+                "unscorable": unscored,
+                "text": base_text,
+            },
+            "sign_test": {
+                "coach_only": coach_only,
+                "rule_only": rule_only,
+                "n": coach_only + rule_only,
+                "k": coach_only,
+                "p": round(p, 4) if p is not None else None,
+                "verdict": verdict,
+                "test": "exact two-sided sign test on the calls only one of the two got right (McNemar's exact test)",
+            },
+        }
+    )
     if with_sentence:
         sentence = headline_sentence(n, k, rule, verdict)
         out["sentence"] = sentence
         out["skill"] = {"n": n, "sentence": sentence.rsplit(". ", 1)[-1]}
         out["comparison"] = {"n": n, "records": coach_baseline.comparison_block(rows)["records"]}
     return out
+
+
+VERIFY_JOB = "__verify__:"  # a `_parallel_fetch` job-key prefix — never a short coach id
+
+
+def add_verify_jobs(jobs: dict, coach_pks: dict, query) -> None:
+    """Add each coach's VERIFY# read (projected, paginated) to ``/api/calibration``'s concurrent fetch. Read through the
+    same governed table, so a private call's record never arrives; a record is joined only through a public pointer."""
+    for cid, pk in coach_pks.items():
+        jobs[VERIFY_JOB + cid] = lambda pk=pk: query(pk, verification_record.VERIFY_PREFIX, VERIFY_PROJECTION, paginate=True)
+
+
+def headline_of(fetched: dict, failed: list, cids: list, *, genesis: str | None) -> dict | None:
+    """Pop the VERIFY# reads out of ``fetched`` and build the headline — None when ANY coach or VERIFY# read failed (a
+    partial read never publishes a partial headline)."""
+    verify = {cid: fetched.pop(VERIFY_JOB + cid, []) for cid in cids}
+    if any(k in cids or str(k).startswith(VERIFY_JOB) for k in failed):
+        return None
+    return headline({cid: fetched.get(cid) or [] for cid in cids}, verify, genesis=genesis)
 
 
 def headline(rows_by_coach: dict, verify_by_coach: dict, *, genesis: str | None) -> dict | None:

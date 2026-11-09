@@ -31,7 +31,6 @@ from coach import (
     commitment_grading,  # #3553: the follow-through tally + its Wilson interval, from the grader's own module
     plain_words,  # #4714: the coach page's "Next" lists a plain in-cycle call; a sealed bet is always listed, labelled if jargon
     prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
-    verification_record,  # owner 2026-11-09 (CR1): the VERIFY# prefix /api/calibration reads the classifications under
 )
 from common import (
     activity_publication as _activity_publication,  # owner rulings 2026-11-03/05: private metrics off the wire
@@ -312,10 +311,6 @@ _RETIRED_SHORT_IDS = frozenset(
 
 _CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
 
-#: The `_parallel_fetch` job-key prefix of a coach's VERIFY# read on /api/calibration (never a short coach id).
-_VERIFY_JOB = "__verify__:"
-
-
 # ── #1527: parallel, projected PREDICTION#-partition fetch ────────────────────
 # /api/predictions and /api/calibration each walked all 8 coaches' full
 # PREDICTION# partitions SEQUENTIALLY once #1376 made both surfaces
@@ -398,9 +393,7 @@ _PREDICTION_PROJECTION_FIELDS = (
     "classification_review",
     # Owner 2026-11-09: the verification record's pointer (coach.verification_record) — served as `verification`.
     "latest_verification",
-    # Owner 2026-11-09 (CR1): the first grade a correction preserved — the archived "as first graded" record and the
-    # eligible total of /api/calibration's verification_summary (web.verification_fields.first_status).
-    "original_grade",
+    "original_grade",  # Owner 2026-11-09 (CR1): the first grade, for verification_fields.first_status (the archive)
 )
 
 
@@ -738,24 +731,13 @@ def handle_calibration(event, *, _g):
 
         jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
         jobs["hypothesis-ledger"] = _fetch_hyp_ledger
-        # Owner 2026-11-09 (CR1): each coach's VERIFY# audit rows, projected — the classification the verified
-        # headline counts by (web.verification_fields.headline). Read through the same governed table, so a private
-        # call's record never arrives; a record is only ever joined through a public call's own pointer.
-        for cid in _CALIB_COACH_NAMES:
-            jobs[_VERIFY_JOB + cid] = lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _query_partition(
-                pk, verification_record.VERIFY_PREFIX, verification_fields.VERIFY_PROJECTION, paginate=True
-            )
+        # Owner 2026-11-09 (CR1): + each coach's VERIFY# rows (web.verification_fields.add_verify_jobs / headline_of)
+        verification_fields.add_verify_jobs(jobs, {c: f"COACH#{_CALIB_COACH_ID_MAP[c]}" for c in _CALIB_COACH_NAMES}, _query_partition)
         failed: list = []
         fetched = _parallel_fetch(jobs, failures=failed)
-        verify_by_coach = {cid: fetched.pop(_VERIFY_JOB + cid, []) for cid in _CALIB_COACH_NAMES}
+        headline = verification_fields.headline_of(fetched, failed, list(_CALIB_COACH_NAMES), genesis=EXPERIMENT_START)
         # Owner rulings 2026-11-03/05: a graded bet on a private metric stays out of the public scores.
         hyp_rows = [r for r in fetched.pop("hypothesis-ledger") if _activity_publication.hypothesis_is_public(r)]
-        # A partial read never publishes a partial headline: any failed coach or VERIFY# read → no summary at all.
-        headline = (
-            None
-            if any(k in _CALIB_COACH_NAMES or str(k).startswith(_VERIFY_JOB) for k in failed)
-            else verification_fields.headline({cid: fetched[cid] for cid in _CALIB_COACH_NAMES}, verify_by_coach, genesis=EXPERIMENT_START)
-        )
 
         per_coach = []
         season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set
@@ -786,8 +768,7 @@ def handle_calibration(event, *, _g):
                     **_decided_blocks(coach_decided),
                     # Owner ruling 2026-11-03: graded calls under classification review — not in n / Brier / record.
                     "under_review": coach_under_review,
-                    # owner 2026-11-09 (CR1): this coach's share of the verified headline; null until recorded
-                    "verified": ((headline or {}).get("by_coach") or {}).get(cid),
+                    "verified": ((headline or {}).get("by_coach") or {}).get(cid),  # owner 2026-11-09 (CR1); null until recorded
                     "lifetime": career_summary,
                 }
             )
@@ -834,7 +815,6 @@ def handle_calibration(event, *, _g):
             {"coaches": platform_career_pairs, "hypotheses": hyp_career_pairs, **forecast_career_strata}
         )
         platform["lifetime"] = platform_lifetime
-        # owner 2026-11-09: additive per-stratum fields; the coaches' `verified` is the CR1 headline's own object
         verification_fields.attach_stratum_extras(platform, season_strata, season_decided, (headline or {}).get("verified"))
 
         # #1893: the void ledger stops being write-only. Every reset stamps one
@@ -858,9 +838,7 @@ def handle_calibration(event, *, _g):
                 # Owner ruling 2026-11-03: this season's coach verdicts under classification review — excluded from
                 # every number above (record, Brier, comparison) and disclosed here so a headline can say so.
                 "under_review": season_under_review,
-                # Owner ruling 2026-11-09 (CR1): the verified headline, the exclusions by category from the eligible
-                # total down to N, the archived first grading — null until a verification record exists.
-                "verification_summary": headline,
+                "verification_summary": headline,  # Owner ruling 2026-11-09 (CR1); null until a verification record exists
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
@@ -970,8 +948,7 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
                 refuted += 1
         coach_pairs.extend(calibration_core.pairs_from_prediction_records(season))
     platform = {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}}
-    # the same per-stratum fields /api/calibration serves; `verified` stays null here — the edition's narrow sweep reads
-    # no VERIFY# record and no edition reader reads it (the verified headline is /api/calibration's, CR1)
+    # the same per-stratum fields /api/calibration serves; `verified` stays null (no VERIFY# read here; CR1)
     verification_fields.attach_stratum_extras(platform, {"coaches": coach_pairs}, decided_all)
     return {
         "predictions": {

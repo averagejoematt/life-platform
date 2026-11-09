@@ -241,7 +241,7 @@ export function verifiedLead(cal) {
   const b = sameCalls(v.baseline, v.n);
   const baseline =
     b && Number.isInteger(b.right)
-      ? { right: b.right, n: v.n, pct: pct(b.right_pct), ci: ciOk(b.right_ci95) ? intervalText(b.right_ci95) : null, unscorable: Number.isInteger(b.unscorable) ? b.unscorable : 0 }
+      ? { right: b.right, n: v.n, pct: pct(b.accuracy_pct), ci: ciOk(b.accuracy_ci95) ? intervalText(b.accuracy_ci95) : null, unscorable: Number.isInteger(b.unscorable) ? b.unscorable : 0 }
       : null;
   const s = v.sign_test && typeof v.sign_test === "object" ? v.sign_test : null;
   const sign =
