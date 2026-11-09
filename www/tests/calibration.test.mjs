@@ -19,7 +19,10 @@ import {
   calibrationDots,
   concentrationText,
   intervalText,
-  labelWords,
+  v2Answers,
+  v2MethodText,
+  v2Short,
+  v2Stratum,
   recordHeadline,
   strataRows,
   versusGuess,
@@ -70,13 +73,39 @@ test("absent data file → no headline (the page says so)", () => {
   assert.equal(recordHeadline(null), null);
 });
 
-test("calibration labels: inadequate evidence reads as such; the API's label is rendered, no threshold invented", () => {
-  assert.match(labelWords("not_measurable"), /^not measurable/);
-  assert.equal(labelWords("insufficient_data"), "insufficient evidence");
-  assert.equal(labelWords("nascent"), "insufficient evidence");
-  assert.equal(labelWords("over-confident"), "came true less often than stated");
-  assert.equal(labelWords("some_new_label"), "some new label");
-  assert.equal(labelWords(null), "no label served");
+test("calibration-v2 (owner 2026-11-09): three answers in the served words, in order; nothing invented", () => {
+  const nutrition = FIXTURE.calibration.coaches.find((c) => c.coach_id === "nutrition");
+  const xs = v2Answers(nutrition.assessment_v2);
+  assert.deepEqual(xs.map((x) => x.key), ["estimability", "confidence_direction", "skill"]);
+  assert.match(xs[1].words, /^Over-confident at its 50% calls \(\d+ of \d+ came true, 95% CI \d+%–\d+%; Holm-adjusted p [\d.]+\)/);
+  assert.match(xs[1].words, /not about calibration across confidence levels/);
+  assert.equal(xs[1].short, "over-confident at its 50% calls");
+  assert.match(v2Short(nutrition.assessment_v2), /^not estimable across confidence levels · over-confident at its 50% calls · /);
+  assert.deepEqual(v2Answers(null), []);
+  assert.deepEqual(v2Answers({ confidence_direction: { label: "over_confident" } }), [], "a bare label is never turned into words");
+  assert.equal(v2Short(undefined), null);
+  assert.equal(v2Stratum(FIXTURE.calibration, "coaches").method_version, "calibration-v2");
+  assert.equal(v2Stratum(FIXTURE.calibration, "nope"), null);
+  assert.equal(v2MethodText(FIXTURE.calibration), "calibration-v2, adopted 9 November 2026");
+  assert.equal(v2MethodText({}), null);
+});
+
+test("no v1 calibration label reaches the words: the served v1 fields are never read (sentinel + mutation control)", () => {
+  const SENT = "V1SENTINEL_LABEL";
+  const cal = clone(FIXTURE.calibration);
+  for (const c of cal.coaches) Object.assign(c, { calibration: SENT, label: SENT });
+  for (const s of Object.values(cal.platform.strata)) Object.assign(s, { calibration: SENT, label: SENT });
+  Object.assign(cal.platform, { calibration: SENT, label: SENT });
+  const file = { ...clone(FIXTURE), calibration: cal };
+  const out = JSON.stringify([
+    strataRows(file),
+    blendRow(file),
+    cal.coaches.map((c) => [v2Answers(c.assessment_v2), v2Short(c.assessment_v2)]),
+    recordHeadline(file),
+  ]);
+  assert.ok(!out.includes(SENT), "a v1 label reached a reader-facing value");
+  // mutation control: the detector does see the sentinel where it IS present
+  assert.ok(JSON.stringify(cal).includes(SENT));
 });
 
 test("stated confidence: the largest served band beside the coach's n, both carried", () => {
@@ -179,6 +208,7 @@ test("per-coach verification and assessment_v2: shown when served, absent otherw
   assert.equal(coachVerified(FIXTURE.calibration.coaches[0]), null);
   assert.deepEqual(coachVerified({ verification: { n: 15, confirmed: 6, accuracy_pct: 40, accuracy_ci95: [19.8, 64.3] } }), { k: 6, n: 15, pct: "40.0%", ci: "95% interval 19.8–64.3%" });
   assert.equal(assessmentWords(null), null);
-  assert.equal(assessmentWords({ sentence: "Served sentence." }), "Served sentence.");
-  assert.equal(assessmentWords({ label: "insufficient_data" }), "insufficient evidence");
+  assert.equal(assessmentWords({ sentence: "Not the v2 shape." }), null);
+  assert.equal(assessmentWords({ label: "insufficient_data" }), null, "a bare label is never rendered");
+  assert.equal(assessmentWords({ estimability: { wording: "A." }, skill: { wording: "C." } }), "A. C.");
 });

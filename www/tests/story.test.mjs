@@ -76,15 +76,23 @@ test("the story so far: the day, the start in words, the first and the latest in
   assert.equal(soFar({ state: "absent" }, { day_n: 1 }), null);
 });
 
-test("no HS1 template or helper reads audio, an excerpt, or a journal / State of Mind / diary field", () => {
-  const sources = ["src/lib/story.js", "src/story/timeline.astro", "src/story/episodes.astro", "src/components/StoryEntry.astro"].map((p) => [
+test("no HS1 template or helper reads audio or a journal / State of Mind / diary field; an excerpt only from a published chapter", () => {
+  const sources = ["src/lib/story.js", "src/story/timeline.astro", "src/components/StoryEntry.astro"].map((p) => [
     p,
     readFileSync(join(WWW, p), "utf8").replace(/^\s*\/\/.*$/gm, ""),
   ]);
-  const forbidden = /audio|episode_id|transcript|podcast|panelcast|\.mp3|\.wav|excerpt|body_html|journal_|state_of_mind|som_|diary|vlog|<Quote|data-verbatim/i;
+  const forbidden = /audio|episode_id|transcript|podcast|panelcast|\.mp3|\.wav|body_html|journal_|state_of_mind|som_|diary|vlog|<Quote|data-verbatim/i;
   for (const [p, text] of sources) {
     const code = text.replace(/\/\*[\s\S]*?\*\//g, "");
     const m = code.match(forbidden);
     assert.equal(m, null, `${p} must not reference ${m && m[0]}`);
   }
+  // 2026-11-09 readiness review: the timeline shows an approved installment's own published excerpt — the words /story/
+  // already shows — read off the PUBLIC chapter object, and only when that object is published. Nothing else may.
+  const [, timeline] = sources[1];
+  const reads = timeline.match(/excerpt/g) || [];
+  assert.ok(reads.length > 0, "the timeline carries the installment's excerpt");
+  assert.match(timeline, /const c = all\.get\("chapter", id\);\s*return c && c\.status === "published" && typeof c\.excerpt === "string"/);
+  for (const [p, text] of [sources[0], sources[2]]) assert.ok(!/excerpt/i.test(text), `${p} must not read an excerpt`);
+  assert.ok(!/excerpt/.test(readFileSync(join(WWW, "src/lib/story.js"), "utf8").replace(/^\s*\/\/.*$/gm, "")));
 });

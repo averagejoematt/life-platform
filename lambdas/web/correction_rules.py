@@ -20,6 +20,13 @@ outcomes, which outcome. They are derived from what the row stores (``lambdas/we
 * ``#5611:o+owner-2026-11-03`` / ``#5611:u+owner-2026-11-03`` — the owner's sibling rulings (2026-11-03): an opinion
   filed as a prediction becomes an observation (o, never graded) or, once graded, could not be checked (u: no measurable
   outcome; m: graded on criteria that measure something else)
+* ``#5611:<r|a|n|d|u|h|m|p|x|v>+owner-2026-11-09`` — the owner's classification rulings of 2026-11-09 (manifest v4,
+  rules OR-1 to OR-8): a call kept on the record, outside the accuracy count, with its words, criteria and any grade
+  it carried — r not a forecast, a a look back at days already past, n a condition no record measures, d no checkable
+  direction, u an opinion, h a hedge, m a stored test of a different claim, p a stand-in measure, x either outcome
+  fits, v a measured condition that did not happen
+* ``#5533:g+owner-2026-11-09`` / ``#5533:l+owner-2026-11-09`` — the same ruling's re-grades: under the current rules
+  on the call's own window (OR-10), and with readings that arrived after the first grade (OR-9)
 * ``revert`` — ``deploy/revert_regrade.py`` (a reason starting ``REVERT``)
 
 AN UNKNOWN ID IS AN ERROR, NOT A FALLBACK. ``explain`` raises ``UnknownCorrectionRule`` — the
@@ -100,6 +107,64 @@ RULES: dict[str, str] = {
     "#5533:e": (
         "Heart-rate measures changed baseline on 10 October 2026, so a window that crosses that day compares two different "
         "baselines. It was graded again against the readings after that day."
+    ),
+    "#5611:r+owner-2026-11-09": (
+        "The call reported something that was already on the record when it was made, so it was not a forecast. By the "
+        "owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and "
+        "any grade it carried."
+    ),
+    "#5611:a+owner-2026-11-09": (
+        "The call was a judgement about days that had already passed when it was made, while their records were still "
+        "coming in. It is a look back, not a forecast. By the owner's ruling it is kept on the record outside the "
+        "accuracy count, with its original wording, its criteria and any grade it carried."
+    ),
+    "#5611:n+owner-2026-11-09": (
+        "The call depends on a condition that no record measures, such as a disrupted dinner or carbs eaten in the "
+        "evening. Checking it would mean inventing that measurement after the fact. By the owner's ruling it is kept on "
+        "the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    ),
+    "#5611:d+owner-2026-11-09": (
+        "The call names no direction or level that can be checked, so grading it would need a threshold or a measure "
+        "chosen after the fact. By the owner's ruling it is kept on the record outside the accuracy count, with its "
+        "original wording, its criteria and any grade it carried."
+    ),
+    "#5611:u+owner-2026-11-09": (
+        "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no "
+        "reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, "
+        "with its original wording, its criteria and any grade it carried."
+    ),
+    "#5611:h+owner-2026-11-09": (
+        "The call hedged: it said something may happen, and no outcome could show that wrong. By the owner's ruling it is "
+        "kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    ),
+    "#5611:m+owner-2026-11-09": (
+        "The call's stored test checks something different from what its sentence says. Testing the sentence itself would "
+        "need criteria written after the fact. By the owner's ruling it is kept on the record outside the accuracy count, "
+        "with its original wording, its criteria and any grade it carried."
+    ),
+    "#5611:p+owner-2026-11-09": (
+        "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was "
+        "graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record "
+        "outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    ),
+    "#5611:x+owner-2026-11-09": (
+        "Either outcome would have fitted the call's sentence, so no reading could show it wrong. By the owner's ruling "
+        "it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it "
+        "carried."
+    ),
+    "#5611:v+owner-2026-11-09": (
+        "The call said what would happen if a condition was met. The condition was measured over the call's own window "
+        "and did not happen, so the forecast was never tested. By the owner's ruling it is kept on the record outside the "
+        "accuracy count, with its original wording, its criteria and any grade it carried."
+    ),
+    "#5533:g+owner-2026-11-09": (
+        "The call was graded again under the current grading rules, on its own original window and criteria, from the "
+        "readings in the record. The result changed. By the owner's ruling the new result stands and the first grade is "
+        "kept."
+    ),
+    "#5533:l+owner-2026-11-09": (
+        "Readings for the call's window arrived after it was first graded. It was graded again with them, on its original "
+        "window and criteria. By the owner's ruling the new result stands and the first grade is kept."
     ),
     "revert": "A correction was reversed and the grade before it was restored.",
 }

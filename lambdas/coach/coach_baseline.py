@@ -387,8 +387,8 @@ def skill_sentence(n: int, skill: float | None) -> str:
     calls = "checked call" if n == 1 else "checked calls"
     if n < MIN_N_FOR_RATE or skill is None:
         return f"Too few checked calls yet ({n}) to compare them with a simple guess."
-    if skill > 0:
-        return f"Across {n} {calls}, so far they beat a simple guess."
+    # Owner 2026-11-09 (calibration v2): a positive point estimate is not a demonstrated advantage — no win is
+    # claimed on this untested score, whichever side of zero it falls.
     return f"Across {n} {calls}, so far they do not beat a simple guess."
 
 
