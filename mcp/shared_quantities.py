@@ -32,6 +32,9 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
     de-dup   in TIME, across devices and against Hevy sessions (`walking_volume.dedup_strava`).
     gaps     a WHOOP walk workout or a completed walk habit with no counted walk is REPORTED
              (`completeness.gaps`) and makes the total a floor — a signal, never hours.
+    owner    a WALK_CORRECTION# row (the owner's own measurement, #5669) counts as a labelled walk
+             (`owner_correction`) on a day with no counted walk and resolves that day's gap; on a
+             day that already holds a counted walk it is a reported conflict, never added.
     A longer window (get_benchmark's 28-day chronic read, which its bands are measured in) is
     the SAME definition over more days, divided by weeks — never a different source set.
 
@@ -137,7 +140,19 @@ def _read_signals(
             out[source] = (read or _core.query_source_range)(source, start, shift_day_key(end, past))
         except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
             out[source] = None
+    out[walking_volume.CORRECTION_INPUT] = _read_corrections(start, end)  # #5669: the owner's walk corrections
     return out
+
+
+def _read_corrections(start: str, end: str) -> list[dict[str, Any]] | None:
+    """The owner's WALK_CORRECTION# rows dated in [start, end] (#5669) — his owner-only partition, keyed by
+    the Pacific day, so no read past the window. Not the injected `read`: that one reads `DATE#` rows, and
+    a correction is not a dated vendor row. A read that RAISES is None — the layer says it could not read
+    the corrections, and a corrected day keeps its gap."""
+    try:
+        return walking_volume.query_corrections(_core.table, start, end)
+    except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
+        return None
 
 
 def completed_end(day: str, today: str | None = None) -> str:

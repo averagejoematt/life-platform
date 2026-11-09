@@ -437,7 +437,7 @@ def test_the_dashboard_composed_for_the_edition_reads_no_dossier_and_serves_the_
 
     dossier_reads = []
 
-    def dossier(coach_id):
+    def dossier(coach_id, **kw):
         dossier_reads.append(coach_id)
         return {"commitments": [{"status": "pending", "text": "Lights out by eleven.", "date": "2026-10-01", "due_date": "2026-10-05"}]}
 

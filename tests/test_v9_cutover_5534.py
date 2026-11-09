@@ -210,6 +210,23 @@ def test_owned_paths_json_is_consistent_with_src_pages_and_the_switch_is_on():
     if OWNED.get("room_public") == "cr1":  # the Coaching Room's published CR1 pages: injected templates, read off room.js
         room_js = open(os.path.join(REPO, "www", "src", "lib", "room.js"), encoding="utf-8").read()
         static |= set(re.findall(r'path:\s*"(/[^"\[]+/)",\s*release:\s*"cr1"', room_js))
+    # The Lab and the Human Story once committed live (LAB_LIVE / STORY_LIVE, read through scripts/www_launch_switch.py):
+    # their pages are injected templates too, so their routes are read off the same lists postbuild adds them from.
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    import www_launch_switch  # noqa: E402
+
+    for live, lib, const in (
+        (www_launch_switch.lab_live(), "lab.js", "LAB_ROUTES"),
+        (www_launch_switch.story_live(), "story_dark.js", "STORY_ROUTES"),
+    ):
+        if not live:
+            continue
+        js = open(os.path.join(REPO, "www", "src", "lib", lib), encoding="utf-8").read()
+        block = js[js.index(f"export const {const} = [") :]
+        block = block[: block.index("];")]
+        for pattern in re.findall(r'pattern:\s*"(/[^"]+)"', block):
+            route = pattern.rstrip("/") + "/"
+            (patterns if "[" in route else static).add(re.sub(r"\[[^\]]+\]", "*", route))
     assert set(OWNED["static_routes"]) == static
     assert set(OWNED["route_patterns"]) == patterns
     assert set(OWNED["static_routes"]) <= set(OWNED["routes"])
