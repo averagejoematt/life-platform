@@ -10,12 +10,15 @@ What is held here:
   * the pair join (THE calorie target, THE protein hit, late eating, an incomplete log is None, never low);
   * the weekly family through the engine's OWN compute_correlations: the under-powered path says 'too early to
     say', a powered synthetic path survives FDR and is worded as an association, never a cause;
-  * privacy: no web or email module reads either partition; the family is stored apart from the public record.
+  * the check-in's own mood rating (1.1.0) in the join and the family, without changing what an answered evening is;
+  * privacy: no web or email module reads either partition; the family is stored apart from the public record; and the
+    fail-closed control over EVERY public reader (site API, public snapshot writers, reader emails, the public narrative
+    and AI packages, the public correlation record, the partner projection, the publication classifier).
 
 Every clock is passed in (no test here reaches `datetime.now` for an asserted value, #4848).
 """
 
-# premerge-gate: #5106: os.walk sweep of lambdas/web/ and lambdas/emails/ — no published module names the owner-only check-in partitions; also reads config/schedules.json
+# premerge-gate: #5106: os.walk sweep of lambdas/ (web, emails, content, ai and every module naming the public generated/ or site/ prefix) — no published module names the owner-only check-in partitions; also reads config/schedules.json
 
 from __future__ import annotations
 
@@ -455,3 +458,120 @@ def test_both_partitions_are_owner_only_and_classed():
     assert SOURCE_TIERS["evening_checkin"] == SOURCE_TIERS["checkin_intake_pairs"] == TIER_OWNER_ONLY
     assert SOURCE_CLASS["evening_checkin"] == "raw_timeseries" and SOURCE_CLASS["checkin_intake_pairs"] == "cross_phase"
     assert classify(ec.LEDGER_PK, f"EVAL#{DAY}") == "system_state"
+
+
+# ── the check-in's own mood in the family (checkin-intake-pairs@1.1.0) ─────────────────────────
+
+
+def test_join_day_carries_the_checkins_own_mood_and_none_when_left_out():
+    row = cip.join_day({"hunger": 2, "stress": 3, "cravings": 1, "mood": 1}, _food(1100, 90, ("12:00",)), {}, 1000, LINE, lambda g: True)
+    assert row["mood"] == 1.0 and row["mood_valence"] is None  # the check-in channel, not State of Mind
+    assert cip.join_day({"stress": 2}, None, None, 1000, LINE, lambda g: True)["mood"] is None
+
+
+def test_mood_never_changes_what_an_answered_evening_is():
+    # The partner letter's one count and n_checkin_days are ruled on the three complete-check-in ratings.
+    assert cip.CHECKIN_FIELDS == ec.COMPLETE_FIELDS and cip.MOOD_FIELD in ec.FIELDS and cip.MOOD_FIELD not in cip.CHECKIN_FIELDS
+    mood_only = cip.day_item(DAY, {"mood": 3}, None, None, 1000, LINE, lambda g: True, "2026-10-29T12:10:00+00:00")
+    assert mood_only["mood"] == 3.0 and mood_only["has_checkin"] is False and mood_only["state"] == "no_checkin"
+    assert cip.ENGINE_VERSION == "checkin-intake-pairs@1.1.0"
+    assert ("mood", "kcal_over_target", "checkin_mood_vs_kcal_over_target", 0) in cip.PAIRS
+
+
+def _mood_series(n, *, coupled):
+    rng = random.Random(51061)
+    d0 = datetime(2026, 8, 1)
+    out = {}
+    for i in range(n):
+        mood = rng.randint(0, 4)
+        kcal = 1000 + (90 * (4 - mood) if coupled else 0) + rng.gauss(0, 60)
+        ci = {"hunger": rng.randint(0, 4), "stress": rng.randint(0, 4), "cravings": rng.randint(0, 4), "mood": mood}
+        out[(d0 + timedelta(days=i)).strftime("%Y-%m-%d")] = cip.join_day(
+            ci, _food(round(kcal), 60, ("12:00",)), {}, 1000, LINE, lambda g: True
+        )
+    return out
+
+
+def test_powered_synthetic_mood_to_intake_is_found_by_the_engine_and_a_null_is_not():
+    hit = cip.evaluate_family(_mood_series(70, coupled=True), _engine(), 10)["checkin_mood_vs_kcal_over_target"]
+    assert hit["fdr_significant"] is True and hit["direction"] == "negative" and "not a cause" in hit["verdict"]
+    null = cip.evaluate_family(_mood_series(70, coupled=False), _engine(), 10)["checkin_mood_vs_kcal_over_target"]
+    assert null["verdict"].startswith("no reliable link yet")
+    early = cip.evaluate_family(_mood_series(6, coupled=True), _engine(), 10)["checkin_mood_vs_kcal_over_target"]
+    assert early["verdict"].startswith("too early to say")
+
+
+# ── the fail-closed control: no check-in value reaches ANY public reader ─────────────────────────
+
+# Every name by which a module could reach the owner-only check-in: the two partitions, the writer/join modules, and
+# the partner projection (whose ONE sanctioned importer is the partner letter, below).
+_CHECKIN_TOKENS = ("evening_checkin", "checkin_intake_pairs", "checkin_intake", "checkin_partner_view")
+_PUBLIC_PACKAGES = ("web", "emails", "content", "ai")  # site API, reader emails, the public narrative + AI packages
+_PUBLIC_PREFIX = ('"generated/', "'generated/", '"site/', "'site/")  # a module that writes/reads the public S3 prefix
+# The ONE owner-ruled door (#5125 R5): the partner letter may name the coarse projection and nothing else.
+_ALLOWED = {os.path.join("lambdas", "emails", "partner_email_lambda.py"): {"checkin_partner_view"}}
+
+
+def _public_reader_modules():
+    out = {}
+    for root, _dirs, files in os.walk(os.path.join(REPO, "lambdas")):
+        for f in files:
+            if not f.endswith(".py"):
+                continue
+            path = os.path.join(root, f)
+            rel = os.path.relpath(path, REPO)
+            text = open(path, encoding="utf-8").read()
+            if rel.split(os.sep)[1] in _PUBLIC_PACKAGES or any(p in text for p in _PUBLIC_PREFIX):
+                out[rel] = text
+    return out
+
+
+def test_no_public_reader_names_any_checkin_door():
+    mods = _public_reader_modules()
+    # Vacuity guard: the sweep must actually see the site API, a public snapshot writer outside web/, and the emails.
+    assert os.path.join("lambdas", "web", "site_api_lambda.py") in mods
+    assert os.path.join("lambdas", "content", "site_writer.py") in mods
+    assert sum(1 for m in mods if m.split(os.sep)[1] not in _PUBLIC_PACKAGES) >= 5
+    assert any(m.startswith(os.path.join("lambdas", "emails")) for m in mods)
+    offenders = []
+    for rel, text in sorted(mods.items()):
+        named = {t for t in _CHECKIN_TOKENS if t in text}
+        allowed = _ALLOWED.get(rel, set())
+        # a token that is only a substring of an allowed one (checkin_partner_view never contains the others) is fine
+        if named - allowed:
+            offenders.append((rel, sorted(named - allowed)))
+    assert offenders == []
+
+
+def test_the_partner_projection_never_carries_mood_word_or_intake():
+    from health import checkin_partner_view as pv
+
+    projected = {t.strip() for t in pv.PROJECTION.split(",")}
+    assert projected == {"sk", "has_checkin", "hunger", "stress", "cravings"}
+    rows = [
+        {"sk": f"DATE#2026-10-{d}", "has_checkin": True, "hunger": 2, "stress": 3, "cravings": 1, "mood": 0, "word": "zzsentinel"}
+        for d in range(20, 27)
+    ]
+    rows += [{"kcal": 2222, "kcal_over_target": 333, "mood_valence": -0.9}]
+    view = json.dumps(pv.summarize(rows, rows))
+    for leak in ("mood", "zzsentinel", "kcal", "2222", "333", "valence"):
+        assert leak not in view
+
+
+def test_the_publication_classifier_holds_both_partitions_private_and_fails_closed():
+    from common import activity_publication as ap
+    from health import character_public
+
+    for src in ("evening_checkin", "checkin_intake_pairs", "checkin_intake_pairs_unclassified_probe"):
+        assert ap.source_is_public(src) is False
+    for f in (*ec.FIELDS, "word"):
+        assert ap.field_is_public("evening_checkin", f) is False
+    assert character_public.mind_component_is_public("stress_management") is False
+
+
+def test_no_checkin_field_is_in_the_public_correlation_record():
+    import weekly_correlation_compute_lambda as wc
+
+    private = {*ec.FIELDS, "word"}
+    assert [p for p in wc.CORRELATION_PAIRS if p[0] in private or p[1] in private] == []
+    assert not {p[2] for p in wc.CORRELATION_PAIRS} & {p[2] for p in cip.PAIRS}
