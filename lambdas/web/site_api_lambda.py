@@ -888,7 +888,7 @@ def _dispatch_route(event, path, method):
                     if _cd_full_id in _cd_absent:
                         continue  # #4217: an absent coach has no standing ask on the door
                     try:
-                        _cd_dossier = _dossier_block(_cd_full_id)
+                        _cd_dossier = _dossier_block(_cd_full_id, commitments_only=True)  # only commitments are read here
                     except Exception:
                         continue  # one coach's dossier failing must not blank the board
                     for _cd_commit in _cd_dossier.get("commitments", []) or []:
