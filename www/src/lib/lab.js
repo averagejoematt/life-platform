@@ -23,7 +23,7 @@ export const LAB_ENV = "WEB_LAB";
  * owned_paths.json, and the deploy scan stops refusing them. Read as text by scripts/publish_snapshot_lab.py
  * (`lab_live`) and scripts/check_www_build.py — keep it one line: `export const LAB_LIVE = true|false;`.
  */
-export const LAB_LIVE = false;
+export const LAB_LIVE = true;
 
 /**
  * The routes the Lab adds when the switch is on (pattern → entrypoint, relative to www/). `path` is the directory
