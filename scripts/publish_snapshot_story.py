@@ -66,8 +66,22 @@ ABSENT_STORY = {
 }
 
 
-def story_enabled(env: dict | None = None) -> bool:
-    """The Python twin of www/src/lib/story_dark.js::storyEnabled — only the literal "1" turns the story on."""
+def story_live() -> bool:
+    """The committed go-live switch, www/src/lib/story_dark.js STORY_LIVE, read as text (scripts/www_launch_switch.py; unreadable = dark)."""
+    import sys
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import www_launch_switch  # noqa: E402 — the one Python reader of the go-live constants
+
+    return www_launch_switch.story_live()
+
+
+def story_enabled(env: dict | None = None, live: bool | None = None) -> bool:
+    """The Python twin of www/src/lib/story_dark.js::storyEnabled — on when committed live, or by the literal WEB_STORY=1."""
+    if (story_live() if live is None else live) is True:
+        return True
     return (os.environ if env is None else env).get(STORY_ENV) == "1"
 
 

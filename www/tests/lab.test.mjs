@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LAB_DATA_FILE, LAB_ENV, LAB_MARKER, LAB_ROOT, LAB_ROUTES, labEnabled, labIntegration, notLabPage } from "../src/lib/lab.js";
+import { LAB_DATA_FILE, LAB_ENV, LAB_LIVE, LAB_MARKER, LAB_ROOT, LAB_ROUTES, labEnabled, labIntegration, labPrivate, notLabPage } from "../src/lib/lab.js";
 import { feeds, gatedPaths, jsonFiles, orphanChunks, ownedPaths, probes, sitemaps } from "../scripts/lab_audit.mjs";
 import { walk } from "../scripts/room_audit.mjs";
 
@@ -30,18 +30,18 @@ function plantedCopy() {
 // ── the switch ──────────────────────────────────────────────────────────────────────────────────────────────────
 test("only the literal WEB_LAB=1 turns the Lab on", () => {
   assert.equal(LAB_ENV, "WEB_LAB");
-  assert.equal(labEnabled({}), false);
-  for (const v of ["", "0", "true", "yes", " 1", "1 "]) assert.equal(labEnabled({ WEB_LAB: v }), false, `WEB_LAB=${JSON.stringify(v)}`);
-  assert.equal(labEnabled({ WEB_ROOM: "1" }), false, "the Coaching Room's switch is not the Lab's");
-  assert.equal(labEnabled({ WEB_LAB: "1" }), true);
+  assert.equal(labEnabled({}, false), false);
+  for (const v of ["", "0", "true", "yes", " 1", "1 "]) assert.equal(labEnabled({ WEB_LAB: v }, false), false, `WEB_LAB=${JSON.stringify(v)}`);
+  assert.equal(labEnabled({ WEB_ROOM: "1" }, false), false, "the Coaching Room's switch is not the Lab's");
+  assert.equal(labEnabled({ WEB_LAB: "1" }, false), true);
 });
 
 test("switch off: the integration injects no route (control: switch on injects every Lab route)", () => {
   const off = [];
-  labIntegration({}).hooks["astro:config:setup"]({ injectRoute: (r) => off.push(r) });
+  labIntegration({}, false).hooks["astro:config:setup"]({ injectRoute: (r) => off.push(r) });
   assert.deepEqual(off, []);
   const on = [];
-  labIntegration({ WEB_LAB: "1" }).hooks["astro:config:setup"]({ injectRoute: (r) => on.push(r) });
+  labIntegration({ WEB_LAB: "1" }, false).hooks["astro:config:setup"]({ injectRoute: (r) => on.push(r) });
   assert.deepEqual(
     on.map((r) => r.pattern),
     LAB_ROUTES.map((r) => r.pattern),
@@ -71,8 +71,8 @@ test("every Lab route sits under /data/lab/ and its page lives outside src/pages
 });
 
 test("the sitemap filter drops every Lab path and keeps everything else", () => {
-  for (const p of [...LAB_ROUTES.map((r) => r.path), "/data/lab/tests/x/", "/next/v9/data/lab/"]) assert.equal(notLabPage(`https://averagejoematt.com${p}`), false, p);
-  for (const p of ["/", "/data/", "/data/experiments/x/", "/data/labs-are-not-the-lab/", "/data/day/2026-10-04/"]) assert.equal(notLabPage(`https://averagejoematt.com${p}`), true, p);
+  for (const p of [...LAB_ROUTES.map((r) => r.path), "/data/lab/tests/x/", "/next/v9/data/lab/"]) assert.equal(notLabPage(`https://averagejoematt.com${p}`, false), false, p);
+  for (const p of ["/", "/data/", "/data/experiments/x/", "/data/labs-are-not-the-lab/", "/data/day/2026-10-04/"]) assert.equal(notLabPage(`https://averagejoematt.com${p}`, false), true, p);
 });
 
 test("the probes include one object page per dynamic route", () => {
@@ -82,7 +82,7 @@ test("the probes include one object page per dynamic route", () => {
 });
 
 // ── the flag-off dist: six checks, each with its own planted control ──────────────────────────────────────────────
-const why = !HAVE_DIST ? `no built dist at ${DIST} — run the flag-off build first (CI: check_www_build.py)` : LAB_BUILD ? `${DIST} is a WEB_LAB=1 build` : false;
+const why = LAB_LIVE ? "the Lab is committed live (LAB_LIVE): the flag-off proofs do not apply" : !HAVE_DIST ? `no built dist at ${DIST} — run the flag-off build first (CI: check_www_build.py)` : LAB_BUILD ? `${DIST} is a WEB_LAB=1 build` : false;
 const distTest = (name, fn) => test(name, { skip: why }, fn);
 
 distTest("1 · every Lab path is a 404 on direct request (control: a planted page answers 200)", async () => {
@@ -140,7 +140,7 @@ distTest("4 · no feed or search index, and nothing machine-readable names a Lab
   }
 });
 
-test("5 · the committed owned_paths.json names no Lab path (control: a planted route and pattern)", () => {
+test("5 · the committed owned_paths.json names no Lab path (control: a planted route and pattern)", { skip: LAB_LIVE ? "the Lab is committed live" : false }, () => {
   const owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"));
   assert.deepEqual(ownedPaths(owned), []);
   const planted = { ...owned, routes: [...owned.routes, LAB_ROOT], route_patterns: [...(owned.route_patterns || []), "/data/lab/tests/[id]/"] };
@@ -166,4 +166,31 @@ distTest("6 · no CSS/JS chunk exists only for a gated page, none is named for t
 distTest("the flag-off dist holds no Lab directory at all", () => {
   assert.ok(!existsSync(join(DIST, LAB_ROOT)), `${LAB_ROOT} must not exist in a flag-off dist (was this dist built with WEB_LAB=1?)`);
   assert.ok(!readdirSync(join(DIST, "data")).includes(LAB_DATA_FILE));
+});
+
+// ── the go-live switch (2026-11-09): LAB_LIVE, one committed line ─────────────────────────────────────────────────
+test("the go-live constant is one literal line, false until the owner's go (feat/lab-go-live flips it)", () => {
+  const src = readFileSync(join(WWW, "src", "lib", "lab.js"), "utf8");
+  const lines = src.match(/^export const LAB_LIVE = (true|false);$/gm) || [];
+  assert.equal(lines.length, 1, "scripts/www_launch_switch.py reads exactly this one line");
+  assert.equal(typeof LAB_LIVE, "boolean");
+});
+
+test("live: the Lab is on with no env, its pages are kept in the sitemap, and no build is 'private' (control: dark)", () => {
+  assert.equal(labEnabled({}, true), true);
+  assert.equal(labPrivate({ WEB_LAB: "1" }, true), false, "a live Lab is never a private build");
+  assert.equal(labPrivate({ WEB_LAB: "1" }, false), true, "the control: dark + env switch IS the private build");
+  assert.equal(labPrivate({}, false), false);
+  for (const r of LAB_ROUTES) assert.equal(notLabPage(`https://averagejoematt.com${r.path}`, true), true, r.path);
+  const on = [];
+  labIntegration({}, true).hooks["astro:config:setup"]({ injectRoute: (r) => on.push(r.pattern) });
+  assert.deepEqual(on, LAB_ROUTES.map((r) => r.pattern));
+});
+
+test("live dist: the Lab is built, owned, mapped and public — no private banner, no noindex", { skip: !LAB_LIVE ? "the Lab is dark (LAB_LIVE false)" : !HAVE_DIST ? "no built dist" : false }, () => {
+  const owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"));
+  assert.ok(owned.routes.includes(LAB_ROOT) && owned.static_routes.includes(LAB_ROOT), "owned_paths.json owns /data/lab/");
+  const html = readFileSync(join(DIST, LAB_ROOT, "index.html"), "utf8");
+  assert.ok(!html.includes("private build"), "no private banner on a live page");
+  assert.ok(!html.includes('content="noindex, nofollow"'), "no private-build robots tag (the preview base's own noindex is the base's, not the Lab's)");
 });

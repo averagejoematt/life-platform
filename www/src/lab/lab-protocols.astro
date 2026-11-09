@@ -6,12 +6,12 @@
 import Base from "../layouts/Base.astro";
 import LabBanner from "../components/LabBanner.astro";
 import { dayInWords, num } from "../lib/format.js";
-import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import { LAB_MARKER, labEnabled, labPrivate } from "../lib/lab.js";
 import { evidenceSplit, prose } from "../lib/laboratory.js";
 import { loadLab } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
-if (!labEnabled()) throw new Error("src/lab/lab-protocols.astro rendered with WEB_LAB off — the Lab route must not be injected");
+if (!labEnabled()) throw new Error("src/lab/lab-protocols.astro rendered with the Lab switched off — the Lab route must not be injected");
 
 const lab = await loadLab();
 const prot = lab.lab_protocols || { groups: [], served_protocols: null };
@@ -23,7 +23,7 @@ const mark = { [LAB_MARKER]: "protocols" };
 ---
 
 <Base title="The protocols" top="data" description="What he takes, when, why — and what the evidence says." status={asOf}>
-  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <Fragment slot="head">{!noindex && labPrivate() && <meta name="robots" content="noindex, nofollow" />}</Fragment>
   <LabBanner />
   <section class="section" {...mark} style="padding-bottom:20px">
     <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:1100px">
