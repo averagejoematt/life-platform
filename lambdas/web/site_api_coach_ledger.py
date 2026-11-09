@@ -837,8 +837,10 @@ def handle_calibration(event, *, _g):
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
-                # Owner requirement 2026-11-09: calibration-v2, served beside v1 and changing none of it.
+                # Owner ruling 2026-11-09: calibration-v2 is ADOPTED — the authority for every calibration verdict.
                 "assessment_v2": site_api_calibration_v2.assessment_v2(decided_by_coach, {"hypotheses": hyp_pairs, **forecast_strata}),
+                # …and the v1 `calibration` / `label` / `score` fields above are deprecated: kept for API compatibility only.
+                "calibration_method": site_api_calibration_v2.method_block(),
                 "cycle": _current_cycle(),
                 # #2957: the season card said "THIS SEASON · CYCLE 14" beside a career
                 # forecast count and the reader-truth judge read the pair as one claim —
@@ -853,17 +855,19 @@ def handle_calibration(event, *, _g):
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
                     "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
-                    "always-say-50% baseline, lower is better. Calibrated and skilled are different claims: "
-                    "calibrated means stated confidence matches how often calls turn out right (reliability); "
-                    "skilled means beating the base rate (Brier skill > 0). A surface can be reliable without "
-                    "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
-                    "Calibrated. The platform-wide card scores skill against a STRATIFIED base rate — coach "
+                    "always-say-50% baseline, lower is better. The calibration verdict is calibration-v2 "
+                    "(`assessment_v2`, adopted 2026-11-09): three separate questions, each with its own test and "
+                    "interval — can calibration across confidence levels be estimated; is there statistically "
+                    "supported over- or under-confidence at an observed confidence level (exact binomial test, "
+                    "Holm-corrected); does a coach beat the same-call guess that nothing changes. Failing to detect "
+                    "a problem is never proof of good calibration. The older `calibration` / `label` / `score` "
+                    "fields are deprecated (see `calibration_method`). The platform-wide card scores skill against a STRATIFIED base rate — coach "
                     "calls, hypothesis bets and each forecasting MODEL's interval forecasts separately, every "
                     "one against its own climatology (the daily metric engine and the weekly training "
                     "prescription are different models and are never counted as one number) — so "
-                    "pooling strata with different base rates cannot manufacture a skill no stratum has; its "
-                    "over/under-confidence verdict is driven by the worst stratum's gap, and each stratum's own "
-                    "n, Brier and skill are served beside it. Voided bets: a reset voids — never grades — every still-open pre-registered "
+                    "pooling strata with different base rates cannot manufacture a skill no stratum has, and each "
+                    "stratum's own n, Brier and skill are served beside it; calibration-v2 assesses each stratum "
+                    "separately and never pools them. Voided bets: a reset voids — never grades — every still-open pre-registered "
                     "bet; each is recorded in the ledger and counted in `voided` so the graded denominator "
                     "is honest. They are excluded from Brier because they never resolved. Every hit rate here "
                     "carries its 95% Wilson interval (`accuracy_ci95`) alongside `n` — a hit rate off a small "

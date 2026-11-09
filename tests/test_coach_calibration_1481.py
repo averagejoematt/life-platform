@@ -335,6 +335,12 @@ def test_get_coach_track_record_shows_provenance(monkeypatch):
     recent_conv = out["conversation_learnings"]["recent"][0]
     assert recent_conv["checkin_id"] == "CHECKIN#2026-07-20#abcd1234"
     assert all(r["channel"] == "data" for r in out["recent_evaluations"])
+    # Owner ruling 2026-11-09: the calibration verdict is calibration-v2's three answers; v1's word is deprecated.
+    cal = out["calibration"]
+    assert cal["deprecated_fields"] == ["calibration"]
+    assert cal["assessment_v2"]["method_version"] == "calibration-v2"
+    assert {"estimability", "confidence_direction", "skill"} <= set(cal["assessment_v2"])
+    assert all(cal["assessment_v2"][q]["wording"] for q in ("estimability", "confidence_direction", "skill"))
 
 
 # ── AC3: observatory provenance helpers ──────────────────────────────────────
