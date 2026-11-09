@@ -92,10 +92,6 @@ def families_for(metrics: Iterable[Any]) -> list:
     return sorted(out)
 
 
-def is_brief_call(row: Any) -> bool:
-    return isinstance(row, dict) and str(row.get("source") or "") == BRIEF_CALL_SOURCE
-
-
 # ── cycles ──────────────────────────────────────────────────────────────────────────────────
 def cycle_of(day: Any) -> str:
     """The cycle id (its Monday, ISO) that contains ``day``."""

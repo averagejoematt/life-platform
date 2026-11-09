@@ -255,6 +255,7 @@ def test_the_written_brief_and_its_calls_carry_a_public_provenance():
 # ── 3. the dark switch ─────────────────────────────────────────────────────────────────────
 def test_the_switch_is_off_and_the_route_404s():
     assert POL.PUBLICATION_LIVE is False
+    assert PP.PUBLIC_BRIEF_SOURCE == POL.BRIEF_CALL_SOURCE  # the call policy and the producer name the same source
     table = Table()
     _run(table)
     resp, _ = _served(table, live=None)
@@ -362,6 +363,7 @@ def test_ledger_calls_are_gradeable_and_linked_to_the_brief():
         lambda d: d["interpretations"][0].update(text="He skipped his journal, so intake drifted."),  # private activity
         lambda d: d["interpretations"][0].update(text="Dinners with his partner pushed intake up."),  # a person
         lambda d: d["interpretations"][0].update(cites=[]),  # cites nothing
+        lambda d: d["interpretations"][0].update(text="Daily calories dropped sharply on 2026-12-25."),  # a date nobody was shown
     ],
 )
 def test_a_failing_interpretation_is_dropped_never_published(mutate):

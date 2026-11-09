@@ -44,7 +44,6 @@ The private coaching process is not touched: no private reader or writer changes
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -53,6 +52,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from ai.model_routing import model_for  # #4770: the one model registry
 from common import narrative_provenance as NP, public_brief_policy as POL
+from experiment.phase_filter import singleton_visible, with_phase_filter
 
 logger = logging.getLogger(__name__)
 
@@ -259,13 +259,9 @@ def generate(invoke: Callable, system: str, user: str, correction: str = "") -> 
 
 
 def parse_reply(text: str) -> Optional[dict]:
-    s, e = (text or "").find("{"), (text or "").rfind("}")
-    if s < 0 or e <= s:
-        return None
-    try:
-        out = json.loads(text[s : e + 1])
-    except ValueError:
-        return None
+    from ai.structured_json import parse_json_span  # #4276: the one parse door for model text
+
+    out = parse_json_span(text, "{")
     return out if isinstance(out, dict) else None
 
 
@@ -276,15 +272,32 @@ def _numbers(text: str) -> set:
     return numbers_in_text(_ISO.sub(" ", text or ""))
 
 
-def text_problems(text: Any, allowed: set) -> list:
-    """Why a piece of the coach's words cannot be published ([] = it can)."""
+def _grounding_findings(text: str, shown: str, today: Optional[str]) -> list:
+    """The registered grounding surface (tests/grounding_wiring.py): numbers, dates, freshness — against an allow-list
+    built from exactly what the model was shown (the facts, the previous brief, the item's own structured numbers)."""
+    from ai import grounded_generation as gg
+    from common.constants import EXPERIMENT_START_DATE
+
+    return gg.grounding_findings(
+        text,
+        allowed=gg.allowed_numbers(shown),
+        allowed_dates=gg.allowed_dates(shown),
+        generation_date_iso=today,
+        start_date_iso=EXPERIMENT_START_DATE,
+    )
+
+
+def text_problems(text: Any, allowed: set, shown: str = "", today: Optional[str] = None) -> list:
+    """Why a piece of the coach's words cannot be published ([] = it can). ``shown`` arms the grounding surface."""
     if not isinstance(text, str) or not text.strip():
         return ["empty"]
     reasons = []
     if len(text.split()) > MAX_WORDS:
         reasons.append("too_long")
-    if _numbers(text) - allowed:
+    if _numbers(text) - allowed:  # exact: every number is one the facts (or the item's own fields) carry
         reasons.append("uncited_number")
+    if shown and _grounding_findings(text, shown, today):
+        reasons.append("grounding")
     from common import prediction_publication as PP
 
     if PP.words_name_private_activity(text):
@@ -314,14 +327,21 @@ def _float(v: Any) -> Optional[float]:
     return f if f == f and abs(f) < 1e7 else None
 
 
-def check_draft(draft: dict, obs: list, metrics: list, actions: list, allowed: set, prior: Optional[dict]) -> tuple:
+def check_draft(
+    draft: dict, obs: list, metrics: list, actions: list, allowed: set, prior: Optional[dict], shown: str = "", today: Optional[str] = None
+) -> tuple:
     """(sections, dropped) — the items that pass, per section, and a count of dropped items (no text kept)."""
+
+    def bad(text: Any, own: set = frozenset()) -> list:
+        extra = " ".join(f"{x:g}" for x in sorted(own))
+        return text_problems(text, allowed | set(own), (shown + "\n" + extra) if shown else "", today)
+
     obs_ids = {o["id"] for o in obs}
     dropped = {"interpretations": 0, "predictions": 0, "recommendations": 0, "position_changes": 0}
     out: dict = {"interpretations": [], "predictions": [], "recommendations": [], "position_changes": []}
     for it in (draft.get("interpretations") or [])[:MAX_ITEMS]:
         cites = _cites((it or {}).get("cites"), obs_ids) if isinstance(it, dict) else None
-        if not cites or text_problems(it.get("text"), allowed):
+        if not cites or bad(it.get("text")):
             dropped["interpretations"] += 1
             continue
         out["interpretations"].append({"id": f"i{len(out['interpretations']) + 1}", "text": it["text"].strip(), "cites": cites})
@@ -338,7 +358,7 @@ def check_draft(draft: dict, obs: list, metrics: list, actions: list, allowed: s
         if not ok or not (WINDOW_MIN <= window <= WINDOW_MAX) or conf is None or not (CONF_MIN <= conf <= CONF_MAX) or not cites:
             dropped["predictions"] += 1
             continue
-        if text_problems(p.get("rationale"), allowed | own):
+        if bad(p.get("rationale"), own):
             dropped["predictions"] += 1
             continue
         out["predictions"].append(
@@ -367,7 +387,7 @@ def check_draft(draft: dict, obs: list, metrics: list, actions: list, allowed: s
                 dropped["recommendations"] += 1
                 continue
         own = {round(check["threshold"], 4)} if check else set()
-        if text_problems(r.get("text"), allowed | own) or text_problems(r.get("rationale"), allowed | own):
+        if bad(r.get("text"), own) or bad(r.get("rationale"), own):
             dropped["recommendations"] += 1
             continue
         out["recommendations"].append(
@@ -378,7 +398,7 @@ def check_draft(draft: dict, obs: list, metrics: list, actions: list, allowed: s
         if not isinstance(c, dict) or str(c.get("target")) not in prior_ids:
             dropped["position_changes"] += 1
             continue
-        if text_problems(c.get("text"), allowed) or text_problems(c.get("reason"), allowed):
+        if bad(c.get("text")) or bad(c.get("reason")):
             dropped["position_changes"] += 1
             continue
         out["position_changes"].append({"target": str(c["target"]), "text": c["text"].strip(), "reason": c["reason"].strip()})
@@ -497,7 +517,7 @@ def _query_briefs(table: Any, coach_id: str) -> list:
     }
     items: list = []
     while True:
-        resp = table.query(**kwargs)
+        resp = table.query(**with_phase_filter(kwargs))  # a reset's tombstoned briefs never feed the next one
         items.extend(resp.get("Items", []))
         if "LastEvaluatedKey" not in resp:
             return items
@@ -688,7 +708,9 @@ def run_coach(
     ledger: dict = {}
     for p in (prior or {}).get("predictions") or []:
         got = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": f"PREDICTION#{p.get('prediction_id')}"}).get("Item") or {}
-        ledger[p.get("prediction_id")] = {"status": got.get("status")}
+        ledger[p.get("prediction_id")] = {
+            "status": got.get("status") if singleton_visible(got) else None
+        }  # #946: a wiped call reads absent
     actions = action_metrics(metrics)
     families = POL.families_for(metrics) + [POL.PERSONA_FAMILY] + ([POL.LEDGER_FAMILY] if prior else [])
     provenance = NP.stamp(families, producer=PRODUCER, upstream=[prev] if prior else [])
@@ -707,7 +729,8 @@ def run_coach(
     if draft is None:
         return {"status": "held", "reason": "unparseable", **_cost(usages), "evidence_written": evidence_n}
     obs_metrics = [o["metric"] for o in obs]
-    sections, dropped = check_draft(draft, obs, obs_metrics, [m for m in actions if m in obs_metrics], allowed, prior)
+    shown = facts_text(obs) + ("\n" + pblock if pblock else "")
+    sections, dropped = check_draft(draft, obs, obs_metrics, [m for m in actions if m in obs_metrics], allowed, prior, shown, today)
     calls: list = []
     for pred in sections["predictions"]:
         item_id = f"p{len(calls) + 1}"

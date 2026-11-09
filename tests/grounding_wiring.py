@@ -162,6 +162,12 @@ _NOT_A_VITALS_SURFACE = (
     "rather than coverage. Revisit if its subject matter widens."
 )
 
+_NOT_A_VITALS_SURFACE_BRIEF = (
+    "not armed: the public brief's sleep and heart-rate figures are 7- and 28-day MEANS over the brief's own computed "
+    "observations (each with its window and n), not a single night's vital, so there is no night to scope a figure to; "
+    "the exact number check refuses any figure that is not one of those means."
+)
+
 _ALL = frozenset(GATE_CLASSES)
 
 
@@ -323,6 +329,16 @@ SURFACES = {
                 "as-of date), not a night-keyed map of stored whoop rows; passing a guessed map would flag every vitals "
                 "figure. Arming waits on the lead read citing the night map (#4188's own residual)."
             ),
+        },
+    ),
+    # Owner ruling 2026-11-09 (third, E): the public-safe coaching brief (COACH#<id> / PUBLIC_BRIEF#), served dark by
+    # /api/coach_brief. Every text field is checked against what the model was shown (the computed facts, the previous
+    # brief, the item's own structured numbers); `text_problems` adds an EXACT number check on top.
+    "lambdas/coach/public_brief.py::_grounding_findings": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": _THIRD_PERSON_SURFACE,
+            "night": _NOT_A_VITALS_SURFACE_BRIEF,
         },
     ),
     # #4188: the head coach's DAILY lead read (COACH#eli_marsh / LEAD_DAILY#), served as
@@ -845,6 +861,15 @@ SURFACE_FACETS = {
         "Fail-closed: `run` regenerates once when `check()` returns reasons and, if any survive, returns `held` before "
         "the write — nothing is stored, and the door falls back to its existing chain. A quality-gate regeneration must "
         "re-pass the same check or it is discarded.",
+    ),
+    "lambdas/coach/public_brief.py::_grounding_findings": _facet(
+        PUBLIC,
+        FAIL_CLOSED,
+        "check_draft@bad",
+        "The public-safe brief is reader text (dark behind public_brief_policy.PUBLICATION_LIVE; /api/coach_brief). "
+        "Fail-closed per item: `check_draft` drops any interpretation, rationale, recommendation or position change with a "
+        "grounding finding or an uncited number, and `run_coach` holds the whole brief (nothing written) when no item "
+        "survives. A dropped item is counted in `dropped_items`, never stored.",
     ),
     "lambdas/coach/coach_moves_sheet.py::check_line": _facet(
         PUBLIC,
