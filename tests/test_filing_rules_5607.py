@@ -392,11 +392,13 @@ class TestEveryPathFiles:
         routed = {
             "lambdas/coach/prediction_emission.py": "build_prediction_record runs/stamps the rules (coach_state_updater files through it)",
             "lambdas/privacy/diary_claims.py": "admit_claim refuses a claim that fails the rules",
+            "lambdas/coach/public_brief.py": "file_call runs validate_filing at filing and drops a call that is not gradeable (2026-11-09 E)",
         }
         named = {
             "lambdas/coach/dispute_docket.py": "a docket position: written already resolved from a code-validated criterion (validate_criterion)",
             "lambdas/coach/advice_links.py": "a key builder for links to an existing call; writes no prediction",
             "lambdas/web/trail_corrections.py": "reads an existing row by key; writes no prediction",
+            "lambdas/web/site_api_coach_brief.py": "reads a brief's filed calls by key (public chokepoint); writes no prediction",
             "deploy/seed_genesis_preregistration.py": "the one-shot genesis pre-registration seeder; the experiment is terminal (no reset)",
         }
         pat = re.compile(r"""["']sk["']\s*:\s*f?["']PREDICTION#|SK_PREFIX\s*=\s*["']PREDICTION#""")
@@ -447,6 +449,7 @@ class TestNoRetrospectiveInvention:
             "lambdas/coach/prediction_emission.py",
             "lambdas/coach/coach_state_updater.py",
             "lambdas/privacy/diary_claims.py",
+            "lambdas/coach/public_brief.py",  # 2026-11-09 E: files a NEW brief call at filing; never touches a stored row
         }
         importers = set()
         for top in ("lambdas", "mcp", "scripts", "deploy"):
