@@ -97,6 +97,23 @@ def week_routines(target_date: str, supplied: list[Any] | None = None) -> list[A
         return None
 
 
+def _plan_audit(hist: dict[str, Any], audits: list[dict[str, Any]], placed: list[str], exercises: list[Any]) -> dict[str, Any]:
+    """The `cardio_plan` audit stored on the routine's inputs snapshot (split out of attach_cardio_cues, #4880)."""
+    from training import cardio_menu
+
+    return {
+        "version": cardio_menu.CARDIO_MENU_VERSION,
+        "charter_version": audits[0].get("charter_version") if audits else None,
+        "kinds": placed,
+        "week_kinds_before": hist["week_kinds"],
+        # #5505: the offers he missed this week and the ones dropped past the re-offer allowance (counted as done)
+        "missed_kinds": hist["missed_kinds"],
+        "dropped_kinds": hist["dropped_kinds"],
+        # the gym cardio minutes this routine adds to the day's steps/movement goal (#5076 -> #5056)
+        "movement_minutes": cardio_menu.movement_minutes(exercises),
+    }
+
+
 def attach_cardio_cues(
     spec: Any,
     catalog: dict[str, Any] | None = None,
@@ -245,17 +262,7 @@ def attach_cardio_cues(
         stamped += 1
     # #5428: the After line follows the list's order as it stands now (a block placed after the cardio one adds it)
     cardio_note.apply_after_lines(exercises)
-    plan = {
-        "version": cardio_menu.CARDIO_MENU_VERSION,
-        "charter_version": audits[0].get("charter_version") if audits else None,
-        "kinds": placed,
-        "week_kinds_before": hist["week_kinds"],
-        # #5505: the offers he missed this week and the ones dropped past the re-offer allowance (counted as done)
-        "missed_kinds": hist["missed_kinds"],
-        "dropped_kinds": hist["dropped_kinds"],
-        # the gym cardio minutes this routine adds to the day's steps/movement goal (#5076 -> #5056)
-        "movement_minutes": cardio_menu.movement_minutes(exercises),
-    }
+    plan = _plan_audit(hist, audits, placed, exercises)
     snap = getattr(spec, "inputs_snapshot", None)
     if isinstance(snap, dict) or snap is None:
         try:
