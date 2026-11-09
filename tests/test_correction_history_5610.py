@@ -225,6 +225,21 @@ def test_the_owner_rulings_of_2026_11_03_map_to_registered_words():
         assert cr.explain([rid])
 
 
+def test_the_owner_rulings_of_2026_11_09_map_to_registered_words():
+    # The reasons the 2026-11-09 classification rulings and re-grades write (manifest v4) parse to registered ids —
+    # registered BEFORE any row is corrected, so the ledger export never meets an unexplained rule.
+    for letter in "randuhmpxv":
+        rid = f"#5611:{letter}+owner-2026-11-09"
+        assert ch.rule_ids_of_reason(f"#5611 ({letter}) + owner ruling 2026-11-09: manifest v4") == [rid]
+        assert "outside the accuracy count" in cr.explain([rid])
+    for letter in "gl":
+        rid = f"#5533:{letter}+owner-2026-11-09"
+        assert ch.rule_ids_of_reason(f"#5533 ({letter}) + owner ruling 2026-11-09: manifest v4") == [rid]
+        assert "the first grade is kept" in cr.explain([rid])
+    # A late-data re-grade followed by a classification ruling reads as two explained entries, in order.
+    assert cr.explain(["#5533:l+owner-2026-11-09", "#5611:m+owner-2026-11-09"]).startswith("Readings for the call's window")
+
+
 def test_an_open_call_reclassified_as_an_observation_reads_as_withdrawn():
     row = {
         "prediction_id": "p",

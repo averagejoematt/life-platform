@@ -149,7 +149,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/web/site_api_body.py::vitals": 174,
     "lambdas/web/site_api_budget.py::inference_receipt": 229,
     "lambdas/web/site_api_character.py::character": 186,
-    "lambdas/web/site_api_coach_ledger.py::handle_predictions": 175,  # call publication (owner, 2026-11-05): the due block moved to _due_block
+    "lambdas/web/site_api_coach_ledger.py::handle_predictions": 156,  # owner 2026-11-09: the overall block moved to _overall_block
     "lambdas/web/site_api_coach_narrative.py::handle_coach_analysis": 190,
     "lambdas/web/site_api_coach_narrative.py::handle_coach_timeline": 163,
     "lambdas/web/site_api_habits.py::habits": 275,

@@ -79,6 +79,10 @@ prose lines read `gated_movements.running.gate_lb` (`_run_gate_lb()`); the whole
 The owner_redlines.py `run_gate_lb` record stays (its row): the owner's stated text, which the charter now carries as
 numbers (`gated_movements.running.walking_weeks` / `walking_hours_per_wk` / `onramp`), held equal to the record's
 `tissue_clause` by tests/test_run_onramp_5090.py.
+Retired since the seed: lambdas/training/program_structure.py::movement_gate_lb (#5694, 2026-11-08, 2 lines: the hinge's
+`conventional_pull_gate_lb` and its "TRAP BAR until 275 lb" pattern prose) and one owner_redlines.py::movement_gate_lb line
+(`load_anchoring.trap_bar_until_lb`) — the owner retired the trap-bar hinge rule; the charter's
+`gated_movements.conventional_deadlift` is open by owner ruling and its weight is read only as the Foundation -> Build boundary.
 
 Registered in scripts/obligation_carriers.py::RESIDUE_LEDGERS (carrier #5050, expires
 2027-01-15).
@@ -90,10 +94,9 @@ SEEDED_ROW_COUNT = 21
 
 TRAINING_CHARTER_RESIDUE = {
     "config/user_goals.json::steps_floor": 1,
-    "lambdas/training/owner_redlines.py::movement_gate_lb": 7,
+    "lambdas/training/owner_redlines.py::movement_gate_lb": 6,
     "lambdas/training/owner_redlines.py::rate_band": 2,
     "lambdas/training/owner_redlines.py::volume_band_sets": 1,
-    "lambdas/training/program_structure.py::movement_gate_lb": 2,
     "lambdas/training/program_structure.py::volume_band_sets": 2,
     "lambdas/training/program_v03.py::anchor_block_weeks": 1,
     "lambdas/training/routine_generator.py::session_minutes": 2,

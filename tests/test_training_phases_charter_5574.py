@@ -33,6 +33,7 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "lambdas"))
 
 from training import training_charter as tc  # noqa: E402
+from training.phase_evaluator import OWNER_TWIN_REFS  # noqa: E402  (#5575: the ONE alias map, the evaluator's)
 
 _CHARTER = json.loads((_REPO / "config" / "training_charter.json").read_text())
 _EXAMPLE_TWIN = json.loads((_REPO / "config" / "training_charter.private.example.json").read_text())
@@ -59,8 +60,8 @@ def _resolve(doc: Any, dotted: str) -> bool:
 
 # An owner-only value is referenced by an alias, never by its twin path: the owner prompt block carries the whole
 # public charter and must not name a private-twin key (tests/test_charter_ai_budget_5084.py). The alias resolves
-# here, against the committed example twin's SHAPE; the evaluator (#5575) reads the same map.
-OWNER_TWIN_REFS = {"owner_twin:goal_weight": "target_picture.weight_band_lb[1]"}
+# here, against the committed example twin's SHAPE, through the evaluator's own map (`training.phase_evaluator`,
+# #5575) — one map, so the contract and the reader cannot disagree about where an alias points.
 
 
 def _ref_ok(charter: dict, ref: str, where: str) -> List[str]:

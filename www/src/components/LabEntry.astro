@@ -3,7 +3,7 @@
 // renders nothing and reads nothing — not even the Lab's data file — so /data/ is byte-identical to a build without
 // it. No <style>, no <script>: it adds no asset to the build either way.
 import { num } from "../lib/format.js";
-import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import { LAB_MARKER, labEnabled, labPrivate } from "../lib/lab.js";
 import { labCounts } from "../lib/laboratory.js";
 import { loadLab } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
@@ -20,7 +20,7 @@ const mark = { [LAB_MARKER]: "entry" };
       <div class="rows" style="max-width:760px">
         <a href={href("/data/lab/")}>
           <span>
-            <b>The Laboratory · private build, not published</b>
+            <b>The Laboratory{labPrivate() ? " · private build, not published" : " · what he is trying on purpose"}</b>
             <br />
             <span class="muted" style="font-size:13px">
               {c

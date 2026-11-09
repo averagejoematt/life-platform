@@ -102,8 +102,20 @@ _LIVE_RUN_KEYS = (
 )
 
 
-def lab_enabled(env: dict | None = None) -> bool:
-    """The Python twin of www/src/lib/lab.js::labEnabled — only the literal "1" turns the Lab on."""
+def lab_live() -> bool:
+    """The committed go-live switch, www/src/lib/lab.js LAB_LIVE, read as text (scripts/www_launch_switch.py; unreadable = dark)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import www_launch_switch  # noqa: E402 — the one Python reader of the go-live constants
+
+    return www_launch_switch.lab_live()
+
+
+def lab_enabled(env: dict | None = None, live: bool | None = None) -> bool:
+    """The Python twin of www/src/lib/lab.js::labEnabled — on when the Lab is committed live, or by the literal WEB_LAB=1."""
+    if (lab_live() if live is None else live) is True:
+        return True
     return (os.environ if env is None else env).get(LAB_ENV) == "1"
 
 
