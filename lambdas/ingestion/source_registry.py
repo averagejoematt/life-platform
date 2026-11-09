@@ -1202,7 +1202,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         },
         # #914: the PRIMARY presence anchor — the daily-expected manual channel and
         # the first, most reliable thing to stop when routine breaks.
-        "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
+        # #5519: a row counts as LOGGING only when it holds diary entries — a summary-only stub
+        # (`entries_count` 0, empty `food_log`: the app's pre-filled scheduled item, or an
+        # emptied #4638 record) is the not-logged day, the same rule as every intake reader
+        # (`health.nutrition_logging.is_stub`).
+        "engagement_channel": {"label": "food", "stale_days": 2, "primary": True, "presence_predicate": "macrofactor_logged"},
         # #3252: the only source that records what he ate.
         "evidence_for": ("nutrition",),
         # #5097: the adaptive expenditure is a field feed — only the daily-summary export

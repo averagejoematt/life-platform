@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-784 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+786 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -231,7 +231,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `temptations` | — | site_api_mind.py |
 | `time_affluence` | — | — |
 | `todoist` | — | daily_insight_compute_lambda.py, intelligence_common.py, site_api_fulfillment.py, site_api_sleep.py, tools_todoist.py |
-| `training_constraints` | tools_training_notes.py, variant_rotation.py | — |
+| `training_constraints` | tools_training_notes.py, variant_rotation.py | note_requests.py |
 | `training_notes` | training_notes_llm.py | tools_training_notes.py, training_notes_llm.py |
 | `training_reference` | — | episode_detect_lambda.py, site_api_nutrition.py, site_api_training.py |
 | `travel` | — | adaptive_mode_lambda.py, anomaly_detector_lambda.py, tools_lifestyle.py |
@@ -583,7 +583,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1377 total · 983 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1380 total · 986 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 146 literal-named declarations across three idioms, 4 composite; routing digest 101 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only

@@ -16,7 +16,8 @@ WIRE_UPPER. Four problem classes, each decided against `docs/coaching/HEVY_NOTE_
     rotation's `New: replaces …`, the pick-load W line, the calf cue); the joints critic's applied set-count change then
     INSERTED `3 sets today: first time in 19 weeks.` as a second reason. One reason per lift (§3.2, whose reason list
     includes the critic clause) and the clause is a safety change that is never dropped (§6.3), so the clause now takes
-    the reason slot (`session_block.add_reason`); `No jumps` and an earlier critic clause keep theirs.
+    the reason slot (`session_block.add_reason`); a layoff line (`Same load all sets: …`, re-grade #6) and an earlier
+    critic clause keep theirs.
   * L5 "dumbbell load 44 lb is not on a 2.5 lb step" (side bend) — COMPOSER defect. He logged 44 lb (19.958 kg, his
     2026-09-26 sets); the progression's floor_raise put that number on the rows unrounded. §5 'Row rounding' states the
     dumbbell step (2.5 lb under 50, nearest, ties down): `load_progression.round_to_implement` -> 45 lb.
@@ -296,10 +297,10 @@ def test_the_critic_clause_displaces_the_rotation_reason_and_fits_the_budget():
 
 
 def test_a_no_jumps_line_and_an_earlier_critic_clause_keep_their_lines():
-    capped = "RPE 7\nNo jumps today: session 2 back after a break.\nBreathe out on the press."
+    capped = "RPE 7\nSame load all sets: 2nd session back after 19 months off.\nBreathe out on the press."
     assert (
         session_block.add_reason(capped, "2 sets today.")
-        == "RPE 7\n2 sets today.\nNo jumps today: session 2 back after a break.\nBreathe out on the press."
+        == "RPE 7\n2 sets today.\nSame load all sets: 2nd session back after 19 months off.\nBreathe out on the press."
     )
     first = session_block.add_reason("RPE 8–9\nVolume day: chase 12.", "2 sets today: a lighter day for the joints.")
     assert first == "RPE 8–9\n2 sets today: a lighter day for the joints."
@@ -316,7 +317,9 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
 
     #5428 re-grade (2026-10-30): stale is now §3.3's 180 days, so the history sits 8 months back (the 10-29 draft's
     06-20 session is fresh and is the re-grade test's case), and a set cap after more than 90 days takes the capped
-    treatment — `RPE 7` and one `No jumps` line in the reason slot (tests/test_hevy_note_regrade_5428.py)."""
+    treatment — `RPE 7` and one layoff line in the reason slot (tests/test_hevy_note_regrade_5428.py). Re-grade #6
+    (2026-11-08): that line is `Same load all sets: ‹gap›.` with no set count, and the W step line leaves — the capped
+    lift holds its load (the 11-06 standing calf raise carried both)."""
     monkeypatch.setenv(lint.MODE_ENV, "off")
     ir = _lower()
     calf = ExerciseBlock(
@@ -344,13 +347,12 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
         "value": 243,
     }
     recs = critics_apply.apply_changes(ir, [verdict])
-    assert recs[0]["applied"] and recs[0]["clauses"][0]["clause"] == "No jumps: 3 sets today, 8 months off.", recs
-    assert ir.exercises[2].notes == (
-        "RPE 7\nNo jumps: 3 sets today, 8 months off.\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft."
-    )
+    assert recs[0]["applied"] and recs[0]["clauses"][0]["clause"] == "Same load all sets: first time in 8 months.", recs
+    assert ir.exercises[2].notes == "RPE 7\nSame load all sets: first time in 8 months.\nFull stretch at the bottom; knees soft."
     res = _lint(ir)
-    assert not [p for p in res.lines() if "[3]" in p], res.lines()
-    assert g.phone_lines(ir.exercises[2].notes) == 4
+    # the feeler W row stays (AT the start load, under the layoff line) and still reads as the feeler, not a warm-up ladder
+    assert ir.exercises[2].sets[0].type == "warmup" and not [p for p in res.lines() if "[3]" in p], res.lines()
+    assert g.phone_lines(ir.exercises[2].notes) == 4 == g.LIFT_MAX_LINES  # the layoff line is two phone lines; no W line beside it
 
 
 # ── composer fix 2: a step / floor-raise load lands on the implement's step ──────────────────────────────────────────

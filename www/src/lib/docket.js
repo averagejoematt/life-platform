@@ -292,6 +292,21 @@ export function refutedLedger(predictions, month) {
   };
 }
 
+/**
+ * "Wrong this month" as published (owner ruling 2026-11-09): ONLY eligible, verified and publication-cleared outcomes.
+ * `counted` is the producer's set of the calls in the verified record (lib/calibration.js countedCalls — public
+ * eligible, latest verification reproduced or corrected, classified as a checkable forecast, counted once). A call
+ * outside it — unverified, excluded by classification, a repeat, under review — is never listed as a miss here.
+ * `counted` null (the producer did not serve the list) → nothing at all: no unverified miss stands in.
+ */
+export function verifiedMisses(predictions, month, counted) {
+  const words = monthWords(month);
+  if (!(counted instanceof Set)) return { month, words, wrong: [], disputed: [], corrected: [], verified: false };
+  const inSet = (predictions || []).filter((p) => p && counted.has(p.id) && !isDisputed(p));
+  const v = refutedLedger(inSet, month);
+  return { ...v, disputed: [], verified: true };
+}
+
 /** One row of the view: the call's words, who, when it was made and settled, and the grader's served notes. */
 export function refutedRow(p, nameOf = (x) => x) {
   const words = callWords(p);

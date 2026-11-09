@@ -1,25 +1,35 @@
 ---
-// /system/calibration/ — the Coaching Room's instrument (CR1). BUILT DARK: this file lives outside src/pages/ and is
-// injected as a route ONLY when WEB_ROOM=1 (src/lib/room.js, astro.config.mjs). With the switch off it is not in the
-// build at all. Every figure is carried from the snapshot's calibration.json (/api/calibration + /api/predictions);
+// /system/calibration/ — the Coaching Room's instrument (CR1). This file lives outside src/pages/ and is injected as a
+// route only when the room's scope is on (src/lib/room.js, astro.config.mjs: WEB_ROOM=1 / WEB_ROOM=cr1 privately, or the
+// committed `room_public: "cr1"`). With the room off it is not in the build at all. Every figure is carried from the snapshot's calibration.json (/api/calibration + /api/predictions);
 // nothing is computed here (README requirement A). Four questions, simple on arrival, deep on demand: what the
 // coaches predicted, how often they were right, against a simple guess, how much uncertainty remains.
+// Owner ruling 2026-11-09: the page LEADS with the producer's verified sentence (the calls that could be checked under
+// the current rules, re-verified, against "nothing changes" on exactly those calls), then — prominently — why the record
+// changed (eligibility and verification rules were corrected, not the coaches improving), then the uncertainty, the
+// excluded calls by category, the method, the archived original grading and the sealed pre-registration.
 import Base from "../layouts/Base.astro";
 import { DISPUTED_NOTE, isDisputed } from "../lib/disputed.js";
 import {
   KIND_WORDS,
-  assessmentWords,
+  v2Answers,
   blendRow,
   coachVerified,
+  archiveRecord,
   excludedAccounting,
   methodChangeText,
   qualifyText,
   calibrationChart,
   concentrationText,
   intervalText,
-  labelWords,
+  v2MethodText,
+  v2Short,
+  v2Stratum,
   pct,
   recordHeadline,
+  signTestText,
+  verifiedLead,
+  whyChanged,
   skillText,
   strataRows,
   verdictWords,
@@ -27,11 +37,11 @@ import {
   voidedRows,
 } from "../lib/calibration.js";
 import { dayInWords, domainWords, kOfN, num } from "../lib/format.js";
-import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { ROOM_MARKER, roomAll, roomEnabled, roomPublic } from "../lib/room.js";
 import { loadAll, loadCalibration } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
 
-if (!roomEnabled()) throw new Error("src/room/calibration.astro rendered with WEB_ROOM off — the room route must not be injected");
+if (!roomEnabled()) throw new Error("src/room/calibration.astro rendered with the room off — the room route must not be injected");
 
 const file = await loadCalibration();
 const all = await loadAll();
@@ -49,11 +59,21 @@ const coaches = [...(cal.coaches || [])].sort((a: any, b: any) => (a.retired ===
 const chartCoaches = coaches.map((c: any) => ({ coach_name: c.coach_name, reliability_bins: c.reliability_bins || [] }));
 const disputed = all.byType.prediction.filter(isDisputed);
 const noindex = process.env.WEB_NOINDEX === "1";
+const pub = roomPublic(); // the published CR1 build: no private banner, indexed
+const whole = roomAll(); // CR2's per-coach record pages exist only on a whole-room private build
+const lead = verifiedLead(cal);
+const why = whyChanged(cal);
+const archived = archiveRecord(cal);
+const signText = signTestText(lead);
+const METHOD_NOTE = "https://github.com/averagejoematt/life-platform/blob/main/docs/methods/CALIBRATION_V2.md";
+const methodPage = all.get("method", "calibration_score_pairs");
 const asOf = file.as_of ? dayInWords(file.as_of) : null;
 const qualify = qualifyText(head);
 const methodChange = methodChangeText(cal.method);
 const excluded = excludedAccounting(cal);
-const stratumAssessment = assessmentWords((cal.platform?.strata?.coaches || {}).assessment_v2) || assessmentWords(cal.assessment_v2);
+// calibration-v2 (owner ruling 2026-11-09): the coaches' stratum's three answers, as served — never a v1 label.
+const stratumAnswers = v2Answers(v2Stratum(cal, "coaches"));
+const methodText = v2MethodText(cal);
 const funnel = [
   ["calls in the public ledger this cycle", rec.total, "ink"],
   ["observations — not graded, by design", rec.observational, "rule"],
@@ -68,10 +88,14 @@ const room = { [ROOM_MARKER]: "calibration" };
 ---
 
 <Base title="The coaches, graded" top="system" description={head ? head.sentence : "The coaches' record, graded by code."} status={asOf}>
-  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
-  <div {...room} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
-    Coaching Room · private build (WEB_ROOM=1) · not published
-  </div>
+  <Fragment slot="head">{!noindex && !pub && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  {
+    !pub && (
+      <div {...room} data-room-private="" class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+        Coaching Room · private build · not published
+      </div>
+    )
+  }
 
   {
     !ok || !head ? (
@@ -86,13 +110,41 @@ const room = { [ROOM_MARKER]: "calibration" };
         <section class="section" {...room} style="padding-bottom:28px">
           <div class="wrap" style="display:flex;flex-direction:column;gap:18px;max-width:1100px">
             <p class="label">System · the Coaching Room · cycle {cal.cycle} · through {asOf}</p>
-            <h1 style="font-size:clamp(32px,6vw,56px);line-height:1.04" data-headline={head.mode}>{head.h1}</h1>
-            <p class="serif" style="font-size:clamp(18px,2.4vw,22px);line-height:1.45;max-width:62ch">{head.dek}</p>
-            <p class="muted" style="font-size:13px;max-width:70ch;border-left:3px solid var(--ink);padding-left:12px" data-verification>{head.caveat}</p>
+            {
+              lead ? (
+                <h1 style="font-size:clamp(26px,4.4vw,42px);line-height:1.15;max-width:32ch" data-headline="verified" data-lead>{lead.sentence}</h1>
+              ) : (
+                <>
+                  <h1 style="font-size:clamp(32px,6vw,56px);line-height:1.04" data-headline={head.mode}>{head.h1}</h1>
+                  <p class="serif" style="font-size:clamp(18px,2.4vw,22px);line-height:1.45;max-width:62ch">{head.dek}</p>
+                  <p class="muted" style="font-size:13px;max-width:70ch;border-left:3px solid var(--ink);padding-left:12px" data-verification>{head.caveat}</p>
+                </>
+              )
+            }
+            {
+              why && (
+                <div style="border:2px solid var(--ink);padding:16px 18px;max-width:72ch;display:flex;flex-direction:column;gap:8px" data-why-changed>
+                  <p class="label">Why this record differs from the one first published</p>
+                  <p style="font-size:16px;line-height:1.5">{why.text}</p>
+                  {why.archive && (
+                    <p class="muted" style="font-size:14px">
+                      As first graded: <b class="mono">{kOfN(why.archive.k, why.archive.n)}</b>{why.archive.pct ? ` · ${why.archive.pct}` : ""}. Kept, every grade with it, in <a href="#archive">the archive</a>.
+                    </p>
+                  )}
+                </div>
+              )
+            }
             <p class="muted" style="font-size:13px;max-width:70ch">
               Graded by code, never by the coaches. A call under classification review keeps its verdict and is counted neither right nor wrong.
             </p>
-            {stratumAssessment && <p style="font-size:15px;max-width:70ch" data-assessment>{stratumAssessment}</p>}
+            {stratumAnswers.length > 0 && (
+              <dl style="font-size:15px;max-width:70ch;margin:0;display:flex;flex-direction:column;gap:8px" data-assessment>
+                {stratumAnswers.map((x) => (
+                  <div><dt style="font-weight:700">{x.ask}</dt><dd style="margin:0">{x.words}</dd></div>
+                ))}
+                {methodText && <p class="muted" style="font-size:13px">Three separate tests, each with its own interval ({methodText}). Not detecting a problem is not proof of good calibration.</p>}
+              </dl>
+            )}
           </div>
         </section>
 
@@ -101,7 +153,7 @@ const room = { [ROOM_MARKER]: "calibration" };
             <div style="padding:22px 18px 22px 0;border-bottom:1px solid var(--rule)">
               <p class="label">What they predicted</p>
               <p style="font-size:28px;font-weight:700;margin-top:8px" class="num">{rec.total ?? "—"} <small style="font-size:14px;font-weight:400">calls this cycle</small></p>
-              <p class="muted" style="font-size:13px;margin-top:6px">{rec.decided} of them could be checked against a reading. {rec.counted_text || ""}</p>
+              <p class="muted" style="font-size:13px;margin-top:6px">{lead && excluded && excluded.eligible !== null ? `${excluded.eligible} were graded right or wrong; ${lead.n} of those are forecasts that could be checked under the current rules.` : `${rec.decided} of them could be checked against a reading. ${rec.counted_text || ""}`}</p>
             </div>
             <div style="padding:22px 18px;border-bottom:1px solid var(--rule)">
               <p class="label">How often they were right</p>
@@ -110,7 +162,7 @@ const room = { [ROOM_MARKER]: "calibration" };
             </div>
             <div style="padding:22px 18px;border-bottom:1px solid var(--rule)">
               <p class="label">Against a simple guess</p>
-              <p style="font-size:17px;font-weight:700;margin-top:8px;line-height:1.3">{head.skill || "Not compared yet."}</p>
+              <p style="font-size:17px;font-weight:700;margin-top:8px;line-height:1.3">{lead && lead.baseline ? `A prediction that nothing changes: ${kOfN(lead.baseline.right, lead.baseline.n)}${lead.baseline.pct ? ` · ${lead.baseline.pct}` : ""}` : head.skill || "Not compared yet."}</p>
               <p class="muted" style="font-size:13px;margin-top:6px">
                 {versusGuess(head.records, "direction") && `Direction calls: coaches ${versusGuess(head.records, "direction")!.coach}, a guess that nothing changes ${versusGuess(head.records, "direction")!.guess}, of ${versusGuess(head.records, "direction")!.of}${head.mode === "verified" ? "" : ", as first graded"}.`}
               </p>
@@ -122,6 +174,75 @@ const room = { [ROOM_MARKER]: "calibration" };
             </div>
           </div>
         </section>
+
+        {
+          lead && (
+            <section class="section" {...room} data-uncertainty>
+              <div class="wrap grid cols2" style="gap:48px;align-items:start">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <h2 style="font-size:30px">How sure can we be</h2>
+                  <dl style="display:flex;flex-direction:column;gap:10px;margin:0;border-top:1px solid var(--ink)">
+                    <div style="display:flex;flex-direction:column;gap:2px;padding-top:10px;border-bottom:1px solid var(--rule);padding-bottom:10px">
+                      <dt style="font-size:14px;font-weight:700">The coaches</dt>
+                      <dd class="mono" style="font-size:13px;margin:0">{kOfN(lead.k, lead.n)}{lead.pct ? ` · ${lead.pct}` : ""}</dd>
+                      <dd class="mono muted" style="font-size:13px;margin:0">{lead.ci || "no interval served"}</dd>
+                    </div>
+                    {lead.baseline && (
+                      <div style="display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--rule);padding-bottom:10px">
+                        <dt style="font-size:14px;font-weight:700">A prediction that nothing changes <span class="muted" style="font-weight:400">· the same calls</span></dt>
+                        <dd class="mono" style="font-size:13px;margin:0">{kOfN(lead.baseline.right, lead.baseline.n)}{lead.baseline.pct ? ` · ${lead.baseline.pct}` : ""}</dd>
+                        {lead.baseline.ci && <dd class="mono muted" style="font-size:13px;margin:0">{lead.baseline.ci}</dd>}
+                      </div>
+                    )}
+                  </dl>
+                  {signText && <p style="font-size:15px;line-height:1.5" data-sign-test>{signText}</p>}
+                  {lead.baseline && lead.baseline.unscorable > 0 && (
+                    <p class="muted" style="font-size:13px;line-height:1.5">{lead.baseline.unscorable} of the calls had no reading before them for the simple prediction to start from; they count as its misses.</p>
+                  )}
+                  <p class="muted" style="font-size:13px;line-height:1.5">
+                    The intervals are 95% Wilson intervals. Several calls share a measure and a window, so they are not independent: the intervals and the test are
+                    optimistic, not conservative.
+                  </p>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px" data-methodology>
+                  <h2 style="font-size:30px">How it is scored</h2>
+                  <p style="font-size:15px;line-height:1.5">
+                    A call counts only if it named a measure, a direction or a number, and a date to check it by; if its grade was re-run under the current rules
+                    and came out the same (or the same as a recorded correction); and if it is cleared for publication. The simple prediction is graded on exactly
+                    those calls, by the same grader, against the same tolerance.
+                  </p>
+                  <p style="font-size:14px">
+                    <a href={METHOD_NOTE}>The method note (calibration v2)</a>
+                    {methodPage && <> · <a href={href(pathOf("method", methodPage.id))}>{methodPage.name || methodPage.title}</a></>}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )
+        }
+
+        {
+          lead && excluded && (
+            <section class="section" {...room} style="border-top:1px solid var(--ink)" data-excluded>
+              <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:900px">
+                <h2 style="font-size:30px">Which calls were left out, and why</h2>
+                {excluded.eligible !== null && excluded.total !== null && (
+                  <p style="font-size:16px;line-height:1.5" data-reconcile>
+                    <b class="mono">{excluded.eligible}</b> calls were graded right or wrong. <b class="mono">{excluded.total}</b> are left out of the count above,
+                    each for one reason, leaving <b class="mono">{excluded.counted}</b>. Every one stays in the ledger with its grade.
+                  </p>
+                )}
+                <div class="rows">
+                  {excluded.rows.map((r) => (
+                    <div data-excluded-category={r.key}><span style="font-size:14px">{r.words}</span><b class="mono">{r.n}</b></div>
+                  ))}
+                  {excluded.total !== null && (<div><span style="font-size:14px"><b>All left out</b></span><b class="mono">{excluded.total}</b></div>)}
+                </div>
+                {excluded.note && <p class="muted" style="font-size:13px">{excluded.note}</p>}
+              </div>
+            </section>
+          )
+        }
 
         <section class="section" {...room}>
           <div class="wrap grid cols2" style="gap:48px;align-items:start">
@@ -143,7 +264,7 @@ const room = { [ROOM_MARKER]: "calibration" };
               <p class="muted" style="font-size:13px;margin-top:12px">The counts are the platform's, as served; the bars only draw them.</p>
               {qualify && <p style="font-size:15px;line-height:1.5;margin-top:16px;border-left:3px solid var(--ink);padding-left:12px" data-qualify>{qualify}</p>}
               {
-                excluded && (
+                excluded && !lead && (
                   <div style="margin-top:16px" data-excluded>
                     <p class="label" style="margin-bottom:6px">Left out of the headline, and why</p>
                     <div class="rows">
@@ -221,14 +342,14 @@ const room = { [ROOM_MARKER]: "calibration" };
         <section class="section" {...room} style="border-top:1px solid var(--ink)">
           <div class="wrap">
             <h2 style="font-size:30px">Each coach</h2>
-            <p class="muted" style="font-size:14px;margin-top:8px;max-width:70ch">Every seat that made a checked call this cycle, retired seats included. A wide interval means the record could still move a long way. Each record is the grades as first written; none is yet published as re-verified.</p>
+            <p class="muted" style="font-size:14px;margin-top:8px;max-width:70ch">Every seat that made a checked call this cycle, retired seats included. A wide interval means the record could still move a long way. {head.mode === "verified" ? "Where a coach's re-verified record is served it leads; the first grading sits beside it." : "Each record is the grades as first written; none is yet published as re-verified."}</p>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:0 28px;margin-top:16px;border-top:1px solid var(--ink)">
               {coaches.map((c: any) => {
                 const obj = c.coach_ref ? all.get("coach", c.coach_ref) : null;
                 const dir = versusGuess(c.comparison?.records, "direction");
                 const numb = versusGuess(c.comparison?.records, "number");
                 const cv = coachVerified(c);
-                const assess = assessmentWords(c.assessment_v2);
+                const answers = v2Answers(c.assessment_v2);
                 return (
                   <article style="padding:16px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px" data-coach={c.coach_id}>
                     <p style="font-size:17px;font-weight:700">
@@ -246,15 +367,22 @@ const room = { [ROOM_MARKER]: "calibration" };
                         <p class="mono muted" style="font-size:12px">{intervalText(c.accuracy_ci95) || "no interval served"}</p>
                       </>
                     )}
-                    <p style="font-size:13px">{assess || c.comparison?.skill?.sentence}</p>
+                    {answers.length > 0 ? (
+                      <dl style="font-size:13px;margin:0;display:flex;flex-direction:column;gap:4px" data-calibration-v2>
+                        {answers.map((x) => (
+                          <div><dt class="muted" style="font-size:12px">{x.ask}</dt><dd style="margin:0">{x.words}</dd></div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p style="font-size:13px">{c.comparison?.skill?.sentence || "No calibration assessment served."}</p>
+                    )}
                     <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px;margin:4px 0 0">
                       {dir && (<><dt class="muted">direction v guess</dt><dd class="mono" style="margin:0">{dir.text}</dd></>)}
                       {numb && (<><dt class="muted">number v guess</dt><dd class="mono" style="margin:0">{numb.text}</dd></>)}
                       <dt class="muted">stated</dt><dd class="mono" style="margin:0">{concentrationText(c)}</dd>
-                      <dt class="muted">calibration</dt><dd style="margin:0">{labelWords(c.calibration)}</dd>
                       {c.under_review > 0 && (<><dt class="muted">disputed</dt><dd class="mono" style="margin:0">{c.under_review}, counted neither way</dd></>)}
                     </dl>
-                    {obj && <a href={href(`/system/coaches/${obj.id}/record/`)} style="font-size:13px;font-weight:700;margin-top:4px">{c.coach_name}'s full record →</a>}
+                    {obj && whole && <a href={href(`/system/coaches/${obj.id}/record/`)} style="font-size:13px;font-weight:700;margin-top:4px">{c.coach_name}'s full record →</a>}
                   </article>
                 );
               })}
@@ -283,7 +411,7 @@ const room = { [ROOM_MARKER]: "calibration" };
                       <td class="mono">{s.n ? (s.pct || "not published") : "none settled"}</td>
                       <td class="mono">{s.n ? (s.ci ? s.ci.replace("95% interval ", "") : "not published") : "—"}</td>
                       <td class="mono">{s.n ? skillText(s.skill).split(" — ")[0] : "—"}</td>
-                      <td>{s.n ? labelWords(s.label) : "insufficient evidence"}</td>
+                      <td>{s.n ? (v2Short(s.assessment) || "no assessment served") : "no resolved calls"}</td>
                     </tr>
                   ))}
                   {blend && (
@@ -294,7 +422,7 @@ const room = { [ROOM_MARKER]: "calibration" };
                       <td class="mono">{blend.pct || "—"}</td>
                       <td class="mono">{blend.ci ? blend.ci.replace("95% interval ", "") : "—"}</td>
                       <td class="mono">{skillText(blend.skill).split(" — ")[0]}</td>
-                      <td>{labelWords(blend.label)}</td>
+                      <td>not assessed — strata are never pooled</td>
                     </tr>
                   )}
                 </tbody>
@@ -351,12 +479,17 @@ const room = { [ROOM_MARKER]: "calibration" };
 
         <section class="section" {...room} style="border-top:1px solid var(--ink)">
           <div class="wrap" style="max-width:1000px">
-            <details data-archive>
+            <details data-archive id="archive">
               <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;gap:10px">
-                <b style="font-size:20px">The archive — grades not re-verified, and the career record</b>
+                <b style="font-size:20px">The archive — the original grading, and the career record</b>
               </summary>
               <div style="display:flex;flex-direction:column;gap:16px;margin-top:14px">
-                {head.archive && (
+                {archived ? (
+                  <p style="font-size:15px" data-archived-original>
+                    The original grading, {archived.label}: <b class="mono">{kOfN(archived.k, archived.n)}</b>{archived.pct ? ` · ${archived.pct}` : ""}{archived.ci ? ` · ${archived.ci}` : ""}.
+                    It is kept as history; the record above replaces it as the coaches' score.
+                  </p>
+                ) : head.archive && (
                   <p style="font-size:15px">As first graded, including grades not re-verified: <b class="mono">{kOfN(head.archive.k, head.archive.n)}</b>{head.archive.pct ? ` · ${head.archive.pct}` : ""}.</p>
                 )}
                 <p style="font-size:15px;line-height:1.5">

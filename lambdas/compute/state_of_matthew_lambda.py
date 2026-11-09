@@ -230,8 +230,9 @@ def gather_calibration_section(platform_summary: dict | None) -> dict | None:
         "accuracy_pct": platform_summary["accuracy_pct"],
         "brier": platform_summary["brier"],
         "brier_skill": platform_summary["brier_skill"],
-        "calibration": platform_summary["calibration"],
-        "label": platform_summary["label"],
+        # Owner ruling 2026-11-09: the calibration-v1 verdict (`calibration` / `label`) is retired from every reader
+        # surface, and this brief is one. calibration-v2 never pools strata, so the platform-wide brief carries no
+        # calibration verdict at all — only the counts and the Brier score; the verdicts live on /method/calibration/.
     }
 
 
@@ -248,7 +249,7 @@ def pick_highlight(forecast, hypotheses, coaches, calibration) -> dict | None:
     if calibration and (calibration.get("n") or 0) >= 5:
         return {
             "kind": "calibration",
-            "detail": {"calibration": calibration["calibration"], "n": calibration["n"], "brier": calibration["brier"]},
+            "detail": {"n": calibration["n"], "brier": calibration["brier"]},
         }
     if coaches and (coaches.get("disagreement_count") or 0) > 0:
         return {"kind": "coach_disagreement", "detail": coaches["disagreements"][0]}
@@ -478,8 +479,7 @@ def deterministic_fallback_narrative(state: dict) -> str:
         parts.append(f"The coaching panel currently has {n} open disagreement{'s' if n != 1 else ''}.")
     cal = state.get("calibration")
     if cal:
-        verdict = (cal.get("calibration") or "ungraded").replace("_", " ")
-        parts.append(f"Across {cal.get('n')} graded predictions the platform is {verdict} (Brier {cal.get('brier')}).")
+        parts.append(f"Across {cal.get('n')} graded predictions the Brier score is {cal.get('brier')}.")
     # #914: a loud/alarm gap leads even the deterministic fallback — this template
     # only restates fields already in `state`, so it stays fabrication-free.
     pres = state.get("presence")

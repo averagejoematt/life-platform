@@ -94,7 +94,7 @@ def test_handler_serves_the_void_count(monkeypatch):
     os.environ.setdefault("S3_BUCKET", "test-bucket")
     from web import site_api_coach as sac
 
-    def _fake_parallel_fetch(jobs):
+    def _fake_parallel_fetch(jobs, **_kw):  # `failures=` (CR1's all-or-nothing headline read)
         return {k: (_FIXTURE if k == "hypothesis-ledger" else []) for k in jobs}
 
     monkeypatch.setattr(sac, "_parallel_fetch", _fake_parallel_fetch)

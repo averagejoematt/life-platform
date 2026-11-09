@@ -5,7 +5,10 @@
     "as_of": "2026-10-31",
     "coaches": [
       {
-        "accuracy_ci95": [27.0, 53.4],
+        "accuracy_ci95": [
+          27.0,
+          53.4
+        ],
         "accuracy_pct": 39.6,
         "brier": 0.2471,
         "brier_skill": -0.0102,
@@ -15,32 +18,276 @@
         "comparison": {
           "rule_words": "a guess that nothing changes",
           "records": {
-            "direction": {"coach_right_on_scored": 3, "rule_right": 6, "scored": 21, "verdict": "no_clear_difference"},
-            "number": {"coach_right_on_scored": 12, "rule_right": 9, "scored": 22, "verdict": "no_clear_difference"},
-            "sealed": {"coach_right_on_scored": 1, "rule_right": 1, "scored": 2, "verdict": "too_few"},
-            "yes_no": {"coach_right_on_scored": 1, "rule_right": 1, "scored": 2, "verdict": "too_few"}
+            "direction": {
+              "coach_right_on_scored": 3,
+              "rule_right": 6,
+              "scored": 21,
+              "verdict": "no_clear_difference"
+            },
+            "number": {
+              "coach_right_on_scored": 12,
+              "rule_right": 9,
+              "scored": 22,
+              "verdict": "no_clear_difference"
+            },
+            "sealed": {
+              "coach_right_on_scored": 1,
+              "rule_right": 1,
+              "scored": 2,
+              "verdict": "too_few"
+            },
+            "yes_no": {
+              "coach_right_on_scored": 1,
+              "rule_right": 1,
+              "scored": 2,
+              "verdict": "too_few"
+            }
           },
-          "skill": {"brier_skill": -0.0102, "n": 48, "sentence": "Across 48 checked calls, so far they do not beat a simple guess."}
+          "skill": {
+            "brier_skill": -0.0102,
+            "n": 48,
+            "sentence": "Across 48 checked calls, so far they do not beat a simple guess."
+          }
         },
         "confirmed": 19,
         "label": "not_yet_skillful",
-        "lifetime": {"accuracy_ci95": [28.1, 51.0], "accuracy_pct": 38.9, "confirmed": 21, "n": 54},
+        "lifetime": {
+          "accuracy_ci95": [
+            28.1,
+            51.0
+          ],
+          "accuracy_pct": 38.9,
+          "confirmed": 21,
+          "n": 54
+        },
         "n": 48,
         "persona": "sleep_coach",
-        "quality": {"by_flag": {"logging_gap": 1, "low_power": 0, "proxy_metric": 0}, "clean": 4, "flagged": 1, "n": 48, "unassessed": 43},
-        "record": {"confirmed": 19, "n": 48, "refuted": 29, "through": "2026-10-31"},
+        "quality": {
+          "by_flag": {
+            "logging_gap": 1,
+            "low_power": 0,
+            "proxy_metric": 0
+          },
+          "clean": 4,
+          "flagged": 1,
+          "n": 48,
+          "unassessed": 43
+        },
+        "record": {
+          "confirmed": 19,
+          "n": 48,
+          "refuted": 29,
+          "through": "2026-10-31"
+        },
         "refuted": 29,
         "reliability_bins": [
-          {"hi": 0.5, "lo": 0.4, "mean_confidence": 0.444, "n": 1, "observed_rate": 0.0},
-          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 46, "observed_rate": 0.413},
-          {"hi": 0.7, "lo": 0.6, "mean_confidence": 0.6, "n": 1, "observed_rate": 0.0}
+          {
+            "hi": 0.5,
+            "lo": 0.4,
+            "mean_confidence": 0.444,
+            "n": 1,
+            "observed_rate": 0.0
+          },
+          {
+            "hi": 0.6,
+            "lo": 0.5,
+            "mean_confidence": 0.5,
+            "n": 46,
+            "observed_rate": 0.413
+          },
+          {
+            "hi": 0.7,
+            "lo": 0.6,
+            "mean_confidence": 0.6,
+            "n": 1,
+            "observed_rate": 0.0
+          }
         ],
         "retired": false,
         "skilled": false,
-        "under_review": 0
+        "under_review": 0,
+        "assessment_v2": {
+          "method_version": "calibration-v2",
+          "n": 48,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 48,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.4,
+                "hi": 0.5,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.444,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 44% came true 0 of 1 (95% CI 0%–98%)."
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 46,
+                "hits": 19,
+                "stated": 0.5,
+                "observed": 0.413,
+                "ci95": [
+                  0.27,
+                  0.568
+                ],
+                "ci_usable": true,
+                "statement": "Calls stated at about 50% came true 19 of 46 (95% CI 27%–57%)."
+              },
+              {
+                "lo": 0.6,
+                "hi": 0.7,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.6,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 60% came true 0 of 1 (95% CI 0%–98%)."
+              }
+            ],
+            "usable_levels": 1,
+            "minority_outcome_n": 19,
+            "reasons": [
+              "1 confidence level(s) with at least 17 calls, 2 needed",
+              "19 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 1 confidence level(s) with at least 17 calls, 2 needed; 19 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 48,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "consistent_not_established",
+            "label": null,
+            "estimate": 0.087,
+            "ci95": [
+              -0.068,
+              0.23
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.4,
+                "hi": 0.5,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.444,
+                "observed": 0.0,
+                "gap": 0.444,
+                "gap_ci95": [
+                  -0.531,
+                  0.444
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 46,
+                "hits": 19,
+                "stated": 0.5,
+                "observed": 0.413,
+                "gap": 0.087,
+                "gap_ci95": [
+                  -0.068,
+                  0.23
+                ],
+                "ci95": [
+                  0.27,
+                  0.568
+                ],
+                "p": 0.302,
+                "p_holm": 0.906,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.6,
+                "hi": 0.7,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.6,
+                "observed": 0.0,
+                "gap": 0.6,
+                "gap_ci95": [
+                  -0.375,
+                  0.6
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 0.8,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Consistent with stated confidence (not established): no level departs at alpha 0.05 over 48 calls.",
+            "short": "consistent with stated confidence (not established)"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 48,
+                "coach_right": 19,
+                "rule_right": 18,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.021,
+                "ci": [
+                  -0.02,
+                  0.021
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 48,
+            "wording": "No demonstrated advantage over the guess that nothing changes (48 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        }
       },
       {
-        "accuracy_ci95": [16.6, 40.3],
+        "accuracy_ci95": [
+          16.6,
+          40.3
+        ],
         "accuracy_pct": 27.1,
         "brier": 0.2502,
         "brier_skill": -0.0431,
@@ -50,31 +297,234 @@
         "comparison": {
           "rule_words": "a guess that nothing changes",
           "records": {
-            "direction": {"coach_right_on_scored": 10, "rule_right": 10, "scored": 36, "verdict": "no_clear_difference"},
-            "number": {"coach_right_on_scored": 1, "rule_right": 6, "scored": 7, "verdict": "too_few"},
-            "sealed": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 1, "verdict": "too_few"},
-            "yes_no": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 1, "verdict": "too_few"}
+            "direction": {
+              "coach_right_on_scored": 10,
+              "rule_right": 10,
+              "scored": 36,
+              "verdict": "no_clear_difference"
+            },
+            "number": {
+              "coach_right_on_scored": 1,
+              "rule_right": 6,
+              "scored": 7,
+              "verdict": "too_few"
+            },
+            "sealed": {
+              "coach_right_on_scored": 1,
+              "rule_right": 0,
+              "scored": 1,
+              "verdict": "too_few"
+            },
+            "yes_no": {
+              "coach_right_on_scored": 1,
+              "rule_right": 0,
+              "scored": 1,
+              "verdict": "too_few"
+            }
           },
-          "skill": {"brier_skill": -0.0431, "n": 48, "sentence": "Across 48 checked calls, so far they do not beat a simple guess."}
+          "skill": {
+            "brier_skill": -0.0431,
+            "n": 48,
+            "sentence": "Across 48 checked calls, so far they do not beat a simple guess."
+          }
         },
         "confirmed": 13,
         "label": "not_yet_skillful",
-        "lifetime": {"accuracy_ci95": [16.6, 40.3], "accuracy_pct": 27.1, "confirmed": 13, "n": 48},
+        "lifetime": {
+          "accuracy_ci95": [
+            16.6,
+            40.3
+          ],
+          "accuracy_pct": 27.1,
+          "confirmed": 13,
+          "n": 48
+        },
         "n": 48,
         "persona": "nutrition_coach",
-        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 2, "flagged": 0, "n": 48, "unassessed": 46},
-        "record": {"confirmed": 13, "n": 48, "refuted": 35, "through": "2026-10-31"},
+        "quality": {
+          "by_flag": {
+            "logging_gap": 0,
+            "low_power": 0,
+            "proxy_metric": 0
+          },
+          "clean": 2,
+          "flagged": 0,
+          "n": 48,
+          "unassessed": 46
+        },
+        "record": {
+          "confirmed": 13,
+          "n": 48,
+          "refuted": 35,
+          "through": "2026-10-31"
+        },
         "refuted": 35,
         "reliability_bins": [
-          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 47, "observed_rate": 0.255},
-          {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.85, "n": 1, "observed_rate": 1.0}
+          {
+            "hi": 0.6,
+            "lo": 0.5,
+            "mean_confidence": 0.5,
+            "n": 47,
+            "observed_rate": 0.255
+          },
+          {
+            "hi": 0.9,
+            "lo": 0.8,
+            "mean_confidence": 0.85,
+            "n": 1,
+            "observed_rate": 1.0
+          }
         ],
         "retired": false,
         "skilled": false,
-        "under_review": 0
+        "under_review": 0,
+        "assessment_v2": {
+          "method_version": "calibration-v2",
+          "n": 48,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 48,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 47,
+                "hits": 12,
+                "stated": 0.5,
+                "observed": 0.255,
+                "ci95": [
+                  0.139,
+                  0.403
+                ],
+                "ci_usable": true,
+                "statement": "Calls stated at about 50% came true 12 of 47 (95% CI 14%–40%)."
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 85% came true 1 of 1 (95% CI 2%–100%)."
+              }
+            ],
+            "usable_levels": 1,
+            "minority_outcome_n": 13,
+            "reasons": [
+              "1 confidence level(s) with at least 17 calls, 2 needed",
+              "13 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 1 confidence level(s) with at least 17 calls, 2 needed; 13 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 48,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "over_confident",
+            "label": "over_confident",
+            "estimate": 0.245,
+            "ci95": [
+              0.097,
+              0.361
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 47,
+                "hits": 12,
+                "stated": 0.5,
+                "observed": 0.255,
+                "gap": 0.245,
+                "gap_ci95": [
+                  0.097,
+                  0.361
+                ],
+                "ci95": [
+                  0.139,
+                  0.403
+                ],
+                "p": 0.0011,
+                "p_holm": 0.0022,
+                "rejects": true,
+                "direction": "over"
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "gap": -0.15,
+                "gap_ci95": [
+                  -0.15,
+                  0.825
+                ],
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Over-confident at its 50% calls (12 of 47 came true, 95% CI 14%–40%; Holm-adjusted p 0.0022) — a finding about calls at that confidence level, not about calibration across confidence levels.",
+            "short": "over-confident at its 50% calls"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 48,
+                "coach_right": 13,
+                "rule_right": 12,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.021,
+                "ci": [
+                  -0.02,
+                  0.021
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 48,
+            "wording": "No demonstrated advantage over the guess that nothing changes (48 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        }
       },
       {
-        "accuracy_ci95": [34.1, 65.9],
+        "accuracy_ci95": [
+          34.1,
+          65.9
+        ],
         "accuracy_pct": 50.0,
         "brier": 0.2433,
         "brier_skill": 0.0122,
@@ -84,31 +534,234 @@
         "comparison": {
           "rule_words": "a guess that nothing changes",
           "records": {
-            "direction": {"coach_right_on_scored": 7, "rule_right": 6, "scored": 19, "verdict": "too_few"},
-            "number": {"coach_right_on_scored": 8, "rule_right": 8, "scored": 12, "verdict": "too_few"},
-            "sealed": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 2, "verdict": "too_few"},
-            "yes_no": {"coach_right_on_scored": 1, "rule_right": 0, "scored": 1, "verdict": "too_few"}
+            "direction": {
+              "coach_right_on_scored": 7,
+              "rule_right": 6,
+              "scored": 19,
+              "verdict": "too_few"
+            },
+            "number": {
+              "coach_right_on_scored": 8,
+              "rule_right": 8,
+              "scored": 12,
+              "verdict": "too_few"
+            },
+            "sealed": {
+              "coach_right_on_scored": 1,
+              "rule_right": 0,
+              "scored": 2,
+              "verdict": "too_few"
+            },
+            "yes_no": {
+              "coach_right_on_scored": 1,
+              "rule_right": 0,
+              "scored": 1,
+              "verdict": "too_few"
+            }
           },
-          "skill": {"brier_skill": 0.0122, "n": 34, "sentence": "Across 34 checked calls, so far they beat a simple guess."}
+          "skill": {
+            "brier_skill": 0.0122,
+            "n": 34,
+            "sentence": "Across 34 checked calls, so far they beat a simple guess."
+          }
         },
         "confirmed": 17,
         "label": "under_review",
-        "lifetime": {"accuracy_ci95": [34.1, 65.9], "accuracy_pct": 50.0, "confirmed": 17, "n": 34},
+        "lifetime": {
+          "accuracy_ci95": [
+            34.1,
+            65.9
+          ],
+          "accuracy_pct": 50.0,
+          "confirmed": 17,
+          "n": 34
+        },
         "n": 34,
         "persona": "physical_coach",
-        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 3, "flagged": 0, "n": 34, "unassessed": 31},
-        "record": {"confirmed": 17, "n": 34, "refuted": 17, "through": "2026-10-31"},
+        "quality": {
+          "by_flag": {
+            "logging_gap": 0,
+            "low_power": 0,
+            "proxy_metric": 0
+          },
+          "clean": 3,
+          "flagged": 0,
+          "n": 34,
+          "unassessed": 31
+        },
+        "record": {
+          "confirmed": 17,
+          "n": 34,
+          "refuted": 17,
+          "through": "2026-10-31"
+        },
         "refuted": 17,
         "reliability_bins": [
-          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 33, "observed_rate": 0.485},
-          {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.85, "n": 1, "observed_rate": 1.0}
+          {
+            "hi": 0.6,
+            "lo": 0.5,
+            "mean_confidence": 0.5,
+            "n": 33,
+            "observed_rate": 0.485
+          },
+          {
+            "hi": 0.9,
+            "lo": 0.8,
+            "mean_confidence": 0.85,
+            "n": 1,
+            "observed_rate": 1.0
+          }
         ],
         "retired": false,
         "skilled": true,
-        "under_review": 0
+        "under_review": 0,
+        "assessment_v2": {
+          "method_version": "calibration-v2",
+          "n": 34,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 34,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 33,
+                "hits": 16,
+                "stated": 0.5,
+                "observed": 0.485,
+                "ci95": [
+                  0.308,
+                  0.665
+                ],
+                "ci_usable": true,
+                "statement": "Calls stated at about 50% came true 16 of 33 (95% CI 31%–66%)."
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 85% came true 1 of 1 (95% CI 2%–100%)."
+              }
+            ],
+            "usable_levels": 1,
+            "minority_outcome_n": 17,
+            "reasons": [
+              "1 confidence level(s) with at least 17 calls, 2 needed",
+              "17 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 1 confidence level(s) with at least 17 calls, 2 needed; 17 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 34,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "consistent_not_established",
+            "label": null,
+            "estimate": 0.015,
+            "ci95": [
+              -0.165,
+              0.192
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 33,
+                "hits": 16,
+                "stated": 0.5,
+                "observed": 0.485,
+                "gap": 0.015,
+                "gap_ci95": [
+                  -0.165,
+                  0.192
+                ],
+                "ci95": [
+                  0.308,
+                  0.665
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "gap": -0.15,
+                "gap_ci95": [
+                  -0.15,
+                  0.825
+                ],
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Consistent with stated confidence (not established): no level departs at alpha 0.05 over 34 calls.",
+            "short": "consistent with stated confidence (not established)"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 34,
+                "coach_right": 17,
+                "rule_right": 16,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.029,
+                "ci": [
+                  -0.028,
+                  0.029
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 34,
+            "wording": "No demonstrated advantage over the guess that nothing changes (34 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        }
       },
       {
-        "accuracy_ci95": [2.6, 51.3],
+        "accuracy_ci95": [
+          2.6,
+          51.3
+        ],
         "accuracy_pct": 14.3,
         "brier": 0.2301,
         "brier_skill": -0.8794,
@@ -118,31 +771,234 @@
         "comparison": {
           "rule_words": "a guess that nothing changes",
           "records": {
-            "direction": {"coach_right_on_scored": 0, "rule_right": 2, "scored": 3, "verdict": "too_few"},
-            "number": {"coach_right_on_scored": 1, "rule_right": 2, "scored": 3, "verdict": "too_few"},
-            "sealed": {"coach_right_on_scored": 0, "rule_right": 0, "scored": 0, "verdict": "none_scored"},
-            "yes_no": {"coach_right_on_scored": 0, "rule_right": 0, "scored": 1, "verdict": "too_few"}
+            "direction": {
+              "coach_right_on_scored": 0,
+              "rule_right": 2,
+              "scored": 3,
+              "verdict": "too_few"
+            },
+            "number": {
+              "coach_right_on_scored": 1,
+              "rule_right": 2,
+              "scored": 3,
+              "verdict": "too_few"
+            },
+            "sealed": {
+              "coach_right_on_scored": 0,
+              "rule_right": 0,
+              "scored": 0,
+              "verdict": "none_scored"
+            },
+            "yes_no": {
+              "coach_right_on_scored": 0,
+              "rule_right": 0,
+              "scored": 1,
+              "verdict": "too_few"
+            }
           },
-          "skill": {"brier_skill": -0.8794, "n": 7, "sentence": "Too few checked calls yet (7) to compare them with a simple guess."}
+          "skill": {
+            "brier_skill": -0.8794,
+            "n": 7,
+            "sentence": "Too few checked calls yet (7) to compare them with a simple guess."
+          }
         },
         "confirmed": 1,
         "label": "not_yet_skillful",
-        "lifetime": {"accuracy_ci95": [2.0, 43.5], "accuracy_pct": 11.1, "confirmed": 1, "n": 9},
+        "lifetime": {
+          "accuracy_ci95": [
+            2.0,
+            43.5
+          ],
+          "accuracy_pct": 11.1,
+          "confirmed": 1,
+          "n": 9
+        },
         "n": 7,
         "persona": "glucose_coach",
-        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 0, "flagged": 0, "n": 7, "unassessed": 7},
-        "record": {"confirmed": 1, "n": 7, "refuted": 6, "through": "2026-10-31"},
+        "quality": {
+          "by_flag": {
+            "logging_gap": 0,
+            "low_power": 0,
+            "proxy_metric": 0
+          },
+          "clean": 0,
+          "flagged": 0,
+          "n": 7,
+          "unassessed": 7
+        },
+        "record": {
+          "confirmed": 1,
+          "n": 7,
+          "refuted": 6,
+          "through": "2026-10-31"
+        },
         "refuted": 6,
         "reliability_bins": [
-          {"hi": 0.4, "lo": 0.3, "mean_confidence": 0.333, "n": 1, "observed_rate": 0.0},
-          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 6, "observed_rate": 0.167}
+          {
+            "hi": 0.4,
+            "lo": 0.3,
+            "mean_confidence": 0.333,
+            "n": 1,
+            "observed_rate": 0.0
+          },
+          {
+            "hi": 0.6,
+            "lo": 0.5,
+            "mean_confidence": 0.5,
+            "n": 6,
+            "observed_rate": 0.167
+          }
         ],
         "retired": false,
         "skilled": false,
-        "under_review": 1
+        "under_review": 1,
+        "assessment_v2": {
+          "method_version": "calibration-v2",
+          "n": 7,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 7,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.3,
+                "hi": 0.4,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.333,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 33% came true 0 of 1 (95% CI 0%–98%)."
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 6,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 0.167,
+                "ci95": [
+                  0.004,
+                  0.641
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 50% came true 1 of 6 (95% CI 0%–64%)."
+              }
+            ],
+            "usable_levels": 0,
+            "minority_outcome_n": 1,
+            "reasons": [
+              "0 confidence level(s) with at least 17 calls, 2 needed",
+              "1 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 0 confidence level(s) with at least 17 calls, 2 needed; 1 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 7,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "insufficient_evidence",
+            "label": null,
+            "estimate": 0.333,
+            "ci95": [
+              -0.141,
+              0.496
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.3,
+                "hi": 0.4,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.333,
+                "observed": 0.0,
+                "gap": 0.333,
+                "gap_ci95": [
+                  -0.642,
+                  0.333
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 6,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 0.167,
+                "gap": 0.333,
+                "gap_ci95": [
+                  -0.141,
+                  0.496
+                ],
+                "ci95": [
+                  0.004,
+                  0.641
+                ],
+                "p": 0.2187,
+                "p_holm": 0.4375,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Insufficient evidence: with 7 calls, no confidence level could have shown a departure at alpha 0.05.",
+            "short": "insufficient evidence"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 7,
+                "coach_right": 1,
+                "rule_right": 0,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.143,
+                "ci": [
+                  -0.136,
+                  0.143
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 7,
+            "wording": "No demonstrated advantage over the guess that nothing changes (7 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        }
       },
       {
-        "accuracy_ci95": [9.5, 90.5],
+        "accuracy_ci95": [
+          9.5,
+          90.5
+        ],
         "accuracy_pct": 50.0,
         "brier": 0.2,
         "brier_skill": null,
@@ -152,53 +1008,283 @@
         "comparison": {
           "rule_words": "a guess that nothing changes",
           "records": {},
-          "skill": {"brier_skill": null, "n": 2, "sentence": "Too few checked calls yet (2) to compare them with a simple guess."}
+          "skill": {
+            "brier_skill": null,
+            "n": 2,
+            "sentence": "Too few checked calls yet (2) to compare them with a simple guess."
+          }
         },
         "confirmed": 1,
         "label": "nascent",
-        "lifetime": {"accuracy_ci95": [9.5, 90.5], "accuracy_pct": 50.0, "confirmed": 1, "n": 2},
+        "lifetime": {
+          "accuracy_ci95": [
+            9.5,
+            90.5
+          ],
+          "accuracy_pct": 50.0,
+          "confirmed": 1,
+          "n": 2
+        },
         "n": 2,
         "persona": "training_coach",
-        "quality": {"by_flag": {"logging_gap": 0, "low_power": 0, "proxy_metric": 0}, "clean": 0, "flagged": 0, "n": 2, "unassessed": 2},
-        "record": {"confirmed": 1, "n": 2, "refuted": 1, "through": "2026-09-20"},
+        "quality": {
+          "by_flag": {
+            "logging_gap": 0,
+            "low_power": 0,
+            "proxy_metric": 0
+          },
+          "clean": 0,
+          "flagged": 0,
+          "n": 2,
+          "unassessed": 2
+        },
+        "record": {
+          "confirmed": 1,
+          "n": 2,
+          "refuted": 1,
+          "through": "2026-09-20"
+        },
         "refuted": 1,
         "reliability_bins": [
-          {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 1, "observed_rate": 1.0},
-          {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.85, "n": 1, "observed_rate": 0.0}
+          {
+            "hi": 0.6,
+            "lo": 0.5,
+            "mean_confidence": 0.5,
+            "n": 1,
+            "observed_rate": 1.0
+          },
+          {
+            "hi": 0.9,
+            "lo": 0.8,
+            "mean_confidence": 0.85,
+            "n": 1,
+            "observed_rate": 0.0
+          }
         ],
         "retired": true,
         "skilled": null,
-        "under_review": 0
+        "under_review": 0,
+        "assessment_v2": {
+          "method_version": "calibration-v2",
+          "n": 2,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 2,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 1.0,
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 50% came true 1 of 1 (95% CI 2%–100%)."
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.85,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 85% came true 0 of 1 (95% CI 0%–98%)."
+              }
+            ],
+            "usable_levels": 0,
+            "minority_outcome_n": 1,
+            "reasons": [
+              "0 confidence level(s) with at least 17 calls, 2 needed",
+              "1 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 0 confidence level(s) with at least 17 calls, 2 needed; 1 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 2,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "insufficient_evidence",
+            "label": null,
+            "estimate": 0.85,
+            "ci95": [
+              -0.125,
+              0.85
+            ],
+            "estimate_level": [
+              0.8,
+              0.9
+            ],
+            "tests": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 1.0,
+                "gap": -0.5,
+                "gap_ci95": [
+                  -0.5,
+                  0.475
+                ],
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.85,
+                "observed": 0.0,
+                "gap": 0.85,
+                "gap_ci95": [
+                  -0.125,
+                  0.85
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 0.3,
+                "p_holm": 0.6,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Insufficient evidence: with 2 calls, no confidence level could have shown a departure at alpha 0.05.",
+            "short": "insufficient evidence"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 2,
+                "coach_right": 1,
+                "rule_right": 0,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.5,
+                "ci": [
+                  -0.475,
+                  0.5
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 2,
+            "wording": "No demonstrated advantage over the guess that nothing changes (2 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        }
       }
     ],
     "comparison": {
       "method": "Sample method text, for layout only. Each graded call is also scored by a rule that predicts nothing changes, graded by the same grader against the same tolerance.",
       "min_n_for_rate": 20,
       "records": {
-        "direction": {"coach_right_on_scored": 36, "rule_right": 33, "scored": 118, "verdict": "no_clear_difference"},
-        "number": {"coach_right_on_scored": 35, "rule_right": 37, "scored": 61, "verdict": "no_clear_difference"},
-        "sealed": {"coach_right_on_scored": 8, "rule_right": 1, "scored": 13, "verdict": "too_few"},
-        "yes_no": {"coach_right_on_scored": 3, "rule_right": 2, "scored": 6, "verdict": "too_few"}
+        "direction": {
+          "coach_right_on_scored": 36,
+          "rule_right": 33,
+          "scored": 118,
+          "verdict": "no_clear_difference"
+        },
+        "number": {
+          "coach_right_on_scored": 35,
+          "rule_right": 37,
+          "scored": 61,
+          "verdict": "no_clear_difference"
+        },
+        "sealed": {
+          "coach_right_on_scored": 8,
+          "rule_right": 1,
+          "scored": 13,
+          "verdict": "too_few"
+        },
+        "yes_no": {
+          "coach_right_on_scored": 3,
+          "rule_right": 2,
+          "scored": 6,
+          "verdict": "too_few"
+        }
       },
       "rule_words": "a guess that nothing changes",
-      "skill": {"brier_skill": -0.0264, "n": 214, "sentence": "Across 214 checked calls, so far they do not beat a simple guess."}
+      "skill": {
+        "brier_skill": -0.0264,
+        "n": 214,
+        "sentence": "Across 214 checked calls, so far they do not beat a simple guess."
+      }
     },
     "cycle": 17,
     "cycle_start": "2026-09-06",
-    "hypotheses": {"accuracy_ci95": null, "accuracy_pct": null, "brier_skill": null, "calibration": "insufficient_data", "confirmed": 0, "n": 0, "reliability_bins": []},
+    "hypotheses": {
+      "accuracy_ci95": null,
+      "accuracy_pct": null,
+      "brier_skill": null,
+      "calibration": "insufficient_data",
+      "confirmed": 0,
+      "n": 0,
+      "reliability_bins": []
+    },
     "interval_forecasts": {
-      "accuracy_ci95": [84.4, 91.0],
+      "accuracy_ci95": [
+        84.4,
+        91.0
+      ],
       "accuracy_pct": 88.1,
       "brier_skill": -0.0627,
       "calibration": "not_yet_skillful",
       "confirmed": 326,
       "n": 370,
       "refuted": 44,
-      "reliability_bins": [{"hi": 0.9, "lo": 0.8, "mean_confidence": 0.8, "n": 370, "observed_rate": 0.881}]
+      "reliability_bins": [
+        {
+          "hi": 0.9,
+          "lo": 0.8,
+          "mean_confidence": 0.8,
+          "n": 370,
+          "observed_rate": 0.881
+        }
+      ]
     },
-    "method": {"effective": "2026-11-05", "note": "Sample method note, for layout only.", "version": 2},
+    "method": {
+      "effective": "2026-11-05",
+      "note": "Sample method note, for layout only.",
+      "version": 2
+    },
     "platform": {
-      "accuracy_ci95": [68.1, 75.4],
+      "accuracy_ci95": [
+        68.1,
+        75.4
+      ],
       "accuracy_pct": 71.9,
       "brier": 0.1588,
       "brier_skill": -0.0427,
@@ -207,14 +1293,122 @@
       "n": 592,
       "refuted": 170,
       "reliability_bins": [
-        {"hi": 0.6, "lo": 0.5, "mean_confidence": 0.5, "n": 208, "observed_rate": 0.409},
-        {"hi": 0.9, "lo": 0.8, "mean_confidence": 0.8, "n": 384, "observed_rate": 0.88}
+        {
+          "hi": 0.6,
+          "lo": 0.5,
+          "mean_confidence": 0.5,
+          "n": 208,
+          "observed_rate": 0.409
+        },
+        {
+          "hi": 0.9,
+          "lo": 0.8,
+          "mean_confidence": 0.8,
+          "n": 384,
+          "observed_rate": 0.88
+        }
       ],
       "strata": {
-        "coaches": {"base_rate": 0.411, "brier": 0.2487, "brier_skill": -0.0264, "calibration": "not_yet_skillful", "confirmed": 88, "n": 214, "skilled": false},
-        "hypotheses": {"base_rate": null, "brier": null, "brier_skill": null, "calibration": "insufficient_data", "confirmed": 0, "n": 0, "skilled": null},
-        "interval_forecasts": {"base_rate": 0.881, "brier": 0.1114, "brier_skill": -0.0627, "calibration": "not_yet_skillful", "confirmed": 326, "n": 370, "skilled": false},
-        "weekly_prescriptions": {"base_rate": 0.875, "brier": 0.115, "brier_skill": -0.0514, "calibration": "not_yet_skillful", "confirmed": 7, "n": 8, "skilled": false}
+        "coaches": {
+          "base_rate": 0.411,
+          "brier": 0.2487,
+          "brier_skill": -0.0264,
+          "calibration": "not_yet_skillful",
+          "confirmed": 88,
+          "n": 214,
+          "skilled": false,
+          "verified": {
+            "accuracy_ci95": [
+              37.2,
+              58.6
+            ],
+            "accuracy_pct": 47.9,
+            "baseline": {
+              "n": 71,
+              "right": 37,
+              "accuracy_ci95": [
+                40.7,
+                63.4
+              ],
+              "accuracy_pct": 52.1,
+              "text": "A prediction that nothing would change got 37 of the same 71 right.",
+              "unscorable": 2
+            },
+            "baseline_pct_rounded": 52,
+            "comparison": {
+              "n": 71,
+              "records": {
+                "direction": {
+                  "coach_right_on_scored": 36,
+                  "rule_right": 33,
+                  "scored": 118,
+                  "verdict": "no_clear_difference"
+                },
+                "number": {
+                  "coach_right_on_scored": 35,
+                  "rule_right": 37,
+                  "scored": 61,
+                  "verdict": "no_clear_difference"
+                },
+                "sealed": {
+                  "coach_right_on_scored": 8,
+                  "rule_right": 1,
+                  "scored": 13,
+                  "verdict": "too_few"
+                },
+                "yes_no": {
+                  "coach_right_on_scored": 3,
+                  "rule_right": 2,
+                  "scored": 6,
+                  "verdict": "too_few"
+                }
+              }
+            },
+            "confirmed": 34,
+            "n": 71,
+            "pct_rounded": 48,
+            "sentence": "Of 71 forecasts that could be checked under the current rules, the coaches got 34 right (48%). A simple prediction that nothing would change got 37 right (52%). The coaches have not demonstrated an advantage over that baseline.",
+            "sign_test": {
+              "coach_only": 14,
+              "k": 14,
+              "n": 31,
+              "p": 0.7201,
+              "rule_only": 17,
+              "verdict": "no_clear_difference"
+            },
+            "skill": {
+              "n": 71,
+              "sentence": "Against a prediction that nothing changes, on the same 71 calls: no detectable difference."
+            }
+          }
+        },
+        "hypotheses": {
+          "base_rate": null,
+          "brier": null,
+          "brier_skill": null,
+          "calibration": "insufficient_data",
+          "confirmed": 0,
+          "n": 0,
+          "skilled": null
+        },
+        "interval_forecasts": {
+          "base_rate": 0.881,
+          "brier": 0.1114,
+          "brier_skill": -0.0627,
+          "calibration": "not_yet_skillful",
+          "confirmed": 326,
+          "n": 370,
+          "skilled": false
+        },
+        "weekly_prescriptions": {
+          "base_rate": 0.875,
+          "brier": 0.115,
+          "brier_skill": -0.0514,
+          "calibration": "not_yet_skillful",
+          "confirmed": 7,
+          "n": 8,
+          "skilled": false
+        }
       }
     },
     "prereg_seal": {
@@ -225,24 +1419,1366 @@
       "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256"
     },
     "under_review": 1,
-    "voided": {"by_reset": {"2026-07-13": 1287, "2026-08-03": 143, "2026-09-06": 23}, "hypotheses": 57, "n": 1453, "predictions": 1396},
-    "weekly_prescriptions": null
+    "voided": {
+      "by_reset": {
+        "2026-07-13": 1287,
+        "2026-08-03": 143,
+        "2026-09-06": 23
+      },
+      "hypotheses": 57,
+      "n": 1453,
+      "predictions": 1396
+    },
+    "weekly_prescriptions": null,
+    "assessment_v2": {
+      "method_version": "calibration-v2",
+      "significance": 0.05,
+      "level_bins": 10,
+      "usable_ci_width": 0.5,
+      "min_level_n": 17,
+      "min_levels": 2,
+      "min_minority_outcome_n": 20,
+      "skill_baseline_rule": "nothing_changes",
+      "methods_note": "docs/methods/CALIBRATION_V2.md",
+      "status": "adopted",
+      "adopted": "2026-11-09",
+      "method_history": [
+        {
+          "version": "calibration-v1",
+          "until": "2026-11-09",
+          "note": "One label per forecaster from a fixed ±0.15 mean-gap trip and a Brier-skill gate; retired because it answered three different questions with one threshold."
+        },
+        {
+          "version": "calibration-v2",
+          "effective": "2026-11-09",
+          "note": "Three separate questions — estimability across confidence levels, over/under-confidence at an observed level (exact test, Holm-corrected), and skill against the same-call baseline — each with its own interval; adopted by the owner on 2026-11-09."
+        }
+      ],
+      "scope": "season",
+      "coaches": {
+        "sleep": {
+          "method_version": "calibration-v2",
+          "n": 48,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 48,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.4,
+                "hi": 0.5,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.444,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 44% came true 0 of 1 (95% CI 0%–98%)."
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 46,
+                "hits": 19,
+                "stated": 0.5,
+                "observed": 0.413,
+                "ci95": [
+                  0.27,
+                  0.568
+                ],
+                "ci_usable": true,
+                "statement": "Calls stated at about 50% came true 19 of 46 (95% CI 27%–57%)."
+              },
+              {
+                "lo": 0.6,
+                "hi": 0.7,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.6,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 60% came true 0 of 1 (95% CI 0%–98%)."
+              }
+            ],
+            "usable_levels": 1,
+            "minority_outcome_n": 19,
+            "reasons": [
+              "1 confidence level(s) with at least 17 calls, 2 needed",
+              "19 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 1 confidence level(s) with at least 17 calls, 2 needed; 19 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 48,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "consistent_not_established",
+            "label": null,
+            "estimate": 0.087,
+            "ci95": [
+              -0.068,
+              0.23
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.4,
+                "hi": 0.5,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.444,
+                "observed": 0.0,
+                "gap": 0.444,
+                "gap_ci95": [
+                  -0.531,
+                  0.444
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 46,
+                "hits": 19,
+                "stated": 0.5,
+                "observed": 0.413,
+                "gap": 0.087,
+                "gap_ci95": [
+                  -0.068,
+                  0.23
+                ],
+                "ci95": [
+                  0.27,
+                  0.568
+                ],
+                "p": 0.302,
+                "p_holm": 0.906,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.6,
+                "hi": 0.7,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.6,
+                "observed": 0.0,
+                "gap": 0.6,
+                "gap_ci95": [
+                  -0.375,
+                  0.6
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 0.8,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Consistent with stated confidence (not established): no level departs at alpha 0.05 over 48 calls.",
+            "short": "consistent with stated confidence (not established)"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 48,
+                "coach_right": 19,
+                "rule_right": 18,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.021,
+                "ci": [
+                  -0.02,
+                  0.021
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 48,
+            "wording": "No demonstrated advantage over the guess that nothing changes (48 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        },
+        "nutrition": {
+          "method_version": "calibration-v2",
+          "n": 48,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 48,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 47,
+                "hits": 12,
+                "stated": 0.5,
+                "observed": 0.255,
+                "ci95": [
+                  0.139,
+                  0.403
+                ],
+                "ci_usable": true,
+                "statement": "Calls stated at about 50% came true 12 of 47 (95% CI 14%–40%)."
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 85% came true 1 of 1 (95% CI 2%–100%)."
+              }
+            ],
+            "usable_levels": 1,
+            "minority_outcome_n": 13,
+            "reasons": [
+              "1 confidence level(s) with at least 17 calls, 2 needed",
+              "13 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 1 confidence level(s) with at least 17 calls, 2 needed; 13 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 48,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "over_confident",
+            "label": "over_confident",
+            "estimate": 0.245,
+            "ci95": [
+              0.097,
+              0.361
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 47,
+                "hits": 12,
+                "stated": 0.5,
+                "observed": 0.255,
+                "gap": 0.245,
+                "gap_ci95": [
+                  0.097,
+                  0.361
+                ],
+                "ci95": [
+                  0.139,
+                  0.403
+                ],
+                "p": 0.0011,
+                "p_holm": 0.0022,
+                "rejects": true,
+                "direction": "over"
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "gap": -0.15,
+                "gap_ci95": [
+                  -0.15,
+                  0.825
+                ],
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Over-confident at its 50% calls (12 of 47 came true, 95% CI 14%–40%; Holm-adjusted p 0.0022) — a finding about calls at that confidence level, not about calibration across confidence levels.",
+            "short": "over-confident at its 50% calls"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 48,
+                "coach_right": 13,
+                "rule_right": 12,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.021,
+                "ci": [
+                  -0.02,
+                  0.021
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 48,
+            "wording": "No demonstrated advantage over the guess that nothing changes (48 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        },
+        "physical": {
+          "method_version": "calibration-v2",
+          "n": 34,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 34,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 33,
+                "hits": 16,
+                "stated": 0.5,
+                "observed": 0.485,
+                "ci95": [
+                  0.308,
+                  0.665
+                ],
+                "ci_usable": true,
+                "statement": "Calls stated at about 50% came true 16 of 33 (95% CI 31%–66%)."
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 85% came true 1 of 1 (95% CI 2%–100%)."
+              }
+            ],
+            "usable_levels": 1,
+            "minority_outcome_n": 17,
+            "reasons": [
+              "1 confidence level(s) with at least 17 calls, 2 needed",
+              "17 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 1 confidence level(s) with at least 17 calls, 2 needed; 17 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 34,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "consistent_not_established",
+            "label": null,
+            "estimate": 0.015,
+            "ci95": [
+              -0.165,
+              0.192
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 33,
+                "hits": 16,
+                "stated": 0.5,
+                "observed": 0.485,
+                "gap": 0.015,
+                "gap_ci95": [
+                  -0.165,
+                  0.192
+                ],
+                "ci95": [
+                  0.308,
+                  0.665
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.85,
+                "observed": 1.0,
+                "gap": -0.15,
+                "gap_ci95": [
+                  -0.15,
+                  0.825
+                ],
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Consistent with stated confidence (not established): no level departs at alpha 0.05 over 34 calls.",
+            "short": "consistent with stated confidence (not established)"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 34,
+                "coach_right": 17,
+                "rule_right": 16,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.029,
+                "ci": [
+                  -0.028,
+                  0.029
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 34,
+            "wording": "No demonstrated advantage over the guess that nothing changes (34 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        },
+        "glucose": {
+          "method_version": "calibration-v2",
+          "n": 7,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 7,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.3,
+                "hi": 0.4,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.333,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 33% came true 0 of 1 (95% CI 0%–98%)."
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 6,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 0.167,
+                "ci95": [
+                  0.004,
+                  0.641
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 50% came true 1 of 6 (95% CI 0%–64%)."
+              }
+            ],
+            "usable_levels": 0,
+            "minority_outcome_n": 1,
+            "reasons": [
+              "0 confidence level(s) with at least 17 calls, 2 needed",
+              "1 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 0 confidence level(s) with at least 17 calls, 2 needed; 1 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 7,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "insufficient_evidence",
+            "label": null,
+            "estimate": 0.333,
+            "ci95": [
+              -0.141,
+              0.496
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.3,
+                "hi": 0.4,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.333,
+                "observed": 0.0,
+                "gap": 0.333,
+                "gap_ci95": [
+                  -0.642,
+                  0.333
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 6,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 0.167,
+                "gap": 0.333,
+                "gap_ci95": [
+                  -0.141,
+                  0.496
+                ],
+                "ci95": [
+                  0.004,
+                  0.641
+                ],
+                "p": 0.2187,
+                "p_holm": 0.4375,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Insufficient evidence: with 7 calls, no confidence level could have shown a departure at alpha 0.05.",
+            "short": "insufficient evidence"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 7,
+                "coach_right": 1,
+                "rule_right": 0,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.143,
+                "ci": [
+                  -0.136,
+                  0.143
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 7,
+            "wording": "No demonstrated advantage over the guess that nothing changes (7 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        },
+        "training": {
+          "method_version": "calibration-v2",
+          "n": 2,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 2,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 1.0,
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 50% came true 1 of 1 (95% CI 2%–100%)."
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.85,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 85% came true 0 of 1 (95% CI 0%–98%)."
+              }
+            ],
+            "usable_levels": 0,
+            "minority_outcome_n": 1,
+            "reasons": [
+              "0 confidence level(s) with at least 17 calls, 2 needed",
+              "1 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 0 confidence level(s) with at least 17 calls, 2 needed; 1 calls of the rarer outcome, 20 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 2,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "insufficient_evidence",
+            "label": null,
+            "estimate": 0.85,
+            "ci95": [
+              -0.125,
+              0.85
+            ],
+            "estimate_level": [
+              0.8,
+              0.9
+            ],
+            "tests": [
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 1,
+                "hits": 1,
+                "stated": 0.5,
+                "observed": 1.0,
+                "gap": -0.5,
+                "gap_ci95": [
+                  -0.5,
+                  0.475
+                ],
+                "ci95": [
+                  0.025,
+                  1.0
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.85,
+                "observed": 0.0,
+                "gap": 0.85,
+                "gap_ci95": [
+                  -0.125,
+                  0.85
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 0.3,
+                "p_holm": 0.6,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Insufficient evidence: with 2 calls, no confidence level could have shown a departure at alpha 0.05.",
+            "short": "insufficient evidence"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 2,
+                "coach_right": 1,
+                "rule_right": 0,
+                "coach_only": 1,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.5,
+                "ci": [
+                  -0.475,
+                  0.5
+                ],
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 2,
+            "wording": "No demonstrated advantage over the guess that nothing changes (2 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        }
+      },
+      "strata": {
+        "coaches": {
+          "method_version": "calibration-v2",
+          "n": 139,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 139,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [
+              {
+                "lo": 0.3,
+                "hi": 0.4,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.333,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 33% came true 0 of 1 (95% CI 0%–98%)."
+              },
+              {
+                "lo": 0.4,
+                "hi": 0.5,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.444,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 44% came true 0 of 1 (95% CI 0%–98%)."
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 133,
+                "hits": 49,
+                "stated": 0.5,
+                "observed": 0.368,
+                "ci95": [
+                  0.286,
+                  0.456
+                ],
+                "ci_usable": true,
+                "statement": "Calls stated at about 50% came true 49 of 133 (95% CI 29%–46%)."
+              },
+              {
+                "lo": 0.6,
+                "hi": 0.7,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.6,
+                "observed": 0.0,
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 60% came true 0 of 1 (95% CI 0%–98%)."
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 3,
+                "hits": 2,
+                "stated": 0.85,
+                "observed": 0.667,
+                "ci95": [
+                  0.094,
+                  0.992
+                ],
+                "ci_usable": false,
+                "statement": "Calls stated at about 85% came true 2 of 3 (95% CI 9%–99%)."
+              }
+            ],
+            "usable_levels": 1,
+            "minority_outcome_n": 51,
+            "reasons": [
+              "1 confidence level(s) with at least 17 calls, 2 needed"
+            ],
+            "wording": "Calibration across confidence levels not estimable: 1 confidence level(s) with at least 17 calls, 2 needed.",
+            "short": "not estimable across confidence levels",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 139,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "over_confident",
+            "label": "over_confident",
+            "estimate": 0.132,
+            "ci95": [
+              0.044,
+              0.214
+            ],
+            "estimate_level": [
+              0.5,
+              0.6
+            ],
+            "tests": [
+              {
+                "lo": 0.3,
+                "hi": 0.4,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.333,
+                "observed": 0.0,
+                "gap": 0.333,
+                "gap_ci95": [
+                  -0.642,
+                  0.333
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.4,
+                "hi": 0.5,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.444,
+                "observed": 0.0,
+                "gap": 0.444,
+                "gap_ci95": [
+                  -0.531,
+                  0.444
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 1.0,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.5,
+                "hi": 0.6,
+                "n": 133,
+                "hits": 49,
+                "stated": 0.5,
+                "observed": 0.368,
+                "gap": 0.132,
+                "gap_ci95": [
+                  0.044,
+                  0.214
+                ],
+                "ci95": [
+                  0.286,
+                  0.456
+                ],
+                "p": 0.003,
+                "p_holm": 0.0152,
+                "rejects": true,
+                "direction": "over"
+              },
+              {
+                "lo": 0.6,
+                "hi": 0.7,
+                "n": 1,
+                "hits": 0,
+                "stated": 0.6,
+                "observed": 0.0,
+                "gap": 0.6,
+                "gap_ci95": [
+                  -0.375,
+                  0.6
+                ],
+                "ci95": [
+                  0.0,
+                  0.975
+                ],
+                "p": 0.8,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              },
+              {
+                "lo": 0.8,
+                "hi": 0.9,
+                "n": 3,
+                "hits": 2,
+                "stated": 0.85,
+                "observed": 0.667,
+                "gap": 0.183,
+                "gap_ci95": [
+                  -0.142,
+                  0.756
+                ],
+                "ci95": [
+                  0.094,
+                  0.992
+                ],
+                "p": 0.7718,
+                "p_holm": 1.0,
+                "rejects": false,
+                "direction": null
+              }
+            ],
+            "wording": "Over-confident at its 50% calls (49 of 133 came true, 95% CI 29%–46%; Holm-adjusted p 0.0152) — a finding about calls at that confidence level, not about calibration across confidence levels.",
+            "short": "over-confident at its 50% calls"
+          },
+          "skill": {
+            "baseline": "nothing_changes",
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_demonstrated_advantage",
+            "label": null,
+            "records": {
+              "direction": {
+                "n": 139,
+                "coach_right": 51,
+                "rule_right": 51,
+                "coach_only": 0,
+                "rule_only": 0,
+                "unscorable": 0,
+                "not_yet_scored": 0,
+                "estimate": 0.0,
+                "ci": null,
+                "ci_confidence": 0.95,
+                "p": 1.0,
+                "label": null
+              }
+            },
+            "n": 139,
+            "wording": "No demonstrated advantage over the guess that nothing changes (139 calls compared).",
+            "short": "no demonstrated advantage"
+          }
+        },
+        "hypotheses": {
+          "method_version": "calibration-v2",
+          "n": 0,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 0,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [],
+            "usable_levels": 0,
+            "minority_outcome_n": 0,
+            "reasons": [
+              "0 confidence level(s) with at least 17 calls, 2 needed",
+              "0 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "No resolved calls.",
+            "short": "no resolved calls",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 0,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "no_resolved_calls",
+            "label": null,
+            "estimate": null,
+            "ci95": null,
+            "tests": [],
+            "wording": "No resolved calls.",
+            "short": "no resolved calls"
+          },
+          "skill": {
+            "baseline": null,
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_baseline",
+            "label": null,
+            "records": {},
+            "n": 0,
+            "wording": "No baseline for this stratum.",
+            "short": "no baseline for this stratum"
+          }
+        },
+        "interval_forecasts": {
+          "method_version": "calibration-v2",
+          "n": 0,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 0,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [],
+            "usable_levels": 0,
+            "minority_outcome_n": 0,
+            "reasons": [
+              "0 confidence level(s) with at least 17 calls, 2 needed",
+              "0 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "No resolved calls.",
+            "short": "no resolved calls",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 0,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "no_resolved_calls",
+            "label": null,
+            "estimate": null,
+            "ci95": null,
+            "tests": [],
+            "wording": "No resolved calls.",
+            "short": "no resolved calls"
+          },
+          "skill": {
+            "baseline": null,
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_baseline",
+            "label": null,
+            "records": {},
+            "n": 0,
+            "wording": "No baseline for this stratum.",
+            "short": "no baseline for this stratum"
+          }
+        },
+        "weekly_prescriptions": {
+          "method_version": "calibration-v2",
+          "n": 0,
+          "estimability": {
+            "result": "not_estimable",
+            "n": 0,
+            "estimate": null,
+            "ci95": null,
+            "slope": null,
+            "levels": [],
+            "usable_levels": 0,
+            "minority_outcome_n": 0,
+            "reasons": [
+              "0 confidence level(s) with at least 17 calls, 2 needed",
+              "0 calls of the rarer outcome, 20 needed"
+            ],
+            "wording": "No resolved calls.",
+            "short": "no resolved calls",
+            "method": "Levels are the 10 stated-confidence bands, each with an exact (Clopper-Pearson) 95% interval. Across levels is estimable with at least 2 levels of at least 17 calls (exact interval no wider than 0.5) and at least 20 calls of the rarer outcome (10 per parameter); the estimate is the logistic recalibration slope with a Wald 95% interval."
+          },
+          "confidence_direction": {
+            "n": 0,
+            "significance": 0.05,
+            "method": "Exact two-sided binomial test of each level's hits against its mean stated confidence (conservative when the stated values inside a level differ), Holm-adjusted across the levels tested, family-wise alpha 0.05. Calls that share a metric and a window are not independent, so the p-values are optimistic.",
+            "result": "no_resolved_calls",
+            "label": null,
+            "estimate": null,
+            "ci95": null,
+            "tests": [],
+            "wording": "No resolved calls.",
+            "short": "no resolved calls"
+          },
+          "skill": {
+            "baseline": null,
+            "significance": 0.05,
+            "method": "Paired against 'nothing_changes' on the same calls: exact sign test on the calls only one of the two got right. The estimate is the hit-rate difference (coach minus rule); its interval is exact conditional on the number of disagreements (Clopper-Pearson on the coach's share), Bonferroni-adjusted across the records. Records are never added together. Calls that share a metric and a window are not independent, so it is optimistic.",
+            "result": "no_baseline",
+            "label": null,
+            "records": {},
+            "n": 0,
+            "wording": "No baseline for this stratum.",
+            "short": "no baseline for this stratum"
+          }
+        }
+      }
+    },
+    "calibration_method": {
+      "version": "calibration-v2",
+      "status": "adopted",
+      "adopted": "2026-11-09",
+      "authority": "assessment_v2",
+      "deprecated_fields": {
+        "fields": [
+          "calibration",
+          "label",
+          "score"
+        ],
+        "where": "coaches[], platform, platform.strata.*, hypotheses, interval_forecasts and each lifetime block",
+        "note": "calibration-v1 labels, kept for API compatibility only and no longer shown on any page. Read assessment_v2 for the calibration verdict."
+      },
+      "history": [
+        {
+          "version": "calibration-v1",
+          "until": "2026-11-09",
+          "note": "One label per forecaster from a fixed ±0.15 mean-gap trip and a Brier-skill gate; retired because it answered three different questions with one threshold."
+        },
+        {
+          "version": "calibration-v2",
+          "effective": "2026-11-09",
+          "note": "Three separate questions — estimability across confidence levels, over/under-confidence at an observed level (exact test, Holm-corrected), and skill against the same-call baseline — each with its own interval; adopted by the owner on 2026-11-09."
+        }
+      ],
+      "methods_note": "docs/methods/CALIBRATION_V2.md"
+    },
+    "verification_summary": {
+      "archive": {
+        "accuracy_ci95": [
+          34.7,
+          47.8
+        ],
+        "accuracy_pct": 41.1,
+        "confirmed": 88,
+        "label": "as first graded, before eligibility and verification were corrected",
+        "n": 214
+      },
+      "counted_calls": [
+        "nutrition-20261015-protein01",
+        "physical-20261015-weight01",
+        "physical-20261016-weight02",
+        "sealed-20260906-genesis01"
+      ],
+      "eligible_total": 214,
+      "excluded_by_category": [
+        {
+          "key": "not_a_forecast",
+          "label": "Not a forecast: the outcome was already on the record when the call was made",
+          "n": 17
+        },
+        {
+          "key": "past_period",
+          "label": "About a past period whose data arrived later",
+          "n": 9
+        },
+        {
+          "key": "opinion",
+          "label": "Opinion, explanation or hedge: not a measurable forecast",
+          "n": 33
+        },
+        {
+          "key": "different_claim",
+          "label": "The stored test checks a different claim from the words",
+          "n": 9
+        },
+        {
+          "key": "stand_in_measure",
+          "label": "Graded on a stand-in measure that cannot show the claim",
+          "n": 8
+        },
+        {
+          "key": "either_outcome",
+          "label": "Either outcome satisfies the words",
+          "n": 1
+        },
+        {
+          "key": "condition_not_measured",
+          "label": "Depends on a condition that was never measured",
+          "n": 23
+        },
+        {
+          "key": "condition_never_happened",
+          "label": "Its condition never happened, so it was never tested",
+          "n": 13
+        },
+        {
+          "key": "docket",
+          "label": "Head-to-head bets settled by their own rule",
+          "n": 7
+        },
+        {
+          "key": "could_not_verify",
+          "label": "Could not be verified under the current rules",
+          "n": 8
+        },
+        {
+          "key": "repeat",
+          "label": "The same forecast repeated: counted once",
+          "n": 15
+        }
+      ],
+      "excluded_total": 143,
+      "outcomes": {
+        "corrected": 31,
+        "could_not_verify": 23,
+        "none": 0,
+        "reproduced": 160
+      },
+      "verified": {
+        "accuracy_ci95": [
+          37.2,
+          58.6
+        ],
+        "accuracy_pct": 47.9,
+        "baseline": {
+          "n": 71,
+          "right": 37,
+          "accuracy_ci95": [
+            40.7,
+            63.4
+          ],
+          "accuracy_pct": 52.1,
+          "text": "A prediction that nothing would change got 37 of the same 71 right.",
+          "unscorable": 2
+        },
+        "baseline_pct_rounded": 52,
+        "comparison": {
+          "n": 71,
+          "records": {
+            "direction": {
+              "coach_right_on_scored": 36,
+              "rule_right": 33,
+              "scored": 118,
+              "verdict": "no_clear_difference"
+            },
+            "number": {
+              "coach_right_on_scored": 35,
+              "rule_right": 37,
+              "scored": 61,
+              "verdict": "no_clear_difference"
+            },
+            "sealed": {
+              "coach_right_on_scored": 8,
+              "rule_right": 1,
+              "scored": 13,
+              "verdict": "too_few"
+            },
+            "yes_no": {
+              "coach_right_on_scored": 3,
+              "rule_right": 2,
+              "scored": 6,
+              "verdict": "too_few"
+            }
+          }
+        },
+        "confirmed": 34,
+        "n": 71,
+        "pct_rounded": 48,
+        "sentence": "Of 71 forecasts that could be checked under the current rules, the coaches got 34 right (48%). A simple prediction that nothing would change got 37 right (52%). The coaches have not demonstrated an advantage over that baseline.",
+        "sign_test": {
+          "coach_only": 14,
+          "k": 14,
+          "n": 31,
+          "p": 0.7201,
+          "rule_only": 17,
+          "verdict": "no_clear_difference"
+        },
+        "skill": {
+          "n": 71,
+          "sentence": "Against a prediction that nothing changes, on the same 71 calls: no detectable difference."
+        }
+      },
+      "why_changed": "The count changed because the rules for which calls are eligible and how a grade is verified were corrected, not because the coaches improved. Calls that were not forecasts, could not be checked as written, depended on a condition that never happened or repeated an earlier call are now listed separately with the reason, and every remaining grade was re-run under the current rules."
+    }
   },
   "record": {
     "accuracy_pct": 41.1,
-    "baseline": {"rate": 0.411, "rate_pct": 41, "rule": "base_rate", "text": "A guess that every call has a 41% chance of coming true does about as well."},
+    "baseline": {
+      "rate": 0.411,
+      "rate_pct": 41,
+      "rule": "base_rate",
+      "text": "A guess that every call has a 41% chance of coming true does about as well."
+    },
     "confirmed": 88,
     "counted_text": "Sample counts, for layout only.",
     "decided": 214,
     "expired": 16,
     "inconclusive": 2,
-    "lifetime": {"accuracy_pct": 38.6, "confirmed": 97, "decided": 251, "total": 3133},
+    "lifetime": {
+      "accuracy_pct": 38.6,
+      "confirmed": 97,
+      "decided": 251,
+      "total": 3133
+    },
     "observational": 230,
     "pending": 21,
     "refuted": 126,
     "total": 484,
     "under_review": 1
   },
-  "source": ["/api/calibration", "/api/predictions"],
+  "source": [
+    "/api/calibration",
+    "/api/predictions"
+  ],
   "state": "ok"
 }

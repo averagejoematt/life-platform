@@ -75,9 +75,7 @@ from typing import Any
 
 from common.pacific_time import pacific_date_of, pacific_weekday, parse_iso_utc
 
-WALKING_VOLUME_VERSION = (
-    "walking-volume@1.3.0"  # 1.1.0 (#4068): time de-dup; 1.2.0 (#5369): the watch backstop; 1.3.0: walk-signal completeness gaps
-)
+WALKING_VOLUME_VERSION = "walking-volume@1.3.1"  # 1.1.0 (#4068): time de-dup; 1.2.0 (#5369): the watch backstop; 1.3.0: walk-signal completeness gaps; 1.3.1 (#5669): WHOOP walks Pacific-dated, an unread signal source said
 
 # ── what counts ──────────────────────────────────────────────────────────────────────
 # Strava activity `type`/`sport_type` (lower-cased) → the modality it counts as.
@@ -485,6 +483,9 @@ def derived_steps_estimate(walking_hours: float | None, cadence_spm: int = ASSUM
 WHOOP_WALK_SPORTS = frozenset({"walking", "hiking", "rucking"})
 # The habit's current name and the alias Habitify rows still carry (#4362).
 WALK_HABIT_NAMES = frozenset({"Walk Outdoor >2mi", "Walk 5k"})
+# The partition reads `completeness` needs past a Pacific window's end: WHOOP rows are keyed by the UTC
+# day of the start, so a walk on the window's last evening sits one key past it; Habitify is Pacific-keyed.
+COMPLETENESS_READ_PAST_END_DAYS = {"whoop": 1, "habitify": 0}
 
 
 def _row_day(r: dict[str, Any]) -> str:
@@ -492,12 +493,21 @@ def _row_day(r: dict[str, Any]) -> str:
 
 
 def _whoop_walks(rows: list[dict[str, Any]], window_start: str, window_end: str) -> list[dict[str, Any]]:
+    """WHOOP walking workouts whose PACIFIC start date lies in the window (#5669).
+
+    A WHOOP workout row is filed under the UTC day of its start (`DATE#2026-10-06#WORKOUT#…` holds a
+    walk that began 2026-10-05 17:41 PT), while every counted source is Pacific-dated. Judged by the
+    row's key, a Pacific-evening walk on the day BEFORE the window read as a gap on its first day (live:
+    10-06, 10-27 and four more window-start days, 2026-08-30..10-27), and one on the window's last
+    evening was never read. So the day is the Pacific date of `start_time` — the key only when the
+    start cannot be parsed — and a caller reads WHOOP one UTC day past its window
+    (`COMPLETENESS_READ_PAST_END_DAYS`)."""
     out = []
     for r in rows or []:
         if "#WORKOUT#" not in str(r.get("sk", "")):
             continue
         sport = str(r.get("sport_name") or r.get("vendor_sport_name") or "").strip().lower()
-        day = _row_day(r)
+        day = pacific_date_of(str(r.get("start_time") or "")) or _row_day(r)
         if sport not in WHOOP_WALK_SPORTS or not (window_start <= day <= window_end):
             continue
         start, end = _parse_utc(r.get("start_time")), _parse_utc(r.get("end_time"))
@@ -579,6 +589,26 @@ def completeness(
             "day with no counted walking — reported, never counted (a WHOOP auto-detect's span is not a walking duration)"
         ),
     }
+
+
+def completeness_honesty(complete: dict[str, Any]) -> list[str]:
+    """The honesty lines for a `completeness` record — one per gap, and one per signal source the check
+    could not read (#5669). An unread signal source is NOT a floor (signals are never counted), but the
+    check is then blind to a walk only that source saw, and the reader is told so rather than shown a
+    silent `gaps: []`. Shared by this layer and `training.recent_aerobic`, so the two say it one way."""
+    lines = []
+    for gap in complete.get("gaps") or []:
+        what = "a WHOOP walking workout" if gap["signal"] == "whoop_walk_workout" else "the walk habit was completed"
+        lines.append(
+            f"{gap['date']}: {what} but no counted walk activity — that walk is missing from this total, which is a floor, "
+            "not a zero for the day"
+        )
+    for name in complete.get("unreadable") or []:
+        lines.append(
+            f"the walk-signal check could not read {name} — a walk only {name} recorded would not be named here (the total "
+            "itself is unaffected: signals are never counted)"
+        )
+    return lines
 
 
 #: `apple_items` default: the caller did not wire the watch backstop (distinct from None = the read failed).
@@ -678,12 +708,7 @@ def build(
             f"{dedup['untimed']} Strava activit{'y' if dedup['untimed'] == 1 else 'ies'} carried no start timestamp — the "
             "cross-device de-dup could not place them in time, so they are counted whole"
         )
-    for gap in complete["gaps"]:
-        what = "a WHOOP walking workout" if gap["signal"] == "whoop_walk_workout" else "the walk habit was completed"
-        honesty.append(
-            f"{gap['date']}: {what} but no counted walk activity — that walk is missing from this total, which is a floor, "
-            "not a zero for the day"
-        )
+    honesty.extend(completeness_honesty(complete))
 
     return {
         "layer": "walking_volume",

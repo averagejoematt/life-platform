@@ -11,7 +11,8 @@
 // that the record is as first graded and not re-verified, and the career / unverified detail sits in an archive.
 //
 // Calibration is drawn to the data's resolution: one dot per coach per stated-confidence band as the API served
-// the band, sized by n — never a curve — and the label is the API's own, in words (no threshold is invented here).
+// the band, sized by n — never a curve — and the verdict is calibration-v2's three answers in the API's own words
+// (no threshold is invented here).
 import { esc } from "./chart.js";
 import { dayInWords, num } from "./format.js";
 
@@ -35,20 +36,48 @@ export function skillText(v) {
   return v > 0 ? `${s} — better than its base rate` : `${s} — no better than its base rate`;
 }
 
-/** The API's calibration label, in words. Inadequate evidence reads as such; nothing favourable is implied. */
-const LABEL_WORDS = {
-  not_measurable: "not measurable — nearly every call was stated at one confidence",
-  insufficient_data: "insufficient evidence",
-  nascent: "insufficient evidence",
-  "over-confident": "came true less often than stated",
-  "under-confident": "came true more often than stated",
-  not_yet_skillful: "not yet skillful — no better than its base rate",
-  "well-calibrated": "stated confidence matched what came true",
-  under_review: "under review",
-};
-export function labelWords(label) {
-  if (!label) return "no label served";
-  return LABEL_WORDS[label] || String(label).replace(/[_-]+/g, " ");
+// ── the calibration verdict: calibration-v2 (owner ruling 2026-11-09) ─────────────────────────────────────────
+// Three separate questions, each answered in the producer's own words (`wording`, and `short` for a dense cell) —
+// carried, never computed or relabelled here. The v1 fields (`calibration`, `label`, `score`) are deprecated on the
+// API and are never read by this module: no v1 label reaches a page.
+export const V2_QUESTIONS = [
+  { key: "estimability", ask: "Can calibration be estimated across confidence levels?" },
+  { key: "confidence_direction", ask: "Over- or under-confident at an observed confidence level?" },
+  { key: "skill", ask: "Better than the same-call guess that nothing changes?" },
+];
+
+/** A served assessment's three answers: [{key, ask, words, short}], only those served; [] when none was served. */
+export function v2Answers(a) {
+  if (!a || typeof a !== "object") return [];
+  return V2_QUESTIONS.map(({ key, ask }) => {
+    const q = a[key];
+    if (!q || typeof q !== "object") return null;
+    const words = typeof q.wording === "string" && q.wording.trim() ? q.wording : null;
+    const short = typeof q.short === "string" && q.short.trim() ? q.short : words;
+    return words || short ? { key, ask, words: words || short, short } : null;
+  }).filter(Boolean);
+}
+
+/** The assessment of a platform stratum ("coaches", "hypotheses", …) as served on `assessment_v2.strata`, or null. */
+export function v2Stratum(cal, key) {
+  const s = ((cal || {}).assessment_v2 || {}).strata || {};
+  return s[key] && typeof s[key] === "object" ? s[key] : null;
+}
+
+/** The three short answers in one line, " · "-separated (a dense cell); null when no assessment was served. */
+export function v2Short(a) {
+  const xs = v2Answers(a);
+  return xs.length ? xs.map((x) => x.short).join(" · ") : null;
+}
+
+/** "calibration-v2, adopted 9 November 2026" — the method and its version, as served; null when not served. */
+export function v2MethodText(cal) {
+  const a = (cal || {}).assessment_v2 || {};
+  const m = (cal || {}).calibration_method || {};
+  const v = a.method_version || m.version;
+  if (!v) return null;
+  const when = a.adopted || m.adopted;
+  return `${v}${when ? `, adopted ${dayInWords(when) || when}` : ""}`;
 }
 
 /** The band a stated confidence was served in, in words: 0.5 → "50%". */
@@ -167,7 +196,101 @@ export function excludedAccounting(cal) {
     .filter((x) => typeof x.key === "string" && Number.isInteger(x.n) && !PRIVATE_CATEGORY.test(x.key) && !PRIVATE_CATEGORY.test(String(x.label || "")))
     .map((x) => ({ key: x.key, n: x.n, words: (typeof x.label === "string" && x.label.trim()) || EXCLUDED_WORDS[x.key] || x.key.replace(/_/g, " ") }));
   if (!rows.length) return null;
-  return { rows, total: Number.isInteger(vs.excluded_total) ? vs.excluded_total : null, note: typeof vs.note === "string" && vs.note.trim() ? vs.note : null };
+  const total = Number.isInteger(vs.excluded_total) ? vs.excluded_total : null;
+  const eligible = Number.isInteger(vs.eligible_total) ? vs.eligible_total : null;
+  const v = verifiedRecord(cal);
+  const counted = v ? v.n : null;
+  // The producer's accounting must reconcile AS SERVED (a check, not a derivation: nothing printed is computed here):
+  // the rows add up to the served total, and eligible = left out + counted. A served accounting that does not add up —
+  // or one that lost a row to the private-name filter above — is not shown at all (fail closed).
+  let reconciles = null;
+  if (total !== null) {
+    const sum = rows.reduce((a, r) => a + r.n, 0);
+    reconciles = sum === total && (eligible === null || counted === null || eligible === total + counted);
+    if (!reconciles) return null;
+  }
+  return { rows, total, eligible, counted, reconciles, note: typeof vs.note === "string" && vs.note.trim() ? vs.note : null };
+}
+
+// ── the verified lead and its uncertainty (owner ruling 2026-11-09) ───────────────────────────────────────────────
+// Fed ONLY from `verification_summary` / `platform.strata.coaches.verified` as served by /api/calibration. The lead
+// sentence is the producer's own (`verified.sentence`, generated from the numbers); this module never writes a figure.
+
+/** The served `verification_summary` object, or null. */
+export function verificationSummary(cal) {
+  const vs = (cal || {}).verification_summary;
+  return vs && typeof vs === "object" ? vs : null;
+}
+
+const ciOk = (ci) => Array.isArray(ci) && ci.length === 2 && isNum(ci[0]) && isNum(ci[1]);
+
+const SIGN_VERDICT_WORDS = {
+  no_clear_difference: "no detectable difference",
+  too_few: "too few calls to tell",
+  coaches_better: "the coaches did better",
+  rule_better: "the simple prediction did better",
+};
+
+/**
+ * The lead the page opens with — only when the producer served a verified block WITH its own sentence and a baseline
+ * on exactly the same calls. Returns {sentence, k, n, pct, ci, baseline:{right, n, pct, ci, unscorable}, sign} or null.
+ */
+export function verifiedLead(cal) {
+  const v = verifiedRecord(cal);
+  if (!v || typeof v.sentence !== "string" || !v.sentence.trim()) return null;
+  const b = sameCalls(v.baseline, v.n);
+  const baseline =
+    b && Number.isInteger(b.right)
+      ? { right: b.right, n: v.n, pct: pct(b.accuracy_pct), ci: ciOk(b.accuracy_ci95) ? intervalText(b.accuracy_ci95) : null, unscorable: Number.isInteger(b.unscorable) ? b.unscorable : 0 }
+      : null;
+  const s = v.sign_test && typeof v.sign_test === "object" ? v.sign_test : null;
+  const sign =
+    s && Number.isInteger(s.coach_only) && Number.isInteger(s.rule_only) && isNum(s.p)
+      ? { coachOnly: s.coach_only, ruleOnly: s.rule_only, p: s.p, verdict: s.verdict, words: SIGN_VERDICT_WORDS[s.verdict] || verdictWords(s.verdict) }
+      : null;
+  return { sentence: v.sentence.trim(), k: v.confirmed, n: v.n, pct: pct(v.accuracy_pct), ci: intervalText(v.accuracy_ci95), baseline, sign };
+}
+
+/** The sign test in plain words, every number carried: "The coaches alone were right on 16 of these calls and the …". */
+export function signTestText(lead) {
+  const s = lead && lead.sign;
+  if (!s) return null;
+  const p = s.p >= 0.001 ? s.p.toFixed(s.p >= 0.1 ? 2 : 3) : "< 0.001";
+  return (
+    `The coaches alone were right on ${s.coachOnly} of these calls and the simple prediction alone on ${s.ruleOnly}. ` +
+    `On those calls an exact two-sided sign test gives p ${p.startsWith("<") ? p : `= ${p}`}: ${s.words}.`
+  );
+}
+
+/** Why the record changed: the producer's sentence, beside the archived as-first-graded figure. Null when not served. */
+export function whyChanged(cal) {
+  const vs = verificationSummary(cal);
+  if (!vs || typeof vs.why_changed !== "string" || !vs.why_changed.trim()) return null;
+  return { text: vs.why_changed.trim(), archive: archiveRecord(cal) };
+}
+
+/** The archived original grading (as first graded), as served: {label, k, n, pct, ci} or null. */
+export function archiveRecord(cal) {
+  const a = (verificationSummary(cal) || {}).archive;
+  if (!a || typeof a !== "object" || !Number.isInteger(a.n) || !Number.isInteger(a.confirmed)) return null;
+  return {
+    label: typeof a.label === "string" && a.label.trim() ? a.label.trim() : "as first graded",
+    k: a.confirmed,
+    n: a.n,
+    pct: pct(a.accuracy_pct),
+    ci: intervalText(a.accuracy_ci95),
+  };
+}
+
+/**
+ * The calls that count in the verified record — eligible, verified (reproduced or corrected) and cleared for
+ * publication — as a Set of snapshot prediction ids (`<coach>-<prediction_id>`). Null when the producer did not serve
+ * the list: then nothing may be presented as a verified outcome ("wrong this month" renders no miss at all).
+ */
+export function countedCalls(cal) {
+  const list = (verificationSummary(cal) || {}).counted_calls;
+  if (!Array.isArray(list) || !list.every((x) => typeof x === "string")) return null;
+  return new Set(list);
 }
 
 /** A coach's own verified record (per-row `verification` / `verified`), when served: "6 of 15 re-checked right". */
@@ -180,11 +303,10 @@ export function coachVerified(c) {
   return { k, n, pct: pct(v.accuracy_pct), ci: intervalText(v.accuracy_ci95) };
 }
 
-/** A served `assessment_v2` in words (its own sentence first, else its label), or null when not served. */
+/** A served calibration-v2 assessment in words: its three answers' sentences in order, or null when not served. */
 export function assessmentWords(a) {
-  if (!a || typeof a !== "object") return null;
-  for (const k of ["sentence", "text", "summary"]) if (typeof a[k] === "string" && a[k].trim()) return a[k];
-  return typeof a.label === "string" && a.label ? labelWords(a.label) : null;
+  const xs = v2Answers(a);
+  return xs.length ? xs.map((x) => x.words).join(" ") : null;
 }
 
 export function recordHeadline(file) {
@@ -204,20 +326,23 @@ export function recordHeadline(file) {
     const vs = sameCalls(v.skill, v.n);
     const vSkill = (vs && vs.sentence) || "No comparison with a simple guess is published for these same calls yet.";
     const vc = sameCalls(v.comparison, v.n);
+    const lead = typeof v.sentence === "string" && v.sentence.trim() ? v.sentence.trim() : null; // the producer's own words
     return {
       mode: "verified",
       k: v.confirmed,
       n: v.n,
-      h1: `The coaches were right on ${v.confirmed} of ${v.n} re-verified calls.`,
+      lead,
+      h1: lead || `The coaches were right on ${v.confirmed} of ${v.n} re-verified calls.`,
       dek: [p ? `${p}${ci ? ` — the ${ci}` : " — no interval published yet"}.` : null, vBaseline, vSkill].filter(Boolean).join(" "),
-      sentence: `${v.confirmed} of ${v.n} re-verified calls right${p ? ` — ${p}${ci ? `, ${ci}` : ""}` : ""}${vBaseline ? ` — and ${lower(vBaseline)}` : ""}.`,
+      sentence: lead || `${v.confirmed} of ${v.n} re-verified calls right${p ? ` — ${p}${ci ? `, ${ci}` : ""}` : ""}${vBaseline ? ` — and ${lower(vBaseline)}` : ""}.`,
       caveat:
         "Only calls that pass the current checks are counted here — a smaller set of calls, graded the same way. The earlier grades are kept in the archive below.",
       skill: vSkill,
       baselineSameCalls: Boolean(vBaseline),
       ci95: v.accuracy_ci95 || null,
       records: (vc && vc.records) || null,
-      archive: { k: rec.confirmed, n: rec.decided, pct: pct(rec.accuracy_pct), label: "as first graded, including grades not re-verified" },
+      // the producer's archived original grading when served (verification_summary.archive), else the record as served
+      archive: archiveRecord(file.calibration) || { k: rec.confirmed, n: rec.decided, pct: pct(rec.accuracy_pct), label: "as first graded, including grades not re-verified" },
     };
   }
   const ci = intervalText(stratum.accuracy_ci95);
@@ -251,7 +376,7 @@ export function strataRows(file) {
     pct: pct((top || {}).accuracy_pct),
     ci: intervalText((top || {}).accuracy_ci95),
     skill: (s || {}).brier_skill,
-    label: (s || {}).calibration,
+    assessment: v2Stratum(cal, key), // calibration-v2: each stratum assessed on its own, never pooled
   });
   return [
     row("coaches", "Coach calls", st.coaches, { accuracy_pct: rec.accuracy_pct, accuracy_ci95: (st.coaches || {}).accuracy_ci95 }),
@@ -261,11 +386,12 @@ export function strataRows(file) {
   ];
 }
 
-/** The platform card — the blend of every stratum — as served. Never presented as the coaches' record. */
+/** The platform card — the blend of every stratum — as served. Never presented as the coaches' record, and never
+ *  given a calibration verdict: calibration-v2 does not pool strata. */
 export function blendRow(file) {
   const p = ((file && file.calibration) || {}).platform || {};
   if (!isNum(p.n)) return null;
-  return { n: p.n, right: p.confirmed, pct: pct(p.accuracy_pct), ci: intervalText(p.accuracy_ci95), skill: p.brier_skill, label: p.calibration };
+  return { n: p.n, right: p.confirmed, pct: pct(p.accuracy_pct), ci: intervalText(p.accuracy_ci95), skill: p.brier_skill };
 }
 
 /** The bets a reset voided, newest reset first, dates in words. */

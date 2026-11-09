@@ -645,11 +645,17 @@ def _days_to_empty(api_activities: list, stored_by_day: dict, first_day: str, la
     return out
 
 
-def _empty_day_record(day: str, ids: list) -> dict:
+def _empty_day_record(day: str, ids: list, activities: list | None = None) -> dict:
     """The explicit empty day: the transform() shape over zero activities (every extensive
     total is a true 0 — a sum over nothing), tombstoned so tombstone-aware readers read the
-    day exactly like a day that never had an activity, and naming what was emptied."""
+    day exactly like a day that never had an activity, and naming what was emptied.
+
+    #5669 (capture-all, interpret later): `activities` — the stored activities the day held — ride
+    along VERBATIM under `emptied_activities`, never under `activities`, so nothing counts them and
+    nothing is lost. On 2026-10-21 this write erased the only stored copy of the 10-20 WHOOP walk
+    (20669407754) from the table; only the raw S3 object still held it."""
     now = datetime.now(timezone.utc).isoformat()
+    kept = {"emptied_activities": list(activities)} if activities else {}
     return {
         "pk": f"USER#{USER_ID}#SOURCE#strava",
         "sk": f"DATE#{day}",
@@ -670,11 +676,13 @@ def _empty_day_record(day: str, ids: list) -> dict:
         "tombstoned_reason": EMPTIED_DAY_REASON,
         "tombstoned_at": now,
         "emptied_activity_ids": list(ids),
+        **kept,
     }
 
 
-def _write_empty_days(table, candidates: list, api_activity_count: int) -> dict:
-    """Write each candidate empty day, behind the two guards. Never raises."""
+def _write_empty_days(table, candidates: list, api_activity_count: int, stored_by_day: dict | None = None) -> dict:
+    """Write each candidate empty day, behind the two guards. Never raises. `stored_by_day` (#5669):
+    the stored activities by day, kept on each tombstone under `emptied_activities`."""
     if not candidates:
         return {"emptied": [], "skipped": None}
     if api_activity_count == 0:
@@ -686,7 +694,7 @@ def _write_empty_days(table, candidates: list, api_activity_count: int) -> dict:
     emptied = []
     for day, ids in candidates:
         try:
-            table.put_item(Item=_empty_day_record(day, ids))
+            table.put_item(Item=_empty_day_record(day, ids, [a for a in (stored_by_day or {}).get(day, []) if isinstance(a, dict)]))
             emptied.append(day)
             logger.warning("[RECONCILE] #4638 %s: every stored activity %s is gone from Strava — wrote the empty day", day, ids)
         except Exception as e:  # one failed write must not cost the report
@@ -793,7 +801,7 @@ def _reconcile(event: dict, context) -> dict:
         candidates = _days_to_empty(
             api_activities, stored_by_day, (start + timedelta(days=1)).isoformat(), (today - timedelta(days=1)).isoformat()
         )
-        written = _write_empty_days(table, candidates, len(api_activities))
+        written = _write_empty_days(table, candidates, len(api_activities), stored_by_day)
         _emit_store_vendor_metrics(len(absent), len(changed), len(written["emptied"]))
         if absent or changed or candidates:
             logger.warning(

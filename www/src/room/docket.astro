@@ -9,11 +9,11 @@
 import Base from "../layouts/Base.astro";
 import { datesOf, docketEntries, incompleteEntries, incompleteText, questionOf, resultOf, sidesOf, tallyText, testWords } from "../lib/docket.js";
 import { dayInWords } from "../lib/format.js";
-import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { ROOM_MARKER, roomAll } from "../lib/room.js";
 import { loadAll, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
-if (!roomEnabled()) throw new Error("src/room/docket.astro rendered with WEB_ROOM off — the room route must not be injected");
+if (!roomAll()) throw new Error("src/room/docket.astro rendered without WEB_ROOM=1 — a CR2/CR3 route must not be injected");
 
 const all = await loadAll();
 const file = await loadCoachRoom();
@@ -33,7 +33,7 @@ const h2 = "font-size:28px;line-height:1.15";
 
 <Base title="The docket" top="system" description="Where the coaches disagreed, what they bet, and what the data said." status={fetched}>
   <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
-  <div {...room} class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+  <div {...room} data-room-private="" class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
     Coaching Room · private build (WEB_ROOM=1) · not published
   </div>
 

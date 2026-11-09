@@ -27,7 +27,8 @@ from __future__ import annotations
 import re
 from typing import Optional, Union
 
-GRAMMAR_VERSION = "hevy-note-grammar@1.4.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4; 1.4.0: the test-block grammar (see each builder)
+GRAMMAR_VERSION = "hevy-note-grammar@1.5.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4; 1.4.0: the test-block grammar;
+# 1.5.0: re-grade #6 (2026-11-08) — one layoff line, plain load-rule line 4, intervals at steady + 2 (see each builder)
 
 Rpe = Union[float, int, tuple[float, float], list[float]]
 
@@ -41,8 +42,10 @@ EX1_MAX_LINES = 11
 LIFT_MAX_LINES = 4
 CARDIO_MAX_LINES = 6
 # #5428 re-grade #4: an interval ride's two-way escape (full sentences up; can't talk → shorter reps at the same level) is
-# two phone lines; with line 1, the clock and the After line that is 7. Every other cardio note keeps 6.
-CARDIO_INTERVAL_MAX_LINES = 7
+# two phone lines; with line 1, the clock and the After line that is 7. Re-grade #6 (2026-11-08): the clock names its hard
+# level after the rep length (`2 min at L13 from min …`, so the number pair is not read as one), which takes a start list
+# of five two-digit minutes (a 40-min ride) to three phone lines: 8. Every other cardio note keeps 6.
+CARDIO_INTERVAL_MAX_LINES = 8
 CARDIO_LINE1_MAX_CHARS = 80
 CARDIO_NOTE_MAX_CHARS = 240
 CLOCK_LINE_MAX_CHARS = 110
@@ -113,8 +116,11 @@ LOAD_RULE_HEAD = "Top reps at RPE 7 or less → "
 OTHER_LIFTS_HEAD = "Other lifts: top reps at RPE 7 or less → "
 # #5428 re-grade #5 (2026-10-31): "Under 40 lb: +5 lb max" was two steps on a 30-lb dumbbell (§5's step there is 2.5 lb)
 # and said nothing when a lift is both a stack and under 40 lb. "One step" is §5's table's step for that implement, and a
-# stack's next plate wins at any load.
-LOAD_RULE_LIMITS = f"Under {SMALL_LOAD_LB} lb: one step. Stack: next plate at any load. Once per lift."
+# stack's next plate wins at any load. Re-grade #6 (2026-11-08, 2 of 4 voices): "Under 40 lb: one step. Stack: next plate
+# at any load. Once per lift." was shorthand. Same meaning in plain words: a dumbbell under 40 lb and any machine (the
+# catalog cannot tell a plate machine from a pin stack, §5, so every machine's step is its next plate) move one step,
+# and every lift changes load once. One line of at most 80 characters, so the block stays inside its 7 phone lines.
+LOAD_RULE_LIMITS = f"Dumbbells under {SMALL_LOAD_LB} lb or a machine: next step only. One load change per lift."
 
 
 def load_rule_line(step_lb: Optional[float], *, other_lifts: bool = False) -> str:
@@ -275,7 +281,17 @@ HEAVIER = "Heavier"
 LIGHTER = "Lighter"
 VOLUME_DAY = "Volume day"
 NOW_AIMING = "Now aiming"
-NO_JUMPS = "No jumps"
+# #5428 re-grade #6 (2026-11-08, 3 of 4 voices): a capped exposure's line was worded three ways (`No jumps: 2 sets today,
+# session 2 back.` / `No jumps today: session 2 back after a break.` / `No jumps: first time in 14 months.`), and "No jumps"
+# next to a split squat read as a movement instruction. ONE line now: `Same load all sets: ‹gap›.` — the gap when it is
+# known (`layoff_gap_words`), else `back after a break`. Never a set count (the rows show it) and never a bare session
+# ordinal. `NO_JUMPS` keeps its name (the coach's critic pass finds the line by it) and now holds the new head.
+LAYOFF_HEAD = "Same load all sets"
+NO_JUMPS = LAYOFF_HEAD
+LAYOFF_BREAK_WORDS = "back after a break"
+# a first-exposure gate on a lift he has never logged (trap bar, crunch): there is no gap to name and no break to come back
+# from, so the ‹gap› slot says so — with no ordinal (the rows and the gate's own count carry that)
+LAYOFF_NEW_WORDS = "new lift"
 # #5428 (owner ruling 2026-10-30): the same load as a PREVIOUS that ran to RPE 10, prescribed inside the band, says why
 SAME_LOAD = "Same load"
 SAME_LOAD_LINE = f"{SAME_LOAD}: aim to leave one more rep."
@@ -337,6 +353,42 @@ def one_set_line(rep_hi: Union[int, float], ceiling_rpe: Union[int, float], next
     return f"{ONE_SET_HEAD}{fmt_num(rep_hi)} reps at RPE {fmt_num(ceiling_rpe)} or less two sessions running → {_step_text(next_step_lb, per_hand)}."
 
 
+def ordinal(n: int) -> str:
+    """2 -> '2nd', 3 -> '3rd', 11 -> '11th'."""
+    n = int(n)
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def layoff_gap_words(gap_days: Union[int, float, str, None], exposure: Optional[int] = 1, *, new_lift: bool = False) -> str:
+    """The layoff line's ‹gap› (re-grade #6): exposure 1 `first time in 14 months`; a later exposure
+    `2nd session back after 5 weeks off`; the gap unknown (or under a week) `back after a break` — never a bare ordinal.
+    `new_lift`: a first-exposure gate on a lift never logged, `new lift`."""
+    if new_lift:
+        return LAYOFF_NEW_WORDS
+    gap = gap_text(gap_days)
+    if not gap:
+        return LAYOFF_BREAK_WORDS
+    n = int(exposure or 1)
+    return f"first time in {gap}" if n <= 1 else f"{ordinal(n)} session back after {gap} off"
+
+
+def layoff_line(gap_words: Optional[str]) -> str:
+    """A capped exposure's one line (§3.2, §3.8): `Same load all sets: first time in 14 months.` The capped exposure
+    holds its load, so the line replaces the load rule for this lift, and no W step line rides with it (lint L4)."""
+    words = str(gap_words or "").strip().rstrip(".") or LAYOFF_BREAK_WORDS
+    return f"{LAYOFF_HEAD}: {words}."
+
+
+_GAP = r"\d+ (?:days|weeks|months|years)"
+# what a layoff line must read as (lint L4): the gap, a later exposure's ordinal WITH its gap, or the break words
+LAYOFF_RE = re.compile(
+    rf"^{LAYOFF_HEAD}: (?:first time in {_GAP}|\d+(?:st|nd|rd|th) session back after {_GAP} off|{LAYOFF_BREAK_WORDS}|{LAYOFF_NEW_WORDS})\.$"
+)
+# the retired capped-exposure wording (re-grade #6): any `No jumps` line on the wire fails lint L1
+RETIRED_LAYOFF_RE = re.compile(r"^No jumps\b")
+
+
 def stale_reason_line(word: str, gap: Optional[str]) -> str:
     """A stale PREVIOUS (§3.3) more than one step from the row: `Lighter: first time in 2 years.` (`gap_text`), never
     `New: replaces …`, which is only for a lift with no PREVIOUS at all."""
@@ -348,7 +400,7 @@ ROTATION_HEAD = "New: replaces "
 # #5057 on the chat path: a stall-rule load step the author's rows did not take, named as a delta
 STEP_DUE_HEAD = "Step due: +"
 REASON_RE = re.compile(
-    r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |No jumps(?: today)?: |Set \d over RPE \d+(?:\.5)? → |\d+ sets? today[:.]"
+    r"^(?:Heavier: |Lighter: |Volume day: |Now aiming \d+–\d+: |Same load all sets: |Set \d over RPE \d+(?:\.5)? → |\d+ sets? today[:.]"
     r"|New: replaces |Step due: \+|Same load(?: to start)?: |One set: |Set 1: \d+ reps at RPE "
     # a critic's applied load / rep change (`session_block.applied_clause`) is a reason too (standard §3.2's list, §3.8)
     r"|(?:Lighter|Heavier|Fewer reps) today[:.])"
@@ -453,17 +505,23 @@ AFTER_LINE = "After: end watch cardio, restart Hevy."
 # #5428 re-grade #2 (2026-10-31), §3.7 intervals: the talk check lands at the END of a hard rep (not a bare minute that is
 # also where the easy minutes start), and the escape is one level.
 INTERVAL_ESCAPE_STEP = 1
+# OWNER RULING 2026-11-08 (#5428, on re-grade #6, 3 of 4 voices: steady + 1 was the same L12 the tempo rides hold for 30 min
+# at RPE 6–7): an interval's hard minutes sit TWO levels over his steady level (L11/L13). Was 1 (platform-chosen, panel).
+# Not a charter number: the composer (`cardio_note`) and the linter (L9) both read it here.
+INTERVAL_HARD_STEP = 2
 
 
-def interval_escape_line(up_level: int, hard_level: int) -> str:
-    """`As rep 1 ends: full sentences → L13; can't talk → 1 min at L12.` — the talk check as rep 1 ends: full sentences
-    (too easy) one level up; "a few words" is the target (line 1); can't talk (too hard) shortens the hard reps to 1 min
-    at the SAME hard level — never below it (re-grade #4: `none → L11` was a non-standard word and dropped the reps to
-    the recovery level, cancelling the intervals). Two phone lines."""
-    return f"As rep 1 ends: full sentences → L{int(up_level)}; can't talk → 1 min at L{int(hard_level)}."
+def interval_escape_line(up_level: int, down_level: int) -> str:
+    """`As rep 1 ends: full sentences → reps at L14; can't talk → reps at L12.` — the talk check as rep 1 ends, in the
+    talk table's words: full sentences (too easy) the remaining reps one level up; "a few words" is the target (line 1);
+    can't talk (too hard) the remaining reps one level down — still over his steady level, so the intervals stay
+    intervals (re-grade #4: `none → L11` dropped the reps to the recovery level). Re-grade #6 (2026-11-08): the old
+    `can't talk → 1 min at L12` could not be parsed mid-rep (L12 was the rep level already); each branch now names the
+    level the reps move to. Two phone lines."""
+    return f"As rep 1 ends: full sentences → reps at L{int(up_level)}; can't talk → reps at L{int(down_level)}."
 
 
-INTERVAL_ESCAPE_RE = re.compile(r"^As rep 1 ends: full sentences → L(?P<up>\d+); can't talk → 1 min at L(?P<hard>\d+)\.$")
+INTERVAL_ESCAPE_RE = re.compile(r"^As rep 1 ends: full sentences → reps at L(?P<up>\d+); can't talk → reps at L(?P<down>\d+)\.$")
 # the easy minutes' talk words on the interval clock (warm-up, recoveries, cool-down: his steady level)
 INTERVAL_EASY_TALK = "full sentences"
 
@@ -600,6 +658,9 @@ BANNED: tuple[tuple[str, str, bool], ...] = (
     (r"@ RPE|@\s*\d+(?:\.5)?(?:–\d+)? *\(", "@ used for effort or a date (loads only)", False),
     (r"Optional if", "per-exercise branch", False),
     (r"model paused|platform-chosen", "engine status", False),
+    # #5428 re-grade #6 (2026-11-08): the capped exposure's line is `Same load all sets: ‹gap›.`; "No jumps" read as a movement
+    # instruction beside a split squat and was worded three ways
+    (r"(?m)^No jumps\b", "retired layoff wording ('No jumps'; the line is 'Same load all sets: ‹gap›.')", True),
     (
         r"\bmetoprolol\b|\bAF\b|afib|atrial|\bECG\b|\bSinus\b|cardiolog|beta-blocker|\bretake\b",
         "medical or gate text (owner ruling 2026-10-27: none on the wire)",

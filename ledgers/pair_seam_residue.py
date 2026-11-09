@@ -367,6 +367,18 @@ REASON_5387_HEVY = (
 )
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "training_constraints::lambdas/training/note_requests.py::read": (
+        "2026-11-08",
+        "training_constraints is sk-family partitioned: training.note_requests reads ONLY sk begins_with REQUEST# (read_rows), and the only writers of that family are note_requests.raise_requests (write-once) and note_requests.resolve (the chat's answer, reached from mcp/tools_training_notes.py's answer_request/decline_request actions). variant_rotation writes ROTATION#, tools_training_notes writes DISMISSAL#/DELOAD#/MODE#disruption# families — none starts with REQUEST#, so no other writer's shape can reach this reader; the round trip is one module's own shape, pinned by tests/test_note_requests_5573.py (#5573).",
+    ),
+    "training_constraints::lambdas/training/variant_rotation.py::write": (
+        "2026-11-08",
+        "training_constraints is sk-family partitioned: training.note_requests reads ONLY sk begins_with REQUEST# (read_rows), and the only writers of that family are note_requests.raise_requests (write-once) and note_requests.resolve (the chat's answer, reached from mcp/tools_training_notes.py's answer_request/decline_request actions). variant_rotation writes ROTATION#, tools_training_notes writes DISMISSAL#/DELOAD#/MODE#disruption# families — none starts with REQUEST#, so no other writer's shape can reach this reader; the round trip is one module's own shape, pinned by tests/test_note_requests_5573.py (#5573).",
+    ),
+    "training_constraints::mcp/tools_training_notes.py::write": (
+        "2026-11-08",
+        "training_constraints is sk-family partitioned: training.note_requests reads ONLY sk begins_with REQUEST# (read_rows), and the only writers of that family are note_requests.raise_requests (write-once) and note_requests.resolve (the chat's answer, reached from mcp/tools_training_notes.py's answer_request/decline_request actions). variant_rotation writes ROTATION#, tools_training_notes writes DISMISSAL#/DELOAD#/MODE#disruption# families — none starts with REQUEST#, so no other writer's shape can reach this reader; the round trip is one module's own shape, pinned by tests/test_note_requests_5573.py (#5573).",
+    ),
     "day_grade::lambdas/content/recap_data.py::read": (
         "2026-11-05",
         "Owner ruling 2026-11-05: the recap card's grade is the day_grade record's PUBLIC variant, read ONLY through "

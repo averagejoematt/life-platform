@@ -480,9 +480,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/training/routine_repo.py:lookup_hevy_id": (
         "#3609 box 2 widen: exercised only by tests/test_routine_repo.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
-    "lambdas/training/training_notes.py:compute_deviation": (
-        "#3609 box 2 widen: exercised only by tests/test_training_notes.py (also named in docs/BACKLOG.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
     "lambdas/web/card_engine.py:draw_uncertainty": (
         "#3609 box 2 widen: exercised by tests/test_card_engine.py; named only in a COMMENT in scripts/doc_facts_og.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
     ),
