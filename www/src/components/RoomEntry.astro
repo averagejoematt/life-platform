@@ -1,14 +1,17 @@
 ---
 // The Coaching Room's entry on /system/ (CR1, built dark). SELF-GATING: with WEB_ROOM off (src/lib/room.js) this
-// component renders nothing and reads nothing — not even the room's data file — so /system/ is byte-identical to a
+// component renders nothing and reads nothing — not even the room's data files — so /system/ is byte-identical to a
 // build without it. No <style>, no <script>: it adds no asset to the build either way.
+// The docket door is shown only when at least one docket entry is complete enough to have a page (owner, 2026-11-09).
 import { recordHeadline } from "../lib/calibration.js";
+import { docketEntries } from "../lib/docket.js";
 import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
-import { loadCalibration } from "../lib/snapshot.js";
+import { loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
 const on = roomEnabled();
 const head = on ? recordHeadline(await loadCalibration()) : null;
+const docketOpen = on ? docketEntries(await loadCoachRoom()).length > 0 : false;
 const room = { [ROOM_MARKER]: "entry" };
 ---
 
@@ -29,7 +32,7 @@ const room = { [ROOM_MARKER]: "entry" };
         )}
         <div style="display:flex;flex-wrap:wrap;gap:10px">
           <a class="btn ghost sm" href={href("/system/calibration/")}>How sure they were, and how often they were right</a>
-          <a class="btn ghost sm" href={href("/system/docket/")}>Where they disagreed, and what the data said</a>
+          {docketOpen && <a class="btn ghost sm" href={href("/system/docket/")}>Where they disagreed, and what the data said</a>}
           <a class="btn ghost sm" href={href("/system/ledger/refuted/")}>Wrong this month</a>
         </div>
       </div>

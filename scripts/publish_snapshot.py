@@ -120,7 +120,13 @@ from publish_snapshot_lab import (  # noqa: E402 — the Laboratory's data file,
     fixture_lab,
     lab_enabled,
     live_lab,
-    resolve_and_validate as resolve_lab,  # noqa: E402
+    resolve_and_validate as resolve_lab,
+)
+from publish_snapshot_story import (  # noqa: E402 — HS1, WEB_STORY=1 only
+    fixture_story,
+    live_story,
+    story_enabled,
+    validate as validate_story,
 )
 
 
@@ -1069,6 +1075,12 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
         lab = fixture_lab(fixtures_dir) if mode == "fixture" else live_lab(lambda p: _get(base_url, p, timeout), log)
         try:
             data_files["lab"] = resolve_lab(lab, public, set((data_files.get("series") or {}).keys()))
+        except ValueError as exc:
+            raise SchemaError(str(exc)) from exc
+    if story_enabled():  # the Human Story, built dark (HS1): off = not fetched, not written, snapshot byte-identical
+        story = fixture_story(fixtures_dir, public) if mode == "fixture" else live_story(lambda p: _get(base_url, p, timeout), public, log)
+        try:
+            data_files["story"] = validate_story(story, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)

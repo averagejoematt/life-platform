@@ -14,7 +14,8 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
                  outside a verbatim coach quotation (scripts/www_verbatim.py — the render gate's rule,
                  static, so the LIVE root deploy holds it too), no Coaching Room output (CR1 is built dark:
                  a WEB_ROOM=1 dist is refused), no Laboratory output (L1, the same: a WEB_LAB=1 dist is
-                 refused), and (on the preview base) `noindex`
+                 refused), no Human Story output (HS1, the same: a WEB_STORY=1 dist is refused),
+                 and (on the preview base) `noindex`
   owned-paths    (#5534) the build's committed route manifest www/owned_paths.json and the reach
                  census www/reach.json equal what the clean build just emitted (drift = someone
                  changed a route and did not commit the artifact the deploy excludes by), the
@@ -230,6 +231,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     issues.extend(heart_coverage(dist, fixture=snapshot_mode(snapshot_dir) == "fixture"))
     issues.extend(room_leaks(dist))
     issues.extend(lab_leaks(dist))
+    issues.extend(story_leaks(dist))
     return issues
 
 
@@ -303,6 +305,31 @@ def lab_leaks(dist: str, lab_js: str = LAB_JS) -> list[str]:
                 out.append(f"{rel}: the Laboratory's data file in the dist")
             elif name.endswith(".html") and 'data-lab="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read():
                 out.append(f"{rel}: carries the Laboratory marker data-lab — a WEB_LAB=1 build is never deployed")
+    return out
+
+
+STORY_JS = os.path.join(WWW, "src", "lib", "story_dark.js")
+
+
+def story_leaks(dist: str, story_js: str = STORY_JS) -> list[str]:
+    """HS1 (built dark, owner brief 2026-11-08): the Human Story's timeline and episode index are NEVER deployed. A dist
+    that holds a story page, the story's data file or the data-story-dark marker is a WEB_STORY=1 build; this scan runs
+    on every deploy (`--scan-only`), so such a dist is refused before it can reach S3. www/tests/story_dark.test.mjs
+    holds the finer flag-off checks. The routes are read off story_dark.js (STORY_ROUTES' `path:` values)."""
+    out = []
+    for p in room_paths(story_js):
+        if os.path.exists(os.path.join(dist, p.strip("/"))):
+            out.append(f"{p.strip('/')}/: a Human Story page in the dist — a WEB_STORY=1 build is private and is never deployed")
+    for dirpath, _d, files in os.walk(dist):
+        for name in files:
+            rel = os.path.relpath(os.path.join(dirpath, name), dist)
+            if name == "story.json":
+                out.append(f"{rel}: the Human Story's data file in the dist")
+            elif (
+                name.endswith(".html")
+                and 'data-story-dark="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read()
+            ):
+                out.append(f"{rel}: carries the Human Story marker data-story-dark — a WEB_STORY=1 build is never deployed")
     return out
 
 

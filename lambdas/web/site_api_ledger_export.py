@@ -32,9 +32,12 @@ hold is the public instrument hold ``unsourced``, ``corrections_withheld: N``).
               due_date, settled_date, kind, status, confidence, sealed,
               grading: {how, actual_text, tolerance_text, outcome_notes},
               simple_guess, quality_flags: [], corrections: [],
+              evaluator_version, algo_version, verification: {outcome, verified_at, ruleset_version,
+                                                              classification_validated} | null,
               grading_held?, grading_held_reason?,     # only on a row under an owner evaluation hold (#5607)
               classification_review?, classification_review_reason?}],  # only on a settled row under review
-     total, page, size, pages, as_of}
+     total, page, size, pages, as_of,
+     verification_summary: {reproduced, corrected, could_not_verify, none}}   # over the `total` served rows
 
 CLASSIFICATION REVIEW (owner rulings 2026-11-03). A settled verdict the owner disputed keeps its place and its
 STORED status (e.g. ``refuted``) and carries ``classification_review: true`` + a public reason; it is out of every
@@ -80,7 +83,7 @@ from coach import (
 from common import journal_silence, prediction_publication
 from common.pacific_time import pacific_date_of, pacific_today
 
-from web import claim_sourcing, correction_history, prediction_reason, site_api_calls
+from web import claim_sourcing, correction_history, prediction_reason, site_api_calls, verification_fields
 from web.site_api_coach_ledger import (
     _CALIB_COACH_NAMES,
     _PREDICTION_PROJECTION_FIELDS,
@@ -239,6 +242,9 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
         "simple_guess": site_api_calls.simple_guess(row.get("baseline"), kind, coach_right=status == "confirmed", metric=ev.get("metric")),
         "quality_flags": _list(row.get("quality_flags")),
         "corrections": [],
+        # Owner 2026-11-09: the version stamp, the grade text's own version and the verification record's pointer
+        # (null when the call has none — never inferred from a version number). web.verification_fields.
+        **verification_fields.item_fields(row),
     }
     corrections = corrections_of(row, logged)
     if withheld or held:
@@ -340,6 +346,8 @@ def handle_ledger_export(event, *, fetch: Callable = fetch_rows, today: str | No
         "pages": max(1, math.ceil(total / size)),
         "as_of": today,
         "source": SOURCE,
+        # Owner 2026-11-09: counts by verification outcome over exactly the served rows (`total`).
+        "verification_summary": verification_fields.summary(i.get("verification") for i in items),
         # Owner ruling 2026-11-05: the ledger is publication-eligible calls only, counted the same as /api/predictions.
         "method": prediction_publication.method_block(),
         # Owner ruling 2026-11-04: no count of withheld rows and no `record_total` — either would publish how

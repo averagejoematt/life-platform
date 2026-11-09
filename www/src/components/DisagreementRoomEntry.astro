@@ -2,8 +2,10 @@
 // The Coaching Room's entry on each disagreement page (CR3, built dark). SELF-GATING: with WEB_ROOM off (src/lib/room.js)
 // this component renders nothing and reads nothing — not even the room's data file — so
 // /system/ledger/disagreements/<id>/ is byte-identical to a build without it. No <style>, no <script>: no asset either way.
-// Simple on arrival: the frozen test, the dates and the result as the docket serves them; the way into the full entry.
-import { datesOf, docketEntries, entryForDisagreement, resultOf, testWords } from "../lib/docket.js";
+// Simple on arrival: the frozen test, the dates and the result as the docket serves them; the way into the full entry —
+// only when that entry is complete enough to have a page (lib/docket.js::isPublishable). An incomplete entry is named
+// as such and gets no link.
+import { allDocketEntries, datesOf, entryForDisagreement, isPublishable, resultOf, testWords } from "../lib/docket.js";
 import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
 import { loadAll, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
@@ -13,7 +15,8 @@ interface Props {
 }
 const { d } = Astro.props;
 const on = roomEnabled();
-const entry = on ? entryForDisagreement(docketEntries(await loadCoachRoom()), d) : null;
+const entry = on ? entryForDisagreement(allDocketEntries(await loadCoachRoom()), d) : null;
+const complete = Boolean(entry && isPublishable(entry));
 const all = on ? await loadAll() : null;
 const nameOf = (id: string) => (all && all.get("coach", id)?.name) || String(id).replace(/_coach$/, "").replace(/_/g, " ");
 const result = on && entry ? resultOf(entry, nameOf) : null;
@@ -32,7 +35,11 @@ const room = { [ROOM_MARKER]: "disagreement-entry" };
             <p class="mono" style="font-size:13px">
               the test: {testWords(entry.criterion) || "no measure served"} · opened {dates!.opened} · {entry.status === "open" ? `the data decides on ${dates!.settles}` : `settled ${dates!.settled}`}
             </p>
-            <a class="btn ghost sm" href={href(`/system/docket/${entry.id}/`)} style="align-self:flex-start">Both sides, the stakes and the result</a>
+            {complete ? (
+              <a class="btn ghost sm" href={href(`/system/docket/${entry.id}/`)} style="align-self:flex-start">Both sides, the stakes and the result</a>
+            ) : (
+              <p class="muted" style="font-size:14px" data-docket-incomplete>Its docket entry is incomplete — not yet cleared for publication — so it has no page.</p>
+            )}
           </>
         ) : (
           <>

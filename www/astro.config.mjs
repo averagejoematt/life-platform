@@ -14,6 +14,8 @@ import sitemap from "@astrojs/sitemap";
 import { notRoomPage, roomIntegration } from "./src/lib/room.js";
 // The Laboratory, built dark (L1): routes injected only when WEB_LAB=1 (src/lib/lab.js). Off = no route at all.
 import { labIntegration, notLabPage } from "./src/lib/lab.js";
+// The Human Story, built dark (HS1): routes injected only when WEB_STORY=1 (src/lib/story_dark.js). Off = no route at all.
+import { notStoryPage, storyIntegration } from "./src/lib/story_dark.js";
 
 const base = process.env.WEB_BASE || "/";
 const noindex = process.env.WEB_NOINDEX === "1";
@@ -47,6 +49,6 @@ export default defineConfig({
     },
   },
   integrations: noindex
-    ? [roomIntegration(), labIntegration()]
-    : [roomIntegration(), labIntegration(), sitemap({ filter: (url) => notRoomPage(url) && notLabPage(url) })],
+    ? [roomIntegration(), labIntegration(), storyIntegration()]
+    : [roomIntegration(), labIntegration(), storyIntegration(), sitemap({ filter: (url) => notRoomPage(url) && notLabPage(url) && notStoryPage(url) })],
 });
