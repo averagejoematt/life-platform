@@ -1,0 +1,144 @@
+---
+// /story/so-far/ — the Human Story's timeline (HS1). BUILT DARK: this file lives outside src/pages/ and is injected as a
+// route ONLY when the story is switched on (src/lib/story_dark.js: WEB_STORY=1 for a private build, STORY_LIVE for the
+// owner's go). With the switch off it is not in the build. Its address is NOT /story/timeline/ — that is the established
+// v8 page, owned by the site/ deploy (the route collision, resolved 2026-11-09).
+// Simple on arrival, deep on demand: one row per program week the platform serves (/api/chapters), its span in words,
+// its installment when one was approved and published (scripts/publish_snapshot_story.py — fail closed) with the
+// chapter's own published excerpt (the same words /story/ already shows), and, folded, the week's days as links to the
+// existing Day pages. No audio, no journal / State of Mind / diary field: a week without an installment says only that.
+import Base from "../layouts/Base.astro";
+import { dayInWords } from "../lib/format.js";
+import { timelineRows, soFar } from "../lib/story.js";
+import { STORY_MARKER, storyEnabled, storyPrivate } from "../lib/story_dark.js";
+import { latestEdition, loadAll, loadStory } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+if (!storyEnabled()) throw new Error("src/story/timeline.astro rendered with the story switched off — the story route must not be injected");
+
+const file = await loadStory();
+const all = await loadAll();
+const edition = await latestEdition();
+const ok = file.state === "ok";
+const rows = timelineRows(file, all.byType.day);
+const so = soFar(file, edition);
+const genesisWords = file.genesis ? dayInWords(file.genesis) : null;
+const genesisDay = file.genesis ? all.get("day", file.genesis) : null;
+const asOf = file.as_of ? dayInWords(file.as_of) : null;
+const priv = storyPrivate();
+const story = { [STORY_MARKER]: "timeline" };
+// the chapter object's own published excerpt — public already, on /story/ and the chapter page; never the body
+const excerptOf = (id: string) => {
+  const c = all.get("chapter", id);
+  return c && c.status === "published" && typeof c.excerpt === "string" && c.excerpt.trim() ? c.excerpt.trim() : null;
+};
+const lastIdx = rows.length - 1;
+---
+
+<Base title="The story so far" top="story" description="The experiment week by week: each week's days and the installment written about it." status={asOf}>
+  <section class="section" {...story}>
+    <div class="wrap" style="max-width:900px">
+      <p class="label"><a href={href("/story/")}>Story</a> · the story so far{priv ? " · private build, not published" : ""}</p>
+      <h1 style="margin-top:10px">Week by week</h1>
+      <p class="dek" style="margin-top:14px;max-width:720px">
+        {so && so.sentence ? `${so.sentence} ` : ""}Each week below is seven days of the experiment: the installment written about it, when one was
+        approved and published, and every day of it, one tap away.
+      </p>
+      {
+        so && so.count > 0 && (
+          <p class="muted" style="margin-top:10px;font-size:15px">
+            {so.weeksWords} so far · {so.count === 1 ? "one installment" : `${so.count} installments`} on this timeline
+          </p>
+        )
+      }
+    </div>
+  </section>
+
+  <section class="section hair" {...story}>
+    <div class="wrap" style="max-width:900px">
+      {
+        !ok ? (
+          <div class="empty">
+            <b style="color:var(--ink)">The week list was not served for this snapshot.</b>
+            <span>{file.absent_text || ""}</span>
+          </div>
+        ) : (
+          <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+            {genesisWords && (
+              <li style="display:flex;gap:18px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--rule)">
+                <span class="mono cobalt" style="font-size:14px;flex:0 0 56px">Day 1</span>
+                <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                  <b style="font-size:18px">The experiment begins</b>
+                  {genesisDay ? (
+                    <a href={href(pathOf("day", genesisDay.id))} class="muted" style="font-size:15px">
+                      {genesisWords}
+                    </a>
+                  ) : (
+                    <span class="muted" style="font-size:15px">{genesisWords}</span>
+                  )}
+                </span>
+              </li>
+            )}
+            {rows.map((r, i) => {
+              const excerpt = r.installment ? excerptOf(r.installment.id) : null;
+              const current = i === lastIdx && r.days.length < 7;
+              return (
+                <li style="display:flex;gap:18px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--rule)" id={`week-${r.week}`}>
+                  <span class={`mono ${r.installment ? "cobalt" : "faint"}`} style="font-size:14px;flex:0 0 56px;padding-top:3px">
+                    {String(r.week).padStart(2, "0")}
+                  </span>
+                  <span style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 auto">
+                    <span class="label">
+                      {r.weekLabel}
+                      {r.span ? ` · ${r.span}` : ""}
+                    </span>
+                    {r.installment ? (
+                      <a href={href(pathOf("chapter", r.installment.id))} style="text-decoration:none;display:flex;flex-direction:column;gap:4px">
+                        <b style="font-size:21px;letter-spacing:-.02em;line-height:1.2">{r.installment.title}</b>
+                        {excerpt && (
+                          <span class="serif muted" style="font-size:16px;line-height:1.45;max-width:66ch">
+                            {excerpt}
+                          </span>
+                        )}
+                        <span class="mono muted" style="font-size:12px">
+                          Published {r.installment.dateWords} · read the installment →
+                        </span>
+                      </a>
+                    ) : (
+                      <span class="muted" style="font-size:15px">
+                        {current ? "This week is under way." : "No published installment for this week."}
+                      </span>
+                    )}
+                    {r.days.length > 0 && (
+                      <details class="more">
+                        <summary>
+                          The days of {r.weekLabel.toLowerCase()} <span class="mono muted" style="font-size:12px">{r.days.length}</span>
+                        </summary>
+                        <nav class="rows" aria-label={`The days of ${r.weekLabel}`}>
+                          {r.days.map((d) => (
+                            <a href={href(pathOf("day", d.id))}>
+                              <b>{d.words}</b>
+                              <span class="mono muted" style="font-size:12px">
+                                the day →
+                              </span>
+                            </a>
+                          ))}
+                        </nav>
+                      </details>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )
+      }
+      <p class="muted" style="font-size:13px;margin-top:24px;max-width:70ch">
+        The weeks are the platform's own seven-day program weeks. An installment appears here only when the platform records it as approved and
+        published; drafts and held installments are not part of this timeline. Every chapter is on <a
+          href={href("/story/")}>the story page</a
+        >.
+      </p>
+    </div>
+  </section>
+</Base>

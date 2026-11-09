@@ -367,13 +367,15 @@ def _feeler_fits(block: Any, entry: dict[str, Any], chat: bool) -> bool:
 
 
 def no_jumps_line(caps: dict[str, Any]) -> str:
-    """A capped exposure's reason (standard §3.2, R3 "opts out by name"): exposure 1 names the gap,
-    `No jumps: first time in 19 weeks.`; exposures 2–3 `No jumps today: session 2 back after a break.`"""
-    n = int(caps.get("exposure") or 1)
-    gap = hevy_note_grammar.gap_text(caps.get("gap_days"))
-    if n == 1:
-        return f"{hevy_note_grammar.NO_JUMPS}: first time in {gap}." if gap else f"{hevy_note_grammar.NO_JUMPS}: first time on it."
-    return f"{hevy_note_grammar.NO_JUMPS} today: session {n} back after a break."
+    """A capped exposure's one line (standard §3.2, R3 "opts out by name"; re-grade #6, 2026-11-08: one grammar, no
+    "No jumps"): `Same load all sets: first time in 19 weeks.` on exposure 1, `Same load all sets: 2nd session back after
+    19 months off.` on exposures 2–3, `Same load all sets: back after a break.` when the gap is unknown
+    (`hevy_note_grammar.layoff_gap_words`). The name is historical: the coach's critic pass imports it by this name."""
+    words = hevy_note_grammar.layoff_gap_words(caps.get("gap_days"), int(caps.get("exposure") or 1))
+    return hevy_note_grammar.layoff_line(words)
+
+
+layoff_line_for = no_jumps_line
 
 
 def _ex1_room() -> int:
@@ -415,11 +417,12 @@ def compose_blocks(
     lateral raise whose PREVIOUS column showed 65 lb x 10 from 2024 read "New" beside a 35 lb row). A stale PREVIOUS
     more than one step from the row gets `stale_reason_line` (`Lighter: first time in 2 years.`) instead; a rotation onto
     a lift with any PREVIOUS keeps its computed reason and the swap stays on the record (`rotation_of`). The line never
-    outranks a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line is the
-    instruction for the feeler W row, not a second reason.
+    outranks a capped exposure's layoff line (`Same load all sets: …`), and the pick-load W line still follows it on an
+    uncapped lift — that line is the instruction for the feeler W row, not a second reason. A capped lift holds its load,
+    so it never carries the W step line (re-grade #6, 2026-11-08; lint L4).
 
     A capped exposure (OD1, the ramp's `exposure_caps`) reads `RPE 7` and opts out of the load rule by name
-    (`no_jumps_line`); a critic's layoff set cap gets the same treatment downstream (`session_block.add_capped_reason`).
+    (`no_jumps_line`, the one layoff line); a critic's layoff set cap gets the same treatment downstream (`session_block.add_capped_reason`).
 
     `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own sentences that already read as
     the standard (`authored_lines`) — `effort` replaces line 1, `line` takes the cue slot (a chat-era technique cue counts

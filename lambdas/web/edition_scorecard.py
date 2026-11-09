@@ -93,7 +93,7 @@ SCORECARD_RULE_TEXT = {
     ),
     "ai": (
         f"Every call the coaches have had checked to date, not this week's alone, against {record_words.GUESS_RULE_WORDS}. "
-        f"Going well when they beat it. Fewer than {AI_MIN_CALLS} checked calls is not enough data."
+        f"Going well only when a tested advantage over it exists. Fewer than {AI_MIN_CALLS} checked calls is not enough data."
     ),
 }
 
@@ -126,7 +126,7 @@ VERDICT_TEXT = {
     ("mind", UNDER): f"In his own words on fewer than {MIND_WELL_DAYS} days",
     ("mind", FEW): "More entries than the count can see",
     # #4580 round 1: the record's one sentence (web/record_words.py), without its period — the page adds it.
-    ("ai", GOING_WELL): record_words.GUESS_BEATS.rstrip("."),
+    # Owner 2026-11-09: no "going well" for the AI row until a tested advantage exists (record_words.claimable_advantage).
     ("ai", UNDER): record_words.GUESS_NOT_YET.rstrip("."),
     ("ai", FEW): "Too few checked calls to compare",
 }

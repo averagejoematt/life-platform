@@ -6,18 +6,18 @@
 import Base from "../layouts/Base.astro";
 import LabBanner from "../components/LabBanner.astro";
 import { dayInWords, num } from "../lib/format.js";
-import { LAB_MARKER, labEnabled } from "../lib/lab.js";
-import { GROUP_WORDS, pillarWords, prose } from "../lib/laboratory.js";
+import { LAB_MARKER, labEnabled, labPrivate } from "../lib/lab.js";
+import { GROUP_WORDS, experimentHasPage, pillarWords, prose } from "../lib/laboratory.js";
 import { loadLab } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
 export async function getStaticPaths() {
   if (!labEnabled()) return [];
   const lab = await loadLab();
-  return (lab.lab_experiments || []).map((x: any) => ({ params: { id: x.id }, props: { x } }));
+  return (lab.lab_experiments || []).filter(experimentHasPage).map((x: any) => ({ params: { id: x.id }, props: { x } }));
 }
 
-if (!labEnabled()) throw new Error("src/lab/lab-experiment.astro rendered with WEB_LAB off — the Lab route must not be injected");
+if (!labEnabled()) throw new Error("src/lab/lab-experiment.astro rendered with the Lab switched off — the Lab route must not be injected");
 
 const { x } = Astro.props as any;
 const lab = await loadLab();
@@ -40,7 +40,7 @@ const KINDS: Record<string, string> = {
 ---
 
 <Base title={x.name} top="data" description={prose(x.hypothesis) || x.name} status={asOf}>
-  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <Fragment slot="head">{!noindex && labPrivate() && <meta name="robots" content="noindex, nofollow" />}</Fragment>
   <LabBanner />
   <section class="section" {...mark} style="padding-bottom:20px">
     <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
@@ -70,6 +70,20 @@ const KINDS: Record<string, string> = {
     </div>
   </section>
 
+  {/* 2026-11-09: an experiment with no run says once what will happen when it starts — never four empty boxes */}
+  {!run ? (
+    <section class="section" style="padding-top:8px">
+      <div class="wrap" style="max-width:1100px">
+        <div class="empty" style="max-width:760px">
+          <b style="color:var(--ink)">Not started.</b>
+          <span>
+            {x.origin === "library" ? "The claim above is the library's wording, not his. " : ""}When a run starts, its criterion, minimum effect, baseline, washout
+            and stopping rule are frozen before the first day, and this page then carries the window, the result and the days as they are recorded.
+          </span>
+        </div>
+      </div>
+    </section>
+  ) : (
   <section class="section" style="padding-top:8px">
     <div class="wrap grid cols2" style="gap:40px;align-items:start;max-width:1100px">
       <div>
@@ -160,6 +174,7 @@ const KINDS: Record<string, string> = {
       </div>
     </div>
   </section>
+  )}
 
   {
     detail && (

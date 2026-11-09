@@ -94,18 +94,24 @@ def test_the_10_25_intervals_list_every_start_minute_and_carry_the_escape():
     """#5428 re-grade #2 (2026-10-31): the easy minutes — warm-up, between and cool-down — are his steady L11 (was L10,
     one under), the escape is one level (L13, was L14), and the talk check lands as rep 1 ENDS on its own line (was
     "at min 8", the minute the easy block also starts). Re-grade #3: those easy minutes carry their talk words, and the
-    escape steps one level either way (L13 up, L11 down) — still ≤ 6 phone lines with the After line."""
+    escape steps one level either way (L13 up, L11 down) — still ≤ 6 phone lines with the After line.
+
+    Owner ruling 2026-11-08 (re-grade #6): hard = steady + 2 (L11/L13; L12 was the tempo level). The clock names the rep
+    length before its level (`L12 2 min` read as one number pair), and the escape names the level the reps move to on
+    each branch: full sentences L14, can't talk L12 — still over the steady L11."""
     note, audit = _compose("intervals", facts=_facts(), followed=True)
     assert note == (
-        "Recumbent · L11/L12 · hard RPE 8 (a few words)\n"
-        "⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\n"
-        "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12.\n" + AFTER
+        "Recumbent · L11/L13 · hard RPE 8 (a few words)\n"
+        "⌚ ride clock: 2 min at L13 from min 6, 10, 14, 18, 22; else L11 (full sentences)\n"
+        "As rep 1 ends: full sentences → reps at L14; can't talk → reps at L12.\n" + AFTER
     )
-    assert audit["clock_numbers"] == ["11", "12"] and audit["clock_off_grid"] == []
-    assert audit["steady_level"] == 11 and audit["interval_escape"] == "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12."
-    # the read-back (adherence grades against it): warm-up and cool-down at L11, the sprints at L12
+    assert audit["clock_numbers"] == ["11", "13"] and audit["clock_off_grid"] == []
+    assert audit["steady_level"] == 11
+    assert audit["interval_escape"] == "As rep 1 ends: full sentences → reps at L14; can't talk → reps at L12."
+    # the read-back (adherence grades against it): warm-up and cool-down at L11, the sprints at L13
     shape = cn.clock_of(note, 30)
-    assert shape["levels"] == [11, 12] and shape["family"] == "intervals", shape
+    assert shape["levels"] == [11, 13] and shape["family"] == "intervals", shape
+    assert cn.read_line1(note)["base_level"] == 11  # the steady level the dose was built on
     assert g.phone_lines(note) <= g.CARDIO_INTERVAL_MAX_LINES and len(note) <= g.CARDIO_NOTE_MAX_CHARS
 
 
@@ -377,6 +383,11 @@ def test_the_legacy_grammar_still_reads_for_history():
         ]
     )
     assert new["h"]["cycling"] == {"machine": "cycling", "kind": "intervals", "level": 12, "base_level": 11}
+    # a 4.5.0 interval note (owner ruling 2026-11-08: steady + 2) reads its steady level off its own clock line
+    ruled = (
+        "Recumbent · L11/L13 · hard RPE 8 (a few words)\n⌚ ride clock: 2 min at L13 from min 6, 10, 14, 18, 22; else L11 (full sentences)"
+    )
+    assert cn.read_line1(ruled)["base_level"] == 11 and cn.read_line1(ruled)["level"] == 13
 
 
 def test_the_carry_note_constants_state_per_hand_and_steps():

@@ -68,7 +68,7 @@ GRADED_TREADMILL_HILL = (
 )
 SESSION = (  # the load rule as re-grade #3 (2026-10-31) left it: two lines, a unit on every step
     "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n"
-    "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift."
+    "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nDumbbells under 40 lb or a machine: next step only. One load change per lift."
 )
 TARGET = "2026-10-30"  # routine 81fe18c0's day; be80e308 / dde23e6b were 10-29
 
@@ -366,12 +366,12 @@ def test_a_layoff_cap_with_no_days_since_value_reads_its_gap_off_previous(monkey
     monkeypatch.setenv(lint.MODE_ENV, "off")
     ir = _calf_ir("standing_calf_raise_machine", "2025-05-14", STANDING_CALF_COMPOSED)
     recs = _cap(ir, None)
+    # re-grade #6 (2026-11-08): the one layoff line (no set count — the rows show it), and NO W step line beside it — the
+    # 11-06 wire read `No jumps: 3 sets today, 18 months off.` then `W at RPE 5 or less → one step, no more.` (4 of 4 voices)
     assert recs[0]["applied"] and recs[0]["clauses"] == [
-        {"movement_key": "standing_calf_raise_machine", "clause": "No jumps: 3 sets today, 18 months off.", "effort_capped": True}
+        {"movement_key": "standing_calf_raise_machine", "clause": "Same load all sets: first time in 18 months.", "effort_capped": True}
     ]
-    assert ir.exercises[1].notes == (
-        "RPE 7\nNo jumps: 3 sets today, 18 months off.\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft."
-    )
+    assert ir.exercises[1].notes == "RPE 7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft."
     assert ir.exercises[1].notes != GRADED_STANDING_CALF and _lint(ir).ok, _lint(ir).lines()
 
 
@@ -384,9 +384,11 @@ def test_MUTATION_no_layoff_clause_is_ever_bare():
     assert session_block.change_reason(v, 40) == "first time in 6 weeks"
     assert session_block.change_reason({**v, "value": 3}) == session_block.BREAK_WORDS  # exposure 2 after a break
     assert session_block.layoff_gap(v, "2025-05-14", TARGET) == 534 and session_block.layoff_gap(v, None, TARGET) is None
-    assert session_block.capped_clause(3, None) == "No jumps: 3 sets today, new to the log."
-    for clause in ("No jumps: 3 sets today, 18 months off.", "No jumps: 1 set today, new to the log."):
-        assert g.phone_lines(clause) == 1 and g.REASON_RE.match(clause) and g.SET_COUNT_RE.search(clause), clause
+    # re-grade #6: the gap unknown reads `back after a break`, and the line carries no set count (the rows show it)
+    assert session_block.capped_clause(3, None) == "Same load all sets: back after a break."
+    for clause in ("Same load all sets: first time in 18 months.", "Same load all sets: back after a break."):
+        assert g.phone_lines(clause) <= 2 and g.REASON_RE.match(clause) and g.LAYOFF_RE.match(clause), clause
+        assert not g.SET_COUNT_RE.search(clause), clause
     # an uncapped layoff (a 40-day gap) keeps the plain clause, reason and all
     ir = _calf_ir("standing_calf_raise_machine", "2026-09-20", STANDING_CALF_COMPOSED)
     recs = _cap(ir, None)
@@ -395,7 +397,7 @@ def test_MUTATION_no_layoff_clause_is_ever_bare():
 
 def test_a_layoff_set_cap_over_90_days_takes_the_capped_exposures_effort(monkeypatch):
     """Dde23e6b's seated calf raise: PREVIOUS 90 lb × 15 @ RPE 9 on 2026-06-20 (133 days), capped 4 → 3 by the joints
-    critic. The graded wire kept `last set RPE 9–10` under the +10 lb rule; now `RPE 7` and the `No jumps` reason."""
+    critic. The graded wire kept `last set RPE 9–10` under the +10 lb rule; now `RPE 7` and the layoff line."""
     monkeypatch.setenv(lint.MODE_ENV, "off")
     calf = _accessory("seated_calf_raise", 90, n=4)
     _compose(
@@ -405,30 +407,34 @@ def test_a_layoff_set_cap_over_90_days_takes_the_capped_exposures_effort(monkeyp
     ir = _calf_ir("seated_calf_raise", "2026-06-20", calf.notes)
     ir.exercises[1] = calf
     _cap(ir, 133, to=3)
-    assert calf.notes == "RPE 7\nNo jumps: 3 sets today, 19 weeks off.\nFull stretch at the bottom; knees soft.", calf.notes
+    assert calf.notes == "RPE 7\nSame load all sets: first time in 19 weeks.\nFull stretch at the bottom; knees soft.", calf.notes
     assert calf.notes != GRADED_SEATED_CALF and _lint(ir).ok, _lint(ir).lines()
 
 
 def test_MUTATION_a_cap_inside_90_days_keeps_the_band_as_the_a_grade_corpus_does():
     """Control: the A-grade incline press, `2 sets today: first incline in 5 weeks.` under RPE 8–9 — a 35-day cap is not
-    OD1's capped exposure, so line 1 and the plain clause stand. And a ramp-capped lift's `No jumps` line merges."""
+    OD1's capped exposure, so line 1 and the plain clause stand. And a ramp-capped lift's layoff line stands as it is
+    (re-grade #6: the critic's cap and the composer's line are one line, with no set count)."""
     ir = _calf_ir("standing_calf_raise_machine", "2026-09-25", "RPE 8–9, last set RPE 9–10\nFull stretch at the bottom; knees soft.")
     _cap(ir, 35)
     assert (
         ir.exercises[1].notes == "RPE 8–9, last set RPE 9–10\n3 sets today: first time in 5 weeks.\nFull stretch at the bottom; knees soft."
     )
-    capped = "RPE 7\nNo jumps today: session 2 back after a break.\nFull stretch at the bottom; knees soft."
+    capped = "RPE 7\nSame load all sets: 2nd session back after 19 months off.\nFull stretch at the bottom; knees soft."
     ir = _calf_ir("standing_calf_raise_machine", "2026-10-27", capped)
     _cap(ir, 3)
-    assert ir.exercises[1].notes == "RPE 7\nNo jumps: 3 sets today, session 2 back.\nFull stretch at the bottom; knees soft."
-    assert session_block.add_capped_reason(ir.exercises[1].notes, "No jumps: 3 sets today, session 2 back.", 7) == ir.exercises[1].notes
+    assert ir.exercises[1].notes == capped
+    assert session_block.add_capped_reason(capped, "Same load all sets: 2nd session back after 19 months off.", 7) == capped
 
 
 def test_a_ramp_capped_first_exposure_names_its_gap():
-    """81fe18c0's split squat (PREVIOUS 2025-04-08): the ramp's exposure cap, exposure 1 — the gap, not 'session 1'."""
+    """81fe18c0's split squat (PREVIOUS 2025-04-08): the ramp's exposure cap, exposure 1 — the gap, not 'session 1'.
+    Re-grade #6 (2026-11-08): one grammar; a later exposure names its ordinal WITH the gap (the 11-06 split squat read
+    `No jumps today: session 2 back after a break.` though the ramp knew the gap: 570 days)."""
     caps = {"exposure": 1, "rpe_max": 7, "reps_max": 8, "gap_days": 540}
-    assert lift_note.no_jumps_line(caps) == "No jumps: first time in 18 months."
-    assert lift_note.no_jumps_line({**caps, "exposure": 2}) == "No jumps today: session 2 back after a break."
+    assert lift_note.no_jumps_line(caps) == "Same load all sets: first time in 18 months."
+    assert lift_note.no_jumps_line({**caps, "exposure": 2, "gap_days": 570}) == "Same load all sets: 2nd session back after 19 months off."
+    assert lift_note.no_jumps_line({**caps, "exposure": 3, "gap_days": None}) == "Same load all sets: back after a break."
     assert g.gap_text(10) == "10 days" and g.gap_text(35) == "5 weeks" and g.gap_text(133) == "19 weeks" and g.gap_text(800) == "2 years"
 
 

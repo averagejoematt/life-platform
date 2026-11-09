@@ -110,7 +110,9 @@ def test_held_and_private_objects_never_reach_the_snapshot(tmp_path):
     assert b"SENTINEL" not in blob, "a held/private object's content leaked into the public snapshot"
     assert b"week-10" not in blob and b"private-20261030" not in blob, "even the ID of a held/private object must not be written"
     for coll in os.listdir(out):
-        if coll in ("manifest.json", "appendix.json", "pairs.json", "journey.json", "series"):
+        # data files beside the collections are not lists of envelopes; the switch-gated ones (lab.json, story.json — on
+        # in a default export once LAB_LIVE / STORY_LIVE is committed) carry their own privacy proofs
+        if coll in ("manifest.json", "appendix.json", "pairs.json", "journey.json", "series", "lab.json", "story.json"):
             continue
         for o in json.load(open(out / coll)):
             assert o["visibility"] == "public"
@@ -213,7 +215,20 @@ def test_manifest_hashes_match_the_files(tmp_path):
             else (
                 data.get("items")
                 if "items" in data
-                else data.get("days") if "days" in data else data.get("rungs") if "rungs" in data else data["pairs"]
+                else (
+                    data.get("days")
+                    if "days" in data
+                    else (
+                        data.get("rungs")
+                        if "rungs" in data
+                        # the switch-gated data files (in a default export once their go-live line is committed)
+                        else (
+                            data["lab_experiments"]
+                            if "lab_experiments" in data
+                            else data["installments_index"] if "installments_index" in data else data["pairs"]
+                        )
+                    )
+                )
             )
         )
         assert meta["count"] == len(rows), name

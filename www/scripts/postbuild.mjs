@@ -30,7 +30,8 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { roomEnabled } from "../src/lib/room.js";
-import { labEnabled } from "../src/lib/lab.js";
+import { LAB_ROUTES, labEnabled, labPrivate } from "../src/lib/lab.js";
+import { STORY_ROUTES, storyEnabled, storyPrivate } from "../src/lib/story_dark.js";
 
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(WWW, "dist");
@@ -46,8 +47,12 @@ const rawBase = process.env.WEB_BASE || "/";
 // A Coaching Room build (WEB_ROOM=1, src/lib/room.js) is private and local: it must never rewrite the two committed
 // artifacts the deploy reads, so they are left exactly as committed and the build says so.
 // A Laboratory build (WEB_LAB=1, src/lib/lab.js, L1) is private in the same way and held to the same rule.
-const lab = labEnabled();
-const room = roomEnabled() || lab;
+// A Human Story build (WEB_STORY=1, src/lib/story_dark.js, HS1) is private and local in exactly the same way.
+// Only a PRIVATE build (the env switch while the go-live constant is false) is held back; once LAB_LIVE / STORY_LIVE is
+// committed true the Lab / the story is ordinary build output and is owned, mapped and deployed like every page.
+const lab = labPrivate();
+const story = storyPrivate();
+const room = roomEnabled() || lab || story;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
 function walk(dir, out = []) {
@@ -103,6 +108,20 @@ for (const abs of walk(PAGES)) {
   if (route.includes("[")) routePatterns.add(route.replace(/\[[^\]]+\]/g, "*"));
   else if (noExt === "404") files.add("404.html");
   else staticRoutes.add(route);
+}
+
+// A LIVE injected route (src/lib/lab.js, src/lib/story_dark.js) is not under src/pages/, so it is added here: a static
+// one to static_routes (qa/qa_manifest.py derives its sweep rows from them), a [param] one to route_patterns.
+for (const [on, list] of [
+  [labEnabled() && !lab, LAB_ROUTES],
+  [storyEnabled() && !story, STORY_ROUTES],
+]) {
+  if (!on) continue;
+  for (const r of list) {
+    const route = r.pattern.replace(/\/?$/, "/");
+    if (route.includes("[")) routePatterns.add(route.replace(/\[[^\]]+\]/g, "*"));
+    else staticRoutes.add(route);
+  }
 }
 
 let previous = {};
@@ -197,7 +216,7 @@ if (!room) writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
 
 if (room) {
   console.log(
-    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : "WEB_ROOM=1 — a private Coaching Room build"} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
+    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : "WEB_ROOM=1 — a private Coaching Room build"} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
   );
 } else {
   console.log(
