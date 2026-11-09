@@ -54,6 +54,7 @@
     "/privacy/",
     "/story/",
     "/story/program-week-09/",
+    "/story/so-far/",
     "/story/week-06/",
     "/story/week-07/",
     "/story/week-08/",
@@ -83,5 +84,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 62
+  "transitive_count": 63
 }

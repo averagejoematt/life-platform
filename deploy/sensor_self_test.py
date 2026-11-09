@@ -6,8 +6,8 @@ A heartbeat alarm is a claim about the future: "if the thing I watch goes quiet,
 Nothing checked that the sensor itself could still read what it watches or write what it
 emits — a deploy that renames a metric, drops an IAM grant, or deletes the alarm leaves the
 ledger in `tests/test_heartbeat_completeness.py` green (it only checks that NAMES exist in
-source) while the sensor is blind. This is the capability check, run after every deploy by
-`deploy/post_cdk_smoke.sh`.
+source) while the sensor is blind. This is the capability check, run as the LAST step of every
+`deploy/cdk_deploy.sh` (#5522) and by `deploy/post_cdk_smoke.sh`.
 
 THE SET IS DERIVED, NEVER LISTED
 ────────────────────────────────
@@ -156,9 +156,15 @@ def read_alarm(cw, name: str, now) -> str | None:
 
 
 def write_scratch(cw, sensor_id: str) -> None:
+    """One scratch datapoint per sensor (dimension `Sensor`), plus the SAME metric with NO
+    dimension — the run-level stream the #5522 dead-man reads (pipeline-health-check's
+    SensorSelfTestStale gauge -> sensor-self-test-stale): absent for 35 days = no self-test ran."""
     cw.put_metric_data(
         Namespace=SCRATCH_NAMESPACE,
-        MetricData=[{"MetricName": SCRATCH_METRIC, "Dimensions": [{"Name": "Sensor", "Value": sensor_id}], "Value": 1.0, "Unit": "Count"}],
+        MetricData=[
+            {"MetricName": SCRATCH_METRIC, "Dimensions": [{"Name": "Sensor", "Value": sensor_id}], "Value": 1.0, "Unit": "Count"},
+            {"MetricName": SCRATCH_METRIC, "Value": 1.0, "Unit": "Count"},
+        ],
     )
 
 

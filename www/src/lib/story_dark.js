@@ -22,7 +22,7 @@ export const STORY_ENV = "WEB_STORY";
  * owned_paths.json, no longer refused by the deploy scan. Read as text by scripts/publish_snapshot_story.py
  * (`story_live`) and scripts/check_www_build.py — keep it one line: `export const STORY_LIVE = true|false;`.
  */
-export const STORY_LIVE = false;
+export const STORY_LIVE = true;
 
 /** The routes HS1 adds when the switch is on (pattern → entrypoint, relative to www/). */
 export const STORY_ROUTES = [
