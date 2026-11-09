@@ -281,6 +281,25 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #5522: the post-deploy sensor self-test's dead-man. deploy/sensor_self_test.py runs as
+        # the last step of every attended deploy/cdk_deploy.sh; nothing else calls it, so its
+        # silence is the failure. The same daily {check_ingest_liveness} run reads
+        # LifePlatform/SelfTest SelfTestWrite over 35 days (one alarm window cannot span that —
+        # CloudWatch caps it at 7 days) and emits SensorSelfTestStale = 1 when no self-test wrote
+        # in that window or the read failed. Same namespace as the run's other gauges, so
+        # ingest-liveness-heartbeat covers this detector's own death. Digest (ADR-050).
+        _alarm(
+            "SensorSelfTestStale",
+            "sensor-self-test-stale",
+            "LifePlatform/IngestLiveness",
+            "SensorSelfTestStale",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # DI-2: source-of-truth reconciliation. Unlike liveness/freshness (which
         # read only DDB and so see only the high-water mark), the strava reconcile
         # job diffs the trailing-14d Strava API activity set against the store and

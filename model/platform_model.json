@@ -774,6 +774,12 @@
       "stack": "operational_stack",
       "via": "declaration"
     },
+    "sensor-self-test-stale": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
     "site-api-ai-errors": {
       "audience": "reader",
       "audience_ruling": "serve_stack \u2014 errors on the reader-facing AI endpoints (/api/ask, /api/board_ask).",
@@ -1093,7 +1099,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 146,
+    "alarms": 147,
     "emf_namespaces": 34,
     "schedules": 96,
     "secrets": 30
@@ -8210,9 +8216,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 146,
+      "alarms": 147,
       "alarms_by_routing": {
-        "digest": 101,
+        "digest": 102,
         "digest+paging": 2,
         "digest+urgent": 11,
         "paging": 2,
