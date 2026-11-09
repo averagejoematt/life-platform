@@ -124,11 +124,13 @@ def test_the_session_block_is_three_lines_with_no_safety_line():
     for word in ("Chest pain", "dizziness", "faint", "911", "heartbeat"):
         assert word not in block
         assert all(word not in e["note"] for r in GOLDEN for e in r["exercises"]), word
-    # R3's safeguard as §5's step (re-grade #5: "+5 lb max" was two steps on a 30-lb dumbbell), a stack's plate at any load
-    assert "Under 40 lb: one step. Stack: next plate at any load." in g.LOAD_RULE_LINE
+    # R3's safeguard as §5's step (re-grade #5: "+5 lb max" was two steps on a 30-lb dumbbell), a stack's plate at any load;
+    # re-grade #6 (2026-11-08): the same meaning in plain words, one line of at most 80 characters (two phone lines)
+    assert g.LOAD_RULE_LINES[1] == "Dumbbells under 40 lb or a machine: next step only. One load change per lift."
+    assert len(g.LOAD_RULE_LINES[1]) <= 2 * g.PHONE_CHARS and "Stack:" not in g.LOAD_RULE_LINE
     # re-grade #2: RPE 7.5 and 8.5 each sit in a branch; no pins. Re-grade #3: two if/then lines, a unit on every step,
     # no "per hand" (a dumbbell row is already per hand), a stack's step is its next plate
-    assert "7.5–8.5 → +5 lb" in g.LOAD_RULE_LINE and "Stack: next plate" in g.LOAD_RULE_LINE and "per hand" not in g.LOAD_RULE_LINE
+    assert "7.5–8.5 → +5 lb" in g.LOAD_RULE_LINE and "a machine: next step only" in g.LOAD_RULE_LINE and "per hand" not in g.LOAD_RULE_LINE
     assert "pin" not in g.LOAD_RULE_LINE and len(g.LOAD_RULE_LINES) == 2
     assert all(g.phone_lines(ln) <= 2 for ln in g.LOAD_RULE_LINES) and not re.search(r"\+\d+(?:\.\d)?(?![\d.]| lb)", g.LOAD_RULE_LINE)
     for r in GOLDEN:
@@ -189,9 +191,28 @@ def test_the_grammar_builders():
     assert g.stale_reason_line(g.LIGHTER, "2 years") == "Lighter: first time in 2 years." and g.REASON_RE.match(
         "Lighter: first time in 2 years."
     )
-    # re-grade #4: the standard's talk words; too hard shortens the reps at the hard level, never drops to the recovery level
-    assert g.interval_escape_line(13, 12) == "As rep 1 ends: full sentences → L13; can't talk → 1 min at L12."
-    assert g.phone_lines(g.interval_escape_line(13, 12)) == 2
+    # re-grade #4: the standard's talk words, never down to the recovery level; re-grade #6 (owner ruling 2026-11-08,
+    # hard = steady + 2): each branch names the level the reps move to, one up or one down
+    assert g.interval_escape_line(14, 12) == "As rep 1 ends: full sentences → reps at L14; can't talk → reps at L12."
+    assert g.phone_lines(g.interval_escape_line(14, 12)) == 2 and g.INTERVAL_HARD_STEP == 2
+    # re-grade #6: ONE layoff line, the gap or the break words, never a set count or a bare ordinal
+    assert g.layoff_line(g.layoff_gap_words(426, 1)) == "Same load all sets: first time in 14 months."
+    assert g.layoff_line(g.layoff_gap_words(36, 2)) == "Same load all sets: 2nd session back after 5 weeks off."
+    assert g.layoff_line(g.layoff_gap_words(None, 3)) == "Same load all sets: back after a break."
+    assert g.layoff_line(g.layoff_gap_words(None, 1, new_lift=True)) == "Same load all sets: new lift."
+    assert all(
+        g.LAYOFF_RE.match(g.layoff_line(g.layoff_gap_words(d, n))) and g.REASON_RE.match(g.layoff_line(g.layoff_gap_words(d, n)))
+        for d in (None, 3, 10, 40, 400, 900)
+        for n in (1, 2, 3)
+    )
+    assert not any(
+        g.LAYOFF_RE.match(x)
+        for x in (
+            "Same load all sets: 3 sets today, 18 months off.",
+            "Same load all sets: session 2 back.",
+            "No jumps: first time in 14 months.",
+        )
+    )
     assert g.sets_today_clause(2, "first incline in 5 weeks") == "2 sets today: first incline in 5 weeks."
     assert g.reason_line(g.HEAVIER, "15 reps was RPE 7") == "Heavier: 15 reps was RPE 7."
     assert g.delta_word(90, 80, 5) == g.HEAVIER and g.delta_word(80, 90, 5) == g.LIGHTER and g.delta_word(85, 80, 5) is None
@@ -237,6 +258,14 @@ def _previous(i: int, lb: float, note_fn: Callable[[str], str] | None = None) ->
         rt["exercises"][i]["previous_lb"] = lb
         if note_fn:
             rt["exercises"][i]["note"] = note_fn(rt["exercises"][i]["note"])
+
+    return m
+
+
+def _compose(*muts: Mut) -> Mut:
+    def m(rt: dict[str, Any]) -> None:
+        for mut in muts:
+            mut(rt)
 
     return m
 
@@ -324,14 +353,15 @@ MUTATIONS: list[tuple[str, str, Mut, str]] = [
     ("a prep cue on the wrong lift", "2026-10-23", _note(1, lambda n: n.replace("Hip hinges first.", "Band pull-aparts first.")), "L8"),
     # L9 — clock lines
     ("a clock number with no min", "2026-10-23", _note(5, lambda n: n.replace("at min 5 and 15", "at 5 and 15")), "L9"),
-    ("four levels on one ride", "2026-10-25", _note(6, lambda n: n.replace("else L11", "else L10")), "L9"),
+    # (re-grade #6: the escape's levels are not counted — it swaps the hard level — so a fourth level is a ladder rep)
+    ("four levels on one ride", "2026-10-25", _note(6, lambda n: n.replace("2 min at L13 from", "2 min at L13 → L15 from")), "L9"),
     (
         "a tempo ride with no clock line",
         "2026-10-23",
         _note(5, lambda n: "\n".join(ln for ln in n.split("\n") if not ln.startswith(g.CLOCK_PREFIX))),
         "L9",
     ),
-    ("intervals with no start minutes", "2026-10-25", _note(6, lambda n: n.replace("at min 6, 10, 14, 18, 22", "every 4 min")), "L9"),
+    ("intervals with no start minutes", "2026-10-25", _note(6, lambda n: n.replace("from min 6, 10, 14, 18, 22", "every 4 min")), "L9"),
     # L10 — the watch step
     ("a missing After line", "2026-10-26", _note(7, lambda n: n.replace("\n" + g.AFTER_LINE, "")), "L10"),
     ("an After line with nothing after", "2026-10-26", _drop_last_exercise, "L10"),
@@ -429,14 +459,14 @@ REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
     (
         "an escape that steps down to the recovery level",
         "2026-10-25",
-        _note(6, lambda n: n.replace("; can't talk → 1 min at L12.", "; none → L11.")),
+        _note(6, lambda n: n.replace("; can't talk → reps at L12.", "; can't talk → reps at L11.")),
         "L9",
-        "shorter reps at the hard level",
+        "reps one level down (over the easy level)",
     ),
     (
         "an escape with no too-hard branch",
         "2026-10-25",
-        _note(6, lambda n: n.replace("; can't talk → 1 min at L12.", ".")),
+        _note(6, lambda n: n.replace("; can't talk → reps at L12.", ".")),
         "L9",
         "can't talk",
     ),
@@ -465,9 +495,9 @@ REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
     (
         "between below his steady level",
         "2026-10-25",
-        _note(6, lambda n: n.replace("L11/L12", "L10/L12")),
+        _note(6, lambda n: n.replace("L11/L13", "L10/L13")),
         "L9",
-        "between is his steady level",
+        "steady level + 2",
     ),
     (
         "no warm-up or cool-down level",
@@ -482,8 +512,8 @@ REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
         _note(
             6,
             lambda n: n.replace(
-                "sentences).\nAs rep 1 ends: full sentences → L13; can't talk → 1 min at L12.",
-                "sentences). Full sentences at min 8 → L13 from min 10.",
+                "sentences)\nAs rep 1 ends: full sentences → reps at L14; can't talk → reps at L12.",
+                "sentences). Full sentences at min 8 → L14 from min 10.",
             ),
         ),
         "L9",
@@ -511,7 +541,87 @@ REGRADE_2_MUTATIONS: list[tuple[str, str, Mut, str, str]] = [
         "L4",
         "not on its rows",
     ),
-    ("a two-level escape", "2026-10-25", _note(6, lambda n: n.replace("→ L13;", "→ L14;")), "L9", "more than one level"),
+    ("a two-level escape", "2026-10-25", _note(6, lambda n: n.replace("→ reps at L14;", "→ reps at L15;")), "L9", "more than one level"),
+    # re-grade #6 (2026-11-08, lint 1.5.0) — each the wire's own defect, as the panel read it on the 11-05/11-06/11-08 drafts
+    (
+        "a pick-load barbell compound with no load on any row (the 11-06 Romanian deadlift)",
+        "2026-10-16",
+        _compose(
+            _rows(1, lambda r: [["W", None, "8"]] + [["N", None, x[2]] for x in r if x[0] == "N"]),
+            _note(1, lambda n: n.replace("RPE 8–9\n", "RPE 8–9\nW set: up to 8 easy reps, find the load.\n")),
+        ),
+        "L4",
+        "a barbell compound with no load on any working row",
+    ),
+    (
+        "a pick-load machine compound with no load on any row",
+        "2026-10-16",
+        _compose(
+            _rows(2, lambda r: [["W", None, "8"]] + [["N", None, x[2]] for x in r]),
+            _note(2, lambda n: n.replace("RPE 8–9\n", "RPE 8–9\nW set: up to 8 easy reps, find the load.\n")),
+        ),
+        "L4",
+        "a machine compound with no load on any working row",
+    ),
+    (
+        "a W step line on a capped lift (the 11-06 standing calf raise)",
+        "2026-10-13",
+        _note(
+            0,
+            lambda n: n.replace("Same load all sets: new lift.", "Same load all sets: new lift.\nW at RPE 5 or less → one step, no more."),
+        ),
+        "L4",
+        "carries the W step line",
+    ),
+    (
+        "the retired No jumps wording",
+        "2026-10-13",
+        _note(0, lambda n: n.replace("Same load all sets: new lift.", "No jumps: 3 sets today, 18 months off.")),
+        "L1",
+        "retired layoff wording",
+    ),
+    (
+        "a layoff line with a set count",
+        "2026-10-13",
+        _note(0, lambda n: n.replace("Same load all sets: new lift.", "Same load all sets: 3 sets today, 18 months off.")),
+        "L4",
+        "not the standard's `Same load all sets",
+    ),
+    (
+        "a layoff line with a bare session ordinal",
+        "2026-10-13",
+        _note(0, lambda n: n.replace("Same load all sets: new lift.", "Same load all sets: session 2 back.")),
+        "L4",
+        "not the standard's `Same load all sets",
+    ),
+    (
+        "the old load-rule line 4",
+        "2026-10-26",
+        _note(0, lambda n: n.replace(g.LOAD_RULE_LINES[1], "Under 40 lb: one step. Stack: next plate at any load. Once per lift.")),
+        "L3",
+        "load rule lines are not the standard's",
+    ),
+    (
+        "intervals at steady + 1 (before the 2026-11-08 ruling)",
+        "2026-10-25",
+        _note(6, lambda n: n.replace("L11/L13", "L11/L12")),
+        "L9",
+        "steady level + 2",
+    ),
+    (
+        "the interval clock's level beside its rep length",
+        "2026-10-25",
+        _note(6, lambda n: n.replace("2 min at L13 from min", "L13 2 min at min")),
+        "L9",
+        "side by side",
+    ),
+    (
+        "the old one-minute escape that stays at the rep level",
+        "2026-10-25",
+        _note(6, lambda n: n.replace("can't talk → reps at L12.", "can't talk → 1 min at L13.")),
+        "L9",
+        "interval escape is not",
+    ),
 ]
 
 

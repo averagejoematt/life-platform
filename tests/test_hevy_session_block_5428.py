@@ -40,7 +40,12 @@ LB = 0.45359237
 MEMORY_TEXT = "STANDING: (1) one. (2) two. (3) three. (4) PLACEHOLDER-STOP-LIST. (5) five."
 # #5428 re-grade #2 (2026-10-31): RPE 7.5–8.5 is the one-step branch; no pins; per hand; "sets left", never "later sets"
 # re-grade #3: two if/then lines, a unit on every step, a stack's step its next plate, no "per hand"
-LOAD_RULE = "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift."
+# #5428 re-grade #6 (2026-11-08): line 4 in plain words, same meaning (was "Under 40 lb: one step. Stack: next plate at any
+# load. Once per lift.")
+LOAD_RULE = (
+    "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\n"
+    "Dumbbells under 40 lb or a machine: next step only. One load change per lift."
+)
 UPPER_BLOCK = "Upper volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n" + LOAD_RULE
 LOWER_BLOCK = "Lower volume · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n" + LOAD_RULE
 

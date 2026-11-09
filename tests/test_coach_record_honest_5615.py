@@ -47,5 +47,7 @@ def test_the_calibration_page_names_the_blend_and_withholds_one_confidence_label
     js = _read("site", "assets", "js", "evidence_intelligence.js")
     assert "the coaches' record" in js and "<em>not</em> the coaches' record" in js
     assert "strata.coaches" in js, "each card leads with the coaches' own stratum"
-    assert "one stated confidence — not measurable" in js
+    # Owner ruling 2026-11-09: the one-band v1 label is retired with every v1 label; the per-coach cell is now
+    # calibration-v2's three answers, whose first says "not estimable" across levels with one band.
+    assert "shortHTML(v2Coach(d, c.coach_id))" in js
     assert '"Reliability curve — this season' not in js, "the pooled table is not presented as the coaches' curve"

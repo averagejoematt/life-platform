@@ -146,3 +146,13 @@ export async function snapshotAsOf() {
   _asOf = JSON.parse(await readFile(join(SNAPSHOT_DIR, "manifest.json"), "utf8")).as_of || null;
   return _asOf;
 }
+
+let _story = null;
+/** The Human Story's data file (HS1, built dark): written by the producer ONLY on a WEB_STORY=1 export and read only by
+ *  story pages and the self-gating entry, which exist only on a story build. Throws when absent — re-export with
+ *  WEB_STORY=1. */
+export async function loadStory() {
+  if (_story) return _story;
+  _story = JSON.parse(await readFile(join(SNAPSHOT_DIR, "story.json"), "utf8"));
+  return _story;
+}

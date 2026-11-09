@@ -1,0 +1,1287 @@
+[
+ {
+  "cardio": [
+   {
+    "kind": "tempo",
+    "minutes": 30.0,
+    "movement_key": "cycling",
+    "steady_level": 11.0
+   }
+  ],
+  "critic_changes": [
+   {
+    "critic": "joints_tendons",
+    "field": "exercises[3].set_count",
+    "metric": "days_since_movement[3]",
+    "to": 2.0,
+    "value": 4.0,
+    "verdict": "change"
+   }
+  ],
+  "exposure_caps": {
+   "lateral_raise_machine": {
+    "exposure": 2.0,
+    "gap_days": 996.0,
+    "reps_max": 8.0,
+    "rpe_max": 7.0
+   },
+   "triceps_extension_cable": {
+    "exposure": 2.0,
+    "gap_days": 1011.0,
+    "reps_max": 8.0,
+    "rpe_max": 7.0
+   }
+  },
+  "graded": [
+   {
+    "notes": "Upper heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\nTop reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift.\n\nBand pull-aparts first. Breathe out on the press.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 52.163122550000004
+     },
+     {
+      "reps": 5.0,
+      "type": "warmup",
+      "weight_kg": 72.57477920000001
+     },
+     {
+      "reps": 3.0,
+      "type": "warmup",
+      "weight_kg": 86.1825503
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 102.05828325
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 90.718474
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 90.718474
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9\nHeavier: 10 reps was RPE 8.5.\nBreathe out on the pull.",
+    "sets": [
+     {
+      "reps": 5.0,
+      "type": "warmup",
+      "weight_kg": 29.48350405
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 49.895160700000005
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 45.359237
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 45.359237
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal",
+      "weight_kg": 77.1107029
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal",
+      "weight_kg": 77.1107029
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nNo jumps: 2 sets today, session 2 back.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nNo jumps today: session 2 back after a break.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 19.27769865101469
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 19.27769865101469
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 14.741752025
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 14.741752025
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 29.483539113316585
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 29.483539113316585
+     }
+    ]
+   },
+   {
+    "notes": "Recumbent · L12 · RPE 6–7 (short phrases)\n⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down",
+    "sets": [
+     {
+      "duration_seconds": 1800.0,
+      "type": "normal"
+     }
+    ]
+   }
+  ],
+  "keys": [
+   "barbell_bench_press",
+   "one_arm_db_row",
+   "lat_pulldown",
+   "lateral_raise_machine",
+   "triceps_extension_cable",
+   "hammer_curl_dumbbell",
+   "face_pull",
+   "cycling"
+  ],
+  "no_history": {},
+  "pre_critic_notes": {
+   "lateral_raise_machine": "RPE 7\nSame load all sets: 2nd session back after 2 years off."
+  },
+  "previous_loads": {
+   "barbell_bench_press": {
+    "date": "2026-10-29",
+    "lb": 225.0,
+    "reps": 4,
+    "rpe": 9.0,
+    "template_id": "79D0BB3A"
+   },
+   "face_pull": {
+    "date": "2026-10-29",
+    "lb": 65.0,
+    "reps": 12,
+    "rpe": 8.0,
+    "template_id": "BE640BA0"
+   },
+   "hammer_curl_dumbbell": {
+    "date": "2026-10-29",
+    "lb": 32.5,
+    "reps": 8,
+    "rpe": 8.0,
+    "template_id": "7E3BC8B6"
+   },
+   "lat_pulldown": {
+    "date": "2026-11-02",
+    "lb": 160.0,
+    "reps": 10,
+    "rpe": 9.0,
+    "template_id": "6A6C31A5"
+   },
+   "lateral_raise_machine": {
+    "date": "2026-11-01",
+    "lb": 20.0,
+    "reps": 12,
+    "rpe": 8.0,
+    "template_id": "D5D0354D"
+   },
+   "one_arm_db_row": {
+    "date": "2026-11-02",
+    "lb": 95.0,
+    "reps": 10,
+    "rpe": 8.5,
+    "template_id": "F1E57334"
+   },
+   "triceps_extension_cable": {
+    "date": "2026-10-29",
+    "lb": 42.5,
+    "reps": 10,
+    "rpe": 9.0,
+    "template_id": "21310F5F"
+   }
+  },
+  "recomposed": [
+   {
+    "notes": "Upper heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\nTop reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nDumbbells under 40 lb or a machine: next step only. One load change per lift.\n\nBand pull-aparts first. Breathe out on the press.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 52.163122550000004
+     },
+     {
+      "reps": 5.0,
+      "type": "warmup",
+      "weight_kg": 72.57477920000001
+     },
+     {
+      "reps": 3.0,
+      "type": "warmup",
+      "weight_kg": 86.1825503
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 102.05828325
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 90.718474
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 90.718474
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9\nHeavier: 10 reps was RPE 8.5.\nBreathe out on the pull.",
+    "sets": [
+     {
+      "reps": 5.0,
+      "type": "warmup",
+      "weight_kg": 29.48350405
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 49.895160700000005
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 45.359237
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 45.359237
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal",
+      "weight_kg": 77.1107029
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal",
+      "weight_kg": 77.1107029
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nSame load all sets: 2nd session back after 2 years off.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nSame load all sets: 2nd session back after 2 years off.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 19.27769865101469
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 19.27769865101469
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 14.741752025
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 14.741752025
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 29.483539113316585
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 29.483539113316585
+     }
+    ]
+   },
+   {
+    "notes": "Recumbent · L12 · RPE 6–7 (short phrases)\n⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down",
+    "sets": [
+     {
+      "duration_seconds": 1800.0,
+      "type": "normal"
+     }
+    ]
+   }
+  ],
+  "routine_id": "e1acdab229dc10dbc83353e87c1da221",
+  "target_date": "2026-11-05",
+  "title": "Foundation - Upper - 18 - 49"
+ },
+ {
+  "cardio": [
+   {
+    "kind": "tempo",
+    "minutes": 30.0,
+    "movement_key": "cycling",
+    "steady_level": 11.0
+   }
+  ],
+  "critic_changes": [
+   {
+    "critic": "joints_tendons",
+    "field": "exercises[4].set_count",
+    "metric": "days_since_movement[4]",
+    "to": 3.0,
+    "value": null,
+    "verdict": "change"
+   }
+  ],
+  "exposure_caps": {
+   "bulgarian_split_squat_dumbbell": {
+    "exposure": 2.0,
+    "gap_days": 570.0,
+    "reps_max": 8.0,
+    "rpe_max": 7.0
+   },
+   "lying_leg_curl_machine": {
+    "exposure": 2.0,
+    "gap_days": 700.0,
+    "reps_max": 8.0,
+    "rpe_max": 7.0
+   }
+  },
+  "graded": [
+   {
+    "notes": "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\nTop reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift.\n\nHeavier: 8 reps was RPE 8.5.\nBrace each rep, breathe between reps.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 61.23496995
+     },
+     {
+      "reps": 5.0,
+      "type": "warmup",
+      "weight_kg": 83.91458845000001
+     },
+     {
+      "reps": 3.0,
+      "type": "warmup",
+      "weight_kg": 102.05828325
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 120.20197805000001
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 108.8621688
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 108.8621688
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9\nW set: up to 8 easy reps, find the load.\nHip hinges first. Brace; breathe out on the way up.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup"
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal"
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal"
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal"
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nNo jumps today: session 2 back after a break.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 10.205828325
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 10.205828325
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nNo jumps today: session 2 back after a break.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 52.163122550000004
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 52.163122550000004
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nNo jumps: 3 sets today, 18 months off.\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 58.9670081
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 58.9670081
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 58.9670081
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 58.9670081
+     }
+    ]
+   },
+   {
+    "notes": "Recumbent · L12 · RPE 6–7 (short phrases)\n⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down",
+    "sets": [
+     {
+      "duration_seconds": 1800.0,
+      "type": "normal"
+     }
+    ]
+   }
+  ],
+  "keys": [
+   "squat_barbell",
+   "romanian_deadlift_barbell",
+   "bulgarian_split_squat_dumbbell",
+   "lying_leg_curl_machine",
+   "standing_calf_raise_machine",
+   "cycling"
+  ],
+  "no_history": {
+   "romanian_deadlift_barbell": {
+    "progression_reason": "hold: no performed session of this movement for 6+ reps on record",
+    "status": "no_history",
+    "template_id": "2B4B7310"
+   }
+  },
+  "pre_critic_notes": {
+   "standing_calf_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 18 months.\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft."
+  },
+  "previous_loads": {
+   "bulgarian_split_squat_dumbbell": {
+    "date": "2026-10-30",
+    "lb": 22.5,
+    "reps": 8,
+    "rpe": 9.0,
+    "template_id": "B5D3A742"
+   },
+   "lying_leg_curl_machine": {
+    "date": "2026-10-30",
+    "lb": 125.0,
+    "reps": 9,
+    "rpe": null,
+    "template_id": "B8127AD1"
+   },
+   "squat_barbell": {
+    "date": "2026-11-03",
+    "lb": 225.0,
+    "reps": 8,
+    "rpe": 8.5,
+    "template_id": "D04AC939"
+   },
+   "standing_calf_raise_machine": {
+    "date": "2025-05-14",
+    "lb": 330.0,
+    "reps": 21,
+    "rpe": null,
+    "template_id": "E05C2C38"
+   }
+  },
+  "recomposed": [
+   {
+    "notes": "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\nTop reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nDumbbells under 40 lb or a machine: next step only. One load change per lift.\n\nHeavier: 8 reps was RPE 8.5.\nBrace each rep, breathe between reps.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 61.23496995
+     },
+     {
+      "reps": 5.0,
+      "type": "warmup",
+      "weight_kg": 83.91458845000001
+     },
+     {
+      "reps": 3.0,
+      "type": "warmup",
+      "weight_kg": 102.05828325
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 120.20197805000001
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 108.8621688
+     },
+     {
+      "rep_range": {
+       "end": 6.0,
+       "start": 4.0
+      },
+      "type": "normal",
+      "weight_kg": 108.8621688
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9\nW set: up to 8 easy reps, find the load.\nHip hinges first. Brace; breathe out on the way up.",
+    "sets": [
+     {
+      "reps": 8,
+      "type": "warmup"
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal"
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal"
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal"
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nSame load all sets: 2nd session back after 19 months off.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 10.205828325
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 10.205828325
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nSame load all sets: 2nd session back after 23 months off.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 52.163122550000004
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 52.163122550000004
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft.",
+    "sets": [
+     {
+      "reps": 8,
+      "type": "warmup",
+      "weight_kg": 58.9670081
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 58.9670081
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 58.9670081
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 58.9670081
+     }
+    ]
+   },
+   {
+    "notes": "Recumbent · L12 · RPE 6–7 (short phrases)\n⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down",
+    "sets": [
+     {
+      "duration_seconds": 1800.0,
+      "type": "normal"
+     }
+    ]
+   }
+  ],
+  "routine_id": "c90f4e353407b5640eee2eaa169a9902",
+  "target_date": "2026-11-06",
+  "title": "Foundation - Lower - 14 - 49"
+ },
+ {
+  "cardio": [
+   {
+    "kind": "intervals",
+    "minutes": 30.0,
+    "movement_key": "cycling",
+    "steady_level": 11.0
+   }
+  ],
+  "critic_changes": [],
+  "exposure_caps": {
+   "db_rear_delt_rows": {
+    "exposure": 3.0,
+    "gap_days": 586.0,
+    "reps_max": 8.0,
+    "rpe_max": 7.0
+   },
+   "lying_db_tricep_extension": {
+    "exposure": 1.0,
+    "gap_days": 419.0,
+    "reps_max": 8.0,
+    "rpe_max": 7.0
+   }
+  },
+  "graded": [
+   {
+    "notes": "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\nOther lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift.\n\nOne set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 22.6796185
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal",
+      "weight_kg": 38.55535145
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10\nHeavier: 15 reps was RPE 8.5.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nNo jumps today: session 3 back after a break.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 15.875732950000002
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 15.875732950000002
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 15.875732950000002
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10\nW at RPE 5 or less → one step, no more.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 38.55535145
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 38.55535145
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 38.55535145
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nNo jumps: first time in 14 months.\nElbows still.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9 · 65 lb per hand to start\nTall, ribs down, bells off your legs.\nSet 1 at RPE 7 or less: +10 lb per hand.\nSteps go in the yards box.",
+    "sets": [
+     {
+      "distance_meters": 60.0,
+      "type": "normal",
+      "weight_kg": 29.483504
+     },
+     {
+      "distance_meters": 60.0,
+      "type": "normal",
+      "weight_kg": 29.483504
+     }
+    ]
+   },
+   {
+    "notes": "Recumbent · L11/L12 · hard RPE 8 (a few words)\n⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).\nAs rep 1 ends: full sentences → L13; can't talk → 1 min at L12.",
+    "sets": [
+     {
+      "duration_seconds": 1800.0,
+      "type": "normal"
+     }
+    ]
+   }
+  ],
+  "keys": [
+   "db_shoulder_press",
+   "db_lateral_raise",
+   "db_rear_delt_rows",
+   "preacher_curl_machine",
+   "lying_db_tricep_extension",
+   "farmers_walk",
+   "cycling"
+  ],
+  "no_history": {
+   "farmers_walk": {
+    "progression_reason": "hold: the slot names no rep range",
+    "status": "no_history",
+    "template_id": "50C613D0"
+   }
+  },
+  "pre_critic_notes": {},
+  "previous_loads": {
+   "db_lateral_raise": {
+    "date": "2026-10-29",
+    "lb": 15.0,
+    "reps": 15,
+    "rpe": 8.5,
+    "template_id": "422B08F1"
+   },
+   "db_rear_delt_rows": {
+    "date": "2026-11-02",
+    "lb": 35.0,
+    "reps": 12,
+    "rpe": 9.0,
+    "template_id": "6e1f6811-3457-40da-ab93-92de19b84707"
+   },
+   "db_shoulder_press": {
+    "date": "2026-11-01",
+    "lb": 85.0,
+    "reps": 6,
+    "rpe": 8.5,
+    "template_id": "878CD1D0"
+   },
+   "farmers_walk": {
+    "carry": true,
+    "date": "2026-11-01",
+    "lb": 65.0,
+    "reps": 0,
+    "rpe": null,
+    "template_id": "50C613D0"
+   },
+   "lying_db_tricep_extension": {
+    "date": "2025-09-15",
+    "lb": 25.0,
+    "reps": 10,
+    "rpe": null,
+    "template_id": "2affffa8-bd9f-4f27-bb8c-159c2875c4b1"
+   },
+   "preacher_curl_machine": {
+    "date": "2025-05-13",
+    "lb": 80.0,
+    "reps": 8,
+    "rpe": null,
+    "template_id": "1E9A6B8E"
+   }
+  },
+  "recomposed": [
+   {
+    "notes": "Shoulders + arms · RPE 8–9 on big lifts\nLow energy → first 2 lifts + cardio, no hard efforts.\nOther lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nDumbbells under 40 lb or a machine: next step only. One load change per lift.\n\nOne set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press.",
+    "sets": [
+     {
+      "reps": 8.0,
+      "type": "warmup",
+      "weight_kg": 22.6796185
+     },
+     {
+      "rep_range": {
+       "end": 10.0,
+       "start": 6.0
+      },
+      "type": "normal",
+      "weight_kg": 38.55535145
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10\nHeavier: 15 reps was RPE 8.5.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nSame load all sets: 3rd session back after 19 months off.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 15.875732950000002
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 15.875732950000002
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 15.875732950000002
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9, last set RPE 9–10\nW at RPE 5 or less → one step, no more.",
+    "sets": [
+     {
+      "reps": 8,
+      "type": "warmup",
+      "weight_kg": 38.55535145
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 38.55535145
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 38.55535145
+     }
+    ]
+   },
+   {
+    "notes": "RPE 7\nSame load all sets: first time in 14 months.\nElbows still.",
+    "sets": [
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     },
+     {
+      "rep_range": {
+       "end": 15.0,
+       "start": 8.0
+      },
+      "type": "normal",
+      "weight_kg": 9.071847400000001
+     }
+    ]
+   },
+   {
+    "notes": "RPE 8–9 · 65 lb per hand to start\nTall, ribs down, bells off your legs.\nSet 1 at RPE 7 or less: +10 lb per hand.\nSteps go in the yards box.",
+    "sets": [
+     {
+      "distance_meters": 60.0,
+      "type": "normal",
+      "weight_kg": 29.483504
+     },
+     {
+      "distance_meters": 60.0,
+      "type": "normal",
+      "weight_kg": 29.483504
+     }
+    ]
+   },
+   {
+    "notes": "Recumbent · L11/L13 · hard RPE 8 (a few words)\n⌚ ride clock: 2 min at L13 from min 6, 10, 14, 18, 22; else L11 (full sentences)\nAs rep 1 ends: full sentences → reps at L14; can't talk → reps at L12.",
+    "sets": [
+     {
+      "duration_seconds": 1800.0,
+      "type": "normal"
+     }
+    ]
+   }
+  ],
+  "routine_id": "6ea0520bf0540814c32dbb7f62561bf5",
+  "target_date": "2026-11-08",
+  "title": "Foundation - Upper - 18 - 49"
+ }
+]
