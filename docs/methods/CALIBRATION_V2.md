@@ -1,7 +1,8 @@
 # Calibration v2 — three questions, three tests
 
 **Owner requirement:** 2026-11-09 ("these are different questions and shouldn't share one arbitrary threshold").
-**Code:** `lambdas/experiment/calibration_v2.py` (pure), exposed as `calibration_core.assess_v2`.
+**Code:** `lambdas/experiment/calibration_v2.py` (pure; `assess`), served by `lambdas/web/site_api_calibration_v2.py`.
+It is a sibling of `calibration_core.py`, not an edit to it: v1, and its open-source and JS copies, stay byte-identical.
 **Served:** `/api/calibration` → `assessment_v2` (per coach and per platform stratum, this season). Dark: no page reads it,
 and no v1 field or label changes until the owner adopts it.
 **Status:** proposed, not adopted. The v1 labels (`calibration`, `label`) stay what the site shows.
@@ -12,6 +13,8 @@ The same publication-eligible calls as every other public count (call publicatio
 `common/prediction_publication.py`): private calls are dropped by the table before this code sees a row. Within that set,
 the same season rows as the coach's record (`coach_record.decided_rows`): graded right or wrong, one resolution per call,
 not under classification review. Platform strata (hypotheses, each forecast model) are assessed separately and never pooled.
+`tests/test_calibration_v2_privacy.py` proves that journal, State of Mind, video-diary and private-call rows cannot change
+any v2 output. Its mutation control is the same walk with the gate off, which does move the output.
 
 ## The three questions
 
@@ -26,8 +29,8 @@ A level is one of the ten stated-confidence bands the reliability curve already 
   (Clopper-Pearson) interval. This is a single-level comparison, and is named as one.
 - **Across levels** is *estimable* only when at least **2 levels** each have a **usable** interval, and the rarer
   outcome occurs at least **20** times. Usable: the level's exact 95% interval is at most **0.5** wide for any hit
-  count, which needs **`min_level_n()`** calls (derived, pinned by a test). 20 = 10 events per parameter (Peduzzi et al.
-  1996) × the 2 parameters of the fit.
+  count. That takes **17** calls: `min_level_n()` derives it from the 0.5, and a test pins it. 20 = 10 events per
+  parameter (Peduzzi et al. 1996) × the 2 parameters of the fit.
 - When estimable, the estimate is the **logistic recalibration slope** (Cox 1958; 1 = confidence tracks outcomes) with
   a Wald 95% interval. Otherwise the answer is "calibration across confidence levels not estimable", with the reason.
 

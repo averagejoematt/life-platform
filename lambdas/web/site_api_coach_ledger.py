@@ -43,6 +43,7 @@ from web import (
     claim_sourcing,  # #4673: a dated claim citing a sensor with no reading that day is not quoted
     prediction_reason,  # #4220: a graded call's reason in reader words
     record_words,  # #4580 round 1: the base-rate guess's exact rate, beside the counts
+    site_api_calibration_v2,  # owner requirement 2026-11-09: calibration-v2, dark and additive
 )
 from web.site_api_common import (
     PT,
@@ -733,6 +734,7 @@ def handle_calibration(event, *, _g):
 
         per_coach = []
         season_decided = []  # #4585: every coach's decided rows this cycle — the comparison's row-set
+        decided_by_coach = {}  # calibration-v2 (owner 2026-11-09): the same rows, per coach
         season_under_review = 0  # owner ruling 2026-11-03: disputed verdicts, out of every score, disclosed
         platform_pairs = []  # season
         platform_career_pairs = []  # career (all cycles, #1376)
@@ -740,6 +742,7 @@ def handle_calibration(event, *, _g):
             summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
             coach_decided = coach_record.decided_rows(fetched[cid], genesis=EXPERIMENT_START)
             season_decided.extend(coach_decided)
+            decided_by_coach[cid] = coach_decided
             coach_under_review = len(coach_record.under_review_rows(fetched[cid], genesis=EXPERIMENT_START))
             season_under_review += coach_under_review
             platform_pairs.extend(pairs)
@@ -828,6 +831,8 @@ def handle_calibration(event, *, _g):
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
+                # Owner requirement 2026-11-09: calibration-v2, served beside v1 and changing none of it.
+                "assessment_v2": site_api_calibration_v2.assessment_v2(decided_by_coach, {"hypotheses": hyp_pairs, **forecast_strata}),
                 "cycle": _current_cycle(),
                 # #2957: the season card said "THIS SEASON · CYCLE 14" beside a career
                 # forecast count and the reader-truth judge read the pair as one claim —
