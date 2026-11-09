@@ -147,7 +147,13 @@ const num1 = "font-size:15px;line-height:1.5";
                 </p>
               )}
               {record.skill && <p style={num1}>{record.skill}</p>}
-              {record.label && <p style="font-size:13px"><span class="muted">Calibration: </span>{record.label}</p>}
+              {record.calibration.length > 0 && (
+                <dl style="font-size:13px;margin:0;display:flex;flex-direction:column;gap:6px" data-calibration-v2>
+                  {record.calibration.map((x: any) => (
+                    <div><dt class="muted">{x.ask}</dt><dd style="margin:0">{x.words}</dd></div>
+                  ))}
+                </dl>
+              )}
               {record.underReview > 0 && <p style="font-size:13px"><span class="flag disputed">{record.underReview} {DISPUTED_NOTE}</span> · counted neither way</p>}
             </>
           )

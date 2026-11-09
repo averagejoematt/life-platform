@@ -82,16 +82,16 @@ const POOLED = {
   },
 };
 
-test("calibration: the pooled card shows every stratum and never reads Well Calibrated over unskilled strata (#3550)", () => {
+test("calibration: the pooled card shows every stratum and carries no pooled verdict (#3550; calibration-v2, owner 2026-11-09)", () => {
   const html = renderCalibration({ platform: { ...POOLED, lifetime: POOLED }, coaches: [], hypotheses: {}, cycle: 17, cycle_start: "2026-09-06" });
   assert.ok(!html.includes("Well Calibrated"), "the 2026-09-05 defect string");
-  assert.ok(html.includes("Over Confident") || html.includes("Over-confident") || html.includes("Over-Confident"), html);
+  // The pooled v1 verdict is retired: calibration-v2 never pools strata, so the card states none.
+  assert.ok(!/Over[ -]Confident|Not Yet Skillful/i.test(html), html);
   assert.ok(html.includes("By stratum, each against its own base rate"), html);
   assert.ok(html.includes("coach calls n=37"), html);
   assert.ok(html.includes("interval forecasts n=137"), html);
   assert.ok(html.includes("hypothesis bets n=0"), html);
   assert.ok(html.includes("gap +0.28"), "the 27-point over-confidence is on the card");
-  assert.ok(html.includes("Verdict driven by the worst stratum&#39;s gap: coach calls") || html.includes("Verdict driven by the worst stratum's gap: coach calls"), html);
   assert.ok(html.includes("skill vs stratified base-rate"), "the skill figure names its reference");
 });
 
