@@ -27,6 +27,7 @@ import {
   previousMonth,
   questionOf,
   refutedLedger,
+  verifiedMisses,
   refutedRow,
   resultOf,
   sidesOf,
@@ -185,4 +186,40 @@ test("wrong this month: served statuses only, disputed never wrong, corrections 
   assert.doesNotMatch(`${row.how || ""} ${row.notes || ""}`, /\d{4}-\d{2}-\d{2}/, "dates in words");
   assert.deepEqual(callWords({ claim_withheld: "unsourced", claim: "Not quoted: held." }), { text: null, message: "Not quoted: held." });
   assert.equal(callWords({ claim: "" }).message, "The words of this call are not published.");
+});
+
+// ── "wrong this month", as published with CR1 (owner ruling 2026-11-09): verified, eligible, cleared outcomes only ──
+test("wrong this month draws only from the producer's counted calls (control: the same refuted call outside the set is not listed)", () => {
+  const miss = "nutrition-20261015-protein01";
+  assert.ok(
+    PREDS.some((p) => p.id === miss && p.status === "refuted" && String(p.settled_date).startsWith("2026-10") && !p.classification_review),
+    "the fixture holds a refuted October call to count or not"
+  );
+  // not in the producer's set (unverified, excluded or a repeat): never listed
+  const out = verifiedMisses(PREDS, "2026-10", new Set(["physical-20261015-weight01"]));
+  assert.equal(out.verified, true);
+  assert.deepEqual(out.wrong, [], "an uncounted miss never reaches the view");
+  // mutation control: the same call in the set appears
+  assert.deepEqual(verifiedMisses(PREDS, "2026-10", new Set([miss])).wrong.map((p) => p.id), [miss]);
+  // a call under classification review is never listed, even when named in the set
+  const v = verifiedMisses(PREDS, "2026-10", new Set([miss, "sleep-20261005-deepsleep01"]));
+  assert.deepEqual(v.wrong.map((p) => p.id), [miss]);
+  assert.deepEqual(v.disputed, [], "a call under review is not a verified outcome");
+});
+
+test("wrong this month with no counted list served renders no miss at all — never the unverified ledger (control: the ledger has misses)", () => {
+  assert.ok(refutedLedger(PREDS, "2026-10").wrong.length > 0, "the control: unverified misses exist to leak");
+  for (const absent of [null, undefined, ["sleep-20261005-deepsleep01"]]) {
+    const v = verifiedMisses(PREDS, "2026-10", absent);
+    assert.equal(v.verified, false);
+    assert.deepEqual([v.wrong.length, v.disputed.length, v.corrected.length], [0, 0, 0]);
+  }
+});
+
+test("the refuted page reads the counted set, and the docket only on a whole-room build", () => {
+  const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "room", "refuted.astro"), "utf8");
+  assert.match(page, /countedCalls\(file\.calibration\)/);
+  assert.match(page, /verifiedMisses\(preds, month, counted\)/);
+  assert.doesNotMatch(page, /refutedLedger\(/, "the unverified ledger view is never the page's source");
+  assert.match(page, /roomAll\(\) \? docketEntries\(await loadCoachRoom\(\)\)/, "coach_room.json is read only on a whole-room build");
 });

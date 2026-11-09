@@ -6,7 +6,7 @@
 // only when that entry is complete enough to have a page (lib/docket.js::isPublishable). An incomplete entry is named
 // as such and gets no link.
 import { allDocketEntries, datesOf, entryForDisagreement, isPublishable, resultOf, testWords } from "../lib/docket.js";
-import { ROOM_MARKER, roomEnabled } from "../lib/room.js";
+import { ROOM_MARKER, roomAll } from "../lib/room.js";
 import { loadAll, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
@@ -14,7 +14,7 @@ interface Props {
   d: { id: string; coach_a: string; coach_b: string; status: string; resolved_date?: string | null };
 }
 const { d } = Astro.props;
-const on = roomEnabled();
+const on = roomAll();
 const entry = on ? entryForDisagreement(allDocketEntries(await loadCoachRoom()), d) : null;
 const complete = Boolean(entry && isPublishable(entry));
 const all = on ? await loadAll() : null;

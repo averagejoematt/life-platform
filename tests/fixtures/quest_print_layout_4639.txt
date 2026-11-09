@@ -1,0 +1,141 @@
+                                                                                                                             Test Patient Quest Result 01/02/2030
+
+
+PATIENT INFORMATION:                                                                                                 ORDERING PHYSICIAN:
+                                                                     STATUS: Final
+Test Patient                                                                                                         Placeholder Physician,
+Phone (H): (555) 555-0100
+DOB:        01/01/1970
+                                             Source:
+                                             Collection Date:
+                                                                             Quest
+                                                                             01/01/2030 06:00 PM
+                                                                                                                     M.D.
+Gender:     Male Age: 71                                                                                             1 Placeholder Street
+                                                                             UTC
+Patient ID: 00000000                                                                                                 Floor 1
+                                             Time Reported:                  01/02/2030 06:09 PM
+                                                                                                                     Nowhere, ZZ, 00000
+                                                                             UTC
+                                             Received:                       01/02/2030 06:54 PM
+                                                                             UTC
+                                         Accession                           ZZ000000F
+                                         Number:
+                                         Lab Ref #:       0000000
+Test                                In Range Out Of Range       Reference Range                                        Previous Result                 Date          Lab
+FASTING:YES
+
+FASTING: YES
+IRON, TIBC AND FERRITIN PANEL Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+ IRON, TOTAL                 100                        50-180 mcg/dL              90.0 01/01/2029 NW
+ IRON BINDING                300                        250-425 mcg/dL            310.0 01/01/2029 NW
+ CAPACITY                                               (calc)
+LIPID PANEL, STANDARD Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+ CHOLESTEROL,                                 250 H    <200 mg/dL                                                                                                     NW
+
+ TOTAL
+ LDL-CHOLESTEROL                              150 H    mg/dL (calc)                                                                                                   NW
+
+       Reference range: <100
+
+       Desirable range <100 mg/dL for primary prevention.
+CHOL/HDLC RATIO             4.0                  <5.0 (calc)                                                                                                          NW
+
+COMPREHENSIVE METABOLIC PANEL                          Collected: 01/01/2030 06:00 PM UTC                          Received: 01/01/2030 06:02 PM
+UTC
+ GLUCOSE                   90                                                           65-99 mg/dL                                     80.0 01/01/2029               NW
+
+
+
+                       Fasting reference interval
+
+EGFR                                          100                                       > OR = 60 mL/min                              100.0 01/01/2029                NW
+
+                                                                                        /1.73m2
+BUN/CREATININE                  SEE NOTE:                                               6-22 (calc)                                                                   NW
+
+RATIO
+                                                          Not Reported: BUN and Creatinine are within
+                                                          reference range.
+
+OMEGACHECK(R)        Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+EPA+DPA+DHA                                          3.0 L >5.4 % by wt                   5.0 01/01/2029                                                               EZ
+URINALYSIS, COMPLETE Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+ GLUCOSE                   NEGATIVE                     NEGATIVE                                                                                                    NW
+ WBC                       NONE SEEN                    < OR = 5 /HPF                                                                                               NW
+ HYALINE CAST              NONE SEEN                    NONE SEEN /LPF                                                                                              NW
+ NOTE                                                                                                                                                               NW
+       This urine was analyzed for the presence of placeholder elements.
+CBC (INCLUDES DIFF/PLT)            Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+ WHITE BLOOD CELL                         5.0                      3.8-10.8 Thousand          6.0 L 01/01/2029                                                        NW
+ COUNT                                                             /uL
+RESPIRATORY ALLERGY PROFILE REGION XVII Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+ BIRCH (T3) IGE              1.00 H                    kU/L                                                                                                           NW
+ CLASS                       2                                                                                                                                       NW
+ COMMON RAGWEED              <0.10                     kU/L                                                                                                           NW
+ (SHORT) (W1) IGE
+
+               Printed from Health Gorilla Secure Clinical Network. Copyright © 2030 Health Gorilla Inc.
+               https://www.healthgorilla.com
+               The contents of this document and/or fax transmission are intended only for the use of the individual or entity to which they are addressed.
+
+
+                                                                                                                                                               Page 1 of 3
+                                                                                                                             Test Patient Quest Result 01/02/2030
+
+PATIENT INFORMATION:                                                                                                 ORDERING PHYSICIAN:
+                                                                     STATUS: Final
+Test Patient                                                                                                         Placeholder Physician,
+Phone (H): (555) 555-0100
+DOB:        01/01/1970
+Gender:     Male Age: 71                                                                                             1 Placeholder Street
+Patient ID: 00000000                                                                                                 Floor 1
+                                         Accession                           ZZ000000F
+Test                                In Range Out Of Range       Reference Range                                        Previous Result                 Date          Lab
+ CLASS                       0                                                                                                                                       NW
+SEX HORMONE BINDING GLOBULIN Collected: 01/01/2030 06:00 PM UTC                                                Received: 01/01/2030 06:02 PM UTC
+ SEX HORMONE                30                       10-50 nmol/L                                                           40.0 H 01/01/2029 NW
+
+
+               Printed from Health Gorilla Secure Clinical Network. Copyright © 2030 Health Gorilla Inc.
+               https://www.healthgorilla.com
+               The contents of this document and/or fax transmission are intended only for the use of the individual or entity to which they are addressed.
+
+
+                                                                                                                                                               Page 2 of 3
+                                                                                                                             Test Patient Quest Result 01/02/2030
+
+PATIENT INFORMATION:                                                                                                 ORDERING PHYSICIAN:
+                                                                     STATUS: Final
+Test Patient                                                                                                         Placeholder Physician,
+Phone (H): (555) 555-0100
+DOB:        01/01/1970
+Gender:     Male Age: 71                                                                                             1 Placeholder Street
+Patient ID: 00000000                                                                                                 Floor 1
+                                         Accession                           ZZ000000F
+Test                                In Range Out Of Range       Reference Range                                        Previous Result                 Date          Lab
+ BINDING GLOBULIN
+ABO GROUP AND RH TYPE Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+ RH TYPE                               RH(D)                                                                                                                           NW
+
+                                    POSITIVE
+
+TESTOSTERONE, FREE (DIALYSIS) AND TOTAL,MS Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM
+TESTOSTERONE,               80                  46.0-224.0 pg/mL                                                                        70.0 01/01/2029               Z4E
+FREE
+     (Note)
+     This test was developed and its analytical performance characteristics have been placeholder.
+LIPOPROTEIN FRACTIONATION ION MOBILITY Collected: 01/01/2030 06:00 PM UTC                                                       Received: 01/01/2030 06:02 PM UTC
+ LDL PATTERN                    A                    A Pattern                                  Z4M
+
+       Relative Risk: Optimal Pattern A; High Pattern B.
+9p21 GENOTYPE Collected: 01/01/2030 05:32 PM UTC Received: 01/01/2030 05:32 PM UTC
+ rs10757278                              aa                                                                               EZ
+ COMMENTS                                See Below                                                                        EZ
+       Placeholder genotype commentary.
+CYSTATIN C WITH eGFR Collected: 12/30/2029 05:32 PM UTC Received: 12/30/2029 05:32 PM UTC
+ eGFR                                                      100                                                     > OR = 60 mL/min/1.                                EZ
+
+                                                                                                                   73m2
+Enhanced PDF Report ZZ000000F-1 Collected: 01/01/2030 06:00 PM UTC Received: 01/01/2030 06:02 PM UTC
+ FERRITIN                    999                        38-380 ng/mL              272.0 01/01/2029 NW

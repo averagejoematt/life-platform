@@ -52,6 +52,7 @@ from publish_snapshot_calibration import (  # noqa: E402 — the Coaching Room's
     fixture_calibration,
     live_calibration,
     resolve_and_validate,
+    room_all,
     room_enabled,
 )
 from publish_snapshot_chapters import (
@@ -1056,13 +1057,13 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
     if bad:
         raise LookupError("dangling edge(s): " + "; ".join(bad[:12]) + (f" (+{len(bad) - 12})" if len(bad) > 12 else ""))
     validate_data_files(data_files, public)
-    if room_enabled():  # the Coaching Room, built dark (CR1): off = not fetched, not written, snapshot byte-identical
+    if room_enabled():  # the Coaching Room (CR1: WEB_ROOM=1/cr1 or the committed room_public): off = not fetched, not written
         cal = fixture_calibration(fixtures_dir) if mode == "fixture" else live_calibration(lambda p: _get(base_url, p, timeout), log)
         try:
             data_files["calibration"] = resolve_and_validate(cal, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
-        # CR2: the coach profiles (stance, asks, docket, voice) — the same switch, the same off-is-absent rule
+    if room_all():  # CR2/CR3: the coach profiles (stance, asks, docket, voice) — WEB_ROOM=1 only, never on a CR1 build
         coach_ids = [o["id"] for o in public.get("coach", [])]
         room = (
             fixture_coach_room(fixtures_dir) if mode == "fixture" else live_coach_room(lambda p: _get(base_url, p, timeout), coach_ids, log)

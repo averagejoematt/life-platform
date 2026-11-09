@@ -311,7 +311,6 @@ _RETIRED_SHORT_IDS = frozenset(
 
 _CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
 
-
 # ── #1527: parallel, projected PREDICTION#-partition fetch ────────────────────
 # /api/predictions and /api/calibration each walked all 8 coaches' full
 # PREDICTION# partitions SEQUENTIALLY once #1376 made both surfaces
@@ -394,6 +393,7 @@ _PREDICTION_PROJECTION_FIELDS = (
     "classification_review",
     # Owner 2026-11-09: the verification record's pointer (coach.verification_record) — served as `verification`.
     "latest_verification",
+    "original_grade",  # Owner 2026-11-09 (CR1): the first grade, for verification_fields.first_status (the archive)
 )
 
 
@@ -699,7 +699,6 @@ def handle_calibration(event, *, _g):
     EXPERIMENT_START = _g["EXPERIMENT_START"]
     _current_cycle = _g["_current_cycle"]
     _fetch_prediction_partition = _g["_fetch_prediction_partition"]
-    _parallel_fetch = _g["_parallel_fetch"]
     _query_partition = _g["_query_partition"]
     _score_coach_calibration = _g["_score_coach_calibration"]
     datetime = _g["datetime"]
@@ -731,7 +730,8 @@ def handle_calibration(event, *, _g):
 
         jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
         jobs["hypothesis-ledger"] = _fetch_hyp_ledger
-        fetched = _parallel_fetch(jobs)
+        # CR1: + each coach's VERIFY# rows (web.verification_fields.fetch_with_headline)
+        fetched, headline = verification_fields.fetch_with_headline(jobs, _CALIB_COACH_ID_MAP, _g)
         # Owner rulings 2026-11-03/05: a graded bet on a private metric stays out of the public scores.
         hyp_rows = [r for r in fetched.pop("hypothesis-ledger") if _activity_publication.hypothesis_is_public(r)]
 
@@ -764,7 +764,7 @@ def handle_calibration(event, *, _g):
                     **_decided_blocks(coach_decided),
                     # Owner ruling 2026-11-03: graded calls under classification review — not in n / Brier / record.
                     "under_review": coach_under_review,
-                    "verified": verification_fields.verified_block(coach_decided),  # owner 2026-11-09; null until recorded
+                    "verified": ((headline or {}).get("by_coach") or {}).get(cid),  # owner 2026-11-09 (CR1); null until recorded
                     "lifetime": career_summary,
                 }
             )
@@ -811,7 +811,7 @@ def handle_calibration(event, *, _g):
             {"coaches": platform_career_pairs, "hypotheses": hyp_career_pairs, **forecast_career_strata}
         )
         platform["lifetime"] = platform_lifetime
-        verification_fields.attach_stratum_extras(platform, season_strata, season_decided)  # owner 2026-11-09: additive per-stratum fields
+        verification_fields.attach_stratum_extras(platform, season_strata, (headline or {}).get("verified"))
 
         # #1893: the void ledger stops being write-only. Every reset stamps one
         # voided_at_reset row per still-open pre-registered bet into this SAME
@@ -834,6 +834,7 @@ def handle_calibration(event, *, _g):
                 # Owner ruling 2026-11-03: this season's coach verdicts under classification review — excluded from
                 # every number above (record, Brier, comparison) and disclosed here so a headline can say so.
                 "under_review": season_under_review,
+                "verification_summary": headline,  # Owner ruling 2026-11-09 (CR1); null until a verification record exists
                 "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
@@ -927,9 +928,7 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
     confirmed = refuted = under_review = 0
     coach_pairs: list = []
     season_all: list = []  # #4617: the rows the class counts are taken over — the same season
-    decided_all: list = []  # owner 2026-11-09: the decided rows the coaches stratum's `verified` block is taken over
     for cid in _CALIB_COACH_NAMES:
-        decided_all.extend(coach_record.decided_rows(rows_by_cid.get(cid, []), genesis=genesis))
         records = coach_record.resolved_once(rows_by_cid.get(cid, []))
         season = [r for r in records if coach_record.counts_this_cycle(r, genesis)]
         season_all.extend(season)
@@ -943,7 +942,7 @@ def record_bodies(rows_by_cid: dict, today_pt: str, genesis) -> dict:
                 refuted += 1
         coach_pairs.extend(calibration_core.pairs_from_prediction_records(season))
     platform = {"strata": {"coaches": calibration_core.score_strata({"coaches": coach_pairs})["strata"]["coaches"]}}
-    verification_fields.attach_stratum_extras(platform, {"coaches": coach_pairs}, decided_all)  # the same fields /api/calibration serves
+    verification_fields.attach_stratum_extras(platform, {"coaches": coach_pairs})
     return {
         "predictions": {
             "overall": {

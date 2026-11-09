@@ -223,7 +223,10 @@ def resolve(
     this_wk = _walking_hours(walk_end)
     last_wk = _walking_hours(shift_day_key(walk_end, -7))
     if this_wk is None or last_wk is None:
-        unresolved["walking_volume"] = "the walking-volume layer could not be built for one or both weeks"
+        unresolved["walking_volume"] = (
+            "the walking-volume layer could not be built for one or both weeks, or a walk signal (a WHOOP walk or a completed "
+            "walk habit) had no counted walk, so the week's hours are only a floor (#5669)"
+        )
     sev = _metabolic_severity(end_date) if include_metabolic else None
     if include_metabolic and sev is None:
         unresolved["metabolic_adaptation"] = "IC-29 returned an error or could not be read (thin data reads the same as an outage here)"

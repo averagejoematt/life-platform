@@ -2,11 +2,17 @@
 
 Owner ruling 2026-10-17 on #4638: "write it". Split out of whoop_lambda.py (module-size ceiling).
 Mirrors strava_lambda._write_empty_days: the same two guards, never raises.
+
+#5669 (capture-all, interpret later): the empty row KEEPS what it replaced. Each tombstone carries the
+stored row it superseded under `emptied_record` — the vendor's own fields, never interpreted — so a
+vendor-side delete is never also an evidence delete. Readers drop tombstoned rows, so nothing counts it.
 """
 
 from datetime import datetime, timedelta, timezone
 
 EMPTIED_DAY_REASON = "whoop_day_absent_from_vendor_list"
+# The stored row's own keys — identity, not vendor content — left out of `emptied_record` (#5669).
+_ROW_KEYS = frozenset({"pk", "sk"})
 
 
 def days_to_empty(vendor_workouts: list, stored_workouts: list, first_day: str, last_day: str) -> list:
@@ -26,13 +32,15 @@ def days_to_empty(vendor_workouts: list, stored_workouts: list, first_day: str, 
     ]
 
 
-def empty_day_records(day: str, rows: list, user_id: str) -> list:
+def empty_day_records(day: str, rows: list, user_id: str, stored_by_sk: dict | None = None) -> list:
     """The explicit empty day: each gone workout's row replaced IN PLACE (same sk) by the
     transform() item shape over zero workouts — identity only, no strain/kilojoule/zone
     fields — tombstoned so tombstone-aware readers read the day as one that never had the
     workout. The day's recovery/sleep row is not a workout aggregate and is never touched. The sk is
-    the stored row's own — this module never derives a day key."""
+    the stored row's own — this module never derives a day key. `stored_by_sk` (#5669): the stored
+    rows by sk; each tombstone keeps the row it replaced under `emptied_record`, verbatim."""
     now = datetime.now(timezone.utc).isoformat()
+    kept = stored_by_sk or {}
     return [
         {
             "pk": f"USER#{user_id}#SOURCE#whoop",
@@ -46,12 +54,13 @@ def empty_day_records(day: str, rows: list, user_id: str) -> list:
             "tombstoned_reason": EMPTIED_DAY_REASON,
             "tombstoned_at": now,
             "emptied_activity_ids": [i for i, _ in rows],
+            **({"emptied_record": {k: v for k, v in kept[sk].items() if k not in _ROW_KEYS}} if sk in kept else {}),
         }
         for wid, sk in rows
     ]
 
 
-def write_empty_days(table, candidates: list, vendor_count: int, user_id: str, logger) -> dict:
+def write_empty_days(table, candidates: list, vendor_count: int, user_id: str, logger, stored_by_sk: dict | None = None) -> dict:
     """Write each candidate empty day, behind the two guards. Never raises."""
     if not candidates:
         return {"emptied": [], "skipped": None}
@@ -63,7 +72,7 @@ def write_empty_days(table, candidates: list, vendor_count: int, user_id: str, l
     for day, rows in candidates:
         ids = [i for i, _ in rows]
         try:
-            for rec in empty_day_records(day, rows, user_id):
+            for rec in empty_day_records(day, rows, user_id, stored_by_sk):
                 table.put_item(Item=rec)
             emptied.append(day)
             logger.warning("[RECONCILE] #4638 %s: every stored workout %s is gone from Whoop — wrote the empty day", day, ids)
@@ -82,7 +91,8 @@ def store_vendor_result(
         candidates = days_to_empty(
             vendor_workouts, stored, (start + timedelta(days=1)).isoformat(), (today - timedelta(days=1)).isoformat()
         )
-        written = write_empty_days(table, candidates, len(vendor_workouts), user_id, logger)
+        stored_by_sk = {str(s.get("sk", "")): s for s in stored if isinstance(s, dict)}
+        written = write_empty_days(table, candidates, len(vendor_workouts), user_id, logger, stored_by_sk)
     except Exception as e:
         logger.error("[RECONCILE] #4638 empty-day judgement failed (non-fatal): %s", e)
         return result | {"empty_day_candidates": [], "emptied_days": [], "empty_day_writes_skipped": "error"}
