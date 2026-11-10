@@ -86,8 +86,12 @@ NARRATIVE_USER_SK_PREFIXES = ("SOURCE#coach_thread#",)  # the analyzer's per-coa
 # Graded-record families: carried to the handler unchanged and withheld at the wire (see the
 # module docstring) — under every narrative partition, by sort-key prefix.
 COUNTED_SK_PREFIXES = ("PREDICTION#", "COMMITMENT#", "LEARNING#", "CALIB#", "OPEN#", "RESOLVED#")
-# Owner-authored rows under a coach partition: his grade corrections (the #5626 public trail).
-NON_NARRATIVE_SK_PREFIXES = ("CORRECTION#",)
+# Owner-authored rows under a coach partition: his grade corrections (the #5626 public trail) — and the engine/owner
+# audit rows of the 2026-11-09 rulings: VERIFY# (coach.verification_record: hashes, statuses, the owner's classification
+# and ruling reference — no coach words) and REPEATFAMILY# (coach.repeat_family: criteria, word hashes, the ruling).
+# Gating them as narrative blanked the classification's ruling_ref, so /api/calibration read every approved
+# classification as unapproved. Publication method v2 still governs all three: each follows the call it names.
+NON_NARRATIVE_SK_PREFIXES = ("CORRECTION#", "VERIFY#", "REPEATFAMILY#")
 # Deliberately NOT gated here: owner-authored partitions (his corrections ledger, his decision log,
 # his own words — #4584), and the publications with their own owner-consent gate (named in the PR):
 # the chronicle (owner approval per installment + the story-auditor's journal class), the diary

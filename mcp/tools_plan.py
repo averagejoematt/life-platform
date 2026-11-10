@@ -120,6 +120,16 @@ def _guidance_freshness() -> dict[str, Any]:
     return guidance_freshness.read_freshness(table, pacific_today())
 
 
+def _training_phase_field() -> dict[str, Any]:
+    """#5576: the weekly evaluator's phase brief (`phase_evaluator_leg.phase_brief_field`, the coach packet's same read) —
+    current phase + since, next phase, and the closest unmet gate with its measured value. Never raises: a failed read
+    is `read_failed` with its class, a not-yet-seeded state is `absent`. Owner-only (MCP)."""
+    from mcp.phase_evaluator_leg import phase_brief_field
+
+    value, status = phase_brief_field()
+    return {**status, "value": value}
+
+
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     """(value, input status) — `_safe`, but the failure is KEPT (#4072).
 
@@ -917,6 +927,7 @@ def tool_plan_next_session(args):
     }
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
+    out["training_phase"] = _training_phase_field()  # #5576: the computed phase, the next one, the closest unmet gate + value
     attach_coach_context(out, target_date, constraint_block=block, packet_reason=PACKET_NOT_REREAD)  # #5071/#5200
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
         from mcp.nightly_predraft import attach_to_stage_1

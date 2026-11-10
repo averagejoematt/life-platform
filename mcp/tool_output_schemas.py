@@ -148,6 +148,7 @@ _PLAN_NEXT_SESSION = _obj(
         "nutrition_critics": _OBJ,
         "critics": _OBJ,
         "predraft": _OBJ,
+        "training_phase": _OBJ,  # #5576: the computed phase brief ({state, value})
     },
     ["target_date", "constraint_block", "protein_days_measured_7d", "how_to_use", "_disclaimer", "nutrition_critics"],
 )
