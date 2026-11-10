@@ -16,6 +16,8 @@ import pytest
 from training import routine_title as rt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
+_REAL_READ_STATE = rt.read_phase_state_row  # the autouse fixture below stubs it; two tests drive the real read
+
 
 def _ir(archetype="upper", variant="ideal", target_date="2026-06-15", rationale=None) -> RoutineSpec:
     return RoutineSpec(
@@ -31,7 +33,9 @@ def _ir(archetype="upper", variant="ideal", target_date="2026-06-15", rationale=
 @pytest.fixture(autouse=True)
 def _reset():
     rt._reset_for_tests()
-    yield
+    # #5576: no PHASE#STATE row unless a test plants one — the file fallback, and no live DDB read
+    with patch.object(rt, "read_phase_state_row", return_value=None):
+        yield
     rt._reset_for_tests()
 
 
@@ -157,3 +161,90 @@ def test_build_context_n_resets_on_phase_advance():
         ctx = rt.build_title_context(_ir(archetype="upper", target_date="2026-08-02"))
     assert ctx["type_count_in_phase"] == 1  # N reset by the new phase window
     assert ctx["all_time_count"] == 2  # Y still counts the pre-advance workout
+
+
+# #5576: the phase comes from the weekly evaluator's PHASE#STATE row (#5575), not the hand-edited file. A fixture STATE row
+# exactly as `phase_evaluator.state_row` writes it after an applied transition: stage/title flipped, `since` = the
+# TRANSITION's effective_on (the block start the stage machine applied it at).
+_PERFORMED_ACROSS_THE_FLIP = [
+    {"date": "2026-10-20", "workout_uid": "hevy:a", "archetype": "upper"},
+    {"date": "2026-11-03", "workout_uid": "hevy:b", "archetype": "upper"},
+    {"date": "2026-11-17", "workout_uid": "hevy:c", "archetype": "lower"},
+]
+
+
+def _performed_since(start):
+    return [w for w in _PERFORMED_ACROSS_THE_FLIP if w["date"] >= start]
+
+
+def _state_row(stage, title, since):
+    from training import phase_evaluator as pe
+
+    return {"pk": pe.pk(), "sk": pe.SK_STATE, "stage": stage, "title": title, "since": since, "origin": "evaluator", "pending": None}
+
+
+def test_a_state_row_flipping_the_phase_changes_the_title_prefix_and_resets_n():
+    """Mutation: keep reading `current`/`current_started` from training_phases.json (the prefix stays Foundation and N
+    keeps counting the two pre-flip uppers), or anchor N on anything but the STATE row's `since`."""
+    file_state = _phase_state(current="Foundation", started="2026-09-06")
+    ir = _ir(archetype="upper", target_date="2026-11-18")
+    with (
+        patch.object(rt, "load_phase_state", return_value=file_state),
+        patch.object(rt, "_query_performed", side_effect=_performed_since),
+        patch.object(rt, "_load_routine_index", return_value=[]),
+    ):
+        with patch.object(rt, "read_phase_state_row", return_value=_state_row("foundation", "Foundation", "2026-09-06")):
+            before = rt.build_title_context(ir)
+        with patch.object(rt, "read_phase_state_row", return_value=_state_row("build", "Build", "2026-11-16")):
+            after = rt.build_title_context(ir)
+    assert rt.format_title(ir, before).startswith("Foundation - Upper - 3 - ")
+    assert before["phase_source"] == rt.PHASE_SOURCE_STATE
+    assert rt.format_title(ir, after).startswith("Build - Upper - 1 - ")  # the new prefix, N reset on the transition date
+    assert after["phase_started"] == "2026-11-16" and after["phase_source"] == rt.PHASE_SOURCE_STATE
+    # Y is untouched by the flip: still derived from EXPERIMENT_START_DATE (#3671), never from the STATE row
+    assert after["reset_epoch"] == rt.EXPERIMENT_START_DATE
+    assert after["all_time_count"] == before["all_time_count"]
+
+
+def test_no_state_row_falls_back_to_the_file():
+    """Mutation: drop the fallback (the title breaks until the evaluator's first Monday run), or let it ignore the file."""
+    with (
+        patch.object(rt, "load_phase_state", return_value=_phase_state(current="Foundation", started="2026-09-06")),
+        patch.object(rt, "_query_performed", side_effect=_performed_since),
+        patch.object(rt, "_load_routine_index", return_value=[]),
+    ):
+        ctx = rt.build_title_context(_ir(archetype="upper", target_date="2026-11-18"))
+    assert (ctx["phase"], ctx["phase_started"], ctx["phase_source"]) == ("Foundation", "2026-09-06", rt.PHASE_SOURCE_FILE)
+    assert ctx["type_count_in_phase"] == 3
+
+
+def test_an_unreadable_state_row_falls_back_to_the_file():
+    """Mutation: let the STATE read's exception escape (a DDB blip would stop every routine push)."""
+
+    class _Boom:
+        def get_item(self, **kw):
+            raise RuntimeError("ddb down")
+
+    with (
+        patch.object(rt, "read_phase_state_row", _REAL_READ_STATE),
+        patch.object(rt, "_table", return_value=_Boom()),
+        patch.object(rt, "load_phase_state", return_value=_phase_state(current="Foundation", started="2026-09-06")),
+    ):
+        assert rt.read_phase_state_row() is None
+        assert rt.resolve_title_phase() == ("Foundation", "2026-09-06", rt.PHASE_SOURCE_FILE)
+
+
+def test_the_state_read_names_the_evaluator_key():
+    """Mutation: read any key but the evaluator's own PHASE#STATE row in the training_constraints partition."""
+    from training import phase_evaluator as pe
+
+    seen = {}
+
+    class _Table:
+        def get_item(self, Key=None, **kw):
+            seen.update(Key)
+            return {"Item": _state_row("build", "Build", "2026-11-16")}
+
+    with patch.object(rt, "read_phase_state_row", _REAL_READ_STATE), patch.object(rt, "_table", return_value=_Table()):
+        assert rt.resolve_title_phase() == ("Build", "2026-11-16", rt.PHASE_SOURCE_STATE)
+    assert seen == {"pk": "USER#matthew#SOURCE#training_constraints", "sk": pe.SK_STATE}

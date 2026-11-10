@@ -478,3 +478,71 @@ def every_transition_param(charter: Mapping[str, Any], metric: str, key: str, de
 def gate_summary(gates: Sequence[Mapping[str, Any]]) -> dict[str, str]:
     """{gate id: verdict} — the compact line the log and the tool lead with."""
     return {str(g.get("id")): str(g.get("verdict")) for g in gates}
+
+
+# ── the read side (#5576): what the Hevy title, the coach packet and plan_next_session carry ─────────────────────────
+def title_phase(state: Optional[Mapping[str, Any]]) -> Optional[tuple[str, Optional[str]]]:
+    """(phase title, since) from a stored STATE row, or None when there is no usable row. `since` is the TRANSITION's
+    `effective_on` (the stage machine writes it on every applied or override transition) or, on a seeded row, the
+    hand-set `current_started` the seed copied — so the title's N counter resets on the recorded transition date."""
+    if not isinstance(state, Mapping) or not state.get("stage"):
+        return None
+    title = str(state.get("title") or str(state["stage"]).replace("_", " ").title())
+    since = str(state["since"])[:10] if state.get("since") else None
+    return title, since
+
+
+def _gate_with_value(gates: Sequence[Mapping[str, Any]], blocking: Mapping[str, Any]) -> dict[str, Any]:
+    """The blocking gate joined to its measured value (the EVAL row's `gates[]`). An any-of unit ("a | b") carries each
+    member's value. A private threshold stays private (`threshold_private`), never a number."""
+    keep = ("metric", "comparator", "value", "threshold", "threshold_private", "ref", "held_for")
+    by_id = {str(g.get("id")): g for g in gates}
+    ids = [p.strip() for p in str(blocking.get("id")).split("|")]
+    members = [{"id": i, **{k: by_id[i].get(k) for k in keep if k in by_id[i]}} for i in ids if i in by_id]
+    out = {"id": blocking.get("id"), "verdict": blocking.get("verdict"), "detail": blocking.get("detail")}
+    if len(members) == 1:
+        out.update({k: v for k, v in members[0].items() if k != "id"})
+    else:
+        out["members"] = members
+    return out
+
+
+def phase_brief(
+    state: Optional[Mapping[str, Any]], latest: Optional[Mapping[str, Any]], charter: Optional[Mapping[str, Any]] = None
+) -> Optional[dict[str, Any]]:
+    """The current phase, the next phase and the closest unmet gate with its measured value, from the stored STATE row
+    and the newest EVAL row. None when no STATE row exists. "Closest unmet gate" is the evaluator's `blocking_gate` —
+    the first not-met gate in charter order, else the first unknown one — never re-ranked here (no second derivation).
+    When the newest EVAL was about an earlier phase (a transition was applied since), its gates are not about the next
+    phase: the next phase is named from the charter order and the gate is reported as not yet evaluated."""
+    if not isinstance(state, Mapping) or not state.get("stage"):
+        return None
+    stage = str(state["stage"])
+    brief: dict[str, Any] = {
+        "phase": stage,
+        "phase_title": state.get("title") or title_of(charter or {}, stage),
+        "since": state.get("since"),
+        "origin": state.get("origin"),
+        "pending": state.get("pending"),
+        "next_phase": None,
+        "next_phase_title": None,
+        "next_verdict": None,
+        "closest_unmet_gate": None,
+        "evaluated_week": None,
+    }
+    if isinstance(latest, Mapping) and str(latest.get("phase")) == stage:
+        brief.update(
+            next_phase=latest.get("next_phase"),
+            next_phase_title=latest.get("next_phase_title"),
+            next_verdict=latest.get("next_verdict"),
+            evaluated_week={"start": latest.get("week_start"), "end": latest.get("week_end")},
+        )
+        blocking = latest.get("blocking_gate")
+        if isinstance(blocking, Mapping):
+            brief["closest_unmet_gate"] = _gate_with_value(list(latest.get("gates") or []), blocking)
+        return brief
+    nxt = sm.next_stage(order(charter or {}), stage)
+    brief.update(next_phase=nxt, next_phase_title=title_of(charter or {}, nxt))
+    if nxt is not None:
+        brief["note"] = "the newest weekly evaluation predates this phase — its gates are evaluated at the next Monday run"
+    return brief

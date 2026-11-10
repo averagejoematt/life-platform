@@ -4,8 +4,10 @@ routine_title.py — Title + WHY-note formatting for Hevy routines
 all-time-since-experiment-start flip).
 
 Title format:  "<Phase> - <Type> - <N> - <Y>"
-  Phase  — current phase name from config/training_phases.json. Decorative
-           context only — does NOT bound N anymore.
+  Phase  — the computed phase (#5576): the title on the weekly phase evaluator's
+           `PHASE#STATE` row (`training.phase_evaluator`, #5575). Fail-soft fallback,
+           while no STATE row exists (or it cannot be read): `current` in
+           config/training_phases.json, the hand-set file the evaluator seeds from.
   Type   — ir.archetype title-cased (Upper, Lower, Full, Aerobic, Mobility…)
   N      — count of *pushed* routines of THIS type since EXPERIMENT_START_DATE
            + 1. Does NOT reset on phase change. 1-based. Phases are now
@@ -13,9 +15,10 @@ Title format:  "<Phase> - <Type> - <N> - <Y>"
   Y      — count of *performed* Hevy workouts since EXPERIMENT_START_DATE
            + 1, DERIVED from constants (#3671) — never read from config, so a
            reset zeroes it with no second edit. Pre-experiment Hevy history is
-           preserved in DDB but excluded from these counters. (N still anchors
-           on `current_started`, which the owner advances by hand: a phase may
-           deliberately span cycles.)
+           preserved in DDB but excluded from these counters. (N anchors on the
+           STATE row's `since` — the TRANSITION date the evaluator records — or, on
+           the fallback, the file's `current_started`: a phase may deliberately span
+           cycles.)
 
 Variant overrides:
   variant=re_entry → "Welcome back · <Type>" (no counters surfaced — kind
@@ -30,6 +33,7 @@ imports format_title lazily and only when a title_context is supplied.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
 
@@ -38,6 +42,7 @@ from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_START_DATE
 from common.repo_config import config_dir
 
+from training import phase_evaluator as _pe
 from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION  # #4636: the retired partition, named once
 from training.routine_ir import RoutineSpec
 
@@ -49,6 +54,10 @@ S3_CONFIG_PREFIX = os.environ.get("TRAINING_CONFIG_S3_PREFIX", "config/")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 MAX_TITLE_CHARS = 60
+PHASE_SOURCE_STATE = "phase_evaluator_state"  # #5576: the computed phase (PHASE#STATE)
+PHASE_SOURCE_FILE = "training_phases_json"  # the hand-set file — the fallback until the evaluator's first run
+
+logger = logging.getLogger(__name__)
 
 _s3 = None
 _ddb_table = None
@@ -80,6 +89,37 @@ def load_phase_state() -> dict[str, Any]:
             return json.load(f)
     obj = _s3_client().get_object(Bucket=S3_BUCKET, Key=f"{S3_CONFIG_PREFIX}training_phases.json")
     return json.loads(obj["Body"].read())
+
+
+def read_phase_state_row() -> dict[str, Any] | None:
+    """The weekly phase evaluator's `PHASE#STATE` row (#5575/#5576), or None — fail-soft. None when no row exists yet
+    (the evaluator's first run seeds it) AND when the read fails: the title then falls back to training_phases.json,
+    and the log names which. The partition is CROSS_PHASE (docs/SCHEMA.md) — never wiped by a reset, so no
+    tombstone guard applies."""
+    try:
+        resp = _table().get_item(Key={"pk": _pe.pk(USER_ID), "sk": _pe.SK_STATE})
+    except Exception as e:  # noqa: BLE001 — the title must still render; the fallback is named in the log + the context
+        logger.warning("[routine_title] PHASE#STATE unread (%s) — title phase falls back to training_phases.json", type(e).__name__)
+        return None
+    return resp.get("Item")
+
+
+def resolve_title_phase() -> tuple[str, str, str]:
+    """(phase title, phase_started, source) for the title. The evaluator's STATE row first (#5576): its title and its
+    `since` — the date the evaluator (or the owner's override) recorded the TRANSITION, so N resets on that date. Else
+    the hand-set file (`current` + `current_started`), as before."""
+    from_state = _pe.title_phase(read_phase_state_row())
+    if from_state is not None:
+        title, since = from_state
+        return title, since or EXPERIMENT_START_DATE, PHASE_SOURCE_STATE
+    state = load_phase_state()
+    phase = state.get("current") or (state.get("phases") or ["Phase"])[0]
+    # N's window is the config's `current_started`, DELIBERATELY not floored at
+    # genesis: the owner's ruling recorded on #3671 is that a phase advances only
+    # when he says so, so a pre-genesis anchor is the real start of a phase he has
+    # not advanced — "Pull #3 of Foundation" is the answer he asked N for, even
+    # where Foundation spans two cycles. Only Y is reset-relative (#3671).
+    return phase, state.get("current_started") or EXPERIMENT_START_DATE, PHASE_SOURCE_FILE
 
 
 # #4312: how far before a window the routine index is read so a performed workout can be
@@ -245,7 +285,8 @@ def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
     2026-05-31 ADR-067 amendment).
 
     N — performed workouts of THIS type since the current phase started
-        (phase_started_date), +1. Resets when the phase advances; a
+        (the STATE row's `since`, the recorded TRANSITION date — #5576; the
+        file's `current_started` on the fallback), +1. Resets when the phase advances; a
         planned-but-skipped session never inflates it (we count performed, not
         pushed). Type is resolved via resolve_archetype (no title parsing).
     Y — performed workouts since EXPERIMENT_START_DATE, +1. Honest,
@@ -264,14 +305,7 @@ def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
     and which ships in every bundle (#781), removes the second copy instead of
     scheduling a second thing to remember.
     """
-    state = load_phase_state()
-    phase = state.get("current") or (state.get("phases") or ["Phase"])[0]
-    # N's window is the config's `current_started`, DELIBERATELY not floored at
-    # genesis: the owner's ruling recorded on #3671 is that a phase advances only
-    # when he says so, so a pre-genesis anchor is the real start of a phase he has
-    # not advanced — "Pull #3 of Foundation" is the answer he asked N for, even
-    # where Foundation spans two cycles. Only Y is reset-relative (#3671).
-    phase_started = state.get("current_started") or EXPERIMENT_START_DATE
+    phase, phase_started, phase_source = resolve_title_phase()  # #5576: the computed phase first, the file as fallback
     reset_epoch = EXPERIMENT_START_DATE
 
     # Load the index from the earlier of the two windows so an early performed
@@ -290,6 +324,7 @@ def build_title_context(ir: RoutineSpec) -> dict[str, Any]:
         "type_count_in_phase": n,
         "all_time_count": y,
         "phase_started": phase_started,
+        "phase_source": phase_source,
         "reset_epoch": reset_epoch,
     }
 
