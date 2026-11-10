@@ -178,6 +178,20 @@ const EXCLUDED_WORDS = {
   under_review: "under classification review — counted neither way",
   classification_review: "under classification review — counted neither way",
   disputed: "under classification review — counted neither way",
+  // The producer's category keys (web.verification_fields.EXCLUDED_CATEGORIES), mirrored here: the wire gate
+  // blanks a served label when withheld grader notes quote the same engine text, so the page carries its own words.
+  not_a_forecast: "Not a forecast: the outcome was already on the record when the call was made",
+  past_period: "About a past period whose data arrived later: kept as a look back, not a forecast",
+  opinion: "An opinion, explanation or hedge: not a measurable forecast",
+  different_claim: "The stored test checks a different claim from the words",
+  stand_in_measure: "Graded on a stand-in measure that cannot show the claim",
+  either_outcome: "Either outcome satisfies the words",
+  condition_not_measured: "Depends on a condition that was never measured, or names no checkable direction",
+  condition_never_happened: "Its condition never happened, so it was never tested",
+  docket: "Head-to-head docket bets, settled by their own rule and audited separately",
+  could_not_verify: "Could not be verified under the current rules",
+  not_yet_classified: "Not yet classified under the current rules",
+  repeat: "The same forecast repeated: counted once",
 };
 const PRIVATE_CATEGORY = /journal|mood|state.?of.?mind|diary|video|self.?report|felt|private/i;
 export function excludedAccounting(cal) {
