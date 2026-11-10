@@ -73,15 +73,17 @@ def test_the_cr2_switch_is_off_on_main():
         assert not NA.active()
 
 
-def test_no_lambda_enters_the_cr2_scope_yet():
-    """No route serves the approved words while CR2 is dark: nothing outside the module opens the scope."""
+def test_only_the_cr2_route_module_enters_the_cr2_scope():
+    """Exactly ONE module outside the allowlist opens the scope — the CR2 route's (web.site_api_coach_room, whose
+    ``scope_for`` opens it for ``/api/coach_room_words`` only; tests/test_coach_room_words_cr2.py pins that). A second
+    opener would widen the approved words to another surface."""
     hits = []
     for p in (ROOT / "lambdas").rglob("*.py"):
         if p.name == "narrative_allowlist.py":
             continue
-        if re.search(r"\bserving\(\s*(?:NA\.)?SCOPE_CR2|narrative_allowlist\.serving\(|NA\.serving\(", p.read_text()):
+        if re.search(r"\bserving\(\s*(?:NA\.)?SCOPE_CR2|narrative_allowlist\.serving\(|NA\.serving\(|_SCOPE\.set\(", p.read_text()):
             hits.append(str(p.relative_to(ROOT)))
-    assert hits == []
+    assert hits == ["lambdas/web/site_api_coach_room.py"]
 
 
 # ── the set ──────────────────────────────────────────────────────────────────────────────────

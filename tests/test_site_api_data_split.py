@@ -131,6 +131,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/chapters": "handle_chapters",  # #5532 — program-week chapter states (v9 Story)
     "/api/pairs": "handle_pairs",  # #5532 — precomputed pair statistics (v9 data room)
     "/api/coach_brief": "handle_coach_brief",  # owner ruling 2026-11-09 (third, E) — the public-safe coaching brief (dark)
+    "/api/coach_room_words": "handle_coach_room_words",  # owner ruling 2026-11-09 (third, D) — approved historical words (CR2, dark)
     "/api/panel_ledger": "handle_panel_ledger",
     "/api/phenoage": "handle_phenoage",
     "/api/physical_overview": "handle_physical_overview",

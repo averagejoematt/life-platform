@@ -16,7 +16,13 @@ chokepoint, the claim-sourcing scrub and the dossier privacy filter), never reco
     under both coaches; and (CR3) once more as ``docket_entries``, each under a room id built from its open day and
     its two seats, with the API's own tally, disclosure and withheld messages (``unsourced`` / ``absent`` /
     ``concession_unsourced``);
-  * ``/api/voice_fidelity`` — the self-measured blind voice test, platform line and per-coach line.
+  * ``/api/voice_fidelity`` — the self-measured blind voice test, platform line and per-coach line;
+  * ``/api/coach_room_words?coach=<id>`` (owner ruling 2026-11-09, third, D) — the owner-approved historical words: the
+    sealed day-one calls and the lead's approved daily reads, as the route serves them (``approved_words``). A 404 (the
+    route is dark until the CR2 release) is an honest absence, never a fabricated empty list;
+  * ``/api/coach_brief?coach=<id>`` (owner ruling 2026-11-09, third, E) — the public-safe coaching brief's six
+    sections, as served (``public_briefs``), with the policy's first cycle read off ``common/public_brief_policy.py``
+    so the page can say when the first brief is due. A 404 (dark, or a coach that writes no brief) is an absence.
 
 What it never carries, by design:
   * any id that spells out words the API withheld (a ``record_id`` / ``prediction_id`` slug is built from the text:
@@ -41,6 +47,9 @@ from typing import Any, Callable, Iterable
 COACH_PATH = "/api/coach/{}"
 DOCKET_PATH = "/api/coach_docket"
 FIDELITY_PATH = "/api/voice_fidelity"
+WORDS_PATH = "/api/coach_room_words?coach={}"
+BRIEF_PATH = "/api/coach_brief?coach={}"
+BRIEF_POLICY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas", "common", "public_brief_policy.py")
 
 ABSENT_COACH_ROOM = {
     "state": "absent",
@@ -357,7 +366,167 @@ def docket_id(e: dict) -> str:
     return re.sub(r"[^a-z0-9]+", "-", raw.lower()).strip("-")
 
 
-def shape_coach(payload: Any) -> dict | None:
+def first_brief_cycle(path: str = BRIEF_POLICY) -> str | None:
+    """``FIRST_CYCLE`` of the brief policy, read as text (the module imports the Lambda tree); None when unreadable."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            m = re.search(r'^FIRST_CYCLE = "(\d{4}-\d{2}-\d{2})"\s*$', fh.read(), re.M)
+    except OSError:
+        return None
+    return m.group(1) if m else None
+
+
+def _approved_words(payload: Any) -> dict:
+    """The served approved historical words, or an absence (the route is dark, or did not answer)."""
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("sealed_calls"), list)
+        or not isinstance(payload.get("lead_reads"), list)
+    ):
+        return {"state": "absent", "sealed_calls": [], "lead_reads": []}
+    calls = []
+    for c in payload["sealed_calls"]:
+        if not isinstance(c, dict) or not _text(c.get("claim")):
+            continue
+        calls.append(
+            {
+                "prediction_id": c.get("prediction_id") if isinstance(c.get("prediction_id"), str) else None,
+                "claim": _text(c.get("claim")),
+                "logged_date": _day(c.get("logged_date")),
+                "due_date": _day(c.get("due_date")),
+                "settled_date": _day(c.get("settled_date")),
+                "metric": c.get("metric") if isinstance(c.get("metric"), str) and not _private(c.get("metric")) else None,
+                "kind": c.get("kind") if isinstance(c.get("kind"), str) else None,
+                "status": c.get("status") if isinstance(c.get("status"), str) else None,
+            }
+        )
+    reads = []
+    for r in payload["lead_reads"]:
+        if not isinstance(r, dict) or not _text(r.get("text")) or not _day(r.get("date")):
+            continue
+        reads.append(
+            {
+                "date": _day(r.get("date")),
+                "text": _text(r.get("text")),
+                "generated_at": _instant(r.get("generated_at")),
+                "data_through": _day(r.get("data_through")),
+                "cited": [
+                    {"metric": _text(c.get("metric")), "value": _text(str(c.get("value") or "")), "as_of": _day(c.get("as_of"))}
+                    for c in r.get("cited") or []
+                    if isinstance(c, dict) and _text(c.get("metric"))
+                ],
+            }
+        )
+    reads.sort(key=lambda r: r["date"], reverse=True)
+    return {
+        "state": "ok",
+        "source": WORDS_PATH.format(payload.get("coach_id")),
+        "approved_at": _day(payload.get("approved_at")),
+        "sealed_calls": calls,
+        "lead_reads": reads,
+    }
+
+
+def _span(v: Any) -> dict | None:
+    if not isinstance(v, dict):
+        return None
+    return {"start": _day(v.get("start")), "end": _day(v.get("end")), "mean": _num(v.get("mean")), "n": _num(v.get("n"))}
+
+
+def _brief(b: dict) -> dict | None:
+    if not _day(b.get("cycle")):
+        return None
+    obs = []
+    for o in b.get("observations") or []:
+        if not isinstance(o, dict) or not _text(o.get("label")) or _private(o.get("metric")):
+            continue
+        latest = o.get("latest") if isinstance(o.get("latest"), dict) else {}
+        obs.append(
+            {
+                "id": o.get("id") if isinstance(o.get("id"), str) else None,
+                "label": _text(o.get("label")),
+                "unit": _text(o.get("unit")),
+                "last7": _span(o.get("last7")),
+                "prior7": _span(o.get("prior7")),
+                "last28": _span(o.get("last28")),
+                "latest": {"date": _day(latest.get("date")), "value": _num(latest.get("value"))},
+            }
+        )
+
+    def items(key: str, fields: tuple) -> list[dict]:
+        """One shape per section; every string through the private-family belt, numbers and id lists as served."""
+        out = []
+        for x in b.get(key) or []:
+            if isinstance(x, dict):
+                out.append(
+                    {f: _text(v) if isinstance(v := x.get(f), str) else v if isinstance(v, (int, float, list)) else None for f in fields}
+                )
+        return out
+
+    preds = []
+    for p in b.get("predictions") or []:
+        if not isinstance(p, dict) or not _text(p.get("claim")):
+            continue
+        led = p.get("ledger") if isinstance(p.get("ledger"), dict) else {}
+        preds.append(
+            {
+                "id": p.get("id") if isinstance(p.get("id"), str) else None,
+                "claim": _text(p.get("claim")),
+                "kind": p.get("kind") if isinstance(p.get("kind"), str) else None,
+                "confidence": _num(p.get("confidence")),
+                "rationale": _text(p.get("rationale")),
+                "status": led.get("status") if isinstance(led.get("status"), str) else None,
+                "outcome_date": _day(led.get("outcome_date")),
+            }
+        )
+    actions = []
+    for a in b.get("owner_actions") or []:
+        if not isinstance(a, dict) or not isinstance(a.get("state"), str):
+            continue
+        actions.append(
+            {
+                "recommendation_id": a.get("recommendation_id") if isinstance(a.get("recommendation_id"), str) else None,
+                "state": a["state"],
+                "metric": a.get("metric") if isinstance(a.get("metric"), str) and not _private(a.get("metric")) else None,
+                "condition": a.get("condition") if isinstance(a.get("condition"), str) else None,
+                "threshold": _num(a.get("threshold")),
+                "window_start": _day(a.get("window_start")),
+                "window_end": _day(a.get("window_end")),
+                "days_with_data": _num(a.get("days_with_data")),
+                "days_meeting": _num(a.get("days_meeting")),
+                "days_in_window": _num(a.get("days_in_window")),
+            }
+        )
+    return {
+        "cycle": _day(b.get("cycle")),
+        "cycle_end": _day(b.get("cycle_end")),
+        "data_through": _day(b.get("data_through")),
+        "generated_at": _instant(b.get("generated_at")),
+        "observations": obs,
+        "interpretations": [i for i in items("interpretations", ("id", "text", "cites")) if i.get("text")],
+        "predictions": preds,
+        "evaluation_criteria": [
+            {**c, "rule_sentence": c.get("rule_sentence") or None}
+            for c in items(
+                "evaluation_criteria", ("prediction", "type", "metric", "target_date", "window_start", "window_end", "rule_sentence")
+            )
+        ],
+        "recommendations": [r for r in items("recommendations", ("id", "text", "rationale")) if r.get("text")],
+        "owner_actions": actions,
+        "revisions": [r for r in items("revisions", ("target", "kind", "text", "reason", "revised_in_cycle")) if r.get("text")],
+    }
+
+
+def _public_briefs(payload: Any, first_cycle: str | None) -> dict:
+    """The served briefs (newest first), or an absence (the route is dark, or this coach writes no brief)."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("briefs"), list):
+        return {"state": "absent", "first_cycle": first_cycle, "briefs": []}
+    briefs = [x for x in (_brief(b) for b in payload["briefs"] if isinstance(b, dict)) if x]
+    briefs.sort(key=lambda b: b["cycle"], reverse=True)
+    return {"state": "ok", "source": BRIEF_PATH.format(payload.get("coach_id")), "first_cycle": first_cycle, "briefs": briefs}
+
+
+def shape_coach(payload: Any, words: Any = None, brief: Any = None, first_cycle: str | None = None) -> dict | None:
     """One coach's entry from its served `/api/coach/<id>` payload; None when the payload is not a coach page."""
     if not isinstance(payload, dict) or not isinstance(payload.get("persona_id"), str):
         return None
@@ -376,14 +545,25 @@ def shape_coach(payload: Any) -> dict | None:
         "fidelity": None,
         "record_card": _record_card(payload),
         "disclosure": _text(payload.get("disclosure")) or None,
+        "approved_words": _approved_words(words),
+        "public_briefs": _public_briefs(brief, first_cycle),
     }
 
 
-def shape(coaches: dict[str, Any], docket: Any, fidelity: Any, fetched_at: str | None = None) -> dict:
-    """The data file from the served payloads. `coaches` maps persona id → its `/api/coach/<id>` payload (or None)."""
+def shape(
+    coaches: dict[str, Any],
+    docket: Any,
+    fidelity: Any,
+    fetched_at: str | None = None,
+    words: dict[str, Any] | None = None,
+    briefs: dict[str, Any] | None = None,
+) -> dict:
+    """The data file from the served payloads. `coaches` maps persona id → its `/api/coach/<id>` payload (or None);
+    `words` / `briefs` map persona id → its `/api/coach_room_words` / `/api/coach_brief` payload (absent = None)."""
     entries = {}
+    first_cycle = first_brief_cycle()
     for pid, payload in coaches.items():
-        e = shape_coach(payload)
+        e = shape_coach(payload, (words or {}).get(pid), (briefs or {}).get(pid), first_cycle)
         if e and e["persona_id"] == pid:
             entries[pid] = e
     if not entries:
@@ -431,7 +611,7 @@ def shape(coaches: dict[str, Any], docket: Any, fidelity: Any, fetched_at: str |
     return {
         "state": "ok",
         "absent_text": None,
-        "source": [COACH_PATH.format("<id>"), DOCKET_PATH, FIDELITY_PATH],
+        "source": [COACH_PATH.format("<id>"), DOCKET_PATH, FIDELITY_PATH, WORDS_PATH.format("<id>"), BRIEF_PATH.format("<id>")],
         "fetched_at": _instant(fetched_at),
         "coaches": entries,
         "voice_fidelity": vf,
@@ -450,6 +630,8 @@ def shape(coaches: dict[str, Any], docket: Any, fidelity: Any, fetched_at: str |
 def live_coach_room(get: Callable[[str], Any], persona_ids: Iterable[str], log: Callable[[str], None] = print) -> dict:
     """Fetch the public routes; a coach that fails is left out (its page then says so), a total failure is absent."""
     coaches: dict[str, Any] = {}
+    words: dict[str, Any] = {}
+    briefs: dict[str, Any] = {}
     fetched_at = None
     for pid in sorted(persona_ids):
         try:
@@ -458,6 +640,14 @@ def live_coach_room(get: Callable[[str], Any], persona_ids: Iterable[str], log: 
             fetched_at = fetched_at or ((payload or {}).get("_meta") or {}).get("served_at")
         except Exception as exc:  # noqa: BLE001 — one coach's failure leaves that coach out, never a partial entry
             log(f"  coach profile {pid} unavailable ({exc}); left out of coach_room.json")
+            continue
+        # The two CR2 sources: a 404 (dark until the release; or a coach with no approved words / no brief) or any
+        # failure is an ABSENCE the page states, never an empty list presented as "none".
+        for path, into in ((WORDS_PATH, words), (BRIEF_PATH, briefs)):
+            try:
+                into[pid] = get(path.format(pid))
+            except Exception as exc:  # noqa: BLE001
+                log(f"  {path.format(pid)} not served ({exc}); recorded as absent")
     docket = fidelity = None
     for path in (DOCKET_PATH, FIDELITY_PATH):
         try:
@@ -469,7 +659,7 @@ def live_coach_room(get: Callable[[str], Any], persona_ids: Iterable[str], log: 
             docket = got
         else:
             fidelity = got
-    return shape(coaches, docket, fidelity, fetched_at)
+    return shape(coaches, docket, fidelity, fetched_at, words, briefs)
 
 
 def fixture_coach_room(fixtures_dir: str) -> dict:

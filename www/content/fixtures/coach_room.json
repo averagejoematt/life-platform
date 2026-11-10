@@ -76,7 +76,92 @@
    },
    "fidelity": null,
    "record_card": null,
-   "disclosure": "An AI character (sample disclosure for layout)."
+   "disclosure": "An AI character (sample disclosure for layout).",
+   "approved_words": {
+    "state": "ok",
+    "source": "/api/coach_room_words?coach=eli_marsh",
+    "approved_at": "2026-11-09",
+    "sealed_calls": [],
+    "lead_reads": [
+     {
+      "date": "2026-10-27",
+      "text": "Sample approved read for layout 1: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-27T17:07:05+00:00",
+      "data_through": "2026-10-26",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "303.2",
+        "as_of": "2026-10-26"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-26"
+       }
+      ]
+     },
+     {
+      "date": "2026-10-24",
+      "text": "Sample approved read for layout 2: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-24T17:07:05+00:00",
+      "data_through": "2026-10-23",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "304.0",
+        "as_of": "2026-10-23"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-23"
+       }
+      ]
+     },
+     {
+      "date": "2026-10-19",
+      "text": "Sample approved read for layout 3: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-19T17:07:05+00:00",
+      "data_through": "2026-10-18",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "305.1",
+        "as_of": "2026-10-18"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-18"
+       }
+      ]
+     },
+     {
+      "date": "2026-10-12",
+      "text": "Sample approved read for layout 4: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-12T17:07:05+00:00",
+      "data_through": "2026-10-11",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "306.8",
+        "as_of": "2026-10-11"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-11"
+       }
+      ]
+     }
+    ]
+   },
+   "public_briefs": {
+    "state": "absent",
+    "first_cycle": "2026-11-16",
+    "briefs": []
+   }
   },
   "sleep_coach": {
    "persona_id": "sleep_coach",
@@ -391,7 +476,158 @@
     "records": null,
     "caveat": "Self-assessment of this coach's own calls, not external validation."
    },
-   "disclosure": "An AI character (sample disclosure for layout)."
+   "disclosure": "An AI character (sample disclosure for layout).",
+   "approved_words": {
+    "state": "ok",
+    "source": "/api/coach_room_words?coach=sleep_coach",
+    "approved_at": "2026-11-09",
+    "lead_reads": [],
+    "sealed_calls": [
+     {
+      "prediction_id": "20260906-genesis01",
+      "claim": "Sample sealed call for layout: weekly loss over the first four weeks will exceed two pounds a week.",
+      "logged_date": "2026-09-06",
+      "due_date": "2026-10-04",
+      "settled_date": "2026-10-04",
+      "metric": "weight_lbs",
+      "kind": "direction",
+      "status": "confirmed"
+     },
+     {
+      "prediction_id": "20260906-genesis02",
+      "claim": "Sample sealed call for layout: sleep duration will rise over the first fourteen days.",
+      "logged_date": "2026-09-06",
+      "due_date": "2026-09-20",
+      "settled_date": "2026-09-20",
+      "metric": "sleep_duration_hours",
+      "kind": "direction",
+      "status": "refuted"
+     }
+    ]
+   },
+   "public_briefs": {
+    "state": "ok",
+    "source": "/api/coach_brief?coach=sleep_coach",
+    "first_cycle": "2026-11-16",
+    "briefs": [
+     {
+      "cycle": "2026-11-16",
+      "cycle_end": "2026-11-22",
+      "data_through": "2026-11-15",
+      "generated_at": "2026-11-16T14:05:00+00:00",
+      "observations": [
+       {
+        "id": "o1",
+        "label": "sleep duration",
+        "unit": "h",
+        "last7": {
+         "start": "2026-11-09",
+         "end": "2026-11-15",
+         "mean": 7.1,
+         "n": 7
+        },
+        "prior7": {
+         "start": "2026-11-02",
+         "end": "2026-11-08",
+         "mean": 6.8,
+         "n": 7
+        },
+        "last28": {
+         "start": "2026-10-19",
+         "end": "2026-11-15",
+         "mean": 6.9,
+         "n": 27
+        },
+        "latest": {
+         "date": "2026-11-15",
+         "value": 7.4
+        }
+       },
+       {
+        "id": "o2",
+        "label": "HRV",
+        "unit": "ms",
+        "last7": {
+         "start": "2026-11-09",
+         "end": "2026-11-15",
+         "mean": 52,
+         "n": 7
+        },
+        "prior7": {
+         "start": "2026-11-02",
+         "end": "2026-11-08",
+         "mean": 49,
+         "n": 6
+        },
+        "last28": {
+         "start": "2026-10-19",
+         "end": "2026-11-15",
+         "mean": 50,
+         "n": 26
+        },
+        "latest": {
+         "date": "2026-11-15",
+         "value": 55
+        }
+       }
+      ],
+      "interpretations": [
+       {
+        "id": "i1",
+        "text": "Sample interpretation for layout: sleep is longer this week than last, and HRV has followed it up.",
+        "cites": [
+         "o1",
+         "o2"
+        ]
+       }
+      ],
+      "predictions": [
+       {
+        "id": "p1",
+        "claim": "Sleep duration will rise over the next 14 days.",
+        "kind": "direction",
+        "confidence": 0.6,
+        "rationale": "Sample rationale for layout: the last two weeks moved the same way.",
+        "status": "pending",
+        "outcome_date": null
+       }
+      ],
+      "evaluation_criteria": [
+       {
+        "prediction": "p1",
+        "type": "directional",
+        "metric": "sleep_duration_hours",
+        "target_date": null,
+        "window_start": "2026-11-16",
+        "window_end": "2026-11-29",
+        "rule_sentence": "Graded on the first and last readings between 2026-11-16 and 2026-11-29: confirmed if the change is in the called direction and larger than the window's own day-to-day noise; refuted if not; inconclusive without readings."
+       }
+      ],
+      "recommendations": [
+       {
+        "id": "r1",
+        "text": "Sample recommendation for layout: keep lights out by ten on at least five nights.",
+        "rationale": "Sample rationale for layout: the longer nights came on the earlier bedtimes."
+       }
+      ],
+      "owner_actions": [
+       {
+        "recommendation_id": "r1",
+        "state": "pending",
+        "metric": null,
+        "condition": null,
+        "threshold": null,
+        "window_start": null,
+        "window_end": null,
+        "days_with_data": null,
+        "days_meeting": null,
+        "days_in_window": null
+       }
+      ],
+      "revisions": []
+     }
+    ]
+   }
   },
   "nutrition_coach": {
    "persona_id": "nutrition_coach",
@@ -561,7 +797,20 @@
     "distinguishability": "distinct"
    },
    "record_card": null,
-   "disclosure": null
+   "disclosure": null,
+   "approved_words": {
+    "state": "ok",
+    "source": "/api/coach_room_words?coach=nutrition_coach",
+    "approved_at": "2026-11-09",
+    "sealed_calls": [],
+    "lead_reads": []
+   },
+   "public_briefs": {
+    "state": "ok",
+    "source": "/api/coach_brief?coach=nutrition_coach",
+    "first_cycle": "2026-11-16",
+    "briefs": []
+   }
   },
   "glucose_coach": {
    "persona_id": "glucose_coach",
@@ -642,7 +891,17 @@
    "voice": null,
    "fidelity": null,
    "record_card": null,
-   "disclosure": null
+   "disclosure": null,
+   "approved_words": {
+    "state": "absent",
+    "sealed_calls": [],
+    "lead_reads": []
+   },
+   "public_briefs": {
+    "state": "absent",
+    "first_cycle": "2026-11-16",
+    "briefs": []
+   }
   }
  },
  "voice_fidelity": {

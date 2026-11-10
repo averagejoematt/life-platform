@@ -71,6 +71,9 @@ export const CR23_DATA_KEYS = [
   "docket_entries",
   "docket_counts",
   "concession_withheld",
+  // owner ruling 2026-11-09 (third, D + E): the approved historical words and the public-safe brief, CR2 only
+  "approved_words",
+  "public_briefs",
 ];
 export const ROOM_DATA_KEYS = [...CR1_DATA_KEYS, ...CR23_DATA_KEYS];
 

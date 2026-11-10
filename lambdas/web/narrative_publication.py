@@ -246,6 +246,7 @@ _TAINT_SHINGLES: set = set()
 
 
 def begin_request() -> None:
+    NA.reset_served()
     _STATE["withheld"] = 0
     _STATE["served"] = 0
     _STATE["scrubbed"] = 0
@@ -347,6 +348,8 @@ def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
         approved = NA.record_for(item, pk)
         if approved is not None:
             ok, reason = NP.eligibility(approved)
+            if ok:
+                NA.note_served(item, pk)  # the wire exempts these words for this request only
     out = {k: v for k, v in item.items() if k != NP.PROVENANCE_KEY}
     if ok:
         _STATE["served"] += 1
