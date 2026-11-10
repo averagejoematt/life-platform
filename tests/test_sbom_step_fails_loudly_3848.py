@@ -49,6 +49,15 @@ def sbom_step() -> dict:
     return matches[0]
 
 
+SBOM_SCRIPT = REPO / "deploy" / "generate_sbom.sh"
+
+
+def sbom_shell() -> str:
+    """The shell the step runs: since #5723 the step is one line calling deploy/generate_sbom.sh."""
+    assert sbom_step()["run"].strip() == "bash deploy/generate_sbom.sh", "the SBOM step no longer calls deploy/generate_sbom.sh"
+    return SBOM_SCRIPT.read_text()
+
+
 # ── stubs ────────────────────────────────────────────────────────────────────────────
 # Each stub is a tiny shell script placed on PATH ahead of the real tool.
 
@@ -168,7 +177,7 @@ def test_step_has_no_continue_on_error() -> None:
 
 def test_step_shell_sets_pipefail() -> None:
     """The 2026-09-16 root shape: without pipefail, `curl | sh` reports sh's exit 0."""
-    run = sbom_step()["run"]
+    run = sbom_shell()
     assert "set -euo pipefail" in run, "the step's shell must set pipefail (3848)"
     assert "| sh -s" not in run, "the `curl | sh` pipeline is the founding defect — do not reintroduce it"
 
@@ -183,7 +192,7 @@ def test_step_shell_sets_pipefail() -> None:
 def test_broken_install_fails_loudly(tmp_path: Path, label: str, curl_stub: str, expect_fragment: str) -> None:
     """MUST-FAIL CONTROL: installer download broken -> non-zero exit and a named ::error::."""
     proc = _run_shell(
-        sbom_step()["run"],
+        sbom_shell(),
         tmp_path / label,
         {"curl": curl_stub, "sleep": _STUB_SLEEP},
     )
@@ -196,7 +205,7 @@ def test_broken_install_fails_loudly(tmp_path: Path, label: str, curl_stub: str,
 def test_installer_exiting_zero_without_installing_fails(tmp_path: Path) -> None:
     """Upstream install.sh can exit 0 having installed nothing — exit 0 is not evidence."""
     proc = _run_shell(
-        sbom_step()["run"],
+        sbom_shell(),
         tmp_path,
         {"curl": _stub_curl_writing(_INSTALLER_NOOP), "sleep": _STUB_SLEEP},
     )
@@ -209,7 +218,7 @@ def test_installer_exiting_zero_without_installing_fails(tmp_path: Path) -> None
 def test_scan_producing_no_output_fails(tmp_path: Path) -> None:
     """syft present and exiting 0, but neither SBOM file written."""
     proc = _run_shell(
-        sbom_step()["run"],
+        sbom_shell(),
         tmp_path,
         {
             "curl": _stub_curl_writing(_installer_installing(_SYFT_SILENT)),
@@ -225,7 +234,7 @@ def test_healthy_install_still_passes(tmp_path: Path) -> None:
     """The guard must not be a permanent red: a working install reaches the success line."""
     workroot = tmp_path / "ok"
     proc = _run_shell(
-        sbom_step()["run"],
+        sbom_shell(),
         workroot,
         {
             "curl": _stub_curl_writing(_installer_installing(_SYFT_GOOD)),
@@ -257,7 +266,7 @@ def _installer_failing_first(syft_body: str, fail_runs: int) -> str:
 def test_transient_release_download_failure_is_retried(tmp_path: Path) -> None:
     """#5723: one 504 inside install.sh is absorbed by the retry and the SBOM is still produced."""
     proc = _run_shell(
-        sbom_step()["run"],
+        sbom_shell(),
         tmp_path,
         {"curl": _stub_curl_writing(_installer_failing_first(_SYFT_GOOD, 1)), "sleep": _STUB_SLEEP},
     )
@@ -269,7 +278,7 @@ def test_transient_release_download_failure_is_retried(tmp_path: Path) -> None:
 def test_persistent_release_download_failure_still_fails_loudly(tmp_path: Path) -> None:
     """MUST-FAIL CONTROL for #5723: an install that fails every attempt is a real outage and stays red."""
     proc = _run_shell(
-        sbom_step()["run"],
+        sbom_shell(),
         tmp_path,
         {"curl": _stub_curl_writing(_installer_failing_first(_SYFT_GOOD, 99)), "sleep": _STUB_SLEEP},
     )

@@ -279,64 +279,13 @@ jobs:
         #      upstream's install.sh deliberately does not `set -e` and its install_asset()
         #      `return`s 0 on an empty asset path, so exit 0 is NOT evidence of install;
         #   3. both SBOM files exist and are non-empty after the scan.
-        # `tests/test_sbom_step_fails_loudly_3848.py` executes THIS step's own shell text
-        # against a broken installer and asserts each assertion fires non-zero.
+        # The shell lives in deploy/generate_sbom.sh (#5723, #4885: install retried 3x);
+        # `tests/test_sbom_step_fails_loudly_3848.py` executes it against broken installers.
         if: always()
         env:
           SYFT_VERSION: v1.49.0
           SYFT_CHECK_FOR_APP_UPDATE: "false"
-        run: |
-          set -euo pipefail
-          SYFT_BIN="${RUNNER_TEMP}/bin/syft"
-          INSTALLER="${RUNNER_TEMP}/syft-install-${SYFT_VERSION}.sh"
-          rm -f "$INSTALLER"
-          # Two independent mirrors of the SAME pinned tag. get.anchore.io is anchore's
-          # own CDN; raw.githubusercontent.com is the origin the pin has always used.
-          for url in \
-            "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
-            "https://get.anchore.io/syft/${SYFT_VERSION}/install.sh" ; do
-            for attempt in 1 2 3; do
-              if curl -sSfL --connect-timeout 10 --max-time 120 \
-                   --retry 3 --retry-delay 2 --retry-all-errors \
-                   -o "$INSTALLER" "$url" && [ -s "$INSTALLER" ]; then
-                echo "syft installer fetched from ${url} (attempt ${attempt})"
-                break 2
-              fi
-              echo "::warning title=syft installer fetch retry::${url} attempt ${attempt} failed"
-              rm -f "$INSTALLER"
-              sleep $(( attempt * 3 ))
-            done
-          done
-          if [ ! -s "$INSTALLER" ]; then
-            echo "::error title=SBOM: syft installer unfetchable::No mirror served a non-empty install.sh for ${SYFT_VERSION} (3848)"
-            exit 1
-          fi
-          # install.sh downloads the release checksums + tarball from GitHub releases with
-          # no retry of its own; a 504 there turned main red twice on 2026-11-09 (#5723).
-          # Retry the whole install; a binary on disk is the only success signal (3848).
-          for attempt in 1 2 3; do
-            rm -f "$SYFT_BIN"
-            if sh "$INSTALLER" -b "${RUNNER_TEMP}/bin" "${SYFT_VERSION}" && [ -x "$SYFT_BIN" ]; then
-              break
-            fi
-            echo "::warning title=syft install retry::install.sh attempt ${attempt} left no executable at ${SYFT_BIN} (5723)"
-            sleep $(( attempt * 10 ))
-          done
-          if [ ! -x "$SYFT_BIN" ]; then
-            echo "::error title=SBOM: syft not installed::install.sh ran 3 times and there is no executable at ${SYFT_BIN} (3848, 5723)"
-            exit 1
-          fi
-          "$SYFT_BIN" version
-          "$SYFT_BIN" scan dir:. -q \
-            -o "spdx-json=sbom.spdx.json" \
-            -o "cyclonedx-json=sbom.cyclonedx.json"
-          for f in sbom.spdx.json sbom.cyclonedx.json; do
-            if [ ! -s "$f" ]; then
-              echo "::error title=SBOM: output missing::syft scan exited 0 but ${f} is absent or empty (3848)"
-              exit 1
-            fi
-          done
-          echo "SBOM generated: sbom.spdx.json (SPDX) + sbom.cyclonedx.json (CycloneDX)"
+        run: bash deploy/generate_sbom.sh
 
       - name: Upload SBOM artifact (#1661)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
