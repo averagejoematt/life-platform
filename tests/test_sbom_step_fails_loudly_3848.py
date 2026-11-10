@@ -240,6 +240,45 @@ def test_healthy_install_still_passes(tmp_path: Path) -> None:
         assert f.exists() and f.stat().st_size > 0, f"{name} not written by the healthy path"
 
 
+# install.sh's own release-asset download returning 504 on the FIRST run only (#5723): the
+# stub counts its runs in a file beside itself.
+def _installer_failing_first(syft_body: str, fail_runs: int) -> str:
+    return (
+        "#!/bin/sh\n"
+        'n_file="$(dirname "$0")/install_runs"\n'
+        'n=$(cat "$n_file" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$n_file"\n'
+        f'if [ "$n" -le {fail_runs} ]; then\n'
+        "  echo \"[error] received HTTP status=504 for url='https://github.com/anchore/syft/releases/download/v1.49.0/syft_1.49.0_checksums.txt'\" >&2\n"
+        "  exit 1\n"
+        "fi\n" + _installer_installing(syft_body).split("\n", 1)[1]
+    )
+
+
+def test_transient_release_download_failure_is_retried(tmp_path: Path) -> None:
+    """#5723: one 504 inside install.sh is absorbed by the retry and the SBOM is still produced."""
+    proc = _run_shell(
+        sbom_step()["run"],
+        tmp_path,
+        {"curl": _stub_curl_writing(_installer_failing_first(_SYFT_GOOD, 1)), "sleep": _STUB_SLEEP},
+    )
+    out = proc.stdout + proc.stderr
+    assert proc.returncode == 0, f"a single transient install failure turned the step red:\n{out}"
+    assert "syft install retry" in out and "SBOM generated:" in proc.stdout, out
+
+
+def test_persistent_release_download_failure_still_fails_loudly(tmp_path: Path) -> None:
+    """MUST-FAIL CONTROL for #5723: an install that fails every attempt is a real outage and stays red."""
+    proc = _run_shell(
+        sbom_step()["run"],
+        tmp_path,
+        {"curl": _stub_curl_writing(_installer_failing_first(_SYFT_GOOD, 99)), "sleep": _STUB_SLEEP},
+    )
+    out = proc.stdout + proc.stderr
+    assert proc.returncode != 0, f"step exited 0 though every install attempt failed:\n{out}"
+    assert "syft not installed" in out and out.count("syft install retry") == 3, out
+    assert "SBOM generated:" not in proc.stdout, out
+
+
 def test_prefix_shape_would_have_passed_silently(tmp_path: Path) -> None:
     """The control's control: the PRE-fix shell, same stub, is the one that goes quiet.
 

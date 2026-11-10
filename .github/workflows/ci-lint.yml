@@ -311,9 +311,19 @@ jobs:
             echo "::error title=SBOM: syft installer unfetchable::No mirror served a non-empty install.sh for ${SYFT_VERSION} (3848)"
             exit 1
           fi
-          sh "$INSTALLER" -b "${RUNNER_TEMP}/bin" "${SYFT_VERSION}"
+          # install.sh downloads the release checksums + tarball from GitHub releases with
+          # no retry of its own; a 504 there turned main red twice on 2026-11-09 (#5723).
+          # Retry the whole install; a binary on disk is the only success signal (3848).
+          for attempt in 1 2 3; do
+            rm -f "$SYFT_BIN"
+            if sh "$INSTALLER" -b "${RUNNER_TEMP}/bin" "${SYFT_VERSION}" && [ -x "$SYFT_BIN" ]; then
+              break
+            fi
+            echo "::warning title=syft install retry::install.sh attempt ${attempt} left no executable at ${SYFT_BIN} (5723)"
+            sleep $(( attempt * 10 ))
+          done
           if [ ! -x "$SYFT_BIN" ]; then
-            echo "::error title=SBOM: syft not installed::install.sh exited 0 but there is no executable at ${SYFT_BIN} (3848)"
+            echo "::error title=SBOM: syft not installed::install.sh ran 3 times and there is no executable at ${SYFT_BIN} (3848, 5723)"
             exit 1
           fi
           "$SYFT_BIN" version
