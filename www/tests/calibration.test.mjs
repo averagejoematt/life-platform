@@ -214,6 +214,26 @@ test("the excluded-calls accounting: nothing until the producer serves it; carri
   assert.equal(excludedAccounting({ verification_summary: { excluded_by_category: { low_power: "2" } } }), null, "a non-integer count is not served");
 });
 
+test("a label the wire gate blanked falls back to the page's own words for the producer's category", () => {
+  const served = excludedAccounting({
+    verification_summary: {
+      excluded_by_category: [
+        { key: "not_a_forecast", n: 16, label: "" },
+        { key: "past_period", n: 8, label: "" },
+        { key: "opinion", n: 32, label: "An opinion, explanation or hedge: not a measurable forecast" },
+      ],
+      excluded_total: 56,
+    },
+  });
+  assert.deepEqual(served.rows.map((r) => r.words), [
+    "Not a forecast: the outcome was already on the record when the call was made",
+    "About a past period whose data arrived later: kept as a look back, not a forecast",
+    "An opinion, explanation or hedge: not a measurable forecast",
+  ]);
+  const unknown = excludedAccounting({ verification_summary: { excluded_by_category: [{ key: "brand_new", n: 1, label: "" }] } });
+  assert.equal(unknown.rows[0].words, "brand new", "the control: a key the page does not know still reads as words, never blank");
+});
+
 test("per-coach verification and assessment_v2: shown when served, absent otherwise", () => {
   assert.equal(coachVerified(FIXTURE.calibration.coaches[0]), null);
   assert.deepEqual(coachVerified({ verification: { n: 15, confirmed: 6, accuracy_pct: 40, accuracy_ci95: [19.8, 64.3] } }), { k: 6, n: 15, pct: "40.0%", ci: "95% interval 19.8–64.3%" });
