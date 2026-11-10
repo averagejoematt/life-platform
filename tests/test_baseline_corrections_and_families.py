@@ -358,3 +358,31 @@ def test_a_ruled_observation_is_recorded_and_a_plain_one_is_not():
     rec = counts["records"][0]
     assert rec["classification"]["value"] == "not_a_forecast" and rec["outcome"] == "could_not_verify"
     assert rec["classification_validated"] is False
+
+
+# ── the governed read keeps a VERIFY# record's classification (live defect 2026-11-10) ─────────────────────
+
+
+def test_the_narrative_gate_passes_verify_and_family_rows_untouched():
+    """The narrative gate blanked VERIFY#'s classification.ruling_ref (free text, no provenance record), so every
+    approved classification read as unapproved and /api/calibration counted nothing. They are audit rows, not narrative."""
+    from web import narrative_publication as NPub
+
+    rec = {
+        "pk": "COACH#sleep_coach",
+        "sk": f"VERIFY#pred_x#{AT}",
+        "prediction_id": "pred_x",
+        "outcome": "reproduced",
+        "classification": {"value": "keep", "approved": True, "ruling_ref": "owner ruling 2026-11-09 (manifest v4): graded as filed"},
+    }
+    assert NPub.gate_item(dict(rec)) == rec
+    fam = {
+        "pk": "COACH#sleep_coach",
+        "sk": f"REPEATFAMILY#pred_x#{AT}",
+        "evidence": {"why_same": "one model output, repeated by two coaches"},
+    }
+    assert NPub.gate_item(dict(fam)) == fam
+    # the classification survives into the headline as APPROVED
+    assert vf.classification({}, NPub.gate_item(dict(rec))) == ("keep", True)
+    # control: a coach-partition narrative row is still gated
+    assert NPub.is_narrative_row("COACH#sleep_coach", "STANCE#2026-11-09") is NPub.is_narrative_partition("COACH#sleep_coach")
