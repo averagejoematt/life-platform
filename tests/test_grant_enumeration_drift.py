@@ -189,6 +189,11 @@ _CONFIG_WITHOUT_REPO_FILE: dict[str, str] = {
     "health, eating, relapse, clinical and genetic fields). Owner-provisioned out of band; the tracked file holds only "
     "the public-safe part and `common.user_goals` merges the two. Deliberately NOT a repo twin, so the config twin sync "
     "can never write or delete it; absent, coach context degrades to the public plan.",
+    "config/coaching/exercise_library.private.json": "#5769/#5773: the exercise library's OWNER-PRIVATE N=1 overlay "
+    "(best sets per bodyweight band, coded note signals, bodyweight gate thresholds). Produced out of band by "
+    "`deploy/write_exercise_library_overlay.py --apply` under the #3043 owner-private prefix and never in this PUBLIC "
+    "repo; the selection engine reads it fail-closed (absent => N=1 fit unknown, never an error). Deliberately NOT a "
+    "repo twin.",
 }
 
 #: The derived content-filter/privacy-guard consumer set → its watch surface.

@@ -4,9 +4,11 @@ The coaching team's menu, chosen **before** drafting: what Matthew has done (his
 what he could do next (expansion candidates), what each movement trains, what it costs, what it needs,
 what must be true before it is programmed, and what to swap to when the kit is missing.
 
-**Status: `proposed`.** Nothing in the drafting path reads it (`tests/test_exercise_library_5769.py`
-asserts no module under `lambdas/` or `mcp/` imports it). Gate evaluation is #5772; selection and
-note rendering are #5771/#5773.
+**Status: `proposed`.** Only the selection engine reads it (#5773, `lambdas/training/selection_engine.py`;
+`tests/test_exercise_library_5769.py` asserts no other module under `lambdas/` or `mcp/` does), and while the
+status is `proposed` it runs in SHADOW: the selection is recorded on each draft as `inputs_snapshot.selection_shadow`
+beside the #5075 pools, which still serve. It changes live drafts only once the status is `approved`. Every draft
+records `inputs_snapshot.library_version`. Gate evaluation is #5772; note rendering is #5771.
 
 ## Files
 
