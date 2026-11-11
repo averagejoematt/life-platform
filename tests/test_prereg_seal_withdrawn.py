@@ -5,8 +5,9 @@ The cycle-17 pre-registration (genesis 2026-09-06) was sealed with a published S
 became a placeholder because the original carries two calls the owner ruled private. The original is kept privately and
 unchanged; it is not republished, and nothing is re-hashed or presented as the seal. These tests pin:
 
-  1. the withdrawal record (lambdas/web/prereg_seal_state.py) to the committed stamp and the sealed fixture — same
-     digest, the right call counts — and that it carries no call's wording;
+  1. the withdrawal record (lambdas/web/prereg_seal_state.py) to the committed stamp — same digest, the right call
+     counts (with the private original, tests/sealed_prereg.py) — that it carries no call's wording, and that no
+     tracked file is the sealed (private) file;
   2. the Site API (``prereg_seal_meta``): the verify command and file link only when the served bytes match;
      otherwise the digest, the stamp link and the reason — for a placeholder, an unreadable file, and an unregistered
      mismatch;
@@ -40,6 +41,7 @@ for p in (str(REPO / "lambdas"), str(REPO / "scripts")):
         sys.path.insert(0, p)
 
 import publish_snapshot_calibration as producer  # noqa: E402
+import sealed_prereg  # noqa: E402
 from web import (
     prereg_seal_state as rule,  # noqa: E402
     site_api_common as common,  # noqa: E402
@@ -47,8 +49,11 @@ from web import (
 
 GENESIS = "2026-09-06"
 STAMP = json.loads((REPO / "deploy" / "generated" / "genesis_preregistration.sha256.json").read_text())
-SEALED_FIXTURE = REPO / "tests" / "fixtures" / "prereg_cycle17_2026-09-06.json"
 PLACEHOLDER = b'{"tombstone": true}'
+# The sealed bytes are private since 2026-11-11 (tests/sealed_prereg.py). The "served file matches" cases use a
+# synthetic file and a stamp naming ITS digest — never the cycle-17 seal.
+SYNTHETIC_BODY = b'{"genesis": "2099-01-01", "synthetic": true}'
+SYNTHETIC_STAMP = dict(STAMP, genesis="2099-01-01", sha256=hashlib.sha256(SYNTHETIC_BODY).hexdigest())
 
 
 def _gps():
@@ -61,16 +66,28 @@ def _gps():
 # 1. the withdrawal record ---------------------------------------------------------------------------------------------
 
 
-def test_the_withdrawal_names_the_published_digest_and_the_sealed_file():
+def test_the_withdrawal_names_the_published_digest():
     w = rule.WITHDRAWN[GENESIS]
     assert STAMP["genesis"] == GENESIS
-    assert w["sha256"] == STAMP["sha256"], "the withdrawal must describe the seal that is actually published"
-    assert hashlib.sha256(SEALED_FIXTURE.read_bytes()).hexdigest() == w["sha256"], "the sealed bytes are the fixture's"
+    assert w["sha256"] == STAMP["sha256"] == sealed_prereg.SEALED_SHA256, "the withdrawal describes the published seal"
+
+
+def test_the_repo_no_longer_carries_the_sealed_file():
+    """Owner ruling 2026-11-11: the sealed file carries withdrawn calls, so no tracked file may be its bytes."""
+    import subprocess
+
+    tracked = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True, check=True).stdout.split(b"\0")
+    hits = []
+    for rel in filter(None, tracked):
+        p = REPO / rel.decode()
+        if p.is_file() and p.stat().st_size == 11578 and hashlib.sha256(p.read_bytes()).hexdigest() == STAMP["sha256"]:
+            hits.append(rel.decode())
+    assert hits == [], f"the sealed (private) file is tracked again: {hits}"
 
 
 def test_the_withdrawal_counts_match_the_sealed_file_and_the_words():
     w = rule.WITHDRAWN[GENESIS]
-    sealed = json.loads(SEALED_FIXTURE.read_text())
+    sealed = json.loads(sealed_prereg.require_sealed_path().read_text())
     total = sum(len(c["predictions"]) for c in sealed["coaches"].values())
     assert w["calls_total"] == total == 16
     assert 0 < w["calls_withdrawn"] < total
@@ -79,13 +96,11 @@ def test_the_withdrawal_counts_match_the_sealed_file_and_the_words():
 
 
 def test_the_withdrawal_text_carries_no_call_wording():
-    sealed = json.loads(SEALED_FIXTURE.read_text())
     text = rule.WITHDRAWN[GENESIS]["text"].lower()
-    for coach in sealed["coaches"].values():
-        for p in coach["predictions"]:
-            claim = p["claim_natural"].lower()
-            for i in range(0, max(1, len(claim) - 24)):
-                assert claim[i : i + 24] not in text
+    for claim in sealed_prereg.sealed_call_texts():  # every call with the private original; the approved ones without
+        claim = claim.lower()
+        for i in range(0, max(1, len(claim) - 24)):
+            assert claim[i : i + 24] not in text
 
 
 def test_artifact_key_parity_with_the_publisher():
@@ -97,11 +112,11 @@ def test_artifact_key_parity_with_the_publisher():
 # 2. the Site API ------------------------------------------------------------------------------------------------------
 
 
-def _meta(monkeypatch, served):
+def _meta(monkeypatch, served, stamp=STAMP):
     monkeypatch.setattr(common, "_prereg_seal_cache", None)
     monkeypatch.setattr(common, "_prereg_seal_attempted", False)
-    monkeypatch.setattr(common, "EXPERIMENT_START", GENESIS)
-    monkeypatch.setattr(common, "_load_s3_json", lambda key, name: dict(STAMP) if key.endswith(".sha256.json") else {})
+    monkeypatch.setattr(common, "EXPERIMENT_START", stamp["genesis"])
+    monkeypatch.setattr(common, "_load_s3_json", lambda key, name: dict(stamp) if key.endswith(".sha256.json") else {})
     seen = []
 
     def _bytes(key, name):
@@ -110,7 +125,7 @@ def _meta(monkeypatch, served):
 
     monkeypatch.setattr(common, "_load_s3_bytes", _bytes)
     seal = common.prereg_seal_meta()
-    assert seen == [f"generated/experiments/prereg/genesis-{GENESIS}.json"], "the hash is taken over the served file"
+    assert seen == [f"generated/experiments/prereg/genesis-{stamp['genesis']}.json"], "the hash is taken over the served file"
     return seal
 
 
@@ -125,7 +140,7 @@ def test_api_offers_no_check_when_the_served_file_does_not_match(monkeypatch, se
 
 
 def test_api_offers_the_check_when_the_served_file_matches(monkeypatch):
-    seal = _meta(monkeypatch, SEALED_FIXTURE.read_bytes())
+    seal = _meta(monkeypatch, SYNTHETIC_BODY, SYNTHETIC_STAMP)
     assert seal["verifiable"] is True
     assert seal["verify"] == STAMP["verify"] and seal["artifact_url"] == STAMP["public_artifact_url"]
     assert "unverifiable_text" not in seal
@@ -169,12 +184,13 @@ def test_producer_strips_the_check_when_the_served_file_does_not_match(get_bytes
 def test_producer_never_fetches_off_the_site_origin():
     fetched = []
     seal = dict(SERVED_SEAL, artifact_url="https://example.com/genesis.json")
-    out = producer.guard_seal(seal, lambda u: fetched.append(u) or SEALED_FIXTURE.read_bytes(), log=lambda m: None)
+    out = producer.guard_seal(seal, lambda u: fetched.append(u) or PLACEHOLDER, log=lambda m: None)
     assert fetched == [] and out["verifiable"] is False
 
 
 def test_producer_keeps_the_check_when_the_served_file_matches():
-    out = producer.guard_seal(dict(SERVED_SEAL), lambda u: SEALED_FIXTURE.read_bytes(), log=lambda m: None)
+    seal = dict(SERVED_SEAL, genesis=SYNTHETIC_STAMP["genesis"], sha256=SYNTHETIC_STAMP["sha256"])
+    out = producer.guard_seal(seal, lambda u: SYNTHETIC_BODY, log=lambda m: None)
     assert out["verifiable"] is True and out["verify"] == STAMP["verify"]
 
 

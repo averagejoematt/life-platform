@@ -15,8 +15,8 @@ over a fake raw table):
   * THE WIRE: a listed row that the gate withheld (its own private record) is NOT exempt from the wire scrub inside
     the scope — the exemption covers only words the gate published in this request.
 
-The sealed calls' words are already public in deploy/generated/genesis_preregistration.json, so these tests use the
-real entries for them; lead reads use a synthetic entry (their words are private until CR2 ships).
+The approved sealed calls' words are public, so these tests use the real entries for them (a labelled test copy,
+tests/fixtures/prereg_cycle17_approved_calls.json; the sealed file is private since 2026-11-11); lead reads use a synthetic entry (their words are private until CR2 ships).
 """
 
 # premerge-gate: CR2 route (owner 2026-11-09 D): walks every routed path of the site API against the approved rows — a diff that adds a route, opens the CR2 scope elsewhere or changes the gate's wire exemption must red before merge.
@@ -32,11 +32,13 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
+sys.path.insert(0, str(ROOT / "tests"))
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 
+import sealed_prereg  # noqa: E402
 from common import narrative_allowlist as NA  # noqa: E402
 from web import (
     narrative_publication as G,  # noqa: E402
@@ -45,8 +47,9 @@ from web import (
     site_api_lambda as L,  # noqa: E402
 )
 
-PREREG = json.loads((ROOT / "deploy" / "generated" / "genesis_preregistration.json").read_text())
-SEALED = {p["claim_natural"] for c in PREREG["coaches"].values() for p in c["predictions"]}
+# The sealed file is private since 2026-11-11 (owner ruling item 3); the approved calls' words come from a labelled
+# test copy (tests/sealed_prereg.py), and every sealed call's words only from the private original when present.
+SEALED = set(sealed_prereg.sealed_call_texts())
 COACH = "sleep_coach"
 LEAD = "eli_marsh"
 LEAD_SK = "LEAD_DAILY#2026-10-11"  # not a listed day: the synthetic entry below is the only one under it
