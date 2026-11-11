@@ -214,7 +214,7 @@ def digest(a: Annotation) -> str:
 
 
 def _day(iso: str) -> str:
-    d = date.fromisoformat(iso[:10])
+    d = date(int(iso[0:4]), int(iso[5:7]), int(iso[8:10]))  # a calendar day, not an instant
     return f"{d.day} {d.strftime('%B %Y')}"
 
 

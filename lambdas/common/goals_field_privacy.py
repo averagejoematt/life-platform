@@ -135,13 +135,13 @@ SEALED_CALL_DIGEST_FIELDS: tuple = (
     "targets.biomarkers.hrv_target_ms",
     "targets.biomarkers.ldl_target_mg_dl",
 )
-SEALED_FREEZE_SK_PREFIX = "PREDICTION#pred_20260906_"
+SEALED_FREEZE_KEY_PREFIX = "PREDICTION#pred_20260906_"
 
 
 def goals_inputs_for(pk: str, sk: str) -> tuple:
     """The goals fields a historical record's generation read. A sealed call of the 2026-09-06 freeze read the whole
     digest; a lead read reads the DynamoDB profile row, never this file, so it reads none."""
-    if str(sk or "").startswith(SEALED_FREEZE_SK_PREFIX):
+    if str(sk or "").startswith(SEALED_FREEZE_KEY_PREFIX):
         return SEALED_CALL_DIGEST_FIELDS
     return ()
 
