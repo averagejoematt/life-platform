@@ -477,7 +477,9 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
     # ALL visible records, so links never move) but leaves the manifest and the Prologue part
     # numbering — the listed season reads Part I, Part II with no gap. Parity with
     # chronicle_render.publish_to_journal (pinned in tests/test_story_desk_unlisted.py).
-    listed = [x for x in installments if not x.get("unlisted")]
+    # A WITHDRAWN installment (content.chronicle_schema.WITHDRAWN_SKS, owner ruling 2026-11-10) is off the list too, and
+    # its page is never rendered again — the loop below skips it, so its URL keeps whatever stub replaced the page.
+    listed = [x for x in installments if not chronicle_schema.off_the_list(x)]
     listed_keys = installment_keys(listed)
     genesis = EXPERIMENT_START_DATE
     print(f"Genesis: {genesis} · visible installments: {len(installments)}")
@@ -486,6 +488,8 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
     invalidation_paths = ["/journal/posts.json"]
 
     for item in installments:
+        if chronicle_schema.is_withdrawn(item):
+            continue
         date_str = item.get("date", "")
         week_num = int(item.get("week_number", 0) or 0)
         title = item.get("title", "Untitled")

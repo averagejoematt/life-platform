@@ -1,4 +1,4 @@
-"""tests/test_hevy_note_lint_5428.py — #5428: the Hevy routine-note linter (standard §8, rules L1–L13).
+"""tests/test_hevy_note_lint_5428.py — #5428: the Hevy routine-note linter (standard §8, rules L1–L15).
 
 Three fixtures, all offline (no Hevy, no AWS, no AI):
 
@@ -374,6 +374,11 @@ MUTATIONS: list[tuple[str, str, Mut, str]] = [
     ("a truncated note", "2026-10-26", _append(2, "Chase 12 reps…"), "L12"),
     # L13 — the dumbbell warm-up row (R4)
     ("the first DB compound with no W row", "2026-10-26", _rows(0, lambda r: [x for x in r if x[0] != "W"]), "L13"),
+    # L14 — a first session back after a long layoff is easy (owner ruling 2026-11-10): the 11-11 torso rotation's two faults
+    ("a first session back at the hard band", "2026-10-26", _note(4, lambda n: n.replace("RPE 6–7", "RPE 8–9, last set RPE 9–10")), "L14"),
+    ("a first session back with its W row at the work", "2026-10-26", _rows(4, lambda r: [["W", 60, "8"]] + r[1:]), "L14"),
+    # L15 — a 10+ rep barbell compound climbs two W rows (owner ruling 2026-11-10): the 11-11 squat's single 70 % row
+    ("a 10+ rep barbell compound with one W row", "2026-10-13", _rows(1, lambda r: r[1:]), "L15"),
 ]
 
 OLD_LOAD_RULE = "Top reps at RPE 7 or less → +10 lb (2 pins) on later sets; at RPE 8 → +5 lb (1 pin). Under 40 lb: +5 max. Once per lift."

@@ -346,7 +346,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     _all_dates = [k[0] for k in _all_keys]
     # #4537: an unlisted installment keeps its URL slot (seq is over ALL keys) but leaves the
     # manifest and the Prologue part numbering. Parity with deploy/restart_leadin_pages.run.
-    _unlisted = {(x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if x.get("unlisted")}
+    _unlisted = {(x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if chronicle_schema.off_the_list(x)}
     _pre_keys = [k for k in _all_keys if k[0] < _genesis and k not in _unlisted]
 
     def _series_label(d, k=""):
@@ -652,7 +652,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # "label" carries the genesis-anchored truth (Prologue vs Week N).
     posts_manifest = []
     for inst in sorted(
-        [x for x in all_installments if not x.get("unlisted")],
+        [x for x in all_installments if not chronicle_schema.off_the_list(x)],
         key=lambda x: (x.get("date", ""), _seq_for(x.get("date", ""), x.get("sk", ""))),
         reverse=True,
     ):

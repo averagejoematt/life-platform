@@ -446,3 +446,21 @@ def real_publication_credit_findings(text) -> list:
                 }
             )
     return findings
+
+
+# Installments withdrawn from public access WITHOUT touching their stored row (owner ruling 2026-11-10). Every manifest
+# and page builder treats one exactly like an `unlisted` row for the reading list (URL slot kept; off the manifest and
+# the Prologue numbering), and never renders its page again. Keyed by the chronicle sort key.
+#   DATE#2026-09-05 — "The Plan, On the Record" (/journal/posts/week-03/): it quotes day-one sealed calls verbatim, two
+#                     of which the owner ruled private on 2026-11-09 (#5720).
+WITHDRAWN_SKS = frozenset({"DATE#2026-09-05"})
+
+
+def is_withdrawn(inst) -> bool:
+    """True when this installment has been withdrawn from public access (WITHDRAWN_SKS)."""
+    return str((inst or {}).get("sk", "")) in WITHDRAWN_SKS
+
+
+def off_the_list(inst) -> bool:
+    """True when an installment stays out of the public reading list: unlisted on its row, or withdrawn."""
+    return bool((inst or {}).get("unlisted")) or is_withdrawn(inst)

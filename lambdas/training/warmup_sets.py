@@ -12,7 +12,9 @@ BEFORE the working sets, each a Hevy `warmup` set (`Set.type == "warmup"`, which
 writes as the wire set's `type`):
 
   * the first warmed lift of the session climbs 50 % x 8, 70 % x 5, 85 % x 3 of its working load;
-  * every later warmed compound gets one set, 70 % x 5 — the body is already warm by then.
+  * every later warmed compound gets one set, 70 % x 5 — the body is already warm by then — except a later barbell
+    compound prescribed at 10+ reps (a working rep range whose top is 10 or more), which climbs two: 50 % x 8, 70 % x 5
+    (#5428, owner ruling 2026-11-10: the 11-11 volume squat at 225 x 8-12 sat behind a single 160 x 5).
 
 "First" is the first lift that receives warm-ups, not the first compound slot: a light dumbbell
 row under the floor does not climb anyone to a heavy squat. Loads round to the same 5 lb step
@@ -57,6 +59,15 @@ WARMUP_PRESCRIPTION: dict[str, Any] = {
     # (fraction of the working load, reps), in climb order
     "first_compound": ((0.50, 8), (0.70, 5), (0.85, 3)),
     "later_compound": ((0.70, 5),),
+    # #5428 (owner ruling 2026-11-10, B): a LATER barbell compound prescribed at 10+ reps (a working rep range whose top is
+    # >= `high_rep_from`) climbs two rows, not one — the first two rungs of the first-compound climb. The 11-11 volume
+    # squat (225 x 8-12) went out behind a single 160 x 5, because the RDL ahead of it took the "first" climb.
+    "later_compound_high_rep": ((0.50, 8), (0.70, 5)),
+    "high_rep_from": 10,
+    # #5428 (owner ruling 2026-11-10, A): a movement's FIRST session back after a long layoff gets one real warm-up row
+    # LIGHTER than the work — the first rung of the climb — never the pick-load feeler at the working load
+    # (`lift_note.compose_blocks`; the long-layoff line is `layoff_tiers.REENTRY_MAX_GAP_DAYS`)
+    "layoff_return": ((0.50, 8),),
     "floor_lb": 95.0,
     # the anchor families (`movement_catalog.anchor_family`) that are the big lifts the issue names:
     # bench / squat / deadlift (hinge) / overhead press / row. The vertical pull is not one of them.
@@ -72,7 +83,9 @@ WARMUP_PRESCRIPTION: dict[str, Any] = {
     "provenance_detail": (
         "#5049 gate:owner — the recommended numbers (50/70/85 % x 8/5/3 first compound, "
         "1 set at 70 % later, floor 95 lb), owner-ruled 2026-10-23: warm-ups as they are (ADR-105); "
-        "#5428 R4 owner-ruled 2026-10-27: one dumbbell warm-up row (~60 % x 8, first dumbbell compound >= 50 lb per hand)"
+        "#5428 R4 owner-ruled 2026-10-27: one dumbbell warm-up row (~60 % x 8, first dumbbell compound >= 50 lb per hand); "
+        "#5428 owner-ruled 2026-11-10 (delegated, 'go'): a later barbell compound at 10+ reps climbs 50 % x 8, 70 % x 5, and a "
+        "first session back after a long layoff gets one warm-up row at 50 % x 8 of the work"
     ),
 }
 
@@ -127,14 +140,22 @@ def working_load_kg(sets: Any) -> float | None:
     return max(loads) if loads else None
 
 
-def warmup_ramp(working_kg: float, first: bool) -> list[Any]:
+def _rungs(first: bool, high_rep: bool) -> Any:
+    """The climb's rungs: the first warmed lift's three; a later one's single row, or two at 10+ reps (owner 2026-11-10)."""
+    if first:
+        return WARMUP_PRESCRIPTION["first_compound"]
+    return WARMUP_PRESCRIPTION["later_compound_high_rep" if high_rep else "later_compound"]
+
+
+def warmup_ramp(working_kg: float, first: bool, high_rep: bool = False) -> list[Any]:
     """The warm-up `Set`s for one lift at `working_kg`, in climb order (may be shorter than the
-    rule's when a rounded load would meet the working load or repeat the previous warm-up)."""
+    rule's when a rounded load would meet the working load or repeat the previous warm-up). `high_rep`: the lift's
+    working rep range tops out at `high_rep_from` or more (#5428, owner ruling 2026-11-10)."""
     from training.routine_ir import Set
 
     half_step_kg = 2.5 * LB_IN_KG
     out: list[Any] = []
-    for frac, reps in WARMUP_PRESCRIPTION["first_compound" if first else "later_compound"]:
+    for frac, reps in _rungs(first, high_rep):
         kg = load_step_kg(float(working_kg) * frac)
         if kg <= 0 or kg >= float(working_kg) - half_step_kg:
             continue
@@ -179,6 +200,24 @@ def dumbbell_warmup(working_kg: float, top_rep_hi: int | None) -> list[Any]:
     if kg <= 0 or kg >= float(working_kg) - 2.5 * LB_IN_KG:
         return []
     return [Set(type=WARMUP_SET_TYPE, weight_kg=kg, reps=int(reps))]
+
+
+def layoff_warmup(working_kg: float) -> list[Any]:
+    """#5428 (owner ruling 2026-11-10, A): the ONE warm-up row of a first session back after a long layoff — 50 % of the
+    work on the 5-lb step, x 8; [] when it would round onto the work (nothing lighter to load) or to nothing."""
+    from training.routine_ir import Set
+
+    frac, reps = WARMUP_PRESCRIPTION["layoff_return"][0]
+    kg = load_step_kg(float(working_kg) * frac)
+    if kg <= 0 or kg >= float(working_kg) - 2.5 * LB_IN_KG:
+        return []
+    return [Set(type=WARMUP_SET_TYPE, weight_kg=kg, reps=int(reps))]
+
+
+def prescribed_rep_top(sets: Any) -> int | None:
+    """The highest rep-range top over a block's working sets (a `10–12` back-off makes a 10+ rep lift)."""
+    his = [int(getattr(s, "rep_range_end", None) or getattr(s, "reps", None) or 0) for s in sets or [] if not is_warmup(s)]
+    return max((h for h in his if h > 0), default=None)
 
 
 def _top_rep_hi(sets: Any) -> int | None:
@@ -227,7 +266,9 @@ def attach_warmups(blocks: list[Any], catalog_movements: dict[str, Any]) -> dict
             if top < floor_kg - 1e-6:
                 row["status"] = "below_floor"
                 continue
-            ramp = warmup_ramp(top, first=warmed == 0)
+            ramp = warmup_ramp(
+                top, first=warmed == 0, high_rep=(prescribed_rep_top(block.sets) or 0) >= WARMUP_PRESCRIPTION["high_rep_from"]
+            )
         if not ramp:
             row["status"] = "no_distinct_load"
             continue
