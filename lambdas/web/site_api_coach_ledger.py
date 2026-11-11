@@ -396,6 +396,9 @@ _PREDICTION_PROJECTION_FIELDS = (
     # Owner 2026-11-09: the verification record's pointer (coach.verification_record) — served as `verification`.
     "latest_verification",
     "original_grade",  # Owner 2026-11-09 (CR1): the first grade, for verification_fields.first_status (the archive)
+    # Owner ruling 2026-11-09 (B): the stored repeat-family marker — its role names the member that stands in a count
+    # (verification_fields.headline). Read for the fold only; never served.
+    "repeat_family",
 )
 
 
