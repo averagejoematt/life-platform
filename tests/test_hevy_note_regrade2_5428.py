@@ -424,7 +424,7 @@ def test_a_critic_change_to_the_cardio_resyncs_the_low_energy_line():
     assert session_block.sync_low_energy(ir) is True and ir.exercises[0].notes.split("\n")[1] == g.LOW_ENERGY_LINE
     assert ir.exercises[0].notes.endswith("\n\n" + NEW_NOTES["db_shoulder_press"].split("\n\n", 1)[1])
     assert session_block.sync_low_energy(ir) is False
-    src = (ROOT / "mcp" / "tools_plan.py").read_text(encoding="utf-8")
+    src = (ROOT / "mcp" / "plan_stage2_run.py").read_text(encoding="utf-8")  # #5781: stage 2's body lives here
     assert "session_block.sync_low_energy(ir)" in src
 
 

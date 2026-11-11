@@ -365,8 +365,8 @@ def test_mutation_control_without_the_stage_2_restamp_the_after_line_is_absent()
 
 def test_the_restamp_runs_after_the_critics_change_the_rows():
     """Order matters: a swap or drop moves what follows the cardio, so the restamp sits AFTER `apply_changes`."""
-    src = (REPO / "mcp" / "tools_plan.py").read_text(encoding="utf-8")
-    fn = next(n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == "_run_stage_2")
+    src = (REPO / "mcp" / "plan_stage2_run.py").read_text(encoding="utf-8")  # #5781: stage 2's body moved here
+    fn = next(n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == "record")
     calls = [(c.lineno, ast.unparse(c.func)) for c in ast.walk(fn) if isinstance(c, ast.Call)]
     apply_line = min(ln for ln, f in calls if f == "critics.apply_changes")
     assert any(f == "apply_after_lines" and ln > apply_line for ln, f in calls)
