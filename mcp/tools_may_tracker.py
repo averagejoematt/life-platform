@@ -158,9 +158,9 @@ def _day(r: Any) -> str:
 
 
 def pain_instances(hevy: Optional[list]) -> Optional[list]:
-    """The pain-flag instances in `tools_plan._pain_instances`' shape, one per exercise whose Hevy note the pain net
-    (`training_notes.pain_lexicon_hit`, the layer's deterministic pass) flags; None = Hevy unread."""
-    from training.training_notes import pain_lexicon_hit
+    """The pain-flag instances in `tools_plan._pain_instances`' shape, one per exercise whose Hevy note reads as the
+    `pain` class (`training_notes_pain.pain_class`, #5800 — the net's discomfort and form notes hold nothing); None = Hevy unread."""
+    from training.training_notes_pain import PAIN, pain_class
 
     if hevy is None:
         return None
@@ -168,7 +168,7 @@ def pain_instances(hevy: Optional[list]) -> Optional[list]:
     for r in hevy:
         for e in r.get("exercises") or []:
             note = str(e.get("notes") or e.get("note") or "")
-            if pain_lexicon_hit(note):
+            if pain_class(note) == PAIN:
                 name = str(e.get("name") or e.get("title") or "exercise")
                 inst = by.setdefault(name, {"movement": name, "exercise": name, "note_dates": [], "notes": []})
                 inst["note_dates"].append(_day(r))

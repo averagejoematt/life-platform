@@ -20,6 +20,12 @@ model is called once and the AWS write is a separate, deliberate act:
           repo is PUBLIC). The first retro reads it as its prior. Refuses a missing row, an unknown row, an
           off-scale letter, or a baseline row that is already stored.
 
+  volume-response  READ-ONLY, ADVISORY (#5801). The block's weekly working sets per muscle (`muscle_volume.
+          working_sets_by_muscle`, the reader behind `get_muscle_volume`) beside each lift's e1RM trend
+          (`plan_engine.anchor_e1rm_trend`) and the #5762 progression record, with a proposed next-block weekly set
+          count per muscle (`training.volume_response`). A proposal for the block design review (#5776), never applied;
+          it writes only `volume_response.json` / `.md` to `--out` — an OWNER-ONLY scratch dir, never a repo file.
+
 Every read uses a 60 s read timeout. A failed read stops the run and names the partition — a broken read is
 never an empty block.
 
@@ -146,6 +152,56 @@ def prediction_update(p: dict[str, Any], graded_at: str) -> dict[str, Any]:
     }
 
 
+def read_hevy(block_end: str, lookback_days: int = 120) -> tuple[Any, list[dict[str, Any]]]:
+    """The block's Hevy rows plus `lookback_days` of history before it (the e1RM trend needs 9 sessions). Read-only:
+    the same cross-phase read `get_muscle_volume` uses. Returns (block window, raw items)."""
+    from datetime import date, timedelta
+
+    for k, v in (("S3_BUCKET", "matthew-life-platform"), ("USER_ID", "matthew"), ("AWS_DEFAULT_REGION", REGION)):
+        os.environ.setdefault(k, v)
+    sys.path.insert(0, _ROOT)
+    from mcp.tools_strength import _read_hevy_all_phases
+
+    window = block_retro.block_window(block_end)
+    start = (date.fromisoformat(window["start"]) - timedelta(days=lookback_days)).isoformat()
+    return window, _read_hevy_all_phases(start, window["end"])[0]
+
+
+def cmd_volume_response(args: argparse.Namespace) -> int:
+    from training import muscle_volume, volume_response
+
+    sys.path.insert(0, _ROOT)  # `mcp` lives at the repo root; read_hevy adds it too late for this import
+    from mcp.strength_helpers import extract_hevy_sessions
+
+    if os.path.abspath(args.out).startswith(_ROOT + os.sep):
+        print("refusing: --out is inside the repo; loads and e1RMs are private. Use a scratch directory outside it.")
+        return 1
+    window, items = read_hevy(args.block_end)
+    workouts = muscle_volume.normalize_hevy_items(items)
+    counted = muscle_volume.working_sets_by_muscle(workouts, window["start"], window["end"])
+    weeks = muscle_volume.window_weeks(window["start"], window["end"])
+    lifts = [
+        {
+            "name": e["name"],
+            "template_id": e["template_id"],
+            "sessions": extract_hevy_sessions(items, e["name"], template_id=e["template_id"] or ""),
+        }
+        for e in counted["exercise_sets"]
+    ]
+    report = volume_response.build_report(
+        args.block_end, weeks=weeks, muscle_totals=counted["muscles"], lifts=lifts, progression=read_progression(args.block_end)
+    )
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, "volume_response.json"), "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, sort_keys=True, default=str)
+    md = volume_response.render_markdown(report)
+    with open(os.path.join(args.out, "volume_response.md"), "w", encoding="utf-8") as f:
+        f.write(md)
+    print(md)
+    print(f"wrote {args.out}/volume_response.json and .md (owner-only; advisory, nothing applied or stored)")
+    return 0
+
+
 def cmd_store(args: argparse.Namespace) -> int:
     from datetime import datetime, timezone
 
@@ -220,8 +276,13 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("baseline", help="write the one-time owner-only baseline row (dry-run unless --apply)")
     b.add_argument("--letters", required=True, help="JSON {row_id: letter} from the PRIVATE review doc, kept outside the repo")
     b.add_argument("--apply", action="store_true", help="write to DynamoDB (default: dry-run)")
+    v = sub.add_parser(
+        "volume-response", help="read-only, advisory: per-muscle sets beside e1RM response, with a next-block proposal (#5801)"
+    )
+    v.add_argument("--block-end", required=True, help="the block's last day (a Sunday, YYYY-MM-DD)")
+    v.add_argument("--out", required=True, help="an OWNER-ONLY scratch directory (never inside the repo)")
     args = ap.parse_args(argv)
-    return {"grade": cmd_grade, "store": cmd_store, "baseline": cmd_baseline}[args.cmd](args)
+    return {"grade": cmd_grade, "store": cmd_store, "baseline": cmd_baseline, "volume-response": cmd_volume_response}[args.cmd](args)
 
 
 if __name__ == "__main__":

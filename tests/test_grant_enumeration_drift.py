@@ -192,6 +192,11 @@ _CONFIG_WITHOUT_REPO_FILE: dict[str, str] = {
     "config/private/genome_lab_xref.json": "Owner ruling 2026-11-11 (second message, item 5): the biomarker -> gene "
     "cross-reference for the owner's labs is personal genetic information. Owner-provisioned out of band; "
     "`mcp.labs_helpers` reads it and fails soft to no genome context. Deliberately NOT a repo twin.",
+    "config/coaching/exercise_library.private.json": "#5769/#5773: the exercise library's OWNER-PRIVATE N=1 overlay "
+    "(best sets per bodyweight band, coded note signals, bodyweight gate thresholds). Produced out of band by "
+    "`deploy/write_exercise_library_overlay.py --apply` under the #3043 owner-private prefix and never in this PUBLIC "
+    "repo; the selection engine reads it fail-closed (absent => N=1 fit unknown, never an error). Deliberately NOT a "
+    "repo twin.",
 }
 
 #: The derived content-filter/privacy-guard consumer set → its watch surface.

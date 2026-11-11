@@ -140,6 +140,9 @@ _SESSION_0917 = {
 }
 
 # ── the derived note layer's wire, copied verbatim from the live row ──────────
+# #5800: every flagged row below carries a SYNTHETIC pain phrase in `note_raw`. Its live words class as
+# `discomfort` / `form_or_equipment` and no longer flag at all (`training_notes_pain`); these tests are about what
+# the engine does with a FLAGGED row — dismissal, re-arm, per-site — so the row has to be one the pain class keeps.
 _RDL_PAIN_NOTE = {
     "pk": f"USER#matthew#SOURCE#training_notes#EXERCISE#{RDL_TID}",
     "sk": "DATE#2026-09-13#WORKOUT#29cbd264-ea01-46d6-bccb-f2692721b1b8",
@@ -154,7 +157,7 @@ _RDL_PAIN_NOTE = {
     "pain_flag": True,
     "signals": [{"class": "pain_discomfort", "summary": "deterministic pain-lexicon hit", "confidence": 0.6}],
     "sentiment": None,
-    "note_raw": "…i could feel my right side of my lower back more consciously…",
+    "note_raw": "…i could feel my right side of my lower back more consciously… [synthetic #5800: sharp pain]",
 }
 _LAT_CLEAN_NOTE = {
     "pk": f"USER#matthew#SOURCE#training_notes#EXERCISE#{LAT_TID}",
@@ -520,6 +523,7 @@ class TestTheBatchNoteRead:
             "pain_flag_any": True,
             "pain_dates": [FLAG_NOTE_DATE],
             "pain_notes": [{"date": FLAG_NOTE_DATE, "text": _RDL_PAIN_NOTE["note_raw"]}],  # #4174: the words tie a note to its site
+            "not_pain_notes": [],  # #5800
             "sessions_with_notes": 1,
             "layer_status": "degraded",
         }
@@ -528,6 +532,7 @@ class TestTheBatchNoteRead:
             "pain_flag_any": False,
             "pain_dates": [],
             "pain_notes": [],
+            "not_pain_notes": [],
             "sessions_with_notes": 0,
             "layer_status": "degraded",
         }
@@ -639,7 +644,7 @@ _CYCLING_NOTE_0909 = {
         {"confidence": 0.85, "class": "pain_discomfort", "summary": "Saddle soreness and compression shorts discomfort during cardio"},
     ],
     "sentiment": None,
-    "note_raw": "Level 8 flat - cardio felt ok - more just saddle sore and uncomfortable with compression shorts",
+    "note_raw": "Level 8 flat - cardio felt ok - more just saddle sore and uncomfortable with compression shorts [synthetic #5800: pain]",
 }
 _CYCLING_NOTE_0918 = {
     "pk": f"USER#matthew#SOURCE#training_notes#EXERCISE#{CYCLING_TID}",
@@ -666,7 +671,7 @@ _CYCLING_NOTE_0918 = {
         {"class": "deviation", "confidence": 0.9, "summary": "Took it easy due to toe pain"},
     ],
     "sentiment": None,
-    "note_raw": "Level 10 flat - big toe throbbing from ingrown toe so took it easy",
+    "note_raw": "Level 10 flat - big toe throbbing from ingrown toe so took it easy [synthetic #5800: pain]",
 }
 
 
@@ -756,7 +761,7 @@ class TestPerSite4174:
             "sk": "DATE#2026-09-27#WORKOUT#ffffffff-0000-0000-0000-000000000000#0",
             "date": "2026-09-27",
             "workout_uid": "hevy:ffffffff",
-            "note_raw": "Level 12 flat - sore again, took it easy",
+            "note_raw": "Level 12 flat - sore again, took it easy [synthetic #5800: pain]",
         }
         fake = _FakeTable(_cycling_rows(SADDLE_SORE, BIG_TOE) + [later])
         monkeypatch.setattr(core, "table", fake)
