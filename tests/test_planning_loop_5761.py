@@ -39,7 +39,8 @@ FIX = _REPO / "tests" / "fixtures" / "panel_golden_5072"
 
 # The live sk suffixes on 2026-11-11 (read-only DDB query): may_tracker WEEK#<monday>, training_constraints PANEL#<week_end>.
 LIVE_TRACKER = ["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02"]
-LIVE_PANEL = ["2026-10-24", "2026-10-25", "2026-11-01", "2026-11-08"]
+LIVE_PANEL = ["2026-10-18", "2026-10-25", "2026-11-01", "2026-11-08"]  # the live record after the 2026-11-11 clean-up
+STRAY = "2026-10-24"  # the mis-keyed Saturday row (exported + deleted 2026-11-11)
 
 
 @pytest.fixture(autouse=True)
@@ -113,15 +114,18 @@ def test_the_job_stores_a_saturday_request_under_its_sunday(monkeypatch):
 def test_a_week_is_due_from_the_following_tuesday():
     assert qa.expected_week("2026-11-17") == "2026-11-09"  # Tuesday: the week just ended
     assert qa.expected_week("2026-11-16") == "2026-11-02"  # Monday: the grade and the tracker may not have landed yet
-    assert qa.due_weeks("2026-11-11") == ["2026-10-19", "2026-10-26", "2026-11-02"]
+    assert qa.due_weeks("2026-11-11") == ["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02"]
     late = qa.due_weeks("2027-03-02")
     assert len(late) == qa.LOOKBACK_WEEKS and late[-1] == qa.expected_week("2027-03-02")
 
 
 def test_the_live_record_is_closed_and_the_saturday_key_is_named():
-    verdict, msg = qa.assess(LIVE_TRACKER, LIVE_PANEL, "2026-11-11")
-    assert verdict == "warn" and "2026-10-24" in msg, msg
-    assert qa.assess(LIVE_TRACKER, [k for k in LIVE_PANEL if k != "2026-10-24"], "2026-11-11")[0] == "ok"
+    assert qa.assess(LIVE_TRACKER, LIVE_PANEL, "2026-11-11")[0] == "ok"
+    verdict, msg = qa.assess(LIVE_TRACKER, LIVE_PANEL + [STRAY], "2026-11-11")
+    assert verdict == "warn" and STRAY in msg, msg
+    # must-fail: the re-graded week 10-12 is covered, so losing its grade reds it
+    verdict, msg = qa.assess(LIVE_TRACKER, [k for k in LIVE_PANEL if k != "2026-10-18"], "2026-11-11")
+    assert verdict == "fail" and "PANEL#2026-10-18" in msg, msg
 
 
 def test_a_missing_tracker_row_or_panel_grade_reds_the_week():
@@ -133,7 +137,7 @@ def test_a_missing_tracker_row_or_panel_grade_reds_the_week():
     assert no_row[0] == "fail" and "WEEK#2026-11-09" in no_row[1] and "PANEL#2026-11-15" not in no_row[1], no_row
     # the Saturday key never closes the week whose Sunday it misses
     assert qa.assess(LIVE_TRACKER, ["2026-10-24", "2026-11-01", "2026-11-08"], "2026-11-11")[0] == "fail"
-    assert qa.assess(LIVE_TRACKER, LIVE_PANEL, "2026-11-16")[0] == "warn"  # Monday: week 11-09 not yet due
+    assert qa.assess(LIVE_TRACKER, LIVE_PANEL, "2026-11-16")[0] == "ok"  # Monday: week 11-09 not yet due
 
 
 class _Table:
@@ -164,7 +168,7 @@ class _Check:
 
 def test_the_check_reads_sk_keys_from_both_partitions_and_warns_on_a_failed_read():
     items = [{"pk": mt.PK, "sk": "WEEK#" + m} for m in LIVE_TRACKER]
-    items += [{"pk": "USER#matthew#SOURCE#training_constraints", "sk": "PANEL#" + e} for e in LIVE_PANEL if e != "2026-10-24"]
+    items += [{"pk": "USER#matthew#SOURCE#training_constraints", "sk": "PANEL#" + e} for e in LIVE_PANEL]
     items.append({"pk": "USER#matthew#SOURCE#training_constraints", "sk": "PHASE#EVAL#2026-11-02"})  # not a panel row
     now = lambda: datetime(2026, 11, 11, 12, 0)  # noqa: E731
     assert qa.check_planning_loop_liveness(_Table(items), _Check, "content", now)[0][0] == "ok"

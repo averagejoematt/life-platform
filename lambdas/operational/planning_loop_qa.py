@@ -34,9 +34,10 @@ from datetime import timedelta
 from common.pacific_time import parse_day_key
 
 CHECK_NAME = "planning_loop_liveness"
-# The first Monday-Sunday week both writers covered (WEEK#2026-10-19 + PANEL#2026-10-25): earlier weeks predate the
-# tracker or the panel, so they are history the retro already scored, never a live hole.
-FIRST_WEEK = "2026-10-19"
+# The first Monday-Sunday week both writers covered: WEEK#2026-10-12 + PANEL#2026-10-18 (that grade was re-run on
+# 2026-11-11 after the mis-keyed Saturday row PANEL#2026-10-24 was exported and deleted, owner-approved). Earlier weeks
+# predate the tracker, so they are history the retro already scored, never a live hole.
+FIRST_WEEK = "2026-10-12"
 LOOKBACK_WEEKS = 6  # one program block
 
 
