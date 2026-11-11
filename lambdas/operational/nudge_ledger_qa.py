@@ -254,6 +254,44 @@ def check_protein_nudge_liveness(table, Check, tier, pt_now, *, lookback_days=ST
     return _eval_liveness(table, Check, tier, pt_now, PROTEIN_LEDGER_PK, "protein", "#5098 - the breakfast pass", lookback_days, armed_on)
 
 
+# #5793: the protein EVENING pass's dead-man. `run_evening` stamps `COACH#protein_nudge / EVAL_EVENING#<date>` on every tick
+# in its 19:00-21:00 PT window (sent or not), so an evening that has closed (after 21:00 PT) with no stamp = the pass never ran.
+# Reads sort keys only. Missing stamp is a FAIL like the breakfast check; a failed read is a WARN, never a pass.
+PROTEIN_EVENING_EVAL_PREFIX = "EVAL_EVENING#"  # = protein_nudge_runner.EVENING_EVAL_PREFIX (contract test)
+PROTEIN_EVENING_CLOSE_HOUR_PT = 21  # the window's end: before it today's evening is not yet due
+# Grace day, as PROTEIN_ARMED_ON is for breakfast: the first evening after merge + deploy (2026-11-12) is unjudged, so
+# the first judged evening is 2026-11-13. Earlier is no evidence.
+PROTEIN_EVENING_ARMED_ON = "2026-11-13"
+
+
+def check_protein_evening_liveness(table, Check, tier, pt_now, *, lookback_days=STEPS_LOOKBACK_DAYS, armed_on=PROTEIN_EVENING_ARMED_ON):
+    c = Check("protein_evening:eval_liveness", "Data Freshness", tier)
+    now = pt_now()
+    today = now.date()
+    first = 0 if now.hour >= PROTEIN_EVENING_CLOSE_HOUR_PT else 1  # tonight counts only once its window has closed
+    days = [d for d in ((today - timedelta(days=n)).isoformat() for n in range(first, lookback_days + 1)) if d >= armed_on]
+    if not days:
+        c.ok(f"protein evening nudge pending: armed on {armed_on}, no completed evening to judge yet")
+        return [c]
+    pfx = PROTEIN_EVENING_EVAL_PREFIX
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(PROTEIN_LEDGER_PK) & Key("sk").between(f"{pfx}{min(days)}", f"{pfx}{max(days)}")
+        )
+        have = {str(r.get("sk"))[len(pfx) :] for r in resp.get("Items") or []}
+    except Exception as exc:  # noqa: BLE001
+        c.warn(f"protein evening nudge ledger - DDB read failed, liveness unproven: {exc}")
+        return [c]
+    missing = [d for d in days if d not in have]
+    if missing:
+        c.fail(
+            f"protein evening nudge evaluated on none of {len(missing)} completed evening(s): {', '.join(sorted(missing))} (#5793 - the evening pass did not run)"
+        )
+    else:
+        c.ok(f"protein evening nudge evaluated on each of the last {len(days)} completed evening(s)")
+    return [c]
+
+
 # #5106: the evening check-in prompt's dead-man — the same shape on `COACH#evening_checkin / EVAL#<date>`, stamped by
 # every scheduled 20:00 PT run (sent, dark, quiet, already logged), so a completed day with no row = the rule stopped.
 EVENING_CHECKIN_LEDGER_PK = "COACH#evening_checkin"  # = coach.evening_checkin.LEDGER_PK (contract test)

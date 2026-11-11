@@ -1168,6 +1168,7 @@ def check_steps():
         ("nudge_ledger_liveness", lambda: nudge_ledger_qa.check_nudge_ledger_liveness(table, Check, CONTENT_TRUTH, pt_now)),
         ("steps_nudge_liveness", lambda: nudge_ledger_qa.check_steps_nudge_liveness(table, Check, CONTENT_TRUTH, pt_now)),
         ("protein_nudge_liveness", lambda: nudge_ledger_qa.check_protein_nudge_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5098
+        ("protein_evening_liveness", lambda: nudge_ledger_qa.check_protein_evening_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5793
         ("evening_checkin_liveness", lambda: nudge_ledger_qa.check_evening_checkin_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5106
         ("checkin_pair_liveness", lambda: nudge_ledger_qa.check_checkin_pair_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5211
         ("morning_checkin_liveness", lambda: nudge_ledger_qa.check_morning_checkin_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5132

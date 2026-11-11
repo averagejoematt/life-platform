@@ -300,3 +300,64 @@ def test_coach_nudge_tick_runs_the_evening_pass(monkeypatch):
     out = cn._protein_evening_pass(TICK_UTC, True)
     assert out["send"] and mails == [("Protein this evening", "Protein note", True)]
     assert t.items[(runner.LEDGER_PK, f"PROTEIN_NUDGE#{DAY}#evening")]["status"] == "dry_run"
+
+
+# ── the evening dead-man (qa-smoke): must-fail controls on an injected frozen clock ───────────────────────────
+class _QaTable:
+    def __init__(self, days=(), boom=False):
+        self.sks, self.boom, self.queries = [f"EVAL_EVENING#{d}" for d in days], boom, 0
+
+    def query(self, **kw):
+        self.queries += 1
+        if self.boom:
+            raise RuntimeError("ddb down")
+        return {"Items": [{"sk": s} for s in self.sks]}
+
+
+class _QaCheck:
+    def __init__(self, name, *_):
+        self.name, self.status, self.msg = name, None, ""
+
+    def ok(self, m=""):
+        self.status, self.msg = "ok", m
+
+    def fail(self, m=""):
+        self.status, self.msg = "fail", m
+
+    def warn(self, m="", chronic=False):
+        self.status, self.msg = "warn", m
+
+
+def _evening_check(table, hour, day=14):
+    from datetime import datetime
+
+    from operational import nudge_ledger_qa as q
+
+    return q.check_protein_evening_liveness(table, _QaCheck, "t", lambda: datetime(2026, 11, day, hour, 0), armed_on="2026-11-13")[0]
+
+
+def test_dead_man_fails_when_a_completed_evening_has_no_stamp():
+    assert _evening_check(_QaTable([]), 22, day=14).status == "fail"  # 11-14 closed, nothing stamped
+    assert _evening_check(_QaTable(["2026-11-13"]), 22, day=14).status == "fail"  # 11-14 itself still missing
+    assert _evening_check(_QaTable(["2026-11-14"]), 8, day=15).status == "fail"  # 11-13 missing the next morning
+
+
+def test_dead_man_is_not_yet_due_inside_or_before_the_window():
+    assert _evening_check(_QaTable([]), 20, day=13).status == "ok"  # tonight's window still open, nothing earlier is armed
+    t = _QaTable([])
+    assert _evening_check(t, 12, day=13).status == "ok" and t.queries == 0
+    assert _evening_check(_QaTable([]), 22, day=12).status == "ok"  # grace day: first evening after deploy is unjudged
+
+
+def test_dead_man_ok_when_every_completed_evening_is_stamped_and_read_failure_warns():
+    assert _evening_check(_QaTable(["2026-11-13", "2026-11-14"]), 22, day=14).status == "ok"
+    assert _evening_check(_QaTable(boom=True), 22, day=14).status == "warn"
+
+
+def test_dead_man_prefix_matches_the_writer_and_is_wired_into_qa_smoke():
+    import inspect
+
+    from operational import nudge_ledger_qa as q, qa_smoke_lambda as qs
+
+    assert q.PROTEIN_EVENING_EVAL_PREFIX == runner.EVENING_EVAL_PREFIX
+    assert "check_protein_evening_liveness" in inspect.getsource(qs)
