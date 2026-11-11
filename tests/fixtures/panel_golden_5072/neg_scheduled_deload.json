@@ -355,6 +355,111 @@
       }
      },
      "status": "applied"
+    },
+    "rotation": {
+     "position": {
+      "block": 1,
+      "week": 4,
+      "week_in_block": 4,
+      "phase": 2,
+      "phases_per_block": 2,
+      "phase_weeks": [
+       4,
+       6
+      ],
+      "step": 1
+     },
+     "cadence": {
+      "anchors_fixed_weeks": 6,
+      "accessory_slots_rotate_every_weeks": 3
+     },
+     "volume_check": {
+      "unchanged": true
+     },
+     "slots": [
+      {
+       "slot_id": "upper_heavy.db_lateral_raise",
+       "incumbent": "db_lateral_raise",
+       "source": "computed",
+       "pool": [
+        "db_lateral_raise",
+        "lateral_raise_machine"
+       ],
+       "previous": "db_lateral_raise",
+       "variant": "lateral_raise_machine"
+      },
+      {
+       "slot_id": "upper_heavy.cable_tricep_pushdown",
+       "incumbent": "cable_tricep_pushdown",
+       "source": "computed",
+       "pool": [
+        "cable_tricep_pushdown",
+        "triceps_extension_cable",
+        "triceps_rope_pushdown",
+        "lying_db_tricep_extension",
+        "triceps_kickback_dumbbell"
+       ],
+       "previous": "cable_tricep_pushdown",
+       "variant": "triceps_extension_cable"
+      },
+      {
+       "slot_id": "upper_heavy.db_curl",
+       "incumbent": "db_curl",
+       "source": "computed",
+       "pool": [
+        "db_curl",
+        "hammer_curl_dumbbell",
+        "seated_incline_curl_dumbbell",
+        "preacher_curl_machine",
+        "spider_curl",
+        "bicep_curl_cable",
+        "bicep_curl_machine"
+       ],
+       "previous": "db_curl",
+       "variant": "hammer_curl_dumbbell"
+      },
+      {
+       "slot_id": "upper_heavy.reverse_pec_deck",
+       "incumbent": "reverse_pec_deck",
+       "source": "computed",
+       "pool": [
+        "reverse_pec_deck",
+        "face_pull",
+        "chest_supported_reverse_fly_dumbbell",
+        "db_rear_delt_rows"
+       ],
+       "previous": "reverse_pec_deck",
+       "variant": "face_pull"
+      }
+     ],
+     "family_floors": [
+      {
+       "family": "single_leg_progression",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "lower_heavy.leg_press",
+         "role": "lower_heavy",
+         "variant": "bulgarian_split_squat_dumbbell",
+         "title": "Bulgarian Split Squat (Dumbbell)"
+        }
+       ],
+       "gate": null
+      },
+      {
+       "family": "carries",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "shoulders_arms.farmers_walk",
+         "role": "shoulders_arms",
+         "variant": "farmers_walk",
+         "title": "Farmers Walk"
+        }
+       ],
+       "gate": null
+      }
+     ]
     }
    },
    "notes": "",
@@ -692,6 +797,90 @@
       }
      },
      "status": "applied"
+    },
+    "rotation": {
+     "position": {
+      "block": 1,
+      "week": 4,
+      "week_in_block": 4,
+      "phase": 2,
+      "phases_per_block": 2,
+      "phase_weeks": [
+       4,
+       6
+      ],
+      "step": 1
+     },
+     "cadence": {
+      "anchors_fixed_weeks": 6,
+      "accessory_slots_rotate_every_weeks": 3
+     },
+     "volume_check": {
+      "unchanged": true
+     },
+     "slots": [
+      {
+       "slot_id": "lower_heavy.leg_press",
+       "incumbent": "leg_press",
+       "source": "computed",
+       "pool": [
+        "bulgarian_split_squat_dumbbell"
+       ],
+       "previous": "bulgarian_split_squat_dumbbell",
+       "variant": "bulgarian_split_squat_dumbbell"
+      },
+      {
+       "slot_id": "lower_heavy.leg_curl",
+       "incumbent": "leg_curl",
+       "source": "computed",
+       "pool": [
+        "leg_curl",
+        "lying_leg_curl_machine"
+       ],
+       "previous": "leg_curl",
+       "variant": "lying_leg_curl_machine"
+      },
+      {
+       "slot_id": "lower_heavy.calf_raise_machine",
+       "incumbent": "calf_raise_machine",
+       "source": "computed",
+       "pool": [
+        "calf_raise_machine",
+        "standing_calf_raise_machine",
+        "seated_calf_raise"
+       ],
+       "previous": "calf_raise_machine",
+       "variant": "standing_calf_raise_machine"
+      }
+     ],
+     "family_floors": [
+      {
+       "family": "single_leg_progression",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "lower_heavy.leg_press",
+         "role": "lower_heavy",
+         "variant": "bulgarian_split_squat_dumbbell",
+         "title": "Bulgarian Split Squat (Dumbbell)"
+        }
+       ],
+       "gate": null
+      },
+      {
+       "family": "carries",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "shoulders_arms.farmers_walk",
+         "role": "shoulders_arms",
+         "variant": "farmers_walk",
+         "title": "Farmers Walk"
+        }
+       ],
+       "gate": null
+      }
+     ]
     }
    },
    "notes": "",
@@ -998,6 +1187,121 @@
       }
      },
      "status": "applied"
+    },
+    "rotation": {
+     "position": {
+      "block": 1,
+      "week": 4,
+      "week_in_block": 4,
+      "phase": 2,
+      "phases_per_block": 2,
+      "phase_weeks": [
+       4,
+       6
+      ],
+      "step": 1
+     },
+     "cadence": {
+      "anchors_fixed_weeks": 6,
+      "accessory_slots_rotate_every_weeks": 3
+     },
+     "volume_check": {
+      "unchanged": true
+     },
+     "slots": [
+      {
+       "slot_id": "shoulders_arms.db_lateral_raise",
+       "incumbent": "db_lateral_raise",
+       "source": "computed",
+       "pool": [
+        "db_lateral_raise",
+        "lateral_raise_machine"
+       ],
+       "previous": "db_lateral_raise",
+       "variant": "lateral_raise_machine"
+      },
+      {
+       "slot_id": "shoulders_arms.face_pull",
+       "incumbent": "face_pull",
+       "source": "computed",
+       "pool": [
+        "face_pull",
+        "reverse_pec_deck",
+        "db_rear_delt_rows",
+        "chest_supported_reverse_fly_dumbbell"
+       ],
+       "previous": "face_pull",
+       "variant": "reverse_pec_deck"
+      },
+      {
+       "slot_id": "shoulders_arms.db_curl",
+       "incumbent": "db_curl",
+       "source": "computed",
+       "pool": [
+        "db_curl",
+        "hammer_curl_dumbbell",
+        "seated_incline_curl_dumbbell",
+        "preacher_curl_machine",
+        "spider_curl",
+        "bicep_curl_cable",
+        "bicep_curl_machine"
+       ],
+       "previous": "db_curl",
+       "variant": "seated_incline_curl_dumbbell"
+      },
+      {
+       "slot_id": "shoulders_arms.cable_tricep_pushdown",
+       "incumbent": "cable_tricep_pushdown",
+       "source": "computed",
+       "pool": [
+        "cable_tricep_pushdown",
+        "triceps_extension_cable",
+        "triceps_rope_pushdown",
+        "lying_db_tricep_extension",
+        "triceps_kickback_dumbbell"
+       ],
+       "previous": "cable_tricep_pushdown",
+       "variant": "triceps_rope_pushdown"
+      },
+      {
+       "slot_id": "shoulders_arms.farmers_walk",
+       "incumbent": "farmers_walk",
+       "source": "pinned",
+       "pool": [
+        "farmers_walk"
+       ],
+       "previous": "farmers_walk",
+       "variant": "farmers_walk"
+      }
+     ],
+     "family_floors": [
+      {
+       "family": "single_leg_progression",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "lower_heavy.leg_press",
+         "role": "lower_heavy",
+         "variant": "bulgarian_split_squat_dumbbell",
+         "title": "Bulgarian Split Squat (Dumbbell)"
+        }
+       ],
+       "gate": null
+      },
+      {
+       "family": "carries",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "shoulders_arms.farmers_walk",
+         "role": "shoulders_arms",
+         "variant": "farmers_walk",
+         "title": "Farmers Walk"
+        }
+       ],
+       "gate": null
+      }
+     ]
     }
    },
    "notes": "Week 6: scheduled deload, sets -40%.",
@@ -1336,6 +1640,113 @@
       }
      },
      "status": "applied"
+    },
+    "rotation": {
+     "position": {
+      "block": 1,
+      "week": 4,
+      "week_in_block": 4,
+      "phase": 2,
+      "phases_per_block": 2,
+      "phase_weeks": [
+       4,
+       6
+      ],
+      "step": 1
+     },
+     "cadence": {
+      "anchors_fixed_weeks": 6,
+      "accessory_slots_rotate_every_weeks": 3
+     },
+     "volume_check": {
+      "unchanged": true
+     },
+     "slots": [
+      {
+       "slot_id": "upper_volume.face_pull",
+       "incumbent": "face_pull",
+       "source": "computed",
+       "pool": [
+        "face_pull",
+        "reverse_pec_deck",
+        "db_rear_delt_rows",
+        "chest_supported_reverse_fly_dumbbell"
+       ],
+       "previous": "face_pull",
+       "variant": "db_rear_delt_rows"
+      },
+      {
+       "slot_id": "upper_volume.cable_chest_fly",
+       "incumbent": "cable_chest_fly",
+       "source": "computed",
+       "pool": [
+        "cable_chest_fly",
+        "chest_fly_machine",
+        "butterfly_pec_deck",
+        "chest_fly_dumbbell"
+       ],
+       "previous": "cable_chest_fly",
+       "variant": "chest_fly_machine"
+      },
+      {
+       "slot_id": "upper_volume.cable_tricep_pushdown",
+       "incumbent": "cable_tricep_pushdown",
+       "source": "computed",
+       "pool": [
+        "cable_tricep_pushdown",
+        "triceps_extension_cable",
+        "triceps_rope_pushdown",
+        "lying_db_tricep_extension",
+        "triceps_kickback_dumbbell"
+       ],
+       "previous": "cable_tricep_pushdown",
+       "variant": "lying_db_tricep_extension"
+      },
+      {
+       "slot_id": "upper_volume.db_curl",
+       "incumbent": "db_curl",
+       "source": "computed",
+       "pool": [
+        "db_curl",
+        "hammer_curl_dumbbell",
+        "seated_incline_curl_dumbbell",
+        "preacher_curl_machine",
+        "spider_curl",
+        "bicep_curl_cable",
+        "bicep_curl_machine"
+       ],
+       "previous": "db_curl",
+       "variant": "preacher_curl_machine"
+      }
+     ],
+     "family_floors": [
+      {
+       "family": "single_leg_progression",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "lower_heavy.leg_press",
+         "role": "lower_heavy",
+         "variant": "bulgarian_split_squat_dumbbell",
+         "title": "Bulgarian Split Squat (Dumbbell)"
+        }
+       ],
+       "gate": null
+      },
+      {
+       "family": "carries",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "shoulders_arms.farmers_walk",
+         "role": "shoulders_arms",
+         "variant": "farmers_walk",
+         "title": "Farmers Walk"
+        }
+       ],
+       "gate": null
+      }
+     ]
     }
    },
    "notes": "",
@@ -1674,6 +2085,82 @@
       }
      },
      "status": "applied"
+    },
+    "rotation": {
+     "position": {
+      "block": 1,
+      "week": 4,
+      "week_in_block": 4,
+      "phase": 2,
+      "phases_per_block": 2,
+      "phase_weeks": [
+       4,
+       6
+      ],
+      "step": 1
+     },
+     "cadence": {
+      "anchors_fixed_weeks": 6,
+      "accessory_slots_rotate_every_weeks": 3
+     },
+     "volume_check": {
+      "unchanged": true
+     },
+     "slots": [
+      {
+       "slot_id": "lower_volume.calf_raise_machine",
+       "incumbent": "calf_raise_machine",
+       "source": "computed",
+       "pool": [
+        "calf_raise_machine",
+        "standing_calf_raise_machine",
+        "seated_calf_raise"
+       ],
+       "previous": "calf_raise_machine",
+       "variant": "seated_calf_raise"
+      },
+      {
+       "slot_id": "lower_volume.machine_crunch",
+       "incumbent": "machine_crunch",
+       "source": "computed",
+       "pool": [
+        "machine_crunch",
+        "side_bend_dumbbell",
+        "torso_rotation",
+        "cable_twist_up_to_down"
+       ],
+       "previous": "machine_crunch",
+       "variant": "side_bend_dumbbell"
+      }
+     ],
+     "family_floors": [
+      {
+       "family": "single_leg_progression",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "lower_heavy.leg_press",
+         "role": "lower_heavy",
+         "variant": "bulgarian_split_squat_dumbbell",
+         "title": "Bulgarian Split Squat (Dumbbell)"
+        }
+       ],
+       "gate": null
+      },
+      {
+       "family": "carries",
+       "met": true,
+       "served": [
+        {
+         "slot_id": "shoulders_arms.farmers_walk",
+         "role": "shoulders_arms",
+         "variant": "farmers_walk",
+         "title": "Farmers Walk"
+        }
+       ],
+       "gate": null
+      }
+     ]
     }
    },
    "notes": "",
