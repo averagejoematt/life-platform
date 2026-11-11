@@ -170,6 +170,7 @@ def read_hevy(block_end: str, lookback_days: int = 120) -> tuple[Any, list[dict[
 def cmd_volume_response(args: argparse.Namespace) -> int:
     from training import muscle_volume, volume_response
 
+    sys.path.insert(0, _ROOT)  # `mcp` lives at the repo root; read_hevy adds it too late for this import
     from mcp.strength_helpers import extract_hevy_sessions
 
     if os.path.abspath(args.out).startswith(_ROOT + os.sep):
