@@ -30,8 +30,8 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ROOM_ENV, roomScope, scopeRoutes } from "../src/lib/room.js";
-import { labEnabled } from "../src/lib/lab.js";
-import { storyEnabled } from "../src/lib/story_dark.js";
+import { LAB_ROUTES, labEnabled, labPrivate } from "../src/lib/lab.js";
+import { STORY_ROUTES, storyEnabled, storyPrivate } from "../src/lib/story_dark.js";
 
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(WWW, "dist");
@@ -49,8 +49,10 @@ const rawBase = process.env.WEB_BASE || "/";
 // build (the committed `room_public: "cr1"`, no WEB_ROOM) is an ordinary build: its pages are owned and counted.
 // A Laboratory build (WEB_LAB=1, src/lib/lab.js, L1) is private in the same way and held to the same rule.
 // A Human Story build (WEB_STORY=1, src/lib/story_dark.js, HS1) is private and local in exactly the same way.
-const lab = labEnabled();
-const story = storyEnabled();
+// Only a PRIVATE build (the env switch while the go-live constant is false) is held back; once LAB_LIVE / STORY_LIVE is
+// committed true the Lab / the story is ordinary build output and is owned, mapped and deployed like every page.
+const lab = labPrivate();
+const story = storyPrivate();
 const privateRoom = roomScope() !== "off" && ["1", "cr1"].includes(process.env[ROOM_ENV]);
 const room = privateRoom || lab || story;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
@@ -108,6 +110,20 @@ for (const abs of walk(PAGES)) {
   if (route.includes("[")) routePatterns.add(route.replace(/\[[^\]]+\]/g, "*"));
   else if (noExt === "404") files.add("404.html");
   else staticRoutes.add(route);
+}
+
+// A LIVE injected route (src/lib/lab.js, src/lib/story_dark.js) is not under src/pages/, so it is added here: a static
+// one to static_routes (qa/qa_manifest.py derives its sweep rows from them), a [param] one to route_patterns.
+for (const [on, list] of [
+  [labEnabled() && !lab, LAB_ROUTES],
+  [storyEnabled() && !story, STORY_ROUTES],
+]) {
+  if (!on) continue;
+  for (const r of list) {
+    const route = r.pattern.replace(/\/?$/, "/");
+    if (route.includes("[")) routePatterns.add(route.replace(/\[[^\]]+\]/g, "*"));
+    else staticRoutes.add(route);
+  }
 }
 
 // A PUBLISHED CR1 build (the committed `room_public: "cr1"`): the room's CR1 pages live outside src/pages/ and are

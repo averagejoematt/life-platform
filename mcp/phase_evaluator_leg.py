@@ -277,6 +277,39 @@ def transitions(table: Any, user_id: str = "matthew") -> list[dict[str, Any]]:
     return [_plain(i) for i in resp.get("Items") or []]
 
 
+# ── the read side (#5576): the coach packet's and plan_next_session's phase field ─────────────────────────────────────
+def phase_brief_field(table: Any = None) -> tuple[Optional[dict[str, Any]], dict[str, Any]]:
+    """(value, status) — the current phase, the next phase and the closest unmet gate with its value
+    (`training.phase_evaluator.phase_brief` over the STATE row + the newest EVAL row). `absent` when no STATE row is
+    stored yet (the first Monday run seeds it); a failed read is `read_failed` with its class, never "no phase"."""
+    from training.plan_engine import ABSENT, MEASURED, READ_FAILED, error_label, input_status
+
+    if table is None:
+        from mcp.config import table as _table
+
+        table = _table
+    try:
+        stored = read_state(table)
+        latest = latest_eval(table) if stored else None
+    except Exception as e:  # noqa: BLE001 — named on the field, never an empty phase
+        return None, input_status(READ_FAILED, error=error_label(e))
+    if stored is None:
+        return None, input_status(ABSENT, "no PHASE#STATE row yet — the first weekly phase evaluation (Monday's panel-grade run) seeds it")
+    stale = not latest or str(latest.get("phase")) != str(stored.get("stage"))
+    return pe.phase_brief(stored, latest, _charter_or_none() if stale else None), input_status(MEASURED)
+
+
+def _charter_or_none() -> Optional[dict[str, Any]]:
+    """The charter (phase order + titles, for a brief whose newest EVAL predates the current phase); None when unread."""
+    from training.training_charter import load_charter
+
+    try:
+        return load_charter()
+    except Exception as e:  # noqa: BLE001 — titles + order only; the brief still carries the stored phase
+        logger.warning("[phase_evaluator] charter unread for the phase brief (%s)", type(e).__name__)
+        return None
+
+
 # ── the weekly run ──────────────────────────────────────────────────────────────────────────────────────────────────
 def evaluate_week(week_end: Optional[str] = None, *, today: Optional[str] = None, table: Any = None) -> dict[str, Any]:
     """Evaluate the Monday-Sunday week ending `week_end` (default: the newest completed week) and store the rows."""

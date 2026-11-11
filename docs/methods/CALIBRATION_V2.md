@@ -1,11 +1,41 @@
 # Calibration v2 — three questions, three tests
 
+**Status: ADOPTED 2026-11-09** (owner ruling). Every page and API that shows or serves a calibration verdict uses it.
 **Owner requirement:** 2026-11-09 ("these are different questions and shouldn't share one arbitrary threshold").
 **Code:** `lambdas/experiment/calibration_v2.py` (pure; `assess`), served by `lambdas/web/site_api_calibration_v2.py`.
-It is a sibling of `calibration_core.py`, not an edit to it: v1, and its open-source and JS copies, stay byte-identical.
-**Served:** `/api/calibration` → `assessment_v2` (per coach and per platform stratum, this season). Dark: no page reads it,
-and no v1 field or label changes until the owner adopts it.
-**Status:** proposed, not adopted. The v1 labels (`calibration`, `label`) stay what the site shows.
+It is a sibling of `calibration_core.py`, not an edit to it. v1's Brier, skill and reliability numbers, and its
+open-source and JS copies, stay byte-identical. `site/assets/js/calibration-v2-core.js` is the browser port used by
+/method/grade-your-coach/; shared vectors hold it to the Python exactly.
+**Served:** `/api/calibration` → `assessment_v2` (per coach and per platform stratum, this season), with
+`status: "adopted"` and `adopted: "2026-11-09"`. The same coach answers are on `/api/coach_team` (each huddle entry)
+and the MCP track-record tool.
+**Shown on:** /method/calibration/, /method/grade-your-coach/, /method/registry/ (`calibration_v2_*`) and the Coaching
+Room build.
+
+## The owner's ruling (2026-11-09)
+
+> "I approve adopting the new calibration methodology. Preserve its three distinct questions: Can calibration be
+> estimated across confidence levels? Is there statistically supported overconfidence or underconfidence at an
+> observed confidence level? Does the coach outperform the same-call simple baseline? Keep the uncertainty ranges and
+> multiple-testing correction. Never equate failure to detect a problem with proof of good calibration. Nutrition's
+> result can be described as evidence of overconfidence for its 50%-confidence calls, but not as proof of poor
+> calibration across confidence levels. No coach currently demonstrates a reliable advantage over the baseline.
+> Update the public methodology accordingly. Do not modify thresholds to accommodate current coach outcomes."
+
+No constant changed at adoption. The words changed in one way: an over- or under-confidence finding now names the
+level it was found at (for example, "Over-confident at its 50% calls (12 of 43 came true, 95% CI 15%–44%; Holm-adjusted
+p 0.0108) — a finding about calls at that confidence level, not about calibration across confidence levels.").
+
+## Method history
+
+| Version | In use | What it was |
+|---|---|---|
+| calibration-v1 | until 2026-11-09 | One label per forecaster from a fixed ±0.15 mean-gap trip, a Brier-skill gate and a one-band withhold rule. |
+| calibration-v2 | from 2026-11-09 | The three questions below, each with its own test and interval. |
+
+The v1 fields (`calibration`, `label`, `score`) are still computed and served for API compatibility. They are listed as
+deprecated in `/api/calibration` → `calibration_method`, and no page renders them
+(`tests/test_calibration_v1_labels_retired.py` guards that).
 
 ## The calls it counts
 
@@ -44,7 +74,9 @@ depends on it.
   than the binomial with the same mean).
 - **Multiplicity:** Holm across the levels tested, family-wise **α = 0.05** per forecaster.
 - **Labels:** *over-confident* (calls came true less often than stated) when a level rejects in that direction;
-  *under-confident* the other way; *mixed* when levels reject both ways.
+  *under-confident* the other way; *mixed* when levels reject both ways. The words always name the level or levels
+  that rejected ("over-confident at its 50% calls"). A finding at one level is never a statement about calibration
+  across levels.
 - **No rejection:** "consistent with stated confidence (not established)". When no level was large enough to reject
   even at its most extreme possible result, the answer is "insufficient evidence" instead — the test could not have
   fired.
@@ -67,6 +99,16 @@ depends on it.
   below 0. Otherwise "no demonstrated advantage".
 - Strata with no baseline (hypotheses, interval forecasts) answer "no baseline for this stratum".
 
+### The CR1 verified sample, split by kind of call (owner ruling 2026-11-10)
+
+`/api/calibration` → `verification_summary.subgroups` (`web/verification_fields.py::subgroups`) asks question 3 of the
+verified headline sample only — the deduplicated forecasts the headline counts, never the eligible total — split by kind
+of call. It is published as a **secondary, exploratory** result, never as the headline. Each kind serves its counted
+calls, the same exact sign test as the headline, and three p-values: unadjusted (`p`), Bonferroni across the kinds tested
+(`p_adjusted`, the correction this method applies across records) and Bonferroni across every subgroup comparison served
+for the sample, the per-coach comparisons included (`p_adjusted_all`). All three are served so no one of them is chosen
+after the fact. The words never call the baseline the better forecaster.
+
 ## Caveats stated with every output
 
 - Calls that share a metric and a window are not independent, so every p-value and interval here is optimistic.
@@ -83,3 +125,18 @@ depends on it.
 
 Disclosure: the author had already seen v1 labels and per-coach call counts (from the v3 proposal's table) before step 2.
 No constant here is tied to a count, and none was revisited after step 4.
+
+## What the results said at the ruling (`/api/calibration`, 2026-11-09 04:10 UTC)
+
+These answers are a dated snapshot. They move whenever calls are graded or grades are corrected, so read the live
+answers on `/api/calibration` or /method/calibration/. After that night's grade corrections, Nutrition had 7 decided
+calls this season and read "insufficient evidence".
+
+- **Nutrition** was over-confident at its 50% calls: 12 of 43 came true (95% CI 15%–44%; Holm-adjusted p 0.0108). That
+  was evidence about its 50% calls only, not proof of poor calibration across confidence levels, which was not
+  estimable for any coach yet.
+- **Every other coach:** no level departed from its stated confidence ("consistent with stated confidence (not
+  established)"), or there are too few calls for the test to fire ("insufficient evidence"). Neither is proof of good
+  calibration.
+- **Skill:** no coach showed a demonstrated advantage over the same-call guess that nothing changes.
+- No constant was changed at adoption, and none will be changed to suit a coach's outcome.

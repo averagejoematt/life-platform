@@ -7,7 +7,7 @@
 import Base from "../layouts/Base.astro";
 import LabBanner from "../components/LabBanner.astro";
 import { dayInWords, num } from "../lib/format.js";
-import { LAB_MARKER, labEnabled } from "../lib/lab.js";
+import { LAB_MARKER, labEnabled, labPrivate } from "../lib/lab.js";
 import {
   conditionWords,
   daysBySide,
@@ -19,6 +19,7 @@ import {
   prose,
   ruleText,
   testDates,
+  testHasPage,
   testSentence,
   verdictOf,
   windowChart,
@@ -30,10 +31,10 @@ import { href, pathOf } from "../lib/url.js";
 export async function getStaticPaths() {
   if (!labEnabled()) return [];
   const lab = await loadLab();
-  return (lab.lab_tests || []).map((t: any) => ({ params: { id: t.id }, props: { t } }));
+  return (lab.lab_tests || []).filter(testHasPage).map((t: any) => ({ params: { id: t.id }, props: { t } }));
 }
 
-if (!labEnabled()) throw new Error("src/lab/lab-test.astro rendered with WEB_LAB off — the Lab route must not be injected");
+if (!labEnabled()) throw new Error("src/lab/lab-test.astro rendered with the Lab switched off — the Lab route must not be injected");
 
 const { t } = Astro.props as any;
 const lab = await loadLab();
@@ -56,11 +57,12 @@ const mark = { [LAB_MARKER]: "test" };
 const unit = metricUnit(spec.condition_metric);
 const payload = (o: any) => JSON.stringify(o ? { ...o, labelDay: undefined } : null);
 const sideWords: Record<string, string> = { test: "on the test side of the line", other: "on the other side" };
+const unseen = [!t.outcome_series && spec.outcome_metric ? metricWords(spec.outcome_metric) : null, !t.condition_series && spec.condition_metric ? metricWords(spec.condition_metric) : null].filter(Boolean) as string[];
 const dataThrough = outcome && outcome.window ? outcome.window.to : condition && condition.window ? condition.window.to : null;
 ---
 
 <Base title="A pre-registered test" top="data" description={testSentence(t)} status={asOf}>
-  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <Fragment slot="head">{!noindex && labPrivate() && <meta name="robots" content="noindex, nofollow" />}</Fragment>
   <LabBanner />
   <section class="section" {...mark} style="padding-bottom:20px">
     <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
@@ -111,6 +113,8 @@ const dataThrough = outcome && outcome.window ? outcome.window.to : condition &&
     </div>
   </section>
 
+  {/* 2026-11-09: a figure whose series the snapshot does not carry is folded into one line (after the result), never an empty box */}
+  {t.outcome_series && (
   <section class="section" style="padding-top:8px">
     <div class="wrap" style="max-width:1100px">
       <p class="label" style="margin-bottom:6px">Baseline → window · {metricWords(spec.outcome_metric)}</p>
@@ -140,6 +144,7 @@ const dataThrough = outcome && outcome.window ? outcome.window.to : condition &&
       </p>
     </div>
   </section>
+  )}
 
   <section class="section" style="padding-top:8px">
     <div class="wrap" style="max-width:1100px">
@@ -163,9 +168,19 @@ const dataThrough = outcome && outcome.window ? outcome.window.to : condition &&
         <div><span>Paired days observed</span><span class="mono">{t.days_observed != null ? num(t.days_observed) : "—"}</span></div>
         <div><span>Last checked</span><span class="mono">{t.last_checked ? dayInWords(t.last_checked) : "not yet"}</span></div>
       </div>
+      {
+        unseen.length > 0 && (
+          <p class="muted" style="font-size:14px;margin-top:14px;max-width:70ch">
+            The {unseen.join(" and the ")} readings are not in the site's published series yet, so this test is told in words and numbers only; its
+            day-by-day {unseen.length > 1 ? "figures appear" : "figure appears"} once the series {unseen.length > 1 ? "are" : "is"} published.
+          </p>
+        )
+      }
+      {!t.condition_series && <p style="margin-top:22px"><a class="btn ghost sm" href={href("/data/lab/")}>Back to the Laboratory</a></p>}
     </div>
   </section>
 
+  {t.condition_series && (
   <section class="section" style="padding-top:8px">
     <div class="wrap" style="max-width:1100px">
       <details open>
@@ -228,6 +243,7 @@ const dataThrough = outcome && outcome.window ? outcome.window.to : condition &&
       <p style="margin-top:22px"><a class="btn ghost sm" href={href("/data/lab/")}>Back to the Laboratory</a></p>
     </div>
   </section>
+  )}
 </Base>
 
 <script>

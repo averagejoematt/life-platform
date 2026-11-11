@@ -37,7 +37,16 @@
         "paused": "I'm going quiet for now — the AI budget's sitting at tier {tier}, so texting is paused while your brief and the site keep running undisturbed. Think of it as a rest phase, not a vanishing act.",
         "capped": "{cap} texts is tonight's full cycle — I stop here so tomorrow's brief isn't what pays for it. Back with you in the morning."
       },
-      "reader_register": "hours and bedtimes in words; no stage percentage without its night"
+      "reader_register": "hours and bedtimes in words; no stage percentage without its night",
+      "public_brief_metrics": [
+        "sleep_duration_hours",
+        "sleep_score",
+        "deep_pct",
+        "rem_pct",
+        "hrv",
+        "resting_heart_rate",
+        "recovery_score"
+      ]
     },
     "training_coach": {
       "name": "Sarah Chen",
@@ -81,7 +90,12 @@
         "paused": "Budget guard's at tier {tier}, so I'm not texting right now — nothing personal, just protecting the numbers that actually matter, your daily brief and the site. Log what you're logging; I'll be back.",
         "capped": "That's {cap} messages today — my cutoff, same as any budget: spend it deliberately, not to zero. Pick this back up tomorrow."
       },
-      "reader_register": "kitchen words — meals, grams, calories, days logged; verdict first, then the number with its day"
+      "reader_register": "kitchen words — meals, grams, calories, days logged; verdict first, then the number with its day",
+      "public_brief_metrics": [
+        "total_calories_kcal",
+        "total_protein_g",
+        "weight_lbs"
+      ]
     },
     "mind_coach": {
       "name": "Nathan Reeves",
@@ -131,7 +145,13 @@
         "paused": "Budget's at tier {tier}, so I'm off the clock for texting — the brief and the site are the priority load right now, not this chat. I'll be back when it clears.",
         "capped": "{cap} reps and I'm racked for the day — that's the daily cap, not me ducking you. Same time tomorrow."
       },
-      "reader_register": "sessions, steps, pounds; never a ratio"
+      "reader_register": "sessions, steps, pounds; never a ratio",
+      "public_brief_metrics": [
+        "steps",
+        "weight_lbs",
+        "resting_heart_rate",
+        "hrv"
+      ]
     },
     "glucose_coach": {
       "name": "Amara Patel",
@@ -152,7 +172,12 @@
       "title": "Metabolic Health & CGM",
       "lens": "glucose response, meal timing, metabolic flexibility",
       "pronouns": "she/her",
-      "reader_register": "blood sugar, meals, times of day"
+      "reader_register": "blood sugar, meals, times of day",
+      "public_brief_metrics": [
+        "blood_glucose_avg",
+        "blood_glucose_std_dev",
+        "total_calories_kcal"
+      ]
     },
     "labs_coach": {
       "name": "James Okafor",

@@ -1295,6 +1295,18 @@ def api_dep_endpoints():
 # All expectations below were MEASURED against live 2026-08-22 before this
 # sweep was allowed to gate (the 2026-07-17 lesson: never arm an unmeasured
 # widened gate).
+def _coach_brief_live():
+    """common.public_brief_policy.PUBLICATION_LIVE, read as text (the module imports the Lambda tree); unreadable = dark."""
+    try:
+        with open(os.path.join(_REPO, "lambdas", "common", "public_brief_policy.py"), encoding="utf-8") as fh:
+            src = fh.read()
+    except OSError:
+        return False
+    import re  # noqa: E402
+
+    return re.search(r"^PUBLICATION_LIVE = True\s*$", src, re.M) is not None
+
+
 _API_SWEEP_OVERRIDES = {
     "/api/coach/": {
         "fetch": "/api/coach/eli_marsh",
@@ -1331,6 +1343,12 @@ _API_SWEEP_OVERRIDES = {
     "/api/social_context": {
         "expect": "400",
         "reason": "param-gated (?route= in {mind, training} required): the validator's structured 400 is " "the alive signal.",
+    },
+    "/api/coach_brief": {
+        "expect": "200" if _coach_brief_live() else "404",
+        "reason": "dark until common.public_brief_policy.PUBLICATION_LIVE (owner ruling 2026-11-09 E): every coach "
+        "answers 404 while the switch is off (measured live 2026-11-09, bare and ?coach=sleep_coach); the "
+        "expectation follows the committed switch, so the launch flips it with no edit here.",
     },
     "/api/verify_subscriber": {
         "expect": "400",

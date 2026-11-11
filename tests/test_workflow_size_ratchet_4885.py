@@ -20,7 +20,7 @@ _WF = _REPO / ".github" / "workflows"
 # read as a gate registry by the census.
 WORKFLOW_SIZE_COUNTS: dict = {
     "ci-cd.yml": (1732, 744),  # #5316: the rollback loop moved to deploy/rollback_fleet.sh
-    "ci-lint.yml": (436, 148),  # #5473: the pip-audit allowlist parse moved to scripts/check_pip_audit.py
+    "ci-lint.yml": (395, 108),  # #5723: the SBOM step's shell moved to deploy/generate_sbom.sh (was 436/148 after #5473)
     "ci-test.yml": (439, 124),
     "citation-network-check.yml": (
         104,

@@ -68,6 +68,11 @@ RULE_ID = "nothing_changes"
 RULE_VERSION = 1
 RULE_WORDS = "a guess that nothing changes"
 
+#: Owner ruling 2026-11-09 (third, A): a frozen verdict re-scored under the current rule is an OVERLAY — the row keeps
+#: ``baseline`` exactly as frozen, and ``baseline_corrections[]`` (written only by
+#: ``grade_corrections.apply_baseline_correction``) records each re-score with its reason, ruleset and instant.
+CORRECTIONS_ATTR = "baseline_corrections"
+
 #: Never a percentage — and never a "better" — on fewer than this many scored calls.
 MIN_N_FOR_RATE = 20
 #: The sign test's two-sided threshold for "did better".
@@ -320,7 +325,45 @@ def write_stamp(table, pk: str, sk: str, baseline: dict | None, *, only_if_absen
         return False
 
 
+# ── the effective verdict (frozen stamp + recorded corrections) ─────────────────────────
+
+
+def baseline_corrections(row: dict) -> list[dict]:
+    """The recorded re-scores of the frozen verdict, oldest first (a malformed entry is skipped)."""
+    raw = (row or {}).get(CORRECTIONS_ATTR)
+    return [e for e in raw or [] if isinstance(e, dict) and isinstance(e.get("corrected_baseline"), dict)] if isinstance(raw, list) else []
+
+
+def effective(row: dict) -> Any:
+    """The verdict every served comparison reads: the LATEST recorded correction's ``corrected_baseline``, else the
+    frozen ``baseline`` as stamped at grading. The frozen stamp itself is never rewritten (owner 2026-11-09, A)."""
+    corr = baseline_corrections(row)
+    return corr[-1]["corrected_baseline"] if corr else (row or {}).get("baseline")
+
+
 # ── the served comparison ────────────────────────────────────────────────────────────────
+
+
+def paired_records(rows: Iterable[dict]) -> dict:
+    """Per record, ``{"pairs": [(coach right, rule right), ...], "unscorable": n, "not_yet_scored": n}`` over graded
+    ``rows`` — calibration-v2's skill input (``experiment.calibration_v2.skill_vs_baseline``). The same split as
+    ``comparison_block``: a call the rule has no stamp for is not yet scored, a stamp without a verdict is unscorable,
+    and the effective verdict is read (a recorded re-score overlays the frozen stamp, owner ruling 2026-11-09 A)."""
+    out: dict = {}
+    for row in rows or []:
+        status = coach_record.graded_status(row)
+        key = record_of(row) if status else None
+        if key is None:
+            continue
+        rec = out.setdefault(key, {"pairs": [], "unscorable": 0, "not_yet_scored": 0})
+        bl = effective(row)
+        if not isinstance(bl, dict) or bl.get("rule") != RULE_ID:
+            rec["not_yet_scored"] += 1
+        elif bl.get("right") is None:
+            rec["unscorable"] += 1
+        else:
+            rec["pairs"].append((status == "confirmed", bool(bl["right"])))
+    return out
 
 
 def _empty_record() -> dict:
@@ -387,8 +430,8 @@ def skill_sentence(n: int, skill: float | None) -> str:
     calls = "checked call" if n == 1 else "checked calls"
     if n < MIN_N_FOR_RATE or skill is None:
         return f"Too few checked calls yet ({n}) to compare them with a simple guess."
-    if skill > 0:
-        return f"Across {n} {calls}, so far they beat a simple guess."
+    # Owner 2026-11-09 (calibration v2): a positive point estimate is not a demonstrated advantage — no win is
+    # claimed on this untested score, whichever side of zero it falls.
     return f"Across {n} {calls}, so far they do not beat a simple guess."
 
 
@@ -407,7 +450,7 @@ def comparison_block(decided: Iterable[dict]) -> dict:
         coach_right = coach_record.graded_status(row) == "confirmed"
         rec["graded"] += 1
         rec["coach_right"] += coach_right
-        bl = row.get("baseline")
+        bl = effective(row)
         if not isinstance(bl, dict) or bl.get("rule") != RULE_ID:
             rec["not_yet_scored"] += 1
             continue

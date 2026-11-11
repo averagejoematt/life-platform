@@ -46,6 +46,7 @@ from common.pacific_time import pacific_today  # #2798: workout DATE# keys name 
 # signals are unchanged by it.
 from training.cardio_note import performed_shape  # noqa: F401
 from training.pinned_setup import is_setup_only, split_setup  # #5010: owner-marked setup lines
+from training.training_notes_deviation import compute_deviation  # noqa: F401 — moved out for the #1665 ceiling (#5573)
 
 # The head-key scheme lives in ONE module (#3918) and is re-exported here, so every
 # existing `training_notes.<helper>` caller — and every monkeypatch of one — is unchanged.
@@ -65,6 +66,7 @@ from training.training_notes_keys import (  # noqa: F401
     workout_id_from_uid,
     workout_id_of_raw_row,
 )
+from training.training_notes_requests import OWNER_REQUEST_SUBTYPES, owner_request_of  # noqa: F401 — #5573, spec §5d
 from training.wrist_clock import walk_signal  # #5374 box 3 / #5428: his treadmill speed / incline shorthand
 
 # pk SOURCE partition is `training_notes`; the projection's `source` label is the
@@ -72,7 +74,7 @@ from training.wrist_clock import walk_signal  # #5374 box 3 / #5428: his treadmi
 NOTES_SOURCE = "training_notes"
 SOURCE_LABEL = "training_feedback_loop"
 RAW_SOURCE = "hevy"  # never written — provenance guard target
-ALGO_VERSION = "note-extractor@1.1.0"  # 1.1.0 = per-block merge + calibration + readiness join (#3817)
+ALGO_VERSION = "note-extractor@1.2.0"  # 1.1.0 = per-block merge + calibration + readiness join (#3817); 1.2.0 = owner_request (#5573)
 
 # ── Frozen taxonomy (Phase 0 lock, brief §5) ──
 # AMENDED 2026-09-19 (#3817): `calibration` joins the lock. The amendment is dated and
@@ -95,6 +97,7 @@ TAXONOMY = frozenset(
         "deviation",
         "rest_adherence",
         "calibration",
+        "owner_request",  # AMENDED 2026-11-08 (#5573, spec §5d): he ASKED for something — the one class that expects a reply
     }
 )
 
@@ -568,6 +571,8 @@ def deterministic_pass(note_text: str, date=None, user: str = "matthew") -> list
     if any(k in t for k in _LOGGING_QUIRK_KW):
         out.append(_signal("logging_quirk", "how the metric was logged", 0.8, None))
 
+    if req := owner_request_of(note_text):  # owner_request (#5573) — `training.note_requests` raises the row
+        out.append(_signal("owner_request", "the owner asks the platform for something", 0.85, req))
     return out
 
 
@@ -834,44 +839,6 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
         )
         + (f" {mismatches} (workout, template) group(s) have fewer note records than noted occurrences." if mismatches else ""),
     }
-
-
-def compute_deviation(pushed_exercises, performed_exercises) -> dict:
-    """Pure diff of the pushed routine vs the performed workout (brief §14.1). No LLM.
-
-    Returns {by_template: {tid: deviation_signal}, added: [...], removed: [...]} — a
-    durable preference/capacity signal (consistently adds a 4th set, swaps DB→barbell).
-    Keyed by template_id so it folds into the exercise-keyed projection.
-    """
-
-    def _index(exs):
-        out = {}
-        for e in exs or []:
-            tid = str(e.get("template_id") or e.get("movement_key") or "")
-            if not tid:
-                continue
-            sets = e.get("sets") or []
-            out[tid] = {"name": e.get("name") or e.get("title") or "", "set_count": len(sets)}
-        return out
-
-    pushed, performed = _index(pushed_exercises), _index(performed_exercises)
-    by_template, added, removed = {}, [], []
-    for tid, p in performed.items():
-        if tid not in pushed:
-            added.append({"template_id": tid, "name": p["name"]})
-            continue
-        sd = p["set_count"] - pushed[tid]["set_count"]
-        if sd:
-            by_template[tid] = {
-                "class": "deviation",
-                "summary": f"performed {p['set_count']} sets vs {pushed[tid]['set_count']} prescribed",
-                "confidence": 1.0,
-                "value": {"set_delta": sd},
-            }
-    for tid, p in pushed.items():
-        if tid not in performed:
-            removed.append({"template_id": tid, "name": p["name"]})
-    return {"by_template": by_template, "added": added, "removed": removed}
 
 
 def _is_historical_pain_note(note_date, today: str | None = None) -> bool:

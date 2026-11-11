@@ -32,6 +32,9 @@ THE DEFINITIONS (each stated once, here, and imported by every critic and tool)
     de-dup   in TIME, across devices and against Hevy sessions (`walking_volume.dedup_strava`).
     gaps     a WHOOP walk workout or a completed walk habit with no counted walk is REPORTED
              (`completeness.gaps`) and makes the total a floor — a signal, never hours.
+    owner    a WALK_CORRECTION# row (the owner's own measurement, #5669) counts as a labelled walk
+             (`owner_correction`) on a day with no counted walk and resolves that day's gap; on a
+             day that already holds a counted walk it is a reported conflict, never added.
     A longer window (get_benchmark's 28-day chronic read, which its bands are measured in) is
     the SAME definition over more days, divided by weeks — never a different source set.
 
@@ -124,6 +127,34 @@ def _read_apple(read: Callable[[str, str, str], list[dict[str, Any]]] | None, st
         return None
 
 
+def _read_signals(
+    read: Callable[[str, str, str], list[dict[str, Any]]] | None, start: str, end: str
+) -> dict[str, list[dict[str, Any]] | None]:
+    """The walk-signal rows `walking_volume.completeness` reads (#5669): WHOOP one UTC day past `end`
+    (its workout rows are keyed by the UTC day of the start, so the window's last Pacific evening sits
+    one key later — `completeness` keeps only Pacific-dated walks inside the window), Habitify over the
+    window. A read that RAISES is None — the check says it could not read that source."""
+    out: dict[str, list[dict[str, Any]] | None] = {}
+    for source, past in walking_volume.COMPLETENESS_READ_PAST_END_DAYS.items():
+        try:
+            out[source] = (read or _core.query_source_range)(source, start, shift_day_key(end, past))
+        except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
+            out[source] = None
+    out[walking_volume.CORRECTION_INPUT] = _read_corrections(start, end)  # #5669: the owner's walk corrections
+    return out
+
+
+def _read_corrections(start: str, end: str) -> list[dict[str, Any]] | None:
+    """The owner's WALK_CORRECTION# rows dated in [start, end] (#5669) — his owner-only partition, keyed by
+    the Pacific day, so no read past the window. Not the injected `read`: that one reads `DATE#` rows, and
+    a correction is not a dated vendor row. A read that RAISES is None — the layer says it could not read
+    the corrections, and a corrected day keeps its gap."""
+    try:
+        return walking_volume.query_corrections(_core.table, start, end)
+    except Exception:  # noqa: BLE001 — unreadable is reported by the layer, never raised past it
+        return None
+
+
 def completed_end(day: str, today: str | None = None) -> str:
     """The last COMPLETED Pacific day on or before `day`: min(day, today - 1).
 
@@ -170,7 +201,7 @@ def walking_layer(
         strava_items=_read("strava"),
         hevy_workouts=_read("hevy"),
         apple_items=_read_apple(read, start, end),  # #5369: the watch backstop
-        completeness_inputs={"whoop": _read("whoop"), "habitify": _read("habitify")},
+        completeness_inputs=_read_signals(read, start, end),
     )
     layer["window"] = {"start": start, "end": end, "days": days}
     total = layer.get("total_hr")
@@ -215,7 +246,7 @@ def walking_layer_for_day(
         strava_items=_read("strava"),
         hevy_workouts=_read("hevy"),
         apple_items=_read_apple(read, day, day) if with_apple else walking_volume.NOT_WIRED,
-        completeness_inputs={"whoop": _read("whoop"), "habitify": _read("habitify")},
+        completeness_inputs=_read_signals(read, day, day),
     )
     layer["window"] = {"start": day, "end": day, "days": 1}
     layer["hr_wk"] = None
@@ -237,7 +268,9 @@ def recent_aerobic_layer(
     weekly walking definition's sources and time de-dup (`training.walking_volume`), read over
     `training.recent_aerobic.READ_DAYS` through target − 1 (today included) and shaped by
     `training.recent_aerobic.build`. None only for an unparseable day key; a partition read
-    that RAISES reaches the block as None — unreadable, never zero hours."""
+    that RAISES reaches the block as None — unreadable, never zero hours. WHOOP + Habitify rows feed
+    the walk-signal check (#5669), the weekly layer's: a signalled walk no source counted is named and
+    floors the totals, never counted as hours."""
     from common.pacific_time import parse_day_key
     from training import recent_aerobic
 
@@ -257,6 +290,7 @@ def recent_aerobic_layer(
         strava_items=_read("strava"),
         hevy_workouts=_read("hevy"),
         apple_items=_read_apple(read, w["start"], w["end"]),  # #5369: the watch backstop
+        completeness_inputs=_read_signals(read, w["start"], w["end"]),  # #5669: the walk-signal check
     )
     block["definition"] = (
         SHARED_QUANTITIES_VERSION + ": the weekly walking sources and de-dup, per activity (see mcp/shared_quantities.py, #4387)"
@@ -275,9 +309,16 @@ def z2_minutes_7d(
 
 
 def weekly_walking_hours(end_day: str, *, today: str | None = None) -> float | None:
-    """Hours in the 7 completed days ending `completed_end(end_day)`. None = unknown."""
+    """Hours in the 7 completed days ending `completed_end(end_day)`. None = unknown.
+
+    A bare number carries no floor flag, so a week whose walk-signal check named a gap (#5669) — a
+    WHOOP walk or a completed walk habit no source counted — is None here: its total is a floor that
+    a week-over-week comparison would read as a collapse (the 2026-10-16..22 week read 7.95 h with
+    10-20's walk missing). Callers that can carry the floor read `walking_layer` instead."""
     layer = walking_layer(end_day, today=today)
-    return None if not layer else layer.get("total_hr")
+    if not layer or (layer.get("completeness") or {}).get("gaps"):
+        return None
+    return layer.get("total_hr")
 
 
 # ── loss rate ────────────────────────────────────────────────────────────────────────

@@ -37,6 +37,15 @@ Strava, then Apple (`walking_volume.dedup_sources`) — so a walk only the watch
 walk it also uploaded is one row. An Apple row carries the modality, minutes and start only: its
 heart rate, distance and device stay in the owner-only map (the walk's HR flag reads unknown).
 
+THE WALK-SIGNAL CHECK (#5669): on 2026-10-20 a WHOOP walk reached Strava, was ingested, then left
+Strava's list; the #4638 reconciler tombstoned the day and this block read it as a day with no
+walk — no floor, no honesty line. A caller may hand in WHOOP + Habitify rows (`completeness_inputs`);
+`walking_volume.completeness` — the weekly layer's own check, not a second rule — names any WHOOP
+walking workout no counted walk or Hevy cardio session overlaps, and any completed walk habit on a
+day with no counted walking. A gap is a SIGNAL, never hours: it turns the totals into a floor, and
+every reader below that turns a total into a decision treats a window holding a gap as unknown in
+the direction the missing walk could flip (`aerobic_minutes_7d`, `legs_loaded`, `weekly_reports`).
+
 It is PURE: the partitions are read by `mcp.shared_quantities.recent_aerobic_layer`, the one
 module that owns the walking definition, and handed in. `None` for a source means it could not
 be read — never zero hours.
@@ -51,7 +60,9 @@ from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
 
 from training import cardio_hr, owner_redlines, walking_volume
 
-RECENT_AEROBIC_VERSION = "recent-aerobic@1.1.0"  # 1.1.0 (#5369): the watch's own walks/rides as a third source
+# 1.1.0 (#5369): the watch's own walks/rides as a third source; 1.2.0 (#5669): the walk-signal completeness check;
+# 1.3.0 (#5669): the owner's walk corrections, labelled `owner_correction`
+RECENT_AEROBIC_VERSION = "recent-aerobic@1.3.0"
 
 RECENT_DAYS = 3  # the rows: target − 3 .. target − 1 (tonight's plan sees today)
 READ_DAYS = 14  # the partition read: covers the prior Mon–Sun week and the trailing-7 comparison
@@ -158,6 +169,20 @@ def _apple_rows(items: Any, start: str, end: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _correction_row(c: dict[str, Any]) -> dict[str, Any]:
+    """A COUNTED owner correction (#5669) as a block row: an outdoor walk with his minutes; no start, HR, distance or
+    device — he measured the duration, nothing else. `method` labels it wherever the row surfaces."""
+    return {
+        **c,
+        "modality": "walk",
+        "seconds_as_recorded": c["seconds"],
+        "distance_mi": None,
+        "elevation_ft": None,
+        "avg_hr": None,
+        "max_hr": None,
+    }
+
+
 def _block_hr(w: dict[str, Any], idx: int, activities: list[dict[str, Any]]) -> dict[str, Any] | None:
     """The block's OWN heart rate (#4412): the stored `cardio_hr` join when it is joined, else the same
     pure join over the Strava activities in hand (the stored copy may predate the wearable's arrival)."""
@@ -235,6 +260,7 @@ def standalone_walks(
     start: str,
     end: str,
     apple_raw: list[dict[str, Any]] | None = None,
+    correction_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The OD7 walk count over [start, end]: Strava walks — and, wired, the watch's own walks (#5369),
     last — whose de-duplicated minutes OUTSIDE every gym window reach the redline's `min_minutes`.
@@ -251,21 +277,36 @@ def standalone_walks(
     min_s = float(_STANDALONE["min_minutes"]) * 60.0
     timed = [r for r in kept if r.get("start") is not None and r.get("end") is not None]
     counted = sorted((r for r in timed if r["seconds"] >= min_s), key=lambda r: r["start"])
+    walks = [
+        {
+            "date": r["date"],
+            "weekday": pacific_weekday(r["date"]),  # #5274: standalone_walks.*.walks[]
+            "start_utc": r["start"].isoformat(),
+            "minutes_outside_gym": round(r["seconds"] / 60.0, 1),
+            "device": r.get("device"),
+        }
+        for r in counted
+    ]
+    # #5669: a COUNTED owner correction is an outdoor walk by its kind — outside every gym window by definition,
+    # untimed by nature. It counts when its minutes reach min_minutes, labelled, never as a device's walk.
+    for c in correction_rows or []:
+        if c["modality"] == "walk" and start <= c["date"] <= end and c["seconds"] >= min_s:
+            walks.append(
+                {
+                    "date": c["date"],
+                    "weekday": pacific_weekday(c["date"]),
+                    "start_utc": None,
+                    "minutes_outside_gym": round(c["seconds"] / 60.0, 1),
+                    "device": None,
+                    "method": walking_volume.CORRECTION_METHOD,
+                }
+            )
     return {
         "start": start,
         "end": end,
-        "count": len(counted),
+        "count": len(walks),
         "untimed": len(kept) - len(timed),
-        "walks": [
-            {
-                "date": r["date"],
-                "weekday": pacific_weekday(r["date"]),  # #5274: standalone_walks.*.walks[]
-                "start_utc": r["start"].isoformat(),
-                "minutes_outside_gym": round(r["seconds"] / 60.0, 1),
-                "device": r.get("device"),
-            }
-            for r in counted
-        ],
+        "walks": walks,
     }
 
 
@@ -293,6 +334,8 @@ def _public_row(r: dict[str, Any]) -> dict[str, Any]:
     }
     if r.get("hr_source"):
         out["hr_source"] = r["hr_source"]
+    if r.get("method"):  # #5669: an owner correction says so on every row it rides
+        out["method"] = r["method"]
     if r["source"] == "hevy":  # #4412: the join's verdict rides every Hevy row — joined or unknown, never a silent 0
         out["hr_state"], out["hr_coverage"] = r.get("hr_state"), r.get("hr_coverage")
     if r.get("seconds_removed"):
@@ -322,13 +365,17 @@ def build(
     strava_items: list[dict[str, Any]] | None,
     hevy_workouts: list[dict[str, Any]] | None,
     apple_items: Any = walking_volume.NOT_WIRED,
+    completeness_inputs: dict[str, list[dict[str, Any]] | None] | None = None,
 ) -> dict[str, Any]:
     """The `constraint_block.recent_aerobic` block for a plan on `target_date`. Pure.
 
     `today` is the Pacific day the plan is made: when it is target − 1 (the nightly pre-draft,
     the evening chat) today's activities are IN, and the block says the day is still in progress.
     `apple_items` (#5369): the apple_health day rows over the read (one UTC day past it); a failed
-    Apple read (None) makes the totals a floor, as any unreadable source does."""
+    Apple read (None) makes the totals a floor, as any unreadable source does.
+    `completeness_inputs` (#5669): WHOOP + Habitify rows over the read — `walking_volume.completeness`
+    over the whole read window; a gap makes the totals a floor and is named under `completeness.gaps`.
+    None (the default) is a caller that did not ask: `completeness.status == "not_checked"`."""
     w = window(target_date)
     end = w["end"]
     wired = apple_items is not walking_volume.NOT_WIRED
@@ -343,11 +390,16 @@ def build(
         s_kept, a_kept, dedup = walking_volume.dedup_sources(s_raw, a_raw, hevy_iv)
     for r in s_kept + a_kept:  # the de-dup copies each row it keeps, with `seconds` cut to the unclaimed part
         r["seconds_removed"] = max(0.0, r["seconds_as_recorded"] - r["seconds"])
-    rows = sorted((_public_row(r) for r in s_kept + a_kept + h_rows), key=lambda r: (r["date"], r["start_utc"] or ""))
     sources: tuple[tuple[str, Any], ...] = (("strava", strava_items), ("hevy", hevy_workouts))
     if wired:
         sources += (("apple_health", apple_items),)
     unreadable = [n for n, v in sources if v is None]
+    # #5669: the owner's corrections — the weekly layer's rule (`walking_volume.apply_corrections`), never a second one
+    signal_inputs, correction_rows = walking_volume._split_inputs(completeness_inputs)
+    as_counted = [{**r, "modality": "walking" if r["modality"] in WEIGHT_BEARING else "cycling"} for r in s_kept + a_kept + h_rows]
+    corr = walking_volume.apply_corrections(correction_rows, w["start"], end, as_counted, not unreadable)
+    c_rows = [_correction_row(c) for c in corr["applied"]]
+    rows = sorted((_public_row(r) for r in s_kept + a_kept + h_rows + c_rows), key=lambda r: (r["date"], r["start_utc"] or ""))
     wtd_start = _monday(end)
     prior_start, prior_end = shift_day_key(wtd_start, -7), shift_day_key(wtd_start, -1)
     wtd = _sum_hr(rows, wtd_start, end)
@@ -359,12 +411,20 @@ def build(
     recent = [r for r in rows if r["date"] >= w["recent_start"]]
     h48_start = shift_day_key(end, -1)
     over_75_48h = [r for r in recent if r["date"] >= h48_start and r["flags"]["over_75_min"]]
+    complete = walking_volume.resolve_gaps(
+        walking_volume.completeness(
+            window_start=w["start"], window_end=end, counted=as_counted, hevy_intervals=hevy_iv, inputs=signal_inputs
+        ),
+        corr,
+    )
     in_progress = end >= today
     honesty = [f"{n} could not be read — every total below is a FLOOR, never zero hours for {n}" for n in unreadable]
     if in_progress:
         honesty.append(f"{end} is still in progress — its rows are the activities completed so far")
     if dedup["untimed"]:
         honesty.append(f"{dedup['untimed']} Strava activit{'y' if dedup['untimed'] == 1 else 'ies'} carried no timestamp — counted whole")
+    honesty.extend(walking_volume.completeness_honesty(complete))
+    honesty.extend(walking_volume.correction_honesty(corr))
     return {
         "layer": "recent_aerobic",
         "version": RECENT_AEROBIC_VERSION,
@@ -396,12 +456,14 @@ def build(
                     "a Strava walk (or the watch's own walk, when the apple rows were read — #5369) whose de-duplicated "
                     "minutes outside every Hevy session (the gym window) reach min_minutes"
                 ),
-                "trailing_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -6), end, a_raw),
-                "prior_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -13), shift_day_key(end, -7), a_raw),
+                "trailing_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -6), end, a_raw, c_rows),
+                "prior_7d": standalone_walks(s_raw, hevy_workouts, shift_day_key(end, -13), shift_day_key(end, -7), a_raw, c_rows),
             },
         },
-        "totals_are_floor": bool(unreadable),
+        "totals_are_floor": bool(unreadable) or bool(complete["gaps"]),
         "unreadable_sources": unreadable,
+        "completeness": complete,
+        "owner_corrections": walking_volume.corrections_public(corr),
         "redlines": {
             "walk_max_min": WALK_MAX_MIN,
             "hr_ceiling_bpm": HR_CEILING_BPM,
@@ -416,14 +478,26 @@ def build(
 
 
 # ── what the block says to the drafter and to the critic ──────────────────────────────
+def gap_days(block: dict[str, Any] | None, start: str, end: str) -> list[str]:
+    """The days in [start, end] the walk-signal check (#5669) says hold a walk no source counted."""
+    gaps = ((block or {}).get("completeness") or {}).get("gaps") or []
+    return sorted({g["date"] for g in gaps if start <= str(g.get("date") or "") <= end})
+
+
 def aerobic_minutes_7d(block: dict[str, Any] | None) -> float | None:
     """The generator's `z2_minutes_7d` (#4410): the block's trailing-7-day walking + cycling hours, in
     minutes — the ONE recent-aerobic quantity, never a second count. None = UNKNOWN (ADR-104): an
-    unread block, or totals that are a FLOOR because a source was unreadable (a floor below the
-    portfolio floor cannot say he is below it). Never 0 for an unread week."""
-    if not block or block.get("state") != "read" or block.get("totals_are_floor"):
+    unread block, or a trailing week that is a FLOOR — a source was unreadable, or a walk signal in
+    those 7 days has no counted walk (#5669) — because a floor below the portfolio floor cannot say
+    he is below it. A gap only in the prior week leaves the trailing week's count exact. Never 0
+    for an unread week."""
+    if not block or block.get("state") != "read":
         return None
-    hours = ((block.get("totals") or {}).get("trailing_7d") or {}).get("hours")
+    t7 = (block.get("totals") or {}).get("trailing_7d") or {}
+    floor_unread = block.get("unreadable_sources") if "unreadable_sources" in block else block.get("totals_are_floor")
+    if floor_unread or gap_days(block, str(t7.get("start") or ""), str(t7.get("end") or "")):
+        return None
+    hours = t7.get("hours")
     return None if hours is None else round(float(hours) * 60.0, 1)
 
 
@@ -457,6 +531,13 @@ def legs_loaded(block: dict[str, Any] | None) -> tuple[bool | None, str]:
         if over:
             parts.append(f"{over} walk(s) over the {WALK_MAX_MIN}-min redline")
         return True, "; ".join(parts)
+    end = str((block.get("window") or {}).get("end") or "")
+    missed = gap_days(block, shift_day_key(end, -1), end) if end else []
+    if missed:  # #5669: the 48 h total is a floor — "fresh" is exactly what an uncounted walk could falsify
+        return None, (
+            f"{wb} h weight-bearing in 48 h is a FLOOR — a walk signal on {', '.join(missed)} has no counted walk, so fresh legs "
+            "cannot be claimed"
+        )
     return False, f"{wb} h weight-bearing in 48 h, no walk over {WALK_MAX_MIN} min"
 
 
@@ -513,6 +594,9 @@ def _standalone_half(block: dict[str, Any]) -> tuple[str, str]:
         return "clear", what
     if t["count"] + int(t["untimed"]) >= need:
         return "unknown", what + f"; {t['untimed']} untimed walk(s) could not be placed against a gym window"
+    missed = gap_days(block, t["start"], t["end"])
+    if missed:  # #5669: an uncounted walk could be the missing standalone walk
+        return "unknown", what + f"; a walk signal on {', '.join(missed)} has no counted walk — the count is a floor"
     return "tripped", what
 
 
@@ -543,10 +627,17 @@ def weekly_reports(block: dict[str, Any] | None, collapse_pct: float) -> dict[st
         return {"walking_collapse": ("unknown", None, why), "walking_overshoot": ("unknown", None, why)}
     t = block["totals"]
     this, last = t["trailing_7d"]["hours"], t["prior_7d"]["hours"]
-    floor = " (a FLOOR — a source was unreadable)" if block.get("totals_are_floor") else ""
+    floor = " (a FLOOR — a source was unreadable or a walk signal has no counted walk)" if block.get("totals_are_floor") else ""
+    # #5669: a gap makes its week's hours a floor. A floored THIS week can fake a collapse; a floored
+    # LAST week can hide one — each makes only the verdict it could falsify unknown.
+    gap_this = gap_days(block, t["trailing_7d"]["start"], t["trailing_7d"]["end"])
+    gap_last = gap_days(block, t["prior_7d"]["start"], t["prior_7d"]["end"])
     if last > 0:
         wow = round((this - last) / last * 100.0, 1)
         hours_state = "tripped" if wow < -collapse_pct else "clear"
+        if (hours_state == "tripped" and gap_this) or (hours_state == "clear" and gap_last):
+            hours_state = "unknown"
+            floor += f"; uncounted walk signal(s) on {', '.join(gap_this if gap_this else gap_last)} (#5669)"
         hours = (
             hours_state,
             wow,
@@ -563,4 +654,12 @@ def weekly_reports(block: dict[str, Any] | None, collapse_pct: float) -> dict[st
     over.append(f"above last week + the {wk['ramp_hr_per_wk_max']:g} h ramp ({wk['ramp_ceiling_hr']} h)" if wk["over_ramp"] else None)
     named = [s for s in over if s]
     detail = f"week to date {wk['start']}..{wk['end']}: {wk['hours']} h" + (" — " + "; ".join(named) if named else "") + floor
-    return {"walking_collapse": collapse, "walking_overshoot": ("tripped" if named else "clear", wk["hours"], detail)}
+    overshoot = "tripped" if named else "clear"
+    # #5669: a floored week-to-date can hide an overshoot; a floored prior week lowers the ramp ceiling and
+    # can fake one that rests on the ramp alone. Only the verdict the missing walk could flip goes unknown.
+    gap_wtd = gap_days(block, wk["start"], wk["end"])
+    gap_prior = gap_days(block, wk["prior_week"]["start"], wk["prior_week"]["end"])
+    if (overshoot == "clear" and gap_wtd) or (overshoot == "tripped" and not wk["over_target"] and gap_prior):
+        overshoot = "unknown"
+        detail += f"; uncounted walk signal(s) on {', '.join(gap_wtd or gap_prior)} (#5669)"
+    return {"walking_collapse": collapse, "walking_overshoot": (overshoot, wk["hours"], detail)}

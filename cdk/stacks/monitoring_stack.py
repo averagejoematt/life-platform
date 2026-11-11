@@ -66,6 +66,9 @@ Covers:
       SubscriberSendSkippedByKillSwitch Sum >= 1, 86400s (digest)
     life-platform-weekly-signal-kill-switch-skip            (same metric, digest)
     life-platform-between-chronicle-kill-switch-skip        (same metric, digest)
+
+  #5541 (MCP auth, 2026-11-08):
+    mcp-auth-failures    LifePlatform/MCP AuthFailures (EventType=AuthFailure) Sum >= 50, 3600s (digest)
 """
 
 from aws_cdk import (
@@ -274,6 +277,25 @@ class MonitoringStack(Stack):
             "cloudtrail-delivery-stale",
             "LifePlatform/IngestLiveness",
             "CloudTrailDeliveryStale",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
+        # #5522: the post-deploy sensor self-test's dead-man. deploy/sensor_self_test.py runs as
+        # the last step of every attended deploy/cdk_deploy.sh; nothing else calls it, so its
+        # silence is the failure. The same daily {check_ingest_liveness} run reads
+        # LifePlatform/SelfTest SelfTestWrite over 35 days (one alarm window cannot span that —
+        # CloudWatch caps it at 7 days) and emits SensorSelfTestStale = 1 when no self-test wrote
+        # in that window or the read failed. Same namespace as the run's other gauges, so
+        # ingest-liveness-heartbeat covers this detector's own death. Digest (ADR-050).
+        _alarm(
+            "SensorSelfTestStale",
+            "sensor-self-test-stale",
+            "LifePlatform/IngestLiveness",
+            "SensorSelfTestStale",
             86400,
             "Maximum",
             1,
@@ -1086,6 +1108,34 @@ class MonitoringStack(Stack):
         # $0.10/mo rather than the RCA-rejected $1.50–2.90.
         # ══════════════════════════════════════════════════════════════
         add_denial_alarms(self, digest)
+
+        # ══════════════════════════════════════════════════════════════
+        # #5541: MCP authentication failures. mcp/handler.py emits
+        # LifePlatform/MCP AuthFailures (EventType=AuthFailure) on every rejected
+        # Bearer — and, since #5540, every refused privileged invoke — and nothing
+        # alarmed on it. Baseline over the 14 days to 2026-11-08: 2-30/day, hourly
+        # Sum max 8 (100 non-empty hours). 50 in one hour is >6x the worst hour seen:
+        # a credential-probing burst reaches the digest within the hour, the normal
+        # trickle (expired session Bearers, the 401 boot probe) never does.
+        # Missing = NOT_BREACHING: no failures is the healthy state.
+        # ══════════════════════════════════════════════════════════════
+        mcp_auth = _alarm(
+            "McpAuthFailures",
+            "mcp-auth-failures",
+            "LifePlatform/MCP",
+            "AuthFailures",
+            3600,
+            "Sum",
+            50,
+            GTE,
+            dims={"EventType": "AuthFailure"},
+            to_digest=True,
+        )
+        mcp_auth.node.default_child.alarm_description = (
+            "#5541: >= 50 MCP authentication failures in one hour (baseline 2-30/day, worst hour 8). Read "
+            "the life-platform-mcp log group for '[Remote] Rejected' and 'Rejected privileged invoke' lines: "
+            "a single source IP or payload shape is probing; a broad spread after a deploy is a broken auth path."
+        )
 
         # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm (period 86400s, daily metric).

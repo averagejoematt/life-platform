@@ -130,6 +130,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/ledger_export": "handle_ledger_export",  # #5532 — the whole ledger, paged (v9 ledger)
     "/api/chapters": "handle_chapters",  # #5532 — program-week chapter states (v9 Story)
     "/api/pairs": "handle_pairs",  # #5532 — precomputed pair statistics (v9 data room)
+    "/api/coach_brief": "handle_coach_brief",  # owner ruling 2026-11-09 (third, E) — the public-safe coaching brief (dark)
     "/api/panel_ledger": "handle_panel_ledger",
     "/api/phenoage": "handle_phenoage",
     "/api/physical_overview": "handle_physical_overview",

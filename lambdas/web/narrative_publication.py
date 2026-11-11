@@ -48,7 +48,7 @@ import logging
 import re
 from typing import Any, Optional
 
-from common import narrative_provenance as NP, prediction_publication as PP
+from common import narrative_allowlist as NA, narrative_provenance as NP, prediction_publication as PP
 
 from web import call_publication  # owner ruling 2026-11-05: a non-eligible call's rows never reach a handler
 
@@ -86,13 +86,22 @@ NARRATIVE_USER_SK_PREFIXES = ("SOURCE#coach_thread#",)  # the analyzer's per-coa
 # Graded-record families: carried to the handler unchanged and withheld at the wire (see the
 # module docstring) — under every narrative partition, by sort-key prefix.
 COUNTED_SK_PREFIXES = ("PREDICTION#", "COMMITMENT#", "LEARNING#", "CALIB#", "OPEN#", "RESOLVED#")
-# Owner-authored rows under a coach partition: his grade corrections (the #5626 public trail).
-NON_NARRATIVE_SK_PREFIXES = ("CORRECTION#",)
+# Owner-authored rows under a coach partition: his grade corrections (the #5626 public trail) — and the engine/owner
+# audit rows of the 2026-11-09 rulings: VERIFY# (coach.verification_record: hashes, statuses, the owner's classification
+# and ruling reference — no coach words) and REPEATFAMILY# (coach.repeat_family: criteria, word hashes, the ruling).
+# Gating them as narrative blanked the classification's ruling_ref, so /api/calibration read every approved
+# classification as unapproved. Publication method v2 still governs all three: each follows the call it names.
+NON_NARRATIVE_SK_PREFIXES = ("CORRECTION#", "VERIFY#", "REPEATFAMILY#")
 # Deliberately NOT gated here: owner-authored partitions (his corrections ledger, his decision log,
 # his own words — #4584), and the publications with their own owner-consent gate (named in the PR):
 # the chronicle (owner approval per installment + the story-auditor's journal class), the diary
 # reactions and journal quotes (``diary_consent`` per entry).
 _SOURCE_PK = re.compile(r"^USER#[^#]+#SOURCE#(?P<source>[^#]+)$")
+# Compiled once (they ran per string per row through ``re``'s cache lookup): the same patterns, the same flags.
+_WS = re.compile(r"\s")
+_MASKED_FIGURE = re.compile(r"\[n\]")
+_FIGURE = re.compile(r"\d+(?:[.,]\d+)*")
+_NON_WORD = re.compile(r"[^a-z0-9]+")
 _USER_PK = re.compile(r"^USER#[^#]+$")
 
 
@@ -221,7 +230,7 @@ def _withhold_value(value: Any, key: Any = None, in_list: bool = False) -> Any:
     if isinstance(value, str):
         if str(key or "") in PROSE_KEYS:
             return ""
-        if re.search(r"\s", value):
+        if _WS.search(value):
             return ""
         if in_list and not _structural_key(key):
             return ""
@@ -257,15 +266,15 @@ def withheld_count() -> int:
 
 def _norm_words(text: str) -> tuple:
     # Digits and the masked-figure token ("[n]", coach_moves_sheet.mask_figures) normalise alike.
-    t = re.sub(r"\[n\]", "0", text.lower())
-    t = re.sub(r"\d+(?:[.,]\d+)*", "0", t)
-    return tuple(re.sub(r"[^a-z0-9]+", " ", t).split())
+    t = _MASKED_FIGURE.sub("0", text.lower())
+    t = _FIGURE.sub("0", t)
+    return tuple(_NON_WORD.sub(" ", t).split())
 
 
 def _prose_strings(value: Any, key: Any = None):
     """Every free-text string under ``value`` (the strings ``_withhold_value`` would empty)."""
     if isinstance(value, str):
-        if str(key or "") in PROSE_KEYS or re.search(r"\s", value):
+        if str(key or "") in PROSE_KEYS or _WS.search(value):
             yield value
     elif isinstance(value, dict):
         for k, v in value.items():
@@ -279,33 +288,73 @@ def _prose_strings(value: Any, key: Any = None):
 # the evaluation spec, the grader's flags, the frozen stakes): deterministic text the engine also
 # prints elsewhere, never the coach's words — not tainted, or every copy of the method would go.
 TAINT_SKIP_KEYS = frozenset(
-    {"baseline", "evaluation", "quality_flags", "stakes", "sides", "verdict_correction", "grade_correction", "corrections", "pk", "sk"}
+    {
+        "baseline",
+        "baseline_corrections",
+        "evaluation",
+        "quality_flags",
+        "stakes",
+        "sides",
+        "verdict_correction",
+        "grade_correction",
+        "corrections",
+        "pk",
+        "sk",
+    }
 )
 
 
-def _wordy(gram: tuple) -> bool:
-    """A run worth matching: at least four real words (a run of masked figures matches anything)."""
-    return sum(1 for w in gram if len(w) >= 3 and not w.isdigit()) >= 4
+# The texts already tainted into the sets above. Tainting is a pure function of the text (its exact
+# hash and its wordy shingles), so a text tainted once adds nothing the second time: every request
+# re-reads the same graded rows, and re-shingling their unchanged words was the route's CPU (#5728).
+# Strings, not hashes — a skip must be exact, never a collision. Emptied whenever the taint is.
+_TAINT_SEEN: set = set()
+
+
+def reset_taint() -> None:
+    """Forget every taint (the sets and the seen-texts memo together)."""
+    _TAINT_EXACT.clear()
+    _TAINT_SHINGLES.clear()
+    _TAINT_SEEN.clear()
+
+
+def _taint_text(text: str) -> None:
+    words = _norm_words(text)
+    n = len(words)
+    if n < EXACT_MIN_WORDS:
+        return
+    _TAINT_EXACT.add(hash(words))
+    if n < SHINGLE:
+        return
+    # A run worth matching (a "wordy" window): at least four REAL words — three letters or more, not a figure —
+    # in the ``SHINGLE`` window, since a run of masked figures matches anything. Kept as one running count
+    # across the windows rather than a recount per window: the same windows, the same test.
+    real = [len(w) >= 3 and not w.isdigit() for w in words]
+    count = sum(real[:SHINGLE])
+    shingles = _TAINT_SHINGLES
+    for i in range(n - SHINGLE + 1):
+        if i:
+            count += real[i + SHINGLE - 1] - real[i - 1]
+        if count >= 4:
+            shingles.add(hash(words[i : i + SHINGLE]))
 
 
 def _taint(row: dict) -> None:
+    if not _TAINT_EXACT or not _TAINT_SHINGLES:
+        _TAINT_SEEN.clear()  # a cleared taint set clears the memo with it: a skip is only ever of a text still tainted
     for key, value in row.items():
         if key in TAINT_SKIP_KEYS:
             continue
         for text in _prose_strings(value, key):
-            words = _norm_words(text)
-            if len(words) < EXACT_MIN_WORDS:
+            if text in _TAINT_SEEN:
                 continue
-            _TAINT_EXACT.add(hash(words))
-            for i in range(len(words) - SHINGLE + 1):
-                gram = words[i : i + SHINGLE]
-                if _wordy(gram):
-                    _TAINT_SHINGLES.add(hash(gram))
+            _taint_text(text)
+            _TAINT_SEEN.add(text)
 
 
 def is_tainted(text: Any) -> bool:
     """True when ``text`` is, or carries a ``SHINGLE``-word run of, a withheld row's text."""
-    if not isinstance(text, str) or not _TAINT_EXACT:
+    if not isinstance(text, str) or not _TAINT_EXACT or NA.is_approved_text(text):
         return False
     words = _norm_words(text)
     if len(words) < EXACT_MIN_WORDS:
@@ -328,6 +377,13 @@ def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
     if not is_narrative_row(pk, item.get("sk")):
         return item
     ok, reason = NP.eligibility(item)
+    if not ok and reason == NP.R_UNRECORDED:
+        # Owner ruling 2026-11-09 (D): a historical row approved BY RECORD KEY, unchanged, with no record of its own,
+        # inside the CR2 scope with the CR2 switch on — published under the allowlist's public record. Everything
+        # else (the switch off, any other scope, any row carrying a record) is decided exactly as before.
+        approved = NA.record_for(item, pk)
+        if approved is not None:
+            ok, reason = NP.eligibility(approved)
     out = {k: v for k, v in item.items() if k != NP.PROVENANCE_KEY}
     if ok:
         _STATE["served"] += 1

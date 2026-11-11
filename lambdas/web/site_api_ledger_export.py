@@ -239,7 +239,9 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
         "confidence": row.get("confidence"),
         "sealed": sealed,
         "grading": grading_block(row),
-        "simple_guess": site_api_calls.simple_guess(row.get("baseline"), kind, coach_right=status == "confirmed", metric=ev.get("metric")),
+        "simple_guess": site_api_calls.simple_guess(
+            coach_baseline.effective(row), kind, coach_right=status == "confirmed", metric=ev.get("metric")
+        ),
         "quality_flags": _list(row.get("quality_flags")),
         "corrections": [],
         # Owner 2026-11-09: the version stamp, the grade text's own version and the verification record's pointer

@@ -15,7 +15,9 @@ What it carries, never recomputed (README requirement A — the snapshot is the 
   * ``/api/predictions`` ``overall`` — the coaches' own record (checked calls, right, the percentage, the base-rate
     guess) as the public API serves it.
 Each coach entry gains ``persona`` (the coach-page id the rest of the snapshot uses) and ``coach_ref`` (that id when
-the coach is a public Coach object in this snapshot, else null) — an id mapping, not a statistic.
+the coach is a public Coach object in this snapshot, else null) — an id mapping, not a statistic — and
+``assessment_v2``: its calibration-v2 assessment exactly as ``/api/calibration`` serves it under
+``assessment_v2.coaches`` (owner ruling 2026-11-09), moved beside the entry, never recomputed.
 
 No new endpoint, no non-public read: both are public Site API routes the platform already serves anonymously.
 """
@@ -99,10 +101,12 @@ def shape(calibration: Any, predictions: Any) -> dict:
     if not isinstance(calibration, dict) or not isinstance(predictions, dict) or not isinstance(predictions.get("overall"), dict):
         return dict(ABSENT_CALIBRATION)
     cal = {k: v for k, v in calibration.items() if k != "_meta"}
+    v2_coaches = ((cal.get("assessment_v2") or {}).get("coaches") or {}) if isinstance(cal.get("assessment_v2"), dict) else {}
     coaches = []
     for c in cal.get("coaches") or []:
         if isinstance(c, dict) and isinstance(c.get("coach_id"), str):
-            coaches.append({**c, "persona": _persona(c["coach_id"])})
+            # calibration-v2 (owner 2026-11-09): the coach's served assessment rides on its entry — carried, not computed.
+            coaches.append({**c, "persona": _persona(c["coach_id"]), "assessment_v2": v2_coaches.get(c["coach_id"])})
     cal["coaches"] = coaches
     overall = predictions["overall"]
     return {

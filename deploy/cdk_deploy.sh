@@ -16,9 +16,15 @@
 #   bash deploy/cdk_deploy.sh LifePlatformCore
 #   bash deploy/cdk_deploy.sh LifePlatformIngestion LifePlatformCompute -- --require-approval never
 #
+# Every deploy ENDS with the #4034 liveness-sensor self-test (#5522): a deploy that renamed a
+# metric, deleted a heartbeat alarm or disabled its actions exits 1 here, AFTER the stacks
+# landed, naming the blinded sensor. Its scratch write feeds LifePlatform/SelfTest
+# SelfTestWrite, whose 35-day absence is the sensor-self-test-stale alarm.
+#
 # Overrides (rare, intentional — mirrors sync_site_to_s3.sh's ALLOW_STALE_SITE):
 #   ALLOW_STALE_DEPLOY_CHECKOUT=1 bash deploy/cdk_deploy.sh <Stack>
 #   ALLOW_LIVE_LAMBDA_DRIFT=1 bash deploy/cdk_deploy.sh <Stack>
+#   SKIP_SENSOR_SELF_TEST=1 bash deploy/cdk_deploy.sh <Stack>   # loud; the 35-day dead-man still counts
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -76,3 +82,17 @@ APP_OVERRIDE=(--app "$ROOT/cdk/.venv/bin/python3 app.py")
 # orders the named ones by dependency.
 echo "→ guard passed. Deploying (exclusively): ${STACKS[*]}"
 (cd "$ROOT/cdk" && npx cdk deploy --exclusively "${STACKS[@]}" "${APP_OVERRIDE[@]}" "${EXTRA[@]+"${EXTRA[@]}"}")
+
+# ── #5522: the post-deploy sensor self-test (#4034) — the LAST step, and it gates ──────────────
+# The set is derived inside the script from the heartbeat ledger. Reads live, writes ONLY the
+# scratch namespace LifePlatform/SelfTest (never a live series). DEGRADED -> exit 1: the stacks
+# are deployed, but a dead-man is blind and the operator must know before walking away.
+if [ "${SKIP_SENSOR_SELF_TEST:-0}" = "1" ]; then
+    echo "⚠️  SKIP_SENSOR_SELF_TEST=1 — the post-deploy sensor self-test did NOT run; no SelfTestWrite was emitted (sensor-self-test-stale counts from the last one)." >&2
+    exit 0
+fi
+echo "→ post-deploy liveness-sensor self-test (#4034/#5522)…"
+if ! python3 "$ROOT/deploy/sensor_self_test.py" --self-test; then
+    echo "✗ sensor self-test DEGRADED — the stacks above DEPLOYED, but at least one liveness sensor is blind (see [DEGRADED] lines). Fix it before relying on its alarm." >&2
+    exit 1
+fi

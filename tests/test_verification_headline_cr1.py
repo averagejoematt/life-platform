@@ -137,7 +137,7 @@ def test_the_owner_sentence_is_generated_from_the_numbers():
     assert v["sentence"] == OWNER_SENTENCE
     assert (v["sign_test"]["coach_only"], v["sign_test"]["rule_only"], v["sign_test"]["p"]) == (16, 18, 0.8642)
     assert v["sign_test"]["verdict"] == "no_clear_difference"
-    assert v["accuracy_ci95"] == [39.6, 61.7] and v["baseline"]["right_ci95"] == [42.2, 64.2]  # HEADLINE.md's Wilson
+    assert v["accuracy_ci95"] == [39.6, 61.7] and v["baseline"]["accuracy_ci95"] == [42.2, 64.2]  # HEADLINE.md's Wilson
     assert v["baseline"]["unscorable"] == 2 and "count as its misses" in v["baseline"]["text"]
     assert (v["pct_rounded"], v["baseline_pct_rounded"]) == (51, 53)
 
@@ -299,3 +299,39 @@ def test_no_category_key_or_label_names_a_private_family():
         assert not _PRIVATE.search(value), value
     # control: the pattern does catch a private family name
     assert _PRIVATE.search("journal_derived")
+
+
+# ── the baseline is the comparison AS STORED, with its rule version (coordinator 2026-11-09) ─────────────────
+
+
+def test_the_baseline_names_its_stored_rule_version_and_is_never_restated():
+    pairs, _ = _owner_set()
+    b = _headline(pairs)["verified"]["baseline"]
+    assert b["available"] is True and b["basis"] == "stored" and b["rule_versions"] == {"1": 75}
+    assert "version 1, as stored when each call was graded" in b["text"]
+
+
+def test_a_call_without_a_stored_stamp_makes_the_baseline_unavailable_not_mismatched():
+    pairs, _ = _owner_set()
+    pairs[0][0].pop("baseline")  # mutation: one counted call has no stored verdict for the simple prediction
+    v = _headline(pairs)["verified"]
+    assert v["baseline"] == {"available": False, "n": 75, "text": vf.NO_SAME_CALL_COMPARISON}
+    assert v["sign_test"] is None and v["comparison"] is None
+    assert v["sentence"].endswith(vf.NO_SAME_CALL_COMPARISON) and "advantage" not in v["sentence"]
+    # control: an unversioned stamp is refused the same way
+    pairs2, _ = _owner_set()
+    pairs2[0][0]["baseline"].pop("version")
+    assert _headline(pairs2)["verified"]["baseline"]["available"] is False
+
+
+def test_mixed_stored_versions_are_each_named():
+    pairs, _ = _owner_set()
+    pairs[0][0]["baseline"]["version"] = 2
+    b = _headline(pairs)["verified"]["baseline"]
+    assert b["rule_versions"] == {"1": 74, "2": 1} and "versions 1, 2" in b["text"]
+
+
+def test_repeats_come_only_from_a_stored_marker():
+    """No stored family marker → the repeat bucket is empty (never inferred from words or ids)."""
+    pairs, _ = _owner_set()
+    assert "repeat" not in {e["key"] for e in _headline(pairs)["excluded_by_category"]}

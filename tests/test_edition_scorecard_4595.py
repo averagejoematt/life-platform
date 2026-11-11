@@ -131,7 +131,7 @@ def test_the_wire_composes_to_these_verdicts():
         assert d["verdict_text"] in {v for (area, _), v in sc.VERDICT_TEXT.items() if area == key}, key
     coaches = wire["calibration"]["platform"]["strata"]["coaches"]
     ai = rows["ai"]["data"]
-    want = sc.NOT_ENOUGH_DATA if coaches["n"] < 30 else (sc.GOING_WELL if coaches["brier_skill"] > 0 else sc.NOT_YET)
+    want = sc.NOT_ENOUGH_DATA if coaches["n"] < 30 else sc.NOT_YET  # owner 2026-11-09: no untested win
     assert ai["verdict"] == want
     assert ai["text"] == f"Counted across all {coaches['n']} calls checked to date, not this week's alone."
     assert re.fullmatch(r"Seven-day average \d+\.\d lb, (down|up) \d+(\.\d)? lb from the seven days before\.", rows["body"]["data"]["text"])
@@ -219,8 +219,8 @@ def test_too_few_readings_is_not_enough_data_never_a_guess():
     if verdict(wire, "ai") != sc.NOT_ENOUGH_DATA:
         offenders.append("ai: 29 checked calls guessed a verdict")
     cal["platform"]["strata"]["coaches"]["n"] = 30
-    if verdict(wire, "ai") != sc.GOING_WELL:
-        offenders.append("ai: 30 checked calls that beat the guess did not decide")
+    if verdict(wire, "ai") != sc.NOT_YET:  # owner 2026-11-09: a positive point estimate decides, but never as a win
+        offenders.append("ai: 30 checked calls with a positive untested skill did not decide as not-yet")
     assert not offenders, offenders
 
 
@@ -382,7 +382,6 @@ def test_every_verdict_text_entry_is_reached_by_its_own_case_and_not_yet_is_neve
         ("food", sc.GOING_WELL): ("food", food(6)),
         ("food", sc.UNDER): ("food", food(2, logged=6)),
         ("food", sc.FEW): ("food", food(2, logged=3)),
-        ("ai", sc.GOING_WELL): ("ai", ai(True)),
         ("ai", sc.UNDER): ("ai", ai(False)),
         ("ai", sc.FEW): ("ai", ai(False, n=12)),
     }

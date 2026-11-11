@@ -93,6 +93,21 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/common/goals_field_privacy.py:is_named": (
+        "Owner ruling 2026-11-10 (6): the coverage guard's predicate - every config/user_goals.json field is named by the field review (tests/test_goals_field_privacy.py). Delete this entry if the guard moves into a script."
+    ),
+    "lambdas/common/narrative_annotations.py:annotated_words": (
+        "Owner ruling 2026-11-10 (4): the one serving path for an annotated CR2 read (words + dated correction), dark until the owner approves an annotation and the CR2 route is wired; pinned by tests/test_narrative_annotations.py. Delete this entry when the route calls it."
+    ),
+    "lambdas/coach/grade_corrections.py:apply_baseline_correction": (
+        "Owner ruling 2026-11-09 (third, A): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_A.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."
+    ),
+    "lambdas/coach/repeat_family.py:plan_family": (
+        "Owner ruling 2026-11-09 (third, B): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_B.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."
+    ),
+    "lambdas/coach/repeat_family.py:write_marker": (
+        "Owner ruling 2026-11-09 (third, B): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_B.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."
+    ),
     "lambdas/health/fulfillment_index.py:attach_resolution": (
         "The fulfillment index's PRIVATE method-1 resolution layer (journal-enrichment components). The owner ruling of 2026-11-03 "
         "took it off the public route (method 2) and kept the private calculation for authorized analysis; pinned by "
@@ -479,9 +494,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     "lambdas/training/routine_repo.py:lookup_hevy_id": (
         "#3609 box 2 widen: exercised only by tests/test_routine_repo.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
-    ),
-    "lambdas/training/training_notes.py:compute_deviation": (
-        "#3609 box 2 widen: exercised only by tests/test_training_notes.py (also named in docs/BACKLOG.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
     "lambdas/web/card_engine.py:draw_uncertainty": (
         "#3609 box 2 widen: exercised by tests/test_card_engine.py; named only in a COMMENT in scripts/doc_facts_og.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."

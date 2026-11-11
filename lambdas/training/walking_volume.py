@@ -75,9 +75,7 @@ from typing import Any
 
 from common.pacific_time import pacific_date_of, pacific_weekday, parse_iso_utc
 
-WALKING_VOLUME_VERSION = (
-    "walking-volume@1.3.0"  # 1.1.0 (#4068): time de-dup; 1.2.0 (#5369): the watch backstop; 1.3.0: walk-signal completeness gaps
-)
+WALKING_VOLUME_VERSION = "walking-volume@1.4.0"  # 1.1.0 (#4068): time de-dup; 1.2.0 (#5369): the watch backstop; 1.3.0: walk-signal completeness gaps; 1.3.1 (#5669): WHOOP walks Pacific-dated, an unread signal source said; 1.4.0 (#5669): owner walk corrections
 
 # ── what counts ──────────────────────────────────────────────────────────────────────
 # Strava activity `type`/`sport_type` (lower-cased) → the modality it counts as.
@@ -485,6 +483,9 @@ def derived_steps_estimate(walking_hours: float | None, cadence_spm: int = ASSUM
 WHOOP_WALK_SPORTS = frozenset({"walking", "hiking", "rucking"})
 # The habit's current name and the alias Habitify rows still carry (#4362).
 WALK_HABIT_NAMES = frozenset({"Walk Outdoor >2mi", "Walk 5k"})
+# The partition reads `completeness` needs past a Pacific window's end: WHOOP rows are keyed by the UTC
+# day of the start, so a walk on the window's last evening sits one key past it; Habitify is Pacific-keyed.
+COMPLETENESS_READ_PAST_END_DAYS = {"whoop": 1, "habitify": 0}
 
 
 def _row_day(r: dict[str, Any]) -> str:
@@ -492,12 +493,21 @@ def _row_day(r: dict[str, Any]) -> str:
 
 
 def _whoop_walks(rows: list[dict[str, Any]], window_start: str, window_end: str) -> list[dict[str, Any]]:
+    """WHOOP walking workouts whose PACIFIC start date lies in the window (#5669).
+
+    A WHOOP workout row is filed under the UTC day of its start (`DATE#2026-10-06#WORKOUT#…` holds a
+    walk that began 2026-10-05 17:41 PT), while every counted source is Pacific-dated. Judged by the
+    row's key, a Pacific-evening walk on the day BEFORE the window read as a gap on its first day (live:
+    10-06, 10-27 and four more window-start days, 2026-08-30..10-27), and one on the window's last
+    evening was never read. So the day is the Pacific date of `start_time` — the key only when the
+    start cannot be parsed — and a caller reads WHOOP one UTC day past its window
+    (`COMPLETENESS_READ_PAST_END_DAYS`)."""
     out = []
     for r in rows or []:
         if "#WORKOUT#" not in str(r.get("sk", "")):
             continue
         sport = str(r.get("sport_name") or r.get("vendor_sport_name") or "").strip().lower()
-        day = _row_day(r)
+        day = pacific_date_of(str(r.get("start_time") or "")) or _row_day(r)
         if sport not in WHOOP_WALK_SPORTS or not (window_start <= day <= window_end):
             continue
         start, end = _parse_utc(r.get("start_time")), _parse_utc(r.get("end_time"))
@@ -581,8 +591,209 @@ def completeness(
     }
 
 
+def completeness_honesty(complete: dict[str, Any]) -> list[str]:
+    """The honesty lines for a `completeness` record — one per gap, and one per signal source the check
+    could not read (#5669). An unread signal source is NOT a floor (signals are never counted), but the
+    check is then blind to a walk only that source saw, and the reader is told so rather than shown a
+    silent `gaps: []`. Shared by this layer and `training.recent_aerobic`, so the two say it one way."""
+    lines = []
+    for gap in complete.get("gaps") or []:
+        what = "a WHOOP walking workout" if gap["signal"] == "whoop_walk_workout" else "the walk habit was completed"
+        lines.append(
+            f"{gap['date']}: {what} but no counted walk activity — that walk is missing from this total, which is a floor, "
+            "not a zero for the day"
+        )
+    for name in complete.get("unreadable") or []:
+        lines.append(
+            f"the walk-signal check could not read {name} — a walk only {name} recorded would not be named here (the total "
+            "itself is unaffected: signals are never counted)"
+        )
+    return lines
+
+
 #: `apple_items` default: the caller did not wire the watch backstop (distinct from None = the read failed).
 NOT_WIRED: Any = object()
+
+
+# ── the owner's correction: a walk no counted source holds, measured by him (#5669) ───────────
+# The 2026-10-20 walk is gone from every counted source (the #4638 Strava tombstone) and the only
+# record left, the WHOOP auto-detect, spans 174 min — not a walking duration. The owner ruled
+# 2026-11-09 that it counts at 55 min. Vendor partitions hold vendor data only (capture-all), so the
+# ruling lives in his own owner-only partition, one row per day:
+#     pk  USER#matthew#SOURCE#training_constraints   sk  WALK_CORRECTION#<YYYY-MM-DD>
+#     minutes, kind (outdoor_walk), basis, ruled_by, ruled_at, source (owner_correction), issue
+# The layer counts a row as a LABELLED walk (method `owner_correction`, its own `by_source` block,
+# an honesty line) — never blended into a device source. It resolves that day's completeness gap.
+# It is never added on top of a counted walk the same day: that is a conflict, reported, not summed.
+CORRECTION_SOURCE = "training_constraints"
+CORRECTION_PK = f"USER#matthew#SOURCE#{CORRECTION_SOURCE}"
+CORRECTION_SK_PREFIX = "WALK_CORRECTION#"
+CORRECTION_METHOD = "owner_correction"
+CORRECTION_KINDS = {"outdoor_walk": "walking"}
+#: the `completeness_inputs` key the shared readers hand the correction rows in under
+CORRECTION_INPUT = CORRECTION_METHOD
+
+
+def query_corrections(table: Any, start: str, end: str) -> list[dict[str, Any]]:
+    """Every WALK_CORRECTION# row dated in [start, end] (Pacific day keys), from `table`. Raises on a
+    failed read — the caller turns a raise into None (unreadable), never into "no correction"."""
+    kwargs: dict[str, Any] = {  # the string form, readable by every table double
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :lo AND :hi",
+        "ExpressionAttributeValues": {":pk": CORRECTION_PK, ":lo": CORRECTION_SK_PREFIX + start, ":hi": CORRECTION_SK_PREFIX + end + "~"},
+    }
+    items: list[dict[str, Any]] = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(i for i in resp.get("Items", []) if not i.get("tombstone"))
+        if not resp.get("LastEvaluatedKey"):
+            return items
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def correction_records(rows: list[dict[str, Any]] | None, window_start: str, window_end: str) -> tuple[list[dict[str, Any]], list[str]]:
+    """(valid correction records in the window, why each malformed row was refused). A row counts only
+    when its sk is a WALK_CORRECTION#, its `source` is `owner_correction`, its `kind` is a counted kind
+    and its `minutes` a positive number — a malformed row is named, never guessed at."""
+    out: list[dict[str, Any]] = []
+    refused: list[str] = []
+    for r in rows or []:
+        sk = str(r.get("sk") or "")
+        if not sk.startswith(CORRECTION_SK_PREFIX):
+            continue
+        day = sk[len(CORRECTION_SK_PREFIX) :][:10]
+        if not (window_start <= day <= window_end):
+            continue
+        modality = CORRECTION_KINDS.get(str(r.get("kind") or ""))
+        minutes = _float(r.get("minutes"))
+        if r.get("source") != CORRECTION_METHOD or modality is None or minutes <= 0:
+            refused.append(
+                f"{day}: correction row refused (source={r.get('source')!r}, kind={r.get('kind')!r}, minutes={r.get('minutes')!r})"
+            )
+            continue
+        out.append(
+            {
+                "date": day,
+                "source": CORRECTION_METHOD,
+                "method": CORRECTION_METHOD,
+                "modality": modality,
+                "kind": r.get("kind"),
+                "label": f"owner correction ({r.get('kind')})",
+                "device": None,
+                "seconds": minutes * 60.0,
+                "minutes": round(minutes, 1),
+                "start": None,
+                "end": None,
+                "basis": r.get("basis"),
+                "ruled_by": r.get("ruled_by"),
+                "ruled_at": r.get("ruled_at"),
+                "issue": r.get("issue"),
+            }
+        )
+    return sorted(out, key=lambda c: c["date"]), refused
+
+
+def apply_corrections(rows: Any, window_start: str, window_end: str, counted: list[dict[str, Any]], sources_read: bool) -> dict[str, Any]:
+    """The owner-correction record for a window: which corrections are COUNTED, which conflict, which are held.
+
+    `rows` is NOT_WIRED (the caller did not hand corrections in: `not_checked`), None (the read failed:
+    `unreadable`) or the partition rows. `counted` is every counted record (`modality` walking/cycling).
+    A correction on a day that already holds a counted walk is a CONFLICT — reported, never added (the
+    owner's minutes and the device's would be one walk counted twice). With a device source unread
+    (`sources_read` False) a same-day walk cannot be ruled out, so the correction is HELD, not counted."""
+    if rows is NOT_WIRED:
+        return {"status": "not_checked", "applied": [], "conflicts": [], "held": [], "refused": []}
+    if rows is None:
+        return {"status": "unreadable", "applied": [], "conflicts": [], "held": [], "refused": []}
+    records, refused = correction_records(rows, window_start, window_end)
+    walked: dict[str, list[dict[str, Any]]] = {}
+    for c in counted:
+        if c.get("modality") == "walking" and c.get("seconds", 0) > 0:
+            walked.setdefault(c["date"], []).append(c)
+    applied, conflicts, held = [], [], []
+    for rec in records:
+        same_day = walked.get(rec["date"]) or []
+        if same_day:
+            conflicts.append(
+                {
+                    "date": rec["date"],
+                    "correction_minutes": rec["minutes"],
+                    "counted_minutes": round(sum(c["seconds"] for c in same_day) / 60.0, 1),
+                    "counted_sources": sorted({str(c.get("source")) for c in same_day}),
+                    "issue": rec.get("issue"),
+                }
+            )
+        elif not sources_read:
+            held.append({"date": rec["date"], "correction_minutes": rec["minutes"], "issue": rec.get("issue")})
+        else:
+            applied.append(rec)
+    return {
+        "status": "read",
+        "applied": applied,
+        "conflicts": conflicts,
+        "held": held,
+        "refused": refused,
+        "rule": (
+            "a WALK_CORRECTION# row in the owner-only training_constraints partition counts as a labelled walk "
+            "(method owner_correction) on a day with no counted walk, and resolves that day's walk-signal gap; on a day "
+            "that already holds a counted walk it is a conflict, reported and never added (#5669)"
+        ),
+    }
+
+
+def corrections_public(corr: dict[str, Any]) -> dict[str, Any]:
+    """The correction record as it rides a layer's output: the applied rows without their datetimes."""
+    out = {k: v for k, v in corr.items() if k != "applied"}
+    out["applied"] = [
+        {k: rec.get(k) for k in ("date", "minutes", "kind", "method", "basis", "ruled_by", "ruled_at", "issue")} for rec in corr["applied"]
+    ]
+    return out
+
+
+def correction_honesty(corr: dict[str, Any]) -> list[str]:
+    """One line per counted, conflicting, held or refused correction, and one when the read failed —
+    shared by this layer and `training.recent_aerobic`."""
+    lines = []
+    for rec in corr.get("applied") or []:
+        lines.append(
+            f"{rec['date']}: {rec['minutes']:g} min of walking counted from the owner's correction (owner_correction, "
+            f"ruled {rec.get('ruled_at') or 'undated'}, {rec.get('issue') or 'no issue'}) — his own measurement, not a device record"
+        )
+    for c in corr.get("conflicts") or []:
+        lines.append(
+            f"{c['date']}: CONFLICT — an owner correction of {c['correction_minutes']:g} min and {c['counted_minutes']:g} min of "
+            f"counted walking ({', '.join(c['counted_sources'])}) on the same day; the correction is NOT added (never counted "
+            "twice) — resolve which record is the walk"
+        )
+    for h in corr.get("held") or []:
+        lines.append(
+            f"{h['date']}: an owner correction of {h['correction_minutes']:g} min is held — a device source could not be read, "
+            "so a counted walk that day cannot be ruled out"
+        )
+    lines.extend(corr.get("refused") or [])
+    if corr.get("status") == "unreadable":
+        lines.append(
+            "the owner corrections (training_constraints WALK_CORRECTION#) could not be read — a day he corrected still reads " "as its gap"
+        )
+    return lines
+
+
+def _split_inputs(inputs: dict[str, Any] | None) -> tuple[dict[str, Any] | None, Any]:
+    """(the walk-signal inputs, the correction rows) — the shared readers hand both in one dict."""
+    if inputs is None:
+        return None, NOT_WIRED
+    signals = {k: v for k, v in inputs.items() if k != CORRECTION_INPUT}
+    return signals, inputs.get(CORRECTION_INPUT, NOT_WIRED)
+
+
+def resolve_gaps(complete: dict[str, Any], corr: dict[str, Any]) -> dict[str, Any]:
+    """`complete` with every gap on a day a COUNTED correction covers moved to `resolved` — the gap is
+    the walk the correction now counts. A conflicting or held correction resolves nothing."""
+    days = {rec["date"] for rec in corr.get("applied") or []}
+    if not days or complete.get("status") != "checked":
+        return complete
+    kept = [g for g in complete["gaps"] if g["date"] not in days]
+    resolved = [{**g, "resolved_by": CORRECTION_METHOD} for g in complete["gaps"] if g["date"] in days]
+    return {**complete, "gaps": kept, "resolved": resolved}
 
 
 def build(
@@ -618,12 +829,19 @@ def build(
     else:
         s_counted, dedup = dedup_strava(s_raw, hevy_cardio_intervals(hevy_workouts or []))
         a_counted = []
-    complete = completeness(
-        window_start=window_start,
-        window_end=window_end,
-        counted=s_counted + h_counted + a_counted,
-        hevy_intervals=hevy_cardio_intervals(hevy_workouts or []),
-        inputs=completeness_inputs,
+    signal_inputs, correction_rows = _split_inputs(completeness_inputs)
+    device_read = strava_items is not None and hevy_workouts is not None and (not wired or apple_items is not None)
+    corr = apply_corrections(correction_rows, window_start, window_end, s_counted + h_counted + a_counted, device_read)
+    c_counted = corr["applied"]
+    complete = resolve_gaps(
+        completeness(
+            window_start=window_start,
+            window_end=window_end,
+            counted=s_counted + h_counted + a_counted,
+            hevy_intervals=hevy_cardio_intervals(hevy_workouts or []),
+            inputs=signal_inputs,
+        ),
+        corr,
     )
 
     def _source_block(raw: list[dict[str, Any]] | None, counted: list[dict[str, Any]], skipped: list[str]) -> dict:
@@ -658,8 +876,11 @@ def build(
         )
         if a_raw:
             contributing.append(by_source[APPLE_SOURCE])
+    if c_counted:  # #5669: the owner's correction is its own labelled source, never folded into a device's block
+        by_source[CORRECTION_METHOD] = {**_source_block(c_counted, c_counted, []), "method": CORRECTION_METHOD}
+        contributing.append(by_source[CORRECTION_METHOD])
 
-    every = s_counted + h_counted + a_counted
+    every = s_counted + h_counted + a_counted + c_counted
     total_hr = _hours(sum(c["seconds"] for c in every)) if contributing else None
     by_modality = {m: _hours(sum(c["seconds"] for c in every if c["modality"] == m)) for m in MODALITIES}
 
@@ -678,12 +899,8 @@ def build(
             f"{dedup['untimed']} Strava activit{'y' if dedup['untimed'] == 1 else 'ies'} carried no start timestamp — the "
             "cross-device de-dup could not place them in time, so they are counted whole"
         )
-    for gap in complete["gaps"]:
-        what = "a WHOOP walking workout" if gap["signal"] == "whoop_walk_workout" else "the walk habit was completed"
-        honesty.append(
-            f"{gap['date']}: {what} but no counted walk activity — that walk is missing from this total, which is a floor, "
-            "not a zero for the day"
-        )
+    honesty.extend(completeness_honesty(complete))
+    honesty.extend(correction_honesty(corr))
 
     return {
         "layer": "walking_volume",
@@ -709,6 +926,7 @@ def build(
         ),
         "dedup": dedup,
         "completeness": complete,
+        "owner_corrections": corrections_public(corr),
         "excluded_proxies": [dict(STEPS_EXCLUSION)],
         "derived_steps_estimate": derived_steps_estimate(by_modality.get("walking") if contributing else None),
         "honesty": honesty,

@@ -15,10 +15,23 @@
 /** The environment variable. Only the literal "1" turns the Human Story on; anything else is off. */
 export const STORY_ENV = "WEB_STORY";
 
+/**
+ * THE GO-LIVE SWITCH — the owner's GO is the one-line PR that sets this to `true` (feat/story-go-live). `false`: HS1 is
+ * dark (the env switch above gives a private, never-deployed build). `true`: the timeline and the "story so far" entry
+ * are part of every build, so every `www/**` merge deploys them: public (no private label), in the sitemap, owned in
+ * owned_paths.json, no longer refused by the deploy scan. Read as text by scripts/publish_snapshot_story.py
+ * (`story_live`) and scripts/check_www_build.py — keep it one line: `export const STORY_LIVE = true|false;`.
+ */
+export const STORY_LIVE = true;
+
 /** The routes HS1 adds when the switch is on (pattern → entrypoint, relative to www/). */
 export const STORY_ROUTES = [
-  { pattern: "/story/timeline", entrypoint: "./src/story/timeline.astro", path: "/story/timeline/" },
-  { pattern: "/story/episodes", entrypoint: "./src/story/episodes.astro", path: "/story/episodes/" },
+  // NOT /story/timeline/: that URL is the established v8 page, served from site/story/timeline/ by the site deploy (and
+  // the target of three redirects). HS1's timeline lives at its own address so no deploy can overwrite the kept page —
+  // tests/test_www_route_site_collision.py refuses any www route on a site/ page that owned_paths.json does not claim.
+  { pattern: "/story/so-far", entrypoint: "./src/story/timeline.astro", path: "/story/so-far/" },
+  // The episode index (/story/episodes/) is folded into the timeline (2026-11-09 readiness review): it repeated
+  // /story/'s own chapter list with less in it.
 ];
 
 /** The attribute every story-rendered element carries; the dist scans look for it (and for STORY_DATA_KEYS). */
@@ -30,26 +43,32 @@ export const STORY_DATA_KEYS = ["story_weeks", "installments_index", "story_excl
 /** The data file the producer writes only on a WEB_STORY=1 export (never copied into dist). */
 export const STORY_DATA_FILE = "story.json";
 
-/** Is the Human Story switched on for this build? */
-export function storyEnabled(env = process.env) {
-  return Boolean(env) && env[STORY_ENV] === "1";
+/** Is the Human Story switched on for this build? Live (the committed switch) or the private env switch. */
+export function storyEnabled(env = process.env, live = STORY_LIVE) {
+  return live === true || (Boolean(env) && env[STORY_ENV] === "1");
+}
+
+/** A PRIVATE story build: on by the env switch while HS1 is not live — local review only, never deployed. */
+export function storyPrivate(env = process.env, live = STORY_LIVE) {
+  return live !== true && storyEnabled(env, false);
 }
 
 /** The Astro integration that injects the Human Story's routes — and nothing at all when the switch is off. */
-export function storyIntegration(env = process.env) {
+export function storyIntegration(env = process.env, live = STORY_LIVE) {
   return {
     name: "human-story-dark",
     hooks: {
       "astro:config:setup": ({ injectRoute }) => {
-        if (!storyEnabled(env)) return;
+        if (!storyEnabled(env, live)) return;
         for (const r of STORY_ROUTES) injectRoute({ pattern: r.pattern, entrypoint: r.entrypoint, prerender: true });
       },
     },
   };
 }
 
-/** The sitemap filter: a story path is never listed (true = keep). Identity on every page HS1 does not own. */
-export function notStoryPage(url) {
+/** The sitemap filter: while HS1 is dark a story path is never listed (true = keep); once live every story page is kept. */
+export function notStoryPage(url, live = STORY_LIVE) {
+  if (live === true) return true;
   const path = new URL(url, "https://averagejoematt.com").pathname;
   return !STORY_ROUTES.some((r) => path === r.path || path.endsWith(r.path));
 }

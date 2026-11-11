@@ -789,6 +789,14 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
             actions=["cloudtrail:GetTrailStatus"],
             resources=[CLOUDTRAIL_TRAIL_ARN],
         ),
+        iam.PolicyStatement(
+            # #5522: the sensor self-test dead-man. The daily run reads LifePlatform/SelfTest
+            # SelfTestWrite over 35 days and emits SensorSelfTestStale. CloudWatch metric reads
+            # support no resource-level scoping, so `*` is the only expressible resource.
+            sid="SelfTestMetricRead",
+            actions=["cloudwatch:GetMetricStatistics"],
+            resources=["*"],
+        ),
     ]
 
 

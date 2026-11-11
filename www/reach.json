@@ -40,6 +40,13 @@
     "/data/experiments/protein-deep-sleep_2026-11-01/",
     "/data/insights/zone2-deep-sleep/",
     "/data/journey/",
+    "/data/lab/",
+    "/data/lab/experiments/berberine-glucose/",
+    "/data/lab/experiments/creatine-strength/",
+    "/data/lab/protocols/",
+    "/data/lab/tests/hyp_carb_load_sleep_lag/",
+    "/data/lab/tests/hyp_protein_deficit_recovery_lag/",
+    "/data/lab/tests/hyp_protein_recovery_lag/",
     "/data/recovery_score/",
     "/data/resting_hr/",
     "/data/total_protein_g/",
@@ -47,9 +54,9 @@
     "/privacy/",
     "/story/",
     "/story/program-week-09/",
+    "/story/so-far/",
     "/story/week-06/",
     "/story/week-07/",
-    "/story/week-08/",
     "/subscribe/",
     "/system/",
     "/system/calibration/",
@@ -78,5 +85,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 57
+  "transitive_count": 64
 }

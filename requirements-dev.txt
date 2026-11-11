@@ -14,11 +14,19 @@ pytest-cov==7.1.0
 # tests/test_suite_parallel_safety_3025.py. Version MUST equal the CI gate's pin
 # (CQ-01, #1963) — resolved by scripts/ci_pins.py, not quoted in the workflow.
 pytest-xdist==3.8.0
+# pytest-timeout — the per-test ceiling in pytest.ini (`timeout`, #5514). Before it, only a
+# job's `timeout-minutes: 60` bounded a hung test: the hang cost an hour and named nothing.
+# Every CI lane that installs pytest resolves this pin through scripts/ci_pins.py (CQ-01).
+pytest-timeout==2.4.0
+# pip itself — CI's `pip install --upgrade pip` floated to whatever PyPI served that
+# minute (#5514). Workflows install this pin instead (scripts/ci_pins.py pip); Dependabot
+# bumps it like every other line here.
+pip==26.3
 # Property-based testing (Hypothesis @given) — pure calculators + AI grounding
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
 # #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-hypothesis==6.170.14
+hypothesis==6.170.15
 # PyYAML — scripts/apply_branch_protection.py's preflight_contexts() parses
 # .github/workflows/*.yml to verify every required check context actually exists
 # as an unfiltered, un-gated job (#1662/#2198). tests/test_branch_protection_spec.py
@@ -65,8 +73,8 @@ mypy==2.4.1
 
 # AWS SDK (for tests that call boto3 directly). Versions MUST equal the CI gate's
 # pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-boto3==1.43.123
-botocore==1.43.123
+boto3==1.43.126
+botocore==1.43.126
 
 # CI supply-chain gates (#2760 — the one-legged-pin class): both were pinned as
 # workflow literals with NO Dependabot leg, so the pins could only rot. This file
@@ -81,7 +89,7 @@ pip-licenses==5.5.5
 # Remediation-agent runtime (remediation-agent.yml, ADR-064/065). Installed
 # UNPINNED (floating latest) until #2760; now pinned here and Dependabot-bumped,
 # resolved by the workflow via scripts/ci_pins.py.
-claude-agent-sdk==0.2.176
+claude-agent-sdk==0.2.179
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release

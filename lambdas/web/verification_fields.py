@@ -29,12 +29,18 @@ from __future__ import annotations
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Iterable
 
-from coach import classification_review, coach_baseline, coach_record, grade_corrections, verification_record
+from coach import classification_review, coach_baseline, coach_record, grade_corrections, repeat_family, verification_record
 from common import stats_core
-from experiment import calibration_core
+from experiment import calibration_core, calibration_v2
 from experiment.phase_filter import singleton_visible
 
 SUMMARY_KEYS = verification_record.OUTCOMES + ("none",)
+
+#: The PREDICTION# fields this module reads off a row, which the call routes' projected read must carry
+#: (``web.site_api_coach_ledger._PREDICTION_PROJECTION_FIELDS``): the verification record's pointer (served as
+#: ``verification``), the first grade a correction preserved (``first_status``, the archive) and the repeat-family
+#: marker whose role names the member that stands in a count (``headline``; read for the fold, never served).
+ROW_FIELDS = (verification_record.POINTER_ATTR, "original_grade", repeat_family.ATTR)
 
 
 def item_fields(row: dict) -> dict:
@@ -54,7 +60,7 @@ def summary(verifications: Iterable[Any]) -> dict:
     return out
 
 
-def attach_stratum_extras(platform: dict, strata_pairs: dict, coach_decided: list, verified: dict | None = None) -> None:
+def attach_stratum_extras(platform: dict, strata_pairs: dict, verified: dict | None = None) -> None:
     """Owner 2026-11-09, additive — changes no existing field. Each season stratum gains:
 
     * ``accuracy_pct`` / ``accuracy_ci95`` (95% Wilson) — ``calibration_core.score_pairs`` over the stratum's OWN
@@ -65,8 +71,7 @@ def attach_stratum_extras(platform: dict, strata_pairs: dict, coach_decided: lis
       which have no verification record.
 
     Computed here, not in ``experiment.calibration_core``, so the scorer, its OSS parity vectors and its methods
-    fingerprint are untouched. ``coach_decided`` is kept for the call shape."""
-    del coach_decided
+    fingerprint are untouched."""
     for name, stratum in (platform.get("strata") or {}).items():
         scored = calibration_core.score_pairs(strata_pairs.get(name) or [])
         stratum["accuracy_pct"] = scored["accuracy_pct"]
@@ -244,6 +249,12 @@ def _family(row: dict, record: dict | None) -> str | None:
     return fam or None
 
 
+def _stands_rank(row: dict) -> int:
+    """0 when the row's stored repeat-family marker names it the member that stands (role "first"), else 1."""
+    marker = (row or {}).get(repeat_family.ATTR)
+    return 0 if isinstance(marker, dict) and marker.get("role") == "first" else 1
+
+
 def _pct(k: int, n: int) -> float | None:
     return round(100.0 * k / n, 1) if n else None
 
@@ -261,23 +272,62 @@ def _wilson(k: int, n: int) -> list | None:
 
 def _rule_right(row: dict) -> bool:
     """Was "nothing changes" right on this call? A call it could not be scored on counts as its miss (the owner's
-    headline: "they count as guess misses")."""
-    bl = (row or {}).get("baseline")
+    headline: "they count as guess misses"). Read through ``coach_baseline.effective``: a recorded re-score under the
+    current rule (owner ruling 2026-11-09, A) overlays the frozen stamp, which itself is never rewritten."""
+    bl = coach_baseline.effective(row or {})
     return isinstance(bl, dict) and bl.get("rule") == coach_baseline.RULE_ID and bl.get("right") is True
 
 
 def _rule_scored(row: dict) -> bool:
-    bl = (row or {}).get("baseline")
+    bl = coach_baseline.effective(row or {})
     return isinstance(bl, dict) and bl.get("rule") == coach_baseline.RULE_ID and isinstance(bl.get("right"), bool)
 
 
-def headline_sentence(n: int, k: int, rule_right: int, verdict: str) -> str:
-    """The one sentence a reader could repeat, generated from the numbers (the owner's wording, 2026-11-09)."""
-    calls = "forecast" if n == 1 else "forecasts"
-    s = (
-        f"Of {n} {calls} that could be checked under the current rules, the coaches got {k} right ({_pct_whole(k, n)}%). "
-        f"A simple prediction that nothing would change got {rule_right} right ({_pct_whole(rule_right, n)}%). "
+NO_SAME_CALL_COMPARISON = "No same-call comparison with a simple prediction that nothing would change is published for these calls yet."
+
+
+def stored_rule_versions(rows: list[dict]) -> dict | None:
+    """``{version: calls}`` of the STORED "nothing changes" stamps on ``rows`` — None when any call has no stamp of the
+    rule with a version (then a same-call comparison as stored cannot be guaranteed, and none is served)."""
+    out: dict = {}
+    for r in rows:
+        bl = coach_baseline.effective(r or {})
+        if not isinstance(bl, dict) or bl.get("rule") != coach_baseline.RULE_ID or bl.get("version") is None:
+            return None
+        v = str(bl["version"]).split(".")[0] if isinstance(bl["version"], (int, float, Decimal)) else str(bl["version"])
+        out[v] = out.get(v, 0) + 1
+    return out
+
+
+def corrected_rows(rows: list[dict]) -> list[dict]:
+    """The calls whose frozen "nothing changes" verdict carries a recorded re-score (owner ruling 2026-11-09, A)."""
+    return [r for r in rows if coach_baseline.baseline_corrections(r or {})]
+
+
+def stored_rule_words(versions: dict, corrected: list[dict] | None = None) -> str:
+    vs = sorted(versions)
+    which = f"version {vs[0]}" if len(vs) == 1 else "versions " + ", ".join(vs)
+    if not corrected:
+        return f"Scored by the rule's {which}, as stored when each call was graded; earlier verdicts have not been restated."
+    n = len(corrected)
+    days = sorted({str(coach_baseline.baseline_corrections(r)[-1].get("corrected_at") or "")[:10] for r in corrected} - {""})
+    when = f" on {days[0]}" if len(days) == 1 else ""
+    calls = "call" if n == 1 else "calls"
+    return (
+        f"Scored by the rule's {which}, as stored when each call was graded, except {n} {calls} whose stored verdict was"
+        f" frozen under an earlier rule: those were re-scored under the current rule{when}, and the original verdicts are kept"
+        " on the record."
     )
+
+
+def headline_sentence(n: int, k: int, rule_right: int | None, verdict: str | None) -> str:
+    """The one sentence a reader could repeat, generated from the numbers (the owner's wording, 2026-11-09). An
+    advantage is claimed only from the tested comparison (the sign test), never from a point estimate."""
+    calls = "forecast" if n == 1 else "forecasts"
+    s = f"Of {n} {calls} that could be checked under the current rules, the coaches got {k} right ({_pct_whole(k, n)}%). "
+    if rule_right is None:
+        return s + NO_SAME_CALL_COMPARISON
+    s += f"A simple prediction that nothing would change got {rule_right} right ({_pct_whole(rule_right, n)}%). "
     if verdict == "coaches_better":
         return s + "The coaches did better than that baseline, by more than chance would explain."
     if verdict == "rule_better":
@@ -295,6 +345,22 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
     if not n:
         return None
     k = sum(1 for r in rows if now_status(r) == "confirmed")
+    out: dict = {
+        "n": n,
+        "confirmed": k,
+        "accuracy_pct": _pct(k, n),
+        "accuracy_ci95": _wilson(k, n),
+        "pct_rounded": _pct_whole(k, n),
+    }
+    versions = stored_rule_versions(rows)
+    if versions is None:
+        # A call without a stored "nothing changes" stamp: no same-call comparison can be guaranteed, so none is served.
+        out.update(baseline_pct_rounded=None, sign_test=None, baseline={"available": False, "n": n, "text": NO_SAME_CALL_COMPARISON})
+        if with_sentence:
+            out["sentence"] = headline_sentence(n, k, None, None)
+            out["skill"] = {"n": n, "sentence": NO_SAME_CALL_COMPARISON}
+            out["comparison"] = None
+        return out
     rule = sum(1 for r in rows if _rule_right(r))
     scored = sum(1 for r in rows if _rule_scored(r))
     coach_only = sum(1 for r in rows if now_status(r) == "confirmed" and not _rule_right(r))
@@ -310,38 +376,197 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
     base_text = f"A simple prediction that nothing would change got {rule} of the same {n} right ({_pct_whole(rule, n)}%)."
     if unscored:
         base_text += f" It could not be scored on {unscored} of them, which count as its misses."
-    out: dict = {
-        "n": n,
-        "confirmed": k,
-        "accuracy_pct": _pct(k, n),
-        "accuracy_ci95": _wilson(k, n),
-        "pct_rounded": _pct_whole(k, n),
-        "baseline_pct_rounded": _pct_whole(rule, n),
-        "baseline": {
-            "rule": coach_baseline.RULE_ID,
-            "n": n,
-            "right": rule,
-            "right_pct": _pct(rule, n),
-            "right_ci95": _wilson(rule, n),
-            "unscorable": unscored,
-            "text": base_text,
-        },
-        "sign_test": {
-            "coach_only": coach_only,
-            "rule_only": rule_only,
-            "n": coach_only + rule_only,
-            "k": coach_only,
-            "p": round(p, 4) if p is not None else None,
-            "verdict": verdict,
-            "test": "exact two-sided sign test on the calls only one of the two got right (McNemar's exact test)",
-        },
-    }
+    corrected = corrected_rows(rows)
+    base_text += f" {stored_rule_words(versions, corrected)}"
+    out.update(
+        {
+            "baseline_pct_rounded": _pct_whole(rule, n),
+            "baseline": {
+                "available": True,
+                "rule": coach_baseline.RULE_ID,
+                # Coordinator 2026-11-09: the comparison is the verdicts AS STORED at grading time (never restated here),
+                # with the stored rule version(s) named; restating them waits on an owner decision.
+                # Owner ruling 2026-11-09 (A): the stored verdicts, with any recorded re-score under the current rule
+                # overlaid ("stored" when there is none); the frozen stamps themselves are never rewritten.
+                "basis": "stored_with_corrections" if corrected else "stored",
+                "corrected": len(corrected),
+                "rule_versions": versions,
+                "current_rule_version": coach_baseline.RULE_VERSION,
+                "n": n,
+                "right": rule,
+                "accuracy_pct": _pct(rule, n),
+                "accuracy_ci95": _wilson(rule, n),
+                "unscorable": unscored,
+                "text": base_text,
+            },
+            "sign_test": {
+                "coach_only": coach_only,
+                "rule_only": rule_only,
+                "n": coach_only + rule_only,
+                "k": coach_only,
+                "p": round(p, 4) if p is not None else None,
+                "verdict": verdict,
+                "test": "exact two-sided sign test on the calls only one of the two got right (McNemar's exact test)",
+            },
+        }
+    )
     if with_sentence:
         sentence = headline_sentence(n, k, rule, verdict)
         out["sentence"] = sentence
         out["skill"] = {"n": n, "sentence": sentence.rsplit(". ", 1)[-1]}
         out["comparison"] = {"n": n, "records": coach_baseline.comparison_block(rows)["records"]}
     return out
+
+
+SUBGROUP_CAVEAT = (
+    "Exploratory, not a headline result: these comparisons split the same calls by kind, after the fact, and were not"
+    " the question the sample was gathered to answer. A low p-value in one kind of call does not show that the simple"
+    " prediction is the better forecaster: the groups are small, several comparisons were tested, and calls that share a"
+    " measure and a window are not independent, so every p-value here is optimistic."
+)
+
+
+def _times(n: int) -> str:
+    return "once" if n == 1 else f"{n} times"
+
+
+def _p_words(p: float) -> str:
+    return "< 0.001" if p < 0.001 else f"{p:.3f}" if p < 0.1 else f"{p:.2f}"
+
+
+def _subgroup_finding(b: int, c: int, p: float, p_kinds: float, p_all: float, m: int, total: int) -> str:
+    better = "the coaches" if b > c else "the simple prediction"
+    if p_all < calibration_v2.ALPHA:
+        return f"{better} did better in this group, even counting all {total} subgroup comparisons"
+    if p_kinds < calibration_v2.ALPHA:
+        return (
+            f"{better} was right more often in this group, and that holds after adjusting for the {m} kinds of call"
+            f" tested, but not once all {total} subgroup comparisons are counted"
+        )
+    if p < calibration_v2.ALPHA:
+        return "a difference before adjustment only; after adjusting for the comparisons tested it could be chance"
+    return "no detectable difference"
+
+
+def subgroups(rows: list[dict], by_coach: dict | None = None) -> dict | None:
+    """The verified sample split by kind of call — number, direction, yes/no, sealed (``coach_baseline.RECORDS``) —
+    each an exact two-sided sign test against "nothing changes" on exactly those counted calls: the SAME test as the
+    headline, and calibration-v2's question 3 (``calibration_v2.skill_vs_baseline``: Bonferroni-adjusted interval and
+    label across the kinds tested). Owner ruling 2026-11-10 (2): an EXPLORATORY secondary result that states its
+    sample size, the comparison tested and whether the p-value accounts for the multiple subgroup tests. Each kind
+    serves three p-values, never a choice between them:
+
+      * ``p`` — unadjusted;
+      * ``p_adjusted`` — Bonferroni across the ``kinds_tested`` (the adopted method's correction across records);
+      * ``p_adjusted_all`` — Bonferroni across EVERY subgroup comparison served for this sample: the kinds AND the
+        per-coach comparisons (``per_coach_tests``, those with a call only one side got right).
+
+    The sample split is the counted calls' own (``n`` per kind sums to the headline N). None on an empty sample."""
+    rows = [r for r in rows or [] if now_status(r)]
+    if not rows:
+        return None
+    paired = coach_baseline.paired_records(rows)
+    skill = calibration_v2.skill_vs_baseline(paired)
+    tested = [k for k in coach_baseline.RECORDS if (skill["records"].get(k) or {}).get("n")]
+    m = len(tested)
+    per_coach = sum(1 for b in (by_coach or {}).values() if isinstance(b, dict) and ((b.get("sign_test") or {}).get("n") or 0) > 0)
+    total = m + per_coach
+    kinds = []
+    for key in coach_baseline.RECORDS:
+        block = paired.get(key)
+        if not block:
+            continue
+        counted = len(block["pairs"]) + int(block["unscorable"]) + int(block["not_yet_scored"])
+        r = skill["records"].get(key) or {}
+        scored = int(r.get("n") or 0)
+        words = coach_baseline.RECORD_WORDS[key]
+        sentence = f"{words.capitalize()}: {counted} of the {len(rows)} counted forecasts."
+        out = {"key": key, "words": words, "counted": counted, "n": scored, "unscored": counted - scored}
+        if not scored:
+            out["sentence"] = sentence + " None could also be scored by the simple prediction, so nothing is tested."
+            kinds.append(out)
+            continue
+        b, c = r["coach_only"], r["rule_only"]
+        d = b + c
+        p = calibration_v2.binomial_two_sided_p(b, d, 0.5) if d else 1.0
+        p_kinds, p_all = min(1.0, p * m), min(1.0, p * total)
+        on = f"On the {scored} the simple prediction could also be scored on" if counted != scored else "On them"
+        sentence += f" {on}, the coaches were right {_times(r['coach_right'])} and the simple prediction that nothing would change {_times(r['rule_right'])}."
+        if d:
+            sentence += (
+                f" Tested on the {d} where only one of the two was right (the coaches alone {b}, the simple prediction alone {c}),"
+                f" an exact two-sided sign test gives p = {_p_words(p)} before any adjustment; p = {_p_words(p_kinds)} adjusted for"
+                f" the {m} kinds of call tested, and p = {_p_words(p_all)} counting all {total} subgroup comparisons (Bonferroni):"
+                f" {_subgroup_finding(b, c, p, p_kinds, p_all, m, total)}."
+            )
+        else:
+            sentence += " No call where only one of the two was right, so there is nothing to test."
+        out.update(
+            {
+                "coach_right": r["coach_right"],
+                "rule_right": r["rule_right"],
+                "coach_only": b,
+                "rule_only": c,
+                "discordant": d,
+                "p": round(p, 4),
+                "p_adjusted": round(p_kinds, 4),
+                "p_adjusted_all": round(p_all, 4),
+                "estimate": r["estimate"],
+                "ci": r["ci"],
+                "ci_confidence": r["ci_confidence"],
+                "label": r["label"],
+                "sentence": sentence,
+            }
+        )
+        kinds.append(out)
+    return {
+        "exploratory": True,
+        "n": len(rows),
+        "test": "exact two-sided sign test on the calls only one of the two got right, per kind of call",
+        "kinds_tested": m,
+        "per_coach_tests": per_coach,
+        "comparisons": total,
+        "adjustment": "bonferroni",
+        "adjustment_words": (
+            f"Each kind of call carries three p-values: before any adjustment; adjusted (Bonferroni) for the {m} kinds of"
+            f" call tested, the correction the adopted method applies across kinds of call; and adjusted for all {total}"
+            f" subgroup comparisons served for this sample (the {m} kinds and the {per_coach} per-coach comparisons)."
+        ),
+        "method_version": calibration_v2.METHOD_VERSION,
+        "kinds": kinds,
+        "caveat": SUBGROUP_CAVEAT,
+    }
+
+
+VERIFY_JOB = "__verify__:"  # a `_parallel_fetch` job-key prefix — never a short coach id
+
+
+def add_verify_jobs(jobs: dict, coach_pks: dict, query) -> None:
+    """Add each coach's VERIFY# read (projected, paginated) to ``/api/calibration``'s concurrent fetch. Read through the
+    same governed table, so a private call's record never arrives; a record is joined only through a public pointer."""
+    for cid, pk in coach_pks.items():
+        jobs[VERIFY_JOB + cid] = lambda pk=pk: query(pk, verification_record.VERIFY_PREFIX, VERIFY_PROJECTION, paginate=True)
+
+
+def fetch_with_headline(jobs: dict, coach_ids: dict, _g: dict) -> tuple[dict, dict | None]:
+    """``/api/calibration``'s ONE concurrent fetch, plus each coach's VERIFY# read: ``(fetched, headline)`` with the
+    VERIFY# results popped out of ``fetched`` (the route's own jobs come back exactly as before). ``coach_ids`` =
+    {short id: partition coach id}; ``_g`` = the route's injectable globals (its fetch, query and genesis)."""
+    parallel_fetch, query, genesis = _g["_parallel_fetch"], _g["_query_partition"], _g["EXPERIMENT_START"]
+    coach_pks = {cid: f"COACH#{full}" for cid, full in coach_ids.items()}
+    add_verify_jobs(jobs, coach_pks, query)
+    failed: list = []
+    fetched = parallel_fetch(jobs, failures=failed)
+    return fetched, headline_of(fetched, failed, list(coach_pks), genesis=genesis)
+
+
+def headline_of(fetched: dict, failed: list, cids: list, *, genesis: str | None) -> dict | None:
+    """Pop the VERIFY# reads out of ``fetched`` and build the headline — None when ANY coach or VERIFY# read failed (a
+    partial read never publishes a partial headline)."""
+    verify = {cid: fetched.pop(VERIFY_JOB + cid, []) for cid in cids}
+    if any(k in cids or str(k).startswith(VERIFY_JOB) for k in failed):
+        return None
+    return headline({cid: fetched.get(cid) or [] for cid in cids}, verify, genesis=genesis)
 
 
 def headline(rows_by_coach: dict, verify_by_coach: dict, *, genesis: str | None) -> dict | None:
@@ -357,9 +582,15 @@ def headline(rows_by_coach: dict, verify_by_coach: dict, *, genesis: str | None)
         return None
 
     cats = {key: category_of(row, rec) for key, _c, row, rec in eligible}
-    # repeats: within a family the earliest counted forecast stands; the rest are the same forecast, counted once
+    # repeats: within a family the earliest counted forecast stands; the rest are the same forecast, counted once. The
+    # member that stands is the one the stored marker names (coach.repeat_family: role "first", the earliest filed —
+    # owner ruling 2026-11-09 B); filing time is only the fallback for a row without a marker. The route's projected
+    # read carries the filing DAY, not the instant, so without the marker two same-day filers fell back to key order
+    # and a repeat was credited to the wrong coach (owner ruling 2026-11-10, the CR1 pre-flip review).
     seen: set = set()
-    for key, _c, row, rec in sorted(eligible, key=lambda t: (str(t[2].get("created_at") or t[2].get("created_date") or ""), t[0])):
+    for key, _c, row, rec in sorted(
+        eligible, key=lambda t: (_stands_rank(t[2]), str(t[2].get("created_at") or t[2].get("created_date") or ""), t[0])
+    ):
         fam = _family(row, rec)
         if cats[key] != COUNTED or not fam:
             continue
@@ -377,13 +608,16 @@ def headline(rows_by_coach: dict, verify_by_coach: dict, *, genesis: str | None)
     first = [row for _k, _c, row, _rec in eligible if first_status(row)]
     ak, an = sum(1 for r in first if first_status(r) == "confirmed"), len(first)
     n = verified["n"] if verified else 0
+    by_coach = {cid: counted_block([r for _k, c, r in counted if c == cid], with_sentence=False) for cid in sorted(rows_by_coach)}
     return {
         "eligible_total": len(eligible),
         "verified": verified,
         "excluded_by_category": [{"key": c, "label": label, "n": tally[c]} for c, label in EXCLUDED_CATEGORIES if tally[c]],
         "excluded_total": sum(tally.values()),
         "counted_calls": sorted(key for key, _c, _r in counted),
-        "by_coach": {cid: counted_block([r for _k, c, r in counted if c == cid], with_sentence=False) for cid in sorted(rows_by_coach)},
+        "by_coach": by_coach,
+        # Owner ruling 2026-11-10 (2): the secondary, exploratory split of the SAME counted calls by kind of call.
+        "subgroups": subgroups([row for _k, _c, row in counted], by_coach),
         "archive": {
             "label": FIRST_GRADE_LABEL,
             "n": an,

@@ -429,7 +429,7 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
     return derived_summary_freshness.annotate_timeline(superseded_gap_reads.apply(out, table, pacific_today()), table, coach_id)
 
 
-def _dossier_block(coach_id, *, _g):
+def _dossier_block(coach_id, *, _g, commitments_only=False):
     """#1387 — The Coach Dossier: what this coach knows, rendered VERBATIM from the
     COACH# partitions. Deterministic build — no LLM anywhere in this path; every
     line carries its date and, where derivable, an evidence link.
@@ -447,7 +447,14 @@ def _dossier_block(coach_id, *, _g):
     error there withholds every section corrections apply to (rather than
     serving them unfiltered, which could republish a record under an unread
     retraction) and sets `degraded=True` so the failure is disclosed, not
-    masked behind `retracted: 0`."""
+    masked behind `retracted: 0`.
+
+    ``commitments_only`` (/api/coaching-dashboard's open_actions, which reads nothing else):
+    the commitments are built exactly as above — same rows, privacy pass and fail-closed
+    corrections — and the learnings, relationship and docket reads are skipped. Since #5627
+    the learning trail costs a prediction read per learning; the dashboard paid that for
+    every coach and threw it away, roughly doubling the route's time (measured: p50
+    ~1.1 s to ~2.2 s from 2026-11-03), and the dashboard gates the coaching door's LCP."""
     _docket_rows = _g["_docket_rows"]
     _reader_reason = _g["_reader_reason"]
     table = _g["table"]
@@ -480,7 +487,7 @@ def _dossier_block(coach_id, *, _g):
     learnings = []
     trail_counts = {"corrected": 0, "withheld": 0, "unverified": 0}
     try:
-        for it in _rows("LEARNING#", 60):
+        for it in [] if commitments_only else _rows("LEARNING#", 60):
             entry, status = coach_dossier.learning_entry(it, reason_translator=_reader_reason)
             if status == coach_dossier.WITHHELD:
                 withheld += 1
@@ -495,7 +502,7 @@ def _dossier_block(coach_id, *, _g):
 
     relationship = None
     try:
-        rel_item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "RELATIONSHIP#state"}).get("Item")
+        rel_item = None if commitments_only else table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "RELATIONSHIP#state"}).get("Item")
         if singleton_visible(rel_item):  # #946/#1085: a wiped cycle's state never serves pre-start
             entry, status = coach_dossier.relationship_entry(_decimal_to_float(rel_item))
             if status == coach_dossier.WITHHELD:
@@ -510,7 +517,7 @@ def _dossier_block(coach_id, *, _g):
         # #1799: phase-filter IN the query here too — tombstoned prior-cycle OPEN# rows
         # (the reset tombstones, never deletes) must not consume this page either. The
         # post-query singleton_visible check below stays as the belt to that suspenders.
-        for it in _docket_rows("OPEN#", 40, newest_first=False):
+        for it in [] if commitments_only else _docket_rows("OPEN#", 40, newest_first=False):
             if not singleton_visible(it):
                 continue
             entry, status = coach_dossier.docket_entry(_decimal_to_float(it), coach_id)

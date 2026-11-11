@@ -684,7 +684,7 @@ class ComputeStack(Stack):
             **shared,
         )
 
-        create_platform_lambda(
+        coach_history_summarizer = create_platform_lambda(
             self,
             "CoachHistorySummarizer",
             function_name="coach-history-summarizer",
@@ -703,6 +703,16 @@ class ComputeStack(Stack):
             },
             custom_policies=rp.compute_coach_orchestrator(),
             **shared,
+        )
+        # Owner ruling 2026-11-09 (third, E): the public-safe coaching brief's Monday run (coach.public_brief) — its own
+        # schedule and its own inputs on the same function and role (DDB table, Bedrock, config read are all granted).
+        add_table_schedule(
+            self,
+            "PublicBrief",
+            target=coach_history_summarizer,
+            schedule=table_schedule("coach-history-summarizer#PublicBrief"),
+            schedule_input={"mode": "public_brief"},
+            description="2026-11-09 E: the weekly public-safe coaching brief (dark until its switch)",
         )
 
         create_platform_lambda(

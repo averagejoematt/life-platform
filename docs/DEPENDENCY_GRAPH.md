@@ -28,7 +28,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `chronicle-email-sender` | email_stack | `cron(10 8 ? * WED *)` (America/Los_Angeles, not UTC) | table |
 | `circadian-compliance` | compute_stack | `cron(0 19 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-daily-reflection` | compute_stack | `cron(0 12 * * ? *)` (America/Los_Angeles, not UTC) | table |
-| `coach-history-summarizer` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `coach-history-summarizer` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) + `cron(0 9 ? * MON *)` (America/Los_Angeles, not UTC) | table, table |
 | `coach-memoir` | compute_stack | `cron(0 8 1 1,4,7,10 ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-nudge` | email_stack | `cron(10 8-22 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-panel-podcast` | email_stack | `cron(0 11 ? * MON,WED *)` (America/Los_Angeles, not UTC) | table |
@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-784 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+787 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -231,7 +231,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `temptations` | — | site_api_mind.py |
 | `time_affluence` | — | — |
 | `todoist` | — | daily_insight_compute_lambda.py, intelligence_common.py, site_api_fulfillment.py, site_api_sleep.py, tools_todoist.py |
-| `training_constraints` | tools_training_notes.py, variant_rotation.py | — |
+| `training_constraints` | tools_training_notes.py, variant_rotation.py | note_requests.py |
 | `training_notes` | training_notes_llm.py | tools_training_notes.py, training_notes_llm.py |
 | `training_reference` | — | episode_detect_lambda.py, site_api_nutrition.py, site_api_training.py |
 | `travel` | — | adaptive_mode_lambda.py, anomaly_detector_lambda.py, tools_lifestyle.py |
@@ -286,7 +286,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 101 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 — of 146 alarms (4 composite)
+Routing: digest 104 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 — of 149 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -395,7 +395,9 @@ Routing: digest 101 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent
 | `life-platform-remediation-dispatcher-errors` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `life-platform-s3-bucket-size-high` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `life-platform-weekly-signal-kill-switch-skip` | monitoring_stack | metric | digest | declaration |  |
+| `mcp-auth-failures` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `mcp-server-duration-high` | mcp_stack | metric | digest | declaration |  |
+| `mcp-throttles` | mcp_stack | metric | digest | declaration |  |
 | `mcp-warmer-error` | mcp_stack | metric | digest | constructor:create_platform_lambda |  |
 | `mcp-warmer-no-invocations-24h` | mcp_stack | metric | digest | declaration |  |
 | `nightly-predraft-missing` | mcp_stack | metric | digest | declaration |  |
@@ -414,6 +416,7 @@ Routing: digest 101 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent
 | `recall-index-failed-chronicle-approve` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `recall-index-failed-wednesday-chronicle` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `recap-card-no-invocations-24h` | operational_stack | metric | digest | declaration |  |
+| `sensor-self-test-stale` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `site-api-ai-errors` | serve_stack | metric | digest+urgent | declaration | reader |
 | `site-api-ai-throttles` | serve_stack | metric | digest+urgent | declaration | reader |
 | `site-api-content-filter-fallback` | serve_stack | metric | digest+urgent | declaration | reader |
@@ -583,11 +586,11 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1377 total · 983 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1381 total · 987 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
-- Alarms: 146 literal-named declarations across three idioms, 4 composite; routing digest 101 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 149 literal-named declarations across three idioms, 4 composite; routing digest 104 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 96 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
+- Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -602,9 +605,9 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 146 | this model's alarms plane (CDK AST) |
+| alarms | 149 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 34 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 96 | this model's schedules plane (CDK AST) |
+| schedules | 97 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

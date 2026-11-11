@@ -99,6 +99,7 @@ from web.site_api_coach import (
     handle_voice_fidelity,
     handle_weekly_priority,
 )
+from web.site_api_coach_brief import handle_coach_brief  # owner ruling 2026-11-09 (third, E), dark
 
 # P1.1 Phase B (2026-05-26): shared helpers extracted to sibling module.
 # Re-import as module-level names so the rest of this file (and the
@@ -465,6 +466,7 @@ ROUTES = {
     "/api/series": None,  # one metric's daily series with presence/gap flags
     "/api/ledger_export": None,  # the whole prediction ledger, paged, with the grader's flags and corrections
     "/api/chapters": None,  # every program week since genesis: published | held | skipped | pending
+    "/api/coach_brief": None,  # owner ruling 2026-11-09 (third, E): the public-safe coaching brief — 404 while dark
     "/api/pairs": None,  # precomputed pair statistics (Pearson, Spearman, n_eff, Fisher CI, BH-FDR) for the data room
     # EL-2: Experiment library (GET) + EL-3: Experiment vote (POST)
     "/api/experiment_library": handle_experiment_library,
@@ -611,6 +613,7 @@ _SIMPLE_ROUTES = {
     "/api/ledger_export": ({"GET"}, handle_ledger_export),
     "/api/chapters": ({"GET"}, handle_chapters),
     "/api/pairs": ({"GET"}, handle_pairs),
+    "/api/coach_brief": ({"GET"}, handle_coach_brief),  # 2026-11-09 E: query-string GET (?coach=<id>); 404 while dark
 }
 
 
@@ -888,7 +891,7 @@ def _dispatch_route(event, path, method):
                     if _cd_full_id in _cd_absent:
                         continue  # #4217: an absent coach has no standing ask on the door
                     try:
-                        _cd_dossier = _dossier_block(_cd_full_id)
+                        _cd_dossier = _dossier_block(_cd_full_id, commitments_only=True)  # only commitments are read here
                     except Exception:
                         continue  # one coach's dossier failing must not blank the board
                     for _cd_commit in _cd_dossier.get("commitments", []) or []:

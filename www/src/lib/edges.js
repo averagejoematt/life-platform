@@ -91,13 +91,14 @@ export function buildIndex(objects) {
  */
 export function connected(index, type, id, opts = {}) {
   const cap = opts.cap ?? 7;
+  const keep = typeof opts.keep === "function" ? opts.keep : () => true; // e.g. no row for an object with no page
   const k = key(type, id);
   const seen = new Set();
   const all = [];
   const inbound = (index.in.get(k) || []).filter((e) => !OUTBOUND_ONLY.includes(e.type));
   for (const e of [...(index.out.get(k) || []), ...inbound]) {
     const ek = key(e.type, e.id);
-    if (ek === k || seen.has(ek)) continue;
+    if (ek === k || seen.has(ek) || !keep(e)) continue;
     seen.add(ek);
     all.push(e);
   }

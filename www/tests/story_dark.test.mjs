@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { STORY_DATA_FILE, STORY_ENV, STORY_MARKER, STORY_ROUTES, notStoryPage, storyEnabled, storyIntegration } from "../src/lib/story_dark.js";
+import { STORY_DATA_FILE, STORY_ENV, STORY_LIVE, STORY_MARKER, STORY_ROUTES, notStoryPage, storyEnabled, storyIntegration, storyPrivate } from "../src/lib/story_dark.js";
 import { ROOM_ENV, roomEnabled } from "../src/lib/room.js";
 import { feeds, gatedPaths, jsonFiles, orphanChunks, ownedPaths, sitemaps } from "../scripts/story_audit.mjs";
 import { walk } from "../scripts/room_audit.mjs";
@@ -20,7 +20,7 @@ import { walk } from "../scripts/room_audit.mjs";
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = resolve(process.env.STORY_AUDIT_DIST || join(WWW, "dist"));
 const HAVE_DIST = existsSync(join(DIST, "index.html"));
-const STORY_PATH = STORY_ROUTES[0].path; // "/story/timeline/"
+const STORY_PATH = STORY_ROUTES[0].path; // "/story/so-far/" (never /story/timeline/: the kept v8 page)
 
 function plantedCopy() {
   const dir = mkdtempSync(join(tmpdir(), "story-audit-"));
@@ -32,19 +32,19 @@ function plantedCopy() {
 test("only the literal WEB_STORY=1 turns the story on, and it is a separate switch from the room", () => {
   assert.equal(STORY_ENV, "WEB_STORY");
   assert.notEqual(STORY_ENV, ROOM_ENV);
-  assert.equal(storyEnabled({}), false);
-  for (const v of ["", "0", "true", "yes", " 1", "1 "]) assert.equal(storyEnabled({ WEB_STORY: v }), false, `WEB_STORY=${JSON.stringify(v)}`);
-  assert.equal(storyEnabled({ WEB_STORY: "1" }), true);
-  assert.equal(storyEnabled({ WEB_ROOM: "1" }), false, "the room's switch does not turn the story on");
+  assert.equal(storyEnabled({}, false), false);
+  for (const v of ["", "0", "true", "yes", " 1", "1 "]) assert.equal(storyEnabled({ WEB_STORY: v }, false), false, `WEB_STORY=${JSON.stringify(v)}`);
+  assert.equal(storyEnabled({ WEB_STORY: "1" }, false), true);
+  assert.equal(storyEnabled({ WEB_ROOM: "1" }, false), false, "the room's switch does not turn the story on");
   assert.equal(roomEnabled({ WEB_STORY: "1" }, "off"), false, "the story's switch does not turn the room on");
 });
 
 test("switch off: the integration injects no route (control: switch on injects every story route)", () => {
   const off = [];
-  storyIntegration({}).hooks["astro:config:setup"]({ injectRoute: (r) => off.push(r) });
+  storyIntegration({}, false).hooks["astro:config:setup"]({ injectRoute: (r) => off.push(r) });
   assert.deepEqual(off, []);
   const on = [];
-  storyIntegration({ WEB_STORY: "1" }).hooks["astro:config:setup"]({ injectRoute: (r) => on.push(r) });
+  storyIntegration({ WEB_STORY: "1" }, false).hooks["astro:config:setup"]({ injectRoute: (r) => on.push(r) });
   assert.deepEqual(
     on.map((r) => r.pattern),
     STORY_ROUTES.map((r) => r.pattern),
@@ -70,15 +70,16 @@ test("the story's pages live outside src/pages (no static route, no page imports
 
 test("the sitemap filter drops every story path and keeps everything else", () => {
   for (const r of STORY_ROUTES) {
-    assert.equal(notStoryPage(`https://averagejoematt.com${r.path}`), false);
-    assert.equal(notStoryPage(`https://averagejoematt.com/next/v9${r.path}`), false);
+    assert.equal(notStoryPage(`https://averagejoematt.com${r.path}`, false), false);
+    assert.equal(notStoryPage(`https://averagejoematt.com/next/v9${r.path}`, false), false);
   }
   for (const u of ["https://averagejoematt.com/", "https://averagejoematt.com/story/", "https://averagejoematt.com/story/week-04/", "https://averagejoematt.com/story/essays/x/"])
-    assert.equal(notStoryPage(u), true, u);
+    assert.equal(notStoryPage(u, false), true, u);
 });
 
 // ── the flag-off dist: six checks, each with its own planted control ──────────────────────────────────────────────
-const distTest = (name, fn) => test(name, { skip: HAVE_DIST ? false : `no built dist at ${DIST} — run the flag-off build first (CI: check_www_build.py)` }, fn);
+const distTest = (name, fn) =>
+  test(name, { skip: STORY_LIVE ? "the story is committed live (STORY_LIVE): the flag-off proofs do not apply" : HAVE_DIST ? false : `no built dist at ${DIST} — run the flag-off build first (CI: check_www_build.py)` }, fn);
 
 distTest("1 · every story path and the data file is a 404 on direct request (control: a planted page answers 200)", async () => {
   assert.deepEqual(await gatedPaths(DIST), []);
@@ -126,7 +127,7 @@ distTest("4 · no feed or search index, and nothing machine-readable names a sto
   assert.deepEqual(feeds(DIST), []);
   const dir = plantedCopy();
   try {
-    writeFileSync(join(dir, "feed.xml"), `<rss><item><link>https://averagejoematt.com${STORY_ROUTES[1].path}</link></item></rss>`);
+    writeFileSync(join(dir, "feed.xml"), `<rss><item><link>https://averagejoematt.com${STORY_PATH}</link></item></rss>`);
     const leaks = feeds(dir);
     assert.ok(leaks.some((l) => l.startsWith("feed.xml: a feed")) && leaks.some((l) => l.includes("names a story path")), `the control must red: ${leaks}`);
   } finally {
@@ -134,10 +135,10 @@ distTest("4 · no feed or search index, and nothing machine-readable names a sto
   }
 });
 
-test("5 · the committed owned_paths.json names no story path (control: a planted route and data file)", () => {
+test("5 · the committed owned_paths.json names no story path (control: a planted route and data file)", { skip: STORY_LIVE ? "the story is committed live" : false }, () => {
   const owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"));
   assert.deepEqual(ownedPaths(owned), []);
-  const planted = { ...owned, routes: [...owned.routes, STORY_PATH], static_routes: [...owned.static_routes, STORY_ROUTES[1].path], files: [...owned.files, STORY_DATA_FILE] };
+  const planted = { ...owned, routes: [...owned.routes, STORY_PATH], static_routes: [...owned.static_routes, STORY_PATH], files: [...owned.files, STORY_DATA_FILE] };
   assert.ok(ownedPaths(planted).length >= 3, `the control must red: ${ownedPaths(planted)}`);
 });
 
@@ -160,4 +161,39 @@ distTest("6 · no CSS/JS chunk exists only for a gated page, no story-named asse
 distTest("the flag-off dist holds no story route directory and no story data file at all", () => {
   for (const r of STORY_ROUTES) assert.ok(!existsSync(join(DIST, r.path)), `${r.path} must not exist in a flag-off dist (was this dist built with WEB_STORY=1?)`);
   assert.ok(!walk(DIST).some((p) => p.endsWith(`/${STORY_DATA_FILE}`)));
+});
+
+// ── the route collision (2026-11-09) and the go-live switch ─────────────────────────────────────────────────────────
+test("no story route is the established /story/timeline/ (the kept v8 page, deployed from site/) — nor any kept site/ page", () => {
+  const SITE = join(WWW, "..", "site");
+  assert.ok(existsSync(join(SITE, "story", "timeline", "index.html")), "the control: the kept page this guards is still in site/");
+  for (const r of STORY_ROUTES) {
+    assert.notEqual(r.path, "/story/timeline/");
+    assert.ok(!existsSync(join(SITE, r.path, "index.html")), `${r.path} would land on site${r.path}index.html`);
+  }
+  assert.ok(!STORY_ROUTES.some((r) => r.path === "/story/episodes/"), "the episode index is folded into the timeline");
+});
+
+test("the go-live constant is one literal line, false until the owner's go (feat/story-go-live flips it)", () => {
+  const src = readFileSync(join(WWW, "src", "lib", "story_dark.js"), "utf8");
+  assert.equal((src.match(/^export const STORY_LIVE = (true|false);$/gm) || []).length, 1, "scripts/www_launch_switch.py reads exactly this one line");
+  assert.equal(typeof STORY_LIVE, "boolean");
+});
+
+test("live: the story is on with no env, kept in the sitemap, never a private build (control: dark)", () => {
+  assert.equal(storyEnabled({}, true), true);
+  assert.equal(storyPrivate({ WEB_STORY: "1" }, true), false);
+  assert.equal(storyPrivate({ WEB_STORY: "1" }, false), true, "the control: dark + env switch IS the private build");
+  for (const r of STORY_ROUTES) assert.equal(notStoryPage(`https://averagejoematt.com${r.path}`, true), true);
+  const on = [];
+  storyIntegration({}, true).hooks["astro:config:setup"]({ injectRoute: (r) => on.push(r.pattern) });
+  assert.deepEqual(on, STORY_ROUTES.map((r) => r.pattern));
+});
+
+test("live dist: the timeline is built, owned and public — no private label", { skip: !STORY_LIVE ? "the story is dark (STORY_LIVE false)" : !HAVE_DIST ? "no built dist" : false }, () => {
+  const owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"));
+  assert.ok(owned.routes.includes(STORY_PATH) && owned.static_routes.includes(STORY_PATH), "owned_paths.json owns the timeline");
+  const html = readFileSync(join(DIST, STORY_PATH, "index.html"), "utf8");
+  assert.ok(!html.includes("private build"));
+  assert.ok(!readFileSync(join(DIST, "story", "index.html"), "utf8").includes("private build"));
 });

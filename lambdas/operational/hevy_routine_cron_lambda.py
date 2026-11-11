@@ -121,12 +121,24 @@ def _read_partition(source: str, start: str, end: str) -> list[dict[str, Any]]:
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
+def _read_corrections(start: str, end: str) -> list[dict[str, Any]] | None:
+    """The owner's WALK_CORRECTION# rows in [start, end] (#5669), the bundled twin of
+    `mcp.shared_quantities._read_corrections`; a raise is None (unreadable — the corrected day keeps its gap)."""
+    from training import exercise_history, walking_volume
+
+    try:
+        return walking_volume.query_corrections(exercise_history._table(), start, end)
+    except Exception as e:  # noqa: BLE001 — unreadable is reported by the block, never raised past it
+        logger.warning(f"recent-aerobic correction read failed: {e}")
+        return None
+
+
 def _z2_minutes_7d(target_date: str, read=None) -> float | None:
     """#4410: the generator's aerobic minutes from the ONE recent-aerobic quantity
     (`training.recent_aerobic`, the block `mcp.shared_quantities.recent_aerobic_layer` builds) —
     never a hard-coded 0. A source that cannot be read reaches the block as None, and the
     minutes come back None (UNKNOWN, ADR-104): no "walk more" note on an unread week."""
-    from training import recent_aerobic
+    from training import recent_aerobic, walking_volume
 
     w = recent_aerobic.window(target_date)
 
@@ -145,12 +157,25 @@ def _z2_minutes_7d(target_date: str, read=None) -> float | None:
             logger.warning(f"recent-aerobic read failed for apple_health: {e}")
             return None
 
+    def _signals() -> dict[str, list[dict[str, Any]] | None]:
+        # #5669: WHOOP one UTC day past the window (its rows are keyed by the UTC day of the start)
+        out: dict[str, list[dict[str, Any]] | None] = {}
+        for source, past in walking_volume.COMPLETENESS_READ_PAST_END_DAYS.items():
+            try:
+                out[source] = (read or _read_partition)(source, w["start"], shift_day_key(w["end"], past))
+            except Exception as e:  # noqa: BLE001 — the check says it could not read the source
+                logger.warning(f"recent-aerobic signal read failed for {source}: {e}")
+                out[source] = None
+        out[walking_volume.CORRECTION_INPUT] = _read_corrections(w["start"], w["end"])  # #5669: the owner's corrections
+        return out
+
     block = recent_aerobic.build(
         target_date=target_date,
         today=pacific_today(),
         strava_items=_safe("strava"),
         hevy_workouts=_safe("hevy"),
         apple_items=_safe_apple(),
+        completeness_inputs=_signals(),  # #5669: the walk-signal check
     )
     return recent_aerobic.aerobic_minutes_7d(block)
 

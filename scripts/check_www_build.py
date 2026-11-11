@@ -55,6 +55,7 @@ sys.path.insert(0, REPO)
 from deploy import www_owned_paths  # noqa: E402 — the one reader of owned_paths.json (#5534)
 
 sys.path.insert(0, os.path.join(REPO, "scripts"))
+import www_launch_switch  # noqa: E402 — the committed go-live constants (LAB_LIVE, STORY_LIVE): a live feature is not a leak
 import www_verbatim  # noqa: E402 — dates in words, quote-aware (owner ruling 2026-11-02); a page-universal rule, fixture AND live
 
 SENTINELS = ("SENTINEL", "DO-NOT-PUBLISH", "POISON-HELD")
@@ -342,13 +343,16 @@ def room_leaks(dist: str, room_js: str = ROOM_JS, published: str | None = None) 
 LAB_JS = os.path.join(WWW, "src", "lib", "lab.js")
 
 
-def lab_leaks(dist: str, lab_js: str = LAB_JS) -> list[str]:
+def lab_leaks(dist: str, lab_js: str = LAB_JS, live: bool | None = None) -> list[str]:
     """L1 (built dark, owner brief 2026-11-08): the Laboratory is NEVER deployed — the room's rule for its own switch. A
     dist that holds anything under a Lab route (read off www/src/lib/lab.js LAB_ROUTES' `path:` values), the Lab's data
     file or the `data-lab` marker is a WEB_LAB=1 build and is refused here, on every deploy (`--scan-only`).
-    www/tests/lab.test.mjs holds the finer flag-off checks."""
+    www/tests/lab.test.mjs holds the finer flag-off checks.
+    Once the owner's go commits LAB_LIVE (www/src/lib/lab.js, read by scripts/www_launch_switch.py) the Lab's pages and
+    marker are ordinary build output and are not refused; the data file is never build output, live or not."""
+    live = www_launch_switch.lab_live(lab_js) if live is None else live
     out = []
-    for p in sorted(set(room_paths(lab_js))):
+    for p in [] if live else sorted(set(room_paths(lab_js))):
         if os.path.exists(os.path.join(dist, p.strip("/"))):
             out.append(f"{p.strip('/')}/: a Laboratory page in the dist — a WEB_LAB=1 build is private and is never deployed")
     for dirpath, _d, files in os.walk(dist):
@@ -356,7 +360,11 @@ def lab_leaks(dist: str, lab_js: str = LAB_JS) -> list[str]:
             rel = os.path.relpath(os.path.join(dirpath, name), dist)
             if name == "lab.json":
                 out.append(f"{rel}: the Laboratory's data file in the dist")
-            elif name.endswith(".html") and 'data-lab="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read():
+            elif (
+                not live
+                and name.endswith(".html")
+                and 'data-lab="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read()
+            ):
                 out.append(f"{rel}: carries the Laboratory marker data-lab — a WEB_LAB=1 build is never deployed")
     return out
 
@@ -364,13 +372,16 @@ def lab_leaks(dist: str, lab_js: str = LAB_JS) -> list[str]:
 STORY_JS = os.path.join(WWW, "src", "lib", "story_dark.js")
 
 
-def story_leaks(dist: str, story_js: str = STORY_JS) -> list[str]:
+def story_leaks(dist: str, story_js: str = STORY_JS, live: bool | None = None) -> list[str]:
     """HS1 (built dark, owner brief 2026-11-08): the Human Story's timeline and episode index are NEVER deployed. A dist
     that holds a story page, the story's data file or the data-story-dark marker is a WEB_STORY=1 build; this scan runs
     on every deploy (`--scan-only`), so such a dist is refused before it can reach S3. www/tests/story_dark.test.mjs
-    holds the finer flag-off checks. The routes are read off story_dark.js (STORY_ROUTES' `path:` values)."""
+    holds the finer flag-off checks. The routes are read off story_dark.js (STORY_ROUTES' `path:` values).
+    Once the owner's go commits STORY_LIVE (read by scripts/www_launch_switch.py) the story's pages and marker are
+    ordinary build output and are not refused; the data file is never build output, live or not."""
+    live = www_launch_switch.story_live(story_js) if live is None else live
     out = []
-    for p in room_paths(story_js):
+    for p in [] if live else room_paths(story_js):
         if os.path.exists(os.path.join(dist, p.strip("/"))):
             out.append(f"{p.strip('/')}/: a Human Story page in the dist — a WEB_STORY=1 build is private and is never deployed")
     for dirpath, _d, files in os.walk(dist):
@@ -379,7 +390,8 @@ def story_leaks(dist: str, story_js: str = STORY_JS) -> list[str]:
             if name == "story.json":
                 out.append(f"{rel}: the Human Story's data file in the dist")
             elif (
-                name.endswith(".html")
+                not live
+                and name.endswith(".html")
                 and 'data-story-dark="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read()
             ):
                 out.append(f"{rel}: carries the Human Story marker data-story-dark — a WEB_STORY=1 build is never deployed")

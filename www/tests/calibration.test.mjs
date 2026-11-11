@@ -18,8 +18,13 @@ import {
   verifiedRecord,
   calibrationDots,
   concentrationText,
+  denominatorSteps,
   intervalText,
-  labelWords,
+  subgroupBlock,
+  v2Answers,
+  v2MethodText,
+  v2Short,
+  v2Stratum,
   recordHeadline,
   strataRows,
   versusGuess,
@@ -80,13 +85,39 @@ test("absent data file → no headline (the page says so)", () => {
   assert.equal(recordHeadline(null), null);
 });
 
-test("calibration labels: inadequate evidence reads as such; the API's label is rendered, no threshold invented", () => {
-  assert.match(labelWords("not_measurable"), /^not measurable/);
-  assert.equal(labelWords("insufficient_data"), "insufficient evidence");
-  assert.equal(labelWords("nascent"), "insufficient evidence");
-  assert.equal(labelWords("over-confident"), "came true less often than stated");
-  assert.equal(labelWords("some_new_label"), "some new label");
-  assert.equal(labelWords(null), "no label served");
+test("calibration-v2 (owner 2026-11-09): three answers in the served words, in order; nothing invented", () => {
+  const nutrition = FIXTURE.calibration.coaches.find((c) => c.coach_id === "nutrition");
+  const xs = v2Answers(nutrition.assessment_v2);
+  assert.deepEqual(xs.map((x) => x.key), ["estimability", "confidence_direction", "skill"]);
+  assert.match(xs[1].words, /^Over-confident at its 50% calls \(\d+ of \d+ came true, 95% CI \d+%–\d+%; Holm-adjusted p [\d.]+\)/);
+  assert.match(xs[1].words, /not about calibration across confidence levels/);
+  assert.equal(xs[1].short, "over-confident at its 50% calls");
+  assert.match(v2Short(nutrition.assessment_v2), /^not estimable across confidence levels · over-confident at its 50% calls · /);
+  assert.deepEqual(v2Answers(null), []);
+  assert.deepEqual(v2Answers({ confidence_direction: { label: "over_confident" } }), [], "a bare label is never turned into words");
+  assert.equal(v2Short(undefined), null);
+  assert.equal(v2Stratum(FIXTURE.calibration, "coaches").method_version, "calibration-v2");
+  assert.equal(v2Stratum(FIXTURE.calibration, "nope"), null);
+  assert.equal(v2MethodText(FIXTURE.calibration), "calibration-v2, adopted 9 November 2026");
+  assert.equal(v2MethodText({}), null);
+});
+
+test("no v1 calibration label reaches the words: the served v1 fields are never read (sentinel + mutation control)", () => {
+  const SENT = "V1SENTINEL_LABEL";
+  const cal = clone(FIXTURE.calibration);
+  for (const c of cal.coaches) Object.assign(c, { calibration: SENT, label: SENT });
+  for (const s of Object.values(cal.platform.strata)) Object.assign(s, { calibration: SENT, label: SENT });
+  Object.assign(cal.platform, { calibration: SENT, label: SENT });
+  const file = { ...clone(FIXTURE), calibration: cal };
+  const out = JSON.stringify([
+    strataRows(file),
+    blendRow(file),
+    cal.coaches.map((c) => [v2Answers(c.assessment_v2), v2Short(c.assessment_v2)]),
+    recordHeadline(file),
+  ]);
+  assert.ok(!out.includes(SENT), "a v1 label reached a reader-facing value");
+  // mutation control: the detector does see the sentinel where it IS present
+  assert.ok(JSON.stringify(cal).includes(SENT));
 });
 
 test("stated confidence: the largest served band beside the coach's n, both carried", () => {
@@ -185,12 +216,33 @@ test("the excluded-calls accounting: nothing until the producer serves it; carri
   assert.equal(excludedAccounting({ verification_summary: { excluded_by_category: { low_power: "2" } } }), null, "a non-integer count is not served");
 });
 
+test("a label the wire gate blanked falls back to the page's own words for the producer's category", () => {
+  const served = excludedAccounting({
+    verification_summary: {
+      excluded_by_category: [
+        { key: "not_a_forecast", n: 16, label: "" },
+        { key: "past_period", n: 8, label: "" },
+        { key: "opinion", n: 32, label: "An opinion, explanation or hedge: not a measurable forecast" },
+      ],
+      excluded_total: 56,
+    },
+  });
+  assert.deepEqual(served.rows.map((r) => r.words), [
+    "Not a forecast: the outcome was already on the record when the call was made",
+    "About a past period whose data arrived later: kept as a look back, not a forecast",
+    "An opinion, explanation or hedge: not a measurable forecast",
+  ]);
+  const unknown = excludedAccounting({ verification_summary: { excluded_by_category: [{ key: "brand_new", n: 1, label: "" }] } });
+  assert.equal(unknown.rows[0].words, "brand new", "the control: a key the page does not know still reads as words, never blank");
+});
+
 test("per-coach verification and assessment_v2: shown when served, absent otherwise", () => {
   assert.equal(coachVerified(FIXTURE.calibration.coaches[0]), null);
   assert.deepEqual(coachVerified({ verification: { n: 15, confirmed: 6, accuracy_pct: 40, accuracy_ci95: [19.8, 64.3] } }), { k: 6, n: 15, pct: "40.0%", ci: "95% interval 19.8–64.3%" });
   assert.equal(assessmentWords(null), null);
-  assert.equal(assessmentWords({ sentence: "Served sentence." }), "Served sentence.");
-  assert.equal(assessmentWords({ label: "insufficient_data" }), "insufficient evidence");
+  assert.equal(assessmentWords({ sentence: "Not the v2 shape." }), null);
+  assert.equal(assessmentWords({ label: "insufficient_data" }), null, "a bare label is never rendered");
+  assert.equal(assessmentWords({ estimability: { wording: "A." }, skill: { wording: "C." } }), "A. C.");
 });
 
 // ── the CR1 launch (owner ruling 2026-11-09): the producer's verified lead, why it changed, uncertainty, exclusions ──
@@ -261,4 +313,47 @@ test("the counted calls: a Set from the producer's list; absent or malformed →
   assert.ok(s.has("nutrition-20261015-protein01") && !s.has("sleep-20261005-deepsleep01"));
   assert.equal(countedCalls(FIXTURE.calibration), null);
   assert.equal(countedCalls({ verification_summary: { counted_calls: [1, 2] } }), null);
+});
+
+// ── owner ruling 2026-11-10: the three denominators and the exploratory split by kind of call ─────────────────────
+
+test("denominators: eligible → left out (with the repeats named) → the verified sample, all carried", () => {
+  const d = denominatorSteps(SERVED.calibration);
+  assert.deepEqual(d, { eligible: 214, excluded: 143, counted: 71, repeats: 15 });
+  assert.equal(denominatorSteps(FIXTURE.calibration), null, "control: nothing served → no strip");
+});
+
+test("denominators: an accounting that does not reconcile is not shown (fail closed)", () => {
+  const f = clone(SERVED);
+  f.calibration.verification_summary.eligible_total = 215; // 143 + 71 ≠ 215
+  assert.equal(denominatorSteps(f.calibration), null);
+  const g = clone(SERVED);
+  delete g.calibration.verification_summary.eligible_total;
+  assert.equal(denominatorSteps(g.calibration), null, "an unserved eligible total is never derived");
+});
+
+test("subgroups: the producer's words and counts, carried; the kinds add up to the verified sample", () => {
+  const sg = subgroupBlock(SERVED.calibration);
+  assert.equal(sg.n, 71);
+  assert.deepEqual(sg.kinds.map((k) => [k.key, k.counted]), [["number", 31], ["direction", 29], ["sealed", 11]]);
+  const served = SERVED.calibration.verification_summary.subgroups.kinds;
+  sg.kinds.forEach((k, i) => assert.equal(k.sentence, served[i].sentence, "the sentence is the producer's, verbatim"));
+  assert.match(sg.caveat, /^Exploratory, not a headline result/);
+  assert.match(sg.adjustment, /three p-values: before any adjustment/);
+  assert.equal(subgroupBlock(FIXTURE.calibration), null, "control: nothing served → no section");
+});
+
+test("subgroups fail closed: not exploratory, another sample, a kind without words, or kinds that do not add up", () => {
+  const mut = (fn) => {
+    const f = clone(SERVED);
+    fn(f.calibration.verification_summary.subgroups);
+    return subgroupBlock(f.calibration);
+  };
+  assert.ok(mut(() => {}), "control: the unmutated block is shown");
+  assert.equal(mut((s) => (s.exploratory = false)), null);
+  assert.equal(mut((s) => delete s.exploratory), null);
+  assert.equal(mut((s) => (s.n = 214)), null, "a split of the eligible calls is not the verified sample's");
+  assert.equal(mut((s) => (s.kinds[1].sentence = " ")), null);
+  assert.equal(mut((s) => (s.kinds[0].counted = 30)), null, "70 ≠ 71: does not reconcile");
+  assert.equal(mut((s) => (s.kinds[0].counted = "31")), null);
 });

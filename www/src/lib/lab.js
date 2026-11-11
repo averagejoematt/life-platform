@@ -17,6 +17,15 @@
 export const LAB_ENV = "WEB_LAB";
 
 /**
+ * THE GO-LIVE SWITCH — the owner's GO is the one-line PR that sets this to `true` (feat/lab-go-live). `false`: the Lab
+ * is dark (the env switch above gives a private, never-deployed build). `true`: the Lab is part of every build, so every
+ * `www/**` merge deploys it; its pages are public (no private banner, no noindex), listed in the sitemap, owned in
+ * owned_paths.json, and the deploy scan stops refusing them. Read as text by scripts/publish_snapshot_lab.py
+ * (`lab_live`) and scripts/check_www_build.py — keep it one line: `export const LAB_LIVE = true|false;`.
+ */
+export const LAB_LIVE = true;
+
+/**
  * The routes the Lab adds when the switch is on (pattern → entrypoint, relative to www/). `path` is the directory
  * every page of the route lives under — the dist scans treat anything under it as Lab output.
  */
@@ -39,26 +48,32 @@ export const LAB_DATA_FILE = "lab.json";
 /** Keys that exist only in the Lab's data file; none may appear in a flag-off dist. */
 export const LAB_DATA_KEYS = ["lab_tests", "lab_protocols", "lab_findings", "condition_series", "outcome_series"];
 
-/** Is the Laboratory switched on for this build? */
-export function labEnabled(env = process.env) {
-  return Boolean(env) && env[LAB_ENV] === "1";
+/** Is the Laboratory switched on for this build? Live (the committed switch) or the private env switch. */
+export function labEnabled(env = process.env, live = LAB_LIVE) {
+  return live === true || (Boolean(env) && env[LAB_ENV] === "1");
+}
+
+/** A PRIVATE Lab build: on by the env switch while the Lab is not live — local review only, never deployed. */
+export function labPrivate(env = process.env, live = LAB_LIVE) {
+  return live !== true && labEnabled(env, false);
 }
 
 /** The Astro integration that injects the Lab's routes — and nothing at all when the switch is off. */
-export function labIntegration(env = process.env) {
+export function labIntegration(env = process.env, live = LAB_LIVE) {
   return {
     name: "laboratory-dark",
     hooks: {
       "astro:config:setup": ({ injectRoute }) => {
-        if (!labEnabled(env)) return;
+        if (!labEnabled(env, live)) return;
         for (const r of LAB_ROUTES) injectRoute({ pattern: r.pattern, entrypoint: r.entrypoint, prerender: true });
       },
     },
   };
 }
 
-/** The sitemap filter: a Lab path is never listed (true = keep). Identity on every page the Lab does not own. */
-export function notLabPage(url) {
+/** The sitemap filter: while the Lab is dark a Lab path is never listed (true = keep); once live every Lab page is kept. */
+export function notLabPage(url, live = LAB_LIVE) {
+  if (live === true) return true;
   const path = new URL(url, "https://averagejoematt.com").pathname;
   return !(path.startsWith(LAB_ROOT) || path.includes(LAB_ROOT));
 }

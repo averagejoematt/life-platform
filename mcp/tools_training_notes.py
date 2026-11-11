@@ -15,9 +15,12 @@ existed anywhere. See the block at the end of this file.
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from typing import Any
 
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.numeric import decimals_to_float
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training import note_requests as nr  # #5573: the owner's Hevy-note requests (the block at the end of this file)
 from training.training_notes import DEGRADE_UNRECORDED, dedupe_head_rows, head_sk_base
 from training.training_notes_keys import PREFLIGHT_LOOKBACK_DAYS  # #3972: the one number, not a restated 180
 
@@ -212,6 +215,14 @@ def tool_get_exercise_notes(args):
         from mcp import tools_fitness_tests as ftt
 
         return (ftt.action_log if action == "fitness_test" else ftt.action_list)(args)
+    if action in (
+        "note_requests",
+        "answer_request",
+        "decline_request",
+    ):  # #5573: his Hevy-note requests (the #5573 block at the end of this file)
+        return {"note_requests": _note_requests_list, "answer_request": _answer_note_request, "decline_request": _decline_note_request}[
+            action
+        ](args)
     if action != "read":
         return {
             "error": f"Unknown action '{action}'.",
@@ -226,6 +237,9 @@ def tool_get_exercise_notes(args):
                 "weekly_menu",
                 "fitness_test",
                 "fitness_tests",
+                "note_requests",
+                "answer_request",
+                "decline_request",
             ],
         }
     exercise = args.get("exercise") or args.get("template_id") or ""
@@ -745,3 +759,89 @@ def _end_disruption(args):
         "step_back_up": disruption.policy().get("step_back_up"),
         "owes_step_back_up": disruption.owes_step_back_up(record),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5573 — the owner's Hevy-note requests: the coach packet's field, the capture queue's section, and the chat's answer
+# ══════════════════════════════════════════════════════════════════════════════
+# `training.note_requests` is the core (the REQUEST# row in `training_constraints`, the raise-time reply, the once-only
+# resolution). This block reads its rows for the two owner surfaces — `get_coach_session_packet.note_requests` (every
+# open request, the overdue count, the replies of the last 14 days) and `get_capture_queues.note_requests` — and
+# carries the chat's write as three more actions on this owner tool (`note_requests` / `answer_request` /
+# `decline_request`), so no tool and no MCP module is minted. Owner-only: nothing here is imported by the site API.
+
+
+def _note_request_rows() -> list[dict[str, Any]]:
+    return [decimals_to_float(r) for r in nr.read_rows(table)]
+
+
+def note_requests_view(today: str | None = None) -> dict[str, Any]:
+    return nr.view(_note_request_rows(), str(today or pacific_today())[:10])
+
+
+NOTE_REQUESTS_HOW_TO = (
+    "Each open request is Matthew asking, in a Hevy note, for something. Answer it ONCE in this conversation — a question "
+    "from the evidence (say when the evidence is mixed; ADR-104/105), a form request with general guidance that is not an "
+    "assessment of his form — then record it: get_exercise_notes action='answer_request' request_id=<id> reply=<what you "
+    "told him>, or action='decline_request' request_id=<id> reason=<why>. `answered_recent` replies were written by code "
+    "(a form cue sheet, a drafted story); deliver them as written and never file or apply a drafted story yourself."
+)
+
+
+def note_requests_packet_field(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The coach packet's `note_requests` field: measured when any request is open or recently answered, else absent."""
+    from training.plan_engine import ABSENT, MEASURED, input_status
+
+    value = note_requests_view(target_date)
+    value["how_to_answer"] = NOTE_REQUESTS_HOW_TO
+    if not value["open"] and not value["answered_recent"]:
+        return value, input_status(ABSENT, "no open or recently answered note request")
+    return value, input_status(MEASURED)
+
+
+def note_requests_capture_section() -> dict[str, Any]:
+    """`get_capture_queues`' compact view: the open requests (no reply text) and the counts."""
+    v = note_requests_view()
+    return {
+        "count": v["open_count"],
+        "overdue_count": v["overdue_count"],
+        "overdue_after_days": v["overdue_after_days"],
+        "items": [{k: o.get(k) for k in ("request_id", "date", "exercise", "subtype", "age_days", "overdue")} for o in v["open"][:10]],
+        "answered_recent_count": len(v["answered_recent"]),
+        "how_to_resolve": "get_coach_session_packet carries the full notes and replies; answer once, then get_exercise_notes "
+        "action='answer_request' | 'decline_request' request_id=<id>.",
+    }
+
+
+def _note_requests_list(args: dict[str, Any] | None = None) -> dict[str, Any]:
+    """action='note_requests' — open requests, overdue count, recent replies (OWNER-ONLY READ)."""
+    view = note_requests_view((args or {}).get("today"))
+    view["how_to_answer"] = NOTE_REQUESTS_HOW_TO
+    view["privacy"] = "owner-only: the rows carry his verbatim notes; never a reader surface"
+    return view
+
+
+def _note_request_resolve(args: dict[str, Any], status: str, text_key: str) -> dict[str, Any]:
+    rid = str(args.get("request_id") or "").strip()
+    if not rid:
+        return {"error": "refused: request_id is required (get_exercise_notes action='note_requests' lists them)", "wrote": False}
+    text = args.get(text_key) or args.get("words") or ""
+    try:
+        out = nr.resolve(table, rid, status=status, text=text, channel=nr.CHANNEL_CHAT)
+    except ValueError as e:
+        return {"error": f"refused: {e}", "wrote": False}
+    if out.get("row"):
+        out["row"] = decimals_to_float(out["row"])
+    if out.get("wrote"):
+        out["status"] = status
+    return out
+
+
+def _answer_note_request(args: dict[str, Any]) -> dict[str, Any]:
+    """action='answer_request' — record the reply given in this conversation (once; refused if already resolved)."""
+    return _note_request_resolve(args or {}, nr.STATUS_ANSWERED, "reply")
+
+
+def _decline_note_request(args: dict[str, Any]) -> dict[str, Any]:
+    """action='decline_request' — record why the request is not being answered (once; refused if already resolved)."""
+    return _note_request_resolve(args or {}, nr.STATUS_DECLINED, "reason")
