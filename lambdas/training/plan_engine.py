@@ -150,8 +150,7 @@ ENGINE_INPUTS = (
     "pain_evidence_scope",
     "pain_layer_status",
     "pain_dismissals",
-    "weight_stall_days",
-    "adherence_on_plan",
+    "weight_stall_evaluation",  # #5802: nutrition_critics' ONE evaluation of weight_stall_with_adherence, read here
     "hevy_workouts_rotation_window",
     "hevy_workouts_prescription_window",
     "block_workouts",
@@ -167,7 +166,8 @@ _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
     "readiness_floor": "readiness_low_streak_days",
     "anchor_lift_strength_drop": "anchor_lift_drop_pct",
-    "weight_stall_with_adherence": "weight_stall_days",
+    "weight_stall_with_adherence": "weight_stall_evaluation",
+    "volume_ceiling": "muscle_volume",
     "pain_flag_named_site": "pain_evidence_scope",
     "self_added_volume": "hevy_workouts_prescription_window",
     "walking_collapse": "recent_aerobic",
@@ -374,8 +374,6 @@ def _tripwire_states(
     anchor_lift_drop_sessions: int | None,
     pain_flag_sites: list[str] | None,
     pain_layer_status: str | None,
-    weight_stall_days: int | None,
-    adherence_on_plan: bool | None,
     pain_flag_instances: list[dict[str, Any]] | None = None,
     pain_dismissals: list[dict[str, Any]] | None = None,
     pain_evidence_scope: dict[str, Any] | None = None,
@@ -387,6 +385,8 @@ def _tripwire_states(
     loss_rate: dict[str, Any] | None = None,
     weight_lb: float | None = None,
     guidance_cap_lb_wk: float | None = None,
+    weight_stall_evaluation: dict[str, Any] | None = None,
+    muscle_volume: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -614,16 +614,17 @@ def _tripwire_states(
             row["evidence"] = pain_evidence_scope
         out.append(row)
 
-    t = by_id["weight_stall_with_adherence"]
-    if weight_stall_days is None or adherence_on_plan is None:
-        out.append(_missing("weight_stall_with_adherence", "needs both a weight trend and an adherence read"))
+    # #5802: weight_stall_with_adherence is nutrition_critics' ONE evaluation (`health.tripwire_readers.stall_from_block`
+    # maps its decisions_offered record) — the engine computes no stall of its own, it reads that one.
+    ws = weight_stall_evaluation
+    if ws is None:
+        out.append(_missing("weight_stall_with_adherence", "the nutrition critics' stall evaluation was not supplied"))
     else:
-        tripped = weight_stall_days >= t["threshold_days"] and adherence_on_plan
-        out.append(
-            _row(
-                "weight_stall_with_adherence", "tripped" if tripped else "clear", f"{weight_stall_days}d stall, on-plan={adherence_on_plan}"
-            )
-        )
+        out.append(_row("weight_stall_with_adherence", ws["state"], ws.get("observed"), ws.get("detail") or ""))
+    out[-1]["evaluated_by"] = "health.nutrition_critics"
+    # #5802: volume_ceiling, REPORT-ONLY — a row and a report, never a change; the plan's growth rule stays the generator's
+    vc = volume_ceiling_read(muscle_volume) if muscle_volume else None
+    out.append({**(_row("volume_ceiling", *vc) if vc else _missing("volume_ceiling", "no muscle volume supplied")), "report_only": True})
 
     # #4081 — self_added_volume: training above the prescription two weeks running, from the
     # per-movement programmed/performed set counts `health.adherence_calc` stored on each Hevy
@@ -675,6 +676,28 @@ def _tripwire_states(
             row["detail"] = reason + (f" — {row['detail']}" if row.get("detail") else "")
 
     return out
+
+
+def stall_input(nutrition_block: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """#5802: (the stall evaluation, its input status) from the nutrition critics block — the MCP caller's one line."""
+    from health.tripwire_readers import stall_from_block
+
+    ev = stall_from_block(nutrition_block)
+    if ev["state"] == READ_FAILED:
+        return ev, input_status(READ_FAILED, error=f"NutritionCriticsError: {ev.get('error')}"[:200])
+    return ev, input_status(MEASURED if ev["state"] in ("tripped", "clear") else ABSENT, ev["detail"])
+
+
+def volume_ceiling_read(muscle_volume: dict[str, Any]) -> tuple[str, Any, str]:
+    """#5802: (state, observed, detail) for `volume_ceiling` over `{muscle: weekly working sets}` (the trailing-28-day
+    average stage 1 already reads). The per-muscle arm only: the per-session lines are the generator's own ceiling
+    (`training.green_block`), enforced when a session is drafted, so stage 1 has no session of its own to read."""
+    t = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "volume_ceiling")
+    ceiling = float(t["threshold"]["sets_per_muscle_wk"])
+    weekly = {m: float(v) for m, v in muscle_volume.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
+    over = {m: round(v, 1) for m, v in sorted(weekly.items()) if v > ceiling}
+    detail = f"{len(over)} of {len(weekly)} muscle(s) above {ceiling:g} sets/wk (28-day average); per-session lines: the generator's"
+    return ("tripped" if over else "clear"), over, detail
 
 
 def _scheduled_session(
@@ -899,8 +922,7 @@ def constraint_block(
     pain_flag_instances: list[dict[str, Any]] | None = None,
     pain_dismissals: list[dict[str, Any]] | None = None,
     pain_evidence_scope: dict[str, Any] | None = None,
-    weight_stall_days: int | None = None,
-    adherence_on_plan: bool | None = None,
+    weight_stall_evaluation: dict[str, Any] | None = None,  # #5802: `health.tripwire_readers.stall_from_block` over the critics block
     hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
     rotation_window_start: str | None = None,
     hevy_workouts_prescription_window: list[dict[str, Any]] | None = None,
@@ -946,8 +968,7 @@ def constraint_block(
             "pain_evidence_scope": pain_evidence_scope,
             "pain_layer_status": pain_layer_status,
             "pain_dismissals": pain_dismissals,
-            "weight_stall_days": weight_stall_days,
-            "adherence_on_plan": adherence_on_plan,
+            "weight_stall_evaluation": weight_stall_evaluation,
             "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
             "hevy_workouts_prescription_window": hevy_workouts_prescription_window,
             "block_workouts": block_workouts,
@@ -976,8 +997,8 @@ def constraint_block(
         anchor_lift_drop_sessions=anchor_lift_drop_sessions,
         pain_flag_sites=pain_flag_sites,
         pain_layer_status=pain_layer_status,
-        weight_stall_days=weight_stall_days,
-        adherence_on_plan=adherence_on_plan,
+        weight_stall_evaluation=weight_stall_evaluation,
+        muscle_volume=muscle_volume,
         pain_flag_instances=pain_flag_instances,
         pain_dismissals=pain_dismissals,
         pain_evidence_scope=pain_evidence_scope,
@@ -1058,6 +1079,7 @@ def constraint_block(
         "shared_quantities": {"loss_rate_lb_wk": loss_rate},
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
+        "tripwires_evaluated_elsewhere": owner_redlines.evaluated_elsewhere(),  # #5802: id -> the module that reads it
         "recovery_tier": recovery_tier,
         "acwr_flag": acwr_flag,
         "muscle_volume": muscle_volume or {},
@@ -1103,7 +1125,7 @@ def constraint_block(
                 ),
                 (
                     f"{len(owner_redlines.unevaluated_tripwires())} v{owner_redlines.REDLINES_VERSION} tripwire(s) are reported but NOT evaluated by this "
-                    f"engine: {', '.join(owner_redlines.unevaluated_tripwires())} (#3753)"
+                    f"engine or any other module: {', '.join(owner_redlines.unevaluated_tripwires())} (#3753, #5802)"
                     if owner_redlines.unevaluated_tripwires()
                     else None
                 ),

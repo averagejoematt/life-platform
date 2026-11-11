@@ -15,6 +15,7 @@ same way:
   * walking hr this week / last    — `mcp.shared_quantities.weekly_walking_hours` (Strava UNION
                                      Hevy, de-duplicated in time, 7 completed days), called twice
   * IC-29 adaptation severity      — `mcp.tools_nutrition._get_metabolic_adaptation`
+  * sleep hours by day             — the Whoop partition (#5802: the `sleep` tripwire, `health.tripwire_readers`)
   * already-logged decisions       — `get_decisions` rows, trailing 14 days, source
                                      `nutrition_critics`, for box 4's dedup
 
@@ -121,6 +122,7 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
         "weight_trend_lb_wk": None,
         "weighin_count": None,
         "weighin_span_days": None,
+        "last_weighin_date": None,  # #5802: weigh_in_dark's input
         "rate_provisional": None,
         "weekly_loss_rates_lb_wk": None,
         "weekly_loss_rate_weeks": None,
@@ -128,7 +130,8 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
     if rows is None:
         return out
     usable = [r for r in rows if (_num(r.get("weight_lbs")) or 0) > 0]
-    out["weight_lb"] = weight_trend.latest_weight(usable).get("weight_lbs")
+    latest = weight_trend.latest_weight(usable)
+    out["weight_lb"], out["last_weighin_date"] = latest.get("weight_lbs"), latest.get("as_of")
     end = shared_quantities.completed_end(keys[-1])
     rate = shared_quantities.loss_rate_from_rows(usable, end)
     out["weighin_count"] = rate["n_weighins"]
@@ -145,6 +148,15 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
         usable, end, trend_days=shared_quantities.LOSS_RATE_WINDOW_DAYS
     )
     return out
+
+
+def sleep_series(rows: list[dict[str, Any]] | None, keys: list[str]) -> list[float | None] | None:
+    """(#5802) Whoop `sleep_duration_hours` by day over `keys` — the `sleep` tripwire's input (the same Whoop
+    partition the readiness_floor tripwire reads); None per unmeasured night, None when the partition could not be read."""
+    if rows is None:
+        return None
+    by_day = {str(r.get("date") or str(r.get("sk") or "").replace("DATE#", ""))[:10]: r for r in rows}
+    return [_num((by_day.get(k) or {}).get("sleep_duration_hours")) for k in keys]
 
 
 def _walking_hours(end_date: str) -> float | None:
@@ -213,7 +225,8 @@ def resolve(
     # the oldest weekly checkpoint (`end - 7`) reads its own 14-day trend, so weigh-ins reach back
     # LOSS_RATE_WINDOW_DAYS + 7 days; a 14-day fetch left it the week's own slope (#5100, live 10-20)
     wt = _safe(query_source, "withings", shift_day_key(start, -shared_quantities.WEEK_DAYS), end_date)
-    for name, rows in (("macrofactor", mf), ("hevy", hevy), ("withings", wt)):
+    whoop = _safe(query_source, "whoop", start, end_date)  # #5802: the sleep tripwire's nights
+    for name, rows in (("macrofactor", mf), ("hevy", hevy), ("withings", wt), ("whoop", whoop)):
         if rows is None:
             unresolved[name] = "partition read raised"
     intake, protein = macrofactor_series(mf, keys)
@@ -260,6 +273,7 @@ def resolve(
         "estimated_maintenance_kcal": estimated_maintenance_kcal,
         "dxa_scans": dxa,
         "guidance_cap_lb_wk": guidance_cap,  # #5074: the clinical record's rate cap outranks the charter band
+        "sleep_hours_by_day": sleep_series(whoop, keys),  # #5802
     }
     return {"inputs": inputs, "unresolved": unresolved}
 

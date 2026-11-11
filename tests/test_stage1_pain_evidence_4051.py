@@ -484,8 +484,6 @@ class TestTheDegradedLayer:
             pain_dismissals=[],
             pain_layer_status="dark",
             pain_evidence_scope={"status": "read", "movements_considered": 3},
-            weight_stall_days=None,
-            adherence_on_plan=None,
         )
         row = next(r for r in rows if r["id"] == "pain_flag_named_site")
         assert row["state"] == "tripped" and row["observed"] == [RDL]
@@ -503,8 +501,6 @@ class TestTheDegradedLayer:
             pain_dismissals=[],
             pain_layer_status="dark",
             pain_evidence_scope={"status": "read", "movements_considered": 3},
-            weight_stall_days=None,
-            adherence_on_plan=None,
         )
         row = next(r for r in rows if r["id"] == "pain_flag_named_site")
         assert row["state"] == "unknown" and "#3768" in row["detail"]

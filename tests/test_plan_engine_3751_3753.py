@@ -70,8 +70,8 @@ _FULL = dict(
     anchor_lift_drop_sessions=1,
     pain_flag_sites=[],
     pain_layer_status="ok",
-    weight_stall_days=3,
-    adherence_on_plan=True,
+    # #5802: nutrition_critics' one evaluation of the stall, as `health.tripwire_readers.stall_from_block` hands it over
+    weight_stall_evaluation={"state": "clear", "observed": None, "detail": "not tripped (nutrition_critics, fixture)"},
 )
 
 
@@ -239,8 +239,10 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     # the tripwires the engine cannot compute are named in the block, never silent (ADR-105)
     block = plan_engine.constraint_block(**_FULL)
     assert set(block["unevaluated_tripwires"]) == set(owner_redlines.unevaluated_tripwires())
-    # #4387: walking_collapse is evaluated (report-only) now; rate_overshoot is still named as unevaluated
-    assert any("NOT evaluated by this engine" in line and "rate_overshoot" in line for line in block["honesty"])
+    # #5802: only the tripwires NO module reads are named (rate_overshoot is nutrition_critics' now, and says so)
+    assert any("NOT evaluated by this engine or any other module" in line and "joy" in line for line in block["honesty"])
+    assert not any("rate_overshoot" in line for line in block["honesty"] if "NOT evaluated" in line)
+    assert block["tripwires_evaluated_elsewhere"]["rate_overshoot"] == "health.nutrition_critics"
     rate = plan_engine.constraint_block(**_FULL)["rate_target"]
     assert (rate["low_lb_wk"], rate["high_lb_wk"]) == (3.0, 3.5)  # #5074: the charter band, not the 0.5-1.0 %BW envelope
     assert rate["owner_to_resolve"] is None and rate["resolution"].startswith("RESOLVED as a schedule")
@@ -383,20 +385,16 @@ _V3_NEW_TRIPWIRES = {
 
 def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
     """Report, don't compute: every §7 addition is in TRIPWIRES with `evaluated_by_engine: False`, is
-    named in the block's honesty line, and never appears among the computed rows."""
+    read by a NAMED module or merged into one (#5802), and never appears among the engine's computed rows."""
     ids = {t["id"] for t in owner_redlines.TRIPWIRES}
     assert _V3_NEW_TRIPWIRES <= ids
     assert "abstinence_violation_spiral" not in ids, "folded into weigh_in_dark + logging_dark in v3"
+    engine_ids = {t["id"] for t in owner_redlines.engine_evaluated_tripwires()}
+    assert not (_V3_NEW_TRIPWIRES & engine_ids)
+    elsewhere = owner_redlines.evaluated_elsewhere()
     unevaluated = set(owner_redlines.unevaluated_tripwires())
-    assert _V3_NEW_TRIPWIRES <= unevaluated
-    assert {
-        "intake_floor_breached",
-        "rate_overshoot",
-        "logging_dark",
-        "volume_ceiling",
-        "medical_stop_lines",
-        "mood_declared",
-    } <= unevaluated
+    assert _V3_NEW_TRIPWIRES <= set(elsewhere) | unevaluated
+    assert {"intake_floor_breached", "rate_overshoot", "logging_dark"} <= set(elsewhere)
     # #4081: self_added_volume is computed by the engine now (from adherence's set counts).
     assert "self_added_volume" not in unevaluated
     # #5001: rate_ceiling is computed by the engine now (over mcp.shared_quantities.loss_rate_lb_wk).
@@ -406,11 +404,12 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
         "protein_floor_missed",
         "readiness_floor",
         "pain_flag_named_site",
-        "weight_stall_with_adherence",
+        "weight_stall_with_adherence",  # #5802: READ from nutrition_critics' evaluation, never computed here
         "rate_ceiling",  # #5001: over mcp.shared_quantities.loss_rate_lb_wk
         "walking_collapse",  # #4387: report-only, from training.recent_aerobic
         "walking_overshoot",  # #4387: report-only
         "self_added_volume",
+        "volume_ceiling",  # #5802: report-only, from the 28-day muscle volume
     ]
     for t in owner_redlines.TRIPWIRES:
         assert t.get("provenance") in ("owner", "owner-history", "population-derived"), t["id"]
@@ -419,7 +418,7 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
     computed = {t["id"] for t in block["tripwires"]}
     assert not (computed & _V3_NEW_TRIPWIRES)
     line = next(line for line in block["honesty"] if "NOT evaluated by this engine" in line)
-    assert all(tid in line for tid in _V3_NEW_TRIPWIRES)
+    assert all(tid in line for tid in owner_redlines.unevaluated_tripwires())  # #5802: only the ones NO module reads
     assert f"v{owner_redlines.REDLINES_VERSION} tripwire(s)" in line
 
 
