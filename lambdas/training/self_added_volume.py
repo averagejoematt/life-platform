@@ -424,11 +424,18 @@ def set_raise_for_plan(
     """`plan_engine.constraint_block['set_raise_proposal']`, beside the ceiling-change proposal it mirrors (#5058): the
     proposals, or `unknown` when the prescription window was not read — never "no proposal" from a read that did not
     happen (#4072). `date` is the planned day, so its week is in progress and never counts."""
-    weeks_running = set_raise_weeks()
-    if rows is None or read_state is None:
+    try:
+        weeks_running: int | None = set_raise_weeks()
+    except KeyError as e:  # an unread charter is named on the block, never a failed plan and never a silent default
+        weeks_running, unread = None, f"the charter run length was not read ({e})"
+    else:
+        unread = (
+            None if rows is not None and read_state is not None else f"the prescription window was not read ({read_state or 'read_failed'})"
+        )
+    if unread or weeks_running is None:
         return {
             "state": "unknown",
-            "reason": f"the prescription window was not read ({read_state or 'read_failed'})",
+            "reason": unread,
             "weeks_running": weeks_running,
             "proposals": [],
             "auto_applied": False,

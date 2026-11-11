@@ -223,3 +223,10 @@ def test_the_plan_carries_it_and_an_unread_window_is_unknown_never_none():
     assert out["state"] == "proposed" and out["auto_applied"] is False
     unread = self_added_volume.set_raise_for_plan("2026-11-11", None, None, _CATALOG["movements"])
     assert unread["state"] == "unknown" and unread["proposals"] == []
+
+
+def test_an_unread_charter_is_unknown_on_the_block_never_a_failed_plan(monkeypatch):
+    rows = [_row(d, 3, 4) for d in _WEEKS]
+    monkeypatch.setattr("training.training_charter.charter_value", lambda *a, **k: None)
+    out = self_added_volume.set_raise_for_plan("2026-11-11", rows, "measured", _CATALOG["movements"])
+    assert out["state"] == "unknown" and "charter" in out["reason"] and out["proposals"] == []
