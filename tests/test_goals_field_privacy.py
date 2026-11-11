@@ -23,7 +23,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
+sys.path.insert(0, str(ROOT / "tests"))
 
+import sealed_prereg  # noqa: E402
 from common import (
     goals_field_privacy as GFP,  # noqa: E402
     narrative_allowlist as NA,  # noqa: E402
@@ -31,8 +33,9 @@ from common import (
 from web import narrative_publication as G  # noqa: E402
 
 GOALS = json.loads((ROOT / "config" / "user_goals.json").read_text())
-PREREG = json.loads((ROOT / "deploy" / "generated" / "genesis_preregistration.json").read_text())
-SEALED = [p["claim_natural"] for c in PREREG["coaches"].values() for p in c["predictions"]]
+# The sealed file is private since 2026-11-11 (owner ruling item 3): tests/sealed_prereg.py serves the approved calls'
+# words from a labelled test copy, and every sealed call's words only from the private original when present.
+SEALED = sealed_prereg.sealed_call_texts()
 
 
 def _sha(s: str) -> str:
@@ -134,6 +137,7 @@ def test_the_ldl_ruling_withholds_every_sealed_call(cr2_on):
 def test_negative_control_a_withheld_sealed_call_stays_withheld(cr2_on):
     """The sealed calls not on the list (the two the 2026-11-09 ruling keeps private) stay withheld in the CR2 scope,
     whatever key they are read under."""
+    sealed_prereg.require_sealed_path()  # the two withheld calls exist only in the private original
     listed = {e.text_sha256 for e in _calls()}
     withheld = [c for c in SEALED if _sha(c) not in listed]
     assert len(withheld) == 2

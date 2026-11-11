@@ -47,11 +47,14 @@ for _p in (str(REPO), str(REPO / "deploy"), str(REPO / "lambdas")):
 
 import prereg_amendment as amend  # noqa: E402
 import prereg_truth_gate as gate  # noqa: E402
+import sealed_prereg  # noqa: E402
 
 FIX = REPO / "tests" / "fixtures"
 CYCLE16 = FIX / "prereg_cycle16_2026-09-05.json"
 CYCLE16_STAMP = FIX / "prereg_cycle16_2026-09-05.stamp.json"
-CYCLE17 = FIX / "prereg_cycle17_2026-09-06.json"
+# The sealed file is private since 2026-11-11 (owner ruling item 3): the private original when present (tests/sealed_prereg.py), else
+# the old path, which no longer exists, so a test that reads it skips (sealed_prereg.require_sealed_path()).
+CYCLE17 = sealed_prereg.sealed_path() or (FIX / "prereg_cycle17_2026-09-06.json")
 CYCLE17_STAMP = REPO / "deploy" / "generated" / "genesis_preregistration.sha256.json"
 
 #: The baseline constant in force for the whole of cycle 16 — read from git history
@@ -78,7 +81,7 @@ def c17_stamp() -> dict:
 
 @pytest.fixture(scope="module")
 def c17_bytes() -> bytes:
-    return CYCLE17.read_bytes()
+    return sealed_prereg.require_sealed_path().read_bytes()  # private since 2026-11-11
 
 
 @pytest.fixture(scope="module")
@@ -130,6 +133,7 @@ class _FakeS3:
 
 
 def test_both_specimens_are_the_published_seals_byte_for_byte():
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     assert _sha(CYCLE16) == json.loads(CYCLE16_STAMP.read_text())["sha256"]
     assert _sha(CYCLE17) == json.loads(CYCLE17_STAMP.read_text())["sha256"]
 
@@ -194,18 +198,21 @@ def test_an_empty_roster_refuses_rather_than_vouching_for_nothing():
 
 
 def test_the_record_over_the_live_cycle17_seal_validates(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     assert amend.validate_amendment(record, artifact_bytes=c17_bytes) == []
     assert record["amends"]["sha256"] == _sha(CYCLE17)
     assert record["amendment_id"] == "genesis-2026-09-06/A1"
 
 
 def test_the_record_carries_the_superseded_baseline_correction(record):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     corrections = [c for c in record["corrections"] if c["kind"] == gate.BASELINE_MISMATCH]
     assert corrections, "the #3649 supersession is the live amendable defect"
     assert all(c["correct_value"] == f"{gate.repo_baseline_lbs()} lbs" for c in corrections)
 
 
 def test_a_record_that_names_other_bytes_is_refused(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     problems = amend.validate_amendment(record, artifact_bytes=CYCLE16.read_bytes())
     assert any("is not the sha256 of the artifact handed in" in p for p in problems)
     assert amend.validate_amendment(record, artifact_bytes=c17_bytes) == []
@@ -213,17 +220,20 @@ def test_a_record_that_names_other_bytes_is_refused(record, c17_bytes):
 
 @pytest.mark.parametrize("key", amend.FORBIDDEN_PAYLOAD_KEYS)
 def test_a_record_carrying_an_artifact_payload_is_a_replacement_not_an_amendment(record, c17_bytes, key):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     record = {**record, key: {"sleep_coach": {}}}
     assert any("replacement pre-registration" in p for p in amend.validate_amendment(record, artifact_bytes=c17_bytes))
 
 
 def test_a_backdated_record_is_refused(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     earlier = (datetime.fromisoformat(record["amends"]["stamped_at"]) - timedelta(seconds=1)).isoformat()
     record = {**record, "authored_at": earlier}
     assert any("predates the seal it amends" in p for p in amend.validate_amendment(record, artifact_bytes=c17_bytes))
 
 
 def test_a_record_with_no_corrections_is_refused(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     record = {**record, "corrections": []}
     assert any("nothing to correct" in p for p in amend.validate_amendment(record, artifact_bytes=c17_bytes))
 
@@ -231,11 +241,13 @@ def test_a_record_with_no_corrections_is_refused(record, c17_bytes):
 def test_a_correction_kind_outside_the_gates_set_is_refused(record, c17_bytes):
     """Guard the SET: a new truth-gate clause cannot reach the public record as an
     unlabelled correction."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     record = {**record, "corrections": [{**record["corrections"][0], "kind": "VIBES_MISMATCH"}]}
     assert any("outside the gate's finding kinds" in p for p in amend.validate_amendment(record, artifact_bytes=c17_bytes))
 
 
 def test_a_correction_silent_on_both_the_value_and_the_reason_is_refused(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     mute = {**record["corrections"][0], "correct_value": None, "correction_unknown_reason": None}
     record = {**record, "corrections": [mute]}
     assert any("neither a corrected value nor why there is none" in p for p in amend.validate_amendment(record, artifact_bytes=c17_bytes))
@@ -254,6 +266,7 @@ def test_every_finding_kind_the_gate_can_emit_has_a_correction_shape(kind, curre
 
 
 def test_the_ledger_preserves_every_earlier_entry(record):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     first = {**record, "amendment_id": "genesis-2026-09-06/A1", "sequence": 1}
     ledger = amend.append_to_ledger(None, first)
     assert ledger["amendments"] == [first]
@@ -264,6 +277,7 @@ def test_the_ledger_preserves_every_earlier_entry(record):
 
 
 def test_a_second_record_built_against_a_stale_ledger_is_refused(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     prior = [{**record, "amendment_id": "genesis-2026-09-06/A1", "sequence": 1}]
     problems = amend.validate_amendment(record, artifact_bytes=c17_bytes, prior=prior)
     assert any("the ledger appends, it never rewrites" in p for p in problems)
@@ -271,6 +285,7 @@ def test_a_second_record_built_against_a_stale_ledger_is_refused(record, c17_byt
 
 
 def test_publish_writes_the_amendment_key_and_never_the_artifact(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     s3 = _FakeS3()
     ledger = amend.publish(record, c17_bytes, s3=s3)
     assert len(s3.puts) == 1
@@ -282,6 +297,7 @@ def test_publish_writes_the_amendment_key_and_never_the_artifact(record, c17_byt
 
 
 def test_publish_appends_to_a_live_ledger_rather_than_replacing_it(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     first = {**record, "amendment_id": "genesis-2026-09-06/A1", "sequence": 1}
     s3 = _FakeS3(existing=json.dumps(amend.append_to_ledger(None, first)).encode())
     second = {**record, "amendment_id": "genesis-2026-09-06/A2", "sequence": 2}
@@ -290,6 +306,7 @@ def test_publish_appends_to_a_live_ledger_rather_than_replacing_it(record, c17_b
 
 
 def test_publish_refuses_a_record_that_would_overwrite_a_published_entry(record, c17_bytes):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     first = {**record, "amendment_id": "genesis-2026-09-06/A1", "sequence": 1}
     s3 = _FakeS3(existing=json.dumps(amend.append_to_ledger(None, first)).encode())
     with pytest.raises(SystemExit) as e:
@@ -299,6 +316,7 @@ def test_publish_refuses_a_record_that_would_overwrite_a_published_entry(record,
 
 
 def test_publish_refuses_a_record_about_different_bytes(record):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     s3 = _FakeS3()
     with pytest.raises(SystemExit):
         amend.publish(record, CYCLE16.read_bytes(), s3=s3)
@@ -318,6 +336,7 @@ def test_the_site_api_reads_the_key_the_publisher_writes():
 
 
 def test_the_reader_summarises_a_published_ledger(record, monkeypatch):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     from web import site_api_common as common
 
     ledger = amend.append_to_ledger(None, record)
@@ -332,6 +351,7 @@ def test_the_reader_summarises_a_published_ledger(record, monkeypatch):
 def test_the_reader_never_serves_the_sealed_bytes_back(record, monkeypatch):
     """An amendment is a correction, not a second artifact — even if a malformed
     record smuggled one in, the served shape cannot carry it."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     from web import site_api_common as common
 
     smuggled = {**record, "coaches": {"sleep_coach": {"coach_name": "x"}}, "hypotheses": [{"id": "h1"}]}
@@ -367,6 +387,7 @@ def test_the_seal_block_carries_no_amendment_keys_until_one_is_published(monkeyp
 
 
 def test_a_published_amendment_travels_with_the_seal(record, monkeypatch):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     from web import site_api_common as common
 
     common._prereg_seal_cache = None

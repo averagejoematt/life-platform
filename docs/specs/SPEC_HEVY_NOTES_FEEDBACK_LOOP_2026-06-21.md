@@ -132,7 +132,9 @@ signals           [ { class, summary, value?, confidence, block? } , ... ]   # �
                                                    # #3817: `block` (0-based) on block-scoped
                                                    # classes only (today: progression); absent =
                                                    # note-level. Merge key is (class, block) — §5b.
-pain_flag         false
+pain_flag         false                            # #5800: the net's `pain` class only (below)
+pain_net          false                            # #5800: the over-inclusive net (lexicon OR model) — never cleared
+pain_class        null                             # #5800: pain | discomfort | form_or_equipment | null
 sentiment         "positive" | "neutral" | "negative" | null
 degraded          false                            # true = LLM failed/capped, deterministic-only
 degraded_reason   null                             # #3699: "<code>: <ExcClass>: <msg>"; code ∈
@@ -157,6 +159,13 @@ Each `{class, summary, value?, confidence}`:
 - `progression` — level/load/ROM/volume change. The arc anchor. *(cycling L10→L18→intervals; calf platform→full ROM)*
 - `form_technique` — technique state / cue that worked or didn't. *("balance harder", "form clicked")*
 - **`pain_discomfort`** — joint/tendon/bad-pain. **Safety: deterministic floor, sets `pain_flag`, elevated.**
+  *AMENDED 2026-11-11 (#5800):* the signal carries `severity: pain | discomfort`, and the record a `pain_class`
+  (`lambdas/training/training_notes_pain.py`, deterministic): `pain` = an un-negated pain word or a stated n/10 at or
+  above the `pain_flag_named_site` threshold (3/10); `discomfort` = a sensation (region + ache, burn/sore/tight, or the
+  model's read alone); `form_or_equipment` = a form or set-up note the model read as pain. Only `pain` sets
+  `pain_flag` — the tripwire, the deload recommendation, the steps-ramp / run-gate holds and elevation read it. The
+  other two are listed (`not_pain_notes`, the plan packet's `not_acted_on`) and acted on nowhere. The reader classes
+  stored rows from their own words, so records written before 1.3.0 need no rewrite.
 - `rpe_caveat` — qualifies a logged metric. **Overlay only, never overwrites raw** (Invariant 3).
 - `equipment_setup` — machine/tool/setup change. *("new machine", "no platform", "used straps")*
 - `limiter` — what capped the set. *("grip gave out before strength")*
@@ -306,7 +315,8 @@ else:
     try:    sig += haiku_extract(note, TAXONOMY)       # constrained JSON, max_tokens tight
     except: degraded = True                            # keep raw + deterministic sig; never drop (Invariant 4)
     cache.put(note_hash, ...)
-pain_flag = pain or any(s.class=="pain_discomfort" for s in sig)   # deterministic OR llm → flag
+pain_net  = pain or any(s.class=="pain_discomfort" for s in sig)   # deterministic OR llm → the net (kept)
+pain_flag = pain_class(note) == "pain"                             # #5800: only the pain class is a flag
 emit(record); if pain_flag: elevate(record)            # §7
 ```
 

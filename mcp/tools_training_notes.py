@@ -23,6 +23,7 @@ from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific
 from training import note_requests as nr  # #5573: the owner's Hevy-note requests (the block at the end of this file)
 from training.training_notes import DEGRADE_UNRECORDED, dedupe_head_rows, head_sk_base
 from training.training_notes_keys import PREFLIGHT_LOOKBACK_DAYS  # #3972: the one number, not a restated 180
+from training.training_notes_pain import PAIN, record_pain_class  # #5800: only the `pain` class is a flag
 
 from mcp.config import table
 from mcp.core import LAYER_DARK, decimal_to_float, derived_layer_status
@@ -88,7 +89,7 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
         # it corrected — it is found by the head's `migrated_from_sk`.
         ov = corrections.get(r.get("sk", "")) or corrections.get(str(r.get("migrated_from_sk") or ""))
         signals = (ov or {}).get("signals", r.get("signals", []))
-        pain = (ov or {}).get("pain_flag", r.get("pain_flag", False))
+        pain_class, pain = _pain_of(r, ov, signals)
         entry = {
             "date": r.get("date"),
             "workout_uid": r.get("workout_uid"),
@@ -98,6 +99,7 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
             "note_raw": r.get("note_raw"),
             "signals": signals,
             "pain_flag": pain,
+            "pain_class": pain_class,  # #5800: pain | discomfort | form_or_equipment | None — only `pain` is a flag
             "sentiment": (ov or {}).get("sentiment", r.get("sentiment")),
             "degraded": r.get("degraded", False),
             # #3699: a degraded row says WHY on the row itself. A row with no reason field
@@ -117,6 +119,24 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
             if s.get("class") == "progression" and s.get("value"):
                 latest_progression = s["value"]
     return timeline, pain_dates, latest_progression
+
+
+def _pain_of(r: dict, ov: dict | None, signals: list) -> tuple[str | None, bool]:
+    """`(pain_class, pain_flag)` for one head (#5800). The class is read from the note's own words and signals, so a
+    record written before #5800 (whose stored `pain_flag` is the whole net) is classed with no rewrite; an owner
+    correction that states `pain_flag` is his word and wins."""
+    cls = record_pain_class({**r, "signals": signals})
+    if ov and "pain_flag" in ov:
+        flag = bool(ov.get("pain_flag"))
+        return (ov.get("pain_class") or (PAIN if flag else (None if cls == PAIN else cls))), flag
+    return cls, cls == PAIN
+
+
+def _not_acted_on(timeline: list) -> list:
+    """`[{date, class}]` for the discomfort / form-or-equipment entries — listed, never a flag (#5800). No note text."""
+    return [
+        {"date": str(e.get("date") or "")[:10], "class": e["pain_class"]} for e in timeline or [] if e.get("pain_class") not in (None, PAIN)
+    ]
 
 
 def _pain_notes(timeline: list) -> list:
@@ -172,6 +192,7 @@ def pain_flags_for_templates(template_ids, start: str, layer_status: str, max_wo
             # #4174: each flagged note with its own words — the dismissal rule is per SITE, and
             # the note layer knows no anatomy, so the words are how a note is tied to a site.
             "pain_notes": _pain_notes(timeline),
+            "not_pain_notes": _not_acted_on(timeline),  # #5800: discomfort / form-or-equipment, listed and acted on nowhere
             "sessions_with_notes": len(timeline),
             "layer_status": layer_status,
         }
@@ -288,12 +309,15 @@ def tool_get_exercise_notes(args):
         "sessions_with_notes": None if dark else len(timeline),
         "pain_flag_any": None if dark else bool(pain_dates),  # PROMINENT — the pre-flight pain surface (§7)
         "pain_dates": pain_dates,
+        "not_pain_notes": _not_acted_on(timeline),  # #5800
         "latest_progression": latest_progression,
         "layer_status": status,
         "layer_health": health,
         "note": (
             "Derived note-signal layer (inferred, confidence-tagged); raw Hevy notes are sovereign. "
-            "pain_flag is over-inclusive by design — confirm or dismiss before loading that movement."
+            "pain_flag is the `pain` class of an over-inclusive net (#5800: an un-negated pain word or a stated n/10 at or above "
+            "the tripwire's 3/10) — confirm or dismiss before loading that movement. not_pain_notes are discomfort or "
+            "form/equipment notes: listed, never acted on."
         ),
     }
     if dark:

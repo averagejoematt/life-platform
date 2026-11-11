@@ -313,7 +313,11 @@ def test_stage_2_stamps_routine_id_version_and_content_hash_on_its_verdict():
     a = _ir("r-A")
     out, stored, _ = _run(a, _evidence())
     b = a.inputs_snapshot["critics"]["binding"]
-    assert b == {"routine_id": "r-A", "version": 2, "content_hash": binding.content_hash(a)}
+    assert b == {
+        "routine_id": "r-A",
+        "version": 3,
+        "content_hash": binding.content_hash(a),
+    }  # #5781: v2 is the deterministic record, v3 the model-reconciled one on top
     assert stored[-1].inputs_snapshot["critics"]["binding"] == b, "the binding is on the version stage 2 WROTE"
     assert out["critics"]["binding"] == b
 
@@ -325,12 +329,12 @@ def test_red_team_A_commit_B_is_refused_by_name_and_commit_A_is_accepted():
     b = _ir("r-B-cdb6ef")
     res_b, created_b = _commit_via_3752(b, siblings=[a, b])
     assert res_b["error_code"] == "REDTEAM_BINDING", res_b
-    assert "r-B-cdb6ef has NO stage-2 verdict" in res_b["error"] and "r-A-21bffbdc (v2" in res_b["error"]
+    assert "r-B-cdb6ef has NO stage-2 verdict" in res_b["error"] and "r-A-21bffbdc (v3" in res_b["error"]
     assert created_b == []
 
     res_a, created_a = _commit_via_3752(a)
     assert res_a["status"] == "committed", res_a
-    assert res_a["redteam_binding"].startswith("bound — stage-2 verdict v2")
+    assert res_a["redteam_binding"].startswith("bound — stage-2 verdict v3")
     assert len(created_a) == 1
 
 
@@ -378,7 +382,7 @@ def test_4172_not_red_teamed_refusal_suggests_stage_2_on_this_id_and_names_the_r
     res, _ = _commit_via_3752(b, siblings=[a, b])
     _assert_policy_suggestions(res)
     assert "plan_next_session with routine_id=r-B-cdb6ef" in res["suggestions"][0], res["suggestions"]
-    assert "r-A-21bffbdc (v2" in res["suggestions"][1] and "already red-teamed" in res["suggestions"][1], res["suggestions"]
+    assert "r-A-21bffbdc (v3" in res["suggestions"][1] and "already red-teamed" in res["suggestions"][1], res["suggestions"]
     assert "Retry or check system status." not in res["suggestions"]
 
 

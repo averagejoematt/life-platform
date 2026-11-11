@@ -244,23 +244,84 @@ def _stray_number(line: str) -> bool:
     return any(ch.isdigit() for ch in _COUNTED_RE.sub("", line))
 
 
+# #5782: a caller's effort CAP written beside other words (`RPE 7 · per hand.`, `RPE 7 cap.`, `cap at RPE 7`, `RPE ≤7`) — on
+# 2026-11-11 only a sentence that WAS `RPE 7` was kept, so three capped accessories went out at the slot's `RPE 8–9, last
+# set RPE 9–10`. The segment must be the effort phrase alone; one embedded in a restated row (`3 sets of 8-15 @ RPE 8-9`)
+# is not a cap and the composer's line stands.
+_AUTHORED_CAP_RE = re.compile(
+    r"^(?:(?:cap(?:ped)?|max(?:imum)?|stay|keep it)\s+(?:at\s+|to\s+|under\s+)?)?RPE\s*(?:≤|<=)?\s*"
+    r"(?P<lo>\d+(?:\.5)?)(?:\s*[–-]\s*(?P<hi>\d+(?:\.5)?))?(?:\s+(?:cap|max|ceiling|or (?:less|below)|tops?))?$",
+    re.I,
+)
+# a unit qualifier the rows already carry (Hevy shows a dumbbell load per hand) — never the exercise's cue
+_QUALIFIER_RE = re.compile(r"^(?:weight is |loads? (?:is |are )?)?(?:per|each) (?:hand|side|arm|leg)$", re.I)
+# #5782: the caller's conditional instruction (`if set 1 stalls short of 8 at RPE 7, drop to 25`) — the one line a row
+# cannot show, so it is kept with its numbers; a restated row or a `Last:` lead-in before it is not (`Last 30x8 was RPE
+# 8.5: if …` keeps the `if …` clause only).
+_CONDITIONAL_RE = re.compile(r"(?:^|:\s+)(?P<clause>(?:if|when|once)\b[^:]+)$|^(?P<whole>[^:]+\s(?:if|when|once)\s[^:]+)$", re.I)
+_CONDITIONAL_DIRTY_RE = re.compile(r"\d\s*(?:x|×)\s*\d|@|Last:|\bsets? of\b|GREEN|YELLOW|RED\b")
+
+
+def _authored_effort(segment: str) -> str | None:
+    """The effort line a segment states, in the standard's form (`RPE 7`, `RPE 6–7`), or None."""
+    if _AUTHORED_EFFORT_RE.match(segment):
+        return segment
+    m = _AUTHORED_CAP_RE.match(segment)
+    if not m:
+        return None
+    return f"RPE {m.group('lo')}" + (f"–{m.group('hi')}" if m.group("hi") else "")
+
+
+def _authored_conditional(segment: str) -> str | None:
+    """The segment's conditional clause as a sentence (`If set 1 stalls short of 8 at RPE 7, drop to 25.`), or None when
+    there is none or it reads as something the standard keeps off the wire (a banned word, a restated row, truncation)."""
+    m = _CONDITIONAL_RE.search(segment)
+    if not m:
+        return None
+    clause = (m.group("clause") or m.group("whole") or "").strip().rstrip(".")
+    line = clause[:1].upper() + clause[1:] + "."
+    if any(re.search(pat, line, flags=0 if case else re.I) for pat, _label, case in hevy_note_grammar.BANNED):
+        return None
+    if len(line) > AUTHORED_LINE_MAX_CHARS or hevy_note_grammar.TRUNCATION_RE.search(line) or _CONDITIONAL_DIRTY_RE.search(line):
+        return None
+    return line
+
+
 def authored_lines(note: str | None) -> dict[str, str]:
     """The chat author's sentences that already read as the standard (#5428), for `compose_blocks(authored=...)`:
-    `effort` — a sentence that IS an effort line (`RPE 7`), kept as line 1; `line` — the first other sentence of at most
-    AUTHORED_LINE_MAX_CHARS with no restated row, no load or date, no banned word — the coach's own cue ("Elbows to
-    hips, no lean-back."), which the standard counts as the exercise's cue (§4). Everything else is left to the composer
-    and kept on the record as `detail`. Empty when nothing qualifies."""
+    `effort` — a segment that IS an effort line or an effort cap (`RPE 7`, `RPE 7 cap`; #5782: a sentence's ` · ` parts
+    are read one by one, so `RPE 7 · per hand.` keeps its cap), kept as line 1; `conditional` — the author's first
+    conditional instruction (`If set 1 stalls short of 8 at RPE 7, drop to 25.`, #5782), kept with its numbers; `line` —
+    the first other sentence of at most AUTHORED_LINE_MAX_CHARS with no restated row, no load or date, no banned word —
+    the coach's own cue ("Elbows to hips, no lean-back."), which the standard counts as the exercise's cue (§4).
+    Everything else is left to the composer and kept on the record as `detail`. Empty when nothing qualifies."""
     out: dict[str, str] = {}
     for raw in str(note or "").split("\n"):
         for part in _SENTENCE_RE.split(raw):
-            line = " ".join(part.split())
-            if not line:
-                continue
-            if _AUTHORED_EFFORT_RE.match(line.rstrip(".")):
-                out.setdefault("effort", line.rstrip("."))
-            elif "line" not in out and line not in hevy_note_grammar.PREP_CUES.values() and _clean_authored(line):
-                out["line"] = line
+            for seg in part.split(" · "):
+                line = " ".join(seg.split())
+                if not line or _QUALIFIER_RE.match(line.rstrip(".")):
+                    continue
+                effort = _authored_effort(line.rstrip("."))
+                if effort:
+                    out.setdefault("effort", effort)
+                elif "conditional" not in out and _authored_conditional(line):
+                    out["conditional"] = _authored_conditional(line) or ""
+                elif "line" not in out and line not in hevy_note_grammar.PREP_CUES.values() and _clean_authored(line):
+                    out["line"] = line
     return out
+
+
+def _effort_top(line: str | None) -> float | None:
+    m = re.match(r"^RPE (\d+(?:\.5)?)(?:–(\d+(?:\.5)?))?", line or "")
+    return float(m.group(2) or m.group(1)) if m else None
+
+
+def keep_stricter(own: str | None, charter: str) -> str:
+    """#5782: the caller's effort line when it caps LOWER than the charter's (an OD1 exposure cap, the layoff-return band);
+    the charter's otherwise — a caller's cap never raises a charter cap, and a charter cap never raises the caller's."""
+    mine, theirs = _effort_top(own), _effort_top(charter)
+    return own if own and mine is not None and theirs is not None and mine < theirs else charter
 
 
 def _clean_authored(line: str) -> bool:
@@ -511,7 +572,7 @@ def compose_blocks(
         line2, pick, reason_kind = "", False, None
         if caps:
             # OD1: a capped exposure after a long gap opts out of the session's load rule, by name
-            line1 = effort_line(caps.get("rpe_max"))
+            line1 = keep_stricter(own.get("effort"), effort_line(caps.get("rpe_max")))
             line2, reason_kind = no_jumps_line(caps), "no_jumps"
         elif layoff and _has_load(block):
             # owner 2026-11-10 (A): a return the ramp did not cap is eased the same way — one load all sets at the layoff
@@ -530,13 +591,13 @@ def compose_blocks(
                 line2 = _one_set_line(block, entry)
             reason_kind = line2.split(":")[0] if line2 else None
         if layoff:
-            line1 = _layoff_return_treatment(block, line1)
+            line1 = keep_stricter(own.get("effort"), _layoff_return_treatment(block, line1))
         swapped = (rotations or {}).get(key)
         lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
         if lead:
             reason_kind = "rotation"
         pick_line = (_pick_result_line(block, entry) if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""
-        body = [x for x in (line1, lead, line2, pick_line) if x]
+        body = [x for x in (line1, lead, line2, own.get("conditional"), pick_line) if x]  # #5782: the caller's if-then
         cue = own.get("line") or ""
         if family and family not in seen_families:
             cue = cue or _cue_for(family, entry, body, _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES)

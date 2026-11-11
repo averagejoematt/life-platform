@@ -29,6 +29,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
+import sealed_prereg
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
@@ -109,9 +110,10 @@ def _tmp_freeze(tmp_path, monkeypatch, genesis="2026-07-19", generated_at="2026-
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_committed_stamp_matches_frozen_artifact():
+def test_committed_stamp_matches_frozen_artifact(monkeypatch):
     """The CI-level write-path block: editing the frozen pre-registration after it
     was stamped reds this test. Restore the file or lose the merge."""
+    monkeypatch.setattr(gps, "FROZEN_PATH", sealed_prereg.require_sealed_path())  # private since 2026-11-11
     assert gps.FROZEN_PATH.exists(), "frozen pre-registration missing"
     assert gps.STAMP_PATH.exists(), (
         f"no hash stamp at {gps.STAMP_PATH} — the frozen pre-registration is not content-addressed; "
