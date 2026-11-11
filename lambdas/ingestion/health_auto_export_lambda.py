@@ -111,7 +111,6 @@ import math
 import os
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any
 
 import boto3
@@ -123,6 +122,7 @@ try:
     from health import glycemic
 except ImportError:
     glycemic = None
+from common.numeric import floats_to_decimal  # #5524: the ONE walker (#1207), never a private copy
 from health import rhythm_channel as _rhythm  # #4972: the owner-only ECG / HR-notification / medication-log channel
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -209,21 +209,11 @@ def get_api_key():
     return secret.get("health_auto_export_api_key") or secret.get("api_key")
 
 
-def floats_to_decimal(obj):
-    # L-04 note (2026-06-06): DELIBERATELY divergent from the canonical
-    # lambdas/numeric.py impl — HAE payloads carry NaN/Inf (must map to None,
-    # DynamoDB rejects Decimal('NaN')) and high-precision sensor floats
-    # (rounded to 4dp to bound item size). Do not "clean up" to the shared
-    # module without porting both behaviors.
-    if isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return None
-        return Decimal(str(round(obj, 4)))
-    if isinstance(obj, dict):
-        return {k: floats_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [floats_to_decimal(v) for v in obj]
-    return obj
+# #5524: the float->Decimal walk is the canonical `common.numeric.floats_to_decimal` — the
+# private copy that lived here (citing a `lambdas/numeric.py` that no longer exists) was
+# the same NaN/Inf->None walk plus a fixed 4dp round, which the canonical helper expresses
+# as `precision=`. HAE payloads carry high-precision sensor floats; rounding bounds item size.
+HAE_DECIMAL_PLACES = 4
 
 
 def parse_date_str(date_str):
@@ -1023,7 +1013,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
         attr_val = f":v{i}"
         set_parts.append(f"{attr_name} = {attr_val}")
         names[attr_name] = key
-        values[attr_val] = floats_to_decimal(val)
+        values[attr_val] = floats_to_decimal(val, precision=HAE_DECIMAL_PLACES)
 
     # Store reading maps for dedup on next sync
     if reading_timestamps:
@@ -1033,7 +1023,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
             rd_key = f"_rd_{field_name}"
             set_parts.append(f"{rd_attr} = {rd_val}")
             names[rd_attr] = rd_key
-            values[rd_val] = {ts: floats_to_decimal(qty) for ts, qty in merged_readings.items()}
+            values[rd_val] = {ts: floats_to_decimal(qty, precision=HAE_DECIMAL_PLACES) for ts, qty in merged_readings.items()}
             if getattr(merged_readings, "classes", None):  # #4969: the companion {ts: untagged|watch}
                 set_parts.append(f"#rc{j} = :rc{j}")
                 names[f"#rc{j}"], values[f":rc{j}"] = f"{_echo.CLASS_MAP_PREFIX}{field_name}", merged_readings.classes

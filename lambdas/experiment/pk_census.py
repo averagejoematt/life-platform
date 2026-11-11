@@ -62,13 +62,24 @@ def pk_family(pk: str) -> str:
     collapse to the base); every other pk folds to its top-level prefix (segment before the
     first '#'). So a NEW source OR a NEW top-level family (the next COACH#-like tier) each
     surface as a distinct family whose representative classify() must resolve.
+
+    #5524: a non-SOURCE `USER#<u>#<X>[#...]` pk folds to `USER#<X>`, NOT to the bare top-level
+    `USER`. Before this every per-user partition (MEMORY, ROUTINE#<id>, MCP_IDEMPOTENCY, ...)
+    collapsed into ONE family with ONE representative, so a new one — `USER#matthew#MCP_IDEMPOTENCY`,
+    72 live rows, unclassified for ten weeks — rode the representative of an older one through
+    the totality census. Keying by <X> makes each per-user partition its own family. The bare
+    `USER#<u>` pk (no third segment) stays the family `USER`. The user id is dropped on purpose:
+    classify() keys these rules by shape, and the family must not split per user.
     """
     marker = "#SOURCE#"
     idx = pk.find(marker)
     if idx != -1:
         base = pk[idx + len(marker) :].split("#", 1)[0]
         return f"SOURCE#{base}"
-    return pk.split("#", 1)[0]
+    parts = pk.split("#", 3)
+    if parts[0] == "USER" and len(parts) >= 3 and parts[2]:
+        return f"USER#{parts[2]}"
+    return parts[0]
 
 
 def scan_pk_sk_pages(table):
@@ -785,7 +796,7 @@ def census_snapshot(table=None) -> dict:
             cls = taxonomy.classify(pk, sk)
         except KeyError:
             cls = None  # unresolved; run_census_preflight is the instrument that RULES on this
-        families[fam] = {"rep_pk": pk, "rep_sk": sk, "class": cls}
+        families[fam] = {"rep_pk": pk, "rep_sk": artifact_rep_sk(fam, sk), "class": cls}
     n_families = len(families)
     coverage_partitions: dict = {}
     for prefix, pks in _coverage.items():
@@ -832,6 +843,31 @@ def census_snapshot(table=None) -> dict:
             "family_count": n_families,
         },
     }
+
+
+_DATE_SEGMENT = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def artifact_rep_sk(family: str, sk: str) -> str:
+    """The representative sk as the COMMITTED artifact records it (#5524): its SHAPE, not the row.
+
+    The artifact is committed to a public repo, and a SOURCE# family's representative sk is a
+    real row key of Matthew's — a journal-quote date, a pain site, a clinical document date, a
+    SNP id. Nothing that reads the artifact needs the row: classify() resolves a SOURCE# pk by
+    its source alone (platform_memory excepted — its category is the sk's second segment and is
+    kept), and `scripts/date_range_read_census.py` needs only "a date, then more". So past the
+    first segment a date becomes `0000-00-00` (suffix kept, so the shape survives) and every other
+    segment becomes `x`. Non-SOURCE families are recorded verbatim, as before: their sk prefix is
+    what classify() keys on (COACH# CHAT#/DEDUPE#, the bare USER#matthew rules)."""
+    if not family.startswith("SOURCE#"):
+        return sk
+    parts = sk.split("#")
+    keep = 2 if family == "SOURCE#platform_memory" else 1
+    out = parts[:keep]
+    for seg in parts[keep:]:
+        m = _DATE_SEGMENT.match(seg)
+        out.append("0000-00-00" + ("x" if len(seg) > 10 else "") if m else ("x" if seg else ""))
+    return "#".join(out)
 
 
 def format_unresolved(unresolved: list[tuple[str, str, str, str]]) -> str:

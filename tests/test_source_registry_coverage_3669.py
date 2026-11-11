@@ -581,7 +581,7 @@ class TestTheCensusWriterDelegates:
                     return {
                         "Items": [
                             {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-09-01"},
-                            {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-09-02"},
+                            {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-09-02#WORKOUT#1"},
                             {"pk": "COACH#nutrition", "sk": "STATE#1"},
                         ],
                         "LastEvaluatedKey": {"pk": "x"},
@@ -594,7 +594,9 @@ class TestTheCensusWriterDelegates:
         # (This lane's earlier writer stored per-family counts; that shape lost the
         # reconciliation, and `item_count` below preserves the anti-vacuity signal it had.)
         assert set(payload["families"]) == {"COACH", "SOURCE#labs", "SOURCE#whoop"}
-        assert payload["families"]["SOURCE#whoop"]["rep_sk"] == "DATE#2026-09-01", "first seen must win"
+        # #5524: the artifact records the representative's SHAPE (pk_census.artifact_rep_sk), so the
+        # second whoop row is given a different shape to keep "first seen wins" observable.
+        assert payload["families"]["SOURCE#whoop"]["rep_sk"] == "DATE#0000-00-00", "first seen must win"
         assert payload["_meta"]["item_count"] == 4, "item_count must count SCANNED items (4), not families (3)"
         assert payload["_meta"]["family_count"] == 3
 

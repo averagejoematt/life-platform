@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-11-10 (v8.6.0 — 91 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
+**Last updated:** 2026-11-11 (v8.6.0 — 91 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -318,6 +318,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `USER#matthew` / `SOURCE#intelligence_quality…` | intelligence quality tracker | quality tracker | `get_intelligence_quality` | system_state | n/v |
 | `USER#matthew#MEMORY` / `CYCLE#<n>#<label>` | durable restart-cycle memory | restart tooling | re-entry flows | cross_phase | ✓ |
 | `USER#matthew#ROUTINE#<version>` / — | Hevy routine IR audit trail | `lambdas/training/routine_repo.py` | routine repo | system_state | n/v |
+| `USER#matthew#MCP_IDEMPOTENCY` / `<scope>#<content key>` | **the MCP write-tool idempotency ledger (#3114/#3115)** — one claim row per guarded write (`claimed_at`, `released`, then the `payload` the first call returned, e.g. a Todoist task id), so a replayed tool call returns the first record's id instead of writing twice. Every row carries a 180-day `ttl` (a released claim 1 day). Kept OUT of the source partitions it guards so a partition query never counts a ledger row as a record. Classified system_state by #5524 (it had been unclassified since 2026-08-25) | `mcp/idempotency.py` (`claim` / `record` / `release`) | `mcp/idempotency.py::claim` (the replay check) | system_state | ✓ (72 rows 2026-10-31) |
 | `USER#system` / `CANARY#…` etc. | ops state (canary, DLQ ledger) | operational lambdas | monitors | system_state | ✓ |
 | `PULSE` / `DATE#<d>` | site pulse cache | pulse writer | site | system_state | ✓ |
 | `BROADCAST_ORIGIN#<channel>` / `POST#<post_id>` | **the provenance membrane ledger (#1670, epic #1668)** — one row per post the platform syndicates OUT, so inbound ingestion can stamp its own echoes `origin: platform` and exclude them from the voice feed / enrichment / re-broadcast. SYSTEM_STATE (provenance is cross-phase truth — survives reset). Outbound writer is LIVE since #1679: `scripts/post_social.py` calls `social_provenance.record_broadcast_origin` after a successful post (fail-soft — a provenance miss warns, it never fails an already-sent post). Also read by `/api/membrane` (the #1679 dashboard's "what I said, where it went" side) | `scripts/post_social.py` via `lambdas/privacy/social_provenance.py` (write helper) | `social_provenance.classify_origin` inbound cross-ref; `web/site_api_social.handle_membrane` | system_state | empty (no post has been made through the poster yet) |

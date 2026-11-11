@@ -10,11 +10,24 @@ READ-ONLY against DynamoDB. Writes exactly one file.
 
     python3 deploy/write_pk_family_census.py            # write the artifact
     python3 deploy/write_pk_family_census.py --dry-run  # print the diff summary only
+    python3 deploy/write_pk_family_census.py --refresh-if-older-than-days 28   # the wrap's cadence
+
+THE CADENCE (#5524). The artifact used to be refreshed "at reset", and no reset will come.
+`--refresh-if-older-than-days N` is the wrap's gather gate (`scripts/wrap_gates.py`
+`pk-census`): it costs nothing while the artifact is younger than N days (no scan at all), and
+past N it re-scans, writes, then runs the pytest files that READ this artifact (every
+`tests/test_*.py` naming its filename, `census_reader_tests()`). If any of
+them reds on the fresh census, the previous bytes are restored and the run exits 1 naming the
+delta — the wrap commits straight to main, so a refresh that would red main is never kept; the
+new family is the finding, and `tests/test_schema_families_census.py` reds at 35 days until a PR
+documents it. No AWS credentials prints UNVERIFIED and exits 0 (the wrap's degrade line).
 """
 
 import argparse
 import json
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -47,10 +60,84 @@ def read_artifact_families() -> dict:
     return (json.loads(ARTIFACT.read_text(encoding="utf-8")) or {}).get("families", {})
 
 
+def artifact_age_days(today=None) -> int | None:
+    """Whole days since the committed artifact's `generated_at` (UTC), or None when absent/unreadable."""
+    if not ARTIFACT.exists():
+        return None
+    try:
+        stamp = json.loads(ARTIFACT.read_text(encoding="utf-8"))["generated_at"]
+        taken = datetime.fromisoformat(stamp).astimezone(timezone.utc).date()
+    except (ValueError, KeyError, TypeError):
+        return None
+    return ((today or datetime.now(timezone.utc).date()) - taken).days
+
+
+def census_reader_tests() -> list:
+    """The pytest files that read THIS artifact — every tests/test_*.py naming its filename.
+
+    Derived, never hand-listed; a name match (not the `deploy/generated/` path needle the reset's
+    #3477 leg uses) so a reader that builds the path from parts is still enrolled. Raises on an
+    empty result: a refresh graded by zero readers is a check that cannot fail."""
+    out = sorted(
+        f"tests/{p.name}"
+        for p in (REPO_ROOT / "tests").glob("test_*.py")
+        if ARTIFACT.name in p.read_text(encoding="utf-8", errors="replace")
+    )
+    if not out:
+        raise RuntimeError(f"no test reads {ARTIFACT.name} — the reader derivation went blind")
+    return out
+
+
+def refresh_if_stale(max_age_days: int, scan=census_snapshot, run=subprocess.run) -> int:
+    """The wrap gate (#5524): no-op while fresh; past `max_age_days` re-scan, write, and keep
+    the write only if every reader of the artifact still passes against it."""
+    age = artifact_age_days()
+    if age is not None and age < max_age_days:
+        print(f"pk-family census: fresh ({age}d old < {max_age_days}d) — no scan")
+        return 0
+    try:
+        snap = scan()
+    except Exception as exc:  # noqa: BLE001 — any botocore failure (no creds, expired SSO, throttle) is a degrade
+        if type(exc).__module__.startswith("botocore"):
+            print(f"pk-family census: UNVERIFIED — could not scan ({type(exc).__name__}: {exc}); artifact is {age}d old")
+            return 0
+        raise
+    previous = ARTIFACT.read_bytes() if ARTIFACT.exists() else None
+    old = read_artifact_families()
+    write_artifact(snap)
+    readers = census_reader_tests()
+    proc = run(
+        [sys.executable, "-m", "pytest", *readers, "-q", "--no-header", "-p", "no:cacheprovider"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    added = sorted(set(snap["families"]) - set(old))
+    if proc.returncode != 0:
+        if previous is not None:
+            ARTIFACT.write_bytes(previous)
+        tail = "\n".join((proc.stdout or "").splitlines()[-15:])
+        print(
+            f"pk-family census: refresh NOT kept — {len(readers)} reader test file(s) red on the fresh scan "
+            f"(new families: {', '.join(added) or 'none'}). Fix in a PR (document/classify the family), then refresh.\n{tail}"
+        )
+        return 1
+    print(
+        f"pk-family census: refreshed ({snap['family_count']} families, +{len(added)}: {', '.join(added) or '-'}); {len(readers)} reader file(s) green — commit {ARTIFACT.name}"
+    )
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true", help="print what would change, write nothing")
+    ap.add_argument(
+        "--refresh-if-older-than-days", type=int, metavar="N", help="the wrap's cadence: scan only past N days, keep only if readers pass"
+    )
     args = ap.parse_args()
+
+    if args.refresh_if_older_than_days is not None:
+        return refresh_if_stale(args.refresh_if_older_than_days)
 
     snap = census_snapshot()
     old = read_artifact_families()
