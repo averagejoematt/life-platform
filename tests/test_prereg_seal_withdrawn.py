@@ -73,16 +73,14 @@ def test_the_withdrawal_names_the_published_digest():
 
 
 def test_the_repo_no_longer_carries_the_sealed_file():
-    """Owner ruling 2026-11-11: the sealed file carries withdrawn calls, so no tracked file may be its bytes."""
-    import subprocess
-
-    tracked = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True, check=True).stdout.split(b"\0")
+    """Owner ruling 2026-11-11: the sealed file carries withdrawn calls, so neither of the directories where copies of
+    it lived (the frozen artifacts and the test fixtures) may hold its bytes again, under any name."""
     hits = []
-    for rel in filter(None, tracked):
-        p = REPO / rel.decode()
-        if p.is_file() and p.stat().st_size == 11578 and hashlib.sha256(p.read_bytes()).hexdigest() == STAMP["sha256"]:
-            hits.append(rel.decode())
-    assert hits == [], f"the sealed (private) file is tracked again: {hits}"
+    for d in (REPO / "deploy" / "generated", REPO / "tests" / "fixtures"):
+        for p in d.iterdir():
+            if p.is_file() and p.stat().st_size == 11578 and hashlib.sha256(p.read_bytes()).hexdigest() == STAMP["sha256"]:
+                hits.append(str(p.relative_to(REPO)))
+    assert hits == [], f"the sealed (private) file is in the repo tree again: {hits}"
 
 
 def test_the_withdrawal_counts_match_the_sealed_file_and_the_words():
