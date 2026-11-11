@@ -82,7 +82,7 @@ def test_the_charter_names_each_test_with_a_machine_a_unit_and_a_better_directio
     assert any("#5078" in e["by"] for e in c["change_log"])
     p = ft.protocol()
     spec = ft.tests_spec()
-    assert len(spec) == len(p["battery"]) == 4
+    assert len(spec) == len(p["battery"]) == 5
     for tid, row in spec.items():
         assert row["catalog_key"] in MOVEMENTS, f"{tid}: {row['catalog_key']} is not in the movement catalog"
         assert MOVEMENTS[row["catalog_key"]].get("hevy_template_id_hint"), f"{tid}: no Hevy template id"
@@ -251,7 +251,7 @@ def test_a_battery_round_trips_through_the_wire_and_a_second_write_merges():
     ft.write_record(t, merged)
     (row,) = ft.load_records(t)
     assert set(row["tests"]) == {"six_minute_walk", "dead_hang", "assisted_pull_up"}
-    assert row["tests"]["dead_hang"] == {"value": 41.5, "unit": "s", "protocol_version": "1", "source": "explicit"}
+    assert row["tests"]["dead_hang"] == {"value": 41.5, "unit": "s", "protocol_version": "2", "source": "explicit"}
     assert row["tests"]["assisted_pull_up"]["notes"] == "machine 2"
 
 
