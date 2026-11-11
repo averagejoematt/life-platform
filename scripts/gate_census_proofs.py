@@ -4613,3 +4613,39 @@ GUARD_PROOFS["guard::scripts/check_library_gates_private.py"] = {
     ),
     "proved_on": "2026-11-11",
 }
+
+# #5772 — the exercise library's weekly gate evaluation. Both modules match the census's `*_gate` guard-name rule and
+# genuinely gate (they lock a movement), so each carries the mutations actually run on 2026-11-11 in this lane: one
+# plant at a time in the real file, restored from a byte copy, against tests/test_exercise_gates_5772.py.
+GUARD_PROOFS["guard::lambdas/training/exercise_gates.py"] = {
+    "gate_name": "lambdas/training/exercise_gates.py",
+    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 20 passed",
+    "mutation": (
+        "E1 `_unknown` returns UNLOCKED (an unknown input opens the gate); E2 the owner-unset branch returns UNLOCKED "
+        "(a null threshold opens it); E3 the chain step-open check disabled (`if False:`); E4 the clinical-cue branch keyed "
+        "on the `locks` flag instead of the kind; E5 `log_view` includes `value_seen` (a body number in the log line)."
+    ),
+    "observed": (
+        "2026-11-11, this lane. E1: 1 failed (test_every_unknown_input_reads_locked_and_says_so). E2: 1 failed "
+        "(test_a_null_owner_threshold_locks_with_its_reason). E3: 1 failed (test_chain_order_a_later_step_alone_opens_nothing). "
+        "E4: 1 failed (test_a_clinical_cue_never_locks_even_with_every_input_unknown). E5: 1 failed "
+        "(test_the_leg_summary_and_log_carry_no_body_number). RESTORED 20 passed."
+    ),
+    "scope": (
+        "The pure evaluator over a synthetic library and the committed library. NOT SEEN: a live weekly run (the first "
+        "EXGATE#EVAL row after deploy) and the owner-private overlay on S3 (not written yet)."
+    ),
+    "proved_on": "2026-11-11",
+}
+GUARD_PROOFS["guard::mcp/exercise_gates_leg.py"] = {
+    "gate_name": "mcp/exercise_gates_leg.py",
+    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 20 passed",
+    "mutation": "L1 `claim` returns True on ConditionalCheckFailedException (a lost claim still announces — twice).",
+    "observed": (
+        "2026-11-11, this lane. L1: 1 failed (test_announce_once_control_a_racing_second_claim_loses). RESTORED 20 passed. "
+        "The proposed-library hold and the first-run baseline are pinned by test_a_proposed_library_announces_nothing and "
+        "test_a_newly_unlocked_movement_is_announced_exactly_once."
+    ),
+    "scope": "Against an in-memory DynamoDB fake with conditional put/update. NOT SEEN: the live table and the Monday run.",
+    "proved_on": "2026-11-11",
+}
