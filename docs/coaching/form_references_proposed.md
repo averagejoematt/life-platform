@@ -1,6 +1,8 @@
 # Form references: PROPOSED (#5779)
 
 > **Status:** proposed, not adopted - nothing here is read by any code. **Owner:** Matthew. **Checked:** 2026-11-11.
+>
+> **Owner ruling 2026-11-11 (D11):** StrengthLog accepted **provisionally for accessories**. The four **anchors** (bench press, squat, conventional deadlift, one-arm DB row / barbell row if served) carry **no reference** until he supplies one he has watched: rows 1, 2, 4 and 17 (and 28 if the barbell row is served) are struck below as anchors.
 > **Part of:** epic #5770 (exercise library, PR #5804). Companion to [FILM_A_SET_DESIGN.md](FILM_A_SET_DESIGN.md).
 
 `config/movement_catalog.json` `form_reference_urls` is empty for every movement. The only reader is
@@ -40,10 +42,10 @@ and name the pages; they would then be added with the same verify step.
 
 | # | Exposures | Movement (library title) | Catalog key | Fit | Proposed URL | Verified |
 |--:|--:|---|---|---|---|---|
-| 1 | 133 | Bench Press (Barbell) | `barbell_bench_press` | exact | <https://www.strengthlog.com/bench-press/> | 2026-11-11, 200 |
-| 2 | 99 | Squat (Barbell) | `squat_barbell` | exact | <https://www.strengthlog.com/squat/> | 2026-11-11, 200 |
+| 1 | 133 | Bench Press (Barbell) | `barbell_bench_press` | anchor: none (owner) | — (owner supplies one he has watched) | — |
+| 2 | 99 | Squat (Barbell) | `squat_barbell` | anchor: none (owner) | — (owner supplies one he has watched) | — |
 | 3 | 96 | Face Pull | `face_pull` | exact | <https://www.strengthlog.com/face-pull/> | 2026-11-11, 200 |
-| 4 | 87 | Deadlift (Barbell) | `deadlift_barbell` | exact | <https://www.strengthlog.com/deadlift/> | 2026-11-11, 200 |
+| 4 | 87 | Deadlift (Barbell) | `deadlift_barbell` | anchor: none (owner) | — (owner supplies one he has watched) | — |
 | 5 | 80 | Hammer Curl (Dumbbell) | `hammer_curl_dumbbell` | exact | <https://www.strengthlog.com/hammer-curl/> | 2026-11-11, 200 |
 | 6 | 75 | Shrug (Barbell) | `shrug_barbell` | exact | <https://www.strengthlog.com/barbell-shrug/> | 2026-11-11, 200 |
 | 7 | 74 | Incline Bench Press (Dumbbell) | `incline_db_press` | exact | <https://www.strengthlog.com/dumbbell-incline-press/> | 2026-11-11, 200 |
@@ -56,7 +58,7 @@ and name the pages; they would then be added with the same verify step.
 | 14 | 53 | Bulgarian Split Squat (Dumbbell) | `bulgarian_split_squat_dumbbell` | near | <https://www.strengthlog.com/bulgarian-split-squat/> | 2026-11-11, 200 |
 | 15 | 50 | Shoulder Press (Dumbbell) | `db_shoulder_press` | exact | <https://www.strengthlog.com/dumbbell-shoulder-press/> | 2026-11-11, 200 |
 | 16 | 43 | Side Bend (Dumbbell) | `side_bend_dumbbell` | exact | <https://www.strengthlog.com/dumbbell-side-bend/> | 2026-11-11, 200 |
-| 17 | 41 | Dumbbell Row | `one_arm_db_row` | exact | <https://www.strengthlog.com/dumbbell-row/> | 2026-11-11, 200 |
+| 17 | 41 | Dumbbell Row | `one_arm_db_row` | anchor: none (owner) | — (owner supplies one he has watched) | — |
 | 18 | 39 | Seated Leg Curl (Machine) | `leg_curl` | exact | <https://www.strengthlog.com/seated-leg-curl/> | 2026-11-11, 200 |
 | 19 | 38 | Standing Calf Raise (Machine) | `standing_calf_raise_machine` | loose | <https://www.strengthlog.com/standing-calf-raise/> | 2026-11-11, 200 |
 | 20 | 31 | Lat Pulldown - Close Grip (Cable) | `lat_pulldown_close_grip_cable` | exact | <https://www.strengthlog.com/close-grip-lat-pulldown/> | 2026-11-11, 200 |
@@ -67,7 +69,7 @@ and name the pages; they would then be added with the same verify step.
 | 25 | 24 | Pullover (Dumbbell) | `pullover_dumbbell` | exact | <https://www.strengthlog.com/dumbbell-pullover/> | 2026-11-11, 200 |
 | 26 | 24 | Front Raise (Dumbbell) | `front_raise_dumbbell` | exact | <https://www.strengthlog.com/dumbbell-front-raise/> | 2026-11-11, 200 |
 | 27 | 20 | Deadlift (Trap bar) | `deadlift_trap_bar` | loose | <https://www.strengthlog.com/trap-bar-deadlift-benefits/> | 2026-11-11, 200 |
-| 28 | 20 | Bent Over Row (Barbell) | `bent_over_row_barbell` | near | <https://www.strengthlog.com/barbell-row/> | 2026-11-11, 200 |
+| 28 | 20 | Bent Over Row (Barbell) | `bent_over_row_barbell` | anchor: none (owner) | — (owner supplies one he has watched) | — |
 | 29 | 19 | Overhead Press (Barbell) | `overhead_press_barbell` | exact | <https://www.strengthlog.com/overhead-press/> | 2026-11-11, 200 |
 | 30 | 19 | Incline Chest Fly (Dumbbell) | `incline_chest_fly_dumbbell` | near | <https://www.strengthlog.com/dumbbell-chest-fly/> | 2026-11-11, 200 |
 

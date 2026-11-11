@@ -1,6 +1,8 @@
 # Film a set: design (#5779)
 
-> **Status:** proposed, design only. **Owner:** Matthew. **Written:** 2026-11-11.
+> **Status:** proposed — **deferred** (owner ruling 2026-11-11). Nothing is built. **Owner:** Matthew. **Written:** 2026-11-11.
+>
+> **Owner rulings 2026-11-11:** D1 no build — a manual trial of 3–5 clips in the Claude chat first; the Phase 0 script only if those reviews change something he does. D2 retire if 2 of the first 5 manual reviews are wrong or change nothing. D3/D4/D9/D10/D12 deferred until Phase 0 is earned. D5 delete after review. D6 guidance only. D7 no. D8 a cue-sheet lane now for bench, squat, conventional deadlift and one-arm DB row (barbell row if served), still-visible vs not-visible cues, `REVIEWED=False` until he approves each; they render in Hevy notes regardless of filming. D11 StrengthLog accepted provisionally for accessories; the four anchors carry no reference until he supplies one he has watched.
 > **Nothing in this document is built.** No upload surface, Lambda, IAM, bucket rule or model call exists for it,
 > and none is built until the owner approves this design (issue acceptance, third box).
 > **Part of:** epic #5770 (exercise library, PR #5804). Companion: [form_references_proposed.md](form_references_proposed.md).
