@@ -191,7 +191,6 @@ def _compose_notes(
     history_index: dict[str, list],
     target_date: str,
     rotation: dict[str, Any] | None = None,
-    *,
     deload: bool = False,
     red_day: bool = False,
 ) -> dict[str, Any]:
@@ -374,9 +373,7 @@ def full_body_routines(
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = _compose_notes(
-        blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload=deload, red_day=drop_accessories
-    )
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload, drop_accessories)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
