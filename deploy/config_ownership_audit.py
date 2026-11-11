@@ -184,6 +184,16 @@ RULINGS: tuple[Ruling, ...] = (
         "and any `coach_added` entry are preserved field-for-field by the builder, so a human edit in the repo is still "
         "an edit to the authority. Read by six modules, written by no Lambda. Uploading it is a publish.",
     ),
+    Ruling(
+        "config/exercise_library.json",
+        REPO_GENERATED,
+        "#5769: the owner's exercise library (status `proposed` until the owner runs scripts/approve_exercise_library.py). "
+        "Its `_provenance.generated_by` names deploy/build_exercise_library.py, which writes LIBRARY_PATH under the repo's "
+        "config/ dir from a read-only DynamoDB Hevy query + config/movement_catalog.json + the hand-owned curation module "
+        "deploy/exercise_library_curation.py, and preserves `version` / `change_log` / `status` — so the owner's approval is "
+        "an edit to the authority. Public half only; the N=1 half is the owner-private S3 object "
+        "config/coaching/exercise_library.private.json (no repo copy). Read by no Lambda yet. Uploading it is a publish.",
+    ),
     # ── hand_owned: a human edits the repo copy; it is the authority ──
     Ruling(
         "config/hevy_template_aliases.json",
