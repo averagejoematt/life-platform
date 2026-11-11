@@ -273,6 +273,22 @@ def _rejoin_cardio_hr() -> dict:
         return {"errors": 1}
 
 
+def _after_walk(written: list[dict]) -> dict:
+    """The post-walk steps, in order. None of them raises.
+
+    #475 / C-7: consume DELETE#WORKOUT# markers — this run's AND any unresolved backlog (self-healing). Runs after the
+    walk so a delete event and its workout record written in the same run still reconcile; a failure leaves the marker
+    unresolved for the next poll and never blocks the cursor (marker state is independent of the events window).
+    #4412: the wearable usually lands AFTER the Hevy session (WHOOP → Strava → hourly pull), so the cardio HR join is
+    re-derived every run over the last two Pacific days — written only when it changed.
+    #5795: a loaded session written for today/yesterday starts the nightly pre-draft (flag `PREDRAFT_ON_INGEST`, off)."""
+    from ingestion import predraft_trigger
+
+    out = {"tombstones": resolve_tombstones(), "cardio_hr_rejoin": _rejoin_cardio_hr()}
+    out["predraft_trigger"] = predraft_trigger.after_poll(written)
+    return out
+
+
 def _record_health(*, attempted: bool, succeeded: bool, exc) -> None:
     """Write the ER-01 INGEST_HEALTH sentinel + EMF metric (best-effort).
 
@@ -662,7 +678,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
     is_initial = since == INITIAL_SINCE
     logger.info("hevy backfill starting. since=%s initial=%s", since, is_initial)
 
-    ingested = 0
+    written: list[dict] = []  # #5795: the records this poll wrote — the pre-draft trigger reads them
     deleted = 0
     errors = 0
     blocking_errors = 0  # #4643: errors that hold the cursor (a quarantined event does not)
@@ -713,7 +729,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
                         cardio_hr_store.attach(_table, USER_ID, rec)  # #4412 cardio block ↔ wearable HR (guarded, pre-write)
                         write_normalized(rec)
                         _derive_training_notes(rec)  # on-ingest note-signal projection (guarded)
-                        ingested += 1
+                        written.append(rec)
                         logger.info(
                             "hevy backfill ingest %s date=%s phase=%s sets=%d volume=%.2fkg",
                             wid,
@@ -789,15 +805,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         # paths engage — a swallowed fatal was how Hevy could die invisibly (#466).
         raise
 
-    # #475 / C-7: consume DELETE#WORKOUT# markers — this run's AND any unresolved
-    # backlog (self-healing). Runs after the walk so a delete event and its
-    # workout record written in the same run still reconcile. Never raises; a
-    # failure leaves the marker unresolved for the next poll and never blocks
-    # the cursor (marker state is independent of the events window).
-    tombstones = resolve_tombstones()
-    # #4412: the wearable usually lands AFTER the Hevy session (WHOOP → Strava → hourly pull), so
-    # the join is re-derived every run over the last two Pacific days — written only when it changed.
-    cardio_rejoin = _rejoin_cardio_hr()
+    post_walk = _after_walk(written)  # tombstones, the cardio HR re-join, the #5795 pre-draft trigger
     # #4643: a truncated walk is a FAILED run. It used to record success whenever no event
     # errored, so a backlog the cap could never clear — `since` frozen, every run walking the
     # same 30 newest pages — read as a healthy source forever. It is not a parse fault; the
@@ -814,7 +822,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         "initial_run": is_initial,
         "since": since,
         "new_since": poll_started_at if blocking_errors == 0 and not truncated else since,
-        "ingested": ingested,
+        "ingested": len(written),
         "deleted": deleted,
         "errors": errors,
         "blocking_errors": blocking_errors,
@@ -822,8 +830,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         "pages_walked": pages_walked,
         "total_pages": total_pages_observed,
         "truncated": truncated,
-        "tombstones": tombstones,
-        "cardio_hr_rejoin": cardio_rejoin,
+        **post_walk,
         "failed_ids": failed_ids[:10],
     }
     logger.info("hevy backfill complete: %s", json.dumps(summary, default=str))
