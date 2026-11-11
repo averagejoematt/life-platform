@@ -1100,7 +1100,7 @@
 "subdomain": "hrv"
 },
 {
-"claim_natural": "Sleep duration will consistently reach or exceed the 7.5-hour target (bed 9:00 PM, wake 4:30 AM) on at least 5 of the first 7 nights, as the fixed schedule removes decision fatigue and the structured ramp discipline reduces late-night training stress that would otherwise delay sleep onset.",
+"claim_natural": "(stand-in text: a day-one sleep duration call, wording withheld under the owner ruling of 2026-11-09)",
 "confidence": 0.5,
 "created_date": "2026-09-06",
 "evaluation": {
@@ -1118,7 +1118,7 @@
 "phase": "experiment",
 "pre_registered": true,
 "pre_registered_at": "2026-09-06T02:13:38.690141+00:00",
-"prediction_id": "pred_20260906_sleep_duration_will_consistently_reach_o",
+"prediction_id": "pred_20260906_withheld_call_a",
 "status": "confirmed",
 "subdomain": "sleep"
 },
