@@ -310,6 +310,29 @@ def logged_rpe(note: str | None) -> float | None:
     return max(vals) if vals else None
 
 
+def swap_counts(
+    served_kind: str | None, note: str | None, performed_minutes: int | None = None, served_minutes: int | None = None
+) -> dict[str, Any]:
+    """#5505's counting rule for a block done on another machine than the one served (owner ruling 2026-11-08) — the ONE
+    rule both readers apply: the week's conditioning count (`kind_of_performed`) and the session's adherence grade
+    (`health.adherence_calc`, #5796). The swap counts as the served block when his own note logs an RPE at or above the
+    served kind's band (`wire_band`): a swap with no logged effort is not evidence. When both sides' minutes are known
+    (adherence has the served block's set row; the conditioning count does not) the swap must also run at least the
+    served minutes. `{counts, logged_rpe, rpe_floor, reason}`; `reason` names the first half that failed."""
+    rpe = logged_rpe(note)
+    band = wire_band(str(served_kind)) if served_kind in KINDS else None
+    out: dict[str, Any] = {"counts": False, "logged_rpe": rpe, "rpe_floor": band[0] if band else None}
+    if band is None:
+        return {**out, "reason": f"the served block names no kind with an RPE band ({served_kind!r})"}
+    if rpe is None:
+        return {**out, "reason": "no RPE logged in his note — a swap with no logged effort is not evidence (#5505)"}
+    if rpe < band[0]:
+        return {**out, "reason": f"logged RPE {rpe:g} is under the served {served_kind} band's floor {band[0]}"}
+    if performed_minutes is not None and served_minutes is not None and performed_minutes < served_minutes:
+        return {**out, "reason": f"{performed_minutes} min is shorter than the served {served_minutes} min"}
+    return {**out, "counts": True, "reason": f"logged RPE {rpe:g} meets the served {served_kind} band (floor {band[0]})"}
+
+
 def kind_of_performed(machine_key: str, note: str | None, served_kind: str | None = None, swap_kind: str | None = None) -> str:
     """The menu kind a performed block was, read from its machine, its own note and the routine it was served.
 
@@ -321,8 +344,8 @@ def kind_of_performed(machine_key: str, note: str | None, served_kind: str | Non
 
     `swap_kind` (#5505, owner ruling 2026-11-08): the HARD kind the same routine served on ANOTHER machine. It counts
     when he did the block on this machine at the prescribed effort — his note logs an RPE at or above the kind's band
-    (`wire_band`); a swap with no logged effort stays the machine's easy kind (an incline walk instead of a bike tempo
-    is not the tempo)."""
+    (`wire_band`, `swap_counts` — the one rule); a swap with no logged effort stays the machine's easy kind (an incline
+    walk instead of a bike tempo is not the tempo)."""
     from training import cardio_note
 
     text = cardio_note.strip_negated(note)  # #5312: "No intervals" never names intervals
@@ -335,9 +358,7 @@ def kind_of_performed(machine_key: str, note: str | None, served_kind: str | Non
         return "tempo"
     if served_kind in KINDS and not _EASY_ONLY_WORD.search(text) and fits_machine(served_kind, machine_key):
         return str(served_kind)
-    rpe = logged_rpe(text)
-    band = wire_band(str(swap_kind)) if swap_kind in HARD else None
-    if band is not None and rpe is not None and rpe >= band[0]:
+    if swap_kind in HARD and swap_counts(str(swap_kind), text)["counts"]:
         return str(swap_kind)
     if machine_key == TREADMILL:
         return "incline_treadmill_walk"
@@ -363,15 +384,20 @@ def served_kinds(routines: list[Any] | None) -> dict[str, dict[str, str]]:
             continue
         for ex in getattr(ir, "exercises", None) or []:
             key = str(getattr(ex, "movement_key", "") or "")
-            if key not in cardio_note.MACHINES:
-                continue
-            tag = str(getattr(ex, "rationale_tag", "") or "").split(":")
-            kind = (
-                tag[3] if len(tag) >= 4 and tag[0] == "cardio" and tag[2] == "menu" else cardio_note.composed_kind(getattr(ex, "notes", ""))
-            )
-            if kind in KINDS:
+            kind = served_kind_of(ex) if key in cardio_note.MACHINES else None
+            if kind:
                 out.setdefault(hid, {})[key] = kind
     return out
+
+
+def served_kind_of(ex: Any) -> str | None:
+    """The menu kind one routine block prescribed: its placement tag (`cardio:<key>:menu:<kind>`), else the kind its
+    composed note names (`cardio_note.composed_kind`), else None."""
+    from training import cardio_note
+
+    tag = str(getattr(ex, "rationale_tag", "") or "").split(":")
+    kind = tag[3] if len(tag) >= 4 and tag[0] == "cardio" and tag[2] == "menu" else cardio_note.composed_kind(getattr(ex, "notes", ""))
+    return kind if kind in KINDS else None
 
 
 def served_levels(routines: list[Any] | None) -> dict[str, dict[str, dict[str, Any]]]:

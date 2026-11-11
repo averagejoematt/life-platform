@@ -851,9 +851,16 @@ def test_5374_a_machine_swap_reads_the_performed_note_against_the_prescribed_clo
     assert tread["units_differ"] == ["level", "%"]
     assert "mean_level_delta" not in tread and "top_level_delta" not in tread
     assert shape["cycling"]["status"] == "performed_unread" and shape["cycling"]["substituted_by"] == "treadmill"
-    # mutation control: the pre-fix record never read the treadmill note, and every verdict is identical either way
+    # mutation control: the pre-fix record never read the treadmill note. His note logs no RPE, so under #5505's rule the
+    # swap is not counted (#5796): every verdict is the pre-fix one, and the cardio reasons only gain the line naming why
     before = _without_extra_read(monkeypatch, ir, performed)
     assert "treadmill" not in before["as_prescribed_by_kind"]["cardio"]["shape"]
+    assert tread["counts_as_performed"] is False and "no RPE logged" in tread["counting"]["reason"]
+    cardio_after = out["as_prescribed_by_kind"]["cardio"]
+    assert cardio_after["verdict"] == "no" and cardio_after["reasons"][-1].startswith("swap: treadmill for cycling not counted")
+    assert cardio_after["reasons"][-1] in out["as_prescribed"]["cardio_note"]
+    cardio_after["reasons"] = cardio_after["reasons"][:-1]
+    out["as_prescribed"]["cardio_note"] = before["as_prescribed"]["cardio_note"]
     assert _verdicts(before) == _verdicts(out)
     assert out["missing"] == ["cycling"] and out["extra"] == ["243710DE"]
 
