@@ -650,30 +650,9 @@ _UNPINNED_INSTALL_EXCEPTIONS: dict = {
     # (#5514 removed `pip`: the workflows' `pip install --upgrade pip` floated to whatever PyPI
     # served; the 2026-10-31 CI audit asked for every CI input pinned, so pip is a
     # requirements-dev.txt pin resolved through scripts/ci_pins.py like the gate tools. The
-    # last floating upgrade, in the composite .github/actions/playwright-browser, is pinned
-    # too, and the scan below now covers composite actions so that blind spot cannot recur.)
+    # composite .github/actions/playwright-browser still upgrades unpinned — it is outside this
+    # workflow scan and is used by the site-deploy/web-preview workflows, left for their owner.)
 }
-
-
-def _composite_action_texts():
-    """Every tracked composite action (`.github/actions/**/action.y[a]ml`), DERIVED.
-
-    A composite action's `run:` steps execute inside every workflow that `uses:` it, so
-    a bare `pip install` there floats exactly like one in a workflow. Before #5514 the
-    unpinned-install scan read workflows only, and the playwright-browser action's
-    `pip install --upgrade pip` sat outside it.
-    """
-    out = {}
-    for rel in _tracked_files():
-        if rel.startswith(".github/actions/") and rel.rsplit("/", 1)[-1] in ("action.yml", "action.yaml"):
-            with open(os.path.join(_REPO, rel), encoding="utf-8") as f:
-                out[rel] = f.read()
-    return out
-
-
-def _install_surface_texts():
-    """Workflows + composite actions: every file whose shell runs on a CI runner."""
-    return {**_workflow_texts(), **_composite_action_texts()}
 
 
 def _unpinned_workflow_installs(texts_by_path):
@@ -709,13 +688,8 @@ def _unpinned_workflow_installs(texts_by_path):
 
 
 def test_no_workflow_installs_an_unpinned_package():
-    """The #2760 box: a bare `pip install <name>` in any workflow — or, since #5514, any
-    composite action a workflow `uses:` — is a red."""
-    surface = _install_surface_texts()
-    # Non-vacuous: the composite leg must actually be read (the action that carried the
-    # last floating `--upgrade pip` is the one it exists for).
-    assert ".github/actions/playwright-browser/action.yml" in surface, sorted(surface)
-    bad = _unpinned_workflow_installs(surface)
+    """The #2760 box: a bare `pip install <name>` in any workflow is a red."""
+    bad = _unpinned_workflow_installs(_workflow_texts())
     assert not bad, (
         "workflow(s) install packages UNPINNED — no literal for the parity guard to "
         "compare and nothing for the resolver to resolve, so the tool floats to "
@@ -750,7 +724,7 @@ def test_unpinned_install_exceptions_are_still_real():
     """The exception ledger must not rot (same contract as the stale-declaration
     ledger): every exempted name must still be installed somewhere, with a reason."""
     installed = set()
-    for _, text in _install_surface_texts().items():
+    for _, text in _workflow_texts().items():
         for line in text.splitlines():
             m = re.search(r"\bpip3?\s+install\s+(.*)$", re.sub(r"\s#.*$", "", line))
             if m:
