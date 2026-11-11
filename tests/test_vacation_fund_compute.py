@@ -53,7 +53,7 @@ def test_strava_miles_no_filter_uses_daily_total_and_per_sport(stub_ranges):
             ],
         }
     ]
-    total, per_sport = vf._strava_miles("2026-07-22", "2026-07-29", "all")
+    total, per_sport = vf._strava_miles(stub_ranges["strava"], "all")
     assert total == 10.0
     assert per_sport == {"Run": 6.0, "Ride": 4.0}
 
@@ -68,7 +68,7 @@ def test_strava_miles_filter_counts_only_matching_sport_types(stub_ranges):
             ],
         }
     ]
-    total, per_sport = vf._strava_miles("2026-07-22", "2026-07-29", ["run"])
+    total, per_sport = vf._strava_miles(stub_ranges["strava"], ["run"])
     assert total == 6.0  # only Run counts, from the activity list not the daily total
     assert per_sport == {"Run": 6.0}  # Ride excluded from the breakdown too
 
@@ -79,7 +79,7 @@ def test_strava_miles_filter_counts_only_matching_sport_types(stub_ranges):
 def test_hevy_miles_converts_meters(stub_ranges):
     stub_ranges["hevy"] = [{"exercises": [{"sets": [{"distance_m": 1609.34}, {"distance_m": 3218.68}]}]}]
     # 1609.34m + 3218.68m = 4828.02m = 3.0 miles
-    assert vf._hevy_miles("2026-07-22", "2026-07-29") == 3.0
+    assert vf._hevy_miles(stub_ranges["hevy"]) == 3.0
 
 
 def test_macrofactor_miles_prefers_miles_then_yards_then_meters(stub_ranges):
@@ -133,8 +133,10 @@ def test_compute_applies_rate_manual_adjustment_and_flags_overlap(stub_ranges, d
     assert out["rate_per_mile"] == 2.0
     assert out["miles_usd"] == 22.0  # 11 * 2
     assert out["total_usd"] == 27.0  # 22 + 5 manual adj
-    # Overlap warning present because extra sources were added on top of strava.
-    assert any("counted twice" in w for w in out["warnings"])
+    # The MacroFactor archive has no clock to join on, so its possible overlap is still flagged;
+    # the Hevy log here holds no block the Strava run sits inside, so nothing is counted once (#5695).
+    assert any("MacroFactor" in w and "may overlap" in w for w in out["warnings"])
+    assert not any("counted once" in w for w in out["warnings"])
 
 
 def test_compute_type_filter_skips_extras_with_warning(stub_ranges, monkeypatch):

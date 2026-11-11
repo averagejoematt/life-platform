@@ -369,13 +369,12 @@ def test_the_weekly_tonnage_counts_a_per_hand_load_twice(monkeypatch):
 
 
 # ── the distance readers (the 2026-10-26 Set additions) ──────────────────────────────────────────────────────────────
-def test_the_vacation_fund_never_sums_a_carry_into_miles(monkeypatch):
+def test_the_vacation_fund_never_sums_a_carry_into_miles():
     from content import vacation_fund
 
     treadmill = {"name": "Treadmill", "template_id": "243710DE", "sets": [{"type": "normal", "distance_m": 1609.344, "duration_sec": 900}]}
     row = {**_stored(), "exercises": _stored()["exercises"] + [treadmill]}
-    monkeypatch.setattr(vacation_fund, "_query_range", lambda src, s, e: [row])
-    assert vacation_fund._hevy_miles(DAY, DAY) == 1.0  # the treadmill mile only — the 180 steps are not 180 m
+    assert vacation_fund._hevy_miles([row]) == 1.0  # the treadmill mile only — the 180 steps are not 180 m
 
 
 def test_tdee_never_reads_a_carry_distance_as_a_walk(monkeypatch):
