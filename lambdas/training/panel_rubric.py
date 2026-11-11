@@ -45,7 +45,7 @@ from typing import Any, Callable
 
 from common import repo_config
 
-from training import block_model, routine_ir, session_shape
+from training import block_model, progression_record, routine_ir, session_shape
 from training.rep_scheme import LB_IN_KG
 from training.training_charter import charter_value
 
@@ -183,12 +183,12 @@ def plan_features(case: dict[str, Any], catalog: dict[str, Any] | None = None) -
     unrecorded_deloads = 0
     for i, ir in enumerate(routines):
         shape = session_shape.routine_minutes(ir.exercises, catalog)
-        floors = ((ir.inputs_snapshot or {}).get("load_floors") or {}).get("movements") or {}
+        bases = progression_record.record_of(ir)["movements"]  # #5762: the engine's own record, the retro reads the same
         cardio_minutes = {c["movement_key"]: c["minutes"] for c in shape["cardio_blocks"]}
         for b in ir.exercises:
             kind = session_shape._block_kind(b, catalog)
             if kind == "lifting":
-                lifts.append(_block_row(b, catalog, i, (floors.get(b.movement_key) or {}).get("progression")))
+                lifts.append(_block_row(b, catalog, i, bases.get(b.movement_key)))
             elif kind == "cardio":
                 cardio.append(_cardio_row(b, i, float(cardio_minutes.get(b.movement_key) or 0)))
         if shape["lifting_minutes"] > 0:
@@ -586,7 +586,7 @@ def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> s
     lines = []
     for i, raw in enumerate(case.get("routines") or []):
         ir = routine_ir.deserialize(copy.deepcopy(raw))
-        floors = ((ir.inputs_snapshot or {}).get("load_floors") or {}).get("movements") or {}
+        bases = progression_record.record_of(ir)["movements"]  # #5762: the same record the criterion reads
         role = ((ir.inputs_snapshot or {}).get("calendar") or {}).get("session_role") or ir.archetype
         lines.append(f"SESSION {i + 1} — {_scrub(role)}" + (f" [{ir.variant}]" if ir.variant not in ("ideal", "") else ""))
         if ir.notes:
@@ -597,7 +597,7 @@ def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> s
             lines.append(f"  - {title}: {_set_line(list(b.sets or []), catalog.get(b.movement_key))}{rest}")
             if b.notes:
                 lines.append(f"      cue: {_scrub(b.notes)[:300]}")
-            prog = (floors.get(b.movement_key) or {}).get("progression") or {}
+            prog = bases.get(b.movement_key) or {}
             if prog.get("reason"):
                 lines.append(f"      progression: {prog.get('basis')} — {_scrub(prog['reason'])[:200]}")
     block = case.get("constraint_block") or {}
@@ -616,6 +616,8 @@ def _freeze_progression(case: dict[str, Any]) -> None:
         floors = (r.get("inputs_snapshot") or {}).get("load_floors") or {}
         for row in (floors.get("movements") or {}).values():
             row.pop("progression", None)
+        for key in (progression_record.RECORD_KEY, "step_due"):  # #5762: the stamped record and the chat step rows too
+            (r.get("inputs_snapshot") or {}).pop(key, None)
 
 
 def _schedule_deload(case: dict[str, Any]) -> None:

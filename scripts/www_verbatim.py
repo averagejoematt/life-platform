@@ -121,6 +121,18 @@ def verbatim_strings(snapshot_dir: str) -> set[str]:
         texts += [p.get("my_claim") for p in c.get("docket_positions") or []]
         texts += [v for d in c.get("docket") or [] for v in (d.get("claims") or {}).values()]
         texts += [d.get("concession") for d in c.get("docket") or []]
+        # owner ruling 2026-11-09 (D): the owner-approved historical words, as /api/coach_room_words serves them
+        words = c.get("approved_words") or {}
+        texts += [x.get("claim") for x in words.get("sealed_calls") or [] if isinstance(x, dict)]
+        texts += [x.get("text") for x in words.get("lead_reads") or [] if isinstance(x, dict)]
+        # owner ruling 2026-11-09 (E): the public-safe brief's coach-written items, as /api/coach_brief serves them
+        for b in (c.get("public_briefs") or {}).get("briefs") or []:
+            if not isinstance(b, dict):
+                continue
+            texts += [x.get("text") for x in b.get("interpretations") or [] if isinstance(x, dict)]
+            texts += [x.get(k) for x in b.get("predictions") or [] if isinstance(x, dict) for k in ("claim", "rationale")]
+            texts += [x.get(k) for x in b.get("recommendations") or [] if isinstance(x, dict) for k in ("text", "rationale")]
+            texts += [x.get(k) for x in b.get("revisions") or [] if isinstance(x, dict) for k in ("text", "reason")]
         out.update(_norm(t) for t in texts if isinstance(t, str) and t.strip())
     # CR3: the docket's own entries — each side's words and a served concession, quoted on /system/docket/<id>/
     for d in (room or {}).get("docket_entries") or [] if isinstance(room, dict) else []:

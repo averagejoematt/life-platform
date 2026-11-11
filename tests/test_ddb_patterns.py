@@ -11,6 +11,8 @@ Rules enforced:
   D3  schema_version included in put_item calls for ingestion Lambdas (DATA-1)
   D4  table.put_item calls in ingestion Lambdas are preceded by validate_item or
       validate_and_write (DATA-2 enforcement at code level)
+  D5  no private float->Decimal walker outside lambdas/common/numeric.py (#1207)
+  D6  no uncoerced float in a put_item/update_item payload in lambdas/ + mcp/ (#5524)
 
 Run with:   python3 -m pytest tests/test_ddb_patterns.py -v
 Or directly: python3 tests/test_ddb_patterns.py
@@ -18,9 +20,11 @@ Or directly: python3 tests/test_ddb_patterns.py
 v1.0.0 — 2026-03-11
 """
 
+import ast
 import os
 import re
 import sys
+import textwrap
 
 import pytest
 
@@ -344,12 +348,13 @@ MCP_DIR = os.path.join(ROOT, "mcp")
 #     tracked as follow-up: character_sheet_lambda._dec (int→Decimal),
 #     episode_detect_lambda._deep_dec (round(4) + int→Decimal + str(k) key coercion),
 #     weekly_correlation_compute_lambda._deep_dec (zero-fallback `_to_dec(obj) or 0`).
-#   * `try: from numeric import floats_to_decimal / except ImportError: def floats_to_decimal`
-#     fallback shims (eightsleep, garmin, enrichment, macrofactor, health_auto_export,
-#     meal_projection, training_notes) — the sanctioned canonical-name shim; its
-#     ImportError branch is dead under the one-bundle rule (#781, numeric always staged).
+#   * (#5524) the `try: from numeric import floats_to_decimal / except ImportError: def
+#     floats_to_decimal` fallback shims this list used to sanction are all gone (measured
+#     2026-11-10: `def floats_to_decimal` exists only in common/numeric.py), and the one
+#     entry it misdescribed as a shim — health_auto_export — was an unconditional
+#     redefinition, now deleted. So the canonical name itself is forbidden outside numeric.py.
 _FORBIDDEN_DECIMAL_DEF = re.compile(
-    r"^\s*def\s+(?:_to_decimal|_decimalize\w*|_float_to_decimal|_floats_to_decimal|to_decimal)\s*\(",
+    r"^\s*def\s+(?:_to_decimal|_decimalize\w*|_float_to_decimal|_floats_to_decimal|to_decimal|floats_to_decimal)\s*\(",
     re.MULTILINE,
 )
 
@@ -386,6 +391,211 @@ def test_d5_no_forked_floats_to_decimal():
         "`from numeric import floats_to_decimal` (with precision=/NaN-guard) instead of "
         "forking a private walker (#1207):\n  " + "\n  ".join(offenders)
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# D6 (#5524) — no uncoerced float in a DynamoDB write payload
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# boto3's TypeSerializer rejects a Python float ("Float types are not supported. Use Decimal
+# types instead.") — at WRITE time, in production, on the first row that happens to carry
+# one. #3569 promised a repo-wide gate and only per-writer tests landed
+# (test_nudge_decimal_and_ledger_3569.py, test_strava_reingest_decimal_5255.py), so a new
+# writer was unguarded until its first live failure.
+#
+# THE RULE (AST, no imports of the code under test). For every `<x>.put_item(Item=P)` and
+# `<x>.update_item(ExpressionAttributeValues=P)` call under lambdas/ and mcp/:
+#   * P wrapped whole in a coercion call (floats_to_decimal(...), Decimal(...), any name in
+#     _DECIMAL_COERCERS) passes;
+#   * otherwise every VALUE in P — and, when P is a bare name, every dict literal assigned
+#     to that name in the same function plus every `P["k"] = v` store — is inspected, and a
+#     value that is PROVABLY a float is red: a float literal, `float(...)`, `time.time()`,
+#     `math.*`/`statistics.*` results, `round(<float>, n)`, or a true division `a / b`
+#     (int / int is a float in Python 3) with neither side a Decimal coercion.
+#
+# THE BOUND, stated rather than implied. A value produced by an arbitrary call
+# (`build_item(...)`, a helper's return) is NOT followed — the gate cannot type it, and
+# guessing would red every builder. Those writers keep their per-writer tests. What this
+# gate guarantees is narrower and total: no write payload SPELLS a float at the call site.
+# Measured 2026-11-10: 307 put_item/update_item call sites in lambdas/ (120 dict literals,
+# 104 names, 64 calls — 48 of them floats_to_decimal) and zero offenders, so the allowlist
+# below starts empty.
+_D6_WRITE_KWARG = {"put_item": "Item", "update_item": "ExpressionAttributeValues"}
+_DECIMAL_COERCERS = frozenset(
+    {
+        "floats_to_decimal",
+        "Decimal",
+        "to_ddb_decimal",
+        "_to_ddb",
+        "_ddb",
+        "_dec",
+        "_deep_dec",
+        "_to_dec",
+        "_scalar_to_decimal",
+        "_parse_decimal_field",
+        "int",
+        "str",
+        "bool",
+        "len",
+    }
+)
+_FLOAT_MODULE_CALLS = frozenset({"math", "statistics"})
+
+# "<relpath>:<line>" -> the written reason a float there is safe (e.g. the payload is
+# coerced by a caller the AST cannot see). Keep it short; each entry is a review.
+D6_UNCOERCED_FLOAT_REASONS: dict[str, str] = {}
+
+
+def _callee_name(fn) -> str:
+    if isinstance(fn, ast.Name):
+        return fn.id
+    if isinstance(fn, ast.Attribute):
+        return fn.attr
+    return ""
+
+
+def _is_coercion(node) -> bool:
+    return isinstance(node, ast.Call) and _callee_name(node.func) in _DECIMAL_COERCERS
+
+
+def _provably_float(node) -> bool:
+    """True when `node` evaluates to a Python float whatever its operands' runtime values."""
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, float)
+    if isinstance(node, ast.Call):
+        if _is_coercion(node):
+            return False
+        fn = node.func
+        if isinstance(fn, ast.Name) and fn.id == "float":
+            return True
+        if isinstance(fn, ast.Name) and fn.id == "round" and node.args:
+            return len(node.args) >= 2 and _provably_float(node.args[0])
+        if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name):
+            if fn.value.id in _FLOAT_MODULE_CALLS or (fn.value.id, fn.attr) == ("time", "time"):
+                return True
+        return False
+    if isinstance(node, ast.BinOp):
+        if isinstance(node.op, ast.Div):
+            return not (_is_coercion(node.left) or _is_coercion(node.right))
+        return _provably_float(node.left) or _provably_float(node.right)
+    if isinstance(node, ast.UnaryOp):
+        return _provably_float(node.operand)
+    if isinstance(node, ast.IfExp):
+        return _provably_float(node.body) or _provably_float(node.orelse)
+    return False
+
+
+def _payload_values(node):
+    """Every value expression in a payload literal; a call is a leaf (never descended)."""
+    if isinstance(node, ast.Dict):
+        for v in node.values:
+            yield from _payload_values(v)
+    elif isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        for v in node.elts:
+            yield from _payload_values(v)
+    else:
+        yield node
+
+
+class _D6Visitor(ast.NodeVisitor):
+    """Walks one module, keeping a per-function table of what each local name was bound to."""
+
+    def __init__(self):
+        self.scopes = [{}]
+        self.hits = []  # (lineno, source of the float value)
+
+    def _visit_scope(self, node):
+        binds: dict = {}
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Assign):
+                for tgt in sub.targets:
+                    if isinstance(tgt, ast.Name):
+                        binds.setdefault(tgt.id, []).append(sub.value)
+                    elif isinstance(tgt, ast.Subscript) and isinstance(tgt.value, ast.Name):
+                        binds.setdefault(tgt.value.id, []).append(ast.Dict(keys=[None], values=[sub.value]))
+        self.scopes.append(binds)
+        self.generic_visit(node)
+        self.scopes.pop()
+
+    visit_FunctionDef = visit_AsyncFunctionDef = _visit_scope
+
+    def visit_Call(self, node):
+        kwarg = _D6_WRITE_KWARG.get(_callee_name(node.func)) if isinstance(node.func, ast.Attribute) else None
+        for kw in node.keywords if kwarg else ():
+            if kw.arg != kwarg:
+                continue
+            candidates = self.scopes[-1].get(kw.value.id, []) if isinstance(kw.value, ast.Name) else [kw.value]
+            for payload in candidates:
+                if _is_coercion(payload):
+                    continue
+                for value in _payload_values(payload):
+                    if _provably_float(value):
+                        self.hits.append((value.lineno, ast.unparse(value)))
+        self.generic_visit(node)
+
+
+def uncoerced_float_writes(src: str) -> list:
+    """[(lineno, value source)] for every provable float in a write payload in `src`."""
+    visitor = _D6Visitor()
+    visitor.visit(ast.parse(src))
+    return sorted(set(visitor.hits))
+
+
+def test_d6_no_uncoerced_float_in_a_write_payload():
+    """D6 (#5524): a float a write payload spells at the call site must pass a Decimal coercion."""
+    offenders, scanned = [], 0
+    for path in _iter_python_sources():
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        if "put_item(" not in src and "update_item(" not in src:
+            continue
+        scanned += 1
+        rel = os.path.relpath(path, ROOT)
+        for lineno, value in uncoerced_float_writes(src):
+            if f"{rel}:{lineno}" not in D6_UNCOERCED_FLOAT_REASONS:
+                offenders.append(f"{rel}:{lineno}: {value}")
+    assert scanned >= 100, f"D6 scanned only {scanned} writer modules — the sweep went blind"
+    assert not offenders, (
+        "Uncoerced float in a DynamoDB write payload — boto3 rejects it at write time. Wrap the value "
+        "(Decimal(str(v))) or the payload (`from common.numeric import floats_to_decimal`) (#5524):\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_d6_allowlist_entries_carry_a_reason():
+    for site, reason in D6_UNCOERCED_FLOAT_REASONS.items():
+        assert isinstance(reason, str) and len(reason) >= 25, f"{site}: a D6 exemption needs a written reason"
+
+
+_D6_PLANTS = {
+    "a float literal in an Item literal": "def f(t):\n    t.put_item(Item={'pk': 'a', 'v': 0.5})\n",
+    "a division in an Item literal": "def f(t, a, b):\n    t.put_item(Item={'pk': 'a', 'ratio': a / b})\n",
+    "round() of a division, through a local name": "def f(t, a):\n    item = {'pk': 'a', 's': round(a / 3, 2)}\n    t.put_item(Item=item)\n",
+    "a subscript store onto the payload name": "def f(t, a):\n    item = {'pk': 'a'}\n    item['avg'] = a / 2\n    t.put_item(Item=item)\n",
+    "float() in update_item values": "def f(t, x):\n    t.update_item(Key={}, ExpressionAttributeValues={':v': float(x)})\n",
+    "time.time() nested in a list": "import time\ndef f(t):\n    t.put_item(Item={'pk': 'a', 'seen': [time.time()]})\n",
+    "a batch writer": "def f(t):\n    with t.batch_writer() as b:\n        b.put_item(Item={'pk': 'a', 'v': 1.5})\n",
+}
+
+
+def test_d6_mutation_control_reds_on_every_planted_shape():
+    """The must-fail control: each planted shape is one the rule must catch. One test that
+    reports every miss (not a parametrize — the census counts a parameter as a gate)."""
+    missed = sorted(label for label, src in _D6_PLANTS.items() if not uncoerced_float_writes(src))
+    assert not missed, f"D6 went blind to: {missed}"
+
+
+def test_d6_coerced_shapes_stay_green():
+    """The other half: the coercions the codebase actually uses must not red."""
+    src = textwrap.dedent("""
+        from decimal import Decimal
+        def f(t, a, b, x):
+            t.put_item(Item=floats_to_decimal({'pk': 'a', 'v': a / b}))
+            t.put_item(Item={'pk': 'a', 'v': Decimal(str(round(a / b, 2))), 'n': int(a / b), 'w': helper(0.5)})
+            item = floats_to_decimal({'pk': 'a', 'v': 0.5})
+            t.put_item(Item=item)
+            t.update_item(Key={}, ExpressionAttributeValues={':v': Decimal(a) / Decimal(b), ':n': 3})
+        """)
+    assert uncoerced_float_writes(src) == []
 
 
 # ══════════════════════════════════════════════════════════════════════════════
