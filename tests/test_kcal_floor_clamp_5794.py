@@ -79,7 +79,7 @@ def test_the_charter_states_the_ruling():
     cal = tc.charter_value("nutrition.calories")
     assert (cal["floor_lifting_day_kcal"], cal["floor_any_day_kcal"]) == (1900, 1600)
     assert "floor_rest_day_kcal" not in cal, "the rest-day floor is floor_any_day_kcal, reused (one key, one number)"
-    assert REREAD["effective_date"] == "2026-11-11" and REREAD["reread_on"] == DAY_14
+    assert REREAD["ruled_on"] == "2026-11-11" and REREAD["reread_on"] == DAY_14
     assert REREAD["decide_below_lb_per_wk"] == 3.0
     log = tc.charter_value("change_log")[-1]
     assert "#5794" in log["by"] and log["version"] == tc.charter_value("version")

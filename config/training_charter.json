@@ -1389,11 +1389,11 @@
       "floor_7d_mean_kcal": 1800,
       "floor_role": "warning",
       "floor_clamp_reread": {
-        "effective_date": "2026-11-11",
+        "ruled_on": "2026-11-11",
         "reread_on": "2026-11-25",
         "decide_below_lb_per_wk": 3.0,
         "rate_read": "the shared 14-day loss rate (mcp.shared_quantities.loss_rate_lb_wk), the critics' weight_trend_lb_wk",
-        "rule": "owner ruling 2026-11-11 (#5794): from reread_on (14 days after effective_date) a 14-day loss rate below decide_below_lb_per_wk surfaces an owner decision (nutrition_critics.decisions_offered, trigger floor_clamp_reread): keep the clamped floors or change them. The decision is offered, never taken; nothing moves on its own"
+        "rule": "owner ruling 2026-11-11 (#5794): from reread_on (14 days after ruled_on) a 14-day loss rate below decide_below_lb_per_wk surfaces an owner decision (nutrition_critics.decisions_offered, trigger floor_clamp_reread): keep the clamped floors or change them. The decision is offered, never taken; nothing moves on its own"
       },
       "planned_minimum_any_weight_kcal": 1400,
       "records_from_version": "1.21.0",
