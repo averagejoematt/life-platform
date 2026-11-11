@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from mcp import plan_call_scope
 from mcp.plan_helpers import _days_between, _minus_days, _resolver, _safe
 
 logger = logging.getLogger("tools_plan")
@@ -29,11 +30,10 @@ PAIN_LOOKBACK_DAYS = 28
 BLOCK_LOOKBACK_DAYS = 56  # 8 weeks, enough to count the trailing consistent block (>=2 lifts/wk)
 
 
+@plan_call_scope.timed("draft_evidence")  # #5813
 def _gather_draft_evidence(ir: Any, target_date: str, layer_status: str) -> dict[str, Any]:
     """Per-draft-exercise evidence for the critics: anchor-lift trend, pain flags, days since.
     Plus the two streaks (#4067) and the lifting-session count from the performed record."""
-    from mcp import plan_call_scope
-
     # #5313: every drafted exercise asks get_exercise_history for the SAME 400-day window; one read serves them all.
     with plan_call_scope.scope(plan_call_scope.HEVY_ALL_PHASES):
         exercises = _draft_exercise_rows(ir, target_date)
