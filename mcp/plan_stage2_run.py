@@ -86,10 +86,10 @@ def packet_builder(block, reference, evidence, protein_missed, protein_measured,
     """`draft -> {critic: packet}` over the already-fetched evidence — no model, no I/O (`critics.recheck` reuses it)."""
     from coach import critics
 
-    from mcp import tools_plan as tp
+    from mcp.tools_plan import _block_rate, _loss_rate_of
 
     by_idx = {e["idx"]: e for e in evidence["exercises"]}
-    rate, provisional = tp._loss_rate_of(reference, tp._block_rate(block))
+    rate, provisional = _loss_rate_of(reference, _block_rate(block))
 
     def build(draft: dict[str, Any]) -> dict[str, dict[str, Any]]:
         return {
@@ -306,6 +306,7 @@ def run(
         clock.lap("narration")
     if dry_run:
         out = plan_stage2_writes.dry_run_result(record, ir, would, tp.pacific_today(), critics.notes_block(ir))
+        clock.lap("response_build")
         return {**out, "timing_ms": clock.result()}
     out = dict(record)
     out["routine_id"], out["routine_version"], out["written"] = ir.routine_id, ir.version, True

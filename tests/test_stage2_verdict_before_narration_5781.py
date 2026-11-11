@@ -122,3 +122,30 @@ def test_the_timing_breakdown_is_small_and_stable_keyed():
     t = crit["timing_ms"]
     assert list(t) == [*plan_stage2_run.TIMING_KEYS, "total"] and all(isinstance(v, int) and v >= 0 for v in t.values())
     assert t["reads"] == 20000  # the plan clock at stage 2's start
+
+
+def test_the_block_record_is_read_once_per_plan_call_and_every_caller_gets_its_own_rows(monkeypatch):
+    """Stage 1 and the commit gate's floors (`v03_load_rule`, `_in_block_performed`) each read the block's Hevy record —
+    three reads of the same rows on a draft_custom stage 2 (~2 s of the 11-11 tail). Mutation control: drop
+    `BLOCK_WORKOUTS` from `plan_call`'s scope -> 3 reads and this reds; return the memo without `deepcopy` -> a caller's
+    edit reaches the next caller and this reds."""
+    from mcp import plan_hevy_windows
+
+    reads = []
+
+    def read(target_date):
+        reads.append(target_date)
+        return [{"date": "2026-11-10", "exercises": []}]
+
+    monkeypatch.setattr(plan_hevy_windows, "_read_block_workouts", read)
+
+    @plan_call_scope.plan_call
+    def one_call():
+        a = plan_hevy_windows._block_workouts("2026-11-11")
+        a[0]["mutated"] = True
+        return a, plan_hevy_windows._block_workouts("2026-11-11"), plan_hevy_windows._block_workouts("2026-11-11")
+
+    a, b, c = one_call()
+    assert reads == ["2026-11-11"] and "mutated" not in b[0] and b is not c
+    plan_hevy_windows._block_workouts("2026-11-11")
+    assert len(reads) == 2, "outside a plan call nothing is memoized"
