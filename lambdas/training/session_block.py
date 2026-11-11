@@ -425,13 +425,13 @@ def add_reason(note: str | None, clause: str | None) -> str:
 
 def _capped_effort(line1: str, clause: str, rpe_max: Any) -> str:
     """Line 1 of a capped lift: the layoff-return band on a first session back (or when line 1 already reads it), else
-    the cap's `RPE 7`."""
-    from training.lift_note import layoff_return_effort
+    the cap's `RPE 7` — never above a line 1 already capped lower (#5782: a draft_custom author's `RPE 6` stands)."""
+    from training.lift_note import keep_stricter, layoff_return_effort
 
     easy = layoff_return_effort()
     if easy and (line1 == easy or hevy_note_grammar.FIRST_RETURN_RE.match(clause.strip())):
-        return easy
-    return hevy_note_grammar.effort_line(rpe_max)
+        return keep_stricter(line1, easy)
+    return keep_stricter(line1, hevy_note_grammar.effort_line(rpe_max))
 
 
 def add_capped_reason(note: str | None, clause: str, rpe_max: Any) -> str:

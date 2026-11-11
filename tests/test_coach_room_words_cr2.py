@@ -15,8 +15,8 @@ over a fake raw table):
   * THE WIRE: a listed row that the gate withheld (its own private record) is NOT exempt from the wire scrub inside
     the scope — the exemption covers only words the gate published in this request.
 
-The sealed calls' words are already public in deploy/generated/genesis_preregistration.json, so these tests use the
-real entries for them; lead reads use a synthetic entry (their words are private until CR2 ships).
+The approved sealed calls' words are public, so these tests use the real entries for them (a labelled test copy,
+tests/fixtures/prereg_cycle17_approved_calls.json; the sealed file is private since 2026-11-11); lead reads use a synthetic entry (their words are private until CR2 ships).
 """
 
 # premerge-gate: CR2 route (owner 2026-11-09 D): walks every routed path of the site API against the approved rows — a diff that adds a route, opens the CR2 scope elsewhere or changes the gate's wire exemption must red before merge.
@@ -32,11 +32,13 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
+sys.path.insert(0, str(ROOT / "tests"))
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 
+import sealed_prereg  # noqa: E402
 from common import narrative_allowlist as NA  # noqa: E402
 from web import (
     narrative_publication as G,  # noqa: E402
@@ -45,8 +47,9 @@ from web import (
     site_api_lambda as L,  # noqa: E402
 )
 
-PREREG = json.loads((ROOT / "deploy" / "generated" / "genesis_preregistration.json").read_text())
-SEALED = {p["claim_natural"] for c in PREREG["coaches"].values() for p in c["predictions"]}
+# The sealed file is private since 2026-11-11 (owner ruling item 3); the approved calls' words come from a labelled
+# test copy (tests/sealed_prereg.py), and every sealed call's words only from the private original when present.
+SEALED = set(sealed_prereg.sealed_call_texts())
 COACH = "sleep_coach"
 LEAD = "eli_marsh"
 LEAD_SK = "LEAD_DAILY#2026-10-11"  # not a listed day: the synthetic entry below is the only one under it
@@ -126,6 +129,19 @@ def cr2_on(monkeypatch):
 
 
 @pytest.fixture
+def ldl_counterfactual(monkeypatch):
+    """The route's positive control. Since the owner ruled the LDL target private (2026-11-11, items 2 and 6) every
+    sealed call is withheld — each generation prompt read that field (tests/test_goals_field_privacy.py). To keep
+    proving the ROUTE serves an approved, unchanged call, the mechanism tests restore the pre-ruling classification
+    of that one field; ``test_the_ldl_ruling_leaves_the_route_no_sealed_call`` pins the live outcome."""
+    from common import goals_field_privacy as GFP
+
+    f = "targets.biomarkers.ldl_target_mg_dl"
+    monkeypatch.setattr(GFP, "_PRIVATE", tuple(p for p in GFP._PRIVATE if p != f))
+    monkeypatch.setattr(GFP, "_PUBLIC_SAFE", GFP._PUBLIC_SAFE + (f,))
+
+
+@pytest.fixture
 def dossier_ok(monkeypatch):
     from coach import coach_dossier
 
@@ -192,7 +208,7 @@ def test_an_ungated_table_is_refused(monkeypatch, cr2_on, dossier_ok):
 # ── switch on, inside the route: the approved rows are served ───────────────────────────────
 
 
-def test_switch_on_the_route_serves_the_approved_sealed_calls(monkeypatch, cr2_on, dossier_ok):
+def test_switch_on_the_route_serves_the_approved_sealed_calls(monkeypatch, cr2_on, dossier_ok, ldl_counterfactual):
     _install(monkeypatch, _rows())
     resp = _get(R.ROUTE, {"coach": COACH})
     assert resp["statusCode"] == 200
@@ -203,6 +219,19 @@ def test_switch_on_the_route_serves_the_approved_sealed_calls(monkeypatch, cr2_o
     for c in b["sealed_calls"]:
         assert set(c) == {"prediction_id", "claim", "logged_date", "due_date", "settled_date", "metric", "kind", "status", "sealed"}
         assert c["logged_date"] == "2026-09-06" and c["status"] == "refuted" and c["sealed"] is True
+
+
+def test_the_ldl_ruling_leaves_the_route_no_sealed_call(monkeypatch, cr2_on, dossier_ok):
+    """Owner ruling 2026-11-11: with the LDL target private, the route serves NONE of the approved sealed calls (all
+    14 read it); only the 21 approved lead reads remain servable. The owner accepted this consequence."""
+    _install(monkeypatch, _rows())
+    resp = _get(R.ROUTE, {"coach": COACH})
+    assert resp["statusCode"] == 200
+    b = _body(resp)
+    assert b["sealed_calls"] == []
+    assert not ({_sealed_row(e)["claim_natural"] for e in _calls()} & set(json.dumps(b).split('"')))
+    sealed = [e for e in NA.APPROVED if e.sk.startswith("PREDICTION#")]
+    assert len(sealed) == 14 and len(NA.APPROVED) - len(sealed) == 21
 
 
 def test_switch_on_the_route_serves_an_approved_lead_read_with_public_figures_only(monkeypatch, cr2_on, lead_entry, dossier_ok):
@@ -226,7 +255,9 @@ def test_the_lead_window_counts_at_least_every_listed_lead_read_and_rides_with_t
     assert "lead_window" not in _body(_get(R.ROUTE, {"coach": COACH}))
 
 
-def test_words_tainted_by_an_earlier_request_are_still_served_inside_the_route(monkeypatch, cr2_on, lead_entry, dossier_ok):
+def test_words_tainted_by_an_earlier_request_are_still_served_inside_the_route(
+    monkeypatch, cr2_on, lead_entry, dossier_ok, ldl_counterfactual
+):
     """The container's taint set persists across requests: the gate's own publication of an approved row is what
     exempts its words at the wire — for that request only."""
     _install(monkeypatch, _rows())
@@ -248,7 +279,7 @@ def _probe_paths() -> list:
     return sorted((set(L.ROUTES) | set(L._SIMPLE_ROUTES) | {"/api/coach/eli_marsh", "/api/coach/sleep_coach"}) - {R.ROUTE})
 
 
-def test_every_other_route_reads_the_approved_rows_withheld(monkeypatch, cr2_on, lead_entry, dossier_ok):
+def test_every_other_route_reads_the_approved_rows_withheld(monkeypatch, cr2_on, lead_entry, dossier_ok, ldl_counterfactual):
     """A probe dispatcher stands in for every routed handler: it reads the approved rows through the gated table and
     echoes every word it got. Under every path but the CR2 route, nothing approved reaches the wire."""
     _install(monkeypatch, _rows())
@@ -273,7 +304,7 @@ def test_every_other_route_reads_the_approved_rows_withheld(monkeypatch, cr2_on,
 # ── negative controls through the route ────────────────────────────────────────────────────
 
 
-def test_a_listed_row_whose_words_changed_is_left_out(monkeypatch, cr2_on, lead_entry, dossier_ok):
+def test_a_listed_row_whose_words_changed_is_left_out(monkeypatch, cr2_on, lead_entry, dossier_ok, ldl_counterfactual):
     rows = _rows()
     rows[0] = {**rows[0], "claim_natural": rows[0]["claim_natural"] + " "}
     rows[-1] = _lead_row(LEAD_TEXT.replace("steady", "steadier"))
@@ -316,7 +347,7 @@ def test_inside_the_scope_a_withheld_listed_row_is_still_scrubbed_at_the_wire(mo
     assert _body(_get(R.ROUTE))["claim"] == ""
 
 
-def test_a_historical_row_not_on_the_list_is_never_served(monkeypatch, cr2_on, dossier_ok):
+def test_a_historical_row_not_on_the_list_is_never_served(monkeypatch, cr2_on, dossier_ok, ldl_counterfactual):
     """Negative control: the same partition holds an unlisted day-one call and an unlisted lead day — neither is read
     as approved (the route reads by listed key only, and the gate withholds them anyway)."""
     extra = [

@@ -64,6 +64,14 @@ def _prescription_window(end_date: str) -> list[dict[str, Any]] | None:
 
 
 def _block_workouts(target_date: str) -> list[dict[str, Any]]:
+    """`_read_block_workouts`, read once per plan call (#5781: stage 1 and the commit gate's floors read the same rows —
+    ~2 s of a draft_custom stage 2 before this); each caller gets its own copy (`plan_call_scope.memoized_copy`)."""
+    from mcp import plan_call_scope
+
+    return plan_call_scope.memoized_copy(plan_call_scope.BLOCK_WORKOUTS, target_date, _read_block_workouts, target_date)
+
+
+def _read_block_workouts(target_date: str) -> list[dict[str, Any]]:
     """Every Hevy row from the program's block start to the day before `target_date` (#4110) — the
     record the session sequence advances on. Read through `tools_strength._read_hevy_all_phases`,
     the ONE sanctioned Hevy read path (#4030/#4032). Before the block start there is nothing to

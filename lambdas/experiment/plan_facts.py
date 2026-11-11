@@ -25,7 +25,6 @@ Pure: no boto3 at import. `load_plan_facts()` is the one I/O helper and fails SO
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Any, Dict, Optional, Set
 
@@ -133,26 +132,17 @@ def plan_figures(facts: Optional[Dict[str, Any]]) -> Dict[str, Set[float]]:
 
 
 def load_plan_facts(bucket: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """The live plan block: the repo file when present (tests, scripts, local runs),
-    else S3 `config/user_goals.json` (the Lambda runtime — config/ is not bundled).
+    """The live plan block from the plan root's PUBLIC part (``common.user_goals.load_public``): the repo file when
+    present (tests, scripts, local runs), else S3 `config/user_goals.json` (the Lambda runtime — config/ is not bundled).
     ``None`` on any failure; the caller disarms the plan class and logs, never raises.
     """
     try:
-        from common.repo_config import config_path
+        from common import user_goals
 
-        path = config_path("user_goals.json")
-        with open(path, encoding="utf-8") as fh:
-            return _with_live_steps(_with_live_calories(plan_facts_from_goals(json.load(fh))))
-    except Exception:  # noqa: BLE001 — no local file: fall through to S3
-        pass
-    try:
-        import os
-
-        import boto3
-
-        s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
-        resp = s3.get_object(Bucket=bucket or os.environ.get("S3_BUCKET", "matthew-life-platform"), Key=PLAN_SOURCE)
-        return _with_live_steps(_with_live_calories(plan_facts_from_goals(json.loads(resp["Body"].read()))))
+        goals = user_goals.load_public(bucket=bucket)
+        if goals is None:
+            return None
+        return _with_live_steps(_with_live_calories(plan_facts_from_goals(goals)))
     except Exception:  # noqa: BLE001 — fail-soft by contract (see module docstring)
         return None
 
