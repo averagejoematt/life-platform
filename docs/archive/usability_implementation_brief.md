@@ -664,7 +664,7 @@ function amjShare() {
 ```
 Vitamin D3 — 5000 IU daily
 ▸ Supports immune function, bone density, and mood regulation
-▸ Genome: VDR Taq1 variant detected → enhanced response likely
+▸ Genome: [genetic detail removed 2026-11-11]
 [PMID: 29943744 ↗]  [PMID: 31405892 ↗]
 ```
 

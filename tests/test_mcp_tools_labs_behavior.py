@@ -109,6 +109,23 @@ def frozen_clock(monkeypatch):
     yield
 
 
+# The biomarker -> gene map is private (owner ruling 2026-11-11, item 5): tests run against a SYNTHETIC map with
+# synthetic gene symbols, never the owner's. GENEA/GENEC/GENED stand where glucose's genes stood; GENEB where the
+# methylation genes stood.
+SYNTH_XREF = {
+    "glucose": ["GENEA", "GENEC", "GENED"],
+    "hba1c": ["GENEA", "GENEC", "GENED"],
+    "homocysteine": ["GENEB"],
+    "folate": ["GENEB"],
+}
+
+
+@pytest.fixture(autouse=True)
+def synthetic_genome_xref(monkeypatch):
+    monkeypatch.setattr(lh, "_GENOME_LAB_XREF_CACHE", dict(SYNTH_XREF))
+    yield
+
+
 @pytest.fixture(autouse=True)
 def healthy_output_artifacts(monkeypatch):
     """Stub the output-artifact dead-man switch to HEALTHY for this module.
@@ -825,21 +842,21 @@ def test_out_of_range_empty_when_nothing_ever_flagged(labs_table):
 GENOME_ROWS = [
     {
         "pk": GENOME_PK,
-        "sk": "SNP#rs9939609",
-        "gene": "FTO",
-        "rsid": "rs9939609",
-        "genotype": "A;T",
+        "sk": "SNP#rs0000001",
+        "gene": "GENEA",
+        "rsid": "rs0000001",
+        "genotype": "X;Y",
         "risk_level": "elevated",
-        "summary": "obesity predisposition",
+        "summary": "synthetic summary A",
     },
     {
         "pk": GENOME_PK,
-        "sk": "SNP#rs1801133",
-        "gene": "MTHFR",
-        "rsid": "rs1801133",
-        "genotype": "C;T",
+        "sk": "SNP#rs0000002",
+        "gene": "GENEB",
+        "rsid": "rs0000002",
+        "genotype": "X;X",
         "risk_level": "moderate",
-        "summary": "folate metabolism",
+        "summary": "synthetic summary B",
     },
 ]
 
@@ -847,9 +864,9 @@ GENOME_ROWS = [
 def test_genome_context_annotates_only_the_cross_referenced_biomarkers(labs_table):
     labs_table({LABS_PK: [_draw("2026-01-01", {"glucose": _bm(99, category="metabolic")})], GENOME_PK: GENOME_ROWS})
     out = tl.tool_get_labs({"view": "results", "draw_date": "2026-01-01"})
-    # glucose maps to FTO/IRS1/TCF7L2 in labs_helpers._GENOME_LAB_XREF; only FTO is seeded.
-    assert [s["gene"] for s in out["genome_context"]["glucose"]] == ["FTO"]
-    # MTHFR is present in the partition but maps to homocysteine/folate/b12 — not here.
+    # glucose maps to GENEA/GENEC/GENED in SYNTH_XREF; only GENEA is seeded.
+    assert [s["gene"] for s in out["genome_context"]["glucose"]] == ["GENEA"]
+    # GENEB is present in the partition but maps to homocysteine/folate — not here.
     assert "homocysteine" not in out["genome_context"]
 
 
@@ -866,14 +883,14 @@ def test_genome_bearing_response_carries_the_privacy_notice(labs_table):
     rsIDs and genotypes was inert."""
     labs_table({LABS_PK: [_draw("2026-01-01", {"glucose": _bm(99, category="metabolic")})], GENOME_PK: GENOME_ROWS})
     out = tl.tool_get_labs({"view": "results", "draw_date": "2026-01-01"})
-    assert out["genome_context"]["glucose"][0]["rsid"] == "rs9939609"  # identifiers really are returned
+    assert out["genome_context"]["glucose"][0]["rsid"] == "rs0000001"  # identifiers really are returned
     assert out[tl._GENOME_PRIVACY_NOTICE_KEY] == tl._GENOME_PRIVACY_NOTICE
 
 
 def test_trends_view_genome_response_carries_the_privacy_notice(labs_table):
     labs_table({LABS_PK: [_draw("2026-01-01", {"glucose": _bm(99, category="metabolic")})], GENOME_PK: GENOME_ROWS})
     out = tl.tool_get_labs({"view": "trends", "biomarker": "glucose"})
-    assert out["genome_context"]["glucose"][0]["genotype"] == "A;T"
+    assert out["genome_context"]["glucose"][0]["genotype"] == "X;Y"
     assert out[tl._GENOME_PRIVACY_NOTICE_KEY] == tl._GENOME_PRIVACY_NOTICE
 
 
@@ -890,7 +907,7 @@ def test_out_of_range_view_genome_response_carries_the_privacy_notice(labs_table
         }
     )
     out = tl.tool_get_labs({"view": "out_of_range"})
-    assert out["genome_drivers"]["glucose"][0]["gene"] == "FTO"
+    assert out["genome_drivers"]["glucose"][0]["gene"] == "GENEA"
     assert out[tl._GENOME_PRIVACY_NOTICE_KEY] == tl._GENOME_PRIVACY_NOTICE
 
 
@@ -907,7 +924,7 @@ def test_notice_detection_is_structural_not_keyed_on_todays_response_shape():
     """DERIVED guard, not a restatement of the three call sites: the detector keys on the
     identifier FIELDS, so a future view shipping them under a new container key is covered
     without editing the module. Both directions are pinned."""
-    snp = {"gene": "FTO", "rsid": "rs9939609", "genotype": "A;T"}
+    snp = {"gene": "GENEA", "rsid": "rs0000001", "genotype": "X;Y"}
     assert tl._carries_genome_identifiers({"some_future_key": {"glucose": [snp]}}) is True
     assert tl._carries_genome_identifiers({"deeply": {"nested": {"under": {"a": {"new": {"shape": snp}}}}}}) is True
     # An empty/absent identifier is not "bearing" — `_genome_context_for_biomarkers`
@@ -958,7 +975,7 @@ def test_every_genome_producer_routes_through_the_notice_chokepoint():
 def test_trends_view_also_carries_the_genome_context(labs_table):
     labs_table({LABS_PK: [_draw("2026-01-01", {"glucose": _bm(99, category="metabolic")})], GENOME_PK: GENOME_ROWS})
     out = tl.tool_get_labs({"view": "trends", "biomarker": "glucose"})
-    assert out["genome_context"]["glucose"][0]["gene"] == "FTO"
+    assert out["genome_context"]["glucose"][0]["gene"] == "GENEA"
 
 
 def test_out_of_range_attaches_genome_drivers_only_to_chronic_flags(labs_table):
@@ -973,7 +990,7 @@ def test_out_of_range_attaches_genome_drivers_only_to_chronic_flags(labs_table):
     )
     out = tl.tool_get_labs({"view": "out_of_range"})
     assert out["chronic_flags"] == ["glucose"]
-    assert out["genome_drivers"]["glucose"][0]["gene"] == "FTO"
+    assert out["genome_drivers"]["glucose"][0]["gene"] == "GENEA"
     assert "genetic baseline rather than lifestyle failure" in out["insight"]
 
 
@@ -1515,3 +1532,35 @@ def _output_schema_conformance_4286(monkeypatch):
     from test_mcp_registry import check_output_schema
 
     check_output_schema(monkeypatch, tl, "get_freshness_status")
+
+
+# ── The private biomarker -> gene map (owner ruling 2026-11-11, item 5) ──────────
+
+
+def test_genome_xref_fails_soft_to_empty_when_the_private_map_is_absent(monkeypatch, tmp_path):
+    monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+    monkeypatch.setenv(lh.GENOME_LAB_XREF_PATH_ENV, str(tmp_path / "absent.json"))
+    assert lh._load_genome_lab_xref() == {}
+
+
+def test_genome_xref_reads_the_off_repo_local_map(monkeypatch, tmp_path):
+    f = tmp_path / "xref.json"
+    f.write_text('{"glucose": ["GENEA"], "bad": "not-a-list"}')
+    monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+    monkeypatch.setenv(lh.GENOME_LAB_XREF_PATH_ENV, str(f))
+    assert lh._load_genome_lab_xref() == {"glucose": ["GENEA"]}
+
+
+def test_no_genome_context_without_the_private_map(labs_table, monkeypatch):
+    monkeypatch.setattr(lh, "_GENOME_LAB_XREF_CACHE", {})
+    labs_table({LABS_PK: [_draw("2026-01-01", {"glucose": _bm(99, category="metabolic")})], GENOME_PK: GENOME_ROWS})
+    out = tl.tool_get_labs({"view": "results", "draw_date": "2026-01-01"})
+    assert out["genome_context"] is None
+
+
+def test_the_biomarker_gene_map_is_not_in_the_tracked_module():
+    import pathlib
+
+    src = pathlib.Path(lh.__file__).read_text()
+    assert "_GENOME_LAB_XREF = {" not in src
+    assert lh.GENOME_LAB_XREF_KEY.startswith("config/private/")
