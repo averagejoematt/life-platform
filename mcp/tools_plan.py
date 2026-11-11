@@ -451,6 +451,7 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
         r["pain_flag_any"] = bool(f.get("pain_flag_any"))
         r["pain_dates"] = f.get("pain_dates") or []
         r["pain_notes"] = f.get("pain_notes") or []  # #4174: the words tie a note to its site
+        r["not_pain_notes"] = f.get("not_pain_notes") or []  # #5800: discomfort / form-or-equipment — listed only
         r["sessions_with_notes"] = f.get("sessions_with_notes")
     scope = {
         # `read` is the only value `plan_engine._evidence_scope_read` accepts, and it also
@@ -463,6 +464,8 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
         "phases_read": phases,
         "movements_considered": len(considered),
         "movements_flagged": sum(1 for r in considered if r.get("pain_flag_any")),
+        # #5800: the net's discomfort and form/equipment notes — shown to the coaches here, acted on nowhere
+        "not_acted_on": [{"movement": r["label"], **n} for r in considered for n in r.get("not_pain_notes") or []],
         "note_layer_status": layer_status,
         "reason": (
             f"{len(considered)} movement(s) performed in {start}..{target_date} were checked against the derived note layer"

@@ -60,9 +60,11 @@ for _p in (str(REPO), str(REPO / "deploy"), str(REPO / "lambdas")):
         sys.path.insert(0, _p)
 
 import prereg_truth_gate as gate  # noqa: E402
+import sealed_prereg  # noqa: E402
 
-FIXTURE_PATH = REPO / "tests" / "fixtures" / "prereg_cycle17_2026-09-06.json"
-FROZEN_PATH = REPO / "deploy" / "generated" / "genesis_preregistration.json"
+# The sealed file is private since 2026-11-11 (owner ruling item 3): the private original when present (tests/sealed_prereg.py), else
+# the old path, which no longer exists, so a test that reads it skips (sealed_prereg.require_sealed_path()).
+FIXTURE_PATH = FROZEN_PATH = sealed_prereg.sealed_path() or (REPO / "tests" / "fixtures" / "prereg_cycle17_2026-09-06.json")
 STAMP_PATH = REPO / "deploy" / "generated" / "genesis_preregistration.sha256.json"
 
 #: The seal the control is taken from. Curled from the public URL on 2026-09-18 and
@@ -90,7 +92,7 @@ def _sha256(path: Path) -> str:
 
 @pytest.fixture(scope="module")
 def sealed() -> dict:
-    return json.loads(FIXTURE_PATH.read_text())
+    return json.loads(sealed_prereg.require_sealed_path().read_text())  # private since 2026-11-11
 
 
 @pytest.fixture(scope="module")
@@ -138,6 +140,7 @@ def _repaired(artifact: dict) -> dict:
 def test_the_control_is_the_published_cycle17_seal_byte_for_byte():
     """If this ever fails the positive control has stopped being a live specimen, and
     every count recorded in this file is about something else."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     assert _sha256(FIXTURE_PATH) == CYCLE17_SEAL_SHA256
     assert _sha256(FROZEN_PATH) == CYCLE17_SEAL_SHA256, "the frozen artifact no longer matches the sealed control"
     stamp = json.loads(STAMP_PATH.read_text())
@@ -149,6 +152,7 @@ def test_the_control_is_the_published_cycle17_seal_byte_for_byte():
 
 
 def test_the_published_cycle17_seal_fails_the_gate(sealed):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     findings = _audit(sealed)
     assert gate.summarize(findings) == CYCLE17_VERDICT
     assert len(gate.blocking(findings)) == 7
@@ -157,16 +161,19 @@ def test_the_published_cycle17_seal_fails_the_gate(sealed):
 def test_the_live_specimen_exercises_every_finding_kind(sealed):
     """Guard-the-set: a kind nothing in the corpus reaches is a clause nobody has
     watched. All four are reached by one real artifact."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     assert set(gate.summarize(_audit(sealed))) == set(gate.FINDING_KINDS)
 
 
 def test_the_retired_coach_is_named_not_merely_counted(sealed):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     offenders = [f for f in _audit(sealed) if f.kind == gate.COACH_NOT_OPERATIONAL]
     assert [f.where for f in offenders] == ["coaches.training_coach"]
     assert "retired" in offenders[0].detail and "Dr. Sarah Chen" in offenders[0].detail
 
 
 def test_the_mismatched_byline_names_both_spellings(sealed):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     offenders = [f for f in _audit(sealed) if f.kind == gate.COACH_NAME_MISMATCH]
     assert [f.where for f in offenders] == ["coaches.physical_coach"]
     assert "Dr. Victor Reyes" in offenders[0].detail and "'Max Reyes'" in offenders[0].detail
@@ -176,6 +183,7 @@ def test_the_mismatched_byline_names_both_spellings(sealed):
 
 
 def test_the_repaired_seal_passes_the_gate(sealed):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     assert _audit(_repaired(sealed)) == []
 
 
@@ -197,6 +205,7 @@ def test_the_repaired_seal_passes_the_gate(sealed):
 def test_each_clause_fires_alone_against_the_repaired_seal(sealed, clause, break_it):
     """Re-break ONE clause on the clean copy. Exactly that clause must fire — a clause
     that only ever reports alongside another has never been separately observed."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     artifact = _repaired(sealed)
     assert _audit(artifact) == []
     break_it(artifact)
@@ -207,6 +216,7 @@ def test_a_seat_swap_of_two_live_bylines_is_caught_here_and_not_by_the_freeze_ch
     """The seeder's #3520 `assert_cast_is_operational` compares NAMES against the set of
     live operational names, so swapping two real coaches between two real seats passes
     it. The pairing is what this gate adds."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     seeder_check = importlib.import_module("seed_genesis_preregistration").assert_cast_is_operational
     artifact = _repaired(sealed)
     people, _ = gate.repo_coach_bylines()
@@ -225,6 +235,7 @@ def test_the_baseline_clause_is_not_vacuous_on_the_real_specimen(sealed):
     """An artifact that asserts no start weight produces no BASELINE finding — correct,
     and a clause that could quietly have nothing to check. The live specimen asserts
     three, all of them the superseded number."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     claims = gate.asserted_baselines(sealed)
     assert len(claims) == 3
     assert {c.literal for c in claims} == {"326.2"}
@@ -240,6 +251,7 @@ def test_a_weight_figure_with_no_start_anchor_is_not_a_baseline_claim(sealed):
     start-of-experiment word. The fourth ("relative to a 326.2-lb individual's
     maintenance needs") is a restatement, not a baseline assertion. If the anchor rule
     stopped discriminating, this count would be 4."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     assert json.dumps(sealed).count("326.2") == 4
     assert len(gate.asserted_baselines(sealed)) == 3
 
@@ -306,6 +318,7 @@ def test_a_null_derivation_field_is_the_same_defect_as_an_absent_one(block, abse
 
 
 def test_a_bare_literal_bar_reports_all_four_fields(sealed):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     spec = sealed["hypotheses"][0]["test_spec"]
     assert spec["min_effect"] == 0.1 and "min_effect_derivation" not in spec
     assert gate.missing_derivation_fields(spec) == ["metric", "sd", "n", "window"]
@@ -318,6 +331,7 @@ def test_the_coach_clause_reads_the_registry_not_a_hand_list(sealed):
     """Hand the audit a registry in which training_coach IS operational and its finding
     must vanish. A hand-copied roster would keep reporting it — which is the R2 defect
     (#3520) reproduced inside the gate meant to catch it."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     people, retired = gate.repo_coach_bylines()
     widened = dict(people, training_coach="Dr. Sarah Chen")
     assert gate.summarize(_audit(sealed, coach_bylines=widened)) == {
@@ -329,6 +343,7 @@ def test_the_coach_clause_reads_the_registry_not_a_hand_list(sealed):
 
 
 def test_the_baseline_clause_reads_the_constant_not_a_hand_number(sealed):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     assert gate.BASELINE_MISMATCH not in gate.summarize(_audit(sealed, baseline_lbs=326.2))
 
 
@@ -378,6 +393,7 @@ _TEST_STAMPED_AT = datetime(2026, 9, 12, 20, 5, tzinfo=timezone.utc)
 def test_write_stamp_refuses_to_mint_a_seal_over_the_cycle17_artifact(tmp_path, monkeypatch, sealed):
     """The whole box, end to end: the real seeded artifact, offered to the real seal
     chokepoint, is refused — and no stamp file is left behind."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     artifact = dict(sealed, genesis=_TEST_GENESIS, generated_at=_TEST_FROZEN_AT)
     gps, _ = _stamp_module(tmp_path, monkeypatch, artifact)
     with pytest.raises(SystemExit) as excinfo:
@@ -387,6 +403,7 @@ def test_write_stamp_refuses_to_mint_a_seal_over_the_cycle17_artifact(tmp_path, 
 
 
 def test_write_stamp_mints_a_seal_over_the_repaired_artifact(tmp_path, monkeypatch, sealed):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     artifact = dict(_repaired(sealed), genesis=_TEST_GENESIS, generated_at=_TEST_FROZEN_AT)
     gps, _ = _stamp_module(tmp_path, monkeypatch, artifact)
     stamp = gps.write_stamp(now=_TEST_STAMPED_AT)
@@ -399,6 +416,7 @@ def test_an_already_published_seal_is_never_re_vouched(tmp_path, monkeypatch, se
     seal returns it untouched rather than refusing it into a rewrite. Simulated by
     stamping once with the gate lifted, then running the real gated path over the
     stamp that already exists."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     artifact = dict(sealed, genesis=_TEST_GENESIS, generated_at=_TEST_FROZEN_AT)
     gps, _ = _stamp_module(tmp_path, monkeypatch, artifact)
     monkeypatch.setattr(gps, "_refuse_untrue_seal", lambda frozen: None)
@@ -418,6 +436,7 @@ def test_the_current_frozen_artifact_is_the_cycle17_seal_or_else_is_clean():
     must be exactly the recorded one — a silent edit to a sealed artifact reds here.
     Branch B (the next reset): a NEW freeze has landed, and it must pass the gate. That
     is the contract this issue ships — a dirty freeze must not reach the seal step."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     current = json.loads(FROZEN_PATH.read_text())
     if _sha256(FROZEN_PATH) == CYCLE17_SEAL_SHA256:
         assert gate.summarize(_audit(current)) == CYCLE17_VERDICT
@@ -437,6 +456,7 @@ def test_mutation_control_retiring_a_live_coach_in_a_real_artifact_reds_the_gate
     """Rename `sleep_coach` to a seat the registry does not have, in a COPY of the
     committed fixture on disk. The gate must report a NEW not-operational finding. If
     the count does not move, the gate is not reading the file it claims to read."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     work = tmp_path / "prereg.json"
     work.write_bytes(FIXTURE_PATH.read_bytes())
     before = _md5(work)
@@ -459,6 +479,7 @@ def test_mutation_control_repairing_the_baseline_in_a_real_artifact_greens_the_c
     """The other direction, which is the one a decorative gate fails: correcting the
     superseded weight in a real file on disk must make the BASELINE findings GO AWAY.
     A clause that reports three findings over any input is not measuring anything."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     work = tmp_path / "prereg.json"
     work.write_bytes(FIXTURE_PATH.read_bytes())
     before = _md5(work)
