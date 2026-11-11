@@ -86,8 +86,11 @@ def test_the_floored_families_are_the_charters_own_names():
     assert not problems, "\n".join(problems)
 
 
+FIRST_ROTATED_WEEK = vr.rotate_every_weeks() + 1  # block 1's first phase (weeks 1-3) serves the committed template as written
+
+
 def test_every_program_week_of_four_blocks_serves_a_single_leg_movement_and_a_carry():
-    weeks = range(1, 4 * block_weeks() + 1)
+    weeks = range(FIRST_ROTATED_WEEK, 4 * block_weeks() + 1)
     assert _weeks_missing_a_family(weeks) == []
     for week in weeks:
         floors = {f["family"]: f for f in vr.plan(_entry(week), CATALOG, role="*", rows=[], missing=[])["family_floors"]}
@@ -100,7 +103,7 @@ def test_control_without_the_floor_a_week_goes_without_single_leg_work():
     """Must-fail control: the pre-#5759 rotation (no floor) leaves weeks with no single-leg movement — the gate above
     can fail, and it fails on exactly the defect the retro named."""
     with patch.object(vr, "WEEKLY_FAMILY_FLOORS", {}):
-        missing = _weeks_missing_a_family(range(1, 4 * block_weeks() + 1))
+        missing = _weeks_missing_a_family(range(FIRST_ROTATED_WEEK, 4 * block_weeks() + 1))
     assert missing and all(SINGLE_LEG in m for m in missing), missing
 
 
@@ -108,10 +111,21 @@ def test_the_single_leg_slot_serves_its_pools_single_leg_member_every_phase_and_
     """The pools are NOT re-curated (the exercise library epic supersedes them): the leg-press slot's pool holds one
     single-leg member, so the floor serves it every phase, and the rationale says why it is held."""
     template = vr.week_volume(CATALOG, {})
-    for week in range(1, 4 * block_weeks() + 1, vr.rotate_every_weeks()):
+    for week in range(FIRST_ROTATED_WEEK, 4 * block_weeks() + 1, vr.rotate_every_weeks()):
         plan = vr.plan(_entry(week), CATALOG, role="*", rows=[], missing=[])
         assert plan["volume_check"]["unchanged"] and vr.week_volume(CATALOG, plan["variants_by_role"]) == template, week
         assert plan["variants_by_role"]["lower_heavy"]["leg_press"] == "bulgarian_split_squat_dumbbell", week
+
+
+def test_block_one_first_phase_keeps_the_committed_session_and_names_why_the_floor_is_not_met():
+    """The owner-committed lower-heavy (tests/test_program_session_4064_4147.py) is served as written in weeks 1-3; the
+    floor does not move it, and the week's record names that as the gate rather than passing silently."""
+    for week in range(1, FIRST_ROTATED_WEEK):
+        plan = vr.plan(_entry(week), CATALOG, role="*", rows=[], missing=[])
+        assert plan["variants_by_role"]["lower_heavy"]["leg_press"] == "leg_press", week
+        sl = next(f for f in plan["family_floors"] if f["family"] == SINGLE_LEG)
+        assert not sl["met"] and "first phase serves the template as written" in sl["gate"], (week, sl)
+        assert next(f for f in plan["family_floors"] if f["family"] == CARRIES)["met"], week
     assert vr.seed_pool("leg_press", CATALOG, missing=[])["pool"] == ["leg_press"] + vr.VETTED_POOLS["leg_press"]["candidates"]
 
 

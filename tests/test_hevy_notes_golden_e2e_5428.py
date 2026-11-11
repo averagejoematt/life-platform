@@ -70,8 +70,7 @@ def test_freshly_rendered_routines_lint_clean():
             f"L4 [1] Squat (Barbell): a barbell {no_load}",
             # #5694 (owner ruling 2026-11-08): Lower-heavy's hinge is the conventional deadlift, no longer the RDL
             f"L4 [2] Deadlift (Barbell): a barbell {no_load}",
-            # #5759: the single-leg floor serves a Bulgarian split squat (dumbbell) in the leg-press slot from the first
-            # phase, so the machine leg press (and its L4 line) is no longer drafted
+            f"L4 [3] Leg Press (Machine): a machine {no_load}",
         ]
     }, offenders
 

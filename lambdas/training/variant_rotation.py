@@ -432,13 +432,17 @@ def _slot_plan(
     if slot["pinned"]:
         return {**base, "variant": slot["incumbent"], "previous": slot["incumbent"], "source": "pinned", "note": None}
     floor = seeded["charter_family"] if seeded["charter_family"] in WEEKLY_FAMILY_FLOORS else None
-    members = [k for k in pool if k in family_members(floor)] if floor else []
-    if members:  # #5759: a floored slot serves only its family's members, every phase
+    # #5759: a floored slot serves only its family's members, every phase after block 1's first (which serves the template
+    # as written — the committed session, the s == 0 rule)
+    members = [k for k in pool if k in family_members(floor)] if floor and step > 0 else []
+    if members:
         pool = members
         base.update(pool=members, floor=floor)
     prev_block, prev_phase = (block, phase - 1) if phase > 1 else (block - 1, pos["phases_per_block"])
     previous = (_ledger_variant(rows, prev_block, slot["slot_id"], prev_phase) if prev_block >= 1 else None) or (
-        (floor_pick(members, step - 1, None) if members else pick(pool, step - 1, slot["offset"])) if step > 0 else slot["incumbent"]
+        (floor_pick(members, step - 1, None) if members and step > 1 else pick(seeded["pool"], step - 1, slot["offset"]))
+        if step > 0
+        else slot["incumbent"]
     )
     computed = floor_pick(members, step, previous) if members else pick(pool, step, slot["offset"])
     held = _ledger_variant(rows, block, slot["slot_id"], phase)
@@ -454,11 +458,6 @@ def _line(s: dict[str, Any], pos: dict[str, Any], catalog: dict[str, Any]) -> st
     )
     if s["source"] == "pinned":
         return f"pinned: {_title(s['variant'], catalog)} — {s['pinned']}"
-    if s.get("floor") and pos["step"] == 0:
-        return (
-            f"weekly floor ({s['floor']}): {_title(s['variant'], catalog)} in place of {_title(s['incumbent'], catalog)}, {where} "
-            f"[{s['slot_id']}, {s['source']}]"
-        )
     if pos["step"] == 0:
         return f"template: {_title(s['variant'], catalog)}, {where} — the first phase serves the template as written [{s['slot_id']}]"
     if s["variant"] == s["previous"]:
@@ -476,6 +475,7 @@ def week_check(
     missing: list[str],
     variants_by_role: dict[str, dict[str, str]] | None = None,
     on: str | None = None,
+    template_phase: bool = False,
 ) -> dict[str, Any]:
     """#5759: the week-level selection check (`week_floors.check_week`) over what this rotation serves — every slot's
     planned variant, or `variants_by_role` (a REFUSED rotation passes `{}`, so the template is checked). A pinned movement
@@ -490,6 +490,9 @@ def week_check(
             refusals.append({"key": v, "reason": f"on the charter's equipment.not_available list ({hit!r})"})
         else:
             served.append({"key": v, "slot_id": p["slot_id"], "role": p["role"]})
+    if template_phase:  # block 1's first phase: the floor does not move the committed session
+        why = "block 1's first phase serves the template as written (#5075 step 0: the committed session)"
+        refusals += [{"key": k, "reason": why} for fam in week_floors.WEEKLY_FAMILY_FLOORS for k in week_floors.family_members(fam)]
     return week_floors.check_week(served, refusals, catalog, on=on)
 
 
@@ -548,7 +551,7 @@ def plan(
     check = volume_check(catalog_movements, by_role, skill_ceiling)
     planned = [p for p in every if role == "*" or p["role"] == role]
     if not check["unchanged"]:
-        week = week_check(every, catalog_movements, missing, variants_by_role={}, on=_draft_day(day_entry))
+        week = week_check(every, catalog_movements, missing, variants_by_role={}, on=_draft_day(day_entry), template_phase=pos["step"] == 0)
         return {
             **base,
             "volume_check": check,
@@ -573,7 +576,9 @@ def plan(
         volume_check=check,
         slots=[{k: v for k, v in p.items() if k != "write"} for p in planned],
         ledger_writes=writes,
-        family_floors=(week := week_check(every, catalog_movements, missing, on=_draft_day(day_entry)))["family_floors"],
+        family_floors=(week := week_check(every, catalog_movements, missing, on=_draft_day(day_entry), template_phase=pos["step"] == 0))[
+            "family_floors"
+        ],
         kettlebell_weekly=week["kettlebell"],
         rationale=[_line(p, pos, catalog_movements) for p in planned] + _week_lines(week),
     )

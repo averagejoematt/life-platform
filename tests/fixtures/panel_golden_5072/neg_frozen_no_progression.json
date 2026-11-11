@@ -826,8 +826,8 @@
        "pool": [
         "bulgarian_split_squat_dumbbell"
        ],
-       "previous": "bulgarian_split_squat_dumbbell",
-       "variant": "bulgarian_split_squat_dumbbell"
+       "previous": "leg_press",
+       "variant": "leg_press"
       },
       {
        "slot_id": "lower_heavy.leg_curl",
