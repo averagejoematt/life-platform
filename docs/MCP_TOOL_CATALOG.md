@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-10
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-11
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-10 | **Total tools:** 91
+**Version:** v8.6.0 | **Last updated:** 2026-11-11 | **Total tools:** 91
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;

@@ -416,6 +416,63 @@ def carry_forward_enrichment(existing: dict, new: dict) -> dict:
     return new
 
 
+# ── Late entries (#5753) ──────────────────────────────────────────────────────
+# The trailing 3-day re-fetch only revisits recent START days, so an activity entered in
+# Strava late for an older day — 20673635694, a manual walk dated 2026-10-06 and typed in
+# about two weeks later — was never fetched: its day was already "present", and the 14-day
+# reconcile only REPORTS what the store lacks. Strava's list call cannot be asked by upload
+# time (`after=`/`before=` filter on the activity's START time, and the summary activity
+# carries no created/upload timestamp), so a cursor on the last poll handed to `after=`
+# would never see a back-dated entry. What the list CAN answer is "which activities START in
+# this window", and the store answers "which ids do we hold": a vendor id with a start day
+# inside the window and no stored counterpart is, by definition, an entry that arrived after
+# its day was last fetched. That day is handed back to the framework, which re-fetches it
+# through `fetch_day` → `transform` → `_store_item` — the same full replace of that day, with
+# `carry_forward_enrichment` applied, that a `date_override` run makes. Stateless on purpose:
+# no cursor to persist or lose, and a day whose write fails is simply found again next run.
+#
+# Cost per run: one list page (100 activities) covers the default 30 days at his volume, plus
+# one DynamoDB query; the ingest runs 18 times a day, well inside Strava's 100-per-15-min /
+# 1,000-per-day read limit. HR enrichment is only paid for the day(s) found, at most
+# LATE_ENTRY_MAX_DAYS_PER_RUN of them; `urlopen_with_retry` backs off on 429 as everywhere else.
+
+LATE_ENTRY_WINDOW_DAYS = int(os.environ.get("LATE_ENTRY_WINDOW_DAYS", "30"))
+LATE_ENTRY_MAX_DAYS_PER_RUN = int(os.environ.get("LATE_ENTRY_MAX_DAYS_PER_RUN", "5"))
+
+
+def late_entry_days(table, today) -> list:
+    """Local days in the last LATE_ENTRY_WINDOW_DAYS holding a vendor activity the store lacks.
+
+    ``today`` is the framework's Pacific date. The UTC list window is bracketed by a day on
+    each side (the `fetch_day` pattern) and each activity is assigned to its own
+    ``start_date_local`` day. Oldest days first — they leave the window soonest.
+    """
+    secret = _secret_cache["secret"]
+    if not secret:
+        return []
+    first = today - timedelta(days=LATE_ENTRY_WINDOW_DAYS)
+    after_ts = datetime(first.year, first.month, first.day, tzinfo=timezone.utc).timestamp() - 86400
+    before_ts = datetime(today.year, today.month, today.day, tzinfo=timezone.utc).timestamp() + 2 * 86400
+    api_activities, secret = _fetch_activities_in_range(secret, after_ts, before_ts)
+    _secret_cache["secret"] = secret
+    lo, hi = first.isoformat(), today.isoformat()
+    in_window = [a for a in api_activities if lo <= str(a.get("start_date_local") or "")[:10] <= hi]
+    if not in_window:
+        return []
+    stored_by_day = _fetch_stored_days(table, (first - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat())
+    stored = [a for day in sorted(stored_by_day) for a in stored_by_day[day]]
+    missing = _activities_missing_from_store(in_window, stored)
+    days = sorted({str(a.get("start_date_local"))[:10] for a in missing})
+    if days:
+        logger.warning(
+            "[LATE-ENTRY] #5753 %d vendor activities absent from the store, on day(s) %s: %s",
+            len(missing),
+            days,
+            [str(a.get("id")) for a in missing],
+        )
+    return days[:LATE_ENTRY_MAX_DAYS_PER_RUN]
+
+
 # ── Framework config ──────────────────────────────────────────────────────────
 
 _config = IngestionConfig(
@@ -437,6 +494,9 @@ _config = IngestionConfig(
     # #2250: ...and because that re-fetch is a full REPLACE, hand the stored record
     # to the merge above first so activity-enrichment's output survives it.
     carry_forward_fn=carry_forward_enrichment,
+    # #5753: ...and an activity entered late for a day OLDER than that window is found by
+    # id against the store and its start day re-fetched through the same path.
+    extra_dates_fn=late_entry_days,
 )
 
 

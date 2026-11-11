@@ -673,6 +673,31 @@ PAGE_BINDINGS.append(
         "endpoints": [{"url": "/api/chapters", "role": "primary", "metrics": []}],
     }
 )
+# The Coaching Room's CR1 (room_public "cr1" — owner GO 2026-11-10): the coaches' verified record against a simple
+# prediction that nothing changes, and "wrong this month". Static builds from the publication snapshot's calibration.json.
+PAGE_BINDINGS.extend(
+    [
+        {
+            "path": "/system/calibration/",
+            "name": "System · the coaches, graded (CR1)",
+            "door": "method",
+            "narrative_order": 110,
+            "story_intent": "the coaches' verified record on the forecasts that could be checked, against a simple prediction that nothing changes, with every excluded call and the uncertainty",
+            "endpoints": [
+                {"url": "/api/calibration", "role": "primary", "metrics": []},
+                {"url": "/api/predictions", "role": "secondary", "metrics": []},
+            ],
+        },
+        {
+            "path": "/system/ledger/refuted/",
+            "name": "System · wrong this month (CR1)",
+            "door": "method",
+            "narrative_order": 111,
+            "story_intent": "the calls the coaches got wrong this month, as graded, with disputed and corrected grades set apart",
+            "endpoints": [{"url": "/api/ledger_export", "role": "primary", "metrics": []}],
+        },
+    ]
+)
 PAGE_BINDINGS.append(
     {
         "path": "/privacy/",
