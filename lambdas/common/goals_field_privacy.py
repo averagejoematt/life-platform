@@ -1,6 +1,8 @@
 """Field-level privacy of ``config/user_goals.json`` (owner ruling 2026-11-10, item 6).
 
-THE RULING. "config/user_goals.json — private by default. Field-level privacy + provenance review. Public-safe goals
+THE RULINGS. 2026-11-11 (item 2): the private fields leave the public repo — the tracked file holds only the
+public-safe paths below, the rest is the private part ``common.user_goals`` loads (item 6: the LDL target is private).
+2026-11-10: "config/user_goals.json — private by default. Field-level privacy + provenance review. Public-safe goals
 may be eligible; sensitive personal details, private plans, restricted-source-derived info stay private. Until
 established, keep the 14 dependent sealed calls withheld if their text could reveal restricted inputs ... don't
 retroactively claim different inputs."
@@ -21,7 +23,7 @@ import fnmatch
 import re
 from typing import Iterable
 
-REVIEWED_AT = "2026-11-10"
+REVIEWED_AT = "2026-11-11"
 PUBLIC_SAFE = "public_safe"
 PRIVATE = "private"
 
@@ -43,9 +45,6 @@ _PUBLIC_SAFE: tuple = (
     "targets.sleep.*",
     "targets.biomarkers.resting_hr_target_bpm",
     "targets.biomarkers.hrv_target_ms",
-    # A bare target for a biomarker whose measured values are owner-consented public (ADR-155). The clinical and
-    # genetic context sits in targets.biomarkers.note, which is private. The owner may reclassify this one.
-    "targets.biomarkers.ldl_target_mg_dl",
     "targets.behavioral.habit_adherence_target_pct",
     "targets.behavioral.note",
     "athlete_profile.type",
@@ -67,6 +66,10 @@ _PRIVATE: tuple = (
     "philosophy",
     "targets.nutrition.calorie_approach",
     "targets.biomarkers.note",
+    # Owner ruling 2026-11-11 (items 2 and 6): the LDL target is PRIVATE. The review had classed it public-safe as a bare
+    # target; the owner reclassified it. Consequence, accepted by the owner: every sealed day-one call read it (it is in
+    # SEALED_CALL_DIGEST_FIELDS), so every sealed call is withheld by the narrative allowlist's goals-input clause.
+    "targets.biomarkers.ldl_target_mg_dl",
     "targets.behavioral.journal_entries_per_week",
     "athlete_profile.prior_transformation.outcome",
     "athlete_profile.weight_cycling_history",

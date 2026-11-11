@@ -4,8 +4,9 @@ What is pinned:
   * COVERAGE: every field in config/user_goals.json is named by the review; a new field reds here until it is
     reviewed (and until then ``classify`` already says private);
   * the sections the review found private classify private; an unnamed path is private (fail closed);
-  * THE SEALED CALLS: each of the 14 approved day-one calls read exactly the plan digest, every field of which is
-    public-safe — and if any of those fields were private, every one of them would be withheld (negative control);
+  * THE SEALED CALLS: each of the 14 approved day-one calls read exactly the plan digest. The owner ruled one digest
+    field — the LDL target — private (2026-11-11), so every one of them is withheld; a counterfactual positive control
+    shows they would be served under the old classification, so the ruling is the only cause;
   * a sealed call withheld by an earlier ruling stays withheld (negative control), and lead reads read no goals field.
 """
 
@@ -88,9 +89,15 @@ def test_private_and_unnamed_paths_are_private(path):
     assert GFP.classify(path) == GFP.PRIVATE
 
 
-def test_the_sealed_call_digest_reads_only_public_safe_fields():
+LDL_TARGET = "targets.biomarkers.ldl_target_mg_dl"
+
+
+def test_the_sealed_call_digest_read_one_private_field_the_ldl_target():
+    """Owner ruling 2026-11-11: the LDL target is private. It is one of the 20 digest fields every sealed call read, so
+    the digest is no longer all public-safe — the other 19 still are."""
     assert len(GFP.SEALED_CALL_DIGEST_FIELDS) == 20
-    assert {p: GFP.classify(p) for p in GFP.SEALED_CALL_DIGEST_FIELDS} == {p: GFP.PUBLIC_SAFE for p in GFP.SEALED_CALL_DIGEST_FIELDS}
+    assert GFP.classify(LDL_TARGET) == GFP.PRIVATE
+    assert [p for p in GFP.SEALED_CALL_DIGEST_FIELDS if GFP.classify(p) == GFP.PRIVATE] == [LDL_TARGET]
     for e in _calls():
         assert GFP.goals_inputs_for(e.pk, e.sk) == GFP.SEALED_CALL_DIGEST_FIELDS, e.sk
     for e in NA.APPROVED:
@@ -98,16 +105,23 @@ def test_the_sealed_call_digest_reads_only_public_safe_fields():
             assert GFP.goals_inputs_for(e.pk, e.sk) == (), "a lead read reads the profile row, never the goals file"
 
 
-def test_the_approved_sealed_calls_are_served_in_scope(cr2_on):
+def test_positive_control_with_the_ldl_target_public_the_approved_sealed_calls_are_served(cr2_on, monkeypatch):
+    """Counterfactual: under the pre-2026-11-11 classification every approved sealed call is served in scope — so the
+    withholding below is caused by the LDL ruling and nothing else."""
+    monkeypatch.setattr(GFP, "_PRIVATE", tuple(p for p in GFP._PRIVATE if p != LDL_TARGET))
+    monkeypatch.setattr(GFP, "_PUBLIC_SAFE", GFP._PUBLIC_SAFE + (LDL_TARGET,))
+    assert GFP.classify(LDL_TARGET) == GFP.PUBLIC_SAFE
     with NA.serving(NA.SCOPE_CR2):
         for e in _calls():
             assert NA.record_for(_sealed_row(e)) is not None, e.sk
 
 
-def test_negative_control_a_private_digest_field_withholds_every_sealed_call(cr2_on, monkeypatch):
-    """If the review had found ONE digest field private, no sealed call could be published: each prompt read it."""
-    monkeypatch.setattr(GFP, "_PUBLIC_SAFE", tuple(p for p in GFP._PUBLIC_SAFE if p != "targets.biomarkers.ldl_target_mg_dl"))
-    assert GFP.classify("targets.biomarkers.ldl_target_mg_dl") == GFP.PRIVATE
+def test_the_ldl_ruling_withholds_every_sealed_call(cr2_on):
+    """Owner ruling 2026-11-11: the LDL target is private, every sealed call's prompt read it, so all 14 approved sealed
+    calls are withheld even inside the CR2 scope. Of the 35 approved entries only the 21 lead reads remain servable.
+    The owner accepted this consequence explicitly."""
+    calls = _calls()
+    assert len(calls) == 14 and len(NA.APPROVED) - len(calls) == 21
     with NA.serving(NA.SCOPE_CR2):
         for e in _calls():
             row = _sealed_row(e)
