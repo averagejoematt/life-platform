@@ -42,7 +42,10 @@ from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, 
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
 
-from web import narrative_publication  # owner ruling 2026-11-03: the one narrative publication chokepoint
+from web import (
+    narrative_publication,  # owner ruling 2026-11-03: the one narrative publication chokepoint
+    prereg_seal_state,  # owner ruling 2026-11-11 item 3: a seal is offered for checking only when the served file matches
+)
 from web.bundle_counts import load_bundle_counts
 from web.platform_counts import DISCOVERED_COUNTS
 
@@ -1114,6 +1117,23 @@ def _prereg_stamp_key(genesis: str) -> str:
     return f"generated/experiments/prereg/genesis-{genesis}.sha256.json"
 
 
+def _prereg_artifact_key(genesis: str) -> str:
+    """S3 key of the sealed pre-registration file itself — mirrors deploy/genesis_prereg_stamp.py's artifact_key()
+    under the same duplication rule as `_prereg_stamp_key` (parity pinned by tests/test_prereg_seal_withdrawn.py)."""
+    return f"generated/experiments/prereg/genesis-{genesis}.json"
+
+
+def _load_s3_bytes(key: str, cache_name: str) -> bytes | None:
+    """The raw bytes of one S3 object (a hash needs the bytes, not a parse); None when it cannot be read."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        return s3.get_object(Bucket=S3_BUCKET, Key=key)["Body"].read()
+    except Exception as e:
+        logger.warning(f"[{cache_name}] Failed to load {key}: {e}")
+        return None
+
+
 def _prereg_amendment_key(genesis: str) -> str:
     """S3 key of the genesis pre-registration's AMENDMENT ledger (#3599).
 
@@ -1160,14 +1180,24 @@ def prereg_seal_meta() -> dict | None:
     if not stamp or not stamp.get("sha256") or stamp.get("genesis") != EXPERIMENT_START:
         _prereg_seal_cache = None
         return None
+    # Owner ruling 2026-11-11 (item 3): the verify command and the file link are offered ONLY while the file served
+    # at the sealed address hashes to the stamp's digest — decided from the served bytes (prereg_seal_state.assess),
+    # never from a flag. Otherwise the digest stays published with the reason it cannot be checked here.
+    verifiable, why_not = prereg_seal_state.assess(
+        stamp.get("genesis"), stamp.get("sha256"), _load_s3_bytes(_prereg_artifact_key(EXPERIMENT_START), "prereg_seal")
+    )
     _prereg_seal_cache = {
         "genesis": stamp.get("genesis"),
         "sha256": stamp.get("sha256"),
-        "artifact_url": stamp.get("public_artifact_url"),
         "stamp_url": stamp.get("public_stamp_url"),
-        "verify": stamp.get("verify"),
         "stamped_at": stamp.get("stamped_at"),
+        "verifiable": verifiable,
     }
+    if verifiable:
+        _prereg_seal_cache["artifact_url"] = stamp.get("public_artifact_url")
+        _prereg_seal_cache["verify"] = stamp.get("verify")
+    else:
+        _prereg_seal_cache["unverifiable_text"] = why_not
     amendments = prereg_amendments(EXPERIMENT_START)
     if amendments:
         _prereg_seal_cache["amendments"] = amendments

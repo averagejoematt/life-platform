@@ -358,6 +358,7 @@ def test_the_seal_block_carries_no_amendment_keys_until_one_is_published(monkeyp
     stamp = json.loads(CYCLE17_STAMP.read_text())
     monkeypatch.setattr(common, "EXPERIMENT_START", stamp["genesis"])
     monkeypatch.setattr(common, "_load_s3_json", lambda key, name: stamp if key.endswith(".sha256.json") else {})
+    monkeypatch.setattr(common, "_load_s3_bytes", lambda key, name: None)
     seal = common.prereg_seal_meta()
     common._prereg_seal_cache = None
     common._prereg_seal_attempted = False
@@ -374,6 +375,7 @@ def test_a_published_amendment_travels_with_the_seal(record, monkeypatch):
     ledger = amend.append_to_ledger(None, record)
     monkeypatch.setattr(common, "EXPERIMENT_START", stamp["genesis"])
     monkeypatch.setattr(common, "_load_s3_json", lambda key, name: stamp if key.endswith(".sha256.json") else ledger)
+    monkeypatch.setattr(common, "_load_s3_bytes", lambda key, name: None)
     seal = common.prereg_seal_meta()
     common._prereg_seal_cache = None
     common._prereg_seal_attempted = False

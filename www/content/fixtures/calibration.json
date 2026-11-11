@@ -1412,11 +1412,12 @@
       }
     },
     "prereg_seal": {
-      "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json",
       "genesis": "2026-09-06",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json",
       "stamped_at": "2026-09-06T02:13:38+00:00",
-      "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256"
+      "unverifiable_text": "The pre-registration for this start was hashed and stamped on 6 September 2026, before the first day was graded, and its SHA-256 is published here. The sealed file itself is no longer served. On 10 November 2026 two of its sixteen calls were withdrawn from the site for privacy, and the file now at its address is a placeholder. The original is kept privately and has not been changed, but because it contains the withdrawn calls it cannot be published for checking, so this hash cannot be checked against a file from this site.",
+      "verifiable": false
     },
     "under_review": 1,
     "voided": {

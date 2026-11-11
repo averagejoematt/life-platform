@@ -149,6 +149,13 @@ def _get_text(base_url: str, path: str, timeout: float) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 
+def _get_bytes(url: str, timeout: float) -> bytes:
+    """The raw bytes of one public URL (the sealed pre-registration's hash check needs the bytes, not a parse)."""
+    req = urllib.request.Request(url, headers={"User-Agent": "life-platform publish_snapshot/" + EXPORTER_VERSION})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — callers pass only the site's own origin
+        return resp.read()
+
+
 def _slug(s: str) -> str:
     s = re.sub(r"[^A-Za-z0-9._:-]+", "-", s).strip("-")
     return s or "x"
@@ -1054,7 +1061,11 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
         raise LookupError("dangling edge(s): " + "; ".join(bad[:12]) + (f" (+{len(bad) - 12})" if len(bad) > 12 else ""))
     validate_data_files(data_files, public)
     if room_enabled():  # the Coaching Room (CR1: WEB_ROOM=1/cr1 or the committed room_public): off = not fetched, not written
-        cal = fixture_calibration(fixtures_dir) if mode == "fixture" else live_calibration(lambda p: _get(base_url, p, timeout), log)
+        cal = (
+            fixture_calibration(fixtures_dir)
+            if mode == "fixture"
+            else live_calibration(lambda p: _get(base_url, p, timeout), log, lambda u: _get_bytes(u, timeout))
+        )
         try:
             data_files["calibration"] = resolve_and_validate(cal, public)
         except ValueError as exc:
