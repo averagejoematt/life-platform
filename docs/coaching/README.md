@@ -66,6 +66,10 @@ copy also lives at `s3://matthew-life-platform/config/coaching/PROGRESS_PHOTO_PR
 beside the rest of the owner-private corpus, for convenience — this repo copy is
 the source of truth.
 
+`FILM_A_SET_DESIGN.md` and `form_references_proposed.md` (#5779) are public on the same terms: a design for an
+owner-only, private clip-review flow (nothing built, owner approval pending) and a proposed list of public
+form-reference article links (nothing adopted). Neither holds any clip, frame, or personal data.
+
 ## Owner notes on the coach-nudge tick
 
 Two deterministic, owner-only notes ride the hourly `coach-nudge` tick beside the coach's own
