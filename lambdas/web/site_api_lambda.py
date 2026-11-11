@@ -100,6 +100,10 @@ from web.site_api_coach import (
     handle_weekly_priority,
 )
 from web.site_api_coach_brief import handle_coach_brief  # owner ruling 2026-11-09 (third, E), dark
+from web.site_api_coach_room import (  # owner ruling 2026-11-09 (third, D): the approved historical words, CR2, dark
+    handle_coach_room_words,
+    in_scope as _in_cr2_scope,
+)
 
 # P1.1 Phase B (2026-05-26): shared helpers extracted to sibling module.
 # Re-import as module-level names so the rest of this file (and the
@@ -467,6 +471,7 @@ ROUTES = {
     "/api/ledger_export": None,  # the whole prediction ledger, paged, with the grader's flags and corrections
     "/api/chapters": None,  # every program week since genesis: published | held | skipped | pending
     "/api/coach_brief": None,  # owner ruling 2026-11-09 (third, E): the public-safe coaching brief — 404 while dark
+    "/api/coach_room_words": None,  # owner ruling 2026-11-09 (third, D): approved historical coach words (CR2) — 404 while dark
     "/api/pairs": None,  # precomputed pair statistics (Pearson, Spearman, n_eff, Fisher CI, BH-FDR) for the data room
     # EL-2: Experiment library (GET) + EL-3: Experiment vote (POST)
     "/api/experiment_library": handle_experiment_library,
@@ -614,6 +619,7 @@ _SIMPLE_ROUTES = {
     "/api/chapters": ({"GET"}, handle_chapters),
     "/api/pairs": ({"GET"}, handle_pairs),
     "/api/coach_brief": ({"GET"}, handle_coach_brief),  # 2026-11-09 E: query-string GET (?coach=<id>); 404 while dark
+    "/api/coach_room_words": ({"GET"}, handle_coach_room_words),  # 2026-11-09 D: ?coach=<id>; 404 while CR2 is dark
 }
 
 
@@ -1312,8 +1318,10 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
 
     narrative_publication.begin_request()  # owner ruling 2026-11-03: count this request's withheld narrative rows
+    # Owner ruling 2026-11-09 (D): the CR2 scope is opened for /api/coach_room_words ONLY (web.site_api_coach_room), for
+    # the dispatch AND the wire half, so the approved rows that route reads are served. Every other path: no scope.
     try:
-        result = _dispatch_route(event, path, method)
+        result = _in_cr2_scope(path, lambda: _dispatch_route(event, path, method))
     except Exception as e:
         logger.error(f"[site_api] {path} failed: {e}")
         _emit_route_log(500)
@@ -1325,4 +1333,4 @@ def lambda_handler(event, context):
 
     _emit_route_log(result.get("statusCode", 200))
     # The provenance gate (web.narrative_publication) is the policy; the #5131 scrub stays as defence in depth.
-    return guard_api_response(narrative_publication.annotate(result), logger)
+    return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)

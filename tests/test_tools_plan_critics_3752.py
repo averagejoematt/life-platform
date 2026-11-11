@@ -212,10 +212,11 @@ def test_stage_2_stores_the_verdicts_as_a_new_version_and_writes_the_thread_row(
     assert crit["engine"] == critics.CRITICS_VERSION and crit["model_ran"] is True and crit["veto"] is False
     assert [v["critic"] for v in crit["verdicts"]] == ["muscle_defense", "joints_tendons", "rate_advocate", "blueprint_historian"]
     assert len(calls) == 4, "one model call per critic"
-    assert stored and stored[-1] is ir and ir.version == 2 and ir.parent_version == 1
+    # #5781: the deterministic record is stored FIRST (v2), the model-reconciled one on top (v3) — one thread row
+    assert len(stored) == 2 and stored[-1] is ir and ir.version == 3 and ir.parent_version == 2
     assert ir.inputs_snapshot["critics"]["verdicts"] == crit["verdicts"]
     assert thread == [ir] and out["critics"]["thread"]["written"] is True
-    assert out["critics"]["routine_version"] == 2
+    assert out["critics"]["routine_version"] == 3 and crit["verdict_state"] == "landed"
     assert "RED TEAM" in out["critics"]["notes_preview"]
     assert out["critics"]["recheck"]["passed"] is True
     # stage 2 also fed the constraint block what stage 1 alone could not read

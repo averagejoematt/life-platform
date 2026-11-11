@@ -13,9 +13,9 @@ Lab results, genome, DEXA tools.
 #   "genomic data suggests elevated LDL baseline"
 #
 # NEVER in public content:
-#   "FTO rs9939609 A;T"
+#   "<GENE> rs<id> <genotype>"  (a gene name + rsID + genotype)
 #   "MTHFR compound heterozygous"
-#   "SLCO1B1 C;T — 4.5x statin myopathy risk"
+#   "<GENE> <genotype> — <n>x <drug-class> risk"
 #
 # This notice is appended to all genome-bearing tool outputs — wired at the
 # `tool_get_labs` dispatcher via `_attach_genome_privacy_notice` (#2241), which
@@ -52,6 +52,7 @@ from datetime import datetime, timedelta, timezone
 
 from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import PACIFIC, pacific_now, pacific_today  # #2817: the Pacific frame
+from ingestion.source_registry import interior_gap_source_keys  # #5527: the interior-gap set, derived
 
 from mcp.config import logger, table
 from mcp.helpers import _linear_regression
@@ -679,7 +680,8 @@ def _build_cadence_trackers():
 # — reads green. This mirrors find_interior_gaps in emails/freshness_checker_lambda.py
 # (TD-14 parity discipline: keep the two in sync). Sparse sources (strava, withings,
 # food_delivery, measurements) have legitimate empty days → excluded here.
-DAILY_SOURCES_INTERIOR = {"whoop", "apple_health", "eightsleep", "habitify"}
+# #5527: the parity is now structural — both read the ONE registry derivation.
+DAILY_SOURCES_INTERIOR = interior_gap_source_keys()
 INTERIOR_GAP_WINDOW_DAYS = 14
 
 

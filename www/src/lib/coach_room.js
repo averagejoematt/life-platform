@@ -283,3 +283,165 @@ export function coachRecord(calCoach, card) {
   }
   return null;
 }
+
+// ── CR2's two public-safe sources (owner ruling 2026-11-09, third, D and E) ──────────────────────────────────────────
+// (D) the owner-approved historical words — the sealed day-one calls and the lead's approved daily reads, served by
+//     /api/coach_room_words row by row; every other historical coach text stays unpublished.
+// (E) the public-safe coaching brief — /api/coach_brief, six sections kept apart; the first cycle is the policy's.
+// Both are CARRIED: an absent source (the route dark or not answering) is stated as absent, never shown as "none".
+
+/** The sentence under the approved words, the same on every coach: what they are and what stays withheld. */
+export const APPROVED_WORDS_NOTE =
+  "Published by the owner's approval, item by item, after a check of what each was written from. Each is shown only while its stored words are unchanged since that check. Every other past word of this coach stays unpublished.";
+
+/** The approved historical words of one coach: {state, calls, reads, approvedOn}. `state` is "ok" (served — the lists
+ *  may be empty, meaning nothing of this coach's was approved) or "absent" (not served for this snapshot). */
+export function approvedWords(entry) {
+  const w = entry && entry.approved_words;
+  if (!w || w.state !== "ok") return { state: "absent", calls: [], reads: [], approvedOn: null, window: null };
+  const win = w.lead_window;
+  return {
+    state: "ok",
+    approvedOn: dayInWords(w.approved_at) || null,
+    // how many reads were WRITTEN in the checked window, served or not — the page says "n of written", never a bare n
+    window:
+      win && Number.isInteger(win.written) && dayInWords(win.from) && dayInWords(win.to)
+        ? { written: win.written, from: dayInWords(win.from), to: dayInWords(win.to) }
+        : null,
+    calls: (w.sealed_calls || [])
+      .filter((c) => c && typeof c.claim === "string" && c.claim.trim())
+      .map((c) => ({
+        id: c.prediction_id || null,
+        claim: c.claim,
+        said: c.logged_date || null,
+        day: dayInWords(c.logged_date) || null,
+        status: c.status || null,
+        settled: c.settled_date || null,
+        word: callOutcome(c.status),
+        metric: c.metric ? String(c.metric).replace(/_/g, " ") : null,
+      })),
+    reads: (w.lead_reads || [])
+      .filter((r) => r && typeof r.text === "string" && r.text.trim() && r.date)
+      .map((r) => ({
+        text: r.text,
+        said: r.date,
+        day: dayInWords(r.date, { weekday: true }),
+        written: instantInWords(r.generated_at),
+        through: dayInWords(r.data_through) || null,
+        cited: (r.cited || []).map((c) => ({ metric: c.metric, value: datesInWords(c.value), asOf: dayInWords(c.as_of) || null })),
+      })),
+  };
+}
+
+/** The heading and the coverage line for the approved reads: "21 of the 28 daily reads written ..." when the window
+ *  is served (and is no smaller than the list), else the bare count. Owner ruling 2026-11-11 (8): a sparse historical
+ *  section must not look more complete than the evidence supports. */
+export function readsCoverage(w) {
+  const n = (w && w.reads && w.reads.length) || 0;
+  const win = w && w.window;
+  const noun = (k) => (k === 1 ? "read" : "reads");
+  if (!win || win.written < n) return { heading: `${n} earlier ${noun(n)}`, line: null };
+  const rest = win.written - n;
+  return {
+    heading: `${n} of ${win.written} earlier ${noun(win.written)}`,
+    line:
+      `${n} of the ${win.written} daily ${noun(win.written)} written between ${win.from} and ${win.to} ${n === 1 ? "is" : "are"} published here.` +
+      (rest > 0 ? ` The other ${rest} ${rest === 1 ? "is" : "are"} not published. A day with no read here is a gap in what is shown, not a quiet day.` : ""),
+  };
+}
+
+/** The coach's ledger calls with an approved call's words in place of "not published" — matched by the stored
+ *  prediction id (the ledger object's id is `<coach>-<prediction id>`), for this coach's calls only. A call with its
+ *  own served words keeps them; nothing else changes. */
+export function withApprovedClaims(predictions, entry) {
+  const calls = approvedWords(entry).calls.filter((c) => c.id);
+  if (!calls.length) return predictions || [];
+  return (predictions || []).map((p) => {
+    if (!p || (typeof p.claim === "string" && p.claim.trim() && !p.claim_withheld)) return p;
+    const hit = calls.find((c) => typeof p.id === "string" && p.id.endsWith(`-${c.id}`));
+    return hit ? { ...p, claim: hit.claim, claim_withheld: null, approved: true } : p;
+  });
+}
+
+const BRIEF_ACTION = {
+  recorded: "recorded",
+  no_record: "no reading in the window",
+  pending: "the window has not closed",
+  not_recorded: "not recorded",
+  not_measured: "no check was set, so nothing is measured",
+};
+
+/** "the week of 16 November" for a cycle's Monday. */
+export function weekOf(cycle) {
+  const d = dayInWords(cycle, { short: false });
+  return d ? `the week of ${d.replace(/ \d{4}$/, "")}` : null;
+}
+
+/** The public brief of one coach: {state, emptyText, latest, earlier}. `state`: "ok" with a brief, "due" (served, none
+ *  yet — the first is due), "none" (served, none, and the first cycle has passed), "absent" (not served). */
+export function briefView(entry, fetchedAt = null) {
+  const b = entry && entry.public_briefs;
+  const first = b && b.first_cycle ? weekOf(b.first_cycle) : null;
+  if (!b || b.state !== "ok") {
+    return { state: "absent", emptyText: "No public brief is served for this coach.", latest: null, earlier: [], firstWeek: first };
+  }
+  const briefs = (b.briefs || []).filter((x) => x && x.cycle);
+  if (!briefs.length) {
+    const before = first && (!fetchedAt || String(fetchedAt).slice(0, 10) < String(b.first_cycle));
+    return before
+      ? { state: "due", emptyText: `The first public brief arrives ${first}.`, latest: null, earlier: [], firstWeek: first }
+      : { state: "none", emptyText: "No public brief has been published for this coach yet.", latest: null, earlier: [], firstWeek: first };
+  }
+  const view = (x) => {
+    const obs = new Map((x.observations || []).map((o) => [o.id, o]));
+    return {
+      week: weekOf(x.cycle),
+      through: dayInWords(x.data_through) || null,
+      written: instantInWords(x.generated_at),
+      said: x.cycle,
+      observations: (x.observations || []).map((o) => ({
+        label: o.label,
+        unit: o.unit || "",
+        last7: o.last7 && o.last7.mean != null ? `${o.last7.mean} ${o.unit || ""}`.trim() : "—",
+        last7n: o.last7 ? o.last7.n : null,
+        prior7: o.prior7 && o.prior7.mean != null ? `${o.prior7.mean} ${o.unit || ""}`.trim() : "—",
+        last28: o.last28 && o.last28.mean != null ? `${o.last28.mean} ${o.unit || ""}`.trim() : "—",
+        latest: o.latest && o.latest.value != null ? `${o.latest.value} ${o.unit || ""}`.trim() : "—",
+        latestDay: o.latest ? dayInWords(o.latest.date) : null,
+      })),
+      interpretations: (x.interpretations || []).map((i) => ({
+        text: i.text,
+        rests: (i.cites || []).map((id) => (obs.get(id) || {}).label).filter(Boolean),
+      })),
+      predictions: (x.predictions || []).map((p) => ({
+        id: p.id,
+        claim: p.claim,
+        status: p.status || "pending",
+        settled: p.outcome_date || null,
+        confidence: typeof p.confidence === "number" ? `${Math.round(p.confidence * 100)}% confidence` : null,
+        rationale: p.rationale || null,
+        rule: datesInWords(((x.evaluation_criteria || []).find((c) => c.prediction === p.id) || {}).rule_sentence || "") || null,
+      })),
+      recommendations: (x.recommendations || []).map((r) => {
+        const a = (x.owner_actions || []).find((o) => o.recommendation_id === r.id) || null;
+        let did = BRIEF_ACTION.not_recorded;
+        if (a && a.state === "recorded" && a.days_with_data != null) {
+          did = `${a.days_meeting ?? 0} of ${a.days_with_data} days with a reading met the check`;
+        } else if (a && BRIEF_ACTION[a.state]) did = BRIEF_ACTION[a.state];
+        return { text: r.text, rationale: r.rationale || null, did };
+      }),
+      revisions: (x.revisions || []).map((v) => ({ text: v.text, reason: v.reason || null, week: weekOf(v.revised_in_cycle) })),
+    };
+  };
+  return { state: "ok", emptyText: null, latest: view(briefs[0]), earlier: briefs.slice(1).map(view), firstWeek: first };
+}
+
+/** The brief's four-word summary for the arrival row: "2 calls · 1 recommendation" or the empty state's short form. */
+export function briefFact(view) {
+  if (!view || view.state === "absent") return { line: "none served", sub: "" };
+  if (view.state === "due") return { line: `first due ${view.firstWeek.replace(/^the /, "")}`, sub: "public-safe, weekly" };
+  if (view.state === "none") return { line: "none published yet", sub: "public-safe, weekly" };
+  const l = view.latest;
+  const n = (k, one) => `${l[k].length} ${l[k].length === 1 ? one : `${one}s`}`;
+  return { line: l.week.replace(/^the /, ""), sub: [n("predictions", "call"), n("recommendations", "recommendation")].join(" · ") };
+}

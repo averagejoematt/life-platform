@@ -1307,6 +1307,18 @@ def _coach_brief_live():
     return re.search(r"^PUBLICATION_LIVE = True\s*$", src, re.M) is not None
 
 
+def _cr2_words_live():
+    """common.narrative_allowlist.CR2_PUBLIC, read as text (the module imports the Lambda tree); unreadable = dark."""
+    try:
+        with open(os.path.join(_REPO, "lambdas", "common", "narrative_allowlist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+    except OSError:
+        return False
+    import re  # noqa: E402
+
+    return re.search(r"^CR2_PUBLIC = True\s*$", src, re.M) is not None
+
+
 _API_SWEEP_OVERRIDES = {
     "/api/coach/": {
         "fetch": "/api/coach/eli_marsh",
@@ -1349,6 +1361,13 @@ _API_SWEEP_OVERRIDES = {
         "reason": "dark until common.public_brief_policy.PUBLICATION_LIVE (owner ruling 2026-11-09 E): every coach "
         "answers 404 while the switch is off (measured live 2026-11-09, bare and ?coach=sleep_coach); the "
         "expectation follows the committed switch, so the launch flips it with no edit here.",
+    },
+    "/api/coach_room_words": {
+        "fetch": "/api/coach_room_words?coach=sleep_coach",
+        "expect": "200" if _cr2_words_live() else "404",
+        "reason": "dark until common.narrative_allowlist.CR2_PUBLIC (owner ruling 2026-11-09 D): every coach answers "
+        "404 while the switch is off; the expectation follows the committed switch, so the CR2 release flips it with no "
+        "edit here.",
     },
     "/api/verify_subscriber": {
         "expect": "400",

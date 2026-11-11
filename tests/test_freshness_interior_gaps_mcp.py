@@ -51,5 +51,9 @@ def test_single_present_date_no_interior():
 
 
 def test_daily_sources_set_matches_lambda():
-    # Parity guard: the MCP daily-source set must mirror the lambda's DAILY_SOURCES.
-    assert DAILY_SOURCES_INTERIOR == {"whoop", "apple_health", "eightsleep", "habitify"}
+    # Parity guard: the MCP daily-source set must mirror the lambda's DAILY_SOURCES. Since #5527
+    # both are the ONE registry derivation (tests/test_source_enumeration_drift.py pins the binding).
+    from ingestion.source_registry import interior_gap_source_keys
+
+    assert DAILY_SOURCES_INTERIOR == interior_gap_source_keys()
+    assert DAILY_SOURCES_INTERIOR == {"whoop", "apple_health", "eightsleep", "habitify", "todoist", "weather"}

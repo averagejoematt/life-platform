@@ -172,30 +172,38 @@ def wired(monkeypatch):
 
 
 class TestFloatsToDecimal:
+    """#5524: HAE now routes through the canonical `common.numeric.floats_to_decimal` with
+    `precision=HAE_DECIMAL_PLACES`; these pin that the private copy's behaviour survived."""
+
+    def test_the_walker_is_the_canonical_one_not_a_copy(self):
+        from common import numeric
+
+        assert hae.floats_to_decimal is numeric.floats_to_decimal
+
     def test_nan_and_inf_become_none_not_decimal_nan(self):
         """DynamoDB rejects Decimal('NaN'); a sensor NaN must become an absent
         value, never a stored one."""
-        assert hae.floats_to_decimal(float("nan")) is None
-        assert hae.floats_to_decimal(float("inf")) is None
-        assert hae.floats_to_decimal(float("-inf")) is None
+        assert hae.floats_to_decimal(float("nan"), precision=hae.HAE_DECIMAL_PLACES) is None
+        assert hae.floats_to_decimal(float("inf"), precision=hae.HAE_DECIMAL_PLACES) is None
+        assert hae.floats_to_decimal(float("-inf"), precision=hae.HAE_DECIMAL_PLACES) is None
 
     def test_float_becomes_decimal_rounded_to_four_places(self):
-        out = hae.floats_to_decimal(1.23456789)
+        out = hae.floats_to_decimal(1.23456789, precision=hae.HAE_DECIMAL_PLACES)
         assert isinstance(out, Decimal)
         assert out == Decimal("1.2346")
 
     def test_decimal_is_exact_not_binary_float_repr(self):
         """Decimal(str(...)) not Decimal(float) — the latter stores 0.1 as
         0.1000000000000000055511151231257827."""
-        assert hae.floats_to_decimal(0.1) == Decimal("0.1")
+        assert hae.floats_to_decimal(0.1, precision=hae.HAE_DECIMAL_PLACES) == Decimal("0.1")
 
     def test_ints_bools_and_strings_pass_through_untouched(self):
-        assert hae.floats_to_decimal(7) == 7
-        assert hae.floats_to_decimal("dexcom_stelo") == "dexcom_stelo"
-        assert hae.floats_to_decimal(None) is None
+        assert hae.floats_to_decimal(7, precision=hae.HAE_DECIMAL_PLACES) == 7
+        assert hae.floats_to_decimal("dexcom_stelo", precision=hae.HAE_DECIMAL_PLACES) == "dexcom_stelo"
+        assert hae.floats_to_decimal(None, precision=hae.HAE_DECIMAL_PLACES) is None
 
     def test_nested_dicts_and_lists_are_converted_recursively(self):
-        out = hae.floats_to_decimal({"a": [1.5, {"b": 2.25}], "c": float("nan")})
+        out = hae.floats_to_decimal({"a": [1.5, {"b": 2.25}], "c": float("nan")}, precision=hae.HAE_DECIMAL_PLACES)
         assert out == {"a": [Decimal("1.5"), {"b": Decimal("2.25")}], "c": None}
 
 

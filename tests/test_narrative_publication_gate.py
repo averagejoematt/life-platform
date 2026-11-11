@@ -407,7 +407,9 @@ def test_the_public_lambdas_install_the_gate():
         assert needle in (ROOT / rel).read_text(encoding="utf-8"), rel
     handler = (ROOT / "lambdas/web/site_api_lambda.py").read_text(encoding="utf-8")
     assert "narrative_publication.begin_request()" in handler
-    assert "return guard_api_response(narrative_publication.annotate(result), logger)" in handler
+    # the wire half is the handler's last step; owner ruling 2026-11-09 (D): it runs in the request's CR2 scope (none for
+    # every path but /api/coach_room_words — tests/test_coach_room_words_cr2.py)
+    assert "return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)" in handler
 
 
 def test_generated_coach_artifacts_are_gated_where_read():

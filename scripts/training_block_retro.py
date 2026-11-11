@@ -6,7 +6,9 @@ model is called once and the AWS write is a separate, deliberate act:
 
   grade   READ-ONLY. Reads the owner-only rows the retro is graded from — the May tracker's WEEK# rows, the
           weekly PANEL# grades, the owner's DELOAD# and MODE#disruption records, the last RETRO# row and the
-          #5089 charter predictions (`diary_claims` PREDICTION# rows, source `charter_build`) — plus the
+          #5089 charter predictions (`diary_claims` PREDICTION# rows, source `charter_build`) and the engine's
+          progression record over the block (#5762: the committed routines' `inputs_snapshot.progression_basis`
+          paired with the Hevy sets logged on each one's day, `progression_record.block_progression`) — plus the
           `--supplied` JSON the skill builds from MCP tools, then runs the retro (the panel re-grade on route
           `charter.retro` unless `--no-panel`) and writes the retro JSON + the doc-tab markdown to `--out`.
   store   THE WRITE (dry-run unless `--apply`). Puts `USER#matthew#SOURCE#training_constraints / RETRO#<block_end>`
@@ -87,11 +89,29 @@ def read_inputs(table: Any, block_end: str) -> dict[str, Any]:
     }
 
 
+def read_progression(block_end: str) -> dict[str, Any]:
+    """#5762: the engine's own progression record over the block — the routines committed in its window (the
+    `routine_index` partition) and the weighted Hevy sets logged since its start. Raises on a failed read."""
+    from datetime import date
+
+    from health.adherence_calc import _load_catalog
+    from training import exercise_history, progression_record, routine_repo
+
+    window = block_retro.block_window(block_end)
+    today = date.today()
+    lookback = max((today - date.fromisoformat(window["start"])).days + 1, 1)
+    routines = routine_repo.list_by_date_range(window["start"], window["end"], limit=1000)
+    history = exercise_history.load_history_indexes(lookback_days=lookback, today=today)[0]
+    rec = progression_record.block_progression(routines, history, start=window["start"], end=window["end"], catalog=_load_catalog())
+    return _plain(rec)
+
+
 def cmd_grade(args: argparse.Namespace) -> int:
     supplied = json.load(open(args.supplied, encoding="utf-8")) if args.supplied else {}
     overrides = json.load(open(args.overrides, encoding="utf-8")) if args.overrides else {}
     inputs = read_inputs(_table(), args.block_end)
-    retro = block_retro.run(args.block_end, supplied=supplied, with_panel=not args.no_panel, **inputs)
+    progression = read_progression(args.block_end)
+    retro = block_retro.run(args.block_end, supplied=supplied, progression=progression, with_panel=not args.no_panel, **inputs)
     if retro.get("status") != "graded":
         print(json.dumps(retro, indent=2))
         return 1

@@ -11,7 +11,8 @@ What is pinned:
     changed, and a listed row whose words name private activity all stay withheld.
 
 The lead reads' words are private until CR2 ships, so their gate tests use a synthetic entry; the sealed calls'
-words are already public in ``deploy/generated/genesis_preregistration.json``, so those tests use the real entries.
+words that the list approves are public, so those tests use the real entries (tests/fixtures/prereg_cycle17_approved_calls.json —
+a labelled copy, not the seal; the sealed file itself is private since 2026-11-11).
 """
 
 # premerge-gate: CR2 historical words (owner 2026-11-09 D): reads the frozen pre-registration artifact and rglobs lambdas/ for a route opening the CR2 scope — a diff that regenerates the artifact or wires a route must red before merge, not after.
@@ -27,7 +28,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
+sys.path.insert(0, str(ROOT / "tests"))
 
+import sealed_prereg  # noqa: E402
 from common import (
     narrative_allowlist as NA,  # noqa: E402
     narrative_provenance as NP,  # noqa: E402
@@ -36,8 +39,9 @@ from common import (
 )
 from web import narrative_publication as G  # noqa: E402
 
-PREREG = json.loads((ROOT / "deploy" / "generated" / "genesis_preregistration.json").read_text())
-SEALED = {p["claim_natural"] for c in PREREG["coaches"].values() for p in c["predictions"]}
+# The sealed file is private since 2026-11-11 (owner ruling item 3); the approved calls' words come from a labelled
+# test copy (tests/sealed_prereg.py), and every sealed call's words only from the private original when present.
+SEALED = set(sealed_prereg.sealed_call_texts())
 EXCLUDED_LEAD_DAYS = {"2026-10-02", "2026-10-07", "2026-10-17", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31"}
 
 
@@ -53,6 +57,18 @@ def _sealed_row(entry: NA.Entry) -> dict:
 @pytest.fixture
 def cr2_on(monkeypatch):
     monkeypatch.setattr(NA, "CR2_PUBLIC", True)
+
+
+@pytest.fixture
+def ldl_counterfactual(monkeypatch):
+    """The serving path's positive control. Since the owner ruled the LDL target private (2026-11-11) every sealed call
+    is withheld (each generation prompt read it — test_goals_field_privacy pins that); to keep proving an approved,
+    unchanged call CAN be served, these tests restore the pre-ruling classification of that one field."""
+    from common import goals_field_privacy as GFP
+
+    f = "targets.biomarkers.ldl_target_mg_dl"
+    monkeypatch.setattr(GFP, "_PRIVATE", tuple(p for p in GFP._PRIVATE if p != f))
+    monkeypatch.setattr(GFP, "_PUBLIC_SAFE", GFP._PUBLIC_SAFE + (f,))
 
 
 def _calls():
@@ -73,15 +89,17 @@ def test_the_cr2_switch_is_off_on_main():
         assert not NA.active()
 
 
-def test_no_lambda_enters_the_cr2_scope_yet():
-    """No route serves the approved words while CR2 is dark: nothing outside the module opens the scope."""
+def test_only_the_cr2_route_module_enters_the_cr2_scope():
+    """Exactly ONE module outside the allowlist opens the scope — the CR2 route's (web.site_api_coach_room, whose
+    ``scope_for`` opens it for ``/api/coach_room_words`` only; tests/test_coach_room_words_cr2.py pins that). A second
+    opener would widen the approved words to another surface."""
     hits = []
     for p in (ROOT / "lambdas").rglob("*.py"):
         if p.name == "narrative_allowlist.py":
             continue
-        if re.search(r"\bserving\(\s*(?:NA\.)?SCOPE_CR2|narrative_allowlist\.serving\(|NA\.serving\(", p.read_text()):
+        if re.search(r"\bserving\(\s*(?:NA\.)?SCOPE_CR2|narrative_allowlist\.serving\(|NA\.serving\(|_SCOPE\.set\(", p.read_text()):
             hits.append(str(p.relative_to(ROOT)))
-    assert hits == []
+    assert hits == ["lambdas/web/site_api_coach_room.py"]
 
 
 # ── the set ──────────────────────────────────────────────────────────────────────────────────
@@ -149,7 +167,7 @@ def test_switch_on_outside_the_scope_nothing_changes(cr2_on):
     assert G.is_tainted(row["claim_natural"])
 
 
-def test_in_scope_an_approved_unchanged_call_is_served(cr2_on):
+def test_in_scope_an_approved_unchanged_call_is_served(cr2_on, ldl_counterfactual):
     e = _calls()[2]
     row = _sealed_row(e)
     G.begin_request()
@@ -261,7 +279,7 @@ def test_a_listed_row_whose_words_name_private_activity_fails_closed(cr2_on, mon
         assert G.gate_item(dict(row))[G.PUBLICATION_KEY]["state"] == "withheld"
 
 
-def test_only_the_cr2_scope_is_honoured(cr2_on):
+def test_only_the_cr2_scope_is_honoured(cr2_on, ldl_counterfactual):
     row = _sealed_row(_calls()[5])
     with NA.serving("cr3"):
         assert NA.record_for(row) is None

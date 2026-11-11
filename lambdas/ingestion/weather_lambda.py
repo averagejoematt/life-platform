@@ -51,6 +51,12 @@ config = IngestionConfig(
     enable_gap_detection=True,
     lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
     refresh_today=True,
+    # #5527: weather is now in freshness_checker_lambda.DAILY_SOURCES — derived from the registry
+    # (expected_days == 7, behavioral=False) — so a day the vendor never returns would hold the
+    # interior-gap alarm red until it aged out of the 14-day window. #2643's marker closes it
+    # honestly on the date's LAST gap-fill retry; tests/test_source_enumeration_drift.py asserts
+    # every framework-based member of the derived set opts in.
+    record_gap_exhausted_absence=True,
 )
 
 _OPEN_METEO_FIELDS = (

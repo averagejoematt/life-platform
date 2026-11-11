@@ -45,7 +45,7 @@ from typing import Any, Callable
 
 from common import repo_config
 
-from training import block_model, routine_ir, session_shape
+from training import block_model, progression_record, routine_ir, session_shape
 from training.rep_scheme import LB_IN_KG
 from training.training_charter import charter_value
 
@@ -183,12 +183,12 @@ def plan_features(case: dict[str, Any], catalog: dict[str, Any] | None = None) -
     unrecorded_deloads = 0
     for i, ir in enumerate(routines):
         shape = session_shape.routine_minutes(ir.exercises, catalog)
-        floors = ((ir.inputs_snapshot or {}).get("load_floors") or {}).get("movements") or {}
+        bases = progression_record.record_of(ir)["movements"]  # #5762: the engine's own record, the retro reads the same
         cardio_minutes = {c["movement_key"]: c["minutes"] for c in shape["cardio_blocks"]}
         for b in ir.exercises:
             kind = session_shape._block_kind(b, catalog)
             if kind == "lifting":
-                lifts.append(_block_row(b, catalog, i, (floors.get(b.movement_key) or {}).get("progression")))
+                lifts.append(_block_row(b, catalog, i, bases.get(b.movement_key)))
             elif kind == "cardio":
                 cardio.append(_cardio_row(b, i, float(cardio_minutes.get(b.movement_key) or 0)))
         if shape["lifting_minutes"] > 0:
@@ -200,6 +200,9 @@ def plan_features(case: dict[str, Any], catalog: dict[str, Any] | None = None) -
     lifting_routines = sorted({r["routine"] for r in lifts})
     return {
         "routines": len(routines),
+        # #5759: each draft's own rotation record (`variant_rotation.plan`, stored on inputs_snapshot) — what the rotation,
+        # single-leg and carry criteria read, so the grade reads the drafts, never the performed record
+        "rotations": {i: (ir.inputs_snapshot or {}).get("rotation") for i, ir in enumerate(routines)},
         "lifting_routines": lifting_routines,
         "session_minutes": minutes,
         "lifts": lifts,
@@ -240,9 +243,57 @@ def check_rep_ranges(f: dict[str, Any]) -> tuple[float, str]:
     return _share(ranged, working), f"{ranged} of {working} working sets carry a rep range at least 2 reps wide"
 
 
+def rotation_problem(rot: Any) -> str | None:
+    """#5759: why one draft's rotation record (`variant_rotation.plan`) is NOT on the charter cadence, or None when it is:
+    the program week known, the rotation not refused, and past block 1's first phase every slot with another pool member
+    serving a variant that differs from the phase before. Absence is not credit."""
+    if not isinstance(rot, dict):
+        return "no rotation record on the draft"
+    pos = rot.get("position")
+    if not pos:
+        return "the program week was unknown, so the template served"
+    if (rot.get("volume_check") or {}).get("unchanged") is False:
+        return "the rotation was refused (the week's counts would move)"
+    if int(pos.get("step") or 0) <= 0:
+        return None  # block 1's first phase serves the template as written
+    held = [
+        str(s.get("slot_id"))
+        for s in rot.get("slots") or []
+        if s.get("source") != "pinned" and len(s.get("pool") or []) >= 2 and s.get("variant") == s.get("previous")
+    ]
+    return f"held at a phase boundary: {', '.join(held)}" if held else None
+
+
 def check_accessory_rotation(f: dict[str, Any]) -> tuple[float, str]:
-    ok = f["block"].get("accessory_rotation_ok")
-    return (10.0 if ok is True else 0.0), f"constraint block accessory_rotation_ok = {ok!r}"
+    """#5759: scored from the DRAFTS — the share of the week's lifting drafts whose rotation record is on the charter cadence."""
+    rots = f.get("rotations") or {}
+    problems = {i: rotation_problem(rots.get(i)) for i in f["lifting_routines"]}
+    ok = [i for i, p in problems.items() if p is None]
+    every = next((r.get("cadence") or {} for r in rots.values() if isinstance(r, dict) and r.get("cadence")), {})
+    rotated = sorted(
+        {
+            f"{s.get('slot_id')} → {s.get('variant')}"
+            for i in ok
+            for s in (rots.get(i) or {}).get("slots") or []
+            if s.get("source") != "pinned" and s.get("variant") != s.get("previous")
+        }
+    )
+    misses = "; ".join(f"draft {i}: {p}" for i, p in problems.items() if p)
+    return _share(len(ok), len(problems)), (
+        f"{len(ok)} of {len(problems)} lifting drafts rotate on the charter cadence "
+        f"(every {every.get('accessory_slots_rotate_every_weeks', '?')} wk)"
+        + (f"; rotated: {', '.join(rotated)}" if rotated else "")
+        + (f"; not on cadence: {misses}" if misses else "")
+    )
+
+
+def _floor_gate(f: dict[str, Any], family: str) -> str:
+    """The recorded gate a draft names for an unmet weekly family floor (`variant_rotation.family_floors`), or ''."""
+    for rot in (f.get("rotations") or {}).values():
+        for fl in (rot or {}).get("family_floors") or [] if isinstance(rot, dict) else []:
+            if fl.get("family") == family and not fl.get("met") and fl.get("gate"):
+                return f"; the drafts name the gate: {fl['gate']}"
+    return ""
 
 
 def check_priority_sets(f: dict[str, Any]) -> tuple[float, str]:
@@ -255,13 +306,15 @@ def check_priority_sets(f: dict[str, Any]) -> tuple[float, str]:
 
 
 def check_single_leg(f: dict[str, Any]) -> tuple[float, str]:
-    n = sum(1 for r in f["lifts"] if _UNILATERAL_LOWER.search(r["title"]))
-    return _tiered(n, 2), f"{n} single-leg lower-body movements this week"
+    hits = [r["title"] for r in f["lifts"] if _UNILATERAL_LOWER.search(r["title"])]
+    named = f" ({', '.join(hits)})" if hits else _floor_gate(f, "single_leg_progression")
+    return _tiered(len(hits), 2), f"{len(hits)} single-leg lower-body movements this week{named}"
 
 
 def check_carries(f: dict[str, Any]) -> tuple[float, str]:
-    n = sum(1 for r in f["lifts"] if _CARRY.search(r["title"]))
-    return _tiered(n, 1), f"{n} loaded carries this week"
+    hits = [r["title"] for r in f["lifts"] if _CARRY.search(r["title"])]
+    named = f" ({', '.join(hits)})" if hits else _floor_gate(f, "carries")
+    return _tiered(len(hits), 1), f"{len(hits)} loaded carries this week{named}"
 
 
 def check_corrective(f: dict[str, Any]) -> tuple[float, str]:
@@ -428,7 +481,7 @@ def check_recovery_tripwires(f: dict[str, Any]) -> tuple[float, str]:
 CHECKS: dict[str, Callable[[dict[str, Any]], tuple[float, str]]] = {
     "double_progression_with_reason": check_double_progression,
     "rep_ranges_stated": check_rep_ranges,
-    "accessory_rotation_ok": check_accessory_rotation,
+    "accessory_rotation_drafted": check_accessory_rotation,  # #5759: was `accessory_rotation_ok` (the performed-drift verdict)
     "priority_sets_in_landmarks": check_priority_sets,
     "single_leg_work": check_single_leg,
     "carries_weekly": check_carries,
@@ -586,7 +639,7 @@ def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> s
     lines = []
     for i, raw in enumerate(case.get("routines") or []):
         ir = routine_ir.deserialize(copy.deepcopy(raw))
-        floors = ((ir.inputs_snapshot or {}).get("load_floors") or {}).get("movements") or {}
+        bases = progression_record.record_of(ir)["movements"]  # #5762: the same record the criterion reads
         role = ((ir.inputs_snapshot or {}).get("calendar") or {}).get("session_role") or ir.archetype
         lines.append(f"SESSION {i + 1} — {_scrub(role)}" + (f" [{ir.variant}]" if ir.variant not in ("ideal", "") else ""))
         if ir.notes:
@@ -597,7 +650,7 @@ def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> s
             lines.append(f"  - {title}: {_set_line(list(b.sets or []), catalog.get(b.movement_key))}{rest}")
             if b.notes:
                 lines.append(f"      cue: {_scrub(b.notes)[:300]}")
-            prog = (floors.get(b.movement_key) or {}).get("progression") or {}
+            prog = bases.get(b.movement_key) or {}
             if prog.get("reason"):
                 lines.append(f"      progression: {prog.get('basis')} — {_scrub(prog['reason'])[:200]}")
     block = case.get("constraint_block") or {}
@@ -605,7 +658,8 @@ def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> s
     lines.append("WEEK CONTEXT")
     lines.append(f"  deload: applied={rec.get('applied')!r}; signals={list(rec.get('reasons') or [])[:4]}")
     lines.append(f"  steps floor carried: {(block.get('steps_ramp') or {}).get('floor')!r}")
-    lines.append(f"  accessory rotation ok: {block.get('accessory_rotation_ok')!r}")
+    on_cadence = [rotation_problem((r.get("inputs_snapshot") or {}).get("rotation")) is None for r in case.get("routines") or []]
+    lines.append(f"  drafts with the accessory rotation on cadence: {sum(on_cadence)} of {len(on_cadence)}")
     return "\n".join(lines)
 
 
@@ -613,9 +667,16 @@ def blind_text(case: dict[str, Any], catalog: dict[str, Any] | None = None) -> s
 def _freeze_progression(case: dict[str, Any]) -> None:
     case["constraint_block"]["accessory_rotation_ok"] = False
     for r in case["routines"]:
+        rot = (r.get("inputs_snapshot") or {}).get("rotation")
+        if isinstance(rot, dict):  # #5759: every slot held across a phase boundary — the accessory layer frozen in the drafts
+            rot["position"] = {**(rot.get("position") or {}), "step": max(1, int((rot.get("position") or {}).get("step") or 0))}
+            for slot in rot.get("slots") or []:
+                slot["variant"] = slot.get("previous")
         floors = (r.get("inputs_snapshot") or {}).get("load_floors") or {}
         for row in (floors.get("movements") or {}).values():
             row.pop("progression", None)
+        for key in (progression_record.RECORD_KEY, "step_due"):  # #5762: the stamped record and the chat step rows too
+            (r.get("inputs_snapshot") or {}).pop(key, None)
 
 
 def _schedule_deload(case: dict[str, Any]) -> None:

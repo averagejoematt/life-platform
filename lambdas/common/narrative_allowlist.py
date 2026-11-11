@@ -294,6 +294,13 @@ APPROVED: tuple = (
 
 INDEX: dict = {(e.pk, e.sk): e for e in APPROVED}
 
+#: How many lead daily reads were WRITTEN in the window the record-level check covered (counted read-only from the
+#: table, 2026-11-11: 28 rows under COACH#eli_marsh, LEAD_DAILY#2026-10-01..2026-11-03). Served beside the approved
+#: reads so the page says "n of 28", never a bare "n" that reads as the whole run (owner ruling 2026-11-11 item 8: do
+#: not make a sparse historical section look more complete than the evidence supports).
+LEAD_PK = "COACH#eli_marsh"
+LEAD_WINDOW: dict = {"from": "2026-10-01", "to": "2026-11-03", "written": 28}
+
 _SCOPE: contextvars.ContextVar = contextvars.ContextVar("narrative_allowlist_scope", default=None)
 
 
@@ -347,10 +354,30 @@ def record_for(item: Any, pk: Any = None) -> Optional[dict]:
     return {"v": NP.SCHEMA_VERSION, "families": families, "producer": PRODUCER, "stamped_at": APPROVED_AT}
 
 
-_APPROVED_HASHES = frozenset(e.text_sha256 for e in APPROVED)
+#: The words the gate PUBLISHED under the allowlist in this request (hashes; cleared by ``reset_served`` at every
+#: request's start). The wire exemption below is keyed on this set, never on the list alone: a listed row whose
+#: words hash to the pinned value but which now carries a private (or any) provenance record is withheld by the gate,
+#: is never noted here, and so stays tainted at the wire.
+_SERVED: set = set()
+
+
+def note_served(item: Any, pk: Any = None) -> None:
+    """Record that the gate published ``item``'s approved words in this request (only an approved row, in scope)."""
+    if not active() or not isinstance(item, dict):
+        return
+    entry = INDEX.get((str(item.get("pk", pk) or ""), str(item.get("sk") or "")))
+    if entry is None:
+        return
+    text = item.get(entry.field)
+    if isinstance(text, str) and _sha(text) == entry.text_sha256:
+        _SERVED.add(entry.text_sha256)
+
+
+def reset_served() -> None:
+    _SERVED.clear()
 
 
 def is_approved_text(text: Any) -> bool:
-    """True, in an active scope, for a string that IS an approved row's words (exempt from a wire taint left by an
-    earlier out-of-scope request in the same container)."""
-    return active() and isinstance(text, str) and _sha(text) in _APPROVED_HASHES
+    """True, in an active scope, for a string that IS the words of an approved row the gate published in THIS request
+    (exempt from a wire taint left by an earlier out-of-scope request in the same container)."""
+    return active() and isinstance(text, str) and _sha(text) in _SERVED

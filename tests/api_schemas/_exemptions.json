@@ -23,6 +23,10 @@
     "category": "capture-failed",
     "reason": "Owner ruling 2026-11-09 (third, E): the public-safe coaching brief is dark \u2014 404 for every coach while common/public_brief_policy.PUBLICATION_LIVE is off; capture a snapshot (?coach=<id>) when the owner turns it on"
   },
+  "/api/coach_room_words": {
+    "category": "capture-failed",
+    "reason": "Owner ruling 2026-11-09 (third, D): the owner-approved historical coach words for the Coaching Room's CR2 are dark \u2014 404 for every coach while common/narrative_allowlist.CR2_PUBLIC is off; capture a snapshot (?coach=<id>) when the owner releases CR2"
+  },
   "/api/cohort_submit": {
     "category": "write-path",
     "reason": "POST-only \u2014 #1394 one-tap weekly cohort single-number submission (write)"
