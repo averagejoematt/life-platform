@@ -67,7 +67,7 @@ New Lambda: `derived-metrics-enrichment`
 Schedule: EventBridge 08:00 UTC (midnight PT)
 Writes to: `USER#matthew#SOURCE#derived_metrics`
 
-### C1. `caffeine_at_bedtime_mg` — Cross: apple_health + whoop + genome CYP1A2
+### C1. `caffeine_at_bedtime_mg` — Cross: apple_health + whoop + genome
 ### C2. `energy_delta` — Cross: notion morning + evening journal
 ### C3. `training_monotony` — Rolling 7d from garmin/whoop
 ### C4. `habit_grade_correlations` — Statistical compute (weekly refresh)

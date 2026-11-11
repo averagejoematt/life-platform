@@ -4,7 +4,6 @@
       "display_name": "Collagen Peptides",
       "purpose_group": "Foundation",
       "evidence_tier": "emerging",
-      "genome_snp": null,
       "rationale": "Hydrolyzed collagen peptides support connective tissue synthesis and joint integrity; morning timing with Vitamin C maximizes cross-linking efficiency.",
       "science_points": [
         "Hydrolyzed collagen peptides increase type-II collagen synthesis markers in joint cartilage (Shaw et al., 2017); meta-analysis shows significant reduction in joint pain in active individuals.",
@@ -19,7 +18,6 @@
       "display_name": "Probiotics",
       "purpose_group": "Foundation",
       "evidence_tier": "emerging",
-      "genome_snp": null,
       "rationale": "Multi-strain probiotic to support microbiome diversity and gut-axis signaling pathways.",
       "science_points": [
         "Multiple RCTs show multi-strain probiotics reduce GI symptoms and improve stool consistency; gut microbiome diversity correlates with improved metabolic and mood markers.",
@@ -34,7 +32,6 @@
       "display_name": "Electrolytes",
       "purpose_group": "Foundation",
       "evidence_tier": "general",
-      "genome_snp": null,
       "rationale": "Sodium/potassium/magnesium replenishment to support hydration, nerve conduction, and morning cardiovascular function.",
       "science_points": [
         "Sodium losses during training are highly individual; even mild sodium deficit impairs muscle contraction efficiency and cardiovascular output during exercise.",
@@ -49,7 +46,6 @@
       "display_name": "L-Glutamine",
       "purpose_group": "Recovery+Performance",
       "evidence_tier": "emerging",
-      "genome_snp": null,
       "rationale": "Primary fuel for intestinal enterocytes; supports gut lining integrity and immune function during high training load.",
       "science_points": [
         "Glutamine is the most conditionally essential amino acid during intense exercise \u2014 plasma levels drop significantly post-training, correlating with immune suppression markers.",
@@ -64,7 +60,6 @@
       "display_name": "Protein Supplement",
       "purpose_group": "Foundation",
       "evidence_tier": "strong",
-      "genome_snp": null,
       "rationale": "Protein target of 1.6\u20132.2g/kg requires supplementation; co-ingested with meals to optimize leucine kinetics and minimize time below muscle protein synthesis threshold.",
       "science_points": [
         "Meta-analysis of 49 RCTs (Morton et al., 2018) confirms protein supplementation significantly augments lean mass and strength gains in resistance-trained individuals.",
@@ -79,7 +74,6 @@
       "display_name": "Magnesium L-Threonate",
       "purpose_group": "Sleep Stack",
       "evidence_tier": "emerging",
-      "genome_snp": null,
       "rationale": "The only form of magnesium with demonstrated blood-brain barrier penetration; taken pre-sleep to support synaptic density and GABA-ergic sleep induction.",
       "science_points": [
         "MIT-derived compound (Slutsky et al., 2010): L-Threonate chelate enables Mg2+ transport across the blood-brain barrier \u2014 unlike oxide, citrate, or glycinate forms which do not meaningfully elevate brain Mg.",
@@ -94,7 +88,6 @@
       "display_name": "Apigenin",
       "purpose_group": "Sleep Stack",
       "evidence_tier": "experimental",
-      "genome_snp": null,
       "rationale": "Competitive CD38 inhibitor and partial GABA-A agonist; taken pre-sleep for anxiolytic effects and potential NAD+ preservation via CD38 suppression.",
       "science_points": [
         "Apigenin binds GABA-A receptors at the benzodiazepine allosteric site \u2014 partial agonist mechanism produces anxiolytic and mild sedative effects without full BZD dependence risk or REM suppression.",
@@ -109,7 +102,6 @@
       "display_name": "L-Theanine",
       "purpose_group": "Sleep Stack",
       "evidence_tier": "strong",
-      "genome_snp": null,
       "rationale": "Non-sedating anxiolytic that promotes alpha brain wave activity; taken pre-sleep for relaxed transition to sleep without next-morning grogginess.",
       "science_points": [
         "Well-replicated RCTs show 200mg L-Theanine increases alpha-band EEG power, reduces perceived stress, and improves subjective sleep quality without sedation or impairment the following day.",
@@ -124,10 +116,9 @@
       "display_name": "Vitamin D3",
       "purpose_group": "Foundation",
       "evidence_tier": "strong",
-      "genome_snp": "VDR Bsm1",
-      "rationale": "VDR gene variant (Bsm1) reduces receptor binding efficiency, requiring higher-than-standard dosing to maintain adequate serum 25(OH)D levels.",
+      "rationale": "Higher-than-standard dosing is used to keep serum 25(OH)D adequate; the dose is titrated against the measured level rather than a population default.",
       "science_points": [
-        "VDR Bsm1 polymorphism is associated with reduced Vitamin D receptor transcriptional activity, necessitating higher circulating levels for equivalent downstream effect.",
+        "Vitamin D receptor activity varies between individuals, so the dose is set by the measured serum level rather than a fixed population default.",
         "Serum 25(OH)D above 40 ng/mL is associated with improved immune function, mood regulation, and musculoskeletal health in RCTs.",
         "At northern latitudes, endogenous synthesis is insufficient October\u2013April regardless of sun exposure."
       ],
@@ -139,7 +130,6 @@
       "display_name": "Creatine Monohydrate",
       "purpose_group": "Recovery+Performance",
       "evidence_tier": "strong",
-      "genome_snp": null,
       "rationale": "Most well-studied ergogenic aid in existence \u2014 consistent strength and power output gains, with emerging cognitive benefit data.",
       "science_points": [
         "Increases phosphocreatine stores in muscle, accelerating ATP resynthesis during high-intensity efforts; meta-analyses show ~8% strength gain over placebo.",
@@ -154,12 +144,11 @@
       "display_name": "Omega-3 Fish Oil",
       "purpose_group": "Foundation",
       "evidence_tier": "strong",
-      "genome_snp": "FADS2 rs1535",
-      "rationale": "FADS2 rs1535 variant impairs conversion of ALA to EPA/DHA, making pre-formed fish oil essential rather than optional for anti-inflammatory benefit.",
+      "rationale": "Pre-formed EPA/DHA is used rather than plant ALA because ALA-to-EPA/DHA conversion is inefficient, making fish oil the reliable route to the anti-inflammatory benefit.",
       "science_points": [
         "EPA and DHA are precursors to resolvins and protectins \u2014 pro-resolving lipid mediators that actively terminate inflammatory cascades rather than merely inhibiting initiation.",
         "High-dose Omega-3 (2\u20134g/day EPA+DHA) significantly reduces triglycerides; cardiovascular mortality reduction seen in REDUCE-IT at 4g/day icosapentaenoic acid.",
-        "FADS2 rs1535 T-allele carriers show substantially lower ALA conversion; pre-formed EPA/DHA is the only reliable dietary source for this genotype."
+        "ALA-to-EPA/DHA conversion is low in most adults; pre-formed EPA/DHA is the most reliable dietary source."
       ],
       "watching": "HRV trend",
       "signal": "positive",
@@ -169,7 +158,6 @@
       "display_name": "Tongkat Ali",
       "purpose_group": "Experimental",
       "evidence_tier": "experimental",
-      "genome_snp": null,
       "rationale": "Testing whether Eurycoma longifolia supplementation produces measurable improvement in recovery metrics and WHOOP strain-to-recovery ratio.",
       "science_points": [
         "Small RCTs (n=76, 300mg/day for 12 weeks) show statistically significant increases in free testosterone in late-middle-aged men; effect size modest.",
@@ -184,7 +172,6 @@
       "display_name": "NMN",
       "purpose_group": "Longevity+Metabolic",
       "evidence_tier": "experimental",
-      "genome_snp": null,
       "rationale": "Testing NAD+ precursor supplementation as a strategy for maintaining mitochondrial function and metabolic flexibility as a longevity lever.",
       "science_points": [
         "NAD+ declines ~50% between ages 40 and 60; NMN is efficiently converted to NAD+ in humans (Yoshino et al., 2021 \u2014 confirmed bioavailability and blood NAD+ elevation at 250mg/day).",
@@ -199,8 +186,7 @@
       "display_name": "CoQ10 Ubiquinol",
       "purpose_group": "Recovery+Performance",
       "evidence_tier": "emerging",
-      "genome_snp": null,
-      "rationale": "Mitochondrial electron transport chain cofactor; ubiquinol form selected for superior bioavailability vs. ubiquinone, particularly important given past statin use history.",
+      "rationale": "Mitochondrial electron transport chain cofactor; ubiquinol form selected for superior bioavailability vs. ubiquinone.",
       "science_points": [
         "Statins inhibit the mevalonate pathway, reducing endogenous CoQ10 synthesis by 40\u201350%; supplementation at 100\u2013200mg/day restores serum levels to pre-statin baseline.",
         "CoQ10 is the mobile electron carrier between Complex I/II and Complex III in the mitochondrial electron transport chain \u2014 essential for ATP synthesis efficiency.",
@@ -214,7 +200,6 @@
       "display_name": "Berberine",
       "purpose_group": "Nutrition+Glucose",
       "evidence_tier": "emerging",
-      "genome_snp": null,
       "rationale": "Testing CGM-measurable postprandial glucose attenuation, particularly for high-carbohydrate meals where my response tends to spike above 140 mg/dL.",
       "science_points": [
         "AMPK activator \u2014 mimics the downstream effects of metformin by increasing insulin sensitivity and reducing hepatic glucose output; several RCTs show HbA1c reduction comparable to metformin in T2D populations.",
@@ -229,7 +214,6 @@
       "display_name": "Magnesium Glycinate",
       "purpose_group": "Sleep Stack",
       "evidence_tier": "strong",
-      "genome_snp": null,
       "rationale": "Magnesium is a cofactor in 300+ enzymatic reactions; glycinate chelate selected for superior bioavailability and minimal laxative effect compared to oxide or citrate forms.",
       "science_points": [
         "Magnesium is required for NMDA receptor regulation and GABA-ergic signalling \u2014 both pathways involved in sleep induction and slow-wave sleep quality.",
@@ -244,11 +228,10 @@
       "display_name": "Zinc",
       "purpose_group": "Foundation",
       "evidence_tier": "strong",
-      "genome_snp": "SLC39A4 variant",
-      "rationale": "Zinc metabolism SNP reduces intestinal zinc absorption efficiency, requiring supplementation to maintain adequate serum zinc status for immune and hormonal function.",
+      "rationale": "Supplementation maintains adequate serum zinc status for immune and hormonal function; the dose is checked against measured serum zinc.",
       "science_points": [
         "Zinc is a cofactor for over 300 enzymes and is essential for testosterone biosynthesis \u2014 clinical zinc deficiency is associated with hypogonadism that reverses with supplementation.",
-        "SLC39A4 (ZIP4) and SLC30A series transporter variants affect zinc homeostasis; impaired absorption variants may double dietary requirement to maintain serum adequacy.",
+        "Intestinal zinc absorption varies between individuals; serum zinc is the check on whether the dose is adequate.",
         "Taken in the evening due to competitive absorption with copper (maintained separately at breakfast via diet); evening zinc avoids meal-time mineral interference."
       ],
       "watching": "Serum zinc",
@@ -259,7 +242,6 @@
       "display_name": "Ashwagandha KSM-66",
       "purpose_group": "Sleep Stack",
       "evidence_tier": "emerging",
-      "genome_snp": null,
       "rationale": "Cortisol modulation and stress-resilience support; KSM-66 extract selected as the most clinically studied form with the largest body of human RCT evidence.",
       "science_points": [
         "Withania somnifera root extract at 600mg/day (KSM-66) reduces serum cortisol by ~25\u201328% vs. placebo in chronically stressed adults across multiple double-blind RCTs.",

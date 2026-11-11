@@ -112,7 +112,7 @@ These pages have MCP tools already returning structured data. The work is purely
 **MCP tools**: `get_supplement_log`, `get_genome_insights` (cross_reference='nutrition')
 **Content**:
 - Current stack with dosage, timing, adherence %
-- Genome rationale for each supplement (e.g., "Omega-3: FADS2 rs1535 poor ALA conversion, adherence 94%")
+- Genome rationale for each supplement [genetic detail removed 2026-11-11]
 - Link to experiment data if supplement has an N=1
 - Cost per month breakdown
 **Effort**: S (2-3h)
