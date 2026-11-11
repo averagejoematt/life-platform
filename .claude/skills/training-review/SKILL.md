@@ -94,6 +94,21 @@ prediction `inconclusive`, naming it, never `confirmed`. Read each prediction's 
 `measurement` block (`get_predictions`, or `manage_diary_claims` action `list`) for its lifts,
 window and threshold, and scope `get_exercise_history` by Hevy `template_id`.
 
+## 2b. Optional: the volume response (#5801)
+
+An advisory section of the retro evidence, never a grade. It puts each muscle's performed weekly working
+sets beside the e1RM trend of the lifts that train it, labels the response `gaining`, `flat` or `losing`
+(with n and the caveat that this is one block and co-occurrence, not cause), and proposes next block's
+weekly sets inside the owner's band and the `volume_ceiling`. A move inside the e1RM noise line is `flat`
+and its proposal reads `insufficient evidence`.
+
+```bash
+python3 scripts/training_block_retro.py volume-response --block-end <YYYY-MM-DD> --out <scratch dir OUTSIDE the repo>
+```
+
+Read-only; no scheduled job. Loads and e1RMs are private: the output goes into his PRIVATE review doc as a
+proposal for the block design review (#5776), never a repo file or a public surface. Nothing is applied.
+
 ## 3. Grade
 
 ```bash
