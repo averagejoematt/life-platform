@@ -782,23 +782,15 @@ def _body_composition(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _goals() -> Dict[str, Any]:
-    """The plan root: the repo file when present (scripts, tests), else S3 config/ (the Lambda runtime — config/ is
-    not bundled), the same order experiment.plan_facts.load_plan_facts uses."""
-    import json
-    import os
+    """The plan root's PUBLIC part (``common.user_goals.load_public``): the repo file when present (scripts, tests),
+    else the S3 twin (the Lambda runtime — config/ is not bundled). The dossier feeds published narrative, so it never
+    reads the private part (owner ruling 2026-11-11)."""
+    from common import user_goals
 
-    try:
-        from common.repo_config import config_path
-
-        with open(config_path("user_goals.json"), encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:  # noqa: BLE001 — fall through to S3
-        import boto3
-
-        s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
-        return json.loads(
-            s3.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="config/user_goals.json")["Body"].read()
-        )
+    goals = user_goals.load_public()
+    if goals is None:
+        raise RuntimeError("plan root unavailable")
+    return goals
 
 
 _PLAN_FACTS_CACHE: Dict[str, Any] = {}

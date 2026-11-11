@@ -626,3 +626,15 @@ def test_update_configs_prints_the_config_anchor_report(tmp_path, monkeypatch, c
 
 
 # premerge-gate: structural gate that sweeps the repo tree (#2372)
+
+
+def test_update_configs_refuses_to_write_a_plan_root_carrying_a_private_field(tmp_path, monkeypatch):
+    """Owner ruling 2026-11-11 (item 2): the tracked plan root is public-only, and a reset writes it back — so a
+    plan root that has picked up a private field (SYNTHETIC here) is refused, naming the path, before any write."""
+    user_goals = {"timeline": {"start_date": "2026-06-16"}, "last_updated": "", "mission": "synthetic private prose"}
+    ug_path = tmp_path / "user_goals.json"
+    ug_path.write_text(__import__("json").dumps(user_goals))
+    monkeypatch.setattr(pipeline, "USER_GOALS", ug_path)
+    with pytest.raises(SystemExit, match=r"private goals fields present \['mission'\]"):
+        pipeline.update_configs("2026-09-06", 320.0, 145.15, "2026-09-06T12:00:00+00:00", apply=True)
+    assert "mission" in __import__("json").loads(ug_path.read_text()), "nothing was written"
