@@ -20,8 +20,9 @@ routine's estimate and the charter's `lifting_ceiling`, so a draft can read the 
 from __future__ import annotations
 
 import statistics
-from datetime import datetime
 from typing import Any
+
+from common.pacific_time import parse_iso_utc
 
 from training.training_charter import charter_value
 
@@ -42,15 +43,6 @@ MEASURED_SET_SECONDS: dict[str, Any] = {
 }
 
 
-def _parse(ts: Any) -> datetime | None:
-    if not ts:
-        return None
-    try:
-        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-
 def _set_seconds_logged(st: dict[str, Any]) -> int:
     return int(st.get("duration_seconds") or st.get("duration_sec") or 0)
 
@@ -62,7 +54,7 @@ def is_timed_block(ex: dict[str, Any]) -> bool:
 
 
 def _workout_seconds(performed: dict[str, Any]) -> int | None:
-    start, end = _parse(performed.get("start_time")), _parse(performed.get("end_time"))
+    start, end = parse_iso_utc(performed.get("start_time")), parse_iso_utc(performed.get("end_time"))
     if start is not None and end is not None:
         return int((end - start).total_seconds())
     dur = performed.get("duration_sec")

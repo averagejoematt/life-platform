@@ -285,7 +285,7 @@
     {
       "version": "1.42.0",
       "date": "2026-11-11",
-      "by": "owner goal 2026-11-11 (#5799, delegated: measure lifting minutes against the 75-min ceiling; over it, antagonist supersets for accessories; drop sets only as an owner-selectable short-on-time variant; vetoable before merge)",
+      "by": "owner goal 2026-11-11 (#5799: measure lifting minutes against the 75-min ceiling; over it, antagonist supersets for accessories; drop sets only as an owner-selectable short-on-time variant) and owner ruling 2026-11-11 on PR #5811: GO, provided every pair is two non-competing accessories and no main lift is paired; no pair beyond these two without his approval",
       "what": "Adds split.session_minutes.measured_min_sessions (10, platform-proposed: two passes of the five-session sequence) and measured_rule: the per-set time model is re-derived from his measured Hevy sessions and the platform's 45 s constant retires. Adds split.supersets: the antagonist pairs (curl + triceps; lateral raise + rear delt), applied ahead of the accessory time trim when a draft runs over the lifting ceiling, anchors never; drop sets only as an owner-selectable short-on-time variant.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
@@ -365,7 +365,7 @@
           ]
         }
       ],
-      "rule": "when a draft's lifting estimate, or the trailing measured median for its session role, is over lifting_ceiling, the generator pairs these accessory slots as antagonist supersets (one Hevy superset_id, the first member's rest moved to the second) BEFORE the time trim cuts any accessory. Pairs are by template slot, so a rotated movement keeps its pair. Anchors are never supersetted.",
+      "rule": "when a draft's lifting estimate, or the trailing measured median for its session role, is over lifting_ceiling, the generator pairs these accessory slots as antagonist supersets (one Hevy superset_id, the first member's rest moved to the second) BEFORE the time trim cuts any accessory. Pairs are by template slot, so a rotated movement keeps its pair. Anchors are never supersetted. Owner ruling 2026-11-11 (PR #5811): every pair is two non-competing accessories, no main lift is paired, and no pair is added without his approval.",
       "drop_sets": "only as the owner-selectable short-on-time variant of a draft (each accessory: one working set, then one drop set); never a default"
     },
     "minimum_session": {
