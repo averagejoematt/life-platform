@@ -81,6 +81,12 @@ EVENING = _lift(TODAY, EVENING_WID)  # 2026-11-10, over at 03:01:30Z on 11-11
 EVENING_FLEX = _lift(TODAY, EVENING_WID, archetype="flex")
 
 
+def _frozen_pacific_today():
+    """Every handler clock read here (`pacific_today()`: the run's tomorrow, the ingest target, the poller's
+    recent window) is frozen to the fixture's TODAY (#2376), so the dated literals cannot desync from it."""
+    return patch("common.pacific_time.pacific_today", return_value=TODAY)
+
+
 class _World:
     """The seams the pre-draft reaches, wired to the real repo + sequence. `rows` is the Hevy record."""
 
@@ -129,7 +135,7 @@ class _World:
     def patches(self, stack: ExitStack) -> None:
         stack.enter_context(patch.object(routine_repo, "_table", self.table))
         stack.enter_context(patch("training.routine_repo._live_genesis", return_value=GENESIS))
-        stack.enter_context(patch("common.pacific_time.pacific_today", return_value=TODAY))
+        stack.enter_context(_frozen_pacific_today())
         stack.enter_context(patch.object(npd, "_block_record", side_effect=self.block_record))
         stack.enter_context(patch.object(npd, "scheduled_session", side_effect=self.scheduled))
         stack.enter_context(patch.object(npd, "_switch", return_value={"source": "charter", "shadow": {"due": False}}))
@@ -238,7 +244,7 @@ def test_the_ingest_run_emits_no_dead_man_datapoint_and_runs_no_side_legs(capsys
         patch.object(predraft_ingest, "_gate_and_run", return_value={"outcome": npd.DRAFTED}),
         patch.object(npd, "_may_tracker_leg", side_effect=AssertionError("no legs on an ingest run")),
         patch.object(npd, "_titration_leg", side_effect=AssertionError("no legs on an ingest run")),
-        patch("common.pacific_time.pacific_today", return_value=TODAY),
+        _frozen_pacific_today(),
     ):
         body = json.loads(npd.lambda_entry(_ingest_event(EVENING_WID))["body"])
     assert body["outcome"] == npd.DRAFTED and body["trigger"] == npd.INGEST_TRIGGER
@@ -248,7 +254,7 @@ def test_the_ingest_run_emits_no_dead_man_datapoint_and_runs_no_side_legs(capsys
 def test_a_failing_ingest_run_is_named_never_raised():
     with (
         patch.object(npd, "_block_record", side_effect=RuntimeError("ddb down")),
-        patch("common.pacific_time.pacific_today", return_value=TODAY),
+        _frozen_pacific_today(),
     ):
         body = json.loads(predraft_ingest.lambda_entry(_ingest_event(EVENING_WID))["body"])
     assert body["outcome"] == npd.FAILED and "RuntimeError" in body["error"]
@@ -344,7 +350,9 @@ def test_the_poll_summary_carries_the_trigger(monkeypatch):
     }.items():
         monkeypatch.setattr(mod, name, val)
     monkeypatch.setattr(mod.cardio_hr_store, "attach", lambda *a, **k: None)
-    monkeypatch.setattr("common.pacific_time.pacific_today", lambda: TODAY)
+    import common.pacific_time as pt
+
+    monkeypatch.setattr(pt, "pacific_today", lambda: TODAY)
     monkeypatch.delenv(predraft_trigger.FLAG_ENV, raising=False)
     body = json.loads(mod.lambda_handler({}, None)["body"])
     assert body["ingested"] == 1 and body["predraft_trigger"] == {"state": "off", "candidates": [EVENING_WID]}
