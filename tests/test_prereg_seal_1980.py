@@ -44,6 +44,7 @@ for p in (str(REPO_ROOT), str(REPO_ROOT / "lambdas"), str(REPO_ROOT / "lambdas" 
         sys.path.insert(0, p)
 
 import qa_manifest  # noqa: E402
+import sealed_prereg  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 from web import (
     site_api_coach as api,  # noqa: E402
@@ -62,7 +63,6 @@ def _load(module_name: str, rel_path: str):
 
 
 gps = _load("genesis_prereg_stamp", "deploy/genesis_prereg_stamp.py")
-_ARTIFACT = REPO_ROOT / "deploy" / "generated" / "genesis_preregistration.json"
 
 
 def _body(resp):
@@ -75,10 +75,16 @@ def _reset_seal_cache(monkeypatch):
     don't leak the previous test's monkeypatched S3 result into the next."""
     monkeypatch.setattr(common, "_prereg_seal_cache", None)
     monkeypatch.setattr(common, "_prereg_seal_attempted", False)
-    # The sealed file as served: the committed frozen artifact, which hashes to the committed stamp (owner ruling
-    # 2026-11-11 item 3 — the verify command is offered only when the served bytes match). The withdrawn case is
-    # tests/test_prereg_seal_withdrawn.py.
-    monkeypatch.setattr(common, "_load_s3_bytes", lambda key, name: _ARTIFACT.read_bytes())
+    # These tests pin the #1980 wiring for a seal whose served file matches. The sealed bytes are private since
+    # 2026-11-11 (owner ruling item 3): serve the private original when present (tests/sealed_prereg.py); otherwise
+    # take the match decision as given, so the wiring is still exercised. The decision itself, and the withdrawn
+    # case, are tests/test_prereg_seal_withdrawn.py.
+    original = sealed_prereg.sealed_path()
+    if original is not None:
+        monkeypatch.setattr(common, "_load_s3_bytes", lambda key, name: original.read_bytes())
+    else:
+        monkeypatch.setattr(common, "_load_s3_bytes", lambda key, name: b"")
+        monkeypatch.setattr(common.prereg_seal_state, "assess", lambda genesis, sha256, served: (True, None))
 
 
 def _real_stamp():
