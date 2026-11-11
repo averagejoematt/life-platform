@@ -23,6 +23,7 @@ import { CALL_NOT_PUBLISHED, docketEntries } from "../lib/docket.js";
 import {
   APPROVED_WORDS_NOTE,
   COMMENTARY_NOTE,
+  COMMENTARY_NOT_SERVED,
   MEASURED_NOTE,
   NO_HISTORICAL_COMMENTARY,
   NOT_PUBLISHED,
@@ -260,10 +261,10 @@ const num1 = "font-size:15px;line-height:1.5";
         </div>
       </section>
     ) : (
-      <section class="section" {...room} id="approved-words" style="border-top:1px solid var(--ink);padding-top:28px;padding-bottom:28px" data-approved-words="none">
+      <section class="section" {...room} id="approved-words" style="border-top:1px solid var(--ink);padding-top:28px;padding-bottom:28px" data-approved-words={commentary.state}>
         <div class="wrap" style="display:flex;flex-direction:column;gap:8px;max-width:1100px">
           <p class="label">{COMMENTARY_NOTE.label}</p>
-          <p style="font-size:17px;line-height:1.45" data-no-commentary>{NO_HISTORICAL_COMMENTARY}</p>
+          <p style="font-size:17px;line-height:1.45" data-no-commentary>{commentary.state === "absent" ? COMMENTARY_NOT_SERVED : NO_HISTORICAL_COMMENTARY}</p>
         </div>
       </section>
     )

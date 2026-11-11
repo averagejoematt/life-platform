@@ -348,6 +348,8 @@ export function correctionOf(c) {
  *  message, item 4). Exactly this: it does not say the coach never commented, that its predictions were not recorded,
  *  or that its performance is unknown — the measured record stays on the page beside it. */
 export const NO_HISTORICAL_COMMENTARY = "No historical commentary from this coach is currently published.";
+/** When the source did not answer for this snapshot: an absence, never a claim that nothing is published. */
+export const COMMENTARY_NOT_SERVED = "This coach's published historical commentary was not served for this snapshot.";
 
 /** The two kinds of material a coach's record keeps apart (owner ruling 2026-11-11, second message, item 2). */
 export const MEASURED_NOTE = {

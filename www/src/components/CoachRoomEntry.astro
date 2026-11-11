@@ -6,7 +6,7 @@
 // Simple on arrival: the coach's published historical commentary — the lead's approved reads, or for every other coach
 // exactly NO_HISTORICAL_COMMENTARY (owner ruling 2026-11-11, second message, item 4) — kept apart from the measured
 // performance: the latest read's date, the record as first graded with its interval, the asks' tally. Each carried.
-import { COMMENTARY_NOTE, MEASURED_NOTE, NO_HISTORICAL_COMMENTARY, askCountsText, coachRecord, historicalCommentary, latestRead, roomCoach } from "../lib/coach_room.js";
+import { COMMENTARY_NOTE, COMMENTARY_NOT_SERVED, MEASURED_NOTE, NO_HISTORICAL_COMMENTARY, askCountsText, coachRecord, historicalCommentary, latestRead, roomCoach } from "../lib/coach_room.js";
 import { ROOM_MARKER, roomAll, roomCr2, roomPublic } from "../lib/room.js";
 import { loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
@@ -52,7 +52,7 @@ const room = { [ROOM_MARKER]: "coach-entry" };
                 <a class="btn sm" href={`${recordHref}#approved-words`} style="align-self:flex-start">Read {coach.name}'s published commentary</a>
               </>
             ) : (
-              <p style="font-size:17px;line-height:1.45" data-no-commentary>{NO_HISTORICAL_COMMENTARY}</p>
+              <p style="font-size:17px;line-height:1.45" data-no-commentary>{commentary.state === "absent" ? COMMENTARY_NOT_SERVED : NO_HISTORICAL_COMMENTARY}</p>
             )
           }
         </div>
