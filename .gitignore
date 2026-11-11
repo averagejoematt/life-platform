@@ -121,6 +121,7 @@ config/training_charter.private.local.json
 # it lives in S3 config/private/ and, locally, under ~/.config/life-platform/. Belt and braces for a stray copy.
 config/private/
 user_goals_private*.json
+config/exercise_library.private.local.json
 cdk/_bundle_staging/
 .worktrees/
 # Agent worktrees. These were ignored ONLY via .git/info/exclude, which is untracked —
