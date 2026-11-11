@@ -61,7 +61,7 @@ from mcp.plan_helpers import (  # noqa: F401 (#4149)
     critics_with_charter,  # #5071
 )
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
-from mcp.plan_stage2_writes import (  # noqa: F401 — re-exported: mcp.plan_stage2_run reads them HERE (#4076, #5781)
+from mcp.plan_stage2_writes import (
     record_override_correction as _record_override_correction,  # noqa: F401 (#4076)
     write_thread as _write_thread,  # noqa: F401 (#4076)
 )
@@ -1010,7 +1010,18 @@ def _run_stage_2(
     from mcp import plan_stage2_run
 
     return plan_stage2_run.run(
-        ir, block, reference, evidence, protein_missed, protein_measured, target_date, dismissals, overrides, dry_run
+        ir,
+        block,
+        reference,
+        evidence,
+        protein_missed,
+        protein_measured,
+        target_date,
+        dismissals,
+        overrides,
+        dry_run,
+        write_thread=_write_thread,  # resolved HERE, where the tests patch it
+        record_correction=_record_override_correction,
     )
 
 

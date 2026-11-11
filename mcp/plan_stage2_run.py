@@ -25,8 +25,9 @@ THE ORDER NOW, each phase timed on the result (`timing_ms`, stable keys):
 
 A paused model tier (or a dry run, #4076) has no narration step, so it keeps the single write it always had.
 
-The names the tests patch live on `mcp.tools_plan` (`_model_allowed`, `_write_thread`, `_record_override_correction`,
-`_place_block_on_first_exercise`, `pacific_today`) and are read through that module at call time.
+The names the tests patch live on `mcp.tools_plan` (`_model_allowed`, `_place_block_on_first_exercise`, `pacific_today`) and
+are read through that module at call time; the two non-routine writers (`_write_thread`, `_record_override_correction`)
+are handed in by `tools_plan._run_stage_2`, so the registry's write-reachability scan still sees the tool write.
 """
 
 from __future__ import annotations
@@ -272,8 +273,12 @@ def run(
     dismissals: list[dict[str, Any]] | None = None,
     overrides: list[dict[str, Any]] | None = None,
     dry_run: bool = False,
+    *,
+    write_thread: Callable[..., dict[str, Any]],
+    record_correction: Callable[[dict[str, Any], str, str], str],
 ) -> dict[str, Any]:
-    """The red team, in the #5781 order (module docstring). `dry_run` (#4076) runs every step and WRITES NOTHING: each
+    """The red team, in the #5781 order (module docstring). `write_thread` / `record_correction` are stage 2's two
+    writes besides the routine version (`mcp.plan_stage2_writes`), handed in by `tools_plan._run_stage_2`. `dry_run` (#4076) runs every step and WRITES NOTHING: each
     put is returned under `would_write` (`mcp.plan_stage2_writes`)."""
     from coach import critics
 
@@ -282,7 +287,7 @@ def run(
     clock = _Clock()
     build = packet_builder(block, reference, evidence, protein_missed, protein_measured, dismissals)
     would: list[dict[str, Any]] = []
-    recorder = _once(plan_stage2_writes.dry_ledger(would) if dry_run else tp._record_override_correction)
+    recorder = _once(plan_stage2_writes.dry_ledger(would) if dry_run else record_correction)
     run_ = _Run(ir, block, build, target_date, overrides, recorder)
     allowed, paused = tp._model_allowed()
     verdicts = critics.run_critics(run_.packets, run_.draft, invoke=None, model_allowed=allowed, model_paused_reason=paused)
@@ -316,7 +321,7 @@ def run(
     if plan_call_scope.past_write_deadline():
         out["thread"] = {"written": False, "reason": "past the write deadline — the verdicts are stored, the coach-thread row is not"}
     else:
-        out["thread"] = tp._write_thread(ir, tp.pacific_today())
+        out["thread"] = write_thread(ir, tp.pacific_today())
     clock.lap("thread_write")
     out["notes_preview"] = critics.notes_block(ir)
     out["next"] = _next_line(record, {v["critic"] for v in record["verdicts"] if critics.is_overridden(v)})
