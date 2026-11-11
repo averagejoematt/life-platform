@@ -496,6 +496,8 @@ NOT_APPLICABLE: Dict[str, str] = {
     "calibration.fitness_tests.early_days_credited": "the battery's due-week arithmetic: read only by training.fitness_tests "
     "(tests/test_fitness_tests_5078.py); no prose names it",
     "calibration.fitness_tests.grace_weeks": "as early_days_credited (training.fitness_tests; tests/test_fitness_tests_5078.py)",
+    "calibration.rpe": "the RPE calibration set's schedule and statistics (#5797): read only by training.rpe_calibration "
+    "(tests/test_rpe_calibration_5797.py); the note line names no number and no prose copies one",
     "calibration.fitness_tests.tests": "each test's protocol constants (durations, reps): the battery's own definition, read "
     "only by training.fitness_tests and printed from the charter by the protocol card (tests/test_fitness_tests_5078.py)",
     "phase_after_may.plan_prompt": "the post-deadline plan prompt's weeks (#5130): owner-only, read only by "

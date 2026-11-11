@@ -86,6 +86,18 @@ def versioned_items(ir: RoutineSpec) -> list[dict]:
         # (workout.hevy_routine_id), not just nearest-date. Empty until commit.
         "hevy_routine_id": ir.hevy_routine_id or "",
     }
+    # #5797: the RPE calibration marks (which set, which top rep) ride the index row, so the history loader joins them to
+    # the performed workout by `hevy_routine_id` in ONE Query (`rpe_calibration.load_marks_failsoft`). Ints and strings only.
+    marks = ((getattr(ir, "inputs_snapshot", None) or {}).get("rpe_calibration") or {}).get("marks")
+    if marks:
+        # a deserialized IR carries floats (Decimal -> float), which boto3 refuses: the numbers are re-cast to int
+        index_item["rpe_calibration"] = [
+            {
+                **{k: str(m[k]) for k in ("movement_key", "template_id") if m.get(k) is not None},
+                **{k: int(m[k]) for k in ("exposure", "target_reps", "set") if m.get(k) is not None},
+            }
+            for m in marks
+        ]
     return [{**body, "pk": pk, "sk": _version_sk(ir.version)}, {**body, "pk": pk, "sk": "VERSION#current"}, index_item]
 
 

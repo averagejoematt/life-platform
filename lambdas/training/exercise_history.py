@@ -236,6 +236,8 @@ def load_history_indexes(
                         "date": workout_date,
                         "sets": sets,
                         "top_weight_kg": top_weight,
+                        # #5797: the routine he performed, so a calibration mark joins to its set (`rpe_calibration.annotate`)
+                        **({"hevy_routine_id": str(item["hevy_routine_id"])} if item.get("hevy_routine_id") else {}),
                     }
                 )
         last_key = resp.get("LastEvaluatedKey")
@@ -246,7 +248,19 @@ def load_history_indexes(
         index[tid].sort(key=lambda s: s["date"], reverse=True)
     for tid in cardio:
         cardio[tid].sort(key=lambda s: s["date"], reverse=True)
+    _annotate_calibration(index, start)
     return index, cardio
+
+
+def _annotate_calibration(index: dict[str, list[dict[str, Any]]], start: str) -> None:
+    """#5797: stamp each performed RPE calibration set with its predicted-vs-actual pair, here in the ONE loader so the
+    generator, the planner and the chat gate read the same pairs. Only when a session carries a Hevy routine id (nothing
+    else can join); fail-soft (`rpe_calibration.load_marks_failsoft`)."""
+    if not any(s.get("hevy_routine_id") for sessions in index.values() for s in sessions):
+        return
+    from training import rpe_calibration
+
+    rpe_calibration.annotate(index, rpe_calibration.load_marks_failsoft(_table(), start))
 
 
 CARRY_INDEX_PREFIX = "carry:"

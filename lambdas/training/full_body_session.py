@@ -24,7 +24,16 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import in_block_variant, lift_note, load_ramp, program_structure, routine_generator as _rg, variant_rotation, warmup_sets
+from training import (
+    in_block_variant,
+    lift_note,
+    load_ramp,
+    program_structure,
+    routine_generator as _rg,
+    rpe_calibration,
+    variant_rotation,
+    warmup_sets,
+)
 from training.rep_scheme import round_to_implement_kg
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
@@ -182,11 +191,16 @@ def _compose_notes(
     history_index: dict[str, list],
     target_date: str,
     rotation: dict[str, Any] | None = None,
+    *,
+    deload: bool = False,
+    red_day: bool = False,
 ) -> dict[str, Any]:
     """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record.
-    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`)."""
+    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`).
+    #5797 (owner ruling 2026-11-11): then the RPE calibration line on a due non-barbell exposure (`rpe_calibration`) —
+    never on a deload or a red day; its marks and the per-movement calibration report ride the record."""
     movements = load_catalog.get("movements") or {}
-    return lift_note.compose_blocks(
+    record = lift_note.compose_blocks(
         blocks,
         movements,
         load_floors=load_floors,
@@ -194,6 +208,10 @@ def _compose_notes(
         target_date=target_date,
         rotations=variant_rotation.swaps(rotation, movements),
     )
+    ctx = {"deload": deload, "red_day": red_day, "load_floors": load_floors, "history_index": history_index, "target_date": target_date}
+    cal = rpe_calibration.mark_session(blocks, movements, note_record=record, context=ctx)
+    record[rpe_calibration.SNAPSHOT_KEY] = {**cal, "report": rpe_calibration.report(history_index, movements)}
+    return record
 
 
 def _sequence_line(day_entry: dict[str, Any]) -> str:
@@ -356,7 +374,9 @@ def full_body_routines(
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation)
+    note_record = _compose_notes(
+        blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload=deload, red_day=drop_accessories
+    )
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
