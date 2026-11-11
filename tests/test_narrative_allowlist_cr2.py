@@ -11,7 +11,8 @@ What is pinned:
     changed, and a listed row whose words name private activity all stay withheld.
 
 The lead reads' words are private until CR2 ships, so their gate tests use a synthetic entry; the sealed calls'
-words are already public in ``deploy/generated/genesis_preregistration.json``, so those tests use the real entries.
+words that the list approves are public, so those tests use the real entries (tests/fixtures/prereg_cycle17_approved_calls.json —
+a labelled copy, not the seal; the sealed file itself is private since 2026-11-11).
 """
 
 # premerge-gate: CR2 historical words (owner 2026-11-09 D): reads the frozen pre-registration artifact and rglobs lambdas/ for a route opening the CR2 scope — a diff that regenerates the artifact or wires a route must red before merge, not after.
@@ -27,7 +28,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
+sys.path.insert(0, str(ROOT / "tests"))
 
+import sealed_prereg  # noqa: E402
 from common import (
     narrative_allowlist as NA,  # noqa: E402
     narrative_provenance as NP,  # noqa: E402
@@ -36,8 +39,9 @@ from common import (
 )
 from web import narrative_publication as G  # noqa: E402
 
-PREREG = json.loads((ROOT / "deploy" / "generated" / "genesis_preregistration.json").read_text())
-SEALED = {p["claim_natural"] for c in PREREG["coaches"].values() for p in c["predictions"]}
+# The sealed file is private since 2026-11-11 (owner ruling item 3); the approved calls' words come from a labelled
+# test copy (tests/sealed_prereg.py), and every sealed call's words only from the private original when present.
+SEALED = set(sealed_prereg.sealed_call_texts())
 EXCLUDED_LEAD_DAYS = {"2026-10-02", "2026-10-07", "2026-10-17", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31"}
 
 
