@@ -423,6 +423,17 @@ def add_reason(note: str | None, clause: str | None) -> str:
     return _join(block, lines)
 
 
+def _capped_effort(line1: str, clause: str, rpe_max: Any) -> str:
+    """Line 1 of a capped lift: the layoff-return band on a first session back (or when line 1 already reads it), else
+    the cap's `RPE 7`."""
+    from training.lift_note import layoff_return_effort
+
+    easy = layoff_return_effort()
+    if easy and (line1 == easy or hevy_note_grammar.FIRST_RETURN_RE.match(clause.strip())):
+        return easy
+    return hevy_note_grammar.effort_line(rpe_max)
+
+
 def add_capped_reason(note: str | None, clause: str, rpe_max: Any) -> str:
     """A critic's set cap on a capped exposure (`layoff_capped`): line 1 becomes the cap's effort (`RPE 7` — the
     "last set RPE 9–10" of the band would contradict it) and `clause` (`capped_clause`) takes the layoff line's
@@ -430,14 +441,16 @@ def add_capped_reason(note: str | None, clause: str, rpe_max: Any) -> str:
     gives a capped exposure (the 2026-10-30 re-grade: a capped seated calf raise kept RPE 9–10 and the +10 lb rule).
     An earlier critic clause keeps its line. Re-grade #6 (2026-11-08, 4 of 4 voices): the capped exposure HOLDS its
     load, so the pick-load W step line (`W at RPE 5 or less → one step, no more.`) leaves the note — the 11-06 standing
-    calf raise read "No jumps" and then "one step" on the next line. Idempotent."""
+    calf raise read "No jumps" and then "one step" on the next line. Owner ruling 2026-11-10 (charter 1.41.0): a FIRST
+    session back (`clause` names `first time in ‹gap›`) reads the layoff-return band instead, and a line 1 already at
+    that band (`lift_note` eased it) is never raised back to the cap's. Idempotent."""
     text = note or ""
     block, own = split(text)
     lines = _own_lines(block, own)
     if not lines:
         return text
     if hevy_note_grammar.EFFORT_RE.match(lines[0]):
-        lines[0] = hevy_note_grammar.effort_line(rpe_max)
+        lines[0] = _capped_effort(lines[0], clause, rpe_max)
     lines = [lines[0]] + [ln for ln in lines[1:] if not hevy_note_grammar.PICK_LOAD_RESULT_RE.match(ln)]
     if clause not in lines:
         slot = next(

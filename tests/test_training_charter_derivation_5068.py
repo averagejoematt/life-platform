@@ -477,6 +477,10 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
 # #5175: the charter numeric leaves NO pattern here owns, each with its reason. A dotted PREFIX covers every leaf under
 # it. The coverage test below fails on a leaf that is neither patterned nor listed, and on a row that covers nothing.
 NOT_APPLICABLE: Dict[str, str] = {
+    "effort_ceilings.layoff_return_rpe": "the layoff-return band (owner ruling 2026-11-10, charter 1.41.0): read only through "
+    "training.effort_ceilings.layoff_return_band (lift_note, session_block, the note linter's L14), pinned by "
+    "tests/test_layoff_return_and_warmup_climb_5428.py; any `RPE lo–hi` copy on a code line is already a hit for the "
+    "effort_ceiling_rpe value-class pattern",
     "disruption.step_back_up.min_days": "the shortest mode that owes a step-back-up week (#5122): read only by "
     "training.disruption.owes_step_back_up; pinned (3, and the boundary either side) by tests/test_step_back_up_min_days_5122.py",
     "gated_movements.running.walking_weeks": "the run gate's walking condition: read only by training.run_onramp; held equal to "
