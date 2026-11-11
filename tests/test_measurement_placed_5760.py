@@ -22,6 +22,7 @@ import os
 import pathlib
 import re
 import sys
+from datetime import timezone
 from unittest.mock import patch
 
 import pytest
@@ -42,6 +43,30 @@ from training import (  # noqa: E402
 )
 
 START = "2026-10-19"  # the preview's synthetic start: one session a day through the real week rule
+TODAY = "2026-11-11"  # the plan's day; the frozen clock below is DERIVED from it (#2376 / #4848)
+
+
+@pytest.fixture(autouse=True)
+def frozen_clock(monkeypatch):
+    """Pin every clock these paths can reach to an instant derived from TODAY: `common.pacific_time`'s own `datetime`
+    (so `pacific_now` / `pacific_today` answer TODAY wherever the name was bound at import), the generator's
+    `_now_iso` stamp, and the Pacific names on the generator and the cadence modules."""
+    from common import pacific_time
+    from training import routine_generator
+
+    from tests.pacific_clock import freeze_pacific
+
+    class _FrozenDatetime(pacific_time.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            y, m, d = (int(x) for x in TODAY.split("-"))
+            return pacific_time.datetime(y, m, d, 17, 0, 0, tzinfo=timezone.utc).astimezone(tz or timezone.utc)
+
+    monkeypatch.setattr(pacific_time, "datetime", _FrozenDatetime)
+    monkeypatch.setattr(routine_generator, "_now_iso", lambda: _FrozenDatetime.now(timezone.utc).isoformat())
+    for mod in (pacific_time, routine_generator, cc, ft, ss):
+        freeze_pacific(monkeypatch, mod, _FrozenDatetime)
+    return _FrozenDatetime
 
 
 @pytest.fixture(autouse=True)
@@ -142,7 +167,7 @@ def test_a_missed_battery_rides_the_dead_man_once_per_due_week_naming_the_day_it
 
 
 def test_the_tape_dead_man_names_the_day_it_lapsed():
-    b = cc.compute("2026-11-11", {"tape": lambda: ["2026-09-06"], "photos": lambda: ["2026-11-10"]}, anchor="2026-09-06")
+    b = cc.compute(TODAY, {"tape": lambda: ["2026-09-06"], "photos": lambda: ["2026-11-10"]}, anchor="2026-09-06")
     text = cc.deadman_alert(b["kinds"]["tape"])
     assert text.startswith("tape has gone") and "lapsed on 2026-09-20" in text and "2026-09-06" in text
 
@@ -151,7 +176,7 @@ def test_the_tape_dead_man_names_the_day_it_lapsed():
 def _plan(monkeypatch, tape, battery_row):
     monkeypatch.setattr(cc, "table_readers", lambda table: {"tape": lambda: list(tape), "photos": lambda: ["2026-11-10"]})
     monkeypatch.setattr(ft, "calibration_row_from_table", lambda table, today: battery_row)
-    return cc.plan_block(object(), "2026-11-11")
+    return cc.plan_block(object(), TODAY)
 
 
 def test_a_due_tape_is_an_item_in_the_plan_through_the_dead_man_and_leaves_once_logged(monkeypatch):
@@ -178,7 +203,7 @@ def test_a_failed_read_is_named_never_an_empty_plan(monkeypatch):
 
     monkeypatch.setattr(cc, "table_readers", lambda table: {"tape": boom, "photos": boom})
     monkeypatch.setattr(ft, "calibration_row_from_table", lambda table, today: {"kind": ft.CALIBRATION_KIND, "state": cc.READ_FAILED})
-    got = cc.plan_block(object(), "2026-11-11")
+    got = cc.plan_block(object(), TODAY)
     assert got["read_failed"] == ["fitness_battery", "photos", "tape"] and got["items"] == []
 
 
@@ -188,7 +213,7 @@ def test_the_plan_field_rides_stage_1_and_fails_soft(monkeypatch):
     src = (_REPO / "mcp" / "tools_plan.py").read_text(encoding="utf-8")
     assert re.search(r'out\["calibration_due"\]\s*=\s*calibration_due_field\(target_date\)', src)
     monkeypatch.setattr(cc, "plan_block", lambda table, today: (_ for _ in ()).throw(RuntimeError("x")))
-    assert plan_helpers.calibration_due_field("2026-11-11") == {"state": "read_failed", "error": "RuntimeError", "items": None}
+    assert plan_helpers.calibration_due_field(TODAY) == {"state": "read_failed", "error": "RuntimeError", "items": None}
 
 
 def test_the_plan_items_carry_dates_and_states_never_a_reading(monkeypatch):
