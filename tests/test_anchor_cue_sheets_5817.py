@@ -65,10 +65,10 @@ def _shape_problems(sheets: dict) -> list[str]:
 
 
 def test_every_anchor_sheet_splits_still_visible_from_not_visible():
-    assert set(fcs.anchor_sheets()) == set(ANCHOR_KEYS.values())
+    assert set(fcs._anchor_sheets()) == set(ANCHOR_KEYS.values())
     assert _shape_problems(fcs._ANCHOR_SHEETS) == []
-    for sid in fcs.anchor_sheets():
-        sheet = fcs.anchor_sheet(sid)
+    for sid in fcs._anchor_sheets():
+        sheet = fcs._anchor_sheet(sid)
         assert sheet["still_visible"] and sheet["not_visible"] and sheet["sheets_version"] == fcs.ANCHOR_SHEETS_VERSION
 
 
@@ -97,12 +97,12 @@ def _reviewed_writers(sources: dict[str, str]) -> list[str]:
 
 def test_no_sheet_is_reviewed_and_no_code_marks_one():
     assert fcs.REVIEWED is False
-    assert {sid: s["reviewed"] for sid, s in fcs._ANCHOR_SHEETS.items()} == dict.fromkeys(fcs.anchor_sheets(), False)
+    assert {sid: s["reviewed"] for sid, s in fcs._ANCHOR_SHEETS.items()} == dict.fromkeys(fcs._anchor_sheets(), False)
     # a caller's copy cannot flip the table
-    copy = fcs.anchor_sheet("bench_press_barbell")
+    copy = fcs._anchor_sheet("bench_press_barbell")
     copy["reviewed"] = True
     copy["still_visible"].clear()
-    assert fcs._ANCHOR_SHEETS["bench_press_barbell"]["reviewed"] is False and fcs.anchor_sheet("bench_press_barbell")["still_visible"]
+    assert fcs._ANCHOR_SHEETS["bench_press_barbell"]["reviewed"] is False and fcs._anchor_sheet("bench_press_barbell")["still_visible"]
 
 
 # premerge-gate: scans every module under lambdas/ and mcp/ for a write to a cue sheet's `reviewed`, so a new writer anywhere reds this

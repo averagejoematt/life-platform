@@ -224,7 +224,14 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     # the cardio arm wrote nothing on it
     own = session_block.split(next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes)[1].split("\n")
     # (its RPE 8–9 is the session line's: re-grade #3 prints it once, so line 1 here is the cue)
-    assert "RPE 8–9" not in own and own[-1] in ("Breathe out on the press.", cue_clause("bench") + " Breathe out on the press."), own
+    # #5817 (owner ruling 2026-11-11, #5779 D8): the barbell bench is an anchor, so its one sheet cue rides ahead of the
+    # press cue; the cue line is still the bench's own, from the strength composer, never the cardio arm's
+    from training.form_cue_sheets import anchor_note_cue
+
+    sheet = anchor_note_cue("barbell_bench_press")
+    press = "Breathe out on the press."
+    allowed = (press, f"{sheet} {press}", cue_clause("bench") + " " + press, cue_clause("bench") + f" {sheet} {press}")
+    assert "RPE 8–9" not in own and own[-1] in allowed and sheet in own[-1], own
     assert not [ln for ln in own if cn.LINE1_RE.match(ln)]
     assert CUE_MARKER not in bike.notes
     assert out["cardio_cues"] == 1

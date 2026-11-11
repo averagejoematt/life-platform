@@ -259,7 +259,7 @@ def anchor_of(movement_key: str, entry: dict[str, Any] | None = None) -> str | N
     return _ANCHOR_MATCH.get(str(movement_key or "")) or _ANCHOR_MATCH.get(title)
 
 
-def anchor_sheet(sheet_id: str) -> dict[str, Any] | None:
+def _anchor_sheet(sheet_id: str) -> dict[str, Any] | None:
     """One anchor sheet as a fresh copy (a caller can never edit the table), or None."""
     s = _ANCHOR_SHEETS.get(sheet_id)
     if s is None:
@@ -276,7 +276,7 @@ def anchor_sheet(sheet_id: str) -> dict[str, Any] | None:
     }
 
 
-def anchor_sheets() -> tuple[str, ...]:
+def _anchor_sheets() -> tuple[str, ...]:
     """Every anchor sheet id — the test reads it to hold each sheet's shape."""
     return tuple(_ANCHOR_SHEETS)
 
