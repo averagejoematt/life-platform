@@ -116,7 +116,7 @@ def evaluate(
             continue
         entry, slot = mv[lid], _slot_of(key, snap)
         chosen = by_slot.get((slot or {}).get("slot_id"))
-        why = se.availability(entry, library, overlay, inventory) or se.pain_exclusion(entry, overlay)
+        why = se.availability(entry, library, overlay, inventory) or se.pain_exclusion(entry, overlay) or se.not_for_you_now(entry)
         if why:
             swap = next((f.get("catalog_key") for f in (chosen or {}).get("fallbacks") or [] if f.get("catalog_key") != key), None)
             v = {"verdict": "change", "why": why, "to": swap}

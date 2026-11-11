@@ -208,21 +208,45 @@ def test_critic_changes_an_absent_equipment_movement():
 
 
 # ── pain exclusion ───────────────────────────────────────────────────────────
-def test_a_pain_flagged_movement_is_never_served():
+def _pain_overlay(tid: str, signals: dict, *, classed: bool = True) -> dict:
+    ov = {"per_template": {tid: {"best_set_by_band": {}, "note_signals": signals}}}
+    return ov | ({"pain_source": xl.PAIN_SOURCE_ID} if classed else {})
+
+
+def test_a_pain_class_movement_is_never_served():
     base = _slot(_week(), "upper_heavy.db_curl")["pick"]["movement_id"]
     tid = LIB0["movements"][base]["template_id"]
-    overlay = {"per_template": {tid: {"best_set_by_band": {}, "note_signals": {"pain_flag": 1}}}}
-    sel = _week(overlay=overlay)
-    assert base not in _served_anywhere(sel)
-    before = _slot(_week(), "upper_heavy.db_curl")["excluded_counts"].get("pain_swap", 0)
-    assert _slot(sel, "upper_heavy.db_curl")["excluded_counts"].get("pain_swap") == before + 1
+    sel = _week(overlay=_pain_overlay(tid, {"pain_flag": 1}))
+    assert base not in _served_anywhere(sel) and sel["pain_source_state"] == "classed"
+    assert _slot(sel, "upper_heavy.db_curl")["excluded_counts"].get("pain_swap") == 1
     # control: the same overlay without the flag -> served again
-    overlay["per_template"][tid]["note_signals"] = {"sentiment_positive": 1}
-    assert _slot(_week(overlay=overlay), "upper_heavy.db_curl")["pick"]["movement_id"] == base
+    assert _slot(_week(overlay=_pain_overlay(tid, {"sentiment_positive": 1})), "upper_heavy.db_curl")["pick"]["movement_id"] == base
 
 
-def test_not_for_you_now_is_pain_excluded():
-    assert se.pain_exclusion(LIB0["movements"]["preacher_curl_barbell"], None)
+def test_discomfort_and_form_notes_never_exclude():
+    base = _slot(_week(), "upper_heavy.db_curl")["pick"]["movement_id"]
+    tid = LIB0["movements"][base]["template_id"]
+    # #5806's classes through the library's tagger: only `pain` sets pain_flag
+    assert "pain_flag" in xl.note_signal_tags("sharp pain in my elbow on these")
+    discomfort = xl.note_signal_tags("my elbow felt a bit achy today")
+    form = xl.note_signal_tags("need to check my form, the cable height was off")
+    assert "pain_flag" not in discomfort and "joint_discomfort" in discomfort
+    assert "pain_flag" not in form
+    for tags in (discomfort, form):
+        sig = {t: 1 for t in tags}
+        assert base in _served_anywhere(_week(overlay=_pain_overlay(tid, sig))), tags
+
+
+def test_a_stale_overlay_pain_tag_is_not_trusted_to_exclude():
+    base = _slot(_week(), "upper_heavy.db_curl")["pick"]["movement_id"]
+    tid = LIB0["movements"][base]["template_id"]
+    sel = _week(overlay=_pain_overlay(tid, {"pain_flag": 1}, classed=False))
+    assert sel["pain_source_state"] == "stale_overlay" and _slot(sel, "upper_heavy.db_curl")["pick"]["movement_id"] == base
+
+
+def test_not_for_you_now_excludes_as_its_own_verdict():
+    e = LIB0["movements"]["preacher_curl_barbell"]
+    assert se.not_for_you_now(e) and se.pain_exclusion(e, None) is None
     assert "preacher_curl_barbell" not in _served_anywhere(_week())
 
 

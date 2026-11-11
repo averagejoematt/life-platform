@@ -47,7 +47,7 @@ sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(o
 
 from training import exercise_library as xl  # noqa: E402
 
-OVERLAY_VERSION = "0.1.0"
+OVERLAY_VERSION = "0.2.0"  # 0.2.0 (#5773): pain_flag tags from training_notes_pain.pain_class; `pain_source` stamped
 _WORKOUT_SK = re.compile(r"^DATE#(\d{4}-\d{2}-\d{2})#WORKOUT#(.+)$")
 _DELETE_SK = re.compile(r"^DELETE#WORKOUT#(.+)$")
 LEGACY_TOMBSTONE = "legacy_daily_aggregate_superseded_by_per_workout"
@@ -219,6 +219,7 @@ def build_overlay(lib, charter, workouts, weight_index, existing) -> tuple[dict[
     overlay = {
         "_comment": "OWNER-PRIVATE. Never commit, never publish. The N=1 half of config/exercise_library.json (#5769).",
         "version": OVERLAY_VERSION,
+        "pain_source": xl.PAIN_SOURCE_ID,
         "library_version": lib.get("version"),
         "location_id": xl.LOCATION_ID,
         "per_template": per,

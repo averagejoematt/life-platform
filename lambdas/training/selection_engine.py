@@ -43,9 +43,13 @@ THE SWITCH (owner, 2026-11-11). The engine changes live drafts ONLY when the lib
 is `proposed` it runs in SHADOW: the selection is computed beside the #5075 pools and recorded on the draft
 (`inputs_snapshot.selection_shadow`), and the pools serve. No library => `no_library`, the pools serve, said so.
 
-PAIN SOURCE. #5806 (`training_notes_pain.pain_class`) is not on main, so the exclusion reads the EXISTING flags: the
-overlay's coded `pain_flag` tag on the template (`exercise_library.n1_view(...)["pain_flagged"]`) and a public
-`not_for_you_now`. `PAIN_SOURCE` names it on every record.
+PAIN SOURCE. #5806's rule (`training_notes_pain.pain_class` / `record_pain_class`): only a `pain`-class note excludes;
+`discomfort` and `form_or_equipment` never do (discomfort is an N=1 demotion through `joint_discomfort`). The overlay
+carries it as the coded `pain_flag` tag, which `exercise_library.note_signal_tags` sets only for `pain`; an overlay
+written before that rule (no `pain_source` stamp equal to `exercise_library.PAIN_SOURCE_ID`) has an over-inclusive tag,
+so it is NOT trusted to exclude and the record says `stale_overlay` until the writer re-runs. A library
+`not_for_you_now` is the library's own curated verdict (with an unlock condition) and excludes as `not_for_you_now`,
+not as pain. `PAIN_SOURCE` and `pain_source_state` name it on every record.
 
 Every draft records `library_version` (`routine_repo.stamp_library_version`), as it records `charter_version`.
 Pure apart from the fail-soft loaders at the top.
@@ -75,8 +79,8 @@ MAX_FALLBACKS = 3
 EXCLUDED_FAMILIES = ("skill_athletic", "strength_anchor")
 GLOBAL_GATE_KINDS = ("pain_flag_exclusion", "equipment_available")  # evaluated here directly, not as a lock
 PAIN_SOURCE = (
-    "existing flags: the private overlay's coded pain_flag tag (exercise_library.n1_view) + the public not_for_you_now; "
-    "#5806's training_notes_pain.pain_class is not on main"
+    "training_notes_pain.pain_class (#5806): only a `pain`-class note excludes, via the overlay's pain_flag tag; discomfort "
+    "and form/equipment never exclude; a library not_for_you_now excludes as its own curated verdict"
 )
 GATES_SOURCE = "every locking gate reads LOCKED until #5772 evaluates gates (unknown input = locked)"
 C_REASONS: dict[str, str] = {
@@ -88,9 +92,10 @@ C_REASONS: dict[str, str] = {
     "skill_track": "a skill/athletic track slot (never a hypertrophy slot)",
     "library_gap": "the library holds no A/B movement for this slot's job",
     "weekly_floor": "an A/B movement for this slot exists but the slot serves the week's family floor (#5759)",
+    "not_for_you_now": "an A/B movement for this slot exists but the library marks it not-for-you-now (unlock recorded)",
 }
 """Why a C movement is served. `equipment`, `pain_swap`, `owner_pin` and `skill_track` are the owner's (2026-11-11);
-`gate_locked`, `not_prescribable`, `library_gap` and `weekly_floor` are platform-proposed: they name the A/B the slot could not serve."""
+`gate_locked`, `not_prescribable`, `library_gap`, `weekly_floor` and `not_for_you_now` are platform-proposed: they name the A/B the slot could not serve."""
 PROGRESSION_DROP = 0.05  # platform-proposed: a latest band best >5 % under the best band's e1RM reads as regressing
 SKILL_TRACK_VOLUME = {"sets_max": 2, "reps_max": 5, "rpe_max": 7, "provenance": "platform-proposed (#5773), low volume"}
 
@@ -192,12 +197,25 @@ def locked_gates(entry: dict[str, Any], lib: dict[str, Any]) -> list[str]:
     return [g for g in entry.get("gates") or [] if (gates.get(g) or {}).get("locks") and gates[g].get("kind") not in GLOBAL_GATE_KINDS]
 
 
+def pain_source_state(overlay: dict[str, Any] | None) -> str:
+    """`classed` (the overlay's pain tags follow #5806's pain_class), `stale_overlay` (written before it — not trusted to
+    exclude) or `absent`."""
+    if not isinstance(overlay, dict):
+        return "absent"
+    return "classed" if overlay.get("pain_source") == xl.PAIN_SOURCE_ID else "stale_overlay"
+
+
+def not_for_you_now(entry: dict[str, Any]) -> str | None:
+    """The library's curated `not_for_you_now` verdict, or None."""
+    nfy = entry.get("not_for_you_now")
+    return f"not_for_you_now ({nfy.get('reason_code')}; unlock: {nfy.get('unlock_condition')})" if nfy else None
+
+
 def pain_exclusion(entry: dict[str, Any], overlay: dict[str, Any] | None) -> str | None:
-    """Why `entry` is pain-excluded (`PAIN_SOURCE`), or None."""
-    if entry.get("not_for_you_now"):
-        return f"not_for_you_now ({entry['not_for_you_now'].get('reason_code')})"
-    if xl.n1_view(entry, overlay).get("pain_flagged"):
-        return "a coded pain flag on this template's notes"
+    """Why `entry` is pain-excluded (`PAIN_SOURCE`): a `pain`-class note on this template in a classed overlay. Never a
+    discomfort or form note; never from a stale overlay."""
+    if pain_source_state(overlay) == "classed" and xl.n1_view(entry, overlay).get("pain_flagged"):
+        return "a pain-class note on this template (training_notes_pain.pain_class)"
     return None
 
 
@@ -289,6 +307,9 @@ def _exclusion(lid: str, e: dict[str, Any], ck: str | None, ctx: dict[str, Any])
     why = pain_exclusion(e, ctx["overlay"])
     if why:
         return "pain_swap", why
+    why = not_for_you_now(e)
+    if why:
+        return "not_for_you_now", why
     why = availability(e, ctx["lib"], ctx["overlay"], ctx["inventory"])
     if why:
         return "equipment", why
@@ -601,6 +622,7 @@ def select_week(
         "library_version": library_version(lib),
         "library_status": lib.get("status"),
         "pain_source": PAIN_SOURCE,
+        "pain_source_state": pain_source_state(overlay),
         "gates_source": GATES_SOURCE,
         "position": position,
         "variety_lookback_blocks": VARIETY_LOOKBACK_BLOCKS,

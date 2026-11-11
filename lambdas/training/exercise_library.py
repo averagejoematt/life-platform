@@ -87,6 +87,7 @@ LIBRARY_GATE_KINDS = (
     "clinical_cue",  # a CUE, never a lock: breathing / no breath-hold. Clinical guidance is reference only.
 )
 UNKNOWN_INPUT = "locked"
+PAIN_SOURCE_ID = "training_notes_pain.pain_class (#5806)"  # the rule behind the overlay's `pain_flag` tag (#5773)
 
 # ── availability (owner ruling 2026-11-11) ──
 # One location id, never a name: `home_gym`. A movement logged in the last AVAILABLE_LOOKBACK_YEARS of his
@@ -602,21 +603,25 @@ def _word_hit(words: list[str], text: str, negatable: bool = False) -> bool:
 def note_signal_tags(text: str) -> list[str]:
     """Pure. One Hevy exercise note -> sorted coded tags. NEVER returns note text.
 
-    Reuses the training_notes lexicons (pain words, joint regions, sentiment) but matches WHOLE WORDS and skips a
-    negated pain word ("it wasn't pain") — the library needs precision where the notes pipeline's net is
-    deliberately over-inclusive (its substring match reads "straight" as "strain").
+    Reuses the training_notes lexicons (joint regions, sentiment), matched as WHOLE WORDS. `pain_flag` is set only when
+    #5806's `training_notes_pain.pain_class` says `pain` (`PAIN_SOURCE_ID`, stamped on the overlay): a negated pain word,
+    a discomfort note or a form/equipment note is never a pain flag.
     """
-    from training.training_notes import _JOINT_REGIONS, _PAIN_WORDS, _SENTIMENT_NEG, _SENTIMENT_POS, _strip_grip_modality
+    from training.training_notes import _JOINT_REGIONS, _SENTIMENT_NEG, _SENTIMENT_POS, _strip_grip_modality
+    from training.training_notes_pain import DISCOMFORT, PAIN, pain_class
 
     t = " ".join(_strip_grip_modality((text or "").lower().replace("’", "'")).split())
     if not t:
         return []
     tags: set[str] = set()
     regions = [r for r in _JOINT_REGIONS if re.search(r"\b" + re.escape(r) + r"s?\b", t)]
-    pain = _word_hit(_PAIN_WORDS, t, negatable=True) or (bool(regions) and _word_hit(["ache", "aching", "achy"], t, negatable=True))
+    # #5773: the pain class is #5806's deterministic rule (`training_notes_pain.pain_class`) — only `pain` is a pain flag;
+    # `discomfort` is coded as joint discomfort (an N=1 demotion, never an exclusion); `form_or_equipment` is neither.
+    cls = pain_class(text or "")
+    pain = cls == PAIN
     if pain:
         tags.add("pain_flag")
-    if regions and _DISCOMFORT_RE.search(t):
+    if (regions and _DISCOMFORT_RE.search(t)) or cls == DISCOMFORT:
         tags.add("joint_discomfort")
     if pain or "joint_discomfort" in tags:
         tags.update(f"region:{r.replace(' ', '_')}" for r in regions)
