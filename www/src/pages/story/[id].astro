@@ -7,16 +7,17 @@ import Connected from "../../components/Connected.astro";
 import Provenance from "../../components/Provenance.astro";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll } from "../../lib/snapshot.js";
-import { href, pathOf } from "../../lib/url.js";
+import { hasPage, href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
   const all = await loadAll();
-  return all.byType.chapter.map((c) => ({ params: { id: c.id }, props: { chapter: c } }));
+  // A held chapter has no page (url.js::hasPage, owner ruling 2026-11-10 item 5): no route, so no sitemap entry.
+  return all.byType.chapter.filter((c) => hasPage("chapter", c)).map((c) => ({ params: { id: c.id }, props: { chapter: c } }));
 }
 const { chapter: c } = Astro.props;
 const all = await loadAll();
 const episode = c.episode_id ? all.get("episode", c.episode_id) : null;
-const ordered = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.week ?? 0) - (b.week ?? 0)));
+const ordered = [...all.byType.chapter].filter((x) => hasPage("chapter", x)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.week ?? 0) - (b.week ?? 0)));
 const i = ordered.findIndex((x) => x.id === c.id);
 const prev = i > 0 ? ordered[i - 1] : null;
 const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;

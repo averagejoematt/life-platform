@@ -4,6 +4,7 @@
 import { getCollection } from "astro:content";
 
 import { buildIndex, COLLECTION_OF, connected } from "./edges.js";
+import { hasPage } from "./url.js";
 
 let _cache = null;
 
@@ -39,7 +40,9 @@ export async function loadAll() {
 /** The Connected rail for one object, resolved to the objects themselves. */
 export async function connectedTo(type, id, opts) {
   const all = await loadAll();
-  const { items, total, more } = connected(all.index, type, id, opts);
+  // A row is a link, so an object with no page (a held chapter, url.js::hasPage) is never a row.
+  const keep = (e) => hasPage(e.type, all.get(e.type, e.id));
+  const { items, total, more } = connected(all.index, type, id, { ...opts, keep });
   return {
     total,
     more,
