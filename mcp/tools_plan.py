@@ -126,6 +126,17 @@ def _training_phase_field() -> dict[str, Any]:
     return {**status, "value": value}
 
 
+def _training_fields(*, stage_1: bool, dry_run: bool) -> dict[str, Any]:
+    """#5576 `training_phase` + #5772 `exercise_unlocks` — a newly unlocked movement is announced ONCE: stage 1 claims
+    the record (`exercise_gates_leg.unlock_announcements_field`), stage 2 and a dry run read without claiming."""
+    from mcp.exercise_gates_leg import unlock_announcements_field
+
+    return {
+        "training_phase": _training_phase_field(),
+        "exercise_unlocks": unlock_announcements_field(claim_rows=stage_1 and not dry_run),
+    }
+
+
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     """(value, input status) — `_safe`, but the failure is KEPT (#4072).
 
@@ -924,7 +935,7 @@ def tool_plan_next_session(args):
     }
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
-    out["training_phase"] = _training_phase_field()  # #5576: the computed phase, the next one, the closest unmet gate + value
+    out.update(_training_fields(stage_1=ir is None, dry_run=bool(args.get("dry_run"))))  # #5576 training_phase + #5772 exercise_unlocks
     out["calibration_due"] = calibration_due_field(target_date)  # #5760: tape / photos / battery due, named until logged
     attach_coach_context(out, target_date, constraint_block=block, packet_reason=PACKET_NOT_REREAD)  # #5071/#5200
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding

@@ -279,6 +279,9 @@ def bundled_extra_paths(repo_root=REPO_ROOT):
     rubric = os.path.join(repo_root, "config", "panel_rubric.json")
     if os.path.isfile(rubric):
         paths.append("config/panel_rubric.json")
+    library = os.path.join(repo_root, "config", "exercise_library.json")
+    if os.path.isfile(library):
+        paths.append("config/exercise_library.json")
     redirects_map = os.path.join(repo_root, "redirects.map")
     if os.path.isfile(redirects_map):
         paths.append("redirects.map")
@@ -333,6 +336,13 @@ def stage_tree(out_dir):
         shutil.copy2(rubric, os.path.join(cfg_out, "panel_rubric.json"))
     else:
         print("⚠️  config/panel_rubric.json missing — the weekly panel grade will report no_rubric", file=sys.stderr)
+    # #5772: the exercise library (public half) ships beside the rubric — the weekly gate evaluation
+    # (mcp/exercise_gates_leg.py) reads it from the bundle only; absent, that leg reports `failed`, never a gate state.
+    library = os.path.join(REPO_ROOT, "config", "exercise_library.json")
+    if os.path.isfile(library):
+        shutil.copy2(library, os.path.join(cfg_out, "exercise_library.json"))
+    else:
+        print("⚠️  config/exercise_library.json missing — the weekly exercise-gate evaluation will report failed", file=sys.stderr)
     # #1430: redirects.map for qa_smoke_lambda's weekly legacy-redirect spot-check
     # (lambdas/redirect_spotcheck.py searches alongside its own module first, same
     # pattern as food_vocabulary.json above).

@@ -88,3 +88,28 @@ python3 deploy/write_exercise_library_overlay.py --out /tmp/overlay.json   # dry
    `python3 scripts/approve_exercise_library.py --by "owner ruling YYYY-MM-DD"`, then commit via a PR.
 
 Never flip `status` by hand.
+
+## Gate evaluation (#5772)
+
+`lambdas/training/exercise_gates.py::evaluate_gates(library, overlay, measured)` is the one evaluator — pure, no reads,
+no clock — and the selection engine (#5773) calls the same function. It returns, per gate id,
+`{kind, state, input, reason, value_seen, unlock_condition}` (plus `by_movement` for the LOCKED carriers of a
+per-movement kind); `movement_states` folds that into a per-movement `{state, locked_by, reasons, unlock_conditions,
+cues}` — every "not for you now" carries its reason and its unlock condition.
+
+- **States are `unlocked` and `locked` only.** An unknown input is `locked` with `input: "unknown"` and a reason
+  naming what was not measured; there is no third state a consumer could mistake for a pass.
+- **A null owner value** (the six owner-unset bodyweight thresholds) is `locked`, `input: "not_set"`, reason
+  `threshold not set by owner`. An unread overlay is `unknown`, not `not_set`.
+- **Measured inputs only:** the 7-day mean bodyweight (Withings, the phase evaluator's reading), the Hevy record over
+  the last 12 weeks for chain and performance standards (an unlogged RPE or an unrecorded assistance/tempo is not
+  evidence), the coded pain classes (`note_signal_tags`) over 28 days, the run gate as the May tracker reads it, and
+  the charter's own numbers (power-clean revisit weight, lower-leg-prep carve-out) — read, never copied.
+- **Chain order:** a chain gate opens only when each prerequisite met its standard AND that prerequisite's own chain
+  gates are open.
+- **A clinical cue never locks** and is never an intensity gate; it rides the movement's `cues`.
+
+It runs weekly as a fail-soft leg on the Monday panel-grade run (`mcp/exercise_gates_leg.py`), writing
+`EXGATE#EVAL#<monday>` (docs/SCHEMA.md). A movement whose own gates open between two evaluations gets one
+`EXGATE#ANNOUNCE#…` claim-once row — only while the library is `approved` — and `plan_next_session` stage 1 says it
+once (`exercise_unlocks`). Logs carry gate ids, states and counts, never a bodyweight or a threshold.

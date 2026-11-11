@@ -222,6 +222,15 @@ _READS_LIBRARY = re.compile(
 )
 
 
+# #5772: the weekly gate evaluator reads the library to RECORD gate states (owner-only rows). It is not the drafting path:
+# an unlock reaches `plan_next_session` only through a claim-once row the leg creates while the library is `approved`
+# (`mcp/exercise_gates_leg.py::evaluate_week`), and that read side never opens the library.
+GATE_EVALUATOR_READERS = {
+    os.path.join("lambdas", "training", "exercise_gates.py"),
+    os.path.join("mcp", "exercise_gates_leg.py"),
+}
+
+
 def test_nothing_in_the_drafting_path_imports_the_library():
     me = os.path.join(ROOT, "lambdas", "training", "exercise_library.py")
     offenders = []
@@ -233,7 +242,7 @@ def test_nothing_in_the_drafting_path_imports_the_library():
                     continue
                 with open(path, encoding="utf-8", errors="ignore") as f:
                     text = f.read()
-                if _READS_LIBRARY.search(text):
+                if _READS_LIBRARY.search(text) and os.path.relpath(path, ROOT) not in GATE_EVALUATOR_READERS:
                     offenders.append(os.path.relpath(path, ROOT))
     assert offenders == [], f"the proposed library is read before owner approval by: {offenders}"
 
