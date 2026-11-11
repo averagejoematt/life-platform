@@ -189,6 +189,9 @@ _CONFIG_WITHOUT_REPO_FILE: dict[str, str] = {
     "health, eating, relapse, clinical and genetic fields). Owner-provisioned out of band; the tracked file holds only "
     "the public-safe part and `common.user_goals` merges the two. Deliberately NOT a repo twin, so the config twin sync "
     "can never write or delete it; absent, coach context degrades to the public plan.",
+    "config/private/genome_lab_xref.json": "Owner ruling 2026-11-11 (second message, item 5): the biomarker -> gene "
+    "cross-reference for the owner's labs is personal genetic information. Owner-provisioned out of band; "
+    "`mcp.labs_helpers` reads it and fails soft to no genome context. Deliberately NOT a repo twin.",
 }
 
 #: The derived content-filter/privacy-guard consumer set → its watch surface.

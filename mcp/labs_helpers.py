@@ -149,10 +149,21 @@ _DEFAULT_XREF_PATH = os.path.join("~", ".config", "life-platform", "genome_lab_x
 _GENOME_LAB_XREF_CACHE = None
 
 
+# One analyte, two stored spellings (health.lab_units.MARKER_ALIASES; mcp carries no health import). The loader
+# mirrors a gene list across both spellings so a draw keyed either way is annotated.
+_XREF_SPELLINGS = {"crp_hs": "hs_crp"}
+
+
 def _valid_xref(doc):
     if not isinstance(doc, dict):
         return {}
-    return {str(k): [str(g) for g in v] for k, v in doc.items() if isinstance(v, list)}
+    out = {str(k): [str(g) for g in v] for k, v in doc.items() if isinstance(v, list)}
+    for alias, canon in _XREF_SPELLINGS.items():
+        if alias in out and canon not in out:
+            out[canon] = list(out[alias])
+        elif canon in out and alias not in out:
+            out[alias] = list(out[canon])
+    return out
 
 
 def _load_genome_lab_xref():
