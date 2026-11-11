@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.request
 from typing import Any, Callable
 
 ROOM_ENV = "WEB_ROOM"
@@ -159,8 +160,17 @@ def guard_seal(seal: Any, get_bytes: Callable[[str], bytes] | None, log: Callabl
     return out
 
 
+def fetch_bytes(url: str, timeout: float = 30.0) -> bytes:
+    """The raw bytes of one public URL (the seal's hash needs the bytes, not a parse). guard_seal passes only SEAL_ORIGIN."""
+    req = urllib.request.Request(url, headers={"User-Agent": "life-platform publish_snapshot"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — the site's own origin only
+        return resp.read()
+
+
 def live_calibration(
-    get: Callable[[str], Any], log: Callable[[str], None] = print, get_bytes: Callable[[str], bytes] | None = None
+    get: Callable[[str], Any],
+    log: Callable[[str], None] = print,
+    get_bytes: Callable[[str], bytes] = fetch_bytes,
 ) -> dict:
     """Fetch the two public routes; a failure leaves the room's data file absent (the page then says so). The sealed
     pre-registration is re-checked against the served file (``guard_seal``)."""

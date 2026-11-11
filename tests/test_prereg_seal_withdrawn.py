@@ -188,7 +188,7 @@ def test_live_calibration_applies_the_guard():
         producer.CALIBRATION_PATH: {"coaches": [], "prereg_seal": dict(SERVED_SEAL)},
         producer.PREDICTIONS_PATH: {"overall": {"decided": 0, "confirmed": 0}},
     }
-    out = producer.live_calibration(payloads.__getitem__, lambda m: None, lambda u: PLACEHOLDER)
+    out = producer.live_calibration(payloads.__getitem__, lambda m: None, get_bytes=lambda u: PLACEHOLDER)
     seal = out["calibration"]["prereg_seal"]
     assert seal["verifiable"] is False and "verify" not in seal
 
