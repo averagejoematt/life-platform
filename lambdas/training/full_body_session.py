@@ -267,7 +267,11 @@ def _prescription(
     movements = catalog.get("movements") or {}
     in_block = in_block_variant.performed_in_block(block_workouts, movements, inputs.target_date)
     rotation = variant_rotation.for_session(
-        {**day_entry, "date": inputs.target_date}, movements, rows=inputs.rotation_rows, skill_ceiling=skill_ceiling
+        {**day_entry, "date": inputs.target_date},
+        movements,
+        rows=inputs.rotation_rows,
+        skill_ceiling=skill_ceiling,
+        block_workouts=block_workouts,  # #5774: the kettlebell slot's entry exposures are counted from the record
     )
     rx = program_structure.session_prescription_for_role(
         day_entry["session_role"],

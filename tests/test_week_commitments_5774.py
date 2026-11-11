@@ -2,7 +2,8 @@
 
 carries + kettlebell (dan_john), single-leg + corrective (athlean_x), stretch-position + rotation (nippard), the side/rear-delt
 band (rp_israetel). A draft whose program week misses a blocking commitment fails stage 1 with the ledger line named and is
-refused at commit. Kettlebell warns until the earlier of exercise-library approval or 2026-12-20 (owner ruling 2026-11-11);
+refused at commit. The week is what is SERVED: departures (draft_custom, the tired-day floor) count toward and
+against it. The pools serve a kettlebell slot (the KB swing, entered via two KB-deadlift exposures). Kettlebell warns until the earlier of exercise-library approval or 2026-12-20 (owner ruling 2026-11-11);
 stretch-position is report-only (no retirement named). Every test has a must-fail control beside it: the mutation that
 removes the commitment from the week, and the verdict that names it.
 
@@ -25,7 +26,14 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-from training import panel_rubric, training_charter as tc, variant_rotation as vr, week_commitments as wc, week_floors as wf  # noqa: E402
+from training import (
+    kb_entry as kb,
+    panel_rubric,
+    training_charter as tc,
+    variant_rotation as vr,
+    week_commitments as wc,
+    week_floors as wf,
+)  # noqa: E402
 from training.block_model import block_weeks  # noqa: E402
 from training.training_charter import charter_value  # noqa: E402
 
@@ -61,10 +69,32 @@ def _verdicts(out: dict) -> dict:
     return {r["id"]: r["verdict"] for r in out["rows"]}
 
 
-def _with_kettlebell(rot: dict, date: str) -> dict:
-    rot = copy.deepcopy(rot)
-    rot["kettlebell_weekly"] = wf.kettlebell_weekly([{"key": "kettlebell_swing", "slot_id": "fixture"}], CATALOG, on=date, status=None)
-    return rot
+def _ir(role, keys, *, rid="r", date="2026-11-12", action="draft_custom", status="active", variant="ideal", week=7, block=2, rot=None):
+    """A routine IR: `keys` its exercises (3 working sets each); a floor draft carries no calendar (only session_role)."""
+    from training.routine_ir import ExerciseBlock, RoutineSpec, Set
+
+    snap = {"session_role": role} if variant == "floor" else {"calendar": {"block": block, "week": week, "session_role": role}}
+    if rot is not None:
+        snap["rotation"] = rot
+    return RoutineSpec(
+        routine_id=rid,
+        target_date=date,
+        archetype="lower",
+        variant=variant,
+        source_action=action,
+        status=status,
+        created_at=f"{date}T00:00:00Z",
+        exercises=[ExerciseBlock(movement_key=k, sets=[Set(reps=8), Set(reps=8), Set(reps=8)]) for k in keys],
+        inputs_snapshot=snap,
+    )
+
+
+def _days(*irs) -> dict:
+    return {r.inputs_snapshot["calendar"]["session_role"]: {"keys": wc.routine_day(r, CATALOG), "source": r.routine_id} for r in irs}
+
+
+# a lower_volume departure: the RDL and squat, no kettlebell slot
+NO_KB_LOWER_VOLUME = ["romanian_deadlift_barbell", "squat_barbell", "calf_raise_machine", "machine_crunch"]
 
 
 # ── the commitments are the ledger's own, and each blocking one names what it merges ─────────────────────────────────
@@ -91,80 +121,161 @@ def test_every_blocking_commitment_names_the_check_it_merges_and_report_only_say
     assert [c["id"] for c in wc.COMMITMENTS if not c["enforce"]] == ["stretch_position"]
 
 
-# ── the current pools fill every blocking commitment (they block NOW) ───────────────────────────────────────────────
-def test_every_program_week_on_the_current_pools_passes_until_the_kettlebell_date():
+# ── the current pools fill every commitment, kettlebell included (owner ruling 2026-11-11, item 1) ──────────────────
+def test_every_program_week_on_the_current_pools_passes_on_and_after_the_kettlebell_date():
     fails = []
     for week in range(1, 19):
-        out = wc.evaluate(_week(week), CATALOG, on=BEFORE, library=None)
-        if out["verdict"] != "pass":
-            fails.append((week, out["blocking"]))
-        v = _verdicts(out)
-        assert v["kettlebell"] == "warn" and v["stretch_position"] == "not_evaluated", (week, v)
-        # block 1's first phase serves the committed template: the recorded gate makes single-leg a WARNING, never a pass
-        assert v["single_leg"] == ("warn" if week <= 3 else "met"), (week, v)
-        assert all(v[k] == "met" for k in ("carries", "corrective", "rotation", "side_rear_delt_band")), (week, v)
+        for day in (BEFORE, ON):
+            out = wc.evaluate(_week(week), CATALOG, on=day, library=None)
+            if out["verdict"] != "pass":
+                fails.append((week, day, out["blocking"]))
+            v = _verdicts(out)
+            assert v["kettlebell"] == "met" and v["stretch_position"] == "not_evaluated", (week, v)
+            # block 1's first phase serves the committed template: the recorded gate makes single-leg a WARNING
+            assert v["single_leg"] == ("warn" if week <= 3 else "met"), (week, v)
+            assert all(v[k] == "met" for k in ("carries", "corrective", "rotation", "side_rear_delt_band")), (week, v)
     assert not fails, fails
 
 
-# ── kettlebell: a fixture week with none fails, the same week with one passes; the date / approval switch ──────────────
+# ── the kettlebell slot: KB deadlift x2, then the swing; set-neutral; measured exposures ─────────────────────────────
+def _row(day, keys, template_id=kb.ENTRY_TEMPLATE_ID, tombstone=False):
+    return {
+        "date": day,
+        "tombstone": tombstone,
+        "exercises": [{"template_id": template_id, "name": kb.ENTRY_TITLE, "sets": [{"reps": 8, "weight_kg": 16}]}] if keys else [],
+    }
+
+
+def test_the_kettlebell_slot_serves_the_deadlift_for_two_logged_exposures_then_the_swing():
+    entry = {"week": 7, "block": 2, "session_role": "lower_volume", "date": "2026-11-20"}
+    rows = [_row("2025-04-13", True), _row("2026-11-10", True)]  # rows before the ruling never count
+    assert kb.exposures(rows, "2026-11-20") == 0 and kb.exposures(None, "2026-11-20") is None
+    assert vr.for_session(entry, CATALOG, read=False, block_workouts=rows)["variants"]["kettlebell_swing"] == kb.ENTRY
+    one = rows + [_row("2026-11-12", True), _row("2026-11-13", True, tombstone=True), _row("2026-11-14", True, template_id="X")]
+    assert kb.exposures(one, "2026-11-20") == 1
+    two = one + [_row("2026-11-17", True), _row("2026-11-17", True)]  # one day counts once
+    assert kb.exposures(two, "2026-11-20") == 2 and kb.exposures(two, "2026-11-17") == 1  # before the day only
+    assert vr.for_session(entry, CATALOG, read=False, block_workouts=two)["variants"]["kettlebell_swing"] == kb.TARGET
+    assert vr.for_session(entry, CATALOG, read=False, block_workouts=None)["variants"]["kettlebell_swing"] == kb.ENTRY  # never assumed
+    # the planned session carries its own measured count (program_structure.planned_session stamps `kb_entry_exposures`)
+    assert vr.for_session({**entry, "kb_entry_exposures": 2}, CATALOG, read=False)["variants"]["kettlebell_swing"] == kb.TARGET
+
+
+def test_control_counting_rows_before_the_ruling_would_skip_the_entry():
+    rows = [_row("2025-04-13", True), _row("2025-03-01", True)]
+    with patch.object(kb, "COUNT_FROM", "2000-01-01"):
+        assert kb.served(kb.exposures(rows, "2026-11-20")) == kb.TARGET  # the bug the date guard prevents
+    assert kb.served(kb.exposures(rows, "2026-11-20")) == kb.ENTRY
+
+
+def test_the_slot_is_set_neutral_capped_and_logs_under_a_real_template():
+    from training import program_structure as ps
+
+    cov = ps.volume_floor_coverage(CATALOG)
+    assert (
+        sum(len(e["sets"]) for r in ps.SPLIT_ROLES for e in ps.session_prescription_for_role(r, catalog_movements=CATALOG)["exposures"])
+        == 75
+    )
+    assert cov["floors"]["core"]["sets"] == cov["floors"]["core"]["mev"] and all(f["meets_mev"] for f in cov["floors"].values())
+    for n in (0, 2):
+        p = vr.plan(
+            {"week": 7, "block": 2, "session_role": "lower_volume", "date": "2026-11-12"}, CATALOG, rows=[], missing=[], kb_exposures=n
+        )
+        assert p["volume_check"]["unchanged"], p["volume_check"]
+        rx = ps.session_prescription_for_role("lower_volume", catalog_movements=CATALOG, accessory_variants=p["variants"])
+        kb_row = next(e for e in rx["exposures"] if e.get("slot") == "kettlebell_swing")
+        assert kb_row["movement_key"] == kb.served(n) and all(st["reps"][1] <= 8 for st in kb_row["sets"]), kb_row  # OD1 reps <= 8
+        assert not rx["time_trim"] or "kettlebell" not in str(rx["time_trim"])
+    entry = CATALOG[kb.ENTRY]
+    assert (entry["hevy_template_id_hint"], entry["title"]) == (kb.ENTRY_TEMPLATE_ID, kb.ENTRY_TITLE) and entry["anchor_family"] is None
+    assert wf.is_kettlebell(kb.ENTRY, CATALOG) and wf.is_kettlebell(kb.TARGET, CATALOG)
+
+
+# ── kettlebell: a week with none fails on the date, the same week with one passes; the date / approval switch ─────────
 def test_a_week_with_no_kettlebell_fails_on_the_date_and_the_same_week_with_one_passes():
     rot = _week(13, date=ON)
-    out = wc.evaluate(rot, CATALOG, on=ON, library=None)
-    assert out["verdict"] == "fail" and out["blocking"] == ["kettlebell"], out["blocking"]
-    assert any("dan_john: 'carries and kettlebell work weekly'" in x for x in out["lines"]), out["lines"]
-    passed = wc.evaluate(_with_kettlebell(rot, ON), CATALOG, on=ON, library=None)
-    assert passed["verdict"] == "pass" and _verdicts(passed)["kettlebell"] == "met", passed["lines"]
+    no_kb = wc.evaluate(rot, CATALOG, on=ON, library=None, days=_days(_ir("lower_volume", NO_KB_LOWER_VOLUME)))
+    assert no_kb["verdict"] == "fail" and no_kb["blocking"] == ["kettlebell"], no_kb["blocking"]
+    assert any("dan_john: 'carries and kettlebell work weekly'" in x for x in no_kb["lines"]), no_kb["lines"]
+    with_kb = wc.evaluate(rot, CATALOG, on=ON, library=None, days=_days(_ir("lower_volume", NO_KB_LOWER_VOLUME + ["kettlebell_swing"])))
+    assert with_kb["verdict"] == "pass" and _verdicts(with_kb)["kettlebell"] == "met", with_kb["lines"]
 
 
 def test_the_kettlebell_switch_warns_the_day_before_blocks_on_the_date_and_on_approval():
-    rot = _week(7)
-    assert _verdicts(wc.evaluate(rot, CATALOG, on=BEFORE, library=None))["kettlebell"] == "warn"
-    assert _verdicts(wc.evaluate(rot, CATALOG, on=ON, library=None))["kettlebell"] == "block"
-    assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved"}))["kettlebell"] == "block"
-    assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "proposed"}))["kettlebell"] == "warn"
-
-
-def test_the_kettlebell_verdict_is_re_dated_on_the_drafts_day_not_the_stamp():
-    """A draft stamped `warn` when it was drafted still FAILS when its own day is on/after the date."""
-    rot = _week(7, date=BEFORE)
-    assert rot["kettlebell_weekly"]["verdict"] == "warn"
-    assert wc.evaluate(rot, CATALOG, on=ON, library=None)["blocking"] == ["kettlebell"]
+    rot, days = _week(7), _days(_ir("lower_volume", NO_KB_LOWER_VOLUME))
+    assert _verdicts(wc.evaluate(rot, CATALOG, on=BEFORE, library=None, days=days))["kettlebell"] == "warn"
+    assert _verdicts(wc.evaluate(rot, CATALOG, on=ON, library=None, days=days))["kettlebell"] == "block"
+    assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved"}, days=days))["kettlebell"] == "block"
+    assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "proposed"}, days=days))["kettlebell"] == "warn"
 
 
 def test_control_a_moved_date_or_an_ignored_approval_breaks_the_switch():
-    rot = _week(7)
+    rot, days = _week(7), _days(_ir("lower_volume", NO_KB_LOWER_VOLUME))
     with patch.object(wf, "KETTLEBELL_BLOCK_FROM", "2026-12-21"):
-        assert _verdicts(wc.evaluate(rot, CATALOG, on=ON, library=None))["kettlebell"] == "warn"
+        assert _verdicts(wc.evaluate(rot, CATALOG, on=ON, library=None, days=days))["kettlebell"] == "warn"
     with patch.object(wf, "LIBRARY_APPROVED", "never"):
-        assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved"}))["kettlebell"] == "warn"
+        assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved"}, days=days))["kettlebell"] == "warn"
 
 
-# ── must-fail controls: remove each blocking commitment from the week, and stage 1 names it ────────────────────────────
-def _floor_missing(rot: dict, family: str, gate: str) -> dict:
-    rot = copy.deepcopy(rot)
-    for f in rot["family_floors"]:
-        if f["family"] == family:
-            f.update(met=False, served=[], gate=gate)
-    return rot
+# ── departures count toward AND against (owner ruling 2026-11-11, item 2) ─────────────────────────────────────────────
+SA_NO_CARRY = ["db_shoulder_press", "db_lateral_raise", "face_pull", "db_curl", "cable_tricep_pushdown"]
+LH_NO_SINGLE_LEG = ["squat_barbell", "deadlift_barbell", "leg_press", "leg_curl", "calf_raise_machine"]
 
 
-@pytest.mark.parametrize("cid,family", [("carries", "carries"), ("single_leg", "single_leg_progression")])
-def test_a_week_missing_a_floored_family_fails_and_a_recorded_gate_only_warns(cid, family):
+def test_a_custom_day_that_displaces_the_only_carry_fails_and_one_that_carries_it_satisfies():
     rot = _week(7)
-    out = wc.evaluate(_floor_missing(rot, family, f"nothing in the week hosts a {family} member"), CATALOG, on=BEFORE, library=None)
-    assert out["verdict"] == "fail" and out["blocking"] == [cid], out["blocking"]
-    ledger = charter_value("concession_ledger")
-    assert any(ledger["athlean_x"]["in_return"] in x for x in out["lines"]), out["lines"]
-    gated = wc.evaluate(
-        _floor_missing(rot, family, "farmers_walk: on the charter's equipment.not_available list"), CATALOG, on=BEFORE, library=None
-    )
-    assert gated["verdict"] == "pass" and _verdicts(gated)[cid] == "warn", gated["lines"]
+    displaced = wc.evaluate(rot, CATALOG, on=BEFORE, library=None, days=_days(_ir("shoulders_arms", SA_NO_CARRY)))
+    assert displaced["blocking"] == ["carries"], displaced["lines"]
+    assert any("athlean_x" in x and "dan_john" in x for x in displaced["lines"]), displaced["lines"]
+    moved = _days(_ir("shoulders_arms", SA_NO_CARRY), _ir("lower_volume", NO_KB_LOWER_VOLUME + ["kettlebell_swing", "farmers_walk"]))
+    assert wc.evaluate(rot, CATALOG, on=BEFORE, library=None, days=moved)["verdict"] == "pass"
 
 
+def test_a_custom_day_removing_the_only_single_leg_fails_the_week():
+    out = wc.evaluate(_week(7), CATALOG, on=BEFORE, library=None, days=_days(_ir("lower_heavy", LH_NO_SINGLE_LEG)))
+    assert out["blocking"] == ["single_leg"] and any("single_leg_progression" in x for x in out["lines"]), out["lines"]
+    kept = _days(_ir("lower_heavy", LH_NO_SINGLE_LEG + ["reverse_lunge_dumbbell"]))
+    assert wc.evaluate(_week(7), CATALOG, on=BEFORE, library=None, days=kept)["verdict"] == "pass"
+
+
+def test_a_custom_day_resolved_by_template_id_counts_as_its_catalog_movement():
+    ir = _ir("shoulders_arms", SA_NO_CARRY + ["tmpl:" + CATALOG["farmers_walk"]["hevy_template_id_hint"]])
+    assert ("farmers_walk", 3) in wc.routine_day(ir, CATALOG)
+    assert wc.evaluate(_week(7), CATALOG, on=BEFORE, library=None, days=_days(ir))["verdict"] == "pass"
+
+
+def test_week_days_reads_the_drafts_in_hand_and_the_routines_committed_this_program_week():
+    hand = _ir("lower_volume", NO_KB_LOWER_VOLUME, rid="hand", action="cron_generated", status="draft", date="2026-11-14")
+    routines = [
+        _ir("shoulders_arms", SA_NO_CARRY, rid="sa-old", date="2026-11-08"),
+        _ir("shoulders_arms", SA_NO_CARRY + ["farmers_walk"], rid="sa-new", date="2026-11-09"),  # newest commit wins
+        _ir("lower_heavy", LH_NO_SINGLE_LEG, rid="lh-draft", status="draft"),  # a draft not committed is not served
+        _ir("upper_heavy", ["barbell_bench_press"], rid="uh-archived", status="archived"),
+        _ir("upper_volume", ["machine_row"], rid="uv-week6", week=6),  # another program week
+        _ir("lower_volume", NO_KB_LOWER_VOLUME, rid="lv-committed", date="2026-11-10"),  # the draft in hand wins its role
+        _ir("lower_heavy", ["machine_hip_thrust", "leg_press"], rid="floor-11", variant="floor", action="floor", date="2026-11-11"),
+        _ir("upper_heavy", ["bench"], rid="anchor-11", action="cron_generated", status="draft", date="2026-11-11"),
+    ]
+    days = wc.week_days(hand, routines, CATALOG, (2, 7))
+    assert {r: d["source"].split()[1] for r, d in days.items()} == {
+        "shoulders_arms": "sa-new",
+        "lower_volume": "hand",
+        "lower_heavy": "floor-11",
+    }
+    # the floor draft (no calendar) joined week 7 by its day's other routine; it now serves lower_heavy, so single-leg fails
+    out = wc.evaluate(_week(7), CATALOG, on=BEFORE, library=None, days=days)
+    assert "single_leg" in out["blocking"] and "kettlebell" not in out["blocking"], out["lines"]
+
+
+# ── must-fail controls on the remaining blocking rows ─────────────────────────────────────────────────────────────────
 def test_a_week_with_no_corrective_movement_fails():
-    with patch.object(wc, "week_keys", lambda rot, catalog: ["squat_barbell", "db_lateral_raise", "farmers_walk"]):
-        out = wc.evaluate(_week(7), CATALOG, on=BEFORE, library=None)
-    assert out["blocking"] == ["corrective"] and any("athlean_x" in x for x in out["lines"]), out["lines"]
+    days = _days(
+        _ir("upper_heavy", ["barbell_bench_press", "machine_row", "lat_pulldown", "db_lateral_raise", "db_curl"]),
+        _ir("shoulders_arms", ["db_shoulder_press", "db_lateral_raise", "db_curl", "farmers_walk"]),
+        _ir("upper_volume", ["incline_db_press", "machine_row", "lat_pulldown", "cable_chest_fly"]),
+    )
+    out = wc.evaluate(_week(7), CATALOG, on=BEFORE, library=None, days=days)
+    assert "corrective" in out["blocking"] and any("athlean_x" in x for x in out["lines"]), out["lines"]
 
 
 def test_a_week_holding_an_accessory_at_a_phase_boundary_fails_rotation():
@@ -182,54 +293,80 @@ def test_a_week_below_the_side_rear_delt_band_fails():
     assert "side_rear_delt_band" in out["blocking"] and any("rp_israetel" in x for x in out["lines"]), out["lines"]
 
 
+@pytest.mark.parametrize("family,cid", [("carries", "carries"), ("single_leg_progression", "single_leg")])
+def test_a_recorded_gate_on_a_family_only_warns(family, cid):
+    rot = copy.deepcopy(_week(7))
+    for f in rot["family_floors"]:
+        if f["family"] == family:
+            f.update(met=False, gate="x: on the charter's equipment.not_available list")
+    role, keys = ("shoulders_arms", SA_NO_CARRY) if cid == "carries" else ("lower_heavy", LH_NO_SINGLE_LEG)
+    out = wc.evaluate(rot, CATALOG, on=BEFORE, library=None, days=_days(_ir(role, keys)))
+    assert _verdicts(out)[cid] == "warn" and out["verdict"] == "pass", out["lines"]
+
+
 # ── stretch-position: measured from the library, report-only ────────────────────────────────────────────────────────
 def test_stretch_position_reads_the_library_and_never_blocks():
     rot = _week(7)
     lengthened = {"status": "approved", "movements": {"bulgarian_split_squat_dumbbell": {"title": "BSS", "length_bias": "lengthened"}}}
     none = {"status": "approved", "movements": {"bulgarian_split_squat_dumbbell": {"title": "BSS", "length_bias": "mid"}}}
     assert _verdicts(wc.evaluate(rot, CATALOG, on=BEFORE, library=lengthened))["stretch_position"] == "met"
-    missed = wc.evaluate(_with_kettlebell(rot, BEFORE), CATALOG, on=BEFORE, library=none)
+    missed = wc.evaluate(rot, CATALOG, on=BEFORE, library=none)
     assert _verdicts(missed)["stretch_position"] == "warn" and missed["verdict"] == "pass", missed["lines"]
 
 
-# ── no record, the stage-1 surface, the commit refusal ─────────────────────────────────────────────────────────────
-def test_no_rotation_record_is_not_evaluated_never_a_pass():
+# ── no week, the stage-1 surface, the commit refusal ──────────────────────────────────────────────────────────────
+def test_no_week_to_read_is_not_evaluated_never_a_pass():
     out = wc.evaluate(None, CATALOG, on=ON, library=None)
     assert out["verdict"] == "not_evaluated" and not out["blocking"] and len(out["warnings"]) == len(wc.COMMITMENTS)
-
-
-class _IR:
-    def __init__(self, rot, day):
-        self.inputs_snapshot, self.target_date, self.routine_id = {"rotation": rot}, day, "fixture"
 
 
 def _err(msg, error_code="INTERNAL", suggestions=None, detail=None):
     return {"error": msg, "error_code": error_code, "suggestions": suggestions, "detail": detail}
 
 
-def test_commit_refuses_a_draft_whose_week_fails_stage_1_and_passes_the_day_before():
+def test_commit_refuses_any_draft_whose_week_fails_and_reads_the_committed_departures():
     rot = _week(13, date=BEFORE)
-    with patch.object(wc, "_catalog", lambda: CATALOG):
-        refused = wc.commit_refusal(_IR(rot, ON), _err)
+    no_kb_committed = [_ir("lower_volume", NO_KB_LOWER_VOLUME, rid="lv", date="2026-12-18", week=13, block=3)]
+    hand = _ir(
+        "upper_heavy",
+        ["barbell_bench_press", "machine_row", "db_lateral_raise", "reverse_pec_deck"],
+        rid="hand",
+        action="cron_generated",
+        status="draft",
+        date=ON,
+        week=13,
+        block=3,
+        rot=rot,
+    )
+    with patch.object(wc, "_catalog", lambda: CATALOG), patch.object(wf, "library", lambda path=None: None):
+        refused = wc.commit_refusal(hand, _err, lister=lambda a, b: no_kb_committed)
         assert refused and refused["error_code"] == wc.ERROR_CODE and "kettlebell" in refused["error"], refused
-        assert wc.commit_refusal(_IR(rot, BEFORE), _err) is None
-        assert wc.commit_refusal(_IR(_with_kettlebell(rot, ON), ON), _err) is None
-        assert wc.commit_refusal(_IR(None, ON), _err) is None  # draft_custom / floor: no week record to read
-    with patch.object(wc, "_catalog", side_effect=OSError("catalog unreadable")):
-        assert wc.commit_refusal(_IR(rot, BEFORE), _err)["error_code"] == wc.ERROR_CODE  # fails closed, named
+        assert wc.commit_refusal(hand, _err, lister=lambda a, b: []) is None  # the engine's lower_volume serves the KB slot
+        # a draft_custom with no rotation record is planned from its calendar, and refused the same way
+        custom = _ir("shoulders_arms", SA_NO_CARRY, rid="custom", status="draft", date=ON, week=13, block=3)
+        assert "carries" in wc.commit_refusal(custom, _err, lister=lambda a, b: [])["error"]
+        # an unreadable routine read is named and the week is this draft + the plan; a broken check fails CLOSED
+        ok = wc.commit_refusal(hand, _err, lister=lambda a, b: (_ for _ in ()).throw(OSError("ddb down")))
+        assert ok is None
+        with patch.object(wc, "_catalog", side_effect=OSError("catalog unreadable")):
+            assert wc.commit_refusal(hand, _err, lister=lambda a, b: [])["error_code"] == wc.ERROR_CODE
+        # a floor draft with no calendar and no same-day routine: no week to plan — not evaluated, never refused
+        floor = _ir("lower_volume", ["machine_hip_thrust"], rid="floor", variant="floor", action="floor", status="draft", date=ON)
+        assert wc.commit_refusal(floor, _err, lister=lambda a, b: []) is None
 
 
 def test_stage_1_attaches_the_verdict_and_names_a_failure_on_honesty():
+    displaced = [_ir("shoulders_arms", SA_NO_CARRY, rid="sa", date="2026-11-08")]
     block = {"session": {"rotation": _week(7)}, "honesty": []}
-    wc.attach(block, None, ON, CATALOG)
-    assert block["week_commitments"]["verdict"] == "fail" and "planned session" in block["week_commitments"]["evaluated_from"]
-    assert any(h.startswith("STAGE 1 FAILS") and "kettlebell" in h for h in block["honesty"]), block["honesty"]
-    draft = {"session": {"rotation": None}, "honesty": []}
-    wc.attach(draft, _IR(_with_kettlebell(_week(7), ON), ON), ON, CATALOG)
-    assert draft["week_commitments"]["verdict"] == "pass" and draft["honesty"] == []
+    wc.attach(block, None, BEFORE, CATALOG, lister=lambda a, b: displaced)
+    assert block["week_commitments"]["verdict"] == "fail" and block["week_commitments"]["blocking"] == ["carries"]
+    assert any(h.startswith("STAGE 1 FAILS") and "carries" in h for h in block["honesty"]), block["honesty"]
+    clean = {"session": {"rotation": _week(7)}, "honesty": []}
+    wc.attach(clean, None, BEFORE, CATALOG, lister=lambda a, b: (_ for _ in ()).throw(OSError("ddb down")))
+    assert clean["week_commitments"]["verdict"] == "pass" and "OSError" in clean["week_commitments"]["routines_read_error"]
     with patch.object(wc, "evaluate", side_effect=KeyError("x")):
         broken = {"session": {}}
-        wc.attach(broken, None, ON, CATALOG)  # stage 1 still answers; the failure is named, never a pass
+        wc.attach(broken, None, ON, CATALOG, lister=lambda a, b: [])  # stage 1 still answers; the failure is named
     assert broken["week_commitments"]["verdict"] == "read_failed" and "KeyError" in broken["week_commitments"]["error"]
 
 
