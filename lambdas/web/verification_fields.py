@@ -36,6 +36,12 @@ from experiment.phase_filter import singleton_visible
 
 SUMMARY_KEYS = verification_record.OUTCOMES + ("none",)
 
+#: The PREDICTION# fields this module reads off a row, which the call routes' projected read must carry
+#: (``web.site_api_coach_ledger._PREDICTION_PROJECTION_FIELDS``): the verification record's pointer (served as
+#: ``verification``), the first grade a correction preserved (``first_status``, the archive) and the repeat-family
+#: marker whose role names the member that stands in a count (``headline``; read for the fold, never served).
+ROW_FIELDS = (verification_record.POINTER_ATTR, "original_grade", repeat_family.ATTR)
+
 
 def item_fields(row: dict) -> dict:
     ver = (row or {}).get("evaluator_version")
