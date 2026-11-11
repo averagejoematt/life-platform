@@ -68,6 +68,10 @@ import the counting / estimating primitives themselves):
                            the owner ASKED for in a Hevy note (form guidance, a question, a rule): every open request
                            with its verbatim note, the overdue count (open > 7 days after the note — a count, not an
                            alarm) and the replies written in the last 14 days. OWNER-ONLY; the reply channel itself.
+  training_phase           `mcp.phase_evaluator_leg.phase_brief_field` -> `training.phase_evaluator.phase_brief` (#5576) over
+                           the weekly evaluator's PHASE#STATE row + newest PHASE#EVAL row (#5575): the current phase and
+                           since when, the next phase, and the closest unmet gate (the evaluator's `blocking_gate`) with its
+                           measured value. `absent` until the first Monday run seeds the state. OWNER-ONLY.
 
 WEEKDAYS (#5274)
 
@@ -90,7 +94,7 @@ from typing import Any
 from common.pacific_time import pacific_today, pacific_weekday, shift_day_key
 from training.routine_title import ROUTINE_INDEX_LOOKBACK_DAYS as _ROUTINE_INDEX_LOOKBACK_DAYS
 
-PACKET_VERSION = "coach-session-packet@1.12.0"  # 1.12.0 #5573: note_requests (the owner's Hevy-note requests + their replies); 1.11.0 #5501: lift_history (the pre-flight exercise history + notes on the packet); 1.10.0 #5274: weekday on not_credited[] / advanced_by / steps_ramp / de-dup removed[] / morning_note / fitness latest; 1.9.0 #5274: a Pacific `weekday` beside every date; 1.8.0 #5078: fitness_tests; 1.7.0 #5061: calibration_cadence (tape / photos / DEXA due dates); 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
+PACKET_VERSION = "coach-session-packet@1.13.0"  # 1.13.0 #5576: training_phase (current phase, next phase, closest unmet gate + value); 1.12.0 #5573: note_requests (the owner's Hevy-note requests + their replies); 1.11.0 #5501: lift_history (the pre-flight exercise history + notes on the packet); 1.10.0 #5274: weekday on not_credited[] / advanced_by / steps_ramp / de-dup removed[] / morning_note / fitness latest; 1.9.0 #5274: a Pacific `weekday` beside every date; 1.8.0 #5078: fitness_tests; 1.7.0 #5061: calibration_cadence (tape / photos / DEXA due dates); 1.6.0 #5059: guidance_freshness (reference only); 1.5.0 #5082: steps_ramp; 1.4.0 #5081: steps_7d; 1.3.0 #4189: morning_note field; 1.2.0 #4313: today; 1.1.0 #4312: block_position.next_session.not_credited / credit_rule; last-session rows carry sequence_credit
 # Long enough that each performed type is found once a block is running (a v0.4 role recurs
 # weekly; an Engine day twice a week), bounded so the read stays one Hevy query.
 LAST_SESSION_LOOKBACK_DAYS = 28
@@ -143,6 +147,11 @@ SOURCES: dict[str, str] = {
         "(training_constraints REQUEST# rows) — open ones with the verbatim note, overdue_count (open > 7 days after the note), "
         "and the replies of the last 14 days; owner-only"
     ),
+    "training_phase": (
+        "mcp.phase_evaluator_leg.phase_brief_field -> training.phase_evaluator.phase_brief (#5576) over the weekly evaluator's "
+        "training_constraints PHASE#STATE + newest PHASE#EVAL rows (#5575): current phase + since, next phase, and the closest unmet "
+        "gate (the evaluator's blocking_gate) with its measured value; owner-only"
+    ),
 }
 
 # Model-facing prose + schema live beside the tool (the #4078 manage_pending_writes precedent), so
@@ -161,7 +170,8 @@ COACH_PACKET_DESCRIPTION = (
     "before he opened any number (#4189; quote them verbatim or not at all), and `lift_history` (#5501) — for each lift the program "
     "serves on target_date, its newest performed sessions (top set, working sets, note) and latest note + pain flag: this IS the "
     "pre-flight get_exercise_history + get_exercise_notes read for those lifts, and `note_requests` (#5573) — what Matthew ASKED "
-    "for in a Hevy note (form guidance, a question, a rule): open ones to answer once in the chat, overdue count, recent replies. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
+    "for in a Hevy note (form guidance, a question, a rule): open ones to answer once in the chat, overdue count, recent replies, "
+    "and `training_phase` (#5576) — the computed phase, the next one and the closest unmet gate with its value. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the "
     "error class) — a failed read is never an empty week — and names the canonical function it came from; "
     "nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. "
     'Every date carries a Pacific `weekday` ("Fri") — quote it, never compute a weekday yourself (#5274). '
@@ -547,6 +557,13 @@ def _note_requests(target_date: str) -> tuple[Any, dict[str, Any]]:
     return note_requests_packet_field(target_date)
 
 
+def _training_phase(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """#5576: the computed phase brief — `phase_evaluator_leg` reads the rows, `phase_evaluator.phase_brief` arranges them."""
+    from mcp.phase_evaluator_leg import phase_brief_field
+
+    return phase_brief_field()
+
+
 def _wrap(fn):
     """A reader that returns (value, status) and may raise -> (value, status) that never raises."""
 
@@ -652,6 +669,7 @@ READERS = {
     "calibration_cadence": _calibration_cadence,
     "lift_history": _lift_history,
     "note_requests": _note_requests,
+    "training_phase": _training_phase,
 }
 
 
@@ -695,7 +713,8 @@ def tool_get_coach_session_packet(args):
             "is the pre-flight exercise history + notes for the day's programmed lifts (#5501): call get_exercise_history / "
             "get_exercise_notes only for a lift it does not carry, or one whose read failed. `note_requests` (#5573) lists what "
             "Matthew asked for in his Hevy notes: deliver each `answered_recent` reply as written, answer each `open` one ONCE, "
-            "then record it (its own how_to_answer says how)."
+            "then record it (its own how_to_answer says how). `training_phase` (#5576) is the computed phase: name it, the next "
+            "phase and its closest unmet gate with the gate's value (a private threshold stays private) — never a phase of your own."
         ),
         "_disclaimer": (
             "For personal health tracking only. Not medical advice. Descriptive of Matthew's own n=1 history. "
