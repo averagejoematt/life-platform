@@ -25,7 +25,9 @@ already owns it — this module arranges and compares, it does not count:
 Then the TRIGGERS — each names its LEVER (the review's calibration table): the rate below the
 floor two weeks running -> steps or food; above the ceiling -> the nutrition review; an anchor
 down two weeks -> fatigue / under-eating before adding work; the steps floor missed -> the walk
-prescription; a priority muscle below its floor two weeks -> a slot. A trigger whose input is not
+prescription (#5758: the trigger names each day it fired on with the walk the plan offered — read back from the
+drafted routine, `training.step_gap_walk` — beside the walking minutes performed); a priority muscle below its floor
+two weeks -> a slot. A trigger whose input is not
 measured is listed under `unevaluated`, never read as green (ADR-104).
 
 PRIVACY. The target date and the band are owner-only by ruling (no May countdown on any published
@@ -42,7 +44,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any, Iterable, Mapping, Optional
 
-TRACKER_VERSION = "may-tracker@1.0.0"
+TRACKER_VERSION = "may-tracker@1.1.0"  # 1.1.0 (#5758): the steps trigger names its days, the walk offered vs performed
 SOURCE = "may_tracker"
 PK = f"USER#matthew#SOURCE#{SOURCE}"
 SK_PREFIX = "WEEK#"
@@ -238,8 +240,13 @@ def _resolved(day_row: Mapping[str, Any]) -> Optional[int]:
     return day_row.get("steps")  # steps-truth: resolve_daily_steps output (training.steps_resolver), already resolved
 
 
-def steps_section(days: Optional[list[Mapping[str, Any]]], read_error: Optional[str] = None) -> dict[str, Any]:
-    """The week's resolved days (`steps_resolver.steps_range(...)["days"]`) against the charter floor/target."""
+def steps_section(
+    days: Optional[list[Mapping[str, Any]]], read_error: Optional[str] = None, walks: Optional[Mapping[str, Any]] = None
+) -> dict[str, Any]:
+    """The week's resolved days (`steps_resolver.steps_range(...)["days"]`) against the charter floor/target.
+    #5758: `walks` = {offers: the plan's stored walk per day (or None, unread), performed: {day: walking minutes}} —
+    each day below the floor then carries the walk offered vs performed (`walk_attribution`, `training.step_gap_walk`).
+    The retro's input (`days_at_floor` / `days_measured`) is unchanged."""
     src = "training.steps_resolver.steps_range"
     if read_error:
         return cell(READ_FAILED, None, src, error=read_error)
@@ -251,6 +258,11 @@ def steps_section(days: Optional[list[Mapping[str, Any]]], read_error: Optional[
         return cell(ABSENT, None, src, "no steps source has a count this week", floor=floor, target=target, days=len(days))
     counts = [int(counts_by_day[d.get("date")]) for d in measured]
     below = [d["date"] for d in measured if floor is not None and int(counts_by_day[d["date"]]) < int(floor)]
+    extra: dict[str, Any] = {}
+    if walks is not None:
+        from training import step_gap_walk
+
+        extra["walk_attribution"] = step_gap_walk.attribution(below, counts_by_day, walks.get("offers"), walks.get("performed") or {})
     return cell(
         MEASURED,
         round(sum(counts) / len(counts)),
@@ -265,6 +277,7 @@ def steps_section(days: Optional[list[Mapping[str, Any]]], read_error: Optional[
         days_without_a_count=[d.get("date") for d in days if counts_by_day[d.get("date")] is None],
         partial_days=[d.get("date") for d in measured if d.get("degraded") == "partial_day"],
         unit="mean steps over measured days (an absent day is never a 0)",
+        **extra,
     )
 
 
@@ -487,6 +500,8 @@ def evaluate_triggers(row: Mapping[str, Any], prior: Optional[Mapping[str, Any]]
                 steps.get("days_below_floor"),
             )
         )
+        # #5758: the days it fired on, each with the walk the plan offered and the walking he did (when the builder read them)
+        fired[-1]["days"] = steps.get("walk_attribution") or [{"date": d} for d in steps.get("days_below_floor") or []]
 
     vrows = ((row.get("volume") or {}).get("rows")) or {}
     prior_v = (((prior or {}).get("volume") or {}).get("rows")) or {}
