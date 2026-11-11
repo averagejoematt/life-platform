@@ -536,13 +536,29 @@ def _protein_pass(now_utc: datetime, dry_run: bool) -> dict:
         return {"send": False, "reason": f"error:{type(e).__name__}"}
 
 
+def _protein_evening_pass(now_utc: datetime, dry_run: bool) -> dict:
+    """#5793: the protein evening nudge — its own slot on the protein ledger, the same hourly tick (fail-soft)."""
+    try:
+        from emails import protein_nudge_runner
+
+        def send(text: str) -> None:
+            _send_steps_email(text, dry_run, subject="Protein this evening", label="Protein note")
+
+        return protein_nudge_runner.run_evening(_table(), send, now_utc, budget_guard.current_tier(), user=USER_ID, dry_run=dry_run)
+    except Exception as e:  # noqa: BLE001 — never let the protein pass break the coach nudge tick
+        logger.error("[protein-evening] pass failed: %s", e)
+        return {"send": False, "reason": f"error:{type(e).__name__}"}
+
+
 def lambda_handler(event: dict, context) -> dict:
     try:
         steps = _steps_pass(datetime.now(timezone.utc), is_dry_run(event))
         protein = _protein_pass(datetime.now(timezone.utc), is_dry_run(event))
+        protein_evening = _protein_evening_pass(datetime.now(timezone.utc), is_dry_run(event))
         out = _coach_nudge(event, context)
         out["steps_nudge"] = steps
         out["protein_nudge"] = protein
+        out["protein_evening_nudge"] = protein_evening
         return out
     except Exception as e:
         logger.error("[nudge] handler failed: %s", e)

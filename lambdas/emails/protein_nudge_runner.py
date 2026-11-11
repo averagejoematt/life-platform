@@ -7,12 +7,18 @@ spends the coach's one-a-day slot. No new EventBridge rule: the hourly cron cove
 
 DEAD-MAN: every in-window tick (sent or not) overwrites `COACH#protein_nudge` / `EVAL#<date>` with its verdict;
 `nudge_ledger_qa.check_protein_nudge_liveness` reds when a recent day has no eval row (the pass never ran).
+
+THE EVENING PASS (`run_evening`, #5793): the same ledger row, a distinct slot (`PROTEIN_NUDGE#<date>#evening`, the
+engine's `evening_key`), stamped on every in-window tick as `EVAL_EVENING#<date>` (outside the breakfast dead-man's
+`EVAL#` range, so neither pass can feed the other's liveness). The evening Pacific day spans two UTC apple_health rows
+(after 17:00 PDT / 16:00 PST the entries land on the next UTC date), so the HAE read merges both; the engine keeps
+only the entries whose own Pacific date is the day.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import date as _date, datetime, timedelta
 from typing import Callable
 
 from common.numeric import floats_to_decimal
@@ -24,6 +30,7 @@ logger = logging.getLogger()
 
 LEDGER_PK = "COACH#protein_nudge"
 EVAL_PREFIX = "EVAL#"
+EVENING_EVAL_PREFIX = "EVAL_EVENING#"
 CHANNEL = "email"
 
 
@@ -32,16 +39,27 @@ def _today_row(table, date: str, user: str) -> dict | None:
     return None if not item or item.get("tombstone") else item
 
 
+def _hae_entries(table, utc_date: str, user: str) -> dict:
+    item = table.get_item(
+        Key={"pk": f"USER#{user}#SOURCE#apple_health", "sk": f"DATE#{utc_date}"},
+        ProjectionExpression="#rd",
+        ExpressionAttributeNames={"#rd": hae_protein.RD_FIELD},
+    ).get("Item")
+    return dict((item or {}).get(hae_protein.RD_FIELD) or {})
+
+
 def _hae_row(table, date: str, user: str) -> dict | None:
     """The same-day path (#5187): the timed protein entries Health Auto Export delivers intraday, as a food-log row.
     The apple_health row is the UTC day; a Pacific morning is the same date, and the engine filters on each entry's own
     Pacific date."""
-    item = table.get_item(
-        Key={"pk": f"USER#{user}#SOURCE#apple_health", "sk": f"DATE#{date}"},
-        ProjectionExpression="#rd",
-        ExpressionAttributeNames={"#rd": hae_protein.RD_FIELD},
-    ).get("Item")
-    return protein_engine.hae_feeding_rows((item or {}).get(hae_protein.RD_FIELD), date)
+    return protein_engine.hae_feeding_rows(_hae_entries(table, date, user), date)
+
+
+def _hae_evening_row(table, date: str, user: str) -> dict | None:
+    """The whole Pacific day's HAE entries: its own UTC row plus the next one (a Pacific evening is past UTC midnight).
+    Entries are keyed by their UTC minute, so the two maps never collide; the engine filters on each one's Pacific date."""
+    nxt = (_date.fromisoformat(date) + timedelta(days=1)).isoformat()
+    return protein_engine.hae_feeding_rows({**_hae_entries(table, date, user), **_hae_entries(table, nxt, user)}, date)
 
 
 def _read_row(table, date: str, user: str) -> dict | None:
@@ -49,14 +67,15 @@ def _read_row(table, date: str, user: str) -> dict | None:
     return _today_row(table, date, user) or _hae_row(table, date, user)
 
 
-def _claim(table, date: str, verdict: dict, now_utc: datetime) -> bool:
-    """Conditional put of `PROTEIN_NUDGE#<date>` BEFORE the send — one attempt per Pacific day across racing ticks."""
+def _claim(table, date: str, verdict: dict, now_utc: datetime, key: str | None = None) -> bool:
+    """Conditional put of `PROTEIN_NUDGE#<date>` (or the evening slot's `key`) BEFORE the send — one attempt per
+    Pacific day and slot across racing ticks."""
     try:
         table.put_item(
             Item=floats_to_decimal(
                 {
                     "pk": LEDGER_PK,
-                    "sk": protein_engine.idempotency_key(date),
+                    "sk": key or protein_engine.idempotency_key(date),
                     "status": "attempting",
                     "channel": CHANNEL,
                     "attempted_at": now_utc.isoformat(),
@@ -74,25 +93,25 @@ def _claim(table, date: str, verdict: dict, now_utc: datetime) -> bool:
         return False
 
 
-def _settle(table, date: str, status: str, text: str = "", error: str = "") -> None:
+def _settle(table, date: str, status: str, text: str = "", error: str = "", key: str | None = None) -> None:
     table.update_item(
-        Key={"pk": LEDGER_PK, "sk": protein_engine.idempotency_key(date)},
+        Key={"pk": LEDGER_PK, "sk": key or protein_engine.idempotency_key(date)},
         UpdateExpression="SET #s = :s, #t = :t, #e = :e",
         ExpressionAttributeNames={"#s": "status", "#t": "text", "#e": "error"},
         ExpressionAttributeValues={":s": status, ":t": text, ":e": error[:300]},
     )
 
 
-def _stamp_eval(table, date: str, verdict: dict, now_utc: datetime) -> None:
+def _stamp_eval(table, date: str, verdict: dict, now_utc: datetime, prefix: str = EVAL_PREFIX) -> None:
     try:
         table.put_item(
             Item={
                 "pk": LEDGER_PK,
-                "sk": f"{EVAL_PREFIX}{date}",
+                "sk": f"{prefix}{date}",
                 "reason": str(verdict.get("reason")),
                 "send": bool(verdict.get("send")),
                 "evaluated_at": now_utc.isoformat(),
-                "version": protein_engine.NUDGE_VERSION,
+                "version": str(verdict.get("version") or protein_engine.NUDGE_VERSION),
                 "source": str(verdict.get("source") or "none"),
             }
         )
@@ -127,3 +146,35 @@ def run(table, send: Callable[[str], None], now_utc: datetime, budget_tier: int,
         return {"send": False, "reason": "send_failed"}
     _settle(table, date, "dry_run" if dry_run else "sent", text=verdict["text"])
     return {"send": True, "reason": verdict["reason"], "key": verdict["key"]}
+
+
+def run_evening(
+    table, send: Callable[[str], None], now_utc: datetime, budget_tier: int, *, user: str = "matthew", dry_run: bool = False
+) -> dict:
+    """One evening-nudge pass (#5793). `send(text)` delivers the owner email. Never raises into the coach nudge's tick.
+    Logs carry reasons only, never a gram figure (the floor and the intake are owner-only numbers)."""
+    now_pt = now_utc.astimezone(PACIFIC)
+    date = now_pt.date().isoformat()
+    if not protein_engine.in_evening_window(now_pt):
+        return {"send": False, "reason": "outside_window"}
+    key = protein_engine.evening_key(date)
+    try:
+        sent = bool(table.get_item(Key={"pk": LEDGER_PK, "sk": key}).get("Item"))
+        row = None if sent else (_today_row(table, date, user) or _hae_evening_row(table, date, user))
+        verdict = protein_engine.evening_decide(date=date, now_pt=now_pt, row=row, already_sent=sent, budget_tier=budget_tier)
+    except Exception as e:  # noqa: BLE001
+        logger.error("[protein-evening] evaluation failed: %s", type(e).__name__)
+        return {"send": False, "reason": f"error:{type(e).__name__}"}
+    _stamp_eval(table, date, verdict, now_utc, prefix=EVENING_EVAL_PREFIX)
+    if not verdict["send"]:
+        return {"send": False, "reason": verdict["reason"]}
+    if not _claim(table, date, verdict, now_utc, key=key):
+        return {"send": False, "reason": "already_sent"}
+    try:
+        send(verdict["text"])
+    except Exception as e:  # noqa: BLE001
+        logger.error("[protein-evening] send failed: %s", type(e).__name__)
+        _settle(table, date, "failed", error=str(e), key=key)
+        return {"send": False, "reason": "send_failed"}
+    _settle(table, date, "dry_run" if dry_run else "sent", text=verdict["text"], key=key)
+    return {"send": True, "reason": verdict["reason"], "key": key}
