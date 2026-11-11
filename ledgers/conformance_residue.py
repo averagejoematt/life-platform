@@ -16,6 +16,11 @@ is not a thing; entries only ever come OUT (the #1964 ratchet precedent).
 Populated honestly by the initial sweep on 2026-08-17 (37 sites). Every entry
 is real debt: convert the site to a registry projection, then delete its line.
 
+2026-11-10 (#5527): -2. The freshness checker's interior-gap `DAILY_SOURCES` and its MCP
+twin `tools_labs.DAILY_SOURCES_INTERIOR` now both derive from
+`source_registry.interior_gap_source_keys()` (expected_days == 7, monitored, not behavioral)
+— the derivation added todoist and weather, which the hand-typed copies had dropped.
+
 2026-10-17 (#4639): dexa entered SOURCE_REGISTRY (the #3669 residual), so the sweep's
 vocabulary grew again. Same mechanics as the 2026-09-17 note below: the
 `intelligence_common.py::sources::…` `_INVENTORY_SOURCES` key gained `dexa` (site unedited,
@@ -53,7 +58,6 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/content/insight_writer.py::sources::strava,whoop": "2026-08-17",  # #4976: was garmin,strava,whoop — garmin dropped
     "lambdas/emails/anomaly_detector_lambda.py::sources::eightsleep,garmin,habitify,macrofactor,strava,todoist,whoop,withings": "2026-08-17",
     "lambdas/emails/chronicle_render.py::personas::andrew_huberman,elena_voss,layne_norton,margaret_calloway,maya_rodriguez,paul_conti,peter_attia,rhonda_patrick,the_chair,vivek_murthy": "2026-08-17",
-    "lambdas/emails/freshness_checker_lambda.py::sources::apple_health,eightsleep,habitify,whoop": "2026-08-17",
     "lambdas/emails/monthly_digest_lambda.py::sources::hevy,macrofactor,strava,todoist,whoop,withings": "2026-08-17",
     "lambdas/emails/partner_email_lambda.py::sources::apple_health,habitify,macrofactor,strava,whoop,withings": "2026-08-17",
     "lambdas/emails/weekly_digest_lambda.py::sources::apple_health,eightsleep,garmin,habitify,macrofactor,strava,todoist,whoop,withings": "2026-08-17",
@@ -71,7 +75,6 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/web/site_api_rollups.py::sources::macrofactor,notion,withings": "2026-08-17",
     "lambdas/web/site_api_status.py::sources::eightsleep,whoop": "2026-08-17",
     "lambdas/web/site_stats_refresh_lambda.py::lambdas::habitify-data-ingestion,whoop-data-ingestion,withings-data-ingestion": "2026-08-17",
-    "mcp/tools_labs.py::sources::apple_health,eightsleep,habitify,whoop": "2026-08-17",
     "mcp/tools_nutrition.py::sources::habitify,hevy,strava,whoop": "2026-08-17",
     "mcp/tools_nutrition.py::sources::macrofactor,withings": "2026-08-17",
 }
