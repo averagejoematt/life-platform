@@ -414,7 +414,14 @@ GATES: dict[str, dict] = {
         params={"hang_seconds_min": 30, "sets": 3, "reps_min": 10, "sessions_min": 2},
     ),
     # kettlebell chain
-    "chain_kb_swing": _chain(["key:kettlebell_deadlift"], "kettlebell deadlift " + _STD_3x + ", hinge pattern (not a squat) confirmed"),
+    # owner ruling 2026-11-11 (#5810): the kettlebell slot is the SWING, entered via 2 exposures of the KB deadlift — exactly
+    # "kettlebell deadlift logged in 2 sessions", not the generic 3-sessions/2-weeks standard (the other KB steps keep it).
+    "chain_kb_swing": _chain(
+        ["key:kettlebell_deadlift"],
+        "kettlebell deadlift logged in 2 sessions (owner ruling 2026-11-11: the kettlebell slot is the swing, entered via 2 KB deadlift exposures)",
+        provenance="owner ruling 2026-11-11 (#5810)",
+        params={"sessions_min": 2},
+    ),
     "chain_kb_clean": _chain(["tid:F8A0FCCA"], "kettlebell swing " + _STD_3x),
     "chain_kb_overhead": _chain(["tid:F99C211D"], "kettlebell clean " + _STD_3x + ", rack position owner-confirmed"),
     # Olympic-bar chain
@@ -975,6 +982,9 @@ EXPANSION: list[dict] = [
         "Kettlebell Deadlift",
         None,
         template_note="no Hevy standard template; log under a custom 'Kettlebell Deadlift' template (to create) — not Deadlift (Dumbbell)",
+        # #5772: until #5810 picks the Hevy template, any logged exercise whose TITLE carries both words counts as an exposure
+        # (training.exercise_gates reads this rule); once a template is chosen, set `template_id` and this rule still holds.
+        template_match={"title_all": ["kettlebell", "deadlift"]},
         target={"primary": "glutes", "secondary": ["hamstrings", "back"], "region": "lower"},
         family="strength_anchor",
         length_bias="mid",

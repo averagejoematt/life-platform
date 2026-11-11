@@ -103,8 +103,11 @@ cues}` — every "not for you now" carries its reason and its unlock condition.
   `threshold not set by owner`. An unread overlay is `unknown`, not `not_set`.
 - **Measured inputs only:** the 7-day mean bodyweight (Withings, the phase evaluator's reading), the Hevy record over
   the last 12 weeks for chain and performance standards (an unlogged RPE or an unrecorded assistance/tempo is not
-  evidence), the coded pain classes (`note_signal_tags`) over 28 days, the run gate as the May tracker reads it, and
+  evidence), the #5800 note class over 28 days (only a `pain` note locks; `discomfort` and `form_or_equipment` never do), the run gate as the May tracker reads it, and
   the charter's own numbers (power-clean revisit weight, lower-leg-prep carve-out) — read, never copied.
+- **Template match:** a movement with no standard Hevy template can carry `template_match.title_all`; any logged exercise
+  whose title carries every word counts (the KB deadlift, until #5810 picks its template).
+- **KB swing (owner ruling 2026-11-11):** `chain_kb_swing` opens on exactly 2 logged KB-deadlift sessions.
 - **Chain order:** a chain gate opens only when each prerequisite met its standard AND that prerequisite's own chain
   gates are open.
 - **A clinical cue never locks** and is never an intensity gate; it rides the movement's `cues`.

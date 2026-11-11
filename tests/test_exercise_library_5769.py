@@ -226,8 +226,7 @@ _READS_LIBRARY = re.compile(
 # an unlock reaches `plan_next_session` only through a claim-once row the leg creates while the library is `approved`
 # (`mcp/exercise_gates_leg.py::evaluate_week`), and that read side never opens the library.
 GATE_EVALUATOR_READERS = {
-    os.path.join("lambdas", "training", "exercise_gates.py"),
-    os.path.join("mcp", "exercise_gates_leg.py"),
+    os.path.join("mcp", "exercise_gates_leg.py"),  # #5772 (the pure evaluator lambdas/training/exercise_gates.py reads nothing)
 }
 
 

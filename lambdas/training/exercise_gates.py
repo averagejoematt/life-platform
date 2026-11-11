@@ -34,6 +34,7 @@ THE RESULT — `evaluate_gates(library, overlay, measured) -> {gate_id: row}`, e
 from __future__ import annotations
 
 import datetime as _dt
+import re
 from typing import Any, Optional
 
 VERSION = "exercise-gates@0.1.0"
@@ -54,7 +55,6 @@ _NOT_ANNOUNCED_KINDS = ("pain_flag_exclusion", "equipment_available", "clinical_
 CHAIN_LOOKBACK_DAYS = 84
 PAIN_WINDOW_DAYS = 28
 PAIN_TRIAL_RPE_MAX = 6
-PAIN_TAGS = ("pain_flag", "joint_discomfort")
 KG_TO_LB = 2.20462
 
 # A performance gate carried by no movement names the movement it measures (library v0.1 has one).
@@ -129,10 +129,13 @@ def carriers(library: dict[str, Any]) -> dict[str, list[str]]:
 
 # ── the Hevy record, indexed once ─────────────────────────────────────────────────────────────────────────────────
 def index_sessions(workouts: Optional[list[dict[str, Any]]]) -> Optional[dict[str, list[dict[str, Any]]]]:
-    """template id (upper) -> [{date, sets (working sets only), tags (coded note classes)}], oldest first. None = unread."""
+    """template id (upper) -> [{date, name, sets (working sets only), pain}], oldest first. None = unread.
+
+    `pain` is the #5800 note class (`training_notes_pain.pain_class`): only a `pain` note flags — `discomfort` and
+    `form_or_equipment` are listed elsewhere and never lock a movement (owner ruling, #5806)."""
     if workouts is None:
         return None
-    from training.exercise_library import note_signal_tags
+    from training.training_notes_pain import PAIN, pain_class
 
     out: dict[str, list[dict[str, Any]]] = {}
     for w in workouts:
@@ -141,10 +144,12 @@ def index_sessions(workouts: Optional[list[dict[str, Any]]]) -> Optional[dict[st
             continue
         for ex in w.get("exercises") or []:
             tid = str(ex.get("template_id") or "").strip().upper()
-            if not tid:
+            name = str(ex.get("name") or ex.get("title") or "")
+            if not tid and not name:
                 continue
             sets = [s for s in ex.get("sets") or [] if str(s.get("type") or s.get("set_type") or "normal").lower() != "warmup"]
-            out.setdefault(tid, []).append({"date": day, "sets": sets, "tags": note_signal_tags(str(ex.get("notes") or ""))})
+            pain = pain_class(str(ex.get("notes") or "")) == PAIN
+            out.setdefault(tid or "_untemplated", []).append({"date": day, "name": name, "sets": sets, "pain": pain})
     for rows in out.values():
         rows.sort(key=lambda r: r["date"])
     return out
@@ -154,20 +159,47 @@ def _tid(library: dict[str, Any], mid: str) -> str:
     return str((_movements(library).get(mid) or {}).get("template_id") or "").strip().upper()
 
 
+def _title_words(library: dict[str, Any], mid: str) -> list[str]:
+    """The library's `template_match.title_all` for a movement (#5772): every word must appear in the logged title."""
+    rule = (_movements(library).get(mid) or {}).get("template_match") or {}
+    return [str(w).lower() for w in rule.get("title_all") or [] if str(w).strip()]
+
+
+def measurable(library: dict[str, Any], mid: str) -> bool:
+    """Can the Hevy record say anything about this movement? A template id, or a title-match rule, is required."""
+    return bool(_tid(library, mid) or _title_words(library, mid))
+
+
+def sessions_for(library: dict[str, Any], index: dict[str, list[dict[str, Any]]], mid: str) -> list[dict[str, Any]]:
+    """The movement's logged sessions: its template id's rows, plus — with a `template_match` rule (the KB deadlift has
+    no standard Hevy template, #5810) — any logged exercise whose title carries every rule word. Oldest first."""
+    tid = _tid(library, mid)
+    rows = list(index.get(tid, [])) if tid else []
+    words = _title_words(library, mid)
+    if words:
+        pats = [re.compile(r"\b" + re.escape(w) + r"s?\b", re.I) for w in words]
+        seen = {id(r) for r in rows}
+        for key, sess in index.items():
+            if key == tid:
+                continue
+            rows += [r for r in sess if id(r) not in seen and all(p.search(r["name"]) for p in pats)]
+    return sorted(rows, key=lambda r: r["date"])
+
+
 # ── pain (the note classes) ───────────────────────────────────────────────────────────────────────────────────────
 def pain_verdict(sessions: Optional[list[dict[str, Any]]], as_of: str, window_days: int = PAIN_WINDOW_DAYS) -> dict[str, Any]:
-    """No pain / discomfort class on this movement's notes in the window -> open. After a flag, one later session with a
+    """No `pain`-class note (#5800) on this movement in the window -> open. After a flag, one later session with a
     working set at RPE <= 6 and no pain class re-opens it (the library's unlock condition)."""
     if sessions is None:
         return _unknown("Hevy record unread — pain flags unknown")
     start = _shift(as_of, -(window_days - 1))
     window = [s for s in sessions if start <= s["date"] <= as_of]
-    flags = [s["date"] for s in window if set(PAIN_TAGS) & set(s["tags"])]
+    flags = [s["date"] for s in window if s["pain"]]
     if not flags:
         return _verdict(UNLOCKED, MEASURED, f"no pain flag on it in the last {window_days} days", {"pain_flags": 0})
     last = max(flags)
     for s in window:
-        if s["date"] <= last or set(PAIN_TAGS) & set(s["tags"]):
+        if s["date"] <= last or s["pain"]:
             continue
         if any((_num(x.get("rpe")) or 99) <= PAIN_TRIAL_RPE_MAX for x in s["sets"]):
             return _verdict(UNLOCKED, MEASURED, "a pain-free trial set at RPE <= 6 after the last flag", {"pain_flags": len(flags)})
@@ -245,8 +277,7 @@ class _ChainCtx:
     def sessions(self, mid: str) -> Optional[list[dict[str, Any]]]:
         if self.index is None:
             return None
-        tid = _tid(self.library, mid)
-        return self.index.get(tid, []) if tid else None
+        return sessions_for(self.library, self.index, mid) if measurable(self.library, mid) else None
 
     def step_open(self, mid: str) -> tuple[bool, Optional[str]]:
         """Are the chain gates the prerequisite movement itself carries open? (False, first locked gate id) if not."""
@@ -258,8 +289,8 @@ class _ChainCtx:
     def prerequisite(self, mid: str, std: dict[str, Any]) -> dict[str, Any]:
         if mid not in _movements(self.library):
             return _unknown(f"{mid}: not a library movement")
-        if not _tid(self.library, mid):
-            return _unknown(f"{mid}: no Hevy template, so its sessions cannot be measured")
+        if not measurable(self.library, mid):
+            return _unknown(f"{mid}: no Hevy template or title rule, so its sessions cannot be measured")
         open_, blocker = self.step_open(mid)
         if not open_:
             reason = f"{mid}: its own step is still locked ({blocker}) — chain order"
@@ -395,10 +426,9 @@ def _per_movement(gid: str, g: dict[str, Any], library, overlay, measured, index
     if kind == "pain_flag_exclusion":
         if index is None:
             return pain_verdict(None, measured.get("as_of") or "")
-        tid = _tid(library, mid)
-        if not tid:
+        if not measurable(library, mid):
             return _verdict(UNLOCKED, MEASURED, "no Hevy template, so no note can flag it")  # nothing logged = nothing flagged
-        return pain_verdict(index.get(tid, []), measured.get("as_of") or "")
+        return pain_verdict(sessions_for(library, index, mid), measured.get("as_of") or "")
     if kind == "equipment_available":
         return equipment_verdict(library, overlay, mid)
     if kind == "owner_confirmation":

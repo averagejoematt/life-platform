@@ -384,3 +384,32 @@ def test_evaluate_gates_never_raises_on_missing_inputs():
     for bad in (None, {}, {"as_of": AS_OF}):
         gates = eg.evaluate_gates(_LIB, None, bad)
         assert all(r["state"] == eg.LOCKED for r in gates.values() if r["kind"] != "clinical_cue"), bad
+
+
+# ── owner ruling 2026-11-11 (#5810): the KB swing opens on exactly 2 logged KB-deadlift sessions ─────────────────────
+def _kb_dl(day: str, name: str = "Kettlebell Deadlift") -> dict[str, Any]:
+    return {"date": day, "exercises": [{"template_id": "C0FFEE01", "name": name, "sets": _sets(2, 10), "notes": ""}]}
+
+
+def test_kb_swing_opens_on_two_kb_deadlift_sessions_and_not_one():
+    assert _LIB["gates"]["chain_kb_swing"]["standard"] == {"sessions_min": 2}
+    one = eg.evaluate_gates(_LIB, None, _measured([_kb_dl("2026-11-10")], mean_lb=250))["chain_kb_swing"]
+    assert one["state"] == eg.LOCKED and one["input"] == eg.MEASURED
+    two = eg.evaluate_gates(
+        _LIB, None, _measured([_kb_dl("2026-11-03"), _kb_dl("2026-11-10", "KB Romanian Deadlift (Kettlebell)")], mean_lb=250)
+    )
+    assert two["chain_kb_swing"]["state"] == eg.UNLOCKED
+    swing = eg.movement_states(_LIB, two)["kettlebell_swing"]
+    assert "chain_kb_swing" not in swing["locked_by"]
+
+
+def test_the_kb_title_rule_needs_both_words():
+    dumbbell = [_kb_dl("2026-11-03", "Deadlift (Dumbbell)"), _kb_dl("2026-11-10", "Kettlebell Swing")]
+    assert eg.evaluate_gates(_LIB, None, _measured(dumbbell, mean_lb=250))["chain_kb_swing"]["state"] == eg.LOCKED
+
+
+def test_only_a_pain_class_note_locks_a_movement():
+    sore = [_workout("2026-11-05", "AAAA0004", _sets(2, 10), notes="my elbow aches a little")]  # the #5800 class: discomfort
+    assert eg.evaluate_gates(_lib(), None, _measured(sore, mean_lb=250))["pain_flag_exclusion"]["by_movement"] == {}
+    pain = [_workout("2026-11-05", "AAAA0004", _sets(2, 10), notes="sharp pain in my elbow")]
+    assert "odd_machine" in eg.evaluate_gates(_lib(), None, _measured(pain, mean_lb=250))["pain_flag_exclusion"]["by_movement"]
