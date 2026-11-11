@@ -178,6 +178,20 @@ const EXCLUDED_WORDS = {
   under_review: "under classification review — counted neither way",
   classification_review: "under classification review — counted neither way",
   disputed: "under classification review — counted neither way",
+  // The producer's category keys (web.verification_fields.EXCLUDED_CATEGORIES), mirrored here: the wire gate
+  // blanks a served label when withheld grader notes quote the same engine text, so the page carries its own words.
+  not_a_forecast: "Not a forecast: the outcome was already on the record when the call was made",
+  past_period: "About a past period whose data arrived later: kept as a look back, not a forecast",
+  opinion: "An opinion, explanation or hedge: not a measurable forecast",
+  different_claim: "The stored test checks a different claim from the words",
+  stand_in_measure: "Graded on a stand-in measure that cannot show the claim",
+  either_outcome: "Either outcome satisfies the words",
+  condition_not_measured: "Depends on a condition that was never measured, or names no checkable direction",
+  condition_never_happened: "Its condition never happened, so it was never tested",
+  docket: "Head-to-head docket bets, settled by their own rule and audited separately",
+  could_not_verify: "Could not be verified under the current rules",
+  not_yet_classified: "Not yet classified under the current rules",
+  repeat: "The same forecast repeated: counted once",
 };
 const PRIVATE_CATEGORY = /journal|mood|state.?of.?mind|diary|video|self.?report|felt|private/i;
 export function excludedAccounting(cal) {
@@ -249,6 +263,52 @@ export function verifiedLead(cal) {
       ? { coachOnly: s.coach_only, ruleOnly: s.rule_only, p: s.p, verdict: s.verdict, words: SIGN_VERDICT_WORDS[s.verdict] || verdictWords(s.verdict) }
       : null;
   return { sentence: v.sentence.trim(), k: v.confirmed, n: v.n, pct: pct(v.accuracy_pct), ci: intervalText(v.accuracy_ci95), baseline, sign };
+}
+
+/**
+ * The three denominators, as served (owner ruling 2026-11-10, 1: "make the distinction between eligible records and the
+ * deduplicated verified headline sample explicit so readers don't confuse denominators"): the eligible calls, the
+ * calls left out (and how many of those are repeats of one forecast), and the verified sample. Carried from
+ * excludedAccounting — which already refuses an accounting that does not reconcile — never derived here. Null when
+ * any of the three is not served.
+ */
+export function denominatorSteps(cal) {
+  const acc = excludedAccounting(cal);
+  if (!acc || acc.eligible === null || acc.total === null || acc.counted === null) return null;
+  const rep = acc.rows.find((r) => r.key === "repeat");
+  return { eligible: acc.eligible, excluded: acc.total, counted: acc.counted, repeats: rep ? rep.n : 0 };
+}
+
+/**
+ * The secondary, exploratory split of the verified sample by kind of call (owner ruling 2026-11-10, 2), as served on
+ * verification_summary.subgroups — the producer's own sentences, p-values and adjustment words; nothing computed here.
+ * Fails closed (null) unless it is marked exploratory, is over EXACTLY the verified sample (n = the headline N and the
+ * kinds' counted calls add up to it — a check, not a derivation) and every kind carries its words.
+ */
+export function subgroupBlock(cal) {
+  const sg = (verificationSummary(cal) || {}).subgroups;
+  const v = verifiedRecord(cal);
+  if (!sg || typeof sg !== "object" || sg.exploratory !== true || !v || sg.n !== v.n || !Array.isArray(sg.kinds)) return null;
+  const kinds = sg.kinds.filter(
+    (k) => k && typeof k === "object" && typeof k.key === "string" && Number.isInteger(k.counted) && typeof k.sentence === "string" && k.sentence.trim(),
+  );
+  if (!kinds.length || kinds.length !== sg.kinds.length || kinds.reduce((a, k) => a + k.counted, 0) !== v.n) return null;
+  const str = (x) => (typeof x === "string" && x.trim() ? x.trim() : null);
+  return {
+    n: sg.n,
+    caveat: str(sg.caveat),
+    adjustment: str(sg.adjustment_words),
+    test: str(sg.test),
+    kinds: kinds.map((k) => ({
+      key: k.key,
+      words: KIND_WORDS[k.key] || str(k.words) || k.key,
+      counted: k.counted,
+      coach: Number.isInteger(k.coach_right) ? k.coach_right : null,
+      rule: Number.isInteger(k.rule_right) ? k.rule_right : null,
+      of: Number.isInteger(k.n) ? k.n : null,
+      sentence: k.sentence.trim(),
+    })),
+  };
 }
 
 /** The sign test in plain words, every number carried: "The coaches alone were right on 16 of these calls and the …". */

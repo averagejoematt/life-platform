@@ -166,12 +166,11 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
         "incline_db_press": "RPE 8–9\nBand pull-aparts first. Breathe out on the press.",
         "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull.",
         "lat_pulldown": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.",
-        # #5428 re-grade #2 (2026-10-31): a stale PREVIOUS still shows in Hevy's PREVIOUS column, so a row more than one
-        # step under it says why; the feeler W row is at the start load and its line is the result rule (re-grade #4)
-        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW at RPE 5 or less → one step, no more.",
-        "lying_db_tricep_extension": (
-            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW at RPE 5 or less → one step, no more.\nElbows still."
-        ),
+        # owner ruling 2026-11-10 (charter 1.41.0): a first session back after a long layoff reads the layoff band and the
+        # one layoff line, behind a W row lighter than the work — was `RPE 8–9, last set RPE 9–10` / `Lighter: first time
+        # in ‹gap›.` / `W at RPE 5 or less → one step, no more.` over a feeler AT the work (re-grades #2 and #4)
+        "chest_fly_machine": "RPE 6–7\nSame load all sets: first time in 4 years.",
+        "lying_db_tricep_extension": "RPE 6–7\nSame load all sets: first time in 13 months.\nElbows still.",
     }
     assert all(not note_problems(n) for n in notes.values())
     # Hevy's PREVIOUS, for the note linter: the last performed top load per movement (lb), with its date
@@ -180,14 +179,22 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
 
 
 def test_a_stale_anchor_is_the_pick_load_form_with_a_feeler_row():
-    """The 10-26 chest fly (a 2022 anchor): a W row of 8 at the engine's start load, and the pick line's result rule."""
+    """The 10-26 chest fly with NO session on file: a W row of 8 at the engine's start load, and the pick line's result
+    rule. Owner ruling 2026-11-10: with its 2022 anchor on file the same lift is a first session back after a long layoff,
+    so its W row is half the work instead (was the feeler at the start load)."""
     blocks, floors = _upper_volume()
-    lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=HISTORY, target_date=TARGET)
+    never = {k: v for k, v in HISTORY.items() if k != "T-FLY"}
+    lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=never, target_date=TARGET)
     fly = next(b for b in blocks if b.movement_key == "chest_fly_machine")
     # re-grade #4: the feeler W row is AT the start load — it is the test of that load, and its line says what the answer does
     assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", fly.sets[1].weight_kg, 8)
     assert [s.weight_kg for s in fly.sets[1:]] == [60 * LB, 60 * LB]  # the engine's start load stays on the working rows
-    assert "80% of your band anchor" not in fly.notes and "Last:" not in fly.notes
+    assert "80% of your band anchor" not in fly.notes and "Last:" not in fly.notes and lift_note.PICK_LOAD_LINE in fly.notes
+    blocks, floors = _upper_volume()
+    lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=HISTORY, target_date=TARGET)
+    fly = next(b for b in blocks if b.movement_key == "chest_fly_machine")
+    assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", 30 * LB, 8)
+    assert [s.weight_kg for s in fly.sets[1:]] == [60 * LB, 60 * LB] and lift_note.PICK_LOAD_LINE not in fly.notes
 
 
 def test_mutation_control_a_recent_anchor_is_not_the_pick_form():

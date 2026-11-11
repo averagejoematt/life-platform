@@ -99,6 +99,16 @@ depends on it.
   below 0. Otherwise "no demonstrated advantage".
 - Strata with no baseline (hypotheses, interval forecasts) answer "no baseline for this stratum".
 
+### The CR1 verified sample, split by kind of call (owner ruling 2026-11-10)
+
+`/api/calibration` → `verification_summary.subgroups` (`web/verification_fields.py::subgroups`) asks question 3 of the
+verified headline sample only — the deduplicated forecasts the headline counts, never the eligible total — split by kind
+of call. It is published as a **secondary, exploratory** result, never as the headline. Each kind serves its counted
+calls, the same exact sign test as the headline, and three p-values: unadjusted (`p`), Bonferroni across the kinds tested
+(`p_adjusted`, the correction this method applies across records) and Bonferroni across every subgroup comparison served
+for the sample, the per-coach comparisons included (`p_adjusted_all`). All three are served so no one of them is chosen
+after the fact. The words never call the baseline the better forecaster.
+
 ## Caveats stated with every output
 
 - Calls that share a metric and a window are not independent, so every p-value and interval here is optimistic.

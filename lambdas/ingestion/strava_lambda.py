@@ -23,7 +23,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 import boto3
 
@@ -234,41 +233,13 @@ def _normalize(activity: dict, zone_data: dict = None, hr_recovery: dict = None)
     return result
 
 
-def _dedup(activities: list) -> list:
-    """Dedup multi-device records — keep richest record per overlap window."""
-    if len(activities) <= 1:
-        return activities
-    sorted_a = sorted(activities, key=lambda x: x.get("start_date", ""))
-    kept: list[dict[str, Any]] = []
-    for act in sorted_a:
-        replaced = False
-        for i, existing in enumerate(kept):
-            try:
-                t_existing = datetime.strptime(existing.get("start_date", "")[:19], "%Y-%m-%dT%H:%M:%S")
-                t_new = datetime.strptime(act.get("start_date", "")[:19], "%Y-%m-%dT%H:%M:%S")
-                if abs((t_new - t_existing).total_seconds()) > 120:
-                    continue
-
-                # Within 2-min window — overlap. Keep richer (has HR, watts, polyline)
-                def richness(a):
-                    return sum(
-                        [
-                            bool(a.get("has_heartrate")),
-                            bool(a.get("device_watts")),
-                            bool(a.get("map", {}).get("summary_polyline")),
-                            bool(a.get("kilojoules")),
-                        ]
-                    )
-
-                if richness(act) > richness(existing):
-                    kept[i] = act
-                replaced = True
-                break
-            except Exception:
-                continue
-        if not replaced:
-            kept.append(act)
-    return kept
+# #5696 (capture-all, interpret later): there is NO ingest-time dedupe. Until 2026-11 a
+# `_dedup` here dropped any activity starting within 120 s of another, whatever its sport,
+# and on a richness tie kept the EARLIER one — 7 vendor activities in the 90 days to
+# 2026-11-10 were never stored, one of them the Apple Watch's own 10-18 walk, lost to a
+# 17-minute WHOOP chunk of it. Every activity the vendor lists is stored; duplicate copies of
+# one session are resolved at read time by `common.strava_read_seam` (same sport, starts
+# within 15 min, or a cross-device >= 80% containment), which keeps the richer copy.
 
 
 # ── SIMP-2 callbacks ──────────────────────────────────────────────────────────
@@ -317,8 +288,7 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
     )
     _secret_cache["secret"] = secret
     if not activities:
-        return None
-    activities = _dedup(activities)
+        return None  # #5696: no ingest dedupe — every listed activity is stored (see the note above)
     enriched = []
     stored = None  # read lazily: only a heart-rate activity needs it
     for a in activities:
@@ -446,6 +416,63 @@ def carry_forward_enrichment(existing: dict, new: dict) -> dict:
     return new
 
 
+# ── Late entries (#5753) ──────────────────────────────────────────────────────
+# The trailing 3-day re-fetch only revisits recent START days, so an activity entered in
+# Strava late for an older day — 20673635694, a manual walk dated 2026-10-06 and typed in
+# about two weeks later — was never fetched: its day was already "present", and the 14-day
+# reconcile only REPORTS what the store lacks. Strava's list call cannot be asked by upload
+# time (`after=`/`before=` filter on the activity's START time, and the summary activity
+# carries no created/upload timestamp), so a cursor on the last poll handed to `after=`
+# would never see a back-dated entry. What the list CAN answer is "which activities START in
+# this window", and the store answers "which ids do we hold": a vendor id with a start day
+# inside the window and no stored counterpart is, by definition, an entry that arrived after
+# its day was last fetched. That day is handed back to the framework, which re-fetches it
+# through `fetch_day` → `transform` → `_store_item` — the same full replace of that day, with
+# `carry_forward_enrichment` applied, that a `date_override` run makes. Stateless on purpose:
+# no cursor to persist or lose, and a day whose write fails is simply found again next run.
+#
+# Cost per run: one list page (100 activities) covers the default 30 days at his volume, plus
+# one DynamoDB query; the ingest runs 18 times a day, well inside Strava's 100-per-15-min /
+# 1,000-per-day read limit. HR enrichment is only paid for the day(s) found, at most
+# LATE_ENTRY_MAX_DAYS_PER_RUN of them; `urlopen_with_retry` backs off on 429 as everywhere else.
+
+LATE_ENTRY_WINDOW_DAYS = int(os.environ.get("LATE_ENTRY_WINDOW_DAYS", "30"))
+LATE_ENTRY_MAX_DAYS_PER_RUN = int(os.environ.get("LATE_ENTRY_MAX_DAYS_PER_RUN", "5"))
+
+
+def late_entry_days(table, today) -> list:
+    """Local days in the last LATE_ENTRY_WINDOW_DAYS holding a vendor activity the store lacks.
+
+    ``today`` is the framework's Pacific date. The UTC list window is bracketed by a day on
+    each side (the `fetch_day` pattern) and each activity is assigned to its own
+    ``start_date_local`` day. Oldest days first — they leave the window soonest.
+    """
+    secret = _secret_cache["secret"]
+    if not secret:
+        return []
+    first = today - timedelta(days=LATE_ENTRY_WINDOW_DAYS)
+    after_ts = datetime(first.year, first.month, first.day, tzinfo=timezone.utc).timestamp() - 86400
+    before_ts = datetime(today.year, today.month, today.day, tzinfo=timezone.utc).timestamp() + 2 * 86400
+    api_activities, secret = _fetch_activities_in_range(secret, after_ts, before_ts)
+    _secret_cache["secret"] = secret
+    lo, hi = first.isoformat(), today.isoformat()
+    in_window = [a for a in api_activities if lo <= str(a.get("start_date_local") or "")[:10] <= hi]
+    if not in_window:
+        return []
+    stored_by_day = _fetch_stored_days(table, (first - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat())
+    stored = [a for day in sorted(stored_by_day) for a in stored_by_day[day]]
+    missing = _activities_missing_from_store(in_window, stored)
+    days = sorted({str(a.get("start_date_local"))[:10] for a in missing})
+    if days:
+        logger.warning(
+            "[LATE-ENTRY] #5753 %d vendor activities absent from the store, on day(s) %s: %s",
+            len(missing),
+            days,
+            [str(a.get("id")) for a in missing],
+        )
+    return days[:LATE_ENTRY_MAX_DAYS_PER_RUN]
+
+
 # ── Framework config ──────────────────────────────────────────────────────────
 
 _config = IngestionConfig(
@@ -467,6 +494,9 @@ _config = IngestionConfig(
     # #2250: ...and because that re-fetch is a full REPLACE, hand the stored record
     # to the merge above first so activity-enrichment's output survives it.
     carry_forward_fn=carry_forward_enrichment,
+    # #5753: ...and an activity entered late for a day OLDER than that window is found by
+    # id against the store and its start day re-fetched through the same path.
+    extra_dates_fn=late_entry_days,
 )
 
 
@@ -501,22 +531,26 @@ def _parse_start(s) -> datetime | None:
 def _activities_missing_from_store(api_activities: list, stored_activities: list, tolerance_seconds: int = 120) -> list:
     """Return the API activities that have no counterpart in the store.
 
-    An API activity counts as present if the store holds either (a) the same
-    ``strava_id`` or (b) an activity that started within ``tolerance_seconds`` of
-    it. The time-window match mirrors the ingestion ``_dedup`` (which collapses
-    near-simultaneous multi-device / GPS-drop twins into one record), so a
-    legitimately-deduped activity is NOT reported as a false gap.
+    An API activity counts as present if the store holds the same ``strava_id``. Only a
+    stored activity WITHOUT a ``strava_id`` (a legacy row) can stand in for it by starting
+    within ``tolerance_seconds`` — there is no other way to match one.
+
+    #5696: the time-window match used to apply to every stored activity, mirroring the
+    ingest ``_dedup`` that dropped any activity within 120 s of another. That rule is gone
+    (every vendor activity is stored; the read seam resolves copies), so a stored sibling
+    with its OWN id no longer hides a vendor activity the store lacks — that is exactly the
+    activity the old rule failed to store, and this check is the one that can see it.
     """
     stored_ids = {str(s.get("strava_id")) for s in stored_activities if s.get("strava_id")}
-    stored_starts = [t for t in (_parse_start(s.get("start_date")) for s in stored_activities) if t is not None]
+    legacy_starts = [t for t in (_parse_start(s.get("start_date")) for s in stored_activities if not s.get("strava_id")) if t is not None]
     missing = []
     for a in api_activities:
         sid = str(a.get("id", ""))
         if sid and sid in stored_ids:
             continue
         t = _parse_start(a.get("start_date"))
-        if t is not None and any(abs((t - ts).total_seconds()) <= tolerance_seconds for ts in stored_starts):
-            continue  # near-duplicate of a stored activity (e.g. a deduped GPS-drop twin)
+        if t is not None and any(abs((t - ts).total_seconds()) <= tolerance_seconds for ts in legacy_starts):
+            continue  # a legacy stored row with no id, starting at the same moment
         missing.append(a)
     return missing
 

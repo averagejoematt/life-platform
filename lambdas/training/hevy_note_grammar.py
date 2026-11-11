@@ -27,8 +27,9 @@ from __future__ import annotations
 import re
 from typing import Optional, Union
 
-GRAMMAR_VERSION = "hevy-note-grammar@1.5.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4; 1.4.0: the test-block grammar;
-# 1.5.0: re-grade #6 (2026-11-08) — one layoff line, plain load-rule line 4, intervals at steady + 2 (see each builder)
+GRAMMAR_VERSION = "hevy-note-grammar@1.6.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4; 1.4.0: the test-block grammar;
+# 1.5.0: re-grade #6 (2026-11-08) — one layoff line, plain load-rule line 4, intervals at steady + 2 (see each builder);
+# 1.6.0: owner ruling 2026-11-10 — a first session back after a long layoff (`FIRST_RETURN_RE`)
 
 Rpe = Union[float, int, tuple[float, float], list[float]]
 
@@ -385,6 +386,10 @@ _GAP = r"\d+ (?:days|weeks|months|years)"
 LAYOFF_RE = re.compile(
     rf"^{LAYOFF_HEAD}: (?:first time in {_GAP}|\d+(?:st|nd|rd|th) session back after {_GAP} off|{LAYOFF_BREAK_WORDS}|{LAYOFF_NEW_WORDS})\.$"
 )
+# a FIRST session back after a long layoff, as its reason line names it (owner ruling 2026-11-10, lint L14): the layoff
+# line on exposure 1, or a stale PREVIOUS's `Lighter:` / `Heavier:` reason — both name `first time in ‹gap›` only past
+# the OD1 exposure-cap line (`layoff_tiers.REENTRY_MAX_GAP_DAYS`; the stale reason past `lift_note.STALE_AFTER_DAYS`)
+FIRST_RETURN_RE = re.compile(rf"^(?:{LAYOFF_HEAD}|Lighter|Heavier): first time in {_GAP}\.$")
 # the retired capped-exposure wording (re-grade #6): any `No jumps` line on the wire fails lint L1
 RETIRED_LAYOFF_RE = re.compile(r"^No jumps\b")
 

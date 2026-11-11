@@ -23,10 +23,21 @@ sys.path.insert(0, os.path.join(_REPO, "deploy"))
 
 from datetime import datetime, timedelta  # noqa: E402
 
+import pytest  # noqa: E402
 import restart_leadin_pages as rlp  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
 
 _G = chron.EXPERIMENT_START_DATE
+
+
+@pytest.fixture(autouse=True)
+def _no_withdrawals(monkeypatch):
+    """PLAN sits on genesis-1 of the live calendar (DATE#2026-09-05), the installment withdrawn on 2026-11-10. This
+    file pins the UNLISTED behaviour, so it runs with no withdrawals; the withdrawal is pinned in
+    tests/test_chronicle_withdrawn_installment.py."""
+    from content import chronicle_schema
+
+    monkeypatch.setattr(chronicle_schema, "WITHDRAWN_SKS", frozenset())
 
 
 def _d(days):

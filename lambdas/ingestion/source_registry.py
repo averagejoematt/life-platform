@@ -643,7 +643,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "#4638) anywhere inside its 14-day window except the first and last day, at most 3 days per run, and "
                 "never when the vendor list comes back wholly empty. An edit, or a partial delete, older than 3 days "
                 "is not written: _reconcile REPORTS it (StoreOnlyActivityCount / ChangedActivityCount, Source=strava) "
-                "and the store keeps what it first saw."
+                "and the store keeps what it first saw — unless that day also gains an activity the store lacks: "
+                "every ingest run re-fetches the start day of a vendor id missing from the store within the last "
+                "30 days (#5753, late manual entries), and that full replace carries the day's edits too."
             ),
         },
     },

@@ -323,7 +323,14 @@ ecosystem bumps it — one copy, no hand-bump (the old "bump the `ci-cd.yml` lit
 hand" step let the pin sit months stale, the #2468 incident). Discover them all —
 `grep -E 'aws-cdk|constructs==' cdk/package.json cdk/requirements.txt
 requirements-dev.txt .github/workflows/ci-cd.yml`. Dependabot proposes both halves
-(`chore(deps-cdk)`); land lib and CLI bumps as deliberate PRs.
+(`chore(deps-cdk)`); land lib and CLI bumps as deliberate PRs. **No
+`cdk/package-lock.json`, on purpose (#5514):** `cdk/package.json` is a
+version-of-record only — no workflow runs `npm install`/`npm ci` in `cdk/`, they run
+`npm install -g "aws-cdk@${CDK_CLI_VERSION}"`, and the CLI ships with no
+dependencies (`npm view aws-cdk@<v> dependencies optionalDependencies
+bundleDependencies` → `{}`, checked 2026-11-10 on 2.1146.1). A lockfile would be read by
+no install path and pin nothing. Revisit if a workflow ever installs FROM `cdk/` or the
+CLI grows a dependency.
 
 **CI-parity test runs need FAKE creds, not absent ones.** CI's runner has no valid AWS
 credentials, but `env -u` alone lets boto3 fall back to the `[default]` profile and

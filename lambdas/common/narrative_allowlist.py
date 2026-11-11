@@ -17,6 +17,9 @@ HOW THE GATE HONOURS IT — fail closed at every step (``record_for``):
   * only for a row with NO provenance record — a row that carries one (a private family, an unrecorded input, a
     malformed record) is decided by that record, allowlisted or not;
   * only when (pk, sk) is listed AND the field's text hashes to the pinned value;
+  * never for a row whose generation read a goals-file field that is not public-safe (``goals_field_privacy``,
+    owner ruling 2026-11-10 item 6) — the 14 sealed calls read the plan digest, every field of which is public-safe;
+  * never for an annotated row (``narrative_annotations``): those are served only with their dated correction;
   * never when the words name private activity (``prediction_publication.words_name_private_activity``) — a belt;
   * the record it returns (a sealed call's listed families; a lead read's families derived from its own stored
     ``cited`` block) must still pass ``narrative_provenance.eligibility`` like any stamped row.
@@ -59,8 +62,9 @@ DERIVED_FROM_CITED = ()
 
 
 #: 21 lead daily reads + 14 sealed day-one calls. Withheld by the check (and so absent): the three 15 g reads, four
-#: reads whose cited figure no longer matches its source record (accuracy hold), and the two sealed calls the owner's
-#: ruling of 2026-11-09 (#5720) keeps private.
+#: reads whose cited figure no longer matches its source record (accuracy hold — owner ruling 2026-11-10 item 4 keeps
+#: them excluded; their dated corrections are in ``narrative_annotations``, unapproved), and the two sealed calls the
+#: owner's ruling of 2026-11-09 (#5720) keeps private.
 APPROVED: tuple = (
     _E(
         "COACH#eli_marsh",
@@ -317,6 +321,16 @@ def record_for(item: Any, pk: Any = None) -> Optional[dict]:
         return None
     entry = INDEX.get((str(item.get("pk", pk) or ""), str(item.get("sk") or "")))
     if entry is None:
+        return None
+    from common import goals_field_privacy as GFP, narrative_annotations as NANN
+
+    # An annotated read is published only WITH its dated correction (``narrative_annotations.annotated_words``),
+    # never as bare words through the gate — even if its key were ever listed here.
+    if (entry.pk, entry.sk) in NANN.KEYS:
+        return None
+    # Owner ruling 2026-11-10 (item 6): a text whose generation read any goals-file field that is not public-safe
+    # stays withheld (the inputs it actually had, per the producing commit).
+    if not GFP.inputs_public(GFP.goals_inputs_for(entry.pk, entry.sk)):
         return None
     text = item.get(entry.field)
     if not isinstance(text, str) or _sha(text) != entry.text_sha256:

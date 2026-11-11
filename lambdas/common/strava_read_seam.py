@@ -24,7 +24,16 @@ THE PAIR RULE (`dedup_activities`) — two activities of the same sport are one 
       WHOOP auto-detects it in chunks, and the second chunk starts an hour or more after the
       Garmin's start — 29 surviving same-sport overlaps in the 2024-09-04 → 2025-05-10
       window under rule (a) alone, 22 of them walks.
-The RICHER copy is kept (measured distance > duration > polyline). Its heart rate is only
+The RICHER copy is kept (measured distance > duration > polyline) — with one exception, the
+ECHO RULE (#5696): Hevy's own push of a session (`device_name` "Hevy",
+`common.activity_overlap.HEVY_DEVICE`) is a copy of what the lifter logged, not a recording.
+When the other copy is a device's own recording covering >= `CONTAINMENT_SHARE` of the push's
+interval, the recording is kept whatever the richness score says (a Hevy push's duration is
+the logged session's, so a few seconds longer than the watch's would otherwise win), and on an
+exact richness tie the recording is kept too. A PARTIAL chunk (WHOOP's 13–86 min of a 2–3.5 h
+lift) still loses to the push, as below. Since #5696 the ingest stores every activity the
+vendor lists — the 120 s any-sport drop it used to apply is gone — so this seam is the ONLY
+place a copy is removed. Its heart rate is only
 kept if it is plausible: the 2024 Garmin copies of walks carry an average of 49–57 bpm
 (physically not a walk; WHOOP recorded 103–124 for the same minutes). When the kept copy's
 average HR is missing or below `PLAUSIBLE_ACTIVITY_AVG_HR` and the dropped copy's is not,
@@ -53,6 +62,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from common.activity_overlap import HEVY_DEVICE  # #5696: Hevy's own Strava push is an echo, not a recording
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive == UTC)
 
 #: The partition this seam normalises. Every other source passes through untouched.
@@ -101,6 +111,21 @@ def _richness(a: Dict[str, Any]) -> float:
     if a.get("summary_polyline"):
         score += 500
     return score
+
+
+def _is_echo(a: Dict[str, Any]) -> bool:
+    return str(a.get("device_name") or "").strip().lower() == HEVY_DEVICE
+
+
+def _keeps_first(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+    """True when `a`, not `b`, is the copy of one session to keep (the richness rule + the ECHO RULE)."""
+    ra, rb = _richness(a), _richness(b)
+    if _is_echo(a) != _is_echo(b):
+        echo, own = (a, b) if _is_echo(a) else (b, a)
+        share = _coverage_share(echo, own)  # how much of the push's interval the device recorded
+        if ra == rb or (share is not None and share >= CONTAINMENT_SHARE):
+            return own is a
+    return ra >= rb
 
 
 def _hr_plausible(a: Dict[str, Any]) -> bool:
@@ -167,7 +192,7 @@ def _dedup_plan(activities: List[Dict[str, Any]]) -> Tuple[List[int], Dict[int, 
             a_i, a_k = eff.get(i, activities[i]), eff.get(k, activities[k])
             if k in removed or _sport(a_i) != _sport(a_k) or not _same_session(a_i, ti, a_k, tk):
                 continue
-            win, lose = (i, k) if _richness(a_i) >= _richness(a_k) else (k, i)
+            win, lose = (i, k) if _keeps_first(a_i, a_k) else (k, i)
             a_win, a_lose = eff.get(win, activities[win]), eff.get(lose, activities[lose])
             # One graft per session: a partial graft (#4627) leaves no `average_heartrate`, and a
             # second chunk of the same session must not overwrite the first donor's family.
