@@ -24,7 +24,16 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import in_block_variant, lift_note, load_ramp, program_structure, routine_generator as _rg, variant_rotation, warmup_sets
+from training import (
+    in_block_variant,
+    lift_note,
+    load_ramp,
+    program_structure,
+    routine_generator as _rg,
+    selection_engine,
+    variant_rotation,
+    warmup_sets,
+)
 from training.rep_scheme import round_to_implement_kg
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
@@ -272,6 +281,7 @@ def _prescription(
         rows=inputs.rotation_rows,
         skill_ceiling=skill_ceiling,
         block_workouts=block_workouts,  # #5774: the kettlebell slot's entry exposures are counted from the record
+        select=True,  # #5773: the selection engine — shadow while the library is proposed
     )
     rx = program_structure.session_prescription_for_role(
         day_entry["session_role"],
@@ -411,6 +421,7 @@ def full_body_routines(
             "session_shape": shape,
             "rotation": rotation,  # #5075: routine_repo.draft_versioned records its ledger_writes
         }
+        | selection_engine.snapshot_fields(rotation)  # #5773: selection_shadow (proposed library) or selection (approved)
         | note_record,
         rationale=rationale,
         caps=caps,

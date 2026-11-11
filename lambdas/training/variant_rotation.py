@@ -634,11 +634,13 @@ def for_session(
     read: bool = True,
     skill_ceiling: int = 2,
     block_workouts: list[dict[str, Any]] | None = None,
+    select: bool = False,
 ) -> dict[str, Any]:
     """`plan` for the served session, with the ledger read here (fail-soft) unless `rows` is injected or `read` is False
     (the plan view: no hidden DDB read — `ledger: not_read`, the rotation computed). `block_workouts`: the Hevy record the
     kettlebell slot's entry exposures are counted from (#5774, `kb_entry`), else the entry's own `kb_entry_exposures`;
-    neither = not read, and the entry (the KB deadlift) serves."""
+    neither = not read, and the entry (the KB deadlift) serves. `select` (a draft) runs the #5773 selection engine over
+    it: SHADOW beside these pools while the exercise library is proposed, LIVE once approved."""
     pos = position(day_entry)
     state = "injected" if rows is not None else "not_read"
     if rows is None and read and pos is not None:
@@ -646,7 +648,12 @@ def for_session(
     day = (day_entry or {}).get("date") or (day_entry or {}).get("target_date")
     # the planned session carries its own measured count (`program_structure.planned_session`); a generator passes the record
     n = kb_entry.exposures(block_workouts, day) if block_workouts is not None else (day_entry or {}).get("kb_entry_exposures")
-    return plan(day_entry, catalog_movements, rows=rows, ledger_state=state, skill_ceiling=skill_ceiling, kb_exposures=n)
+    out = plan(day_entry, catalog_movements, rows=rows, ledger_state=state, skill_ceiling=skill_ceiling, kb_exposures=n)
+    if not select:
+        return out
+    from training import selection_engine
+
+    return selection_engine.apply(out, catalog_movements, rows=rows, skill_ceiling=skill_ceiling, target_date=_draft_day(day_entry))
 
 
 def week_volume(catalog_movements: dict[str, Any], variants_by_role: dict[str, dict[str, str]], skill_ceiling: int = 2) -> dict[str, Any]:
