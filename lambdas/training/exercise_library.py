@@ -9,9 +9,10 @@ profile, stability), what it costs (joint stress, skill) and what it needs (equi
 controlled vocabulary). A hypertrophy tier above C needs a citation verified to exist (DOI or
 PMID) — an unreviewed entry is tier C, never a guess.
 
-It ships `status: "proposed"`. NOTHING in the drafting path reads it until the owner approves it
-(`tests/test_exercise_library_5769.py` asserts no module imports this one). The next stories wire
-gate evaluation (#5772) and selection.
+It ships `status: "proposed"`. Only the selection engine (#5773, `selection_engine` / `selection_critic`)
+reads it, and it changes no live draft until the owner approves the library: while `proposed` the engine
+runs in SHADOW (`tests/test_exercise_library_5769.py` asserts no other module imports this one). Gate
+evaluation is #5772.
 
 TWO HALVES — PUBLIC AND PRIVATE
 
