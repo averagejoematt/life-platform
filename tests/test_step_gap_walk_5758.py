@@ -149,7 +149,8 @@ def test_stage_1_attaches_the_walk_and_stage_2_stores_it_on_the_drafted_routine(
     fns = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
     stage1 = ast.unparse(fns["tool_plan_next_session"])
     assert "step_gap_walk.attach(block, steps_window, prescription_rows)" in stage1
-    stage2 = ast.unparse(fns["_run_stage_2"])
+    # #5781: stage 2's record is built in mcp/plan_stage2_run.py (`_Run.record`); `_run_stage_2` delegates to it
+    stage2 = ast.unparse(next(n for n in ast.walk(ast.parse(_source("mcp/plan_stage2_run.py"))) if getattr(n, "name", None) == "record"))
     assert "'steps_walk': (block.get('steps_ramp') or {}).get('walk_to_close_gap')" in stage2
 
 

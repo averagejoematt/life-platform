@@ -222,6 +222,11 @@ def goals_digest(goals):
     """Compact, number-faithful digest of user_goals.json for the generation prompt."""
     t = goals["targets"]
     tl = goals["timeline"]
+    # The LDL target is private (owner ruling 2026-11-11) and has left the tracked plan file, so a digest built today
+    # carries it only when a caller hands in a document that has it. The 2026-09-06 freeze's digest DID carry it —
+    # goals_field_privacy.SEALED_CALL_DIGEST_FIELDS records that, and history is never re-claimed.
+    ldl_target = (t.get("biomarkers") or {}).get("ldl_target_mg_dl")
+    ldl = f", LDL {ldl_target} mg/dL" if ldl_target is not None else ""
     milestones = ", ".join(f'{m["lbs"]} lbs ({m["label"]})' for m in t["weight"]["interim_milestones"])
     return (
         f"Start date (Day 1): {tl['start_date']}. Start weight: {tl['start_weight_lbs']} lbs. "
@@ -238,7 +243,7 @@ def goals_digest(goals):
         f"Sleep: bed {t['sleep']['target_bedtime']}, wake {t['sleep']['target_wake']}, "
         f"{t['sleep']['target_hours']} h target. "
         f"Biomarker targets: RHR {t['biomarkers']['resting_hr_target_bpm']} bpm, "
-        f"HRV {t['biomarkers']['hrv_target_ms']} ms, LDL {t['biomarkers']['ldl_target_mg_dl']} mg/dL. "
+        f"HRV {t['biomarkers']['hrv_target_ms']} ms{ldl}. "
         f"Ramp discipline: week 1 reduced volume, no failure sets, no PRs before day 21, "
         f"zone-2 by RPE for the first 2 weeks."
     )

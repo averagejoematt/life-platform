@@ -160,9 +160,9 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         "mcp/panel_weekly_grade.py writes and MCP reads, and in the panel-rubric-gate CI verdict; no /api/ route, site page "
         "or email reads PANEL#.",
     ),
-    "mcp/tools_plan.py": _ex(
+    "mcp/plan_stage2_run.py": _ex(
         OWNER_CHAT_MCP,
-        "#3752 stage 2: the four debrief critics — each model reply is ONE JSON object {verdict, metric, value, field, to, sentence} parsed by "
+        "#3752 stage 2 (moved from mcp/tools_plan.py by #5781): the four debrief critics — each model reply is ONE JSON object {verdict, metric, value, field, to, sentence} parsed by "
         "coach.critics.parse_model_verdict; the verdict is floored by the deterministic layer and a `metric` outside the packet is discarded, "
         "so the model cannot introduce a number. The only free text is a single <=200-char sentence that lands in Matthew's own Hevy routine "
         "notes and the training coach thread (owner-only surfaces, never rendered publicly).",

@@ -785,8 +785,8 @@
     "phase": "experiment",
     "pk": "COACH#mind_coach",
     "pre_registered": true,
-    "prediction_id": "pred_20260906_sleep_duration_will_consistently_reach_o",
-    "sk": "PREDICTION#pred_20260906_sleep_duration_will_consistently_reach_o",
+    "prediction_id": "pred_20260906_withheld_call_a",
+    "sk": "PREDICTION#pred_20260906_withheld_call_a",
     "status": "refuted",
     "subdomain": "sleep",
     "verdict_correction": {

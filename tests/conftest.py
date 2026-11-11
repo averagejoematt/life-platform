@@ -459,3 +459,13 @@ def _ip_hash_salt_3620(monkeypatch):
     except Exception:
         pass
     yield
+
+
+# Owner ruling 2026-11-11 (item 2): the plan root's private part lives OFF the repo — on a developer's machine at
+# ~/.config/life-platform/user_goals_private.json (common.user_goals). A test must never read the owner's real private
+# part, so the suite points the loader at a path that does not exist; a test that needs a private part writes a
+# SYNTHETIC one to tmp_path and sets the variable itself.
+@pytest.fixture(autouse=True)
+def _goals_private_part_is_synthetic(monkeypatch, tmp_path_factory):
+    monkeypatch.setenv("LIFE_PLATFORM_GOALS_PRIVATE_PATH", str(tmp_path_factory.getbasetemp() / "no-goals-private-part.json"))
+    yield
