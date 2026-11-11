@@ -1,9 +1,9 @@
 {
   "_meta": {
     "captured_at": "2026-11-11",
-    "family_count": 118,
+    "family_count": 119,
     "generated_by": "lambdas/experiment/pk_census.py::census_snapshot via deploy/write_pk_family_census.py \u2014 never hand-edit this artifact",
-    "item_count": 52689,
+    "item_count": 52707,
     "region": "us-west-2",
     "table": "life-platform"
   },
@@ -11,135 +11,140 @@
     "COACH#": {
       "COACH#career_coach": {
         "class": "cross_phase",
-        "rep_sk": "CHAT#2026-08-25#1120a41b"
+        "rep_sk": "CHAT#0000-00-00#x"
       },
       "COACH#commitments": {
         "class": "experiment_scoped",
-        "rep_sk": "TALLY#current"
+        "rep_sk": "TALLY#x"
       },
       "COACH#computation": {
         "class": "experiment_scoped",
-        "rep_sk": "RESULTS#2026-04-07"
+        "rep_sk": "RESULTS#0000-00-00"
       },
       "COACH#eli_marsh": {
         "class": "cross_phase",
-        "rep_sk": "CHAT#2026-08-12#18818e69"
+        "rep_sk": "CHAT#0000-00-00#x"
       },
       "COACH#evening_checkin": {
         "class": "system_state",
-        "rep_sk": "EVAL#2026-10-24"
+        "rep_sk": "EVAL#0000-00-00"
       },
       "COACH#explorer_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       },
       "COACH#glucose_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       },
       "COACH#labs_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       },
       "COACH#mind_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       },
       "COACH#morning_checkin": {
         "class": "system_state",
-        "rep_sk": "EVAL#2026-10-27"
+        "rep_sk": "EVAL#0000-00-00"
       },
       "COACH#nudge_ledger": {
         "class": "system_state",
-        "rep_sk": "DAY#2026-07-26"
+        "rep_sk": "DAY#0000-00-00"
       },
       "COACH#nutrition_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       },
       "COACH#outbound_events": {
         "class": "system_state",
-        "rep_sk": "EVENT#CALIB_DEADMAN#photos#2026-09-06"
+        "rep_sk": "EVENT#x#x#0000-00-00"
       },
       "COACH#outbound_ledger": {
         "class": "system_state",
-        "rep_sk": "DAY#2026-10-24"
+        "rep_sk": "DAY#0000-00-00"
       },
       "COACH#physical_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       },
       "COACH#protein_nudge": {
         "class": "system_state",
-        "rep_sk": "EVAL#2026-10-20"
+        "rep_sk": "EVAL#0000-00-00"
       },
       "COACH#sleep_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       },
       "COACH#steps_nudge": {
         "class": "system_state",
-        "rep_sk": "EVAL#2026-10-19"
+        "rep_sk": "EVAL#0000-00-00"
       },
       "COACH#training_coach": {
         "class": "experiment_scoped",
-        "rep_sk": "BRIEF#2026-04-07"
+        "rep_sk": "BRIEF#0000-00-00"
       }
     },
     "ENSEMBLE#": {
       "ENSEMBLE#digest": {
         "class": "experiment_scoped",
-        "rep_sk": "CYCLE#2026-04-08"
+        "rep_sk": "CYCLE#0000-00-00"
       },
       "ENSEMBLE#disagreements": {
         "class": "experiment_scoped",
-        "rep_sk": "ACTIVE#caloric_deficit_sustainability_and_muscle_preservation"
+        "rep_sk": "ACTIVE#x"
       },
       "ENSEMBLE#dispute": {
         "class": "experiment_scoped",
-        "rep_sk": "THREAD#2026-W27#caloric_intake_adequacy_for_current_activity_and_upcoming_tr"
+        "rep_sk": "THREAD#x#x"
       },
       "ENSEMBLE#docket": {
         "class": "experiment_scoped",
-        "rep_sk": "OPEN#explorer_coach__nutrition_coach#recovery"
+        "rep_sk": "OPEN#x#x"
       },
       "ENSEMBLE#influence_graph": {
         "class": "system_state",
-        "rep_sk": "CONFIG#v1"
+        "rep_sk": "CONFIG#x"
       }
     },
     "NARRATIVE#": {
       "NARRATIVE#arc": {
         "class": "experiment_scoped",
-        "rep_sk": "HISTORY#2026-05-18"
+        "rep_sk": "HISTORY#0000-00-00"
       }
     },
     "PERSONA#": {
       "PERSONA#elena": {
         "class": "experiment_scoped",
-        "rep_sk": "CALLBACK#2026-06-30#what-happened-tuesday-to-sunday"
+        "rep_sk": "CALLBACK#0000-00-00#x"
       },
       "PERSONA#margaret": {
         "class": "cross_phase",
-        "rep_sk": "NOTE#2026-09-01"
+        "rep_sk": "NOTE#0000-00-00"
       }
     }
   },
   "families": {
+    "BOARDSESS": {
+      "class": "system_state",
+      "rep_pk": "BOARDSESS#x",
+      "rep_sk": "SESSION"
+    },
     "BOOK": {
       "class": "cross_phase",
-      "rep_pk": "BOOK#bd1540f875fbe0af",
+      "rep_pk": "BOOK#x",
       "rep_sk": "META"
     },
     "CACHE": {
       "class": "system_state",
       "rep_pk": "CACHE#matthew",
-      "rep_sk": "TOOL#cgm_dashboard_today"
+      "rep_sk": "TOOL#x"
     },
     "COACH": {
       "class": "cross_phase",
       "rep_pk": "COACH#eli_marsh",
-      "rep_sk": "CHAT#2026-08-12#18818e69"
+      "rep_sk": "CHAT#0000-00-00#x"
     },
     "COACHSIM": {
       "class": "cross_phase",
@@ -149,42 +154,42 @@
     "ENSEMBLE": {
       "class": "experiment_scoped",
       "rep_pk": "ENSEMBLE#docket",
-      "rep_sk": "OPEN#explorer_coach__nutrition_coach#recovery"
+      "rep_sk": "OPEN#x#x"
     },
     "EVALRET": {
       "class": "cross_phase",
       "rep_pk": "EVALRET#state_of_matthew",
-      "rep_sk": "TS#2026-07-26T19:30:36.637151+00:00#4c20b46f"
+      "rep_sk": "TS#0000-00-00x#x"
     },
     "EVALUATOR": {
       "class": "system_state",
       "rep_pk": "EVALUATOR#coach_prediction",
-      "rep_sk": "CORRECTION#SUMMARY#2026-11-01T18:11:57Z"
+      "rep_sk": "CORRECTION#x#0000-00-00x"
     },
     "NARRATIVE": {
       "class": "experiment_scoped",
       "rep_pk": "NARRATIVE#arc",
-      "rep_sk": "HISTORY#2026-05-18"
+      "rep_sk": "HISTORY#0000-00-00"
     },
     "PERSONA": {
       "class": "experiment_scoped",
       "rep_pk": "PERSONA#elena",
-      "rep_sk": "CALLBACK#2026-06-30#what-happened-tuesday-to-sunday"
+      "rep_sk": "CALLBACK#0000-00-00#x"
     },
     "PULSE": {
       "class": "system_state",
       "rep_pk": "PULSE",
-      "rep_sk": "DATE#2026-04-04"
+      "rep_sk": "DATE#0000-00-00"
     },
     "RATE": {
       "class": "system_state",
-      "rep_pk": "RATE#board_ask#bd5dadf9e2d5d70d",
-      "rep_sk": "HOUR#1794369600"
+      "rep_pk": "RATE#ask#x",
+      "rep_sk": "HOUR#x"
     },
     "READING": {
       "class": "cross_phase",
-      "rep_pk": "READING#9551158909c31d27",
-      "rep_sk": "NOTE#coach-why"
+      "rep_pk": "READING#x",
+      "rep_sk": "NOTE#x"
     },
     "SOURCE#achievements": {
       "class": "experiment_scoped",
@@ -638,7 +643,7 @@
     },
     "SOURCE#training_notes": {
       "class": "raw_timeseries",
-      "rep_pk": "USER#matthew#SOURCE#training_notes#EXERCISE#2f9e5895-87cd-4c51-baca-3cbd2b910d67",
+      "rep_pk": "USER#matthew#SOURCE#training_notes#EXERCISE#x",
       "rep_sk": "ARCHIVE#x#0000-00-00#x#x#x"
     },
     "SOURCE#training_reference": {
@@ -679,37 +684,37 @@
     "SUBSCRIBE": {
       "class": "system_state",
       "rep_pk": "SUBSCRIBE#rate_limit",
-      "rep_sk": "IP#00aa3a91934f550b#BUCKET#5981253"
+      "rep_sk": "IP#x#x#x"
     },
     "SYSTEM": {
       "class": "system_state",
       "rep_pk": "SYSTEM#dlq-ledger",
-      "rep_sk": "MSG#1d0441287a30042c1ba394bc4a9c7ba1"
+      "rep_sk": "MSG#x"
     },
     "USER": {
       "class": "cross_phase",
       "rep_pk": "USER#matthew",
-      "rep_sk": "PROFILE#v1"
+      "rep_sk": "PROFILE#x"
     },
     "USER#MCP_IDEMPOTENCY": {
       "class": "system_state",
       "rep_pk": "USER#matthew#MCP_IDEMPOTENCY",
-      "rep_sk": "create_todoist_task#0a4e706b68b0baff"
+      "rep_sk": "create_todoist_task#x"
     },
     "USER#MEMORY": {
       "class": "cross_phase",
       "rep_pk": "USER#matthew#MEMORY",
-      "rep_sk": "CYCLE#1#launch"
+      "rep_sk": "CYCLE#x#x"
     },
     "USER#ROUTINE": {
       "class": "system_state",
-      "rep_pk": "USER#matthew#ROUTINE#32ec141860f64ad09d02d73993e10826",
-      "rep_sk": "VERSION#000001"
+      "rep_pk": "USER#matthew#ROUTINE#x",
+      "rep_sk": "VERSION#x"
     },
     "VOICEFIDELITY": {
       "class": "cross_phase",
       "rep_pk": "VOICEFIDELITY#labs_coach",
-      "rep_sk": "JUDGMENT#2026-08#0"
+      "rep_sk": "JUDGMENT#x#x"
     },
     "VOTES": {
       "class": "system_state",
@@ -717,7 +722,7 @@
       "rep_sk": "COUNT"
     }
   },
-  "family_count": 118,
-  "generated_at": "2026-11-11T06:17:26.166596+00:00",
+  "family_count": 119,
+  "generated_at": "2026-11-11T17:40:46.153777+00:00",
   "note": "Live pk-family census (#3514). Regenerate with deploy/write_pk_family_census.py."
 }

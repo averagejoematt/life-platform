@@ -796,7 +796,7 @@ def census_snapshot(table=None) -> dict:
             cls = taxonomy.classify(pk, sk)
         except KeyError:
             cls = None  # unresolved; run_census_preflight is the instrument that RULES on this
-        families[fam] = {"rep_pk": pk, "rep_sk": artifact_rep_sk(fam, sk), "class": cls}
+        families[fam] = {"rep_pk": artifact_rep_pk(pk), "rep_sk": artifact_rep_sk(fam, sk), "class": cls}
     n_families = len(families)
     coverage_partitions: dict = {}
     for prefix, pks in _coverage.items():
@@ -806,7 +806,7 @@ def census_snapshot(table=None) -> dict:
                 cls = taxonomy.classify(pk, sk)
             except KeyError:
                 cls = None
-            block[pk] = {"rep_sk": sk, "class": cls}
+            block[pk] = {"rep_sk": artifact_rep_sk(pk, sk), "class": cls}
         coverage_partitions[prefix] = block
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -846,6 +846,16 @@ def census_snapshot(table=None) -> dict:
 
 
 _DATE_SEGMENT = re.compile(r"^\d{4}-\d{2}-\d{2}")
+# An opaque id inside a pk: a hex digest, a uuid, or a long mixed token (a BOARDSESS# reader-session bearer token).
+_OPAQUE_SEGMENT = re.compile(r"^(?:[0-9a-f]{12,}|[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9_-]{24,})$")
+
+
+def artifact_rep_pk(pk: str) -> str:
+    """The representative pk as the committed artifact records it (#5524): an opaque id segment becomes `x`.
+
+    classify() keys a pk on its named segments (COACH#mind_coach, USER#matthew#SOURCE#whoop), never on an id, so the
+    class is unchanged; what goes is a reader's session bearer token, a book or routine digest, an exercise uuid."""
+    return "#".join("x" if _OPAQUE_SEGMENT.match(seg) else seg for seg in pk.split("#"))
 
 
 def artifact_rep_sk(family: str, sk: str) -> str:
@@ -857,10 +867,11 @@ def artifact_rep_sk(family: str, sk: str) -> str:
     its source alone (platform_memory excepted — its category is the sk's second segment and is
     kept), and `scripts/date_range_read_census.py` needs only "a date, then more". So past the
     first segment a date becomes `0000-00-00` (suffix kept, so the shape survives) and every other
-    segment becomes `x`. Non-SOURCE families are recorded verbatim, as before: their sk prefix is
-    what classify() keys on (COACH# CHAT#/DEDUPE#, the bare USER#matthew rules)."""
-    if not family.startswith("SOURCE#"):
-        return sk
+    segment becomes `x`. Every other family (and every `coverage_partitions` row) is shaped the same
+    way: classify() keys a non-SOURCE row on its sk PREFIX (COACH# CHAT#/DEDUPE#, the bare
+    USER#matthew rules), which is kept, while the rest held a reader's hashed IP, the dates of
+    owner-only check-in evaluations and free-text slugs. Shaping all 145 rows of the 2026-11-11
+    artifact changed no row's class (tests/test_schema_families_census.py pins that)."""
     parts = sk.split("#")
     keep = 2 if family == "SOURCE#platform_memory" else 1
     out = parts[:keep]

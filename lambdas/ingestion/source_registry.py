@@ -1961,8 +1961,8 @@ UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
         "dated": "2026-09-17",
         "reason": (
             "431 rows, written by ingestion/macrofactor_lambda.py from the same Dropbox CSV drop as "
-            "`macrofactor`. A FROZEN pre-Hevy strength archive (public posture 'archive' in the "
-            "catalogue at site/data/data_sources.json); the live strength source is `hevy`, which is registered."
+            "`macrofactor`. A FROZEN pre-Hevy strength archive (public posture 'archive' in "
+            "site/data/data_sources.json); the live strength source is `hevy`, which is registered."
         ),
     },
     "milestones": {

@@ -319,3 +319,52 @@ def test_the_exemption_registry_is_documented_when_used():
 
 
 # premerge-gate: 3514: grades docs/SCHEMA.md against the committed pk-family census, which deploy/write_pk_family_census.py regenerates — a PR that lands a refreshed artifact must red on that PR, not on whoever pushes next (#2975).
+
+
+# ── #5524: the committed artifact carries shapes, never row keys (the repo is public) ─────────────
+
+
+def _artifact_rows(snap: dict):
+    for fam, v in snap["families"].items():
+        yield fam, v["rep_pk"], v.get("rep_sk", ""), v.get("class")
+    for block in snap.get("coverage_partitions", {}).values():
+        for pk, v in block.items():
+            yield pk, pk, v.get("rep_sk", ""), v.get("class")
+
+
+def test_the_committed_census_carries_no_row_key_and_no_opaque_id():
+    """Every recorded rep_sk is already its own shape and every rep_pk its own masked form: a regenerated artifact
+    that slipped a real key past the writer (a SNP id, a subscriber digest, a reader's IP hash, a session token) reds."""
+    from experiment.pk_census import artifact_rep_pk, artifact_rep_sk
+
+    snap = json.loads(CENSUS.read_text(encoding="utf-8"))
+    leaks = [(f, pk, sk) for f, pk, sk, _ in _artifact_rows(snap) if artifact_rep_sk(f, sk) != sk or artifact_rep_pk(pk) != pk]
+    assert not leaks, f"census rows not reduced to their shape: {leaks[:5]}"
+
+
+def test_shaping_never_changes_a_rows_class():
+    """The shaping is safe only because classify() keys on prefixes and named segments. Re-classify each shaped row and
+    compare with the class the scan recorded from the REAL row."""
+    snap = json.loads(CENSUS.read_text(encoding="utf-8"))
+    moved = []
+    for f, pk, sk, cls in _artifact_rows(snap):
+        try:
+            now = taxonomy.classify(pk, sk)
+        except KeyError:
+            now = None
+        if cls and now != cls:
+            moved.append((f, cls, now))
+    assert not moved, f"rows whose class depends on the masked part: {moved}"
+
+
+def test_the_shapers_mask_the_values_that_leaked():
+    """Must-fail control on the two functions, with synthetic stand-ins for each leaked kind."""
+    from experiment.pk_census import artifact_rep_pk, artifact_rep_sk
+
+    assert artifact_rep_sk("SOURCE#genome", "GENE#ABC1#SNP#rs0000001") == "GENE#x#x#x"
+    assert artifact_rep_sk("SUBSCRIBE", "IP#0123456789abcdef#BUCKET#42") == "IP#x#x#x"
+    assert artifact_rep_sk("COACH", "EVAL#2026-01-02") == "EVAL#0000-00-00"
+    assert artifact_rep_sk("PERSONA", "CALLBACK#2026-01-02#some-free-text-slug") == "CALLBACK#0000-00-00#x"
+    assert artifact_rep_pk("BOARDSESS#Ab12Cd34Ef56Gh78Ij90Kl12Mn34") == "BOARDSESS#x"
+    assert artifact_rep_pk("USER#matthew#SOURCE#whoop") == "USER#matthew#SOURCE#whoop"
+    assert artifact_rep_pk("COACH#mind_coach") == "COACH#mind_coach"

@@ -509,7 +509,12 @@ _CHECKIN_TOKENS = ("evening_checkin", "checkin_intake_pairs", "checkin_intake", 
 _PUBLIC_PACKAGES = ("web", "emails", "content", "ai")  # site API, reader emails, the public narrative + AI packages
 _PUBLIC_PREFIX = ('"generated/', "'generated/", '"site/', "'site/")  # a module that writes/reads the public S3 prefix
 # The ONE owner-ruled door (#5125 R5): the partner letter may name the coarse projection and nothing else.
-_ALLOWED = {os.path.join("lambdas", "emails", "partner_email_lambda.py"): {"checkin_partner_view"}}
+_ALLOWED = {
+    os.path.join("lambdas", "emails", "partner_email_lambda.py"): {"checkin_partner_view"},
+    # The source registry names the partition as a disposition key (#5524) and reads no row; it is swept because its
+    # prose cites a site/ path. Only that one name is allowed, so any other check-in door it gains still reds here.
+    os.path.join("lambdas", "ingestion", "source_registry.py"): {"checkin_intake_pairs"},
+}
 
 
 def _public_reader_modules():
@@ -535,9 +540,12 @@ def test_no_public_reader_names_any_checkin_door():
     assert any(m.startswith(os.path.join("lambdas", "emails")) for m in mods)
     offenders = []
     for rel, text in sorted(mods.items()):
-        named = {t for t in _CHECKIN_TOKENS if t in text}
         allowed = _ALLOWED.get(rel, set())
-        # a token that is only a substring of an allowed one (checkin_partner_view never contains the others) is fine
+        # An allowed name is blanked before the sweep, so a token that is only a substring of it (checkin_intake inside
+        # checkin_intake_pairs) is not counted, while the same token standing alone elsewhere in the module still is.
+        for ok in allowed:
+            text = text.replace(ok, "")
+        named = {t for t in _CHECKIN_TOKENS if t in text}
         if named - allowed:
             offenders.append((rel, sorted(named - allowed)))
     assert offenders == []
