@@ -130,23 +130,25 @@ def test_an_absent_or_empty_titration_record_falls_through_to_the_charter():
         assert (r["kcal"], r["source"]) == (2100, "charter"), record
 
 
-def test_the_any_day_floor_is_a_warning_never_a_clamp():
-    """Owner ruling 2026-10-23 R1 (#5091): the floors stay, as WARNINGS — a target under the any-day floor is served as
-    resolved and the gap is named (the pre-ruling clamp lifted it to the floor)."""
+def test_the_any_day_floor_is_a_clamp_on_the_served_target_5794():
+    """Owner ruling 2026-11-11 (#5794, option A; it replaces R1's warning): a target under the any-day floor is SERVED at
+    the floor, the titrated base stays stated and the lift is named — no floor warning beside it."""
     r = ct.resolve(FIXTURE_DAY, titration_reader=lambda week: {"kcal": 1400}, charter_reader=_charter())
-    assert r["kcal"] == 1400 and r["source"] == "titration" and "clamped" not in r["provenance"]
-    assert r["floor_warnings"] == ["unknown day 1400 kcal is 200 kcal under its 1600 kcal floor (a warning, not a clamp)"]
-    assert r["floor_warnings"][0] in r["provenance"]
+    assert (r["kcal"], r["base_kcal"], r["floor_clamp_kcal"], r["source"]) == (1600, 1400, 200, "titration")
+    assert "clamped 1400 -> 1600" in r["provenance"] and "floor_warnings" not in r
     r = ct.resolve(FIXTURE_DAY, charter_reader=_charter(target_kcal=1200))
-    assert r["kcal"] == 1200 and r["floor_warnings"]
-    assert ct.resolve(FIXTURE_DAY, charter_reader=_charter())["floor_warnings"] == [], "at or above the floor: no warning"
+    assert (r["kcal"], r["floor_clamp_kcal"]) == (1600, 400)
+    r = ct.resolve(FIXTURE_DAY, charter_reader=_charter())
+    assert (r["kcal"], r["floor_clamp_kcal"]) == (2100, 0) and "clamped" not in r["provenance"], "at or above the floor: no clamp"
 
 
 def test_the_live_charter_is_re_targeted_to_1500_with_a_band_centred_on_it():
     r = ct.resolve(FIXTURE_DAY)
-    assert (r["kcal"], r["source"]) == (1500, "charter") and r["band_low"] < r["kcal"] < r["band_high"]
-    assert r["kcal"] - r["band_low"] == r["band_high"] - r["kcal"], "#5099: the band is centred on the target"
-    assert r["floor_warnings"], "1,500 sits under the 1,600 any-day floor: the warning is visible (owner ruling R1)"
+    base = r["base_kcal"]
+    assert (base, r["source"]) == (1500, "charter") and r["band_low"] < base < r["band_high"]
+    assert base - r["band_low"] == r["band_high"] - base, "#5099: the band is centred on the target"
+    floor = tc.charter_value("nutrition.calories.floor_any_day_kcal")
+    assert r["kcal"] == floor and r["floor_clamp_kcal"] == floor - base, "#5794: 1,500 sits under the any-day floor: served at it"
     assert ct.calorie_band(FIXTURE_DAY) == (r["band_low"], r["band_high"])
 
 
@@ -169,7 +171,7 @@ def test_the_public_charter_carries_the_block_and_the_redlines_read_it():
     from training import owner_redlines
 
     block = tc.charter_value(ct.CHARTER_PATH)
-    assert block and ct.target_kcal(FIXTURE_DAY) == block["target_kcal"]
+    assert block and ct.target_kcal(FIXTURE_DAY) == max(block["target_kcal"], block["floor_any_day_kcal"]), "#5794: clamped at the floor"
     lo, hi = block["prescribed_band_kcal"]
     assert lo <= block["target_kcal"] <= hi, "panel default R1: the target sits in the prescribed band"
     energy = owner_redlines.REDLINES["energy_floor_kcal"]

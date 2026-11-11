@@ -43,7 +43,7 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "lambdas"))
 sys.path.insert(0, str(_REPO / "tests"))
 
-from health import food_quality as fq, weekly_menu as wm, weekly_menu_exact as wme  # noqa: E402
+from health import calorie_target as ct, food_quality as fq, weekly_menu as wm, weekly_menu_exact as wme  # noqa: E402
 from test_weekly_menu_5103 import ANCHORS, _food, _plan  # noqa: E402 — the sibling's placeholder week and foods
 from training import training_charter as tc  # noqa: E402
 
@@ -56,6 +56,10 @@ def _bundled_charter_only(monkeypatch):
     monkeypatch.delenv(tc.PRIVATE_ENV_VAR, raising=False)
     monkeypatch.setattr(tc, "_from_s3", lambda key: None)
     monkeypatch.setattr(tc, "_load_private", lambda: tc._from_env(tc.PRIVATE_ENV_VAR))
+    # The placeholder tables below were SEARCHED against the unclamped days (lifting 1,650 / rest 1,500): the day floor
+    # clamp (owner ruling 2026-11-11, #5794) is held off here so each trap stays the trap it was built as. The clamp
+    # itself is tests/test_kcal_floor_clamp_5794.py's.
+    monkeypatch.setattr(ct, "day_floor", lambda *_a, **_k: None)
     tc.reset_cache()
     yield
     tc.reset_cache()
