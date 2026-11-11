@@ -205,6 +205,12 @@ def load_history_indexes(
                             # #5076: the routine he performed, so the menu reads the kind it prescribed for an empty-note ride
                             **({"hevy_routine_id": str(item["hevy_routine_id"])} if item.get("hevy_routine_id") else {}),
                             "duration_sec": block_seconds,
+                            # #5796: the effort on the set row when Hevy carries one (read before his note)
+                            **(
+                                {"set_rpe": max(rpes)}
+                                if (rpes := [_to_float(s["rpe"]) for s in sets_raw if s.get("rpe") is not None])
+                                else {}
+                            ),
                             "distance_m": block_meters if block_meters > 0 else None,
                             "session_start": item.get("start_time"),
                             "session_end": item.get("end_time"),

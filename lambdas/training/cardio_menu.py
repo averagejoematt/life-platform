@@ -38,7 +38,7 @@ from typing import Any
 
 from training import training_charter
 
-CARDIO_MENU_VERSION = "cardio-menu@1.1.0"  # 1.1.0: #5505 counting (swaps at the logged effort, missed offers past the re-offer allowance)
+CARDIO_MENU_VERSION = "cardio-menu@1.2.0"  # 1.2.0: #5796 three-state swaps (effort not logged on its own); 1.1.0: #5505 counting (swaps at the logged effort, missed offers past the re-offer allowance)
 
 KINDS = ("incline_treadmill_walk", "easy", "tempo", "hills", "intervals")
 HARD = ("tempo", "hills", "intervals")
@@ -305,35 +305,95 @@ _RPE_IN_NOTE = re.compile(r"\bRPE\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 
 
 def logged_rpe(note: str | None) -> float | None:
-    """The highest RPE his own note logs ("RPE 7", "rpe 6.5"), or None when it logs none — an unlogged RPE is not evidence."""
-    vals = [float(m.group(1)) for m in _RPE_IN_NOTE.finditer(note or "")]
+    """The highest RPE his own note logs ("RPE 7", "rpe 6.5"), or None when it logs none — an unlogged RPE is not evidence.
+    #5796: a composed prescription line ("Recumbent · L12 · RPE 6–7 …") and the unfilled capture prompt ("RPE _") are
+    never read as a logged effort."""
+    from training import cardio_note
+
+    text = "\n".join(ln for ln in str(note or "").split("\n") if not cardio_note.LINE1_RE.match(ln.strip()))
+    vals = [float(m.group(1)) for m in _RPE_IN_NOTE.finditer(text)]
     return max(vals) if vals else None
 
 
+SWAP_MET, SWAP_EFFORT_NOT_LOGGED, SWAP_NOT_MET = "met", "done_effort_not_logged", "not_met"
+"""#5796 (owner ruling 2026-11-11): the three states of a swap. `done_effort_not_logged` is NEVER met: it is reported on
+its own, apart from `not_met`, by both readers."""
+
+
 def swap_counts(
-    served_kind: str | None, note: str | None, performed_minutes: int | None = None, served_minutes: int | None = None
+    served_kind: str | None,
+    note: str | None,
+    performed_minutes: int | None = None,
+    served_minutes: int | None = None,
+    set_rpe: float | None = None,
 ) -> dict[str, Any]:
     """#5505's counting rule for a block done on another machine than the one served (owner ruling 2026-11-08) — the ONE
-    rule both readers apply: the week's conditioning count (`kind_of_performed`) and the session's adherence grade
-    (`health.adherence_calc`, #5796). The swap counts as the served block when his own note logs an RPE at or above the
-    served kind's band (`wire_band`): a swap with no logged effort is not evidence. When both sides' minutes are known
-    (adherence has the served block's set row; the conditioning count does not) the swap must also run at least the
-    served minutes. `{counts, logged_rpe, rpe_floor, reason}`; `reason` names the first half that failed."""
-    rpe = logged_rpe(note)
+    rule both readers apply: the week's conditioning count (`kind_of_performed`, `swap_state`) and the session's
+    adherence grade (`health.adherence_calc`, #5796).
+
+    The effort is the RPE on the set row when Hevy carries one (`set_rpe`), else the one his note logs (`logged_rpe`).
+    Three states (owner ruling 2026-11-11): `met` — the effort is logged at or above the served kind's band floor
+    (`wire_band`) and the duration is complete; `done_effort_not_logged` — the duration is complete and no effort is
+    logged (never met, never `not_met`: its own state); `not_met` — shorter than served, or logged under the floor, or a
+    served block with no band. The duration is complete when the swap ran at least the served minutes; a reader with no
+    served minutes (the conditioning count) cannot check it and reads it as complete. Heart rate is not effort evidence
+    until a baseline exists (owner ruling 2026-11-11). `{state, counts, logged_rpe, rpe_source, rpe_floor, reason}`."""
+    rpe = float(set_rpe) if set_rpe is not None else logged_rpe(note)
+    source = "set_row" if set_rpe is not None else ("note" if rpe is not None else None)
     band = wire_band(str(served_kind)) if served_kind in KINDS else None
-    out: dict[str, Any] = {"counts": False, "logged_rpe": rpe, "rpe_floor": band[0] if band else None}
-    if band is None:
-        return {**out, "reason": f"the served block names no kind with an RPE band ({served_kind!r})"}
-    if rpe is None:
-        return {**out, "reason": "no RPE logged in his note — a swap with no logged effort is not evidence (#5505)"}
-    if rpe < band[0]:
-        return {**out, "reason": f"logged RPE {rpe:g} is under the served {served_kind} band's floor {band[0]}"}
+    out: dict[str, Any] = {"counts": False, "logged_rpe": rpe, "rpe_source": source, "rpe_floor": band[0] if band else None}
     if performed_minutes is not None and served_minutes is not None and performed_minutes < served_minutes:
-        return {**out, "reason": f"{performed_minutes} min is shorter than the served {served_minutes} min"}
-    return {**out, "counts": True, "reason": f"logged RPE {rpe:g} meets the served {served_kind} band (floor {band[0]})"}
+        return {**out, "state": SWAP_NOT_MET, "reason": f"{performed_minutes} min is shorter than the served {served_minutes} min"}
+    if rpe is None:
+        return {
+            **out,
+            "state": SWAP_EFFORT_NOT_LOGGED,
+            "reason": "duration complete, no RPE logged — effort not logged is never met (#5505)",
+        }
+    if band is None:
+        return {**out, "state": SWAP_NOT_MET, "reason": f"the served block names no kind with an RPE band ({served_kind!r})"}
+    if rpe < band[0]:
+        return {**out, "state": SWAP_NOT_MET, "reason": f"logged RPE {rpe:g} is under the served {served_kind} band's floor {band[0]}"}
+    return {**out, "state": SWAP_MET, "counts": True, "reason": f"logged RPE {rpe:g} meets the served {served_kind} band (floor {band[0]})"}
 
 
-def kind_of_performed(machine_key: str, note: str | None, served_kind: str | None = None, swap_kind: str | None = None) -> str:
+def _minutes(session: dict[str, Any]) -> int | None:
+    try:
+        secs = float(session.get("duration_sec") or 0)
+    except (TypeError, ValueError):
+        return None
+    return round(secs / 60) if secs > 0 else None
+
+
+def swap_state(machine_key: str, session: dict[str, Any]) -> str | None:
+    """#5796: the swap state of one performed cardio session — None when it is not a swap candidate (no `served_swap_kind`)
+    or its own note / served kind already reads a hard kind."""
+    swap = session.get("served_swap_kind")
+    if swap not in HARD:
+        return None
+    note, set_rpe = session.get("note"), session.get("set_rpe")
+    if kind_of_performed(machine_key, note, session.get("served_kind"), None, set_rpe) in HARD:
+        return None
+    return str(swap_counts(str(swap), note, _minutes(session), None, set_rpe)["state"])
+
+
+def effort_not_logged_rows(
+    sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_start: str, target_date: str
+) -> list[tuple[str, str]]:
+    """(date, served hard kind) of this week's swaps done with no effort logged, oldest first — reported on their own,
+    never counted toward the week's conditioning and never a missed offer (owner ruling 2026-11-11, #5796)."""
+    rows = []
+    for key, sessions in (sessions_by_machine or {}).items():
+        for s in sessions or []:
+            d = str(s.get("date") or "")[:10]
+            if week_start <= d < target_date and swap_state(key, s) == SWAP_EFFORT_NOT_LOGGED:
+                rows.append((d, str(s["served_swap_kind"])))
+    return sorted(rows)
+
+
+def kind_of_performed(
+    machine_key: str, note: str | None, served_kind: str | None = None, swap_kind: str | None = None, set_rpe: float | None = None
+) -> str:
     """The menu kind a performed block was, read from its machine, its own note and the routine it was served.
 
     His own note wins when it names a kind (intervals / hill / tempo / hard, or easy / steady). Otherwise the
@@ -345,7 +405,7 @@ def kind_of_performed(machine_key: str, note: str | None, served_kind: str | Non
     `swap_kind` (#5505, owner ruling 2026-11-08): the HARD kind the same routine served on ANOTHER machine. It counts
     when he did the block on this machine at the prescribed effort — his note logs an RPE at or above the kind's band
     (`wire_band`, `swap_counts` — the one rule); a swap with no logged effort stays the machine's easy kind (an incline
-    walk instead of a bike tempo is not the tempo)."""
+    walk instead of a bike tempo is not the tempo). `set_rpe` (#5796): the RPE on the block's set row, read first."""
     from training import cardio_note
 
     text = cardio_note.strip_negated(note)  # #5312: "No intervals" never names intervals
@@ -358,7 +418,7 @@ def kind_of_performed(machine_key: str, note: str | None, served_kind: str | Non
         return "tempo"
     if served_kind in KINDS and not _EASY_ONLY_WORD.search(text) and fits_machine(served_kind, machine_key):
         return str(served_kind)
-    if swap_kind in HARD and swap_counts(str(swap_kind), text)["counts"]:
+    if swap_kind in HARD and swap_counts(str(swap_kind), text, set_rpe=set_rpe)["counts"]:
         return str(swap_kind)
     if machine_key == TREADMILL:
         return "incline_treadmill_walk"
@@ -726,7 +786,8 @@ def history_context(
     #5505 (owner ruling 2026-11-08): `counted_kinds` is what the week's conditioning count reads — the performed kinds
     plus every MISSED offer beyond the charter's `missed_reoffers_per_wk` (a missed hard block is re-offered that many
     times a week, every later miss is dropped). `routines` are this week's routine records; None = not read, so
-    `counted_kinds` is the performed kinds alone (the pre-#5505 count, never a guessed miss)."""
+    `counted_kinds` is the performed kinds alone (the pre-#5505 count, never a guessed miss). #5796:
+    `effort_not_logged_kinds` are the week's swaps done with no effort logged — never in `counted_kinds`, never a miss."""
     from common.pacific_time import parse_day_key
 
     from training import cardio_note
@@ -742,13 +803,16 @@ def history_context(
     yday = cardio_note.week_kinds(by_machine, yesterday, target_date)
     week = cardio_note.week_kinds(by_machine, week_start, target_date)
     missed: list[str] = []
+    # #5796: a swap done with no effort logged is its own count — not conditioning, not a miss (owner ruling 2026-11-11)
+    not_logged = effort_not_logged_rows(by_machine, week_start, target_date)
     if routines is not None:
         performed = cardio_note.week_rows(by_machine, week_start, target_date)
-        missed = missed_offers(offered_hard(routines, week_start, target_date), performed)
+        missed = missed_offers(offered_hard(routines, week_start, target_date), performed + not_logged)
     dropped = missed[reoffers_per_wk() :]
     return {
         "by_machine": by_machine,
         "week_kinds": week,
+        "effort_not_logged_kinds": [k for _, k in not_logged],
         "missed_kinds": missed,
         "dropped_kinds": dropped,
         "counted_kinds": week + dropped,
