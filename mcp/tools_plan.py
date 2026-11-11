@@ -634,7 +634,7 @@ def tool_plan_next_session(args):
     target_date = args.get("target_date") or pacific_today()
     routine_id = args.get("routine_id")
 
-    from training import accessory_strength_trend, plan_engine
+    from training import accessory_strength_trend, plan_engine, step_gap_walk
 
     # #4076: the owner override is parsed BEFORE anything runs — a malformed one is an error,
     # never a stage-2 run that silently ignored it and left the veto standing unexplained.
@@ -889,6 +889,7 @@ def tool_plan_next_session(args):
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
+    step_gap_walk.attach(block, steps_window, prescription_rows)  # #5758: the walk that closes the day's projected step gap
     _attach_below_mev(block, volume)  # #5053
     _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     attach_morning_note(block, target_date, recovery_tier)  # #4189: his four words beside the recovery tier
@@ -1122,6 +1123,8 @@ def _run_stage_2(
         "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
         # #4387: the per-activity rows the joints critic argued from, on the stored record (the live-proof read)
         "recent_aerobic": {k: (block.get("recent_aerobic") or {}).get(k) for k in ("window", "rows", "totals", "cardio_pick")},
+        # #5758: the walk the plan offered against the day's projected step gap — the May tracker reads it back per day
+        "steps_walk": (block.get("steps_ramp") or {}).get("walk_to_close_gap"),
         # the coach's draft as critiqued, so a re-run re-evaluates THIS, not its own output
         "draft_exercises": draft_exercises,
     }

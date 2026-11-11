@@ -264,9 +264,12 @@ def assemble_evidence(
     deload_records: Iterable[Mapping[str, Any]] = (),
     disruption_records: Iterable[Mapping[str, Any]] = (),
     supplied: Optional[Mapping[str, Any]] = None,
+    progression: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     """Every row input, as labelled cells. The stored rows are filtered to the block; `supplied` carries the counts
-    the skill reads through MCP tools (sessions, sleep, progression, cardio, planning, fitness) — see the skill."""
+    the skill reads through MCP tools (sessions, sleep, cardio, planning, fitness) — see the skill. `progression` is
+    the engine's own record over the block (#5762, `progression_record.block_progression`); a hand-supplied
+    `supplied["progression"]` is retired and never read — without the record the progression cells are absent."""
     sup = dict(supplied or {})
     may = sorted((dict(r) for r in may_rows if _in(r.get("week_end"), window)), key=lambda r: str(r.get("week_end")))
     panel = sorted((dict(r) for r in panel_rows if _in(r.get("week_end"), window)), key=lambda r: str(r.get("week_end")))
@@ -276,10 +279,6 @@ def assemble_evidence(
     battery = battery if battery is not None else (fit_rows[-1].get("value") if fit_rows else None)
     weeks = int(window["weeks"])
     days, cond = _cv("split.lifting_days_per_wk"), _cv("cardio_menu.conditioning_sessions_per_wk")
-    prog = sup.get("progression") or {}
-    opportunities = None
-    if prog.get("steps_taken") is not None and prog.get("step_due") is not None:
-        opportunities = int(prog["steps_taken"]) + int(prog["step_due"])
     deloads = [dict(r) for r in deload_records if _in(r.get("start_date"), window)]
     modes = [dict(r) for r in disruption_records if _overlaps(r, window)]
     return {
@@ -300,12 +299,7 @@ def assemble_evidence(
             k: _supplied(sup, "sleep", k, "the sleep tools over the block (get_sleep_analysis)")
             for k in ("nights", "mean_hours", "consistency")
         },
-        "progression": {
-            "steps_taken": _supplied(sup, "progression", "steps_taken", "load steps logged (get_exercise_history, double progression)"),
-            "step_due": _supplied(sup, "progression", "step_due", "stall_detector step_due verdicts in the block"),
-            "stalls": _supplied(sup, "progression", "stalls", "stall_detector stall verdicts in the block"),
-            "step_opportunities": _measured(opportunities, "steps_taken + step_due"),
-        },
+        "progression": _progression_evidence(progression),
         "cardio": {
             "conditioning_sessions": _supplied(sup, "cardio", "conditioning_sessions", "conditioning blocks logged in the block"),
             "conditioning_target": _measured(int(cond) * weeks if isinstance(cond, int) else None, "charter cardio_menu x block weeks"),
@@ -321,6 +315,18 @@ def assemble_evidence(
         },
         "disruption": {"records": cell(MEASURED, modes, "training_constraints MODE#disruption")},
     }
+
+
+def _progression_evidence(rec: Optional[Mapping[str, Any]]) -> dict[str, Any]:
+    """#5762: the progression cells from the engine's own record — an engine step he performed is `steps_taken`, a
+    load he raised himself is `progressed` (`progression.self_raised_load`), never a step. No record: all absent."""
+    src = "progression_record.block_progression (the engine's recorded bases, paired with the sets logged)"
+    rec = rec or {}
+    taken, due = rec.get("steps_taken"), rec.get("step_due")
+    opportunities = int(taken) + int(due) if taken is not None and due is not None else None
+    out = {k: _measured(rec.get(k), src) for k in ("steps_prescribed", "steps_taken", "step_due", "stalls", "progressed")}
+    out["step_opportunities"] = _measured(opportunities, "steps_taken + step_due")
+    return out
 
 
 def _overlaps(rec: Mapping[str, Any], window: Mapping[str, Any]) -> bool:
@@ -796,6 +802,7 @@ def run(
     predictions: Iterable[Mapping[str, Any]] = (),
     prior: Optional[Mapping[str, Any]] = None,
     supplied: Optional[Mapping[str, Any]] = None,
+    progression: Optional[Mapping[str, Any]] = None,
     call: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None,
     with_panel: bool = True,
 ) -> dict[str, Any]:
@@ -808,7 +815,13 @@ def run(
     window = block_window(block_end)
     may = list(may_rows)
     evidence = assemble_evidence(
-        window, may_rows=may, panel_rows=panel_rows, deload_records=deload_records, disruption_records=disruption_records, supplied=supplied
+        window,
+        may_rows=may,
+        panel_rows=panel_rows,
+        deload_records=deload_records,
+        disruption_records=disruption_records,
+        supplied=supplied,
+        progression=progression,
     )
     codes = code_scores(sc, evidence)
     panel = panel_regrade(sc, codes, window, call=call) if with_panel else {"status": "skipped", "seats": {}, "usage": {}}
