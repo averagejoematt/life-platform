@@ -284,6 +284,7 @@ def run(
 
     from mcp import tools_plan as tp
 
+    plan_call_scope.stage_1_done()  # #5813: the stage-1 reader clock stops where stage 2's starts
     clock = _Clock()
     build = packet_builder(block, reference, evidence, protein_missed, protein_measured, dismissals)
     would: list[dict[str, Any]] = []
