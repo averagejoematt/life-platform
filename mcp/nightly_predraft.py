@@ -14,6 +14,9 @@ WHAT A RUN DOES — nothing a chat turn could not already do, in the same order
      (2026-10-11): a live-cycle draft the pre-draft did not author (chat-built, or an unmarked cron
      draft), never pushed to Hevy, whose day has passed and which nobody has touched for
      `STALE_DRAFT_DAYS` (14 = `routine_repo.ORPHAN_DRAFT_DAYS`) days is archived the same way (reason `stale_untouched`).
+     #5795: and a pre-draft whose stamped `sequence_index` the sequence has since CREDITED (reason `sequence_done` —
+     the session it drafted was performed after it was drafted: 2026-11-11, run 03:00:07Z, session over 03:01:30Z).
+     That reason alone reaches past `today`, up to the run's target, because the stale draft IS tomorrow's.
      Fail-soft and reported as `sweep`.
   1. `scheduled_session(tomorrow)` — THE seam (below). No lifting session → the first-class
      `no_session` outcome, never a guessed one. Archetype-agnostic (full / upper / lower).
@@ -72,7 +75,14 @@ THE READ SIDE
   `predraft_for(target_date)` is what `plan_next_session` stage 1 attaches as `predraft`, so
   the evening chat's first call shows the waiting draft and its verdicts before anything else.
   Writer (`_mark_draft`) and reader share `MARKER`; the round trip through the real routine IR
-  serializer is the contract test.
+  serializer is the contract test. #5795: a draft whose stamped slot is already credited reads
+  `stale_sequence_done`, never `ready`.
+
+THE INGEST TRIGGER (#5795, `mcp/predraft_ingest.py`)
+  The Hevy poller (`ingestion/predraft_trigger.py`, behind `PREDRAFT_ON_INGEST`, default off) invokes the
+  warmer with `{"job": "nightly_predraft", "trigger": "hevy_ingest", ...}`; that run is gated on the
+  sequence crediting the ingested workout and emits NO dead-man datapoint — the 19:00 PT run is the one
+  `nightly-predraft-missing` watches.
 """
 
 from __future__ import annotations
@@ -134,6 +144,10 @@ STALE_DRAFT_DAYS = ORPHAN_DRAFT_DAYS
 """#4732 owner ruling 2026-10-11: a non-pre-draft draft untouched this many days is auto-archived. Not a
 local number: `routine_repo.ORPHAN_DRAFT_DAYS`, the same one the qa-smoke orphan-draft leg warns at."""
 STALE_REASON = "stale_untouched"
+SEQUENCE_DONE = "sequence_done"
+"""#5795: the sweep reason for a pre-draft whose stamped `sequence_index` the sequence has credited since."""
+INGEST_TRIGGER = "hevy_ingest"
+"""#5795: `event["trigger"]` on the Hevy poller's invoke (`ingestion/predraft_trigger.TRIGGER` — pinned equal by test)."""
 AUTO_ARCHIVE_KEY = "auto_archived"
 """Where a non-pre-draft archive is stamped — NEVER `MARKER`, which would make the row read as ours."""
 """#4732: the index Query page the sweep reads — the same bound `routine_repo.stale_draft_census` uses."""
@@ -318,6 +332,7 @@ def _mark_draft(
                 "drafted_at": run_at,
                 "session_label": session.get("label"),
                 "session_role": session.get("session_role"),
+                "sequence_index": session.get("sequence_index"),  # #5795: the slot drafted — the sweep's `sequence_done` reads it
                 "optional": bool(session.get("optional")),
                 "seam": "program_v04.build_session" if plan_source == "v04" else "plan_engine._scheduled_session",
                 "charter_version": (ir.inputs_snapshot or {}).get("charter_version"),  # #5085: the version that drafted it
@@ -367,12 +382,14 @@ def _draft_by_source(target_date: str, switch: dict[str, Any]) -> dict[str, Any]
     return {**ps.draft_v04(target_date, plan), "v04_plan": plan}
 
 
-def _v04_marked(plan: dict[str, Any]) -> dict[str, Any]:
-    """#5080: the marker's session for a v0.4 draft — the frozen plan's own role, so `_routine_role` reads what was drafted."""
+def _v04_marked(plan: dict[str, Any], sequence_index: Any = None) -> dict[str, Any]:
+    """#5080: the marker's session for a v0.4 draft — the frozen plan's own role, so `_routine_role` reads what was drafted.
+    #5795: the slot is the SEQUENCE's (the served session's `sequence_index`) — both engines fill the same next slot."""
     return {
         "label": f"v0.4 {plan['session_role']}",
         "session_role": plan["session_role"],
         "archetype": plan["archetype"],
+        "sequence_index": sequence_index,
         "optional": False,
     }
 
@@ -451,19 +468,52 @@ def _committed(ir: Any) -> bool:
     return bool(getattr(ir, "hevy_routine_id", None)) or getattr(ir, "status", None) == "active"
 
 
-def _sweep_reason(ir: Any, today: str, on_date: list[Any]) -> str | None:
+def _stamped_index(ir: Any) -> int | None:
+    """#5795: the `sequence_index` the pre-draft stamped on its marker, or None (a pre-#5795 draft, a pre-block day)."""
+    v = ((getattr(ir, "inputs_snapshot", None) or {}).get(MARKER) or {}).get("sequence_index")
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        return int(v)  # DynamoDB hands it back as a Decimal
+    except (TypeError, ValueError):
+        return None
+
+
+def _credited_before(day: str) -> int | None:
+    """#5795: how many program sessions the sequence credits before `day` — `session_sequence.completed_sessions` over
+    stage 1's own record (`_block_record`). None when the record was not read: an unknown is never read as done."""
+    from training import session_sequence
+
+    rows = _block_record(day)
+    return None if rows is None else len(session_sequence.completed_sessions(rows, day))
+
+
+def _slot_done(ir: Any, credited: int | None) -> bool:
+    """#5795: the slot this pre-draft drafted is already credited — the session it drafts was performed after the draft.
+    A session logged ON the draft's own day never counts (the sequence credits [block start, day)): it IS that day's."""
+    idx = _stamped_index(ir)
+    return idx is not None and credited is not None and idx < credited
+
+
+def _sweep_reason(ir: Any, today: str, on_date: list[Any], credited: Any = None) -> str | None:
     """Why the pre-draft's OWN uncommitted draft is dead, or None to leave it.
 
     Only a routine the pre-draft stamped (`_is_ours`), still `draft`, never pushed to Hevy. Expired:
     its target day is before `today`. Superseded: a committed routine of the same archetype is on its
-    date (the owner committed a session for that day — his own, or this primary, for a sibling)."""
+    date (the owner committed a session for that day — his own, or this primary, for a sibling).
+    #5795 sequence_done: `credited(day)` (sessions credited before the draft's day) has passed its stamped
+    slot — the ONE reason that also reaches a day after `today`."""
     if not _is_ours(ir) or getattr(ir, "status", None) != "draft" or getattr(ir, "hevy_routine_id", None):
         return None
     day = str(getattr(ir, "target_date", "") or "")
-    if not day or day > today:
+    if not day:
         return None
     if day < today:
         return "expired"
+    if credited is not None and _stamped_index(ir) is not None and _slot_done(ir, credited(day)):
+        return SEQUENCE_DONE
+    if day > today:
+        return None
     archetype = str(getattr(ir, "archetype", "") or "").lower()
     for other in on_date:
         if other.routine_id != ir.routine_id and _committed(other) and str(getattr(other, "archetype", "") or "").lower() == archetype:
@@ -505,15 +555,16 @@ def _stale_reason(ir: Any, today: str, cutoff: str) -> str | None:
     return STALE_REASON
 
 
-def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[str, Any]:
+def sweep_expired(today: str, run_at: str, genesis: str | None = None, horizon: str | None = None) -> dict[str, Any]:
     """Archive the pre-draft's own expired / superseded drafts — NEVER delete (#4732).
 
     The archive is `manage_hevy_routine archive`'s local-only branch (`_action_archive` for a routine
     never pushed to Hevy): status `archived` as the routine's next version, so every prior version stays
     readable. A routine the pre-draft did not author is touched by ONE rule only, the owner's
     (2026-10-11): a draft of his untouched for STALE_DRAFT_DAYS whose day has passed (`_stale_reason`),
-    stamped under `AUTO_ARCHIVE_KEY` so it never reads as a pre-draft. Never targets a day after `today`,
-    so tonight's draft (tomorrow) is never in reach."""
+    stamped under `AUTO_ARCHIVE_KEY` so it never reads as a pre-draft. Expired / superseded / stale never
+    target a day after `today`. #5795: up to `horizon` (the run's target) a pre-draft whose slot is already
+    credited is archived (`sequence_done`) — the run then drafts the slot the sequence now serves."""
     from common.pacific_time import shift_day_key
     from training.routine_repo import list_by_date_range, put_versioned
 
@@ -525,14 +576,21 @@ def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[s
     if genesis and genesis > start:
         start = genesis  # a pre-genesis draft is history, never this sweep's business
     stale_cutoff = shift_day_key(today, -STALE_DRAFT_DAYS)
-    rows = list_by_date_range(start, today, limit=SWEEP_LIMIT)
+    rows = list_by_date_range(start, max(today, horizon or today), limit=SWEEP_LIMIT)
+    credited_memo: dict[str, int | None] = {}
+
+    def credited(day: str) -> int | None:  # one record read per day, and only for a draft carrying a stamped slot
+        if day not in credited_memo:
+            credited_memo[day] = _credited_before(day)
+        return credited_memo[day]
+
     by_date: dict[str, list[Any]] = {}
     for ir in rows:
         by_date.setdefault(str(ir.target_date), []).append(ir)
     archived: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     for ir in rows:
-        reason = _sweep_reason(ir, today, by_date.get(str(ir.target_date), [])) or _stale_reason(ir, today, stale_cutoff)
+        reason = _sweep_reason(ir, today, by_date.get(str(ir.target_date), []), credited) or _stale_reason(ir, today, stale_cutoff)
         if not reason:
             continue
         snap = dict(getattr(ir, "inputs_snapshot", None) or {})
@@ -541,6 +599,8 @@ def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[s
             stamp["last_touched"] = _last_touched_day(ir)
             snap[AUTO_ARCHIVE_KEY] = stamp
         else:
+            if reason == SEQUENCE_DONE:
+                stamp["credited_before"] = credited(str(ir.target_date))
             snap[MARKER] = {**(snap.get(MARKER) or {}), "archived": stamp}
         ir.inputs_snapshot = snap
         ir.status = "archived"
@@ -553,7 +613,7 @@ def sweep_expired(today: str, run_at: str, genesis: str | None = None) -> dict[s
             continue
         archived.append({"routine_id": ir.routine_id, "target_date": ir.target_date, "reason": reason})
     return {
-        "window": {"start": start, "end": today, "stale_cutoff": stale_cutoff},
+        "window": {"start": start, "end": today, "horizon": max(today, horizon or today), "stale_cutoff": stale_cutoff},
         "scanned": len(rows),
         "archived": archived,
         "errors": errors,
@@ -573,7 +633,7 @@ def run(target_date: str | None = None) -> dict[str, Any]:
     # pre-draft as "expired" before its day. Fail-soft: a sweep error is named, never fatal.
     try:
         sweep_today = min(shift_day_key(target, -JOB["target_offset_days"]), pacific_today())
-        out["sweep"] = sweep_expired(sweep_today, run_at)
+        out["sweep"] = sweep_expired(sweep_today, run_at, horizon=target)  # #5795: + a stale-slot draft for the target
     except Exception as e:  # noqa: BLE001 — the draft still runs; the sweep's failure is on the record
         logger.warning(f"nightly predraft: the expired-draft sweep failed ({type(e).__name__}: {e})")
         out["sweep"] = {"error": f"{type(e).__name__}: {e}"[:300]}
@@ -613,6 +673,8 @@ def run(target_date: str | None = None) -> dict[str, Any]:
 
     existing = _routines_for(target)
     mine = [r for r in existing if _is_primary(r) and getattr(r, "status", None) != "archived"]
+    # #5795: a draft of an EARLIER slot than the one now served is never `exists` / resumed (the sweep archives it)
+    mine = [r for r in mine if not _slot_done(r, session.get("sequence_index"))]
     owners = [r for r in existing if _blocks_served_session(r, session, frozenset())]
     if owners:  # the served role is on file: read the record once to drop any already PERFORMED
         performed = _performed_hevy_ids(_block_record(target))
@@ -672,7 +734,9 @@ def run(target_date: str | None = None) -> dict[str, Any]:
         _mark_draft(
             target,
             routine_id,
-            _v04_marked(v04_built) if v04_built else session,  # #5080: a v0.4 draft carries ITS role, never the charter's
+            (
+                _v04_marked(v04_built, session.get("sequence_index")) if v04_built else session
+            ),  # #5080: a v0.4 draft carries ITS role, never the charter's
             run_at,
             {r.routine_id: int(r.version) for r in existing},
             frozenset(r.routine_id for r in others),
@@ -769,7 +833,12 @@ def _charter_version() -> Any:
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled entry. Never raises: a failure is logged with its class and emits the
     datapoint at 0 (#4568), so the dead-man — not a misattributed warmer Errors alarm — reports it.
-    #5200: the tracker leg runs FIRST so the draft's coach context reads the week this run just wrote."""
+    #5200: the tracker leg runs FIRST so the draft's coach context reads the week this run just wrote.
+    #5795: an ingest-triggered invoke goes to its own entry — gated on a credited session, no legs, no dead-man datapoint."""
+    if (event or {}).get("trigger") == INGEST_TRIGGER:
+        from mcp.predraft_ingest import lambda_entry as ingest_entry
+
+        return ingest_entry(event)
     tracker = _may_tracker_leg()  # #5073: the newest completed week's tracker row; fail-soft, never the outcome
     try:
         result = run((event or {}).get("target_date"))
@@ -800,11 +869,26 @@ def predraft_for(target_date: str) -> dict[str, Any]:
                 f"`{JOB['deadman_alarm']}` alarm covers the last). Build the session as usual."
             ),
         }
+    stale: list[Any] = []
+    if any(_stamped_index(r) is not None for r in mine):  # #5795: a slot credited since the draft is not ready
+        n = _credited_before(target_date)
+        stale = [r.routine_id for r in mine if _slot_done(r, n)]
+        mine = [r for r in mine if r.routine_id not in stale] or mine
     r = mine[0]
     rec = _critics(r)
     base = {"target_date": target_date, "routine_id": r.routine_id, "routine_version": int(r.version), "status_in_repo": r.status}
     base["drafted_at"] = ((r.inputs_snapshot or {}).get(MARKER) or {}).get("drafted_at")
     base["plan_source"] = ((r.inputs_snapshot or {}).get(MARKER) or {}).get("plan_source") or "charter"  # #5080: which engine drafted it
+    if r.routine_id in stale:
+        return {
+            **base,
+            "status": "stale_sequence_done",
+            "sequence_index": _stamped_index(r),
+            "how_to_use": (
+                "This pre-draft is of a session ALREADY PERFORMED — its sequence slot was credited after it was drafted — so do "
+                "not review or commit it; build the session the sequence now serves. The next pre-draft run archives it."
+            ),
+        }
     if not _red_teamed(r):
         return {**base, "status": "drafted_not_red_teamed", "how_to_use": "Run stage 2 on this routine_id before anything else."}
     summary = _critics_summary(rec)
