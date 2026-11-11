@@ -188,7 +188,10 @@ def test_moderate_anchors_ride_the_same_ramp():
     pulldown = next(b for b in ideal.exercises if b.movement_key == "lat_pulldown")
     # #4388: rounded to the NEAREST 5 lb (owner ruling) — within half a step of the exact 60 %
     expect = rep_scheme.load_step_kg(_discounted("lat_pulldown") * 0.60)
-    assert all(s.weight_kg == expect for s in pulldown.sets)
+    # owner ruling 2026-11-10 (#5428): the pulldown is 21 months off, so its first session back carries one W row at 50 %
+    # of the work ahead of the ramped working sets — the ramp is judged on the working sets
+    assert all(s.weight_kg == expect for s in pulldown.sets if s.type != "warmup")
+    assert [s.weight_kg for s in pulldown.sets if s.type == "warmup"] == [rep_scheme.load_step_kg(expect * 0.5)]
     assert abs(expect - _discounted("lat_pulldown") * 0.60) <= 2.5 * LB + 1e-9
 
 

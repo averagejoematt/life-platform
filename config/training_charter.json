@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.40.0",
+  "version": "1.41.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -273,6 +273,13 @@
       "date": "2026-11-08",
       "by": "owner ruling 2026-11-08 (#5694, attended, delegated: \"just tell me what i should lift for my program and goals, ican do all the deadlifts\")",
       "what": "Retired the conventional-deadlift movement gate: `gated_movements.conventional_deadlift` is open by owner ruling (`status: open`), and its trap-bar `until_then` is gone. He has pulled conventional since 2026-09-09 (10 sessions, 195 to 225 lb). The Lower-heavy hinge is the conventional deadlift (the heavy pull) and the Lower-volume hinge is the Romanian deadlift (barbell, 8 to 10 reps). The numeric `gate_lb` stays where it is, read ONLY as the Foundation to Build weight boundary (`phases.definitions.build.entry_gates[0].value_ref`, the #5574 ruling); what that boundary becomes is a separate owner ruling. Foundation's `until_then` and Build's conventional-deadlift unlock are removed (nothing is held back any more); the power-clean revisit is unchanged.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.41.0",
+      "date": "2026-11-10",
+      "by": "owner ruling 2026-11-10 (#5428, delegated training call: \"go\"; vetoable before merge)",
+      "what": "Adds effort_ceilings.layoff_return_rpe (RPE 6 to 7) and its rule: the FIRST session of a movement back after a gap longer than the OD1 exposure-cap line (layoff_tiers.REENTRY_MAX_GAP_DAYS, more than 90 days) runs its working sets at this band with no last-set target, behind a warm-up row lighter than the working load. The 2026-11-08 draft read `RPE 8\u20139, last set RPE 9\u201310` on a torso rotation first done in 2 years, with its W row at the working load. This supersedes the 2026-10-30 'no blanket layoff cap' for exposure 1 only; exposures 2 to 3 keep the OD1 cap (RPE 7) and a lift with no session on file is not a return.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -634,6 +641,11 @@
     "ceiling_is": "the high end of the set's class band: the band is the prescription, its top is the ceiling a set is graded against",
     "overage_tolerance_rpe": 1,
     "overage_rule": "within +1 RPE of the ceiling is not a breach",
+    "layoff_return_rpe": [
+      6,
+      7
+    ],
+    "layoff_return_rule": "the first session of a movement back after a gap longer than the OD1 exposure-cap line (layoff_tiers.REENTRY_MAX_GAP_DAYS) runs its working sets at this band with no last-set target, behind a warm-up row lighter than the working load (owner ruling 2026-11-10)",
     "ceiling_change_proposal": {
       "when": "a ceiling is beaten on more than 50% of sets two weeks running",
       "share_of_sets": 0.5,

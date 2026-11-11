@@ -239,13 +239,16 @@ def test_a_stale_previous_far_off_is_lighter_not_new_and_a_lift_never_logged_kee
     leads (§3.3) and the band stays (owner ruling 2026-10-30: no blanket layoff cap). Re-grade #2 (2026-10-31): Hevy
     still shows that PREVIOUS beside the 30-lb row, so the reason slot carries `Lighter: first time in 23 months.`, not
     `New: replaces …` — New is only for a lift with NO PREVIOUS (the 40f2c0b5 machine lateral raise read "New" over 65 lb
-    × 10 from 2024 and dropped to 35 lb with no why)."""
+    × 10 from 2024 and dropped to 35 lb with no why). Owner ruling 2026-11-10 (charter 1.41.0) supersedes the band and the
+    feeler here: a first session back after more than 90 days reads the layoff band and the one layoff line, behind a W
+    row at half the work (was `RPE 8–9, last set RPE 9–10` / `Lighter: first time in 23 months.` / the feeler AT 30 lb)."""
     leg = _accessory("lying_leg_curl_machine", 30)
     _compose(
         [leg], _history("lying_leg_curl_machine", ("2024-11-29", 40, 8, None)), {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"}
     )
-    assert leg.notes == "RPE 8–9, last set RPE 9–10\nLighter: first time in 23 months.\nW at RPE 5 or less → one step, no more."
-    assert leg.sets[0].type == "warmup" and leg.sets[0].reps == g.PICK_LOAD_W_REPS and leg.notes != GRADED_LEG_CURL
+    assert leg.notes == "RPE 6–7\nSame load all sets: first time in 23 months."
+    assert (leg.sets[0].type, leg.sets[0].weight_kg, leg.sets[0].reps) == ("warmup", _kg(15), 8) and leg.notes != GRADED_LEG_CURL
+    assert "New: replaces" not in leg.notes
     # never logged: New stands, with the feeler line over the engine's start load
     fresh = _accessory("lying_leg_curl_machine", 30)
     _compose([fresh], {}, {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"})
@@ -371,8 +374,13 @@ def test_a_layoff_cap_with_no_days_since_value_reads_its_gap_off_previous(monkey
     assert recs[0]["applied"] and recs[0]["clauses"] == [
         {"movement_key": "standing_calf_raise_machine", "clause": "Same load all sets: first time in 18 months.", "effort_capped": True}
     ]
-    assert ir.exercises[1].notes == "RPE 7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft."
-    assert ir.exercises[1].notes != GRADED_STANDING_CALF and _lint(ir).ok, _lint(ir).lines()
+    # owner ruling 2026-11-10 (charter 1.41.0): a FIRST session back reads the layoff band, not the cap's RPE 7 (was `RPE 7`)
+    assert ir.exercises[1].notes == "RPE 6–7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft."
+    assert ir.exercises[1].notes != GRADED_STANDING_CALF
+    # lint L14: the fixture's no-load feeler is not a W row lighter than the work; the composer puts one at half of it
+    assert any(ln.startswith("L14") for ln in _lint(ir).lines()), _lint(ir).lines()
+    ir.exercises[1].sets[0].weight_kg = _kg(60)
+    assert _lint(ir).ok, _lint(ir).lines()
 
 
 def test_MUTATION_no_layoff_clause_is_ever_bare():
@@ -403,11 +411,15 @@ def test_a_layoff_set_cap_over_90_days_takes_the_capped_exposures_effort(monkeyp
     _compose(
         [calf], _history("seated_calf_raise", ("2026-06-20", 90, 15, 9.0)), {"seated_calf_raise": "Calf Press (Machine)"}, "2026-10-31"
     )
-    assert calf.notes == "RPE 8–9, last set RPE 9–10\nFull stretch at the bottom; knees soft."  # 133 days: fresh, not New
+    # owner ruling 2026-11-10 (charter 1.41.0): 133 days is past the OD1 line, so the composer already eases it — the
+    # layoff band, the one layoff line and a W row at half the work (was `RPE 8–9, last set RPE 9–10` and no W row)
+    assert calf.notes == "RPE 6–7\nSame load all sets: first time in 19 weeks.\nFull stretch at the bottom; knees soft."  # not New
+    assert [(s.type, s.weight_kg) for s in calf.sets if s.type == "warmup"] == [("warmup", _kg(45))]
     ir = _calf_ir("seated_calf_raise", "2026-06-20", calf.notes)
     ir.exercises[1] = calf
     _cap(ir, 133, to=3)
-    assert calf.notes == "RPE 7\nSame load all sets: first time in 19 weeks.\nFull stretch at the bottom; knees soft.", calf.notes
+    # the critic's cap keeps the easier band (was `RPE 7`)
+    assert calf.notes == "RPE 6–7\nSame load all sets: first time in 19 weeks.\nFull stretch at the bottom; knees soft.", calf.notes
     assert calf.notes != GRADED_SEATED_CALF and _lint(ir).ok, _lint(ir).lines()
 
 
