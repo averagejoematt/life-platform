@@ -201,6 +201,8 @@ class _Run:
             "packet_numbers": {cid: p["numbers"] for cid, p in self.packets.items()},
             # #4387: the per-activity rows the joints critic argued from, on the stored record (the live-proof read)
             "recent_aerobic": {k: (block.get("recent_aerobic") or {}).get(k) for k in ("window", "rows", "totals", "cardio_pick")},
+            # #5758: the walk the plan offered against the day's projected step gap — the May tracker reads it back per day
+            "steps_walk": (block.get("steps_ramp") or {}).get("walk_to_close_gap"),
             "draft_exercises": self.draft_exercises,  # the coach's draft as critiqued — a re-run re-evaluates THIS
         }
 

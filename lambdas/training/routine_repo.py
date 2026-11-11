@@ -131,6 +131,23 @@ def stamp_charter_version(ir: RoutineSpec) -> RoutineSpec:
     return ir
 
 
+def stamp_progression_basis(ir: RoutineSpec) -> RoutineSpec:
+    """#5762: every drafted plan records, per movement, the progression basis it applied and whether it was a
+    `step_due` step (`inputs_snapshot.progression_basis`, `training.progression_record`). Fail-soft — a record that
+    cannot be built is named on the draft (`status: failed`), never a blocked draft; the block reader then derives it."""
+    from training import progression_record
+
+    try:
+        return progression_record.stamp(ir)
+    except Exception as e:  # noqa: BLE001 — recording only; the draft lands either way
+        logger.warning(f"progression_basis stamp failed ({type(e).__name__}: {e}); the draft lands without it")
+        ir.inputs_snapshot = {
+            **(getattr(ir, "inputs_snapshot", None) or {}),
+            "progression_basis": {"status": "failed", "error": str(e)[:200]},
+        }
+        return ir
+
+
 def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     """Persist a DRAFT idempotently (#3115) — the entry point every drafting path uses.
 
@@ -150,6 +167,7 @@ def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     new draft at it would resurrect an archived routine rather than create today's.
     """
     stamp_charter_version(ir)
+    stamp_progression_basis(ir)
     existing = get_current(ir.routine_id)
     if not existing:
         return _record_rotation(put_versioned(ir))

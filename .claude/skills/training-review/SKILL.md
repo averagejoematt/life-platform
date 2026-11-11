@@ -58,7 +58,12 @@ refuses to overwrite a stored baseline.
 `scripts/training_block_retro.py grade` reads the stored rows itself: the May tracker's `WEEK#`
 rows, the weekly `PANEL#` grades (C5's panel rubric, `config/panel_rubric.json`, run on each
 week's committed plan), the owner's `DELOAD#` and disruption-mode records, the last `RETRO#` and
-the dated charter predictions. Check the latest tracker row with `get_may_tracker` first. If it is
+the dated charter predictions, plus the engine's own progression record (#5762): the routines committed
+in the block, each carrying the basis it applied per movement (`inputs_snapshot.progression_basis`),
+paired with the sets logged on its day (`progression_record.block_progression`). That gives the
+progression row `steps_taken` (engine steps he performed), `step_due`, `stalls` and, apart from them,
+`progressed` (loads he raised himself, never an engine step). Do not supply progression counts by
+hand: the hand count is retired and `grade` never reads it. Check the latest tracker row with `get_may_tracker` first. If it is
 `read_failed` or the block's weeks are missing, say which weeks; do not run the retro over a gap
 you have not named.
 
@@ -71,8 +76,6 @@ not read is LEFT OUT, never written as 0; the retro then shows that input as abs
                "distinct_movements": "<distinct movements logged: get_workouts / get_exercise_history>"},
   "sleep": {"nights": "<nights with a sleep record>", "mean_hours": "<mean sleep hours>",
             "consistency": "<0-1, from get_daily_metrics>"},
-  "progression": {"steps_taken": "<load steps logged>", "step_due": "<step_due verdicts>",
-                  "stalls": "<stall verdicts: get_exercise_history>"},
   "cardio": {"conditioning_sessions": "<menu conditioning blocks logged: get_training / get_workouts>"},
   "planning": {"custom_departures": "<draft_custom commits with a departure_reason>",
                "committed_plans": "<committed routines: manage_hevy_routine>"},

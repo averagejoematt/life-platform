@@ -698,6 +698,13 @@ _PK_RULES: list = [
     # routine_index entry in SOURCE_CLASS): pre-genesis drafts are history a genesis-reading
     # consumer excludes by `target_date`, never a partition the reset tombstones.
     (lambda pk, sk: pk.startswith("USER#matthew#ROUTINE#"), SYSTEM_STATE),
+    # #5524: the MCP write-tool idempotency ledger (`mcp/idempotency.py` LEDGER_PK, since
+    # 1316cec12, #3114/#3115) — claim/payload/release rows keyed by `<scope>#<content key>`,
+    # each with a 180-day TTL. Dedup bookkeeping about tool CALLS, not run intelligence: a
+    # replay suppressed in cycle N would still be a replay in cycle N+1, so the reset neither
+    # tags nor wipes it. Unclassified for ten weeks because pk_census folded every per-user
+    # partition into one `USER` family whose representative was a ROUTINE# pk.
+    (lambda pk, sk: pk == "USER#matthew#MCP_IDEMPOTENCY", SYSTEM_STATE),
     (lambda pk, sk: pk == "USER#system", SYSTEM_STATE),
     # Presentation/cache/infra.
     (lambda pk, sk: pk == "PULSE", SYSTEM_STATE),
