@@ -145,7 +145,7 @@
      "movement_key": "cable_tricep_pushdown",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 90,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
@@ -165,13 +165,14 @@
        "type": "normal",
        "weight_kg": 27.22
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "lateral_raise_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 90,
      "sets": [
       {
        "rep_range_end": 15,
@@ -185,13 +186,14 @@
        "type": "normal",
        "weight_kg": 18.14
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "face_pull",
      "notes": "RPE 8; pull to the forehead, thumbs back.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
@@ -205,7 +207,8 @@
        "type": "normal",
        "weight_kg": 22.68
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "shrug_dumbbell",
@@ -218,54 +221,39 @@
        "rep_range_start": 10,
        "type": "normal",
        "weight_kg": 31.75
-      },
-      {
-       "rep_range_end": 15,
-       "rep_range_start": 10,
-       "type": "normal",
-       "weight_kg": 31.75
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "standing_calf_raise_machine",
      "notes": "RPE 9; 2 s pause in the stretch.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
        "rep_range_start": 10,
        "type": "normal",
        "weight_kg": 63.5
-      },
-      {
-       "rep_range_end": 15,
-       "rep_range_start": 10,
-       "type": "normal",
-       "weight_kg": 63.5
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "cable_pallof_press",
      "notes": "RPE 7; anti-rotation, each side.",
      "rationale_tag": "",
-     "rest_seconds": 60,
+     "rest_seconds": 75,
      "sets": [
       {
        "rep_range_end": 12,
        "rep_range_start": 10,
        "type": "normal",
        "weight_kg": 13.61
-      },
-      {
-       "rep_range_end": 12,
-       "rep_range_start": 10,
-       "type": "normal",
-       "weight_kg": 13.61
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "treadmill",
@@ -475,7 +463,7 @@
      "movement_key": "lying_leg_curl_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 90,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
@@ -495,47 +483,38 @@
        "type": "normal",
        "weight_kg": 40.82
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "db_rear_delt_rows",
      "notes": "RPE 8.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 90,
      "sets": [
       {
        "rep_range_end": 15,
        "rep_range_start": 12,
        "type": "normal",
        "weight_kg": 11.34
-      },
-      {
-       "rep_range_end": 15,
-       "rep_range_start": 12,
-       "type": "normal",
-       "weight_kg": 11.34
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "shrug_machine",
      "notes": "RPE 8.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
        "rep_range_start": 10,
        "type": "normal",
        "weight_kg": 63.5
-      },
-      {
-       "rep_range_end": 15,
-       "rep_range_start": 10,
-       "type": "normal",
-       "weight_kg": 63.5
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "seated_calf_raise",
@@ -548,34 +527,24 @@
        "rep_range_start": 12,
        "type": "normal",
        "weight_kg": 40.82
-      },
-      {
-       "rep_range_end": 15,
-       "rep_range_start": 12,
-       "type": "normal",
-       "weight_kg": 40.82
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "dead_bug",
      "notes": "RPE 7; slow, low back flat.",
      "rationale_tag": "",
-     "rest_seconds": 60,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
        "rep_range_start": 8,
        "type": "normal",
        "weight_kg": null
-      },
-      {
-       "rep_range_end": 12,
-       "rep_range_start": 8,
-       "type": "normal",
-       "weight_kg": null
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "farmers_walk",
@@ -595,7 +564,8 @@
        "type": "normal",
        "weight_kg": 31.75
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "cycling",
@@ -767,7 +737,7 @@
      "movement_key": "lateral_raise_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
@@ -781,7 +751,8 @@
        "type": "normal",
        "weight_kg": 18.14
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "seated_incline_curl_dumbbell",
@@ -807,13 +778,14 @@
        "type": "normal",
        "weight_kg": 11.34
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "triceps_extension_machine",
      "notes": "RPE 9 on the last set; deep stretch overhead.",
      "rationale_tag": "",
-     "rest_seconds": 90,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
@@ -833,13 +805,14 @@
        "type": "normal",
        "weight_kg": 31.75
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "bicep_curl_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 90,
      "sets": [
       {
        "rep_range_end": 15,
@@ -853,13 +826,14 @@
        "type": "normal",
        "weight_kg": 27.22
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "cable_tricep_pushdown",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 90,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
@@ -873,33 +847,29 @@
        "type": "normal",
        "weight_kg": 27.22
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "shrug_dumbbell",
      "notes": "RPE 8.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 90,
      "sets": [
       {
        "rep_range_end": 15,
        "rep_range_start": 10,
        "type": "normal",
        "weight_kg": 31.75
-      },
-      {
-       "rep_range_end": 15,
-       "rep_range_start": 10,
-       "type": "normal",
-       "weight_kg": 31.75
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "calf_raise_machine",
      "notes": "RPE 9.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
@@ -913,13 +883,14 @@
        "type": "normal",
        "weight_kg": 81.65
       }
-     ]
+     ],
+     "superset_id": 4
     },
     {
      "movement_key": "dead_bug",
      "notes": "RPE 7; slow, low back flat.",
      "rationale_tag": "",
-     "rest_seconds": 60,
+     "rest_seconds": 75,
      "sets": [
       {
        "rep_range_end": 12,
@@ -933,7 +904,8 @@
        "type": "normal",
        "weight_kg": null
       }
-     ]
+     ],
+     "superset_id": 4
     },
     {
      "movement_key": "treadmill",
@@ -1125,7 +1097,7 @@
      "movement_key": "chest_fly_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
@@ -1145,7 +1117,8 @@
        "type": "normal",
        "weight_kg": 40.82
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "db_curl",
@@ -1171,13 +1144,14 @@
        "type": "normal",
        "weight_kg": 13.61
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "lateral_raise_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
@@ -1191,7 +1165,8 @@
        "type": "normal",
        "weight_kg": 18.14
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "machine_row",
@@ -1211,27 +1186,23 @@
        "type": "normal",
        "weight_kg": 54.43
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "shrug_dumbbell",
      "notes": "RPE 8.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
        "rep_range_start": 10,
        "type": "normal",
        "weight_kg": 31.75
-      },
-      {
-       "rep_range_end": 15,
-       "rep_range_start": 10,
-       "type": "normal",
-       "weight_kg": 31.75
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "standing_calf_raise_machine",
@@ -1251,7 +1222,8 @@
        "type": "normal",
        "weight_kg": 63.5
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "machine_crunch",
@@ -1437,7 +1409,7 @@
      "movement_key": "reverse_lunge_dumbbell",
      "notes": "RPE 8 each leg.",
      "rationale_tag": "",
-     "rest_seconds": 90,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
@@ -1457,13 +1429,14 @@
        "type": "normal",
        "weight_kg": 13.61
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "leg_extension_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 90,
      "sets": [
       {
        "rep_range_end": 15,
@@ -1483,13 +1456,14 @@
        "type": "normal",
        "weight_kg": 40.82
       }
-     ]
+     ],
+     "superset_id": 1
     },
     {
      "movement_key": "lying_leg_curl_machine",
      "notes": "RPE 9 on the last set.",
      "rationale_tag": "",
-     "rest_seconds": 90,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
@@ -1509,13 +1483,14 @@
        "type": "normal",
        "weight_kg": 40.82
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "lateral_raise_machine",
      "notes": "RPE 9.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 90,
      "sets": [
       {
        "rep_range_end": 15,
@@ -1529,13 +1504,14 @@
        "type": "normal",
        "weight_kg": 18.14
       }
-     ]
+     ],
+     "superset_id": 2
     },
     {
      "movement_key": "shrug_dumbbell",
      "notes": "RPE 8.",
      "rationale_tag": "",
-     "rest_seconds": 75,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 15,
@@ -1549,7 +1525,8 @@
        "type": "normal",
        "weight_kg": 31.75
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "seated_calf_raise",
@@ -1569,13 +1546,14 @@
        "type": "normal",
        "weight_kg": 40.82
       }
-     ]
+     ],
+     "superset_id": 3
     },
     {
      "movement_key": "cable_pallof_press",
      "notes": "RPE 7; anti-rotation, each side.",
      "rationale_tag": "",
-     "rest_seconds": 60,
+     "rest_seconds": 0,
      "sets": [
       {
        "rep_range_end": 12,
@@ -1589,7 +1567,8 @@
        "type": "normal",
        "weight_kg": 13.61
       }
-     ]
+     ],
+     "superset_id": 4
     },
     {
      "movement_key": "suitcase_carry",
@@ -1609,7 +1588,8 @@
        "type": "normal",
        "weight_kg": 22.68
       }
-     ]
+     ],
+     "superset_id": 4
     },
     {
      "movement_key": "elliptical",

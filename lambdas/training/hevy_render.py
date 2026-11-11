@@ -164,8 +164,8 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
     },
     {
         "field": "superset_id",
-        "issue": "-",
-        "producer": "the block's superset",
+        "issue": "#5799",
+        "producer": "session_shape.pair_supersets",
         "home": NATIVE,
         "wire": "routine.exercises[].superset_id",
         "shows": "the exercises grouped as a superset",

@@ -337,13 +337,19 @@ def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
     """Each role's estimate (working + assumed warm-up sets x (set time + the exposure's rest)) is inside the charter's
     cap with nothing trimmed. Upper-heavy by hand before #5162: bench 3+3 warm-up and row 3+1 at 180 s rest, the press 3+1 and
     the pulldown 2 at 120 s, two accessories x 2 at 90 s, set time 45 s -> (6+4)x225 + 4x165 + 2x165 + 4x135 = 3780 s = 63.0 min.
-    #5162 traded the press (3 sets + a warm-up at 120 s) for a 3-set lateral raise at 90 s: 67.5 -> 63.2 min."""
+    #5162 traded the press (3 sets + a warm-up at 120 s) for a 3-set lateral raise at 90 s: 67.5 -> 63.2 min.
+    #5799: the set time is his MEASURED median (`session_time.MEASURED_SET_SECONDS`, 99 s), not the platform's 45 s, so every
+    estimate grew; upper-heavy (82.2 min) now fits by pairing its accessories as the charter's two antagonist supersets
+    (the first member's rest goes), and still nothing is trimmed."""
     cap = charter_value("split.session_minutes.lifting_ceiling")
     assert program_structure.lifting_minutes_cap() == cap == 75
     got = {r: _rx(r)["session_minutes"]["lifting_minutes"] for r in program_structure.SESSION_TEMPLATES}
     # #5162: were 67.5 / 51.5 / 39 / 57.5 / 45.5 (#5053: 63 / 47 / 39 / 57.5 / 41). #5694: Lower-heavy's hinge became a
-    # heavy pull (top set + 2 back-offs at 180 s rest, not 3 moderate sets at 120 s): 51.5 -> 55.5
-    assert got == {UH: 63.2, LH: 55.5, SA: 38.0, UV: 53.2, LV: 45.5}
+    # heavy pull (top set + 2 back-offs at 180 s rest, not 3 moderate sets at 120 s): 51.5 -> 55.5. #5799: at the measured
+    # 99 s a set they were 82.2 / 71.7 / 52.4 / 72.2 / 61.7; upper-heavy's two supersets bring it to 74.7
+    assert program_structure.SESSION_TIME_MODEL["set_seconds"] == 99
+    assert got == {UH: 74.7, LH: 71.7, SA: 52.4, UV: 72.2, LV: 61.7}
+    assert _rx(UH)["supersets"]["estimate_before_min"] == 82.2 and [_rx(r)["supersets"] for r in (LH, SA, UV, LV)] == [None] * 4
     for role in program_structure.SESSION_TEMPLATES:
         rx = _rx(role)
         assert rx["time_trim"] is None and rx["session_minutes"]["within_cap"] and rx["session_minutes"]["cap"] == cap, role
@@ -361,26 +367,28 @@ def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
 
 
 def test_mutation_control_a_session_over_the_cap_trims_accessories_first_and_records_it():
-    """Rest at 300 s on every accessory puts upper-volume over 75 min: the trim drops accessories, last-listed first,
-    until it fits, and says what it dropped; the anchors are untouched."""
+    """Rest at 300 s on every accessory puts upper-volume over 75 min: the curl and the pushdown are paired first (#5799),
+    then the trim drops accessories, last-listed first, until it fits, and says what it dropped; the anchors are untouched.
+    A cut superset member leaves its partner unpaired before the partner is weighed."""
     with patch.dict(program_structure.EXPOSURES["accessory"], {"rest_seconds": 300}):
         rx = _rx(UV)
     t = rx["time_trim"]
     assert t["estimate_before_min"] > t["cap_minutes"] == 75 >= t["estimate_after_min"] == rx["session_minutes"]["lifting_minutes"]
-    assert t["dropped_accessories"] == ["db_curl"] and t["over_cap_after_trim"] is False
-    assert [e["kind"] for e in rx["exposures"]].count("anchor") == 3 and [e["movement_key"] for e in rx["exposures"]][
-        -1
-    ] == "cable_tricep_pushdown"
+    assert [p["movements"] for p in rx["supersets"]["pairs"]] == [["db_curl", "cable_tricep_pushdown"]]
+    assert t["dropped_accessories"] == ["cable_tricep_pushdown", "db_curl", "cable_chest_fly"] and t["over_cap_after_trim"] is False
+    assert [e["kind"] for e in rx["exposures"]].count("anchor") == 3 and [e["movement_key"] for e in rx["exposures"]][-1] == "face_pull"
+    assert not [e for e in rx["exposures"] if e.get("superset_id") is not None]
 
 
 def test_anchors_are_never_cut_for_time_an_anchors_only_overrun_is_flagged():
     with patch.dict(program_structure.EXPOSURES["heavy"], {"rest_seconds": 900}):
         rx = _rx(UH)
     t = rx["time_trim"]
+    # #5799: paired first (curl + pushdown, lateral raise + rear delt), so the last-listed order is the paired order
     assert t["over_cap_after_trim"] is True and t["dropped_accessories"] == [
-        "reverse_pec_deck",
-        "db_curl",
         "cable_tricep_pushdown",
+        "db_curl",
+        "reverse_pec_deck",
         "db_lateral_raise",
     ]
     assert [e["pattern"] for e in rx["exposures"]] == ["bench", "row", "vertical_pull"]  # #5162: the press is on shoulders+arms
@@ -410,7 +418,7 @@ def test_the_session_shape_keeps_one_cardio_block_and_cuts_cardio_and_stretching
     assert shape["cardio_blocks"] == [{"movement_key": "treadmill", "minutes": 30.0}] and shape["stretching_minutes"] == 10.0
     assert len(shape["actions"]) == 3 and program_structure.session_shape_problems(blocks, movements) == []
     # a weighted walking lunge is a LIFT (by its set shape), never the session's cardio block
-    assert shape["lifting_minutes"] == round(2 * (45 + 90) / 60.0, 1)
+    assert shape["lifting_minutes"] == round(2 * (program_structure.SESSION_TIME_MODEL["set_seconds"] + 90) / 60.0, 1)
 
 
 def test_mutation_control_a_routine_inside_the_shape_reports_nothing_and_is_left_alone():

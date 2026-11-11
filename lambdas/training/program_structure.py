@@ -87,11 +87,11 @@ from training.session_cues import CARRY_EXPOSURE, _default_sets, exposure_cue  #
 from training.session_shape import (  # noqa: F401 — #5069: a session's length and shape (ruling 5), re-exported from here
     SESSION_TIME_MODEL,
     enforce_session_shape,
+    fit_to_time,
     lifting_minutes_cap,
     routine_minutes,
     session_minutes_estimate,
     session_shape_problems,
-    trim_to_time,
 )
 from training.training_charter import charter_value, charter_version
 
@@ -877,12 +877,14 @@ def session_prescription_for_role(
     in_block: list[dict[str, Any]] | None = None,
     deload_sets_pct: int | None = None,
     accessory_variants: dict[str, str] | None = None,
+    measured_minutes: dict[str, Any] | None = None,
+    short_on_time_variant: bool = False,
 ) -> dict[str, Any]:
     """The session for one role, as data: exposures, sets (top / back_off / working), reps, and its lifting minutes.
 
     #5069 (owner ruling 5): the session fits the charter's lifting-minute cap — `trim_to_time` drops accessories, last-listed
     first, and records what it dropped (`time_trim`); anchors are never cut for time. `session_minutes` is the estimate after
-    every trim (`session_minutes_estimate`).
+    every trim (`session_minutes_estimate`). #5799: `fit_to_time` pairs supersets first; drop sets only on the owner's pick.
 
     `in_block` (#4409): `in_block_variant.performed_in_block` — a slot keeps its in-block variant.
 
@@ -965,7 +967,7 @@ def session_prescription_for_role(
                 "rest_seconds": acc["rest_seconds"],
             }
         )
-    time_trim = trim_to_time(exposures)  # #5069: the charter's lifting-minute cap, accessories first
+    fit = fit_to_time(exposures, measured_minutes, short_on_time_variant)  # #5069/#5799: supersets, then the accessory trim
     in_block_variant.stamp_template_ids(exposures, catalog_movements, in_block)  # #4431: the one slot-template resolver
     deload_info = None
     if deload:
@@ -982,7 +984,7 @@ def session_prescription_for_role(
         "exposures": exposures,
         "total_sets": sum(len(e["sets"]) for e in exposures),
         "session_minutes": session_minutes_estimate(exposures),
-        "time_trim": time_trim,
+        **fit,  # time_trim (#5069), supersets and short_on_time (#5799)
         "charter_version": CHARTER_VERSION,
         "hevy_folder": HEVY_FOLDERS[tmpl["archetype"]],
         "distribution": SESSION_DISTRIBUTION_PROVENANCE,

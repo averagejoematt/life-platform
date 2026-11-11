@@ -860,6 +860,19 @@ def find_workout_for_routine(ir: RoutineSpec, workouts: list[dict[str, Any]]) ->
     return None, None
 
 
+def _session_time(performed: dict[str, Any], ir: RoutineSpec | None) -> dict[str, Any] | None:
+    """#5799: the session's measured lifting minutes beside its routine's estimate and the ceiling (`training.session_time`).
+    Fail-soft: a measurement error leaves the field None and never costs the adherence record."""
+    try:
+        from training import session_time
+
+        movements = ((_load_catalog() or {}).get("movements") or {}) if ir is not None else {}
+        return session_time.measure(performed, ir, movements)
+    except Exception as e:  # noqa: BLE001 — a projection; never break ingestion
+        logger.warning("session_time measure failed (non-fatal): %s", type(e).__name__)
+        return None
+
+
 def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
     """On-ingest deviation readback (#412): match a performed Hevy workout to the plan
     that was pushed for it, and compute programmed-vs-performed adherence.
@@ -898,7 +911,7 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
                     "matched_routine_id": None,
                     "candidate_routine_ids": [getattr(c, "routine_id", None) for c in candidates],
                 }
-            return {**base, "status": "ad_hoc", "matched_routine_id": None}
+            return {**base, "status": "ad_hoc", "matched_routine_id": None, "session_time": _session_time(performed, None)}
 
         return {
             **base,
@@ -907,6 +920,7 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
             "match_method": match_method,
             "routine_target_date": getattr(ir, "target_date", None),
             **calculate_adherence(ir, performed),
+            "session_time": _session_time(performed, ir),  # #5799: measured lifting minutes vs the estimate and the ceiling
         }
     except Exception as e:  # noqa: BLE001 — deviation is a projection; never break ingestion
         logger.warning("adherence derive failed (non-fatal): %s", e)
