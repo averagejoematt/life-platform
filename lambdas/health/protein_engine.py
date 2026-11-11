@@ -20,6 +20,15 @@ TODAY WITHHOLDS (`no_same_day_log`): the only protein source is an end-of-day up
 is the upload's lag, not a missed feeding. SAME-DAY SOURCE (#5187): when the day's MacroFactor row is absent the
 runner hands in the timed protein entries Health Auto Export delivers intraday (`hae_feeding_rows`); the verdict's
 `source` names which read decided it. Only when neither exists does the note withhold.
+
+THE EVENING NUDGE (`evening_decide`, #5793). The same module, ledger and budget silence tier, a distinct slot
+(`PROTEIN_NUDGE#<date>#evening`, at most once a Pacific day), on the same hourly tick inside the charter's
+`nutrition.protein.evening_nudge` window (a platform default: the steps nudge's evening window, pending an owner ruling).
+It sends only when the protein logged so far is below the range low (THE `hit`), and states the grams remaining and
+the feedings left in the eating window (`nutrition.eating_window`, opened by the day's first feeding). Fat and fibre ride
+the same note as one line each when `health.macro_floors` grades them below their floors; an unknown macro gets no line.
+No same-day row, or a row with no protein figure, withholds with the reason recorded (ADR-104): never a nudge on an
+unknown.
 """
 
 from __future__ import annotations
@@ -32,11 +41,15 @@ from common.macrofactor_fields import protein_meals_at
 from common.pacific_time import PACIFIC, parse_iso_utc
 from training import training_charter
 
+from health import macro_floors
 from health.protein_floor import met_floor
 
 ENGINE_VERSION = "protein-engine@1.0.0"
 NUDGE_VERSION = "protein-nudge@1.2.0"
 KEY_PREFIX = "PROTEIN_NUDGE#"
+EVENING_NUDGE_VERSION = "protein-evening-nudge@1.0.0"
+EVENING_SLOT = "evening"
+EVENING_MACROS = ("fat", "fibre")  # the issue's two companions; carbohydrate is not asked for
 BUDGET_SILENCE_TIER = 2  # = steps_nudge.BUDGET_SILENCE_TIER: a deterministic owner note, silenced with the coach nudge
 _P = "nutrition.protein."
 
@@ -212,4 +225,117 @@ def nudge_decide(*, date: str, now_pt: datetime, row: Optional[Mapping[str, Any]
         return {**out, "reason": "on_track"}
     out["send"], out["reason"] = True, "behind_logged_below"
     out["text"] = copy(out)
+    return out
+
+
+# ── the evening nudge (#5793) ───────────────────────────────────────────────────────────────────────────────────
+def evening_key(date: str) -> str:
+    """The evening slot on the SAME ledger: distinct from the breakfast claim, still one per Pacific day."""
+    return f"{KEY_PREFIX}{date}#{EVENING_SLOT}"
+
+
+def in_evening_window(now_pt: datetime) -> bool:
+    start, end = _minutes(_cv("evening_nudge.at_pt")), _minutes(_cv("evening_nudge.window_end_pt"))
+    now = now_pt.hour * 60 + now_pt.minute
+    return start is not None and end is not None and start <= now < end
+
+
+def logged_total_g(row: Optional[Mapping[str, Any]]) -> Optional[float]:
+    """The protein logged so far: the day row's rollup when it carries one, else the sum of its timed food-log rows
+    (the HAE intraday shape). None when neither carries a figure: unknown, never 0."""
+    if not row:
+        return None
+    total = evaluate_day(row)["total_g"]
+    if total is not None:
+        return total
+    grams = []
+    for r in row.get("food_log") or []:
+        try:
+            grams.append(float((r or {}).get("protein_g")))
+        except (TypeError, ValueError):
+            continue
+    return round(sum(grams), 1) if grams else None
+
+
+def eating_window(fed: Optional[list], now_pt: datetime) -> Optional[dict[str, Any]]:
+    """The day's eating window `{opened, closes, open}`: it opens at the first feeding and runs the charter's
+    `nutrition.eating_window.eating_hours`. None when the feedings or the charter's hours are unknown."""
+    hours = training_charter.charter_value("nutrition.eating_window.eating_hours")
+    if not fed or hours is None:
+        return None
+    opened = _minutes(fed[0]["time"])
+    if opened is None:
+        return None
+    closes = opened + int(round(float(hours) * 60))
+    return {"opened": fed[0]["time"], "closes": _hhmm(closes % (24 * 60)), "open": now_pt.hour * 60 + now_pt.minute < closes}
+
+
+def _g(v: Any) -> str:
+    return f"{float(v):g}"
+
+
+def evening_copy(verdict: Mapping[str, Any]) -> str:
+    """Information, never a command (the breakfast copy's rule)."""
+    parts = [
+        f"{_g(verdict['total_g'])} g of protein is logged so far today, {_g(verdict['remaining_g'])} g short of the {_g(verdict['range_low'])} g range low."
+    ]
+    win, left = verdict.get("window"), verdict.get("feedings_left")
+    if win is not None and left is not None:
+        logged = f"{verdict['feedings_counted']} of the plan's {verdict['feedings_target']} feedings of {verdict['threshold_g']} g or more are logged"
+        if win["open"]:
+            parts.append(
+                f"{logged}; the eating window that opened at {win['opened']} runs to {win['closes']}, with {left} of them left in it."
+            )
+        else:
+            parts.append(f"{logged}; the eating window that opened at {win['opened']} closed at {win['closes']}.")
+    for line in verdict.get("macro_lines") or []:
+        parts.append(line[:1].upper() + line[1:] + ".")
+    parts.append("Fine to leave as it is; this is just where the day stands.")
+    return " ".join(parts)
+
+
+def evening_decide(
+    *, date: str, now_pt: datetime, row: Optional[Mapping[str, Any]], already_sent: bool, budget_tier: int
+) -> dict[str, Any]:
+    """One verdict for the evening nudge: `send` plus the reason, with every number that decided it."""
+    out: dict[str, Any] = {
+        "date": date,
+        "slot": EVENING_SLOT,
+        "send": False,
+        "reason": None,
+        "key": evening_key(date),
+        "version": EVENING_NUDGE_VERSION,
+        "charter_version": training_charter.charter_version(),
+    }
+    if budget_tier >= BUDGET_SILENCE_TIER:
+        return {**out, "reason": f"budget_tier_{budget_tier}"}
+    if not in_evening_window(now_pt):
+        return {**out, "reason": "outside_window"}
+    if already_sent:
+        return {**out, "reason": "already_sent"}
+    out["by"] = now_pt.strftime("%H:%M")
+    if not row:
+        return {**out, "reason": "no_same_day_log"}  # nothing logged anywhere today: never a nudge on an unknown
+    out["source"] = row.get("row_source", "macrofactor_day_row")
+    total = logged_total_g(row)
+    if total is None:
+        return {**out, "reason": "intake_unknown"}
+    low = range_low()
+    out.update(total_g=total, range_low=low)
+    if hit(total, low):
+        return {**out, "reason": "floor_met"}
+    out["remaining_g"] = round(float(low) - total, 1)
+    fed, threshold, target = feedings(row.get("food_log")), _cv("feeding_threshold_g"), _cv("feedings_per_day")
+    out.update(threshold_g=threshold, feedings_target=target, feedings=fed)
+    if fed is not None and threshold is not None and target is not None:
+        counted = sum(1 for f in fed if f["g"] >= float(threshold))
+        win = eating_window(fed, now_pt)
+        out["feedings_counted"], out["window"] = counted, win
+        if win is not None:
+            out["feedings_left"] = max(0, int(target) - counted) if win["open"] else 0
+    graded = macro_floors.evaluate_day(row)
+    out["macro_floors"] = {m: graded[m] for m in EVENING_MACROS}
+    out["macro_lines"] = [t for t in (macro_floors.miss_text(m, graded[m]) for m in EVENING_MACROS) if t]
+    out["send"], out["reason"] = True, "below_range_low"
+    out["text"] = evening_copy(out)
     return out
