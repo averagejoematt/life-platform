@@ -35,6 +35,10 @@ prefix, owner-credential access only). Relocated there 2026-08-23 (#3043):
   **UNCONFIRMED by the owner** (`gate:owner`, #3715) until he reviews the list in
   `lambdas/training/training_context_registry.py`'s `RECORDED_CONSTRAINTS` and flips
   `CONFIRMED_BY_OWNER` there — a coach must not treat it as cleared before that.
+- `exercise_library.private.json` — the N=1 half of the exercise library (#5769): best set per bodyweight
+  band, coded note signals, learned availability, gate threshold values. **Not yet written** — the driver runs
+  `deploy/write_exercise_library_overlay.py --apply` after review; the public half and the approval path are
+  `EXERCISE_LIBRARY.md` here.
 - `WORKORDER_BENCH1_benchmarking.md` — the BENCH-1 work order (ADR-089)
 - `WORKORDER_DI1_movement_integrity.md` — the DI-1 work order (ADR-091)
 
@@ -65,6 +69,10 @@ owner-only per `docs/DATA_GOVERNANCE.md`'s `progress_photos` entry. A working
 copy also lives at `s3://matthew-life-platform/config/coaching/PROGRESS_PHOTO_PROTOCOL.md`
 beside the rest of the owner-private corpus, for convenience — this repo copy is
 the source of truth.
+
+`FILM_A_SET_DESIGN.md` and `form_references_proposed.md` (#5779) are public on the same terms: a design for an
+owner-only, private clip-review flow (nothing built, owner approval pending) and a proposed list of public
+form-reference article links (nothing adopted). Neither holds any clip, frame, or personal data.
 
 ## Owner notes on the coach-nudge tick
 

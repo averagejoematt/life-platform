@@ -1895,8 +1895,8 @@ GUARD_PROOFS.update(
                 "the evening before Day 1. It found that on the run that introduced it."
             ),
             "scope": (
-                "The predicate is pure and is proved here against the committed frozen artifact plus a committed "
-                "read-only capture of the live ledger (tests/fixtures/prereg_season_rows_2026-09-17.json). What "
+                "The predicate is pure and is proved here against the frozen artifact plus a read-only capture of "
+                "the live ledger (both private since 2026-11-11; the proof runs where tests/sealed_prereg.py finds them). What "
                 "that does NOT prove: that the credentialed callers actually reach it in anger — "
                 "restart_verify.py check 20 and genesis_prereg_stamp.py --apply are asserted only at the source "
                 "level here, and the seal-publish refusal has not been watched aborting a real publish (the next "
@@ -1961,8 +1961,8 @@ GUARD_PROOFS.update(
                 "— 7 blocking, every kind reached by one real artifact."
             ),
             "scope": (
-                "The predicate is pure and is proved here against the committed sealed bytes "
-                "(tests/fixtures/prereg_cycle17_2026-09-06.json, byte-identical to the published artifact). What that "
+                "The predicate is pure and is proved here against the sealed bytes (private since 2026-11-11, "
+                "supplied through tests/sealed_prereg.py, hash-checked against the published seal). What that "
                 "does NOT prove: that the seal chokepoint aborts a REAL attended seal — the write_stamp() refusal is "
                 "exercised behaviourally against a tmp_path stamp here, and the next genesis freeze is the first live "
                 "chance. The gate binds seals it MINTS only, so today's already-published cycle-17 seal passes "
@@ -4557,4 +4557,59 @@ GUARD_PROOFS["guard::mcp/invoke_gate.py"] = {
         "no `resources` yet, so they are gated on the function name only (the #5540 residual)."
     ),
     "proved_on": "2026-11-08",
+}
+
+
+# #5769 — the exercise library v0.1: schema, coverage, verified-citation tiers, the public-file privacy scan, gate
+# coverage, ranked fallbacks, home_gym availability, the fail-closed private join and the approval path. ONE structural
+# entrant (the file carries a premerge-gate sweep of lambdas/ + mcp/), proved by six plants in the real tree, one at a
+# time, each restored from a byte copy (config/exercise_library.json md5 3cbe7a71ddc0774fb7aee8d00e6eaf8c before/after).
+STRUCTURAL_HAND_PROOFS["structural::test_exercise_library_5769.py"] = {
+    "gate_name": "test_exercise_library_5769.py",
+    "command": "python3 -m pytest tests/test_exercise_library_5769.py -q -p no:cacheprovider   # baseline 48 passed",
+    "mutation": (
+        "M1 a planted lambdas/training/ module importing training.exercise_library (the drafting path reads the proposed "
+        "library); M2 a `top_weight_kg` number written into a movement's history block; M3 seated_leg_curl's tier-A row "
+        "stripped of its citations; M4 `bw_pull` removed from pull_up's gates; M5 pull_up's fallbacks emptied; M6 the seeded "
+        "preacher_machine state flipped to available."
+    ),
+    "observed": (
+        "2026-11-11, this lane. BASELINE 48 passed. M1: 1 failed (test_nothing_in_the_drafting_path_imports_the_library). "
+        "M2: 1 failed (test_no_private_numbers_in_the_committed_library). M3: 3 failed (schema valid, tier A/B cites a "
+        "DOI/PMID, approval refuses). M4: 4 failed (schema valid, every movement that needs a gate has one, named gate "
+        "chains, approval refuses). M5: 4 failed (schema valid, ranked fallback matches the rule, first fallback avoids "
+        "the primary's equipment, approval refuses). M6: 1 failed (test_availability_follows_the_owner_rule). "
+        "REVERTED 48 passed."
+    ),
+    "scope": (
+        "Repo-side only: the committed public library, the curation, the pure classifiers and a fixture overlay. NOT SEEN: "
+        "the live owner-private overlay (the driver runs scripts/check_library_gates_private.py against it) and any "
+        "selection-time read (#5771/#5773)."
+    ),
+    "proved_on": "2026-11-11",
+}
+
+# #5769 — the private-side gate completeness check (owner requirement 2026-11-11): every public gate resolves to a
+# complete private overlay row; ids and field names only in its output.
+GUARD_PROOFS["guard::scripts/check_library_gates_private.py"] = {
+    "gate_name": "scripts/check_library_gates_private.py",
+    "command": (
+        "python3 -m pytest tests/test_exercise_library_5769.py -q -p no:cacheprovider -k 'private_check or approval'   "
+        "# baseline 9 passed; plus the script against the lane's dry-run overlay (exit 1: 6 bodyweight values unset)"
+    ),
+    "mutation": (
+        "G1 private_gate_gaps never appends a finding (`if False and missing:`); G2 the script's run() returns 0 "
+        "regardless of findings. One at a time; lambdas/training/exercise_library.py restored from a byte copy, the "
+        "script from the index."
+    ),
+    "observed": (
+        "2026-11-11, this lane. G1: 7 failed / 2 passed (all five must-fail shapes, prints-no-values, approval refuses) and "
+        "the script exits 0 on the incomplete dry-run overlay. G2: 2 failed / 7 passed (prints-no-values, approval "
+        "refuses). RESTORED 9 passed; the script exits 1 again."
+    ),
+    "scope": (
+        "Against fixture overlays and the lane's dry-run overlay file. NOT SEEN: the S3 overlay (not written yet — the "
+        "driver runs --apply after review, then this check without --overlay)."
+    ),
+    "proved_on": "2026-11-11",
 }

@@ -8,6 +8,8 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from mcp import plan_call_scope
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +42,7 @@ def _union_evidence_rows(performed: list[dict[str, Any]], draft: list[dict[str, 
     return list(out.values())
 
 
+@plan_call_scope.timed("catalog")  # #5813
 def _catalog_and_ceiling() -> tuple[dict[str, Any] | None, int]:
     """(movement catalog `movements` dict or None, the week grid's skill ceiling) — #4064."""
     try:
@@ -123,6 +126,7 @@ def felt_vs_recovery_tier(fact: dict[str, Any], recovery_tier: str | None) -> di
     }
 
 
+@plan_call_scope.timed("morning_note")  # #5813
 def attach_morning_note(block: dict[str, Any], target_date: str, recovery_tier: str | None, reader=None) -> None:
     """Stamp `block["morning_note"]` and its read state on `block["inputs"]["morning_note"]`."""
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED, error_label, input_status
@@ -264,6 +268,7 @@ def coach_context_for(
         return {"state": "read_failed", "error": f"{type(e).__name__}: {e}"[:200]}
 
 
+@plan_call_scope.timed("coach_context")  # #5813
 def attach_coach_context(
     out: dict[str, Any],
     target_date: str,
@@ -336,6 +341,7 @@ def critics_with_charter(
     return packets
 
 
+@plan_call_scope.timed("calibration_due")  # #5813
 def calibration_due_field(target_date: str) -> dict[str, Any]:
     """#5760: the due measurement items (tape, photos, the fitness battery) as an explicit field of the daily plan, every
     day until each is logged (`calibration_cadence.plan_block`). Never raises: a failed read is `read_failed` with its class,
