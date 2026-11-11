@@ -339,9 +339,9 @@ def test_stage_2_pays_the_slowest_critic_not_the_sum_and_reads_the_indexes_once(
     assert crit["written"] is True and stored, crit.get("next")
     assert all(not (v.get("model") or {}).get("error") for v in crit["verdicts"]), crit["verdicts"]
     assert len(reads) == 1, f"the history index was read {len(reads)}x in one stage 2 — the session loads and the floor clamp must share it"
-    assert len(critic_wall) == 1
+    assert len(critic_wall) == 2, "#5781: the deterministic pass (no model, stored first), then the model pass"
     print(
-        f"\n[#5313 timing] stage 2 wall {wall:.2f}s; the critics' share {critic_wall[0]:.2f}s for 4 x 0.5 s calls "
+        f"\n[#5313 timing] stage 2 wall {wall:.2f}s; the critics' share {critic_wall[-1]:.2f}s for 4 x 0.5 s calls "
         "(sequential floor 2.0 s); history index read 1x (0.2 s)"
     )
-    assert critic_wall[0] < 1.5, f"the critics took {critic_wall[0]:.2f}s — the four 0.5 s calls ran one after another (sum 2.0 s)"
+    assert critic_wall[-1] < 1.5, f"the critics took {critic_wall[-1]:.2f}s — the four 0.5 s calls ran one after another (sum 2.0 s)"

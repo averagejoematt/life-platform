@@ -185,6 +185,10 @@ _CONFIG_WITHOUT_REPO_FILE: dict[str, str] = {
     "out of band into the private coaching home and never in this PUBLIC repo (the contact-path test greps the tree "
     "for the field shape). The tracked shape is `coach.named_human_contact`'s module docstring. Deliberately NOT a "
     "repo twin, and no example JSON under config/ either.",
+    "config/private/user_goals_private.json": "Owner ruling 2026-11-11 (item 2): the plan root's PRIVATE part (mental "
+    "health, eating, relapse, clinical and genetic fields). Owner-provisioned out of band; the tracked file holds only "
+    "the public-safe part and `common.user_goals` merges the two. Deliberately NOT a repo twin, so the config twin sync "
+    "can never write or delete it; absent, coach context degrades to the public plan.",
 }
 
 #: The derived content-filter/privacy-guard consumer set → its watch surface.

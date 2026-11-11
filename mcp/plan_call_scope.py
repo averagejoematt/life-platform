@@ -34,6 +34,7 @@ thread) and is dropped when the call returns.
 
 from __future__ import annotations
 
+import copy
 import functools
 import time
 from contextlib import contextmanager
@@ -42,6 +43,10 @@ from typing import Any, Callable, Iterator
 
 ANCHOR_INDEXES = "anchor_indexes"
 HEVY_ALL_PHASES = "hevy_all_phases"
+# #5781: the block's Hevy record (`plan_hevy_windows._block_workouts`) — read by stage 1 and twice more by the commit
+# gate's floors (`v03_load_rule`, `_in_block_performed`) on a draft_custom stage 2. Its consumers are not all checked
+# read-only, so every caller gets its OWN copy (`memoized_copy`): the read is shared, the rows never are.
+BLOCK_WORKOUTS = "block_workouts"
 
 # Must sit below the handler's cap with room for what follows the write (one put_versioned, the
 # coach-thread put, the notes block, the response): tests/test_plan_stage2_latency_5313.py holds it there.
@@ -80,6 +85,13 @@ def memoized(kind: str, key: Any, fn: Callable[..., Any], *args: Any, **kwargs: 
     return value
 
 
+def memoized_copy(kind: str, key: Any, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """`memoized`, handing every caller a deep copy — for a value whose consumers may mutate it."""
+    if (_ACTIVE.get() or {}).get(kind) is None:
+        return fn(*args, **kwargs)
+    return copy.deepcopy(memoized(kind, key, fn, *args, **kwargs))
+
+
 def anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
     """(Hevy history index, bodyweight index) at the floor lookback — the pair both the session
     loads and the commit gate's floor clamp read, memoized under `anchor_indexes`."""
@@ -92,13 +104,13 @@ def anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
 
 
 def plan_call(fn: Callable[..., Any]) -> Callable[..., Any]:
-    """Run `fn` as one plan call: the clock stamped, the `anchor_indexes` memo open."""
+    """Run `fn` as one plan call: the clock stamped, the `anchor_indexes` and `block_workouts` memos open."""
 
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         token = _STARTED.set(time.monotonic())
         try:
-            with scope(ANCHOR_INDEXES):
+            with scope(ANCHOR_INDEXES, BLOCK_WORKOUTS):
                 return fn(*args, **kwargs)
         finally:
             _STARTED.reset(token)

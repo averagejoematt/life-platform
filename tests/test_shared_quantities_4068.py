@@ -295,7 +295,7 @@ def test_the_stage_2_rate_advocate_reads_the_reference_loss_rate_block():
 # that reports weekly walking hours or the loss rate, including get_benchmark (owner, #4068).
 CALL_SITES = {
     ("mcp/tools_plan.py", "_walking_volume_last_7d"): "shared_quantities.walking_layer",  # plan_next_session + walking layer
-    ("mcp/tools_plan.py", "_run_stage_2"): "_loss_rate_of",  # rate_advocate's loss rate
+    ("mcp/plan_stage2_run.py", "packet_builder"): "_loss_rate_of",  # rate_advocate's loss rate (#5781: moved from _run_stage_2)
     ("mcp/nutrition_critics_inputs.py", "_walking_hours"): "shared_quantities.weekly_walking_hours",  # adherence critic
     ("mcp/nutrition_critics_inputs.py", "resolve"): "shared_quantities.completed_end",  # adherence critic's two weeks
     ("mcp/nutrition_critics_inputs.py", "withings_trend"): "shared_quantities.loss_rate_from_rows",  # deficit critic

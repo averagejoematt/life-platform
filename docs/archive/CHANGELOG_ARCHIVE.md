@@ -32,7 +32,7 @@
 - Parsed 49-page comprehensive SNP interpretation report (consumer genomics, dated 2020-06-19)
 - Risk distribution: 35 unfavorable, 17 mixed, 47 neutral, 11 favorable
 - 14 categories: metabolism (20), longevity (20), nutrient_metabolism (19), lipids (10), immune (9), taste (7), exercise (6), sleep (6), miscellaneous (5), statin_response (3), antioxidant (2), cardiovascular (1), caffeine (1), cancer_risk (1)
-- Key actionable themes: 6 FTO obesity variants, triple vitamin D deficiency risk, MTHFR compound heterozygous, FADS2 poor ALA→EPA conversion, SLCO1B1 statin sensitivity, ABCG8 elevated LDL, CYP1A2 fast caffeine metabolizer
+- Key actionable themes: [genetic detail removed 2026-11-11: genotype data is owner-only]
 - Stores ONLY clinical interpretations — no raw genome data (privacy by design)
 
 ---

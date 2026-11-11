@@ -513,6 +513,15 @@ def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measur
     # Always assign — a conditional here let the PREVIOUS cycle's timestamp
     # survive a restart whose genesis date had no weigh-in yet (None clears it).
     cfg["timeline"]["baseline_measurement_utc"] = measurement_utc
+    # Owner ruling 2026-11-11 (item 2): the tracked plan root is the PUBLIC part only. A reset writes it back, so it
+    # refuses to write one that has picked up a private field (paths only in the message; never a value).
+    from common import user_goals as _user_goals  # noqa: PLC0415
+
+    leaked = _user_goals.private_paths_in(cfg)
+    if leaked:
+        raise SystemExit(
+            f"refusing to write config/user_goals.json: private goals fields present {leaked} — they belong in the private part"
+        )
     if apply:
         USER_GOALS.write_text(json.dumps(cfg, indent=2) + "\n")
 
