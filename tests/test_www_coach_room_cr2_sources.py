@@ -145,4 +145,19 @@ def test_the_first_cycle_is_read_off_the_policy_and_unreadable_is_none(tmp_path)
 def test_a_malformed_payload_is_absent():
     assert P._approved_words({"sealed_calls": "x"})["state"] == "absent"
     assert P._approved_words(None)["state"] == "absent"
+
+
+def test_the_lead_window_is_carried_only_when_well_formed_and_no_smaller_than_the_list():
+    read = {"date": "2026-10-03", "text": "Sample read.", "cited": []}
+    base = {"coach_id": "eli_marsh", "approved_at": "2026-11-09", "sealed_calls": [], "lead_reads": [read]}
+    good = P._approved_words({**base, "lead_window": {"from": "2026-10-01", "to": "2026-11-03", "written": 28}})
+    assert good["lead_window"] == {"from": "2026-10-01", "to": "2026-11-03", "written": 28}
+    for bad in (
+        {"from": "x", "to": "2026-11-03", "written": 28},
+        {"from": "2026-10-01", "to": "2026-11-03", "written": 0},
+        {"written": True},
+        "28",
+    ):
+        assert "lead_window" not in P._approved_words({**base, "lead_window": bad})
+    assert "lead_window" not in P._approved_words(base)
     assert P._public_briefs({"briefs": None}, "2026-11-16")["state"] == "absent"

@@ -294,6 +294,13 @@ APPROVED: tuple = (
 
 INDEX: dict = {(e.pk, e.sk): e for e in APPROVED}
 
+#: How many lead daily reads were WRITTEN in the window the record-level check covered (counted read-only from the
+#: table, 2026-11-11: 28 rows under COACH#eli_marsh, LEAD_DAILY#2026-10-01..2026-11-03). Served beside the approved
+#: reads so the page says "n of 28", never a bare "n" that reads as the whole run (owner ruling 2026-11-11 item 8: do
+#: not make a sparse historical section look more complete than the evidence supports).
+LEAD_PK = "COACH#eli_marsh"
+LEAD_WINDOW: dict = {"from": "2026-10-01", "to": "2026-11-03", "written": 28}
+
 _SCOPE: contextvars.ContextVar = contextvars.ContextVar("narrative_allowlist_scope", default=None)
 
 

@@ -298,10 +298,16 @@ export const APPROVED_WORDS_NOTE =
  *  may be empty, meaning nothing of this coach's was approved) or "absent" (not served for this snapshot). */
 export function approvedWords(entry) {
   const w = entry && entry.approved_words;
-  if (!w || w.state !== "ok") return { state: "absent", calls: [], reads: [], approvedOn: null };
+  if (!w || w.state !== "ok") return { state: "absent", calls: [], reads: [], approvedOn: null, window: null };
+  const win = w.lead_window;
   return {
     state: "ok",
     approvedOn: dayInWords(w.approved_at) || null,
+    // how many reads were WRITTEN in the checked window, served or not — the page says "n of written", never a bare n
+    window:
+      win && Number.isInteger(win.written) && dayInWords(win.from) && dayInWords(win.to)
+        ? { written: win.written, from: dayInWords(win.from), to: dayInWords(win.to) }
+        : null,
     calls: (w.sealed_calls || [])
       .filter((c) => c && typeof c.claim === "string" && c.claim.trim())
       .map((c) => ({
@@ -324,6 +330,23 @@ export function approvedWords(entry) {
         through: dayInWords(r.data_through) || null,
         cited: (r.cited || []).map((c) => ({ metric: c.metric, value: datesInWords(c.value), asOf: dayInWords(c.as_of) || null })),
       })),
+  };
+}
+
+/** The heading and the coverage line for the approved reads: "21 of the 28 daily reads written ..." when the window
+ *  is served (and is no smaller than the list), else the bare count. Owner ruling 2026-11-11 (8): a sparse historical
+ *  section must not look more complete than the evidence supports. */
+export function readsCoverage(w) {
+  const n = (w && w.reads && w.reads.length) || 0;
+  const win = w && w.window;
+  const noun = (k) => (k === 1 ? "read" : "reads");
+  if (!win || win.written < n) return { heading: `${n} earlier ${noun(n)}`, line: null };
+  const rest = win.written - n;
+  return {
+    heading: `${n} of ${win.written} earlier ${noun(win.written)}`,
+    line:
+      `${n} of the ${win.written} daily ${noun(win.written)} written between ${win.from} and ${win.to} ${n === 1 ? "is" : "are"} published here.` +
+      (rest > 0 ? ` The other ${rest} ${rest === 1 ? "is" : "are"} not published. A day with no read here is a gap in what is shown, not a quiet day.` : ""),
   };
 }
 

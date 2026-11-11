@@ -213,6 +213,17 @@ def test_switch_on_the_route_serves_an_approved_lead_read_with_public_figures_on
     assert r["text"] == LEAD_TEXT and r["date"] == "2026-10-11" and r["data_through"] == "2026-10-10"
     assert r["cited"] == [{"metric": c["metric"], "value": c["value"], "as_of": c["as_of"]} for c in PUBLIC_CITED]
     assert "source_field" not in json.dumps(b), "the cited block's source names never cross the wire"
+    # the denominator rides with the lead's reads (a count, no words) — and only with the lead's
+    assert b["lead_window"] == NA.LEAD_WINDOW and b["lead_window"]["written"] >= len(b["lead_reads"])
+
+
+def test_the_lead_window_counts_at_least_every_listed_lead_read_and_rides_with_the_lead_only(monkeypatch, cr2_on, dossier_ok):
+    listed = [e for e in NA.APPROVED if e.pk == NA.LEAD_PK and e.sk.startswith(R.LEAD_PREFIX)]
+    days = sorted(e.sk[len(R.LEAD_PREFIX) :] for e in listed)
+    assert NA.LEAD_WINDOW["written"] >= len(listed)
+    assert NA.LEAD_WINDOW["from"] <= days[0] and days[-1] <= NA.LEAD_WINDOW["to"]
+    _install(monkeypatch, _rows())
+    assert "lead_window" not in _body(_get(R.ROUTE, {"coach": COACH}))
 
 
 def test_words_tainted_by_an_earlier_request_are_still_served_inside_the_route(monkeypatch, cr2_on, lead_entry, dossier_ok):

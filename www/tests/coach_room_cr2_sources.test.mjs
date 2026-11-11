@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { approvedWords, briefFact, briefView, roomCoach, weekOf, withApprovedClaims } from "../src/lib/coach_room.js";
+import { approvedWords, briefFact, briefView, readsCoverage, roomCoach, weekOf, withApprovedClaims } from "../src/lib/coach_room.js";
 import { CR23_DATA_KEYS } from "../src/lib/room.js";
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "..", "content", "fixtures");
@@ -100,4 +100,19 @@ test("brief: what Matt did is the recorded evidence or a stated reason, never in
   assert.equal(did([{ recommendation_id: "r1", state: "not_measured" }]), "no check was set, so nothing is measured");
   assert.equal(did([{ recommendation_id: "r1", state: "no_record" }]), "no reading in the window");
   assert.equal(did([]), "not recorded");
+});
+
+test("approved reads say how many of the reads written they are — never a bare count that reads as the whole run", () => {
+  const lead = approvedWords(roomCoach(FILE, "eli_marsh"));
+  assert.deepEqual(lead.window, { written: 28, from: "1 October 2026", to: "3 November 2026" });
+  const cov = readsCoverage(lead);
+  assert.equal(cov.heading, "4 of 28 earlier reads");
+  assert.match(cov.line, /^4 of the 28 daily reads written between 1 October 2026 and 3 November 2026 are published here\. The other 24 are not published\./);
+  assert.match(cov.line, /a gap in what is shown, not a quiet day/);
+  // all of them served: no "other" clause
+  assert.equal(readsCoverage({ reads: [1, 2], window: { written: 2, from: "a", to: "b" } }).line.includes("other"), false);
+  // no window (or one smaller than the list): the bare count, and no coverage line claimed
+  assert.deepEqual(readsCoverage({ reads: [1], window: null }), { heading: "1 earlier read", line: null });
+  assert.deepEqual(readsCoverage({ reads: [1, 2, 3], window: { written: 2, from: "a", to: "b" } }), { heading: "3 earlier reads", line: null });
+  assert.equal(approvedWords(roomCoach(FILE, "sleep_coach")).window, null);
 });

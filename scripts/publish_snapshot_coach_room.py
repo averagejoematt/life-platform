@@ -418,13 +418,19 @@ def _approved_words(payload: Any) -> dict:
             }
         )
     reads.sort(key=lambda r: r["date"], reverse=True)
-    return {
+    out = {
         "state": "ok",
         "source": WORDS_PATH.format(payload.get("coach_id")),
         "approved_at": _day(payload.get("approved_at")),
         "sealed_calls": calls,
         "lead_reads": reads,
     }
+    win = payload.get("lead_window")
+    if isinstance(win, dict) and _day(win.get("from")) and _day(win.get("to")):
+        n = win.get("written")
+        if isinstance(n, int) and not isinstance(n, bool) and n >= len(reads):
+            out["lead_window"] = {"from": _day(win.get("from")), "to": _day(win.get("to")), "written": n}
+    return out
 
 
 def _span(v: Any) -> dict | None:

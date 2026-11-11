@@ -21,6 +21,7 @@ import {
   WHAT_MATT_DID_NOTE,
   approvedWords,
   askCountsText,
+  readsCoverage,
   briefFact,
   briefView,
   askRows,
@@ -74,6 +75,7 @@ const approved = approvedWords(entry);
 const brief = briefView(entry, file && file.fetched_at);
 const briefNow = briefFact(brief);
 const READS_SHOWN = 3;
+const coverage = readsCoverage(approved);
 const mine = withApprovedClaims(all.byType.prediction.filter((p: any) => p.coach_id === c.id), entry);
 // an approved call's verdict is the LEDGER's (its classification review included) when the ledger serves the call
 const ledgerOf = (id: any) => (id ? mine.find((p: any) => typeof p.id === "string" && p.id.endsWith(`-${id}`)) : null) || null;
@@ -253,7 +255,8 @@ const num1 = "font-size:15px;line-height:1.5";
         <div class="wrap grid cols2" style="gap:48px;align-items:start">
           <div style="display:flex;flex-direction:column;gap:10px">
             <p class="label">In their own words, approved for publication</p>
-            <h2 style={h2}>{approved.calls.length > 0 ? `${approved.calls.length} sealed day-one ${approved.calls.length === 1 ? "call" : "calls"}` : `${approved.reads.length} earlier ${approved.reads.length === 1 ? "read" : "reads"}`}</h2>
+            <h2 style={h2}>{approved.calls.length > 0 ? `${approved.calls.length} sealed day-one ${approved.calls.length === 1 ? "call" : "calls"}` : coverage.heading}</h2>
+            {approved.reads.length > 0 && coverage.line && <p style="font-size:14px;max-width:62ch;line-height:1.5" data-reads-coverage>{coverage.line}</p>}
             <p class="muted" style="font-size:13px;max-width:62ch">{APPROVED_WORDS_NOTE}{approved.approvedOn ? ` Approved ${approved.approvedOn}.` : ""}</p>
             {approved.calls.length > 0 && <p style="font-size:14px;max-width:62ch;line-height:1.5">Sealed in the pre-registration at the start of the experiment, and graded later by the same rules as every other call. The verdict beside each is the ledger's.</p>}
           </div>

@@ -138,7 +138,11 @@ def serve(coach: str, table: Any) -> dict:
             leads.append(_lead(item, text))
     calls.sort(key=lambda c: (str(c.get("logged_date") or ""), str(c.get("prediction_id") or "")))
     leads.sort(key=lambda r: r["date"], reverse=True)
-    return {"coach_id": coach, "approved_at": NA.APPROVED_AT, "method": METHOD, "sealed_calls": calls, "lead_reads": leads}
+    body = {"coach_id": coach, "approved_at": NA.APPROVED_AT, "method": METHOD, "sealed_calls": calls, "lead_reads": leads}
+    if f"COACH#{coach}" == NA.LEAD_PK:
+        # the denominator: how many reads were written in the checked window, served or not (a count, no words)
+        body["lead_window"] = dict(NA.LEAD_WINDOW)
+    return body
 
 
 def handle_coach_room_words(event: dict, *, table: Any = None) -> dict:

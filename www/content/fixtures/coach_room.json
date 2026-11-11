@@ -81,6 +81,11 @@
     "state": "ok",
     "source": "/api/coach_room_words?coach=eli_marsh",
     "approved_at": "2026-11-09",
+    "lead_window": {
+     "from": "2026-10-01",
+     "to": "2026-11-03",
+     "written": 28
+    },
     "sealed_calls": [],
     "lead_reads": [
      {
