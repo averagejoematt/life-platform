@@ -270,9 +270,10 @@ def tool_get_exercise_notes(args):
     # into get_freshness_status"; it was hooked into the freshness TOOL and never into the
     # reader whose zeros it qualifies.
     try:
-        from training.training_notes import training_notes_health
+        from mcp import plan_call_scope
 
-        health = training_notes_health(table)
+        # #5813: once per plan_next_session call (stage 1 asks once per drafted exercise); a plain read elsewhere
+        health = plan_call_scope.notes_health(table)
     except Exception as e:  # noqa: BLE001
         health = {"checked": False, "error": f"{type(e).__name__}: {e}"}
     status, reason = derived_layer_status(health)
