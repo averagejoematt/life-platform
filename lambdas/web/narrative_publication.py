@@ -97,6 +97,11 @@ NON_NARRATIVE_SK_PREFIXES = ("CORRECTION#", "VERIFY#", "REPEATFAMILY#")
 # the chronicle (owner approval per installment + the story-auditor's journal class), the diary
 # reactions and journal quotes (``diary_consent`` per entry).
 _SOURCE_PK = re.compile(r"^USER#[^#]+#SOURCE#(?P<source>[^#]+)$")
+# Compiled once (they ran per string per row through ``re``'s cache lookup): the same patterns, the same flags.
+_WS = re.compile(r"\s")
+_MASKED_FIGURE = re.compile(r"\[n\]")
+_FIGURE = re.compile(r"\d+(?:[.,]\d+)*")
+_NON_WORD = re.compile(r"[^a-z0-9]+")
 _USER_PK = re.compile(r"^USER#[^#]+$")
 
 
@@ -225,7 +230,7 @@ def _withhold_value(value: Any, key: Any = None, in_list: bool = False) -> Any:
     if isinstance(value, str):
         if str(key or "") in PROSE_KEYS:
             return ""
-        if re.search(r"\s", value):
+        if _WS.search(value):
             return ""
         if in_list and not _structural_key(key):
             return ""
@@ -261,15 +266,15 @@ def withheld_count() -> int:
 
 def _norm_words(text: str) -> tuple:
     # Digits and the masked-figure token ("[n]", coach_moves_sheet.mask_figures) normalise alike.
-    t = re.sub(r"\[n\]", "0", text.lower())
-    t = re.sub(r"\d+(?:[.,]\d+)*", "0", t)
-    return tuple(re.sub(r"[^a-z0-9]+", " ", t).split())
+    t = _MASKED_FIGURE.sub("0", text.lower())
+    t = _FIGURE.sub("0", t)
+    return tuple(_NON_WORD.sub(" ", t).split())
 
 
 def _prose_strings(value: Any, key: Any = None):
     """Every free-text string under ``value`` (the strings ``_withhold_value`` would empty)."""
     if isinstance(value, str):
-        if str(key or "") in PROSE_KEYS or re.search(r"\s", value):
+        if str(key or "") in PROSE_KEYS or _WS.search(value):
             yield value
     elif isinstance(value, dict):
         for k, v in value.items():
@@ -299,24 +304,52 @@ TAINT_SKIP_KEYS = frozenset(
 )
 
 
-def _wordy(gram: tuple) -> bool:
-    """A run worth matching: at least four real words (a run of masked figures matches anything)."""
-    return sum(1 for w in gram if len(w) >= 3 and not w.isdigit()) >= 4
+# The texts already tainted into the sets above. Tainting is a pure function of the text (its exact
+# hash and its wordy shingles), so a text tainted once adds nothing the second time: every request
+# re-reads the same graded rows, and re-shingling their unchanged words was the route's CPU (#5728).
+# Strings, not hashes — a skip must be exact, never a collision. Emptied whenever the taint is.
+_TAINT_SEEN: set = set()
+
+
+def reset_taint() -> None:
+    """Forget every taint (the sets and the seen-texts memo together)."""
+    _TAINT_EXACT.clear()
+    _TAINT_SHINGLES.clear()
+    _TAINT_SEEN.clear()
+
+
+def _taint_text(text: str) -> None:
+    words = _norm_words(text)
+    n = len(words)
+    if n < EXACT_MIN_WORDS:
+        return
+    _TAINT_EXACT.add(hash(words))
+    if n < SHINGLE:
+        return
+    # A run worth matching (a "wordy" window): at least four REAL words — three letters or more, not a figure —
+    # in the ``SHINGLE`` window, since a run of masked figures matches anything. Kept as one running count
+    # across the windows rather than a recount per window: the same windows, the same test.
+    real = [len(w) >= 3 and not w.isdigit() for w in words]
+    count = sum(real[:SHINGLE])
+    shingles = _TAINT_SHINGLES
+    for i in range(n - SHINGLE + 1):
+        if i:
+            count += real[i + SHINGLE - 1] - real[i - 1]
+        if count >= 4:
+            shingles.add(hash(words[i : i + SHINGLE]))
 
 
 def _taint(row: dict) -> None:
+    if not _TAINT_EXACT or not _TAINT_SHINGLES:
+        _TAINT_SEEN.clear()  # a cleared taint set clears the memo with it: a skip is only ever of a text still tainted
     for key, value in row.items():
         if key in TAINT_SKIP_KEYS:
             continue
         for text in _prose_strings(value, key):
-            words = _norm_words(text)
-            if len(words) < EXACT_MIN_WORDS:
+            if text in _TAINT_SEEN:
                 continue
-            _TAINT_EXACT.add(hash(words))
-            for i in range(len(words) - SHINGLE + 1):
-                gram = words[i : i + SHINGLE]
-                if _wordy(gram):
-                    _TAINT_SHINGLES.add(hash(gram))
+            _taint_text(text)
+            _TAINT_SEEN.add(text)
 
 
 def is_tainted(text: Any) -> bool:
