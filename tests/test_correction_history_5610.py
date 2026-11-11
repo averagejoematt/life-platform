@@ -108,7 +108,7 @@ def test_dates_are_distinct_and_never_invented():
             else:
                 assert e["corrected_at"] == row["respecified_at"] and e["original_status"] == "pending"
                 assert e["original_outcome_date"] is None, "the call was open when its target moved"
-    count = items["pred_20260906_sleep_duration_will_consistently_reach_o"]["corrections"][0]
+    count = items["pred_20260906_withheld_call_a"]["corrections"][0]
     assert count["rules"] == [{"id": "#4541:count", "version": None}]
     assert count["original_status"] == "confirmed" and count["original_outcome_date"] is None, "#4541 stored no grading day"
     assert count["corrected_status"] == "refuted", "#4541's write set the row's status; nothing later moved it"

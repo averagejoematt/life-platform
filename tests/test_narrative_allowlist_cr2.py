@@ -55,6 +55,18 @@ def cr2_on(monkeypatch):
     monkeypatch.setattr(NA, "CR2_PUBLIC", True)
 
 
+@pytest.fixture
+def ldl_counterfactual(monkeypatch):
+    """The serving path's positive control. Since the owner ruled the LDL target private (2026-11-11) every sealed call
+    is withheld (each generation prompt read it — test_goals_field_privacy pins that); to keep proving an approved,
+    unchanged call CAN be served, these tests restore the pre-ruling classification of that one field."""
+    from common import goals_field_privacy as GFP
+
+    f = "targets.biomarkers.ldl_target_mg_dl"
+    monkeypatch.setattr(GFP, "_PRIVATE", tuple(p for p in GFP._PRIVATE if p != f))
+    monkeypatch.setattr(GFP, "_PUBLIC_SAFE", GFP._PUBLIC_SAFE + (f,))
+
+
 def _calls():
     return [e for e in NA.APPROVED if e.sk.startswith("PREDICTION#")]
 
@@ -151,7 +163,7 @@ def test_switch_on_outside_the_scope_nothing_changes(cr2_on):
     assert G.is_tainted(row["claim_natural"])
 
 
-def test_in_scope_an_approved_unchanged_call_is_served(cr2_on):
+def test_in_scope_an_approved_unchanged_call_is_served(cr2_on, ldl_counterfactual):
     e = _calls()[2]
     row = _sealed_row(e)
     G.begin_request()
@@ -263,7 +275,7 @@ def test_a_listed_row_whose_words_name_private_activity_fails_closed(cr2_on, mon
         assert G.gate_item(dict(row))[G.PUBLICATION_KEY]["state"] == "withheld"
 
 
-def test_only_the_cr2_scope_is_honoured(cr2_on):
+def test_only_the_cr2_scope_is_honoured(cr2_on, ldl_counterfactual):
     row = _sealed_row(_calls()[5])
     with NA.serving("cr3"):
         assert NA.record_for(row) is None

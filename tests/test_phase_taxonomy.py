@@ -66,7 +66,7 @@ LIVE_FAMILIES = [
     ("USER#matthew#SOURCE#food_delivery", "STREAK#current"),
     ("USER#matthew#SOURCE#food_delivery", "YEAR#2011"),
     ("USER#matthew#SOURCE#garmin", "DATE#2022-04-25"),
-    ("USER#matthew#SOURCE#genome", "GENE#ABCG8#SNP#rs6544713"),
+    ("USER#matthew#SOURCE#genome", "GENE#SYNTH1#SNP#rs0000001"),  # synthetic gene/SNP key (owner ruling 2026-11-11)
     ("USER#matthew#SOURCE#genome", "SUMMARY"),
     ("USER#matthew#SOURCE#google_calendar", "DATE#2026-03-08"),
     ("USER#matthew#SOURCE#habit_scores", "DATE#2026-02-23"),

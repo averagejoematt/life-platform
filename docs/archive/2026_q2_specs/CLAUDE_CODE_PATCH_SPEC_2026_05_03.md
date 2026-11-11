@@ -334,7 +334,7 @@ life-platform:create_todoist_task \
 
 life-platform:create_todoist_task \
   content="Schedule PCP appointment to discuss rosuvastatin 5mg" \
-  description="Bring FH 2026 report (s3://matthew-life-platform/raw/matthew/labs/2026-04-03/) and SLCO1B1 C;T genotype info — 4.5x myopathy risk with simvastatin/atorvastatin contraindicates those, rosuvastatin is the appropriate choice. Board verdict: 4-2 in favor of starting now. ApoB 116, IR Score 75, Lp-PLA2 137 are the data points to anchor the conversation." \
+  description="Bring FH 2026 report (s3://matthew-life-platform/raw/matthew/labs/2026-04-03/) and [genetic detail removed 2026-11-11: genotype data is owner-only]. Board verdict: 4-2 in favor of starting now. ApoB 116, IR Score 75, Lp-PLA2 137 are the data points to anchor the conversation." \
   due_date="2026-05-06" \
   priority=2
 

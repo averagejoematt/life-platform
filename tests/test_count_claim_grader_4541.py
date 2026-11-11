@@ -1,16 +1,17 @@
 """tests/test_count_claim_grader_4541.py — a count claim is graded by COUNTING (#4541).
 
-`pred_20260906_sleep_duration_will_consistently_reach_o` (mind coach, pre-registered) said
-"Sleep duration will consistently reach or exceed the 7.5-hour target ... on at least 5 of
-the first 7 nights". It was stored with a `directional` spec and graded CONFIRMED by the EWMA
-slope (0.0603) while only 3 of the 7 nights reached 7.5 h. These tests pin:
+A pre-registered count claim (a night count over sleep duration) was stored with a `directional`
+spec and graded CONFIRMED by the EWMA slope while the night count fell short of its stated K. The
+claim below is a STAND-IN written for this test (the original call's wording is private, owner ruling
+2026-11-09), graded over real public Whoop nights: "at or above 8 hours on at least 3 of the first 7
+nights", which 2 of the 7 nights reach. These tests pin:
 
   * the parser — the sentence reads into (K, N, metric, comparator, threshold), and every
     ambiguous variant reads into NOTHING (not graded, with the reason);
-  * the counting rule — 3 of 7 refuted, exactly 5 of 7 confirmed, a missing day is never a
+  * the counting rule — 2 of 7 refuted, exactly 3 of 7 confirmed, a missing day is never a
     miss and never a hit;
   * the wire — the real Whoop nights, run through `_evaluate_all`, come out REFUTED on a
-    count of 3; and the MUTATION CONTROL — the same fixture with the count route removed is
+    count of 2; and the MUTATION CONTROL — the same fixture with the count route removed is
     graded CONFIRMED by slope, so the fixture really does reproduce the bug.
 
 Every expected number is hand-derived from the values in the fixture, never read back.
@@ -34,14 +35,13 @@ from coach import (
 )
 
 ISSUE_SENTENCE = (
-    "Sleep duration will consistently reach or exceed the 7.5-hour target (bed 9:00 PM, wake 4:30 AM) on at least 5 of "
-    "the first 7 nights, as the fixed schedule removes decision fatigue and the structured ramp discipline reduces "
-    "late-night training stress that would otherwise delay sleep onset."
+    "Sleep duration will reach or exceed 8 hours (lights out by 9:30 PM, up at 5:00 AM) on at least 3 of the first 7 "
+    "nights while the new routine settles in."
 )
 ISSUE_SPEC = {"type": "directional", "metric": "sleep_duration_hours", "condition": "up", "threshold": None, "evaluation_window_days": 7}
 
 # The live Whoop rows (USER#matthew#SOURCE#whoop, phase=experiment), read 2026-10-09. Whoop keys a
-# night by its wake date. Window 09-06..09-12: 7.93, 8.37 and 8.76 reach 7.5 — 3 of 7 (7.46 does not).
+# night by its wake date. Window 09-06..09-12: 8.37 and 8.76 reach 8 — 2 of 7 (7.93 does not).
 WHOOP_SLEEP_HOURS = {
     "2026-09-06": 7.93,
     "2026-09-07": 8.37,
@@ -63,10 +63,10 @@ GRADED_ON = "2026-09-19"  # the day the live row was graded (outcome_date)
 
 def _issue_pred(sentence=ISSUE_SENTENCE, spec=None):
     return {
-        "pk": "COACH#mind_coach",
-        "sk": "PREDICTION#pred_20260906_sleep_duration_will_consistently_reach_o",
-        "prediction_id": "pred_20260906_sleep_duration_will_consistently_reach_o",
-        "coach_id": "mind_coach",
+        "pk": "COACH#sleep_coach",
+        "sk": "PREDICTION#pred_20260906_stand_in_count_claim_4541",
+        "prediction_id": "pred_20260906_stand_in_count_claim_4541",
+        "coach_id": "sleep_coach",
         "subdomain": "sleep",
         "created_date": "2026-09-06",
         "status": "pending",
@@ -103,16 +103,16 @@ class TestParser:
         assert why == ""
         assert (claim["rule"], claim["k"], claim["n"], claim["metric"], claim["comparator"], claim["threshold"]) == (
             "at_least",
-            5,
+            3,
             7,
             "sleep_duration_hours",
             "gte",
-            7.5,
+            8.0,
         )
 
     def test_the_issue_title_phrasing_reads_over_as_strictly_greater(self):
-        claim, why = cg.parse_count_claim("Sleep duration: at least 5 of 7 nights over 7.5 h", "sleep_duration_hours")
-        assert why == "" and claim["comparator"] == "gt" and claim["threshold"] == 7.5 and (claim["k"], claim["n"]) == (5, 7)
+        claim, why = cg.parse_count_claim("Sleep duration: at least 3 of 7 nights over 8 h", "sleep_duration_hours")
+        assert why == "" and claim["comparator"] == "gt" and claim["threshold"] == 8.0 and (claim["k"], claim["n"]) == (3, 7)
 
     def test_every_one_of_the_first_n_days_is_all_n(self):
         s = "Daily step count will remain at or above 6,000 steps on every one of the first 14 days."
@@ -120,30 +120,30 @@ class TestParser:
         assert why == "" and (claim["k"], claim["n"], claim["comparator"], claim["threshold"]) == (14, 14, "gte", 6000.0)
 
     def test_a_clock_time_is_not_a_threshold(self):
-        # "bed 9:00 PM, wake 4:30 AM" sits in the issue sentence; only 7.5 may be read.
+        # "lights out by 9:30 PM, up at 5:00 AM" sits in the issue sentence; only 8 may be read.
         claim, _ = cg.parse_count_claim(ISSUE_SENTENCE, "sleep_duration_hours")
-        assert claim["threshold"] == 7.5
+        assert claim["threshold"] == 8.0
 
     @pytest.mark.parametrize(
         "sentence,metric,needle",
         [
-            ("Sleep duration will exceed 7.5 hours on 5 of 7 nights.", "sleep_duration_hours", "no bound"),
-            ("Sleep duration will reach 7.5 hours on approximately 5 of 7 nights.", "sleep_duration_hours", "approximately"),
-            ("Sleep duration will reach or exceed 7.5 hours on at least 5 out of every 7 nights.", "sleep_duration_hours", "rate"),
-            ("Sleep duration will reach or exceed 7.5 hours on at least 5 of 7 logged nights.", "sleep_duration_hours", "logged"),
+            ("Sleep duration will exceed 8 hours on 3 of 7 nights.", "sleep_duration_hours", "no bound"),
+            ("Sleep duration will reach 8 hours on approximately 3 of 7 nights.", "sleep_duration_hours", "approximately"),
+            ("Sleep duration will reach or exceed 8 hours on at least 3 out of every 7 nights.", "sleep_duration_hours", "rate"),
+            ("Sleep duration will reach or exceed 8 hours on at least 3 of 7 logged nights.", "sleep_duration_hours", "logged"),
             (
-                "Sleep duration will reach or exceed 7.5 hours on at least 5 of 7 nights in the first 14 days.",
+                "Sleep duration will reach or exceed 8 hours on at least 3 of 7 nights in the first 14 days.",
                 "sleep_duration_hours",
                 "disagrees",
             ),
-            ("Sleep duration will be good on at least 5 of the first 7 nights.", "sleep_duration_hours", "no per-day threshold"),
+            ("Sleep duration will be good on at least 3 of the first 7 nights.", "sleep_duration_hours", "no per-day threshold"),
             (
-                "Sleep duration will exceed 7 hours and stay under 9 hours on at least 5 of the first 7 nights.",
+                "Sleep duration will exceed 7 hours and stay under 9 hours on at least 3 of the first 7 nights.",
                 "sleep_duration_hours",
                 "more than one threshold",
             ),
-            ("Eating window held on at least 5 of the first 7 days, at or above 8 hours.", "sleep_duration_hours", "names"),
-            ("Sleep duration will reach or exceed 450 minutes on at least 5 of the first 7 nights.", "sleep_duration_hours", "unit"),
+            ("Eating window held on at least 3 of the first 7 days, at or above 8 hours.", "sleep_duration_hours", "names"),
+            ("Sleep duration will reach or exceed 480 minutes on at least 3 of the first 7 nights.", "sleep_duration_hours", "unit"),
         ],
     )
     def test_an_ambiguous_sentence_parses_into_nothing_with_a_reason(self, sentence, metric, needle):
@@ -161,39 +161,39 @@ class TestParser:
 
 
 class TestCountingRule:
-    def test_the_issue_case_three_of_seven_is_refuted(self):
+    def test_the_issue_case_two_of_seven_is_refuted(self):
         r = _grade(WHOOP_SLEEP_HOURS)
         assert r["status"] == "refuted"
-        assert r["actual_value"] == 3  # 7.93, 8.37, 8.76
+        assert r["actual_value"] == 2  # 8.37, 8.76
         assert r["beats_null"] is False
         assert "slope" not in r["reason"]
-        assert "on 3 of 7 days 2026-09-06..2026-09-12" in r["reason"]
+        assert "on 2 of 7 days 2026-09-06..2026-09-12" in r["reason"]
 
-    def test_exactly_five_of_seven_is_confirmed(self):
-        r = _grade(_week(7.5, 8.0, 6.0, 7.6, 5.0, 9.0, 7.5))  # 7.5 counts: the claim says "reach or exceed"
-        assert (r["status"], r["actual_value"], r["beats_null"]) == ("confirmed", 5, True)
+    def test_exactly_three_of_seven_is_confirmed(self):
+        r = _grade(_week(8.0, 8.5, 6.0, 7.9, 5.0, 9.0, 7.5))  # 8.0 counts: the claim says "reach or exceed"
+        assert (r["status"], r["actual_value"], r["beats_null"]) == ("confirmed", 3, True)
 
-    def test_four_of_seven_is_refuted(self):
-        r = _grade(_week(7.5, 8.0, 6.0, 7.49, 5.0, 9.0, 7.5))
-        assert (r["status"], r["actual_value"]) == ("refuted", 4)
+    def test_two_of_seven_is_refuted(self):
+        r = _grade(_week(8.0, 7.99, 6.0, 7.5, 5.0, 9.0, 7.5))
+        assert (r["status"], r["actual_value"]) == ("refuted", 2)
 
     def test_a_missing_day_that_could_decide_it_leaves_the_claim_undecided(self):
-        # 4 qualify, 1 missing, 2 miss: the missing night alone decides 5-of-7 either way.
-        r = _grade(_week(8.0, 8.0, None, 8.0, 6.0, 8.0, 6.0))
-        assert (r["status"], r["actual_value"]) == ("inconclusive", 4)
+        # 2 qualify, 1 missing, 4 miss: the missing night alone decides 3-of-7 either way.
+        r = _grade(_week(8.0, 8.0, None, 6.0, 6.0, 6.0, 6.0))
+        assert (r["status"], r["actual_value"]) == ("inconclusive", 2)
         assert "1 day(s) missing" in r["reason"]
 
     def test_missing_days_cannot_rescue_a_count_that_is_already_short(self):
-        # 2 qualify + 2 missing = at most 4 < 5.
-        r = _grade(_week(8.0, None, 6.0, 8.0, None, 6.0, 6.0))
-        assert (r["status"], r["actual_value"]) == ("refuted", 2)
+        # 0 qualify + 2 missing = at most 2 < 3.
+        r = _grade(_week(7.0, None, 6.0, 7.0, None, 6.0, 6.0))
+        assert (r["status"], r["actual_value"]) == ("refuted", 0)
 
     def test_missing_days_do_not_block_a_count_that_is_already_met(self):
-        r = _grade(_week(8.0, 8.0, None, 8.0, 8.0, None, 8.0))
-        assert (r["status"], r["actual_value"]) == ("confirmed", 5)
+        r = _grade(_week(8.0, 6.0, None, 8.0, 6.0, None, 8.0))
+        assert (r["status"], r["actual_value"]) == ("confirmed", 3)
 
     def test_days_after_today_are_missing_not_misses(self):
-        r = _grade(WHOOP_SLEEP_HOURS, today="2026-09-09")  # 4 of 7 days observed: 7.93, 8.37 qualify
+        r = _grade(WHOOP_SLEEP_HOURS, today="2026-09-09")  # 4 of 7 days observed: only 8.37 qualifies
         assert r["status"] == "inconclusive"
         assert "3 day(s) missing" in r["reason"]
 
@@ -255,10 +255,10 @@ def evaluator_io(monkeypatch):
 def test_the_live_row_is_refuted_by_its_count_through_the_evaluator(evaluator_io):
     evaluations, stats = ev._evaluate_all([_issue_pred()], GRADED_ON)
     (e,) = evaluations
-    assert (e["status"], e["actual_value"], e["evaluation_type"]) == ("refuted", 3, "count")
-    assert (e["metric"], e["condition"], e["threshold"]) == ("sleep_duration_hours", "gte", 7.5)
+    assert (e["status"], e["actual_value"], e["evaluation_type"]) == ("refuted", 2, "count")
+    assert (e["metric"], e["condition"], e["threshold"]) == ("sleep_duration_hours", "gte", 8.0)
     assert e["bayesian_update"] == "failure"
-    assert evaluator_io["bayes"] == [("mind_coach", "sleep", "failure")]
+    assert evaluator_io["bayes"] == [("sleep_coach", "sleep", "failure")]
     assert stats["refuted"] == 1 and stats["confirmed"] == 0
     # The #4585 baseline rule is not asked to judge a count as a direction call.
     assert evaluator_io["stamp_specs"] == [{"type": "count"}]
@@ -285,7 +285,7 @@ def test_mutation_control_without_the_count_route_the_same_fixture_is_confirmed_
 def _graded_row(status="refuted"):
     from coach.prediction_grading import build_outcome_notes
 
-    r = _grade(WHOOP_SLEEP_HOURS) if status == "refuted" else _grade(_week(7.5, 8.0, 6.0, 7.6, 5.0, 9.0, 7.5))
+    r = _grade(WHOOP_SLEEP_HOURS) if status == "refuted" else _grade(_week(8.0, 8.5, 6.0, 7.9, 5.0, 9.0, 7.5))
     evaluation = {**r, "status": r["status"], "bayesian_update": None}
     row = _issue_pred()
     row.update(status=r["status"], outcome_date=GRADED_ON, outcome_notes=build_outcome_notes(evaluation, "1.0"))
@@ -297,7 +297,7 @@ def test_the_outcome_notes_mark_a_count_grade():
 
     row, _ = _graded_row()
     notes = json.loads(row["outcome_notes"])
-    assert notes["graded_as"] == "count" and notes["actual_value"] == 3
+    assert notes["graded_as"] == "count" and notes["actual_value"] == 2
 
 
 def test_the_reason_reader_says_the_count_not_a_direction():
@@ -305,10 +305,10 @@ def test_the_reason_reader_says_the_count_not_a_direction():
 
     row, _ = _graded_row()
     reason, graded = prediction_reason.reason_words(row)
-    assert reason == "Sleep time came in at or above 7.5 hours on 3 of 7 days — the call needed at least 5"
+    assert reason == "Sleep time came in at or above 8 hours on 2 of 7 days — the call needed at least 3"
     assert graded is True
     row, _ = _graded_row("confirmed")
-    assert prediction_reason.reason_words(row)[0] == "Sleep time came in at or above 7.5 hours on 5 of 7 days — the call needed at least 5"
+    assert prediction_reason.reason_words(row)[0] == "Sleep time came in at or above 8 hours on 3 of 7 days — the call needed at least 3"
 
 
 def test_the_latest_checked_block_does_not_serve_a_count_as_a_slope():
@@ -325,6 +325,6 @@ def test_the_wrong_obituary_counts_days_not_hours():
 
     _, evaluation = _graded_row()
     believed, number, changed = site_api_foresight._wrong_obituary_text(evaluation)
-    assert believed == "sleep duration would come in at or above 7.5 hours on at least 5 of 7 days"
-    assert number == "3 of 7 days came in at or above 7.5 hours — the call needed at least 5"
-    assert "3 of 7" in changed
+    assert believed == "sleep duration would come in at or above 8 hours on at least 3 of 7 days"
+    assert number == "2 of 7 days came in at or above 8 hours — the call needed at least 3"
+    assert "2 of 7" in changed
