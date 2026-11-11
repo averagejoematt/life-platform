@@ -131,6 +131,8 @@ DEFAULT_STALE_HOURS = 48
 #                  but excluded from UnhealthySourceCount (pipeline_health_check).
 #   expected_days  expected record days per week for gap reconciliation
 #                  (data_reconciliation); None = event-driven, gaps are behavior.
+#                  #5527: 7 on a monitored, non-behavioral source ALSO enrolls it in
+#                  the freshness checker's interior-gap scan (interior_gap_source_keys()).
 #   qa_tier        'required' (missing yesterday = FAIL) | 'optional' (warn) |
 #                  None (not checked). Paused sources render ⏸ regardless (qa_smoke).
 #   method         how the data arrives — public catalogue text (data_sources.json).
@@ -2035,6 +2037,67 @@ UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
             "the registered `withings` source. Derived, cross_phase."
         ),
     },
+    # ── #5524: the seven SOURCE# partitions the first census refresh since 2026-09-22 found with no
+    # disposition. Row counts are deliberately NOT stated for the owner-only ones: a count of a private
+    # partition is activity metadata, and this file is public.
+    "checkin_intake_pairs": {
+        "dated": "2026-11-10",
+        "reason": (
+            "Written by health/checkin_intake_pairs.write_day from compute/scenario_explorer_lambda.py — the weekly "
+            "pairing of the owner's evening check-in with the same days' intake (#5106). DERIVED from registered "
+            "inputs on a compute cron; no vendor feed, so no cadence of its own. TIER_OWNER_ONLY."
+        ),
+    },
+    "clinical": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The owner clinical record: owner-written via scripts/load_clinical_record.py --apply; no lambda writes "
+            "it (ADR-155 amendment, 2026-10-12). Documents arrive when a clinician produces one — there is no "
+            "cadence a staleness check could hold. TIER_INTERNAL; raw documents are NON_INGESTION_RAW_PREFIXES."
+        ),
+    },
+    "journal_quotes": {
+        "dated": "2026-11-10",
+        "reason": (
+            "Consent records for journal lines the owner marks for publication, written by the MCP journal tool "
+            "(mcp/tools_journal.py through content/journal_quotes.py's mark-time gate). An owner ACT, not a feed: "
+            "nothing arrives on a schedule, so a staleness threshold would only measure how often he chooses to "
+            "publish a line."
+        ),
+    },
+    "may_tracker": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The weekly May tracker row, written by training/may_tracker.write_week via the MCP tool "
+            "mcp/tools_may_tracker.py (#5073). DERIVED from registered sources (withings weight, apple_health steps, hevy strength). "
+            "TIER_OWNER_ONLY; its liveness is its producer's, not a vendor's."
+        ),
+    },
+    "nutrition_titration": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The weekly calorie titration decision, written by health/titration.write_decision from the nightly "
+            "predraft's titration leg (mcp/titration_leg.py, #5096). DERIVED from registered sources; the leg "
+            "carries its own dead-man (titration.deadman_row). TIER_OWNER_ONLY."
+        ),
+    },
+    "public_corrections": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The public correction ledger of the scoring methods (owner rulings 2026-11-05/06): one item per "
+            "method version, written by scripts/backfill_public_variant.py --apply and served by "
+            "/api/character_config. Written once per methodology change, never on a cadence."
+        ),
+    },
+    "training_constraints": {
+        "dated": "2026-11-10",
+        "reason": (
+            "Owner-only training records keyed by sk family: pain-flag dismissals (DISMISSAL#, the MCP "
+            "get_exercise_notes action, #4036), the weekly panel-rubric grade (PANEL#, mcp/panel_weekly_grade.py, "
+            "#5072) and walking corrections (WALK_CORRECTION#). Owner acts and derived grades, not a vendor feed. "
+            "TIER_OWNER_ONLY."
+        ),
+    },
 }
 
 # ── Non-ingestion / accidental raw/ prefixes (#3570) ──────────────────────────────
@@ -2135,6 +2198,29 @@ def stale_hours_overrides(keys=None) -> dict:
 def behavioral_source_keys() -> set:
     """Monitored sources whose staleness is a logging lapse — never pages."""
     return {k for k, v in _active_monitored().items() if v["behavioral"]}
+
+
+#: A source that should land a record on all seven days of the week (`expected_days`).
+EVERY_DAY = 7
+
+
+def interior_gap_source_keys(registry=None) -> set:
+    """The sources the interior-gap scan holds to a record-EVERY-day bar (#5527, DI-2b).
+
+    Derived, never typed: a monitored, unpaused source whose `expected_days` is 7 and which is
+    NOT behavioral. A missing day inside its present span can only be a pipeline miss or a
+    measured vendor absence (the #2643 marker closes the latter honestly). A behavioral source
+    — even one expected daily, like supplements via the Habitify bridge — has legitimate empty
+    days, so it is excluded, exactly as the hand list's own comment said. The hand-typed
+    `{"whoop", "apple_health", "eightsleep", "habitify"}` this replaces had already drifted:
+    todoist and weather met the rule and were silently unscanned.
+
+    `registry` is injectable so the must-fail control runs THIS rule over a planted row.
+    """
+    rows = SOURCE_REGISTRY if registry is None else registry
+    # The same pool `_active_monitored()` draws (freshness-resident, monitored, unpaused), over `rows`.
+    pool = {k: v for k, v in rows.items() if v.get("freshness", True) and v.get("monitored", True) and not v.get("paused")}
+    return {k for k, v in pool.items() if v.get("expected_days") == EVERY_DAY and not v["behavioral"]}
 
 
 # ── #2326: the quiet notice for load-bearing behavioral sources ────────────────
