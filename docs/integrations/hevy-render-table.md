@@ -51,7 +51,7 @@ One path keeps its block ahead of the reason on purpose: the standing-constraint
 - `status`: `lands`, `not_leading` (in the note but not first), `missing` (the IR records it, the wire lacks it), `absent` (not in this routine), `deferred` or `not_shown`
 - `found`: where each hit sits (for example "exercise 2 note, line 1" or "exercise 1 set rows (3 W)"), its offset and whether it leads its note
 - `session_note` with its length, and `expected_reasons`
-- `note_lint` (#5428): the note linter's result over the body — its mode (`HEVY_NOTE_LINT_MODE`, `warn` today), its problems by rule (L1–L13) and the rules it could not check
+- `note_lint` (#5428): the note linter's result over the body — its mode (`HEVY_NOTE_LINT_MODE`, `warn` today), its problems by rule (L1–L15) and the rules it could not check
 - `problems`: one line for every `not_leading` or `missing` row, a session block not heading exercise 1, a warm-up set after a working set, and every note-lint problem (prefixed `note lint: `). In warn mode none of them refuses a commit.
 
 ## 5. The live proof (owner or driver; never from a lane)

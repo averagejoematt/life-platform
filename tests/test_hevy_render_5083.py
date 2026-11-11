@@ -146,7 +146,8 @@ def test_every_charter_field_lands_where_the_table_says():
     assert _where(rc, "cardio_speed") == ["exercise 5 note, line 1"]  # the treadmill: incline at mph
     assert _where(rc, "cardio_level") == ["exercise 6 note, line 1"]  # the bike: level N
     assert set(_where(rc, "cardio_rpe")) == {"exercise 5 note, line 1", "exercise 6 note, line 1"}
-    assert _where(rc, "warmup_sets") == ["exercise 1 set rows (3 W)", "exercise 2 set rows (1 W)"]
+    # owner ruling 2026-11-10 (#5428): exercise 2, a later barbell compound at 10+ reps, climbs two W rows (was 1)
+    assert _where(rc, "warmup_sets") == ["exercise 1 set rows (3 W)", "exercise 2 set rows (2 W)"]
     assert set(_where(rc, "superset_id")) == {"exercise 3 superset", "exercise 4 superset"}
 
 
