@@ -208,7 +208,8 @@ def test_the_due_battery_prompts_once_through_the_calibration_sweep_and_a_stall_
     stalled = ft.calibration_row("2026-11-09", ft.due("2026-11-09", _pos(5, "2026-10-19"), []))
     assert stalled["state"] == "ok" and stalled["prompt"] is None and sweep(stalled) == []
     missed = ft.calibration_row("2026-11-10", ft.due("2026-11-10", _pos(8, "2026-11-09"), []))
-    assert missed["state"] == ft.MISSED and sweep(missed) == []  # its dead-man is the fitness-battery-missed alarm, not a second one
+    # #5760: a missed battery is the block's dead-man (`missed_2`, the fixed-text alert), never an AI-sweep prompt
+    assert missed["state"] == "missed_2" and missed["battery_state"] == ft.MISSED and sweep(missed) == []
     assert "40" not in json.dumps(ft.calibration_row("2026-10-27", ft.due("2026-10-27", _pos(6), ["2026-10-01"])))
 
 

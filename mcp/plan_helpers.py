@@ -334,3 +334,18 @@ def critics_with_charter(
     for p in packets.values():
         p["charter"] = charter
     return packets
+
+
+def calibration_due_field(target_date: str) -> dict[str, Any]:
+    """#5760: the due measurement items (tape, photos, the fitness battery) as an explicit field of the daily plan, every
+    day until each is logged (`calibration_cadence.plan_block`). Never raises: a failed read is `read_failed` with its class,
+    never an empty list. Owner-only (MCP); dates only, never a measurement."""
+    try:
+        from training import calibration_cadence
+
+        from mcp.config import table
+
+        return calibration_cadence.plan_block(table, target_date)
+    except Exception as e:  # noqa: BLE001 — named on the field, never raised into the plan
+        logger.warning("[calibration] plan field failed (%s)", type(e).__name__)
+        return {"state": "read_failed", "error": type(e).__name__, "items": None}
