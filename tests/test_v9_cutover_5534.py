@@ -207,9 +207,12 @@ def test_owned_paths_json_is_consistent_with_src_pages_and_the_switch_is_on():
                 continue
             route = "/" if rel == "index" else ("/" + rel[: -len("/index")] + "/" if rel.endswith("/index") else "/" + rel + "/")
             (patterns if "[" in route else static).add(re.sub(r"\[[^\]]+\]", "*", route))
-    if OWNED.get("room_public") == "cr1":  # the Coaching Room's published CR1 pages: injected templates, read off room.js
+    if OWNED.get("room_public") in ("cr1", "cr2"):  # the Coaching Room's published CR1 pages: injected templates, read off room.js
         room_js = open(os.path.join(REPO, "www", "src", "lib", "room.js"), encoding="utf-8").read()
         static |= set(re.findall(r'path:\s*"(/[^"\[]+/)",\s*release:\s*"cr1"', room_js))
+    if OWNED.get("room_public") == "cr2":  # CR2's per-coach record: an injected [param] template -> a route pattern
+        room_js = open(os.path.join(REPO, "www", "src", "lib", "room.js"), encoding="utf-8").read()
+        patterns |= {re.sub(r"\[[^\]]+\]", "*", p) for p in re.findall(r'path:\s*"(/[^"]+/)",\s*release:\s*"cr2"', room_js)}
     # The Lab and the Human Story once committed live (LAB_LIVE / STORY_LIVE, read through scripts/www_launch_switch.py):
     # their pages are injected templates too, so their routes are read off the same lists postbuild adds them from.
     sys.path.insert(0, os.path.join(REPO, "scripts"))

@@ -288,7 +288,8 @@ distTest("CR2 · 2 · no coach_room.json ever; no gated room key in any JSON (co
 
 distTest("CR2 · 3+4 · the sitemap lists the record pages exactly when CR2 is published; never a gated path (control: planted)", () => {
   const sm = readdirSync(DIST).filter((f) => /^sitemap[^/]*\.xml$/.test(f)).map((f) => readFileSync(join(DIST, f), "utf8")).join("\n");
-  assert.equal(/\/system\/coaches\/[^/<]+\/record\//.test(sm), CR2_ON, "record pages in the sitemap exactly while CR2 is published");
+  // a preview build (WEB_NOINDEX=1) writes no sitemap at all; where one is written it lists the record pages exactly while CR2 is published
+  if (sm.includes("<loc>")) assert.equal(/\/system\/coaches\/[^/<]+\/record\//.test(sm), CR2_ON, "record pages in the sitemap exactly while CR2 is published");
   const dir = plantedCopy();
   try {
     const loc = CR2_ON ? "https://averagejoematt.com/system/docket/x/" : `https://averagejoematt.com/system/coaches/${someCoach()}/record/`;
