@@ -356,7 +356,7 @@ def _num(v: Any) -> int | None:
 
 def _calendar(ir: Any) -> dict[str, Any]:
     snap = getattr(ir, "inputs_snapshot", None) or {}
-    cal = snap.get("calendar") if isinstance(snap.get("calendar"), dict) else {}
+    cal: dict[str, Any] = snap["calendar"] if isinstance(snap.get("calendar"), dict) else {}
     return {
         "block": _num(cal.get("block")),
         "week": _num(cal.get("week")),
