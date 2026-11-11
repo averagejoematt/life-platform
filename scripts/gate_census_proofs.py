@@ -4558,3 +4558,32 @@ GUARD_PROOFS["guard::mcp/invoke_gate.py"] = {
     ),
     "proved_on": "2026-11-08",
 }
+
+
+# #5817 — the four anchor cue sheets (owner ruling 2026-11-11, #5779 D8): the still-visible / not-visible split, no sheet
+# reviewed by code (a premerge-gate sweep of lambdas/ and mcp/ for a `reviewed` write), and the anchors' one sheet cue on
+# the rendered Hevy note beside the family breathing cue, lint-clean. ONE structural entrant, proved by five plants in the
+# real tree, one at a time, each restored from a byte copy (md5 identical before and after).
+STRUCTURAL_HAND_PROOFS["structural::test_anchor_cue_sheets_5817.py"] = {
+    "gate_name": "test_anchor_cue_sheets_5817.py",
+    "command": "python3 -m pytest tests/test_anchor_cue_sheets_5817.py -q -p no:cacheprovider -p no:randomly   # baseline 14 passed",
+    "mutation": (
+        "M1 lift_note's sheet cue switched off (`sheet_cue = \"\"`); M2 a module-level `_ANCHOR_SHEETS[...]['reviewed'] = True` "
+        "planted at the foot of form_cue_sheets.py; M3 the squat sheet's not_visible emptied; M4 the family cue dropped from "
+        "the sheet cue line (`tries = [prefix + sheet, sheet, with_prep]`); M5 session_block._fit's sheet-cue drop disarmed "
+        "(`sheet = ()`)."
+    ),
+    "observed": (
+        "2026-11-11, this lane. BASELINE 14 passed. M1: 4 failed (the rendered anchor day, the anchor-after-its-family, the "
+        "non-anchor on/off comparison, the off-lint control). M2: 2 failed (test_no_sheet_is_reviewed_and_no_code_marks_one, "
+        "test_no_module_writes_a_sheets_reviewed_flag). M3: 1 failed (test_every_anchor_sheet_splits_still_visible_from_not_"
+        "visible). M4: 2 failed (the rendered anchor day, the tight-budget order). M5: 1 failed (the tight-budget order). "
+        "REVERTED 14 passed."
+    ),
+    "scope": (
+        "Repo-side only: the lift-note composer, the session block's overflow fitter and the wire linter over synthetic "
+        "routines and the real catalog keys. NOT SEEN: a live drafted routine carrying an anchor sheet cue (the next nightly "
+        "predraft with a bench, squat, deadlift or one-arm DB row is the issue's live proof)."
+    ),
+    "proved_on": "2026-11-11",
+}

@@ -164,7 +164,9 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
     notes = {b.movement_key: b.notes for b in blocks}
     assert notes == {
         "incline_db_press": "RPE 8–9\nBand pull-aparts first. Breathe out on the press.",
-        "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull.",
+        # #5817 (owner ruling 2026-11-11, D8): the one-arm DB row is an anchor with a cue sheet — its one still-visible
+        # cue rides ahead of the family breathing cue, which stays
+        "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nElbow to hip. Breathe out on the pull.",
         "lat_pulldown": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.",
         # owner ruling 2026-11-10 (charter 1.41.0): a first session back after a long layoff reads the layoff band and the
         # one layoff line, behind a W row lighter than the work — was `RPE 8–9, last set RPE 9–10` / `Lighter: first time
@@ -210,7 +212,7 @@ def test_a_row_more_than_one_step_from_previous_carries_a_reason_and_one_within_
     blocks, floors = _upper_volume()
     near = dict(HISTORY, **{"T-ROW": [_sess("2026-10-21", 95, 10, 8)]})  # 90 vs 95: one 5-lb step -> no reason
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=near, target_date=TARGET)
-    assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nBreathe out on the pull."
+    assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nElbow to hip. Breathe out on the pull."
     blocks, floors = _upper_volume()
     heavier = dict(HISTORY, **{"T-ROW": [_sess("2026-10-21", 75, 12, 7)]})  # 90 vs 75: three steps up
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=heavier, target_date=TARGET)
@@ -225,12 +227,12 @@ def test_the_same_load_as_a_previous_that_ran_to_rpe_10_carries_the_one_more_rep
     grind = dict(HISTORY, **{"T-ROW": [_sess("2026-10-21", 90, 12, 10)]})  # 90 vs 90 at RPE 10
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=grind, target_date=TARGET)
     row = next(b for b in blocks if b.movement_key == "one_arm_db_row")
-    assert row.notes == "RPE 8–9\nSame load: aim to leave one more rep.\nBreathe out on the pull."
+    assert row.notes == "RPE 8–9\nSame load: aim to leave one more rep.\nElbow to hip. Breathe out on the pull."  # #5817 sheet cue
     assert lift_note.hevy_note_grammar.REASON_RE.match(row.notes.split("\n")[1])  # the linter reads it as a reason
     for prev in (_sess("2026-10-21", 90, 12, 9), _sess("2026-10-21", 95, 12, 10), _sess("2026-10-21", 90, 12)):
         blocks, floors = _upper_volume()
         lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=dict(HISTORY, **{"T-ROW": [prev]}), target_date=TARGET)
-        assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nBreathe out on the pull."
+        assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nElbow to hip. Breathe out on the pull."
 
 
 def test_one_cue_per_family_and_no_press_cue_on_a_squat_day():
@@ -254,7 +256,8 @@ def test_one_cue_per_family_and_no_press_cue_on_a_squat_day():
     }
     hist = {"S1": [_sess("2026-10-16", 245, 5, 8)], "S2": [_sess("2026-10-16", 135, 8, 8)]}
     lift_note.compose_blocks(blocks, cat, load_floors={}, history_index=hist, target_date="2026-10-23")
-    assert blocks[0].notes == "RPE 8–9\nAnkles + hips first. Brace each rep, breathe between reps."
+    # #5817: the barbell squat's one sheet cue between the prep clause and the family cue (exercise 1: 3 phone lines)
+    assert blocks[0].notes == "RPE 8–9\nAnkles + hips first. Knees track the toes. Brace each rep, breathe between reps."
     assert blocks[1].notes == "RPE 8–9"  # the second squat-family lift: no second cue
     assert "press" not in blocks[0].notes.lower()
     assert movement_cues.family_of("leg_press", {"anchor_family": "squat"}) == "leg_press"  # a leg press is not a squat cue
