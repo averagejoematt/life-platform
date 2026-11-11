@@ -47,7 +47,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Any, Callable, Mapping, Optional
 
-VERSION = "calibration-cadence@1.4.0"  # 1.4.0 #5061: the DEXA prompt names the built ingest; 1.3.0 #5111: the lab_draw dead-man + lab_draw_row; 1.2.0 #5006/#5108: food_delivery_upload; 1.1.0 #5111: lab_draw
+VERSION = "calibration-cadence@1.5.0"  # 1.5.0 #5760: plan_items + the lapse day on the dead-man; 1.4.0 #5061: the DEXA prompt names the built ingest; 1.3.0 #5111: the lab_draw dead-man + lab_draw_row; 1.2.0 #5006/#5108: food_delivery_upload; 1.1.0 #5111: lab_draw
 KINDS = ("tape", "photos", "dexa", "lab_draw", "food_delivery_upload")
 OK, DUE, OVERDUE, MISSED_2, UNKNOWN, READ_FAILED = "ok", "due", "overdue", "missed_2", "unknown", "read_failed"
 PROMPT_PREFIX = "CALIB_PROMPT"
@@ -285,10 +285,60 @@ def prompts_due(block: Mapping[str, Any]) -> list[dict[str, Any]]:
 def deadman_alert(row: Mapping[str, Any]) -> str:
     if row.get("alert"):  # a row that names its own alert (#5096: the titration dead-man is a missed run, not a missed log)
         return str(row["alert"])
+    # #5760: the day it lapsed is the first due day that passed with nothing logged (`due_on` of the open cycle)
     return (
-        f"{row['kind']} has gone {row.get('missed_cycles')} cycles with nothing logged (last {row.get('last_logged') or 'never'}). "
-        "The calibration the May plan rests on is running blind; log one this week."
+        f"{row['kind']} has gone {row.get('missed_cycles')} cycles with nothing logged: it lapsed on {row.get('due_on') or 'an unknown day'} "
+        f"(last {row.get('last_logged') or 'never'}). The calibration the May plan rests on is running blind; log one this week."
     )
+
+
+# ── the daily plan's calibration items (#5760) ─────────────────────────────────────────────
+PLAN_KINDS = ("tape", "photos", "fitness_battery")
+"""The measurement items the block retro's Measurement row counts (`block_retro._calibration_evidence`): the tape and
+photo cycle and the fitness battery (`fitness_tests.CALIBRATION_KIND`). Only these ride the daily plan."""
+PLAN_ITEM_STATES = (DUE, OVERDUE, MISSED_2)
+PLAN_LABEL = {"tape": "Tape", "photos": "Progress photos", "fitness_battery": "Fitness battery"}
+PLAN_INSTRUCTION = (
+    "Each item is a measurement the charter's calibration cadence says is due and is not logged. Say every item to him in "
+    "the plan, in substance, every day until it is logged; never drop it because it was said yesterday. Dates only — "
+    "never quote a measurement, a body number or a goal."
+)
+
+
+def plan_items(block: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The due measurement items for the daily plan: tape, photos and the fitness battery while due, overdue or at the
+    dead-man — UNLIKE `prompts_due`, the dead-man state stays on the list, because the plan names the item until it is
+    logged (a new log moves the cycle and the item leaves). `[{kind, state, due_on, last_logged, text}]`; dates only. Pure."""
+    out = []
+    for kind in PLAN_KINDS:
+        row = (block.get("kinds") or {}).get(kind) or {}
+        if row.get("state") not in PLAN_ITEM_STATES:
+            continue
+        since = row.get("due_on") or "an unknown day"
+        head = f"{PLAN_LABEL[kind]} due" + (f" ({since})" if row["state"] == DUE else f" — overdue since {since}")
+        text = f"{head}: {row['prompt']}" if row.get("prompt") else f"{head}: {deadman_alert(row)}"
+        if kind == "fitness_battery":  # the battery's owner write (#5078) — the one door its results land through
+            text += " Results land through get_exercise_notes action='fitness_test'."
+        out.append({"kind": kind, "state": row["state"], "due_on": row.get("due_on"), "last_logged": row.get("last_logged"), "text": text})
+    return out
+
+
+def plan_block(table: Any, today: str) -> dict[str, Any]:
+    """`{as_of, items, instruction, read_failed}` for the daily plan — reads only the tape and photo dates and the battery
+    row (not DEXA, labs or food delivery). A kind that could not be read is NAMED in `read_failed`, never left out silently."""
+    from common.constants import EXPERIMENT_START_DATE
+
+    from training import fitness_tests
+
+    readers = table_readers(table)
+    kinds = {k: _behavioural(k, readers, today, EXPERIMENT_START_DATE) for k in ("tape", "photos")}
+    kinds[fitness_tests.CALIBRATION_KIND] = fitness_tests.calibration_row_from_table(table, today)
+    for r in kinds.values():
+        if r.get("kind") in ("tape", "photos"):
+            r["prompt"] = _prompt(r)
+    block = {"kinds": kinds}
+    failed = sorted(k for k, r in kinds.items() if r.get("state") == READ_FAILED)
+    return {"as_of": today, "items": plan_items(block), "instruction": PLAN_INSTRUCTION, "read_failed": failed, "tier": "owner_only"}
 
 
 # ── the readers over a DynamoDB table (injected table; the only I/O in this module) ───────────────────────

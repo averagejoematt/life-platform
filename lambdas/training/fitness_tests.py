@@ -33,7 +33,8 @@ THREE PURE PIECES (the DDB read and write take an injected table; the MCP side i
   3. THE TEST DAY — on the due week the charter's `test_day.role` (the lightest day, never a lower
      day) carries the battery: the generator's ideal session cut to the minimum shape (anchors only,
      `split.minimum_session.sets_per_movement` working sets) with the tests placed in `order`.
-     A battery already on file for the due week leaves the usual session alone.
+     A battery already on file for the due week leaves the usual session alone. A due week that passed with no battery
+     (overdue / missed) is carried by the NEXT test-day session, whatever its week, until one is logged (#5760).
 """
 
 from __future__ import annotations
@@ -464,10 +465,11 @@ CALIBRATION_KIND = "fitness_battery"
 """The battery's row in `training.calibration_cadence`'s block — the ONE prompt path to the owner (the Telegram
 event sweep's `detect_calibration`, keyed `CALIB_PROMPT#fitness_battery#<due week opening>`, once per due week)."""
 
-_CALIBRATION_STATE = {UPCOMING: "ok", DUE: "due", OVERDUE: "overdue", MISSED: MISSED, UNKNOWN: UNKNOWN}
-"""This module's states in the calibration block's vocabulary. `missed` stays `missed` (NOT the block's `missed_2`):
-the battery's dead-man is its own alarm (`fitness-battery-missed`), so the calibration sweep prompts a due or
-overdue battery and never raises a second dead-man for it."""
+_CALIBRATION_STATE = {UPCOMING: "ok", DUE: "due", OVERDUE: "overdue", MISSED: "missed_2", UNKNOWN: UNKNOWN}
+"""This module's states in the calibration block's vocabulary. `missed` is the block's `missed_2` (#5760): the block-1
+battery lapsed with only the `fitness-battery-missed` digest alarm to say so, so a missed battery now rides the same
+dead-man path as the tape — one fixed-text Telegram alert per due week (`coach.calibration_deadman_alert`, keyed
+`CALIB_DEADMAN#fitness_battery#<due week opening>`) naming the battery and the day it lapsed. The digest alarm stays."""
 
 
 def calibration_row(today: str, cadence: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
@@ -493,13 +495,19 @@ def calibration_row(today: str, cadence: Mapping[str, Any], proto: Optional[Mapp
         "issue": ISSUE,
         "prompt": None,
     }
-    if state in (DUE, OVERDUE) and fact:
+    if state in (DUE, OVERDUE, MISSED) and fact:
         labels = ", ".join(str(t.get("label")) for t in tests_spec(p).values())
         row["prompt"] = (
             f"Fitness tests are {state} (program week {cadence.get('due_program_week')} closes the block, opened {cadence.get('due_on')}): "
-            f"{labels}. The test-day draft carries them; log each result with your coach. Last battery {cadence.get('latest') or 'never'}."
+            f"{labels}. The next test-day draft carries them; log each result with your coach. Last battery {cadence.get('latest') or 'never'}."
         )
         row["prompt_key"] = cc.prompt_key(CALIBRATION_KIND, str(row["cycle_start"]))
+    if state == MISSED and fact:  # #5760: the dead-man's fixed text names the item and the day it lapsed
+        row["lapsed_on"] = cadence.get("due_on")
+        row["alert"] = (
+            f"The fitness battery lapsed on {cadence.get('due_on')}: the week that closed the block passed, then its grace week, "
+            f"with no battery logged (last {cadence.get('latest') or 'never'}). The next test-day draft carries it; log each result with your coach."
+        )
     return row
 
 
@@ -542,7 +550,9 @@ def never_on_roles(proto: Optional[Mapping[str, Any]] = None) -> set[str]:
 
 
 def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> bool:
-    """True when the served session is the test-day role in a due program week (before any record read)."""
+    """True when the served session is the test-day role in a week that can carry a battery (before any record read):
+    the week that closes a block (block_model's week_in_block == n), or any later week — an earlier block's battery may
+    still be uncovered, and an overdue battery goes on the NEXT test day, not the next block's end (#5760)."""
     p = protocol() if proto is None else proto
     role, week = day_entry.get("session_role"), day_entry.get("week")
     try:
@@ -551,7 +561,22 @@ def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]]
         return False
     if not role or role != test_day_role(p) or role in never_on_roles(p):
         return False
-    return isinstance(week, int) and week >= 1 and week % n == 0  # the week that closes a block (block_model's week_in_block == n)
+    return isinstance(week, int) and not isinstance(week, bool) and (week % n == 0 or week > n)
+
+
+def _closes_block(day_entry: Mapping[str, Any], proto: Mapping[str, Any]) -> bool:
+    week = day_entry.get("week")
+    return isinstance(week, int) and week >= 1 and week % block_weeks(proto) == 0
+
+
+def _overdue_info(day_entry: Mapping[str, Any], block_workouts: Any, dates: list[str], target: str, proto: Mapping[str, Any]) -> dict:
+    """#5760: off a block's closing week, the cadence of the battery from the session ledger's own week openings — the same
+    `due()` the prompt and the dead-man read. Overdue or missed with a FACT due day = an earlier block's battery is still
+    uncovered, so this test day carries it; anything else (upcoming, unknown, an unplaced week) leaves the session alone."""
+    from training import session_sequence
+
+    completed = session_sequence.completed_positions(block_workouts or [], target) if target else []
+    return due(target, position_from(day_entry, completed), dates, proto)
 
 
 # A test block's rationale tag prefix: every block that must keep its protocol note (cardio_cues skips it).
@@ -635,8 +660,11 @@ def _minimum_blocks(blocks: list[Any], per_movement: int, max_movements: int) ->
 def session_note(due_info: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> str:
     """The routine's session note (Hevy cuts at ~150 chars) — what the day is and why."""
     p = protocol() if proto is None else proto
-    note = f"Fitness tests today, then a short lift. Why: the battery is due this week (every {every_weeks(p)} wk, block end). Log each result."
-    return note[:_NOTE_CHARS]
+    if due_info.get("state") in (OVERDUE, MISSED):  # #5760: an earlier block's battery, carried by the next test day
+        why = f"the battery due {due_info.get('due_on')} (block end) was not logged"
+    else:
+        why = f"the battery is due this week (every {every_weeks(p)} wk, block end)"
+    return f"Fitness tests today, then a short lift. Why: {why}. Log each result."[:_NOTE_CHARS]
 
 
 def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> Any:
@@ -677,7 +705,12 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
     }
     ideal.rationale = [
         f"fitness battery ({ISSUE}): program week {due_info.get('due_program_week')} closes the block, so the test-day role carries "
-        "the tests on its minimum session (anchors only) — the lightest day, never a lower day",
+        "the tests on its minimum session (anchors only) — the lightest day, never a lower day"
+        + (
+            f"; it was not logged by {due_info.get('due_on')}, so this next test day carries it (#5760)"
+            if due_info.get("state") in (OVERDUE, MISSED)
+            else ""
+        ),
         *[f"UNRESOLVED — {u}" for u in unresolved],
         *list(ideal.rationale or []),
     ]
@@ -708,6 +741,18 @@ def place_battery(
         )
         return routines
     dates = [b["date"] for b in batteries(records, from_hevy(block_workouts or [], movements, p))]
+    if not _closes_block(day_entry, p):
+        info = _overdue_info(day_entry, block_workouts, dates, str(getattr(ideal, "target_date", "") or ""), p)
+        if info.get("state") not in (OVERDUE, MISSED) or info.get("due_on_is_estimate") is not False:
+            return routines
+        try:
+            minimum_shape()
+        except ValueError:
+            msg = f"fitness battery ({ISSUE}): overdue, but UNRESOLVED split.minimum_session in the charter — the usual session"
+            ideal.rationale = [msg, *list(ideal.rationale or [])]
+            return routines
+        apply_battery(ideal, movements, info, p)
+        return routines
     opened = _day((day_entry.get("week_basis") or {}).get("week_opened_on"))
     latest = dates[-1] if dates else None
     if opened is None:
