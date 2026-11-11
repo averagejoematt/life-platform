@@ -2748,7 +2748,81 @@
           "sentence": "Against a prediction that nothing changes, on the same 71 calls: no detectable difference."
         }
       },
-      "why_changed": "The count changed because the rules for which calls are eligible and how a grade is verified were corrected, not because the coaches improved. Calls that were not forecasts, could not be checked as written, depended on a condition that never happened or repeated an earlier call are now listed separately with the reason, and every remaining grade was re-run under the current rules."
+      "why_changed": "The count changed because the rules for which calls are eligible and how a grade is verified were corrected, not because the coaches improved. Calls that were not forecasts, could not be checked as written, depended on a condition that never happened or repeated an earlier call are now listed separately with the reason, and every remaining grade was re-run under the current rules.",
+      "subgroups": {
+        "exploratory": true,
+        "n": 71,
+        "test": "exact two-sided sign test on the calls only one of the two got right, per kind of call",
+        "kinds_tested": 3,
+        "per_coach_tests": 5,
+        "comparisons": 8,
+        "adjustment": "bonferroni",
+        "adjustment_words": "Each kind of call carries three p-values: before any adjustment; adjusted (Bonferroni) for the 3 kinds of call tested, the correction the adopted method applies across kinds of call; and adjusted for all 8 subgroup comparisons served for this sample (the 3 kinds and the 5 per-coach comparisons).",
+        "method_version": "calibration-v2",
+        "kinds": [
+          {
+            "key": "number",
+            "words": "number calls",
+            "counted": 31,
+            "n": 30,
+            "unscored": 1,
+            "coach_right": 16,
+            "rule_right": 15,
+            "coach_only": 4,
+            "rule_only": 3,
+            "discordant": 7,
+            "p": 1.0,
+            "p_adjusted": 1.0,
+            "p_adjusted_all": 1.0,
+            "estimate": 0.033,
+            "ci": null,
+            "ci_confidence": 0.9833,
+            "label": null,
+            "sentence": "Number calls: 31 of the 71 counted forecasts. On the 30 the simple prediction could also be scored on, the coaches were right 16 times and the simple prediction that nothing would change 15 times. Tested on the 7 where only one of the two was right (the coaches alone 4, the simple prediction alone 3), an exact two-sided sign test gives p = 1.00 before any adjustment; p = 1.00 adjusted for the 3 kinds of call tested, and p = 1.00 counting all 8 subgroup comparisons (Bonferroni): no detectable difference."
+          },
+          {
+            "key": "direction",
+            "words": "direction calls",
+            "counted": 29,
+            "n": 29,
+            "unscored": 0,
+            "coach_right": 11,
+            "rule_right": 15,
+            "coach_only": 5,
+            "rule_only": 9,
+            "discordant": 14,
+            "p": 0.42,
+            "p_adjusted": 1.0,
+            "p_adjusted_all": 1.0,
+            "estimate": -0.138,
+            "ci": null,
+            "ci_confidence": 0.9833,
+            "label": null,
+            "sentence": "Direction calls: 29 of the 71 counted forecasts. On them, the coaches were right 11 times and the simple prediction that nothing would change 15 times. Tested on the 14 where only one of the two was right (the coaches alone 5, the simple prediction alone 9), an exact two-sided sign test gives p = 0.42 before any adjustment; p = 1.00 adjusted for the 3 kinds of call tested, and p = 1.00 counting all 8 subgroup comparisons (Bonferroni): no detectable difference."
+          },
+          {
+            "key": "sealed",
+            "words": "sealed day-one predictions",
+            "counted": 11,
+            "n": 11,
+            "unscored": 0,
+            "coach_right": 7,
+            "rule_right": 1,
+            "coach_only": 7,
+            "rule_only": 1,
+            "discordant": 8,
+            "p": 0.07,
+            "p_adjusted": 0.21,
+            "p_adjusted_all": 0.56,
+            "estimate": 0.545,
+            "ci": null,
+            "ci_confidence": 0.9833,
+            "label": null,
+            "sentence": "Sealed day-one predictions: 11 of the 71 counted forecasts. On them, the coaches were right 7 times and the simple prediction that nothing would change 1 times. Tested on the 8 where only one of the two was right (the coaches alone 7, the simple prediction alone 1), an exact two-sided sign test gives p = 0.070 before any adjustment; p = 0.21 adjusted for the 3 kinds of call tested, and p = 0.56 counting all 8 subgroup comparisons (Bonferroni): no detectable difference."
+          }
+        ],
+        "caveat": "Exploratory, not a headline result: these comparisons split the same calls by kind, after the fact, and were not the question the sample was gathered to answer. A low p-value in one kind of call does not show that the simple prediction is the better forecaster: the groups are small, several comparisons were tested, and calls that share a measure and a window are not independent, so every p-value here is optimistic."
+      }
     }
   },
   "record": {

@@ -344,6 +344,28 @@ def effective(row: dict) -> Any:
 # ── the served comparison ────────────────────────────────────────────────────────────────
 
 
+def paired_records(rows: Iterable[dict]) -> dict:
+    """Per record, ``{"pairs": [(coach right, rule right), ...], "unscorable": n, "not_yet_scored": n}`` over graded
+    ``rows`` — calibration-v2's skill input (``experiment.calibration_v2.skill_vs_baseline``). The same split as
+    ``comparison_block``: a call the rule has no stamp for is not yet scored, a stamp without a verdict is unscorable,
+    and the effective verdict is read (a recorded re-score overlays the frozen stamp, owner ruling 2026-11-09 A)."""
+    out: dict = {}
+    for row in rows or []:
+        status = coach_record.graded_status(row)
+        key = record_of(row) if status else None
+        if key is None:
+            continue
+        rec = out.setdefault(key, {"pairs": [], "unscorable": 0, "not_yet_scored": 0})
+        bl = effective(row)
+        if not isinstance(bl, dict) or bl.get("rule") != RULE_ID:
+            rec["not_yet_scored"] += 1
+        elif bl.get("right") is None:
+            rec["unscorable"] += 1
+        else:
+            rec["pairs"].append((status == "confirmed", bool(bl["right"])))
+    return out
+
+
 def _empty_record() -> dict:
     return {
         "graded": 0,

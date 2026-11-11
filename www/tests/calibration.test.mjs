@@ -18,7 +18,9 @@ import {
   verifiedRecord,
   calibrationDots,
   concentrationText,
+  denominatorSteps,
   intervalText,
+  subgroupBlock,
   v2Answers,
   v2MethodText,
   v2Short,
@@ -311,4 +313,47 @@ test("the counted calls: a Set from the producer's list; absent or malformed →
   assert.ok(s.has("nutrition-20261015-protein01") && !s.has("sleep-20261005-deepsleep01"));
   assert.equal(countedCalls(FIXTURE.calibration), null);
   assert.equal(countedCalls({ verification_summary: { counted_calls: [1, 2] } }), null);
+});
+
+// ── owner ruling 2026-11-10: the three denominators and the exploratory split by kind of call ─────────────────────
+
+test("denominators: eligible → left out (with the repeats named) → the verified sample, all carried", () => {
+  const d = denominatorSteps(SERVED.calibration);
+  assert.deepEqual(d, { eligible: 214, excluded: 143, counted: 71, repeats: 15 });
+  assert.equal(denominatorSteps(FIXTURE.calibration), null, "control: nothing served → no strip");
+});
+
+test("denominators: an accounting that does not reconcile is not shown (fail closed)", () => {
+  const f = clone(SERVED);
+  f.calibration.verification_summary.eligible_total = 215; // 143 + 71 ≠ 215
+  assert.equal(denominatorSteps(f.calibration), null);
+  const g = clone(SERVED);
+  delete g.calibration.verification_summary.eligible_total;
+  assert.equal(denominatorSteps(g.calibration), null, "an unserved eligible total is never derived");
+});
+
+test("subgroups: the producer's words and counts, carried; the kinds add up to the verified sample", () => {
+  const sg = subgroupBlock(SERVED.calibration);
+  assert.equal(sg.n, 71);
+  assert.deepEqual(sg.kinds.map((k) => [k.key, k.counted]), [["number", 31], ["direction", 29], ["sealed", 11]]);
+  const served = SERVED.calibration.verification_summary.subgroups.kinds;
+  sg.kinds.forEach((k, i) => assert.equal(k.sentence, served[i].sentence, "the sentence is the producer's, verbatim"));
+  assert.match(sg.caveat, /^Exploratory, not a headline result/);
+  assert.match(sg.adjustment, /three p-values: before any adjustment/);
+  assert.equal(subgroupBlock(FIXTURE.calibration), null, "control: nothing served → no section");
+});
+
+test("subgroups fail closed: not exploratory, another sample, a kind without words, or kinds that do not add up", () => {
+  const mut = (fn) => {
+    const f = clone(SERVED);
+    fn(f.calibration.verification_summary.subgroups);
+    return subgroupBlock(f.calibration);
+  };
+  assert.ok(mut(() => {}), "control: the unmutated block is shown");
+  assert.equal(mut((s) => (s.exploratory = false)), null);
+  assert.equal(mut((s) => delete s.exploratory), null);
+  assert.equal(mut((s) => (s.n = 214)), null, "a split of the eligible calls is not the verified sample's");
+  assert.equal(mut((s) => (s.kinds[1].sentence = " ")), null);
+  assert.equal(mut((s) => (s.kinds[0].counted = 30)), null, "70 ≠ 71: does not reconcile");
+  assert.equal(mut((s) => (s.kinds[0].counted = "31")), null);
 });

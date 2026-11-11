@@ -43,9 +43,20 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 from datetime import datetime, timedelta  # noqa: E402
 
+import pytest  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
 
 _GENESIS = chron.EXPERIMENT_START_DATE
+
+
+@pytest.fixture(autouse=True)
+def _no_withdrawals(monkeypatch):
+    """These fixtures sit on the live calendar, where genesis-1 (DATE#2026-09-05) is the installment withdrawn on
+    2026-11-10. This file pins ORDERING, so it runs with no withdrawals; the withdrawal itself is pinned in
+    tests/test_chronicle_withdrawn_installment.py."""
+    from content import chronicle_schema
+
+    monkeypatch.setattr(chronicle_schema, "WITHDRAWN_SKS", frozenset())
 
 
 def _minus(days):

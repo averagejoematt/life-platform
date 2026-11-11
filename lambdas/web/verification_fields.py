@@ -29,12 +29,18 @@ from __future__ import annotations
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Iterable
 
-from coach import classification_review, coach_baseline, coach_record, grade_corrections, verification_record
+from coach import classification_review, coach_baseline, coach_record, grade_corrections, repeat_family, verification_record
 from common import stats_core
-from experiment import calibration_core
+from experiment import calibration_core, calibration_v2
 from experiment.phase_filter import singleton_visible
 
 SUMMARY_KEYS = verification_record.OUTCOMES + ("none",)
+
+#: The PREDICTION# fields this module reads off a row, which the call routes' projected read must carry
+#: (``web.site_api_coach_ledger._PREDICTION_PROJECTION_FIELDS``): the verification record's pointer (served as
+#: ``verification``), the first grade a correction preserved (``first_status``, the archive) and the repeat-family
+#: marker whose role names the member that stands in a count (``headline``; read for the fold, never served).
+ROW_FIELDS = (verification_record.POINTER_ATTR, "original_grade", repeat_family.ATTR)
 
 
 def item_fields(row: dict) -> dict:
@@ -243,6 +249,12 @@ def _family(row: dict, record: dict | None) -> str | None:
     return fam or None
 
 
+def _stands_rank(row: dict) -> int:
+    """0 when the row's stored repeat-family marker names it the member that stands (role "first"), else 1."""
+    marker = (row or {}).get(repeat_family.ATTR)
+    return 0 if isinstance(marker, dict) and marker.get("role") == "first" else 1
+
+
 def _pct(k: int, n: int) -> float | None:
     return round(100.0 * k / n, 1) if n else None
 
@@ -406,6 +418,126 @@ def counted_block(rows: list[dict], *, with_sentence: bool = True) -> dict | Non
     return out
 
 
+SUBGROUP_CAVEAT = (
+    "Exploratory, not a headline result: these comparisons split the same calls by kind, after the fact, and were not"
+    " the question the sample was gathered to answer. A low p-value in one kind of call does not show that the simple"
+    " prediction is the better forecaster: the groups are small, several comparisons were tested, and calls that share a"
+    " measure and a window are not independent, so every p-value here is optimistic."
+)
+
+
+def _times(n: int) -> str:
+    return "once" if n == 1 else f"{n} times"
+
+
+def _p_words(p: float) -> str:
+    return "< 0.001" if p < 0.001 else f"{p:.3f}" if p < 0.1 else f"{p:.2f}"
+
+
+def _subgroup_finding(b: int, c: int, p: float, p_kinds: float, p_all: float, m: int, total: int) -> str:
+    better = "the coaches" if b > c else "the simple prediction"
+    if p_all < calibration_v2.ALPHA:
+        return f"{better} did better in this group, even counting all {total} subgroup comparisons"
+    if p_kinds < calibration_v2.ALPHA:
+        return (
+            f"{better} was right more often in this group, and that holds after adjusting for the {m} kinds of call"
+            f" tested, but not once all {total} subgroup comparisons are counted"
+        )
+    if p < calibration_v2.ALPHA:
+        return "a difference before adjustment only; after adjusting for the comparisons tested it could be chance"
+    return "no detectable difference"
+
+
+def subgroups(rows: list[dict], by_coach: dict | None = None) -> dict | None:
+    """The verified sample split by kind of call — number, direction, yes/no, sealed (``coach_baseline.RECORDS``) —
+    each an exact two-sided sign test against "nothing changes" on exactly those counted calls: the SAME test as the
+    headline, and calibration-v2's question 3 (``calibration_v2.skill_vs_baseline``: Bonferroni-adjusted interval and
+    label across the kinds tested). Owner ruling 2026-11-10 (2): an EXPLORATORY secondary result that states its
+    sample size, the comparison tested and whether the p-value accounts for the multiple subgroup tests. Each kind
+    serves three p-values, never a choice between them:
+
+      * ``p`` — unadjusted;
+      * ``p_adjusted`` — Bonferroni across the ``kinds_tested`` (the adopted method's correction across records);
+      * ``p_adjusted_all`` — Bonferroni across EVERY subgroup comparison served for this sample: the kinds AND the
+        per-coach comparisons (``per_coach_tests``, those with a call only one side got right).
+
+    The sample split is the counted calls' own (``n`` per kind sums to the headline N). None on an empty sample."""
+    rows = [r for r in rows or [] if now_status(r)]
+    if not rows:
+        return None
+    paired = coach_baseline.paired_records(rows)
+    skill = calibration_v2.skill_vs_baseline(paired)
+    tested = [k for k in coach_baseline.RECORDS if (skill["records"].get(k) or {}).get("n")]
+    m = len(tested)
+    per_coach = sum(1 for b in (by_coach or {}).values() if isinstance(b, dict) and ((b.get("sign_test") or {}).get("n") or 0) > 0)
+    total = m + per_coach
+    kinds = []
+    for key in coach_baseline.RECORDS:
+        block = paired.get(key)
+        if not block:
+            continue
+        counted = len(block["pairs"]) + int(block["unscorable"]) + int(block["not_yet_scored"])
+        r = skill["records"].get(key) or {}
+        scored = int(r.get("n") or 0)
+        words = coach_baseline.RECORD_WORDS[key]
+        sentence = f"{words.capitalize()}: {counted} of the {len(rows)} counted forecasts."
+        out = {"key": key, "words": words, "counted": counted, "n": scored, "unscored": counted - scored}
+        if not scored:
+            out["sentence"] = sentence + " None could also be scored by the simple prediction, so nothing is tested."
+            kinds.append(out)
+            continue
+        b, c = r["coach_only"], r["rule_only"]
+        d = b + c
+        p = calibration_v2.binomial_two_sided_p(b, d, 0.5) if d else 1.0
+        p_kinds, p_all = min(1.0, p * m), min(1.0, p * total)
+        on = f"On the {scored} the simple prediction could also be scored on" if counted != scored else "On them"
+        sentence += f" {on}, the coaches were right {_times(r['coach_right'])} and the simple prediction that nothing would change {_times(r['rule_right'])}."
+        if d:
+            sentence += (
+                f" Tested on the {d} where only one of the two was right (the coaches alone {b}, the simple prediction alone {c}),"
+                f" an exact two-sided sign test gives p = {_p_words(p)} before any adjustment; p = {_p_words(p_kinds)} adjusted for"
+                f" the {m} kinds of call tested, and p = {_p_words(p_all)} counting all {total} subgroup comparisons (Bonferroni):"
+                f" {_subgroup_finding(b, c, p, p_kinds, p_all, m, total)}."
+            )
+        else:
+            sentence += " No call where only one of the two was right, so there is nothing to test."
+        out.update(
+            {
+                "coach_right": r["coach_right"],
+                "rule_right": r["rule_right"],
+                "coach_only": b,
+                "rule_only": c,
+                "discordant": d,
+                "p": round(p, 4),
+                "p_adjusted": round(p_kinds, 4),
+                "p_adjusted_all": round(p_all, 4),
+                "estimate": r["estimate"],
+                "ci": r["ci"],
+                "ci_confidence": r["ci_confidence"],
+                "label": r["label"],
+                "sentence": sentence,
+            }
+        )
+        kinds.append(out)
+    return {
+        "exploratory": True,
+        "n": len(rows),
+        "test": "exact two-sided sign test on the calls only one of the two got right, per kind of call",
+        "kinds_tested": m,
+        "per_coach_tests": per_coach,
+        "comparisons": total,
+        "adjustment": "bonferroni",
+        "adjustment_words": (
+            f"Each kind of call carries three p-values: before any adjustment; adjusted (Bonferroni) for the {m} kinds of"
+            f" call tested, the correction the adopted method applies across kinds of call; and adjusted for all {total}"
+            f" subgroup comparisons served for this sample (the {m} kinds and the {per_coach} per-coach comparisons)."
+        ),
+        "method_version": calibration_v2.METHOD_VERSION,
+        "kinds": kinds,
+        "caveat": SUBGROUP_CAVEAT,
+    }
+
+
 VERIFY_JOB = "__verify__:"  # a `_parallel_fetch` job-key prefix — never a short coach id
 
 
@@ -450,9 +582,15 @@ def headline(rows_by_coach: dict, verify_by_coach: dict, *, genesis: str | None)
         return None
 
     cats = {key: category_of(row, rec) for key, _c, row, rec in eligible}
-    # repeats: within a family the earliest counted forecast stands; the rest are the same forecast, counted once
+    # repeats: within a family the earliest counted forecast stands; the rest are the same forecast, counted once. The
+    # member that stands is the one the stored marker names (coach.repeat_family: role "first", the earliest filed —
+    # owner ruling 2026-11-09 B); filing time is only the fallback for a row without a marker. The route's projected
+    # read carries the filing DAY, not the instant, so without the marker two same-day filers fell back to key order
+    # and a repeat was credited to the wrong coach (owner ruling 2026-11-10, the CR1 pre-flip review).
     seen: set = set()
-    for key, _c, row, rec in sorted(eligible, key=lambda t: (str(t[2].get("created_at") or t[2].get("created_date") or ""), t[0])):
+    for key, _c, row, rec in sorted(
+        eligible, key=lambda t: (_stands_rank(t[2]), str(t[2].get("created_at") or t[2].get("created_date") or ""), t[0])
+    ):
         fam = _family(row, rec)
         if cats[key] != COUNTED or not fam:
             continue
@@ -470,13 +608,16 @@ def headline(rows_by_coach: dict, verify_by_coach: dict, *, genesis: str | None)
     first = [row for _k, _c, row, _rec in eligible if first_status(row)]
     ak, an = sum(1 for r in first if first_status(r) == "confirmed"), len(first)
     n = verified["n"] if verified else 0
+    by_coach = {cid: counted_block([r for _k, c, r in counted if c == cid], with_sentence=False) for cid in sorted(rows_by_coach)}
     return {
         "eligible_total": len(eligible),
         "verified": verified,
         "excluded_by_category": [{"key": c, "label": label, "n": tally[c]} for c, label in EXCLUDED_CATEGORIES if tally[c]],
         "excluded_total": sum(tally.values()),
         "counted_calls": sorted(key for key, _c, _r in counted),
-        "by_coach": {cid: counted_block([r for _k, c, r in counted if c == cid], with_sentence=False) for cid in sorted(rows_by_coach)},
+        "by_coach": by_coach,
+        # Owner ruling 2026-11-10 (2): the secondary, exploratory split of the SAME counted calls by kind of call.
+        "subgroups": subgroups([row for _k, _c, row in counted], by_coach),
         "archive": {
             "label": FIRST_GRADE_LABEL,
             "n": an,
