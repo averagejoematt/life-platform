@@ -386,16 +386,18 @@ def test_diagnosis_is_deterministic_across_20_runs_under_a_scheduling_stall():
 
 
 def test_progress_line_says_no_checks_attached_when_none_are():
-    env, _ = _make_env([[]], INDETERMINATE)
-    r = _run(env, "--zero-check-grace", "99")
+    env, stub_dir = _make_env([[]], INDETERMINATE)
+    env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)  # #5814: no real-clock race
+    r = _run(env, "--zero-check-grace", "99", interval="0")
     assert "NO CHECKS ATTACHED YET" in r.stdout, r.stdout
     assert "0 of 7 expected are present" in r.stdout
 
 
 def test_progress_line_says_how_many_attached_once_some_have():
     """PRE-FIX both states printed `0/6 green` — this asserts they now differ."""
-    env, _ = _make_env([_partially_attached()], INDETERMINATE)
-    r = _run(env, "--zero-check-grace", "99")
+    env, stub_dir = _make_env([_partially_attached()], INDETERMINATE)
+    env = _with_fake_clock(env, stub_dir, _CLOCK_DIAGNOSE_THEN_TIMEOUT)  # #5814: no real-clock race
+    r = _run(env, "--zero-check-grace", "99", interval="0")
     assert "check(s) attached" in r.stdout, r.stdout
     assert "NO CHECKS ATTACHED YET" not in r.stdout
 

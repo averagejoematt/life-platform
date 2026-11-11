@@ -328,6 +328,14 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
     ) + [
         _bedrock_statement(),
         _experiment_cycle_read(),
+        # #5795 — OWNER-REQUIRED (additive IAM + cdk deploy LifePlatformIngestion): the poller starts the nightly
+        # pre-draft when it writes a loaded session (ingestion/predraft_trigger.py, async `Event` invoke). Inert until
+        # the function's PREDRAFT_ON_INGEST env reads `on`; the warmer's own gate (mcp/invoke_gate.py) still applies.
+        iam.PolicyStatement(
+            sid="PredraftOnIngestInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:life-platform-mcp-warmer"],
+        ),
     ]  # #3599: bundles content.insight_writer (the stamp's SSM fallback)
 
 
