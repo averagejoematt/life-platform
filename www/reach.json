@@ -57,7 +57,6 @@
     "/story/so-far/",
     "/story/week-06/",
     "/story/week-07/",
-    "/story/week-08/",
     "/subscribe/",
     "/system/",
     "/system/coaches/eli_marsh/",
@@ -84,5 +83,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 63
+  "transitive_count": 62
 }
