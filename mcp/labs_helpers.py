@@ -2,12 +2,17 @@
 Lab / DEXA / Genome query helpers.
 """
 
+import json
+import logging
+import os
 from datetime import datetime
 
 from boto3.dynamodb.conditions import Key
 
 from mcp.config import USER_PREFIX, table
 from mcp.core import _apply_phase_filter, decimal_to_float
+
+logger = logging.getLogger(__name__)
 
 _GENOME_CACHE_V2 = None
 
@@ -133,31 +138,56 @@ def _query_lab_meta():
     return [i for i in all_items if not i.get("sk", "").startswith("DATE#")]
 
 
-_GENOME_LAB_XREF = {
-    "ldl_c": ["ABCG8", "SLCO1B1"],
-    "cholesterol_total": ["ABCG8"],
-    "triglycerides": ["ADIPOQ"],
-    "glucose": ["FTO", "IRS1", "TCF7L2"],
-    "hba1c": ["FTO", "IRS1", "TCF7L2"],
-    "vitamin_d_25oh": ["VDR", "GC", "CYP2R1"],
-    "homocysteine": ["MTHFR", "MTRR"],
-    "ferritin": ["HFE"],
-    # one analyte, two stored spellings (health.lab_units.MARKER_ALIASES; mcp carries no health import)
-    "crp_hs": ["CRP", "IL6"],
-    "hs_crp": ["CRP", "IL6"],
-    "folate": ["MTHFR", "MTRR"],
-    "vitamin_b12": ["MTHFR", "MTRR"],
-    "omega_3_index": ["FADS2"],
-    "testosterone_total": ["SHBG"],
-    "apolipoprotein_b": ["ABCG8", "SLCO1B1"],
-}
+# The biomarker -> gene cross-reference is PRIVATE (owner ruling 2026-11-11, item 5): which genes are mapped to which
+# of the owner's biomarkers is personal genetic information, so the map lives off-repo, in the same private config
+# prefix as ``common.user_goals`` (bucket-root ``config/private/`` -- no bucket-policy grant, no CloudFront origin, no
+# repo twin). Locally: ``$LIFE_PLATFORM_GENOME_XREF_PATH``, else ``~/.config/life-platform/genome_lab_xref.json``.
+# It fails SOFT to an empty map: no genome context is attached, nothing is guessed. Shape: {biomarker_key: [gene, ...]}.
+GENOME_LAB_XREF_KEY = "config/private/genome_lab_xref.json"
+GENOME_LAB_XREF_PATH_ENV = "LIFE_PLATFORM_GENOME_XREF_PATH"
+_DEFAULT_XREF_PATH = os.path.join("~", ".config", "life-platform", "genome_lab_xref.json")
+_GENOME_LAB_XREF_CACHE = None
+
+
+def _valid_xref(doc):
+    if not isinstance(doc, dict):
+        return {}
+    return {str(k): [str(g) for g in v] for k, v in doc.items() if isinstance(v, list)}
+
+
+def _load_genome_lab_xref():
+    """The private biomarker -> gene map; {} when it cannot be read (logged by exception TYPE only)."""
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        try:
+            from mcp.config import S3_BUCKET, s3_client  # noqa: PLC0415 -- lazy: tests never touch S3
+
+            body = s3_client.get_object(Bucket=S3_BUCKET, Key=GENOME_LAB_XREF_KEY)["Body"].read()
+            return _valid_xref(json.loads(body))
+        except Exception as e:  # noqa: BLE001 -- fail soft: no map, no genome context
+            logger.warning("genome lab xref not read (%s)", type(e).__name__)
+            return {}
+    path = os.path.expanduser(os.environ.get(GENOME_LAB_XREF_PATH_ENV) or _DEFAULT_XREF_PATH)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return _valid_xref(json.load(fh))
+    except (OSError, ValueError):
+        return {}
+
+
+def _genome_lab_xref():
+    """Cached per warm container, like the genome partition itself."""
+    global _GENOME_LAB_XREF_CACHE
+    if _GENOME_LAB_XREF_CACHE is None:
+        _GENOME_LAB_XREF_CACHE = _load_genome_lab_xref()
+    return _GENOME_LAB_XREF_CACHE
 
 
 def _genome_context_for_biomarkers(biomarker_keys):
     """Return genome annotations relevant to a set of biomarker keys."""
+    xref = _genome_lab_xref()
     genes_needed = set()
     for bk in biomarker_keys:
-        genes_needed.update(_GENOME_LAB_XREF.get(bk, []))
+        genes_needed.update(xref.get(bk, []))
     if not genes_needed:
         return {}
     all_snps = _get_genome_cached()
@@ -166,7 +196,7 @@ def _genome_context_for_biomarkers(biomarker_keys):
         return {}
     result = {}
     for bk in biomarker_keys:
-        genes = _GENOME_LAB_XREF.get(bk, [])
+        genes = xref.get(bk, [])
         if not genes:
             continue
         matches = [s for s in relevant if s.get("gene") in genes]

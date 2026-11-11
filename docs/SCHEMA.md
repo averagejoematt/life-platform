@@ -1544,9 +1544,9 @@ Stores ONLY clinical interpretations and actionable recommendations — no raw g
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `gene` | string | Gene name (e.g. "FTO", "MTHFR", "CYP1A2") |
-| `rsid` | string | dbSNP identifier (e.g. "rs9939609") |
-| `genotype` | string | Observed genotype (e.g. "A;T", "C;C") |
+| `gene` | string | Gene name (HGNC symbol) |
+| `rsid` | string | dbSNP identifier ("rs" + digits) |
+| `genotype` | string | Observed genotype (allele pair, "X;Y" notation) |
 | `summary` | string | One-line clinical interpretation |
 | `category` | string | See categories below |
 | `risk_level` | string | `favorable` / `neutral` / `unfavorable` / `mixed` |

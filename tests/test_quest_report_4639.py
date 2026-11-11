@@ -82,7 +82,7 @@ def test_every_line_shape_reads_to_the_schema_row(parsed):
         "rh_type": ("RH TYPE", "RH(D) POSITIVE", "", "", ""),
         "testosterone_free": ("TESTOSTERONE, FREE", "80", "pg/mL", "46.0-224.0", ""),
         "ldl_pattern": ("LDL PATTERN", "A", "", "A Pattern", ""),
-        "9p21_rs10757278": ("rs10757278", "aa", "", "", ""),
+        "9p21_rs10757278": ("rs10757278", "zz", "", "", ""),
         "egfr_cystatin_c": ("eGFR", "100", "mL/min/1.73m2", ">= 60", ""),
     }
     for marker, (name, value, unit, ref_text, flag) in expect.items():

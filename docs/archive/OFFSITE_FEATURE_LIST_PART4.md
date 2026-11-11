@@ -571,7 +571,7 @@ This document appends to the Part 1-3 feature lists (Decisions 1–24, ~338 reco
 - **Effort:** Low (decision, not code)
 - [ ] Matthew makes conscious decision about: genome SNP identifiers, specific lab values, supplement adherence rates
 - [ ] Document which categories are published at what granularity
-- [ ] Consider: genome page shows "MTHFR variant present" vs "MTHFR C677T heterozygous"
+- [ ] Consider: genome page granularity (variant present vs a named genotype) [genetic detail removed 2026-11-11]
 
 ---
 
