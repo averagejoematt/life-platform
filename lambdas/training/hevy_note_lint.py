@@ -1,5 +1,5 @@
 """
-hevy_note_lint.py — the style linter for Hevy routine notes (#5428; rules L1–L13 of
+hevy_note_lint.py — the style linter for Hevy routine notes (#5428; rules L1–L15 of
 `docs/coaching/HEVY_NOTE_STANDARD.md` §8).
 
 It reads what Matthew will read: the COMPILED wire body (`hevy_compiler` output) plus the IR it
@@ -36,9 +36,10 @@ from training import hevy_note_grammar as g
 
 logger = logging.getLogger(__name__)
 
-LINT_VERSION = "hevy-note-lint@1.5.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes; 1.4.0: test blocks;
+LINT_VERSION = "hevy-note-lint@1.6.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes; 1.4.0: test blocks;
 # 1.5.0: the 2026-11-08 re-grade #6 classes (a pick-load compound with no load, a W step on a capped lift, the one layoff
-# line, intervals at steady + 2 with a two-way one-level escape) — see each rule's comment
+# line, intervals at steady + 2 with a two-way one-level escape) — see each rule's comment; 1.6.0: L14 / L15, the owner's
+# 2026-11-10 ruling (an easy first session back after a long layoff; a 10+ rep barbell compound climbs two W rows)
 MODE_ENV = "HEVY_NOTE_LINT_MODE"
 MODES = ("off", "warn", "enforce")
 DEFAULT_MODE = "warn"
@@ -64,6 +65,9 @@ RULES = {
     "is whole steps and its note names no metres; no speed off the treadmill",
     "L12": "exercise 1 opens with the session block; nothing truncated",
     "L13": "the first dumbbell compound at 50 lb per hand or more has a W row",
+    "L14": "a first session back after a long layoff (its reason names 'first time in ‹gap›') runs line 1 at the charter's "
+    "layoff-return band with no last-set target, behind a W row lighter than the work",
+    "L15": "a barbell compound prescribed at 10+ reps, at or over the warm-up floor, climbs at least 2 W rows",
 }
 
 KG_PER_LB = 0.45359237
@@ -390,7 +394,51 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
             out.append(Problem("L5", where, f"warm-up {g.fmt_num(lb)} lb is not on a {g.fmt_num(g.WARMUP_ROUNDING_LB)} lb step"))
     if ex.kind != "carry" and l1.count("RPE") - l1.count("last set RPE") != 1:
         out.append(Problem("L6", where, f"line 1 carries {l1.count('RPE')} RPE expressions"))
+    if any(g.FIRST_RETURN_RE.match(ln) for ln in lines[1:]):
+        _lint_layoff_return(ex, l1, where, out)
     _lint_previous(ex, lines, where, out)
+
+
+LAYOFF_W_FROM_LB = 2 * g.WARMUP_ROUNDING_LB  # under this there is no W row lighter than the work on the 5-lb step
+
+
+def _lint_layoff_return(ex: LintExercise, l1: str, where: str, out: list[Problem]) -> None:
+    """L14 (owner ruling 2026-11-10, charter 1.41.0): the 11-11 torso rotation read `Lighter: first time in 2 years.` under
+    `RPE 8–9, last set RPE 9–10`, with its W row at the working 100 lb. A first session back runs at the charter's
+    layoff-return band, never a last-set target, and its W row sits below the work (one is owed over a load of 10 lb+)."""
+    from training import effort_ceilings
+
+    band = effort_ceilings.layoff_return_band()
+    m = g.EFFORT_RE.match(l1)
+    if band and m and ("last set" in l1 or float(m.group("rpe").split("–")[-1]) > float(band[1])):
+        out.append(
+            Problem("L14", where, f"a first session back after a long layoff reads {l1!r}, over the layoff band RPE {g.fmt_rpe(band)}")
+        )
+    work = [r[1] for r in _working(ex.rows) if r[1] is not None]
+    w = [r[1] for r in ex.rows if r[0] == "W" and r[1] is not None]
+    if work and w and max(w) >= max(work):
+        out.append(Problem("L14", where, f"a first session back has a W row at {g.fmt_num(max(w))} lb, not lighter than the work"))
+    elif work and not w and max(work) >= LAYOFF_W_FROM_LB:
+        out.append(Problem("L14", where, "a first session back after a long layoff has no W row lighter than the work"))
+
+
+def _lint_high_rep_climb(exs: list[LintExercise], out: list[Problem]) -> None:
+    """L15 (owner ruling 2026-11-10): the 11-11 volume squat went out at 225 x 8–12 behind ONE W row (160 x 5) — the RDL
+    ahead of it took the session's first climb. A barbell compound of the warm-up families at or over the warm-up floor
+    whose working rep range tops out at 10 or more climbs at least two W rows (`warmup_sets.WARMUP_PRESCRIPTION`)."""
+    from training.warmup_sets import WARMUP_PRESCRIPTION as rule
+
+    for i, ex in enumerate(exs):
+        if ex.kind != "barbell" or ex.anchor_family not in rule["compound_families"]:
+            continue
+        work = _working(ex.rows)
+        top = _top_load(work)
+        hi = max((t for t in (_rep_top(r[2]) for r in work) if t is not None), default=None)
+        if top is None or top < float(rule["floor_lb"]) or hi is None or hi < int(rule["high_rep_from"]):
+            continue
+        n = sum(1 for r in ex.rows if r[0] == "W")
+        if n < 2:
+            out.append(Problem("L15", f"[{i + 1}] {ex.name}", f"a barbell compound at {g.fmt_num(hi)} reps climbs {n} W row(s), not 2+"))
 
 
 _LEVEL_SPAN = re.compile(r"\bL(\d+) → L(\d+)\b")
@@ -650,6 +698,7 @@ def lint_routine(rt: LintRoutine) -> LintResult:
                 if not any(r[0] == "W" for r in ex.rows):
                     out.append(Problem("L13", f"[{i + 1}] {ex.name}", "the first dumbbell compound at 50 lb per hand or more has no W row"))
                 break
+    _lint_high_rep_climb(exs, out)
     _lint_cues(rt, bodies, out, not_checked)
     if not rt.previous_supplied:
         not_checked.append(f"L4 PREVIOUS: inputs_snapshot[{PREVIOUS_LOADS_KEY!r}] absent")

@@ -74,6 +74,9 @@ REGRADE_2 = (
     "the W line says 'find the load.' but the working rows carry a load",
     "'New: replaces …' over a PREVIOUS",
     "with no reason (what moves it?)",
+    # owner ruling 2026-11-10 (lint 1.6.0, L15): a later barbell compound at 10+ reps behind one W row — the lower draft's
+    # squat at 8–12 behind a single 70 % row, the 11-11 squat's class
+    "climbs 1 W row(s), not 2+",
 )
 
 # ── the two stored drafts, as the compiler saw them (loads in kg off the stored IR; reps as floats, as stored) ────────
@@ -278,6 +281,7 @@ CALF_COMPOSED = (
 )  # the composer's own 4 lines on 2026-10-29 (inputs_snapshot.critics.draft_exercises)
 CLAUSE = "3 sets today: first time in 19 weeks."
 CALF_COMPOSED_2 = "RPE 8–9, last set RPE 9–10\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft."
+CALF_COMPOSED_EASY = "RPE 6–7\nSame load all sets: first time in 8 months.\nFull stretch at the bottom; knees soft."
 
 
 def test_the_critic_clause_displaces_the_rotation_reason_and_fits_the_budget():
@@ -335,9 +339,11 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
         target_date="2026-10-29",
         rotations={"seated_calf_raise": "Calf Press (Machine)"},
     )
-    # re-grade #2 (2026-10-31): PREVIOUS (90 lb, 8 months back) exists, so no `New: replaces …`; the row is its load,
-    # so no reason; the feeler W line tests the start load
-    assert calf.notes == CALF_COMPOSED_2, calf.notes
+    # re-grade #2 (2026-10-31): PREVIOUS (90 lb, 8 months back) exists, so no `New: replaces …`. Owner ruling 2026-11-10
+    # (charter 1.41.0): 8 months is past the OD1 line, so this is a first session back — the layoff band, the one layoff
+    # line and a W row at half the work (was CALF_COMPOSED_2: the hard band and the feeler AT the start load)
+    assert calf.notes == CALF_COMPOSED_EASY, calf.notes
+    assert [(s.type, s.weight_kg) for s in calf.sets if s.type == "warmup"] == [("warmup", _kg(45))]
     verdict = {
         "critic": "joints_tendons",
         "verdict": "change",
@@ -348,9 +354,10 @@ def test_a_freshly_composed_rotated_pick_load_lift_with_a_critic_change_lints_cl
     }
     recs = critics_apply.apply_changes(ir, [verdict])
     assert recs[0]["applied"] and recs[0]["clauses"][0]["clause"] == "Same load all sets: first time in 8 months.", recs
-    assert ir.exercises[2].notes == "RPE 7\nSame load all sets: first time in 8 months.\nFull stretch at the bottom; knees soft."
+    # the critic's cap keeps the composer's easier band (was `RPE 7`)
+    assert ir.exercises[2].notes == CALF_COMPOSED_EASY
     res = _lint(ir)
-    # the feeler W row stays (AT the start load, under the layoff line) and still reads as the feeler, not a warm-up ladder
+    # the light W row stays under the layoff line, and the lift lints clean
     assert ir.exercises[2].sets[0].type == "warmup" and not [p for p in res.lines() if "[3]" in p], res.lines()
     assert g.phone_lines(ir.exercises[2].notes) == 4 == g.LIFT_MAX_LINES  # the layoff line is two phone lines; no W line beside it
 

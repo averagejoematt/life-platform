@@ -27,7 +27,8 @@ import json
 import pathlib
 from typing import Any
 
-from training import cardio_note, hevy_compiler, hevy_note_grammar as g, hevy_note_lint as lint, lift_note, session_block
+import pytest
+from training import cardio_note, hevy_compiler, hevy_note_grammar as g, hevy_note_lint as lint, lift_note, rep_scheme, session_block
 from training.exercise_history import CARRY_INDEX_PREFIX
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
 
@@ -210,6 +211,10 @@ ROUND_1_PROBLEMS = [
     "L3 session block: the load rule heads a one-set exercise 1 (no later set to step)",
     "L6 [1] Shoulder Press (Dumbbell): exercise 1 repeats the session line's effort ('RPE 8–9')",
     "L4 [2] Lateral Raise (Machine): the W line gives its test no result rule: 'W set: up to 8 easy reps, test the load.'",
+    # owner ruling 2026-11-10 (lint 1.6.0, L14): the lateral raise, 2 years off, at the hard band with no lighter W row
+    "L14 [2] Lateral Raise (Machine): a first session back after a long layoff reads 'RPE 8–9, last set RPE 9–10', over the "
+    "layoff band RPE 6–7",
+    "L14 [2] Lateral Raise (Machine): a first session back after a long layoff has no W row lighter than the work",
     "L4 [3] Rear Delt Reverse Fly (Machine): the reason contradicts the load rule or leaves its timeline open: 'Same load: hit 15 "
     "again to move it up.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the step on later sets)",
     "L4 [5] Triceps Rope Pushdown: the reason contradicts the load rule or leaves its timeline open: 'Same load: hit 15 again to "
@@ -225,6 +230,14 @@ ROUND_1_PROBLEMS = [
 ]
 
 
+@pytest.fixture
+def _pre_ruling_rows(monkeypatch):
+    """The rounds below are renderings from BEFORE the owner's 2026-11-10 layoff ruling, so their rows are composed the way
+    those rounds composed them (the lateral raise's feeler AT the work, not the ruling's lighter W row); the linter of
+    today still reads them, so each list carries its L14 lines too."""
+    monkeypatch.setattr(lift_note, "is_layoff_return", lambda *a, **k: False)
+
+
 def _as_rendered(notes: dict[str, str]) -> RoutineSpec:
     """The recomposed rows with an earlier round's notes, and that round's rows: the feeler W row without a load and the
     carry rows without one (both were added in round 4)."""
@@ -238,7 +251,7 @@ def _as_rendered(notes: dict[str, str]) -> RoutineSpec:
     return ir
 
 
-def test_the_round_1_rendering_fails_the_round_3_rules(monkeypatch):
+def test_the_round_1_rendering_fails_the_round_3_rules(monkeypatch, _pre_ruling_rows):
     """Blind re-grade #3's five defects, on the rendering it graded: the load rule on a one-set exercise 1, RPE 8–9
     twice, the hold reason against the load rule, a carry with no start and no adjust rule, and intervals whose easy
     minutes have no talk words and whose escape only steps up."""
@@ -270,6 +283,10 @@ ROUND_2_NOTES = {
 ROUND_2_PROBLEMS = [
     "L3 session block: no load rule for the session's multi-set lifts ('Other lifts: …')",
     "L4 [2] Lateral Raise (Machine): the W line gives its test no result rule: 'W set: up to 8 easy reps, test the load.'",
+    # owner ruling 2026-11-10 (lint 1.6.0, L14): the lateral raise, 2 years off, at the hard band with no lighter W row
+    "L14 [2] Lateral Raise (Machine): a first session back after a long layoff reads 'RPE 8–9, last set RPE 9–10', over the "
+    "layoff band RPE 6–7",
+    "L14 [2] Lateral Raise (Machine): a first session back after a long layoff has no W row lighter than the work",
     "L4 [3] Rear Delt Reverse Fly (Machine): the reason contradicts the load rule or leaves its timeline open: 'Same load to start: "
     "15 reps on set 1 at RPE 8.5 or less → next plate.' (PREVIOUS's top reps at RPE <= 8.5 earn the step: say it as set 1 → the "
     "step on later sets)",
@@ -283,7 +300,7 @@ ROUND_2_PROBLEMS = [
 ]
 
 
-def test_the_round_3_rendering_fails_the_round_4_rules(monkeypatch):
+def test_the_round_3_rendering_fails_the_round_4_rules(monkeypatch, _pre_ruling_rows):
     """Blind re-grade #4's four defects, on the rendering it graded: no in-session load rule left for the multi-set lifts
     (it was dropped with the one-set exercise 1), a feeler W line with no result, the carry's load only in the note, and
     an escape whose "none" is not a talk word and whose step down cancels the intervals."""
@@ -305,11 +322,15 @@ ROUND_3_CHANGED = {
 ROUND_3_PROBLEMS = [
     "L3 session block: the load rule lines are not the standard's (the session line, the low-energy line, the load rule)",
     "L4 [2] Lateral Raise (Machine): the W line gives its test no result rule: 'W set at RPE 5 or less → next plate.'",
+    # owner ruling 2026-11-10 (lint 1.6.0, L14): the lateral raise, 2 years off, at the hard band with no lighter W row
+    "L14 [2] Lateral Raise (Machine): a first session back after a long layoff reads 'RPE 8–9, last set RPE 9–10', over the "
+    "layoff band RPE 6–7",
+    "L14 [2] Lateral Raise (Machine): a first session back has a W row at 35 lb, not lighter than the work",
     "L5 [2] Lateral Raise (Machine): warm-up rows do not ascend below the work",  # a W row at the work load needs the bound line
 ]
 
 
-def test_the_round_4_rendering_fails_the_round_5_rules(monkeypatch):
+def test_the_round_4_rendering_fails_the_round_5_rules(monkeypatch, _pre_ruling_rows):
     monkeypatch.setenv(lint.MODE_ENV, "off")
     ir = recomposed_ir()  # round 4's rows: the feeler at 35 lb, the carry at 60 lb per hand
     for b in ir.exercises:
@@ -330,8 +351,10 @@ SESSION = (
 NEW_NOTES = {
     "db_shoulder_press": SESSION
     + "\n\nOne set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.\nBreathe out on the press.",
-    # the feeler W row is AT the 35-lb start load now, and the line says what its answer does
-    "lateral_raise_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 2 years.\nW at RPE 5 or less → one step, no more.",
+    # owner ruling 2026-11-10 (charter 1.41.0): 2 years off, so a first session back — the layoff band, the one layoff line,
+    # and a W row at half the 35-lb work (was `RPE 8–9, last set RPE 9–10` / `Lighter: first time in 2 years.` / the feeler
+    # AT the start load with `W at RPE 5 or less → one step, no more.`)
+    "lateral_raise_machine": "RPE 6–7\nSame load all sets: first time in 2 years.",
     # the load rule's own step on this lift, in the rule's own timeline words
     "reverse_pec_deck": "RPE 8–9, last set RPE 9–10\nSet 1: 15 reps at RPE 8.5 or less → next plate on later sets.",
     "seated_incline_curl_dumbbell": "RPE 8–9, last set RPE 9–10",
@@ -363,7 +386,7 @@ def test_the_recomposed_draft_reads_the_new_notes_and_lints_clean(monkeypatch):
         got = [(s.type, s.weight_kg, s.reps, s.rep_range_end, s.distance_meters) for s in new.sets]
         want = [(s.type, s.weight_kg, s.reps, s.rep_range_end, s.distance_meters) for s in old.sets]
         if new.movement_key == "lateral_raise_machine":
-            want[0] = ("warmup", new.sets[1].weight_kg, 8, None, None)
+            want[0] = ("warmup", rep_scheme.load_step_kg(new.sets[1].weight_kg * 0.5), 8, None, None)  # 20 lb under 35
         if new.movement_key == "farmers_walk":
             want = [(t, round(60 * 0.45359237, 6), r, e, d) for t, _w, r, e, d in want]
         assert got == want, new.movement_key

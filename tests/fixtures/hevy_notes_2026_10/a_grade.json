@@ -1,5 +1,5 @@
 {
- "_source": "issue 5428 review corpus (a_grade_corpus.txt, round 7) with the owner's 2026-10-27 ~04:50Z session block: no safety line, the low-energy line back. Re-grade #2 (2026-10-31): the load rule closes RPE 7.5/8.5 and drops pins and \"later sets\", a pick-load W line over loaded rows feels out the start load, intervals ride the steady level before/between/after with a one-level escape, and an intervals-only session's low-energy line promises no easy cardio. Re-grade #6 (2026-11-08): the load rule's line 4 in plain words, the one layoff line (`Same load all sets: ‹gap›.`), and intervals at steady + 2 (owner ruling) with an escape that names the level either way. The §4 calf-press cue added where the corpus omitted it (10-13, 10-16, 10-23). Rows in lb; no body measurements.",
+ "_source": "issue 5428 review corpus (a_grade_corpus.txt, round 7) with the owner's 2026-10-27 ~04:50Z session block: no safety line, the low-energy line back. Re-grade #2 (2026-10-31): the load rule closes RPE 7.5/8.5 and drops pins and \"later sets\", a pick-load W line over loaded rows feels out the start load, intervals ride the steady level before/between/after with a one-level escape, and an intervals-only session's low-energy line promises no easy cardio. Re-grade #6 (2026-11-08): the load rule's line 4 in plain words, the one layoff line (`Same load all sets: ‹gap›.`), and intervals at steady + 2 (owner ruling) with an escape that names the level either way. The §4 calf-press cue added where the corpus omitted it (10-13, 10-16, 10-23). Rows in lb; no body measurements. Owner ruling 2026-11-10: a first session back after a long layoff reads the charter's layoff band (RPE 6–7) and holds one load behind a W row lighter than the work (the 10-26 chest fly and lying extension), and a later barbell compound at 10+ reps climbs two W rows (50 % x 8, then 70 % x 5).",
  "routines": [
   {
    "date": "2026-10-11",
@@ -263,6 +263,11 @@
      "family": "squat",
      "anchor_family": "squat",
      "rows": [
+      [
+       "W",
+       90,
+       "8"
+      ],
       [
        "W",
        135,
@@ -630,6 +635,11 @@
      "family": "hinge",
      "anchor_family": "hinge",
      "rows": [
+      [
+       "W",
+       105,
+       "8"
+      ],
       [
        "W",
        135,
@@ -1007,6 +1017,11 @@
      "family": "squat",
      "anchor_family": "squat",
      "rows": [
+      [
+       "W",
+       105,
+       "8"
+      ],
       [
        "W",
        145,
@@ -1389,6 +1404,11 @@
      "family": "hinge",
      "anchor_family": "hinge",
      "rows": [
+      [
+       "W",
+       115,
+       "8"
+      ],
       [
        "W",
        160,
@@ -1803,7 +1823,7 @@
      "rows": [
       [
        "W",
-       60,
+       30,
        "8"
       ],
       [
@@ -1817,7 +1837,7 @@
        "8–15"
       ]
      ],
-     "note": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW at RPE 5 or less → one step, no more."
+     "note": "RPE 6–7\nSame load all sets: first time in 4 years."
     },
     {
      "name": "Lying DB Tricep Extension",
@@ -1828,7 +1848,7 @@
      "rows": [
       [
        "W",
-       20,
+       10,
        "8"
       ],
       [
@@ -1842,7 +1862,7 @@
        "8–15"
       ]
      ],
-     "note": "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW at RPE 5 or less → one step, no more.\nElbows still."
+     "note": "RPE 6–7\nSame load all sets: first time in 13 months.\nElbows still."
     },
     {
      "name": "Preacher Curl (Machine)",
