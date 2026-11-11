@@ -77,11 +77,20 @@ def test_the_graded_wire_fails_with_every_regrade_6_class():
     ]
 
 
+# The `recomposed` snapshot predates the owner's 2026-11-10 layoff ruling (charter 1.41.0, lint 1.6.0 L14): its two FIRST
+# sessions back carry no W row lighter than the work, which today's composer adds (`lift_note._layoff_return_treatment`;
+# tests/test_layoff_return_and_warmup_climb_5428.py). The snapshot stays as re-grade #7 read it; the linter names both.
+PRE_RULING_L14 = {
+    "c90f4e35": ["L14 [5] Standing Calf Raise (Machine): a first session back has a W row at 130 lb, not lighter than the work"],
+    "6ea0520b": ["L14 [5] Lying Db Tricep Extension: a first session back after a long layoff has no W row lighter than the work"],
+}
+
+
 def test_the_recomposed_wire_lints_clean_but_the_rdl_with_no_basis_for_a_load():
     assert _lint(UPPER, "recomposed").lines() == []
-    assert _lint(ARMS, "recomposed").lines() == []
-    # the one problem left is the honest one: no session on the RDL template, so no start load to put on its rows
-    assert _lint(LOWER, "recomposed").lines() == [RDL_NO_BASIS]
+    assert _lint(ARMS, "recomposed").lines() == PRE_RULING_L14["6ea0520b"]
+    # the one re-grade #6 problem left is the honest one: no session on the RDL template, so no start load to put on its rows
+    assert _lint(LOWER, "recomposed").lines() == [RDL_NO_BASIS] + PRE_RULING_L14["c90f4e35"]
     assert LOWER["no_history"]["romanian_deadlift_barbell"]["status"] == "no_history"
     assert all(s.get("weight_kg") is None for s in LOWER["recomposed"][1]["sets"])
 
@@ -124,12 +133,13 @@ def test_the_critic_cap_on_the_calf_raise_holds_the_load_and_drops_the_w_step_li
     clause = session_block.capped_clause(3, gap)
     assert clause == "Same load all sets: first time in 18 months."
     after = session_block.add_capped_reason(pre, clause, 7)
-    assert (
-        after
-        == _note(LOWER, "recomposed", key)
-        == "RPE 7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft."
-    )
-    # the feeler W row stays on the rows, at the working load; the linter reads it as the feeler, not a broken ladder
+    # owner ruling 2026-11-10 (charter 1.41.0): a FIRST session back reads the layoff band — the snapshot's `RPE 7` line 1
+    # (re-grade #6's) is now `RPE 6–7`; the rest of the note is the snapshot's
+    snap = _note(LOWER, "recomposed", key)
+    assert snap == "RPE 7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft."
+    assert after == "RPE 6–7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft."
+    assert after.split("\n")[1:] == snap.split("\n")[1:]
+    # the snapshot's feeler W row stays on its rows, at the working load (today's composer puts a lighter one there: L14)
     rows = LOWER["recomposed"][LOWER["keys"].index(key)]["sets"]
     assert rows[0]["type"] == "warmup" and rows[0]["weight_kg"] == rows[1]["weight_kg"]
 

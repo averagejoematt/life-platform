@@ -19,6 +19,13 @@ of the engine's start load, and `W set: up to 8 easy reps, test the load.` (`fin
 no load). A stale PREVIOUS more than one step from the row still gets its reason (`Lighter: first time in 2 years.`):
 Hevy shows that PREVIOUS beside the row, and the drop needs a why (#5428 re-grade #2, 2026-10-31).
 
+A FIRST SESSION BACK after a long layoff (owner ruling 2026-11-10, charter 1.41.0) is easy: line 1 is the charter's
+`effort_ceilings.layoff_return_rpe` with no last-set target, the reason is the one layoff line (`Same load all sets: first
+time in 2 years.` — the load rule's step is off), and the rows carry ONE W row at half the work (`warmup_sets.
+layoff_warmup`), never the feeler AT the work. "Long" is the OD1 exposure-cap line, `layoff_tiers.REENTRY_MAX_GAP_DAYS`
+(`is_layoff_return`); a stale PREVIOUS is past it, so the stale pick-load form above is now for a lift never logged (or
+unloaded rows). The 11-11 torso rotation read `RPE 8–9, last set RPE 9–10` over a W row at its working 100 lb.
+
 WHAT LEAVES THE WIRE, NOT THE RECORD. The passes still compute everything they did — the floor, the ramp, the hold, the
 progression — and their text is kept on `inputs_snapshot["lift_notes"][key]["detail"]` and in the rationale, where
 the dry-run and the coach chat read it. Only the Hevy note is rewritten.
@@ -366,6 +373,43 @@ def _feeler_fits(block: Any, entry: dict[str, Any], chat: bool) -> bool:
     return True
 
 
+def is_layoff_return(caps: dict[str, Any] | None, previous: dict[str, Any] | None, target_date: str) -> bool:
+    """A movement's FIRST session back after a long layoff (owner ruling 2026-11-10, charter 1.41.0): the ramp's OD1
+    exposure cap at exposure 1, or — where the ramp set no cap (a nearest-band fallback, an unramped accessory) — a
+    PREVIOUS older than the same OD1 line, `layoff_tiers.REENTRY_MAX_GAP_DAYS` (PREVIOUS is his newest session, so the
+    session being drafted is exposure 1). No new threshold: the exposure-cap gap is the long-layoff line. A lift with no
+    session on file is new, not a return; exposures 2–3 keep the OD1 cap."""
+    from training.layoff_tiers import REENTRY_MAX_GAP_DAYS
+
+    if caps:
+        return int(caps.get("exposure") or 1) == 1
+    if not previous:
+        return False
+    gap = _days_between(str(previous.get("date") or ""), target_date)
+    return gap is not None and gap > REENTRY_MAX_GAP_DAYS
+
+
+def layoff_return_effort() -> str | None:
+    """Line 1 of a layoff return: the charter's `effort_ceilings.layoff_return_rpe`, with no last-set target; None when
+    the charter does not state it (the lift keeps its line 1)."""
+    from training import effort_ceilings
+
+    band = effort_ceilings.layoff_return_band()
+    return effort_line(tuple(band)) if band else None
+
+
+def _layoff_return_treatment(block: Any, line1: str) -> str:
+    """Owner ruling 2026-11-10 (A), IN PLACE: a layoff return's working sets run at the layoff band (the returned line 1,
+    no `last set RPE 9–10`), behind a W row lighter than the work (`warmup_sets.layoff_warmup`) when the block carries no
+    W row yet — a warmed compound already climbs below its work. A block with no load on its rows keeps what it has."""
+    from training.warmup_sets import layoff_warmup
+
+    top = max((float(s.weight_kg) for s in _working(block.sets) if getattr(s, "weight_kg", None)), default=None)
+    if top is not None and not any(_is_warmup(s) for s in block.sets or []):
+        block.sets = layoff_warmup(top) + list(block.sets or [])
+    return layoff_return_effort() or line1
+
+
 def no_jumps_line(caps: dict[str, Any]) -> str:
     """A capped exposure's one line (standard §3.2, R3 "opts out by name"; re-grade #6, 2026-11-08: one grammar, no
     "No jumps"): `Same load all sets: first time in 19 weeks.` on exposure 1, `Same load all sets: 2nd session back after
@@ -423,6 +467,8 @@ def compose_blocks(
 
     A capped exposure (OD1, the ramp's `exposure_caps`) reads `RPE 7` and opts out of the load rule by name
     (`no_jumps_line`, the one layoff line); a critic's layoff set cap gets the same treatment downstream (`session_block.add_capped_reason`).
+    A FIRST session back (`is_layoff_return`, owner ruling 2026-11-10) reads the layoff-return band instead, takes the same
+    layoff line when the ramp set no cap, and gets one W row lighter than the work (`_layoff_return_treatment`).
 
     `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own sentences that already read as
     the standard (`authored_lines`) — `effort` replaces line 1, `line` takes the cue slot (a chat-era technique cue counts
@@ -460,12 +506,18 @@ def compose_blocks(
         row = movements.get(key) or {}
         caps = (row.get("ramp") or {}).get("exposure_caps")
         stale = is_stale(previous, target_date)
+        layoff = is_layoff_return(caps, previous, target_date)
         line1 = own.get("effort") or exposure_cue(intensity, [{}] * max(1, len(_working(block.sets))))
         line2, pick, reason_kind = "", False, None
         if caps:
             # OD1: a capped exposure after a long gap opts out of the session's load rule, by name
             line1 = effort_line(caps.get("rpe_max"))
             line2, reason_kind = no_jumps_line(caps), "no_jumps"
+        elif layoff and _has_load(block):
+            # owner 2026-11-10 (A): a return the ramp did not cap is eased the same way — one load all sets at the layoff
+            # band, behind a W row lighter than the work (never the pick-load feeler AT the work, whose step would undo it)
+            gap = _days_between(str((previous or {}).get("date") or ""), target_date)
+            line2, reason_kind = no_jumps_line({"gap_days": gap, "exposure": 1}), "no_jumps"
         elif stale:
             pick = _feeler_fits(block, entry, authored is not None) and _add_feeler(block)
             reason_kind = "pick_load" if pick else None
@@ -477,6 +529,8 @@ def compose_blocks(
             if not line2 and index == 0:
                 line2 = _one_set_line(block, entry)
             reason_kind = line2.split(":")[0] if line2 else None
+        if layoff:
+            line1 = _layoff_return_treatment(block, line1)
         swapped = (rotations or {}).get(key)
         lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
         if lead:
@@ -490,6 +544,7 @@ def compose_blocks(
         block.notes = "\n".join(body + ([cue] if cue else []))
         notes[key] = {
             "note": block.notes,
+            "layoff_return": layoff,
             "reason": reason_kind,
             "reason_line": (lead or line2) or None,
             "authored_line": own.get("line"),
