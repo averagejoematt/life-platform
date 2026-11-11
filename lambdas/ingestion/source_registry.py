@@ -131,6 +131,8 @@ DEFAULT_STALE_HOURS = 48
 #                  but excluded from UnhealthySourceCount (pipeline_health_check).
 #   expected_days  expected record days per week for gap reconciliation
 #                  (data_reconciliation); None = event-driven, gaps are behavior.
+#                  #5527: 7 on a monitored, non-behavioral source ALSO enrolls it in
+#                  the freshness checker's interior-gap scan (interior_gap_source_keys()).
 #   qa_tier        'required' (missing yesterday = FAIL) | 'optional' (warn) |
 #                  None (not checked). Paused sources render ⏸ regardless (qa_smoke).
 #   method         how the data arrives — public catalogue text (data_sources.json).
@@ -2135,6 +2137,29 @@ def stale_hours_overrides(keys=None) -> dict:
 def behavioral_source_keys() -> set:
     """Monitored sources whose staleness is a logging lapse — never pages."""
     return {k for k, v in _active_monitored().items() if v["behavioral"]}
+
+
+#: A source that should land a record on all seven days of the week (`expected_days`).
+EVERY_DAY = 7
+
+
+def interior_gap_source_keys(registry=None) -> set:
+    """The sources the interior-gap scan holds to a record-EVERY-day bar (#5527, DI-2b).
+
+    Derived, never typed: a monitored, unpaused source whose `expected_days` is 7 and which is
+    NOT behavioral. A missing day inside its present span can only be a pipeline miss or a
+    measured vendor absence (the #2643 marker closes the latter honestly). A behavioral source
+    — even one expected daily, like supplements via the Habitify bridge — has legitimate empty
+    days, so it is excluded, exactly as the hand list's own comment said. The hand-typed
+    `{"whoop", "apple_health", "eightsleep", "habitify"}` this replaces had already drifted:
+    todoist and weather met the rule and were silently unscanned.
+
+    `registry` is injectable so the must-fail control runs THIS rule over a planted row.
+    """
+    rows = SOURCE_REGISTRY if registry is None else registry
+    # The same pool `_active_monitored()` draws (freshness-resident, monitored, unpaused), over `rows`.
+    pool = {k: v for k, v in rows.items() if v.get("freshness", True) and v.get("monitored", True) and not v.get("paused")}
+    return {k for k, v in pool.items() if v.get("expected_days") == EVERY_DAY and not v["behavioral"]}
 
 
 # ── #2326: the quiet notice for load-bearing behavioral sources ────────────────
