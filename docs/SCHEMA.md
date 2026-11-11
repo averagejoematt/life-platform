@@ -1569,7 +1569,7 @@ Stores ONLY clinical interpretations and actionable recommendations — no raw g
 | `blood_type` | string | e.g. "A_Rh_D_Positive" |
 | `blood_type_date` | string | Date blood type was determined |
 
-Note: `related_biomarkers` enables cross-referencing genome data with labs data. For example, ABCG8 rs6544713 T;T (elevated LDL) can be correlated with actual LDL-C trends across GP blood draws.
+Note: `related_biomarkers` enables cross-referencing genome data with labs data. For example, a variant associated with elevated LDL can be correlated with actual LDL-C trends across GP blood draws (the genotype itself is owner-only and never named in the repo).
 
 ### chronicling (P40 habits — historical archive)
 

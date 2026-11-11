@@ -357,8 +357,10 @@ RULINGS: tuple[Ruling, ...] = (
     Ruling(
         "config/user_goals.json",
         HAND_OWNED,
-        "Hand-authored mission/targets. Like character_sheet.json, deploy/restart_pipeline.py rewrites FIELDS in the "
-        "tree at each reset (USER_GOALS, line 145) and the result is committed — the repo stays the authority, and "
+        "Hand-authored plan targets — the PUBLIC part only since the owner's 2026-11-11 ruling (the private part is "
+        "S3-only at config/private/user_goals_private.json, no repo twin, merged by lambdas/common/user_goals.py). "
+        "Like character_sheet.json, deploy/restart_pipeline.py rewrites FIELDS in the tree at each reset (USER_GOALS) "
+        "and the result is committed — the repo stays the authority for the public part, and "
         "deploy/sync_constants_from_config.py reads it to generate constants (the opposite direction).",
     ),
     Ruling(
