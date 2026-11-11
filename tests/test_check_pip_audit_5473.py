@@ -52,6 +52,9 @@ _ADVISORIES = {
         {"id": "PYSEC-2026-4320", "aliases": ["GHSA-6q48-6c7w-9gw2"], "fix_versions": ["2026.10.18"]},
         {"id": "PYSEC-2026-4320", "aliases": ["GHSA-6q48-6c7w-9gw2"], "fix_versions": ["2026.10.19"]},
     ],
+    ("oauthlib", "4.0.0"): [
+        {"id": "CVE-2026-49272", "aliases": ["GHSA-3jp2-3mrg-2vxc"], "fix_versions": ["4.0.1"]},
+    ],
 }
 
 
@@ -96,9 +99,11 @@ def test_allowlist_parses_plain_and_scoped_entries_and_rejects_stray_tokens():
 def test_real_allowlist_scopes_the_garth_certifi_waiver_to_garmin_only():
     entries = pam.parse_allowlist(pam.ALLOWLIST_PATH.read_text())
     assert pam.stale_scopes(entries) == [], "every scope= must name a manifest that exists"
-    assert "GHSA-6q48-6c7w-9gw2" in pam.ignore_ids_for("lambdas/requirements/garmin.txt", entries)
-    for other in ("requirements-dev.txt", "cdk/requirements.txt", "lambdas/requirements/pillow.txt"):
-        assert "GHSA-6q48-6c7w-9gw2" not in pam.ignore_ids_for(other, entries), other
+    # certifi (#5473) and oauthlib (#5724): both waive the RETIRED garth layer only.
+    for vuln in ("GHSA-6q48-6c7w-9gw2", "GHSA-3jp2-3mrg-2vxc"):
+        assert vuln in pam.ignore_ids_for("lambdas/requirements/garmin.txt", entries), vuln
+        for other in ("requirements-dev.txt", "cdk/requirements.txt", "lambdas/requirements/pillow.txt"):
+            assert vuln not in pam.ignore_ids_for(other, entries), (vuln, other)
 
 
 def test_a_scope_naming_no_manifest_is_a_usage_error(tmp_path, capsys):
@@ -185,14 +190,17 @@ def test_the_live_tree_scans_all_three_layer_manifests_and_honours_the_scope(tmp
     for name, count in (("pillow", 1), ("lameenc", 1), ("garmin", 18)):
         line = next(ln for ln in out.splitlines() if f"lambdas/requirements/{name}.txt" in ln)
         assert line.startswith("SCANNED") and f"packages={count}" in line, line
-    assert "allowlisted: GHSA-6q48-6c7w-9gw2" in out
+    garmin = next(ln for ln in out.splitlines() if "lambdas/requirements/garmin.txt" in ln)
+    allowlisted = garmin.split("allowlisted:", 1)[1]
+    assert "GHSA-6q48-6c7w-9gw2" in allowlisted and "GHSA-3jp2-3mrg-2vxc" in allowlisted, garmin
     assert "lambdas/requirements/pillow.txt" in summary.read_text()
     # The same garmin bytes OUTSIDE the scoped path: the waiver does not travel.
     reqs = tmp_path / "requirements"
     reqs.mkdir()
     (reqs / "garmin.txt").write_text((_REPO / "lambdas" / "requirements" / "garmin.txt").read_text())
     assert pam.main(["--layers", "--requirements-dir", str(reqs)], runner=_fake_pip_audit) == 1
-    assert "PYSEC-2026-4320" in capsys.readouterr().out
+    unscoped = capsys.readouterr().out
+    assert "PYSEC-2026-4320" in unscoped and "CVE-2026-49272" in unscoped
 
 
 # ── wiring ──────────────────────────────────────────────────────────────────────
