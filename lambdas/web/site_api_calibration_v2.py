@@ -10,7 +10,7 @@ beside it, so private calls never reach it (``tests/test_calibration_v2_privacy.
 
 from __future__ import annotations
 
-from coach import coach_baseline, coach_record
+from coach import coach_baseline
 from experiment import calibration_core, calibration_v2
 
 from web.site_api_common import logger
@@ -62,22 +62,9 @@ def method_block() -> dict:
 def baseline_paired(decided) -> dict:
     """calibration-v2's skill input (``calibration_v2.skill_vs_baseline``): per record, (coach right, nothing-changes
     right) over the SAME decided rows ``coach_baseline.comparison_block`` tallies, with the same unscorable /
-    not-yet-scored split — so v2's question 3 is asked of exactly the calls the served comparison counts."""
-    out: dict = {}
-    for row in decided or []:
-        status = coach_record.graded_status(row)
-        key = coach_baseline.record_of(row) if status else None
-        if key is None:
-            continue
-        rec = out.setdefault(key, {"pairs": [], "unscorable": 0, "not_yet_scored": 0})
-        bl = coach_baseline.effective(row)  # owner ruling 2026-11-09 (A): a recorded re-score overlays the frozen stamp
-        if not isinstance(bl, dict) or bl.get("rule") != coach_baseline.RULE_ID:
-            rec["not_yet_scored"] += 1
-        elif bl.get("right") is None:
-            rec["unscorable"] += 1
-        else:
-            rec["pairs"].append((status == "confirmed", bool(bl["right"])))
-    return out
+    not-yet-scored split — so v2's question 3 is asked of exactly the calls the served comparison counts. One builder
+    (``coach_baseline.paired_records``), shared with the CR1 verified headline's subgroups (``web.verification_fields``)."""
+    return coach_baseline.paired_records(decided)
 
 
 def _assess_rows(rows) -> dict:

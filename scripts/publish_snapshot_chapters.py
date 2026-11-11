@@ -38,6 +38,23 @@ _EDITOR_NOTE = re.compile(r"^\s*[*_]*\s*Editor[’']s note\b[\s\S]*?(?:\n\s*\n|$
 _EMPHASIS = re.compile(r"(?<![\w*])[*_]{1,3}(?=\S)|(?<=\S)[*_]{1,3}(?![\w*])")
 
 
+# Installments withdrawn from public access, by their permanent URL (fail closed: even if /journal/posts.json lists
+# one again, it is never a chapter, so it has no v9 page, link or sitemap entry; the stored installment is untouched).
+#   week-02 — the pilot instalment "The Night Before Everything" (owner rulings 2026-11-06 redirect, 2026-11-09 held).
+#   week-03 — "The Plan, On the Record": it quotes day-one sealed calls verbatim, two of which the owner ruled private
+#             on 2026-11-09 (#5720); withdrawn 2026-11-10.
+WITHDRAWN_CHAPTER_URLS = frozenset({"/journal/posts/week-02/", "/journal/posts/week-03/"})
+
+
+def week_id(url: str | None) -> str | None:
+    """The chapter id of a journal permalink ("/journal/posts/week-04/" -> "week-04"), or None — and None for a
+    withdrawn installment (WITHDRAWN_CHAPTER_URLS), so no caller can make one a chapter."""
+    if (url or "").rstrip("/") + "/" in WITHDRAWN_CHAPTER_URLS:
+        return None
+    m = re.search(r"/week-(\d+)/?$", url or "")
+    return f"week-{int(m.group(1)):02d}" if m else None
+
+
 def call_outcome(status: str) -> str:
     return CALL_OUTCOME.get(status, status)
 

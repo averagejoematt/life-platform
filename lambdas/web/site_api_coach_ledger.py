@@ -393,9 +393,9 @@ _PREDICTION_PROJECTION_FIELDS = (
     # Owner ruling 2026-11-03: a verdict under classification review is out of every verified count and
     # disclosed as `under_review` (coach.classification_review) — the flag must ride the sweep to be seen.
     "classification_review",
-    # Owner 2026-11-09: the verification record's pointer (coach.verification_record) — served as `verification`.
-    "latest_verification",
-    "original_grade",  # Owner 2026-11-09 (CR1): the first grade, for verification_fields.first_status (the archive)
+    # Owner 2026-11-09: the verification record's pointer, the first grade a correction kept and (ruling 2026-11-09 B)
+    # the repeat-family marker — the row fields web.verification_fields reads, owned by that module.
+    *verification_fields.ROW_FIELDS,
 )
 
 
