@@ -192,13 +192,22 @@ def test_weather_joined_freshness_surfaces_470():
 # "land the absence marker, keep the alarm honest."
 #
 # This asserts the SET: every framework-based member of the freshness checker's
-# DAILY_SOURCES opts in. Derived from the checker's own constant and from each
-# lambda's own IngestionConfig — never from a hand-list here.
+# DAILY_SOURCES opts in. Derived from the registry rule the checker binds to and from
+# each lambda's own IngestionConfig — never from a hand-list here.
+#
+# #5527: DAILY_SOURCES itself was a hand-typed literal this file read as TEXT and never
+# compared to the registry — so it guarded the opt-in of whatever the literal said, while
+# todoist and weather (expected_days 7, behavioral False) sat outside it unscanned. It is
+# now `source_registry.interior_gap_source_keys()`, and the tests below pin (a) the checker
+# binds to that call, not a literal, (b) the derived set against an independent read of the
+# raw facets, and (c) a must-fail control over a planted registry row.
 
 _DAILY_SOURCE_LAMBDAS = {
     "whoop": "whoop_lambda.py",
     "eightsleep": "eightsleep_lambda.py",
     "habitify": "habitify_lambda.py",
+    "todoist": "todoist_lambda.py",  # #5527: entered the derived set
+    "weather": "weather_lambda.py",  # #5527: entered the derived set
     # apple_health has no ingestion lambda of its own: it is the HAE WEBHOOK partition
     # (near-real-time push, no gap-fill window to exhaust), so there is no
     # IngestionConfig to opt in and nothing to assert. Stated, not silently omitted.
@@ -206,16 +215,13 @@ _DAILY_SOURCE_LAMBDAS = {
 
 
 def _daily_sources():
-    """freshness_checker_lambda.DAILY_SOURCES, read from its own source text.
+    """freshness_checker_lambda.DAILY_SOURCES — the registry derivation it binds to (#5527).
 
-    Text extraction rather than import: the checker pulls in the AWS/email surface at
-    import time, and this file's other CDK/JSON pins use the same technique for the
-    same reason.
+    The checker is not imported (it pulls in the AWS/email surface at import time); instead
+    `test_the_checker_binds_daily_sources_to_the_registry` pins, from its source text, that
+    its DAILY_SOURCES IS this call, so reading the call here reads the checker's set.
     """
-    src = open(os.path.join(ROOT, "lambdas", "emails", "freshness_checker_lambda.py")).read()
-    match = re.search(r"^DAILY_SOURCES\s*=\s*\{([^}]*)\}", src, re.M)
-    assert match, "DAILY_SOURCES no longer parses out of freshness_checker_lambda.py — the pin went blind"
-    return {token.strip().strip('"').strip("'") for token in match.group(1).split(",") if token.strip()}
+    return reg.interior_gap_source_keys()
 
 
 def _records_absence(source_key):
@@ -256,6 +262,45 @@ def test_every_daily_source_is_either_framework_based_or_stated():
         f"DAILY_SOURCES member(s) {unmapped} are neither mapped to an ingestion lambda in _DAILY_SOURCE_LAMBDAS "
         "nor the known webhook partition — map them (so the absence-marker rule covers them) or state why not"
     )
+
+
+def test_the_checker_binds_daily_sources_to_the_registry():
+    """#5527 box 1. A literal here is the drift this issue fixed; the call is the only shape allowed."""
+    for rel, name in (("lambdas/emails/freshness_checker_lambda.py", "DAILY_SOURCES"), ("mcp/tools_labs.py", "DAILY_SOURCES_INTERIOR")):
+        src = open(os.path.join(ROOT, rel)).read()
+        bound = re.findall(rf"^{name}\s*=\s*(.+)$", src, re.M)
+        assert bound == ["interior_gap_source_keys()"], f"{rel}: {name} must be the registry derivation, found {bound}"
+
+
+def test_daily_sources_is_the_registry_rule_over_the_raw_facets():
+    """#5527 box 1, the registry comparison the old text-read never made. Recomputed from the
+    raw SOURCE_REGISTRY rows (not through the helper), so a helper that drifted from its own
+    docstring reds here."""
+    expected = {
+        k
+        for k, v in reg.SOURCE_REGISTRY.items()
+        if v.get("freshness", True)
+        and v.get("monitored", True)
+        and not v.get("paused")
+        and v.get("expected_days") == 7
+        and not v["behavioral"]
+    }
+    assert _daily_sources() == expected
+    # The measured set on 2026-11-10 (the PR lists the before/after): the four the literal
+    # carried plus the two it had dropped. Pinned so a facet edit that moves the set is a
+    # visible diff here, not a silent change to what pages.
+    assert _daily_sources() == {"whoop", "apple_health", "eightsleep", "habitify", "todoist", "weather"}
+
+
+def test_the_derivation_reds_on_a_planted_registry_row():
+    """MUST-FAIL CONTROL for the derivation: a new every-day, non-behavioral source enters the
+    set; the same row behavioral, paused, or not every-day does not."""
+    base = {"expected_days": 7, "behavioral": False}
+    planted = {"__planted_daily_5527__": dict(base)}
+    assert reg.interior_gap_source_keys(planted) == {"__planted_daily_5527__"}
+    assert reg.interior_gap_source_keys({"p": {**base, "behavioral": True}}) == set()
+    assert reg.interior_gap_source_keys({"p": {**base, "paused": True}}) == set()
+    assert reg.interior_gap_source_keys({"p": {**base, "expected_days": 5}}) == set()
 
 
 def test_the_positive_control_the_rule_reds_on_a_missing_opt_in():

@@ -279,6 +279,7 @@ Phase 3 must have exited 0; stage repo-tracked artifacts only:
 
 ```bash
 git add handovers/HANDOVER_LATEST.md CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ covers (e) pages, (e3) docs/INCIDENT_LOG.md (#3682 — stage it explicitly), (e10) docs/alarm_citations.json, (e12) docs/PROPORTIONALITY.md
+git add deploy/generated/pk_family_census.json   # only if Phase 1's pk-census gate printed "refreshed" (#5524) — it keeps a refresh only when every reader test passes
 git commit -m "docs(wrap): <short session theme> (<n items/PRs shipped>)"
 ```
 

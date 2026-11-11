@@ -394,7 +394,31 @@ def test_a_never_rendering_is_an_honest_duration():
     rows = wq._extract_status_components(
         {"groups": [{"components": [{"id": "x", "status": "blue", "last_sync_relative": "never", "comment": "c"}]}]}
     )
-    assert rows["x"]["duration_rendered"] is True and rows["x"]["duration_days"] is None
+    assert rows["x"][0]["duration_rendered"] is True and rows["x"][0]["duration_days"] is None
+
+
+# ── #5527: several components sharing one partition id are ALL judged ────────────
+_AH_SUBFEEDS = ("CGM Glucose", "Water Intake", "Blood Pressure", "Breathwork", "Stretching", "Mindful Minutes", "State of Mind", "Import")
+
+
+def test_every_component_of_a_shared_partition_id_is_extracted_5527():
+    """/api/status renders one component per apple_health sub-feed under ONE id. The old
+    dict-per-id shape kept the last and silently dropped seven of eight."""
+    comps = [{"id": "apple_health", "name": n, "status": "green", "last_sync_relative": "today"} for n in _AH_SUBFEEDS]
+    rows = wq._extract_status_components({"groups": [{"components": comps}]})
+    assert [r["label"] for r in rows["apple_health"]] == list(_AH_SUBFEEDS)
+
+
+def test_a_bad_narration_on_a_non_last_component_still_fails_5527():
+    """MUST-FAIL fixture: two components share the paused source's id; the FIRST narrates a
+    broken pipe, the LAST is honest. Keyed by id, the last overwrote the first and the gate
+    passed — the violation must now be found, and named by its component."""
+    payloads = _absence_payloads("PAUSED in the source registry — paused (ADR-074). Last record: 97d ago.")
+    honest = payloads["/api/status"]["groups"][0]["components"][0]
+    bad = dict(honest, name="Garmin sub-feed", comment="Pipeline may need attention — stopped 97d ago. Check auth/webhook.")
+    payloads["/api/status"]["groups"][0]["components"] = [bad, honest]
+    check = _run_absence(payloads)
+    assert check.passed is False and "Garmin sub-feed" in check.message, check.message
 
 
 def test_relative_durations_parse_the_way_the_panel_renders_them():

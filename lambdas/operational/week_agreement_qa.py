@@ -304,8 +304,13 @@ def check_week_agreement(Check, tier, *, site_base_url: str, budget: Optional[Pr
 
 
 # ── box 3: the absence half ──────────────────────────────────────────────────
+#
+# #5527: both extractors return `{source id: [row, ...]}` — a LIST per id. `/api/status`
+# renders one component PER apple_health sub-feed (CGM, Water, BP, Breathwork, …), all
+# carrying the partition id `apple_health`, and the dict-per-id shape kept only the last
+# one: seven of eight components were never judged. Every row is now judged.
 def _extract_freshness_rows(payload: dict) -> dict:
-    out = {}
+    out: dict = {}
     for row in (payload or {}).get("sources") or []:
         if not isinstance(row, dict) or not row.get("id"):
             continue
@@ -315,17 +320,20 @@ def _extract_freshness_rows(payload: dict) -> dict:
         if duration is None and row.get("age_hours") is not None:
             duration = (_as_float(row.get("age_hours")) or 0.0) / 24.0
         cause = " ".join(str(row.get(k) or "") for k in ("desc", "status", "paused_reason", "absence_caveat"))
-        out[str(row["id"])] = {
-            "narrating_absence": status in ("paused", "stale", "behavioral-stale", "unknown"),
-            "duration_days": duration,
-            "duration_rendered": any(row.get(k) is not None for k in reg.DURATION_FIELDS),
-            "cause_text": cause,
-        }
+        out.setdefault(str(row["id"]), []).append(
+            {
+                "label": str(row.get("name") or row["id"]),
+                "narrating_absence": status in ("paused", "stale", "behavioral-stale", "unknown"),
+                "duration_days": duration,
+                "duration_rendered": any(row.get(k) is not None for k in reg.DURATION_FIELDS),
+                "cause_text": cause,
+            }
+        )
     return out
 
 
 def _extract_status_components(payload: dict) -> dict:
-    out = {}
+    out: dict = {}
     for group in (payload or {}).get("groups") or []:
         for comp in (group or {}).get("components") or []:
             if not isinstance(comp, dict) or not comp.get("id"):
@@ -336,12 +344,15 @@ def _extract_status_components(payload: dict) -> dict:
             # "never" / "not imported" is an HONEST terminal rendering, not a missing
             # duration: nothing has ever arrived, so there is no elapsed time to state.
             explicit_never = rel.strip().lower() in ("never", "not imported", "no data")
-            out[str(comp["id"])] = {
-                "narrating_absence": str(comp.get("status") or "") in ("yellow", "red", "blue"),
-                "duration_days": rel_days,
-                "duration_rendered": bool(rel) and (rel_days is not None or explicit_never),
-                "cause_text": f"{comment} {comp.get('description') or ''}",
-            }
+            out.setdefault(str(comp["id"]), []).append(
+                {
+                    "label": str(comp.get("name") or comp["id"]),
+                    "narrating_absence": str(comp.get("status") or "") in ("yellow", "red", "blue"),
+                    "duration_days": rel_days,
+                    "duration_rendered": bool(rel) and (rel_days is not None or explicit_never),
+                    "cause_text": f"{comment} {comp.get('description') or ''}",
+                }
+            )
     return out
 
 
@@ -413,6 +424,33 @@ def _cause_verdict(facet: dict, cause_text: str, duration_days: Optional[float])
     return None
 
 
+def _judge_surface_rows(sid, facet, surface_id, rows, violations, advisories, details) -> Optional[float]:
+    """Judge EVERY row one surface renders for `sid` (#5527); return the surface's duration, or None.
+
+    A partition with several sub-feeds (apple_health) renders several rows on one surface. Each
+    narration is judged on its own. For the cross-surface duration comparison the surface's
+    figure is its FRESHEST row — the partition's last record is its newest sub-feed's, which is
+    what a one-row surface (the freshness board) renders for the same id.
+    """
+    freshest = None
+    for row in rows:
+        if not row["narrating_absence"]:
+            continue
+        who = f"{sid}[{row['label']}]" if len(rows) > 1 else sid
+        details.append(f"{surface_id}/{who}: {facet['status']} duration={row['duration_days']} cause={row['cause_text'][:90]!r}")
+        problem = _cause_verdict(facet, row["cause_text"], row["duration_days"])
+        if problem:
+            severity, message = problem
+            (violations if severity == "fail" else advisories).append(f"{surface_id} narrating {who}: {message}")
+        if not row["duration_rendered"]:
+            line = f"{surface_id} narrating {who}: renders NO duration for a {facet['status']} source"
+            (violations if facet["status"] == "paused" else advisories).append(line)
+        elif row["duration_days"] is not None:
+            d = float(row["duration_days"])
+            freshest = d if freshest is None else min(freshest, d)
+    return freshest
+
+
 def check_absence_agreement(Check, tier, pt_now, *, site_base_url: str, budget: Optional[ProbeBudget] = None) -> list:
     """Every narrating surface tells ONE absence story: duration + the registry's cause."""
     check = Check("weeks:absence_agreement", "Cross-surface Absence Truth", tier)
@@ -439,19 +477,9 @@ def check_absence_agreement(Check, tier, pt_now, *, site_base_url: str, budget: 
     details: list = []
     for sid, facet in facets.items():
         for surface_id, rows in rendered.items():
-            row = rows.get(sid)
-            if not row or not row["narrating_absence"]:
-                continue
-            details.append(f"{surface_id}/{sid}: {facet['status']} duration={row['duration_days']} cause={row['cause_text'][:90]!r}")
-            problem = _cause_verdict(facet, row["cause_text"], row["duration_days"])
-            if problem:
-                severity, message = problem
-                (violations if severity == "fail" else advisories).append(f"{surface_id} narrating {sid}: {message}")
-            if not row["duration_rendered"]:
-                line = f"{surface_id} narrating {sid}: renders NO duration for a {facet['status']} source"
-                (violations if facet["status"] == "paused" else advisories).append(line)
-            elif row["duration_days"] is not None:
-                durations.setdefault(sid, []).append((surface_id, float(row["duration_days"])))
+            judged = _judge_surface_rows(sid, facet, surface_id, rows.get(sid) or [], violations, advisories, details)
+            if judged is not None:
+                durations.setdefault(sid, []).append((surface_id, judged))
 
     for sid, pairs in durations.items():
         if len(pairs) < 2:
