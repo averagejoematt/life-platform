@@ -1,7 +1,12 @@
 ---
-// /system/coaches/<id>/record/ — one coach's record in the Coaching Room (CR2). BUILT DARK: this file lives outside
-// src/pages/ and is injected as a route ONLY when WEB_ROOM=1 (src/lib/room.js, astro.config.mjs). With the switch off
-// it is not in the build at all.
+// /system/coaches/<id>/record/ — one coach's record in the Coaching Room (CR2). This file lives outside src/pages/ and
+// is injected as a route ONLY when CR2 is on (src/lib/room.js, astro.config.mjs): the committed `room_public: "cr2"`
+// (owner GO 2026-11-11, second message), or WEB_ROOM=cr2 / WEB_ROOM=1 privately. With CR2 off it is not in the build.
+//
+// Owner ruling 2026-11-11 (second message, items 2 and 4): the page keeps MEASURED PERFORMANCE (the graded calls, the
+// verified record, the asks) apart from PUBLISHED HISTORICAL COMMENTARY (past words published item by item). The lead's
+// approved reads are the substantive commentary and sit first; every other coach carries exactly
+// NO_HISTORICAL_COMMENTARY beside its measured record. The docket (CR3) renders only on a whole-room private build.
 //
 // The owner's brief (2026-11-08): "make each coach's evolution understandable: what they believed, what changed, what
 // they advised, and what I demonstrably did or didn't do." Simple on arrival (four facts), deep on demand (seven
@@ -17,6 +22,9 @@ import { KIND_WORDS, coachVerified, verdictWords, versusGuess } from "../lib/cal
 import { CALL_NOT_PUBLISHED, docketEntries } from "../lib/docket.js";
 import {
   APPROVED_WORDS_NOTE,
+  COMMENTARY_NOTE,
+  MEASURED_NOTE,
+  NO_HISTORICAL_COMMENTARY,
   NOT_PUBLISHED,
   WHAT_MATT_DID_NOTE,
   approvedWords,
@@ -32,6 +40,7 @@ import {
   datesInWords,
   docketRows,
   fidelityText,
+  historicalCommentary,
   latestRead,
   roomCoach,
   stanceTimeline,
@@ -39,11 +48,11 @@ import {
   withApprovedClaims,
 } from "../lib/coach_room.js";
 import { clip, dayInWords, domainWords, kOfN } from "../lib/format.js";
-import { ROOM_MARKER, roomAll } from "../lib/room.js";
+import { ROOM_MARKER, roomAll, roomCr2, roomPublic } from "../lib/room.js";
 import { loadAll, loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
 
-if (!roomAll()) throw new Error("src/room/coach-record.astro rendered without WEB_ROOM=1 — a CR2/CR3 route must not be injected");
+if (!roomCr2()) throw new Error("src/room/coach-record.astro rendered without CR2 on — a CR2 route must not be injected");
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -68,10 +77,15 @@ const docket = docketRows(entry, c.id, nameOf);
 const voice = voiceRows(entry && entry.voice);
 const fidelity = fidelityText(entry && entry.fidelity);
 const vf = file && file.voice_fidelity;
-const record = coachRecord(calCoach, entry && entry.record_card);
+// the lead makes no calls of its own: an empty calibration row is "no calls of its own", never "no checked call yet"
+const record = c.tier === "lead" && !((calCoach && calCoach.n) || (entry && entry.record_card && entry.record_card.n)) ? null : coachRecord(calCoach, entry && entry.record_card);
 const verified = coachVerified(calCoach); // the per-row verified record, when /api/calibration serves it
 // CR2 (owner ruling 2026-11-09, D + E): the owner-approved historical words and the public-safe brief, both carried
 const approved = approvedWords(entry);
+const commentary = historicalCommentary(entry);
+const corrected = approved.reads.filter((r: any) => r.correction).length;
+const pub = roomPublic(); // the committed switch: no private banner, indexed
+const whole = roomAll(); // the docket (CR3) only on a whole-room private build
 const brief = briefView(entry, file && file.fetched_at);
 const briefNow = briefFact(brief);
 const READS_SHOWN = 3;
@@ -100,19 +114,40 @@ const h2 = "font-size:28px;line-height:1.15";
 const num1 = "font-size:15px;line-height:1.5";
 ---
 
-<Base title={`${c.name} — the record`} top="system" description={`${c.name}: what they believed, what changed, what they advised.`} status={fetched}>
-  <Fragment slot="head">{!noindex && <meta name="robots" content="noindex, nofollow" />}</Fragment>
-  <div {...room} data-room-private="" class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
-    Coaching Room · private build (WEB_ROOM=1) · not published
-  </div>
+<Base
+  title={`${c.name} — the record`}
+  top="system"
+  description={commentary.state === "published" ? `${c.name}'s daily reads, published as written, and the record.` : `${c.name}'s measured record: calls graded against the data, beside a simple guess.`}
+  status={fetched}
+>
+  <Fragment slot="head">{!noindex && !pub && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  {
+    !pub && (
+      <div {...room} data-room-private="" class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+        Coaching Room · private build (WEB_ROOM) · not published
+      </div>
+    )
+  }
 
   <section class="section" {...room} style="padding-bottom:24px">
     <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:1100px">
       <p class="label"><a href={href(pathOf("coach", c.id))}>{c.name}</a> · {domainWords(c.domain)} · the record</p>
-      <h1 style="font-size:clamp(30px,5.5vw,52px);line-height:1.05">What {c.name} believed, what changed, what they advised</h1>
+      <h1 style="font-size:clamp(30px,5.5vw,52px);line-height:1.05">{c.name}, on the record</h1>
       <p class="muted" style="font-size:13px;max-width:72ch">
         An AI character: software built with Claude, not a person. Everything below is the platform's own record, as its public API serves it{fetched ? `, read on ${fetched}` : ""}. Where the platform does not publish a coach's words, this page says so and shows nothing in their place.
       </p>
+      <dl style="display:grid;grid-template-columns:minmax(0,1fr);gap:6px;font-size:14px;line-height:1.5;max-width:72ch;margin:0;border-left:3px solid var(--ink);padding-left:12px" data-two-kinds>
+        {[MEASURED_NOTE, COMMENTARY_NOTE].map((k) => (
+          <div><dt style="display:inline;font-weight:700">{k.label}:</dt> <dd style="display:inline;margin:0">{k.text}</dd></div>
+        ))}
+      </dl>
+      {
+        commentary.state === "published" ? (
+          <a class="btn sm" href="#approved-words" style="align-self:flex-start" data-commentary-jump>
+            {approved.calls.length ? "Read the published commentary ↓" : `Read the ${commentary.count} published ${commentary.count === 1 ? "read" : "reads"} ↓`}
+          </a>
+        ) : null
+      }
       {!entry && <div class="empty"><span>{(file && file.absent_text) || "The platform did not serve this coach's profile for this snapshot."}</span></div>}
     </div>
   </section>
@@ -147,10 +182,97 @@ const num1 = "font-size:15px;line-height:1.5";
     </div>
   </section>
 
+  {
+    commentary.state === "published" ? (
+      <section class="section" {...room} id="approved-words" style="border-top:1px solid var(--ink)" data-approved-words>
+        <div class="wrap grid cols2" style="gap:48px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <p class="label">{COMMENTARY_NOTE.label}</p>
+            <h2 style={h2}>{approved.calls.length > 0 ? `${approved.calls.length} sealed day-one ${approved.calls.length === 1 ? "call" : "calls"}` : coverage.heading}</h2>
+            {approved.reads.length > 0 && coverage.line && <p style="font-size:14px;max-width:62ch;line-height:1.5" data-reads-coverage>{coverage.line}</p>}
+            {
+              corrected > 0 && (
+                <p style="font-size:14px;max-width:62ch;line-height:1.5" data-corrections-count>
+                  {corrected} of {corrected === 1 ? "them carries" : "them carry"} a dated correction: a figure the read cited has changed in the record since it was written. The words are shown exactly as written, with the correction directly beneath.
+                </p>
+              )
+            }
+            <p class="muted" style="font-size:13px;max-width:62ch">{APPROVED_WORDS_NOTE}{approved.approvedOn ? ` Approved ${approved.approvedOn}.` : ""}</p>
+            {approved.calls.length > 0 && <p style="font-size:14px;max-width:62ch;line-height:1.5">Sealed in the pre-registration at the start of the experiment, and graded later by the same rules as every other call. The verdict beside each is the ledger's.</p>}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            {
+              approved.calls.length > 0 && (
+                <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-approved-calls>
+                  {approved.calls.map((x: any) => {
+                    const led = ledgerOf(x.id);
+                    return (
+                      <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
+                        <p style="font-size:15px;line-height:1.5"><Quote text={x.claim} said={x.said} /></p>
+                        <p style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;font-size:12px">
+                          {led ? <StatusTag status={led.status} date={led.settled_date} call disputed={isDisputed(led)} /> : x.status ? <StatusTag status={x.status} date={x.settled} call /> : null}
+                          <span class="muted">{[x.day ? `sealed ${x.day}` : null, x.metric].filter(Boolean).join(" · ")}</span>
+                          {led && <a href={href(pathOf("prediction", led.id))}>the call in the ledger →</a>}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )
+            }
+            {
+              approved.reads.length > 0 && (
+                <>
+                  <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-approved-reads>
+                    {approved.reads.slice(0, READS_SHOWN).map((r: any) => (
+                      <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
+                        <p style="font-size:14px;font-weight:700">{r.day}</p>
+                        <div class="serif" style="font-size:17px;line-height:1.5"><Quote text={r.text} said={r.said} block /></div>
+                        {r.correction && <p style="font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-correction-note><b>Correction · {r.correction.day}.</b> {r.correction.note}</p>}
+                        <p class="muted" style="font-size:12px">{[r.written ? `written ${r.written}` : null, r.through ? `data through ${r.through}` : null].filter(Boolean).join(" · ")}</p>
+                        {r.cited.length > 0 && (
+                          <details style="font-size:13px">
+                            <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">The figures it cites, as it cited them ({r.cited.length})</summary>
+                            <div class="rows">{r.cited.map((x: any) => (<div><span style="font-size:13px">{x.metric}{x.asOf ? <span class="muted"> · {x.asOf}</span> : ""}</span><span class="mono">{x.value}</span></div>))}</div>
+                          </details>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                  {approved.reads.length > READS_SHOWN && (
+                    <details>
+                      <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Earlier published reads ({approved.reads.length - READS_SHOWN}{approved.reads.slice(READS_SHOWN).some((r: any) => r.correction) ? `, ${approved.reads.slice(READS_SHOWN).filter((r: any) => r.correction).length} with a dated correction` : ""})</summary>
+                      <ol style="list-style:none;padding:0;margin:0">
+                        {approved.reads.slice(READS_SHOWN).map((r: any) => (
+                          <li style="padding:10px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px">
+                            <p style="font-size:13px;font-weight:700">{r.day}</p>
+                            <p style="font-size:14px;line-height:1.5"><Quote text={r.text} said={r.said} /></p>
+                            {r.correction && <p style="font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-correction-note><b>Correction · {r.correction.day}.</b> {r.correction.note}</p>}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                </>
+              )
+            }
+          </div>
+        </div>
+      </section>
+    ) : (
+      <section class="section" {...room} id="approved-words" style="border-top:1px solid var(--ink);padding-top:28px;padding-bottom:28px" data-approved-words="none">
+        <div class="wrap" style="display:flex;flex-direction:column;gap:8px;max-width:1100px">
+          <p class="label">{COMMENTARY_NOTE.label}</p>
+          <p style="font-size:17px;line-height:1.45" data-no-commentary>{NO_HISTORICAL_COMMENTARY}</p>
+        </div>
+      </section>
+    )
+  }
+
   <section class="section" {...room} id="record">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:10px">
-        <p class="label">The record, with its uncertainty, beside a simple guess</p>
+        <p class="label">{MEASURED_NOTE.label} · the record, with its uncertainty, beside a simple guess</p>
         <h2 style={h2}>{record ? record.line : c.tier === "lead" ? "The lead makes no calls of its own" : "No record served"}</h2>
         {
           record && (
@@ -249,77 +371,6 @@ const num1 = "font-size:15px;line-height:1.5";
     </div>
   </section>
 
-  {
-    approved.state === "ok" && (approved.calls.length > 0 || approved.reads.length > 0) && (
-      <section class="section" {...room} id="approved-words" style="border-top:1px solid var(--ink)" data-approved-words>
-        <div class="wrap grid cols2" style="gap:48px;align-items:start">
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <p class="label">In their own words, approved for publication</p>
-            <h2 style={h2}>{approved.calls.length > 0 ? `${approved.calls.length} sealed day-one ${approved.calls.length === 1 ? "call" : "calls"}` : coverage.heading}</h2>
-            {approved.reads.length > 0 && coverage.line && <p style="font-size:14px;max-width:62ch;line-height:1.5" data-reads-coverage>{coverage.line}</p>}
-            <p class="muted" style="font-size:13px;max-width:62ch">{APPROVED_WORDS_NOTE}{approved.approvedOn ? ` Approved ${approved.approvedOn}.` : ""}</p>
-            {approved.calls.length > 0 && <p style="font-size:14px;max-width:62ch;line-height:1.5">Sealed in the pre-registration at the start of the experiment, and graded later by the same rules as every other call. The verdict beside each is the ledger's.</p>}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            {
-              approved.calls.length > 0 && (
-                <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-approved-calls>
-                  {approved.calls.map((x: any) => {
-                    const led = ledgerOf(x.id);
-                    return (
-                      <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
-                        <p style="font-size:15px;line-height:1.5"><Quote text={x.claim} said={x.said} /></p>
-                        <p style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;font-size:12px">
-                          {led ? <StatusTag status={led.status} date={led.settled_date} call disputed={isDisputed(led)} /> : x.status ? <StatusTag status={x.status} date={x.settled} call /> : null}
-                          <span class="muted">{[x.day ? `sealed ${x.day}` : null, x.metric].filter(Boolean).join(" · ")}</span>
-                          {led && <a href={href(pathOf("prediction", led.id))}>the call in the ledger →</a>}
-                        </p>
-                      </li>
-                    );
-                  })}
-                </ol>
-              )
-            }
-            {
-              approved.reads.length > 0 && (
-                <>
-                  <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-approved-reads>
-                    {approved.reads.slice(0, READS_SHOWN).map((r: any) => (
-                      <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
-                        <p style="font-size:14px;font-weight:700">{r.day}</p>
-                        <div class="serif" style="font-size:17px;line-height:1.5"><Quote text={r.text} said={r.said} block /></div>
-                        <p class="muted" style="font-size:12px">{[r.written ? `written ${r.written}` : null, r.through ? `data through ${r.through}` : null].filter(Boolean).join(" · ")}</p>
-                        {r.cited.length > 0 && (
-                          <details style="font-size:13px">
-                            <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">The figures it cites ({r.cited.length})</summary>
-                            <div class="rows">{r.cited.map((x: any) => (<div><span style="font-size:13px">{x.metric}{x.asOf ? <span class="muted"> · {x.asOf}</span> : ""}</span><span class="mono">{x.value}</span></div>))}</div>
-                          </details>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                  {approved.reads.length > READS_SHOWN && (
-                    <details>
-                      <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Earlier approved reads ({approved.reads.length - READS_SHOWN})</summary>
-                      <ol style="list-style:none;padding:0;margin:0">
-                        {approved.reads.slice(READS_SHOWN).map((r: any) => (
-                          <li style="padding:10px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px">
-                            <p style="font-size:13px;font-weight:700">{r.day}</p>
-                            <p style="font-size:14px;line-height:1.5"><Quote text={r.text} said={r.said} /></p>
-                          </li>
-                        ))}
-                      </ol>
-                    </details>
-                  )}
-                </>
-              )
-            }
-          </div>
-        </div>
-      </section>
-    )
-  }
-
   <section class="section" {...room} id="stance" style="border-top:1px solid var(--ink)">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:12px">
@@ -402,7 +453,7 @@ const num1 = "font-size:15px;line-height:1.5";
 
   <section class="section" {...room} id="calls" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
-      <p class="label">The calls, by day</p>
+      <p class="label">{MEASURED_NOTE.label} · the calls, by day</p>
       <h2 style={h2}>{days.length ? `What ${c.name} called, and how each came out` : "No calls in the ledger"}</h2>
       <p class="muted" style="font-size:13px;max-width:72ch">
         Each call with its own verdict: right, wrong, open, could not be checked, or not graded. A verdict under classification review keeps its word and is marked {DISPUTED_NOTE}; it is counted neither right nor wrong. A corrected grade shows the original, the correction, the dates and the reason.
@@ -470,7 +521,7 @@ const num1 = "font-size:15px;line-height:1.5";
 
   <section class="section" {...room} id="asks" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
-      <p class="label">What they asked, and what happened</p>
+      <p class="label">{MEASURED_NOTE.label} · what they asked, and what happened</p>
       <h2 style={h2}>{askCounts || "No asks served"}</h2>
       <p style="font-size:14px;max-width:72ch;line-height:1.5">
         An ask is advice with a due date. The grader checks each one against the data when it falls due: kept, broken, or unresolved when the check could not settle it. That is the grader's word on the data, not a record of what Matt chose to do.
@@ -598,6 +649,8 @@ const num1 = "font-size:15px;line-height:1.5";
     </div>
   </section>
 
+  {
+    whole && (
   <section class="section" {...room} id="docket" style="border-top:1px solid var(--ink)">
     <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
       <p class="label">Docket positions</p>
@@ -642,6 +695,8 @@ const num1 = "font-size:15px;line-height:1.5";
       }
     </div>
   </section>
+    )
+  }
 
   <section class="section" {...room} id="voice" style="border-top:1px solid var(--ink)">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">

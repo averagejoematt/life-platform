@@ -10,9 +10,9 @@ AND its wire half (``narrative_publication.annotate``) inside it, so an approved
 and not scrubbed at the wire. Every other path — ``/api/coach/<id>``, the ledger, every live page — runs outside the
 scope and reads these rows exactly as before (withheld). ``tests/test_coach_room_words_cr2.py`` pins both halves.
 
-DARK. While ``narrative_allowlist.CR2_PUBLIC`` is False this route answers 404 for every coach, and the gate would
-withhold the rows even if it did not (the allowlist honours an entry only with the switch on). Flipping the switch is
-the CR2 release — the owner's act.
+LIVE since the owner's CR2 GO (ruling 2026-11-11, second message): ``narrative_allowlist.CR2_PUBLIC`` is on. With it
+off this route answers 404 for every coach, and the gate withholds the rows even if it did not (the allowlist honours
+an entry only with the switch on).
 
 WHAT IS SERVED — only the approved rows of the asked coach, each read through the public chokepoint
 (``web.site_api_common.table``, the ``PublicationTable``) by its record key, and each served ONLY when the gate itself
@@ -23,7 +23,10 @@ policy omits, or a row whose words the dossier filter flags is left out — omit
   * ``sealed_calls`` — a day-one call: its words, the day it was sealed, the metric, and the ledger's own verdict
     fields from ``web.site_api_ledger_export.export_item`` (the same derivation the ledger page serves);
   * ``lead_reads`` — a lead daily read: its words, when it was written, the data it read through, and the figures it
-    cites (metric, value, day — never the source field names).
+    cites (metric, value, day — never the source field names). An owner-approved ANNOTATED read
+    (``common.narrative_annotations``, owner ruling 2026-11-11 second message, item 3) is one of them only WITH its
+    ``correction``: the original words byte-identical, and the dated correction beside them. A read whose pair the
+    annotation module will not build is left out, never served as bare words.
 """
 
 from __future__ import annotations
@@ -55,9 +58,16 @@ def in_scope(path: Any, fn: Callable[[], Any]) -> Any:
         return fn()
 
 
+def _approved_annotations() -> list:
+    from common import narrative_annotations as NANN
+
+    return [a for a in NANN.INDEX.values() if a.owner_approved]
+
+
 def coaches() -> list:
-    """The persona ids with at least one approved row (the only coaches this route answers for)."""
-    return sorted({e.pk[len("COACH#") :] for e in NA.APPROVED if e.pk.startswith("COACH#")})
+    """The persona ids with at least one approved row or approved annotated read (the only coaches this route answers for)."""
+    keys = [e.pk for e in NA.APPROVED] + [a.pk for a in _approved_annotations()]
+    return sorted({pk[len("COACH#") :] for pk in keys if pk.startswith("COACH#")})
 
 
 def _f(v: Any) -> Any:
@@ -122,6 +132,26 @@ def _lead(item: dict, text: str) -> dict:
     }
 
 
+def _annotated(item: Any, a: Any) -> Optional[dict]:
+    """An approved annotated read as served: the gate published its words in this request, and the annotation module
+    builds the pair (words + dated correction) over the same row. Else None — never the words alone."""
+    from common import narrative_annotations as NANN
+
+    from web.narrative_publication import is_withheld
+
+    if not isinstance(item, dict) or is_withheld(item) or str(item.get("sk") or "") != a.sk:
+        return None
+    text = item.get(a.field)
+    if not isinstance(text, str) or not text.strip() or not NA.is_approved_text(text) or not _dossier_safe(text):
+        return None
+    pair = NANN.annotated_words(item, a.pk)
+    if pair is None or pair["words"] != text:
+        return None
+    lead = _lead(item, text)
+    lead["correction"] = pair["annotation"]
+    return lead
+
+
 def serve(coach: str, table: Any) -> dict:
     """The approved rows of one coach, read one by one through ``table`` (which must be the gated table)."""
     calls, leads = [], []
@@ -136,6 +166,13 @@ def serve(coach: str, table: Any) -> dict:
             calls.append(_call(item, text, coach))
         elif entry.sk.startswith(LEAD_PREFIX):
             leads.append(_lead(item, text))
+    for a in _approved_annotations():
+        if a.pk != f"COACH#{coach}" or not a.sk.startswith(LEAD_PREFIX):
+            continue
+        item = (table.get_item(Key={"pk": a.pk, "sk": a.sk}) or {}).get("Item")
+        lead = _annotated(item, a)
+        if lead is not None:
+            leads.append(lead)
     calls.sort(key=lambda c: (str(c.get("logged_date") or ""), str(c.get("prediction_id") or "")))
     leads.sort(key=lambda r: r["date"], reverse=True)
     body = {"coach_id": coach, "approved_at": NA.APPROVED_AT, "method": METHOD, "sealed_calls": calls, "lead_reads": leads}

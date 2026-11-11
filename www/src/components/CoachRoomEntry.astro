@@ -1,11 +1,13 @@
 ---
-// The Coaching Room's entry on each coach page (CR2, built dark). SELF-GATING: with WEB_ROOM off (src/lib/room.js)
-// this component renders nothing and reads nothing — not even the room's data files — so /system/coaches/<id>/ is
-// byte-identical to a build without it. No <style>, no <script>: it adds no asset to the build either way.
-// Simple on arrival: the latest read's date, the record as first graded with its interval, the asks' tally — each
-// carried, none computed — and the way into the full record (src/room/coach-record.astro).
-import { askCountsText, coachRecord, latestRead, roomCoach } from "../lib/coach_room.js";
-import { ROOM_MARKER, roomAll } from "../lib/room.js";
+// The Coaching Room's entry on each coach page (CR2). SELF-GATING: with CR2 off (src/lib/room.js) this component
+// renders nothing and reads nothing — not even the room's data files — so /system/coaches/<id>/ is byte-identical to a
+// build without it. No <style>, no <script>: it adds no asset to the build either way. On the published CR2 build (the
+// committed `room_public: "cr2"`, owner GO 2026-11-11, second message) it is the door to the coach's record page.
+// Simple on arrival: the coach's published historical commentary — the lead's approved reads, or for every other coach
+// exactly NO_HISTORICAL_COMMENTARY (owner ruling 2026-11-11, second message, item 4) — kept apart from the measured
+// performance: the latest read's date, the record as first graded with its interval, the asks' tally. Each carried.
+import { COMMENTARY_NOTE, MEASURED_NOTE, NO_HISTORICAL_COMMENTARY, askCountsText, coachRecord, historicalCommentary, latestRead, roomCoach } from "../lib/coach_room.js";
+import { ROOM_MARKER, roomAll, roomCr2, roomPublic } from "../lib/room.js";
 import { loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
@@ -13,22 +15,48 @@ interface Props {
   coach: { id: string; name: string; tier?: string };
 }
 const { coach } = Astro.props;
-const on = roomAll();
+const on = roomCr2();
+const pub = on && roomPublic();
 const entry = on ? roomCoach(await loadCoachRoom(), coach.id) : null;
 const cal = on ? await loadCalibration() : null;
 const calCoach = on ? (((cal && cal.calibration) || {}).coaches || []).find((x: any) => x.persona === coach.id) || null : null;
 const read = on ? latestRead(entry) : null;
-const record = on ? coachRecord(calCoach, entry && entry.record_card) : null;
+const record = on && !(coach.tier === "lead" && !((calCoach && calCoach.n) || (entry && entry.record_card && entry.record_card.n))) ? coachRecord(calCoach, entry && entry.record_card) : null;
 const asks = on ? askCountsText(entry && entry.asks && entry.asks.commitment_counts) : null;
+const commentary = on ? historicalCommentary(entry) : null;
+const recordHref = href(`/system/coaches/${coach.id}/record/`);
 const room = { [ROOM_MARKER]: "coach-entry" };
 ---
 
 {
-  on && (
+  on && commentary && (
     <section class="section" {...room} style="border-top:1px solid var(--ink)">
       <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:1000px">
-        <p class="label">The Coaching Room · private build, not published</p>
-        <h2 style="font-size:28px;line-height:1.15">What {coach.name} believed, what changed, what they advised</h2>
+        <p class="label">{pub ? "The Coaching Room" : "The Coaching Room · private build, not published"}</p>
+        <h2 style="font-size:28px;line-height:1.15">{coach.name}, on the record</h2>
+        <div style="border-top:1px solid var(--rule);padding-top:12px;display:flex;flex-direction:column;gap:8px" data-commentary={commentary.state}>
+          <p class="label">{COMMENTARY_NOTE.label}</p>
+          {
+            commentary.state === "published" ? (
+              <>
+                <p style="font-size:17px;line-height:1.45">
+                  {[
+                    commentary.words.reads.length && commentary.coverage && commentary.coverage.line
+                      ? commentary.coverage.line
+                      : `${commentary.count} ${commentary.count === 1 ? "item" : "items"} published as written.`,
+                    commentary.corrected > 0 ? `${commentary.corrected} ${commentary.corrected === 1 ? "carries" : "carry"} a dated correction beneath the words as written.` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                </p>
+                <a class="btn sm" href={`${recordHref}#approved-words`} style="align-self:flex-start">Read {coach.name}'s published commentary</a>
+              </>
+            ) : (
+              <p style="font-size:17px;line-height:1.45" data-no-commentary>{NO_HISTORICAL_COMMENTARY}</p>
+            )
+          }
+        </div>
+        <p class="label" style="margin-top:6px">{MEASURED_NOTE.label}</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 28px;border-top:1px solid var(--rule);padding-top:12px">
           <div>
             <p class="label">The latest read</p>
@@ -43,8 +71,8 @@ const room = { [ROOM_MARKER]: "coach-entry" };
             <p style="font-size:15px;margin-top:4px">{asks || "none served"}</p>
           </div>
         </div>
-        <a class="btn ghost sm" href={href(`/system/coaches/${coach.id}/record/`)} style="align-self:flex-start">
-          The full record: stances, calls, asks, docket, voice
+        <a class="btn ghost sm" href={recordHref} style="align-self:flex-start">
+          {roomAll() ? "The full record: stances, calls, asks, docket, voice" : "The full record: calls, asks, stance, voice"}
         </a>
       </div>
     </section>

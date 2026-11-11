@@ -329,8 +329,57 @@ export function approvedWords(entry) {
         written: instantInWords(r.generated_at),
         through: dayInWords(r.data_through) || null,
         cited: (r.cited || []).map((c) => ({ metric: c.metric, value: datesInWords(c.value), asOf: dayInWords(c.as_of) || null })),
-      })),
+        correction: correctionOf(r.correction),
+      }))
+      // an annotated read is published only WITH its dated correction: one whose correction did not carry is dropped
+      .filter((r) => r.correction !== false),
   };
+}
+
+/** A served dated correction ({day, note}), null when the read carries none, false when one is present but unusable
+ *  (the read is then not shown at all — never the words without the correction the owner approved them with). */
+export function correctionOf(c) {
+  if (c === undefined || c === null) return null;
+  if (!c || typeof c.note !== "string" || !c.note.trim() || !dayInWords(c.annotated_at)) return false;
+  return { day: dayInWords(c.annotated_at), note: c.note };
+}
+
+/** The one sentence every coach without published historical commentary carries (owner ruling 2026-11-11, second
+ *  message, item 4). Exactly this: it does not say the coach never commented, that its predictions were not recorded,
+ *  or that its performance is unknown — the measured record stays on the page beside it. */
+export const NO_HISTORICAL_COMMENTARY = "No historical commentary from this coach is currently published.";
+
+/** The two kinds of material a coach's record keeps apart (owner ruling 2026-11-11, second message, item 2). */
+export const MEASURED_NOTE = {
+  label: "Measured performance",
+  text: "the calls the grader checked against the data, beside a simple guess, and how each ask came out. Kept for every coach.",
+};
+export const COMMENTARY_NOTE = {
+  label: "Published historical commentary",
+  text: "a coach's own past words, published item by item after a check of what each was written from.",
+};
+
+/** One coach's published historical commentary: {state: "published" | "none" | "absent", count, corrected, coverage}.
+ *  "absent" only when the source did not answer for a coach that has published words elsewhere in the file. */
+export function historicalCommentary(entry) {
+  const w = approvedWords(entry);
+  const count = w.calls.length + w.reads.length;
+  if (w.state === "ok" && count > 0) {
+    return { state: "published", count, corrected: w.reads.filter((r) => r.correction).length, coverage: readsCoverage(w), words: w };
+  }
+  return { state: w.state === "ok" ? "none" : "absent", count: 0, corrected: 0, coverage: null, words: w };
+}
+
+/** The coach whose historical commentary is published (the room entry and the coach list feature it), or null. */
+export function featuredCommentary(file) {
+  if (!file || file.state !== "ok" || !file.coaches) return null;
+  const published = Object.entries(file.coaches)
+    .map(([id, entry]) => ({ id, ...historicalCommentary(entry) }))
+    .filter((h) => h.state === "published");
+  if (!published.length) return null;
+  // the coach with the most published items leads; `others` counts every other coach with any (never implied equal)
+  published.sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
+  return { ...published[0], others: published.length - 1 };
 }
 
 /** The heading and the coverage line for the approved reads: "21 of the 28 daily reads written ..." when the window

@@ -74,14 +74,17 @@ def live_at_root(data: dict | None = None) -> bool:
     return data.get("live_at_root") is True
 
 
-#: The Coaching Room's committed publication switch (owner ruling 2026-11-09: CR1 launches ahead of CR2/CR3).
-ROOM_PUBLIC_VALUES = ("off", "cr1")
+#: The Coaching Room's committed publication switch (owner ruling 2026-11-09: CR1 launches ahead of CR2/CR3; owner GO
+#: 2026-11-11, second message: CR2 publishes; CR3 stays dark).
+ROOM_PUBLIC_VALUES = ("off", "cr1", "cr2")
 
 
 def room_public(data: dict | None = None) -> str:
-    """`room_public`: "cr1" publishes CR1 on every build (www/src/lib/room.js reads the same bit); anything else is off."""
+    """`room_public`: "cr1" publishes CR1, "cr2" CR1 + CR2, on every build (www/src/lib/room.js reads the same bit);
+    anything else is off."""
     data = data if data is not None else load()
-    return "cr1" if data.get("room_public") == "cr1" else "off"
+    v = data.get("room_public")
+    return v if v in ("cr1", "cr2") else "off"
 
 
 def owned_relpaths(data: dict | None = None) -> list[str]:
