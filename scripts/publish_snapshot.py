@@ -59,6 +59,7 @@ from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
     clean_excerpt,
+    week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
 from publish_snapshot_coach_room import (  # noqa: E402 — the Coaching Room's coach profiles, WEB_ROOM=1 only (CR2)
     fixture_coach_room,
@@ -155,11 +156,6 @@ def _slug(s: str) -> str:
 
 def _persona(short: str) -> str:
     return short if short.endswith("_coach") or short == "eli_marsh" else f"{short}_coach"
-
-
-def _week_id(url: str | None) -> str | None:
-    m = re.search(r"/week-(\d+)/?$", url or "")
-    return f"week-{int(m.group(1)):02d}" if m else None
 
 
 LIVE_ENDPOINTS = {
