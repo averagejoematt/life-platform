@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+import urllib.request
 from typing import Any, Callable
 
 ROOM_ENV = "WEB_ROOM"
@@ -119,13 +121,68 @@ def shape(calibration: Any, predictions: Any) -> dict:
     }
 
 
-def live_calibration(get: Callable[[str], Any], log: Callable[[str], None] = print) -> dict:
-    """Fetch the two public routes; a failure leaves the room's data file absent (the page then says so)."""
+SEAL_ORIGIN = "https://averagejoematt.com/"
+
+
+def _seal_state():
+    """lambdas/web/prereg_seal_state.py — the one rule the Site API also applies (imported, never restated)."""
+    lambdas = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
+    if lambdas not in sys.path:
+        sys.path.insert(0, lambdas)
+    from web import prereg_seal_state  # type: ignore
+
+    return prereg_seal_state
+
+
+def guard_seal(seal: Any, get_bytes: Callable[[str], bytes] | None, log: Callable[[str], None] = print) -> Any:
+    """Owner ruling 2026-11-11 (item 3): the published page offers the verify command and the file link only when the
+    file served at the sealed address hashes, here and now, to the published digest. Otherwise both are removed and the
+    seal carries ``verifiable: false`` with the reason. The served value is never trusted on its own (a Site API not
+    yet redeployed still serves the command), and any fetch failure is unverifiable — fail closed. The digest is kept."""
+    if not isinstance(seal, dict) or not seal.get("sha256"):
+        return seal
+    rule = _seal_state()
+    url = seal.get("artifact_url")
+    served = None
+    if get_bytes is not None and isinstance(url, str) and url.startswith(SEAL_ORIGIN):
+        try:
+            served = get_bytes(url)
+        except Exception as exc:  # noqa: BLE001 — unreadable is unverifiable, never assumed to match
+            log(f"  sealed file unreadable ({exc}); the seal is published without a check")
+    verifiable, why_not = rule.assess(seal.get("genesis"), seal.get("sha256"), served)
+    out = {k: v for k, v in seal.items() if k not in ("verify", "artifact_url", "verifiable", "unverifiable_text")}
+    out["verifiable"] = verifiable
+    if verifiable:
+        out["artifact_url"] = url
+        out["verify"] = seal.get("verify")
+    else:
+        out["unverifiable_text"] = why_not
+    return out
+
+
+def fetch_bytes(url: str, timeout: float = 30.0) -> bytes:
+    """The raw bytes of one public URL (the seal's hash needs the bytes, not a parse). guard_seal passes only SEAL_ORIGIN."""
+    req = urllib.request.Request(url, headers={"User-Agent": "life-platform publish_snapshot"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — the site's own origin only
+        return resp.read()
+
+
+def live_calibration(
+    get: Callable[[str], Any],
+    log: Callable[[str], None] = print,
+    get_bytes: Callable[[str], bytes] = fetch_bytes,
+) -> dict:
+    """Fetch the two public routes; a failure leaves the room's data file absent (the page then says so). The sealed
+    pre-registration is re-checked against the served file (``guard_seal``)."""
     try:
-        return shape(get(CALIBRATION_PATH), get(PREDICTIONS_PATH))
+        out = shape(get(CALIBRATION_PATH), get(PREDICTIONS_PATH))
     except Exception as exc:  # noqa: BLE001 — any fetch/parse failure is an absent record, never a partial one
         log(f"  calibration unavailable ({exc}); calibration.json written absent")
         return dict(ABSENT_CALIBRATION)
+    cal = out.get("calibration")
+    if isinstance(cal, dict) and "prereg_seal" in cal:
+        cal["prereg_seal"] = guard_seal(cal["prereg_seal"], get_bytes, log)
+    return out
 
 
 def fixture_calibration(fixtures_dir: str) -> dict:

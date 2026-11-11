@@ -58,6 +58,7 @@ from mcp.plan_helpers import (  # noqa: F401 (#4149)
     _union_evidence_rows,
     attach_coach_context,  # #5071
     attach_morning_note,  # #4189
+    calibration_due_field,  # #5760
     critics_with_charter,  # #5071
 )
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
@@ -924,6 +925,7 @@ def tool_plan_next_session(args):
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
     out["training_phase"] = _training_phase_field()  # #5576: the computed phase, the next one, the closest unmet gate + value
+    out["calibration_due"] = calibration_due_field(target_date)  # #5760: tape / photos / battery due, named until logged
     attach_coach_context(out, target_date, constraint_block=block, packet_reason=PACKET_NOT_REREAD)  # #5071/#5200
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
         from mcp.nightly_predraft import attach_to_stage_1

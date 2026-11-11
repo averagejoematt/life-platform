@@ -529,7 +529,7 @@ const room = { [ROOM_MARKER]: "calibration" };
             </div>
             <div>
               <h2 style="font-size:30px">Sealed before day one</h2>
-              {seal ? (
+              {seal && seal.verifiable === true && seal.verify && seal.artifact_url ? (
                 <>
                   <p style="font-size:15px;margin-top:8px;line-height:1.5">
                     The pre-registration for the start on {dayInWords(seal.genesis)} was hashed and stamped before the first day was graded. Anyone can check that
@@ -544,6 +544,18 @@ const room = { [ROOM_MARKER]: "calibration" };
                     <button type="button" class="btn ghost sm" hidden style="align-self:flex-end;min-height:44px">Copy</button>
                   </div>
                   <p style="font-size:13px;margin-top:10px"><a href={seal.artifact_url}>The sealed file</a> · <a href={seal.stamp_url || seal.artifact_url}>its stamp</a>{seal.stamped_at ? ` · stamped ${dayInWords(seal.stamped_at)}` : ""}</p>
+                </>
+              ) : seal && seal.sha256 ? (
+                <>
+                  {/* Owner ruling 2026-11-11 (item 3): the served file does not match the seal, so no check is offered —
+                      the digest stays published with the reason, as served (prereg_seal_state). */}
+                  <p style="font-size:15px;margin-top:8px;line-height:1.5" data-seal-unverifiable>
+                    {seal.unverifiable_text || "The file served at the sealed address does not match this hash, so the seal cannot be checked against a file from this site."}
+                  </p>
+                  <p class="mono" style="font-size:12px;margin-top:12px;word-break:break-all"><span class="muted">sha-256 </span>{seal.sha256}</p>
+                  {seal.stamp_url && (
+                    <p style="font-size:13px;margin-top:10px"><a href={seal.stamp_url}>The stamp</a>{seal.stamped_at ? ` · stamped ${dayInWords(seal.stamped_at)}` : ""}</p>
+                  )}
                 </>
               ) : (
                 <div class="empty" style="margin-top:12px"><span>No sealed pre-registration was served.</span></div>
