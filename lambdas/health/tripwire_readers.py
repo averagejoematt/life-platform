@@ -52,6 +52,9 @@ READER_IDS = (
     "weigh_in_dark",
     "lean_mass",
     "sleep",
+    "medical_stop_lines",
+    "mood_declared",
+    "joy",
 )
 # the share of a 7-day window that must be measured before its mean is read (a mean over two nights is not a week)
 SLEEP_MIN_NIGHTS_OF_7 = 4
@@ -214,14 +217,47 @@ def lean_mass(inputs: dict[str, Any]) -> dict[str, Any]:
     lean_wk = round(lean_lost / weeks, 2) if weeks > 0 else None
     total_lost = (a["scan_weight_lb"] - b["scan_weight_lb"]) if a["scan_weight_lb"] and b["scan_weight_lb"] else None
     share = round(lean_lost / total_lost * 100, 1) if total_lost and total_lost > 0 else None
-    observed = {"interval": [a["scan_date"], b["scan_date"]], "lean_share_pct": share, "lean_lb_wk": lean_wk}
-    arms = [None if share is None else share > th["lean_share_pct"], None if lean_wk is None else lean_wk > th["lean_lb_wk"]]
-    detail = f"DXA {a['scan_date']} → {b['scan_date']}: lean share of the loss {share} %, lean {lean_wk} lb/wk; appendicular-lean arm not computed"
+    app = _appendicular_vs_week0(scans)
+    observed = {"interval": [a["scan_date"], b["scan_date"]], "lean_share_pct": share, "lean_lb_wk": lean_wk, **app}
+    pct, app_line = app["appendicular_lean_pct_vs_week0"], th["maintenance_at_appendicular_lean_pct"]
+    arms = [
+        None if share is None else share > th["lean_share_pct"],
+        None if lean_wk is None else lean_wk > th["lean_lb_wk"],
+        None if pct is None else pct <= app_line,
+    ]
+    escalate = (share is not None and share > th["maintenance_at_lean_share_pct"]) or arms[2] is True
+    observed["escalation"] = "maintenance_until_next_scan" if escalate else None
+    detail = (
+        f"DXA {a['scan_date']} → {b['scan_date']}: lean share of the loss {share} %, lean {lean_wk} lb/wk; "
+        f"appendicular lean {pct} % vs the week-0 scan {app['week0_scan']}"
+    )
     if any(x is True for x in arms):
         return _row(t["id"], "tripped", observed, detail)
     if any(x is None for x in arms):
-        return _row(t["id"], "unknown", observed, detail + " — one arm unreadable (no loss across the interval, or a scan weight missing)")
+        return _row(
+            t["id"], "unknown", observed, detail + " — an arm unreadable (no loss across the interval, a scan weight or limb missing)"
+        )
     return _row(t["id"], "clear", observed, detail)
+
+
+_LIMBS = ("right_arm", "left_arm", "right_leg", "left_leg")
+
+
+def _appendicular_lb(row: dict[str, Any]) -> float | None:
+    """Arms + legs lean (lb) of one DXA row (`limbs.<limb>.lean_lb`), or None when any limb is missing — never a partial sum."""
+    limbs = (row or {}).get("limbs") or {}
+    vals = [nc._num((limbs.get(k) or {}).get("lean_lb")) for k in _LIMBS]
+    return None if any(v is None for v in vals) else sum(vals)
+
+
+def _appendicular_vs_week0(scans: list[dict[str, Any]]) -> dict[str, Any]:
+    """The latest scan's appendicular lean vs the week-0 scan (`medical_cover.week0_reference.dxa.date`), in %."""
+    w0_date = owner_redlines.REDLINES["medical_cover"]["week0_reference"]["dxa"]["date"]
+    w0 = next((r for r in scans if str(r.get("scan_date") or "") == w0_date), None)
+    latest = scans[-1] if scans else None
+    base, now = (_appendicular_lb(w0) if w0 else None), (_appendicular_lb(latest) if latest else None)
+    pct = round((now - base) / base * 100, 1) if base and now is not None and latest is not w0 else None
+    return {"week0_scan": w0_date if w0 else None, "appendicular_lean_pct_vs_week0": pct}
 
 
 def _sleep_means(s: list[Any], days: int) -> list[float | None]:
@@ -248,6 +284,180 @@ def sleep(inputs: dict[str, Any]) -> dict[str, Any]:
     return _row(t["id"], "tripped", means, detail)
 
 
+# ── medical_stop_lines: which lines are MEASURED, which stay self-report ─────────────────────
+# `medical_cover.stop_lines`, each mapped to the measured input that can read it — or to None (self-report or not on any
+# panel). A stop line with no measured input is `unknown`, every time: the row can trip on a measured line, and it can
+# NEVER read clear while a self-report line is unread (#5802, owner veto 2026-11-11).
+LAB_FRESH_DAYS = 56  # `medical_cover.labs_cadence`: every 8 weeks with the DXA — an older draw is not a current read
+# stop line (verbatim from `medical_cover.stop_lines`) -> the labs marker keys that read it; the threshold is parsed from
+# the line's own text (`_nums`), never re-typed here
+_LAB_LINES = {"K < 3.5": ("potassium",), "Na < 133": ("sodium",), "uric acid > 9 or a flare": ("uric_acid",)}
+_MG_PO4, _ALT, _EGFR, _RHR = (
+    "Mg < 1.7 or PO4 < 2.5",
+    "ALT > 3× ULN",
+    "eGFR worse than −25 % from baseline",
+    "RHR +12 over the 14-day baseline",
+)
+_SELF_REPORT_LINES = {
+    "QTc > 470": "a 12-lead ECG reading; the clinical ECG rows are consumer single-lead recordings with no QTc",
+    "orthostatic SBP drop > 20 or syncope": "orthostatic BP and syncope are not measured by any device on the platform",
+    "PHQ-9 ≥ 10 or any item 9 (stop AND firewall)": "the PHQ-9 is the check-in lane's input (#5819)",
+    "a gout flare (the uric-acid line's second half)": "self-report",
+    "RUQ pain": "self-report (the tripwire's signal)",
+    "palpitations": "self-report (the tripwire's signal; an ECG recording is evidence of a rhythm, not of the symptom)",
+}
+MEASURED_LINES = (*_LAB_LINES, _MG_PO4, _ALT, _EGFR, _RHR)
+
+
+def _nums(line: str) -> list[float]:
+    import re
+
+    # only a number that follows a comparison or a sign — "PO4" and "eGFR" carry digits that are not thresholds
+    return [float(x) for x in re.findall(r"[<>≥≤−+-]\s*(\d+(?:\.\d+)?)", line)]
+
+
+def _lab_value(draw: dict[str, Any] | None, keys: tuple[str, ...]) -> float | None:
+    bms = (draw or {}).get("biomarkers") or {}
+    for k in keys:
+        cell = bms.get(k)
+        if isinstance(cell, dict):
+            v = nc._num(cell.get("value_numeric", cell.get("value")))
+            if v is not None:
+                return v
+    return None
+
+
+def _lab_uln(draw: dict[str, Any] | None, key: str) -> float | None:
+    """The upper limit of normal from the marker's own `ref_text` ('10-44', '<44', '0 - 44 IU/L'), or None."""
+    import re
+
+    text = str((((draw or {}).get("biomarkers") or {}).get(key) or {}).get("ref_text") or "")
+    m = re.search(r"(?:-|–|<|≤)\s*(\d+(?:\.\d+)?)", text)
+    return float(m.group(1)) if m else None
+
+
+def _draw_date(draw: dict[str, Any] | None) -> str | None:
+    d = str((draw or {}).get("draw_date") or str((draw or {}).get("sk") or "").replace("DATE#", ""))[:10]
+    return d if parse_day_key(d) else None
+
+
+def _arm(value: float | None, tripped: bool | None, as_of: str | None, fresh: bool, why_none: str) -> dict[str, Any]:
+    """One stop line's read. A clear on a stale draw is NOT a clear (unknown); a crossed line on any draw is tripped."""
+    if tripped is True:
+        return {"state": "tripped", "as_of": as_of}
+    if value is None or tripped is None:
+        return {"state": "unknown", "as_of": as_of, "why": why_none}
+    if not fresh:
+        return {"state": "unknown", "as_of": as_of, "why": f"the draw is older than {LAB_FRESH_DAYS} days"}
+    return {"state": "clear", "as_of": as_of}
+
+
+def _medical_lab_arms(draws: list[dict[str, Any]], end: str | None) -> dict[str, dict[str, Any]]:
+    """One {state, as_of, why?} per lab stop line over the latest draw (fresh within LAB_FRESH_DAYS of `end`)."""
+    latest = draws[-1] if draws else None
+    as_of = _draw_date(latest)
+    end_d, as_of_d = parse_day_key(str(end)) if end else None, parse_day_key(as_of) if as_of else None
+    fresh = bool(end_d and as_of_d and (end_d - as_of_d).days <= LAB_FRESH_DAYS)
+    arms: dict[str, dict[str, Any]] = {}
+    for line, keys in _LAB_LINES.items():
+        v, th = _lab_value(latest, keys), _nums(line)[0]
+        arms[line] = _arm(v, None if v is None else (v < th if "<" in line else v > th), as_of, fresh, "not on the latest panel")
+    mg_th, po4_th = _nums(_MG_PO4)
+    mg, po4 = _lab_value(latest, ("magnesium", "magnesium_serum")), _lab_value(latest, ("phosphorus", "phosphate"))
+    low = (mg is not None and mg < mg_th) or (po4 is not None and po4 < po4_th)
+    known = mg is not None and po4 is not None
+    arms[_MG_PO4] = _arm(
+        mg if known else None, True if low else (False if known else None), as_of, fresh, "serum Mg / PO4 not on the panel"
+    )
+    alt, uln = _lab_value(latest, ("alt",)), _lab_uln(latest, "alt")
+    alt_trip = None if (alt is None or uln is None) else alt > _nums(_ALT)[0] * uln
+    arms[_ALT] = _arm(alt if uln else None, alt_trip, as_of, fresh, "ALT or its reference range not on the panel")
+    w0 = owner_redlines.REDLINES["medical_cover"]["week0_reference"]["labs"]["date"]
+    base = _lab_value(next((d for d in draws if _draw_date(d) == w0), None), ("egfr",))
+    now = _lab_value(latest, ("egfr",)) if as_of != w0 else None
+    drop = None if (base is None or now is None) else (now - base) / base * 100
+    egfr_trip = None if drop is None else drop < -_nums(_EGFR)[0]
+    arms[_EGFR] = _arm(drop, egfr_trip, as_of, fresh, "no eGFR on the baseline draw and a later one")
+    return arms
+
+
+def _rhr_arm(rhr: list[Any] | None) -> dict[str, Any]:
+    """RHR +N over the 14-day baseline: the latest night vs the mean of the nights before it (Whoop)."""
+    vals = [nc._num(v) for v in (rhr or [])]
+    prior, last = [v for v in vals[:-1] if v is not None], (vals[-1] if vals else None)
+    if last is None or len(prior) < 7:
+        return {"state": "unknown", "why": "no latest night, or under 7 baseline nights"}
+    rise = last - sum(prior) / len(prior)
+    return {"state": "tripped" if rise >= _nums(_RHR)[0] else "clear", "rise_bpm": round(rise, 1)}
+
+
+def medical_stop_lines(inputs: dict[str, Any]) -> dict[str, Any]:
+    t = nc._tripwire("medical_stop_lines")
+    draws = inputs.get("lab_draws")
+    unread = {"state": "unknown", "why": "the labs partition could not be read"}
+    lab_arms = _medical_lab_arms(draws, inputs.get("window_end")) if draws is not None else {k: dict(unread) for k in MEASURED_LINES[:-1]}
+    arms = {**lab_arms, _RHR: _rhr_arm(inputs.get("rhr_by_day"))}
+    arms.update({line: {"state": "unknown", "why": why} for line, why in _SELF_REPORT_LINES.items()})
+    tripped = [line for line, a in arms.items() if a["state"] == "tripped"]
+    observed = {"arms": arms, "measured": list(MEASURED_LINES), "self_report_only": list(_SELF_REPORT_LINES)}
+    if tripped:
+        return _row(t["id"], "tripped", observed, f"stop line(s) crossed: {', '.join(tripped)}")
+    unread_lines = [line for line, a in arms.items() if a["state"] == "unknown"]
+    return _row(
+        t["id"],
+        "unknown",
+        observed,
+        f"no measured stop line crossed; {len(unread_lines)} line(s) unread (self-report or no current panel) — never clear",
+    )
+
+
+# ── mood_declared and joy: SHELLS — the input is the check-in lane's (#5819); this lane never reads it ─────────
+_CHECKIN_LANE = "input owned by the check-in lane (#5819) — not supplied"
+
+
+def mood_declared(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Pure over an injected `mood_instrument` {phq9_total, phq9_item9, grief_event, declared, as_of}; absent ⇒ unknown."""
+    t = nc._tripwire("mood_declared")
+    m = inputs.get("mood_instrument")
+    if not isinstance(m, dict):
+        return _unknown(t["id"], ["mood_instrument"], _CHECKIN_LANE)
+    total, item9 = nc._num(m.get("phq9_total")), nc._num(m.get("phq9_item9"))
+    arms = {
+        "phq9_total": None if total is None else total >= float(t["phq9_at_least"]),
+        "phq9_item9": None if item9 is None else item9 > 0,
+        "grief_event": m.get("grief_event") if isinstance(m.get("grief_event"), bool) else None,
+        "declared": m.get("declared") if isinstance(m.get("declared"), bool) else None,
+    }
+    detail = f"the instrument of {m.get('as_of') or 'an unstated date'}: " + ", ".join(f"{k}={v}" for k, v in arms.items())
+    if any(v is True for v in arms.values()):
+        return _row(t["id"], "tripped", sorted(k for k, v in arms.items() if v), detail)
+    if any(v is None for v in arms.values()):
+        return _row(t["id"], "unknown", None, detail + " — an arm unread", [k for k, v in arms.items() if v is None])
+    return _row(t["id"], "clear", [], detail)
+
+
+def joy(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Pure over injected weekly `joy_answers` (True yes / False no / None unanswered, oldest first) and `weight_lb`."""
+    t = nc._tripwire("joy")
+    rule = t["threshold_rule"]
+    answers = inputs.get("joy_answers")
+    if not isinstance(answers, (list, tuple)):
+        return _unknown(t["id"], ["joy_answers"], _CHECKIN_LANE)
+    last = list(answers)[-int(rule["no_answers"]) :]
+    weight = nc._num(inputs.get("weight_lb"))
+    detail = f"the last {rule['no_answers']} weekly answers: {last}"
+    if any(a is True for a in last):
+        return _row(t["id"], "clear", last, detail)
+    if len(last) < int(rule["no_answers"]) or any(a is not False for a in last):
+        return _row(t["id"], "unknown", last, detail + " — a week unanswered", ["joy_answers"])
+    if weight is None:
+        return _row(t["id"], "unknown", last, detail + " — the weight the rule is armed above is unread", ["weight_lb"])
+    armed = weight > float(rule["above_lb"])
+    return _row(
+        t["id"], "tripped" if armed else "clear", last, detail + ("" if armed else " — the rule is armed only above its weight line")
+    )
+
+
 _READERS = {
     "loss_acceptable": loss_acceptable,
     "loss_insufficient_adherent": loss_insufficient_adherent,
@@ -257,6 +467,9 @@ _READERS = {
     "weigh_in_dark": weigh_in_dark,
     "lean_mass": lean_mass,
     "sleep": sleep,
+    "medical_stop_lines": medical_stop_lines,
+    "mood_declared": mood_declared,
+    "joy": joy,
 }
 
 

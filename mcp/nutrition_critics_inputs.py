@@ -15,7 +15,8 @@ same way:
   * walking hr this week / last    — `mcp.shared_quantities.weekly_walking_hours` (Strava UNION
                                      Hevy, de-duplicated in time, 7 completed days), called twice
   * IC-29 adaptation severity      — `mcp.tools_nutrition._get_metabolic_adaptation`
-  * sleep hours by day             — the Whoop partition (#5802: the `sleep` tripwire, `health.tripwire_readers`)
+  * sleep hours / RHR by day       — the Whoop partition (#5802: the `sleep` tripwire, the RHR stop line)
+  * lab draws                      — `mcp.labs_helpers` (#5802: the medical stop lines' lab arms)
   * already-logged decisions       — `get_decisions` rows, trailing 14 days, source
                                      `nutrition_critics`, for box 4's dedup
 
@@ -150,13 +151,21 @@ def withings_trend(rows: list[dict[str, Any]] | None, keys: list[str]) -> dict[s
     return out
 
 
-def sleep_series(rows: list[dict[str, Any]] | None, keys: list[str]) -> list[float | None] | None:
-    """(#5802) Whoop `sleep_duration_hours` by day over `keys` — the `sleep` tripwire's input (the same Whoop
-    partition the readiness_floor tripwire reads); None per unmeasured night, None when the partition could not be read."""
+def whoop_series(rows: list[dict[str, Any]] | None, keys: list[str], field: str = "sleep_duration_hours") -> list[float | None] | None:
+    """(#5802) one Whoop field by day over `keys` — `sleep_duration_hours` (the `sleep` tripwire) and `resting_heart_rate`
+    (the medical stop line's RHR arm), from the same partition the readiness_floor tripwire reads; None per unmeasured
+    night, None when the partition could not be read."""
     if rows is None:
         return None
     by_day = {str(r.get("date") or str(r.get("sk") or "").replace("DATE#", ""))[:10]: r for r in rows}
-    return [_num((by_day.get(k) or {}).get("sleep_duration_hours")) for k in keys]
+    return [_num((by_day.get(k) or {}).get(field)) for k in keys]
+
+
+def _lab_draws() -> list[dict[str, Any]] | None:
+    """(#5802) every labs draw, chronological by draw date (`mcp.labs_helpers`) — the medical stop lines' panel; None on a raise."""
+    from mcp.labs_helpers import _query_all_lab_draws
+
+    return _safe(_query_all_lab_draws)
 
 
 def _walking_hours(end_date: str) -> float | None:
@@ -225,7 +234,10 @@ def resolve(
     # the oldest weekly checkpoint (`end - 7`) reads its own 14-day trend, so weigh-ins reach back
     # LOSS_RATE_WINDOW_DAYS + 7 days; a 14-day fetch left it the week's own slope (#5100, live 10-20)
     wt = _safe(query_source, "withings", shift_day_key(start, -shared_quantities.WEEK_DAYS), end_date)
-    whoop = _safe(query_source, "whoop", start, end_date)  # #5802: the sleep tripwire's nights
+    whoop = _safe(query_source, "whoop", start, end_date)  # #5802: the sleep tripwire's nights + the RHR stop line
+    labs = _lab_draws()
+    if labs is None:
+        unresolved["labs"] = "the labs partition read raised — the medical stop lines' lab arms are unknown"
     for name, rows in (("macrofactor", mf), ("hevy", hevy), ("withings", wt), ("whoop", whoop)):
         if rows is None:
             unresolved[name] = "partition read raised"
@@ -273,7 +285,9 @@ def resolve(
         "estimated_maintenance_kcal": estimated_maintenance_kcal,
         "dxa_scans": dxa,
         "guidance_cap_lb_wk": guidance_cap,  # #5074: the clinical record's rate cap outranks the charter band
-        "sleep_hours_by_day": sleep_series(whoop, keys),  # #5802
+        "sleep_hours_by_day": whoop_series(whoop, keys),  # #5802
+        "rhr_by_day": whoop_series(whoop, keys, "resting_heart_rate"),  # #5802: the RHR stop line
+        "lab_draws": labs,  # #5802: the medical stop lines' panel
     }
     return {"inputs": inputs, "unresolved": unresolved}
 

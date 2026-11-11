@@ -737,6 +737,7 @@ def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_rea
     monkeypatch.setattr(nci, "_guidance_cap", lambda: None)  # #5074: the clinical record states no cap (the read succeeded)
     monkeypatch.setattr(nci, "already_logged", lambda days=14: [])
     monkeypatch.setattr(nci.shared_quantities, "dxa_scans", lambda end: [])  # #4166: no scan on file -> tier unknown
+    monkeypatch.setattr(nci, "_lab_draws", lambda: [])  # #5802: the medical stop lines' panel — read, empty
     out = nci.block("2026-09-20", deficit_severity="SUSTAINABLE", degraded_count=0)
     md = next(v for v in out["verdicts"] if v["critic"] == "muscle_defense")
     # owner ruling 2026-10-23 R1: 1,533 kcal sits on the ~1,500 target (the energy floor is a warning); 146 g protein is not

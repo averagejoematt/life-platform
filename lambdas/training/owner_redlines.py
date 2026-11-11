@@ -938,20 +938,21 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "obesity-medicine physician (red team 2026-09-22)",
         "action": "deficit to zero for 72 h; labs / ECG / ultrasound; resume on clearance. A slow line → −0.5 lb/wk and +250 kcal",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802 owner veto 2026-11-11: report-only; the self-report lines read unknown
         "note": "The platform has a labs partition; the cadence and the thresholds are not wired to it. Postprandial RUQ pain → ultrasound within 48 h.",
     },
     {
         "id": "mood_declared",
         "signal": "PHQ-9 ≥ 10, item 9 > 0, a grief event, or he declares it himself",
         "threshold": "any",
+        "phq9_at_least": 10,  # #5802: the number the reader uses (the signal's PHQ-9 line)
         "provenance": "owner-history",
         "action": (
             "the Minimum Viable Week fires AUTOMATICALLY, not chosen — calories to the band's maintenance (not down), the walking floor "
             "halves (never zero), logging becomes ate / walked / weighed, daily weighing continues with no judgement for 14 days; one named "
             "human is contacted within 48 h BY THE PLAN, not by him; day 14 the plan asks whether the week extends; day 28 someone other than him decides"
         ),
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802 owner veto 2026-11-11: a shell — its input is the check-in lane's (#5819)
         "note": (
             "Both major reversals were bereavement/depression, not training. Two in fourteen years is the base rate, not the exception. "
             "v3 lowers the PHQ-9 line from 15 to 10 (physician). Written now because it cannot be written on the day; the named human is an owner act (§13)."
@@ -961,11 +962,12 @@ TRIPWIRES: list[dict[str, Any]] = [
         "id": "joy",
         "signal": "weekly yes/no: did you want to do any of it",
         "threshold": "three 'no' answers before 230 lb",
+        "threshold_rule": {"no_answers": 3, "above_lb": 230},  # #5802: the numbers the reader uses (the threshold text's)
         "threshold_days": 21,
         "provenance": "population-derived",
         "derived_by": "lived experience (red team 2026-09-22)",
         "action": "one week at maintenance — numbers-only tripwires miss this",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802 owner veto 2026-11-11: a shell — its input is the check-in lane's (#5819)
         "note": "The one tripwire with no number behind it, on purpose.",
     },
     {

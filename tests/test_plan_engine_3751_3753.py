@@ -240,7 +240,7 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     block = plan_engine.constraint_block(**_FULL)
     assert set(block["unevaluated_tripwires"]) == set(owner_redlines.unevaluated_tripwires())
     # #5802: only the tripwires NO module reads are named (rate_overshoot is nutrition_critics' now, and says so)
-    assert any("NOT evaluated by this engine or any other module" in line and "joy" in line for line in block["honesty"])
+    assert any("NOT evaluated by this engine or any other module" in line and "post_goal_walking" in line for line in block["honesty"])
     assert not any("rate_overshoot" in line for line in block["honesty"] if "NOT evaluated" in line)
     assert block["tripwires_evaluated_elsewhere"]["rate_overshoot"] == "health.nutrition_critics"
     rate = plan_engine.constraint_block(**_FULL)["rate_target"]

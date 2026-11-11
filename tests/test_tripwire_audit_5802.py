@@ -42,11 +42,10 @@ from training import (
 TW = {t["id"]: t for t in rl.TRIPWIRES}
 
 # The owner's decision list. Each entry: why it cannot be read by measured inputs today.
+# Owner ruling 2026-11-11: deletion VETOED for medical_stop_lines, mood_declared, joy and lean_mass — readers built instead
+# (mood_declared and joy as shells over an injected input the check-in lane owns, #5819). These two await his decision.
 PROPOSE_DELETE = {
     "leverage_not_deterioration": "action is 'log it; no action' — an interpretation note on anchor_lift_strength_drop, not a tripwire",
-    "medical_stop_lines": "symptoms are self-report and the labs cadence is not wired — a human stop line, not a machine one",
-    "mood_declared": "PHQ-9 is not instrumented; the declaration is his — no measured input exists",
-    "joy": "no weekly yes/no instrument exists",
     "post_goal_walking": "maintenance-phase only and needs the cut-phase walking mean — dormant until the landing",
 }
 WIRED_HERE = {
@@ -58,6 +57,9 @@ WIRED_HERE = {
     "weigh_in_dark",
     "lean_mass",
     "sleep",
+    "medical_stop_lines",  # owner veto 2026-11-11: measured lab + RHR lines; the self-report lines read unknown
+    "mood_declared",  # owner veto 2026-11-11: a shell over the check-in lane's injected input (#5819)
+    "joy",  # owner veto 2026-11-11: a shell over the check-in lane's injected input (#5819)
 }
 EVALUATED_BY_CRITICS = {"rate_overshoot", "intake_floor_breached", "logging_dark", "weight_stall_with_adherence"}
 MERGED = {"loss_excessive_clean": "rate_overshoot", "loss_excessive_flagged": "rate_overshoot"}
@@ -167,9 +169,13 @@ def test_a_provisional_rate_reads_unknown_never_on_schedule():
 def test_the_clean_fortnight_reads_on_schedule_and_every_other_reader_clear():
     rows = _rows(_inputs())
     assert rows["loss_acceptable"]["state"] == "tripped"  # 'tripped' = on schedule, the computed base case
-    others = {k: r["state"] for k, r in rows.items() if k not in ("loss_acceptable", "lean_mass")}
+    unread = ("loss_acceptable", "lean_mass", "medical_stop_lines", "mood_declared", "joy")
+    others = {k: r["state"] for k, r in rows.items() if k not in unread}
     assert set(others.values()) == {"clear"}, others
     assert rows["lean_mass"]["state"] == "unknown"  # no DXA interval in the fixture
+    # the self-report stop lines are never read, so the medical row can trip but never clear; the shells have no input live
+    assert {rows[k]["state"] for k in ("medical_stop_lines", "mood_declared", "joy")} == {"unknown"}
+    assert "#5819" in rows["mood_declared"]["detail"] and "#5819" in rows["joy"]["detail"]
 
 
 def test_the_rate_rules_trip_on_a_slow_trend():
@@ -213,8 +219,14 @@ def test_weigh_in_dark_counts_from_the_last_weigh_in_and_an_empty_read_is_dark()
     assert _rows(_inputs(last_weighin_date=None, weighin_count=None))["weigh_in_dark"]["state"] == "unknown"
 
 
-def _scan(date, total, lean):
-    return {"scan_date": date, "body_composition": {"total_mass_lb": total, "lean_mass_lb": lean, "bone_mineral_content_lb": 8.0}}
+def _scan(date, total, lean, limb_lean=None):
+    limb = lean * 0.1 if limb_lean is None else limb_lean  # synthetic: each of four limbs carries 10 % of the lean
+    limbs = {k: {"lean_lb": limb} for k in ("right_arm", "left_arm", "right_leg", "left_leg")}
+    return {
+        "scan_date": date,
+        "body_composition": {"total_mass_lb": total, "lean_mass_lb": lean, "bone_mineral_content_lb": 8.0},
+        "limbs": limbs,
+    }
 
 
 def test_lean_mass_reads_the_last_dxa_interval():
@@ -226,6 +238,19 @@ def test_lean_mass_reads_the_last_dxa_interval():
     assert _rows(_inputs(dxa_scans=ok))["lean_mass"]["state"] == "clear"
     assert _rows(_inputs(dxa_scans=bad))["lean_mass"]["state"] == "tripped"
     assert _rows(_inputs(dxa_scans=ok[:1]))["lean_mass"]["state"] == "unknown"
+
+
+def test_lean_mass_appendicular_arm_reads_against_the_week0_scan():
+    """Owner veto 2026-11-11: the appendicular-lean arm is computed — vs the week-0 scan `medical_cover` names."""
+    th = TW["lean_mass"]["threshold"]
+    w0 = rl.REDLINES["medical_cover"]["week0_reference"]["dxa"]["date"]
+    drop = 1 + (th["maintenance_at_appendicular_lean_pct"] - 1) / 100  # one point past the line, from the redline
+    first, later = _scan(w0, 300.0, 150.0, 15.0), _scan("2026-05-25", 296.0, 149.6, 15.0 * drop)
+    row = _rows(_inputs(dxa_scans=[first, later]))["lean_mass"]
+    assert row["state"] == "tripped" and row["observed"]["escalation"] == "maintenance_until_next_scan"
+    assert row["observed"]["appendicular_lean_pct_vs_week0"] < th["maintenance_at_appendicular_lean_pct"]
+    no_limbs = dict(later, limbs={})
+    assert _rows(_inputs(dxa_scans=[first, no_limbs]))["lean_mass"]["state"] == "unknown", "a missing limb is never a pass"
 
 
 def test_sleep_trips_only_when_every_trailing_mean_is_under_the_line():
@@ -294,3 +319,81 @@ def test_the_report_rows_never_move_a_critic_verdict():
     inputs = _inputs(intake_kcal_by_day=[1000] * 14, sleep_hours_by_day=[3.0] * 14, last_weighin_date="2026-09-01")
     assert {r["id"] for r in nc.block(inputs)["tripwire_reports"] if r["state"] == "tripped"} >= {"sleep", "weigh_in_dark", "under_floor"}
     assert [v["verdict"] for v in nc.block(inputs)["verdicts"]] == [v["verdict"] for v in nc.run(inputs)["verdicts"]]
+
+
+# ── owner veto 2026-11-11: medical_stop_lines, mood_declared, joy ─────────────────────────────────────────
+def _draw(date, **markers):
+    bms = {k: {"value": v, "ref_text": "10-44" if k == "alt" else ""} for k, v in markers.items()}
+    return {"draw_date": date, "biomarkers": bms}
+
+
+def test_every_medical_stop_line_is_named_measured_or_self_report():
+    lines = rl.REDLINES["medical_cover"]["stop_lines"]
+    assert set(lines) <= set(tr.MEASURED_LINES) | set(tr._SELF_REPORT_LINES)
+    assert not set(tr.MEASURED_LINES) & set(tr._SELF_REPORT_LINES)
+    row = tr.medical_stop_lines({})
+    assert row["observed"]["measured"] == list(tr.MEASURED_LINES)
+    assert set(row["observed"]["self_report_only"]) == set(tr._SELF_REPORT_LINES)
+
+
+def test_medical_stop_lines_trips_on_a_measured_line_and_is_never_clear():
+    k_line = tr._nums("K < 3.5")[0]
+    end = "2026-09-20"
+    low_k = _draw("2026-09-10", potassium=k_line - 0.3, sodium=140, uric_acid=5, alt=20)
+    row = tr.medical_stop_lines({"window_end": end, "lab_draws": [low_k], "rhr_by_day": [60] * 14})
+    assert row["state"] == "tripped" and row["observed"]["arms"]["K < 3.5"]["state"] == "tripped"
+    fine = _draw("2026-09-10", potassium=k_line + 0.8, sodium=140, uric_acid=5, alt=20)
+    row = tr.medical_stop_lines({"window_end": end, "lab_draws": [fine], "rhr_by_day": [60] * 14})
+    assert row["observed"]["arms"]["K < 3.5"]["state"] == "clear"
+    assert row["state"] == "unknown", "every measured line clear still leaves the self-report lines unread — never a pass"
+    assert all(row["observed"]["arms"][line]["state"] == "unknown" for line in tr._SELF_REPORT_LINES)
+
+
+def test_a_stale_draw_is_unknown_not_clear_but_a_crossed_line_still_trips():
+    old = "2026-01-01"
+    fine = _draw(old, potassium=4.5, sodium=140, uric_acid=5, alt=20)
+    arms = tr.medical_stop_lines({"window_end": "2026-09-20", "lab_draws": [fine]})["observed"]["arms"]
+    assert arms["K < 3.5"]["state"] == "unknown" and "older" in arms["K < 3.5"]["why"]
+    low = _draw(old, potassium=3.0)
+    assert tr.medical_stop_lines({"window_end": "2026-09-20", "lab_draws": [low]})["state"] == "tripped"
+
+
+def test_medical_rhr_alt_and_unreadable_labs():
+    rise = tr._nums(tr._RHR)[0]
+    row = tr.medical_stop_lines({"window_end": "2026-09-20", "rhr_by_day": [60] * 13 + [60 + rise + 1]})
+    assert row["state"] == "tripped" and row["observed"]["arms"][tr._RHR]["state"] == "tripped"
+    high_alt = _draw("2026-09-10", alt=44 * tr._nums(tr._ALT)[0] + 1)
+    assert tr.medical_stop_lines({"window_end": "2026-09-20", "lab_draws": [high_alt]})["observed"]["arms"][tr._ALT]["state"] == "tripped"
+    row = tr.medical_stop_lines({"window_end": "2026-09-20", "lab_draws": None})
+    assert row["state"] == "unknown" and row["observed"]["arms"]["K < 3.5"]["why"] == "the labs partition could not be read"
+
+
+def test_mood_declared_is_a_shell_over_an_injected_input_and_unknown_never_passes():
+    at = TW["mood_declared"]["phq9_at_least"]
+    clean = {"phq9_total": at - 5, "phq9_item9": 0, "grief_event": False, "declared": False, "as_of": "2026-09-20"}
+    assert tr.mood_declared({})["state"] == "unknown" and "check-in lane" in tr.mood_declared({})["detail"]
+    assert tr.mood_declared({"mood_instrument": clean})["state"] == "clear"
+    assert tr.mood_declared({"mood_instrument": {**clean, "phq9_total": at}})["state"] == "tripped"
+    assert tr.mood_declared({"mood_instrument": {**clean, "phq9_item9": 1}})["state"] == "tripped"
+    assert tr.mood_declared({"mood_instrument": {**clean, "declared": True}})["state"] == "tripped"
+    partial = {k: v for k, v in clean.items() if k != "grief_event"}
+    assert tr.mood_declared({"mood_instrument": partial})["state"] == "unknown", "an unread arm is never a pass"
+
+
+def test_joy_is_a_shell_over_injected_weekly_answers_and_unknown_never_passes():
+    rule = TW["joy"]["threshold_rule"]
+    n, above = int(rule["no_answers"]), float(rule["above_lb"])
+    assert tr.joy({"weight_lb": above + 50})["state"] == "unknown"
+    assert tr.joy({"joy_answers": [False] * n, "weight_lb": above + 50})["state"] == "tripped"
+    assert tr.joy({"joy_answers": [False] * (n - 1) + [True], "weight_lb": above + 50})["state"] == "clear"
+    assert tr.joy({"joy_answers": [False] * (n - 1) + [None], "weight_lb": above + 50})["state"] == "unknown"
+    assert tr.joy({"joy_answers": [False] * (n - 1), "weight_lb": above + 50})["state"] == "unknown"
+    assert tr.joy({"joy_answers": [False] * n})["state"] == "unknown", "the weight the rule is armed above is unread"
+    assert tr.joy({"joy_answers": [False] * n, "weight_lb": above - 1})["state"] == "clear"
+
+
+def test_the_live_resolver_never_supplies_the_check_in_inputs():
+    """This lane reads no State of Mind / journal / check-in data: the two shell inputs are never resolved here."""
+    src = (REPO / "mcp" / "nutrition_critics_inputs.py").read_text(encoding="utf-8")
+    assert "mood_instrument" not in src and "joy_answers" not in src
+    assert "state_of_mind" not in src and "evening_checkin" not in src and "journal" not in src

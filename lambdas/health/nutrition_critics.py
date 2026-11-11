@@ -108,6 +108,10 @@ INPUT_KEYS = (
     "estimated_maintenance_kcal",  # optional, for sizing a diet break
     "last_weighin_date",  # #5802: weigh_in_dark's input (health.tripwire_readers)
     "sleep_hours_by_day",  # #5802: 14 entries oldest->newest (Whoop sleep_duration_hours), None for an unmeasured night
+    "rhr_by_day",  # #5802: same shape (Whoop resting_heart_rate) — the medical stop line's RHR arm
+    "lab_draws",  # #5802: every labs draw, chronological — the medical stop lines' lab arms
+    "mood_instrument",  # #5802: injected by the check-in lane (#5819); never resolved here
+    "joy_answers",  # #5802: injected by the check-in lane (#5819); never resolved here
 )
 
 
