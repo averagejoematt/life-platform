@@ -48,9 +48,12 @@ for _p in (str(REPO), str(REPO / "deploy"), str(REPO / "lambdas")):
         sys.path.insert(0, _p)
 
 import prereg_provenance_gate as gate  # noqa: E402
+import sealed_prereg  # noqa: E402
 
-FROZEN_PATH = REPO / "deploy" / "generated" / "genesis_preregistration.json"
-FIXTURE_PATH = REPO / "tests" / "fixtures" / "prereg_season_rows_2026-09-17.json"
+# The sealed file is private since 2026-11-11 (owner ruling item 3): the private original when present (tests/sealed_prereg.py), else
+# the old path, which no longer exists, so a test that reads it skips (sealed_prereg.require_sealed_path()).
+FROZEN_PATH = sealed_prereg.sealed_path() or (REPO / "deploy" / "generated" / "genesis_preregistration.json")
+FIXTURE_PATH = sealed_prereg.season_rows_path() or (REPO / "tests" / "fixtures" / "prereg_season_rows_2026-09-17.json")
 
 
 def _md5(path: Path) -> str:
@@ -59,12 +62,12 @@ def _md5(path: Path) -> str:
 
 @pytest.fixture(scope="module")
 def frozen() -> dict:
-    return json.loads(FROZEN_PATH.read_text())
+    return json.loads(sealed_prereg.require_sealed_path().read_text())  # private since 2026-11-11
 
 
 @pytest.fixture(scope="module")
 def live_capture() -> dict:
-    return json.loads(FIXTURE_PATH.read_text())
+    return json.loads(sealed_prereg.require_season_rows_path().read_text())  # private since 2026-11-11
 
 
 # ── the derivation is ONE function, and the seeder routes through it ──────────
@@ -83,6 +86,8 @@ def test_the_seeder_uses_the_gates_id_derivation_not_a_copy():
 
 
 def test_frozen_ids_are_derived_from_the_committed_artifact_and_are_unique(frozen):
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
+    sealed_prereg.require_season_rows_path()
     ids = gate.frozen_prediction_ids(frozen)
     claims = [p["claim_natural"] for b in frozen["coaches"].values() for p in b["predictions"]]
     assert len(ids) == len(claims) == 16, f"16 sealed claims expected for genesis {frozen['genesis']}, got {len(claims)}/{len(ids)}"
@@ -288,6 +293,8 @@ def test_the_committed_capture_reproduces_the_live_verdict(frozen, live_capture)
     """The 2026-09-17 read-only capture of the real ledger. Recorded here as EXACT
     numbers rather than "non-empty", so a change in either direction is a decision
     somebody has to make in a diff."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
+    sealed_prereg.require_season_rows_path()
     assert live_capture["_genesis"] == frozen["genesis"]
     findings = gate.audit_prereg_provenance(live_capture["rows"], frozen, as_of="2026-09-17")
     assert gate.summarize(findings) == {
@@ -307,6 +314,8 @@ def test_the_committed_capture_reproduces_the_live_verdict(frozen, live_capture)
 def test_the_nine_day_one_rows_in_the_live_capture_are_not_reported(frozen, live_capture):
     """The negative control ON REAL DATA: the capture contains nine rows dated on
     genesis and written at 17:0xZ that day. None of them may be a finding."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
+    sealed_prereg.require_season_rows_path()
     day_one = [
         r
         for r in live_capture["rows"]
@@ -326,6 +335,8 @@ def test_mutation_control_unsealing_a_claim_in_the_real_artifact_reds_the_gate(t
     """Delete one claim from a COPY of the committed frozen artifact on disk. The live
     row for it must flip from "sealed" to a finding. If it does not, the gate is not
     reading the artifact it claims to read."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
+    sealed_prereg.require_season_rows_path()
     work = tmp_path / "genesis_preregistration.json"
     work.write_bytes(FROZEN_PATH.read_bytes())
     before_md5 = _md5(work)
@@ -364,6 +375,8 @@ def test_mutation_control_unsealing_a_claim_in_the_real_artifact_reds_the_gate(t
 def test_mutation_control_planting_an_unsealed_row_in_the_real_capture_reds_the_gate(tmp_path, frozen, live_capture):
     """Plant one unsealed pre-genesis row into a COPY of the committed live capture on
     disk and watch the finding count move by exactly one, naming the plant."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
+    sealed_prereg.require_season_rows_path()
     work = tmp_path / "capture.json"
     work.write_bytes(FIXTURE_PATH.read_bytes())
     before_md5 = _md5(work)
@@ -429,6 +442,8 @@ def test_the_partition_list_unions_the_registry_and_the_artifact(frozen):
     """training_coach is sealed in the 2026-09-06 artifact and is NOT in the live
     operational roster (retired at the cycle-13 genesis, ADR-153). Reading only the
     roster would report its two sealed bets as missing forever."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
+    sealed_prereg.require_season_rows_path()
     parts = gate.season_partitions(frozen)
     assert "COACH#training_coach" in parts
     from coach import persona_registry

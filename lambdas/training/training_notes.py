@@ -22,8 +22,10 @@ INVARIANTS (tests enforce):
      never mutated (we store note_raw, we don't touch the workout).
   4. Conservation — every non-empty note → exactly one record; on LLM failure keep
      note_raw + deterministic signals + degraded:true; never drop a note.
-  5. Pain never missed — the deterministic pain lexicon is authoritative for pain_flag;
-     the LLM can ADD a pain signal but can never CLEAR the deterministic hit.
+  5. Pain never missed — the deterministic pain lexicon is authoritative for the pain NET
+     (`pain_net`); the LLM can ADD a pain signal but can never CLEAR the deterministic hit.
+     Since #5800 `pain_flag` is the net's `pain` class only (`training_notes_pain`): a
+     discomfort or form/equipment note stays on the record, listed, and moves nothing.
 """
 
 from __future__ import annotations
@@ -66,6 +68,7 @@ from training.training_notes_keys import (  # noqa: F401
     workout_id_from_uid,
     workout_id_of_raw_row,
 )
+from training.training_notes_pain import PAIN, classify_pain, pain_class  # noqa: F401 — #5800
 from training.training_notes_requests import OWNER_REQUEST_SUBTYPES, owner_request_of  # noqa: F401 — #5573, spec §5d
 from training.wrist_clock import walk_signal  # #5374 box 3 / #5428: his treadmill speed / incline shorthand
 
@@ -74,7 +77,8 @@ from training.wrist_clock import walk_signal  # #5374 box 3 / #5428: his treadmi
 NOTES_SOURCE = "training_notes"
 SOURCE_LABEL = "training_feedback_loop"
 RAW_SOURCE = "hevy"  # never written — provenance guard target
-ALGO_VERSION = "note-extractor@1.2.0"  # 1.1.0 = per-block merge + calibration + readiness join (#3817); 1.2.0 = owner_request (#5573)
+# 1.1.0 = per-block merge + calibration + readiness join (#3817); 1.2.0 = owner_request (#5573); 1.3.0 = pain severity (#5800)
+ALGO_VERSION = "note-extractor@1.3.0"
 
 # ── Frozen taxonomy (Phase 0 lock, brief §5) ──
 # AMENDED 2026-09-19 (#3817): `calibration` joins the lock. The amendment is dated and
@@ -660,7 +664,9 @@ def extract_signals(note_text: str, llm_fn=None, date=None, user: str = "matthew
             # of Lambda logs carried no Bedrock line at all. Log the CLASS and message,
             # never the note text (raw notes are owner-private, ADR-104/Tier-2 discipline).
             logger.warning("training_notes llm degraded: %s", degraded_reason)
-    signals, pain_flag = merge_signals(det, llm, pain_det)
+    signals, pain_net = merge_signals(det, llm, pain_det)
+    # #5800: the net stays whole on the record; only its `pain` class is a pain_flag (the tripwire + deload input).
+    signals, pain_net, pclass = classify_pain(signals, pain_net, raw, llm)
     extracted_by = "hybrid" if (used_llm and det) else ("haiku" if used_llm else "deterministic")
     # The two tag fields exist ONLY when a marked line is present, so every untagged note's
     # record — and its extraction fingerprint — is byte-identical to before #5010.
@@ -670,7 +676,9 @@ def extract_signals(note_text: str, llm_fn=None, date=None, user: str = "matthew
         "note_raw": raw,  # verbatim, never mutated (Invariant 1/3)
         "note_hash": note_hash(raw),
         "signals": signals,
-        "pain_flag": pain_flag,
+        "pain_flag": pclass == PAIN,
+        "pain_net": pain_net,
+        "pain_class": pclass,
         "sentiment": _sentiment_label(signals),
         "degraded": degraded,
         "degraded_reason": degraded_reason,  # None when healthy; ABSENT on pre-#3699 records
@@ -948,6 +956,8 @@ COMPARED_FIELDS = (
     "note_raw",
     "signals",
     "pain_flag",
+    "pain_net",
+    "pain_class",
     "sentiment",
     "degraded",
     "degraded_reason",

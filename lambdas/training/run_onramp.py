@@ -315,9 +315,9 @@ def attach_prep(
 def performed_from_notes(sessions: Optional[Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
     """His logged run/walks from treadmill/running cardio-index sessions: `{date, level, rpe, pain_flag}` for
     every session whose note names a run/walk. The level and RPE come from his note ("run/walk L3 RPE 5");
-    an unlogged RPE is None (not evidence for the advance rule); a pain word naming a lower-leg site flags it."""
+    an unlogged RPE is None (not evidence for the advance rule); a `pain`-class note (#5800) naming a lower-leg site flags it."""
     from training import steps_ramp  # noqa: PLC0415
-    from training.training_notes import pain_lexicon_hit  # noqa: PLC0415
+    from training.training_notes_pain import PAIN, pain_class  # noqa: PLC0415 — #5800: the pain class, not the whole net
 
     out = []
     for s in sessions or []:
@@ -330,7 +330,7 @@ def performed_from_notes(sessions: Optional[Iterable[Mapping[str, Any]]]) -> lis
                 "date": str(s.get("date") or "")[:10],
                 "level": int(lv.group(1)) if lv else None,
                 "rpe": float(rpe.group(1)) if rpe else None,
-                "pain_flag": bool(pain_lexicon_hit(note) and steps_ramp.is_lower_leg(note)),
+                "pain_flag": bool(pain_class(note) == PAIN and steps_ramp.is_lower_leg(note)),
             }
         )
     return sorted(out, key=lambda r: r["date"])
