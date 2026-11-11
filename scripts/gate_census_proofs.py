@@ -1895,8 +1895,8 @@ GUARD_PROOFS.update(
                 "the evening before Day 1. It found that on the run that introduced it."
             ),
             "scope": (
-                "The predicate is pure and is proved here against the committed frozen artifact plus a committed "
-                "read-only capture of the live ledger (tests/fixtures/prereg_season_rows_2026-09-17.json). What "
+                "The predicate is pure and is proved here against the frozen artifact plus a read-only capture of "
+                "the live ledger (both private since 2026-11-11; the proof runs where tests/sealed_prereg.py finds them). What "
                 "that does NOT prove: that the credentialed callers actually reach it in anger — "
                 "restart_verify.py check 20 and genesis_prereg_stamp.py --apply are asserted only at the source "
                 "level here, and the seal-publish refusal has not been watched aborting a real publish (the next "
@@ -1961,8 +1961,8 @@ GUARD_PROOFS.update(
                 "— 7 blocking, every kind reached by one real artifact."
             ),
             "scope": (
-                "The predicate is pure and is proved here against the committed sealed bytes "
-                "(tests/fixtures/prereg_cycle17_2026-09-06.json, byte-identical to the published artifact). What that "
+                "The predicate is pure and is proved here against the sealed bytes (private since 2026-11-11, "
+                "supplied through tests/sealed_prereg.py, hash-checked against the published seal). What that "
                 "does NOT prove: that the seal chokepoint aborts a REAL attended seal — the write_stamp() refusal is "
                 "exercised behaviourally against a tmp_path stamp here, and the next genesis freeze is the first live "
                 "chance. The gate binds seals it MINTS only, so today's already-published cycle-17 seal passes "

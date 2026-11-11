@@ -21,7 +21,7 @@ Now layer the lipids. ApoB 116 on standard, 111 on Cardio IQ. LDL particle numbe
 
 Here is what matters strategically. You are 307 lbs going to 185 lbs. The act of losing 30+ lbs of fat mass will improve insulin sensitivity by itself. The question is whether you can afford to wait for that, and the answer depends on one thing: **your ApoB.** I would normally say to a patient in your position: drop ApoB to under 60 mg/dL. With your ApoB at 116, your particle number at 2128, and Lp-PLA2 elevated, the cumulative ApoB exposure during your weight loss journey is the variable that determines whether you arrive at 185 lbs with a clean vascular system or with subclinical plaque.
 
-My recommendation: **start a low-dose statin now**, but — and this is critical — your SLCO1B1 genotype rules out simvastatin and high-dose atorvastatin. Rosuvastatin is the move. Start at 5 mg, recheck ApoB and CK at 6 weeks. The myopathy risk from SLCO1B1 is specific to the OATP1B1 transporter substrates, and rosuvastatin's metabolism is different.
+My recommendation: **start a low-dose statin now**, but — and this is critical — [genetic detail removed 2026-11-11: genotype data is owner-only] Start at 5 mg, recheck ApoB and CK at 6 weeks. 
 
 On metformin, I'm cautious. Metformin masks the metabolic signal you're trying to use as feedback. Right now your CGM data and insulin trajectory are diagnostic instruments. If you start metformin, you lose the ability to see whether the deficit is doing what we think it's doing. Defer metformin until 6 months of sustained deficit + statin shows whether the IR resolves on its own.
 
@@ -37,7 +37,7 @@ I'll go after Peter because I want to push back on one thing and reinforce anoth
 
 **Push back:** The framing of "insulin resistance as diagnosis" can become a story that disempowers Matthew. Insulin resistance at 307 lbs is a near-universal finding. It is *caused* by adiposity. The fasting insulin will come down with weight loss in a way that's almost mechanical. I don't disagree with Peter's vascular argument, but I want to register that the IR score itself is a lagging indicator of body composition, not a separate metabolic disease. We don't need to medicalize what is going to resolve with sustained deficit.
 
-**Reinforce:** What we should medicalize is the ApoB. Peter's right. ApoB is a separate problem with a genetic floor (your ABCG8 T;T) and it will not fully resolve with weight loss alone for someone with elevated LDL particle number. That's a lifelong management problem that's worth starting on now.
+**Reinforce:** What we should medicalize is the ApoB. Peter's right. ApoB is a separate problem with a genetic floor [genetic detail removed 2026-11-11: genotype data is owner-only] and it will not fully resolve with weight loss alone for someone with elevated LDL particle number. That's a lifelong management problem that's worth starting on now.
 
 Now, on the deficit itself. 1500 kcal deficit, 190g protein target. Looking at your MacroFactor — it's been dormant since the silence. So I can't grade your adherence over the last four weeks because there's no data. **Before any other intervention, the adherence loop has to come back online.** Resume MacroFactor logging starting tomorrow. Without that, every other recommendation in this room is being made on faith.
 
@@ -131,7 +131,7 @@ This is not separate from the metabolic prescription. It is part of it. The same
 **Where the board splits — the statin question:**
 
 - **Attia:** Start rosuvastatin 5 mg now. ApoB-driven, lifelong management problem, vascular protection cannot wait for weight loss.
-- **Norton:** Concurs with Attia on statin specifically *because* of the ApoB genetic component (ABCG8 T;T). Does not believe weight loss alone will resolve ApoB.
+- **Norton:** Concurs with Attia on statin specifically *because* of the ApoB genetic component [genetic detail removed 2026-11-11: genotype data is owner-only]. Does not believe weight loss alone will resolve ApoB.
 - **Huberman:** Wants 90 days of strict protocol stack first. Concerned about pharmacologizing too early.
 - **Patrick:** Aligns with Attia + Norton on the ApoB argument, but wants the omega-3 repletion to be in place for at least 8 weeks before the statin to ensure the lipid panel reflects the corrected baseline.
 - **Conti:** Neutral on pharmacology. Concerned about how Matthew receives the recommendation.

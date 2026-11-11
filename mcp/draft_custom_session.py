@@ -240,6 +240,17 @@ def _step_floors(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {"movements": out}
 
 
+def _gate_safe(own: dict[str, str]) -> dict[str, str]:
+    """#5782: the author's conditional rides only when the subtract-only gate would pass it — `If set 1 feels good, go up
+    to 85.` is the #3971 load jump (`recovery_authoring.find_conditional_up`), kept on the record and off the wire; a
+    conditional that drops the load (`if set 1 stalls short of 8, drop to 25`) is the author's to keep."""
+    from mcp.recovery_authoring import find_conditional_up
+
+    if own.get("conditional") and find_conditional_up(own["conditional"]):
+        return {k: v for k, v in own.items() if k != "conditional"}
+    return own
+
+
 def compose_custom_notes(
     ir: Any, catalog: dict[str, Any], index: dict[str, list] | None, step_rows: list[dict[str, Any]] | None
 ) -> dict[str, Any]:
@@ -254,7 +265,7 @@ def compose_custom_notes(
 
         lifts = [b for b in ir.exercises or [] if not lift_note._skip(b)]
         before = {id(b): str(b.notes or "") for b in lifts}
-        authored = {str(b.movement_key): lift_note.authored_lines(b.notes) for b in lifts}
+        authored = {str(b.movement_key): _gate_safe(lift_note.authored_lines(b.notes)) for b in lifts}
         record = lift_note.compose_blocks(
             list(ir.exercises or []),
             catalog,

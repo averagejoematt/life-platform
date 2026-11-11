@@ -13,9 +13,9 @@ Lab results, genome, DEXA tools.
 #   "genomic data suggests elevated LDL baseline"
 #
 # NEVER in public content:
-#   "FTO rs9939609 A;T"
+#   "<GENE> rs<id> <genotype>"  (a gene name + rsID + genotype)
 #   "MTHFR compound heterozygous"
-#   "SLCO1B1 C;T — 4.5x statin myopathy risk"
+#   "<GENE> <genotype> — <n>x <drug-class> risk"
 #
 # This notice is appended to all genome-bearing tool outputs — wired at the
 # `tool_get_labs` dispatcher via `_attach_genome_privacy_notice` (#2241), which

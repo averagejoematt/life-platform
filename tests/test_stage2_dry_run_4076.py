@@ -130,9 +130,12 @@ def test_dry_run_writes_nothing_and_returns_the_overridden_plan_with_the_joints_
     assert len(ir.exercises[1].sets) == 2 and sum(len(e.sets) for e in ir.exercises) == 18
 
     # and every put a real run makes is returned, in write order, with the routine the commit would read
+    # #5781: the live run stores the deterministic version first, then the model-reconciled one on top. The historian's
+    # veto here is the MODEL's escalation, so the override's ledger row is written during the second pass, between them.
     kinds = [w["kind"] for w in crit["would_write"]]
-    assert kinds == ["corrections_ledger", "routine_version", "routine_current", "routine_index", "coach_thread"], kinds
-    ledger, _, current, index, thread = crit["would_write"]
+    version = ["routine_version", "routine_current", "routine_index"]
+    assert kinds == [*version, "corrections_ledger", *version, "coach_thread"], kinds
+    _v, _c, _i, ledger, _, current, index, thread = crit["would_write"]
     assert ledger["item"]["correction_text"] == TEST_WORDS and ledger["sk"] == rec["correction_id"]
     assert ledger["item"]["item_ref"]["critic"] == "blueprint_historian" and ledger["item"]["cycle"] == 17
     assert current["sk"] == "VERSION#current" and len(current["item"]["exercises"][1]["sets"]) == 2
@@ -151,23 +154,24 @@ def test_without_dry_run_the_same_run_makes_exactly_the_puts_the_dry_run_listed(
     live, ir, routine_table, config_table, api_calls, http_calls = _run(dry_run=False)
     crit = live["critics"]
     assert crit["written"] is True and crit["verdict_state"] == "landed" and "would_write" not in crit
-    assert len(routine_table.puts) == 3 and len(config_table.puts) == 2, (routine_table.puts, config_table.puts)
+    assert len(routine_table.puts) == 6 and len(config_table.puts) == 2, (routine_table.puts, config_table.puts)
     assert not set(api_calls) & _WRITE_OPS and http_calls == []
 
     by_kind = {w["kind"]: w for w in dry["critics"]["would_write"]}
     routine_kinds = ["routine_version", "routine_current", "routine_index"]
-    assert _keys(routine_table.puts) == _keys([by_kind[k] for k in routine_kinds])
+    assert _keys(routine_table.puts) == _keys([w for w in dry["critics"]["would_write"] if w["kind"] in routine_kinds])
     assert _keys(config_table.puts) == _keys([by_kind["corrections_ledger"], by_kind["coach_thread"]])
     # same plan either way: the joints cap applied, the historian overridden
     assert _joints_cap(crit)[0]["applied"] is True and len(ir.exercises[1].sets) == 2
-    assert routine_table.puts[1]["exercises"][1]["sets"] == by_kind["routine_current"]["item"]["exercises"][1]["sets"]
+    assert routine_table.puts[4]["exercises"][1]["sets"] == by_kind["routine_current"]["item"]["exercises"][1]["sets"]
 
 
 def test_dry_run_without_an_override_leaves_the_veto_standing_and_lists_no_ledger_row():
     out, ir, routine_table, config_table, api_calls, _ = _run(dry_run=True, override=False)
     crit = out["critics"]
     assert crit["veto"] is True and crit["owner_overrides"] == [] and "a veto STANDS" in crit["next"]
-    assert [w["kind"] for w in crit["would_write"]] == ["routine_version", "routine_current", "routine_index", "coach_thread"]
+    version = ["routine_version", "routine_current", "routine_index"]
+    assert [w["kind"] for w in crit["would_write"]] == [*version, *version, "coach_thread"]  # #5781: two versions
     assert routine_table.puts == config_table.puts == [] and not set(api_calls) & _WRITE_OPS
     assert _joints_cap(crit)[0]["applied"] is True, "the cap is applied to the draft with or without the veto"
 
@@ -179,7 +183,7 @@ def test_a_dry_run_past_the_write_deadline_still_returns_its_would_be_writes():
     with patch("mcp.plan_call_scope.past_write_deadline", return_value="NOT WRITTEN — late"):
         out, *_ = _run(dry_run=True)
         live, _, routine_table, *_ = _run(dry_run=False)
-    assert out["critics"]["verdict_state"] == "dry_run" and len(out["critics"]["would_write"]) == 5
+    assert out["critics"]["verdict_state"] == "dry_run" and len(out["critics"]["would_write"]) == 8  # #5781: two versions
     assert live["critics"]["verdict_state"] == "not_written" and routine_table.puts == [], "the real run still refuses late"
 
 
