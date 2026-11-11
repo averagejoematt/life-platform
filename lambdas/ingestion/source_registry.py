@@ -2037,6 +2037,67 @@ UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
             "the registered `withings` source. Derived, cross_phase."
         ),
     },
+    # ── #5524: the seven SOURCE# partitions the first census refresh since 2026-09-22 found with no
+    # disposition. Row counts are deliberately NOT stated for the owner-only ones: a count of a private
+    # partition is activity metadata, and this file is public.
+    "checkin_intake_pairs": {
+        "dated": "2026-11-10",
+        "reason": (
+            "Written by health/checkin_intake_pairs.write_day from compute/scenario_explorer_lambda.py — the weekly "
+            "pairing of the owner's evening check-in with the same days' intake (#5106). DERIVED from registered "
+            "inputs on a compute cron; no vendor feed, so no cadence of its own. TIER_OWNER_ONLY."
+        ),
+    },
+    "clinical": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The owner clinical record: owner-written via scripts/load_clinical_record.py --apply; no lambda writes "
+            "it (ADR-155 amendment, 2026-10-12). Documents arrive when a clinician produces one — there is no "
+            "cadence a staleness check could hold. TIER_INTERNAL; raw documents are NON_INGESTION_RAW_PREFIXES."
+        ),
+    },
+    "journal_quotes": {
+        "dated": "2026-11-10",
+        "reason": (
+            "Consent records for journal lines the owner marks for publication, written by the MCP journal tool "
+            "(mcp/tools_journal.py through content/journal_quotes.py's mark-time gate). An owner ACT, not a feed: "
+            "nothing arrives on a schedule, so a staleness threshold would only measure how often he chooses to "
+            "publish a line."
+        ),
+    },
+    "may_tracker": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The weekly May tracker row, written by training/may_tracker.write_week via the MCP tool "
+            "mcp/tools_may_tracker.py (#5073). DERIVED from registered sources (withings weight, apple_health steps, hevy strength). "
+            "TIER_OWNER_ONLY; its liveness is its producer's, not a vendor's."
+        ),
+    },
+    "nutrition_titration": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The weekly calorie titration decision, written by health/titration.write_decision from the nightly "
+            "predraft's titration leg (mcp/titration_leg.py, #5096). DERIVED from registered sources; the leg "
+            "carries its own dead-man (titration.deadman_row). TIER_OWNER_ONLY."
+        ),
+    },
+    "public_corrections": {
+        "dated": "2026-11-10",
+        "reason": (
+            "The public correction ledger of the scoring methods (owner rulings 2026-11-05/06): one item per "
+            "method version, written by scripts/backfill_public_variant.py --apply and served by "
+            "/api/character_config. Written once per methodology change, never on a cadence."
+        ),
+    },
+    "training_constraints": {
+        "dated": "2026-11-10",
+        "reason": (
+            "Owner-only training records keyed by sk family: pain-flag dismissals (DISMISSAL#, the MCP "
+            "get_exercise_notes action, #4036), the weekly panel-rubric grade (PANEL#, mcp/panel_weekly_grade.py, "
+            "#5072) and walking corrections (WALK_CORRECTION#). Owner acts and derived grades, not a vendor feed. "
+            "TIER_OWNER_ONLY."
+        ),
+    },
 }
 
 # ── Non-ingestion / accidental raw/ prefixes (#3570) ──────────────────────────────
