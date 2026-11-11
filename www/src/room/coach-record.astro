@@ -11,14 +11,19 @@
 import Base from "../layouts/Base.astro";
 import Quote from "../components/Quote.astro";
 import StatusTag from "../components/StatusTag.astro";
-import { DISPUTED_NOTE } from "../lib/disputed.js";
+import { DISPUTED_NOTE, isDisputed } from "../lib/disputed.js";
 import { correctionRows, gradeNoteRows, ruleText } from "../lib/corrections.js";
 import { KIND_WORDS, coachVerified, verdictWords, versusGuess } from "../lib/calibration.js";
 import { CALL_NOT_PUBLISHED, docketEntries } from "../lib/docket.js";
 import {
+  APPROVED_WORDS_NOTE,
   NOT_PUBLISHED,
   WHAT_MATT_DID_NOTE,
+  approvedWords,
   askCountsText,
+  readsCoverage,
+  briefFact,
+  briefView,
   askRows,
   callsByDay,
   coachRecord,
@@ -31,6 +36,7 @@ import {
   roomCoach,
   stanceTimeline,
   voiceRows,
+  withApprovedClaims,
 } from "../lib/coach_room.js";
 import { clip, dayInWords, domainWords, kOfN } from "../lib/format.js";
 import { ROOM_MARKER, roomAll } from "../lib/room.js";
@@ -64,7 +70,15 @@ const fidelity = fidelityText(entry && entry.fidelity);
 const vf = file && file.voice_fidelity;
 const record = coachRecord(calCoach, entry && entry.record_card);
 const verified = coachVerified(calCoach); // the per-row verified record, when /api/calibration serves it
-const mine = all.byType.prediction.filter((p: any) => p.coach_id === c.id);
+// CR2 (owner ruling 2026-11-09, D + E): the owner-approved historical words and the public-safe brief, both carried
+const approved = approvedWords(entry);
+const brief = briefView(entry, file && file.fetched_at);
+const briefNow = briefFact(brief);
+const READS_SHOWN = 3;
+const coverage = readsCoverage(approved);
+const mine = withApprovedClaims(all.byType.prediction.filter((p: any) => p.coach_id === c.id), entry);
+// an approved call's verdict is the LEDGER's (its classification review included) when the ledger serves the call
+const ledgerOf = (id: any) => (id ? mine.find((p: any) => typeof p.id === "string" && p.id.endsWith(`-${id}`)) : null) || null;
 const days = callsByDay(mine);
 const DAYS_SHOWN = 8;
 const ASKS_SHOWN = 10;
@@ -124,6 +138,11 @@ const num1 = "font-size:15px;line-height:1.5";
         <p class="label">The asks</p>
         <p style="font-size:20px;font-weight:700;margin-top:6px;line-height:1.25">{askCounts || "none served"}</p>
         <p class="muted" style="font-size:13px;margin-top:4px">what Matt did: not recorded</p>
+      </div>
+      <div style="padding:18px 0;border-bottom:1px solid var(--rule)" data-brief-fact>
+        <p class="label">The public brief</p>
+        <p style="font-size:20px;font-weight:700;margin-top:6px;line-height:1.25">{briefNow.line}</p>
+        <p class="muted" style="font-size:13px;margin-top:4px">{briefNow.sub}</p>
       </div>
     </div>
   </section>
@@ -229,6 +248,77 @@ const num1 = "font-size:15px;line-height:1.5";
       </div>
     </div>
   </section>
+
+  {
+    approved.state === "ok" && (approved.calls.length > 0 || approved.reads.length > 0) && (
+      <section class="section" {...room} id="approved-words" style="border-top:1px solid var(--ink)" data-approved-words>
+        <div class="wrap grid cols2" style="gap:48px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <p class="label">In their own words, approved for publication</p>
+            <h2 style={h2}>{approved.calls.length > 0 ? `${approved.calls.length} sealed day-one ${approved.calls.length === 1 ? "call" : "calls"}` : coverage.heading}</h2>
+            {approved.reads.length > 0 && coverage.line && <p style="font-size:14px;max-width:62ch;line-height:1.5" data-reads-coverage>{coverage.line}</p>}
+            <p class="muted" style="font-size:13px;max-width:62ch">{APPROVED_WORDS_NOTE}{approved.approvedOn ? ` Approved ${approved.approvedOn}.` : ""}</p>
+            {approved.calls.length > 0 && <p style="font-size:14px;max-width:62ch;line-height:1.5">Sealed in the pre-registration at the start of the experiment, and graded later by the same rules as every other call. The verdict beside each is the ledger's.</p>}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            {
+              approved.calls.length > 0 && (
+                <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-approved-calls>
+                  {approved.calls.map((x: any) => {
+                    const led = ledgerOf(x.id);
+                    return (
+                      <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
+                        <p style="font-size:15px;line-height:1.5"><Quote text={x.claim} said={x.said} /></p>
+                        <p style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;font-size:12px">
+                          {led ? <StatusTag status={led.status} date={led.settled_date} call disputed={isDisputed(led)} /> : x.status ? <StatusTag status={x.status} date={x.settled} call /> : null}
+                          <span class="muted">{[x.day ? `sealed ${x.day}` : null, x.metric].filter(Boolean).join(" · ")}</span>
+                          {led && <a href={href(pathOf("prediction", led.id))}>the call in the ledger →</a>}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )
+            }
+            {
+              approved.reads.length > 0 && (
+                <>
+                  <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-approved-reads>
+                    {approved.reads.slice(0, READS_SHOWN).map((r: any) => (
+                      <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
+                        <p style="font-size:14px;font-weight:700">{r.day}</p>
+                        <div class="serif" style="font-size:17px;line-height:1.5"><Quote text={r.text} said={r.said} block /></div>
+                        <p class="muted" style="font-size:12px">{[r.written ? `written ${r.written}` : null, r.through ? `data through ${r.through}` : null].filter(Boolean).join(" · ")}</p>
+                        {r.cited.length > 0 && (
+                          <details style="font-size:13px">
+                            <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">The figures it cites ({r.cited.length})</summary>
+                            <div class="rows">{r.cited.map((x: any) => (<div><span style="font-size:13px">{x.metric}{x.asOf ? <span class="muted"> · {x.asOf}</span> : ""}</span><span class="mono">{x.value}</span></div>))}</div>
+                          </details>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                  {approved.reads.length > READS_SHOWN && (
+                    <details>
+                      <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Earlier approved reads ({approved.reads.length - READS_SHOWN})</summary>
+                      <ol style="list-style:none;padding:0;margin:0">
+                        {approved.reads.slice(READS_SHOWN).map((r: any) => (
+                          <li style="padding:10px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px">
+                            <p style="font-size:13px;font-weight:700">{r.day}</p>
+                            <p style="font-size:14px;line-height:1.5"><Quote text={r.text} said={r.said} /></p>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                </>
+              )
+            }
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   <section class="section" {...room} id="stance" style="border-top:1px solid var(--ink)">
     <div class="wrap grid cols2" style="gap:48px;align-items:start">
@@ -421,6 +511,90 @@ const num1 = "font-size:15px;line-height:1.5";
         )
       }
       {entry && entry.asks && entry.asks.disclosure && <p class="muted" style="font-size:12px;max-width:72ch">{entry.asks.disclosure}</p>}
+    </div>
+  </section>
+
+  <section class="section" {...room} id="public-brief" style="border-top:1px solid var(--ink)" data-public-brief={brief.state}>
+    <div class="wrap grid cols2" style="gap:48px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <p class="label">The public brief</p>
+        <h2 style={h2}>{brief.latest ? `${c.name}'s brief for ${brief.latest.week}` : "A weekly brief, written for publication"}</h2>
+        <p style="font-size:14px;max-width:62ch;line-height:1.5">
+          Each week, a brief written only from measured, publishable data, with its parts kept apart: what the numbers show and how the coach reads them, specific calls with their test frozen before the window opens, what the coach proposes, what Matt actually did as recorded by the data, and any later change of position. Nothing before the first brief is reconstructed.
+        </p>
+        {!brief.latest && <div class="empty" data-brief-empty><span>{brief.emptyText}</span></div>}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        {
+          brief.latest && (
+            <>
+              <p class="muted" style="font-size:13px">{[brief.latest.through ? `data through ${brief.latest.through}` : null, brief.latest.written ? `written ${brief.latest.written}` : null].filter(Boolean).join(" · ")}</p>
+              {brief.latest.interpretations.map((i: any) => (
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <div class="serif" style="font-size:17px;line-height:1.5"><Quote text={i.text} said={brief.latest.said} block /></div>
+                  {i.rests.length > 0 && <p class="muted" style="font-size:12px">rests on: {i.rests.join(" · ")}</p>}
+                </div>
+              ))}
+              <details>
+                <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">What the numbers show ({brief.latest.observations.length})</summary>
+                <div class="scroll" tabindex="0" role="region" aria-label="The brief's observations (scrolls sideways)">
+                  <table style="min-width:520px" data-brief-observations>
+                    <thead><tr><th>Measure</th><th>Last 7 days</th><th>The 7 before</th><th>Last 28 days</th><th>Latest</th></tr></thead>
+                    <tbody>
+                      {brief.latest.observations.map((o: any) => (
+                        <tr><td>{o.label}</td><td class="mono">{o.last7}{o.last7n != null ? <span class="muted"> · {o.last7n} days</span> : ""}</td><td class="mono">{o.prior7}</td><td class="mono">{o.last28}</td><td class="mono">{o.latest}{o.latestDay ? <span class="muted"> · {o.latestDay}</span> : ""}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+              <details>
+                <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">The calls, and how each will be graded ({brief.latest.predictions.length})</summary>
+                {brief.latest.predictions.length ? (
+                  <ol style="list-style:none;padding:0;margin:0" data-brief-calls>
+                    {brief.latest.predictions.map((p: any) => (
+                      <li style="padding:10px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px;font-size:14px">
+                        <p style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline"><StatusTag status={p.status} date={p.settled} call /><Quote text={p.claim} said={brief.latest.said} /></p>
+                        {p.confidence && <p class="muted" style="font-size:12px">{p.confidence}</p>}
+                        {p.rationale && <p style="font-size:13px"><span class="muted">Why: </span><Quote text={p.rationale} said={null} /></p>}
+                        {p.rule && <p class="muted" style="font-size:12px">{p.rule}</p>}
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p class="muted" style="font-size:13px">No call in this brief is served.</p>}
+              </details>
+              <details>
+                <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">What the coach proposed, and what Matt did ({brief.latest.recommendations.length})</summary>
+                <ol style="list-style:none;padding:0;margin:0" data-brief-recommendations>
+                  {brief.latest.recommendations.map((r: any) => (
+                    <li style="padding:10px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px;font-size:14px">
+                      <p><Quote text={r.text} said={null} /></p>
+                      {r.rationale && <p style="font-size:13px"><span class="muted">Why: </span><Quote text={r.rationale} said={null} /></p>}
+                      <p style="font-size:13px"><span class="muted">What Matt did: </span>{r.did}</p>
+                    </li>
+                  ))}
+                </ol>
+                <p class="muted" style="font-size:12px;margin-top:6px">What Matt did is read from the recorded data over the brief's own week, never inferred from timing.</p>
+              </details>
+              {brief.latest.revisions.length > 0 && (
+                <details>
+                  <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Later changes of position ({brief.latest.revisions.length})</summary>
+                  <ol style="list-style:none;padding:0;margin:0">
+                    {brief.latest.revisions.map((v: any) => (
+                      <li style="padding:10px 0;border-bottom:1px solid var(--rule);font-size:14px;display:flex;flex-direction:column;gap:4px">
+                        <p><Quote text={v.text} said={null} /></p>
+                        <p class="muted" style="font-size:12px">{[v.week ? `in ${v.week}` : null].filter(Boolean).join("")}</p>
+                        {v.reason && <p style="font-size:13px"><span class="muted">Why: </span><Quote text={v.reason} said={null} /></p>}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
+              {brief.earlier.length > 0 && <p class="muted" style="font-size:13px">Earlier briefs: {brief.earlier.map((e: any) => e.week).join(" · ")}.</p>}
+            </>
+          )
+        }
+      </div>
     </div>
   </section>
 
