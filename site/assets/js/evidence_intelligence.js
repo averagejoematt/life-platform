@@ -357,7 +357,18 @@ export async function renderCorrelations(d) {
 // a skeptic reaches the frozen artifact whichever door they came in. Honest-empty:
 // a freshly re-anchored cycle whose stamp hasn't published yet renders nothing.
 function _sealBlock(seal) {
-  if (!seal || !seal.sha256 || !seal.artifact_url) return "";
+  if (!seal || !seal.sha256) return "";
+  // Owner ruling 2026-11-11 (item 3): the file link and the verify command render ONLY when the API says the file
+  // served at the sealed address hashes to this digest (verifiable === true, decided from the served bytes by
+  // prereg_seal_state.assess). Anything else — false, or absent from an older API — publishes the digest and the
+  // reason, and offers no check a reader could not complete.
+  if (seal.verifiable !== true || !seal.artifact_url) {
+    return sec(
+      "The frozen pre-registration — sealed before Day 1",
+      `<p class="rd-line">${esc(seal.unverifiable_text || "The file served at the sealed address cannot be checked against this hash from this site.")}</p>` +
+        `<p class="rd-line label">SHA-256</p><pre class="rd-code">${esc(seal.sha256)}</pre>`,
+    );
+  }
   return sec(
     "The frozen pre-registration — sealed before Day 1",
     `<p class="rd-line">This experiment's predictions and hypotheses were locked and hash-sealed before any Day-1 data existed: ` +
@@ -365,9 +376,9 @@ function _sealBlock(seal) {
       `<p class="rd-line label">SHA-256</p><pre class="rd-code">${esc(seal.sha256)}</pre>` +
       (seal.verify
         ? `<div class="rd-verify"><pre class="rd-code rd-verify-cmd">${esc(seal.verify)}</pre>` +
-          `<button type="button" class="rd-copy-btn" data-copy="${esc(seal.verify)}">copy verify command</button></div>`
-        : "") +
-      `<p class="rd-archive">Anyone can run that command and compare the printed hash against the one above — the claims can't be quietly edited after they were made.</p>`,
+          `<button type="button" class="rd-copy-btn" data-copy="${esc(seal.verify)}">copy verify command</button></div>` +
+          `<p class="rd-archive">Anyone can run that command and compare the printed hash against the one above — the claims can't be quietly edited after they were made.</p>`
+        : ""),
   );
 }
 

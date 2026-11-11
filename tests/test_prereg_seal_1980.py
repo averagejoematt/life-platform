@@ -62,6 +62,7 @@ def _load(module_name: str, rel_path: str):
 
 
 gps = _load("genesis_prereg_stamp", "deploy/genesis_prereg_stamp.py")
+_ARTIFACT = REPO_ROOT / "deploy" / "generated" / "genesis_preregistration.json"
 
 
 def _body(resp):
@@ -74,6 +75,10 @@ def _reset_seal_cache(monkeypatch):
     don't leak the previous test's monkeypatched S3 result into the next."""
     monkeypatch.setattr(common, "_prereg_seal_cache", None)
     monkeypatch.setattr(common, "_prereg_seal_attempted", False)
+    # The sealed file as served: the committed frozen artifact, which hashes to the committed stamp (owner ruling
+    # 2026-11-11 item 3 — the verify command is offered only when the served bytes match). The withdrawn case is
+    # tests/test_prereg_seal_withdrawn.py.
+    monkeypatch.setattr(common, "_load_s3_bytes", lambda key, name: _ARTIFACT.read_bytes())
 
 
 def _real_stamp():
