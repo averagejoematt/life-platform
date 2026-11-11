@@ -97,7 +97,7 @@ def test_owner_request_is_in_the_locked_taxonomy_and_the_extractor_version_moved
     """Mutation: drop the class from TAXONOMY (merge_signals then silently drops every owner_request signal)."""
     assert "owner_request" in tn.TAXONOMY
     assert tn.OWNER_REQUEST_SUBTYPES == nr.SUBTYPES == ("form_guidance", "question", "rule_request")
-    assert tn.ALGO_VERSION == "note-extractor@1.2.0"
+    assert tn.ALGO_VERSION >= "note-extractor@1.2.0"  # #5800 moved it again (1.3.0, pain severity)
     spec = (ROOT / "docs" / "specs" / "SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md").read_text()
     assert "§5d" in spec and "owner_request" in spec, "the taxonomy is a Phase-0 lock: an added class is dated and argued in the spec"
 

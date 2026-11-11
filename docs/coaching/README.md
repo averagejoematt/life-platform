@@ -35,6 +35,10 @@ prefix, owner-credential access only). Relocated there 2026-08-23 (#3043):
   **UNCONFIRMED by the owner** (`gate:owner`, #3715) until he reviews the list in
   `lambdas/training/training_context_registry.py`'s `RECORDED_CONSTRAINTS` and flips
   `CONFIRMED_BY_OWNER` there — a coach must not treat it as cleared before that.
+- `exercise_library.private.json` — the N=1 half of the exercise library (#5769): best set per bodyweight
+  band, coded note signals, learned availability, gate threshold values. **Not yet written** — the driver runs
+  `deploy/write_exercise_library_overlay.py --apply` after review; the public half and the approval path are
+  `EXERCISE_LIBRARY.md` here.
 - `WORKORDER_BENCH1_benchmarking.md` — the BENCH-1 work order (ADR-089)
 - `WORKORDER_DI1_movement_integrity.md` — the DI-1 work order (ADR-091)
 
