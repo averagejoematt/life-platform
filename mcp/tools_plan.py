@@ -633,7 +633,7 @@ def tool_plan_next_session(args):
     target_date = args.get("target_date") or pacific_today()
     routine_id = args.get("routine_id")
 
-    from training import accessory_strength_trend, plan_engine, step_gap_walk
+    from training import accessory_strength_trend, plan_engine, step_gap_walk, week_commitments
 
     # #4076: the owner override is parsed BEFORE anything runs — a malformed one is an error,
     # never a stage-2 run that silently ignored it and left the veto standing unexplained.
@@ -892,6 +892,7 @@ def tool_plan_next_session(args):
     _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     attach_morning_note(block, target_date, recovery_tier)  # #4189: his four words beside the recovery tier
     _attach_session_loads(block, target_date, catalog_movements)
+    week_commitments.attach(block, ir, target_date, catalog_movements)  # #5774: the ledger's weekly commitments, hard at stage 1
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
     accessory_strength_trend.attach(block, evidence)

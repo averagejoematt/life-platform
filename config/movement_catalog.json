@@ -9,13 +9,13 @@
     "history_through": "2026-10-18",
     "workouts": 518,
     "distinct_templates": 538,
-    "entries": 543,
-    "reviewed": 26,
+    "entries": 544,
+    "reviewed": 27,
     "coach_added": 2,
     "generated": 515,
     "entries_by_skill_tier": {
       "1": 278,
-      "2": 197,
+      "2": 198,
       "3": 68
     },
     "entries_by_anchor_family": {
@@ -926,6 +926,31 @@
       "sessions": 31,
       "first_done": "2023-01-03",
       "last_done": "2026-06-19",
+      "anchor_family": null
+    },
+    "kettlebell_deadlift": {
+      "title": "Sumo Deadlift",
+      "hevy_template_id_hint": "D20D7BBE",
+      "primary_muscle": "other",
+      "secondary_muscles": [],
+      "volume_muscle": null,
+      "hevy_primary_muscle_group": "other",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:kettlebell (a kettlebell, by the owner ruling that names it)",
+      "joint_friendly_score": 2,
+      "default_rep_range": {
+        "start": 6,
+        "end": 8
+      },
+      "equipment": "kettlebell",
+      "notes": "#5774 owner ruling 2026-11-11: the kettlebell slot enters through 2 kettlebell-deadlift exposures, then the swing. Hevy has no Kettlebell Deadlift template (the Hevy template index of 2026-11-11 holds none; the exercise library notes template_id null and a custom template to create). Until one exists it logs under the closest real template no catalog key already holds: Sumo Deadlift D20D7BBE (the kettlebell deadlift is a floor-start hinge with the bell between the feet, a sumo stance; never logged before, so its exposures count cleanly). Deadlift (Dumbbell) 5F4E6DD3 is closer by implement but already catalogued (deadlift_dumbbell, with 2021-2025 history), and one template id is catalogued once (#4169). Counted as `other` like the swing, so it never moves a weekly muscle count; no anchor_family, so it is never the hinge anchor. One kettlebell, logged as the bell's weight.",
+      "provenance": "hand_curated",
+      "reviewed": true,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
       "anchor_family": null
     },
     "lat_pulldown_close_grip_cable": {
