@@ -106,6 +106,12 @@ INPUT_KEYS = (
     "metabolic_adaptation_flag",  # bool derived from the severity by the caller, or None
     "training_above_prescription_weeks",  # int, or None when the platform has no such read yet
     "estimated_maintenance_kcal",  # optional, for sizing a diet break
+    "last_weighin_date",  # #5802: weigh_in_dark's input (health.tripwire_readers)
+    "sleep_hours_by_day",  # #5802: 14 entries oldest->newest (Whoop sleep_duration_hours), None for an unmeasured night
+    "rhr_by_day",  # #5802: same shape (Whoop resting_heart_rate) — the medical stop line's RHR arm
+    "lab_draws",  # #5802: every labs draw, chronological — the medical stop lines' lab arms
+    "mood_instrument",  # #5802: injected by the check-in lane (#5819); never resolved here
+    "joy_answers",  # #5802: injected by the check-in lane (#5819); never resolved here
 )
 
 
@@ -1039,6 +1045,9 @@ def decisions_offered(
 
 def block(inputs: dict[str, Any], *, already_logged: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """The whole owner-facing block: verdicts + decisions, one call."""
+    from health import tripwire_readers  # imported here: tripwire_readers reads this module's helpers
+
     res = run(inputs)
     res["decisions_offered"] = decisions_offered(res["verdicts"], inputs, already_logged=already_logged or [])
+    res["tripwire_reports"] = tripwire_readers.evaluate(inputs)  # #5802: report-only rows for the tripwires nothing else read
     return res

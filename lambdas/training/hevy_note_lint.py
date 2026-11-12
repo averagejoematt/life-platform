@@ -553,6 +553,13 @@ def _lint_intervals(m: "re.Match[str]", lines: list[str], clock: list[str], wher
 
 def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> None:
     lines = body.split("\n")
+    # #5796 (owner ruling 2026-11-11): the RPE capture prompt opens a drafted cardio note; it is an input field, so the
+    # rules below read the note after it. Anywhere else it is a misplaced prompt.
+    if lines[0].strip() == g.CARDIO_RPE_CAPTURE_LINE and len(lines) > 1:
+        lines = lines[1:]
+        body = "\n".join(lines)
+    if any(ln.strip() == g.CARDIO_RPE_CAPTURE_LINE for ln in lines):
+        out.append(Problem("L3", where, f"the {g.CARDIO_RPE_CAPTURE_LINE!r} prompt is the note's first line only"))
     m = g.CARDIO_LINE1_RE.match(lines[0])
     if not m:
         out.append(Problem("L3", where, f"cardio line 1 grammar: {lines[0]!r}"))
@@ -622,7 +629,12 @@ def _lint_cues(rt: LintRoutine, bodies: list[str], out: list[Problem], not_check
                 out.append(Problem("L8", where, f"a {wrong[0]} cue on a {ex.family} exercise"))
             if ex.family not in seen:
                 lines = body.split("\n")[1:]
-                free = [ln for ln in lines if not g.REASON_RE.match(ln) and not ln.startswith("W set:") and ln not in prep_family]
+                # #5771: the fallback line (`If taken: …`) names other exercises; it is never the family's cue
+                free = [
+                    ln
+                    for ln in lines
+                    if not g.REASON_RE.match(ln) and not ln.startswith("W set:") and ln not in prep_family and not g.FALLBACK_RE.match(ln)
+                ]
                 if ex.family not in present and not free:
                     out.append(Problem("L8", where, f"first {ex.family} exercise without its cue ({g.FAMILY_CUES[ex.family]!r})"))
                 seen.add(ex.family)

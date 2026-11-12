@@ -25,6 +25,7 @@ sys.path.insert(0, str(REPO))
 
 from coach import critics  # noqa: E402
 from training import cardio_note, session_block, standing_constraints as sc  # noqa: E402
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.hevy_compiler import to_create_body  # noqa: E402
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 from training.routine_title import format_why_note  # noqa: E402
@@ -280,7 +281,7 @@ def test_the_cardio_swap_is_the_composers_note_with_no_hr_target():
         constraint=sc.active_constraint("2026-10-28"),
     )
     assert swapped.movement_key == "cycling" and swapped.notes == want
-    assert cardio_note.LINE1_RE.match(swapped.notes.split("\n")[0])
+    assert cardio_note.LINE1_RE.match(_wc(swapped.notes).split("\n")[0])
     assert not [t for t in ("bpm", "#", "joints", "swapped", "critic") if t in swapped.notes]
     # mutation control: the pre-#5428 literal carried exactly what this scan refuses
     old = "Cycling (recumbent), same duration, HR avg ≤ 120 bpm (target 105) — swapped from treadmill by joints_tendons (#4387)"

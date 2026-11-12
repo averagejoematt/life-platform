@@ -13,6 +13,8 @@ the W rows and the PREVIOUS column, so the note carries only what a row cannot:
     RPE a–b[, last set RPE c–d]     line 1, always — the charter's band (`session_cues.exposure_cue`)
     ‹one reason›                    only when a row moves more than one step from PREVIOUS, or the scheme changes
     ‹one cue›                       the first exercise of a movement family (`movement_cues`)
+                                    + an anchor lift's one sheet cue (`form_cue_sheets`, #5817)
+    If taken: ‹X›, then ‹Y›.        last, when it fits: the ranked same-stimulus fallback (#5771, `fit_fallback`)
 
 A movement with no session on file, or none in `STALE_AFTER_DAYS`, is the pick-load form: a no-load W row of 8 ahead
 of the engine's start load, and `W set: up to 8 easy reps, test the load.` (`find the load.` when the rows carry
@@ -38,7 +40,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from training import hevy_note_grammar, movement_cues
+from training import form_cue_sheets, hevy_note_grammar, movement_cues
 from training.rep_scheme import LB_IN_KG, implement_step_lb
 from training.session_cues import effort_line, exposure_cue
 
@@ -493,13 +495,47 @@ def _ex1_room() -> int:
     return min(hevy_note_grammar.LIFT_MAX_LINES, hevy_note_grammar.EX1_MAX_LINES - 1 - hevy_note_grammar.phone_lines(block))
 
 
-def _cue_for(family: str | None, entry: dict[str, Any], lines: list[str], room: int) -> str:
+def _cue_for(family: str | None, entry: dict[str, Any], lines: list[str], room: int, sheet_cue: str = "") -> str:
     """The family cue, with the #5049 prep clause when the note still fits its budget with it (R8: one prep cue per
-    compound family, "if overkill skip"); a reason line no longer drops the prep by itself."""
+    compound family, "if overkill skip"); a reason line no longer drops the prep by itself.
+
+    `sheet_cue` (#5817, owner ruling 2026-11-11 D8): an anchor lift's one still-visible cue from its cue sheet
+    (`form_cue_sheets.anchor_note_cue`) rides between the prep clause and the family cue. It outranks the prep clause
+    and never displaces the family breathing cue (standard §6.1): `prep + sheet + family`, then `sheet + family`, then
+    the family cue's own forms. Empty for every non-anchor, which is then exactly the old two-step choice."""
     with_prep = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=True)
-    if hevy_note_grammar.phone_lines("\n".join(lines + [with_prep])) <= room:
-        return with_prep
-    return movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=False)
+    bare = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=False)
+    tries = [with_prep]
+    if sheet_cue and bare:
+        prefix = with_prep[: -len(bare)]  # the prep clause and its space, or "" when the family has none
+        tries = [f"{prefix}{sheet_cue} {bare}", f"{sheet_cue} {bare}", with_prep]
+    for line in tries:
+        if hevy_note_grammar.phone_lines("\n".join(lines + [line])) <= room:
+            return line
+    return bare
+
+
+def fit_fallback(lines: list[str], cue: str, names: list[str] | None, room: int) -> tuple[str, str]:
+    """(cue, fallback line) for a lift note whose other lines are `lines` (#5771, owner ruling 2026-11-11: every movement's
+    ranked same-stimulus fallback renders in its note). The fallback line is LAST and is the first thing the budget takes,
+    after the optional prep clause (standard §3.2, the fallback line): try it with the cue as chosen, then with the prep
+    clause dropped from the cue; two names, then one; else no fallback line. The breathing / family cue and an anchor's
+    sheet cue never yield to it. ("", cue unchanged) when it does not fit or there is no clean name."""
+    g = hevy_note_grammar
+    names = [n for n in names or [] if g.fallback_line([n])]  # a title that cannot go on the wire is skipped, not the line
+    if not names:
+        return cue, ""
+    cues = [cue]
+    if cue:
+        lead = next((p for p in g.PREP_CUES.values() if cue.startswith(p + " ")), None)
+        if lead:
+            cues.append(cue[len(lead) + 1 :])
+    for c in cues:
+        for n in range(min(len(names), g.FALLBACK_MAX_NAMES), 0, -1):
+            line = g.fallback_line(names[:n])
+            if line and g.phone_lines("\n".join(lines + ([c] if c else []) + [line])) <= room:
+                return c, line
+    return cue, ""
 
 
 def compose_blocks(
@@ -511,6 +547,7 @@ def compose_blocks(
     target_date: str,
     rotations: dict[str, str] | None = None,
     authored: dict[str, dict[str, str]] | None = None,
+    fallbacks: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     """Rewrite every lift block's note to the standard, IN PLACE, after every load and warm-up pass. Returns the
     `inputs_snapshot` record: `previous_loads` (Hevy's PREVIOUS, for the linter) and `lift_notes` (per movement: the
@@ -534,7 +571,11 @@ def compose_blocks(
     `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own sentences that already read as
     the standard (`authored_lines`) — `effort` replaces line 1, `line` takes the cue slot (a chat-era technique cue counts
     as the cue, standard §4, so the family cue is not added beside it). On that path a block whose rows carry the
-    author's load never gets the pick-load feeler (the load is chosen)."""
+    author's load never gets the pick-load feeler (the load is chosen).
+
+    `fallbacks` (`selection_engine.note_fallbacks`, #5771: served key -> ranked same-stimulus Hevy titles, unavailable ones
+    never named) gives a lift its LAST line, `If taken: X, then Y.`, when it fits the budget (`fit_fallback`: it yields
+    before the breathing cue and an anchor's sheet cue, after the prep clause). A carry keeps its own four-line grammar."""
     from training.exercise_history import previous_load
 
     movements = (load_floors or {}).get("movements") or {}
@@ -599,10 +640,15 @@ def compose_blocks(
         pick_line = (_pick_result_line(block, entry) if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""
         body = [x for x in (line1, lead, line2, own.get("conditional"), pick_line) if x]  # #5782: the caller's if-then
         cue = own.get("line") or ""
+        room = _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES
+        sheet_cue = "" if cue else form_cue_sheets.anchor_note_cue(key, entry)  # #5817: an author's own cue wins
         if family and family not in seen_families:
-            cue = cue or _cue_for(family, entry, body, _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES)
+            cue = cue or _cue_for(family, entry, body, room, sheet_cue)
             seen_families.add(family)
-        block.notes = "\n".join(body + ([cue] if cue else []))
+        elif sheet_cue and hevy_note_grammar.phone_lines("\n".join(body + [sheet_cue])) <= room:
+            cue = sheet_cue  # an anchor after its family's first exercise: its sheet cue alone (the family cue was given)
+        cue, fb_line = fit_fallback(body, cue, (fallbacks or {}).get(key), room)  # #5771: last, and first to yield
+        block.notes = "\n".join(body + ([cue] if cue else []) + ([fb_line] if fb_line else []))
         notes[key] = {
             "note": block.notes,
             "layoff_return": layoff,
@@ -612,6 +658,9 @@ def compose_blocks(
             "pick_load": pick,
             "detail": detail,
         }
+        fb_names = (fallbacks or {}).get(key)
+        if fb_names:  # #5771: the ranked names, and whether the budget let the line on the wire
+            notes[key]["fallback"] = {"names": list(fb_names), "line": fb_line or None}
         if swapped and not lead:
             notes[key]["rotation_of"] = swapped  # #5428: a swap onto a lift he did recently is not "New" on the wire
     return {"previous_loads": previous_loads, "lift_notes": notes}

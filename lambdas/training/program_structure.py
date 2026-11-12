@@ -292,7 +292,7 @@ ACCESSORY_POOL: dict[str, list[str]] = {
     # #5069: face_pull (rear delts, 93 logged sessions) joins for the shoulders+arms day; #5318 (owner ruling B3, 2026-10-24):
     # the farmer's carry replaced the dumbbell shrug there (traps, grip and core)
     "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise", "face_pull", "farmers_walk"],
-    "lower": ["leg_press", "leg_curl", "calf_raise_machine", "machine_crunch", "machine_hip_thrust"],
+    "lower": ["leg_press", "leg_curl", "calf_raise_machine", "machine_crunch", "machine_hip_thrust", "kettlebell_swing"],  # #5774
 }
 """The pools, one per archetype, the block's accessories are chosen FROM at block start (v0.4's machines/cables, plus the
 shoulders+arms day's face pull, #5069, and the farmer's carry that replaced its dumbbell shrug, #5318); not a rotation menu (the rotation is #5075's). `leg_press` is a squat-family member used here as a lower ACCESSORY — the committed first v0.4
@@ -658,9 +658,12 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         "anchor_keys": {"hinge": ["romanian_deadlift_barbell", "romanian_deadlift_dumbbell", "machine_hip_thrust"]},
         "anchor_reps": {"hinge": [8, 10]},
         # #5053: core and calves reach their MEV floors (4 and 8 sets/wk) here; the second leg curl is the week's trade — the
-        # redline's 75-set week is full (`owner_redlines` total_hard_sets_wk) and hamstrings still sit at the 8-set floor
-        "accessories": ["calf_raise_machine", "machine_crunch"],
-        "accessory_sets": {"calf_raise_machine": 4, "machine_crunch": 4},
+        # redline's 75-set week is full (`owner_redlines` total_hard_sets_wk) and hamstrings still sit at the 8-set floor.
+        # #5774 (owner ruling 2026-11-11): the kettlebell slot — the KB swing, entered via 2 KB-deadlift exposures (`kb_entry`)
+        # — beside the RDL, set-neutral: 2 of the crunch's 4 sets (core stays at its MEV of 4 with the carry's 2 core sets).
+        # It sits before the crunch so a time trim drops the crunch first; reps 6-8 (the OD1 novel-again cap, reps <= 8)
+        "accessories": ["calf_raise_machine", "kettlebell_swing", "machine_crunch"],
+        "accessory_sets": {"calf_raise_machine": 4, "kettlebell_swing": 2, "machine_crunch": 2},
     },
 }
 """Per role: its archetype, the anchor exposures (pattern, intensity) and the block-fixed accessories, in the charter's order.
@@ -947,6 +950,7 @@ def session_prescription_for_role(
         # #5318: a carry slot is distance-dosed (`CARRY_EXPOSURE`, #5372), every other accessory is a rep range (`EXPOSURES['accessory']`)
         shape = (tmpl.get("accessory_shapes") or {}).get(k, "accessory")
         acc = CARRY_EXPOSURE if shape == "carry" else EXPOSURES["accessory"]
+        acc = {**acc, "reps": [6, 8]} if k == "kettlebell_swing" else acc  # #5774: the KB slot runs the OD1 novel-again cap, reps <= 8
         n_acc = int((tmpl.get("accessory_sets") or {}).get(k, acc["sets"]))  # #5053: a floor slot may run more than 2 sets
         # an accessory is named by its catalog key already; without the catalog it is still
         # prescribable by that key, it just has not been checked against the skill ceiling
@@ -1019,6 +1023,7 @@ def planned_session(
     if role in SESSION_TEMPLATES:
         ib = in_block_variant.performed_in_block(block_workouts, catalog_movements, day)  # #4409
         # #5075: the plan view computes the rotation (no hidden ledger read)
+        out["kb_entry_exposures"] = variant_rotation.kb_entry.exposures(block_workouts, day)  # #5774: measured, None = not read
         out["rotation"] = variant_rotation.for_session(out, catalog_movements or {}, read=False, skill_ceiling=skill_ceiling)
         applied = ((entry.get("deload_recommendation") or {}).get("applied_on")) or {}  # #5070: his recorded word's own cut
         out["prescription"] = session_prescription_for_role(
