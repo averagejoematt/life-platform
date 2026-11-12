@@ -63,6 +63,7 @@ DEC_B = "DECISION#2026-10-31T08:00:00.000Z"
 PRED = "pred_20261029_protein_first_meal_lifts_hrv"
 OUTPUT = "2026-10-30#daily_brief_sleep"
 ACTION = "2026-10-30-sleep"
+ASK = "commit_20261030_lights_out_by_22_30_on_weeknights"
 
 # The three modules allowed to name the family at all, and the one allowed to construct a row.
 REGISTRY_MODULE = "lambdas/coach/advice_links.py"
@@ -108,6 +109,14 @@ def _table(*extra):
         {"pk": "COACH#nutrition_coach", "sk": f"PREDICTION#{PRED}", "prediction_id": PRED, "coach_id": "nutrition_coach"},
         {"pk": "COACH#sleep_coach", "sk": f"OUTPUT#{OUTPUT}", "text": "Lights out by 22:30."},
         {"pk": "USER#matthew", "sk": f"SOURCE#coach_actions#{ACTION}", "action_id": ACTION, "coach_id": "sleep"},
+        {
+            "pk": "COACH#sleep_coach",
+            "sk": f"COMMITMENT#{ASK}",
+            "commitment_id": ASK,
+            "coach_id": "sleep_coach",
+            "commitment_natural": "Lights out by 22:30 on weeknights.",
+            "status": "kept",
+        },
         *extra,
     ]
     return FakeDdbTable(rows=rows, query_hook=_query_hook)
@@ -470,3 +479,83 @@ def test_the_advice_queue_is_read_only_and_outside_the_family():
     }
     assert not calls & (_DDB_WRITES | {"build_link_record", "tool_log_advice_link"}), calls
     assert not _assigns_an_asserting_state(tree)
+
+
+# ── a coach ASK (COMMITMENT#) as a reference: his words only (owner 2026-11-12) ─────────────
+
+
+def _ask_link(**over):
+    return _link(**{"coach_id": "sleep_coach", "ref_kind": "commitment", "ref_id": ASK, **over})
+
+
+def test_an_ask_is_linked_with_his_own_words_and_reads_back(table):
+    words = "I did lights out by 22:30 four of the five weeknights; Thursday ran late."
+    res = tal.tool_log_advice_link(_ask_link(state="partially_followed", evidence_text=words))
+    assert res["written"] is True and res["ref_kind"] == "commitment"
+    row = table.store[(PK, res["sk"])]
+    assert res["sk"] == f"ADVICELINK#2026-10-30T22:41:18.075Z#commitment#sleep_coach#{ASK}"
+    assert row["evidence"]["text"] == words and row["evidence"]["asserted_by"] == "owner" and row["recorded_by"] == "owner"
+    a = next(d for d in td.tool_get_decisions({"days": 3650})["decisions"] if d["sk"] == DEC_A)
+    assert a["advice_links"] == [al.owner_view(row)] and a["advice_links"][0]["state"] == "partially_followed"
+
+
+def test_an_ask_without_his_words_is_refused_must_fail_control(table):
+    """The must-fail control: every data-shaped 'evidence' for an ask is refused and nothing lands.
+    A reference alone (a workout id, a meal day, the grader's verdict) is what a data-derived link would carry."""
+    data_only = [
+        {},
+        {"evidence_text": "   "},
+        {"evidence_ref": "hevy workout 2026-10-31 (matches the ask)"},
+        {"evidence_ref": "grader_status: kept"},
+        {"evidence_ref": "macrofactor 2026-10-31", "evidence_text": ""},
+    ]
+    misses = []
+    for state in sorted(al.EVIDENCE_REQUIRED_STATES):
+        for ev in data_only:
+            res = tal.tool_log_advice_link(_ask_link(state=state, **ev))
+            if res.get("written") is not False or "evidence_text" not in res.get("error", ""):
+                misses.append((state, ev, res))
+    assert misses == []
+    assert _links_in(table) == []
+    # the same reference-only call on a non-ask kind is still accepted — the stricter rule is the ask's alone,
+    # so the refusal above is the words rule biting, not a broken fixture
+    assert tal.tool_log_advice_link(_link(state="declined", evidence_ref="journal 2026-10-31"))["written"] is True
+    # and an explicit unknown on an ask needs nothing (absence and unknown are the same answer)
+    assert tal.tool_log_advice_link(_ask_link(state="unknown"))["written"] is True
+
+
+def test_an_ask_reference_must_exist_for_the_named_coach(table):
+    misses = []
+    for over, fragment in [
+        ({"coach_id": "nutrition_coach"}, "no current-cycle commitment"),  # the ask is the sleep coach's
+        ({"ref_id": "commit_20261030_never_asked"}, "no current-cycle commitment"),
+        ({"ref_id": "COMMITMENT#commit_20261030_x"}, "ref_id"),
+        ({"ref_id": "pred_20261029_protein_first_meal_lifts_hrv"}, "ref_id"),
+    ]:
+        res = tal.tool_log_advice_link(_ask_link(evidence_text="I did it", **over))
+        if res.get("written") is not False or fragment not in res.get("error", ""):
+            misses.append((over, res))
+    assert misses == []
+    assert _links_in(table) == []
+
+
+def test_a_stored_ask_link_without_his_words_reads_unknown():
+    base = {
+        "pk": PK,
+        "sk": al.link_sk(DEC_A, "commitment", "sleep_coach", ASK),
+        "decision_sk": DEC_A,
+        "ref_kind": "commitment",
+        "state": "acted_on",
+        "recorded_by": "owner",
+    }
+    assert al.effective_state({**base, "evidence": {"reference": "hevy workout 2026-10-31"}}) == "unknown"
+    assert al.effective_state({**base, "evidence": {"text": "I did it"}}) == "acted_on"
+
+
+def test_the_queue_points_at_the_ask_kind_the_registry_accepts():
+    """get_advice_link_queue's instructions name the ask kind; it must be a real REF_KINDS key that needs his words."""
+    from mcp import tools_advice_queue as taq
+
+    assert "log_advice_link" in taq.HOW_TO_RECORD and "ref_kind='commitment'" in taq.HOW_TO_RECORD
+    assert "commitment" in al.REF_KINDS and al.words_required("commitment")
+    assert not any(al.words_required(k) for k in ("prediction", "coach_output", "coach_action"))

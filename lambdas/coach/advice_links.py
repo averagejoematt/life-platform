@@ -62,8 +62,13 @@ RECORDED_BY: frozenset[str] = frozenset({RECORDED_BY_OWNER})
 # ── the reference kinds: recommendations the platform can identify DURABLY ──────────────
 # kind -> (description, key builder (coach_id, ref_id, user_id) -> DDB key, ref_id pattern).
 # Each one resolves to a single existing row the tool reads before it writes, and each row
-# names its coach in its own pk (prediction, coach_output) or its own `coach_id` field
-# (coach_action), so the link's coach_id is checked against the row, never trusted.
+# names its coach in its own pk (prediction, coach_output, commitment) or its own `coach_id`
+# field (coach_action), so the link's coach_id is checked against the row, never trusted.
+#
+# `words_required` (commitment, owner 2026-11-12): an ask already carries the grader's metric
+# verdict (kept/broken), so the one thing a link can add is what Matthew SAYS he did. For that
+# kind an asserting state needs his own words (evidence_text); a reference alone — which could
+# name a workout, a meal log or any other data row — is refused.
 
 
 def _prediction_key(coach_id: str, ref_id: str, user_id: str) -> dict:
@@ -76,6 +81,10 @@ def _coach_output_key(coach_id: str, ref_id: str, user_id: str) -> dict:
 
 def _coach_action_key(coach_id: str, ref_id: str, user_id: str) -> dict:
     return {"pk": f"USER#{user_id}", "sk": f"SOURCE#coach_actions#{ref_id}"}
+
+
+def _commitment_key(coach_id: str, ref_id: str, user_id: str) -> dict:
+    return {"pk": f"COACH#{coach_id}", "sk": f"COMMITMENT#{ref_id}"}
 
 
 REF_KINDS: dict[str, dict] = {
@@ -93,6 +102,12 @@ REF_KINDS: dict[str, dict] = {
         "about": "a coach-issued action — pk USER#<user>, sk SOURCE#coach_actions#<action_id>",
         "key": _coach_action_key,
         "ref_id": re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9_]{1,40}$"),
+    },
+    "commitment": {
+        "about": "a coach ask — pk COACH#<coach_id>, sk COMMITMENT#<ask_id> (ask_id from get_advice_link_queue)",
+        "key": _commitment_key,
+        "ref_id": re.compile(r"^commit_\d{8}_[a-z0-9_]{0,80}$"),
+        "words_required": True,
     },
 }
 
@@ -118,11 +133,22 @@ def ref_key(ref_kind: str, coach_id: str, ref_id: str, user_id: str) -> dict:
     return REF_KINDS[ref_kind]["key"](coach_id, ref_id, user_id)
 
 
-def _evidence(state: str, evidence: dict | None, recorded_at: str) -> dict | None:
+def words_required(ref_kind: str | None) -> bool:
+    """True for a kind whose asserting states need Matthew's own words, not a reference alone."""
+    return bool((REF_KINDS.get(ref_kind or "") or {}).get("words_required"))
+
+
+def _evidence(state: str, evidence: dict | None, recorded_at: str, ref_kind: str | None = None) -> dict | None:
     ev = evidence or {}
     text = str(ev.get("text") or "").strip()
     reference = str(ev.get("reference") or "").strip()
     if state in EVIDENCE_REQUIRED_STATES:
+        if words_required(ref_kind) and not text:
+            raise AdviceLinkError(
+                f"state '{state}' on a {ref_kind} needs Matthew's own words (evidence_text) saying what he did with the ask. "
+                "A reference alone is refused, and nothing the data shows (a workout, a meal, the grader's kept/broken) is "
+                "evidence. Without his words the link stays 'unknown' (ruling F)."
+            )
         if not text and not reference:
             raise AdviceLinkError(
                 f"state '{state}' asserts what Matthew did, so it needs evidence — his own words (evidence_text) "
@@ -177,7 +203,7 @@ def build_link_record(
         "recorded_at": recorded_at,
         "recorded_by": recorded_by,
     }
-    ev = _evidence(state, evidence, recorded_at)
+    ev = _evidence(state, evidence, recorded_at, ref_kind)
     if ev is not None:
         record["evidence"] = ev
     return record
@@ -195,6 +221,8 @@ def validate_stored(record: dict) -> list[str]:
         ev = record.get("evidence") or {}
         if not (str(ev.get("text") or "").strip() or str(ev.get("reference") or "").strip()):
             problems.append(f"state {state!r} carries no evidence")
+        elif words_required(record.get("ref_kind")) and not str(ev.get("text") or "").strip():
+            problems.append(f"state {state!r} on a {record.get('ref_kind')} carries no words of his")
     return problems
 
 

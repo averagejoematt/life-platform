@@ -70,9 +70,12 @@ CONTEXT_LABEL = (
 )
 HOW_TO_RECORD = (
     "Ask Matthew, one ask at a time, what he did with it, and record only what he says, in his words. An entry under "
-    "same_window_ids shares the ask's dates; it is not a link and is not evidence on its own. log_advice_link links a "
-    "logged decision to a prediction, coach_output or coach_action; an ask (COMMITMENT#) is not one of its reference "
-    "kinds today, so his answer about an ask is recorded with log_decision (his words) until it is."
+    "same_window_ids shares the ask's dates; it is not a link and is not evidence on its own. To record his answer: "
+    "log it with log_decision (his words) — or use a decision he already logged that answers it — then call "
+    "log_advice_link with that decision_sk, ref_kind='commitment', ref_id=<ask_id>, coach_id=<coach_id>, the state "
+    "he names, and his own words as evidence_text; that tool refuses an ask's "
+    "state without them. If he does not say, record nothing: the ask stays unknown. Never pass the grader_status or "
+    "anything under context_not_evidence as evidence."
 )
 
 ADVICE_QUEUE_DESCRIPTION = (

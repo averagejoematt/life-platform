@@ -1,8 +1,8 @@
 """mcp/tools_advice_links.py — `log_advice_link`, the ONLY writer of an advice link (#5612, ruling F).
 
 Links ONE recorded decision (a DECISION# row) to ONE coach recommendation the platform can
-identify durably (a prediction, a dated coach output, or a coach action — the kinds are
-`coach.advice_links.REF_KINDS`) with a state from `coach.advice_links.STATES`.
+identify durably (a prediction, a dated coach output, a coach action, or a coach ask — the kinds
+are `coach.advice_links.REF_KINDS`) with a state from `coach.advice_links.STATES`.
 
 The rule this tool exists to keep: a state other than `unknown` is Matthew's OWN assertion,
 with evidence — his words, or a reference to where he recorded it. It is never derived from
@@ -38,7 +38,9 @@ LOG_ADVICE_LINK_DESCRIPTION = (
     "NEVER from data: a workout, a meal, a metric or any behaviour that happens to match the advice is NOT evidence, "
     "and the tool must not be called on that basis. Any state but unknown without evidence is refused. "
     "The recommendation is ref_kind + ref_id + coach_id: prediction (prediction_id from get_predictions), "
-    "coach_output (<YYYY-MM-DD>#<type>, e.g. 2026-11-02#daily_brief_sleep), or coach_action (<YYYY-MM-DD>-<domain>). "
+    "coach_output (<YYYY-MM-DD>#<type>, e.g. 2026-11-02#daily_brief_sleep), coach_action (<YYYY-MM-DD>-<domain>), "
+    "or commitment — a coach ask (ask_id from get_advice_link_queue, e.g. commit_20261102_<slug>); for an ask, every "
+    "state but unknown needs his own words in evidence_text (a reference alone is refused). "
     "Both records are checked to exist first. Re-calling with a new state supersedes and keeps the old one."
 )
 
@@ -56,7 +58,7 @@ LOG_ADVICE_LINK_INPUT = {
         "ref_kind": {
             "type": "string",
             "description": "What kind of recommendation is referenced.",
-            "enum": ["coach_action", "coach_output", "prediction"],
+            "enum": ["coach_action", "coach_output", "commitment", "prediction"],
         },
         "ref_id": {"type": "string", "description": "The recommendation's id within its kind (see the tool description)."},
         "state": {
@@ -70,7 +72,8 @@ LOG_ADVICE_LINK_INPUT = {
         },
         "evidence_ref": {
             "type": "string",
-            "description": "Where he recorded it instead (e.g. a journal date, a DECISION# note, a Hevy workout id he named).",
+            "description": "Where he recorded it instead (e.g. a journal date, a DECISION# note, a Hevy workout id he named). "
+            "Not enough on its own for a commitment (an ask): that needs evidence_text.",
         },
     },
     "required": ["decision_sk", "coach_id", "ref_kind", "ref_id", "state"],
