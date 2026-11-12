@@ -274,3 +274,12 @@ def test_must_fail_control_the_interim_counts_only_shape_is_rejected():
     }
     found = "\n".join(_genome_violations(interim))
     assert "numeric genetic field" in found and "categories" in found and "risk_summary" in found
+
+
+def test_supplements_route_never_passes_a_genome_variant_list_through():
+    """/api/supplements carried `genome_snps` straight from the supplement registry
+    (empty today). A populated registry would publish variant-to-supplement links,
+    so the public route serves an empty list whatever the registry holds."""
+    src = (_REPO / "lambdas" / "web" / "site_api_protocols.py").read_text()
+    assert 'registry.get("genome_snps"' not in src, "/api/supplements passes the registry's genome_snps through"
+    assert '"genome_snps": [],' in src
