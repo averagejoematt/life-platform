@@ -453,3 +453,20 @@ def test_the_state_sweep_can_fail():
     assert missed == []
     for clean in ('ob = {"acted_on": True}', 'x.get("acted_on")', 'state = "unknown"'):
         assert _assigns_an_asserting_state(ast.parse(clean)) == [], clean
+
+
+#: The read-only ask queue (`get_advice_link_queue`) sits beside the owner tool: it must never write, never name the
+#: family and never call the writer, so the one-writer guard above still has exactly one writer to name.
+QUEUE_MODULE = "mcp/tools_advice_queue.py"
+_DDB_WRITES = {"put_item", "update_item", "delete_item", "batch_writer", "batch_write_item", "transact_write_items"}
+
+
+def test_the_advice_queue_is_read_only_and_outside_the_family():
+    src = (ROOT / QUEUE_MODULE).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    assert QUEUE_MODULE not in ALLOWED_TO_NAME and not _names_the_family(src, tree)
+    calls = {
+        c.func.attr if isinstance(c.func, ast.Attribute) else getattr(c.func, "id", None) for c in ast.walk(tree) if isinstance(c, ast.Call)
+    }
+    assert not calls & (_DDB_WRITES | {"build_link_record", "tool_log_advice_link"}), calls
+    assert not _assigns_an_asserting_state(tree)

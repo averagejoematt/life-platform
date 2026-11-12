@@ -10,6 +10,7 @@ from mcp.config import RAW_DAY_LIMIT, SOURCES
 from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 from mcp.tool_output_schemas import attach_output_schemas  # #4286 box 2: outputSchema, the ten most-called tools
 from mcp.tools_advice_links import LOG_ADVICE_LINK_DESCRIPTION, LOG_ADVICE_LINK_INPUT, tool_log_advice_link  # #5612
+from mcp.tools_advice_queue import ADVICE_QUEUE_DESCRIPTION, ADVICE_QUEUE_INPUT, tool_get_advice_link_queue  # read-only ask queue
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
@@ -42,7 +43,7 @@ from mcp.tools_data import (
     tool_get_sources,
     tool_search_activities,
 )
-from mcp.tools_decisions import tool_get_decisions, tool_log_decision, tool_update_decision_outcome
+from mcp.tools_decisions import GET_DECISIONS_INPUT, tool_get_decisions, tool_log_decision, tool_update_decision_outcome
 
 # #3692: the model-facing selection prose lives in a cohesive sibling so this file
 # stays the wiring table it says it is. Two descriptions stayed inline below — see
@@ -1482,15 +1483,7 @@ TOOLS = {
         "schema": {
             "name": "get_decisions",
             "description": GET_DECISIONS_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "days": {"type": "integer", "description": "Look back N days (default 30)."},
-                    "pillar": {"type": "string", "description": "Filter by pillar (e.g. 'sleep', 'nutrition')."},
-                    "outcome_only": {"type": "boolean", "description": "If true, only return decisions with recorded outcomes."},
-                },
-                "required": [],
-            },
+            "inputSchema": GET_DECISIONS_INPUT,
         },
     },
     "update_decision_outcome": {
@@ -1517,6 +1510,10 @@ TOOLS = {
     "log_advice_link": {  # #5612 (ruling F): owner-asserted decision <-> coach recommendation link
         "fn": tool_log_advice_link,
         "schema": {"name": "log_advice_link", "description": LOG_ADVICE_LINK_DESCRIPTION, "inputSchema": LOG_ADVICE_LINK_INPUT},
+    },
+    "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
+        "fn": tool_get_advice_link_queue,
+        "schema": {"name": "get_advice_link_queue", "description": ADVICE_QUEUE_DESCRIPTION, "inputSchema": ADVICE_QUEUE_INPUT},
     },
     # ── IC-18: Cross-Domain Hypothesis Engine ───────────────────────────────────────────
     # ── BS-12: Deficit Sustainability Tracker ──
