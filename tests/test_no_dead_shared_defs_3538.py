@@ -96,9 +96,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     "lambdas/common/goals_field_privacy.py:is_named": (
         "Owner ruling 2026-11-10 (6): the coverage guard's predicate - every config/user_goals.json field is named by the field review (tests/test_goals_field_privacy.py). Delete this entry if the guard moves into a script."
     ),
-    "lambdas/common/narrative_annotations.py:annotated_words": (
-        "Owner ruling 2026-11-10 (4): the one serving path for an annotated CR2 read (words + dated correction), dark until the owner approves an annotation and the CR2 route is wired; pinned by tests/test_narrative_annotations.py. Delete this entry when the route calls it."
-    ),
     "lambdas/coach/grade_corrections.py:apply_baseline_correction": (
         "Owner ruling 2026-11-09 (third, A): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_A.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."
     ),

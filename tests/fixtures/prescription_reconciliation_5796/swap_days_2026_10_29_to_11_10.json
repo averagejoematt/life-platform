@@ -1,0 +1,222 @@
+{
+ "_README": "#5796: every Hevy session from 2026-10-29 to 2026-11-10 whose stored adherence paired a cardio machine swap with the missing programmed block (read-only DynamoDB, 2026-11-11). Served side: the committed routine's cardio block (its menu tag, the program's own composed note, its minutes). Performed side: the swapped machine's template id and minutes only; his own notes are stripped (none logged an RPE, checked at extraction), distances and every lifting block are dropped. stored_cardio_* is the verdict the live row carries (pre-#5796).",
+ "days": [
+  {
+   "date": "2026-10-29",
+   "served": [
+    {
+     "movement_key": "cycling",
+     "rationale_tag": "cardio:cycling:menu:hills",
+     "notes": "Recumbent · L11 → L15 · RPE 5–7 (short phrases)\n⌚ ride clock: L11 to min 6 · up a level every 2 min to min 14 · down the same to min 22 · L11 to the end",
+     "duration_seconds": [
+      1800
+     ]
+    }
+   ],
+   "performed": [
+    {
+     "exercise_template_id": "243710DE",
+     "title": "treadmill",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "duration_seconds": 2700,
+       "rpe": null
+      }
+     ]
+    }
+   ],
+   "stored_cardio_verdict": "no",
+   "stored_cardio_reasons": [
+    "sets: 0.0% of programmed sets completed"
+   ]
+  },
+  {
+   "date": "2026-10-30",
+   "served": [
+    {
+     "movement_key": "treadmill",
+     "rationale_tag": "cardio:treadmill:menu:hills",
+     "notes": "Treadmill · today 2.8 mph, 6% → 10% · RPE 6–7 (short phrases)\n⌚ walk clock: 6% to min 6 · +1% every 2 min to min 14 · down the same to min 22 · 6% to the end",
+     "duration_seconds": [
+      1800
+     ]
+    }
+   ],
+   "performed": [
+    {
+     "exercise_template_id": "D8F7F851",
+     "title": "cycling",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "duration_seconds": 3600,
+       "rpe": null
+      }
+     ]
+    }
+   ],
+   "stored_cardio_verdict": "no",
+   "stored_cardio_reasons": [
+    "sets: 0.0% of programmed sets completed"
+   ]
+  },
+  {
+   "date": "2026-11-02",
+   "served": [
+    {
+     "movement_key": "cycling",
+     "rationale_tag": "cardio:cycling:menu:easy",
+     "notes": "Recumbent · L11 · RPE 4–5 (full sentences)",
+     "duration_seconds": [
+      1800
+     ]
+    }
+   ],
+   "performed": [
+    {
+     "exercise_template_id": "243710DE",
+     "title": "treadmill",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "duration_seconds": 2700,
+       "rpe": null
+      }
+     ]
+    }
+   ],
+   "stored_cardio_verdict": "no",
+   "stored_cardio_reasons": [
+    "sets: 0.0% of programmed sets completed"
+   ]
+  },
+  {
+   "date": "2026-11-03",
+   "served": [
+    {
+     "movement_key": "cycling",
+     "rationale_tag": "cardio:cycling:menu:tempo",
+     "notes": "Recumbent · L12 · RPE 6–7 (short phrases)\n⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down",
+     "duration_seconds": [
+      1800
+     ]
+    }
+   ],
+   "performed": [
+    {
+     "exercise_template_id": "243710DE",
+     "title": "treadmill",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "duration_seconds": 3600,
+       "rpe": null
+      }
+     ]
+    }
+   ],
+   "stored_cardio_verdict": "no",
+   "stored_cardio_reasons": [
+    "sets: 0.0% of programmed sets completed"
+   ]
+  },
+  {
+   "date": "2026-11-05",
+   "served": [
+    {
+     "movement_key": "cycling",
+     "rationale_tag": "cardio:cycling:menu:tempo",
+     "notes": "Recumbent · L12 · RPE 6–7 (short phrases)\n⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down",
+     "duration_seconds": [
+      1800
+     ]
+    }
+   ],
+   "performed": [
+    {
+     "exercise_template_id": "243710DE",
+     "title": "treadmill",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "duration_seconds": 2700,
+       "rpe": null
+      }
+     ]
+    }
+   ],
+   "stored_cardio_verdict": "no",
+   "stored_cardio_reasons": [
+    "sets: 0.0% of programmed sets completed"
+   ]
+  },
+  {
+   "date": "2026-11-09",
+   "served": [
+    {
+     "movement_key": "cycling",
+     "rationale_tag": "cardio:cycling:menu:easy",
+     "notes": "Recumbent · L11 · RPE 4–5 (full sentences)",
+     "duration_seconds": [
+      1800
+     ]
+    }
+   ],
+   "performed": [
+    {
+     "exercise_template_id": "243710DE",
+     "title": "treadmill",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "duration_seconds": 2700,
+       "rpe": null
+      }
+     ]
+    }
+   ],
+   "stored_cardio_verdict": "no",
+   "stored_cardio_reasons": [
+    "sets: 0.0% of programmed sets completed"
+   ]
+  },
+  {
+   "date": "2026-11-10",
+   "served": [
+    {
+     "movement_key": "treadmill",
+     "rationale_tag": "cardio:treadmill:menu:hills",
+     "notes": "Treadmill · today 2.8 mph, 6% → 10% · RPE 6–7 (short phrases)\n⌚ walk clock: 6% to min 6 · +1% every 2 min to min 14 · down the same to min 22 · 6% to the end",
+     "duration_seconds": [
+      1800
+     ]
+    }
+   ],
+   "performed": [
+    {
+     "exercise_template_id": "D8F7F851",
+     "title": "cycling",
+     "notes": "",
+     "sets": [
+      {
+       "type": "normal",
+       "duration_seconds": 2400,
+       "rpe": null
+      }
+     ]
+    }
+   ],
+   "stored_cardio_verdict": "no",
+   "stored_cardio_reasons": [
+    "sets: 0.0% of programmed sets completed"
+   ]
+  }
+ ]
+}

@@ -388,11 +388,20 @@ def _fit(block: str, lines: list[str]) -> list[str]:
 
     if not over(lines):
         return lines
-    out = []
-    for ln in lines:
-        prep = next((p for p in hevy_note_grammar.PREP_CUES.values() if ln.startswith(p + " ")), None)
-        out.append(ln[len(prep) + 1 :] if prep else ln)
-    return out
+    out = [_drop_lead(ln, hevy_note_grammar.PREP_CUES.values()) for ln in lines]
+    if not over(out):
+        return out
+    # #5817: then an anchor's sheet cue (`form_cue_sheets.anchor_note_cue`) — it rode ahead of the family cue, which stays
+    from training import form_cue_sheets
+
+    sheet = form_cue_sheets.anchor_note_cues()
+    return [ln2 for ln2 in (_drop_lead(ln, sheet) for ln in out) if ln2]
+
+
+def _drop_lead(line: str, leads: Any) -> str:
+    """`line` without the first of `leads` it opens with (and its space); "" when the line is that lead alone."""
+    lead = next((p for p in leads if line == p or line.startswith(p + " ")), None)
+    return line[len(lead) + 1 :] if lead else line
 
 
 def _join(block: str, lines: list[str]) -> str:

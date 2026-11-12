@@ -553,6 +553,13 @@ def _lint_intervals(m: "re.Match[str]", lines: list[str], clock: list[str], wher
 
 def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> None:
     lines = body.split("\n")
+    # #5796 (owner ruling 2026-11-11): the RPE capture prompt opens a drafted cardio note; it is an input field, so the
+    # rules below read the note after it. Anywhere else it is a misplaced prompt.
+    if lines[0].strip() == g.CARDIO_RPE_CAPTURE_LINE and len(lines) > 1:
+        lines = lines[1:]
+        body = "\n".join(lines)
+    if any(ln.strip() == g.CARDIO_RPE_CAPTURE_LINE for ln in lines):
+        out.append(Problem("L3", where, f"the {g.CARDIO_RPE_CAPTURE_LINE!r} prompt is the note's first line only"))
     m = g.CARDIO_LINE1_RE.match(lines[0])
     if not m:
         out.append(Problem("L3", where, f"cardio line 1 grammar: {lines[0]!r}"))

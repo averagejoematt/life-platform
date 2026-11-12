@@ -82,10 +82,13 @@ def _leads():
 # ── dark ─────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_cr2_switch_is_off_on_main():
-    assert NA.CR2_PUBLIC is False, "flipping CR2_PUBLIC is the CR2 release — the owner's GO, not a routine change"
-    assert not NA.active()
+def test_the_cr2_switch_is_on_and_opens_only_inside_the_scope():
+    """Owner GO 2026-11-11 (second message, item 1): CR2_PUBLIC is on. It is active ONLY inside the CR2 scope."""
+    assert NA.CR2_PUBLIC is True, "CR2 was released by the owner's GO of 2026-11-11 (second message)"
+    assert not NA.active(), "outside the CR2 scope nothing is active"
     with NA.serving(NA.SCOPE_CR2):
+        assert NA.active()
+    with NA.serving("cr3"):
         assert not NA.active()
 
 

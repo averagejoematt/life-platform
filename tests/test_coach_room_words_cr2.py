@@ -171,9 +171,9 @@ def _rows():
 # ── the route is registered, dark, and the only scope opener ─────────────────────────────────
 
 
-def test_the_route_is_routed_and_the_switch_is_off_on_main():
+def test_the_route_is_routed_and_the_switch_is_on():
     assert R.ROUTE in L.ROUTES and L._SIMPLE_ROUTES[R.ROUTE][1] is R.handle_coach_room_words
-    assert NA.CR2_PUBLIC is False
+    assert NA.CR2_PUBLIC is True, "CR2 was released by the owner's GO of 2026-11-11 (second message)"
 
 
 def test_the_scope_opens_for_the_cr2_route_only(cr2_on):
@@ -187,6 +187,7 @@ def test_the_scope_opens_for_the_cr2_route_only(cr2_on):
 
 @pytest.mark.parametrize("coach", [COACH, LEAD, "training_coach", "", "not_a_coach"])
 def test_switch_off_the_route_is_a_404_for_every_coach(monkeypatch, lead_entry, dossier_ok, coach):
+    monkeypatch.setattr(NA, "CR2_PUBLIC", False)
     _install(monkeypatch, _rows())
     resp = _get(R.ROUTE, {"coach": coach})
     assert resp["statusCode"] == 404
@@ -385,3 +386,103 @@ def test_the_route_answers_only_for_coaches_with_approved_rows(monkeypatch, cr2_
     _install(monkeypatch, _rows())
     assert _get(R.ROUTE, {"coach": "career_coach"})["statusCode"] == 404
     assert _get(R.ROUTE)["statusCode"] == 404
+
+
+# ── annotated reads: served ONLY with their dated correction (owner ruling 2026-11-11, second message, item 3) ──────
+
+ANN_SK = "LEAD_DAILY#2026-10-28"
+ANN_TEXT = "A synthetic annotated lead read: protein came in under the floor yesterday."
+ANN_CITED = [
+    {"metric": "protein eaten (grams)", "value": "111", "as_of": "2026-10-27", "source_field": "macrofactor.total_protein_g"},
+    {"metric": "protein floor (grams a day)", "value": "170", "as_of": "2026-10-27", "source_field": "profile.protein_floor_g"},
+]
+
+
+@pytest.fixture
+def annotated(monkeypatch):
+    """The real approved 10-28 annotation, re-pinned to synthetic words (the real words live only in the table)."""
+    from common import narrative_annotations as NANN
+
+    a = NANN.INDEX[(f"COACH#{LEAD}", ANN_SK)]._replace(text_sha256=_sha(ANN_TEXT))
+    monkeypatch.setattr(NANN, "INDEX", {**NANN.INDEX, (a.pk, a.sk): a})
+    return a
+
+
+def _ann_row(text: str = ANN_TEXT, **extra) -> dict:
+    return {
+        "pk": f"COACH#{LEAD}",
+        "sk": ANN_SK,
+        "coach_id": LEAD,
+        "text": text,
+        "generated_at": "2026-10-28T17:00:56Z",
+        "data_through": "2026-10-27",
+        "cited": list(ANN_CITED),
+        **extra,
+    }
+
+
+def _ann_reads(body: dict) -> list:
+    return [r for r in body["lead_reads"] if r["date"] == ANN_SK.split("#")[1]]
+
+
+def test_an_approved_annotated_read_is_served_with_its_dated_correction(monkeypatch, cr2_on, dossier_ok, annotated):
+    from common import narrative_annotations as NANN
+
+    _install(monkeypatch, [_ann_row()])
+    resp = _get(R.ROUTE, {"coach": LEAD})
+    assert resp["statusCode"] == 200
+    reads = _ann_reads(_body(resp))
+    assert len(reads) == 1 and reads[0]["text"] == ANN_TEXT, "the original words, byte-identical"
+    corr = reads[0]["correction"]
+    assert corr["id"] == "ann-2026-11-11-lead-2026-10-28" and corr["supersedes"] == "ann-2026-11-10-lead-2026-10-28"
+    assert corr["note"] == NANN.render_note(annotated) and "logged after the read" not in corr["note"]
+    assert "source_field" not in json.dumps(reads[0]["cited"]), "never the source field names"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"text": ANN_TEXT + " Edited."},  # the words changed since the check
+        {"provenance": {"v": 1, "families": ["journal"], "producer": "t"}},  # a record of its own (private)
+        {"cited": ANN_CITED + [{"metric": "m", "value": "1", "as_of": "2026-10-27", "source_field": "journal.days_since_last_entry"}]},
+    ],
+)
+def test_an_annotated_read_that_fails_any_check_is_left_out(monkeypatch, cr2_on, dossier_ok, annotated, change):
+    """The negative control: the same key, approved — but changed words, a private record or a private cited field."""
+    _install(monkeypatch, [_ann_row(**change)])
+    resp = _get(R.ROUTE, {"coach": LEAD})
+    assert resp["statusCode"] == 200
+    assert _ann_reads(_body(resp)) == []
+    assert ANN_TEXT not in resp["body"]
+
+
+def test_an_unapproved_annotation_serves_nothing_and_the_bare_words_never(monkeypatch, cr2_on, dossier_ok, annotated):
+    from common import narrative_annotations as NANN
+
+    monkeypatch.setattr(NANN, "INDEX", {**NANN.INDEX, (annotated.pk, annotated.sk): annotated._replace(owner_approved=False)})
+    _install(monkeypatch, [_ann_row()])
+    resp = _get(R.ROUTE, {"coach": LEAD})
+    assert ANN_TEXT not in resp["body"]
+
+
+def test_an_annotated_read_is_withheld_on_every_other_route(monkeypatch, cr2_on, dossier_ok, annotated):
+    """Outside the CR2 scope the gate withholds the annotated row exactly as before (the route is the only opener)."""
+    raw = _install(monkeypatch, [_ann_row()])
+    G.begin_request()
+    item = C.table.get_item(Key={"pk": f"COACH#{LEAD}", "sk": ANN_SK}).get("Item")
+    assert item["text"] == "" and G.is_withheld(item)
+    assert raw.rows[(f"COACH#{LEAD}", ANN_SK)]["text"] == ANN_TEXT
+
+
+def test_the_served_lead_reads_are_exactly_the_approved_set(monkeypatch, cr2_on, dossier_ok, annotated, lead_entry):
+    """Provenance: every served read is an allowlisted key or an approved annotated key, with its pinned hash."""
+    from common import narrative_annotations as NANN
+
+    _install(monkeypatch, [_lead_row(), _ann_row()])
+    body = _body(_get(R.ROUTE, {"coach": LEAD}))
+    allowed = {(e.sk, e.text_sha256) for e in NA.APPROVED} | {(a.sk, a.text_sha256) for a in NANN.INDEX.values() if a.owner_approved}
+    assert body["lead_reads"], "the positive control serves both"
+    for r in body["lead_reads"]:
+        assert (f"LEAD_DAILY#{r['date']}", _sha(r["text"])) in allowed, r["date"]
+        if any(a.sk == f"LEAD_DAILY#{r['date']}" for a in NANN.INDEX.values()):
+            assert r.get("correction"), "an annotated read never without its correction"

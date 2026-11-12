@@ -71,7 +71,10 @@ def _facts(history=HISTORY):
 
 
 def _compose(kind, machine="cycling", minutes=30, facts=None, **kw):
-    return cn.compose(movement_key=machine, minutes=minutes, target_date=DAY, kind=kind, facts=facts, **kw)
+    # #5796: every drafted note opens with the RPE capture prompt; these tests read the prescription after it
+    note, audit = cn.compose(movement_key=machine, minutes=minutes, target_date=DAY, kind=kind, facts=facts, **kw)
+    assert note.startswith(cn.hevy_note_grammar.CARDIO_RPE_CAPTURE_LINE + "\n"), note
+    return cn.without_capture(note), audit
 
 
 # ── the corpus target lines ──────────────────────────────────────────────────────────
@@ -247,7 +250,7 @@ def test_a_chat_authors_route_why_stays_and_the_generated_why_does_not():
     spec = _spec("cycling", "stretching")
     spec.exercises[0].notes = "Level 11 flat, easy.\nBike, not treadmill: rest the feet."
     rg.attach_cardio_cues(spec, cardio_index={CYCLING_TID: list(HISTORY)}, whoop_index={})
-    assert spec.exercises[0].notes == "Recumbent · L11 · RPE 4–5 (full sentences)\nBike, not treadmill: rest the feet.\n" + AFTER
+    assert spec.exercises[0].notes == "RPE _\nRecumbent · L11 · RPE 4–5 (full sentences)\nBike, not treadmill: rest the feet.\n" + AFTER
     # a re-draft keeps it once
     rg.attach_cardio_cues(spec, cardio_index={CYCLING_TID: list(HISTORY)}, whoop_index={})
     assert spec.exercises[0].notes.count("Bike, not treadmill") == 1

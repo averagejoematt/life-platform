@@ -24,6 +24,8 @@ _ALLOWED_FILES = {
     os.path.join(ROOT, "tests", "test_hevy_commit_readback_3718.py"),
     os.path.join(ROOT, "tests", "test_adherence_calc.py"),
     os.path.join(ROOT, "tests", "test_hevy_adherence_wiring.py"),
+    # #5796 — replays real performed workouts through adherence_calc (the read side, as test_adherence_calc does).
+    os.path.join(ROOT, "tests", "test_prescription_reconciliation_5796.py"),
     # #417 2b end-to-end restamp test asserts on the compiled wire body's
     # exercise_template_id to prove the recommended-branch push actually works.
     os.path.join(ROOT, "tests", "test_hevy_restamp.py"),
@@ -47,6 +49,8 @@ _ALLOWED_FILES = {
     # the routine-write schema this isolation rule guards. Grandfathered.
     os.path.join(ROOT, "lambdas", "training", "hevy_common.py"),
     os.path.join(ROOT, "tests", "test_hevy_common.py"),
+    # #5801 — wire-shaped inbound Hevy workouts as fixtures for the read-only volume-response report.
+    os.path.join(ROOT, "tests", "test_volume_response_5801.py"),
 }
 
 _KEY = "exercise_template_id"

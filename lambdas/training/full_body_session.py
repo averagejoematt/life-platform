@@ -30,6 +30,7 @@ from training import (
     load_ramp,
     program_structure,
     routine_generator as _rg,
+    selection_engine,
     session_time,
     variant_rotation,
     warmup_sets,
@@ -281,7 +282,12 @@ def _prescription(
     movements = catalog.get("movements") or {}
     in_block = in_block_variant.performed_in_block(block_workouts, movements, inputs.target_date)
     rotation = variant_rotation.for_session(
-        {**day_entry, "date": inputs.target_date}, movements, rows=inputs.rotation_rows, skill_ceiling=skill_ceiling
+        {**day_entry, "date": inputs.target_date},
+        movements,
+        rows=inputs.rotation_rows,
+        skill_ceiling=skill_ceiling,
+        block_workouts=block_workouts,  # #5774: the kettlebell slot's entry exposures are counted from the record
+        select=True,  # #5773: the selection engine — shadow while the library is proposed
     )
     rx = program_structure.session_prescription_for_role(
         day_entry["session_role"],
@@ -422,6 +428,7 @@ def full_body_routines(
             "session_shape": shape,
             "rotation": rotation,  # #5075: routine_repo.draft_versioned records its ledger_writes
         }
+        | selection_engine.snapshot_fields(rotation)  # #5773: selection_shadow (proposed library) or selection (approved)
         | note_record,
         rationale=rationale,
         caps=caps,

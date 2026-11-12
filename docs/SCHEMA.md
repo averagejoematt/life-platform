@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-11-11 (v8.6.0 — 91 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
+**Last updated:** 2026-11-12 (v8.6.0 — 91 MCP tools, 20 data sources, 107 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1544,9 +1544,9 @@ Stores ONLY clinical interpretations and actionable recommendations — no raw g
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `gene` | string | Gene name (e.g. "FTO", "MTHFR", "CYP1A2") |
-| `rsid` | string | dbSNP identifier (e.g. "rs9939609") |
-| `genotype` | string | Observed genotype (e.g. "A;T", "C;C") |
+| `gene` | string | Gene name (HGNC symbol) |
+| `rsid` | string | dbSNP identifier ("rs" + digits) |
+| `genotype` | string | Observed genotype (allele pair, "X;Y" notation) |
 | `summary` | string | One-line clinical interpretation |
 | `category` | string | See categories below |
 | `risk_level` | string | `favorable` / `neutral` / `unfavorable` / `mixed` |
@@ -3475,7 +3475,7 @@ Hevy routine write-loop IR (system of record). Versioned, audit-replayable, inde
 | `inputs_snapshot.charter_version` | string | The training charter version (`config/training_charter.json` `version`, via `training_charter.charter_version()`) the plan was drafted under (#5085); stamped by `routine_repo.draft_versioned` on every draft/draft_custom/predraft routine. Copied to the `nightly_predraft.charter_version` marker field (below) and to the `routine_spec_ledger.build_spec` row's `charter_version` (the committed-routine spec in S3, `schema_version` 1; the same row also carries a `departure_reason` key, below). `null` on routines drafted before the stamp. |
 | `inputs_snapshot.progression_basis` | map | The engine's own progression record (#5762, `training.progression_record.stamp`; stamped by `routine_repo.draft_versioned` on every drafted routine, fail-soft — a failed build stores `{status: failed, error}`): `recorded_by` and `movements` = `{movement_key: {basis, step_due, applied, source, template_id, trigger?, step_kind?, next_load_kg?, next_reps?, reason?, load_convention?}}`. `basis` is one of the charter's `progression.bases` (`floor_raise` \| `hold` \| `step` \| `re_entry`, `load_progression.BASES`) or null when the engine applied none (a `draft_custom` block, `source: chat_authored` — its loads are the caller's, ADR-069); `step_due` is true for the stall rule's step (#5057); `applied` is true when the draft's working sets carry the engine's load. Built from `load_floors.movements[*].progression` (generator) and `step_due` (chat). No new key: a field of the existing versioned rows. Read by `progression_record.block_progression` (the `/training-review` retro's progression cells) and `panel_rubric.plan_features` (the weekly double-progression criterion); a routine drafted before #5762 is derived from the same fields (`record_of`, `recorded: false`). |
 | `inputs_snapshot.departure_reason` | string or null | Why a `draft_custom` routine departs from the engine's `draft` (#5055): REQUIRED on `manage_hevy_routine draft_custom` (refused `DEPARTURE_REASON_REQUIRED` when missing or under 12 chars), whitespace-normalised, 12 or more chars (`mcp/draft_custom_session.py`). Absent/`null` on engine drafts and predrafts. Copied to the `routine_spec_ledger.build_spec` row's `departure_reason` key (S3, `schema_version` 1). Owner-only like the rest of the ROUTINE# IR. |
-| `inputs_snapshot.nightly_predraft` | map | The nightly predraft marker (`mcp/nightly_predraft.py`, #5085 adds `charter_version`): `engine`, `role` (primary/sibling), `primary_routine_id`, `drafted_at`, `session_label`, `session_role`, `optional`, `seam`, and `charter_version` (the version that drafted it; same value as `inputs_snapshot.charter_version`). |
+| `inputs_snapshot.nightly_predraft` | map | The nightly predraft marker (`mcp/nightly_predraft.py`, #5085 adds `charter_version`): `engine`, `role` (primary/sibling), `primary_routine_id`, `drafted_at`, `session_label`, `session_role`, `sequence_index` (#5795: the sequence slot drafted — the sweep archives the draft `sequence_done` once that slot is credited; `archived.credited_before` records the count it saw), `optional`, `seam`, and `charter_version` (the version that drafted it; same value as `inputs_snapshot.charter_version`). |
 | `rationale` | list[string] | Human-readable log of why each block was chosen. |
 | `caps` | map | `total_sets`, `session_minutes`, `weekly_volume_per_muscle`. Hard asserts in the generator. |
 | `hevy_routine_id` | string \| null | Populated on push; null while local draft. |

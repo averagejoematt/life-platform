@@ -478,8 +478,11 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
 # it. The coverage test below fails on a leaf that is neither patterned nor listed, and on a row that covers nothing.
 NOT_APPLICABLE: Dict[str, str] = {
     "split.session_minutes.measured_min_sessions": "the measured sessions before the per-set time is re-derived (#5799, charter "
-    "1.42.0): read only by training.session_time.min_sessions (derive_set_seconds), pinned against the recorded derivation by "
+    "1.47.0): read only by training.session_time.min_sessions (derive_set_seconds), pinned against the recorded derivation by "
     "tests/test_session_time_supersets_5799.py; a bare session count no prose pattern can key",
+    "progression.set_raise_proposal.weeks_running": "the set-raise proposal's run length (#5796, charter 1.42.0, a platform "
+    "default): read only through training.self_added_volume.set_raise_weeks (no fallback; a missing key raises), pinned by "
+    "tests/test_prescription_reconciliation_5796.py",
     "effort_ceilings.layoff_return_rpe": "the layoff-return band (owner ruling 2026-11-10, charter 1.41.0): read only through "
     "training.effort_ceilings.layoff_return_band (lift_note, session_block, the note linter's L14), pinned by "
     "tests/test_layoff_return_and_warmup_climb_5428.py; any `RPE lo–hi` copy on a code line is already a hit for the "

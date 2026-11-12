@@ -25,7 +25,7 @@
   },
   "/api/coach_room_words": {
     "category": "capture-failed",
-    "reason": "Owner ruling 2026-11-09 (third, D): the owner-approved historical coach words for the Coaching Room's CR2 are dark \u2014 404 for every coach while common/narrative_allowlist.CR2_PUBLIC is off; capture a snapshot (?coach=<id>) when the owner releases CR2"
+    "reason": "Owner ruling 2026-11-09 (third, D); released by the owner's CR2 GO 2026-11-11 (second message): the route answers ?coach=<id> only (bare = 404), so the generic capture fails; its shape is pinned by tests/test_coach_room_words_cr2.py"
   },
   "/api/cohort_submit": {
     "category": "write-path",

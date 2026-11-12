@@ -167,7 +167,9 @@ COMPLETED_2026_11_11 = (
 
 
 def _kb(date: str, status=None) -> dict:
-    with patch.object(wf, "library_status", return_value=status):
+    """Week 7's rotation with NO kettlebell movement served — since #5774 (owner ruling 2026-11-11) the pools serve one
+    (`lower_volume.kettlebell_swing`), so the verdict's warn/block arms are read with that slot taken out of the week."""
+    with patch.object(wf, "library_status", return_value=status), patch.object(wf, "is_kettlebell", lambda key, catalog: False):
         return vr.plan(_entry(7, date=date), CATALOG, rows=[], missing=[])
 
 

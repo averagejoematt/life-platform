@@ -309,14 +309,14 @@ def test_b3_the_carry_counts_toward_core_and_forearms_and_holds_the_trap_floor()
     cov = program_structure.volume_floor_coverage(MOVEMENTS)
     by = cov["sets_by_muscle"]
     assert by["forearms"] == 2  # the carry's 2 sets (no other forearm work in the week)
-    assert by["abs"] == 4 + 2  # the lower-volume crunch + the carry
-    assert cov["floors"]["core"]["sets"] == 6 and SA in cov["floors"]["core"]["slot_roles"]
+    assert by["abs"] == 2 + 2  # the lower-volume crunch (2 sets since #5774 gave 2 to the kettlebell slot) + the carry
+    assert cov["floors"]["core"]["sets"] == 4 and SA in cov["floors"]["core"]["slot_roles"]  # #5774: at the core MEV (4)
     assert cov["floors"]["traps"]["sets"] == 2 and cov["floors"]["traps"]["slot_roles"] == [SA] and cov["floors"]["traps"]["meets_mev"]
     assert CARRY in volume_floors.FLOOR_MOVEMENTS["core"] and CARRY in volume_floors.FLOOR_MOVEMENTS["traps"]
     # the control: strip the carry's credits and core / forearms fall back to the catalog muscle alone
     with patch.object(volume_floors, "CARRY_CREDITS", ()):
         stripped = program_structure.volume_floor_coverage(MOVEMENTS)["sets_by_muscle"]
-    assert stripped["abs"] == 4 and stripped.get("forearms", 0) == 0
+    assert stripped["abs"] == 2 and stripped.get("forearms", 0) == 0
 
 
 def test_b3_the_carry_is_the_template_he_logs_and_the_custom_one_is_retired():

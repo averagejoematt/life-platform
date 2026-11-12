@@ -332,6 +332,7 @@ controls for owner-private material are:
   owner credentials only) — relocated 2026-08-23 (#3043, DIL-001); see
   `docs/coaching/README.md` for the file list. What remains in `docs/coaching/` is
   deliberately public.
+  The exercise library's N=1 half (#5769) lives there too: the private S3 object `config/coaching/exercise_library.private.json` — best set per 10-lb bodyweight band, coded tag counts from his Hevy exercise notes (never note text), equipment availability learned from swap notes, and every gate's private row including bodyweight threshold values. **Owner-only, no repo copy, no public projection**; the public half is `config/exercise_library.json`, which carries no bodyweight, load, body-composition number or note text (`tests/test_exercise_library_5769.py` scans it). Written only by `deploy/write_exercise_library_overlay.py --apply` (dry-run default, counts-only output); read fail-closed by `training.exercise_library.load_private_overlay`; gate completeness checked by `scripts/check_library_gates_private.py`, which prints ids and field names, never values. The gym is named nowhere — location id `home_gym` only.
 - **The structural marker guard.** `tests/test_no_private_markers_3043.py` fails CI if
   any tracked file declares itself PRIVATE — the in-band marker in a public tree is
   itself the defect.

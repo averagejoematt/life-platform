@@ -370,6 +370,14 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=None):
         end_date = min(end_date, pacific_today())
         if start_date > end_date:
             return []  # DynamoDB rejects a BETWEEN whose lower bound exceeds the upper
+    # #5813: inside one plan_next_session call the same (source, window) is read once and each caller gets its own copy;
+    # outside a plan call (every other tool, the crons) `memo_get` always misses and `memo_put` stores nothing.
+    from mcp import plan_call_scope
+
+    memo_key = (source, start_date, end_date, lean, include_pilot)
+    hit = plan_call_scope.memo_get(plan_call_scope.SOURCE_RANGE, memo_key)
+    if hit is not plan_call_scope.MISS:
+        return hit
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)
     pk = f"{USER_PREFIX}{source}"
     kwargs = _apply_phase_filter(
@@ -389,8 +397,8 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=None):
         items = [i for i in items if not i.get("tombstone")]
     raw = strava_read_seam(source, decimal_to_float(items))  # #4419: every MCP history read of strava is deduped here
     if lean:
-        return [{k: v for k, v in item.items() if k not in _LEAN_STRIP} for item in raw]
-    return raw
+        raw = [{k: v for k, v in item.items() if k not in _LEAN_STRIP} for item in raw]
+    return plan_call_scope.memo_put(plan_call_scope.SOURCE_RANGE, memo_key, raw)
 
 
 def parallel_query_sources(sources, start_date, end_date, lean=False, include_pilot=None):

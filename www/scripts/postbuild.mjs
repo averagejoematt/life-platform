@@ -29,7 +29,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ROOM_ENV, roomScope, scopeRoutes } from "../src/lib/room.js";
+import { ROOM_ENV, ROOM_PUBLIC_VALUES, roomPrivate, roomScope, scopeRoutes } from "../src/lib/room.js";
 import { LAB_ROUTES, labEnabled, labPrivate } from "../src/lib/lab.js";
 import { STORY_ROUTES, storyEnabled, storyPrivate } from "../src/lib/story_dark.js";
 
@@ -53,7 +53,7 @@ const rawBase = process.env.WEB_BASE || "/";
 // committed true the Lab / the story is ordinary build output and is owned, mapped and deployed like every page.
 const lab = labPrivate();
 const story = storyPrivate();
-const privateRoom = roomScope() !== "off" && ["1", "cr1"].includes(process.env[ROOM_ENV]);
+const privateRoom = roomScope() !== "off" && roomPrivate();
 const room = privateRoom || lab || story;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
@@ -126,10 +126,16 @@ for (const [on, list] of [
   }
 }
 
-// A PUBLISHED CR1 build (the committed `room_public: "cr1"`): the room's CR1 pages live outside src/pages/ and are
-// injected (src/lib/room.js), so they are added to the static routes here — each is written by a template. Never on a
-// private build (which does not write this file) and never while the switch is off (no route is injected).
-if (!privateRoom && roomScope() === "cr1") for (const r of scopeRoutes("cr1")) staticRoutes.add(r.path);
+// A PUBLISHED room build (the committed `room_public: "cr1"` or "cr2"): the room's pages live outside src/pages/ and are
+// injected (src/lib/room.js), so they are added here — a static one to static_routes, a [param] one (CR2's per-coach
+// record) to route_patterns. Never on a private build (which does not write this file) and never while the switch is
+// off (no route is injected).
+if (!privateRoom && ["cr1", "cr2"].includes(roomScope())) {
+  for (const r of scopeRoutes(roomScope())) {
+    if (r.path.includes("[")) routePatterns.add(r.path.replace(/\[[^\]]+\]/g, "*"));
+    else staticRoutes.add(r.path);
+  }
+}
 
 let previous = {};
 if (existsSync(OWNED_OUT)) {
@@ -147,13 +153,14 @@ const owned = {
     "through deploy/www_owned_paths.py — one owner per path (#5534). `live_at_root` is the cut-over switch, not build output: " +
     "false = the build is served at /next/v9/ only; true = the build owns `/` and every `www/**` merge deploys there. " +
     "`room_public` is the Coaching Room's committed publication switch, not build output: \"off\" = no room page is built; " +
-    "\"cr1\" = every build publishes CR1 (/system/calibration/, /system/ledger/refuted/, the /system/ entry) and never CR2/CR3.",
+    "\"cr1\" = every build publishes CR1 (/system/calibration/, /system/ledger/refuted/, the /system/ entry); \"cr2\" = CR1 + CR2 " +
+    "(/system/coaches/<id>/record/ and the entry on each coach page); never CR3.",
   base: "/",
   files: [...files].sort(),
   flipped_on: previous.flipped_on ?? null,
   live_at_root: previous.live_at_root === true,
   prefixes: [...prefixes].sort(),
-  room_public: previous.room_public === "cr1" ? "cr1" : "off",
+  room_public: ROOM_PUBLIC_VALUES.includes(previous.room_public) ? previous.room_public : "off",
   route_patterns: [...routePatterns].sort(),
   routes: [...routes].sort(),
   static_routes: [...staticRoutes].sort(),

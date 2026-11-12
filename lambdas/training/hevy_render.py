@@ -42,6 +42,7 @@ import re
 from typing import Any
 
 from training.cardio_note import LINE1_RE
+from training.hevy_note_grammar import CARDIO_RPE_CAPTURE_LINE
 from training.hevy_note_types import PINNED_ROUTINE_NOTE_FIELD
 from training.warmup_sets import is_warmup
 
@@ -310,6 +311,10 @@ def _note_hits(i: int, own: str, base: int) -> dict[str, list[dict[str, Any]]]:
     where = f"exercise {i + 1} note"
     out: dict[str, list[dict[str, Any]]] = {}
     first = own.split("\n", 1)[0]
+    if first.strip() == CARDIO_RPE_CAPTURE_LINE and "\n" in own:  # #5796: line 1 follows the RPE capture prompt
+        base += len(first) + 1
+        own = own.split("\n", 1)[1]
+        first = own.split("\n", 1)[0]
     m = LINE1_RE.match(first)
     if m:
         if m.group("level"):

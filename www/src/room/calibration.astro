@@ -39,7 +39,8 @@ import {
   voidedRows,
 } from "../lib/calibration.js";
 import { dayInWords, domainWords, kOfN, num } from "../lib/format.js";
-import { ROOM_MARKER, roomAll, roomEnabled, roomPublic } from "../lib/room.js";
+import { ROOM_MARKER, roomCr2, roomEnabled, roomPublic } from "../lib/room.js";
+import CommentaryFeature from "../components/CommentaryFeature.astro"; // CR2: renders nothing unless CR2 is on
 import { loadAll, loadCalibration } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
 
@@ -62,7 +63,7 @@ const chartCoaches = coaches.map((c: any) => ({ coach_name: c.coach_name, reliab
 const disputed = all.byType.prediction.filter(isDisputed);
 const noindex = process.env.WEB_NOINDEX === "1";
 const pub = roomPublic(); // the published CR1 build: no private banner, indexed
-const whole = roomAll(); // CR2's per-coach record pages exist only on a whole-room private build
+const whole = roomCr2(); // CR2's per-coach record pages exist only when CR2 is on (committed "cr2", or a private build)
 const lead = verifiedLead(cal);
 const why = whyChanged(cal);
 const archived = archiveRecord(cal);
@@ -168,6 +169,7 @@ const room = { [ROOM_MARKER]: "calibration" };
             <p class="muted" style="font-size:13px;max-width:70ch">
               Graded by code, never by the coaches. A call under classification review keeps its verdict and is counted neither right nor wrong.
             </p>
+            <CommentaryFeature />
           </div>
         </section>
 

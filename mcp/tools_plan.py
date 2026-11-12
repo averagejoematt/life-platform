@@ -137,7 +137,8 @@ def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED, error_label, input_status
 
     try:
-        value = fn(*a, **kw)
+        with plan_call_scope.reading(name):  # #5813: timed per reader on `timing_ms.stage_1`
+            value = fn(*a, **kw)
     except Exception as e:  # noqa: BLE001 — reported in the block, never swallowed (#4072)
         logger.warning("plan_next_session input %s read failed: %s", name, e)
         return None, input_status(READ_FAILED, error=error_label(e))
@@ -632,7 +633,7 @@ def tool_plan_next_session(args):
     target_date = args.get("target_date") or pacific_today()
     routine_id = args.get("routine_id")
 
-    from training import accessory_strength_trend, plan_engine, step_gap_walk
+    from training import accessory_strength_trend, plan_engine, step_gap_walk, week_commitments
 
     # #4076: the owner override is parsed BEFORE anything runs — a malformed one is an error,
     # never a stage-2 run that silently ignored it and left the veto standing unexplained.
@@ -729,12 +730,11 @@ def tool_plan_next_session(args):
     layer_status = LAYER_UNKNOWN
     status["pain_layer_status"] = st(plan_engine.MEASURED)
     try:
-        from training.training_notes import training_notes_health
-
         from mcp.config import table
         from mcp.core import derived_layer_status
+        from mcp.plan_call_scope import notes_health  # #5813: the one health sweep per call
 
-        layer_status = derived_layer_status(training_notes_health(table))[0]
+        layer_status = derived_layer_status(notes_health(table))[0]
     except Exception as e:  # noqa: BLE001
         status["pain_layer_status"] = st(READ_FAILED, error=plan_engine.error_label(e))
 
@@ -892,6 +892,7 @@ def tool_plan_next_session(args):
     _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     attach_morning_note(block, target_date, recovery_tier)  # #4189: his four words beside the recovery tier
     _attach_session_loads(block, target_date, catalog_movements)
+    week_commitments.attach(block, ir, target_date, catalog_movements)  # #5774: the ledger's weekly commitments, hard at stage 1
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
     accessory_strength_trend.attach(block, evidence)

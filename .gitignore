@@ -117,6 +117,7 @@ config/content_filter.local.json
 # #5087: the owner-only half of the training charter (body/appearance targets) lives in
 # the same non-committed channel. Only training_charter.private.example.json is tracked.
 config/training_charter.private.local.json
+config/exercise_library.private.local.json
 # Owner ruling 2026-11-11 (item 2): the plan root's private part (common.user_goals) never enters this PUBLIC repo —
 # it lives in S3 config/private/ and, locally, under ~/.config/life-platform/. Belt and braces for a stray copy.
 config/private/
