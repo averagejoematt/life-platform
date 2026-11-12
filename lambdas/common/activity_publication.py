@@ -501,6 +501,88 @@ def public_correlations(correlations: Any, alpha: float = 0.05, metric_methods: 
     return [v for _k, v in items]
 
 
+def _names_versioned_metric(pair: Mapping) -> bool:
+    return any(
+        str(m or "").strip() in PUBLIC_METRIC_METHODS
+        for m in (pair.get("metric_a", pair.get("field_a")), pair.get("metric_b", pair.get("field_b")))
+    )
+
+
+def _same_pair(a: Mapping, b: Mapping) -> bool:
+    def key(p: Mapping) -> frozenset:
+        return frozenset(str(p.get(k) or "").strip() for k in ("metric_a", "metric_b"))
+
+    return key(a) == key(b)
+
+
+def public_newly_unlocked(unlocked: Any, weekly_records: Any, window_end: Any = None, window_days: int = 30) -> list:
+    """The ``what_changed.newly_unlocked`` list as published (owner rulings 2026-11-03/05/11). Every pair naming a
+    private metric is omitted. A pair naming a method-versioned metric (``PUBLIC_METRIC_METHODS``) carries a
+    "newly unlocked" claim — a comparison with earlier weeks — only when that comparison is made among
+    ``weekly_correlations`` records stamped with the public method: the first such record where the pair is
+    FDR-significant (``public_correlations``) must have an EARLIER public-method record as its baseline, and must
+    fall in the trailing window. Otherwise the pair is omitted (fail closed): the stored ``first_seen`` may come from
+    a pre-method record (the day grade with its journal component, habit_pct over the journal habits), and the first
+    public-method week has nothing public to be "new" against. A kept pair's ``first_seen`` is the public one."""
+    from datetime import datetime, timedelta
+
+    def end_of(rec: Mapping) -> str:
+        return str(rec.get("end_date") or rec.get("week") or rec.get("sk") or "")
+
+    records = sorted((r for r in (weekly_records or []) if isinstance(r, Mapping)), key=end_of)
+    cutoff = None
+    if window_end:
+        records = [r for r in records if end_of(r) <= str(window_end)]
+        try:
+            cutoff = (datetime.strptime(str(window_end)[:10], "%Y-%m-%d") - timedelta(days=window_days)).strftime("%Y-%m-%d")
+        except ValueError:
+            cutoff = None
+    out = []
+    for u in unlocked or []:
+        if not correlation_pair_is_public(u):
+            continue
+        if not _names_versioned_metric(u):
+            out.append(u)
+            continue
+        public_weeks = [r for r in records if correlation_pair_method_is_public(u, r.get("metric_methods"))]
+        first = None
+        for i, rec in enumerate(public_weeks):
+            corrs = public_correlations(rec.get("correlations", {}), metric_methods=rec.get("metric_methods"))
+            pairs = corrs.values() if isinstance(corrs, Mapping) else corrs if isinstance(corrs, list) else []
+            if any(isinstance(p, Mapping) and _same_pair(p, u) and p.get("fdr_significant") for p in pairs):
+                first = i
+                break
+        if not first:  # never significant on a public-method record, or significant in the FIRST one (no baseline)
+            continue
+        seen = str(public_weeks[first].get("end_date") or "")[:10]
+        if not seen or (cutoff is not None and seen < cutoff):
+            continue
+        out.append({**u, "first_seen": seen})
+    return out
+
+
+def unlocked_baseline_records(table: Any, query: Mapping, unlocked: Any) -> list:
+    """Every ``weekly_correlations`` record ``query`` (the caller's phase-filtered Query kwargs) reads — the baseline
+    ``public_newly_unlocked`` compares against — fetched only when a newly-unlocked pair names a method-versioned
+    metric. A failed read is no records, so those pairs are withheld (fail closed)."""
+    if not any(isinstance(u, Mapping) and _names_versioned_metric(u) for u in unlocked or []):
+        return []
+    import logging
+
+    records: list = []
+    params = dict(query)
+    try:
+        while True:
+            resp = table.query(**params)
+            records.extend(resp.get("Items", []))
+            if not resp.get("LastEvaluatedKey"):
+                return records
+            params["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    except Exception as e:
+        logging.getLogger(__name__).warning("weekly_correlations read failed; method-versioned pairs withheld: %s", e)
+        return []
+
+
 # ── sources ────────────────────────────────────────────────────────────────────────────────
 
 
