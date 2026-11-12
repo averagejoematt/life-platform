@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.41.0",
+  "version": "1.42.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -280,6 +280,13 @@
       "date": "2026-11-10",
       "by": "owner ruling 2026-11-10 (#5428, delegated training call: \"go\"; vetoable before merge)",
       "what": "Adds effort_ceilings.layoff_return_rpe (RPE 6 to 7) and its rule: the FIRST session of a movement back after a gap longer than the OD1 exposure-cap line (layoff_tiers.REENTRY_MAX_GAP_DAYS, more than 90 days) runs its working sets at this band with no last-set target, behind a warm-up row lighter than the working load. The 2026-11-08 draft read `RPE 8\u20139, last set RPE 9\u201310` on a torso rotation first done in 2 years, with its W row at the working load. This supersedes the 2026-10-30 'no blanket layoff cap' for exposure 1 only; exposures 2 to 3 keep the OD1 cap (RPE 7) and a lift with no session on file is not a return.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.42.0",
+      "date": "2026-11-11",
+      "by": "#5796 (epic #5050); no new owner ruling: the new number is a platform default named as one, pending his ruling",
+      "what": "Adds progression.set_raise_proposal: a movement performed above its prescribed working sets in each of the last weeks_running (3) complete weeks becomes a PROPOSAL to raise its prescription, read by training.self_added_volume and carried on the plan's constraint block beside the ceiling-change proposal, with the weeks' prescribed and performed sets and the headroom under the volume_ceiling redline. It never changes a prescription; the owner approves.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -674,6 +681,12 @@
       "provenance": "owner",
       "stated": "2026-09-30",
       "ruling": "#4503 OD5"
+    },
+    "set_raise_proposal": {
+      "weeks_running": 3,
+      "when": "a movement's performed working sets exceed its prescribed working sets in each of the last weeks_running complete Mon-Sun weeks (training.self_added_volume, from adherence's stored per-movement counts)",
+      "effect": "proposes prescribing the fewest working sets he performed in any session of the run, with the headroom under the volume_ceiling redline; a proposal only, the owner approves it",
+      "provenance": "platform default (#5796), pending his ruling"
     },
     "self_raised_load": {
       "rule": "a load the owner raised himself, logged at or under the movement's effort ceiling (an overage within `effort_ceilings.overage_tolerance_rpe` is not a breach), becomes the next floor and is graded `progressed` — a named state, never folded into an adherence percentage",

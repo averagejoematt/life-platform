@@ -233,6 +233,17 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
 
 Chat-era technique cues ("Elbows to hips, no lean-back", "Pause at the top for one count") count as the cue. A cue from the wrong family fails the check. The table is `hevy_note_grammar.FAMILY_CUES`.
 
+**Anchor sheet cue (owner ruling 2026-11-11, #5779 D8; #5817).** Four lifts carry ONE still-visible technique cue from their cue sheet (`form_cue_sheets.anchor_note_cue`), rendered whether or not he films and whether or not he has approved the sheet yet (`reviewed: False` until he does):
+
+| Lift | Sheet cue |
+|---|---|
+| Bench Press (Barbell) | `Stack wrists.` |
+| Squat (Barbell) | `Knees track the toes.` |
+| Deadlift (Barbell) | `Bar over mid-foot.` |
+| Dumbbell Row (one-arm) | `Elbow to hip.` |
+
+It sits on the cue line between the prep clause and the family cue (`Hip hinges first. Bar over mid-foot. Brace; breathe out on the way up.`). It outranks the prep clause and never displaces the family breathing cue (§6.1): the line is `prep + sheet + family` when that fits the budget (§7), else `sheet + family`, else the family cue's own forms; a critic clause that overflows drops the prep, then the sheet cue (`session_block._fit`). An anchor after its family's first exercise carries the sheet cue alone. An author's own cue (`draft_custom`) takes the slot instead. Every other movement's note is unchanged; the barbell bent-over row has no sheet because no program role serves it.
+
 ## 5. Vocabulary, numbers and units
 
 - **Effort:** `RPE ‹n›`, `RPE ‹a–b›`, `last set RPE ‹c–d›`. Never RIR, "in the tank" or "leave N".

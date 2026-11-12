@@ -55,9 +55,12 @@ from mcp import (  # noqa: E402
 )
 
 # The pin. Measured on this fixture when #5813 landed: 97 DynamoDB calls with the memos (the pre-#5813 read set: 137).
-# 97 -> 98 (2026-11-11, #5772): ONE genuinely new read, not a lost memo — `exercise_unlocks` queries the
-# `EXGATE#ANNOUNCE#` claim-once rows (a single begins_with Query; no other stage-1 reader touches that sk family).
-MAX_STAGE_1_DDB_CALLS = 98
+# +2 (#5774, owner ruling 2026-11-11 item 2): the week-commitment check reads the program week's committed routines once per
+# stage-1 call (`week_commitments.attach`: one routine-index Query + one GetItem for the routine this fixture holds) — a
+# new read the ruling requires (departures count at the week level), not a memo that stopped holding.
+# +1 (#5772): `exercise_unlocks` queries the `EXGATE#ANNOUNCE#` claim-once rows — ONE begins_with Query no other stage-1
+# reader touches (a new read, not a lost memo). MEASURED on the merged tree: 100 calls (99 on main + this one).
+MAX_STAGE_1_DDB_CALLS = 100
 
 _TARGET = "2026-09-20"
 _NOW = datetime(2026, 9, 20, 19, 0, tzinfo=timezone.utc)  # noon Pacific on the target day — the clock is frozen

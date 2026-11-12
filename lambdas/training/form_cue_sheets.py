@@ -15,6 +15,22 @@ WHAT THIS IS AND IS NOT
     A guessed sheet for the wrong pattern is worse than an honest "no sheet for this movement".
   * Video links are never here. The only link a reply may carry is a curated, owner-approved one on the catalog
     entry's `form_reference_urls` (see `training.note_requests.approved_reference_urls`). None exist yet.
+
+THE ANCHOR SHEETS (#5817, owner ruling 2026-11-11, #5779 D8)
+
+  * Four lifts: barbell bench press, barbell back squat, conventional deadlift (barbell) and the one-arm dumbbell row.
+    The barbell bent-over row has no sheet: no program role serves it (the row anchor resolves `machine_row`, then
+    `one_arm_db_row` — `program_structure.ANCHORS["row"]`; no v0.4 template, charter pool or rotation names it).
+  * Matched by catalog key, Hevy template id or exact catalog title only — never a regex — so an incline bench, a front
+    squat, a Romanian deadlift or a cable row never reads an anchor's sheet.
+  * Each sheet splits its cues into `still_visible` (checkable in one still frame: joint stack, bar position at a fixed
+    point, angles) and `not_visible` (tempo, bracing timing, breath, anything that needs motion or sensation). The one
+    clinical-context line is a breathing cue (breathe between reps, no long breath-hold), reference only: never an
+    intensity statement, never rendered. No cue claims to prevent injury or to have a medical effect.
+  * ONE still-visible cue per sheet (`note_cue`) rides on the lift's Hevy note beside the family breathing cue
+    (`lift_note._cue_for`), regardless of filming (D8). The family breathing cue is never dropped for it (standard §6.1).
+  * Every anchor sheet is `reviewed: False` until the owner approves THAT sheet; the approval is his edit to the
+    literal below (a date), never a code path. No anchor carries a form-reference link (D11).
 """
 
 from __future__ import annotations
@@ -132,3 +148,146 @@ def sheet_for(title: str) -> dict[str, Any] | None:
 def patterns() -> tuple[str, ...]:
     """Every pattern with a sheet — the test reads it to hold each sheet's shape."""
     return tuple(_SHEETS)
+
+
+# ── the anchor sheets (#5817) ───────────────────────────────────────────────────────────────────────────────────────
+ANCHOR_SHEETS_VERSION = "anchor-cue-sheets@0.1.0"
+
+# Per sheet: `reviewed` is False until the owner approves THAT sheet (his edit: the approval date as a string). Cues are
+# (id, text); `note_cue` names one still-visible id and the short form the Hevy note carries.
+_ANCHOR_SHEETS: dict[str, dict[str, Any]] = {
+    "bench_press_barbell": {
+        "title": "Bench Press (Barbell)",
+        "reviewed": False,
+        "still_visible": (
+            ("feet_planted", "Feet flat on the ground, knees bent, glutes on the bench."),
+            ("blades_set", "Shoulder blades pulled back and down, upper back set into the bench, a small arch."),
+            ("grip_width", "Grip a little wider than the shoulders; the forearms are vertical with the bar on the chest."),
+            ("wrists_over_elbows", "Wrists stacked straight over the elbows, the bar in the heel of the hand."),
+            ("elbow_angle", "Elbows angled under the bar, not flared straight out to the sides."),
+            ("touch_point", "The bar touches the lower chest, around the nipple line."),
+            ("lockout_over_shoulders", "At lockout the bar sits over the shoulders, arms straight."),
+        ),
+        "not_visible": (
+            ("controlled_lower", "Lower under control to a light touch; no bounce off the chest."),
+            ("leg_drive", "Push the feet into the ground as you press."),
+            ("stay_tight", "Keep the upper back tight from the first rep to the last."),
+            ("bar_path", "Press up and slightly back toward the shoulders."),
+        ),
+        "note_cue": ("wrists_over_elbows", "Stack wrists."),  # with the press cue: ONE phone line (fits exercise 1)
+        "clinical_context": "Breathe between reps; no long breath-hold.",
+    },
+    "back_squat_barbell": {
+        "title": "Squat (Barbell)",
+        "reviewed": False,
+        "still_visible": (
+            ("bar_on_upper_back", "Bar across the upper back (the traps), not on the neck; hands just outside the shoulders."),
+            ("stance", "Feet about shoulder width, toes turned out a little."),
+            ("knees_track_toes", "Knees track in line with the toes, not caving in."),
+            ("heels_down", "Whole foot on the ground, heels down, at the bottom."),
+            ("bar_over_midfoot", "From the side, the bar sits over the middle of the foot, top and bottom."),
+            ("neutral_back", "Back flat at the bottom, not rounding under; chest up over the bar."),
+            ("depth", "Hip crease at or below the top of the knee, as deep as the back stays flat."),
+        ),
+        "not_visible": (
+            ("brace_before_descent", "Brace before each descent and hold it to the bottom."),
+            ("controlled_descent", "Sit down under control; no dropping into the bottom."),
+            ("drive_whole_foot", "Drive up through the whole foot; hips and chest rise together."),
+            ("stay_tight_bottom", "Stay tight at the bottom; no relaxing before the drive."),
+        ),
+        "note_cue": ("knees_track_toes", "Knees track the toes."),
+        "clinical_context": "Breathe between reps; no long breath-hold.",
+    },
+    "conventional_deadlift_barbell": {
+        "title": "Deadlift (Barbell)",
+        "reviewed": False,
+        "still_visible": (
+            ("bar_over_midfoot", "At the start the bar is over the middle of the foot, about an inch from the shins."),
+            ("grip_outside_legs", "Hands just outside the legs, arms straight."),
+            ("shoulders_over_bar", "Shoulders just in front of the bar at the start."),
+            ("hip_height", "Hips higher than the knees and lower than the shoulders at the start."),
+            ("flat_back", "Back flat from hips to head at the start, not rounded."),
+            ("bar_close", "Bar close to the legs as it passes the knees."),
+            ("tall_lockout", "At lockout: standing tall, hips through, no leaning back."),
+        ),
+        "not_visible": (
+            ("slack_out", "Pull the slack out of the bar before it leaves the ground."),
+            ("push_the_ground", "Push the ground away; the bar stays in contact with the legs on the way up."),
+            ("rise_together", "Hips and shoulders rise together off the ground."),
+            ("lower_hips_first", "Lower it the way it came: hips back first, knees bend once the bar passes them."),
+        ),
+        "note_cue": ("bar_over_midfoot", "Bar over mid-foot."),
+        "clinical_context": "Breathe at the top between reps; no long breath-hold.",
+    },
+    "one_arm_db_row": {
+        "title": "Dumbbell Row",
+        "reviewed": False,
+        "still_visible": (
+            ("supported_stance", "One hand and knee on the bench (or a hand on it, feet staggered), the free arm hanging straight."),
+            ("flat_back", "Back flat and roughly level with the ground, not twisted toward the dumbbell."),
+            ("square_shoulders", "Shoulders square to the ground at the top, not rotated open."),
+            ("elbow_to_hip", "At the top the elbow is by the hip, close to the side."),
+            ("neutral_head", "Head in line with the back, eyes down."),
+        ),
+        "not_visible": (
+            ("pull_with_back", "Start the pull by drawing the shoulder blade back, then the elbow."),
+            ("no_jerk", "No yanking or torso swing to start the rep."),
+            ("controlled_lower", "Lower to a full stretch under control."),
+        ),
+        "note_cue": ("elbow_to_hip", "Elbow to hip."),
+        "clinical_context": "Breathe between reps; no long breath-hold.",
+    },
+}
+
+# catalog key, Hevy template id, or exact catalog title (lower-cased) -> sheet id. Exact only (module doc).
+_ANCHOR_MATCH: dict[str, str] = {
+    "barbell_bench_press": "bench_press_barbell",
+    "tmpl:79D0BB3A": "bench_press_barbell",
+    "squat_barbell": "back_squat_barbell",
+    "tmpl:D04AC939": "back_squat_barbell",
+    "deadlift_barbell": "conventional_deadlift_barbell",
+    "tmpl:C6272009": "conventional_deadlift_barbell",
+    "one_arm_db_row": "one_arm_db_row",
+    "tmpl:F1E57334": "one_arm_db_row",
+}
+_ANCHOR_MATCH.update({s["title"].lower(): sid for sid, s in _ANCHOR_SHEETS.items()})
+
+
+def anchor_of(movement_key: str, entry: dict[str, Any] | None = None) -> str | None:
+    """The anchor sheet id for a movement (its catalog key, `tmpl:<id>` key, or exact catalog title), or None."""
+    title = " ".join(str((entry or {}).get("title") or "").lower().split())
+    return _ANCHOR_MATCH.get(str(movement_key or "")) or _ANCHOR_MATCH.get(title)
+
+
+def _anchor_sheet(sheet_id: str) -> dict[str, Any] | None:
+    """One anchor sheet as a fresh copy (a caller can never edit the table), or None."""
+    s = _ANCHOR_SHEETS.get(sheet_id)
+    if s is None:
+        return None
+    return {
+        "sheet": sheet_id,
+        "title": s["title"],
+        "still_visible": [{"id": i, "cue": t} for i, t in s["still_visible"]],
+        "not_visible": [{"id": i, "cue": t} for i, t in s["not_visible"]],
+        "note_cue": {"id": s["note_cue"][0], "text": s["note_cue"][1]},
+        "clinical_context": s["clinical_context"],
+        "sheets_version": ANCHOR_SHEETS_VERSION,
+        "reviewed": s["reviewed"],
+    }
+
+
+def _anchor_sheets() -> tuple[str, ...]:
+    """Every anchor sheet id — the test reads it to hold each sheet's shape."""
+    return tuple(_ANCHOR_SHEETS)
+
+
+def anchor_note_cue(movement_key: str, entry: dict[str, Any] | None = None) -> str:
+    """The one still-visible cue an anchor's Hevy note carries (#5817, D8: rendered regardless of filming and of
+    `reviewed`), or "" for every other movement — which is what keeps every other note unchanged."""
+    sid = anchor_of(movement_key, entry)
+    return _ANCHOR_SHEETS[sid]["note_cue"][1] if sid else ""
+
+
+def anchor_note_cues() -> tuple[str, ...]:
+    """Every anchor's note cue text — `session_block._fit` drops one when a critic's clause overflows the note."""
+    return tuple(s["note_cue"][1] for s in _ANCHOR_SHEETS.values())

@@ -983,10 +983,12 @@ EXPANSION: list[dict] = [
     _x(
         "kettlebell_deadlift",
         "Kettlebell Deadlift",
-        None,
-        template_note="no Hevy standard template; log under a custom 'Kettlebell Deadlift' template (to create) — not Deadlift (Dumbbell)",
-        # #5772: until #5810 picks the Hevy template, any logged exercise whose TITLE carries both words counts as an exposure
-        # (training.exercise_gates reads this rule); once a template is chosen, set `template_id` and this rule still holds.
+        "D20D7BBE",
+        template_note=(
+            "#5774 owner ruling 2026-11-11: no Hevy Kettlebell Deadlift template exists, and Deadlift (Dumbbell) 5F4E6DD3 is catalogued already (deadlift_dumbbell), so the kettlebell slot's entry logs under Hevy's Sumo Deadlift D20D7BBE (never logged before) until a custom 'Kettlebell Deadlift' template exists"
+        ),
+        # #5772: the evaluator counts the template id's sessions, PLUS any logged exercise whose title carries both words
+        # (a custom "Kettlebell Deadlift" template he may create later) — training.exercise_gates.sessions_for.
         template_match={"title_all": ["kettlebell", "deadlift"]},
         target={"primary": "glutes", "secondary": ["hamstrings", "back"], "region": "lower"},
         family="strength_anchor",

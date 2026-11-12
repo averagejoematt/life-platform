@@ -41,7 +41,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from common.pacific_time import pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
-from training import commit_binding  # #4066: the commit is bound to the red-teamed routine
+from training import commit_binding, week_commitments  # #4066: the commit is bound to the red-teamed routine; #5774
 from training.warmup_sets import working_set_count  # #5049: the set ceilings count working sets
 
 from mcp.draft_custom_session import custom_args_refusal, finish_custom_draft, lift_note_warnings  # #5005 #5049 #5057 #5055 #5428
@@ -999,7 +999,8 @@ def _action_commit(args: dict[str, Any]) -> dict[str, Any]:
     # provenance; `floor`/`re_entry` are exempt by design and say so. The audit is stamped
     # into inputs_snapshot so the stored IR records what ran (box 4's readback).
     gate = prescription_gate(ir)
-    if refused := _gate_refusal(gate, mcp_error):  # #4172: message AND suggestions derived from the violations
+    # #4172: message AND suggestions derived from the violations; #5774: then the week fails stage 1 on a ledger commitment
+    if refused := _gate_refusal(gate, mcp_error) or week_commitments.commit_refusal(ir, mcp_error):
         return refused
     # #4066: the commit must be the routine stage 2 verdicted, unchanged since — or an explicit owner override.
     binding_refusal, binding_line, binding_warnings = commit_binding.preflight(ir, args, mcp_error)
