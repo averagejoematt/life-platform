@@ -6123,6 +6123,34 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "habitify",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
       "direction": "read",
       "lambda": "life-platform-mcp",
       "module": "mcp/tools_benchmark.py",
@@ -8290,10 +8318,10 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 788,
+      "edges": 792,
       "lambdas": 107,
-      "mcp_tool_modules": 40,
-      "mcp_tools": 91,
+      "mcp_tool_modules": 41,
+      "mcp_tools": 92,
       "partitions": 125,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
@@ -8305,8 +8333,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 394,
-        "sites_resolved": 988,
-        "sites_total": 1382
+        "sites_resolved": 992,
+        "sites_total": 1386
       },
       "schedule_resolution": {
         "dynamic": 0,
