@@ -50,8 +50,9 @@ Movement matching: by Hevy exercise_template_id when present; falls back to
 title prefix on the catalog title.
 
 TEMPLATE-ID ALIASES (#3929). Hevy's own catalog carries the same movement under more
-than one exercise_template_id (specimen: `21310F5F` "Triceps Extension (Cable)" vs
-`B5EFBF9C` "Overhead Triceps Extension (Cable)" — one movement, two ids). Matched by
+than one exercise_template_id (the original specimen, `21310F5F` "Triceps Extension (Cable)" vs
+`B5EFBF9C` "Overhead Triceps Extension (Cable)", was SPLIT by owner ruling 2026-11-11 (#5773) into
+two movements — the registry's `split` map records it). Matched by
 raw template_id alone, a performed set logged under the alias id scored as BOTH one
 missing (the prescribed id never seen performed) and one extra (the alias id never
 seen prescribed) — a single real movement double-penalized. `config/hevy_template_aliases.json`
@@ -350,14 +351,18 @@ def _normalize_alias_title(title: str) -> str:
     return " ".join(words)
 
 
-def find_alias_candidates(titles: dict[str, str], known_aliases: dict[str, str] | None = None) -> list[dict[str, Any]]:
+def find_alias_candidates(
+    titles: dict[str, str], known_aliases: dict[str, str] | None = None, known_split: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """Report UNCONFIRMED alias candidates — never applied to scoring (shrink-only-honest,
     #3929's acceptance: "an unrecognized template pairing is reported as a candidate,
     never silently merged"). `titles` is `{exercise_template_id: title}` (e.g. from
     `config/hevy_template_aliases.json`'s own `titles` map, or a Hevy template-index
     walk); `known_aliases` is the registry's confirmed `aliases` map, used only to
     exclude ids the registry already accounts for so the output is the unconfirmed
-    residue a human still needs to review.
+    residue a human still needs to review. `known_split` is the registry's `split` map
+    (ids the owner ruled a DIFFERENT movement from their former canonical, #5773): those
+    ids are never re-proposed.
 
     A group of >=2 template ids that normalize (see `_normalize_alias_title`) to the
     same core title is a candidate. This function performs NO resolution — it is a
@@ -375,7 +380,7 @@ def find_alias_candidates(titles: dict[str, str], known_aliases: dict[str, str] 
     for key, ids in groups.items():
         if len(ids) < 2:
             continue
-        unconfirmed = sorted(tid for tid in ids if tid not in known_aliases)
+        unconfirmed = sorted(tid for tid in ids if tid not in known_aliases and tid not in (known_split or {}))
         if len(unconfirmed) < 2:
             continue  # the registry already accounts for every id but one in this group
         candidates.append({"normalized_title": key, "template_ids": unconfirmed})

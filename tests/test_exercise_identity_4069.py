@@ -106,7 +106,17 @@ def test_the_real_alias_registry_is_the_one_read():
     """The alias map is #3929's registry through adherence_calc — not a table of this PR's own."""
     amap, status = ts.template_alias_map()
     assert status["status"] == "read" and status["source"] == "config/hevy_template_aliases.json"
-    assert amap.get("B5EFBF9C") == "21310F5F"
+    # owner ruling 2026-11-11 (#5773): the overhead cable extension was SPLIT from the neutral-arm one — no longer folded
+    assert "B5EFBF9C" not in amap
+
+
+def test_the_split_pair_is_two_movements_under_the_shipped_registry(monkeypatch):
+    items = [
+        _row("2026-09-07", "a", [_ex(*TRI_CANON, 40, reps=12)]),
+        _row("2026-09-14", "b", [_ex(*TRI_ALIAS, 45, reps=12)]),
+    ]
+    out = _run(monkeypatch, {"template_id": "B5EFBF9C"}, items)
+    assert out["n_sessions"] == 1 and out["identity"] == "B5EFBF9C"
 
 
 def test_a_name_resolves_to_template_ids_first():
@@ -146,6 +156,8 @@ def test_barbell_bench_by_template_id_returns_no_incline_db_sets(monkeypatch):
 
 
 def test_a_confirmed_alias_pair_is_one_movement(monkeypatch):
+    """The fold mechanism, on the #3929 pair as a synthetic registry (split in the shipped one, 2026-11-11)."""
+    monkeypatch.setattr(ts, "template_alias_map", lambda: ({"B5EFBF9C": "21310F5F"}, {"status": "read", "source": "synthetic"}))
     items = [
         _row("2026-09-07", "a", [_ex(*TRI_CANON, 40, reps=12)]),
         _row("2026-09-14", "b", [_ex(*TRI_ALIAS, 45, reps=12)]),

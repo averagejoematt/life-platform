@@ -313,10 +313,15 @@ def test_clinical_cue_never_locks():
 
 
 def test_not_for_you_now_entries_carry_reason_and_unlock():
+    # owner ruling 2026-11-11 (#5773) unlocked the only entry (Preacher Curl (Barbell)), so the set may be empty;
+    # the schema rule is held on a planted entry instead
     nfy = {k: e["not_for_you_now"] for k, e in MV.items() if e["not_for_you_now"]}
-    assert nfy
     for k, v in nfy.items():
         assert v["reason_code"] and v["unlock_condition"], k
+    assert MV["preacher_curl_barbell"]["not_for_you_now"] is None
+    lib = copy.deepcopy(LIB)
+    lib["movements"]["preacher_curl_barbell"]["not_for_you_now"] = {"reason_code": "x"}
+    assert any("not_for_you_now needs" in e for e in xl.validate(lib))
 
 
 # ── fallbacks + availability ───────────────────────────────────────────────────────────────────────────────────
