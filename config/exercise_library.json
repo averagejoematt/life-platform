@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.1.0",
+ "version": "0.1.1",
  "status": "proposed",
  "change_log": [
   {
@@ -9,6 +9,12 @@
    "by": "#5769 (owner spec 2026-11-11)",
    "what": "First library: every Hevy template he has logged (full history, tombstones excluded), expansion candidates, attributes, verified-citation hypertrophy tiers, gates defined (evaluated in #5772), gym inventory unconfirmed.",
    "rule": "proposed until the owner approves; any change after approval needs an owner ruling — bump `version`, add a line"
+  },
+  {
+   "version": "0.1.1",
+   "date": "2026-11-11",
+   "by": "owner ruling 2026-11-11 (#5773)",
+   "what": "Preacher Curl (Barbell) unlocked: its not_for_you_now is removed (a real pain-class note still excludes it at selection). Overhead Triceps Extension (Cable) (B5EFBF9C) split from Triceps Extension (Cable) (21310F5F): no longer an alias (`alias_of` dropped); its own catalog entry `overhead_triceps_extension_cable`. Status stays proposed."
   }
  ],
  "_provenance": {
@@ -3959,15 +3965,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "preacher_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "behind_the_back_curl_cable",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "ez_bar_biceps_curl",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -5857,7 +5863,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "preacher_curl_dumbbell",
+     "movement_id": "preacher_curl_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -8353,7 +8359,6 @@
    "title": "Overhead Triceps Extension (Cable)",
    "source": "history",
    "template_id": "B5EFBF9C",
-   "alias_of": "21310F5F",
    "history": {
     "first_done": "2025-10-27",
     "last_done": "2026-11-02",
@@ -8422,7 +8427,7 @@
      "reason": "same_stimulus"
     }
    ],
-   "curation_note": "missing from the #5075 upper_heavy triceps pool (owner, 2026-11-11); alias-registry pair of 21310F5F"
+   "curation_note": "missing from the #5075 upper_heavy triceps pool (owner, 2026-11-11); SPLIT from 21310F5F by owner ruling 2026-11-11 (#5773) — its own movement, no longer an alias"
   },
   "skullcrusher_barbell": {
    "title": "Skullcrusher (Barbell)",
@@ -12826,15 +12831,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "preacher_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "behind_the_back_curl_cable",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "ez_bar_biceps_curl",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -19334,11 +19339,7 @@
     }
    ],
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "history_pain_flag",
-    "detail": "private overlay (not_for_you_now_detail)",
-    "unlock_condition": "a pain-free trial at RPE <= 6 with a neutral / angled grip handle, or the preacher machine once the gym audit confirms one"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -31628,15 +31629,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "preacher_curl_barbell",
+     "reason": "same_target"
+    },
+    {
      "movement_id": "behind_the_back_curl_cable",
      "reason": "same_target"
     },
     {
      "movement_id": "ez_bar_biceps_curl",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "bicep_curl_barbell",
      "reason": "same_target"
     }
    ]
@@ -34968,7 +34969,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "preacher_curl_dumbbell",
+     "movement_id": "preacher_curl_barbell",
      "reason": "same_stimulus"
     }
    ]

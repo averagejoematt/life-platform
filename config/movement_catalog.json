@@ -8,14 +8,14 @@
     "history_first": "2021-04-12",
     "history_through": "2026-10-18",
     "workouts": 518,
-    "distinct_templates": 538,
-    "entries": 543,
+    "distinct_templates": 539,
+    "entries": 544,
     "reviewed": 26,
     "coach_added": 2,
-    "generated": 515,
+    "generated": 516,
     "entries_by_skill_tier": {
       "1": 278,
-      "2": 197,
+      "2": 198,
       "3": 68
     },
     "entries_by_anchor_family": {
@@ -1338,30 +1338,6 @@
       "last_done": "2026-05-31",
       "anchor_family": "row"
     },
-    "triceps_extension_cable": {
-      "title": "Triceps Extension (Cable)",
-      "hevy_template_id_hint": "21310F5F",
-      "primary_muscle": "triceps",
-      "secondary_muscles": [],
-      "volume_muscle": "Triceps",
-      "hevy_primary_muscle_group": "triceps",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "title:cable",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "cable",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 19,
-      "first_done": "2021-04-13",
-      "last_done": "2026-09-19",
-      "anchor_family": null
-    },
     "deadlift_trap_bar": {
       "title": "Deadlift (Trap bar)",
       "hevy_template_id_hint": "B923B230",
@@ -1465,6 +1441,30 @@
       "last_done": "2025-05-21",
       "anchor_family": null,
       "load_convention": "per_hand"
+    },
+    "triceps_extension_cable": {
+      "title": "Triceps Extension (Cable)",
+      "hevy_template_id_hint": "21310F5F",
+      "primary_muscle": "triceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Triceps",
+      "hevy_primary_muscle_group": "triceps",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "title:cable",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "cable",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 16,
+      "first_done": "2021-04-13",
+      "last_done": "2024-01-22",
+      "anchor_family": null
     },
     "pull_up_assisted": {
       "title": "Pull Up (Assisted)",
@@ -5294,6 +5294,30 @@
       "first_done": "2024-12-18",
       "last_done": "2025-03-19",
       "anchor_family": "row"
+    },
+    "overhead_triceps_extension_cable": {
+      "title": "Overhead Triceps Extension (Cable)",
+      "hevy_template_id_hint": "B5EFBF9C",
+      "primary_muscle": "triceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Triceps",
+      "hevy_primary_muscle_group": "triceps",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "title:cable",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "cable",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 3,
+      "first_done": "2025-10-27",
+      "last_done": "2026-09-19",
+      "anchor_family": null
     },
     "plyo_inverted_rows": {
       "title": "Plyo Inverted Rows",

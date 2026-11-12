@@ -496,7 +496,7 @@ CURATED: dict[str, dict] = {
             hyp("triceps_long_head", "A", ["maeo2023_overhead_triceps"], "rct_direct", "this exact movement (cable, overhead arm)"),
             hyp("triceps_lateral_medial", "A", ["maeo2023_overhead_triceps"], "rct_direct"),
         ],
-        "curation_note": "missing from the #5075 upper_heavy triceps pool (owner, 2026-11-11); alias-registry pair of 21310F5F",
+        "curation_note": "missing from the #5075 upper_heavy triceps pool (owner, 2026-11-11); SPLIT from 21310F5F by owner ruling 2026-11-11 (#5773) — its own movement, no longer an alias",
     },
     "21310F5F": {
         "target": {"primary": "triceps", "secondary": [], "region": "upper"},
@@ -545,11 +545,8 @@ CURATED: dict[str, dict] = {
         "hypertrophy": [
             hyp("biceps", "B", ["sato2021_elbow_angle"], "rct_characteristic", "preacher position loads the extended-elbow range")
         ],
-        "not_for_you_now": {
-            "reason_code": "history_pain_flag",
-            "detail": "private overlay (not_for_you_now_detail)",
-            "unlock_condition": "a pain-free trial at RPE <= 6 with a neutral / angled grip handle, or the preacher machine once the gym audit confirms one",
-        },
+        # owner ruling 2026-11-11 (#5773): UNLOCKED — the not_for_you_now (a discomfort-class note, never a pain-class
+        # one under #5806's rule) is removed; a real `pain` note still excludes it at selection time.
     },
     "1E9A6B8E": {
         "family": "hypertrophy",

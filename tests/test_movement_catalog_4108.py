@@ -128,6 +128,17 @@ def test_a_confirmed_alias_is_folded_not_catalogued():
         assert alias_tid.upper() not in hints
 
 
+def test_a_split_alias_is_catalogued_under_its_own_id():
+    """Owner ruling 2026-11-11 (#5773): B5EFBF9C (Overhead Triceps Extension (Cable)) was split from 21310F5F — its own
+    catalog entry, its own history (sessions no longer folded into the neutral-arm extension), never an alias again."""
+    reg = json.loads((REPO / "config" / "hevy_template_aliases.json").read_text())
+    assert "B5EFBF9C" in reg["split"] and not set(reg["split"]) & set(reg["aliases"])
+    oh, neutral = CATALOG["overhead_triceps_extension_cable"], CATALOG["triceps_extension_cable"]
+    assert oh["hevy_template_id_hint"] == "B5EFBF9C" and neutral["hevy_template_id_hint"] == "21310F5F"
+    assert oh["primary_muscle"] == neutral["primary_muscle"] == "triceps" and oh["hevy_type"] == "weight_reps"
+    assert oh["sessions"] >= 1 and neutral["last_done"] < oh["first_done"]  # the split history: overhead is the recent one
+
+
 def test_squat_barbell_fixture():
     """The issue's fixture: Squat (Barbell) present at tier 3 with its template id, eligible once the ceiling allows 3."""
     sq = CATALOG["squat_barbell"]
