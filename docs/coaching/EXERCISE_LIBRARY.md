@@ -109,6 +109,12 @@ cues}` — every "not for you now" carries its reason and its unlock condition.
   the charter's own numbers (power-clean revisit weight, lower-leg-prep carve-out) — read, never copied.
 - **Template match:** a movement with no standard Hevy template can carry `template_match.title_all`; any logged exercise
   whose title carries every word counts (the KB deadlift, until #5810 picks its template).
+- **Owner confirmation:** the overlay's `technique_confirmations` (movement id -> `{confirmed_on, source}`, seeded by
+  `deploy/write_exercise_library_overlay.py::OWNER_TECHNIQUE_CONFIRMATIONS`, never dropped on a re-run) meets the
+  `owner_confirmation` gate for that movement only — its chain and bodyweight gates still apply. Owner ruling 2026-11-11:
+  `clean` and `hang_power_clean` confirmed.
+- **Progression standards** (every chain and performance gate) are owner-approved as proposed (ruling 2026-11-11); the six
+  owner-set bodyweight values stay null, so those gates stay locked and the library stays `proposed`.
 - **KB swing (owner ruling 2026-11-11):** `chain_kb_swing` opens on exactly 2 logged KB-deadlift sessions.
 - **Chain order:** a chain gate opens only when each prerequisite met its standard AND that prerequisite's own chain
   gates are open.

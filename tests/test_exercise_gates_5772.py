@@ -413,3 +413,35 @@ def test_only_a_pain_class_note_locks_a_movement():
     assert eg.evaluate_gates(_lib(), None, _measured(sore, mean_lb=250))["pain_flag_exclusion"]["by_movement"] == {}
     pain = [_workout("2026-11-05", "AAAA0004", _sets(2, 10), notes="sharp pain in my elbow")]
     assert "odd_machine" in eg.evaluate_gates(_lib(), None, _measured(pain, mean_lb=250))["pain_flag_exclusion"]["by_movement"]
+
+
+# ── owner rulings 2026-11-11 on PR #5824: clean technique confirmed; progression standards approved ─────────────────
+def test_the_owners_clean_confirmation_meets_its_gate_and_nothing_else():
+    sys.path.insert(0, str(_REPO / "deploy"))
+    import write_exercise_library_overlay as w
+
+    conf = w.technique_confirmations(_LIB, None)
+    assert set(conf) == {"clean", "hang_power_clean"}
+    assert all(v == {"confirmed_on": "2026-11-11", "source": "owner ruling 2026-11-11"} for v in conf.values())
+    kept = w.technique_confirmations(_LIB, {"technique_confirmations": {"snatch": {"confirmed_on": "2026-12-01"}, "ghost": {}}})
+    assert "snatch" in kept and "ghost" not in kept  # an existing one is kept; a non-library id is dropped
+
+    overlay = {"gates": {}, "availability_learned": {}, "technique_confirmations": conf}
+    gates = eg.evaluate_gates(_LIB, overlay, {**_measured([], mean_lb=250), "charter": _CHARTER})
+    locked = gates["owner_confirmation_skill"]["by_movement"]
+    assert "clean" not in locked and "hang_power_clean" not in locked
+    assert "snatch" in locked and locked["snatch"]["input"] == eg.UNKNOWN  # unconfirmed skills stay locked
+    states = eg.movement_states(_LIB, gates)
+    assert "owner_confirmation_skill" not in states["clean"]["locked_by"]
+    assert "chain_full_clean" in states["clean"]["locked_by"]  # the chain still applies
+    assert "chain_hang_power_clean" in states["hang_power_clean"]["locked_by"]
+
+
+def test_progression_standards_are_owner_approved_and_bodyweight_values_stay_unset():
+    for gid, g in _LIB["gates"].items():
+        if g["kind"] in ("chain_prerequisite", "performance_threshold"):
+            assert g["provenance"].startswith("owner"), gid
+            assert "pending owner ruling" not in g["provenance"], gid
+        if g["kind"] == "bodyweight_threshold" and "ref" in (g.get("threshold") or {}):
+            assert "value" not in g["threshold"], gid  # the number is the owner's, in the private overlay
+    assert _LIB["status"] == "proposed"

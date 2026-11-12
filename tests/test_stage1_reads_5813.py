@@ -55,7 +55,9 @@ from mcp import (  # noqa: E402
 )
 
 # The pin. Measured on this fixture when #5813 landed: 97 DynamoDB calls with the memos (the pre-#5813 read set: 137).
-MAX_STAGE_1_DDB_CALLS = 97
+# 97 -> 98 (2026-11-11, #5772): ONE genuinely new read, not a lost memo — `exercise_unlocks` queries the
+# `EXGATE#ANNOUNCE#` claim-once rows (a single begins_with Query; no other stage-1 reader touches that sk family).
+MAX_STAGE_1_DDB_CALLS = 98
 
 _TARGET = "2026-09-20"
 _NOW = datetime(2026, 9, 20, 19, 0, tzinfo=timezone.utc)  # noon Pacific on the target day — the clock is frozen

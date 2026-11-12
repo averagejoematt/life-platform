@@ -287,6 +287,9 @@ CITATIONS: dict[str, dict] = {
 
 # ── gates ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 _PROPOSED = "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+# Owner ruling 2026-11-11 (#5772): the progression standards (every chain_prerequisite and performance_threshold gate)
+# are APPROVED as proposed. The bodyweight thresholds stay owner-to-set; the other gates keep `_PROPOSED`.
+_APPROVED_STANDARD = "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
 
 
 def _bw(gid_key: str, what: str) -> dict:
@@ -305,7 +308,7 @@ def _bw(gid_key: str, what: str) -> dict:
 STD_3X = {"prerequisite_sessions_min": 3, "span_weeks_min": 2, "rpe_max": 7, "flag_free_days": 28}
 
 
-def _chain(prereqs: list[str], standard: str, provenance: str = _PROPOSED, params: dict | None = None) -> dict:
+def _chain(prereqs: list[str], standard: str, provenance: str = _APPROVED_STANDARD, params: dict | None = None) -> dict:
     """`standard` is the readable rule; `params` its machine-readable form (non-identifying performance numbers),
     which the overlay writer copies into the private gate table the evaluator (#5772) reads."""
     return {
@@ -383,7 +386,7 @@ GATES: dict[str, dict] = {
         "standard": {"sets": 3, "reps_min": 6, "assistance_fraction_max": 0.25, "sessions_min": 2, "rpe_max": 8},
         "chain_prerequisites": [],
         "unknown_input": "locked",
-        "provenance": _PROPOSED,
+        "provenance": _APPROVED_STANDARD,
     },
     "chain_pull": _chain(
         ["key:pull_up_negative"],

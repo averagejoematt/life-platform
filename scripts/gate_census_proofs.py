@@ -4619,13 +4619,14 @@ GUARD_PROOFS["guard::scripts/check_library_gates_private.py"] = {
 # plant at a time in the real file, restored from a byte copy, against tests/test_exercise_gates_5772.py.
 GUARD_PROOFS["guard::lambdas/training/exercise_gates.py"] = {
     "gate_name": "lambdas/training/exercise_gates.py",
-    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 23 passed",
+    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 25 passed",
     "mutation": (
         "E1 `_unknown` returns UNLOCKED (an unknown input opens the gate); E2 the owner-unset branch returns UNLOCKED "
         "(a null threshold opens it); E3 the chain step-open check disabled (`if False:`); E4 the clinical-cue branch keyed "
         "on the `locks` flag instead of the kind; E5 `log_view` includes `value_seen` (a body number in the log line); "
         "K1 the `template_match` title rule disabled; K2 `sessions_min` read as a minimum of 1 (one KB-deadlift session "
-        "opens the swing); K3 any #5800 note class (discomfort included) flags pain."
+        "opens the swing); K3 any #5800 note class (discomfort included) flags pain; C1 `confirmation_verdict` ignores the "
+        "overlay's technique_confirmations; C2 a confirmation also opens chain gates."
     ),
     "observed": (
         "2026-11-11, this lane. E1: 1 failed (test_every_unknown_input_reads_locked_and_says_so). E2: 1 failed "
@@ -4633,7 +4634,8 @@ GUARD_PROOFS["guard::lambdas/training/exercise_gates.py"] = {
         "E4: 1 failed (test_a_clinical_cue_never_locks_even_with_every_input_unknown). E5: 1 failed "
         "(test_the_leg_summary_and_log_carry_no_body_number). K1, K2: 1 failed each "
         "(test_kb_swing_opens_on_two_kb_deadlift_sessions_and_not_one). K3: 1 failed "
-        "(test_only_a_pain_class_note_locks_a_movement). RESTORED 23 passed."
+        "(test_only_a_pain_class_note_locks_a_movement). C1, C2: 1 failed each "
+        "(test_the_owners_clean_confirmation_meets_its_gate_and_nothing_else). RESTORED 25 passed."
     ),
     "scope": (
         "The pure evaluator over a synthetic library and the committed library. NOT SEEN: a live weekly run (the first "
@@ -4643,10 +4645,10 @@ GUARD_PROOFS["guard::lambdas/training/exercise_gates.py"] = {
 }
 GUARD_PROOFS["guard::mcp/exercise_gates_leg.py"] = {
     "gate_name": "mcp/exercise_gates_leg.py",
-    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 20 passed",
+    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 25 passed",
     "mutation": "L1 `claim` returns True on ConditionalCheckFailedException (a lost claim still announces — twice).",
     "observed": (
-        "2026-11-11, this lane. L1: 1 failed (test_announce_once_control_a_racing_second_claim_loses). RESTORED 20 passed. "
+        "2026-11-11, this lane. L1: 1 failed (test_announce_once_control_a_racing_second_claim_loses). RESTORED 25 passed. "
         "The proposed-library hold and the first-run baseline are pinned by test_a_proposed_library_announces_nothing and "
         "test_a_newly_unlocked_movement_is_announced_exactly_once."
     ),
