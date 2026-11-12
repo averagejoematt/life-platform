@@ -50,7 +50,7 @@ from web import (
 # The sealed file is private since 2026-11-11 (owner ruling item 3); the approved calls' words come from a labelled
 # test copy (tests/sealed_prereg.py), and every sealed call's words only from the private original when present.
 SEALED = set(sealed_prereg.sealed_call_texts())
-COACH = "sleep_coach"
+COACH = "physical_coach"  # two approved calls whose words the test copy still carries (tests/sealed_prereg.py)
 LEAD = "eli_marsh"
 LEAD_SK = "LEAD_DAILY#2026-10-11"  # not a listed day: the synthetic entry below is the only one under it
 LEAD_TEXT = "A synthetic dated lead read: weight down and recovery steady this morning."

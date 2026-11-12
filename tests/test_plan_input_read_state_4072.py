@@ -236,7 +236,8 @@ class TestEveryInputStatesItsRead:
         inputs = _stage1()["constraint_block"]["inputs"]
         for name in ("recovery_tier", "acwr_flag", "muscle_volume", "protein_days_missed_7d", "readiness_low_streak_days"):
             assert inputs[name]["state"] == "measured", (name, inputs[name])
-        assert inputs["weight_stall_days"]["state"] == "not_read", "an unwired input is named, never implied"
+        # #5802: the stall is nutrition_critics' evaluation now — the input is that block, never `not_read`
+        assert inputs["weight_stall_evaluation"]["state"] != "not_read" and "weight_stall_days" not in inputs
         assert inputs["anchor_lift_drop_pct"]["state"] == "not_read"
 
     @pytest.mark.parametrize(
