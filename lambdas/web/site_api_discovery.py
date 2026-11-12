@@ -195,7 +195,7 @@ def intelligence_summary(*, _g) -> dict:
         items = _decimal_to_float(resp.get("Items", []))
         if items:
             record = items[0]
-            corrs = _activity_publication.public_correlations(record.get("correlations", {}))
+            corrs = _activity_publication.public_correlations(record.get("correlations", {}), metric_methods=record.get("metric_methods"))
             summary["correlations"]["count"] = len(corrs) if isinstance(corrs, (dict, list)) else 0
             summary["correlations"]["last_week"] = record.get("sk", "").replace("WEEK#", "")
     except Exception as e:
@@ -454,7 +454,7 @@ def correlations(event: dict = None, *, _g) -> dict:
     # Owner rulings 2026-11-03/05: a pair naming a private metric (State-of-Mind valence, the diary
     # session count, the journal-coded values count) is omitted, and the FDR correction re-run over the
     # public pairs only (common.activity_publication.public_correlations).
-    raw_corrs = _activity_publication.public_correlations(record.get("correlations", {}))
+    raw_corrs = _activity_publication.public_correlations(record.get("correlations", {}), metric_methods=record.get("metric_methods"))
     if isinstance(raw_corrs, list):
         # Legacy format: already a list
         pairs = raw_corrs

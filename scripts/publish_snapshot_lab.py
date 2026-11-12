@@ -298,10 +298,46 @@ def shape_tests(payload: Any, excluded: list, metric_is_public: Callable[[Any], 
     return sorted(out, key=lambda t: (t["pre_registered"] or "", t["id"]), reverse=True)
 
 
-def shape_findings(payload: Any, excluded: list) -> list[dict]:
+# A served finding label (or key) that names a METHOD-VERSIONED metric → its key in the weekly record's
+# ``metric_methods`` (owner rulings 2026-11-05/06). Matched broadly on purpose: a relabelled "Day grade" or
+# "Habits completed" is still the method-versioned metric, never an unversioned one (fail closed).
+METHOD_VERSIONED = (
+    (re.compile(r"grade", re.IGNORECASE), "day_grade"),
+    (re.compile(r"habit", re.IGNORECASE), "habit_pct"),
+)
+
+
+def _public_methods() -> dict:
+    """``common.activity_publication.PUBLIC_METRIC_METHODS`` (the rule the Site API applies). Fail closed: none."""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
+        from common.activity_publication import PUBLIC_METRIC_METHODS  # type: ignore
+
+        return {k: tuple(v) for k, v in PUBLIC_METRIC_METHODS.items()}
+    except Exception:  # pragma: no cover — the module is in the repo
+        return {}
+
+
+def finding_method_is_public(f: dict, public_methods: dict | None = None) -> bool:
+    """Every method-versioned metric the finding names is stamped with a public method by the served finding.
+
+    A weekly record computed before the public method (W42-W44 in the live data) correlated the METHOD-1 day grade —
+    its journal component included (``scoring_engine.score_journal``) — and habit_pct over every habit, the journal
+    habits among them; it stamps nothing, so its pairs naming those metrics are private by inference."""
+    pm = _public_methods() if public_methods is None else public_methods
+    stamps = f.get("metric_methods") if isinstance(f.get("metric_methods"), dict) else {}
+    for name in (f.get("metric_a"), f.get("metric_b")):
+        for rx, key in METHOD_VERSIONED:
+            if rx.search(str(name or "")) and stamps.get(key) not in pm.get(key, ()):
+                return False
+    return True
+
+
+def shape_findings(payload: Any, excluded: list, public_methods: dict | None = None) -> list[dict]:
     rows = (payload or {}).get("ai_findings") if isinstance(payload, dict) else None
     if not isinstance(rows, list):
         return []
+    pm = _public_methods() if public_methods is None else public_methods
     out = []
     for f in rows:
         if not isinstance(f, dict) or not isinstance(f.get("metric_a"), str) or not isinstance(f.get("metric_b"), str):
@@ -311,6 +347,10 @@ def shape_findings(payload: Any, excluded: list) -> list[dict]:
         if word:
             excluded.append(("finding", fid, word))
             continue
+        if not finding_method_is_public(f, pm):
+            excluded.append(("finding", fid, "a method-versioned metric without its public method stamp"))
+            continue
+        stamps = f.get("metric_methods") if isinstance(f.get("metric_methods"), dict) else {}
         ev = f.get("evidence") if isinstance(f.get("evidence"), dict) else {}
         ci = ev.get("ci95") if isinstance(ev.get("ci95"), list) and len(ev["ci95"]) == 2 else [None, None]
         out.append(
@@ -326,6 +366,9 @@ def shape_findings(payload: Any, excluded: list) -> list[dict]:
                 "ci95_high": _num(ci[1]),
                 "fdr_corrected": bool(ev.get("fdr_significant")),
                 "level": _text(ev.get("level")),
+                "methods": {str(k): str(v) for k, v in sorted(stamps.items()) if isinstance(v, str)},
+                "window_start": _day(f.get("window_start")),
+                "window_end": _day(f.get("window_end")),
             }
         )
     return sorted(out, key=lambda r: (r["week"] or "", r["id"]), reverse=True)
