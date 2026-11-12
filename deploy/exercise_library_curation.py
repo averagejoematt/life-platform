@@ -9,8 +9,8 @@ here wins over the derivation:
   * EQUIPMENT_VOCABULARY — the controlled equipment ids (the gym audit matches against these).
   * CITATIONS — ONLY references verified to exist on 2026-11-11: each DOI resolved through Crossref
     (title, authors, year, journal) and its PMID through PubMed E-utilities, and the finding the row
-    leans on was read in the PubMed abstract. Nothing here is from memory alone. A tier A/B row must
-    cite one of these; anything else is tier C, `last_reviewed: "unreviewed"`.
+    leans on was read in the PubMed abstract. Nothing here is from memory alone. A row with evidence above
+    `none_reviewed` must cite one of these; anything else is `none_reviewed`, `last_reviewed: "unreviewed"`.
   * GATES — the gate definitions (shape: `exercise_library.LIBRARY_GATE_KINDS`). No bodyweight number: a
     bodyweight threshold is a ref into the owner-private overlay, or a pointer at the charter gate
     that already owns it. Thresholds that ARE written here are relative / performance standards
@@ -19,10 +19,13 @@ here wins over the derivation:
   * EXPANSION — candidates he has not done (a candidate whose template IS in his history is merged
     into that history entry instead, and the builder records which).
 
-Tier rules (stated once): A = a randomized trial measured hypertrophy of THIS target with THIS
-movement (or its defining variable, e.g. arm position) and found it superior or robust; B = a trial
-supports it through the movement's defining characteristic (training length, joint angle) or found
-it equal to a reference lift; C = not reviewed or no verified evidence.
+Evidence rules (stated once, #5857): the TIER is a quality band S-D the rubric derives from the attributes
+(`training.quality_rubric`, docs/coaching/EXERCISE_LIBRARY.md "Quality tiers"); evidence is its own field.
+`evidence_confidence`: rct_direct = a randomized trial measured hypertrophy of THIS target with THIS movement
+(or its defining variable, e.g. arm position); rct_characteristic = a trial supports it through the movement's
+defining characteristic (training length, joint angle); consensus = a named evidence-based reviewer's
+peer-reviewed position; none_reviewed = not reviewed. Only an rct_direct row may move ONE band off its rubric
+tier (`adjust`): +1 when the trial found it grew the target more than a compared movement, -1 when less.
 """
 
 from __future__ import annotations
@@ -476,17 +479,36 @@ def js(spinal: str, shear: str, wrist: str, elbow: str, shoulder: str) -> dict:
     return {"spinal_load": spinal, "shear": shear, "wrist": wrist, "elbow": elbow, "shoulder": shoulder}
 
 
-def hyp(target: str, tier: str, cites: list[str] | None = None, quality: str | None = None, note: str | None = None) -> dict:
-    row = {
+def hyp(
+    target: str,
+    confidence: str = "none_reviewed",
+    cites: list[str] | None = None,
+    note: str | None = None,
+    adjust: tuple[int, str, str] | None = None,
+) -> dict:
+    """One per-target hypertrophy row's EVIDENCE half (#5857). The quality tier is not written here: the builder derives
+    `rubric_score`, `rubric_tier` and `tier` from the movement's attributes (`training.quality_rubric`). `adjust` is
+    (bands +1/-1, citation id, why): a direct trial moving the row one band off its rubric tier."""
+    row: dict = {
         "target": target,
-        "tier": tier,
+        "evidence_confidence": confidence,
         "citations": list(cites or []),
-        "evidence_quality": quality or ("none_reviewed" if tier == "C" else "rct_characteristic"),
-        "last_reviewed": REVIEWED_ON if tier in ("A", "B") else "unreviewed",
+        "last_reviewed": REVIEWED_ON if confidence != "none_reviewed" else "unreviewed",
     }
+    if adjust:
+        row["evidence_adjustment"] = {"bands": adjust[0], "citation": adjust[1], "why": adjust[2]}
     if note:
         row["note"] = note
     return row
+
+
+_MAEO23 = "maeo2023_overhead_triceps"
+_MAEO21 = "maeo2021_seated_leg_curl"
+_KINO23 = "kinoshita2023_standing_calf"
+_OVERHEAD_UP = (+1, _MAEO23, "overhead arm position grew the triceps more than the neutral position (Maeo 2023)")
+_SEATED_UP = (+1, _MAEO21, "seated grew the hamstrings more than prone (Maeo 2021)")
+_PRONE_DOWN = (-1, _MAEO21, "prone grew the hamstrings less than seated (Maeo 2021)")
+_STANDING_UP = (+1, _KINO23, "standing grew the gastrocnemius more than seated (Kinoshita 2023)")
 
 
 # Keyed by Hevy template id (upper). Each value overrides the derived attribute of the same name.
@@ -503,8 +525,8 @@ CURATED: dict[str, dict] = {
         "skill_complexity": "low",
         "equipment": ["cable_stack"],
         "hypertrophy": [
-            hyp("triceps_long_head", "A", ["maeo2023_overhead_triceps"], "rct_direct", "this exact movement (cable, overhead arm)"),
-            hyp("triceps_lateral_medial", "A", ["maeo2023_overhead_triceps"], "rct_direct"),
+            hyp("triceps_long_head", "rct_direct", [_MAEO23], "this exact movement (cable, overhead arm)", _OVERHEAD_UP),
+            hyp("triceps_lateral_medial", "rct_direct", [_MAEO23], adjust=_OVERHEAD_UP),
         ],
         "curation_note": "missing from the #5075 upper_heavy triceps pool (owner, 2026-11-11); SPLIT from 21310F5F by owner ruling 2026-11-11 (#5773) — its own movement, no longer an alias",
     },
@@ -518,7 +540,7 @@ CURATED: dict[str, dict] = {
         "skill_complexity": "low",
         "equipment": ["cable_stack"],
         "hypertrophy": [
-            hyp("triceps", "C", note="neutral-arm extension grew less than overhead in Maeo 2023; tier not assigned without review")
+            hyp("triceps", note="neutral-arm extension grew less than overhead in Maeo 2023; evidence not assigned without review")
         ],
     },
     "93A552C6": {
@@ -539,7 +561,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _H, _M),
         "skill_complexity": "low",
         "equipment": ["dumbbell", "bench_flat"],
-        "hypertrophy": [hyp("triceps", "C", note="owner asked 2026-11-08 to pressure-test its efficacy; not reviewed")],
+        "hypertrophy": [hyp("triceps", note="owner asked 2026-11-08 to pressure-test its efficacy; not reviewed")],
     },
     # biceps
     "4F942934": {
@@ -552,9 +574,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _H, _M, _L),
         "skill_complexity": "low",
         "equipment": ["ez_bar", "preacher_bench"],
-        "hypertrophy": [
-            hyp("biceps", "B", ["sato2021_elbow_angle"], "rct_characteristic", "preacher position loads the extended-elbow range")
-        ],
+        "hypertrophy": [hyp("biceps", "rct_characteristic", ["sato2021_elbow_angle"], "preacher position loads the extended-elbow range")],
         # owner ruling 2026-11-11 (#5773): UNLOCKED — the not_for_you_now (a discomfort-class note, never a pain-class
         # one under #5806's rule) is removed; a real `pain` note still excludes it at selection time.
     },
@@ -566,7 +586,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _M, _L),
         "skill_complexity": "low",
         "equipment": ["preacher_machine"],
-        "hypertrophy": [hyp("biceps", "B", ["sato2021_elbow_angle"], "rct_characteristic")],
+        "hypertrophy": [hyp("biceps", "rct_characteristic", ["sato2021_elbow_angle"])],
     },
     "FAB6EB2F": {
         "family": "hypertrophy",
@@ -576,7 +596,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _M, _L),
         "skill_complexity": "low",
         "equipment": ["dumbbell", "preacher_bench"],
-        "hypertrophy": [hyp("biceps", "B", ["sato2021_elbow_angle"], "rct_characteristic")],
+        "hypertrophy": [hyp("biceps", "rct_characteristic", ["sato2021_elbow_angle"])],
     },
     "8BAB2735": {
         "family": "hypertrophy",
@@ -586,7 +606,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _M),
         "skill_complexity": "low",
         "equipment": ["dumbbell", "bench_adjustable"],
-        "hypertrophy": [hyp("biceps", "C", note="shoulder-extended position; no verified trial on this movement")],
+        "hypertrophy": [hyp("biceps", note="shoulder-extended position; no verified trial on this movement")],
     },
     "7E3BC8B6": {
         "family": "hypertrophy",
@@ -605,7 +625,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _L),
         "skill_complexity": "low",
         "equipment": ["leg_curl_seated"],
-        "hypertrophy": [hyp("hamstrings", "A", ["maeo2021_seated_leg_curl"], "rct_direct", "seated beat prone, MRI, 12 wk")],
+        "hypertrophy": [hyp("hamstrings", "rct_direct", [_MAEO21], "seated beat prone, MRI, 12 wk", _SEATED_UP)],
     },
     "B8127AD1": {
         "family": "hypertrophy",
@@ -615,7 +635,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _L),
         "skill_complexity": "low",
         "equipment": ["leg_curl_lying"],
-        "hypertrophy": [hyp("hamstrings", "B", ["maeo2021_seated_leg_curl"], "rct_direct", "grew, but less than the seated curl")],
+        "hypertrophy": [hyp("hamstrings", "rct_direct", [_MAEO21], "grew, but less than the seated curl", _PRONE_DOWN)],
     },
     "75A4F6C4": {
         "family": "hypertrophy",
@@ -628,9 +648,8 @@ CURATED: dict[str, dict] = {
         "hypertrophy": [
             hyp(
                 "quadriceps_rectus_femoris",
-                "B",
-                ["ema2013_knee_extension", "pedrosa2022_long_length_partials"],
                 "rct_characteristic",
+                ["ema2013_knee_extension", "pedrosa2022_long_length_partials"],
                 "rectus femoris grew most with knee extension; the stretched-range partial grew most",
             )
         ],
@@ -644,9 +663,9 @@ CURATED: dict[str, dict] = {
         "skill_complexity": "moderate",
         "equipment": ["barbell", "squat_rack"],
         "hypertrophy": [
-            hyp("quadriceps", "A", ["kubo2019_squat_depth", "plotkin2023_hip_thrust_vs_squat"], "rct_direct"),
-            hyp("glutes", "B", ["kubo2019_squat_depth", "plotkin2023_hip_thrust_vs_squat"], "rct_direct", "full depth beat half depth"),
-            hyp("adductors", "B", ["kubo2019_squat_depth"], "rct_direct", "full depth"),
+            hyp("quadriceps", "rct_direct", ["kubo2019_squat_depth", "plotkin2023_hip_thrust_vs_squat"]),
+            hyp("glutes", "rct_direct", ["kubo2019_squat_depth", "plotkin2023_hip_thrust_vs_squat"], "full depth beat half depth"),
+            hyp("adductors", "rct_direct", ["kubo2019_squat_depth"], "full depth"),
         ],
     },
     "D57C2EC7": {
@@ -657,7 +676,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _L),
         "skill_complexity": "moderate",
         "equipment": ["barbell", "bench_flat"],
-        "hypertrophy": [hyp("glutes", "B", ["plotkin2023_hip_thrust_vs_squat"], "rct_direct", "equal to the back squat for the glutes")],
+        "hypertrophy": [hyp("glutes", "rct_direct", ["plotkin2023_hip_thrust_vs_squat"], "equal to the back squat for the glutes")],
     },
     "68CE0B9B": {
         "family": "hypertrophy",
@@ -667,7 +686,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _L),
         "skill_complexity": "low",
         "equipment": ["hip_thrust_machine"],
-        "hypertrophy": [hyp("glutes", "C", note="machine form of the hip thrust; the trial used a barbell")],
+        "hypertrophy": [hyp("glutes", note="machine form of the hip thrust; the trial used a barbell")],
     },
     "4F5866F8": {
         "title": "Back Extension (Hyperextension)",
@@ -682,9 +701,8 @@ CURATED: dict[str, dict] = {
         "hypertrophy": [
             hyp(
                 "hamstrings_biceps_femoris_long_head",
-                "B",
-                ["bourne2017_hip_extension_nordic"],
                 "rct_characteristic",
+                ["bourne2017_hip_extension_nordic"],
                 "hip-extension training",
             )
         ],
@@ -697,7 +715,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _L),
         "skill_complexity": "high",
         "equipment": ["bodyweight"],
-        "hypertrophy": [hyp("hamstrings_semitendinosus", "B", ["bourne2017_hip_extension_nordic"], "rct_direct")],
+        "hypertrophy": [hyp("hamstrings_semitendinosus", "rct_direct", ["bourne2017_hip_extension_nordic"])],
     },
     "E05C2C38": {
         "family": "hypertrophy",
@@ -707,7 +725,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_M, _L, _L, _L, _L),
         "skill_complexity": "low",
         "equipment": ["calf_raise_standing_machine"],
-        "hypertrophy": [hyp("gastrocnemius", "A", ["kinoshita2023_standing_calf", "kassiano2023_calf_long_length"], "rct_direct")],
+        "hypertrophy": [hyp("gastrocnemius", "rct_direct", [_KINO23, "kassiano2023_calf_long_length"], adjust=_STANDING_UP)],
     },
     "E53CCBE5": {
         "family": "hypertrophy",
@@ -717,7 +735,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_M, _L, _L, _L, _M),
         "skill_complexity": "moderate",
         "equipment": ["barbell", "squat_rack"],
-        "hypertrophy": [hyp("gastrocnemius", "A", ["kinoshita2023_standing_calf"], "rct_direct", "standing / knee-extended position")],
+        "hypertrophy": [hyp("gastrocnemius", "rct_direct", [_KINO23], "standing / knee-extended position", _STANDING_UP)],
     },
     "062AB91A": {
         "family": "hypertrophy",
@@ -728,8 +746,8 @@ CURATED: dict[str, dict] = {
         "skill_complexity": "low",
         "equipment": ["calf_raise_seated_machine"],
         "hypertrophy": [
-            hyp("soleus", "B", ["kinoshita2023_standing_calf"], "rct_direct", "soleus grew similarly seated and standing"),
-            hyp("gastrocnemius", "C", note="did not grow significantly seated in Kinoshita 2023 — prefer a standing raise for it"),
+            hyp("soleus", "rct_direct", ["kinoshita2023_standing_calf"], "soleus grew similarly seated and standing"),
+            hyp("gastrocnemius", note="did not grow significantly seated in Kinoshita 2023 — prefer a standing raise for it"),
         ],
     },
     "91237BDD": {
@@ -743,9 +761,8 @@ CURATED: dict[str, dict] = {
         "hypertrophy": [
             hyp(
                 "gastrocnemius",
-                "B",
-                ["kassiano2023_calf_long_length"],
                 "rct_direct",
+                ["kassiano2023_calf_long_length"],
                 "the trial ran on a leg press; stretched-range partials",
             )
         ],
@@ -822,7 +839,7 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _L),
         "skill_complexity": "low",
         "equipment": ["decline_press_machine"],
-        "hypertrophy": [hyp("chest", "C", note="machines ~= free weights for hypertrophy overall (Haugen 2023, context only)")],
+        "hypertrophy": [hyp("chest", note="machines ~= free weights for hypertrophy overall (Haugen 2023, context only)")],
     },
     "6A6C31A5": {
         "family": "hypertrophy",
@@ -1358,7 +1375,7 @@ EXPANSION: list[dict] = [
         joint_stress=js(_M, _L, _L, _L, _L),
         skill_complexity="low",
         equipment=["back_extension_45", "weight_plate"],
-        hypertrophy=[hyp("hamstrings_biceps_femoris_long_head", "B", ["bourne2017_hip_extension_nordic"], "rct_characteristic")],
+        hypertrophy=[hyp("hamstrings_biceps_femoris_long_head", "rct_characteristic", ["bourne2017_hip_extension_nordic"])],
         gates=["chain_nordic_free"],
     ),
     _x(
@@ -1427,7 +1444,7 @@ EXPANSION: list[dict] = [
         joint_stress=js(_L, _L, _L, _L, _L),
         skill_complexity="low",
         equipment=["leg_extension_machine"],
-        hypertrophy=[hyp("quadriceps_rectus_femoris", "B", ["ema2013_knee_extension"], "rct_characteristic")],
+        hypertrophy=[hyp("quadriceps_rectus_femoris", "rct_characteristic", ["ema2013_knee_extension"])],
     ),
     _x(
         "single_leg_standing_calf_raise_machine",
@@ -1441,7 +1458,7 @@ EXPANSION: list[dict] = [
         joint_stress=js(_M, _L, _L, _L, _L),
         skill_complexity="low",
         equipment=["calf_raise_standing_machine"],
-        hypertrophy=[hyp("gastrocnemius", "A", ["kinoshita2023_standing_calf", "kassiano2023_calf_long_length"], "rct_direct")],
+        hypertrophy=[hyp("gastrocnemius", "rct_direct", [_KINO23, "kassiano2023_calf_long_length"], adjust=_STANDING_UP)],
     ),
     _x(
         "single_leg_rdl_dumbbell",

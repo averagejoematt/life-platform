@@ -29,11 +29,15 @@ import library_evidence_review as ler  # noqa: E402
 _spec = importlib.util.spec_from_file_location("_attr_3005", os.path.join(ROOT, "tests", "test_no_tool_attribution_3005.py"))
 attribution = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(attribution)
-from training import exercise_library as xl  # noqa: E402
+from training import (
+    exercise_library as xl,  # noqa: E402
+    quality_rubric as qr,  # noqa: E402
+)
 
 LIB = xl.load_library()
 ALLOW = ler.load_allowlist()
 TODAY = "2026-12-01"
+ADJ_UP = {"bands": 1, "citation": "testerson2026_overhead", "why": "grew the target more than the compared movement (test)"}
 
 NEW = {
     "doi": "10.1000/test.2026.001",
@@ -126,14 +130,14 @@ def _add(cid="testerson2026_overhead", c=None, via=None):
     return {"op": "add_citation", "citation_id": cid, "citation": dict(c or NEW), "found_via": via or {"kind": "pubmed"}}
 
 
-def _set(tier="B", cites=("testerson2026_overhead",), movement="bench_press_barbell", target="chest", **kw):
+def _set(confidence="rct_characteristic", cites=("testerson2026_overhead",), movement="bench_press_barbell", target="chest", **kw):
+    """A `set_evidence` op (#5857: evidence is proposed; the quality tier is derived by the rubric, never proposed)."""
     op = {
-        "op": "set_tier",
+        "op": "set_evidence",
         "movement": movement,
         "target": target,
-        "tier": tier,
+        "evidence_confidence": confidence,
         "citations": list(cites),
-        "evidence_quality": "rct_characteristic",
         "rationale": "test",
         "abstract_read": True,
     }
@@ -191,8 +195,10 @@ def test_the_allowlist_denies_social_media_and_blogs_and_names_reviewers():
         assert ler._host_ok("www." + host, ALLOW), host
     assert ler._host_ok("doi.org", ALLOW) is None
     assert ALLOW["reviewers"]["names"] and set(ALLOW["channels"]) == {"pubmed", "crossref", "reviewer"}
-    assert ALLOW["designs"]["randomized_trial"]["may_back_tiers"] == ["A", "B"]
-    assert all("A" not in d["may_back_tiers"] for k, d in ALLOW["designs"].items() if k != "randomized_trial")
+    # #5857: only a randomized trial may back rct_direct — the only evidence that may move a row off its rubric tier
+    assert ALLOW["designs"]["randomized_trial"]["may_back"] == ["rct_direct", "rct_characteristic"]
+    assert all("rct_direct" not in d["may_back"] for k, d in ALLOW["designs"].items() if k != "randomized_trial")
+    assert all(set(d["may_back"]) <= set(xl.EVIDENCE_CONFIDENCE) - {"none_reviewed"} for d in ALLOW["designs"].values())
 
 
 def test_a_narrative_review_needs_a_named_reviewer_author():
@@ -202,16 +208,19 @@ def test_a_narrative_review_needs_a_named_reviewer_author():
     decided, _ = _decide([_add("rev_unnamed", review), _add("rev_named", named)], http=http)
     assert "rev_unnamed" not in decided["accepted"]["citations"]
     assert "rev_named" in decided["accepted"]["citations"]
-    # and a review backs no tier
+    # and a review backs consensus at most: never trial evidence, never a band move
     decided, _ = _decide([_add("rev_named", named), _set(cites=["rev_named"])], http=http)
-    assert decided["accepted"]["tier_changes"] == []
+    assert decided["accepted"]["evidence_changes"] == []
+    decided, _ = _decide([_add("rev_named", named), _set("consensus", cites=["rev_named"])], http=http)
+    assert [t["evidence_confidence"] for t in decided["accepted"]["evidence_changes"]] == ["consensus"]
 
 
 # ── verification gates the tier ─────────────────────────────────────────────────────────────────────────────────
 
 
-def test_an_unverifiable_citation_cannot_raise_a_tier():
-    """Each way a citation can fail live verification leaves the row C. Must-fail shapes, one test, all reported."""
+def test_an_unverifiable_citation_cannot_raise_evidence():
+    """Each way a citation can fail live verification leaves the row none_reviewed on its rubric tier. Must-fail shapes,
+    one test, all reported."""
     variants = {
         "doi_404_pmid_404": FakeHttp.for_library(),
         "title_mismatch": FakeHttp.for_library(extra=[{**NEW, "title": "Something else entirely about calves"}]),
@@ -225,46 +234,55 @@ def test_an_unverifiable_citation_cannot_raise_a_tier():
     variants["preprint_not_article"].crossref[NEW["doi"]]["type"] = "posted-content"
     offenders = []
     for name, http in variants.items():
-        decided, _ = _decide([_add(), _set()], http=http)
+        decided, _ = _decide([_add(), _set("rct_direct", adjust=ADJ_UP)], http=http)
         after = ler.apply_review(LIB, decided) if ler.has_changes(decided) else LIB
+        row = _row(after, "bench_press_barbell", "chest")
         if (
             decided["accepted"]["citations"]
-            or decided["accepted"]["tier_changes"]
-            or _row(after, "bench_press_barbell", "chest")["tier"] != "C"
+            or decided["accepted"]["evidence_changes"]
+            or row["evidence_confidence"] != "none_reviewed"
+            or row["tier"] != row["rubric_tier"]
         ):
             offenders.append(name)
-    assert offenders == [], f"an unverified citation raised a tier: {offenders}"
+    assert offenders == [], f"an unverified citation raised evidence: {offenders}"
 
 
-def test_a_verified_citation_raises_a_tier():
-    decided, http = _decide([_add(), _set("A")])
+def test_a_verified_direct_trial_records_evidence_and_moves_the_row_one_band():
+    decided, http = _decide([_add(), _set("rct_direct", adjust=ADJ_UP)])
     assert decided["rejected"] == []
     assert any(NEW["doi"] in urllib.parse.unquote(u) for u in http.calls) and any("40000001" in u for u in http.calls)
     after = ler.apply_review(LIB, decided)
     row = _row(after, "bench_press_barbell", "chest")
-    assert (row["tier"], row["citations"], row["last_reviewed"]) == ("A", ["testerson2026_overhead"], TODAY)
+    assert (row["evidence_confidence"], row["citations"], row["last_reviewed"]) == ("rct_direct", ["testerson2026_overhead"], TODAY)
+    assert row["rubric_tier"] != "S", "the specimen must have a band above it, or the move is invisible"
+    assert row["evidence_adjustment"]["bands"] == 1 and row["tier"] == qr.shift(row["rubric_tier"], 1) != row["rubric_tier"]
     assert after["citations"]["testerson2026_overhead"]["verified_on"] == f"Crossref + PubMed, {TODAY}"
     assert xl.validate(after) == []
     assert after["version"] == ler._bump_patch(LIB["version"]) and after["change_log"][-1]["version"] == after["version"]
-    assert _row(LIB, "bench_press_barbell", "chest")["tier"] == "C", "apply_review mutated its input"
+    assert _row(LIB, "bench_press_barbell", "chest")["evidence_confidence"] == "none_reviewed", "apply_review mutated its input"
 
 
-def test_tier_backing_needs_a_pmid_abstract_read_and_a_permitted_design():
+def test_evidence_backing_needs_a_pmid_abstract_read_and_a_permitted_design():
     doi_only = {k: v for k, v in NEW.items() if k != "pmid"}
     cases = {
-        "doi_only": ([_add(c=doi_only), _set("B")], FakeHttp.for_library(extra=[doi_only])),
-        "abstract_not_read": ([_add(c={**NEW, "abstract_read": False}), _set("B")], None),
-        "set_tier_without_abstract_read": ([_add(), _set("B", abstract_read=False)], None),
-        "meta_analysis_for_A": ([_add(c={**NEW, "study_design": "meta_analysis"}), _set("A")], None),
-        "no_citation": ([_set("B", cites=())], None),
-        "unknown_movement": ([_add(), _set("B", movement="not_a_movement")], None),
+        "doi_only": ([_add(c=doi_only), _set()], FakeHttp.for_library(extra=[doi_only])),
+        "abstract_not_read": ([_add(c={**NEW, "abstract_read": False}), _set()], None),
+        "set_evidence_without_abstract_read": ([_add(), _set(abstract_read=False)], None),
+        "meta_analysis_for_rct_direct": ([_add(c={**NEW, "study_design": "meta_analysis"}), _set("rct_direct")], None),
+        "no_citation": ([_set(cites=())], None),
+        "unknown_movement": ([_add(), _set(movement="not_a_movement")], None),
+        # #5857: the quality tier is never proposed, and only a direct trial moves a row — one band, its own citation
+        "proposes_a_tier": ([_add(), _set(tier="S")], None),
+        "adjust_without_a_direct_trial": ([_add(), _set(adjust=ADJ_UP)], None),
+        "adjust_two_bands": ([_add(), _set("rct_direct", adjust={**ADJ_UP, "bands": 2})], None),
+        "adjust_cites_another_paper": ([_add(), _set("rct_direct", adjust={**ADJ_UP, "citation": "maeo2023_overhead_triceps"})], None),
     }
-    offenders = [n for n, (ops, http) in cases.items() if _decide(ops, http=http)[0]["accepted"]["tier_changes"]]
+    offenders = [n for n, (ops, http) in cases.items() if _decide(ops, http=http)[0]["accepted"]["evidence_changes"]]
     assert offenders == [], offenders
-    # controls: a meta-analysis may back B; a DOI-only record still registers (backing nothing)
-    assert _decide([_add(c={**NEW, "study_design": "meta_analysis"}), _set("B")])[0]["accepted"]["tier_changes"]
+    # controls: a meta-analysis may back rct_characteristic; a DOI-only record still registers (backing nothing)
+    assert _decide([_add(c={**NEW, "study_design": "meta_analysis"}), _set()])[0]["accepted"]["evidence_changes"]
     reg = _decide([_add(c=doi_only)], http=FakeHttp.for_library(extra=[doi_only]))[0]["accepted"]["citations"]
-    assert "backs no tier" in reg["testerson2026_overhead"]["finding"]
+    assert "backs no evidence" in reg["testerson2026_overhead"]["finding"]
 
 
 def test_a_correction_must_verify_too():
@@ -332,7 +350,7 @@ def test_dry_run_writes_nothing(tmp_path):
     watched = [os.path.join(ROOT, ler.LIBRARY_REL), os.path.join(ROOT, ler.LEDGER_REL), os.path.join(ROOT, ler.ALLOWLIST_REL)]
     before = _tree_digest(watched)
     prop = tmp_path / "p.json"
-    prop.write_text(json.dumps({"review_id": "t", "proposals": [_add(), _set("B")]}))
+    prop.write_text(json.dumps({"review_id": "t", "proposals": [_add(), _set()]}))
     listing = sorted(os.listdir(tmp_path))
 
     def no_runner(*a, **k):
@@ -367,9 +385,7 @@ def _candidate(**over):
         "joint_stress": {"spinal_load": "low", "shear": "low", "wrist": "low", "elbow": "moderate", "shoulder": "moderate"},
         "skill_complexity": "low",
         "equipment": ["cable_stack"],
-        "hypertrophy": [
-            {"target": "triceps_long_head", "tier": "B", "citations": ["testerson2026_overhead"], "evidence_quality": "rct_direct"}
-        ],
+        "hypertrophy": [{"target": "triceps_long_head", "citations": ["testerson2026_overhead"], "evidence_confidence": "rct_direct"}],
     }
     x.update(over)
     return {"op": "add_candidate", "candidate": x, "citations": ["testerson2026_overhead"], "rationale": "test", "abstract_read": True}
@@ -380,7 +396,9 @@ def test_a_new_candidate_enters_valid_with_rule_fallbacks():
     assert decided["rejected"] == [], decided["rejected"]
     after = ler.apply_review(LIB, decided)
     e = after["movements"]["overhead_cable_extension_rope_test"]
-    assert e["source"] == "expansion" and e["fallbacks"] and e["hypertrophy"][0]["tier"] == "B"
+    row = e["hypertrophy"][0]
+    assert e["source"] == "expansion" and e["fallbacks"] and row["evidence_confidence"] == "rct_direct"
+    assert row["tier"] == row["rubric_tier"] == qr.rubric_tier(e, "triceps_long_head"), "the rubric derives a candidate's tier"
     assert xl.validate(after) == []
     fidx = xl.fallback_index(after)
     for k, mv in after["movements"].items():
@@ -394,12 +412,15 @@ def test_a_new_candidate_enters_valid_with_rule_fallbacks():
     assert _decide([no_cite])[0]["accepted"]["candidates"] == []
     derived = _candidate(fallbacks=[])
     assert _decide([_add(), derived])[0]["accepted"]["candidates"] == []
+    tiered = _candidate()
+    tiered["candidate"]["hypertrophy"][0]["tier"] = "S"  # #5857: a proposed tier is refused — the rubric derives it
+    assert _decide([_add(), tiered])[0]["accepted"]["candidates"] == []
 
 
 def test_the_builder_reapplies_the_ledger(monkeypatch):
     import build_exercise_library as b
 
-    decided, _ = _decide([_add(), _set("B"), _candidate()])
+    decided, _ = _decide([_add(), _set(), _candidate()])
     ledger = copy.deepcopy(reviews.EMPTY_LEDGER)
     ledger["reviews"].append(ler.ledger_record(decided))
     monkeypatch.setattr(b, "_LEDGER", ledger)
@@ -407,9 +428,11 @@ def test_the_builder_reapplies_the_ledger(monkeypatch):
     assert set(b.cur.CITATIONS) < set(b.library_citations())
     assert any(x["key"] == "overhead_cable_extension_rope_test" for x in b._expansion_list())
     mv = copy.deepcopy(LIB["movements"])
-    assert reviews.apply_tier_changes(mv, reviews.ledger_tier_changes(ledger)) == []
-    assert _row({"movements": mv}, "bench_press_barbell", "chest")["tier"] == "B"
-    assert reviews.apply_tier_changes(mv, [{**decided["accepted"]["tier_changes"][0], "movement": "nope"}]) == ["nope:chest"]
+    assert reviews.apply_evidence_changes(mv, reviews.ledger_evidence_changes(ledger)) == []
+    reviews.finalize_tiers(mv)
+    row = _row({"movements": mv}, "bench_press_barbell", "chest")
+    assert row["evidence_confidence"] == "rct_characteristic" and row["tier"] == row["rubric_tier"]
+    assert reviews.apply_evidence_changes(mv, [{**decided["accepted"]["evidence_changes"][0], "movement": "nope"}]) == ["nope:chest"]
 
 
 def test_the_committed_ledger_loads_and_is_consistent_with_the_library():
@@ -417,8 +440,10 @@ def test_the_committed_ledger_loads_and_is_consistent_with_the_library():
     assert "reviews" in ledger
     for cid, c in reviews.ledger_citations(ledger).items():
         assert LIB["citations"].get(cid) == c, f"ledger citation {cid} is not in the committed library"
-    for t in reviews.ledger_tier_changes(ledger):
-        assert reviews.hypertrophy_row(t) in LIB["movements"][t["movement"]]["hypertrophy"]
+    for t in reviews.ledger_evidence_changes(ledger):
+        want = reviews.evidence_row(t)
+        rows = LIB["movements"][t["movement"]]["hypertrophy"]
+        assert any({k: r.get(k) for k in want} == want for r in rows), t
     for x in reviews.ledger_candidates(ledger):
         assert x["key"] in LIB["movements"]
 
@@ -456,7 +481,7 @@ class Recorder:
 
 
 def test_open_pr_pushes_the_lane_branch_and_never_merges(tmp_path):
-    decided, _ = _decide([_add(), _set("B")])
+    decided, _ = _decide([_add(), _set()])
     rec = Recorder()
     lane = _lane(tmp_path)
     url = ler.open_pr(decided, 5778, {}, [], runner=rec, make_lane=lambda n, s: lane, out=lambda s: None)
@@ -472,13 +497,13 @@ def test_open_pr_pushes_the_lane_branch_and_never_merges(tmp_path):
     assert "Refs #5778" in body and "Fixes" not in body
     assert attribution.trailer_forms(body) == [] and attribution.mention_forms(body) == []
     with open(os.path.join(lane, ler.LIBRARY_REL), encoding="utf-8") as f:
-        assert _row(json.load(f), "bench_press_barbell", "chest")["tier"] == "B"
+        assert _row(json.load(f), "bench_press_barbell", "chest")["evidence_confidence"] == "rct_characteristic"
     with open(os.path.join(lane, ler.LEDGER_REL), encoding="utf-8") as f:
         assert len(json.load(f)["reviews"]) == 1
 
 
 def test_open_pr_refuses_main_a_merge_and_an_unlanded_push(tmp_path):
-    decided, _ = _decide([_add(), _set("B")])
+    decided, _ = _decide([_add(), _set()])
     with pytest.raises(SystemExit, match="refusing"):
         ler.open_pr(decided, 5778, {}, [], runner=Recorder(branch="main"), make_lane=lambda n, s: _lane(tmp_path), out=lambda s: None)
     with pytest.raises(SystemExit, match="push did not land"):

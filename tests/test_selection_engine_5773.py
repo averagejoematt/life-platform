@@ -1,5 +1,5 @@
-"""#5773 — the selection engine: per slot, rank the exercise library by tier, then N=1 fit, then variety; C only with a
-recorded reason; absent equipment never served; pain-excluded never served; a novelty budget; SHADOW while the library is
+"""#5773 — the selection engine: per slot, rank the exercise library by QUALITY tier (S-D, the library's rubric tier,
+#5857), then N=1 fit, then variety, evidence confidence a tie-break; C/D only with a recorded reason; absent equipment never served; pain-excluded never served; a novelty budget; SHADOW while the library is
 `proposed`, LIVE only once it is `approved`; `library_version` on every plan; the pure `selection_critic.evaluate`.
 
 Every must-fail control flips one input and asserts the outcome flips with it. Real library + real catalog, deep-copied
@@ -86,45 +86,58 @@ def _served_anywhere(sel: dict) -> set:
 
 
 # ── tier order (must-fail controls) ──────────────────────────────────────────
-def test_tier_a_beats_b_and_c_for_the_slot_muscle():
+def test_the_best_quality_tier_wins_for_the_slot_muscle():
     s = _slot(_week(), "lower_heavy.calf_raise_machine")
-    assert s["pick"]["tier"] == "A"
+    assert s["pick"]["tier"] == "S"
     assert s["pick"]["c_reason"] is None
-    # control: strip every A row in the library -> the pick drops to B, never stays on a now-C movement
+    # control: strip every S row in the library -> the pick drops to A, never stays on a now-D movement
     lib = _lib()
     for e in xl.movements(lib).values():
         for r in e["hypertrophy"]:
-            if r["tier"] == "A":
-                r["tier"] = "C"
+            if r["tier"] == "S":
+                r["tier"] = "D"
     s2 = _slot(_week(lib=lib), "lower_heavy.calf_raise_machine")
-    assert s2["pick"]["tier"] == "B"
+    assert s2["pick"]["tier"] == "A"
+
+
+def test_evidence_confidence_breaks_a_tie_and_never_outranks_the_tier():
+    """#5857: evidence is a tie-break only — after tier, N=1 fit and variety."""
+    a = {"tier": "S", "n1": {"score": 0}, "novel": False, "exposures": 5, "movement_id": "a", "catalog_key": "a"}
+    direct = a | {"evidence": "rct_direct", "movement_id": "z", "catalog_key": "z"}
+    plain = a | {"evidence": "none_reviewed"}
+    assert sorted([plain, direct], key=lambda c: se.rank_key(c, set()))[0] is direct
+    # control: a higher tier with no evidence still beats a lower tier with a direct trial
+    assert sorted([direct | {"tier": "A"}, plain], key=lambda c: se.rank_key(c, set()))[0] is plain
+    # control: variety outranks evidence
+    assert sorted([direct, plain], key=lambda c: se.rank_key(c, {"z"}))[0] is plain
 
 
 def test_the_overhead_triceps_extension_wins_now_the_catalog_writes_it():
-    """The owner's specimen: the A-tier overhead extension outranks every C triceps movement the pool held — for real,
-    on the shipped catalog, since the 2026-11-11 split gave it its own entry (B5EFBF9C)."""
+    """The owner's specimen: the S-tier overhead extension (rubric S, a direct trial recorded beside it) outranks every
+    triceps movement the pool held — for real, on the shipped catalog, since the 2026-11-11 split gave it its own entry."""
     assert CAT0["overhead_triceps_extension_cable"]["hevy_template_id_hint"] == "B5EFBF9C"
     s = _slot(_week(), "upper_heavy.cable_tricep_pushdown")
-    assert s["pick"]["movement_id"] == "overhead_triceps_extension_cable" and s["pick"]["tier"] == "A"
-    assert s["pick"]["c_reason"] is None
-    # control: without the catalog entry it is ranked but never served (the pre-split state)
+    assert s["pick"]["movement_id"] == "overhead_triceps_extension_cable" and s["pick"]["tier"] == "S"
+    assert s["pick"]["evidence"] == "rct_direct" and s["pick"]["c_reason"] is None
+    # control: without the catalog entry it is ranked but never served (the pre-split state); the next band serves
     cat = _cat()
     del cat["overhead_triceps_extension_cable"]
     s2 = _slot(_week(cat=cat), "upper_heavy.cable_tricep_pushdown")
-    assert s2["pick"]["tier"] == "C" and s2["pick"]["c_reason"]["code"] == "not_prescribable"
-    assert s2["above_pick"][0]["movement_id"] == "overhead_triceps_extension_cable"
-    # control: demote it to C -> it no longer wins on tier
+    assert s2["pick"]["movement_id"] != "overhead_triceps_extension_cable" and s2["pick"]["tier"] != "S"
+    hit = next(x for x in s2["above_pick"] if x["movement_id"] == "overhead_triceps_extension_cable")
+    assert hit["code"] == "not_prescribable"
+    # control: demote it to D -> it no longer wins on tier
     lib = _lib()
     for r in lib["movements"]["overhead_triceps_extension_cable"]["hypertrophy"]:
-        r["tier"] = "C"
-    assert _slot(_week(lib=lib), "upper_heavy.cable_tricep_pushdown")["pick"]["tier"] == "C"
+        r["tier"] = "D"
+    assert _slot(_week(lib=lib), "upper_heavy.cable_tricep_pushdown")["pick"]["movement_id"] != "overhead_triceps_extension_cable"
 
 
 def test_tier_for_reads_the_slot_muscle_and_its_sub_targets():
     e = LIB0["movements"]["overhead_triceps_extension_cable"]
-    assert se.tier_for(e, "triceps") == "A"
-    assert se.tier_for(e, "biceps") == "C"
-    assert se.tier_for(LIB0["movements"]["standing_calf_raise_machine"], "calves") == "A"
+    assert se.tier_for(e, "triceps") == "S" and se.evidence_for(e, "triceps") == "rct_direct"
+    assert se.tier_for(e, "biceps") == se.UNRATED_TIER == "D" and se.evidence_for(e, "biceps") == "none_reviewed"
+    assert se.tier_for(LIB0["movements"]["standing_calf_raise_machine"], "calves") == "S"
 
 
 # ── C only with a recorded reason ────────────────────────────────────────────
@@ -249,7 +262,7 @@ def test_not_for_you_now_excludes_as_its_own_verdict():
 def test_preacher_curl_barbell_is_unlocked_by_the_owner_ruling():
     """Owner ruling 2026-11-11: the library's only not_for_you_now is lifted; a real pain-class note still excludes it."""
     e = LIB0["movements"]["preacher_curl_barbell"]
-    assert e["not_for_you_now"] is None and LIB0["change_log"][-1]["by"].startswith("owner ruling 2026-11-11")
+    assert e["not_for_you_now"] is None and any(x["by"].startswith("owner ruling 2026-11-11") for x in LIB0["change_log"])
     assert se.not_for_you_now(e) is None
     # first logged 2026-10-26; the 2026-11-12 catalog rebuild (history through 2026-11-11) writes it under its own id.
     # Like every barbell movement it is skill tier 3, so the week grid's skill ceiling 2 (program_conflicts: tier-3
@@ -285,8 +298,10 @@ def test_overlay_missing_is_unknown_never_an_error():
 
 
 def test_n1_fit_breaks_a_tier_tie_and_swap_outs_demote():
-    s = _slot(_week(), "upper_heavy.reverse_pec_deck")
+    s = _slot(_week(), "upper_heavy.db_curl")
     first, second = s["ranked_top"][0], s["ranked_top"][1]
+    mv = LIB0["movements"]
+    assert se.tier_for(mv[first], "biceps") == se.tier_for(mv[second], "biceps"), "the specimen must be a tier tie"
     tid1, tid2 = LIB0["movements"][first]["template_id"], LIB0["movements"][second]["template_id"]
     overlay = {
         "per_template": {
@@ -294,20 +309,50 @@ def test_n1_fit_breaks_a_tier_tie_and_swap_outs_demote():
             tid2: {"note_signals": {"sentiment_positive": 2}},
         }
     }
-    s2 = _slot(_week(overlay=overlay), "upper_heavy.reverse_pec_deck")
+    s2 = _slot(_week(overlay=overlay), "upper_heavy.db_curl")
     assert s2["pick"]["movement_id"] == second
     assert se.n1_fit(LIB0["movements"][first], overlay)["components"]["swap_out"] == -1
 
 
 # ── variety ──────────────────────────────────────────────────────────────────
 def test_variety_demotes_a_movement_served_in_the_lookback():
-    s = _slot(_week(), "upper_heavy.reverse_pec_deck")
+    s = _slot(_week(), "upper_heavy.db_curl")
     pick = s["pick"]["catalog_key"]
-    rows = [{"sk": vr.ledger_sk(1, "upper_heavy.reverse_pec_deck"), "block": 1, "phase_2": {"variant": pick}}]
-    s2 = _slot(_week(rows=rows), "upper_heavy.reverse_pec_deck")
+    rows = [{"sk": vr.ledger_sk(1, "upper_heavy.db_curl"), "block": 1, "phase_2": {"variant": pick}}]
+    s2 = _slot(_week(rows=rows), "upper_heavy.db_curl")
     assert s2["pick"]["catalog_key"] != pick and s2["pick"]["tier"] == s["pick"]["tier"]
     # the current phase's own row is this draft's held pick, never a "recent use"
     assert se.recent_uses([{"block": 2, "phase_1": {"variant": pick}}], _pos()) == set()
+
+
+def test_variety_rotates_a_slot_within_its_band_by_its_own_history():
+    """#5857: slots sharing one band (three curl slots, one S curl band) each served one member last phase, so a global
+    `recent` ranks every member alike. The slot's OWN least-recently-served member leads, so each slot rotates."""
+    s = _slot(_week(), "upper_heavy.db_curl")
+    band = [m for m in s["ranked_top"] if se.tier_for(LIB0["movements"][m], "biceps") == s["pick"]["tier"]]
+    assert len(band) >= 3, band
+    keys = {m: se.key_index(LIB0, CAT0)["to_cat"][m] for m in band}
+    # this slot served band[0] last phase and band[1] the phase before; other slots served band[1] and band[2] last phase
+    rows = [
+        {
+            "sk": vr.ledger_sk(1, "upper_heavy.db_curl"),
+            "block": 1,
+            "phase_1": {"variant": keys[band[1]]},
+            "phase_2": {"variant": keys[band[0]]},
+        },
+        {"sk": vr.ledger_sk(1, "shoulders_arms.db_curl"), "block": 1, "phase_2": {"variant": keys[band[1]]}},
+        {"sk": vr.ledger_sk(1, "upper_volume.db_curl"), "block": 1, "phase_2": {"variant": keys[band[2]]}},
+    ]
+    assert se.slot_last_served(rows, _pos(), "upper_heavy.db_curl") == {keys[band[1]]: 101, keys[band[0]]: 102}
+    s2 = _slot(_week(rows=rows), "upper_heavy.db_curl")
+    assert s2["pick"]["movement_id"] == band[2], "the member this slot never served leads"
+    # control: without the slot term (global recency only) every member is `recent` and the slot holds band[0]
+    real = se.rank_key
+    try:
+        se.rank_key = lambda c, recent, slot_last=None: real(c, recent)  # type: ignore[assignment]
+        assert _slot(_week(rows=rows), "upper_heavy.db_curl")["pick"]["movement_id"] == band[0]
+    finally:
+        se.rank_key = real
 
 
 def test_each_muscle_gets_a_lengthened_movement_or_says_why():
@@ -320,9 +365,14 @@ def test_each_muscle_gets_a_lengthened_movement_or_says_why():
 
 # ── novelty budget ───────────────────────────────────────────────────────────
 def _novel_curl_lib() -> dict:
+    """The dumbbell preacher curl as new to him AND the slot's only S-tier curl (the other S curls planted down to A)."""
     lib = _lib()
     e = lib["movements"]["preacher_curl_dumbbell"]
     e["source"], e["history"] = "expansion", None
+    for k, other in lib["movements"].items():
+        if k != "preacher_curl_dumbbell" and other["target"]["primary"] == "biceps":
+            for r in other["hypertrophy"]:
+                r["tier"] = "A" if r["tier"] == "S" else r["tier"]
     return lib
 
 

@@ -94,7 +94,7 @@ def test_alias_ids_stay_their_own_movement():
         assert alias.upper() in TIDS
         assert MV[TIDS[alias.upper()]].get("alias_of")
     e = MV[TIDS["B5EFBF9C"]]
-    assert e["length_bias"] == "lengthened" and any(r["tier"] == "A" for r in e["hypertrophy"])
+    assert e["length_bias"] == "lengthened" and any(r["tier"] == "S" and r["evidence_confidence"] == "rct_direct" for r in e["hypertrophy"])
 
 
 def test_expansion_covers_the_owner_spec():
@@ -131,10 +131,11 @@ def test_expansion_covers_the_owner_spec():
 # ── citations ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_tier_a_b_rows_cite_a_doi_or_pmid():
+def test_reviewed_evidence_rows_cite_a_doi_or_pmid():
+    """#5857: evidence is its own field — a row whose evidence_confidence is above none_reviewed cites a DOI/PMID."""
     cites = LIB["citations"]
-    rows = [(k, r) for k, e in MV.items() for r in e["hypertrophy"] if r["tier"] in ("A", "B")]
-    assert rows, "no tier A/B rows at all"
+    rows = [(k, r) for k, e in MV.items() for r in e["hypertrophy"] if r["evidence_confidence"] != "none_reviewed"]
+    assert rows, "no reviewed evidence rows at all"
     for k, r in rows:
         assert r["citations"], k
         for c in r["citations"]:
@@ -142,11 +143,12 @@ def test_tier_a_b_rows_cite_a_doi_or_pmid():
         assert r["last_reviewed"] != "unreviewed"
 
 
-def test_unreviewed_rows_are_tier_c():
+def test_unreviewed_rows_carry_no_evidence_and_sit_on_their_rubric_tier():
     for k, e in MV.items():
         for r in e["hypertrophy"]:
             if r["last_reviewed"] == "unreviewed":
-                assert r["tier"] == "C", k
+                assert r["evidence_confidence"] == "none_reviewed" and not r.get("evidence_adjustment"), k
+                assert r["tier"] == r["rubric_tier"], k
 
 
 def test_every_registered_citation_is_well_formed():
@@ -167,6 +169,8 @@ _NUMBER_ALLOWED_PATHS = (
     re.compile(r"^movements\.[^.]+\.history\.exposures$"),
     re.compile(r"^citations\.[^.]+\.year$"),
     re.compile(r"^gates\.[^.]+\.standard\.[a-z_]+$"),
+    re.compile(r"^quality_rubric\."),  # #5857: the public rubric's weights and bands
+    re.compile(r"^movements\.[^.]+\.hypertrophy\[\d+\]\.(rubric_score|evidence_adjustment\.bands)$"),
 )
 _UNIT_NUMBER_RE = re.compile(r"\b\d{2,3}(?:\.\d)?\s*(?:lb|lbs|pounds|kg|kilos?)\b", re.I)
 
@@ -187,7 +191,8 @@ def test_no_private_numbers_in_the_committed_library():
     offenders = []
     for path, val in _walk(LIB):
         leaf = path.rsplit(".", 1)[-1].split("[")[0]
-        if _PRIVATE_KEY_RE.search(leaf) and leaf not in _KEY_ALLOWED and not path.startswith("equipment_vocabulary"):
+        vocabulary = path.startswith(("equipment_vocabulary", "quality_rubric"))  # resistance-profile names, not data
+        if _PRIVATE_KEY_RE.search(leaf) and leaf not in _KEY_ALLOWED and not vocabulary:
             offenders.append(f"key {path}")
         if isinstance(val, (int, float)) and not isinstance(val, bool) and not any(rx.match(path) for rx in _NUMBER_ALLOWED_PATHS):
             offenders.append(f"number at {path}")
@@ -498,7 +503,9 @@ def test_approval_refuses_without_a_complete_private_check(tmp_path):
     good.write_text(json.dumps(_complete_overlay()))
     assert appr.approve("owner ruling (test)", str(lib_path), str(good), today="2026-11-11", out=lambda *_: None) == 0
     after = json.loads(lib_path.read_text())
-    assert after["status"] == "approved" and after["version"] == "0.2.0" and after["change_log"][-1]["by"] == "owner ruling (test)"
+    major, minor, _patch = (int(x) for x in LIB["version"].split("."))
+    assert after["status"] == "approved" and after["version"] == f"{major}.{minor + 1}.0"
+    assert after["change_log"][-1]["by"] == "owner ruling (test)"
 
 
 def test_approval_doc_names_the_check():

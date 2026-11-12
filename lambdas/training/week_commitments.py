@@ -120,7 +120,8 @@ def ledger_line(seats: dict[str, str]) -> str:
 def rotation_problem(rot: Any) -> str | None:
     """#5759: why one draft's rotation record (`variant_rotation.plan`) is NOT on the charter cadence, or None when it is:
     the program week known, the rotation not refused, and past block 1's first phase every slot with another pool member
-    serving a variant that differs from the phase before. Absence is not credit."""
+    serving a variant that differs from the phase before — except a hold owner ruling B accepts (#5856, 2026-11-12: the held
+    pick is the only member of the slot's best servable quality band; `rotation_holds` records it). Absence is not credit."""
     if not isinstance(rot, dict):
         return "no rotation record on the draft"
     pos = rot.get("position")
@@ -130,12 +131,35 @@ def rotation_problem(rot: Any) -> str | None:
         return "the rotation was refused (the week's counts would move)"
     if int(pos.get("step") or 0) <= 0:
         return None  # block 1's first phase serves the template as written
-    held = [
-        str(s.get("slot_id"))
+    held = [str(s.get("slot_id")) for s in _held(rot) if not _sole_best(s)]
+    return f"held at a phase boundary: {', '.join(held)}" if held else None
+
+
+def _held(rot: dict[str, Any]) -> list[dict[str, Any]]:
+    """Past block 1's first phase: the unpinned slots with another pool member that serve the phase before's variant."""
+    if int(((rot.get("position") or {}).get("step")) or 0) <= 0:
+        return []
+    return [
+        s
         for s in rot.get("slots") or []
         if s.get("source") != "pinned" and len(s.get("pool") or []) >= 2 and s.get("variant") == s.get("previous")
     ]
-    return f"held at a phase boundary: {', '.join(held)}" if held else None
+
+
+def _sole_best(slot: dict[str, Any]) -> bool:
+    """Owner ruling B on #5856 (2026-11-12): a held pick is accepted when it is the ONLY member of the slot's best servable
+    quality band (`selection_engine.top_band`). A band with two or more members still rotates."""
+    band = slot.get("top_band") or {}
+    return list(band.get("members") or []) == [slot.get("variant")]
+
+
+def rotation_holds(rot: Any) -> list[str]:
+    """The holds ruling B accepted, recorded: `slot_id (tier X, the band's only member)`."""
+    if not isinstance(rot, dict):
+        return []
+    return [
+        f"{s.get('slot_id')} (tier {(s.get('top_band') or {}).get('tier')}, the band's only member)" for s in _held(rot) if _sole_best(s)
+    ]
 
 
 # ── the week's served movements ─────────────────────────────────────────────────────────────────────────────────────
@@ -290,7 +314,9 @@ def _rotation(c: dict[str, Any], rot: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(rot, dict):
         return _row(c, NOT_EVALUATED, "no rotation record for the week")
     why = rotation_problem(rot)
-    return _row(c, BLOCK if why else MET, why or "on the charter cadence")
+    holds = rotation_holds(rot)
+    met = "on the charter cadence" + (f"; held by owner ruling B (#5856, 2026-11-12): {', '.join(holds)}" if holds else "")
+    return _row(c, BLOCK if why else MET, why or met)
 
 
 def evaluate(

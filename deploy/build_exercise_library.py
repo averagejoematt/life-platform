@@ -16,7 +16,7 @@ WHAT IT READS (all read-only)
   3. `deploy/exercise_library_curation.py` — the hand-authored half (vocabulary, verified
      citations, gates, per-template overrides, expansion candidates).
   4. `deploy/exercise_library_reviews.json` — the accepted evidence-review ledger (#5778): citations,
-     tier changes and candidates the owner merged from `scripts/library_evidence_review.py`, re-applied
+     evidence changes and candidates the owner merged from `scripts/library_evidence_review.py`, re-applied
      on top of the curation so a rebuild keeps them.
 
 WHAT IT WRITES
@@ -27,8 +27,10 @@ those go to the owner-private overlay (`deploy/write_exercise_library_overlay.py
 is keyed by RAW template id — the alias registry is not folded here, so an alias id (B5EFBF9C,
 Overhead Triceps Extension (Cable)) stays its own movement and records `alias_of`.
 
-Attributes a rule cannot know are `unknown` and the hypertrophy tier is C/unreviewed, unless the
-curation module says otherwise. `version`, `change_log` and `status` are preserved from the file
+Attributes a rule cannot know are `unknown` and each hypertrophy row's evidence is `none_reviewed`, unless the
+curation module says otherwise. Each row's QUALITY tier (S-D) is derived last, by the written rubric
+(`training.quality_rubric`, #5857) from the final attributes, moved at most one band by a recorded direct-trial
+adjustment — never authored. `version`, `change_log` and `status` are preserved from the file
 on disk, so an owner approval is never overwritten by a rebuild.
 
     python3 deploy/build_exercise_library.py                       # dry-run summary, writes nothing
@@ -53,7 +55,10 @@ sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(o
 
 import exercise_library_curation as cur  # noqa: E402
 import exercise_library_reviews as reviews  # noqa: E402
-from training import exercise_library as lib_rules  # noqa: E402
+from training import (
+    exercise_library as lib_rules,  # noqa: E402
+    quality_rubric,  # noqa: E402
+)
 
 LIBRARY_PATH = os.path.join(REPO_ROOT, "config", "exercise_library.json")
 CATALOG_PATH = os.path.join(REPO_ROOT, "config", "movement_catalog.json")
@@ -77,6 +82,37 @@ INITIAL_HEADER = {
         }
     ],
 }
+
+# Change-log lines the BUILDER owns: a rule change in this file (not an owner ruling on the file) records itself here, and
+# `with_builder_changes` adds each line once and moves `version` to the highest. The file's own lines are never rewritten.
+BUILDER_CHANGE_LOG = [
+    {
+        "version": "0.2.0",
+        "date": "2026-11-12",
+        "by": "#5857 (owner note 2026-11-12, PROPOSAL for the owner's review with the library)",
+        "what": "Tiers grade QUALITY, not evidence: every per-target row's `tier` is S/A/B/C/D, derived by the written rubric "
+        "(`quality_rubric`, docs/coaching/EXERCISE_LIBRARY.md) from length_bias, stability, resistance_profile, "
+        "skill_complexity and joint_stress; `evidence_confidence` (rct_direct | rct_characteristic | consensus | "
+        "none_reviewed) is its own field, and a direct trial moves a row at most one band, recorded with its citation "
+        "(`evidence_adjustment`). The A/B/C evidence grade and `evidence_quality` are retired. Attribute rules: a named "
+        "machine reads `machine_selectorized` (was `unknown`); the pec deck reads `lengthened` (was `unknown`).",
+        "rule": "rubric weights are PROPOSED — owner to confirm; status stays proposed",
+    }
+]
+
+
+def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
+    """The header with every builder-owned change-log line present once and `version` at the highest line."""
+    log = list(head.get("change_log") or [])
+    have = {str(x.get("version")) for x in log}
+    log += [dict(x) for x in BUILDER_CHANGE_LOG if x["version"] not in have]
+
+    def _v(v: str) -> tuple[int, ...]:
+        return tuple(int(p) for p in str(v).split("."))
+
+    top = max([str(head.get("version") or "0.0.0")] + [str(x["version"]) for x in log], key=_v)
+    return head | {"change_log": log, "version": top}
+
 
 # ── history ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -171,6 +207,7 @@ _LENGTH_RULES: list[tuple[str, str]] = [
     ),
     (r"preacher|bayesian|behind the back curl|seated leg curl|romanian|\brdl\b|stiff leg|straight leg deadlift|good morning", "lengthened"),
     (r"deficit|split squat|bulgarian|lunge|cossack|\bfly\b|flyes?|crossover|pullover|standing calf|sissy|nordic", "lengthened"),
+    (r"pec deck|butterfly", "lengthened"),  # #5857: the pec deck is a fly (it read `unknown` before)
     (r"hyperextension|back extension|pull ?up|chin ?up|pulldown|\bdips?\b|jefferson|zercher|goblet|front squat|\bsquat\b", "lengthened"),
     (r"bench press|chest press|shoulder press|overhead press|military press|\brow\b|rows\b|leg press|leg extension|curl\b|deadlift", "mid"),
 ]
@@ -318,6 +355,37 @@ def _equipment(title: str, hevy_eq: str | None, family: str) -> list[str]:
     return out
 
 
+# A named pin-stack (or unspecified-loading) machine: selectorized unless the curation says plate-loaded. `machine_unspecified`
+# stays `unknown` — the rule cannot say what it is.
+_SELECTORIZED = {
+    "leg_extension_machine",
+    "leg_curl_seated",
+    "leg_curl_lying",
+    "calf_raise_standing_machine",
+    "calf_raise_seated_machine",
+    "hip_thrust_machine",
+    "glute_kickback_machine",
+    "hip_abduction_machine",
+    "hip_adduction_machine",
+    "incline_press_machine",
+    "decline_press_machine",
+    "chest_press_machine",
+    "pec_deck",
+    "shoulder_press_machine",
+    "lateral_raise_machine",
+    "rear_delt_machine",
+    "seated_row_machine",
+    "pullover_machine",
+    "preacher_machine",
+    "biceps_curl_machine",
+    "triceps_machine",
+    "ab_crunch_machine",
+    "torso_rotation_machine",
+    "back_extension_machine",
+    "assisted_pullup_dip_machine",
+}
+
+
 def _resistance(equipment: list[str], hevy_eq: str | None, family: str, title: str) -> str:
     eq = set(equipment)
     if family == "carry_conditioning" and _CARDIO_RE.search(title):
@@ -338,6 +406,8 @@ def _resistance(equipment: list[str], hevy_eq: str | None, family: str, title: s
         "t_bar_row_machine",
     }:
         return "machine_plate_loaded"
+    if eq & _SELECTORIZED:
+        return "machine_selectorized"  # #5857: a named machine read `unknown` before, so the rubric scored it as nothing
     if eq & {"bodyweight", "pullup_bar", "dip_station", "plyo_box", "ab_wheel", "back_extension_45"}:
         return "bodyweight"
     return "unknown"
@@ -422,7 +492,7 @@ def derive(tid: str, title: str, meta: dict[str, Any]) -> dict[str, Any]:
     primary = meta.get("primary_muscle") or "unknown"
     if primary in ("unknown", "other"):
         # Hevy files many custom templates under "other"; the movement pattern names the target honestly enough to
-        # find a same-stimulus fallback. Still tier C — this is a label, not an evidence claim.
+        # find a same-stimulus fallback. Still `none_reviewed` — this is a label, not an evidence claim.
         primary = _PATTERN_TARGET.get(lib_rules.movement_pattern(title), primary)
     return {
         "title": title,
@@ -444,7 +514,7 @@ def derive(tid: str, title: str, meta: dict[str, Any]) -> dict[str, Any]:
         },
         "skill_complexity": _skill(title, family, meta.get("skill_tier")),
         "equipment": equipment,
-        "hypertrophy": [cur.hyp(primary, "C")],
+        "hypertrophy": [cur.hyp(primary)],
     }
 
 
@@ -649,9 +719,10 @@ def build_library(
     no_template = _expansion_entries(entries, merged_into_history)
     movements, tid_to_key = _keyed_movements(entries, no_template)
     gates_out = _resolved_gates(movements, tid_to_key)
-    missing = reviews.apply_tier_changes(movements, reviews.ledger_tier_changes(_ledger()))
+    missing = reviews.apply_evidence_changes(movements, reviews.ledger_evidence_changes(_ledger()))
     if missing:
-        raise SystemExit(f"evidence-review ledger: tier change for a movement not in the library: {missing}")
+        raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")
+    reviews.finalize_tiers(movements)  # #5857: every row's quality tier from the rubric (+ at most one recorded band)
 
     used_eq = sorted({x for e in movements.values() for x in e["equipment"]})
     inventory, cutoff = home_gym_inventory(movements, history, used_eq)
@@ -664,8 +735,9 @@ def build_library(
         e["fallbacks"] = [{"movement_id": k, "reason": r} for k, r in fbs]
     for key in list(movements):
         movements[key] = _ordered(movements[key])
-    head = {k: (current or {}).get(k, v) for k, v in INITIAL_HEADER.items()}
+    head = with_builder_changes({k: (current or {}).get(k, v) for k, v in INITIAL_HEADER.items()})
     tiers = Counter(r["tier"] for e in movements.values() for r in e["hypertrophy"])
+    confidence = Counter(r["evidence_confidence"] for e in movements.values() for r in e["hypertrophy"])
     src = Counter(e["source"] for e in movements.values())
     return {
         "_README": (
@@ -688,11 +760,13 @@ def build_library(
             "distinct_template_ids": len(history["templates"]),
             "movements": len(movements),
             "by_source": dict(sorted(src.items())),
-            "hypertrophy_rows_by_tier": dict(sorted(tiers.items())),
+            "hypertrophy_rows_by_tier": {t: tiers.get(t, 0) for t in quality_rubric.QUALITY_TIERS},
+            "hypertrophy_rows_by_evidence_confidence": {c: confidence.get(c, 0) for c in quality_rubric.EVIDENCE_CONFIDENCE},
             "expansion_candidates_already_in_history": sorted(merged_into_history),
             "catalog_movements_not_in_current_history": sorted(catalog_only),
             "attribute_rule": "derived by rule unless deploy/exercise_library_curation.py overrides; `unknown` = the rule cannot say",
         },
+        "quality_rubric": quality_rubric.rubric_doc(),
         "equipment_vocabulary": cur.EQUIPMENT_VOCABULARY,
         "gym_inventory": {
             "location_id": lib_rules.LOCATION_ID,

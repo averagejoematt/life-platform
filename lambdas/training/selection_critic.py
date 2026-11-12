@@ -12,7 +12,7 @@ The FACTS (each library movement's tier for the slot's muscle, and which exclusi
 (`selection_engine.candidates`, the engine's exclusion predicates over library + inventory + overlay); the DECISION is this
 module's — the critic re-ranks every movement of the slot's job, eligible or excluded, and decides for itself which
 exclusions stand. So the critic is a red team over the draft, not a replay of the engine's pick: a departure, a stale
-rotation, or an engine bug that served a C where an A was open is caught here.
+rotation, or an engine bug that served a C where an S was open is caught here. Tiers are the library's QUALITY tiers (S-D, #5857).
 
 Every served exercise (a slot or not) whose library entry is UNAVAILABLE at home_gym, PAIN-EXCLUDED or not-for-you-now gets
 `change` too — to the slot's best available movement (any tier), else the selection record's ranked fallback.
@@ -126,7 +126,7 @@ def judge_slot(
     entry = xl.movements(ctx["lib"]).get(lid or "")
     served = next((c for c in pool if c.get("catalog_key") == key), None)
     title = (served or {}).get("title") or (entry or {}).get("title") or key
-    tier = se.tier_for(entry, ctx["spec"]["muscle"]) if entry else "C"
+    tier = se.tier_for(entry, ctx["spec"]["muscle"]) if entry else se.UNRATED_TIER
     base = {"served_tier": tier, "muscle": ctx["spec"]["muscle"]}
     own, own_why = (served or {}).get("code"), (served or {}).get("why")
     if served is None and entry:  # served outside the slot's job (a departure): the engine's predicates still judge it

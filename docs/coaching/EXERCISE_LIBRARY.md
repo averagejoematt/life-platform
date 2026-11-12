@@ -1,4 +1,4 @@
-# Exercise library (v0.1, PROPOSED) — #5769
+# Exercise library (v0.2, PROPOSED) — #5769
 
 The coaching team's menu, chosen **before** drafting: what Matthew has done (his full Hevy history),
 what he could do next (expansion candidates), what each movement trains, what it costs, what it needs,
@@ -16,7 +16,8 @@ records `inputs_snapshot.library_version`. Gate evaluation is #5772; note render
 |---|---|
 | `config/exercise_library.json` | The PUBLIC library (built; committed). |
 | `deploy/build_exercise_library.py` | Builder: read-only Hevy history Query + `config/movement_catalog.json` + curation. Preserves `version` / `change_log` / `status`. |
-| `deploy/exercise_library_curation.py` | The hand-authored half: equipment vocabulary, verified citations, gates, per-template overrides, expansion candidates. |
+| `deploy/exercise_library_curation.py` | The hand-authored half: equipment vocabulary, verified citations and each row's evidence, gates, per-template overrides, expansion candidates. |
+| `lambdas/training/quality_rubric.py` | The quality-tier rubric (#5857): weights, bands, the one-band evidence rule. Pure. |
 | `lambdas/training/exercise_library.py` | Loader, schema check, gate rules, fallbacks, swap-note classifier, private-overlay join (fail-closed), private gate check. |
 | `deploy/write_exercise_library_overlay.py` | Writer for the OWNER-PRIVATE overlay. Dry-run by default (counts only); `--out FILE`; `--apply` PUTs to S3. |
 | `scripts/check_library_gates_private.py` | Private-side gate completeness check (prints ids + missing field names only). |
@@ -47,12 +48,57 @@ is `unknown`; it never raises.
 `history` {first_done, last_done, exposures} · `target` · `family` (hypertrophy | strength_anchor |
 carry_conditioning | core_anti_movement | skill_athletic | corrective) · `length_bias` · `resistance_profile`
 · `stability` · `joint_stress` {spinal_load, shear, wrist, elbow, shoulder} · `skill_complexity` ·
-`equipment` (ids from `equipment_vocabulary`) · `hypertrophy` (per target: tier, citations,
-evidence_quality, last_reviewed) · `gates` · `not_for_you_now` · `availability.home_gym` ·
-`fallbacks` (ranked). Attributes a rule cannot know are `unknown`.
+`equipment` (ids from `equipment_vocabulary`) · `hypertrophy` (per target: `tier` S-D, `rubric_tier`, `rubric_score`,
+`evidence_confidence`, `evidence_adjustment` when a direct trial moved it, `citations`, `last_reviewed`) · `gates` ·
+`not_for_you_now` · `availability.home_gym` · `fallbacks` (ranked). Attributes a rule cannot know are `unknown`.
 
-**Hypertrophy tiers.** A or B only with a citation whose DOI/PMID was resolved (Crossref + PubMed) and
-whose abstract was read. Everything else is C with `last_reviewed: "unreviewed"`.
+## Quality tiers (#5857, rubric v1.0.0 — PROPOSED)
+
+The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
+of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
+band had one member or none. Owner, 2026-11-12: *"if we are saying there is only one S tier tricep exercise in the
+world, that sounds slightly off … there may be a best of the best, but there may be some in that same territory to
+justify S-tier."* So each per-target row's `tier` is now a band S/A/B/C/D that a written rubric derives from the
+attributes the library already records, and evidence strength is its own field beside it.
+
+**The rubric — proposed weights — owner to confirm** (`lambdas/training/quality_rubric.py`; the library carries the
+same table as its `quality_rubric` block). Per (movement, target muscle), the sum of:
+
+| Term | Field | Points |
+|---|---|---|
+| stretch (weighted highest) | `length_bias` | lengthened 5 · mid 3 · shortened 1 · unknown / not_applicable 0 |
+| stability (the target muscle is the limiter) | `stability` | high 3 · moderate 2 · low 1 · unknown 0 |
+| resistance profile (fit to the target's strength curve) | `resistance_profile` | single-joint upper-body targets (chest, shoulders, biceps, triceps, forearms): cable / selectorized machine 3 · plate-loaded machine / free weight 2 · band / bodyweight 1. Everything else: free weight / any machine 3 · cable 2 · band / bodyweight / sled 1. Unknown 0 |
+| progressability (load steps, low skill) | `skill_complexity` + profile | skill low 2 · moderate 1 · high 0, +1 when the resistance loads in small external steps (free weight, cable, machine) |
+| joint stress (a penalty) | `joint_stress` | -2 per joint rated high, -1 once when any joint is rated moderate |
+
+Maximum 14. **Bands:** S >= 12 · A >= 10 · B >= 8 · C >= 5 · D below. Bands, not a single winner: every movement that
+reaches a band shares it. An `unknown` attribute scores 0 — the rubric never guesses what the library cannot state.
+
+**Evidence** is `evidence_confidence`: `rct_direct` (a randomized trial of this target with this movement or its
+defining variable) · `rct_characteristic` (a trial of the movement's defining characteristic: training length, joint
+angle) · `consensus` (a named evidence-based reviewer's peer-reviewed position) · `none_reviewed`. Anything above
+`none_reviewed` cites a reference whose DOI/PMID resolved (Crossref + PubMed) and whose abstract was read. **Only a direct
+trial may move a row, and only one band** from its rubric tier, recorded on the row as `evidence_adjustment {bands,
+citation, why}`: +1 when the trial found this movement grew the target more than a compared movement or range, -1 when
+less; equal or uncompared growth moves nothing; a move past S or D is capped. The shipped adjustments: the overhead cable
+triceps extension +1 (Maeo 2023), the seated leg curl +1 and the lying leg curl -1 (Maeo 2021), the standing calf raises
++1 (Kinoshita 2023).
+
+**Derived, never authored.** The builder writes `rubric_score`, `rubric_tier` and `tier` last, from the final
+attributes; `exercise_library.validate` re-derives every row, so a hand-edited tier is a schema error
+(`tests/test_quality_tiers_5857.py`, with its must-fail control). A muscle whose S band holds fewer than two selectable
+movements names why in `quality_rubric.TOP_BAND_SHORTFALL` (today: abs — no lengthened, externally loaded ab movement is
+recorded).
+
+**How selection reads it** (`selection_engine.rank_key`): quality tier first, then his N=1 fit, then variety (the
+movement this slot served least recently first, then not served by any slot in the lookback), with evidence confidence
+as a tie-break only. A C or D pick is served only with a recorded reason (`C_REASONS`, unchanged codes).
+
+**Rotation (owner ruling B on #5856, 2026-11-12).** Once the library is approved, the nippard `rotation` commitment
+accepts a pick held at a phase boundary only when it is the single servable member of its slot's best band
+(`selection_engine.top_band`), and the hold is recorded on the rotation row. A band with two or more members still
+rotates.
 
 ## Gates
 
@@ -90,16 +136,19 @@ It PROPOSES; the owner accepts by merging the PR it opens; it never merges and n
 
 - **Re-verification.** Every registered citation is resolved live: DOI via Crossref, PMID via PubMed E-utilities,
   title + first author + year matched, the PMID's DOI cross-checked, a retraction / erratum / comment pubtype
-  rejected. `not_found` or retracted on every citation behind an A/B row proposes that row's downgrade to C; a
+  rejected. `not_found` or retracted on every citation behind a reviewed row proposes that row's evidence back to
+  `none_reviewed` (its tier falls back to the rubric's); a
   `mismatch` is reported for a `correct_citation`; `unreachable` changes nothing. Exit 1 on a definitive failure.
 - **Allow-listed sources only** — `config/evidence_source_allowlist.json` (hand-owned; a change to it is a reviewed
   PR): channels `pubmed`, `crossref`, `reviewer` (a named evidence-based reviewer's peer-reviewed paper, cited by its
-  DOI/PMID). No social media, blogs or bare URLs (a denied host is rejected by name). Study designs and the tiers
-  each may back: randomized trial A/B; controlled trial, meta-analysis, systematic review B; narrative review and
-  position stand context only, and only with a named reviewer among the authors.
-- **Verification before tier.** A proposed citation registers only if it resolves live with a DOI. It backs a
-  tier only with a verified PMID, `abstract_read: true` and a design the allowlist permits; otherwise the row stays
-  C. Every proposed change carries its citation. Nothing is invented: the optional `--discover` PubMed search is
+  DOI/PMID). No social media, blogs or bare URLs (a denied host is rejected by name). Study designs and the evidence
+  each may back (`may_back`, #5857): randomized trial `rct_direct` / `rct_characteristic`; controlled trial,
+  meta-analysis, systematic review `rct_characteristic`; narrative review and position stand `consensus` at most, and
+  only with a named reviewer among the authors.
+- **Verification before evidence.** A proposed citation registers only if it resolves live with a DOI. It backs
+  evidence only with a verified PMID, `abstract_read: true` and a design the allowlist permits for that confidence;
+  otherwise the row stays `none_reviewed`. A proposal sets evidence (`set_evidence`, with an optional one-band `adjust`
+  that only `rct_direct` may carry) — never the quality tier, which the rubric derives. Every proposed change carries its citation. Nothing is invented: the optional `--discover` PubMed search is
   a reading list built from the library's own targets, never a change, and no model is used.
 - **Outputs.** Dry-run by default (prints the report + diff, writes nothing); `--out DIR` writes
   `proposal.json` + `library.diff`; `--open-pr --issue N` makes a locked lane off `origin/main`
@@ -108,7 +157,7 @@ It PROPOSES; the owner accepts by merging the PR it opens; it never merges and n
   runs `gh pr create`.
 - **Durable across rebuilds.** `deploy/build_exercise_library.py` re-applies the ledger
   (`deploy/exercise_library_reviews.py`): its citations beside the curation's, its candidates beside `EXPANSION`,
-  its tier changes over the derived rows.
+  its evidence changes over the derived rows; the quality tier is then re-derived.
 
 ## Approval (the owner's step)
 

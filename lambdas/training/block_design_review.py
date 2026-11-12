@@ -4,8 +4,9 @@ WHAT IT IS. Block accessories used to change with no reviewed proposal: he saw t
 not veto a pick before it was drafted. At each new 6-week block (`block_model.block_weeks()`), this turns the selection
 engine's own record (`selection_engine.select_week`, #5773) into a proposal, per accessory slot:
 
-    pick           what the engine ranks first, with WHY THIS AND WHY NOW — its tier for the slot's muscle, his N=1 fit,
-                   variety (served in the lookback or not, new to him or familiar), a C pick's recorded reason, a
+    pick           what the engine ranks first, with WHY THIS AND WHY NOW — its quality tier (S-D, #5857) for the slot's
+                   muscle and its evidence confidence, his N=1 fit, variety (served in the lookback or not, new to him or
+                   familiar), a C/D pick's recorded reason, a
                    lengthened-bias swap — all read off the record, nothing re-ranked here;
     replaces       what the slot served last block: the prior block's approved pick, else the rotation ledger's last
                    variant for the slot, else the template accessory;
@@ -166,16 +167,17 @@ def replaces(
 
 
 def why(slot: Mapping[str, Any], recent: set[str], replaced: Mapping[str, Any]) -> dict[str, str]:
-    """Why this (tier, N=1 fit, variety, a C pick's reason) and why now, read off the engine's record."""
+    """Why this (quality tier + evidence, N=1 fit, variety, a C/D pick's reason) and why now, read off the engine's record."""
     p = slot.get("pick") or {}
     muscle = slot.get("muscle") or "the slot's muscle"
     n1 = p.get("n1") or {}
     fit = "his N=1 fit is unknown (no overlay read)" if n1.get("fit") != "known" else f"his N=1 fit scores {n1.get('score'):+d}"
     variety = "new to him (novel-again caps and a cue sheet ride it)" if p.get("novel") else "familiar"
     variety += ", served in the last block's rotation" if p.get("catalog_key") in recent else ", not served in the lookback"
-    parts = [f"tier {p.get('tier')} for {muscle}", fit, variety]
+    evidence = f" (evidence: {p['evidence']})" if p.get("evidence") else ""
+    parts = [f"tier {p.get('tier')} for {muscle}{evidence}", fit, variety]
     if p.get("c_reason"):
-        parts.append(f"C because {p['c_reason'].get('code')}: {p['c_reason'].get('why')}")
+        parts.append(f"{p.get('tier')} because {p['c_reason'].get('code')}: {p['c_reason'].get('why')}")
     if slot.get("lengthened_swap"):
         parts.append(f"taken as the week's lengthened-bias movement for {muscle}")
     if p.get("catalog_key") == replaced.get("catalog_key"):
@@ -269,7 +271,11 @@ def build_proposal(
             "muscle": s.get("muscle"),
             "incumbent": s["incumbent"],
             "pinned": s.get("pinned"),
-            "pick": {k: pick.get(k) for k in ("movement_id", "catalog_key", "title", "tier", "novel", "length_bias")} if pick else None,
+            "pick": (
+                {k: pick.get(k) for k in ("movement_id", "catalog_key", "title", "tier", "evidence", "novel", "length_bias")}
+                if pick
+                else None
+            ),
             "replaces": replaced,
             "changes": bool(pick) and pick.get("catalog_key") != replaced.get("catalog_key"),
             "alternatives": [] if s.get("pinned") else alternatives(s, lib, idx),

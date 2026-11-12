@@ -7,11 +7,13 @@ and each beside a must-fail control that mutates the config or the engine and sh
   G1  every slot candidate the engine considers (template accessory, vetted pool, pinned entry, served variant, pick,
       fallback) joins a library entry through the engine's own join (`selection_engine.key_index`);
   G2  no slot pick sits below the best available tier without a recorded reason — every better-tier candidate of the
-      slot is either an exclusion recorded on `above_pick` with a `C_REASONS` code, or a `week_repeat` skip; a C pick
-      carries `c_reason`; `library_gap` only where the slot truly has no A/B candidate. Owner pins are exempt;
+      slot is either an exclusion recorded on `above_pick` with a `C_REASONS` code, or a `week_repeat` skip; a C/D pick
+      carries `c_reason`; `library_gap` only where the slot truly has no higher-tier candidate. Owner pins are exempt.
+      Tiers are the library's QUALITY tiers, S-D, derived by its rubric (#5857);
   G3  no prescription (the served week, anchors included; every pick and fallback) names equipment that is not
       `available` at home_gym in the library's `gym_inventory`, nor anything on the charter's `equipment.not_available`;
-  G4  every concession-ledger weekly commitment (`week_commitments`, #5774) is met by the served week;
+  G4  every concession-ledger weekly commitment (`week_commitments`, #5774) is met by the served week — once the library
+      is approved too, a hold at a phase boundary accepted only under owner ruling B (#5856, 2026-11-12);
   G5  gates (`exercise_gates`, #5772) evaluate from measured inputs only: an unmeasured input reads `locked` with input
       `unknown` / `not_set`, never a guessed value — the six overlay-referenced bw_* thresholds are null in the public
       file (owner-owed) and read locked.
@@ -222,8 +224,8 @@ def test_g1_a_hintless_catalog_entry_joins_its_one_same_titled_library_entry():
 
 # ── G2: no unexplained sub-tier pick ─────────────────────────────────────────────────────────────────────────────
 def _unexplained(sel: dict, step: int, env: dict) -> list[str]:
-    """Offenders: a better-tier candidate of the slot that is neither a recorded exclusion nor a week-repeat skip; a C pick
-    with no `C_REASONS` code; a `library_gap` that is false; a named blocker that is not a better-tier candidate."""
+    """Offenders: a better-tier candidate of the slot that is neither a recorded exclusion nor a week-repeat skip; a C/D
+    pick with no `C_REASONS` code; a `library_gap` that is false; a named blocker that is not a better-tier candidate."""
     by_id = {s["slot_id"]: s for s in sel["slots"]}
     out = []
     for slot in vr.slots():
@@ -233,8 +235,8 @@ def _unexplained(sel: dict, step: int, env: dict) -> list[str]:
             continue
         reason = pick.get("c_reason") or {}
         if s.get("pinned") or (s.get("owner_pin") or {}).get("state") == "held":
-            if pick["tier"] == "C" and reason.get("code") != "owner_pin":
-                out.append(f"{slot['slot_id']}: an owner pin's C pick without the owner_pin reason")
+            if pick["tier"] in se.REASONED_TIERS and reason.get("code") != "owner_pin":
+                out.append(f"{slot['slot_id']}: an owner pin's {pick['tier']} pick without the owner_pin reason")
             continue
         eligible, excluded = se.candidates(se._ctx(slot, env, step))
         rank = se.TIER_RANK[pick["tier"]]
@@ -246,19 +248,19 @@ def _unexplained(sel: dict, step: int, env: dict) -> list[str]:
                 out.append(
                     f"{slot['slot_id']}: {pick['movement_id']} (tier {pick['tier']}) sits below {mid} (tier {better[mid]['tier']}) unexplained"
                 )
-        if pick["tier"] == "C":
+        if pick["tier"] in se.REASONED_TIERS:
             code = reason.get("code")
             if code not in se.C_REASONS:
-                out.append(f"{slot['slot_id']}: C pick {pick['movement_id']} with no recorded reason ({code!r})")
+                out.append(f"{slot['slot_id']}: {pick['tier']} pick {pick['movement_id']} with no recorded reason ({code!r})")
             elif code == "library_gap" and better:
-                out.append(f"{slot['slot_id']}: library_gap recorded but {sorted(better)} are A/B candidates")
+                out.append(f"{slot['slot_id']}: library_gap recorded but {sorted(better)} are higher-tier candidates")
             elif code not in ("library_gap", "owner_pin") and reason.get("blocked") not in better:
                 out.append(f"{slot['slot_id']}: c_reason names {reason.get('blocked')!r}, not a better-tier candidate")
     return out
 
 
 def _synthetic_overlay() -> dict:
-    """A SYNTHETIC owner overlay (no real values): a pain-class note on the slot's A-tier overhead extension, a learned
+    """A SYNTHETIC owner overlay (no real values): a pain-class note on the slot's S-tier overhead extension, a learned
     'gym doesn't have it' on the rear-delt machine, and swap-outs on a curl — so pain, equipment and N=1 all move picks."""
     m = xl.movements(LIB0)
     return {
@@ -279,30 +281,46 @@ def test_g2_no_slot_pick_sits_below_the_best_available_tier_without_a_reason():
         for pos, sel in _selections(lib, cat, overlay):
             assert _unexplained(sel, pos["step"], env) == [], (pos, overlay is not None)
             seen_codes |= {(s["pick"].get("c_reason") or {}).get("code") for s in sel["slots"] if s.get("pick")}
+            seen_codes |= {(s["pick"].get("week_repeat") or {}).get("code") for s in sel["slots"] if s.get("pick")}
             seen_codes |= {x["code"] for s in sel["slots"] for x in s.get("above_pick") or []}
     for pos, rot in _shipped(0):  # the drafted (shadow) record, with the ledger carried forward, holds too
         assert _unexplained(rot["selection"], pos["step"], _env(lib, cat)) == [], pos
-    # the run exercised the reasons it guards: the guard is not vacuous
-    assert {"library_gap", "week_repeat", "not_prescribable", "equipment", "owner_pin", "weekly_floor", "pain_swap"} <= seen_codes
+    # the run exercised the reasons it guards: the guard is not vacuous. `library_gap` is no longer reached by the shipped
+    # library — every slot's job holds a higher-tier movement now that the tiers grade quality (#5857); control 3 of the
+    # test below plants one and the guard names it.
+    assert {"week_repeat", "not_prescribable", "equipment", "owner_pin", "weekly_floor", "pain_swap"} <= seen_codes
+
+
+def _plant_top(lib: dict, keep: str, muscle: str, to: str) -> dict:
+    """Every OTHER `muscle` movement's rows above `to` planted down to it, so `keep` is the slot's best-tier movement."""
+    for k, e in xl.movements(lib).items():
+        if k != keep and (e.get("target") or {}).get("primary") == muscle:
+            for r in e["hypertrophy"]:
+                r["tier"] = to if se.TIER_RANK[r["tier"]] < se.TIER_RANK[to] else r["tier"]
+    return lib
 
 
 def test_g2_a_skill_ceiling_exclusion_is_recorded_not_silent():
-    """Barbell movements sit at skill tier 3 and the generator's accessory ceiling is 2: an A/B barbell candidate is
-    excluded as `not_prescribable`, naming the ceiling, on the slot's `above_pick` — never an unexplained sub-tier pick."""
+    """Barbell movements sit at skill tier 3 and the generator's accessory ceiling is 2: a better-tier barbell candidate is
+    excluded as `not_prescribable`, naming the ceiling, on the slot's `above_pick` — never an unexplained sub-tier pick.
+    The shipped library's S bands sit above every barbell candidate (#5857), so the specimens are planted to lead."""
     pos = vr.position(_program_entries()[1])
-    sel = se.select_week(pos, CAT0, _lib(), None, skill_ceiling=CEILING)
+    calf = _plant_top(_lib(), "standing_calf_raise_barbell", "calves", "B")
+    sel = se.select_week(pos, CAT0, calf, None, skill_ceiling=CEILING)
     s = next(x for x in sel["slots"] if x["slot_id"] == "lower_volume.calf_raise_machine")
     hit = next(x for x in s["above_pick"] if x["movement_id"] == "standing_calf_raise_barbell")
     assert hit["code"] == "not_prescribable" and f"skill ceiling {CEILING}" in hit["why"]
     assert int(CAT0["standing_calf_raise_barbell"]["skill_tier"]) > CEILING
-    # the owner's specimen: the B-tier barbell preacher curl (catalog entry since the 2026-11-11 rebuild) above a C curl
+    # the owner's specimen: the barbell preacher curl (catalog entry since the 2026-11-11 rebuild) above a lower-tier curl
+    curls = _plant_top(_lib(), "preacher_curl_barbell", "biceps", "C")
+    sel_c = se.select_week(pos, CAT0, curls, None, skill_ceiling=CEILING)
     for sid in ("shoulders_arms.db_curl", "upper_volume.db_curl"):
-        curl = next(x for x in sel["slots"] if x["slot_id"] == sid)
+        curl = next(x for x in sel_c["slots"] if x["slot_id"] == sid)
         hit = next(x for x in curl["above_pick"] if x["movement_id"] == "preacher_curl_barbell")
         assert hit["code"] == "not_prescribable" and f"skill ceiling {CEILING}" in hit["why"], sid
-        assert curl["pick"]["tier"] == "C" and curl["pick"]["c_reason"]["code"] in se.C_REASONS, sid
+        assert curl["pick"]["tier"] in se.REASONED_TIERS and curl["pick"]["c_reason"]["code"] in se.C_REASONS, sid
     # control: at ceiling 3 the same movement is no longer excluded for the ceiling
-    sel3 = se.select_week(pos, CAT0, _lib(), None, skill_ceiling=3)
+    sel3 = se.select_week(pos, CAT0, calf, None, skill_ceiling=3)
     s3 = next(x for x in sel3["slots"] if x["slot_id"] == "lower_volume.calf_raise_machine")
     assert not any(x["movement_id"] == "standing_calf_raise_barbell" and "skill ceiling" in x["why"] for x in s3.get("above_pick") or [])
 
@@ -313,23 +331,24 @@ def test_g2_control_a_dropped_reason_or_a_misranked_pick_goes_red(monkeypatch):
     pos = vr.position(_program_entries()[1])
     sel = se.select_week(pos, CAT0, lib, None, skill_ceiling=CEILING)
     assert _unexplained(sel, pos["step"], env) == []
-    # control 1: strip the recorded A exclusions above a B pick
+    # control 1: strip the recorded S exclusions above an A pick
     bad = copy.deepcopy(sel)
-    next(s for s in bad["slots"] if s["slot_id"] == "lower_volume.calf_raise_machine")["above_pick"] = []
-    assert any("lower_volume.calf_raise_machine" in o and "unexplained" in o for o in _unexplained(bad, pos["step"], env))
-    # control 2: a C pick loses its reason
+    next(s for s in bad["slots"] if s["slot_id"] == "lower_heavy.leg_press")["above_pick"] = []
+    assert any("lower_heavy.leg_press" in o and "unexplained" in o for o in _unexplained(bad, pos["step"], env))
+    # control 2: a C/D pick loses its reason
     bad = copy.deepcopy(sel)
-    c_slot = next(s for s in bad["slots"] if s.get("pick") and s["pick"]["tier"] == "C" and not s.get("pinned"))
+    c_slot = next(s for s in bad["slots"] if s.get("pick") and s["pick"]["tier"] in se.REASONED_TIERS and not s.get("pinned"))
     c_slot["pick"]["c_reason"] = None
     assert any("no recorded reason" in o for o in _unexplained(bad, pos["step"], env))
-    # control 3: a false library_gap where an A/B candidate exists
+    # control 3: a false library_gap where a higher-tier candidate exists
     bad = copy.deepcopy(sel)
-    s = next(s for s in bad["slots"] if s["slot_id"] == "shoulders_arms.db_curl")
+    s = next(s for s in bad["slots"] if s["slot_id"] == "shoulders_arms.db_lateral_raise")
+    assert s["pick"]["tier"] in se.REASONED_TIERS
     s["pick"]["c_reason"] = {"code": "library_gap", "why": "planted"}
     assert any("library_gap recorded but" in o for o in _unexplained(bad, pos["step"], env))
     # control 4: the ENGINE regresses — rank ignores tier — and the guard names the sub-tier picks
     real = se.rank_key
-    monkeypatch.setattr(se, "rank_key", lambda c, recent: (-se.TIER_RANK[c["tier"]],) + real(c, recent)[1:])
+    monkeypatch.setattr(se, "rank_key", lambda c, recent, slot_last=None: (-se.TIER_RANK[c["tier"]],) + real(c, recent, slot_last)[1:])
     worse = se.select_week(pos, CAT0, lib, None, skill_ceiling=CEILING)
     assert any("unexplained" in o for o in _unexplained(worse, pos["step"], env))
 
@@ -481,24 +500,36 @@ def _approved_offenders() -> list[str]:
 
 def test_g4_once_approved_every_commitment_but_rotation_is_met_by_the_served_week():
     """The live selection (an APPROVED library) keeps carries, kettlebell, single-leg, corrective, stretch and the
-    side/rear-delt band — only `rotation` is open (the strict xfail below names it)."""
+    side/rear-delt band (rotation has its own test below)."""
     assert [o for o in _approved_offenders() if not o.split(": ", 1)[1].startswith("rotation:")] == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#5780 FINDING (open, owner ruling needed): once the library is APPROVED the selection serves live and ranks tier "
-        "before variety, so a slot whose best tier has one member (the A-tier overhead triceps extension, the A-tier seated "
-        "leg curl, ...) serves it again at the next phase boundary — the nippard `rotation` commitment then BLOCKS stage 1 "
-        "for every phase after block 1's first. Today's served week (proposed library, the #5075 pools) is unaffected."
-    ),
-)
 def test_g4_the_served_week_still_meets_rotation_once_the_library_is_approved():
+    """#5780's finding, closed by #5857 + owner ruling B on #5856 (2026-11-12). Once approved the selection serves live and
+    ranks tier before variety. Quality bands now hold several members and each slot rotates within its band by its own
+    history (`selection_engine.slot_last_served`); a held pick is accepted ONLY when it is its band's single servable
+    member, and the hold is recorded on the rotation row."""
     assert [o for o in _approved_offenders() if o.split(": ", 1)[1].startswith("rotation:")] == []
 
 
-# ── G5: gates evaluate from measured inputs only ─────────────────────────────────────────────────────────────────
+def test_g4_control_rotation_without_ruling_b_or_with_a_wider_band_goes_red(monkeypatch):
+    lib = _lib("approved")
+    program = _serve_program(lib, CAT0, kb=kb_entry.ENTRY_EXPOSURES, day=BLOCK_DAY)
+    held = [(pos, rot) for pos, rot in program if wc.rotation_holds(rot)]
+    assert held, "the approved program exercises ruling B (a band with one servable member held at a boundary)"
+    pos, rot = held[0]
+    row = next(r for r in wc.evaluate(rot, CAT0, on=BLOCK_DAY, library=lib)["rows"] if r["id"] == "rotation")
+    assert row["verdict"] == wc.MET and "owner ruling B" in row["detail"], "the accepted hold is recorded, not silent"
+    # control 1: a held slot whose band has a SECOND member is not accepted — it must rotate
+    bad = copy.deepcopy(rot)
+    s = next(x for x in bad["slots"] if x.get("top_band") and x["variant"] == x.get("previous"))
+    s["top_band"]["members"] = list(s["top_band"]["members"]) + ["a_second_member"]
+    assert any(o.startswith("rotation: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=lib))
+    # control 2: the rotation check without ruling B -> the same approved program blocks stage 1 again
+    monkeypatch.setattr(wc, "_sole_best", lambda slot: False)
+    assert any(o.startswith("rotation: block") for o in _commitment_offenders(rot, pos, on=BLOCK_DAY, lib=lib))
+
+
 def _guessed(gates: dict) -> list[str]:
     """Offenders: a locking gate open on an unmeasured input, an unknown/not-set input not reading locked, or an unknown
     bodyweight gate carrying a value it did not measure."""

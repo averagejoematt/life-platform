@@ -39,7 +39,15 @@ CAT0 = json.loads((REPO / "config" / "movement_catalog.json").read_text())["move
 WEEK7 = {"week": 7, "block": 2, "session_role": "upper_heavy", "date": "2026-11-12"}  # block 2, phase 1 (rotation step 2)
 TRI = "upper_heavy.cable_tricep_pushdown"
 CURL = "upper_heavy.db_curl"
-OHE = "overhead_triceps_extension_cable"  # the A-tier triceps movement the owner named (2026-11-11)
+OHE = "overhead_triceps_extension_cable"  # the S-tier triceps movement the owner named (2026-11-11; quality tiers #5857)
+NEXT_TRI = "triceps_extension_cable"  # the A band below it: with OHE held off, nothing else ranks above this one
+# #5857: the upper_heavy week served at its best available quality tier, slot by slot (the critic's own flips)
+BEST = {
+    "cable_tricep_pushdown": OHE,
+    "db_curl": "preacher_curl_dumbbell",
+    "db_lateral_raise": "lateral_raise_machine",
+    "reverse_pec_deck": "reverse_pec_deck",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -59,6 +67,17 @@ def _offline(monkeypatch):
 def _lib(status: str = "approved") -> dict:
     lib = copy.deepcopy(LIB0)
     lib["status"] = status
+    return lib
+
+
+def _ohe_alone(lib: dict | None = None) -> dict:
+    """The library with OHE the slot's ONLY S-tier triceps movement (any other S triceps row planted down to A), so the
+    one movement above NEXT_TRI is OHE and each exclusion test reads OHE's own reason."""
+    lib = lib or _lib()
+    for k, e in lib["movements"].items():
+        if k != OHE and e["target"]["primary"] == "triceps":
+            for r in e["hypertrophy"]:
+                r["tier"] = "A" if r["tier"] == "S" else r["tier"]
     return lib
 
 
@@ -86,6 +105,17 @@ def _ir(rot: dict | None = None, **swap: str) -> RoutineSpec:
     return ir
 
 
+def _best_ir() -> RoutineSpec:
+    """The week at its best available tier. The machine lateral raise is its slot's only A-band member and the plan
+    served it the phase before, so the live selection records that band (`selection_engine.top_band`) and owner ruling B
+    (#5856, 2026-11-12) accepts the hold — what `selection_engine._live` writes onto the rotation slot."""
+    rot = _rot()
+    for s in rot["slots"]:
+        if s["incumbent"] == "db_lateral_raise":
+            s["top_band"] = {"tier": "A", "members": [BEST["db_lateral_raise"]]}
+    return _ir(rot, **BEST)
+
+
 def _run(ir=None, lib=None, overlay=None, **kw) -> dict:
     return critic.evaluate(ir or _ir(), lib or _lib(), None, overlay, catalog=copy.deepcopy(CAT0), missing=[], **kw)
 
@@ -104,12 +134,12 @@ def _pain(lid: str, *, classed: bool = True) -> dict:
 def test_a_slot_below_the_best_available_tier_is_flipped_naming_the_movement():
     out = _run()
     v = _slot(out, TRI)
-    assert v["served_tier"] == "C" and v["verdict"] == "change", v
-    assert v["to"] == OHE and v["to_tier"] == "A" and "Overhead Triceps Extension" in v["why"]
+    assert se.TIER_RANK[v["served_tier"]] > se.TIER_RANK["S"] and v["verdict"] == "change", v
+    assert v["to"] == OHE and v["to_tier"] == "S" and "Overhead Triceps Extension" in v["why"]
     assert out["verdict"] == "change"
-    # biceps: the B dumbbell preacher curl is open; the B preacher MACHINE is never the target (no machine at home_gym)
+    # biceps: an S curl is open; the preacher MACHINE is never the target (no machine at home_gym)
     c = _slot(out, CURL)
-    assert c["verdict"] == "change" and c["to"] == "preacher_curl_dumbbell" and c["to_tier"] == "B"
+    assert (c.get("to_tier") or c["served_tier"]) == "S" and c.get("to") != "preacher_curl_machine", c
     # control: serve the A -> it stands as the best available, nothing to flip
     v2 = _slot(_run(_ir(cable_tricep_pushdown=OHE)), TRI)
     assert v2["verdict"] == "pass" and v2["stands"] == "best_available"
@@ -137,24 +167,24 @@ def test_a_proposed_library_records_the_flip_and_applies_nothing():
 
 # ── each exclusion kind keeps the pick standing ─────────────────────────────
 def test_a_locked_gate_keeps_the_pick():
-    lib = _lib()
+    lib = _ohe_alone()
     lib.setdefault("gates", {})["synthetic_gate_5775"] = {"locks": True, "kind": "synthetic"}
     lib["movements"][OHE]["gates"] = list(lib["movements"][OHE].get("gates") or []) + ["synthetic_gate_5775"]
-    v = _slot(_run(lib=lib), TRI)
+    v = _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=lib), TRI)
     assert v["verdict"] == "pass" and v["stands"] == "gate_locked" and v["blocked"] == OHE, v
 
 
 def test_a_pain_flag_keeps_the_pick():
-    v = _slot(_run(overlay=_pain(OHE)), TRI)
+    v = _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone(), overlay=_pain(OHE)), TRI)
     assert v["verdict"] == "pass" and v["stands"] == "pain_swap" and v["blocked"] == OHE, v
     # control: a stale overlay (written before #5806's pain_class) is not trusted to exclude -> the flip is back
-    assert _slot(_run(overlay=_pain(OHE, classed=False)), TRI)["to"] == OHE
+    assert _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone(), overlay=_pain(OHE, classed=False)), TRI)["to"] == OHE
 
 
 def test_absent_equipment_keeps_the_pick():
-    lib = _lib()
+    lib = _ohe_alone()
     lib["movements"][OHE]["availability"]["home_gym"]["state"] = "unavailable"
-    v = _slot(_run(lib=lib), TRI)
+    v = _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=lib), TRI)
     assert v["verdict"] == "pass" and v["stands"] == "equipment" and v["blocked"] == OHE, v
 
 
@@ -175,7 +205,7 @@ def test_an_owner_pin_or_approval_keeps_the_pick():
 def test_a_movement_served_elsewhere_this_week_keeps_the_pick():
     rot = _rot()
     rot["variants_by_role"]["shoulders_arms"]["cable_tricep_pushdown"] = OHE  # another session this week serves it
-    v = _slot(_run(_ir(rot)), TRI)
+    v = _slot(_run(_ir(rot, cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone()), TRI)
     assert v["verdict"] == "pass" and v["stands"] == "week_repeat" and v["blocked"] == OHE, v
 
 
@@ -189,7 +219,7 @@ def test_dropping_the_pain_exclusion_flips_into_the_pain_flagged_movement(monkey
     """The control that proves the pain test can fail: with `pain_swap` no longer honoured the critic flips INTO the
     pain-flagged movement — exactly the outcome test_a_pain_flag_keeps_the_pick forbids."""
     monkeypatch.setattr(critic, "HONORED_EXCLUSIONS", tuple(c for c in critic.HONORED_EXCLUSIONS if c != "pain_swap"))
-    v = _slot(_run(overlay=_pain(OHE)), TRI)
+    v = _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone(), overlay=_pain(OHE)), TRI)
     assert v["verdict"] == "change" and v["to"] == OHE
 
 
@@ -206,16 +236,16 @@ def test_an_unmet_weekly_commitment_fails_the_critic():
     assert cv["verdict"] == "veto" and cv["metric"] == "week_commitments.kettlebell"
     # control: the same row as a WARN (the kettlebell switch before its date) is reported, never a fail
     warn = [{"id": "kettlebell", "verdict": "warn", "blocking": False, "detail": "a warning until the switch"}]
-    out2 = _run(_ir(cable_tricep_pushdown=OHE, db_curl="preacher_curl_dumbbell"), week_commitments=_stage1(warn))
+    out2 = _run(_best_ir(), week_commitments=_stage1(warn))
     assert out2["verdict"] != "fail" and out2["week_rows"][0]["verdict"] == "warn"
 
 
 def test_the_week_is_computed_from_the_draft_when_stage1_is_not_passed():
-    out = _run(_ir(cable_tricep_pushdown=OHE, db_curl="preacher_curl_dumbbell"))
+    out = _run(_best_ir())
     assert out["week_source"].startswith("week_commitments.evaluate") and out["verdict"] == "pass", out["week"]
     # control: drop the draft's rear-delt work -> the rp_israetel side/rear-delt band is unmet -> fail
-    ir = _ir(cable_tricep_pushdown=OHE, db_curl="preacher_curl_dumbbell")
-    ir.exercises = [e for e in ir.exercises if "reverse_fly" not in e.movement_key]
+    ir = _best_ir()
+    ir.exercises = [e for e in ir.exercises if "reverse_fly" not in e.movement_key and "reverse_pec_deck" not in e.movement_key]
     out2 = _run(ir)
     assert out2["verdict"] == "fail" and "side_rear_delt_band" in {r["check"] for r in out2["week"]}
 
