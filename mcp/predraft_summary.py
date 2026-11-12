@@ -94,6 +94,7 @@ def summarise(result: dict[str, Any], charter_version: Any = None) -> dict[str, 
         "calibration": _pick(r.get("calibration"), ("outcome", "deadman")),
         "titration": _pick(r.get("titration"), ("outcome", "week", "action", "step_kcal", "reason_code")),
         "fitness_battery": _pick(r.get("fitness_battery"), ("outcome", "state")),
+        "fuel_loop": _pick(r.get("fuel_loop"), ("outcome", "iso_week", "fired", "claimed", "error")),  # #5792
         "charter_version": _scalar(charter_version),
     }
     if r.get("error"):
