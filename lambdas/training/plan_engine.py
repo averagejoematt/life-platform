@@ -101,6 +101,7 @@ from training import (
     training_charter,
     training_context_registry,
 )
+from training.tripwire_rows import stall_input, volume_ceiling_read  # noqa: F401 — #5802 (stall_input re-exported for the MCP caller)
 
 # The v1 critics stub the block carries until #3752 wires the adversarial stage (extracted
 # from constraint_block so the #5068 charter stamp did not grow the function).
@@ -676,28 +677,6 @@ def _tripwire_states(
             row["detail"] = reason + (f" — {row['detail']}" if row.get("detail") else "")
 
     return out
-
-
-def stall_input(nutrition_block: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
-    """#5802: (the stall evaluation, its input status) from the nutrition critics block — the MCP caller's one line."""
-    from health.tripwire_readers import stall_from_block
-
-    ev = stall_from_block(nutrition_block)
-    if ev["state"] == READ_FAILED:
-        return ev, input_status(READ_FAILED, error=f"NutritionCriticsError: {ev.get('error')}"[:200])
-    return ev, input_status(MEASURED if ev["state"] in ("tripped", "clear") else ABSENT, ev["detail"])
-
-
-def volume_ceiling_read(muscle_volume: dict[str, Any]) -> tuple[str, Any, str]:
-    """#5802: (state, observed, detail) for `volume_ceiling` over `{muscle: weekly working sets}` (the trailing-28-day
-    average stage 1 already reads). The per-muscle arm only: the per-session lines are the generator's own ceiling
-    (`training.green_block`), enforced when a session is drafted, so stage 1 has no session of its own to read."""
-    t = next(t for t in owner_redlines.TRIPWIRES if t["id"] == "volume_ceiling")
-    ceiling = float(t["threshold"]["sets_per_muscle_wk"])
-    weekly = {m: float(v) for m, v in muscle_volume.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
-    over = {m: round(v, 1) for m, v in sorted(weekly.items()) if v > ceiling}
-    detail = f"{len(over)} of {len(weekly)} muscle(s) above {ceiling:g} sets/wk (28-day average); per-session lines: the generator's"
-    return ("tripped" if over else "clear"), over, detail
 
 
 def _scheduled_session(
