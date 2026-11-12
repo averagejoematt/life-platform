@@ -130,7 +130,7 @@ LIPOPROTEIN FRACTIONATION ION MOBILITY Collected: 01/01/2030 06:00 PM UTC       
 
        Relative Risk: Optimal Pattern A; High Pattern B.
 9p21 GENOTYPE Collected: 01/01/2030 05:32 PM UTC Received: 01/01/2030 05:32 PM UTC
- rs10757278                              aa                                                                               EZ
+ rs10757278                              zz                                                                               EZ
  COMMENTS                                See Below                                                                        EZ
        Placeholder genotype commentary.
 CYSTATIN C WITH eGFR Collected: 12/30/2029 05:32 PM UTC Received: 12/30/2029 05:32 PM UTC

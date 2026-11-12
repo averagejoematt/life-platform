@@ -1363,11 +1363,11 @@ _API_SWEEP_OVERRIDES = {
         "expectation follows the committed switch, so the launch flips it with no edit here.",
     },
     "/api/coach_room_words": {
-        "fetch": "/api/coach_room_words?coach=sleep_coach",
+        "fetch": "/api/coach_room_words?coach=eli_marsh",
         "expect": "200" if _cr2_words_live() else "404",
-        "reason": "dark until common.narrative_allowlist.CR2_PUBLIC (owner ruling 2026-11-09 D): every coach answers "
-        "404 while the switch is off; the expectation follows the committed switch, so the CR2 release flips it with no "
-        "edit here.",
+        "reason": "live since the CR2 release (owner GO 2026-11-11, second message; common.narrative_allowlist.CR2_PUBLIC): "
+        "the lead's approved reads; every coach answers 404 while the switch is off, and the expectation follows the "
+        "committed switch.",
     },
     "/api/verify_subscriber": {
         "expect": "400",

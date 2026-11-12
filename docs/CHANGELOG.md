@@ -3392,7 +3392,7 @@ This PR is purely documentation. The next session that touches Secrets Manager I
 
 ### Pre-PR housekeeping (not strictly v6.8.2 work but landed in this version's commits)
 - **`852be19` v6.8.0-retroactive**: Recovered the COST-OPT-2 prompt caching + model tiering work from the working tree. Source had been uncommitted for ~3 weeks while prod was already running it via shared layer v41. ADR-049 in DECISIONS.md, RUNBOOK cost monitoring section. 13 Lambdas plus shared `ai_calls.py` / `retry_utils.py` got the diff committed.
-- **`1c2a9f5` design artifacts**: 6 untracked design docs from the 2026-05-02 cowork session committed as historical record (TECH_DEBT_INDEX, CLAUDE_CODE_PATCH_SPEC, alternate FUNCTION_HEALTH_V2_HANDOFF, PERSONAL_BOARD_FH_2026_DELIBERATION, WR_35_36_ARCHITECTURE_SPEC, cowork_handoff).
+- **`1c2a9f5` design artifacts**: 6 untracked design docs from the 2026-05-02 cowork session committed as historical record (TECH_DEBT_INDEX, CLAUDE_CODE_PATCH_SPEC, alternate FUNCTION_HEALTH_V2_HANDOFF, a personal clinical document (removed 2026-11-11, owner-only), WR_35_36_ARCHITECTURE_SPEC, cowork_handoff).
 - **`d8a63a0` restore sync_doc_metadata.py**: Script was archived in v4.9.0-docs but is still actively referenced by `scripts/update_architecture_header.sh` (the wrapper invoked by `.git/hooks/pre-commit`). Restored to silence the `[WARN] sync_doc_metadata.py not found` that fires on every commit.
 - **`dc0ac14` doc metadata sync**: Side effect of restoring sync_doc_metadata.py — the pre-commit hook auto-applied 14 changes across 7 docs to bring counter values current (66 Lambdas, 123 MCP tools, 36 modules, 9 secrets, 49 alarms). `docs/HANDOVER_LATEST.md` manually fixed to point at v6.8.1 instead of stale v6.8.0.
 

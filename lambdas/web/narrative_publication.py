@@ -383,6 +383,10 @@ def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
         # inside the CR2 scope with the CR2 switch on — published under the allowlist's public record. Everything
         # else (the switch off, any other scope, any row carrying a record) is decided exactly as before.
         approved = NA.record_for(item, pk)
+        if approved is None:
+            # owner ruling 2026-11-11 (second message, item 3): an approved annotated read, words unchanged — the CR2
+            # route serves it only beside its dated correction (common.narrative_annotations)
+            approved = NA.record_for_annotated(item, pk)
         if approved is not None:
             ok, reason = NP.eligibility(approved)
             if ok:

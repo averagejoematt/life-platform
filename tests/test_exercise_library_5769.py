@@ -1,6 +1,6 @@
 """Exercise library v0.1 (#5769): schema, coverage, citations, privacy, gates, fallbacks, availability, overlay.
 
-# premerge-gate: sweeps lambdas/ and mcp/ to prove nothing in the drafting path imports the proposed library yet
+# premerge-gate: sweeps lambdas/ and mcp/ to prove nothing but the selection engine (#5773) reads the proposed library
 """
 
 from __future__ import annotations
@@ -222,11 +222,15 @@ _READS_LIBRARY = re.compile(
 )
 
 
-# #5772: the weekly gate evaluator reads the library to RECORD gate states (owner-only rows). It is not the drafting path:
-# an unlock reaches `plan_next_session` only through a claim-once row the leg creates while the library is `approved`
-# (`mcp/exercise_gates_leg.py::evaluate_week`), and that read side never opens the library.
-GATE_EVALUATOR_READERS = {
-    os.path.join("mcp", "exercise_gates_leg.py"),  # #5772 (the pure evaluator lambdas/training/exercise_gates.py reads nothing)
+# #5773: the selection engine is the ONE drafting-path reader, and it changes a live draft only when the library is
+# `approved` (shadow while `proposed` — tests/test_selection_engine_5773.py holds that switch). Its critic reads through it.
+# #5772: the weekly gate evaluator's leg reads the library to RECORD gate states (owner-only rows); an unlock reaches
+# `plan_next_session` only through a claim-once row the leg creates while the library is `approved`, and that read side
+# never opens the library (the pure evaluator lambdas/training/exercise_gates.py reads nothing).
+_SANCTIONED_READERS = {
+    os.path.join("lambdas", "training", "selection_engine.py"),
+    os.path.join("lambdas", "training", "selection_critic.py"),
+    os.path.join("mcp", "exercise_gates_leg.py"),  # #5772
 }
 
 
@@ -237,11 +241,11 @@ def test_nothing_in_the_drafting_path_imports_the_library():
         for dirpath, _dirs, files in os.walk(os.path.join(ROOT, top)):
             for fn in files:
                 path = os.path.join(dirpath, fn)
-                if not fn.endswith(".py") or path == me:
+                if not fn.endswith(".py") or path == me or os.path.relpath(path, ROOT) in _SANCTIONED_READERS:
                     continue
                 with open(path, encoding="utf-8", errors="ignore") as f:
                     text = f.read()
-                if _READS_LIBRARY.search(text) and os.path.relpath(path, ROOT) not in GATE_EVALUATOR_READERS:
+                if _READS_LIBRARY.search(text):
                     offenders.append(os.path.relpath(path, ROOT))
     assert offenders == [], f"the proposed library is read before owner approval by: {offenders}"
 

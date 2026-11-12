@@ -47,9 +47,9 @@ SEEDED_VIOLATIONS = [
     ("age_turns", "before he turns 44 I want the RHR under 60"),
     ("age_im", "he told me: I'm 43 and tired of restarting"),
     # genotype strings (PRE-13 / DATA_GOVERNANCE)
-    ("genotype_rsid", "the rs429358 variant explains the lipid response"),
+    ("genotype_rsid", "the rs0000000 variant explains the lipid response"),
     ("genotype_gene", "given his APOE status we keep saturated fat conservative"),
-    ("genotype_allele_pair", "as an e3/e4 carrier the target stays aggressive"),
+    ("genotype_allele_pair", "a synthetic e2/e2 allele pair sets the target"),
     ("genotype_vocab", "he is heterozygous for the relevant polymorphism"),
     # real-person third parties (privacy_guard banned-name sets)
     ("real_name_full", "as Peter Attia says, zone 2 is the base of the pyramid"),
