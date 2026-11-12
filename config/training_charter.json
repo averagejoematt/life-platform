@@ -290,6 +290,20 @@
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     },
     {
+      "version": "1.43.0",
+      "date": "2026-11-11",
+      "by": "owner ruling 2026-11-11 (#5798, setting owner-confirmed 2026-11-11: the fixed-workload cardio test is the treadmill, 20 minutes at a fixed speed and incline; the bike test stays as it is)",
+      "what": "calibration.fitness_tests gains treadmill_20min_fixed (protocol_version 1 -> 2): 20 minutes on the treadmill at ONE fixed speed and incline, mean heart rate over minutes 10 to 20 (lower is better) with the logged RPE beside it. The setting (3.2 mph, 3.5 % incline) was proposed by the platform from his treadmill history and is OWNER-CONFIRMED 2026-11-11; it stays fixed across tests, and a changed setting starts a new comparison series. Heart rate is a MEASUREMENT here, never an effort gate: it builds the baseline after the 2026-10-10 heart-rate regime marker. A test with no usable heart-rate join is stored invalid, never as a value; no result before the marker is compared with one after it. It rides the battery's cadence, test day and dead-man; the order places it before the bike test.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.44.0",
+      "date": "2026-11-11",
+      "by": "owner ruling 2026-11-11 on #5797 (gate:owner): \"calibration sets ONLY on NON-BARBELL anchors (lat pulldown, one-arm DB row, machine press); the calibration set STOPS AT THE FIRST SLOW REP, NOT FAILURE\"; his standing no-grinding rule (2026-10-10) excludes barbell rep-outs; rir_at_first_slow_rep 2 confirmed by the owner 2026-11-11",
+      "what": "Adds calibration.rpe, the RPE calibration set (#5797). On every third exposure (counted from 2026-11-11) of an eligible movement, the LAST back-off set (the last working set when the exposure has no back-offs; never the only working set) is a calibration set: before it he logs, in the Hevy set's RPE field, the RPE he predicts for the row's top rep; he then does reps until the first slow rep (rep speed visibly drops), never to failure, and logs the reps done. Predicted reps in reserve = 10 - that RPE; actual = reps done + rir_at_first_slow_rep - the row's top rep; the error is actual - predicted, reported per movement and pooled (n stated; descriptive under min_n). The RPE-adjusted e1RM (training.load_ramp) adds a movement's mean error to its RIR only once n >= min_n AND the interval excludes zero, recorded on hold.rpe_basis. Never on a barbell (equipment barbell is refused even if listed), a deload week, a red day, an OD1-capped exposure (1 to 3 after a layoff), a first session back, a lift with no PREVIOUS, or the tired-day floor variant. eligible, every_nth_exposure, the stop rule and rir_at_first_slow_rep (owner-confirmed 2026-11-11) are the owner's; min_n, interval_pct and min_working_sets are platform defaults, labelled, pending his ruling.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
       "version": "1.45.0",
       "date": "2026-11-12",
       "by": "owner ruling 2026-11-11 (equipment policy, #5771): no preacher curl machine at home_gym (owner note 2026-11-08)",
@@ -1277,11 +1291,12 @@
       "every_weeks": 6,
       "battery": [
         "6-minute walk",
+        "20-minute treadmill at a fixed workload (heart rate, RPE)",
         "20-minute bike at RPE 6",
         "dead hang",
         "assisted pull-up assistance"
       ],
-      "protocol_version": "1",
+      "protocol_version": "2",
       "aligned_to": "the block: a battery is due in the program week that closes each block (program week a whole multiple of every_weeks)",
       "early_days_credited": 7,
       "grace_weeks": 1,
@@ -1300,6 +1315,7 @@
         "dead_hang",
         "assisted_pull_up",
         "minimum_session",
+        "treadmill_20min_fixed",
         "bike_20min_rpe6"
       ],
       "tests": {
@@ -1312,6 +1328,24 @@
           "hevy_field": "distance_m",
           "protocol": "Treadmill at 0 % incline, no handrails, no running: the fastest steady walk you can hold for 6 minutes. Log the distance.",
           "hevy": "a Treadmill set of about 6 minutes with a distance"
+        },
+        "treadmill_20min_fixed": {
+          "label": "20-minute fixed treadmill",
+          "catalog_key": "treadmill",
+          "unit": "bpm",
+          "better": "lower",
+          "duration_s": 1200,
+          "hevy_field": "final_window_hr",
+          "window_from_s": 600,
+          "window_to_s": 1200,
+          "regime_bound": true,
+          "setting": {
+            "speed_mph": 3.2,
+            "incline_pct": 3.5,
+            "provenance": "owner-confirmed 2026-11-11 (platform-proposed from the median of his recent steady treadmill blocks (2026-10-26 to 2026-11-09, five blocks of 30 to 45 minutes with a logged speed and incline: 3.2 mph and 3.5 % incline)). Keep it fixed across tests; a changed setting starts a new series."
+          },
+          "protocol": "Treadmill, 20 minutes at 3.2 mph and 3.5 % incline, never changed. Start a watch workout. Note RPE at the end.",
+          "hevy": "a Treadmill set of about 20 minutes; heart rate over minutes 10 to 20 joins from the watch, RPE from the note"
         },
         "bike_20min_rpe6": {
           "label": "20-minute bike at RPE 6",
@@ -1348,6 +1382,42 @@
     "block_retro": {
       "every_weeks": 6,
       "scorecard_rows": 13
+    },
+    "rpe": {
+      "_note": "The RPE calibration set (#5797). Read ONLY through training.rpe_calibration; the RPE-adjusted e1RM (training.load_ramp.achieved_hold) is its one consumer of the error.",
+      "eligible": [
+        "lat_pulldown",
+        "one_arm_db_row",
+        "machine_chest_press",
+        "machine_shoulder_press"
+      ],
+      "eligible_basis": "the owner's three non-barbell anchors (2026-11-11): lat pulldown, one-arm DB row, machine press; 'machine press' maps to both catalog machine presses (machine_chest_press, the bench family's machine member; machine_shoulder_press, the overhead-press slot's first member)",
+      "never_equipment": [
+        "barbell"
+      ],
+      "standing_rule": "no grinding (owner, 2026-10-10, restated in the 2026-11-11 ruling): no barbell rep-out and no set taken to failure. A calibration set is never placed on a barbell movement, even one listed in `eligible`, and it stops at the first slow rep",
+      "every_nth_exposure": 3,
+      "exposures_counted_from": "2026-11-11",
+      "set": "the last back-off set; on an exposure with no back-offs, the last working set; never the only working set (min_working_sets), so the top set the gain and stall rules read is never the calibration set",
+      "min_working_sets": 2,
+      "stop_rule": "first_slow_rep",
+      "stop_rule_text": "reps until the first rep whose speed visibly drops; never to failure, never a grind",
+      "capture": "Hevy set RPE = the RPE he predicts, BEFORE the set, for the row's top rep; Hevy reps = the reps done to the first slow rep. No new field and no new app: he already logs RPE in the Hevy set's RPE field",
+      "rir_at_first_slow_rep": 2,
+      "min_n": 6,
+      "interval_pct": 80,
+      "adjust_when": "n >= min_n and the interval excludes zero: the movement's mean error (actual - predicted reps in reserve) is added to the RIR of every RPE-logged set the hold reads; never above the load he moved (the hold's own bound)",
+      "never_when": [
+        "a barbell movement",
+        "a deload week",
+        "a red day (recovery red or ACWR high)",
+        "an OD1-capped exposure (1 to 3 after a layoff)",
+        "a first session back after a long layoff",
+        "a lift with no PREVIOUS",
+        "the Minimum Viable Session (the tired-day floor variant)",
+        "a note with no room for the line (deferred, recorded)"
+      ],
+      "provenance": "eligible, every_nth_exposure, the stop rule and the barbell exclusion: owner ruling 2026-11-11 (#5797); rir_at_first_slow_rep: owner-confirmed 2026-11-11; min_n, interval_pct, min_working_sets: platform defaults (min_n and interval_pct from TB-6 of the closed epic #4425), pending his ruling"
     }
   },
   "concession_ledger": {

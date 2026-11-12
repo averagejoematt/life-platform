@@ -4263,6 +4263,13 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/training/block_design_review.py",
+      "partition": "training_constraints",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/training/block_retro.py",
       "partition": "training_constraints",
       "via": "pk"
@@ -4770,20 +4777,6 @@
       "module": "lambdas/web/site_api_biomarkers.py",
       "partition": "apple_health",
       "via": "seam"
-    },
-    {
-      "direction": "read",
-      "lambda": null,
-      "module": "lambdas/web/site_api_biomarkers.py",
-      "partition": "genome",
-      "via": "pk"
-    },
-    {
-      "direction": "unknown",
-      "lambda": null,
-      "module": "lambdas/web/site_api_biomarkers.py",
-      "partition": "genome",
-      "via": "pk"
     },
     {
       "direction": "read",
@@ -8283,7 +8276,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 788,
+      "edges": 787,
       "lambdas": 107,
       "mcp_tool_modules": 40,
       "mcp_tools": 91,
@@ -8298,8 +8291,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 394,
-        "sites_resolved": 988,
-        "sites_total": 1382
+        "sites_resolved": 987,
+        "sites_total": 1381
       },
       "schedule_resolution": {
         "dynamic": 0,

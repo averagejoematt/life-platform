@@ -151,4 +151,5 @@ def test_coach_packet_and_plan_carry_the_same_field(monkeypatch):
     field = tools_plan._training_phase_field()
     assert field["state"] == "measured" and field["value"]["closest_unmet_gate"]["value"] == WEIGHT_GATE["value"]
     src = open(os.path.join(ROOT, "mcp", "tools_plan.py"), encoding="utf-8").read()
-    assert 'out["training_phase"] = _training_phase_field()' in src
+    # #5772: the field is built beside exercise_unlocks by `_training_fields`, which plan_next_session merges into its output
+    assert '"training_phase": _training_phase_field()' in src and "out.update(_training_fields(" in src

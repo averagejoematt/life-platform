@@ -482,10 +482,13 @@ def test_committed_sitemaps_and_robots():
 def test_workflow_has_one_target_input_and_root_only_sweeps_and_rollback():
     on = WORKFLOW.get("on") or WORKFLOW.get(True)
     inputs = on["workflow_dispatch"]["inputs"]
-    assert set(inputs) == {"target"} and inputs["target"]["options"] == ["preview", "root"] and inputs["target"]["default"] == "preview"
+    # + api_readiness (2026-11-12, run 43124939822): the dispatch-only break-glass for the Site API readiness gate.
+    assert set(inputs) == {"target", "api_readiness"} and inputs["api_readiness"]["default"] == "enforce"
+    assert inputs["target"]["options"] == ["preview", "root"] and inputs["target"]["default"] == "preview"
     assert set(on["push"]["paths"]) >= {"www/**", "deploy/www_preview_sync.sh"}
     jobs = WORKFLOW["jobs"]
-    assert set(jobs) == {"deploy", "smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"}
+    # api-readiness + deferred: tests/test_www_api_readiness.py owns their wiring.
+    assert set(jobs) == {"api-readiness", "deferred", "deploy", "smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"}
     for name in ("smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"):
         assert "needs.deploy.outputs.target == 'root'" in jobs[name]["if"], f"{name} must run for the root target only"
     assert "needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure'" in jobs["rollback-v9-on-failure"]["if"]

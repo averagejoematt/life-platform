@@ -59,7 +59,12 @@ Every planning conversation runs in this order (`lambdas/training/coach_context.
      and merges movements) or `get_exercise_notes` (action `read`) yourself only for a lift the
      packet does not carry (a departure he states, a swap), or one whose read there failed.
 2. **`plan_next_session`** (stage 1, no routine id): the deterministic constraint block. The
-   packet is the INPUTS; the plan is this call. Never plan from the packet alone.
+   packet is the INPUTS; the plan is this call. Never plan from the packet alone. **Call it with
+   `detail="summary"`** (#5803), both stages: the full result is ~250-335 KB per call and it all
+   lands in this chat. The summary carries the session, the verdicts, the binding status, the
+   tripwires, `recent_aerobic`, `steps`, `rate_target` and every line you must say; its `omitted`
+   names each key left out and how to fetch it. Need one (a load's derivation, the redlines)?
+   Re-call stage 1 with `detail="full"` (reads only), never a live stage 2.
 3. **`manage_hevy_routine` action `draft`** is the default: the engine authors the session and
    its loads from the served plan (progression, stall steps, ceilings, cardio dose, warm-ups).
    `draft_custom` is ONLY for a departure he has stated, never the default route. It REQUIRES a
@@ -67,7 +72,7 @@ Every planning conversation runs in this order (`lambdas/training/coach_context.
    call is refused (`DEPARTURE_REASON_REQUIRED`). The reason is recorded on the routine and in
    its spec-ledger row, so tell him you are departing and why. A departure you thought of is
    not his departure.
-4. Then `plan_next_session(routine_id)` (stage 2, the red team over the draft) → `dry_run`
+4. Then `plan_next_session(routine_id, detail="summary")` (stage 2, the red team over the draft) → `dry_run`
    (show him, with an "inputs current through X" line) → `commit`.
 
 ### Reading the packet
@@ -142,7 +147,7 @@ does not carry:
   (any walk or lift). A long active-day streak is not a risk signal for him.
 - **Steps:** the charter's daily floor and target hold every day, lifting days included.
   Walking carries the volume. Quote the packet's steps line and `plan_next_session`'s
-  `steps_ramp`; a lower-leg strain flag holds the ramp where it is.
+  `steps_ramp` (`steps` in the summary view); a lower-leg strain flag holds the ramp where it is.
 - **Energy:** logged intake only (`get_nutrition` view=macros), protein against its floor.
   On a deep cut, protein plus enough fuel to defend muscle is the first lever.
 - **Rate:** `rate_target` gives the band in lb/wk AND % of bodyweight. Always say both.

@@ -90,3 +90,37 @@ python3 deploy/write_exercise_library_overlay.py --out /tmp/overlay.json   # dry
    `python3 scripts/approve_exercise_library.py --by "owner ruling YYYY-MM-DD"`, then commit via a PR.
 
 Never flip `status` by hand.
+
+## Gate evaluation (#5772)
+
+`lambdas/training/exercise_gates.py::evaluate_gates(library, overlay, measured)` is the one evaluator — pure, no reads,
+no clock — and the selection engine (#5773) calls the same function. It returns, per gate id,
+`{kind, state, input, reason, value_seen, unlock_condition}` (plus `by_movement` for the LOCKED carriers of a
+per-movement kind); `movement_states` folds that into a per-movement `{state, locked_by, reasons, unlock_conditions,
+cues}` — every "not for you now" carries its reason and its unlock condition.
+
+- **States are `unlocked` and `locked` only.** An unknown input is `locked` with `input: "unknown"` and a reason
+  naming what was not measured; there is no third state a consumer could mistake for a pass.
+- **A null owner value** (the six owner-unset bodyweight thresholds) is `locked`, `input: "not_set"`, reason
+  `threshold not set by owner`. An unread overlay is `unknown`, not `not_set`.
+- **Measured inputs only:** the 7-day mean bodyweight (Withings, the phase evaluator's reading), the Hevy record over
+  the last 12 weeks for chain and performance standards (an unlogged RPE or an unrecorded assistance/tempo is not
+  evidence), the #5800 note class over 28 days (only a `pain` note locks; `discomfort` and `form_or_equipment` never do), the run gate as the May tracker reads it, and
+  the charter's own numbers (power-clean revisit weight, lower-leg-prep carve-out) — read, never copied.
+- **Template match:** a movement with no standard Hevy template can carry `template_match.title_all`; any logged exercise
+  whose title carries every word counts (the KB deadlift, until #5810 picks its template).
+- **Owner confirmation:** the overlay's `technique_confirmations` (movement id -> `{confirmed_on, source}`, seeded by
+  `deploy/write_exercise_library_overlay.py::OWNER_TECHNIQUE_CONFIRMATIONS`, never dropped on a re-run) meets the
+  `owner_confirmation` gate for that movement only — its chain and bodyweight gates still apply. Owner ruling 2026-11-11:
+  `clean` and `hang_power_clean` confirmed.
+- **Progression standards** (every chain and performance gate) are owner-approved as proposed (ruling 2026-11-11); the six
+  owner-set bodyweight values stay null, so those gates stay locked and the library stays `proposed`.
+- **KB swing (owner ruling 2026-11-11):** `chain_kb_swing` opens on exactly 2 logged KB-deadlift sessions.
+- **Chain order:** a chain gate opens only when each prerequisite met its standard AND that prerequisite's own chain
+  gates are open.
+- **A clinical cue never locks** and is never an intensity gate; it rides the movement's `cues`.
+
+It runs weekly as a fail-soft leg on the Monday panel-grade run (`mcp/exercise_gates_leg.py`), writing
+`EXGATE#EVAL#<monday>` (docs/SCHEMA.md). A movement whose own gates open between two evaluations gets one
+`EXGATE#ANNOUNCE#…` claim-once row — only while the library is `approved` — and `plan_next_session` stage 1 says it
+once (`exercise_unlocks`). Logs carry gate ids, states and counts, never a bodyweight or a threshold.

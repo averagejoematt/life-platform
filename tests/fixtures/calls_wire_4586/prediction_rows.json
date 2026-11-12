@@ -84,7 +84,7 @@
 "subdomain": "sleep"
 },
 {
-"claim_natural": "With the ramp discipline rule mandating reduced volume and no failure sets in week 1, and the 7.5-hour sleep target anchored to a fixed 9:00 PM–4:30 AM window, I predict that the 7-day rolling HRV average will trend upward across the first 14 days — reflecting low acute training stress allowing the autonomic nervous system to begin adapting without suppression, a pattern that is directly checkable against wearable HRV logs.",
+"claim_natural": "(stand-in text, wording withheld under the owner ruling of 2026-11-11) The 7-day average of his heart rate variability will go up over the first fourteen days (explorer coach).",
 "confidence": 0.5,
 "created_date": "2026-09-06",
 "evaluation": {
@@ -807,7 +807,7 @@
 ],
 "labs": [
 {
-"claim_natural": "With 7.5 hours of nightly sleep targeted (bed 9:00 PM, wake 4:30 AM) and reduced training volume prescribed for week 1, HRV 7-day average will trend upward across the first 14 days as the nervous system responds to consistent sleep scheduling and controlled training stress, moving toward the plan's target of 50 ms.",
+"claim_natural": "(stand-in text, wording withheld under the owner ruling of 2026-11-11) The 7-day average of his heart rate variability will go up over fourteen days (labs coach, an earlier start).",
 "confidence": 0.5,
 "created_date": "2026-08-17",
 "evaluation": {
@@ -831,7 +831,7 @@
 "tombstone": true
 },
 {
-"claim_natural": "With 7.5 hours of nightly sleep (bed 9:00 PM, wake 4:30 AM) held consistently from Day 1 and week-1 training volume deliberately reduced with no failure sets, HRV 7-day average will trend upward over the first 14 days as the nervous system is not acutely overloaded — progressing toward the stated target of 50 ms.",
+"claim_natural": "(stand-in text, wording withheld under the owner ruling of 2026-11-11) The 7-day average of his heart rate variability will go up over the first fourteen days (labs coach).",
 "confidence": 0.5,
 "created_date": "2026-09-06",
 "evaluation": {
@@ -1053,7 +1053,7 @@
 "tombstone": true
 },
 {
-"claim_natural": "Sleep duration will average at or above 7.5 hours per night across the first 14 days, as the fixed 9:00 PM bedtime and 4:30 AM wake protocol is followed consistently from Day 1 with no deviation window built in.",
+"claim_natural": "(stand-in text, wording withheld under the owner ruling of 2026-11-11) His nightly sleep duration will go up over fourteen days (mind coach, an earlier start).",
 "confidence": 0.5,
 "created_date": "2026-08-17",
 "evaluation": {
@@ -1077,7 +1077,7 @@
 "tombstone": true
 },
 {
-"claim_natural": "HRV 7-day average will trend upward over the first 14 days relative to Day 1, reflecting successful behavioral adherence to the ramp discipline rules (reduced volume, no failure sets, no PRs before Day 21) which collectively limit psychological and physiological stress during the adaptation window.",
+"claim_natural": "(stand-in text, wording withheld under the owner ruling of 2026-11-11) The 7-day average of his heart rate variability will go up over the first fourteen days (mind coach).",
 "confidence": 0.5,
 "created_date": "2026-09-06",
 "evaluation": {
@@ -2896,7 +2896,7 @@
 "subdomain": "sleep"
 },
 {
-"claim_natural": "The ramp discipline in week 1 — reduced training volume, no failure sets, and no PRs before day 21 — will allow the nervous system to avoid excessive stress load, causing hrv_7day_avg to trend upward over the first 14 days toward the 50 ms biomarker target rather than suppressing it.",
+"claim_natural": "(stand-in text, wording withheld under the owner ruling of 2026-11-11) The 7-day average of his heart rate variability will go up over the first fourteen days (sleep coach).",
 "confidence": 0.5,
 "created_date": "2026-09-06",
 "evaluation": {
@@ -2919,7 +2919,7 @@
 "subdomain": "hrv"
 },
 {
-"claim_natural": "With a fixed bed time of 9:00 PM and wake time of 4:30 AM targeting 7.5 hours, sleep_duration_hours will trend upward across the first 14 days as the schedule is established and the body adapts to the consistent timing.",
+"claim_natural": "(stand-in text, wording withheld under the owner ruling of 2026-11-11) His nightly sleep duration will go up over the first fourteen days (sleep coach).",
 "confidence": 0.5,
 "created_date": "2026-09-06",
 "evaluation": {

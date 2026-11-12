@@ -57,6 +57,12 @@ def _calls():
     return [e for e in NA.APPROVED if e.sk.startswith("PREDICTION#")]
 
 
+def _worded():
+    """The approved calls whose words are available here (all 14 with the private original; else the 8 the labelled
+    test copy still carries — six are stand-ins since the 2026-11-11 privacy cleanup, tests/sealed_prereg.py)."""
+    return sealed_prereg.with_words(_calls())
+
+
 def _sealed_row(entry) -> dict:
     claim = next(c for c in SEALED if _sha(c) == entry.text_sha256)
     return {"pk": entry.pk, "sk": entry.sk, "claim_natural": claim, "status": "refuted", "prediction_id": entry.sk[len("PREDICTION#") :]}
@@ -114,8 +120,9 @@ def test_positive_control_with_the_ldl_target_public_the_approved_sealed_calls_a
     monkeypatch.setattr(GFP, "_PRIVATE", tuple(p for p in GFP._PRIVATE if p != LDL_TARGET))
     monkeypatch.setattr(GFP, "_PUBLIC_SAFE", GFP._PUBLIC_SAFE + (LDL_TARGET,))
     assert GFP.classify(LDL_TARGET) == GFP.PUBLIC_SAFE
+    assert len(_worded()) >= 8
     with NA.serving(NA.SCOPE_CR2):
-        for e in _calls():
+        for e in _worded():
             assert NA.record_for(_sealed_row(e)) is not None, e.sk
 
 
@@ -126,7 +133,7 @@ def test_the_ldl_ruling_withholds_every_sealed_call(cr2_on):
     calls = _calls()
     assert len(calls) == 14 and len(NA.APPROVED) - len(calls) == 21
     with NA.serving(NA.SCOPE_CR2):
-        for e in _calls():
+        for e in _worded():
             row = _sealed_row(e)
             assert NA.record_for(row) is None, e.sk
             G.begin_request()
