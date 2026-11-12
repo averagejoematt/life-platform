@@ -295,6 +295,12 @@ def test_g2_a_skill_ceiling_exclusion_is_recorded_not_silent():
     hit = next(x for x in s["above_pick"] if x["movement_id"] == "standing_calf_raise_barbell")
     assert hit["code"] == "not_prescribable" and f"skill ceiling {CEILING}" in hit["why"]
     assert int(CAT0["standing_calf_raise_barbell"]["skill_tier"]) > CEILING
+    # the owner's specimen: the B-tier barbell preacher curl (catalog entry since the 2026-11-11 rebuild) above a C curl
+    for sid in ("shoulders_arms.db_curl", "upper_volume.db_curl"):
+        curl = next(x for x in sel["slots"] if x["slot_id"] == sid)
+        hit = next(x for x in curl["above_pick"] if x["movement_id"] == "preacher_curl_barbell")
+        assert hit["code"] == "not_prescribable" and f"skill ceiling {CEILING}" in hit["why"], sid
+        assert curl["pick"]["tier"] == "C" and curl["pick"]["c_reason"]["code"] in se.C_REASONS, sid
     # control: at ceiling 3 the same movement is no longer excluded for the ceiling
     sel3 = se.select_week(pos, CAT0, _lib(), None, skill_ceiling=3)
     s3 = next(x for x in sel3["slots"] if x["slot_id"] == "lower_volume.calf_raise_machine")
