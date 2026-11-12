@@ -1308,6 +1308,11 @@ a.mb-row:hover .mb-row-k { color: var(--ember); }
    already carries the gutter, so the hero's own gutter doubled it; and the decorative
    rule bands step aside at ≤760px so the write-up — not the ornament — fills the fold. */
 .dx-main > .page-hero { padding-inline: 0; }
+/* The Coaching Room door in the /coaching/ hero (2026-11-11): one text line, ink on the paper (AA in both
+   themes), the accent only as the underline — weightless on the first screen. */
+.page-hero .ph-room { margin-top: var(--sp-3); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.page-hero .ph-room .label { color: var(--ink); margin-right: var(--sp-2); }
+.page-hero .ph-room a { color: var(--ink); font-weight: var(--weight-med); text-decoration: underline; text-decoration-color: var(--ember); text-underline-offset: 0.18em; }
 @media (max-width: 760px) {
   .dx-main { padding-top: var(--sp-3); }
   .dx-main > .page-hero { padding-block: var(--sp-2) 0; }
