@@ -992,8 +992,8 @@ def stamp_run(table: Any, today: str, result: dict, merge: bool = False) -> bool
         except Exception as e:  # noqa: BLE001
             logger.warning("[public_brief] run stamp unreadable for %s: %s", cycle, e)
             return False
-        if not prev:
-            return False  # a partial re-run never stands in for the cycle's own run
+        if not singleton_visible(prev):  # absent, or tombstoned by a reset: a partial re-run never stands in for the cycle's run
+            return False
         results = {**_plain(prev.get("results") or {}), **results}
     row = {
         "pk": RUN_PK,
