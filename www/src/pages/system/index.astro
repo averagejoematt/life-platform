@@ -2,6 +2,7 @@
 // System — three depths on one page (Stage 3 `#system`). Depth 1 plain English; depth 2 the
 // record, from the edition's one producer; depth 3 the sources and methods.
 import Base from "../../layouts/Base.astro";
+import CommentaryFeature from "../../components/CommentaryFeature.astro"; // the Coaching Room (CR2): renders nothing unless CR2 is on
 import RoomEntry from "../../components/RoomEntry.astro"; // the Coaching Room (CR1): renders nothing unless WEB_ROOM=1
 import { dayInWords, domainWords, kOfN } from "../../lib/format.js";
 import { loadAll, latestEdition } from "../../lib/snapshot.js";
@@ -63,7 +64,7 @@ const steps = [
               </a>
             ))
           }
-        </div>
+        </div>{/* CR2's featured commentary sits flush against the closing tag: with CR2 off the page's bytes are unchanged */}<CommentaryFeature compact />
       </div>
     </div>
   </section>
