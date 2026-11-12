@@ -553,13 +553,13 @@ def load_rows(block: int, table: Any = None, user_id: str = "matthew") -> list[d
     return list(table.query(KeyConditionExpression=cond).get("Items") or [])
 
 
-GATE_EVAL_SK_PREFIX = "EXGATE#EVAL#"  # #5772's weekly evaluation row (`mcp/exercise_gates_leg.SK_EVAL`)
-GATE_EVAL_MAX_AGE_DAYS = 14  # #5861 L3 (platform-proposed): an evaluation older than two weekly runs is stale -> locked
+EVALUATION_SK_PREFIX = "EXGATE#EVAL#"  # #5772's weekly evaluation row (`mcp/exercise_gates_leg.SK_EVAL`)
+EVALUATION_MAX_AGE_DAYS = 14  # #5861 L3 (platform-proposed): an evaluation older than two weekly runs is stale -> locked
 
 
 def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
     """#5861 L3: the newest #5772 gate evaluation for LIVE selection (read-only): `{state, row, week_end}`. `state` is
-    `read`, `stale` (its week ended more than GATE_EVAL_MAX_AGE_DAYS before `as_of`), `none` (nothing stored) or
+    `read`, `stale` (its week ended more than EVALUATION_MAX_AGE_DAYS before `as_of`), `none` (nothing stored) or
     `read_failed: <type>`. Only `read` carries a row — every other state is FAIL-CLOSED: the caller reads every locking
     gate as locked, as before #5772 was read at all."""
     import datetime as dt
@@ -572,7 +572,7 @@ def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
 
             table = exercise_history._table()
         resp = table.query(
-            KeyConditionExpression=Key("pk").eq(pk()) & Key("sk").begins_with(GATE_EVAL_SK_PREFIX), ScanIndexForward=False, Limit=1
+            KeyConditionExpression=Key("pk").eq(pk()) & Key("sk").begins_with(EVALUATION_SK_PREFIX), ScanIndexForward=False, Limit=1
         )
         items = resp.get("Items") or []
     except Exception as e:  # noqa: BLE001 — an unread evaluation locks every gate, never blocks a draft
@@ -586,7 +586,7 @@ def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
         age = (dt.date.fromisoformat(str(as_of)[:10]) - dt.date.fromisoformat(end)).days
     except ValueError:
         age = None
-    if age is None or age > GATE_EVAL_MAX_AGE_DAYS:
+    if age is None or age > EVALUATION_MAX_AGE_DAYS:
         return {"state": "stale", "row": None, "week_end": end or None}
     return {"state": "read", "row": row, "week_end": end}
 
