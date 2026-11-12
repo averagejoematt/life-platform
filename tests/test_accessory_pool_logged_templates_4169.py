@@ -120,9 +120,9 @@ def test_leg_curl_and_calf_raise_machine_resolve_to_the_logged_templates():
 def test_the_prior_templates_are_preserved_not_deleted():
     """The old ids are still real logged history — demoted to unclaimed catalog entries, never dropped."""
     assert CATALOG["lying_leg_curl_machine"]["hevy_template_id_hint"] == "B8127AD1"
-    assert CATALOG["lying_leg_curl_machine"]["sessions"] == 12
+    assert CATALOG["lying_leg_curl_machine"]["sessions"] >= 12  # real history only grows (12 at the #4169 build)
     assert CATALOG["standing_calf_raise_machine"]["hevy_template_id_hint"] == "E05C2C38"
-    assert CATALOG["standing_calf_raise_machine"]["sessions"] == 38
+    assert CATALOG["standing_calf_raise_machine"]["sessions"] >= 38  # real history only grows (38 at the #4169 build)
 
 
 def test_no_template_id_is_catalogued_twice_after_the_remap():

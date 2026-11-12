@@ -34,6 +34,7 @@ export const LAB_ROUTES = [
   { pattern: "/data/lab/experiments/[id]", entrypoint: "./src/lab/lab-experiment.astro", path: "/data/lab/experiments/" },
   { pattern: "/data/lab/tests/[id]", entrypoint: "./src/lab/lab-test.astro", path: "/data/lab/tests/" },
   { pattern: "/data/lab/protocols", entrypoint: "./src/lab/lab-protocols.astro", path: "/data/lab/protocols/" },
+  { pattern: "/data/lab/findings", entrypoint: "./src/lab/lab-findings.astro", path: "/data/lab/findings/" },
 ];
 
 /** The directory every Lab page lives under (the first route's path). */

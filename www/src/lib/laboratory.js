@@ -262,27 +262,73 @@ export function byPillar(experiments) {
   return [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([pillar, items]) => ({ pillar, items: items.sort((a, b) => (a.name < b.name ? -1 : 1)) }));
 }
 
-/** "2026-W45" → "the week of 2 November 2026" (ISO week, Monday). */
-export function weekWords(w) {
+/** "2026-W45" → "2026-11-02", the ISO week's Monday (null for anything else). */
+export function weekMonday(w) {
   const m = /^(\d{4})-W(\d{2})$/.exec(String(w || ""));
-  if (!m) return w || "an unnamed week";
+  if (!m) return null;
   const y = Number(m[1]);
   const wk = Number(m[2]);
   const jan4 = new Date(Date.UTC(y, 0, 4));
   const monday = new Date(jan4.getTime() - ((jan4.getUTCDay() + 6) % 7) * 86400000 + (wk - 1) * 7 * 86400000);
-  return `the week of ${dayInWords(monday.toISOString().slice(0, 10))}`;
+  return monday.toISOString().slice(0, 10);
 }
 
-/** The newest week's findings, each with how many of the served weeks listed the same pair. */
+/** "2026-W45" → "the week of 2 November 2026" (ISO week, Monday); `short` → "week of 2 Nov". */
+export function weekWords(w, { short = false } = {}) {
+  const monday = weekMonday(w);
+  if (!monday) return w || "an unnamed week";
+  return short ? `week of ${dayInWords(monday, { short: true })}` : `the week of ${dayInWords(monday)}`;
+}
+
+/**
+ * PRIVACY (owner rulings 2026-11-03/05/06; fail closed). Two metrics the weekly correlation run names changed METHOD:
+ * the day grade (method 1 carries a journal component, scoring_engine.score_journal; the public grade is
+ * health.day_grade_public) and habit completion (method 1 counted the journal habits; the public share is
+ * health.habit_pct_public). A week computed before the public method correlated the private-by-inference version and
+ * is never shown — not its r, not that it was listed, not a count. A finding naming either metric renders only with
+ * the public method's stamp, carried from the record (common.activity_publication.PUBLIC_METRIC_METHODS — the same
+ * versions, pinned equal by tests/test_lab_findings_over_time.py). Matched broadly: "Day grade", "habits", any case.
+ */
+export const PUBLIC_METHODS = { day_grade: ["day-grade-public-v1"], habit_pct: ["habit-pct-public-v1"] };
+const METHOD_VERSIONED = [
+  [/grade/i, "day_grade"],
+  [/habit/i, "habit_pct"],
+];
+
+/** The method-versioned metric keys a finding names (a label or a key). */
+function versionedKeys(f) {
+  const keys = [];
+  for (const name of [f && f.metric_a, f && f.metric_b]) for (const [rx, key] of METHOD_VERSIONED) if (rx.test(String(name || ""))) keys.push(key);
+  return keys;
+}
+
+/** May this finding be shown? Every method-versioned metric it names carries its public method stamp. */
+export function findingIsPublic(f) {
+  if (!f || typeof f !== "object") return false;
+  const stamps = f.methods && typeof f.methods === "object" ? f.methods : {};
+  return versionedKeys(f).every((k) => (PUBLIC_METHODS[k] || []).includes(stamps[k]));
+}
+
+/**
+ * The newest week's findings, each with how many weeks listed the same pair (`seen`) out of the weeks it could have
+ * been listed in (`of`): every served week, or for a pair naming a method-versioned metric the weeks from the first
+ * week its public method was stamped (never a week whose private-method record was withheld).
+ */
 export function latestFindings(findings) {
-  const fs = findings || [];
+  const fs = (findings || []).filter(findingIsPublic);
   if (!fs.length) return { week: null, items: [], weeks: 0 };
   const weeks = [...new Set(fs.map((f) => f.week))].sort();
   const latest = weeks[weeks.length - 1];
   const key = (f) => `${f.metric_a}|${f.metric_b}`;
   const seen = new Map();
   for (const f of fs) seen.set(key(f), (seen.get(key(f)) || 0) + 1);
-  const items = fs.filter((f) => f.week === latest).map((f) => ({ ...f, seen: seen.get(key(f)) }));
+  const first = {};
+  for (const f of fs) for (const k of versionedKeys(f)) if (!first[k] || f.week < first[k]) first[k] = f.week;
+  const of = (f) => {
+    const from = versionedKeys(f).reduce((m, k) => (first[k] > m ? first[k] : m), "");
+    return weeks.filter((w) => w >= from).length;
+  };
+  const items = fs.filter((f) => f.week === latest).map((f) => ({ ...f, seen: seen.get(key(f)), of: of(f) }));
   items.sort((a, b) => Math.abs(b.r || 0) - Math.abs(a.r || 0));
   return { week: latest, items, weeks: weeks.length };
 }
@@ -330,4 +376,132 @@ export function experimentHasPage(x) {
 /** Does this test earn a page? A test retired before any check was recorded has nothing to show beyond its sentence. */
 export function testHasPage(t) {
   return Boolean(t) && !(t.status === "archived" && !t.verdict && !(t.check_count > 0));
+}
+
+/** True when a served interval sits wholly on one side of zero. */
+function clearOfZero(f) {
+  return f != null && f.ci95_low != null && f.ci95_high != null && (f.ci95_low > 0 || f.ci95_high < 0);
+}
+
+/** "the weeks of 19 and 26 Oct" / "the week of 2 Nov" — a list of served weeks in words. */
+export function weeksInWords(ws) {
+  const ds = (ws || []).map((w) => dayInWords(weekMonday(w), { short: true }) || w);
+  if (!ds.length) return "";
+  if (ds.length === 1) return `the week of ${ds[0]}`;
+  return `the weeks of ${ds.slice(0, -1).join(", ")} and ${ds[ds.length - 1]}`;
+}
+
+/**
+ * One pair's record across the weekly runs, in one honest line. The claim "held in N of N weeks" is made ONLY when the
+ * pair was listed every week in its window AND every listed week's 95% interval excludes zero on the same side;
+ * otherwise the line says what happened: the weeks it was not listed, the weeks its interval reached zero, or that it
+ * changed direction. Nothing is recomputed — r and its interval are as served; this only counts and words them.
+ */
+export function stabilitySummary(p) {
+  const listed = p.weeks.filter((w) => w.finding).map((w) => w.finding);
+  const n = p.weeks.length;
+  const missing = p.weeks.filter((w) => !w.finding).map((w) => w.week);
+  const reached = p.weeks.filter((w) => w.finding && !clearOfZero(w.finding)).map((w) => w.week);
+  const rs = listed.map((f) => f.r).filter((r) => r != null);
+  const signs = new Set(rs.map((r) => Math.sign(r)).filter((x) => x !== 0));
+  const lo = rs.length ? Math.min(...rs) : null;
+  const hi = rs.length ? Math.max(...rs) : null;
+  const range = lo == null ? "" : lo === hi ? `r = ${signed(lo, 2)}` : `r from ${signed(lo, 2)} to ${signed(hi, 2)}`;
+  if (signs.size > 1) return { key: "flipped", text: `Changed direction: ${range} across the ${num(listed.length)} weeks it was listed.` };
+  if (!missing.length && !reached.length && listed.length === n && n > 0)
+    return { key: "held", text: `Held in ${num(n)} of ${num(n)} weeks: ${range}, every week's 95% interval clear of zero.` };
+  const parts = [`Listed in ${num(listed.length)} of ${num(n)} weeks`];
+  if (missing.length) parts.push(`not listed in ${weeksInWords(missing)}`);
+  parts.push(reached.length ? `its interval reached zero in ${weeksInWords(reached)}` : `clear of zero each week it was listed (${range})`);
+  return { key: reached.length ? "reached" : "partial", text: `${parts.join("; ")}.` };
+}
+
+/**
+ * Findings over time: every pair the weekly correlation run listed in MORE THAN ONE served week, each with its week by
+ * week finding (or null when that week's run did not list it) and its one-line summary. Only public findings
+ * (findingIsPublic); a pair naming a method-versioned metric is counted over the weeks from the first week its public
+ * method was stamped, never over weeks whose private-method record was withheld. Strongest record first.
+ */
+export function findingsOverTime(findings) {
+  const fs = (findings || []).filter((f) => findingIsPublic(f) && /^\d{4}-W\d{2}$/.test(String(f.week || "")));
+  const weeks = [...new Set(fs.map((f) => f.week))].sort();
+  const first = {};
+  for (const f of fs) for (const k of versionedKeys(f)) if (!first[k] || f.week < first[k]) first[k] = f.week;
+  const groups = new Map();
+  for (const f of fs) {
+    const key = `${f.metric_a}|${f.metric_b}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f);
+  }
+  const RANK = { held: 0, partial: 1, reached: 2, flipped: 3 };
+  const pairs = [];
+  for (const [key, items] of groups) {
+    const from = versionedKeys(items[0]).reduce((m, k) => (first[k] > m ? first[k] : m), "");
+    const window = weeks.filter((w) => w >= from);
+    const byWeek = new Map(items.map((f) => [f.week, f]));
+    const perWeek = window.map((w) => ({ week: w, finding: byWeek.get(w) || null }));
+    const listed = perWeek.filter((w) => w.finding).length;
+    if (listed < 2) continue;
+    const p = { key, metric_a: items[0].metric_a, metric_b: items[0].metric_b, weeks: perWeek, listed, from: from || null };
+    p.summary = stabilitySummary(p);
+    pairs.push(p);
+  }
+  const latestR = (p) => Math.abs((p.weeks.filter((w) => w.finding).pop() || {}).finding.r || 0);
+  pairs.sort((a, b) => RANK[a.summary.key] - RANK[b.summary.key] || b.listed - a.listed || latestR(b) - latestR(a) || (a.key < b.key ? -1 : 1));
+  const newest = fs.filter((f) => f.week === weeks[weeks.length - 1] && f.window_start && f.window_end)[0] || null;
+  return { weeks, pairs, window: newest ? { start: newest.window_start, end: newest.window_end } : null };
+}
+
+/** A pair's name in words: "HRV and recovery". */
+export function pairWords(p) {
+  return `${labelWords(p.metric_a)} and ${labelWords(p.metric_b)}`;
+}
+
+/**
+ * One pair's small multiple: r with its 95% interval for each week of its window, on ONE fixed axis from −1 to +1 shared
+ * by every multiple (so a reader compares pairs by eye honestly), zero drawn, a week the run did not list marked
+ * "not listed" at zero. Carries data-points for the inspector. `width` is the viewBox width — on a phone the island
+ * passes the container's width, so the 12.5-unit text stays ≥ 11 px (#1210).
+ */
+export function stabilityFigure(p, { width = 340 } = {}) {
+  if (!p || !p.weeks || !p.weeks.length) return "";
+  const W = Math.max(240, Math.round(width));
+  const H = 168;
+  const padL = 34;
+  const padR = 12;
+  const padT = 12;
+  const padB = 30;
+  const n = p.weeks.length;
+  const x = (i) => padL + ((i + 0.5) / n) * (W - padL - padR);
+  const y = (r) => padT + ((1 - r) / 2) * (H - padT - padB);
+  const fs = 12.5;
+  const text = (tx, ty, s, anchor = "middle", fill = "#5C5C58") =>
+    `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="${anchor}" font-family="IBM Plex Mono,monospace" font-size="${fs}" fill="${fill}">${s}</text>`;
+  let g = "";
+  for (const v of [1, -1]) g += `<line x1="${padL}" y1="${y(v).toFixed(1)}" x2="${W - padR}" y2="${y(v).toFixed(1)}" stroke="#E2E2DC" stroke-width="1"/>`;
+  g += `<line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W - padR}" y2="${y(0).toFixed(1)}" stroke="#121212" stroke-width="1"/>`;
+  g += text(padL - 6, y(1) + 4, "+1", "end") + text(padL - 6, y(0) + 4, "0", "end") + text(padL - 6, y(-1) + 4, "−1", "end");
+  const points = [];
+  p.weeks.forEach((w, i) => {
+    const cx = x(i);
+    const day = dayInWords(weekMonday(w.week), { short: true }) || w.week;
+    g += text(cx, H - 9, day);
+    const f = w.finding;
+    if (!f || f.r == null) {
+      g += `<line x1="${(cx - 7).toFixed(1)}" y1="${y(0).toFixed(1)}" x2="${(cx + 7).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="#8A8A84" stroke-width="3" stroke-linecap="round"/>`;
+      points.push({ x: Number(cx.toFixed(1)), y: Number(y(0).toFixed(1)), label: `Week of ${day}: not listed by that week's run` });
+      return;
+    }
+    const clear = clearOfZero(f);
+    const ink = clear ? "#1B3FD6" : "#8A8A84";
+    if (f.ci95_low != null && f.ci95_high != null)
+      g += `<line x1="${cx.toFixed(1)}" y1="${y(f.ci95_high).toFixed(1)}" x2="${cx.toFixed(1)}" y2="${y(f.ci95_low).toFixed(1)}" stroke="${ink}" stroke-width="5" stroke-linecap="round"/>`;
+    g += `<circle cx="${cx.toFixed(1)}" cy="${y(f.r).toFixed(1)}" r="5.5" fill="#F4F4F0" stroke="${ink}" stroke-width="2"/>`;
+    const ci = f.ci95_low != null && f.ci95_high != null ? ` (95% interval ${signed(f.ci95_low, 2)} to ${signed(f.ci95_high, 2)})` : " (no interval served)";
+    const neff = f.n_eff != null ? `, about ${num(f.n_eff)} independent days` : "";
+    points.push({ x: Number(cx.toFixed(1)), y: Number(y(f.r).toFixed(1)), label: `Week of ${day}: r ${signed(f.r, 2)}${ci}${neff}` });
+  });
+  const aria = `${pairWords(p)}, r with its 95% interval in each of ${num(n)} weekly runs, on an axis from −1 to +1. ${p.summary ? p.summary.text : ""}`;
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}" data-chart data-points="${esc(JSON.stringify(points))}">${g}</svg>`;
 }

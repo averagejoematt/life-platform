@@ -1,0 +1,137 @@
+---
+// /data/lab/findings/ — findings over time (2026-11-11). Injected with the Lab's other routes (src/lib/lab.js).
+// Simple on arrival: one line per recurring pair saying how it held across the weekly correlation runs. Deep on
+// demand: the small multiple (r with its 95% interval each week, one shared axis from −1 to +1) and the week-by-week
+// numbers. Every r, interval and n is carried from the snapshot's lab.json as /api/discoveries served it; the page
+// only counts weeks and words them (lib/laboratory.js findingsOverTime / stabilitySummary).
+// PRIVACY: only findings that pass findingIsPublic render — a week computed under the private-by-inference day grade
+// or habit share (owner rulings 2026-11-03/05/06) is never drawn, listed or counted.
+import Base from "../layouts/Base.astro";
+import LabBanner from "../components/LabBanner.astro";
+import { dayInWords, num } from "../lib/format.js";
+import { LAB_MARKER, labEnabled, labPrivate } from "../lib/lab.js";
+import { findingsOverTime, pairWords, signed, stabilityFigure, weekMonday, weekWords, weeksInWords } from "../lib/laboratory.js";
+import { loadLab } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+if (!labEnabled()) throw new Error("src/lab/lab-findings.astro rendered with the Lab switched off — the Lab route must not be injected");
+
+const lab = await loadLab();
+const ok = lab.state === "ok";
+const over = findingsOverTime(lab.lab_findings);
+const pairs = over.pairs;
+const held = pairs.filter((p) => p.summary.key === "held").length;
+const asOf = lab.as_of ? dayInWords(lab.as_of) : null;
+const noindex = process.env.WEB_NOINDEX === "1";
+const mark = { [LAB_MARKER]: "findings" };
+const span = over.weeks.length > 1 ? `the weeks of ${dayInWords(weekMonday(over.weeks[0]), { short: true })} to ${dayInWords(weekMonday(over.weeks[over.weeks.length - 1]))}` : null;
+const SCLASS: Record<string, string> = { held: "confirmed", flipped: "refuted" };
+const SWORD: Record<string, string> = { held: "Held every week", partial: "Some weeks", reached: "Reached zero", flipped: "Changed direction" };
+---
+
+<Base title="Findings over time" top="data" description="How each correlation the weekly run found held from week to week." status={asOf}>
+  <Fragment slot="head">{!noindex && labPrivate() && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  <LabBanner />
+  <section class="section" {...mark} style="padding-bottom:20px">
+    <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:1100px">
+      <p class="label"><a href={href("/data/lab/")}>The Laboratory</a> · findings over time</p>
+      <h1 style="font-size:clamp(30px,5vw,48px);line-height:1.08">How the findings held</h1>
+      {
+        ok && pairs.length ? (
+          <p class="dek" style="font-size:18px;max-width:70ch">
+            {`${num(pairs.length)} ${pairs.length === 1 ? "pair was" : "pairs were"} listed by more than one of the ${num(over.weeks.length)} weekly correlation runs${span ? `, ${span}` : ""}. ${num(held)} held in every week; the rest say what happened.`}
+          </p>
+        ) : (
+          <p class="dek" style="font-size:18px;max-width:70ch">No pair was listed by more than one weekly run in this snapshot.</p>
+        )
+      }
+      <p class="muted" style="font-size:14px;max-width:72ch">
+        "Held" means the pair was listed every week and each week's 95% interval sat wholly on the same side of zero. Each weekly run looks back over a trailing
+        window{over.window ? ` (the newest ran from ${dayInWords(over.window.start)} to ${dayInWords(over.window.end)})` : ""}, so neighbouring weeks share most of their
+        days: a pair that held every week is not an accident of one week's newest days, but it was not found that many independent times. A week where a pair is
+        not listed means that run did not pass it after correcting for how many pairs it tried, not that the pair disappeared. A correlation, not an experiment: two
+        things travel together; this does not say one causes the other.
+      </p>
+    </div>
+  </section>
+
+  {
+    ok && pairs.length > 0 && (
+      <section class="section" style="padding-top:8px" aria-label="Each pair, one line">
+        <div class="wrap" style="max-width:1100px">
+          <div class="rows">
+            {pairs.map((p) => (
+              <a href={`#${p.key.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()}`}>
+                <span style="font-size:15px">
+                  <b>{pairWords(p)}</b>
+                  <br />
+                  <span class="muted" style="font-size:13px">{p.summary.text}</span>
+                </span>
+                <span class={`status ${SCLASS[p.summary.key] || "inconclusive"}`}>{SWORD[p.summary.key]}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    ok && pairs.length > 0 && (
+      <section class="section" style="padding-top:8px" aria-label="Each pair, week by week">
+        <div class="wrap" style="max-width:1100px">
+          <p class="label" style="margin-bottom:6px">Week by week · r and its 95% interval, axis −1 to +1</p>
+          <p class="muted" style="font-size:14px;max-width:70ch;margin-bottom:14px">
+            A dot is the week's r; the bar is its 95% interval. Blue: the interval is clear of zero. Grey: it reached zero. A short grey dash on the zero line: that
+            week's run did not list the pair.
+          </p>
+          <div class="grid cols3" style="gap:28px 32px">
+            {pairs.map((p) => (
+              <div id={p.key.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()} style="display:flex;flex-direction:column;gap:8px;scroll-margin-top:80px">
+                <p style="font-size:16px">
+                  <b>{pairWords(p)}</b>
+                </p>
+                <p class="muted" style="font-size:13px;line-height:1.45">{p.summary.text}</p>
+                <figure class="chart" data-lab-multiple data-payload={JSON.stringify(p)} style="margin:0">
+                  <Fragment set:html={stabilityFigure(p)} />
+                </figure>
+                <details>
+                  <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:14px">
+                    <b>The numbers, week by week</b>
+                  </summary>
+                  <div class="rows" style="margin-top:6px">
+                    {p.weeks.map((w) => (
+                      <div>
+                        <span style="font-size:13px">{weekWords(w.week)}</span>
+                        <span class="mono" style="font-size:12px;text-align:right">
+                          {w.finding
+                            ? `r ${signed(w.finding.r, 2)}${w.finding.ci95_low != null && w.finding.ci95_high != null ? ` (${signed(w.finding.ci95_low, 2)} to ${signed(w.finding.ci95_high, 2)})` : " (no interval)"}${w.finding.n_eff != null ? ` · ~${num(w.finding.n_eff)} of ${num(w.finding.n)} days` : w.finding.n != null ? ` · ${num(w.finding.n)} days` : ""}`
+                            : "not listed"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {p.from && p.from !== over.weeks[0] && (
+                    <p class="muted" style="font-size:12px;margin-top:6px">Counted from {weeksInWords([p.from])}, the first week this pair's measure was computed by its published method.</p>
+                  )}
+                </details>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section" style="padding-top:8px">
+    <div class="wrap" style="max-width:1100px">
+      <p class="muted" style="font-size:13px;max-width:70ch">
+        <a href={href("/data/lab/#learned")}>The newest week's findings</a> are on the Laboratory's front page.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../islands/lab.js";
+</script>

@@ -43,6 +43,7 @@
     "/data/lab/",
     "/data/lab/experiments/berberine-glucose/",
     "/data/lab/experiments/creatine-strength/",
+    "/data/lab/findings/",
     "/data/lab/protocols/",
     "/data/lab/tests/hyp_carb_load_sleep_lag/",
     "/data/lab/tests/hyp_protein_deficit_recovery_lag/",
@@ -90,5 +91,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 69
+  "transitive_count": 70
 }

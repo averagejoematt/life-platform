@@ -661,6 +661,17 @@ PAGE_BINDINGS.append(
         "endpoints": [{"url": "/api/supplements", "role": "primary", "metrics": []}],
     }
 )
+# Findings over time (2026-11-11): each correlation pair the weekly run listed more than once, week by week.
+PAGE_BINDINGS.append(
+    {
+        "path": "/data/lab/findings/",
+        "name": "Data · the Laboratory's findings over time (v9)",
+        "door": "data",
+        "narrative_order": 112,
+        "story_intent": "each correlation the weekly run listed in more than one week: how it held, with r and its interval each week",
+        "endpoints": [{"url": "/api/discoveries", "role": "primary", "metrics": []}],
+    }
+)
 # The Human Story (HS1, STORY_LIVE — owner GO 2026-11-09): the week-by-week timeline, a static build from the
 # publication snapshot's approved, published installments. Never /story/timeline/ (the kept v8 page, bound above).
 PAGE_BINDINGS.append(
