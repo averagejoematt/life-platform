@@ -172,8 +172,9 @@ def test_the_interval_ride_is_steady_plus_two_from_the_composer():
     note, audit = cardio_note.compose(
         movement_key=c["movement_key"], minutes=int(c["minutes"]), target_date=ARMS["target_date"], kind=c["kind"], facts=facts
     )
+    assert note.startswith(g.CARDIO_RPE_CAPTURE_LINE + "\n")  # #5796
     assert (
-        note
+        cardio_note.without_capture(note)
         == _note(ARMS, "recomposed", "cycling")
         == (
             "Recumbent · L11/L13 · hard RPE 8 (a few words)\n"

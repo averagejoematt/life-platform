@@ -39,6 +39,7 @@ from training import (
     lift_note,
     session_block,
 )
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.exercise_history import STALE_AFTER_DAYS as HISTORY_STALE_AFTER_DAYS
 from training.rep_scheme import LB_IN_KG
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set, deserialize, serialize
@@ -231,7 +232,7 @@ def test_MUTATION_the_28_day_line_brings_back_the_graded_wire(monkeypatch):
     face2 = _accessory("face_pull", 65)
     monkeypatch.setattr(lift_note, "STALE_AFTER_DAYS", 180)
     _compose([face2], _history("face_pull", ("2026-10-21", 65, 15, 9.0)), {"face_pull": "Rear Delt Reverse Fly (Machine)"}, "2026-10-29")
-    assert "New: replaces" not in face2.notes and GRADED_FACE_PULL.split("\n")[0] == face2.notes
+    assert "New: replaces" not in face2.notes and _wc(GRADED_FACE_PULL).split("\n")[0] == face2.notes
 
 
 def test_a_stale_previous_far_off_is_lighter_not_new_and_a_lift_never_logged_keeps_new():
@@ -289,7 +290,7 @@ def test_the_graded_hill_fails_lint_on_levels_and_talk_words_and_the_composed_hi
     ]
     facts = {"last_level": 11}
     note, audit = cardio_note.compose(movement_key="cycling", minutes=30, target_date=TARGET, kind="hills", facts=facts)
-    assert note == (
+    assert _wc(note) == (
         "Recumbent · L11 → L13 · RPE 6–7 (short phrases)\n"
         "⌚ ride clock: L11 to min 10 · up a level every 2 min to min 14 · down the same to min 18 · L11 to the end"
     ), note
@@ -327,7 +328,7 @@ def test_a_treadmill_hill_reads_the_walk_clock_and_a_bike_the_ride_clock(monkeyp
     monkeypatch.setenv(lint.MODE_ENV, "off")
     sessions = [{"date": "2026-10-20", "note": "2.8 / 6"}]
     note, _ = cardio_note.compose(movement_key="treadmill", minutes=30, target_date=TARGET, kind="hills", treadmill_sessions=sessions)
-    line1, clock = note.split("\n")
+    line1, clock = _wc(note).split("\n")
     assert line1.endswith("6% → 10% · RPE 6–7 (short phrases)") and clock.startswith("⌚ walk clock: 6% to min 6"), note
     assert cardio_note.clock_of(note, 30) is not None  # the adherence reader reads the walk clock back
     assert _lint(_cardio_ir(note, "treadmill")).ok, _lint(_cardio_ir(note, "treadmill")).lines()
@@ -460,7 +461,10 @@ def test_the_squat_prep_cue_stays_beside_a_reason_line_when_it_fits():
     squat = ExerciseBlock(movement_key="squat_barbell", sets=[_n(215, 8, 12) for _ in range(3)], rationale_tag="anchor:squat:volume")
     history = {**_history("deadlift_trap_bar", ("2026-10-19", 235, 8, 8.5)), **_history("squat_barbell", ("2026-10-23", 265, 4, 9.0))}
     _compose([hinge, squat], history, target="2026-10-29")
-    assert squat.notes == "RPE 8–9\nVolume day: chase 12.\nAnkles + hips first. Brace each rep, breathe between reps.", squat.notes
+    # #5817 (owner ruling 2026-11-11, D8): the barbell squat's one sheet cue rides with them and still fits 4 lines
+    assert (
+        squat.notes == "RPE 8–9\nVolume day: chase 12.\nAnkles + hips first. Knees track the toes. Brace each rep, breathe between reps."
+    ), squat.notes
     assert g.phone_lines(squat.notes) == g.LIFT_MAX_LINES
 
 

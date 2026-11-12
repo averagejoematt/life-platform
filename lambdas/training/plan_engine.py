@@ -756,11 +756,19 @@ def _scheduled_session(
 def _effort_blocks(
     date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any, block_workouts: Any = None
 ) -> dict[str, Any]:
-    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `training_day_fuel` (#5101, typed by the #5191 calendar)."""
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `set_raise_proposal` (#5796) + `training_day_fuel` (#5101,
+    typed by the #5191 calendar). Both proposals are owner-approved; neither changes a prescription."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
-    proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
+    read = None if st == READ_FAILED else st
+    proposal = ceiling_proposal.for_plan(date, rows, read, catalog_movements)
+    raises = self_added_volume.set_raise_for_plan(date, rows, read, catalog_movements)
     fuel = training_calendar.plan_fuel(date, disruption.state(dis_records, date) if dis_records is not None else None, block_workouts)
-    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal, "training_day_fuel": fuel}
+    return {
+        "progression": load_progression.rule_summary(),
+        "ceiling_change_proposal": proposal,
+        "set_raise_proposal": raises,
+        "training_day_fuel": fuel,
+    }
 
 
 def _steps_ramp_block(
