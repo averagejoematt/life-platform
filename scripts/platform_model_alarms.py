@@ -501,6 +501,12 @@ def extract_alarms() -> dict[str, dict]:
         for name in inventory.get(stack, []):
             here.setdefault(name, {"stack": stack, "kind": "metric", "routing": "unresolved", "via": "alarm_discovery-only (untraced)"})
         alarms.update(here)
+    _attach_reader_audience(alarms)
+    return alarms
+
+
+def _attach_reader_audience(alarms: dict[str, dict]) -> None:
+    """#3423/#3499/#5821: overlay the curated reader-audience facet onto the traced alarms (mutates)."""
     # #3423: attach the curated reader-audience facet — a name the registry holds
     # that no CDK-derived alarm matches is a typo/rename and must not be dropped
     # silently (tests/test_reader_audience_alarms.py pins the same invariant against
@@ -533,4 +539,3 @@ def extract_alarms() -> dict[str, dict]:
             continue
         prior = set() if alarms[name]["routing"] == "unresolved" else set(alarms[name]["routing"].split("+"))
         alarms[name]["routing"] = _join_routing(prior | {"urgent"})
-    return alarms
