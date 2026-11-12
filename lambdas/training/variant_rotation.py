@@ -640,11 +640,17 @@ def for_session(
     (the plan view: no hidden DDB read — `ledger: not_read`, the rotation computed). `block_workouts`: the Hevy record the
     kettlebell slot's entry exposures are counted from (#5774, `kb_entry`), else the entry's own `kb_entry_exposures`;
     neither = not read, and the entry (the KB deadlift) serves. `select` (a draft) runs the #5773 selection engine over
-    it: SHADOW beside these pools while the exercise library is proposed, LIVE once approved."""
+    it: SHADOW beside these pools while the exercise library is proposed, LIVE once approved — and, with the ledger read
+    here, the block design review's approval record too (#5776): live drafting then serves only owner-approved picks."""
     pos = position(day_entry)
     state = "injected" if rows is not None else "not_read"
+    approvals = None  # #5776: read beside the ledger, so an injected ledger (a test, a generator input) reads neither
     if rows is None and read and pos is not None:
         rows, state = load_rows_failsoft(pos["block"])
+        if select:
+            from training import block_design_review
+
+            approvals = block_design_review.load_failsoft(pos["block"])
     day = (day_entry or {}).get("date") or (day_entry or {}).get("target_date")
     # the planned session carries its own measured count (`program_structure.planned_session`); a generator passes the record
     n = kb_entry.exposures(block_workouts, day) if block_workouts is not None else (day_entry or {}).get("kb_entry_exposures")
@@ -653,7 +659,9 @@ def for_session(
         return out
     from training import selection_engine
 
-    return selection_engine.apply(out, catalog_movements, rows=rows, skill_ceiling=skill_ceiling, target_date=_draft_day(day_entry))
+    return selection_engine.apply(
+        out, catalog_movements, rows=rows, skill_ceiling=skill_ceiling, target_date=_draft_day(day_entry), approvals=approvals
+    )
 
 
 def week_volume(catalog_movements: dict[str, Any], variants_by_role: dict[str, dict[str, str]], skill_ceiling: int = 2) -> dict[str, Any]:

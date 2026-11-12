@@ -9,7 +9,7 @@
 // existing Day pages. No audio, no journal / State of Mind / diary field: a week without an installment says only that.
 import Base from "../layouts/Base.astro";
 import { dayInWords } from "../lib/format.js";
-import { timelineRows, soFar } from "../lib/story.js";
+import { timelineRows, soFar, weekRecords } from "../lib/story.js";
 import { STORY_MARKER, storyEnabled, storyPrivate } from "../lib/story_dark.js";
 import { latestEdition, loadAll, loadStory } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
@@ -33,6 +33,11 @@ const excerptOf = (id: string) => {
   return c && c.status === "published" && typeof c.excerpt === "string" && c.excerpt.trim() ? c.excerpt.trim() : null;
 };
 const lastIdx = rows.length - 1;
+// "That week in the record": one quiet line per RELEASED week, from the public Day objects only (src/lib/story.js
+// weekRecords — a week without an approved, published installment gets no line). A call counts only with a public
+// ledger page; each element links to its Day page or call page.
+const records = weekRecords(file, all.byType.day, (id: string) => all.get("prediction", id) || null);
+const linkOf = (seg: any) => (seg.type === "prediction" ? href(pathOf("prediction", seg.id)) : href(pathOf("day", seg.id)));
 ---
 
 <Base title="The story so far" top="story" description="The experiment week by week: each week's days and the installment written about it." status={asOf}>
@@ -109,6 +114,23 @@ const lastIdx = rows.length - 1;
                         {current ? "This week is under way." : "No published installment for this week."}
                       </span>
                     )}
+                    {records.get(r.week) && (
+                      <p class="muted" style="font-size:14px;line-height:1.5;margin:0" data-week-record={r.week}>
+                        <span class="label" style="margin-right:6px">That week in the record</span>
+                        {records.get(r.week).parts.map((part: any, j: number) => (
+                          <span data-record={part.key}>
+                            {j > 0 ? " · " : ""}
+                            {part.text.map((seg: any) =>
+                              typeof seg === "string" ? (
+                                seg
+                              ) : (
+                                <a href={linkOf(seg)} title={seg.label} class="mono" style="font-size:13px;white-space:nowrap">{seg.text}</a>
+                              ),
+                            )}
+                          </span>
+                        ))}
+                      </p>
+                    )}
                     {r.days.length > 0 && (
                       <details class="more">
                         <summary>
@@ -135,7 +157,10 @@ const lastIdx = rows.length - 1;
       }
       <p class="muted" style="font-size:13px;margin-top:24px;max-width:70ch">
         The weeks are the platform's own seven-day program weeks. An installment appears here only when the platform records it as approved and
-        published; drafts and held installments are not part of this timeline. Every chapter is on <a
+        published; drafts and held installments are not part of this timeline. The record line under a published week is read
+        off that week's own day pages: weights only from a recorded weigh-in, sessions and food as logged, and the calls settled
+        that week on the ledger (a verdict under review is not counted). A figure the week's days cannot answer is left out.
+        Every chapter is on <a
           href={href("/story/")}>the story page</a
         >.
       </p>

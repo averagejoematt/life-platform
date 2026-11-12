@@ -37,6 +37,12 @@ own curated registry into a conformance violation. So this module imports it ins
 READER_AUDIENCE_ALARMS` reference in docs/PROPORTIONALITY.md, docs/DEPENDENCY_GRAPH.md and
 check_alarm_citations.py true).
 
+#5821 — THE FACET IS SPLIT: membership is the ESCALATION tag; the urgent route is withheld
+from the names in `READER_AUDIENCE_DIGEST_ONLY` (owner ruling 2026-11-11, the #3499 row's
+named demote trigger having fired for `site-api-invocation-spike`). The seam still sees
+those members — so a digest-only member declared nowhere is still caught — but attaches no
+action, and the dead-man requires the urgent action only of `urgent_routed_reader_alarms()`.
+
 IMPORT POSTURE: the module-level import is stdlib-only (`platform_model_alarms` imports
 `ast` + `pathlib` and nothing else at module scope — its heavy work is behind function
 calls), so importing this file needs no CDK installed and no AWS. `aws_cdk` is imported
@@ -52,7 +58,7 @@ _SCRIPTS = pathlib.Path(__file__).resolve().parents[2] / "scripts"
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from platform_model_alarms import READER_AUDIENCE_ALARMS  # noqa: E402
+from platform_model_alarms import READER_AUDIENCE_ALARMS, READER_AUDIENCE_DIGEST_ONLY, urgent_routed_reader_alarms  # noqa: E402
 
 # The urgent, real-time SNS topic (ADR-052 tier 1). Same ARN literal the monitoring stack
 # already carries; kept here so serve_stack does not grow a second spelling of it.
@@ -62,15 +68,22 @@ URGENT_TOPIC_NAME = "life-platform-alerts"
 # facet spans two stacks (monitoring_stack declares the `ai-canary-*` family, serve_stack
 # the `site-api-*` family) and the completeness proof has to span them too.
 _ROUTED: set[str] = set()
+# Every member handed to the seam, routed or not (#5821: a digest-only member is offered
+# and declined, so the dead-man can still prove every member is declared and wired).
+_OFFERED: set[str] = set()
 
 
 def route_reader_audience(alarm, alarm_name: str, urgent_topic) -> bool:
-    """Give `alarm` the urgent SNS action iff the facet names it. Returns whether it did.
+    """Give `alarm` the urgent SNS action iff the facet names it AND it is not one of the
+    #5821 digest-only members. Returns whether it did.
 
     Additive: the caller has already attached whatever routing ADR-052 gave the alarm
-    (digest for all 11 of today's members). This never removes an action.
+    (digest for every one of today's members). This never removes an action.
     """
     if alarm_name not in READER_AUDIENCE_ALARMS:
+        return False
+    _OFFERED.add(alarm_name)
+    if alarm_name in READER_AUDIENCE_DIGEST_ONLY:
         return False
     from aws_cdk import aws_cloudwatch_actions as cw_actions
 
@@ -87,6 +100,7 @@ def routed_members() -> frozenset[str]:
 def reset_routing_record() -> None:
     """Clear the cross-stack record. For tests that synth more than one app."""
     _ROUTED.clear()
+    _OFFERED.clear()
 
 
 def assert_facet_fully_routed() -> None:
@@ -97,7 +111,16 @@ def assert_facet_fully_routed() -> None:
     `route_reader_audience` would otherwise be silently escalation-tagged and
     digest-only — the #3499 defect, restored, and invisible. This raises instead.
     """
-    missing = sorted(set(READER_AUDIENCE_ALARMS) - _ROUTED)
+    leaked = sorted(_ROUTED & set(READER_AUDIENCE_DIGEST_ONLY))
+    if leaked:
+        raise AssertionError(f"#5821: digest-only reader-audience alarms gained the urgent route: {leaked}")
+    unoffered = sorted(set(READER_AUDIENCE_ALARMS) - _OFFERED)
+    if unoffered:
+        raise AssertionError(
+            "#3499/#5821: reader-audience alarms tagged in READER_AUDIENCE_ALARMS but never handed to "
+            f"route_reader_audience() during synth: {unoffered}."
+        )
+    missing = sorted(urgent_routed_reader_alarms() - _ROUTED)
     if missing:
         raise AssertionError(
             "#3499: reader-audience alarms tagged in READER_AUDIENCE_ALARMS but NOT routed to "
