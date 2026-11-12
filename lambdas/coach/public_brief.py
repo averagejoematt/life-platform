@@ -22,8 +22,10 @@ inputs ONLY, with six sections kept apart by construction:
 THE INPUT SET. The model is shown exactly: the coach's name and title (``persona``), the observation table for the
 coach's ``public_brief_metrics`` (``config/personas.json``) intersected with ``public_brief_policy.eligible_metrics()``
 (derived from the source classification — see that module), and the coach's previous brief with its calls' ledger
-statuses when that brief is itself publishable. Nothing else: no coach state, stance, thread, conversation, check-in,
-journal or mood read, no other coach's words. The provenance stamp is computed from that same set, so
+statuses when that brief is itself publishable, and (CR3, ``coach.public_brief_disputes``) the earlier coaches'
+current-cycle calls on metrics this coach also reads — their RENDERED claims, from publishable briefs, which the coach may
+dispute. Nothing else: no coach state, stance, thread, conversation, check-in, journal or mood read, no other coach's
+own words. The provenance stamp is computed from that same set, so
 ``narrative_provenance`` decides publication from what the brief was actually made from.
 
 THE ORDER (cost first, then honesty), per run:
@@ -53,6 +55,8 @@ from typing import Any, Callable, Iterable, Optional
 from ai.model_routing import model_for  # #4770: the one model registry
 from common import narrative_provenance as NP, public_brief_policy as POL
 from experiment.phase_filter import singleton_visible, with_phase_filter
+
+from coach import public_brief_disputes as DISP
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +232,7 @@ def prior_block(prior: Optional[dict], ledger: dict) -> str:
 
 
 # ── 6. the model ──────────────────────────────────────────────────────────────────────────────
-def system_prompt(persona: dict, metrics: list, actions: list) -> str:
+def system_prompt(persona: dict, metrics: list, actions: list, targets: Optional[list] = None) -> str:
     name, title = persona.get("name") or "The coach", persona.get("title") or "coach"
     return (
         f"You are {name}, {title}, writing this week's PUBLIC coaching brief for a public health-experiment site. "
@@ -251,7 +255,7 @@ def system_prompt(persona: dict, metrics: list, actions: list) -> str:
         f'"at_least"|"at_most", "threshold": number}}}} for this week. A check\'s metric must be one of: '
         f"{', '.join(actions) or '(none — use null)'}.\n"
         '- "position_changes": only if a previous brief is shown: up to 3 of {"target": its item id, "text": what you '
-        'now think, "reason"} where your position has changed. Otherwise [].\n'
+        'now think, "reason"} where your position has changed. Otherwise [].\n' + DISP.prompt_rules(targets or [])
     )
 
 
@@ -340,7 +344,15 @@ def _float(v: Any) -> Optional[float]:
 
 
 def check_draft(
-    draft: dict, obs: list, metrics: list, actions: list, allowed: set, prior: Optional[dict], shown: str = "", today: Optional[str] = None
+    draft: dict,
+    obs: list,
+    metrics: list,
+    actions: list,
+    allowed: set,
+    prior: Optional[dict],
+    shown: str = "",
+    today: Optional[str] = None,
+    targets: Optional[list] = None,
 ) -> tuple:
     """(sections, dropped) — the items that pass, per section, and a count of dropped items (no text kept)."""
 
@@ -349,8 +361,8 @@ def check_draft(
         return text_problems(text, allowed | set(own), (shown + "\n" + extra) if shown else "", today)
 
     obs_ids = {o["id"] for o in obs}
-    dropped = {"interpretations": 0, "predictions": 0, "recommendations": 0, "position_changes": 0}
-    out: dict = {"interpretations": [], "predictions": [], "recommendations": [], "position_changes": []}
+    dropped = {"interpretations": 0, "predictions": 0, "recommendations": 0, "position_changes": 0, "disputes": 0}
+    out: dict = {"interpretations": [], "predictions": [], "recommendations": [], "position_changes": [], "disputes": []}
     for it in (draft.get("interpretations") or [])[:MAX_ITEMS]:
         cites = _cites((it or {}).get("cites"), obs_ids) if isinstance(it, dict) else None
         if not cites or bad(it.get("text")):
@@ -414,7 +426,48 @@ def check_draft(
             dropped["position_changes"] += 1
             continue
         out["position_changes"].append({"target": str(c["target"]), "text": c["text"].strip(), "reason": c["reason"].strip()})
+    by_ref = {t["ref"]: t for t in targets or []}
+    means = {o["metric"]: o["last7"]["mean"] for o in obs}
+    seen: set = set()
+    for d in (draft.get("disputes") or [])[: DISP.MAX_DISPUTES] if by_ref else []:
+        pred = _check_dispute(d, by_ref, means, obs_ids, seen, bad)
+        if pred is None:
+            dropped["disputes"] += 1
+            continue
+        seen.add((pred["against"]["coach_id"], pred["metric"]))
+        out["disputes"].append(pred)
     return out, dropped
+
+
+def _check_dispute(d: Any, by_ref: dict, means: dict, obs_ids: set, seen: set, bad: Callable) -> Optional[dict]:
+    """A dispute the opposition rule accepts, as a call structure over its target's window — or None."""
+    theirs = by_ref.get(str(d.get("against"))) if isinstance(d, dict) else None
+    if theirs is None or (d.get("metric") not in (None, theirs["metric"])) or (theirs["coach_id"], theirs["metric"]) in seen:
+        return None
+    mine = {
+        "metric": theirs["metric"],
+        "kind": d.get("kind"),
+        "direction": d.get("direction") if d.get("kind") == "direction" else None,
+        "target": _float(d.get("target")) if d.get("kind") == "level" else None,
+    }
+    rule = DISP.opposition(theirs, mine, means.get(theirs["metric"]))
+    conf, cites = _float(d.get("confidence")), _cites(d.get("cites"), obs_ids)
+    if rule is None or conf is None or not (CONF_MIN <= conf <= CONF_MAX) or not cites:
+        return None
+    own = {round(float(theirs["window_days"]), 4)} | ({round(mine["target"], 4)} if mine["target"] is not None else set())
+    if bad(d.get("rationale"), own):
+        return None
+    against = {k: theirs[k] for k in ("coach_id", "item", "prediction_id", "claim")}
+    return {
+        **mine,
+        "window_days": int(theirs["window_days"]),
+        "confidence": round(conf, 2),
+        "rationale": d["rationale"].strip(),
+        "cites": cites,
+        "against": against,
+        "rule": rule,
+        "mean": means.get(theirs["metric"]),
+    }
 
 
 def _item_ids(brief: Optional[dict]) -> set:
@@ -542,7 +595,7 @@ def write_evidence(table: Any, coach_id: str, rows: list, readings: Callable, to
     n = 0
     for b in rows:
         sk = str(b.get("sk"))
-        if POL.EVIDENCE_TAG in sk or POL.REVISION_TAG in sk or not b.get("brief_cycle"):
+        if not POL.is_brief_sk(sk) or not b.get("brief_cycle"):
             continue
         if _day(POL.cycle_end(b["brief_cycle"]), EVIDENCE_SETTLE_DAYS) > today:
             continue
@@ -604,9 +657,11 @@ def build_brief(
                 "kind": pred["kind"],
                 "direction": pred.get("direction"),
                 "target": pred.get("target"),
+                "window_days": pred.get("window_days"),
                 "confidence": pred["confidence"],
                 "rationale": pred["rationale"],
                 "cites": pred["cites"],
+                **({"against": pred["against"]} if pred.get("against") else {}),
             }
         )
         criteria.append(
@@ -705,11 +760,15 @@ def run_coach(
     tolerance_for: Callable,
     persist: bool = True,
     personas: Optional[dict] = None,
+    others: Optional[list] = None,
 ) -> dict:
+    """One coach's brief. ``others``: the earlier coaches' shareable calls this cycle (registry order); the result's
+    ``_shared`` carries this coach's for the coaches after it (``run`` strips it)."""
     rows = _query_briefs(table, coach_id)
     evidence_n = write_evidence(table, coach_id, rows, readings, today, persist)
-    if any(str(r.get("sk")) == POL.brief_sk(cycle) for r in rows):
-        return {"status": "exists", "evidence_written": evidence_n}
+    have = next((r for r in rows if POL.is_brief_sk(r.get("sk"), cycle)), None)
+    if have is not None:
+        return {"status": "exists", "evidence_written": evidence_n, "_shared": DISP.shared_calls(coach_id, _plain(have))}
     persona = _personas(personas).get(coach_id) or {}
     metrics = coach_metrics(coach_id, personas)
     obs = observe(metrics, cycle, readings)
@@ -731,8 +790,14 @@ def run_coach(
     provenance = NP.stamp(families, producer=PRODUCER, upstream=[prev] if prior else [])
     if not NP.is_publishable(provenance):  # belt: the input set must be publishable before any call is made
         return {"status": "refused", "reason": "inputs_not_publishable", "evidence_written": evidence_n}
-    system = system_prompt(persona, [o["metric"] for o in obs], [m for m in actions if m in {o["metric"] for o in obs}])
-    pblock = prior_block(prior, ledger)
+    targets = DISP.offered(others or [], [o["metric"] for o in obs])
+    if targets:  # the later coach reads earlier briefs' rendered calls: its provenance carries theirs
+        families.append(POL.LEDGER_FAMILY)
+        provenance = NP.stamp(families, producer=PRODUCER, upstream=([prev] if prior else []) + [t["brief"] for t in targets])
+        if not NP.is_publishable(provenance):
+            return {"status": "refused", "reason": "inputs_not_publishable", "evidence_written": evidence_n}
+    system = system_prompt(persona, [o["metric"] for o in obs], [m for m in actions if m in {o["metric"] for o in obs}], targets)
+    pblock = "\n\n".join(b for b in (prior_block(prior, ledger), DISP.others_block(targets, _personas(personas))) if b)
     user = "Measured facts (data through " + _day(cycle, -1) + "):\n" + facts_text(obs) + ("\n\n" + pblock if pblock else "")
     allowed = _numbers(facts_text(obs) + "\n" + pblock) | {float(LAST_DAYS), float(BASELINE_DAYS)}
     usages: list = []
@@ -745,7 +810,9 @@ def run_coach(
         return {"status": "held", "reason": "unparseable", **_cost(usages), "evidence_written": evidence_n}
     obs_metrics = [o["metric"] for o in obs]
     shown = facts_text(obs) + ("\n" + pblock if pblock else "")
-    sections, dropped = check_draft(draft, obs, obs_metrics, [m for m in actions if m in obs_metrics], allowed, prior, shown, today)
+    sections, dropped = check_draft(
+        draft, obs, obs_metrics, [m for m in actions if m in obs_metrics], allowed, prior, shown, today, targets
+    )
     calls: list = []
     for pred in sections["predictions"]:
         item_id = f"p{len(calls) + 1}"
@@ -754,6 +821,17 @@ def run_coach(
             dropped["predictions"] += 1
             continue
         calls.append((item_id, pred, row))
+    disputes: list = []  # (call, target, dispute provenance) — each side a ledger call graded by the existing evaluator
+    for n, pred in enumerate(sections["disputes"], 1):
+        theirs = next(t for t in targets if t["prediction_id"] == pred["against"]["prediction_id"])
+        prov = DISP.provenance(provenance, theirs["brief"], pred["metric"], PRODUCER)
+        row = file_call(coach_id, cycle, f"d{n}", pred, tolerance_for, provenance) if NP.is_publishable(prov) else None
+        if row is None:
+            dropped["disputes"] += 1
+            continue
+        row["dispute_ref"] = {"coach_id": theirs["coach_id"], "prediction_id": theirs["prediction_id"], "rule": pred["rule"]}
+        calls.append((f"d{n}", pred, row))
+        disputes.append(((f"d{n}", pred, row), theirs, prov))
     if not (sections["interpretations"] or calls or sections["recommendations"]):
         return {"status": "held", "reason": "no_item_passed", "dropped": dropped, **_cost(usages), "evidence_written": evidence_n}
     cost = _cost(usages)
@@ -766,6 +844,9 @@ def run_coach(
             return {"status": "exists", "evidence_written": evidence_n}
         for n, change in enumerate(sections["position_changes"]):
             _put_new(table, revision_row(coach_id, (prior or {})["brief_cycle"], cycle, change, provenance, n))
+        filed_ids = {c[2]["prediction_id"] for c in filed}
+        disputes = [d for d in disputes if d[0][2]["prediction_id"] in filed_ids]
+        write_disputes(table, coach_id, cycle, disputes)
     out = {
         "status": "written" if persist else "dry_run",
         "sk": brief["sk"],
@@ -773,13 +854,23 @@ def run_coach(
         "predictions": len(brief["predictions"]),
         "recommendations": len(sections["recommendations"]),
         "position_changes": len(sections["position_changes"]),
+        "disputes": len(disputes),
         "dropped": dropped,
         "evidence_written": evidence_n,
         **cost,
+        "_shared": DISP.shared_calls(coach_id, brief),
     }
     if not persist:  # the rehearsal reports what each check decided — counts and classes only, never the words
         out["checks"] = dry_run_checks(coach_id, brief, calls)
+        out["checks"]["dispute_provenance_publishable"] = [NP.is_publishable(d[2]) for d in disputes]
     return out
+
+
+def write_disputes(table: Any, coach_id: str, cycle: str, disputes: list) -> int:
+    """Each ``(call, target, provenance)`` as its DISPUTE row — written once (conditional put): the frozen criterion
+    is never rewritten, not by a re-run and not by a later dispute on the same pair and metric."""
+    rows = [DISP.dispute_row(coach_id, cycle, mine, theirs, mine[1]["rule"], mine[1]["mean"], prov) for mine, theirs, prov in disputes]
+    return sum(1 for r in rows if _put_new(table, r))
 
 
 def dry_run_checks(coach_id: str, brief: dict, calls: list) -> dict:
@@ -835,9 +926,12 @@ def run(
             cache: dict = {}
             readings = readings or (lambda m, s, e: MTS.window_readings(table, USER_ID, m, s, e))
             tolerance_for = tolerance_for or (lambda m: MTS.point_tolerance(table, USER_ID, m, cache, POINT_LOOKBACK_DAYS))
-        results = {}
+        results: dict = {}
+        shared: list = []  # registry order: each coach sees the calls of the coaches before it
         for coach_id in brief_coaches(personas):
-            if coach_ids and coach_id not in coach_ids:
+            if coach_ids and coach_id not in coach_ids:  # not re-run: its stored brief still sets the coaches after it
+                have = next((r for r in _query_briefs(table, coach_id) if POL.is_brief_sk(r.get("sk"), cycle)), None)
+                shared.extend(DISP.shared_calls(coach_id, _plain(have)) if have else [])
                 continue
             try:
                 results[coach_id] = run_coach(
@@ -850,7 +944,9 @@ def run(
                     tolerance_for=tolerance_for,
                     persist=persist,
                     personas=personas,
+                    others=list(shared),
                 )
+                shared.extend(results[coach_id].pop("_shared", None) or [])
             except Exception as e:  # noqa: BLE001 — one coach never stops the others
                 logger.warning("[public_brief] %s failed: %s", coach_id, e, exc_info=True)
                 results[coach_id] = {"status": "error", "error": str(e)}
