@@ -176,7 +176,8 @@ def _finding_provenance(item: dict, pair: dict) -> dict:
     """2026-11-11: the method each method-versioned metric of the pair was computed under, as the weekly record stamped
     it (public_correlations already withheld an unstamped one) — so a downstream reader (the Laboratory's snapshot) can
     hold the same rule without the record — and the run's trailing window (consecutive weeks share most of their days)."""
-    stamps = item.get("metric_methods") if isinstance(item.get("metric_methods"), dict) else {}
+    raw = item.get("metric_methods")
+    stamps: dict = raw if isinstance(raw, dict) else {}
     return {
         "metric_methods": {k: stamps[k] for k in (pair.get("metric_a"), pair.get("metric_b")) if k in stamps},
         "window_start": item.get("start_date"),
