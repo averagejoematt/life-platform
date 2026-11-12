@@ -49,6 +49,7 @@ POLICY_VERSION = 1
 BRIEF_SK_PREFIX = "PUBLIC_BRIEF#"  # COACH#<id> / PUBLIC_BRIEF#<cycle>            — the brief (immutable)
 EVIDENCE_TAG = "#EVIDENCE#"  # COACH#<id> / PUBLIC_BRIEF#<cycle>#EVIDENCE#<rec>   — what he did (append-only)
 REVISION_TAG = "#REVISION#"  # COACH#<id> / PUBLIC_BRIEF#<cycle>#REVISION#<ts>    — a later change (append-only)
+DISPUTE_TAG = "#DISPUTE#"  # COACH#<later id> / PUBLIC_BRIEF#<cycle>#DISPUTE#<pair>#<metric> — a brief-native disagreement
 BRIEF_CALL_SOURCE = "public_brief"  # PREDICTION#.source of a call the brief files
 
 # A cycle is the Monday-to-Sunday week (platform time) that opens on the run's Monday.
@@ -128,6 +129,18 @@ def evidence_sk(cycle: str, rec_id: str) -> str:
 
 def revision_sk(cycle: str, at_iso: str) -> str:
     return f"{brief_sk(cycle)}{REVISION_TAG}{at_iso}"
+
+
+def dispute_sk(cycle: str, pair: str, metric: str) -> str:
+    return f"{brief_sk(cycle)}{DISPUTE_TAG}{pair}#{metric}"
+
+
+def is_brief_sk(sk: Any, cycle: Optional[str] = None) -> bool:
+    """True only for a brief row itself — never its evidence, revision or dispute rows."""
+    s = str(sk or "")
+    if not s.startswith(BRIEF_SK_PREFIX) or any(t in s for t in (EVIDENCE_TAG, REVISION_TAG, DISPUTE_TAG)):
+        return False
+    return cycle is None or s == brief_sk(cycle)
 
 
 def method_block() -> dict:
