@@ -62,7 +62,9 @@ from mcp import (  # noqa: E402
 # new read the ruling requires (departures count at the week level), not a memo that stopped holding.
 # +1 (#5802, owner veto 2026-11-11): the medical stop lines' labs panel — ONE new partition read per call
 # (`nutrition_critics_inputs._lab_draws`), not a duplicate a memo could fold; the Whoop nights ride the existing memo.
-MAX_STAGE_1_DDB_CALLS = 100
+# +1 (#5772): `exercise_unlocks` queries the `EXGATE#ANNOUNCE#` claim-once rows — ONE begins_with Query no other stage-1
+# reader touches (a new read, not a lost memo). MEASURED on the merged tree (with #5802's labs read): see the pin below.
+MAX_STAGE_1_DDB_CALLS = 101
 
 _TARGET = "2026-09-20"
 _NOW = datetime(2026, 9, 20, 19, 0, tzinfo=timezone.utc)  # noon Pacific on the target day — the clock is frozen
