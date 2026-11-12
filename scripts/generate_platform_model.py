@@ -1002,6 +1002,17 @@ def render_doc(model: dict) -> str:
         for name in reader_alarms:
             add(f"- `{name}` — {model['alarms'][name].get('audience_ruling', '')}")
         add("")
+        digest_only = [n for n in reader_alarms if model["alarms"][n].get("audience_routing_ruling")]
+        if digest_only:
+            add(
+                "**Escalation tag without the urgent route (#5821):** every member above also publishes to "
+                "`life-platform-alerts` (#3499) EXCEPT these, curated in "
+                "`scripts/platform_model_alarms.py::READER_AUDIENCE_DIGEST_ONLY`:"
+            )
+            add("")
+            for name in digest_only:
+                add(f"- `{name}` — {model['alarms'][name]['audience_routing_ruling']}")
+            add("")
     add("## 5b. Privacy Tiers (field_tiers registry, ADR-155)")
     add("")
     privacy = model.get("privacy", {})
