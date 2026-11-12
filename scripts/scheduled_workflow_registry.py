@@ -139,6 +139,17 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "from OUTSIDE. If it stops, a green merge that never deployed sits invisible for "
         "exactly as long as nobody looks.",
     },
+    "web-deploy-resume.yml": {
+        "watched": True,
+        "grace_hours": 8.0,
+        "basis": "declared hourly (41 * * * *); no fire history yet (born 2026-11-12). Sized as "
+        "deploy-wedge-watch.yml's high-frequency cron, whose measured worst gap (2026-08-26) set 8h; "
+        "check_cron_freshness re-derives a live grace once history exists.",
+        "reason": "The backstop that resumes a v9 deploy DEFERRED behind the Site API (2026-11-12, run "
+        "43124939822) and the dead-man for a deferral nobody resumed (deploy/www_api_readiness.py). "
+        "Its workflow_run trigger covers the usual case; if the cron stops, a laptop or cdk API deploy "
+        "leaves the site deferred with no page.",
+    },
     "config-drift.yml": {
         "watched": True,
         "grace_hours": 14.0,

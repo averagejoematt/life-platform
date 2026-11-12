@@ -205,6 +205,14 @@ RULINGS: tuple[Ruling, ...] = (
         "Landed 2026-09-20 (PR #3957) without a ruling — the serial pass of every PR red on it until this line.",
     ),
     Ruling(
+        "config/evidence_source_allowlist.json",
+        HAND_OWNED,
+        "#5778: the allow-listed source set for the exercise library's per-block evidence review (channels, study designs "
+        "and the tiers each may back, named evidence-based reviewers, denied social/blog hosts). Hand-authored; read only "
+        "by scripts/library_evidence_review.py from the repo tree. No writer anywhere and no Lambda reader; a change is a "
+        "reviewed PR. Public content, so a twin upload is harmless.",
+    ),
+    Ruling(
         "config/action_detection_rules.json",
         HAND_OWNED,
         "Hand-authored rule list read by lambdas/intelligence/intelligence_common.py. No writer in lambdas/mcp "

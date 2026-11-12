@@ -161,6 +161,62 @@ hand-edit a prediction row.
 4. Say what you stored, the tab you added, the issues filed and the charter proposals awaiting
    his word, and stamp the charter version the retro was graded against (`charter_version`).
 
+## 6. The block design review (#5776): next block's accessories, for his approval
+
+After the retro, before the new block's first draft. The selection engine ranks each accessory slot
+(tier, then his N=1 fit, then variety); this step turns its record into a proposal he approves, so a
+pick never changes without him seeing why.
+
+```bash
+python3 scripts/block_design_review.py propose --block <the NEW block's number> --out <scratch dir OUTSIDE the repo> \
+  [--volume-response <the volume_response.json from 2b>] [--experiment <scratch>/experiment.json] [--narrate]
+```
+
+Read-only. Per slot: the pick, why this and why now, what it replaces, the ranked alternatives
+below it, and what unlocks next (each gate with its STATE only: "locked: threshold not set",
+"locked: input not measured", and so on; never a value). `proposal.json` has `complete: true` only
+when every accessory slot is on it; if `missing_slots` is not empty, say which and stop.
+`--narrate` adds ONE model narration on route `charter.retro` (budget-tier aware). When it is paused
+or fails, the deterministic summary stands, and the proposal says so. Put `proposal.md` in a new tab of
+his PRIVATE review doc (`Block design <N>`), never a repo file or a public page.
+
+**The experiment slot is empty unless he fills it.** If he asks for a one-block experiment (for
+example, lengthened partials on one muscle), he creates the record with `create_experiment` first.
+Then write `{"slot_id", "technique", "experiment_id", "catalog_key"?, "hypothesis"?, "outcome_metric"?}`
+to a scratch file and re-run `propose --experiment <file>`. It holds for that block only. The next
+block's proposal drops it unless he pins it again.
+
+**His approval** is a dry run first:
+`python3 scripts/block_design_review.py approve --proposal <dir>/proposal.json [--decisions <file>]`.
+`--decisions` is `{slot_id: catalog_key | "incumbent"}` for the slots where he departs from the
+proposal. It refuses any key that is not the pick, a ranked alternative or the template accessory.
+`--apply` writes the owner-only `training_constraints / BLOCKREVIEW#APPROVED#B<nnn>` row. It is an
+AWS write, so run it only on his word in this session. Once the library is `approved`, drafting
+serves only these picks. A block he has not approved serves the prior block's approved picks (said so,
+without its experiment). With neither, the #5075 pools serve.
+
+## 7. The exercise library evidence review (#5778)
+
+Once per block, after the retro: propose library changes for the owner to merge. No schedule runs it.
+
+```bash
+python3 scripts/library_evidence_review.py                                     # re-verify the registered citations (dry-run)
+python3 scripts/library_evidence_review.py --discover --out <scratch dir>      # + a PubMed reading list since the last review
+python3 scripts/library_evidence_review.py --proposals <file> --out <scratch dir>  # decide a proposal file; prints the diff
+python3 scripts/library_evidence_review.py --proposals <file> --open-pr --issue <N>  # the PR for the owner
+```
+
+The reading list is reading, never a change. For each paper worth acting on, read the abstract, then write it into
+a proposal file (`add_citation` with `study_design` and `abstract_read: true`, then the `set_tier` /
+`add_candidate` it supports — shape in the script's docstring). Sources come only from
+`config/evidence_source_allowlist.json`: PubMed / Crossref records, or a paper a named reviewer there surfaced —
+cited by its DOI/PMID, never the reviewer's post. Never type a citation from memory and never let a model write
+one: the script verifies every DOI/PMID live and rejects anything that does not resolve with a matching title,
+first author and year; a rejected citation leaves its row C. A re-verification failure on an existing citation is
+reported (exit 1) and, when the row has no other citation, proposed as a downgrade to C. Read the dry run to him;
+open the PR only on his word, and never merge it — his merge is the acceptance. The library is public: no load,
+bodyweight or note text in a proposal.
+
 ## Guardrails
 
 - Owner-only from end to end: the RETRO# row, the PANEL# rows, the May tracker and the review doc

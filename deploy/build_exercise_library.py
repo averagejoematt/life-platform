@@ -15,6 +15,9 @@ WHAT IT READS (all read-only)
      type, skill tier), already fetched read-only by the catalog builder.
   3. `deploy/exercise_library_curation.py` — the hand-authored half (vocabulary, verified
      citations, gates, per-template overrides, expansion candidates).
+  4. `deploy/exercise_library_reviews.json` — the accepted evidence-review ledger (#5778): citations,
+     tier changes and candidates the owner merged from `scripts/library_evidence_review.py`, re-applied
+     on top of the curation so a rebuild keeps them.
 
 WHAT IT WRITES
 
@@ -49,6 +52,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(os.path.abspath(__file__))]
 
 import exercise_library_curation as cur  # noqa: E402
+import exercise_library_reviews as reviews  # noqa: E402
 from training import exercise_library as lib_rules  # noqa: E402
 
 LIBRARY_PATH = os.path.join(REPO_ROOT, "config", "exercise_library.json")
@@ -489,6 +493,29 @@ def _merge(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+_LEDGER: dict[str, Any] | None = None
+
+
+def _ledger() -> dict[str, Any]:
+    """The accepted evidence-review ledger (#5778), read once per process."""
+    global _LEDGER
+    if _LEDGER is None:
+        _LEDGER = reviews.load_ledger()
+    return _LEDGER
+
+
+def _expansion_list() -> list[dict[str, Any]]:
+    """The curation's candidates, then the ledger's accepted ones (a ledger key already curated is a replacement)."""
+    extra = reviews.ledger_candidates(_ledger())
+    keys = {x["key"] for x in extra}
+    return [x for x in cur.EXPANSION if x["key"] not in keys] + extra
+
+
+def library_citations() -> dict[str, dict[str, Any]]:
+    """The curation's verified citations plus the ledger's (a ledger id already curated is a correction and wins)."""
+    return {**cur.CITATIONS, **reviews.ledger_citations(_ledger())}
+
+
 def _history_entries(
     history: dict[str, Any], catalog: dict[str, Any], aliases: dict[str, str]
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
@@ -496,7 +523,7 @@ def _history_entries(
     cat_mv = catalog.get("movements") or {}
     by_tid = {str(v.get("hevy_template_id_hint") or "").upper(): v for v in cat_mv.values() if v.get("hevy_template_id_hint")}
     by_title = {str(v.get("title") or "").strip().lower(): v for v in cat_mv.values()}
-    expansion_by_tid = {str(x["template_id"]).upper(): x for x in cur.EXPANSION if x.get("template_id")}
+    expansion_by_tid = {str(x["template_id"]).upper(): x for x in _expansion_list() if x.get("template_id")}
     entries: dict[str, dict[str, Any]] = {}
     merged_into_history: list[str] = []
     for tid, h in history["templates"].items():
@@ -547,7 +574,7 @@ def _catalog_only_entries(catalog: dict[str, Any], entries: dict[str, dict[str, 
 def _expansion_entries(entries: dict[str, dict[str, Any]], merged_into_history: list[str]) -> list[dict[str, Any]]:
     """Adds template-bearing candidates to `entries`; returns the candidates with no Hevy template."""
     no_template: list[dict[str, Any]] = []
-    for x in cur.EXPANSION:
+    for x in _expansion_list():
         tid = str(x.get("template_id") or "").upper()
         if tid and tid in entries:
             if entries[tid]["source"] == "expansion" and x["key"] not in merged_into_history:
@@ -622,6 +649,9 @@ def build_library(
     no_template = _expansion_entries(entries, merged_into_history)
     movements, tid_to_key = _keyed_movements(entries, no_template)
     gates_out = _resolved_gates(movements, tid_to_key)
+    missing = reviews.apply_tier_changes(movements, reviews.ledger_tier_changes(_ledger()))
+    if missing:
+        raise SystemExit(f"evidence-review ledger: tier change for a movement not in the library: {missing}")
 
     used_eq = sorted({x for e in movements.values() for x in e["equipment"]})
     inventory, cutoff = home_gym_inventory(movements, history, used_eq)
@@ -672,7 +702,7 @@ def build_library(
             "(owner-confirmable); contention ('X was taken', 'no bench free') never changes a state. The gym is never named.",
             "items": inventory,
         },
-        "citations": cur.CITATIONS,
+        "citations": library_citations(),
         "gate_schema": {
             "kinds": list(lib_rules.LIBRARY_GATE_KINDS),
             "fields": {
