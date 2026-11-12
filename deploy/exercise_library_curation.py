@@ -287,6 +287,9 @@ CITATIONS: dict[str, dict] = {
 
 # ── gates ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 _PROPOSED = "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+# Owner ruling 2026-11-11 (#5772): the progression standards (every chain_prerequisite and performance_threshold gate)
+# are APPROVED as proposed. The bodyweight thresholds stay owner-to-set; the other gates keep `_PROPOSED`.
+_APPROVED_STANDARD = "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
 
 
 def _bw(gid_key: str, what: str) -> dict:
@@ -305,7 +308,7 @@ def _bw(gid_key: str, what: str) -> dict:
 STD_3X = {"prerequisite_sessions_min": 3, "span_weeks_min": 2, "rpe_max": 7, "flag_free_days": 28}
 
 
-def _chain(prereqs: list[str], standard: str, provenance: str = _PROPOSED, params: dict | None = None) -> dict:
+def _chain(prereqs: list[str], standard: str, provenance: str = _APPROVED_STANDARD, params: dict | None = None) -> dict:
     """`standard` is the readable rule; `params` its machine-readable form (non-identifying performance numbers),
     which the overlay writer copies into the private gate table the evaluator (#5772) reads."""
     return {
@@ -383,7 +386,7 @@ GATES: dict[str, dict] = {
         "standard": {"sets": 3, "reps_min": 6, "assistance_fraction_max": 0.25, "sessions_min": 2, "rpe_max": 8},
         "chain_prerequisites": [],
         "unknown_input": "locked",
-        "provenance": _PROPOSED,
+        "provenance": _APPROVED_STANDARD,
     },
     "chain_pull": _chain(
         ["key:pull_up_negative"],
@@ -414,7 +417,14 @@ GATES: dict[str, dict] = {
         params={"hang_seconds_min": 30, "sets": 3, "reps_min": 10, "sessions_min": 2},
     ),
     # kettlebell chain
-    "chain_kb_swing": _chain(["key:kettlebell_deadlift"], "kettlebell deadlift " + _STD_3x + ", hinge pattern (not a squat) confirmed"),
+    # owner ruling 2026-11-11 (#5810): the kettlebell slot is the SWING, entered via 2 exposures of the KB deadlift — exactly
+    # "kettlebell deadlift logged in 2 sessions", not the generic 3-sessions/2-weeks standard (the other KB steps keep it).
+    "chain_kb_swing": _chain(
+        ["key:kettlebell_deadlift"],
+        "kettlebell deadlift logged in 2 sessions (owner ruling 2026-11-11: the kettlebell slot is the swing, entered via 2 KB deadlift exposures)",
+        provenance="owner ruling 2026-11-11 (#5810)",
+        params={"sessions_min": 2},
+    ),
     "chain_kb_clean": _chain(["tid:F8A0FCCA"], "kettlebell swing " + _STD_3x),
     "chain_kb_overhead": _chain(["tid:F99C211D"], "kettlebell clean " + _STD_3x + ", rack position owner-confirmed"),
     # Olympic-bar chain
@@ -977,6 +987,9 @@ EXPANSION: list[dict] = [
         template_note=(
             "#5774 owner ruling 2026-11-11: no Hevy Kettlebell Deadlift template exists, and Deadlift (Dumbbell) 5F4E6DD3 is catalogued already (deadlift_dumbbell), so the kettlebell slot's entry logs under Hevy's Sumo Deadlift D20D7BBE (never logged before) until a custom 'Kettlebell Deadlift' template exists"
         ),
+        # #5772: the evaluator counts the template id's sessions, PLUS any logged exercise whose title carries both words
+        # (a custom "Kettlebell Deadlift" template he may create later) — training.exercise_gates.sessions_for.
+        template_match={"title_all": ["kettlebell", "deadlift"]},
         target={"primary": "glutes", "secondary": ["hamstrings", "back"], "region": "lower"},
         family="strength_anchor",
         length_bias="mid",

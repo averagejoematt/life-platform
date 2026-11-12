@@ -195,7 +195,7 @@ _CONFIG_WITHOUT_REPO_FILE: dict[str, str] = {
     "config/coaching/exercise_library.private.json": "#5769/#5773: the exercise library's OWNER-PRIVATE N=1 overlay "
     "(best sets per bodyweight band, coded note signals, bodyweight gate thresholds). Produced out of band by "
     "`deploy/write_exercise_library_overlay.py --apply` under the #3043 owner-private prefix and never in this PUBLIC "
-    "repo; the selection engine reads it fail-closed (absent => N=1 fit unknown, never an error). Deliberately NOT a "
+    "repo; the selection engine reads it fail-closed (absent => N=1 fit unknown, never an error), and so does the #5772 weekly gate evaluation (absent => every overlay-fed gate locks as unknown). Deliberately NOT a "
     "repo twin.",
 }
 
