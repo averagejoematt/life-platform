@@ -767,8 +767,6 @@ def tool_plan_next_session(args):
         status["anchor_lift_drop_pct"] = st(ABSENT, "no drafted lift has enough history for a band-matched comparison")
     else:
         status["anchor_lift_drop_pct"] = st(plan_engine.MEASURED)
-    for name in ("weight_stall_days", "adherence_on_plan"):
-        status[name] = st(NOT_READ, "no reader is wired for this input yet — the weight_stall_with_adherence tripwire cannot evaluate")
 
     # #4051: the evidence set stage 1 never had — every movement PERFORMED in the trailing
     # window, with the note layer's flags for each. Gathered on EVERY call (a draft's
@@ -826,6 +824,11 @@ def tool_plan_next_session(args):
     if block_workouts == [] and status["block_workouts"]["state"] != READ_FAILED:
         status["block_workouts"] = st(ABSENT, "no Hevy session since the program's block start")
 
+    # #3754 boxes 3+4: the nutrition critics ride beside the constraint block on the daily surface the owner reads — the same
+    # block get_deficit_sustainability carries, built by the same resolver (owner-only MCP, never a site or email surface).
+    # #5802: built BEFORE the block, because weight_stall_with_adherence is ITS evaluation, read by the engine (one, not two).
+    nutrition = _safe(_nutrition_critics_block, deficit_raw) or {"error": "nutrition critics could not be built", "verdicts": []}
+    stall, status["weight_stall_evaluation"] = plan_engine.stall_input(nutrition)
     attach_fatigue_inputs(
         evidence,
         readiness_low_streak_days=readiness_streak,
@@ -871,6 +874,7 @@ def tool_plan_next_session(args):
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.
         pain_evidence_scope=pain_scope,
+        weight_stall_evaluation=stall,  # #5802
         # with a draft in hand the per-movement note reads report the layer's status themselves
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
         hevy_workouts_rotation_window=rotation_rows,
@@ -919,14 +923,7 @@ def tool_plan_next_session(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
-    # #3754 boxes 3+4: the nutrition critics ride beside the constraint block on the daily
-    # surface the owner reads — the same block get_deficit_sustainability carries, built by
-    # the same resolver, so the two surfaces cannot disagree. Owner-only (MCP), never a site
-    # or email surface.
-    out["nutrition_critics"] = _safe(_nutrition_critics_block, deficit_raw) or {
-        "error": "nutrition critics could not be built",
-        "verdicts": [],
-    }
+    out["nutrition_critics"] = nutrition  # #3754: built above (#5802), the same block get_deficit_sustainability carries
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
     out["training_phase"] = _training_phase_field()  # #5576: the computed phase, the next one, the closest unmet gate + value

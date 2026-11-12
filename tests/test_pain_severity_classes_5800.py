@@ -187,8 +187,6 @@ def _deload_pain_reasons(monkeypatch, rows):
         anchor_lift_drop_sessions=None,
         pain_flag_sites=[r["label"] for r in flagged],
         pain_layer_status="ok",
-        weight_stall_days=None,
-        adherence_on_plan=None,
         pain_flag_instances=instances,
         pain_dismissals=[],
         pain_evidence_scope={"status": "read", "movements_considered": 1, "reason": "synthetic"},
