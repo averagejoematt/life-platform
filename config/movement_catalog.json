@@ -9,18 +9,18 @@
     "history_through": "2026-11-11",
     "workouts": 535,
     "distinct_templates": 539,
-    "entries": 545,
+    "entries": 546,
     "reviewed": 27,
-    "coach_added": 2,
+    "coach_added": 3,
     "generated": 516,
     "entries_by_skill_tier": {
       "1": 278,
-      "2": 198,
+      "2": 199,
       "3": 69
     },
     "entries_by_anchor_family": {
       "bench": 10,
-      "hinge": 14,
+      "hinge": 15,
       "overhead_press": 11,
       "row": 25,
       "squat": 14,
@@ -651,6 +651,35 @@
       "last_done": null,
       "anchor_family": null,
       "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
+    },
+    "romanian_deadlift_dumbbell": {
+      "title": "Romanian Deadlift (Dumbbell)",
+      "hevy_template_id_hint": "72CFFAD5",
+      "provenance": "coach_added",
+      "notes": "Re-added as coach_added 2026-11-12: the owner-approved 2026-11-01 Hevy relabel moved its logged history to Deadlift (those pulls were conventional), so a true dumbbell RDL is a new movement; kept because the disruption pools program it.",
+      "primary_muscle": "hamstrings",
+      "secondary_muscles": [
+        "glutes",
+        "back"
+      ],
+      "volume_muscle": "Hamstrings",
+      "hevy_primary_muscle_group": "hamstrings",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "reviewed": false,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "squat_barbell": {
       "title": "Squat (Barbell)",
