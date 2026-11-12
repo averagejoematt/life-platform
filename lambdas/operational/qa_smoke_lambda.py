@@ -1176,6 +1176,13 @@ def check_steps():
         ("phase_eval_liveness", lambda: phase_eval_qa.check_phase_eval_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5575 dead-man
         ("planning_loop_liveness", lambda: planning_loop_qa.check_planning_loop_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5761
         ("public_brief_liveness", lambda: public_brief_qa.check_public_brief_liveness(table, Check, CONTENT_TRUTH, pt_now)),
+        # the Monday brief's one manual input: MacroFactor's export age, WARN from Saturday while an upload can still land
+        (
+            "macrofactor_export_age",
+            lambda: public_brief_qa.check_macrofactor_export_age(
+                table, Check, CONTENT_TRUTH, pt_now, user_prefix=USER_PREFIX, bucket=S3_BUCKET
+            ),
+        ),
         # #3829 dead-man: coach-ensemble-digest writes exactly one ENSEMBLE#digest row per cycle on EVERY
         # non-crashing path (including the budget-tier pause), so a missing CYCLE# row is unambiguous. Two of
         # four cycles were missing for eight days with nothing reporting it but a DLQ alarm a human read at wrap.

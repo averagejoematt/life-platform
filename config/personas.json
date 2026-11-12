@@ -101,7 +101,8 @@
       ],
       "public_brief_required_metrics": [
         "total_calories_kcal"
-      ]
+      ],
+      "public_brief_fresh_within_days": 2
     },
     "mind_coach": {
       "name": "Nathan Reeves",
