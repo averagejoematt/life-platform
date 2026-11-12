@@ -32,13 +32,33 @@ REASON = (
 APPROVED_CALLS = Path(__file__).resolve().parent / "fixtures" / "prereg_cycle17_approved_calls.json"
 
 
+#: The privacy cleanup of 2026-11-11 replaced the wording of six approved calls (they stated the subject's sleep-window
+#: and HRV targets) with stand-in text that starts with this marker. A stand-in is never a sealed call's words: those six
+#: entries' hashes are matched only against the private original.
+STAND_IN = "(stand-in text"
+
+
 def approved_call_texts() -> list:
-    """The 14 day-one calls the CR2 allowlist approves (a labelled test copy, never the seal), in sealed order."""
-    return [c["claim_natural"] for c in json.loads(APPROVED_CALLS.read_text())["calls"]]
+    """The day-one calls the CR2 allowlist approves whose words the labelled test copy still carries (never the seal),
+    in sealed order — 8 of the 14; the stand-ins are left out."""
+    return [c["claim_natural"] for c in json.loads(APPROVED_CALLS.read_text())["calls"] if not c["claim_natural"].startswith(STAND_IN)]
+
+
+def stand_in_count() -> int:
+    """How many approved calls the test copy carries only as stand-in text."""
+    return sum(1 for c in json.loads(APPROVED_CALLS.read_text())["calls"] if c["claim_natural"].startswith(STAND_IN))
+
+
+def with_words(entries) -> list:
+    """The allowlist entries whose words are available here: all 14 with the private original, else the 8 approved
+    calls the test copy still carries."""
+    have = {hashlib.sha256(t.encode("utf-8")).hexdigest() for t in sealed_call_texts()}
+    return [e for e in entries if e.text_sha256 in have]
 
 
 def sealed_call_texts() -> list:
-    """Every sealed call's wording: the private original's when available, else only the approved ones."""
+    """Every sealed call's wording: the private original's when available, else only the approved ones the test copy
+    still carries (stand-ins excluded)."""
     sealed = load_sealed()
     if sealed is None:
         return approved_call_texts()
