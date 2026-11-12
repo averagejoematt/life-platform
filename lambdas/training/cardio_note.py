@@ -148,7 +148,15 @@ def machine_for(movement_key: str) -> str | None:
 
 
 def _first_line(note: str | None) -> str:
-    return (note or "").strip().split("\n", 1)[0]
+    """Line 1 of a cardio note — the line after the RPE capture prompt when the note opens with one (#5796)."""
+    return without_capture(note).strip().split("\n", 1)[0]
+
+
+def without_capture(note: str | None) -> str:
+    """`note` without its leading RPE capture prompt (`hevy_note_grammar.CARDIO_RPE_CAPTURE_LINE`, #5796), else unchanged."""
+    text = note or ""
+    head, sep, rest = text.lstrip().partition("\n")
+    return rest if sep and head.strip() == hevy_note_grammar.CARDIO_RPE_CAPTURE_LINE else text
 
 
 def _clock_line(note: str | None) -> str | None:
@@ -364,7 +372,8 @@ def week_rows(sessions_by_machine: dict[str, list[dict[str, Any]]] | None, week_
         for s in sessions or []:
             d = str(s.get("date") or "")[:10]
             if week_start <= d < target_date:
-                rows.append((d, cardio_menu.kind_of_performed(key, s.get("note"), s.get("served_kind"), s.get("served_swap_kind"))))
+                kind = cardio_menu.kind_of_performed(key, s.get("note"), s.get("served_kind"), s.get("served_swap_kind"), s.get("set_rpe"))
+                rows.append((d, kind))
     rows.sort()
     return rows
 
@@ -753,7 +762,7 @@ def compose(
     followed: bool = False,
     route_why: str | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    """(the note, the audit). Line 1 matches `LINE1_RE`; the ⌚ line rides tempo / hills / intervals; `route_why` (a
+    """(the note, the audit). The note opens with the RPE capture prompt (#5796); line 1 after it matches `LINE1_RE`; the ⌚ line rides tempo / hills / intervals; `route_why` (a
     chat author's route choice, ≤ `ROUTE_WHY_MAX` characters, e.g. "Bike, not treadmill: rest the feet.") is the only
     why that reaches the wire; `followed` adds the `After:` line (a Hevy block follows this one).
 
@@ -793,7 +802,8 @@ def compose(
     shape = wrist_clock.resolve([dict(c, unit=unit) for c in clauses], int(minutes))
     top = shape.get("top_level") if kind == "hills" else None
     first = f"{machine} · {levels_text(kind, dose, walk=is_walk, usual=usual, top=top)} · {effort_text(kind)}"
-    lines = [first]
+    # #5796 (owner ruling 2026-11-11): the RPE capture prompt opens the note, so the effort he rode at is logged
+    lines = [hevy_note_grammar.CARDIO_RPE_CAPTURE_LINE, first]
     if clock_line:
         lines.append(hevy_note_grammar.clock_line(clock_line, machine))
     escape = interval_escape(kind, dose, int(minutes), walk=is_walk)

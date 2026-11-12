@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.42.0",
+  "version": "1.46.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -284,6 +284,13 @@
     },
     {
       "version": "1.42.0",
+      "date": "2026-11-11",
+      "by": "#5796 (epic #5050); no new owner ruling: the new number is a platform default named as one, pending his ruling",
+      "what": "Adds progression.set_raise_proposal: a movement performed above its prescribed working sets in each of the last weeks_running (3) complete weeks becomes a PROPOSAL to raise its prescription, read by training.self_added_volume and carried on the plan's constraint block beside the ceiling-change proposal, with the weeks' prescribed and performed sets and the headroom under the volume_ceiling redline. It never changes a prescription; the owner approves.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.46.0",
       "date": "2026-11-11",
       "by": "owner ruling 2026-11-11 on #5794 (option A)",
       "what": "The served calorie target is CLAMPED at the day's floor: a lifting day never serves under floor_lifting_day_kcal (1,900) and every other day (rest, travel, disrupted, unknown) never under floor_any_day_kcal (1,600), the rest-day floor the owner named. No new key: floor_any_day_kcal already is the floor the resolver applied to every non-lifting day, so it is reused, not renamed (its readers in the critics, the redlines and the coach facts are unchanged). health.calorie_target.resolve clamps; the planned-day floor_warnings entry it stamped (\"a warning, not a clamp\") is retired, not kept beside the clamp. floor_role stays 'warning': it now governs only the GRADING of logged days (a logged day under its floor is reported, never vetoed); the 7-day-mean floor stays reported. The titrated base is unchanged and still stated (base_kcal); the clamp's lift is floor_clamp_kcal. Re-read rule (floor_clamp_reread): 14 days after the ruling (reread_on 2026-11-25), when the shared 14-day loss rate is below 3.0 lb/wk, nutrition_critics.decisions_offered surfaces an owner decision (trigger floor_clamp_reread) in the existing decision channel (get_deficit_sustainability and the plan's nutrition_critics block); it never moves a number on its own. Second ruling the same day (#5794, PR #5830): the calorie habit band prescribed_band_kcal is RAISED [1400, 1600] -> [1600, 1900] so an on-plan day (1,600 rest, 1,900 lifting) reads in band; it is no longer centred on the base (scoring, the critics, the titration offset and the menu and travel-day tolerance read it as before). Untyped days serve 1,600 everywhere and the clamp is undated (a recomputed past day grades against it, as under R1): both owner-confirmed.",
@@ -681,6 +688,12 @@
       "provenance": "owner",
       "stated": "2026-09-30",
       "ruling": "#4503 OD5"
+    },
+    "set_raise_proposal": {
+      "weeks_running": 3,
+      "when": "a movement's performed working sets exceed its prescribed working sets in each of the last weeks_running complete Mon-Sun weeks (training.self_added_volume, from adherence's stored per-movement counts)",
+      "effect": "proposes prescribing the fewest working sets he performed in any session of the run, with the headroom under the volume_ceiling redline; a proposal only, the owner approves it",
+      "provenance": "platform default (#5796), pending his ruling"
     },
     "self_raised_load": {
       "rule": "a load the owner raised himself, logged at or under the movement's effort ceiling (an overage within `effort_ceilings.overage_tolerance_rpe` is not a breach), becomes the next floor and is graded `progressed` — a named state, never folded into an adherence percentage",

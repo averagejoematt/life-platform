@@ -81,8 +81,11 @@ def test_the_charter_states_the_ruling():
     assert "floor_rest_day_kcal" not in cal, "the rest-day floor is floor_any_day_kcal, reused (one key, one number)"
     assert REREAD["ruled_on"] == "2026-11-11" and REREAD["reread_on"] == DAY_14
     assert REREAD["decide_below_lb_per_wk"] == 3.0
-    log = tc.charter_value("change_log")[-1]
-    assert "#5794" in log["by"] and log["version"] == tc.charter_value("version")
+    # found by lookup, never by position or a pinned version: the driver stacks concurrent charter bumps at merge
+    (log,) = [e for e in tc.charter_value("change_log") if "#5794" in e["by"]]
+    have = tuple(int(x) for x in tc.charter_value("version").split("."))
+    assert tuple(int(x) for x in log["version"].split(".")) <= have
+    assert "[1400, 1600] -> [1600, 1900]" in log["what"], "the habit-band raise is recorded in the same entry"
 
 
 def test_every_served_day_is_clamped_at_its_floor_and_carries_no_warning():

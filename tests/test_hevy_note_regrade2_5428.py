@@ -376,7 +376,9 @@ NEW_NOTES = {
 def test_the_recomposed_draft_reads_the_new_notes_and_lints_clean(monkeypatch):
     monkeypatch.setenv(lint.MODE_ENV, "off")
     ir = recomposed_ir()
-    assert {b.movement_key: b.notes for b in ir.exercises} == NEW_NOTES
+    # #5796: a drafted cardio note opens with the RPE capture prompt; the prescription after it is the regraded one
+    assert all(b.notes.startswith("RPE _\n") for b in ir.exercises if cardio_note.machine_for(b.movement_key))
+    assert {b.movement_key: cardio_note.without_capture(b.notes) for b in ir.exercises} == NEW_NOTES
     res = _lint(ir)
     assert res.ok and res.not_checked == [], res.lines()
     # the working rows the engine chose are untouched; two rows gained a load (round 4): the feeler W row is AT the
@@ -408,7 +410,7 @@ def test_each_fixed_note_fits_its_budget():
     assert g.phone_lines(block) <= g.SESSION_BLOCK_MAX_LINES and g.phone_lines(ir.exercises[0].notes) <= g.EX1_MAX_LINES
     for b in ir.exercises[1:6]:
         assert g.phone_lines(b.notes) <= g.LIFT_MAX_LINES, b.movement_key
-    cardio = ir.exercises[6].notes
+    cardio = cardio_note.without_capture(ir.exercises[6].notes)  # #5796: the prompt is outside the budget (linter)
     # an interval ride's budget is 7 with its two-line escape (re-grade #4); room for an After line
     assert g.phone_lines(cardio) <= g.CARDIO_INTERVAL_MAX_LINES - 1 and len(cardio) + 1 + len(g.AFTER_LINE) <= g.CARDIO_NOTE_MAX_CHARS
     assert all(len(ln) <= g.LINE_MAX_CHARS for b in ir.exercises for ln in b.notes.split("\n"))

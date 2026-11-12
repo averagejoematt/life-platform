@@ -55,7 +55,10 @@ from mcp import (  # noqa: E402
 )
 
 # The pin. Measured on this fixture when #5813 landed: 97 DynamoDB calls with the memos (the pre-#5813 read set: 137).
-MAX_STAGE_1_DDB_CALLS = 97
+# +2 (#5774, owner ruling 2026-11-11 item 2): the week-commitment check reads the program week's committed routines once per
+# stage-1 call (`week_commitments.attach`: one routine-index Query + one GetItem for the routine this fixture holds) — a
+# new read the ruling requires (departures count at the week level), not a memo that stopped holding.
+MAX_STAGE_1_DDB_CALLS = 99
 
 _TARGET = "2026-09-20"
 _NOW = datetime(2026, 9, 20, 19, 0, tzinfo=timezone.utc)  # noon Pacific on the target day — the clock is frozen
