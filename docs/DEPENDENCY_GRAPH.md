@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-787 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+788 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -197,7 +197,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `labs` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py |
 | `ledger` | — | site_api_ledger.py |
 | `life_events` | — | — |
-| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, nutrition_micronutrients.py, protein_nudge_runner.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
+| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, fuel_loop.py, nutrition_micronutrients.py, protein_nudge_runner.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
 | `macrofactor_meals` | — | — |
 | `macrofactor_workouts` | — | — |
 | `may_tracker` | — | may_tracker.py |
@@ -591,7 +591,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1381 total · 987 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1382 total · 988 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 150 literal-named declarations across three idioms, 4 composite; routing digest 106 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
