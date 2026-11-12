@@ -127,6 +127,7 @@ from mcp.tools_descriptions import (
     MANAGE_SICK_DAYS_DESCRIPTION,
     MARK_JOURNAL_QUOTE_DESCRIPTION,
     PLAN_NEXT_SESSION_DESCRIPTION,
+    PLAN_NEXT_SESSION_INPUT,
     READ_PLATFORM_MEMORY_DESCRIPTION,
     SAVE_INSIGHT_DESCRIPTION,
     SEARCH_ACTIVITIES_DESCRIPTION,
@@ -550,39 +551,7 @@ TOOLS = {
         "schema": {
             "name": "plan_next_session",
             "description": PLAN_NEXT_SESSION_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "target_date": {"type": "string", "description": "Session date YYYY-MM-DD. Defaults to today (Pacific)."},
-                    "routine_id": {
-                        "type": "string",
-                        "description": "Stage 2 (#3752): a drafted routine_id to red-team. Runs the four critics over disjoint evidence, applies their changes to the draft, stores the verdicts on it; a veto then blocks commit.",
-                    },
-                    "veto_override": {
-                        "type": "object",
-                        "description": (
-                            "#4076, stage 2 only: Matthew overrules ONE vetoing critic. {critic: muscle_defense|joints_tendons|"
-                            "rate_advocate|blueprint_historian, owner_words: his words VERBATIM, error_class?: corrections-ledger class}. "
-                            "Only that critic's veto is marked overridden (recorded on the routine, in the Hevy notes and in the "
-                            "corrections ledger); every other critic's changes still apply and any other veto still blocks."
-                        ),
-                        "properties": {
-                            "critic": {"type": "string"},
-                            "owner_words": {"type": "string"},
-                            "error_class": {"type": "string"},
-                        },
-                    },
-                    "dry_run": {
-                        "type": "boolean",
-                        "description": (
-                            "#4076, stage 2 only: run the critics, the override and the changes exactly as a real run, but WRITE "
-                            "NOTHING (no routine version or routine_index row, no coach thread row, no corrections-ledger row). "
-                            "Every put it would make is returned under critics.would_write. Default false."
-                        ),
-                    },
-                },
-                "required": [],
-            },
+            "inputSchema": PLAN_NEXT_SESSION_INPUT,
         },
     },
     "get_coach_session_packet": {

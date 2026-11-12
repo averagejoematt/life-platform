@@ -245,10 +245,13 @@ BASELINE = {
     # 2026-11-08 (#5575): 2124 -> 2120. manage_training_phase's entry (+7) was paid by moving get_training's input table
     # beside its description in mcp/tools_descriptions.py (14 logical lines out, 1 import line in); measured 2118, 2 of
     # the 14 (a fifth, #2610) banked, the rest handed back.
-    # 2026-11-11 (get_advice_link_queue): 2120 -> 2117. The read-only ask queue's entry (+5) was paid by moving
+    # 2026-11-11 (#5803): 2120 -> 2093. plan_next_session's `detail` parameter (+12) was paid by moving its whole input
+    # table beside its description in mcp/tools_descriptions.py (32 logical lines out, 1 import line in); measured 2087,
+    # 6 of the 32 (a fifth, #2610) banked, the rest handed back.
+    # 2026-11-11 (get_advice_link_queue): 2093 -> 2086. The read-only ask queue's entry (+5) was paid by moving
     # get_decisions' input table beside its tool in mcp/tools_decisions.py (8 logical lines out, 0 import lines in);
-    # measured 2115, 2 of the 8 (a fifth, #2610) banked, the rest handed back.
-    "mcp/registry.py": 2117,
+    # measured 2084, 2 of the 8 (a fifth, #2610) banked, the rest handed back.
+    "mcp/registry.py": 2086,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict

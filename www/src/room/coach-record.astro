@@ -84,7 +84,8 @@ const verified = coachVerified(calCoach); // the per-row verified record, when /
 // CR2 (owner ruling 2026-11-09, D + E): the owner-approved historical words and the public-safe brief, both carried
 const approved = approvedWords(entry);
 const commentary = historicalCommentary(entry);
-const corrected = approved.reads.filter((r: any) => r.correction).length;
+const correctedReads = approved.reads.filter((r: any) => r.correction);
+const corrected = correctedReads.length;
 const pub = roomPublic(); // the committed switch: no private banner, indexed
 const whole = roomAll(); // the docket (CR3) only on a whole-room private build
 const brief = briefView(entry, file && file.fetched_at);
@@ -194,7 +195,7 @@ const num1 = "font-size:15px;line-height:1.5";
             {
               corrected > 0 && (
                 <p style="font-size:14px;max-width:62ch;line-height:1.5" data-corrections-count>
-                  {corrected} of {corrected === 1 ? "them carries" : "them carry"} a dated correction: a figure the read cited has changed in the record since it was written. The words are shown exactly as written, with the correction directly beneath.
+                  {corrected} of {corrected === 1 ? "them carries" : "them carry"} a dated correction: a figure the read cited has changed in the record since it was written. The words are shown exactly as written, with the correction directly beneath. <a href="#dated-corrections">{corrected === 1 ? "The corrected read" : `The ${corrected} corrected reads`}</a> are gathered first, and each also stays in its place among the reads.
                 </p>
               )
             }
@@ -224,6 +225,27 @@ const num1 = "font-size:15px;line-height:1.5";
             {
               approved.reads.length > 0 && (
                 <>
+                  {
+                    /* Discoverability (owner-approved 2026-11-11): the corrected reads, visible without expanding anything.
+                       Presentation only: the same served reads, in the served order. The original words stay the primary
+                       text, verbatim; the dated correction is an annotation directly beneath, never merged into them. */
+                    corrected > 0 && (
+                      <div id="dated-corrections" data-dated-corrections={corrected} style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px">
+                        <h3 style="font-size:20px;line-height:1.2">Dated corrections ({corrected})</h3>
+                        <p class="muted" style="font-size:13px;max-width:62ch;line-height:1.5">Each read is shown exactly as it was written. The note beneath it was added later, on the date it gives; it does not change the original words.</p>
+                        <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-corrected-reads>
+                          {correctedReads.map((r: any) => (
+                            <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
+                              <p style="font-size:14px;font-weight:700">{r.day}{r.written ? <span class="muted" style="font-weight:400"> · written {r.written}</span> : null}</p>
+                              <p style="font-size:15px;line-height:1.5"><Quote text={r.text} said={r.said} /></p>
+                              <p style="font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-correction-note><b>Correction · {r.correction.day}.</b> {r.correction.note}</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )
+                  }
+                  {corrected > 0 && <h3 style="font-size:20px;line-height:1.2">The latest reads</h3>}
                   <ol style="list-style:none;padding:0;margin:0;border-top:1px solid var(--ink)" data-approved-reads>
                     {approved.reads.slice(0, READS_SHOWN).map((r: any) => (
                       <li style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px">
