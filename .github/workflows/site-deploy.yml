@@ -37,6 +37,11 @@
 # PR) so the previous good site == HEAD~1; for a multi-commit push roll back
 # manually: bash deploy/rollback_site.sh <ref>.
 #
+# Site API readiness (2026-11-12, the v9 gate's twin): these pages fetch, and smoke/visual judge, the
+# LIVE Site API, which CI deploys, not this workflow. `api-readiness` runs the same
+# deploy/www_api_readiness.py check as web-preview-deploy.yml; not ready → `deferred` (nothing synced,
+# so nothing can roll back) and web-deploy-resume.yml re-dispatches once the API lands.
+#
 # First watched run: merge of this PR (it touches .github/workflows/site-deploy.yml,
 # which is in its own paths filter, so the workflow exercises itself end-to-end).
 
@@ -83,6 +88,12 @@ on:
         default: none
         type: choice
         options: [none, api]
+      api_readiness:
+        description: 'enforce (default) · skip = break-glass: deploy against whatever Site API is live (deploy/www_api_readiness.py)'
+        required: false
+        default: enforce
+        type: choice
+        options: [enforce, skip]
 
 # Never two site syncs racing (each pushes the whole tree + invalidates).
 # cancel-in-progress=false: a sync mid-flight should complete, not be killed halfway.
@@ -100,6 +111,47 @@ permissions:
   contents: read
 
 jobs:
+  # ── Job 0: the live Site API must already carry this commit's site-API code (same check as v9) ──
+  api-readiness:
+    name: Site API readiness (the live bundle contains the commit it owes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      ready: ${{ steps.ready.outputs.ready }}
+      reason: ${{ steps.ready.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the owed commit is git history; the script refuses a shallow clone
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role   # lambda:GetFunction (read-only)
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Compare the live Site API bundle's commit with the commit it owes
+        id: ready
+        env:
+          WWW_API_READINESS: ${{ github.event.inputs.api_readiness }}
+        run: python3 deploy/www_api_readiness.py check
+
+  # ── not ready: defer (a clear, non-rollback status); web-deploy-resume.yml re-dispatches later ──
+  deferred:
+    name: "Deferred: the Site API is not serving this commit's code yet"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: api-readiness
+    if: "!cancelled() && needs.api-readiness.result == 'success' && needs.api-readiness.outputs.ready != 'true'"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role   # sns:Publish on the digest topic
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Record the deferral (step summary + one SNS line)
+        env:
+          READINESS_REASON: ${{ needs.api-readiness.outputs.reason }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 deploy/www_api_readiness.py notify-deferred --target site
+
   # ════════════════════════════════════════════════════════════════
   # Job 1: Deploy the site from the merged main tree
   # ════════════════════════════════════════════════════════════════
@@ -107,6 +159,8 @@ jobs:
     name: Deploy public site
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: api-readiness
+    if: "!cancelled() && needs.api-readiness.result == 'success' && needs.api-readiness.outputs.ready == 'true'"
     outputs:
       superseded: ${{ steps.supersede.outputs.superseded }}
     # #4257: the deploy role trusts only `environment:` subjects, never a bare main ref. This
@@ -265,7 +319,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: deploy-site
-    if: needs.deploy-site.outputs.superseded != 'true'
+    if: "!cancelled() && needs.deploy-site.result == 'success' && needs.deploy-site.outputs.superseded != 'true'"
     # #3395: the rollback's scope check reads these (the smoke twin of visual-qa's
     # #3352 outputs). The smoke script appends them to $GITHUB_OUTPUT itself, right
     # before its own exit — step outputs written before a step fails survive the
@@ -321,7 +375,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     needs: deploy-site
-    if: needs.deploy-site.outputs.superseded != 'true'
+    if: "!cancelled() && needs.deploy-site.result == 'success' && needs.deploy-site.outputs.superseded != 'true'"
     # #3352: the rollback's scope check reads these. Job outputs survive a FAILED job as
     # long as the step that set them RAN — which is why the classifier step below is
     # `if: always()` and never behind the sweep's success.
@@ -623,8 +677,8 @@ jobs:
     name: Notify deploy failure
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: deploy-site
-    if: always() && needs.deploy-site.result == 'failure'
+    needs: [api-readiness, deploy-site]
+    if: always() && (needs.deploy-site.result == 'failure' || needs.api-readiness.result == 'failure')
     steps:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0

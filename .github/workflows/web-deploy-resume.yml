@@ -1,22 +1,22 @@
-# Resume a deferred v9 deploy once the Site API it waited on is live (2026-11-12, run 43124939822).
+# Resume a deferred site deploy once the Site API it waited on is live (2026-11-12, run 43124939822).
 #
-# web-preview-deploy.yml DEFERS (syncs nothing, rolls nothing back) when the live Site API bundle does
-# not yet contain the commit the Site API owes — the Site API's code ships through CI's fleet deploy or a
-# laptop deploy/deploy_site_api.sh, never through the site workflow. This workflow closes the loop:
-# when the newest decisive v9 run is a deferral and the API is now ready, it dispatches ONE v9 deploy.
+# BOTH site paths — web-preview-deploy.yml (v9) and site-deploy.yml (legacy site/**, /coaching/ …) — DEFER
+# (sync nothing, roll nothing back) when the live Site API bundle lacks the commit the Site API owes; that
+# code ships only via CI's fleet deploy or a laptop deploy/deploy_site_api.sh. This closes the loop: for
+# each TARGET (deploy/www_api_readiness.py) whose newest decisive run is a deferral, once the API is ready,
+# it dispatches ONE deploy of that workflow.
 #
 #   workflow_run  every CI/CD completion on main — the fleet deploy is the usual way the API lands
 #   schedule      the backstop: a laptop deploy whose own `resume` call failed, a cdk deploy, or a race
-#                 with an in-flight v9 run; also the dead-man — a deferral older than
-#                 STALE_DEFERRAL_HOURS reds this run (a red scheduled run is the owner's email)
+#                 with an in-flight run; also the dead-man — a deferral streak older than STALE_DEFERRAL_HOURS reds it
 #
 # A SEPARATE workflow, deliberately: inside web-preview-deploy.yml a trigger on every CI/CD completion
 # would share the `v9-deploy` concurrency group and could displace a pending real deploy; inside
 # ci-cd.yml it would grow the ratcheted file and run before CI's own smoke/rollback had settled.
-# Read-only AWS (lambda:GetFunction); the only write is the workflow dispatch. Logic and tests:
-# deploy/www_api_readiness.py, tests/test_www_api_readiness.py.
+# Read-only AWS (lambda:GetFunction); the only writes are the dispatches. Logic + tests: deploy/www_api_readiness.py,
+# tests/test_www_api_readiness.py.
 
-name: v9 deploy resume (after the Site API lands)
+name: Site deploy resume (v9 + site/**, after the Site API lands)
 
 on:
   workflow_run:
@@ -30,7 +30,7 @@ on:
 permissions:
   contents: read
   id-token: write   # OIDC → the read-only role (lambda:GetFunction for the live build sha)
-  actions: write    # read v9 run history; dispatch web-preview-deploy.yml
+  actions: write    # read both run histories; dispatch web-preview-deploy.yml / site-deploy.yml
 
 concurrency:
   group: web-deploy-resume
@@ -42,7 +42,7 @@ env:
 
 jobs:
   resume:
-    name: Resume a deferred v9 deploy
+    name: Resume deferred site deploys (v9 + site/**)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -54,7 +54,7 @@ jobs:
         with:
           aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
           aws-region: ${{ env.AWS_REGION }}
-      - name: Dispatch the deferred v9 deploy if the Site API is now ready
+      - name: Dispatch each deferred deploy if the Site API is now ready
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 deploy/www_api_readiness.py resume

@@ -335,6 +335,8 @@ def test_registry_json_is_valid():
 _CONFIRMED_LIVE_ROUTES = {
     # #4189 — answered 200 {"state": "absent", ...} live on 2026-10-10 05:23Z.
     "/api/morning_note",
+    # #5532 — answered 200 {"pairs": [...]} live on 2026-11-12 23:20Z; re-armed with the site-deploy readiness gate.
+    "/api/pairs",
 }
 
 

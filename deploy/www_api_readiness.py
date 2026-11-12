@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""deploy/www_api_readiness.py — the v9 deploy waits for the Site API it reads, then resumes on its own.
+"""deploy/www_api_readiness.py — both site deploys wait for the Site API they read, then resume on their own.
 
 THE INCIDENT (2026-11-12, run 43124939822). #5827 changed the Site API (CR2_PUBLIC on, so the
 already-registered /api/coach_room_words starts answering 200) and the v9 build in ONE merge. The push
@@ -21,21 +21,30 @@ an ancestor of live). Behind or diverged is NOT READY. A bundle with no fingerpr
 checkout cannot resolve, is UNVERIFIED and proceeds with a warning — the deploy-path posture since #2377
 (an unverifiable deploy must be visible, not blocked); the smoke gate still judges it.
 
+TWO TARGETS, ONE DECISION. The legacy site/** pipeline (site-deploy.yml — /coaching/ and every other kept
+shell) has the same exposure: its pages fetch, and its smoke + visual sweeps judge, the same live Site API,
+and before this gate it relied only on the hand-maintained route list in deploy/api_deploy_sequencing.json
+(which cannot see a flag flip on a registered route — the incident's exact shape). It runs the SAME `check`
+and defers the same way; `resume` walks both workflows' run histories (TARGETS) and re-dispatches each one
+whose newest decisive run is a deferral. The route registry stays as the secondary line (PR-time advisory +
+the smoke/visual 404 downgrade for an UNVERIFIED or break-glass run) — docs/CONVENTIONS.md §4b.
+
 THE POLICY (defer, never wait). A not-ready v9 run skips its build/sync and runs the `deferred` job: a
 step summary, a warning annotation and one SNS line. Nothing is synced, so nothing can roll back; a real
 smoke/visual failure on a ready run still rolls back exactly as before. The run is RESUMED by
 `resume`, invoked from web-deploy-resume.yml (on every CI/CD completion, and on a
 schedule as the backstop) and from the laptop deploy paths (deploy_site_api.sh, deploy_fleet.sh). It
-dispatches ONE v9 deploy when the newest decisive v9 run is a deferral AND the API is now ready. No
+dispatches ONE deploy per target whose newest decisive run is a deferral, once the API is ready. No
 deadlock with CI's production gate: CI never waits on the site and the site never waits on CI — it
 defers and is resumed by whichever API deploy lands. A deferral still outstanding after
-STALE_DEFERRAL_HOURS reds the resume run (the dead-man).
+STALE_DEFERRAL_HOURS reds the resume run (the dead-man) — timed from the FIRST deferral of the unbroken
+streak, so a stream of merges each deferring behind the same stuck API cannot keep resetting the clock.
 
 Subcommands:
-  check            web-preview-deploy.yml `api-readiness` job → ready=true|false (+verdict/reason) in
+  check            web-preview-deploy.yml / site-deploy.yml `api-readiness` job → ready=true|false (+verdict/reason) in
                    $GITHUB_OUTPUT. WWW_API_READINESS=skip (dispatch-only break-glass) → ready=true.
-  notify-deferred  the `deferred` job → step summary + SNS (a failed publish fails the job).
-  resume           dispatch the deferred v9 deploy once the API is ready; exit 1 on a stale deferral.
+  notify-deferred  the `deferred` job (--target v9|site) → step summary + SNS (a failed publish fails the job).
+  resume           dispatch each deferred deploy once the API is ready (--target narrows); exit 1 on a stale deferral.
 
 Exit: 0 decided (either way) · 1 error / stale deferral · the check REFUSES a shallow clone (exit 1):
 in a depth-1 checkout `git log -1 -- <paths>` answers HEAD for everything and ancestry is unresolvable,
@@ -49,6 +58,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,6 +78,32 @@ SITE_API_HANDLER = "lambdas/web/site_api_lambda.py"
 DEFERRED_JOB = "Deferred: the Site API is not serving this commit's code yet"
 DEPLOY_JOB = "Live snapshot → build → sync to the resolved target"
 ROOT_SMOKE_JOB = "Site smoke test (root deploy)"
+
+# The legacy site/** pipeline's job display names (site-deploy.yml) — pinned the same way.
+SITE_WORKFLOW = "site-deploy.yml"
+SITE_DEFERRED_JOB = "Deferred: the Site API is not serving this commit's code yet"
+SITE_DEPLOY_JOB = "Deploy public site"
+SITE_SMOKE_JOB = "Site smoke test"
+
+
+@dataclass(frozen=True)
+class Target:
+    """One production deploy path that reads the live Site API and so defers behind it."""
+
+    key: str
+    workflow: str
+    label: str
+    deferred_job: str
+    deploy_job: str
+    smoke_job: str
+    #: True: a deploy-job success whose smoke never ran is NOT a deploy. site-deploy.yml's deploy job
+    #: succeeds as a no-op when superseded (its smoke is skipped); v9 needs smoke only at the root.
+    smoke_always: bool
+
+
+V9 = Target("v9", WORKFLOW, "v9 deploy", DEFERRED_JOB, DEPLOY_JOB, ROOT_SMOKE_JOB, smoke_always=False)
+SITE = Target("site", SITE_WORKFLOW, "site/** deploy", SITE_DEFERRED_JOB, SITE_DEPLOY_JOB, SITE_SMOKE_JOB, smoke_always=True)
+TARGETS = {t.key: t for t in (V9, SITE)}
 
 READY, NOT_READY, UNVERIFIED, BREAK_GLASS = "ready", "not-ready", "unverified", "break-glass"
 #: A deferral older than this with no resume reds the resume run. CI deploys minutes after a green
@@ -114,26 +150,42 @@ def evaluate() -> dict:
     return {"function": fn, "state": state, "reason": reason, "live_sha": live_sha or "", "owed_sha": owed_sha or ""}
 
 
-# ── resume: which v9 run is decisive? (pure over the run history) ───────────────────────────────
-def classify_v9_run(run: dict, jobs: list[dict], live_at_root: bool) -> str:
-    """'in-flight' | 'deferred' | 'deployed' | 'other' for one web-preview-deploy run."""
+# ── resume: which run is decisive? (pure over the run history) ──────────────────────────────────
+def classify_run(run: dict, jobs: list[dict], live_at_root: bool, target: Target = V9) -> str:
+    """'in-flight' | 'deferred' | 'deployed' | 'other' for one run of `target`'s workflow."""
     if run.get("status") in IN_FLIGHT_STATUSES:
         return "in-flight"
     by_name = {j.get("name"): j.get("conclusion") for j in jobs}
-    if by_name.get(DEFERRED_JOB) in ("success", "failure"):  # a failed SNS publish is still a deferral
+    if by_name.get(target.deferred_job) in ("success", "failure"):  # a failed SNS publish is still a deferral
         return "deferred"
-    if by_name.get(DEPLOY_JOB) == "success" and (not live_at_root or by_name.get(ROOT_SMOKE_JOB) not in (None, "skipped")):
+    need_smoke = target.smoke_always or live_at_root
+    if by_name.get(target.deploy_job) == "success" and (not need_smoke or by_name.get(target.smoke_job) not in (None, "skipped")):
         return "deployed"
-    return "other"  # refused dispatch, failed export, a preview run after the cut-over: not decisive
+    return "other"  # refused dispatch, failed export, a superseded no-op, a preview run after the cut-over
 
 
-def outstanding_deferral(runs: list[dict], jobs_for, live_at_root: bool) -> tuple[str, dict | None]:
+classify_v9_run = classify_run  # the #5844 name
+
+
+def outstanding_deferral(runs: list[dict], jobs_for, live_at_root: bool, target: Target = V9) -> tuple[str, dict | None]:
     """Walk newest → oldest to the first decisive run. ('deferred', run) means a resume is owed."""
     for run in runs[:MAX_RUNS]:
-        kind = classify_v9_run(run, jobs_for(run), live_at_root)
+        kind = classify_run(run, jobs_for(run), live_at_root, target)
         if kind in ("in-flight", "deferred", "deployed"):
             return kind, run
     return "none", None
+
+
+def first_deferral_of_streak(runs: list[dict], jobs_for, live_at_root: bool, target: Target = V9) -> dict | None:
+    """The OLDEST deferral since the last real deploy — where the dead-man's clock starts."""
+    first = None
+    for run in runs[:MAX_RUNS]:
+        kind = classify_run(run, jobs_for(run), live_at_root, target)
+        if kind == "deployed":
+            break
+        if kind == "deferred":
+            first = run
+    return first
 
 
 def _gh_json(path: str):
@@ -183,19 +235,19 @@ def cmd_check() -> int:
     return 0
 
 
-def cmd_notify_deferred() -> int:
+def cmd_notify_deferred(target: Target = V9) -> int:
     reason = os.environ.get("READINESS_REASON") or "(no reason recorded)"
     run_url = os.environ.get("RUN_URL", "")
     line = (
-        f"v9 deploy DEFERRED, not failed: {reason}. Nothing was synced. It resumes on its own when the Site API "
+        f"{target.label} DEFERRED, not failed: {reason}. Nothing was synced. It resumes on its own when the Site API "
         f"deploy lands (web-deploy-resume.yml, or the laptop deploy_site_api.sh / deploy_fleet.sh). {run_url}"
     )
-    print(f"::warning title=v9 deploy deferred::{line}")
-    _summary(f"### ⏸️ v9 deploy deferred\n\n{line}")
+    print(f"::warning title={target.label} deferred::{line}")
+    _summary(f"### ⏸️ {target.label} deferred\n\n{line}")
     topic = os.environ.get("SNS_TOPIC_ARN")
     if topic:
         subprocess.run(
-            ["aws", "sns", "publish", "--topic-arn", topic, "--subject", "v9 deploy deferred: Site API not ready", "--message", line],
+            ["aws", "sns", "publish", "--topic-arn", topic, "--subject", f"{target.label} deferred: Site API not ready", "--message", line],
             check=True,
             capture_output=True,
             timeout=60,
@@ -203,51 +255,94 @@ def cmd_notify_deferred() -> int:
     return 0
 
 
-def cmd_resume(dry_run: bool = False) -> int:
-    live_at_root = www_owned_paths.live_at_root()
-    runs = _gh_json(f"repos/{GH_REPO}/actions/workflows/{WORKFLOW}/runs?branch=main&per_page={MAX_RUNS}").get("workflow_runs") or []
+def dispatch_command(target: Target, live_at_root: bool) -> list[str]:
+    """The one `gh workflow run` that re-deploys `target` from main's tip."""
+    cmd = ["gh", "workflow", "run", target.workflow, "--repo", GH_REPO, "--ref", "main"]
+    if target is V9:
+        cmd += ["-f", f"target={'root' if live_at_root else 'preview'}"]
+    return cmd
+
+
+def _break_glass(target: Target) -> str:
+    extra = " -f target=root" if target is V9 else ""
+    return f"gh workflow run {target.workflow} --ref main{extra} -f api_readiness=skip"
+
+
+def resume_target(target: Target, live_at_root: bool, verdict, dry_run: bool = False) -> int:
+    """Resume one target's deferral if one is outstanding and the API (verdict(), shared) is ready."""
+    runs = _gh_json(f"repos/{GH_REPO}/actions/workflows/{target.workflow}/runs?branch=main&per_page={MAX_RUNS}").get("workflow_runs") or []
+    cache: dict = {}
 
     def jobs_for(run: dict) -> list[dict]:
-        return _gh_json(f"repos/{GH_REPO}/actions/runs/{run['id']}/jobs?per_page=100").get("jobs") or []
+        if run["id"] not in cache:
+            cache[run["id"]] = _gh_json(f"repos/{GH_REPO}/actions/runs/{run['id']}/jobs?per_page=100").get("jobs") or []
+        return cache[run["id"]]
 
-    kind, run = outstanding_deferral(runs, jobs_for, live_at_root)
+    kind, run = outstanding_deferral(runs, jobs_for, live_at_root, target)
     if kind != "deferred":
-        print(f"www_api_readiness resume: nothing to resume (newest decisive v9 run: {kind}{'' if not run else ' ' + str(run.get('id'))})")
+        print(
+            f"www_api_readiness resume [{target.key}]: nothing to resume (newest decisive run: {kind}{'' if not run else ' ' + str(run.get('id'))})"
+        )
         return 0
-    age = _run_age_hours(run, datetime.now(timezone.utc))
-    if is_shallow():
-        print("::error::resume needs full history to judge readiness — checkout with fetch-depth: 0")
+    first = first_deferral_of_streak(runs, jobs_for, live_at_root, target) or run
+    age = _run_age_hours(first, datetime.now(timezone.utc))
+    r = verdict()
+    if r is None:
         return 1
-    r = evaluate()
     if r["state"] == NOT_READY:
         if age > STALE_DEFERRAL_HOURS:
             print(
-                f"::error title=v9 deploy deferred {age:.1f} h::run {run['id']} is still waiting on the Site API — {r['reason']}. "
-                f"Ship the API (gh workflow run ci-cd.yml --ref main -f deploy_all=true, or bash deploy/deploy_site_api.sh), "
-                f"or break glass: gh workflow run {WORKFLOW} --ref main -f target=root -f api_readiness=skip"
+                f"::error title={target.label} deferred {age:.1f} h::run {run['id']} (streak since run {first['id']}) is still waiting on "
+                f"the Site API — {r['reason']}. Ship the API (gh workflow run ci-cd.yml --ref main -f deploy_all=true, or bash "
+                f"deploy/deploy_site_api.sh), or break glass: {_break_glass(target)}"
             )
             return 1
-        print(f"www_api_readiness resume: run {run['id']} deferred {age:.1f} h ago; still waiting — {r['reason']}")
+        print(f"www_api_readiness resume [{target.key}]: run {run['id']} deferred {age:.1f} h ago; still waiting — {r['reason']}")
         return 0
-    target = "root" if live_at_root else "preview"
-    cmd = ["gh", "workflow", "run", WORKFLOW, "--repo", GH_REPO, "--ref", "main", "-f", f"target={target}"]
-    print(f"www_api_readiness resume: run {run['id']} was deferred; the Site API is {r['state']} ({r['reason']}) → {' '.join(cmd)}")
+    cmd = dispatch_command(target, live_at_root)
+    print(
+        f"www_api_readiness resume [{target.key}]: run {run['id']} was deferred; the Site API is {r['state']} ({r['reason']}) → {' '.join(cmd)}"
+    )
     if not dry_run:
         subprocess.run(cmd, check=True, timeout=60)
     return 0
+
+
+def cmd_resume(dry_run: bool = False, targets: tuple[Target, ...] = (V9, SITE)) -> int:
+    live_at_root = www_owned_paths.live_at_root()
+    memo: dict = {}
+
+    def verdict() -> dict | None:  # ONE read of the API, shared by every target that needs it
+        if "r" not in memo:
+            if is_shallow():
+                print("::error::resume needs full history to judge readiness — checkout with fetch-depth: 0")
+                memo["r"] = None
+            else:
+                memo["r"] = evaluate()
+        return memo["r"]
+
+    rc = 0
+    for target in targets:  # one target's error or stale deferral never blocks the other's resume
+        try:
+            rc |= resume_target(target, live_at_root, verdict, dry_run)
+        except (subprocess.SubprocessError, OSError, ValueError, KeyError) as e:
+            print(f"::error title=resume {target.key} failed::{type(e).__name__}: {e}")
+            rc = 1
+    return rc
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("command", choices=("check", "notify-deferred", "resume"))
     ap.add_argument("--dry-run", action="store_true", help="resume: decide and print, never dispatch")
+    ap.add_argument("--target", choices=sorted(TARGETS), help="notify-deferred: which deploy deferred (default v9); resume: only this one")
     args = ap.parse_args(argv)
     os.chdir(REPO)  # the owed derivation reads repo-relative paths and runs git here
     if args.command == "check":
         return cmd_check()
     if args.command == "notify-deferred":
-        return cmd_notify_deferred()
-    return cmd_resume(dry_run=args.dry_run)
+        return cmd_notify_deferred(TARGETS[args.target or "v9"])
+    return cmd_resume(dry_run=args.dry_run, targets=(TARGETS[args.target],) if args.target else (V9, SITE))
 
 
 if __name__ == "__main__":
