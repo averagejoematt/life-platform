@@ -42,12 +42,12 @@ from training import (
 TW = {t["id"]: t for t in rl.TRIPWIRES}
 
 # The owner's decision list. Each entry: why it cannot be read by measured inputs today.
-# Owner ruling 2026-11-11: deletion VETOED for medical_stop_lines, mood_declared, joy and lean_mass — readers built instead
-# (mood_declared and joy as shells over an injected input the check-in lane owns, #5819). These two await his decision.
-PROPOSE_DELETE = {
-    "leverage_not_deterioration": "action is 'log it; no action' — an interpretation note on anchor_lift_strength_drop, not a tripwire",
-    "post_goal_walking": "maintenance-phase only and needs the cut-phase walking mean — dormant until the landing",
-}
+# Owner rulings 2026-11-11: deletion VETOED for medical_stop_lines, mood_declared, joy and lean_mass — readers built instead
+# (mood_declared and joy as shells over an injected input the check-in lane owns, #5819); leverage_not_deterioration
+# DELETED (folded into anchor_lift_strength_drop's note, recorded in redline_changelog); post_goal_walking KEPT, dormant.
+PROPOSE_DELETE: dict[str, str] = {}
+DELETED = {"leverage_not_deterioration"}
+DORMANT = {"post_goal_walking"}
 WIRED_HERE = {
     "loss_acceptable",
     "loss_insufficient_adherent",
@@ -63,7 +63,7 @@ WIRED_HERE = {
 }
 EVALUATED_BY_CRITICS = {"rate_overshoot", "intake_floor_breached", "logging_dark", "weight_stall_with_adherence"}
 MERGED = {"loss_excessive_clean": "rate_overshoot", "loss_excessive_flagged": "rate_overshoot"}
-AUDITED = set(PROPOSE_DELETE) | WIRED_HERE | EVALUATED_BY_CRITICS | set(MERGED) | {"volume_ceiling"}
+AUDITED = set(PROPOSE_DELETE) | WIRED_HERE | EVALUATED_BY_CRITICS | set(MERGED) | {"volume_ceiling"} | DELETED | DORMANT
 
 
 def _inputs(**over):
@@ -102,9 +102,9 @@ def test_unevaluated_tripwires_is_exactly_the_propose_delete_set():
 
 
 def test_every_audited_tripwire_has_exactly_one_disposition_and_it_is_in_the_data():
-    groups = [set(PROPOSE_DELETE), WIRED_HERE, EVALUATED_BY_CRITICS, set(MERGED), {"volume_ceiling"}]
+    groups = [set(PROPOSE_DELETE), WIRED_HERE, EVALUATED_BY_CRITICS, set(MERGED), {"volume_ceiling"}, DELETED, DORMANT]
     assert sum(len(g) for g in groups) == len(AUDITED) == 20, "one disposition per tripwire — the issue's 19 plus the stall"
-    assert AUDITED <= set(TW)
+    assert AUDITED - DELETED <= set(TW) and not (DELETED & set(TW))
     elsewhere = rl.evaluated_elsewhere()
     problems = []
     for tid in WIRED_HERE:
@@ -397,3 +397,28 @@ def test_the_live_resolver_never_supplies_the_check_in_inputs():
     src = (REPO / "mcp" / "nutrition_critics_inputs.py").read_text(encoding="utf-8")
     assert "mood_instrument" not in src and "joy_answers" not in src
     assert "state_of_mind" not in src and "evening_checkin" not in src and "journal" not in src
+
+
+# ── owner rulings 2026-11-11: one deletion, one dormant keep ───────────────────────────────────────────────
+def test_the_deleted_tripwire_is_gone_folded_and_recorded():
+    from training import redline_changelog
+
+    assert "leverage_not_deterioration" not in TW
+    assert "allometric" in TW["anchor_lift_strength_drop"]["note"] and "#5802" in TW["anchor_lift_strength_drop"]["note"]
+    entry = [e for e in redline_changelog.CHANGELOG_V2_TO_V3 if "2026-11-11" in e and "#5802" in e]
+    assert entry and "leverage_not_deterioration DELETED" in entry[0] and "post_goal_walking KEPT" in entry[0]
+
+
+def test_a_dormant_tripwire_is_dated_named_and_not_unevaluated():
+    dormant = rl.dormant_tripwires()
+    assert set(dormant) == DORMANT
+    assert dormant["post_goal_walking"]["since"] == "2026-11-11" and dormant["post_goal_walking"]["until"]
+    assert "post_goal_walking" not in rl.unevaluated_tripwires()
+    assert rl.summary()["tripwires_dormant"] == dormant
+    assert "post_goal_walking" not in {r["id"] for r in plan_engine.constraint_block(date="2026-09-21")["tripwires"]}
+
+
+def test_mutation_control_an_undated_keep_reappears_as_unevaluated(monkeypatch):
+    patched = [{k: v for k, v in t.items() if k != "dormant_until"} for t in rl.TRIPWIRES]
+    monkeypatch.setattr(rl, "TRIPWIRES", patched)
+    assert rl.unevaluated_tripwires() == ["post_goal_walking"]

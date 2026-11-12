@@ -652,8 +652,9 @@ TRIPWIRES: list[dict[str, Any]] = [
             "Strength held flat through a 118 lb loss last time and the DEXA called retention excellent; a sustained drop is the earliest "
             "honest signal that the rate is outrunning recovery. v3: 5 % (was 7.5 %) on a rolling e1RM MEDIAN, and the action no longer "
             "adds calories by reflex — the wave-and-eat-more loop 'manufactures failures that raise calories for the wrong reason'. "
-            "`leverage_not_deterioration` is the companion: an absolute drop ≤ 5 % per 20 lb with allometric strength flat is leverage, "
-            "logged and not acted on. Since #4098 the engine computes the rolling 3-session e1RM median against the 6-session baseline "
+            "Leverage is not deterioration (folded from the deleted `leverage_not_deterioration` tripwire, owner ruling 2026-11-11, #5802): "
+            "an absolute drop ≤ 5 % per 20 lb of bodyweight with allometric strength (e1RM / BW^0.67) flat is a lighter man moving slightly "
+            "less — logged and not acted on; treating it as deterioration is how 2025's loads got held flat out of fear. Since #4098 the engine computes the rolling 3-session e1RM median against the 6-session baseline "
             "per template identity (`plan_engine.anchor_e1rm_trend`), trips on `threshold_pct` with `consecutive_sessions` of the last 3 "
             "below it, on the WORST core anchor, and holds the whole tripwire `not_yet_active` before `not_before_week` on the block "
             "calendar; the '2 of 4 anchors inside 14 days' and '> 10 % on one anchor for 3 sessions' clauses are not yet computed. "
@@ -850,16 +851,6 @@ TRIPWIRES: list[dict[str, Any]] = [
         "note": "The rule that stops 1,500 kcal from quietly substituting for 16 hours of walking, which is exactly how the current block is producing its rate.",
     },
     {
-        "id": "leverage_not_deterioration",
-        "signal": "absolute anchor load down ≤ 5 % per 20 lb of bodyweight WITH allometric strength (e1RM / BW^0.67) flat",
-        "threshold": "≤ 5 % per 20 lb, allometric flat",
-        "provenance": "population-derived",
-        "derived_by": "S&C coach (red team 2026-09-22; from practice)",
-        "action": "log it; no action",
-        "evaluated_by_engine": False,
-        "note": "The companion to `anchor_lift_strength_drop`: a lighter man moving slightly less is leverage, and treating it as deterioration is how 2025's loads got held flat out of fear.",
-    },
-    {
         "id": "lean_mass",
         "signal": "DXA-interval lean share of the loss > 20 %, or > 1.0 lb lean/wk",
         "threshold": {
@@ -1017,6 +1008,12 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 7,
         "provenance": "owner-history",
         "derived_by": "lived experience (red team 2026-09-22) on his own 2025 regain — walking gone within eight weeks of the trough",
+        # #5802 owner ruling 2026-11-11: KEEP, dormant — it reads a maintenance week, and none exists before the landing
+        "dormant_until": {
+            "since": "2026-11-11",
+            "until": "the maintenance phase (the landing, `landing()`)",
+            "ruling": "owner 2026-11-11 (#5802)",
+        },
         "action": "relapse declared; the band protocol begins regardless of weight",
         "evaluated_by_engine": False,
         "note": "Relapse detection is walking, not weight. This is the tripwire the 2024–25 campaign did not have.",
@@ -1041,9 +1038,15 @@ def evaluated_elsewhere() -> dict[str, str]:
     return {k: v for k, v in named.items() if v}
 
 
+def dormant_tripwires() -> dict[str, dict[str, str]]:
+    """#5802: {id: its `dormant_until`} — kept by owner ruling, unread until a dated condition; never counted unevaluated."""
+    return {t["id"]: t["dormant_until"] for t in TRIPWIRES if t.get("dormant_until")}
+
+
 def unevaluated_tripwires() -> list[str]:
-    """Tripwires read by NO module — not plan_engine, not an `evaluated_by` reader, not merged (#5802). Named, never silent (ADR-105)."""
-    return [t["id"] for t in TRIPWIRES if not _on_engine(t) and t["id"] not in evaluated_elsewhere()]
+    """Tripwires read by NO module and not owner-dormant (#5802) — not plan_engine, not `evaluated_by`, not merged. Named (ADR-105)."""
+    skip = {**evaluated_elsewhere(), **dormant_tripwires()}
+    return [t["id"] for t in TRIPWIRES if not _on_engine(t) and t["id"] not in skip]
 
 
 def landing() -> dict[str, Any]:
@@ -1072,6 +1075,7 @@ def summary() -> dict[str, Any]:
         "population_derived_thresholds": [t["id"] for t in TRIPWIRES if t.get("provenance") == "population-derived"],
         "unevaluated_tripwires": unevaluated_tripwires(),
         "tripwires_evaluated_elsewhere": evaluated_elsewhere(),  # #5802
+        "tripwires_dormant": dormant_tripwires(),  # #5802: owner-kept, dated
         "changelog_v1_to_v2": CHANGELOG_V1_TO_V2,
         "changelog_v2_to_v3": CHANGELOG_V2_TO_V3,
     }

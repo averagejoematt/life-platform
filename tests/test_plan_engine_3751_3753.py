@@ -215,7 +215,8 @@ def test_approved_redlines_are_reported_active_not_proposed():
     block = plan_engine.constraint_block(**_FULL)
     assert block["redlines"]["active"] is True
     assert not any("redlines are PROPOSED" in line for line in block["honesty"])
-    assert any("NOT evaluated by this" in line for line in block["honesty"])
+    # #5802 (owner rulings 2026-11-11): no tripwire is left unread, so the "NOT evaluated" honesty line is gone
+    assert not any("NOT evaluated by this" in line for line in block["honesty"])
     assert owner_redlines.ACTIVE is True and owner_redlines.LAST_REVIEWED_BY_OWNER == "2026-09-23"
     assert owner_redlines.REDLINES_VERSION == "3.3"  # #4161: the deload and ruling "B" (the protein-gated rate target)
 
@@ -239,9 +240,8 @@ def test_the_rate_tension_is_resolved_as_a_schedule_and_approved():
     # the tripwires the engine cannot compute are named in the block, never silent (ADR-105)
     block = plan_engine.constraint_block(**_FULL)
     assert set(block["unevaluated_tripwires"]) == set(owner_redlines.unevaluated_tripwires())
-    # #5802: only the tripwires NO module reads are named (rate_overshoot is nutrition_critics' now, and says so)
-    assert any("NOT evaluated by this engine or any other module" in line and "post_goal_walking" in line for line in block["honesty"])
-    assert not any("rate_overshoot" in line for line in block["honesty"] if "NOT evaluated" in line)
+    # #5802 (owner rulings 2026-11-11): every tripwire is read by a named module, merged, or owner-dormant — no line left
+    assert block["unevaluated_tripwires"] == [] and not any("NOT evaluated" in line for line in block["honesty"])
     assert block["tripwires_evaluated_elsewhere"]["rate_overshoot"] == "health.nutrition_critics"
     rate = plan_engine.constraint_block(**_FULL)["rate_target"]
     assert (rate["low_lb_wk"], rate["high_lb_wk"]) == (3.0, 3.5)  # #5074: the charter band, not the 0.5-1.0 %BW envelope
@@ -374,7 +374,6 @@ _V3_NEW_TRIPWIRES = {
     "loss_insufficient_nonadherent",
     "under_floor",
     "walking_vs_fork",
-    "leverage_not_deterioration",
     "lean_mass",
     "sleep",
     "weigh_in_dark",
@@ -393,7 +392,7 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
     assert not (_V3_NEW_TRIPWIRES & engine_ids)
     elsewhere = owner_redlines.evaluated_elsewhere()
     unevaluated = set(owner_redlines.unevaluated_tripwires())
-    assert _V3_NEW_TRIPWIRES <= set(elsewhere) | unevaluated
+    assert _V3_NEW_TRIPWIRES <= set(elsewhere) | unevaluated | set(owner_redlines.dormant_tripwires())
     assert {"intake_floor_breached", "rate_overshoot", "logging_dark"} <= set(elsewhere)
     # #4081: self_added_volume is computed by the engine now (from adherence's set counts).
     assert "self_added_volume" not in unevaluated
@@ -417,9 +416,7 @@ def test_v3_new_tripwires_are_reported_as_unevaluated_by_name():
     block = plan_engine.constraint_block(**_FULL)
     computed = {t["id"] for t in block["tripwires"]}
     assert not (computed & _V3_NEW_TRIPWIRES)
-    line = next(line for line in block["honesty"] if "NOT evaluated by this engine" in line)
-    assert all(tid in line for tid in owner_redlines.unevaluated_tripwires())  # #5802: only the ones NO module reads
-    assert f"v{owner_redlines.REDLINES_VERSION} tripwire(s)" in line
+    assert not any("NOT evaluated by this engine" in line for line in block["honesty"])  # #5802: none left unread
 
 
 def test_v3_updated_thresholds_on_the_kept_tripwires():
