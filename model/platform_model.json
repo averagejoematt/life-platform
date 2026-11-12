@@ -2427,6 +2427,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "between-chronicle",
       "module": "lambdas/emails/between_chronicle_lambda.py",
@@ -5256,6 +5263,13 @@
     },
     {
       "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ledger.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
       "lambda": null,
       "module": "lambdas/web/site_api_ledger.py",
       "partition": "weekly_correlations",
@@ -8318,7 +8332,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 792,
+      "edges": 794,
       "lambdas": 107,
       "mcp_tool_modules": 41,
       "mcp_tools": 92,
@@ -8333,8 +8347,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 394,
-        "sites_resolved": 992,
-        "sites_total": 1386
+        "sites_resolved": 994,
+        "sites_total": 1388
       },
       "schedule_resolution": {
         "dynamic": 0,
