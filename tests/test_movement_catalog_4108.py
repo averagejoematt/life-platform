@@ -136,7 +136,8 @@ def test_a_split_alias_is_catalogued_under_its_own_id():
     oh, neutral = CATALOG["overhead_triceps_extension_cable"], CATALOG["triceps_extension_cable"]
     assert oh["hevy_template_id_hint"] == "B5EFBF9C" and neutral["hevy_template_id_hint"] == "21310F5F"
     assert oh["primary_muscle"] == neutral["primary_muscle"] == "triceps" and oh["hevy_type"] == "weight_reps"
-    assert oh["sessions"] >= 1 and neutral["last_done"] < oh["first_done"]  # the split history: overhead is the recent one
+    # the split history: overhead is the newer movement (the neutral one is still trained after it, so compare first_done)
+    assert oh["sessions"] >= 1 and neutral["first_done"] < oh["first_done"]
 
 
 def test_squat_barbell_fixture():
