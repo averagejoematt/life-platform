@@ -14,7 +14,7 @@ Lab results, genome, DEXA tools.
 #
 # NEVER in public content:
 #   "<GENE> rs<id> <genotype>"  (a gene name + rsID + genotype)
-#   "MTHFR compound heterozygous"
+#   "<GENE> <zygosity>"  (a gene name + a zygosity call)
 #   "<GENE> <genotype> — <n>x <drug-class> risk"
 #
 # This notice is appended to all genome-bearing tool outputs — wired at the

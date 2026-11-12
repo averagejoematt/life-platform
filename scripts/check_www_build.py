@@ -13,8 +13,8 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
   scan           the clean build carries no fixture sentinel, no inline <script>, no ISO date
                  outside a verbatim coach quotation (scripts/www_verbatim.py — the render gate's rule,
                  static, so the LIVE root deploy holds it too), no Coaching Room output beyond what the
-                 committed `room_public` publishes (CR1 only when it is "cr1"; a CR2/CR3 page, coach_room.json,
-                 a CR2/CR3-only key or a private-build banner is refused whatever it says), no Laboratory output (L1, the same: a WEB_LAB=1 dist is
+                 committed `room_public` publishes (CR1 at "cr1"; CR1 + CR2 at "cr2"; a CR3 page, coach_room.json,
+                 a CR3-only key or a private-build banner is refused whatever it says), no Laboratory output (L1, the same: a WEB_LAB=1 dist is
                  refused), no Human Story output (HS1, the same: a WEB_STORY=1 dist is refused),
                  and (on the preview base) `noindex`
   owned-paths    (#5534) the build's committed route manifest www/owned_paths.json and the reach
@@ -293,28 +293,40 @@ ROOM_PRIVATE_MARKER = "data-room-private"
 
 def room_leaks(dist: str, room_js: str = ROOM_JS, published: str | None = None) -> list[str]:
     """The Coaching Room in a dist the deploy is about to sync. `published` is the committed switch (www/owned_paths.json
-    `room_public`, read through deploy/www_owned_paths.py when None): "off" (default) or "cr1" (owner ruling 2026-11-09:
-    CR1 launches ahead of CR2/CR3).
+    `room_public`, read through deploy/www_owned_paths.py when None): "off", "cr1" (owner GO 2026-11-10) or "cr2" (owner
+    GO 2026-11-11, second message).
 
       * off: no room page, no room data file, no `data-room` marker — a room build is private and never deployed;
       * cr1: the CR1 pages (/system/calibration/, /system/ledger/refuted/) and the CR1 markers (calibration, refuted,
-        entry) are allowed; a CR2/CR3 page, coach_room.json or a CR2/CR3 marker is still refused;
-      * always: the private-build banner (`data-room-private`, every WEB_ROOM build) and any CR2/CR3-only data key.
+        entry) are allowed; a CR2/CR3 page, a CR2/CR3 marker or a CR2/CR3-only key is still refused;
+      * cr2: CR1, plus each coach's record page (/system/coaches/<id>/record/) and the CR2 markers (coach-record,
+        coach-entry); a CR3 page, a CR3 marker or a CR3-only (docket) key is still refused;
+      * always: the room's data files (calibration.json is CR1's and may ride a published dist; coach_room.json never),
+        the private-build banner (`data-room-private`, every WEB_ROOM build) and every CR3-only data key.
 
     This scan runs on every deploy (`--scan-only`). www/tests/room.test.mjs holds the finer checks."""
-    published = www_owned_paths.room_public() if published is None else ("cr1" if published == "cr1" else "off")
+    if published is None:
+        published = www_owned_paths.room_public()
+    published = published if published in ("cr1", "cr2") else "off"
+    releases = {"off": set(), "cr1": {"cr1"}, "cr2": {"cr1", "cr2"}}[published]
     out = []
     data_files = set(room_data_files(room_js))
-    allowed_files = {"calibration.json"} if published == "cr1" else set()
-    cr1_markers = set(_room_list("CR1_MARKERS", room_js)) if published == "cr1" else set()
-    cr23_keys = _room_list("CR23_DATA_KEYS", room_js)
+    allowed_files = {"calibration.json"} if published != "off" else set()
+    markers = set()
+    if published in ("cr1", "cr2"):
+        markers |= set(_room_list("CR1_MARKERS", room_js))
+    if published == "cr2":
+        markers |= set(_room_list("CR2_MARKERS", room_js))
+    cr2_keys = _room_list("CR2_DATA_KEYS", room_js)
+    cr3_keys = _room_list("CR3_DATA_KEYS", room_js)
+    refused_keys = cr3_keys + ([] if published == "cr2" else cr2_keys)
     for p, release in room_routes(room_js):
-        if published == "cr1" and release == "cr1":
+        if release in releases:
             continue
         for d in _room_dirs(dist, p):
             rel = os.path.relpath(d, dist)
-            if published == "cr1":
-                out.append(f"{rel}/: a {release.upper()} Coaching Room page in the dist — only CR1 is published (room_public=cr1)")
+            if published != "off":
+                out.append(f"{rel}/: a {release.upper()} Coaching Room page in the dist — not published (room_public={published})")
             else:
                 out.append(f"{rel}/: a Coaching Room page in the dist — a room build is private and is never deployed (room_public=off)")
     for dirpath, _d, files in os.walk(dist):
@@ -327,15 +339,16 @@ def room_leaks(dist: str, room_js: str = ROOM_JS, published: str | None = None) 
             if not name.endswith((".html", ".json", ".js", ".xml", ".txt")):
                 continue
             text = open(path, encoding="utf-8", errors="replace").read()
-            for k in cr23_keys:
+            for k in refused_keys:
                 if f'"{k}"' in text or f"&quot;{k}&quot;" in text or f"&#34;{k}&#34;" in text:
-                    out.append(f"{rel}: carries the CR2/CR3-only key {k!r}")
+                    kind = "CR3" if published == "cr2" else "CR2/CR3"
+                    out.append(f"{rel}: carries the {kind}-only key {k!r}")
             if not name.endswith(".html"):
                 continue
             if ROOM_PRIVATE_MARKER in text:
                 out.append(f"{rel}: carries the private-build banner {ROOM_PRIVATE_MARKER} — a WEB_ROOM build is never deployed")
             for v in sorted(set(ROOM_MARKER_RX.findall(text))):
-                if v not in cr1_markers:
+                if v not in markers:
                     out.append(f"{rel}: carries the Coaching Room marker data-room={v!r} — not published (room_public={published})")
     return out
 

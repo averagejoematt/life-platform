@@ -53,6 +53,7 @@ from publish_snapshot_calibration import (  # noqa: E402 — the Coaching Room's
     live_calibration,
     resolve_and_validate,
     room_all,
+    room_cr2,
     room_enabled,
 )
 from publish_snapshot_chapters import (
@@ -1059,13 +1060,14 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
             data_files["calibration"] = resolve_and_validate(cal, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
-    if room_all():  # CR2/CR3: the coach profiles (stance, asks, docket, voice) — WEB_ROOM=1 only, never on a CR1 build
+    if room_cr2():  # CR2 (the committed "cr2", WEB_ROOM=cr2 or =1): the coach profiles — never on a CR1 build
         coach_ids = [o["id"] for o in public.get("coach", [])]
         room = (
             fixture_coach_room(fixtures_dir) if mode == "fixture" else live_coach_room(lambda p: _get(base_url, p, timeout), coach_ids, log)
         )
         try:
-            data_files["coach_room"] = resolve_coach_room(room, public)
+            # CR3 (the docket) stays dark: a CR2 build carries no docket entry, position, count or disclosure
+            data_files["coach_room"] = resolve_coach_room(room, public, cr3=room_all())
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
     if lab_enabled():  # the Laboratory, built dark (L1): off = not fetched, not written, snapshot byte-identical

@@ -263,13 +263,13 @@ Add a `<p>` element with class `obs-subtitle` between the observatory nav and th
 **Glucose:**
 - "About this observatory"
 - "Hypotheses under test (4)"
-- "Genomic context" (FADS2, MTHFR variants)
+- "Genomic context" [genetic detail removed 2026-11-11]
 - "Measurement protocol" (Dexcom Stelo, TIR methodology)
 
 **Nutrition:**
 - "About this observatory"
 - "Hypotheses under test (4)"
-- "Genomic context & micronutrients" (PEMT, VDR, FADS1, MTHFR)
+- "Genomic context & micronutrients" [genetic detail removed 2026-11-11]
 - "Behavioral triggers" (sleep deprivation, travel, stress patterns)
 - "Macro deep-dives" (carbs, fats, fiber detail)
 - "Nutrition protocol"
@@ -347,7 +347,7 @@ Add a one-line preview below each collapsed `<summary>`:
 <details class="obs-depth-section">
   <summary>
     Genomic context
-    <span class="obs-depth-teaser">FADS2, MTHFR variants and their effect on glucose response</span>
+    <span class="obs-depth-teaser">Genetic variants and their effect on glucose response</span>
   </summary>
   <!-- full content -->
 </details>
@@ -372,7 +372,7 @@ Add a one-line preview below each collapsed `<summary>`:
 |---------|--------|
 | About this observatory | The story behind this page and Matthew's reflections |
 | Hypotheses under test (4) | Screen-off timing, bed temperature, alcohol impact, bedtime consistency |
-| Genomic context | FADS2, MTHFR variants — why population averages don't apply |
+| Genomic context | Genetic variants — why population averages don't apply |
 | Measurement protocol | Whoop 4.0, Eight Sleep Pod, Apple Health — how data is collected |
 | Behavioral triggers | Sleep deprivation, travel, stress — when nutrition falls apart |
 | Training balance framework | Attia's 5 pillars: Zone 2, strength, stability, Zone 5, sport |

@@ -121,8 +121,8 @@ def test_the_layoff_band_is_the_charters_and_the_long_layoff_line_is_the_od1_one
     from training import training_charter as tc
 
     assert effort_ceilings.layoff_return_band() == [6, 7]
-    # the 1.41.0 entry exists (later charter bumps must not break this pin — find it by version)
-    log = next(e for e in tc.charter_value("change_log") if e.get("version") == "1.41.0")
+    # the 1.41.0 entry, found by version: a later charter bump (#5796's 1.42.0) must not red this pin
+    log = next(e for e in tc.charter_value("change_log") if e["version"] == "1.41.0")
     assert "2026-11-10" in log["by"] and "layoff_return_rpe" in log["what"]
     # no new number: the long-layoff line IS the exposure-cap gap
     assert layoff_tiers.REENTRY_MAX_GAP_DAYS == 90

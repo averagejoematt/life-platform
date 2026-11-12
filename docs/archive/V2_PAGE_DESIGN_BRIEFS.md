@@ -938,7 +938,7 @@ A complete, transparent supplement protocol. Every supplement with: what, why, d
 ├── Adherence: [X]% this month
 ├── Evidence Level: [GENOME-JUSTIFIED | WELL-SOURCED | N=1 EXPERIMENT | EXPLORATORY]
 │   └── Badge color: green / blue / yellow / grey
-├── Genome Rationale: [if applicable] "FADS2 rs1535: poor ALA→EPA conversion"
+├── Genome Rationale: [if applicable] [genetic detail removed 2026-11-11]
 ├── Scientific Summary: [2-3 sentences on what the evidence says]
 ├── Links: [expandable list of journal article links]
 ├── Monthly Cost: $[X]

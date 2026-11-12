@@ -62,25 +62,31 @@ OWNED_PATHS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 ROOM_PUBLIC_KEY = "room_public"
 
 
+#: The committed switch's published values (www/src/lib/room.js ROOM_PUBLIC_VALUES minus "off").
+PUBLISHED_SCOPES = ("cr1", "cr2")
+#: WEB_ROOM's private values and the scope each builds.
+PRIVATE_SCOPES = {"1": "all", "cr1": "cr1", "cr2": "cr2"}
+
+
 def committed_room_public(path: str = OWNED_PATHS) -> str:
     """The committed production switch in www/owned_paths.json (www/src/lib/room.js::committedRoomPublic's twin):
-    "cr1", else "off" — a missing file, an unreadable one or any other value is off (fail closed)."""
+    "cr1" or "cr2", else "off" — a missing file, an unreadable one or any other value is off (fail closed)."""
     try:
         with open(path, encoding="utf-8") as fh:
-            return "cr1" if json.load(fh).get(ROOM_PUBLIC_KEY) == "cr1" else "off"
+            v = json.load(fh).get(ROOM_PUBLIC_KEY)
     except (OSError, ValueError, AttributeError):
         return "off"
+    return v if isinstance(v, str) and v in PUBLISHED_SCOPES else "off"
 
 
 def room_scope(env: dict | None = None, committed: str | None = None) -> str:
-    """The Python twin of www/src/lib/room.js::roomScope: "all" (WEB_ROOM=1, private), "cr1" (WEB_ROOM=cr1, private —
-    or the committed `room_public: "cr1"`, published) or "off". WEB_ROOM wins when it is "1" or "cr1"."""
+    """The Python twin of www/src/lib/room.js::roomScope: "all" (WEB_ROOM=1, private), "cr1" / "cr2" (WEB_ROOM=cr1 /
+    cr2, private — or the committed `room_public`, published) or "off". WEB_ROOM wins when it is "1", "cr1" or "cr2"."""
     v = (os.environ if env is None else env).get(ROOM_ENV)
-    if v == "1":
-        return "all"
-    if v == "cr1":
-        return "cr1"
-    return "cr1" if (committed_room_public() if committed is None else committed) == "cr1" else "off"
+    if isinstance(v, str) and v in PRIVATE_SCOPES:
+        return PRIVATE_SCOPES[v]
+    c = committed_room_public() if committed is None else committed
+    return c if c in PUBLISHED_SCOPES else "off"
 
 
 def room_enabled(env: dict | None = None, committed: str | None = None) -> bool:
@@ -89,9 +95,14 @@ def room_enabled(env: dict | None = None, committed: str | None = None) -> bool:
 
 
 def room_all(env: dict | None = None, committed: str | None = None) -> bool:
-    """Is the WHOLE room on (CR2 + CR3)? Only WEB_ROOM=1. coach_room.json is written exactly then — never on a CR1
-    build, private or published."""
+    """Is the WHOLE room on (CR2 + CR3)? Only WEB_ROOM=1 — the committed switch never publishes CR3."""
     return room_scope(env, committed) == "all"
+
+
+def room_cr2(env: dict | None = None, committed: str | None = None) -> bool:
+    """Is CR2 on (the committed "cr2", WEB_ROOM=cr2, or the whole room)? coach_room.json is written exactly then —
+    never on a CR1 build; on a CR2 build without its CR3 (docket) parts."""
+    return room_scope(env, committed) in ("cr2", "all")
 
 
 def _persona(short: str) -> str:

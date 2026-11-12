@@ -69,7 +69,7 @@ The site's primary weakness is not data or content — it's *information archite
 | **Labs** | `/labs/` | A- | "Wearables estimate — labs measure" is a great one-liner. **Real data: 119 biomarkers from Function Health, 86 in range, 14 out of range, biological age delta -9.6 years.** This is substantive, credentialed data. | Lab data is from Spring 2025 — the "getting labs at the starting line" narrative from Elena's pull-quote is perfect framing for the new baseline draw. |
 | **Supplements** | `/supplements/` | B- | Honest: "I've never been particularly methodical about supplements." Good evidence-grading intention. Supplement logging active (Protein Supplement logged April 1). | Content is thin. The evidence confidence levels (genome-justified vs. N=1) aren't yet visually implemented on the page. |
 | **Benchmarks** | `/benchmarks/` | A- | The interactive "Quick Check" — 6 questions, instant letter grades, no account needed — is the single best engagement tool on the site. Centenarian decathlon framing is strong. | Should be promoted much more aggressively. This is a standalone viral tool buried in the science section. |
-| **Biology** | `/biology/` | B- | Genome SNP data (110 SNPs) with actionable themes identified. Real data: FTO obesity variants, vitamin D deficiency risk, MTHFR compound heterozygous, CYP1A2 fast caffeine metabolizer. | Niche audience, but the genome→supplement→protocol connection is scientifically interesting. |
+| **Biology** | `/biology/` | B- | Genome SNP data (110 SNPs) with actionable themes identified. Real data [owner-specific genotypes removed 2026-11-11]. | Niche audience, but the genome→supplement→protocol connection is scientifically interesting. |
 
 ### THE BUILD
 
@@ -298,7 +298,7 @@ Cross-domain intelligence, public accountability with narrative, AI coaching lay
 ## Section 7: Domain Credibility Panel
 
 ### Dr. Rhonda Patrick — Nutrigenomics & Supplementation
-"The genome integration (110 SNPs) with actionable themes (FTO/obesity, MTHFR, CYP1A2, FADS2) is more sophisticated than expected. I would endorse the *framework* publicly. Lab data showing 119 biomarkers from Function Health adds genuine credibility."
+"The genome integration (110 SNPs) with actionable themes [genes removed 2026-11-11] is more sophisticated than expected. I would endorse the *framework* publicly. Lab data showing 119 biomarkers from Function Health adds genuine credibility."
 
 ### Dr. Layne Norton — Nutrition Methodology
 "MacroFactor integration is solid — Matthew logged 1,375 cal with 146g protein yesterday. The nutrition page's honesty about emotional eating is refreshing and accurate. Methodology is sound."

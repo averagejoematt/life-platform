@@ -64,7 +64,7 @@ def test_the_charter_carries_the_test_beside_the_unchanged_bike_test():
     row = spec[TID]
     assert (row["unit"], row["better"], row["duration_s"], row["catalog_key"]) == ("bpm", "lower", 1200, "treadmill")
     assert row["regime_bound"] is True
-    assert "owner to confirm" in row["setting"]["provenance"] and "platform-proposed" in row["setting"]["provenance"]
+    assert "owner-confirmed 2026-11-11" in row["setting"]["provenance"] and "platform-proposed" in row["setting"]["provenance"]
     assert str(row["setting"]["speed_mph"]) in row["protocol"] and str(row["setting"]["incline_pct"]) in row["protocol"]
     assert "RPE at the end" in row["protocol"]
     bike = spec["bike_20min_rpe6"]  # the ruling: no second bike test, the existing one as it was

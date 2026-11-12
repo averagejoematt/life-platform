@@ -422,7 +422,7 @@ def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_tre
     assert ir.exercises[5].movement_key == "cycling" and ir.exercises[5].sets[0].duration_seconds == 3600
     # #5428: the swapped block's note is the cardio composer's — no HR target, no critic name, no issue number
     # #5428 lane C: line 1 is `<Machine> · <levels> · RPE …` (no minutes on line 1, cardio-note@4.0.0); the swap still lands on the bike.
-    assert ir.exercises[5].notes.startswith("Recumbent · ")
+    assert ir.exercises[5].notes.startswith("RPE _\nRecumbent · ")  # #5796: line 1 follows the RPE capture prompt
     assert "bpm" not in ir.exercises[5].notes and "#" not in ir.exercises[5].notes and "joints_tendons" not in ir.exercises[5].notes
     # re-evaluated, the revised draft carries nothing left to swap
     assert critics.deterministic_verdict(_joints(critics.draft_summary(ir), block))["verdict"] == "approve"
