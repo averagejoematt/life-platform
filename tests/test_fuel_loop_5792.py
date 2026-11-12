@@ -79,6 +79,15 @@ def _bundled_charter_only(monkeypatch):
     tc.reset_cache()
 
 
+@pytest.fixture(autouse=True)
+def _frozen_clock(monkeypatch):
+    """Every run injects its day; the Pacific clock is pinned to the same constant anyway, so a path that falls back to
+    `pacific_today()` (calorie_target.resolve's lazy read, run()'s default) can never desync from the fixture dates."""
+    from common import pacific_time
+
+    monkeypatch.setattr(pacific_time, "pacific_today", lambda: TODAY)
+
+
 class ConditionalCheckFailedException(Exception):
     pass
 

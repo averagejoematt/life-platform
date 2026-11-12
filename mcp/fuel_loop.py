@@ -40,10 +40,9 @@ DRY RUN (the post-deploy proof, read-only — no claim, no Todoist): from a chec
 from __future__ import annotations
 
 import logging
-from datetime import date
 from typing import Any, Callable, Mapping, Optional, Sequence
 
-from common.pacific_time import shift_day_key
+from common.pacific_time import parse_day_key, shift_day_key
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,10 @@ FAILED = "failed"
 
 def iso_week(day: str) -> str:
     """`YYYY-Www` of a `YYYY-MM-DD` day — the idempotency period."""
-    y, w, _ = date.fromisoformat(day[:10]).isocalendar()
+    d = parse_day_key(day[:10])
+    if d is None:
+        raise ValueError(f"not a YYYY-MM-DD day: {day!r}")
+    y, w, _ = d.isocalendar()
     return f"{y}-W{w:02d}"
 
 
