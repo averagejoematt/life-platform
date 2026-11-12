@@ -461,7 +461,10 @@ def test_the_squat_prep_cue_stays_beside_a_reason_line_when_it_fits():
     squat = ExerciseBlock(movement_key="squat_barbell", sets=[_n(215, 8, 12) for _ in range(3)], rationale_tag="anchor:squat:volume")
     history = {**_history("deadlift_trap_bar", ("2026-10-19", 235, 8, 8.5)), **_history("squat_barbell", ("2026-10-23", 265, 4, 9.0))}
     _compose([hinge, squat], history, target="2026-10-29")
-    assert squat.notes == "RPE 8–9\nVolume day: chase 12.\nAnkles + hips first. Brace each rep, breathe between reps.", squat.notes
+    # #5817 (owner ruling 2026-11-11, D8): the barbell squat's one sheet cue rides with them and still fits 4 lines
+    assert (
+        squat.notes == "RPE 8–9\nVolume day: chase 12.\nAnkles + hips first. Knees track the toes. Brace each rep, breathe between reps."
+    ), squat.notes
     assert g.phone_lines(squat.notes) == g.LIFT_MAX_LINES
 
 
