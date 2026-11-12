@@ -132,9 +132,18 @@ def what_changed(*, _g) -> dict:
         )
     item = _decimal_to_float(item)
     # Owner rulings 2026-11-03/05: a newly-unlocked pair naming a private metric is omitted, and the
-    # honest-null flag is re-judged over what is served (common.activity_publication).
+    # honest-null flag is re-judged over what is served (common.activity_publication). 2026-11-12: a day_grade /
+    # habit_pct pair is "newly unlocked" only against earlier PUBLIC-METHOD weeks (public_newly_unlocked).
     deltas = item.get("deltas", [])
-    unlocked = [u for u in item.get("newly_unlocked", []) or [] if _activity_publication.correlation_pair_is_public(u)]
+    unlocked = _activity_publication.public_newly_unlocked(
+        item.get("newly_unlocked", []),
+        _activity_publication.unlocked_baseline_records(
+            table,
+            with_phase_filter({"KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations")}),
+            item.get("newly_unlocked"),
+        ),
+        item.get("window_end"),
+    )
     return _ok(
         {
             "deltas": deltas,
