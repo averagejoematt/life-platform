@@ -33,6 +33,8 @@ import {
   unservedText,
 } from "../../../lib/day.js";
 import { callOutcome, dayInWords, num } from "../../../lib/format.js";
+import { VISIBLE_CAP, callsAboutDay, leadLine } from "../../../lib/day_coaching.js";
+import StatusTag from "../../../components/StatusTag.astro";
 import { gradeNoteRows } from "../../../lib/corrections.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
@@ -119,6 +121,12 @@ const coachHref = (id: string) => (all.get("coach", id) ? href(pathOf("coach", i
 const foodTile = food
   ? { value: food.calories != null ? num(food.calories, 0) : "—", unit: "kcal", d: food.logging_gap ? "a logging gap — entries not made; not counted as eaten" : `${food.protein_g != null ? `${num(food.protein_g, 0)} g protein` : "protein not logged"}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}` }
   : { value: "—", unit: "", d: d.food_state === "not logged" ? "not logged — missing, not zero" : "not readable for this day" };
+// The day → what the coaches called about it → how the window closed (owner brief 2026-11-12). The public ledger's own
+// objects, withheld calls left out entirely (lib/day_coaching.js); no calls, no section — the part stays as an empty
+// anchor so the in-place day swap (islands/day.js) can fill it.
+const dayCalls = callsAboutDay(all.byType.prediction, d.date);
+const dayCallsShown = dayCalls.slice(0, VISIBLE_CAP);
+const dayCallsMore = dayCalls.slice(VISIBLE_CAP);
 const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_through, sample: d.sample, source: d.source, absent_text: d.absent_text };
 ---
 
@@ -452,6 +460,109 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
         </div>
       </div>
     </section>
+
+    <div data-day-part="coaching">
+      {
+        dayCalls.length > 0 && (
+          <section class="section hair" aria-labelledby="day-calls-h">
+            <div class="wrap daycalls">
+              <h2 id="day-calls-h">What the coaches called for this day</h2>
+              <p class="small muted daycalls-lead">{leadLine(dayCalls, d.date)}</p>
+              {[dayCallsShown, dayCallsMore].map((group, gi) => {
+                const list = (
+                  <ol class="daycall-list">
+                    {group.map((c) => (
+                      <li class="daycall" data-day-call={c.id} data-timing={c.timing}>
+                        <div class="daycall-head">
+                          <span class={`when ${c.timing}`}>{c.tag}</span>
+                          <span class="daycall-who">
+                            {coachHref(c.coach_id) ? <a href={coachHref(c.coach_id)}>{c.coach_name}</a> : c.coach_name} · said {c.saidWords}
+                          </span>
+                          <StatusTag status={c.status} call disputed={c.disputed} />
+                          <a class="daycall-ledger" href={predHref(c.id)}>
+                            On the ledger
+                          </a>
+                        </div>
+                        <p class="daycall-line">
+                          {c.words ? <>Predicted <Quote text={c.words} said={c.said} /></> : <>Predicted, in the grader's terms: <span class="mono">{c.test}</span></>}{`; the window closed ${c.closedWords}${c.closed}.`}
+                        </p>
+                        <details class="daycall-more">
+                          <summary>How it was graded</summary>
+                          <dl class="kv">
+                            <dt>When said</dt>
+                            <dd>
+                              {c.saidWords} · {c.note}
+                            </dd>
+                            {c.words && c.test && (
+                              <>
+                                <dt>The test</dt>
+                                <dd class="mono">{c.test}</dd>
+                              </>
+                            )}
+                            {!c.words && (
+                              <>
+                                <dt>The words</dt>
+                                <dd>Not published on the ledger; the line above is the grader's test.</dd>
+                              </>
+                            )}
+                            <dt>Window closed</dt>
+                            <dd>{c.closedWords}</dd>
+                            {c.gradedWords && (
+                              <>
+                                <dt>Graded</dt>
+                                <dd>{c.gradedWords}</dd>
+                              </>
+                            )}
+                            {c.notes && (
+                              <>
+                                <dt>The grader read</dt>
+                                <dd>{c.notes}</dd>
+                              </>
+                            )}
+                            {c.tolerance && (
+                              <>
+                                <dt>Tolerance</dt>
+                                <dd>{c.tolerance}</dd>
+                              </>
+                            )}
+                            {c.guess && (
+                              <>
+                                <dt>Beside a simple guess</dt>
+                                <dd>{c.guess}</dd>
+                              </>
+                            )}
+                            {c.flags.length > 0 && (
+                              <>
+                                <dt>Flagged</dt>
+                                <dd>{c.flags.join(" · ")}</dd>
+                              </>
+                            )}
+                            {c.corrected && (
+                              <>
+                                <dt>Corrected</dt>
+                                <dd>This grade was corrected; the original is kept on the ledger.</dd>
+                              </>
+                            )}
+                          </dl>
+                        </details>
+                      </li>
+                    ))}
+                  </ol>
+                );
+                return gi === 0 ? (
+                  list
+                ) : group.length > 0 ? (
+                  <details class="daycall-rest">
+                    <summary>The other {group.length}</summary>
+                    {list}
+                  </details>
+                ) : null;
+              })}
+            </div>
+          </section>
+        )
+      }
+    </div>
 
     <section class="section hair" data-day-part="coaches-calls">
       <div class="wrap grid cols2 daylayer" style="gap:40px 56px;align-items:start">
