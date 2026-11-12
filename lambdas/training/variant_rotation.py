@@ -659,8 +659,16 @@ def for_session(
         return out
     from training import selection_engine
 
+    # #5861 L3: the Hevy record rides to the engine, which reads it ONLY when the library is approved (live policy: each
+    # movement's trend and discomfort, the fatigue model's swaps); in shadow it is ignored and the output is unchanged
     return selection_engine.apply(
-        out, catalog_movements, rows=rows, skill_ceiling=skill_ceiling, target_date=_draft_day(day_entry), approvals=approvals
+        out,
+        catalog_movements,
+        rows=rows,
+        skill_ceiling=skill_ceiling,
+        target_date=_draft_day(day_entry),
+        approvals=approvals,
+        block_workouts=block_workouts,
     )
 
 

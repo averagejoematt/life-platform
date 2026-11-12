@@ -190,15 +190,67 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
     """
     from training.routine_generator import GeneratorInputs
 
-    return GeneratorInputs(
+    live = _live_inputs(target_date)  # #5861 L3: {} unless the exercise library is approved — then the real values
+    inputs = GeneratorInputs(
         target_date=target_date,
-        recovery_tier="yellow",
-        acwr_flag="safe",
-        volume_7d={},
+        recovery_tier=live.get("recovery_tier") or "yellow",
+        acwr_flag=live.get("acwr_flag") or "safe",
+        volume_7d=live.get("volume_7d") or {},
         z2_minutes_7d=_z2_minutes_7d(target_date),
         days_since_last_workout=2,
         add_load_enabled=add_load_enabled,
     )
+    if live.get("sleep_hours") is not None:
+        setattr(inputs, "sleep_hours", live["sleep_hours"])  # read by fatigue_model.for_live_draft (live only)
+    return inputs
+
+
+# #5861 L3 — the audit's live-wiring bug (gap 4): the cron typed recovery "yellow", ACWR "safe" and an empty 7-day volume
+# for every draft, and the ACWR writer's zones (`safe | caution | danger`) never matched the generator's autoreg keys
+# (`high | very_high`), so "danger" could not reach the 0.6 multiplier. Behind THE SWITCH only: while the library is
+# proposed the three values stay exactly as they were.
+ACWR_ZONE_TO_AUTOREG = {"safe": "safe", "caution": "caution", "danger": "high"}  # anything else (detraining, re-baselining) = safe
+RECOVERY_BANDS = (67, 34)  # green >= 67, yellow >= 34 — the bands `mcp/tools_plan._recovery_tier` maps the score with
+
+
+def _latest(rows: list[dict[str, Any]] | None, field: str) -> Any:
+    hits = sorted((r for r in rows or [] if r.get(field) is not None), key=lambda r: str(r.get("sk") or r.get("date") or ""))
+    return hits[-1].get(field) if hits else None
+
+
+def _live_inputs(target_date: str, read=None) -> dict[str, Any]:
+    """The real recovery tier, ACWR flag, 7-day hard sets per muscle and sleep — ONLY when the exercise library is approved
+    (`selection_engine.mode`). Each read is fail-soft: an unread value keeps the conservative default."""
+    from training import fatigue_model, selection_engine as se
+
+    lib = se.load_library_failsoft()  # the same cached read the draft's selection makes
+    if se.mode(lib) != se.MODE_LIVE:
+        return {}
+    read = read or _read_partition
+    out: dict[str, Any] = {}
+
+    def _safe(source: str, days: int) -> list[dict[str, Any]] | None:
+        try:
+            return read(source, shift_day_key(target_date, -days), target_date)
+        except Exception as e:  # noqa: BLE001 — unread keeps the default
+            logger.warning(f"live input read failed for {source}: {type(e).__name__}")
+            return None
+
+    from health import hr_regime
+
+    whoop = _safe("whoop", 1)
+    score = _latest(whoop, "recovery_score")
+    if score is not None and not hr_regime.is_rebaselining(target_date):  # HR-derived tiers are not evidence in the window
+        out["recovery_tier"] = "green" if float(score) >= RECOVERY_BANDS[0] else ("yellow" if float(score) >= RECOVERY_BANDS[1] else "red")
+    sleep = _latest(whoop, "sleep_duration_hours")
+    out["sleep_hours"] = float(sleep) if sleep is not None else None
+    zone = _latest(_safe("computed_metrics", 2), "acwr_zone")
+    out["acwr_flag"] = ACWR_ZONE_TO_AUTOREG.get(str(zone), "safe") if zone is not None else None
+    hevy = _safe("hevy", 7)
+    if hevy is not None:
+        sets = fatigue_model.hard_sets_by_muscle(hevy, fatigue_model.library_index(lib), as_of=target_date)
+        out["volume_7d"] = {m: int(round(n)) for m, n in sets.items() if m != "unplaced"}
+    return out
 
 
 def lambda_handler(event, context):

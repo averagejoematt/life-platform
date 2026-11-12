@@ -25,6 +25,7 @@ import functools
 from typing import Any
 
 from training import (
+    fatigue_model,
     in_block_variant,
     lift_note,
     load_ramp,
@@ -310,6 +311,7 @@ def _prescription(
         accessory_variants=rotation["variants"],
         measured_minutes=session_time.role_median_minutes(block_workouts, day_entry["session_role"]),  # #5799
     )
+    rx = fatigue_model.for_live_draft(rx, rotation, inputs, block_workouts)  # #5861 L3: LIVE only — in shadow it returns rx itself
     return in_block, rotation, rx
 
 

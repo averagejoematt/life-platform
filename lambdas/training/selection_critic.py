@@ -160,9 +160,22 @@ def judge_slot(
     return base | {"verdict": "pass", "stands": "best_available", "why": f"no movement for this slot's job ranks above tier {tier}"}
 
 
-def _record_slot(key: str, entry: dict[str, Any], slot: dict[str, Any], rec: dict[str, Any] | None, library: dict) -> dict | None:
+def _record_slot(
+    key: str,
+    entry: dict[str, Any],
+    slot: dict[str, Any],
+    rec: dict[str, Any] | None,
+    library: dict,
+    policy: dict | None = None,
+    mid: str | None = None,
+) -> dict | None:
     """No catalog: judge against the selection record the draft carries (its pick is the best the engine could serve)."""
-    gates = se.locked_gates(entry, library)
+    if policy is not None:  # #5861 L3, live only: the stored gate evaluation (fail-closed)
+        from training import selection_live
+
+        gates = selection_live.gate_locked(entry, library, str(mid or key), policy.get("gate_eval"))
+    else:
+        gates = se.locked_gates(entry, library)
     if gates:
         return {
             "verdict": "change",
@@ -258,6 +271,8 @@ def _one(i: int, key: str, ir: Any, env: dict | None, taken: Counter, records: d
         spec_slot = next((s for s in vr.slots() if s["slot_id"] == slot["slot_id"]), None)
         if spec_slot:
             ctx = se._ctx(spec_slot, env, step)  # the engine's own per-slot context (muscle, job, floor)
+            if args.get("policy") is not None:  # #5861 L3, live only: the engine's live facts (evaluated gates, objective tier)
+                ctx |= {"policy": args["policy"], "slot_id": slot["slot_id"]}
             pin = _pinned(slot, rec, key, args["owner_pins"])
             prefer = ((rec or {}).get("pick") or {}).get("catalog_key")
             return head | {"movement_id": lid, "slot_id": slot["slot_id"]} | judge_slot(key, slot, ctx, taken, pin=pin, prefer=prefer)
@@ -270,7 +285,7 @@ def _one(i: int, key: str, ir: Any, env: dict | None, taken: Counter, records: d
         swap = next((f.get("catalog_key") for f in (rec or {}).get("fallbacks") or [] if f.get("catalog_key") != key), None)
         return head | {"verdict": "change", "why": why, "to": swap}
     if slot and not _pinned(slot, rec, key, args["owner_pins"]):
-        return head | (_record_slot(key, entry, slot, rec, library) or {"verdict": "pass"})
+        return head | (_record_slot(key, entry, slot, rec, library, args.get("policy"), lid) or {"verdict": "pass"})
     return head | {"verdict": "pass"}
 
 
@@ -285,8 +300,13 @@ def evaluate(
     owner_pins: dict[str, dict[str, Any]] | None = None,
     missing: list[str] | None = None,
     skill_ceiling: int = 2,
+    gate_eval: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The `selection` critic over one draft (`RoutineSpec` or its dict). Pure.
+
+    #5861 L3: with an APPROVED library the critic judges by the engine's LIVE facts (`selection_live`: the evaluated gates —
+    `gate_eval` is the stored #5772 row, None = every gate locked — and the slot objective's tier); while proposed it is
+    the #5775 critic exactly.
 
     `catalog` (the movement catalog) arms the per-slot red team (`judge_slot`); without it each slot is judged against the
     selection record the draft carries. `week_commitments` is stage 1's #5774 result, when the caller holds it.
@@ -299,7 +319,13 @@ def evaluate(
     kmap = env["idx"]["to_lib"] if env else {c["catalog_key"]: c["movement_id"] for s in records.values() for c in _named(s)}
     rot = snap.get("rotation") if isinstance(snap.get("rotation"), dict) else {}
     taken = week_taken(ir, rot, catalog)
-    args = {"library": library, "overlay": overlay, "inventory": inventory, "owner_pins": owner_pins}
+    args = {
+        "library": library,
+        "overlay": overlay,
+        "inventory": inventory,
+        "owner_pins": owner_pins,
+        "policy": _live_policy(library, rot, ir, gate_eval),
+    }
     verdicts = []
     for i, key in enumerate(_keys(ir)):
         verdicts.append(_one(i, key, ir, env, taken, records, kmap, args))
@@ -320,6 +346,19 @@ def evaluate(
         "week_source": week_source,
     }
     return out | {"stage2": as_critic_verdict(out)}  # the stage-2 verdict the registry appends (#5784)
+
+
+def _live_policy(library: dict[str, Any], rot: dict[str, Any], ir: Any, gate_eval: dict[str, Any] | None) -> dict[str, Any] | None:
+    """#5861 L3: the engine's live policy for the critic — None unless the library is approved (no Hevy record: trends
+    unknown; the critic judges availability and tier, never a hold)."""
+    if se.mode(library) != se.MODE_LIVE:
+        return None
+    from training import selection_live
+
+    ge = {"state": "read", "row": gate_eval} if isinstance(gate_eval, dict) else None
+    return selection_live.build_policy(
+        library, position=rot.get("position"), rows=None, block_workouts=None, as_of=getattr(ir, "target_date", None), gate_eval=ge
+    )
 
 
 def _named(s: dict[str, Any]) -> list[dict[str, Any]]:
