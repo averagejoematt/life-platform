@@ -4,10 +4,11 @@ Split out of ``site_api_vitals.py`` (#1654 — god-module breakup). One seam: **
 measured chemistry**, and it is the module carrying the platform's hardest privacy
 absolutes:
 
-  * `/api/genome_risks` publishes AGGREGATES ONLY (counts + risk levels + the
-    disclosure saying why detail is absent). Named genes, rsids, per-variant
-    summaries and implications must NEVER reach the response — a Tier-2 owner-only
-    boundary, and any per-variant publication is a PRE-13 decision.
+  * `/api/genome_risks` publishes NO genetic finding at all (owner ruling
+    2026-11-11): no variant, no category, no count, no risk summary — only a
+    status and a disclosure. Aggregation does not make genetic findings safe;
+    the analysis stays in the owner-only DynamoDB genome partition, which this
+    handler does not even read. Any publication is a PRE-13 decision.
   * `/api/labs` runs every panel through ``_strip_genetic_biomarkers``
     (``_GENETIC_CATEGORY_RE`` / ``_GENETIC_TEXT_RE``) so a pharmacogenomic marker
     filed as an ordinary lab cannot leak through the labs door instead.
@@ -31,18 +32,14 @@ import json
 import os
 import re as _re  # genetic-biomarker strip regexes (labs)
 from datetime import timezone
-from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Key
 from health.sensor_absence import absence_verdict, is_stale
 
 from web.site_api_common import (
     PT,
     S3_REGION,
     USER_ID,
-    USER_PREFIX,
-    _decimal_to_float,
     _error,
     _get_profile,
     _ok,
@@ -57,73 +54,32 @@ from web.site_api_common import (
 # ════════════════════════════════════════════════════════════════════════
 
 
+GENOME_PUBLIC_DISCLOSURE = (
+    "Genome analysis is owner-only. No genetic findings are published here: no variants, genes, "
+    "categories, counts or risk summaries, because even aggregated genetic results are personal."
+)
+
+
 def genome_risks(*, _g) -> dict:
     """
     GET /api/genome_risks
-    Returns genome risk AGGREGATES grouped by category. Cache: 86400s (24h).
+    Returns a status only. Cache: 86400s (24h).
 
-    PRIVACY ABSOLUTE — no genetic IDENTIFIER may reach this public payload.
-    The docstring here used to say "no raw genotypes exposed", which was true
-    and beside the point: this endpoint served 111 dbSNP `rsid` values and 93
-    `gene` names, each paired with the owner's personal risk classification, to
-    any unauthenticated caller. An rsID IS the identifier — it is what
-    `_GENETIC_TEXT_RE` (line ~2450 of this same file) exists to keep out of the
-    public labs payload, what `docs/DATA_GOVERNANCE.md` classes Tier 2
-    owner-only, and what #920/#945 purged from three other surfaces. This
-    handler was simply never brought under the rule (guard-the-instance, not
-    the set), and PRE-13 — the review that would decide whether ANY of this may
-    be published — is still deferred. Until that decision is Matthew's to make
-    explicitly, the public shape is aggregate-only:
+    PRIVACY ABSOLUTE (owner ruling 2026-11-11): individual variants, inferred
+    outcomes, genetic risk CATEGORIES and personalised genetic risk summaries are
+    private by default, and aggregation does not make them safe. History: the
+    per-variant payload (rsid, gene, readouts) was withdrawn 2026-08-02; the
+    per-category {n, risk_levels} aggregate that replaced it still revealed
+    single-variant results in 1-2 variant categories and named a drug-response
+    category, so on 2026-11-11 every genetic finding left this payload.
 
-      per category: how many variants, and the risk-level distribution.
-
-    That keeps the honest reader-facing fact ("the genome has been analysed and
-    here is the shape of it") without publishing which variants he carries.
-    Restoring per-variant detail is a PRE-13 decision, not a code change.
+    The route stays (rather than 404) so the pages and the nightly archive that
+    list it keep resolving; it answers with a status and a disclosure and
+    deliberately does NOT read the genome partition, so no future edit here can
+    leak a field from a row it never loaded. Restoring any genetic content is a
+    PRE-13 decision for the owner, not a code change.
     """
-    table = _g["table"]
-
-    pk = f"{USER_PREFIX}genome"
-    resp = table.query(KeyConditionExpression=Key("pk").eq(pk))
-    items = _decimal_to_float(resp.get("Items", []))
-
-    if not items:
-        # No genome uploaded yet — shaped-empty 200 so the page shows "not yet published".
-        return _ok(
-            {"genome": {"total_snps": 0, "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}, "categories": {}}},
-            cache_seconds=3600,
-        )
-
-    categories: dict[str, dict[str, Any]] = {}
-    risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
-
-    for snp in items:
-        cat = snp.get("category", "other")
-        risk = snp.get("risk_level", "neutral")
-        risk_summary[risk] = risk_summary.get(risk, 0) + 1
-        # Aggregate ONLY — never the rsid, the gene, or the per-variant free
-        # text (summary/implications carried genotype calls). Counting a
-        # category is a fact about the analysis; naming a variant is a fact
-        # about the person.
-        bucket = categories.setdefault(cat, {"n": 0, "risk_levels": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}})
-        bucket["n"] += 1
-        bucket["risk_levels"][risk] = bucket["risk_levels"].get(risk, 0) + 1
-
-    return _ok(
-        {
-            "genome": {
-                "total_snps": len(items),
-                "risk_summary": risk_summary,
-                "categories": dict(sorted(categories.items())),
-                "disclosure": (
-                    "Per-variant detail (identifiers, genes, and their individual readouts) is deliberately "
-                    "not published: genome variants are owner-only under this platform's data-governance tiers. "
-                    "These are counts of what was analysed, not which variants he carries."
-                ),
-            }
-        },
-        cache_seconds=86400,
-    )
+    return _ok({"genome": {"status": "private", "disclosure": GENOME_PUBLIC_DISCLOSURE}}, cache_seconds=86400)
 
 
 def glucose(*, _g) -> dict:

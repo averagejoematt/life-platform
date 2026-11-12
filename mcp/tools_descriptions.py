@@ -76,7 +76,7 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "fitted to its resolved calorie target and day type, four feedings at the protein threshold, the macro floors — with "
     "each day's fit verdict and the cook days' grocery list (optional week_start, a Monday; default the coming week). "
     "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
-    "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
+    "(six_minute_walk m, treadmill_20min_fixed bpm over minutes 10-20 with the RPE in the note, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
     "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due. "
     "action='note_requests' (#5573, OWNER-ONLY READ): what he ASKED for in a Hevy note (form guidance, a question, a "
     "rule) — open requests, the overdue count, recent replies; action='answer_request' / 'decline_request' (request_id, "
@@ -181,7 +181,7 @@ GET_EXERCISE_NOTES_INPUT = {
         "results": {
             "type": "object",
             "description": (
-                "action='fitness_test': {test: value} — six_minute_walk (m), bike_20min_rpe6 (m), dead_hang (s), "
+                "action='fitness_test': {test: value} — six_minute_walk (m), treadmill_20min_fixed (bpm, minutes 10-20; RPE in the note), bike_20min_rpe6 (m), dead_hang (s), "
                 "assisted_pull_up (lb of assistance; lower is better). Any subset; a second call on the same date merges."
             ),
         },
