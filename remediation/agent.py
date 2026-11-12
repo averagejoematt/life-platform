@@ -20,7 +20,7 @@ Flow per run:
          gap-fill): done directly via the scoped role.
   4. Claude emits a JSON summary; we render + email it (SES) and write the audit log.
      The email is SKIPPED when the needs-human hand-off is unchanged since the last send
-     (#5821, remediation/email_gate.py); the audit log is always written.
+     (#5821, remediation/email_change.py); the audit log is always written.
 
 Triggered by: schedule (daily sweep) or repository_dispatch (urgent_alarm).
 Auth: AWS OIDC (Bedrock + read-only diagnosis + scoped ops). Model: Sonnet 4.6.
@@ -35,7 +35,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 import drift_report
-import email_gate
+import email_change
 import signal_identity
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -923,7 +923,7 @@ def email_report(report, mode):
     stale = report.get("stale", [])
     unt = report.get("untriaged", [])
     # #5821: one email per CHANGE in the hand-off, not one per run.
-    send, why = email_gate.should_send(report, email_gate.load_last_sent(_s3, LOG_BUCKET), os.environ.get("GITHUB_EVENT_NAME", ""))
+    send, why = email_change.should_send(report, email_change.load_last_sent(_s3, LOG_BUCKET), os.environ.get("GITHUB_EVENT_NAME", ""))
     if not send:
         print(f"report email skipped: {why}")
         return False
@@ -962,7 +962,7 @@ def email_report(report, mode):
     except Exception as e:
         print(f"[warn] SES send: {e}")
         return False
-    email_gate.save_last_sent(_s3, LOG_BUCKET, report, f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}")
+    email_change.save_last_sent(_s3, LOG_BUCKET, report, f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}")
     return True
 
 

@@ -1,4 +1,4 @@
-"""remediation/email_gate.py — send the remediation email only when the hand-off changed (#5821).
+"""remediation/email_change.py — send the remediation email only when the hand-off changed (#5821).
 
 The agent runs Mon/Wed/Fri plus every urgent `repository_dispatch`, and until #5821 every run
 sent one email. #4034 already stopped a line whose state had not moved from being re-sent as
