@@ -75,6 +75,12 @@ def _calls():
     return [e for e in NA.APPROVED if e.sk.startswith("PREDICTION#")]
 
 
+def _worded():
+    """The approved calls whose words are available here: all 14 with the private original, else the 8 the labelled
+    test copy still carries (six are stand-ins since the 2026-11-11 privacy cleanup, tests/sealed_prereg.py)."""
+    return sealed_prereg.with_words(_calls())
+
+
 def _leads():
     return [e for e in NA.APPROVED if e.sk.startswith("LEAD_DAILY#")]
 
@@ -129,9 +135,14 @@ def test_every_sealed_call_is_the_sealed_artifacts_words_and_public_in_the_live_
     """Derivation guard: the hash is of a frozen pre-registration claim, and the live call policy lists the call
     public (the two the owner's 2026-11-09 ruling keeps private are not on the list)."""
     sealed_hashes = {_sha(c) for c in SEALED}
+    unmatched = len(_calls()) - len(_worded())
+    # Without the private original the six stand-in calls cannot be matched; with it, every one must be.
+    assert sealed_prereg.stand_in_count() == 6
+    assert unmatched == (0 if sealed_prereg.sealed_path() else 6), unmatched
     for e in _calls():
-        assert e.text_sha256 in sealed_hashes, e.sk
         assert PP.digest(e.pk, e.sk[len("PREDICTION#") :]) in REG.PUBLIC_DIGESTS, e.sk
+    for e in _worded():
+        assert e.text_sha256 in sealed_hashes, e.sk
         assert PP.classify_call(e.pk, _sealed_row(e)) == (PP.PUBLIC, "registry"), e.sk
 
 
@@ -149,7 +160,7 @@ def test_the_module_carries_no_coach_words():
 
 
 def test_switch_off_an_approved_call_stays_withheld_in_every_scope():
-    row = _sealed_row(_calls()[0])
+    row = _sealed_row(_worded()[0])
     for scope in (None, NA.SCOPE_CR2):
         G.begin_request()
         if scope:
@@ -164,14 +175,14 @@ def test_switch_off_an_approved_call_stays_withheld_in_every_scope():
 
 def test_switch_on_outside_the_scope_nothing_changes(cr2_on):
     """Every live route reads outside the scope: an approved row is withheld exactly as before."""
-    row = _sealed_row(_calls()[1])
+    row = _sealed_row(_worded()[1])
     G.begin_request()
     assert G.gate_item(dict(row)) == row and G.withheld_count() == 1
     assert G.is_tainted(row["claim_natural"])
 
 
 def test_in_scope_an_approved_unchanged_call_is_served(cr2_on, ldl_counterfactual):
-    e = _calls()[2]
+    e = _worded()[2]
     row = _sealed_row(e)
     G.begin_request()
     G.gate_item(dict(row))  # an earlier, out-of-scope request in the same container taints the words
@@ -228,7 +239,7 @@ def test_negative_control_a_historical_row_not_on_the_list_stays_withheld(cr2_on
 )
 def test_a_listed_row_carrying_a_private_or_broken_record_fails_closed(cr2_on, record):
     """The row's own record decides — the allowlist never overrides a private-family marker."""
-    row = {**_sealed_row(_calls()[3]), "provenance": record}
+    row = {**_sealed_row(_worded()[3]), "provenance": record}
     with NA.serving(NA.SCOPE_CR2):
         G.begin_request()
         out = G.gate_item(dict(row))
@@ -239,7 +250,7 @@ def test_a_listed_row_carrying_a_private_or_broken_record_fails_closed(cr2_on, r
 
 
 def test_a_listed_row_whose_words_changed_is_not_the_approved_row(cr2_on):
-    row = _sealed_row(_calls()[4])
+    row = _sealed_row(_worded()[4])
     row["claim_natural"] = row["claim_natural"] + " "
     with NA.serving(NA.SCOPE_CR2):
         assert NA.record_for(row) is None
@@ -283,7 +294,7 @@ def test_a_listed_row_whose_words_name_private_activity_fails_closed(cr2_on, mon
 
 
 def test_only_the_cr2_scope_is_honoured(cr2_on, ldl_counterfactual):
-    row = _sealed_row(_calls()[5])
+    row = _sealed_row(_worded()[5])
     with NA.serving("cr3"):
         assert NA.record_for(row) is None
     with NA.serving(NA.SCOPE_CR2):

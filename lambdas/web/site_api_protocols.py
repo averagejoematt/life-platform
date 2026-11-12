@@ -254,7 +254,10 @@ def supplements(*, _g) -> dict:
         {
             "as_of_date": as_of_date,
             "groups": groups,
-            "genome_snps": registry.get("genome_snps", []),
+            # Owner ruling 2026-11-11: genetic findings are private, so a variant list in the
+            # registry is never passed through to this public route (fail closed; key kept
+            # empty so existing readers still get a list).
+            "genome_snps": [],
             "total_count": total_count,
         },
         cache_seconds=3600,
