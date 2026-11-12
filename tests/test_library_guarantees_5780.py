@@ -57,7 +57,7 @@ CHARTER0 = json.loads((REPO / "config" / "training_charter.json").read_text())
 CEILING = 2  # the generator's default skill ceiling (`select_week`'s default)
 KB_EXPOSURES = (0, kb_entry.ENTRY_EXPOSURES)  # the KB slot before (the KB deadlift) and after (the swing) its entry
 WARN_DAY, BLOCK_DAY = "2026-11-12", wf.KETTLEBELL_BLOCK_FROM  # the kettlebell commitment warns, then blocks
-BW_OVERLAY_GATES = ("bw_pull", "bw_dip", "bw_pushup", "bw_nordic", "bw_hanging", "bw_advanced")
+BW_OVERLAY_IDS = ("bw_pull", "bw_dip", "bw_pushup", "bw_nordic", "bw_hanging", "bw_advanced")
 
 
 @pytest.fixture(autouse=True)
@@ -521,7 +521,7 @@ def _synthetic_world() -> tuple[dict, dict]:
     """(overlay, measured) — every input the gates read, SYNTHETIC: thresholds far above a synthetic 7-day mean, the run
     gate open, a technique confirmation, the shipped (public) charter, an empty but READ Hevy record."""
     overlay = {
-        "gate_thresholds": {g: {"value": 999} for g in BW_OVERLAY_GATES},
+        "gate_thresholds": {g: {"value": 999} for g in BW_OVERLAY_IDS},
         "technique_confirmations": {m: True for m in xl.movements(LIB0)},
     }
     measured = {
@@ -566,7 +566,7 @@ def _public_threshold_values(lib: dict) -> list[str]:
 def test_g5_the_six_bw_thresholds_are_null_in_public_and_read_locked():
     assert _public_threshold_values(LIB0) == []
     assert sorted(g for g, v in LIB0["gates"].items() if v["kind"] == "bodyweight_threshold" and "ref" in v["threshold"]) == sorted(
-        BW_OVERLAY_GATES
+        BW_OVERLAY_IDS
     )
     # control: a number planted in the public file, or an unknown input that is not locked, is named
     lib = _lib()
@@ -576,13 +576,13 @@ def test_g5_the_six_bw_thresholds_are_null_in_public_and_read_locked():
     _ov, measured = _synthetic_world()
     no_overlay = eg.evaluate_gates(_lib(), None, measured)
     not_set = eg.evaluate_gates(_lib(), {"gate_thresholds": {}}, measured)
-    for gid in BW_OVERLAY_GATES:
+    for gid in BW_OVERLAY_IDS:
         assert (no_overlay[gid]["state"], no_overlay[gid]["input"]) == (eg.LOCKED, eg.UNKNOWN), gid
         assert (not_set[gid]["state"], not_set[gid]["input"], not_set[gid]["reason"]) == (eg.LOCKED, eg.NOT_SET, eg.THRESHOLD_NOT_SET)
         assert not_set[gid]["value_seen"] is None
     # control: a SYNTHETIC owner threshold plus a measured mean opens them — the lock is the missing input, not a constant
     opened = eg.evaluate_gates(_lib(), _synthetic_world()[0], measured)
-    assert all((opened[g]["state"], opened[g]["input"]) == (eg.UNLOCKED, eg.MEASURED) for g in BW_OVERLAY_GATES)
+    assert all((opened[g]["state"], opened[g]["input"]) == (eg.UNLOCKED, eg.MEASURED) for g in BW_OVERLAY_IDS)
 
 
 def _drop_offenders(drop: str) -> list[str]:
