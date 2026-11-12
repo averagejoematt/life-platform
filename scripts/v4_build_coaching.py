@@ -137,6 +137,7 @@ SHELL = """<!DOCTYPE html>
       <p class="ph-kicker label">the coaching<span data-bind="coachingDay" hidden></span></p>
       <h1 class="ph-title">The Coaching</h1>
       <p class="ph-promise">{roster_word} AI characters, software not people, read his numbers every morning.</p>
+      {room}
       {ribbon}
     </div>
     {proof}{today}
@@ -161,6 +162,27 @@ SHELL = """<!DOCTYPE html>
 # #578 — inline the shared loop-ribbon once (constant for this door) before the
 # per-page .format() calls, so the spine can't drift from the other builders.
 SHELL = SHELL.replace("{ribbon}", loop_ribbon("coaching"))
+
+# The Coaching Room door (owner-approved 2026-11-11, after the CR2 launch #5827): one text line in the hero —
+# no image, no script, no fetch, so the first screen's weight and LCP are unchanged. The Room lives on the v9
+# build at /system/ (the graded record) and the lead's record page (his past reads, published as written,
+# each dated correction beside the original words). The lead is DERIVED from the persona registry, never typed.
+ROOM_LINE = (
+    '<p class="ph-room"><span class="label">on the record</span> '
+    '<a href="/system/">The Coaching Room</a> grades every call they make against a simple guess, '
+    'and publishes <a href="/system/coaches/{lead_id}/record/#approved-words">{lead_name}&rsquo;s past reads</a> '
+    "as written, each dated correction beside the original words.</p>"
+)
+
+
+def room_line() -> str:
+    """ROOM_LINE with the lead coach the registry names (the one whose past reads the Room publishes)."""
+    lead = persona_registry.lead_persona()
+    name = lead.get("name")
+    if not (lead.get("lead") and name):
+        raise SystemExit("v4_build_coaching: the persona registry names no lead — refusing to link a record page")
+    return ROOM_LINE.format(lead_id=persona_registry.LEAD_PERSONA_ID, lead_name=name)
+
 
 # #4182: the first-screen mount — emitted on the hub and /coaching/read/ only (the two
 # shells whose default view IS the read); every other section opens on its own content.
@@ -210,6 +232,7 @@ def main() -> None:
     # topical title/desc + the generic home card.
     hub_og = coaching_og(read)
     word = roster_word()
+    room = room_line()
 
     write(
         OUT / "index.html",
@@ -221,6 +244,7 @@ def main() -> None:
             proof=read_proof,
             today=TODAY_MOUNT,
             roster_word=word,
+            room=room,
             og_title=hub_og[("property", "og:title")],
             og_desc=hub_og[("property", "og:description")],
             og_image=hub_og[("property", "og:image")],
@@ -244,6 +268,7 @@ def main() -> None:
                 proof=proof,
                 today=TODAY_MOUNT if key == "read" else "",
                 roster_word=word,
+                room=room,
                 og_title=section_title,
                 og_desc=desc,
                 og_image=_OG_HOME,

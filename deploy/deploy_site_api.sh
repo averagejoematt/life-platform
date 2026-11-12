@@ -42,3 +42,7 @@ aws lambda invoke --function-name "$FN" --region "$REGION" --cli-binary-format r
 python3 -c "import json,sys; d=json.load(open('/tmp/siteapi_verify.json')); \
 assert 'errorType' not in d, ('HANDLER FAILED: '+json.dumps(d)[:300]); \
 print('✅ site-api OK — status', d.get('statusCode'), 'on $VERIFY_PATH')"
+
+# A v9 deploy that DEFERRED while this API lagged its commit resumes now (deploy/www_api_readiness.py;
+# web-deploy-resume.yml's hourly schedule is the backstop if this call cannot reach GitHub).
+python3 "$ROOT/deploy/www_api_readiness.py" resume || echo "⚠️  v9 resume check did not complete — web-deploy-resume.yml retries hourly"
