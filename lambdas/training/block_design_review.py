@@ -64,7 +64,7 @@ EXPERIMENT_EMPTY = {
 
 # The gate value-state vocabulary. Read from an evaluator row's `state` and `input` ONLY (#5772's row also holds
 # `value_seen` and a `reason`, both private-capable): the phrase never carries a number.
-GATE_PHRASES = {
+LOCK_STATE_WORDS = {
     "unlocked": "unlocked",
     "cue": "a cue, never a lock",
     "not_set": "locked: threshold not set",
@@ -108,10 +108,10 @@ def gate_state(gate_eval: Optional[Mapping[str, Any]], gate_id: str, movement_id
 def gate_phrase(state: Mapping[str, Any]) -> str:
     """The owner-facing words for a gate's value state. Never a number."""
     if state.get("input") == "cue":
-        return GATE_PHRASES["cue"]
+        return LOCK_STATE_WORDS["cue"]
     if state.get("state") == "unlocked":
-        return GATE_PHRASES["unlocked"]
-    return GATE_PHRASES.get(str(state.get("input")), GATE_PHRASES["unknown"])
+        return LOCK_STATE_WORDS["unlocked"]
+    return LOCK_STATE_WORDS.get(str(state.get("input")), LOCK_STATE_WORDS["unknown"])
 
 
 def unlocks_next(slot: Mapping[str, Any], lib: Mapping[str, Any], gate_eval: Optional[Mapping[str, Any]]) -> list[dict[str, Any]]:

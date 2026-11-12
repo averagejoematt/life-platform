@@ -122,7 +122,7 @@ def test_unlocks_next_names_the_gate_state_and_never_a_value():
     assert locked, "the library has gate-locked movements for some slot"
     sid, u = locked[0]
     gid = u["gates"][0]["gate"]
-    assert u["gates"][0]["state"] == bdr.GATE_PHRASES["not_evaluated"]
+    assert u["gates"][0]["state"] == bdr.LOCK_STATE_WORDS["not_evaluated"]
     secret = 987.6
     row = {"state": "locked", "input": "measured", "reason": f"mean {secret} above the threshold", "value_seen": {"mean_lb_7d": secret}}
     for inp, phrase in (("measured", "locked: measured, standard not yet met"), ("not_set", "locked: threshold not set")):
