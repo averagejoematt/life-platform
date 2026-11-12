@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import importlib.util
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -25,6 +25,10 @@ for p in (os.path.join(ROOT, "lambdas"), os.path.join(ROOT, "deploy"), os.path.j
 
 import exercise_library_reviews as reviews  # noqa: E402
 import library_evidence_review as ler  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("_attr_3005", os.path.join(ROOT, "tests", "test_no_tool_attribution_3005.py"))
+attribution = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(attribution)
 from training import exercise_library as xl  # noqa: E402
 
 LIB = xl.load_library()
@@ -460,15 +464,13 @@ def test_open_pr_pushes_the_lane_branch_and_never_merges(tmp_path):
     cmds = [c for c, _ in rec.calls]
     assert not any("merge" in c for c in cmds)
     commit = next(c for c in cmds if c[:2] == ["bash", "deploy/agent_commit.sh"])
-    assert commit[3:] == [ler.LIBRARY_REL, ler.LEDGER_REL], "the commit stages exactly the library and the ledger"
-    assert "--push" not in commit
-    push = next(c for c in cmds if c[:2] == ["git", "push"])
-    assert push[-1] == rec.branch
+    assert commit[2] == "--push" and commit[4:] == [ler.LIBRARY_REL, ler.LEDGER_REL], "commits exactly the library + ledger"
+    assert not any(c[:1] == ["git"] and c[1:2] == ["push"] for c in cmds), "the one landing path is agent_commit.sh --push"
     create = next((c, body) for c, body in rec.calls if c[:3] == ["gh", "pr", "create"])
     assert create[0][create[0].index("--base") + 1] == "main"
     body = create[1]
     assert "Refs #5778" in body and "Fixes" not in body
-    assert not re.search(r"co-authored-by|claude-session|generated with \[claude", body, re.I)
+    assert attribution.trailer_forms(body) == [] and attribution.mention_forms(body) == []
     with open(os.path.join(lane, ler.LIBRARY_REL), encoding="utf-8") as f:
         assert _row(json.load(f), "bench_press_barbell", "chest")["tier"] == "B"
     with open(os.path.join(lane, ler.LEDGER_REL), encoding="utf-8") as f:

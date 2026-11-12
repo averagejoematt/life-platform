@@ -33,7 +33,7 @@ OUTPUTS
   --open-pr --issue N    creates a locked lane worktree off origin/main (scripts/lane_worktree.py), applies the
                          accepted changes there (the library JSON + one ledger record in
                          deploy/exercise_library_reviews.json), commits the two paths through
-                         deploy/agent_commit.sh, pushes the lane branch and opens a PR against main for the
+                         deploy/agent_commit.sh --push (the lane branch) and opens a PR against main for the
                          owner. Never merges; refuses to push main.
 
     python3 scripts/library_evidence_review.py                                  # re-verify only
@@ -711,7 +711,7 @@ PROTECTED_BRANCHES = ("main", "master", "HEAD")
 def _run(runner: Runner, args: list[str], cwd: str, stdin: Optional[str] = None) -> str:
     if args[:2] == ["gh", "pr"] and len(args) > 2 and args[2] == "merge":
         raise SystemExit("refusing: this script never merges")
-    if args[:2] == ["git", "push"] and any(a.split(":")[-1] in PROTECTED_BRANCHES or a.endswith("/main") for a in args[2:]):
+    if args[0] == "git" and args[1:2] == ["push"] and any(a.split(":")[-1] in PROTECTED_BRANCHES or a.endswith("/main") for a in args[2:]):
         raise SystemExit(f"refusing to push a protected branch: {args}")
     cp = runner(args, cwd=cwd, input=stdin, capture_output=True, text=True)
     if cp.returncode != 0:
@@ -792,8 +792,9 @@ def open_pr(
     with open(os.path.join(lane, LEDGER_REL), "w", encoding="utf-8") as f:
         f.write(_dump(ledger))
     title = f"feat(training): exercise library evidence review {decided['review_id']} (Refs #{issue})"
-    _run(runner, ["bash", "deploy/agent_commit.sh", title, LIBRARY_REL, LEDGER_REL], cwd=lane)
-    _run(runner, ["git", "push", "-u", "origin", branch], cwd=lane)
+    # agent_commit.sh --push is the repo's ONE landing path (#3528): on a lane branch it commits the named paths and
+    # pushes that branch; it would gate a push to main, which this lane never is (checked above).
+    _run(runner, ["bash", "deploy/agent_commit.sh", "--push", title, LIBRARY_REL, LEDGER_REL], cwd=lane)
     local = _run(runner, ["git", "rev-parse", "HEAD"], cwd=lane)
     remote = _run(runner, ["git", "ls-remote", "origin", f"refs/heads/{branch}"], cwd=lane).split()[:1]
     if remote != [local]:
