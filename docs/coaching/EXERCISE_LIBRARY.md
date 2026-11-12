@@ -85,7 +85,7 @@ python3 deploy/write_exercise_library_overlay.py --out /tmp/overlay.json   # dry
 
 ## Evidence review (per block, #5778)
 
-`scripts/library_evidence_review.py`, run from the training-review skill (§6) once per block — no schedule.
+`scripts/library_evidence_review.py`, run from the training-review skill (§7) once per block — no schedule.
 It PROPOSES; the owner accepts by merging the PR it opens; it never merges and never pushes main.
 
 - **Re-verification.** Every registered citation is resolved live: DOI via Crossref, PMID via PubMed E-utilities,

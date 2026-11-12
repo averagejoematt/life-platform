@@ -56,9 +56,13 @@ WORKFLOW_SIZE_COUNTS: dict = {
         6,
     ),  # #5530: the v9 build gate (new); its shell lives in scripts/check_www_build.py + tests/web_preview_gate.py; #5534: +2 path lines (deploy/www_owned_paths.py); required-check PR: +46 lines / +2 run lines — the scope + verdict jobs, each ONE line calling scripts/check_web_gate_required.py (was 84, 4); #5609: +1 path line (scripts/www_verbatim.py, the rule both www gates call)
     "web-preview-deploy.yml": (
-        228,
-        10,
-    ),  # #5534: preview + ROOT targets, four root-only jobs (smoke, visual, record-previous, rollback); every run line is one tested entrypoint (deploy/www_deploy_target.py, www_build_target.sh, www_preview_sync.sh, www_root_rollback.sh) — was (72, 5) at #5530
+        280,
+        12,
+    ),  # #5534: preview + ROOT targets, four root-only jobs (smoke, visual, record-previous, rollback); every run line is one tested entrypoint (deploy/www_deploy_target.py, www_build_target.sh, www_preview_sync.sh, www_root_rollback.sh) — was (72, 5) at #5530; 2026-11-12 (run 43124939822): +2 jobs (api-readiness, deferred) + the api_readiness input, each run ONE line calling deploy/www_api_readiness.py — was (228, 10)
+    "web-deploy-resume.yml": (
+        60,
+        1,
+    ),  # 2026-11-12: new — resumes a v9 deploy deferred behind the Site API; its one run line is deploy/www_api_readiness.py resume
     "wrap-nightly.yml": (137, 11),  # #5316 box 2 + #5143 box 4: two AWS read-only legs (matrix rows + header, one guarded pip line)
 }
 

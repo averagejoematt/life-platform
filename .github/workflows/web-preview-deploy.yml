@@ -26,6 +26,9 @@
 # nothing is deployed and the run is red; a fixture build is never published here. The shell lives
 # in tested entrypoints (deploy/www_deploy_target.py, deploy/www_build_target.sh,
 # deploy/www_preview_sync.sh, deploy/www_root_rollback.sh), not here (#4885).
+# Site API readiness (run 43124939822): the snapshot and smoke read the LIVE Site API, which CI deploys,
+# not this workflow. Not ready → `deferred` (nothing synced, nothing to roll back); web-deploy-resume.yml
+# re-dispatches once the API lands. The logic is deploy/www_api_readiness.py.
 
 name: v9 deploy (preview · root)
 
@@ -45,6 +48,12 @@ on:
         default: preview
         type: choice
         options: [preview, root]
+      api_readiness:
+        description: 'enforce (default) · skip = break-glass: build against whatever Site API is live (deploy/www_api_readiness.py)'
+        required: false
+        default: enforce
+        type: choice
+        options: [enforce, skip]
 
 permissions:
   contents: read
@@ -60,10 +69,53 @@ env:
   SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest
 
 jobs:
+  # ── the Site API this build reads must already carry this commit's site-API code ─────────────────
+  api-readiness:
+    name: Site API readiness (the live bundle contains the commit it owes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      ready: ${{ steps.ready.outputs.ready }}
+      reason: ${{ steps.ready.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the owed commit is git history; the script refuses a shallow clone
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role   # lambda:GetFunction (read-only)
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Compare the live Site API bundle's commit with the commit it owes
+        id: ready
+        env:
+          WWW_API_READINESS: ${{ github.event.inputs.api_readiness }}
+        run: python3 deploy/www_api_readiness.py check
+
+  # ── not ready: defer (a clear, non-rollback status); web-deploy-resume.yml re-dispatches later ──
+  deferred:
+    name: "Deferred: the Site API is not serving this commit's code yet"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: api-readiness
+    if: "!cancelled() && needs.api-readiness.result == 'success' && needs.api-readiness.outputs.ready != 'true'"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role   # sns:Publish on the digest topic
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Record the deferral (step summary + one SNS line)
+        env:
+          READINESS_REASON: ${{ needs.api-readiness.outputs.reason }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 deploy/www_api_readiness.py notify-deferred
+
   deploy:
     name: Live snapshot → build → sync to the resolved target
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: api-readiness
+    if: "!cancelled() && needs.api-readiness.result == 'success' && needs.api-readiness.outputs.ready == 'true'"
     environment: ungated-deploy
     outputs:
       target: ${{ steps.target.outputs.target }}
@@ -118,7 +170,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: deploy
-    if: needs.deploy.outputs.target == 'root'
+    if: "!cancelled() && needs.deploy.result == 'success' && needs.deploy.outputs.target == 'root'"
     outputs:
       site_reachable: ${{ steps.smoke.outputs.site_reachable }}
       surfaces: ${{ steps.smoke.outputs.surfaces }}
@@ -136,7 +188,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     needs: deploy
-    if: needs.deploy.outputs.target == 'root'
+    if: "!cancelled() && needs.deploy.result == 'success' && needs.deploy.outputs.target == 'root'"
     outputs:
       site_reachable: ${{ steps.verdict.outputs.site_reachable }}
       surfaces: ${{ steps.verdict.outputs.surfaces }}

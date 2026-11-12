@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-11 (v8.6.0 — 91 MCP tools, 91-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-12 (v8.6.0 — 91 MCP tools, 92-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -1838,8 +1838,9 @@ Actions history (the silent-failure class from the 2026-07-11 ~26h-unnoticed inc
 
 - **On failure** it files a GitHub issue labeled `auto-filed` + `area:infra` with an
   ADR-099-shaped body (what failed, run link, first-failure timestamp) — **one open issue
-  per workflow**: a repeat failure comments the new run link on the existing open issue
-  instead of filing a duplicate. Dedup key = an HTML-comment marker
+  per workflow**. A repeat failure does NOT comment (#5821 — one notification per episode):
+  it rewrites the issue body's `Last failing run:` line (body edits send no notification)
+  and comments only when the failure summary changed since the last recorded one. Dedup key = an HTML-comment marker
   (`<!-- advisory-failure: <slug> -->`) in the issue body, stable across title edits.
 - **On recovery (close policy):** the next green run of the *same* workflow — scheduled or
   `workflow_dispatch` — comments the recovery run link and **auto-closes** the issue. You

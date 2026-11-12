@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """library_evidence_review.py — the exercise library's per-block evidence review (#5778).
 
-Run once per training block from the training-review skill (`.claude/skills/training-review/SKILL.md` §6). No
+Run once per training block from the training-review skill (`.claude/skills/training-review/SKILL.md` §7). No
 schedule. It PROPOSES library changes; the owner accepts them by merging the PR it opens. It never merges, never
 pushes to main and never edits the library in place without `--open-pr`.
 

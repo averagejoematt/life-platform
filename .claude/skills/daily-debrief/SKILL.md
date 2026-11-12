@@ -69,6 +69,13 @@ source; nothing in it is a second computation.
 - `read_failed` is never zero or empty: name the field and what it leaves unknown.
 - It is the planner's INPUTS. Authoring still runs `plan_next_session` stage 1 → draft →
   stage 2 (below); the packet does not replace the constraint block.
+- **Call `plan_next_session` with `detail="summary"` (#5803)**, both stages. The full result is
+  ~250-335 KB and every call lands in this chat's context; the summary (~15 KB) carries the
+  session, every critic verdict, the commit-binding status, tripwires, the steps walk and every
+  line you must say (`must_say`, `honesty`, `calibration_due`, `exercise_unlocks`). Its `omitted`
+  names each key left out and how to fetch it: when you need one (a load's derivation, the
+  redlines, `coach_context`), re-call stage 1 with `detail="full"` (reads only), never a live stage
+  2. Commit binds to the stored record either way.
 - Today's session logged AFTER the packet was read is not in it — re-call the packet (not
   the individual tools) once the workout has synced.
 
@@ -245,7 +252,7 @@ Matthew authors at night and trains the next morning with zero chance to adjust.
   Pallof/carries). Don't repeat the same anti-movement pattern on consecutive days.
 - When Matthew's happy with the plan: `manage_hevy_routine` **`draft`** (the engine authors
   the loads: progression, stall steps, ceilings, cardio dose, warm-ups; #5055) →
-  **`plan_next_session(routine_id=<the draft>)` — the red team (#3752)** → `dry_run`
+  **`plan_next_session(routine_id=<the draft>, detail="summary")` — the red team (#3752)** → `dry_run`
   (show him the compiled preview, with an "inputs current through X" line so he can
   trust it) → `commit`. **Never pass a title** — it's auto-rendered from
   `Phase - Type - N - Y`.
