@@ -379,7 +379,8 @@ def _displaceable(line: str) -> bool:
 
 def _fit(block: str, lines: list[str]) -> list[str]:
     """Drop the optional #5049 prep clause (R8: "if overkill skip") from the cue line when a critic's clause has pushed
-    the lift past its phone budget (§7: lift note ≤ 4, exercise 1 ≤ 11). The family cue itself stays (§6.1)."""
+    the lift past its phone budget (§7: lift note ≤ 4, exercise 1 ≤ 11); then the #5771 fallback line (to one name, then
+    gone); then an anchor's sheet cue. The family cue itself stays (§6.1)."""
 
     def over(ls: list[str]) -> bool:
         own = "\n".join(ls)
@@ -388,11 +389,31 @@ def _fit(block: str, lines: list[str]) -> list[str]:
 
     if not over(lines):
         return lines
-    out = []
-    for ln in lines:
-        prep = next((p for p in hevy_note_grammar.PREP_CUES.values() if ln.startswith(p + " ")), None)
-        out.append(ln[len(prep) + 1 :] if prep else ln)
-    return out
+    out = [_drop_lead(ln, hevy_note_grammar.PREP_CUES.values()) for ln in lines]
+    if not over(out):
+        return out
+    # #5771: then the fallback line (one name, then none) — it yields before the sheet cue and the family cue
+    fb = next((i for i, ln in enumerate(out) if hevy_note_grammar.FALLBACK_RE.match(ln)), None)
+    if fb is not None:
+        first = out[fb][len(hevy_note_grammar.FALLBACK_HEAD) : -1].split(hevy_note_grammar.FALLBACK_JOIN)[0]
+        one = hevy_note_grammar.fallback_line([first])
+        out = out[:fb] + ([one] if one else []) + out[fb + 1 :]
+        if not over(out):
+            return out
+        out = [ln for ln in out if not hevy_note_grammar.FALLBACK_RE.match(ln)]
+        if not over(out):
+            return out
+    # #5817: then an anchor's sheet cue (`form_cue_sheets.anchor_note_cue`) — it rode ahead of the family cue, which stays
+    from training import form_cue_sheets
+
+    sheet = form_cue_sheets.anchor_note_cues()
+    return [ln2 for ln2 in (_drop_lead(ln, sheet) for ln in out) if ln2]
+
+
+def _drop_lead(line: str, leads: Any) -> str:
+    """`line` without the first of `leads` it opens with (and its space); "" when the line is that lead alone."""
+    lead = next((p for p in leads if line == p or line.startswith(p + " ")), None)
+    return line[len(lead) + 1 :] if lead else line
 
 
 def _join(block: str, lines: list[str]) -> str:

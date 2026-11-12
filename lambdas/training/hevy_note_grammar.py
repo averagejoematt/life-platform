@@ -55,6 +55,10 @@ MOBILITY_MAX_LINES = 2
 LINE_MAX_CHARS = 120  # no single line longer than three phone lines
 ROUTINE_TOTAL_MAX_CHARS = 1600
 CLOCK_MAX_LEVELS = 3
+# #5796 (owner ruling 2026-11-11): a drafted cardio note opens with this line, a prompt he overwrites with the effort he
+# rode at ("RPE 7"). Hevy's wire has an `rpe` slot on a duration set, but none of his timed sets has ever carried one, so the
+# note is where cardio effort is logged. Not counted in the cardio line or character budgets (an input field, not prose).
+CARDIO_RPE_CAPTURE_LINE = "RPE _"
 
 
 def phone_lines(text: str) -> int:
@@ -402,6 +406,31 @@ def stale_reason_line(word: str, gap: Optional[str]) -> str:
 
 # #5083/#5075: a rotated accessory's one reason — the exercise it stands in for, by its Hevy title
 ROTATION_HEAD = "New: replaces "
+# #5771 (owner ruling 2026-11-11): every movement carries a ranked same-stimulus fallback IN its note, so a missing or taken
+# item is a swap, not a hole. The LAST line of a lift note, never a reason (it does not take the reason slot) and never the
+# cue (lint L8 does not count it as one). Names are Hevy titles, at most FALLBACK_MAX_NAMES, best first.
+FALLBACK_HEAD = "If taken: "
+FALLBACK_JOIN = ", then "
+FALLBACK_MAX_NAMES = 2
+FALLBACK_RE = re.compile(r"^If taken: \S[^\n]*\.$")
+
+
+def fallback_line(names: list[str] | tuple[str, ...] | None) -> Optional[str]:
+    """`If taken: Lateral Raise (Machine), then Lateral Raise (Cable).` — the first FALLBACK_MAX_NAMES titles that read clean
+    on the wire (no banned token, no truncation); None when none does."""
+    clean = []
+    for n in names or []:
+        t = " ".join(str(n or "").split()).rstrip(".")
+        if not t or TRUNCATION_RE.search(t) or any(re.search(p, t, flags=0 if case else re.I) for p, _label, case in BANNED):
+            continue
+        if t not in clean:
+            clean.append(t)
+    if not clean:
+        return None
+    line = FALLBACK_HEAD + FALLBACK_JOIN.join(clean[:FALLBACK_MAX_NAMES]) + "."
+    return line if len(line) <= LINE_MAX_CHARS else (fallback_line(clean[:1]) if len(clean) > 1 else None)
+
+
 # #5057 on the chat path: a stall-rule load step the author's rows did not take, named as a delta
 STEP_DUE_HEAD = "Step due: +"
 REASON_RE = re.compile(

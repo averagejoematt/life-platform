@@ -122,6 +122,7 @@ from typing import Any
 
 from common.repo_config import config_dir
 from training import effort_ceilings
+from training.cardio_menu import SWAP_EFFORT_NOT_LOGGED, SWAP_MET, SWAP_NOT_MET  # #5796: a swap's three states, one rule
 from training.intensity_prescription import grade_sets, resolve_ceiling
 from training.movement_catalog import canonical_key
 from training.program_structure import classify_movement
@@ -509,14 +510,26 @@ def _as_prescribed_by_kind(
     block reads `unknown` on the cardio verdict and no longer touches the lifting one.
 
     `extra_shapes` (#5374) are the performed shapes of cardio blocks the routine did not program
-    (`_extra_cardio_shapes`), keyed by their movement key beside the programmed ones — read, never graded
-    into the verdict. With no programmed cardio there is no cardio entry to carry them (None stays None)."""
+    (`_extra_cardio_shapes`), keyed by their movement key beside the programmed ones. With no programmed cardio there is no
+    cardio entry to carry them (None stays None). #5796: a paired swap that meets the served block under #5505's one rule
+    (`cardio_menu.swap_counts`, `counts_as_performed` on its shape) is graded AS that block — its sets done, its intensity
+    the swap's own logged RPE against the block's ceiling — and `substituted_by` names it. A swap that ran the served minutes
+    with no effort logged reads `done_effort_not_logged` (owner ruling 2026-11-11): never `yes`, never folded into `no`,
+    named in `effort_not_logged`. Before #5796 the swap was read and never graded, so the block stayed at 0 sets and the
+    cardio verdict read `no` on a day he did the work."""
     out: dict[str, Any] = {}
     for kind in KINDS:
         mine = [m for m in movements if m.get("kind") == kind]
         if not mine:
             out[kind] = None
             continue
+        credited: dict[str, tuple[str, dict[str, Any], str]] = {}
+        for m in mine if kind == KIND_CARDIO else []:
+            if (c := _swap_credit(m, extra_shapes)) is not None:
+                credited[m["movement_key"]] = c
+        subs = {k: c[0] for k, c in credited.items() if c[2] == SWAP_MET}
+        not_logged = {k: c[0] for k, c in credited.items() if c[2] == SWAP_EFFORT_NOT_LOGGED}
+        mine = [credited[m["movement_key"]][1] if m["movement_key"] in credited else m for m in mine]
         pct = _sets_pct([(muscle_of.get(m["movement_key"], "unknown"), m["programmed_sets"], m["performed_sets"]) for m in mine])
         rollup = _intensity_rollup(mine)
         out[kind] = {
@@ -531,7 +544,45 @@ def _as_prescribed_by_kind(
             out[kind]["shape"] = {m["movement_key"]: m["shape"] for m in mine if m.get("shape")}
             for key, shape in (extra_shapes or {}).items():
                 out[kind]["shape"][key if key not in out[kind]["shape"] else f"{key}:performed_extra"] = shape
+            if subs:
+                out[kind]["substituted_by"] = subs
+            out[kind]["reasons"] += _uncounted_swap_reasons(mine, extra_shapes)
+            if not_logged:
+                # #5796 (owner ruling 2026-11-11): the work was done, the effort was not logged — its own verdict, never
+                # `yes` and never folded into `no` (a block that failed on its own still reads `no`)
+                out[kind]["effort_not_logged"] = not_logged
+                out[kind]["reasons"] += [
+                    f"effort not logged: {v} for {k} ran the served minutes with no RPE" for k, v in not_logged.items()
+                ]
+                if out[kind]["verdict"] != "no":
+                    out[kind]["verdict"] = SWAP_EFFORT_NOT_LOGGED
+                    out[kind]["reasons"] = [r for r in out[kind]["reasons"] if "no RPE-vs-ceiling comparison" not in r]
     return out
+
+
+def _uncounted_swap_reasons(mine: list[dict[str, Any]], extra_shapes: dict[str, dict[str, Any]] | None) -> list[str]:
+    """#5796: one line per paired swap the #5505 rule did not count — the `no` names why, never only "0% of sets"."""
+    out = []
+    for m in mine:
+        key = (m.get("shape") or {}).get("substituted_by") if m["performed_sets"] == 0 else None
+        swap = (extra_shapes or {}).get(key) if key else None
+        if swap and (swap.get("counting") or {}).get("state") == SWAP_NOT_MET:
+            out.append(f"swap: {key} for {m['movement_key']} not counted — {(swap.get('counting') or {}).get('reason')}")
+    return out
+
+
+def _swap_credit(m: dict[str, Any], extra_shapes: dict[str, dict[str, Any]] | None) -> tuple[str, dict[str, Any], str] | None:
+    """#5796: (the swap's key, the programmed block as the swap did it, the swap's state) when a paired swap replaced `m`
+    and ran its duration: `met` carries the swap's graded intensity; `done_effort_not_logged` has its sets done and nothing
+    graded (no effort to grade). None for a `not_met` swap or no swap."""
+    key = (m.get("shape") or {}).get("substituted_by")
+    swap: dict[str, Any] = ((extra_shapes or {}).get(key) if key else None) or {}
+    state = (swap.get("counting") or {}).get("state")
+    if state == SWAP_MET and isinstance(swap.get("intensity"), dict):
+        return str(key), {**m, "performed_sets": m["programmed_sets"], "intensity": swap["intensity"]}, state
+    if state == SWAP_EFFORT_NOT_LOGGED:
+        return str(key), {**m, "performed_sets": m["programmed_sets"]}, state
+    return None
 
 
 def _cardio_shape(
@@ -552,10 +603,27 @@ def _performed_cardio_shape(performed_exs: list[dict[str, Any]], movement_key: s
     read on the machine they were done on; None when he left no note."""
     from training.training_notes import performed_shape
 
+    note, minutes = _performed_note_minutes(performed_exs)
+    machine = movement_key or " ".join(str(ex.get("title") or "") for ex in performed_exs)
+    return performed_shape(note, minutes, machine=machine) if note else None
+
+
+def _performed_note_minutes(performed_exs: list[dict[str, Any]]) -> tuple[str, int | None]:
+    """The performed blocks' joined note and their logged minutes (None when no set carries a duration)."""
     note = " / ".join(str(ex.get("notes") or "").strip() for ex in performed_exs if str(ex.get("notes") or "").strip())
     secs = sum(int(st.get("duration_seconds") or 0) for ex in performed_exs for st in ex.get("sets") or [])
-    machine = movement_key or " ".join(str(ex.get("title") or "") for ex in performed_exs)
-    return performed_shape(note, round(secs / 60) if secs else None, machine=machine) if note else None
+    return note, (round(secs / 60) if secs else None)
+
+
+def _cardio_sets_with_note_rpe(performed_exs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """#5796: a cardio block's performed sets with the RPE his note logs (`cardio_menu.logged_rpe`, #5505's evidence) on
+    each set that carries none — Hevy offers no RPE field on a timed set (#5372), so the note is the only place he can log
+    it. A note that logs no RPE leaves the sets unchanged (absence stays absence, ADR-104)."""
+    from training.cardio_menu import logged_rpe
+
+    rpe = logged_rpe(_performed_note_minutes(performed_exs)[0])
+    sets = [st for ex in performed_exs for st in ex.get("sets") or []]
+    return sets if rpe is None else [st if st.get("rpe") is not None else {**st, "rpe": rpe} for st in sets]
 
 
 def _extra_cardio_shapes(
@@ -565,6 +633,7 @@ def _extra_cardio_shapes(
     extra: list[str],
     catalog: dict[str, Any],
     alias_titles: dict[str, str],
+    tolerance_rpe: float | None = None,
 ) -> dict[str, dict[str, Any]]:
     """#5374: the cardio blocks he performed that the routine did not program, read rather than dropped into `extra`.
 
@@ -574,8 +643,12 @@ def _extra_cardio_shapes(
     Exactly one programmed cardio block missing (0 sets) and exactly one extra cardio machine performed is a SWAP: graded
     against the missing block's clock (`wrist_clock.grade`), with `substituted_for` naming it, and the missing block's
     own entry gains `substituted_by`. Anything else — two blocks missing, two machines added, nothing missing — is
-    `unprogrammed`: his performed shape only, no grade, never a guess at which block it replaced. Named facts beside the
-    verdict, never folded into it (the verdict is still sets AND intensity)."""
+    `unprogrammed`: his performed shape only, no grade, never a guess at which block it replaced.
+
+    #5796: the paired swap is then put to #5505's one counting rule (`cardio_menu.swap_counts`: his note's logged RPE at or
+    above the served kind's band, and at least the served block's minutes). `counts_as_performed` and `counting` record the
+    answer; a counted swap carries `intensity` — its sets (RPE from his note) graded against the block's own ceiling, within
+    the charter's `tolerance_rpe` — and `_as_prescribed_by_kind` grades the block as done by it."""
     from training import cardio_menu, cardio_note, wrist_clock
 
     by_tid = {tid.upper(): key for tid, key in cardio_menu.machine_template_ids(catalog).items()}
@@ -592,12 +665,31 @@ def _extra_cardio_shapes(
         tid, key = cardio_extra[0]
         gone = missing[0]
         p = next(x for x in programmed if x["movement_key"] == gone["movement_key"])
-        performed = _performed_cardio_shape(performed_exs_by_tid.get(tid, []), key)
+        exs = performed_exs_by_tid.get(tid, [])
+        performed = _performed_cardio_shape(exs, key)
+        note, minutes = _performed_note_minutes(exs)
+        set_rpes = [float(st["rpe"]) for ex in exs for st in ex.get("sets") or [] if st.get("rpe") is not None]
+        rule = cardio_menu.swap_counts(p.get("served_kind"), note, minutes, p.get("minutes"), max(set_rpes) if set_rpes else None)
         out[key] = {
             **wrist_clock.grade(cardio_note.clock_of(p["notes"], p.get("minutes")), performed),
             "substituted_for": gone["movement_key"],
             "template_id": tid,
+            "counts_as_performed": rule["counts"],
+            "counting": {k: rule[k] for k in ("state", "logged_rpe", "rpe_source", "rpe_floor", "reason")}
+            | {"served_kind": p.get("served_kind")},
         }
+        if rule["counts"]:
+            ceiling = p["ceiling"]
+            out[key]["intensity"] = {
+                **grade_sets(
+                    ceiling["rpe"],
+                    _cardio_sets_with_note_rpe(exs),
+                    progression=p["progression"],
+                    tolerance_rpe=tolerance_rpe,
+                    last_set_ceiling=ceiling.get("last_set_rpe"),
+                ),
+                "basis": ceiling["basis"],
+            }
         if isinstance(gone.get("shape"), dict):
             gone["shape"]["substituted_by"] = key
         return out
@@ -645,6 +737,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     recovery_branches = ((getattr(ir, "inputs_snapshot", None) or {}) or {}).get("recovery_branches")
     programmed: list[dict[str, Any]] = []
     template_to_key: dict[str, str] = {}
+    from training.cardio_menu import served_kind_of
     from training.load_progression import effort_limits
 
     limits = effort_limits()  # #5052: the charter's ceilings, read once per session
@@ -672,6 +765,7 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
                 "minutes": round(sum(int(getattr(st, "duration_seconds", 0) or 0) for st in ex.sets or []) / 60) or None,
                 "ceiling": ceiling,
                 "progression": _progression_for(ex.movement_key, ex.sets, catalog, alias_titles, limits),
+                "served_kind": served_kind_of(ex),  # #5796: the menu kind a swap is counted against (#5505)
             }
         )
         if tid:
@@ -699,16 +793,21 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     for p in programmed:
         performed_sets = performed_by_tid.get(p["template_id"], 0)
         pct = round(min(1.0, performed_sets / p["sets"]) * 100, 1) if p["sets"] else 0.0
+        kind = _kind_of(p["movement_key"], catalog, alias_titles)
         intensity = grade_sets(
             p["ceiling"]["rpe"],
-            performed_sets_by_tid.get(p["template_id"], []),
+            # #5796: a cardio block's RPE is the one his note logs — the same evidence a counted swap is graded on
+            (
+                _cardio_sets_with_note_rpe(performed_exs_by_tid.get(p["template_id"], []))
+                if kind == KIND_CARDIO
+                else performed_sets_by_tid.get(p["template_id"], [])
+            ),
             progression=p["progression"],
             tolerance_rpe=limits.get("tolerance_rpe"),  # #5058: within the charter's tolerance is never a breach
             last_set_ceiling=p["ceiling"].get("last_set_rpe"),
         )
         intensity["basis"] = p["ceiling"]["basis"]
         intensity["movement_class"] = p["progression"].get("movement_class")  # #5058: the ceiling-change proposal groups by it
-        kind = _kind_of(p["movement_key"], catalog, alias_titles)
         movements.append(
             {
                 "movement_key": p["movement_key"],
@@ -750,7 +849,9 @@ def calculate_adherence(ir: RoutineSpec, performed: dict[str, Any]) -> dict[str,
     overall_pct = round((total_performed / total_programmed) * 100, 1) if total_programmed else 0.0
 
     intensity_adherence = _intensity_rollup(movements)
-    extra_cardio = _extra_cardio_shapes(movements, programmed, performed_exs_by_tid, extra, catalog, alias_titles)
+    extra_cardio = _extra_cardio_shapes(
+        movements, programmed, performed_exs_by_tid, extra, catalog, alias_titles, tolerance_rpe=limits.get("tolerance_rpe")
+    )
     by_kind = _as_prescribed_by_kind(movements, muscle_of, extra_cardio)
 
     return {

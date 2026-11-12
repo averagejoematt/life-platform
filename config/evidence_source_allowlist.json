@@ -1,0 +1,79 @@
+{
+ "_README": "The allow-listed source set for the exercise library's per-block evidence review (#5778, scripts/library_evidence_review.py). A proposed library change is admitted only when its citation came through an allow-listed channel, is a peer-reviewed record with a DOI or PMID, and resolves LIVE (Crossref for a DOI, PubMed E-utilities for a PMID) with a matching title, first author and year. Social media, blogs, podcasts, video and any bare URL are never a source. Adding a channel, a design or a reviewer is a reviewed PR to this file, never a runtime edit. Doc: docs/coaching/EXERCISE_LIBRARY.md (Evidence review).",
+ "version": "1.0.0",
+ "channels": {
+  "pubmed": "a PubMed record found by search or read directly (identifier: PMID, verified via E-utilities esummary)",
+  "crossref": "a DOI-registered journal article (identifier: DOI, verified via api.crossref.org/works)",
+  "reviewer": "a peer-reviewed paper surfaced by a named evidence-based reviewer below; the paper itself is still the source and is still verified by DOI/PMID — the reviewer's post, video or newsletter never is"
+ },
+ "identifier_kinds": ["doi", "pmid"],
+ "crossref_types": ["journal-article"],
+ "designs": {
+  "randomized_trial": {"may_back_tiers": ["A", "B"], "what": "a randomized trial (parallel or within-subject) that measured hypertrophy"},
+  "controlled_trial": {"may_back_tiers": ["B"], "what": "a non-randomized controlled training study that measured hypertrophy"},
+  "meta_analysis": {"may_back_tiers": ["B"], "what": "a meta-analysis of training trials"},
+  "systematic_review": {"may_back_tiers": ["B"], "what": "a systematic review of training trials"},
+  "narrative_review": {"may_back_tiers": [], "what": "a peer-reviewed narrative review; context only, and admitted only when an author is a named reviewer below"},
+  "position_stand": {"may_back_tiers": [], "what": "a peer-reviewed position stand; context only, and admitted only when an author is a named reviewer below"}
+ },
+ "tier_backing_requires": {
+  "identifier": "pmid",
+  "abstract_read": true,
+  "why": "the library's tier rule (deploy/exercise_library_curation.py): a tier A/B row cites a reference whose PMID resolved in PubMed AND whose abstract was read. A DOI-only record (Crossref, not PubMed-indexed) can be registered but backs no tier, the way stasinaki2018 and wolf2023 already are."
+ },
+ "reviewers": {
+  "_rule": "Named evidence-based reviewers, matched against the verified record's author list as '<Surname> <Initials>'. A name here admits that person's PEER-REVIEWED output only (a DOI/PMID record); it never admits a blog, a post or a video by them.",
+  "names": [
+   "Schoenfeld BJ",
+   "Krieger JW",
+   "Helms ER",
+   "Henselmans M",
+   "Androulakis-Korakakis P",
+   "Steele J",
+   "Fisher JP",
+   "Wolf M",
+   "Pelland JC",
+   "Refalo MC",
+   "Nuckols G",
+   "Phillips SM"
+  ]
+ },
+ "rejected_pubtypes": [
+  "Retracted Publication",
+  "Retraction of Publication",
+  "Published Erratum",
+  "Comment",
+  "Editorial",
+  "Letter",
+  "News",
+  "Preprint"
+ ],
+ "denied_hosts": [
+  "twitter.com",
+  "x.com",
+  "instagram.com",
+  "facebook.com",
+  "tiktok.com",
+  "youtube.com",
+  "youtu.be",
+  "reddit.com",
+  "threads.net",
+  "linkedin.com",
+  "medium.com",
+  "substack.com",
+  "blogspot.com",
+  "wordpress.com",
+  "tumblr.com",
+  "patreon.com",
+  "strongerbyscience.com",
+  "t-nation.com"
+ ],
+ "allowed_hosts": [
+  "doi.org",
+  "dx.doi.org",
+  "pubmed.ncbi.nlm.nih.gov",
+  "www.ncbi.nlm.nih.gov",
+  "api.crossref.org",
+  "eutils.ncbi.nlm.nih.gov"
+ ]
+}

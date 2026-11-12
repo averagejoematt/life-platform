@@ -839,7 +839,7 @@
    },
    "chain_prerequisites": [],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_pull": {
    "standard": {
@@ -856,7 +856,7 @@
     "pull_up_negative"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_pull_negative": {
    "standard": {
@@ -873,7 +873,7 @@
     "pull_up_assisted"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_dip": {
    "standard": {
@@ -891,7 +891,7 @@
     "triceps_dip_assisted"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_pushup": {
    "standard": {
@@ -907,7 +907,7 @@
     "incline_push_up"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_nordic": {
    "standard": {
@@ -925,7 +925,7 @@
     "seated_leg_curl"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_hanging": {
    "standard": {
@@ -943,24 +943,21 @@
     "hanging_knee_raise"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_kb_swing": {
    "standard": {
-    "prerequisite_sessions_min": 3,
-    "span_weeks_min": 2,
-    "rpe_max": 7,
-    "flag_free_days": 28
+    "sessions_min": 2
    },
    "kind": "chain_prerequisite",
    "locks": true,
    "measured_input": "logged Hevy sessions of the prerequisite movement(s), with RPE and the private overlay's pain flags",
-   "unlock_condition": "kettlebell deadlift the prerequisite logged in at least 3 sessions across at least 2 weeks at RPE <= 7, with no pain flag on it in the last 28 days, hinge pattern (not a squat) confirmed",
+   "unlock_condition": "kettlebell deadlift logged in 2 sessions (owner ruling 2026-11-11: the kettlebell slot is the swing, entered via 2 KB deadlift exposures)",
    "chain_prerequisites": [
     "kettlebell_deadlift"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner ruling 2026-11-11 (#5810)"
   },
   "chain_kb_clean": {
    "standard": {
@@ -977,7 +974,7 @@
     "kettlebell_swing"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_kb_overhead": {
    "standard": {
@@ -994,7 +991,7 @@
     "kettlebell_clean"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_hang_high_pull": {
    "standard": {
@@ -1011,7 +1008,7 @@
     "tall_high_pull"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_hang_power_clean": {
    "standard": {
@@ -1028,7 +1025,7 @@
     "hang_high_pull"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "chain_full_clean": {
    "standard": {
@@ -1045,7 +1042,7 @@
     "hang_power_clean"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   },
   "owner_confirmation_skill": {
    "kind": "owner_confirmation",
@@ -1091,7 +1088,7 @@
     "back_extension_45"
    ],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+   "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
   }
  },
  "movements": {
@@ -36948,8 +36945,8 @@
   "kettlebell_deadlift": {
    "title": "Kettlebell Deadlift",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy standard template; log under a custom 'Kettlebell Deadlift' template (to create) — not Deadlift (Dumbbell)",
+   "template_id": "D20D7BBE",
+   "template_note": "#5774 owner ruling 2026-11-11: no Hevy Kettlebell Deadlift template exists, and Deadlift (Dumbbell) 5F4E6DD3 is catalogued already (deadlift_dumbbell), so the kettlebell slot's entry logs under Hevy's Sumo Deadlift D20D7BBE (never logged before) until a custom 'Kettlebell Deadlift' template exists",
    "target": {
     "primary": "glutes",
     "secondary": [
@@ -37006,7 +37003,13 @@
      "reason": "same_stimulus"
     }
    ],
-   "curation_note": "first link of the kettlebell chain (deadlift -> swing -> clean -> press/snatch)"
+   "curation_note": "first link of the kettlebell chain (deadlift -> swing -> clean -> press/snatch)",
+   "template_match": {
+    "title_all": [
+     "kettlebell",
+     "deadlift"
+    ]
+   }
   },
   "kettlebell_suitcase_carry": {
    "title": "Suitcase Carry (Kettlebell)",

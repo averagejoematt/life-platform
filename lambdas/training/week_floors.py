@@ -94,9 +94,8 @@ def family_floors(served: list[dict[str, Any]], refusals: list[dict[str, str]], 
     return out
 
 
-def library_status(path: str | None = None) -> str | None:
-    """The exercise library's `status` (`config/exercise_library.json`, the library lane), or None when the file is absent
-    or unreadable — which reads as NOT approved (owner ruling 2026-11-11)."""
+def library(path: str | None = None) -> dict[str, Any] | None:
+    """The exercise library (`config/exercise_library.json`, the library lane), or None when absent or unreadable."""
     import json
 
     from common import repo_config
@@ -106,6 +105,13 @@ def library_status(path: str | None = None) -> str | None:
             data = json.load(f)
     except (OSError, ValueError):
         return None
+    return data if isinstance(data, dict) else None
+
+
+def library_status(path: str | None = None, data: Any = ...) -> str | None:
+    """The exercise library's `status`, or None when the file is absent or unreadable — which reads as NOT approved (owner
+    ruling 2026-11-11). `data`: an already-read `library()` (#5774 reads the file once for both its rows)."""
+    data = library(path) if data is ... else data
     return str(data.get("status")) if isinstance(data, dict) and data.get("status") is not None else None
 
 

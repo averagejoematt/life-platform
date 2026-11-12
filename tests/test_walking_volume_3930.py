@@ -422,7 +422,7 @@ def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_tre
     assert ir.exercises[5].movement_key == "cycling" and ir.exercises[5].sets[0].duration_seconds == 3600
     # #5428: the swapped block's note is the cardio composer's — no HR target, no critic name, no issue number
     # #5428 lane C: line 1 is `<Machine> · <levels> · RPE …` (no minutes on line 1, cardio-note@4.0.0); the swap still lands on the bike.
-    assert ir.exercises[5].notes.startswith("Recumbent · ")
+    assert ir.exercises[5].notes.startswith("RPE _\nRecumbent · ")  # #5796: line 1 follows the RPE capture prompt
     assert "bpm" not in ir.exercises[5].notes and "#" not in ir.exercises[5].notes and "joints_tendons" not in ir.exercises[5].notes
     # re-evaluated, the revised draft carries nothing left to swap
     assert critics.deterministic_verdict(_joints(critics.draft_summary(ir), block))["verdict"] == "approve"
@@ -925,7 +925,7 @@ def test_the_live_rides_join_through_the_store_and_the_0928_ride_needs_the_whoop
     t = _live_4412_table()
     j29 = store.derive(t, "matthew", _live_hevy("2026-09-29"))
     (b29,) = j29["blocks"]
-    assert j29["version"] == "cardio-hr@1.1.0"
+    assert j29["version"] == "cardio-hr@1.2.0"
     assert (b29["state"], b29["hr_coverage"], b29["avg_hr"], b29["max_hr"], b29["hr_source"]) == ("joined", 0.551, 109.0, 139, "WHOOP")
     assert [a["whoop_workout_id"] for a in b29["hr_activities"]] == ["d49d8bac-e0f4-4d80-9828-29840bc361cf"]
     assert b29["zone_seconds"] is None  # WHOOP's zone minutes read 0 at avg 109 — not used, never prorated

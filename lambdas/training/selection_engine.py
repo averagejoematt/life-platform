@@ -38,7 +38,8 @@ ranks the exercise library (#5769, `config/exercise_library.json`) per slot, det
                   and a cue sheet (`form_cue_sheets`); a new movement with no cue sheet is not a candidate.
     fallbacks   = every pick carries its ranked same-stimulus fallbacks (the slot's next eligible candidates, those that
                   share no equipment with the pick first, so a missing item is a swap and not the same hole). The
-                  Hevy-note line is `fallback_note_line` — a render hook, not yet on the wire (#5771 owns the note).
+                  Hevy note names them (#5771, `note_fallbacks` -> `lift_note.fit_fallback`: `If taken: X, then Y.`),
+                  on the wire only once the library is approved; `fallback_note` records the slot's line.
 
 Anchors are not slots (`variant_rotation`): they stay fixed for the block. Pinned slots keep their pin (`owner_pin`).
 
@@ -53,6 +54,12 @@ written before that rule (no `pain_source` stamp equal to `exercise_library.PAIN
 so it is NOT trusted to exclude and the record says `stale_overlay` until the writer re-runs. A library
 `not_for_you_now` is the library's own curated verdict (with an unlock condition) and excludes as `not_for_you_now`,
 not as pain. `PAIN_SOURCE` and `pain_source_state` name it on every record.
+
+OWNER APPROVAL (#5776). `apply(approvals=...)` takes the block design review's resolved approval
+(`block_design_review.resolve`, read beside the ledger by `variant_rotation.for_session`). Once it was read, a LIVE draft
+serves only owner-approved picks: each approved slot is an owner pin (`_owner_pinned` — an approved movement the slot can
+no longer serve is refused, never forced, and the pool's variant serves); a block with no approval serves the prior
+block's (said so); with neither, the pools serve. The approval's one-block experiment pin rides its slot (`experiment`).
 
 Every draft records `library_version` (`routine_repo.stamp_library_version`), as it records `charter_version`.
 Pure apart from the fail-soft loaders at the top.
@@ -102,6 +109,7 @@ C_REASONS: dict[str, str] = {
 `gate_locked`, `not_prescribable`, `library_gap`, `weekly_floor` and `not_for_you_now` are platform-proposed; `week_repeat`
 follows the owner's no-repeats ruling (2026-11-11): they name the A/B the slot could not serve."""
 PROGRESSION_DROP = 0.05  # platform-proposed: a latest band best >5 % under the best band's e1RM reads as regressing
+APPROVAL_SERVES = ("approved", "prior_block")  # `block_design_review.APPROVED` / `PRIOR_BLOCK` (#5776)
 SKILL_TRACK_VOLUME = {"sets_max": 2, "reps_max": 5, "rpe_max": 7, "provenance": "platform-proposed (#5773), low volume"}
 
 _LIB_TTL_S = 900
@@ -364,7 +372,7 @@ def candidates(ctx: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str
         c = _candidate(lid, e, ck, ctx)
         hit = _exclusion(lid, e, ck, ctx)
         if hit:
-            excluded.append({**c, "code": hit[0], "why": hit[1]})
+            excluded.append({**c, "code": hit[0], "why": hit[1], "gates": locked_gates(e, lib) if hit[0] == "gate_locked" else []})
         else:
             eligible.append(c)
     return eligible, excluded
@@ -464,7 +472,38 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], wee
         "fallbacks": fallbacks(pick, ranked, novel_budget=budget),
         "ranked": [c["movement_id"] for c in ranked],
         "above_pick": [{k: x[k] for k in ("movement_id", "title", "tier", "code", "why")} for x in above],
-        "excluded": [{k: x[k] for k in ("movement_id", "tier", "code", "why")} for x in excluded],
+        "excluded": [{k: x[k] for k in ("movement_id", "title", "tier", "code", "why", "gates")} for x in excluded],
+    }
+
+
+def _owner_pinned(slot: dict[str, Any], ctx: dict[str, Any], pin: dict[str, Any], recent: set[str], week_taken: set[str]) -> dict[str, Any]:
+    """A slot the owner approved on the block design review (#5776): it serves the approved movement — the template
+    accessory, or one of the slot's eligible candidates. An approved movement the slot can no longer serve (equipment,
+    pain, a lock, the catalog) is REFUSED, never forced: the record says why and drafting keeps the pool's variant."""
+    eligible, excluded = candidates(ctx)
+    ranked = sorted(eligible, key=lambda c: rank_key(c, recent, week_taken))
+    ck = str(pin.get("catalog_key") or "")
+    meta = {k: pin.get(k) for k in ("source", "approved_block")} | {"catalog_key": ck, "experiment": pin.get("experiment")}
+    hit = next((c for c in ranked if c["catalog_key"] == ck), None)
+    if hit is None and ck == slot["incumbent"]:
+        lid = ctx["idx"]["to_lib"].get(ck)
+        hit = _candidate(lid or ck, xl.movements(ctx["lib"]).get(lid or "") or {"title": ck}, ck, ctx)
+    if hit is None:
+        why = next((x["why"] for x in excluded if x.get("catalog_key") == ck), "not a candidate for this slot's muscle and job")
+        return select_slot(slot, ctx, recent, week_taken) | {"owner_pin": meta | {"state": "refused", "why": why}}
+    pick = hit | {"c_reason": c_reason(hit, excluded, pinned=True), "novel_terms": _novel_terms(hit)}
+    return {
+        "slot_id": slot["slot_id"],
+        "role": slot["role"],
+        "incumbent": slot["incumbent"],
+        "spec": ctx["spec"],
+        "floor": ctx["floor"],
+        "owner_pin": meta | {"state": "held"},
+        "pick": pick,
+        "fallbacks": fallbacks(pick, ranked, novel_budget=NOVELTY_PER_SLOT - int(pick["novel"])),
+        "ranked": [c["movement_id"] for c in ranked],
+        "above_pick": [],
+        "excluded": [{k: x[k] for k in ("movement_id", "title", "tier", "code", "why", "gates")} for x in excluded],
     }
 
 
@@ -519,7 +558,11 @@ def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str
     """Each muscle >= 1 lengthened-bias movement per week — inside the pick's tier and N=1 score only."""
     rows = []
     for muscle in sorted({p["spec"]["muscle"] for p in picked if p.get("spec") and p.get("pick")}):
-        group = [p for p in picked if p.get("spec", {}).get("muscle") == muscle and p.get("pick") and not p.get("pinned")]
+        group = [
+            p
+            for p in picked
+            if p.get("spec", {}).get("muscle") == muscle and p.get("pick") and not p.get("pinned") and not p.get("owner_pin")
+        ]
         if any(p["pick"]["length_bias"] == "lengthened" for p in group):
             rows.append({"muscle": muscle, "state": "met"})
             continue
@@ -600,11 +643,15 @@ def _trim(p: dict[str, Any]) -> dict[str, Any]:
             k: pick[k]
             for k in ("movement_id", "catalog_key", "title", "tier", "n1", "length_bias", "novel", "c_reason", "novel_terms", "week_repeat")
         }
+    locked = sorted(
+        (x for x in p.get("excluded") or [] if x.get("code") == "gate_locked"), key=lambda x: (TIER_RANK[x["tier"]], x["movement_id"])
+    )
     return out | {
         "muscle": (p.get("spec") or {}).get("muscle"),
         "ranked_top": (p.get("ranked") or [])[:5],
+        "locked_next": [{k: x.get(k) for k in ("movement_id", "title", "tier", "gates")} for x in locked],  # #5776: what unlocks next
         "excluded_counts": counts,
-        "fallback_note": fallback_note_line(pick, p.get("fallbacks")),  # the render hook's line, recorded (not yet on the wire)
+        "fallback_note": fallback_note_line(pick, p.get("fallbacks")),  # the slot's line, recorded (#5771 renders note_fallbacks)
     }
 
 
@@ -618,8 +665,11 @@ def select_week(
     missing: list[str] | None = None,
     skill_ceiling: int = 2,
     inventory: dict[str, Any] | None = None,
+    owner_pins: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Every accessory slot of the week ranked from the library. Pure (the caller loads library, overlay and ledger)."""
+    """Every accessory slot of the week ranked from the library. Pure (the caller loads library, overlay and ledger).
+    `owner_pins` {slot_id: {catalog_key, source, approved_block, experiment}} are the block design review's approved
+    picks (#5776, `block_design_review.resolve`): each such slot serves its approved movement (`_owner_pinned`)."""
     from training import variant_rotation as vr
 
     env = {
@@ -639,6 +689,9 @@ def select_week(
         ctx = _ctx(slot, env, step)
         if slot["pinned"]:
             p = _pinned(slot, ctx) | {"spec": ctx["spec"]}
+        elif (owner_pins or {}).get(slot["slot_id"]):
+            p = _owner_pinned(slot, ctx, (owner_pins or {})[slot["slot_id"]], recent, taken)
+            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent, taken))
         else:
             p = select_slot(slot, ctx, recent, taken)
             full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent))
@@ -700,21 +753,35 @@ def _live(
     pos = rotation.get("position") or {}
     if int(pos.get("step") or 0) <= 0:
         return rotation | {"selection_note": "block 1's first phase serves the template as written (#5075 step 0)"}
+    approval = sel.get("approval")
+    gated = isinstance(approval, dict)  # #5776: an approval READ means drafting serves only owner-approved picks
+    if isinstance(approval, dict) and approval.get("state") not in APPROVAL_SERVES:
+        return rotation | {
+            "selection_note": f"no owner-approved block proposal ({approval.get('note') or approval.get('state')}) — the #5075 pools serve"
+        }
     by_slot = {s["slot_id"]: s for s in sel["slots"]}
     by_role = {r: dict(v) for r, v in (rotation.get("variants_by_role") or {}).items()}
     slots, writes = [], []
     for s in rotation.get("slots") or []:
         chosen = by_slot.get(s["slot_id"]) or {}
         pick = (chosen.get("pick") or {}).get("catalog_key")
+        op = chosen.get("owner_pin") or {}
         if s.get("source") == "pinned" or not pick:
             slots.append(s)
             continue
+        if gated and op.get("state") != "held":
+            why = op.get("why") or "the approved proposal holds no pick for this slot"
+            slots.append(s | {"approval_note": f"not served from the approval: {why} — the pool's variant serves"})
+            continue
         held = vr._ledger_variant(rows, pos["block"], s["slot_id"], pos["phase"])
-        eligible = {(chosen.get("pick") or {}).get("catalog_key")} | {f.get("catalog_key") for f in chosen.get("fallbacks") or []}
+        fb = [f.get("catalog_key") for f in chosen.get("fallbacks") or []]
+        eligible = {pick} if op.get("state") == "held" else {pick} | set(fb)  # an approved pick is served as approved
         variant = held if held and held in eligible else pick
         by_role.setdefault(s["role"], {})[s["incumbent"]] = variant
-        pool = [k for k in [pick] + [f.get("catalog_key") for f in chosen.get("fallbacks") or []] if k]
-        slots.append(s | {"variant": variant, "source": "ledger" if variant == held else "selection", "pool": pool})
+        pool = [k for k in [pick] + fb if k]
+        source = "ledger" if variant == held else ("owner_approved" if op.get("state") == "held" else "selection")
+        extra = {"experiment": op["experiment"]} if op.get("experiment") else {}
+        slots.append(s | {"variant": variant, "source": source, "pool": pool} | extra)
         if not held:
             writes.append(
                 {**{k: s[k] for k in ("block", "phase", "weeks", "slot_id", "role", "incumbent")}, "variant": variant, "pool": pool}
@@ -742,6 +809,11 @@ def _live(
 def _line(s: dict[str, Any]) -> str:
     p = s.get("pick") or {}
     why = f" — C because {p['c_reason']['code']}: {p['c_reason']['why']}" if p.get("c_reason") else ""
+    op = s.get("owner_pin") or {}
+    if op.get("state") == "held":
+        why += f" — owner-approved (block {op.get('approved_block')}, {op.get('source')})"
+        if op.get("experiment"):
+            why += f" — EXPERIMENT {op['experiment'].get('technique')} ({op['experiment'].get('experiment_id')}), this block only"
     return f"selection: {p.get('title') or s['incumbent']} [tier {p.get('tier')}] for {s['slot_id']}{why}"
 
 
@@ -754,21 +826,31 @@ def apply(
     target_date: str | None = None,
     lib: Any = ...,
     overlay: Any = ...,
+    approvals: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The rotation a draft serves, with the selection attached. `live` (an approved library) rewrites the served role's
     accessory variants; `shadow` leaves the #5075 pools serving and attaches the selection for comparison; `no_library`
-    attaches the state. Never raises: a selection that fails is recorded as `failed` and the pools serve."""
+    attaches the state. Never raises: a selection that fails is recorded as `failed` and the pools serve.
+
+    `approvals` (#5776) is `block_design_review.resolve(...)` for the draft's block, or None when it was not read (an
+    injected ledger, the plan view). Once read, LIVE drafting serves only owner-approved picks: this block's approval, else
+    the prior block's (said so), else the pools; an approved slot serves its approved movement (`owner_pins`)."""
     lib = load_library_failsoft() if lib is ... else lib
     m = mode(lib)
     if m == MODE_NO_LIBRARY:
         return rotation | {"selection": {"issue": ISSUE, "mode": m, "library_version": None}}
     try:
         overlay = load_overlay_failsoft() if overlay is ... else overlay
-        sel = select_week(rotation.get("position"), catalog, lib, overlay, rows=rows, skill_ceiling=skill_ceiling)
+        pins = (approvals or {}).get("pins") if (approvals or {}).get("state") in APPROVAL_SERVES else None
+        sel = select_week(rotation.get("position"), catalog, lib, overlay, rows=rows, skill_ceiling=skill_ceiling, owner_pins=pins)
     except Exception as e:  # noqa: BLE001 — the selection never blocks a draft
         logger.warning(f"selection_engine: the selection failed ({type(e).__name__}: {e}) — the #5075 pools serve")
         return rotation | {"selection": {"issue": ISSUE, "mode": m, "state": "failed", "error": f"{type(e).__name__}: {e}"[:200]}}
     sel |= {"mode": m, "overlay": "read" if isinstance(overlay, dict) else "absent (N=1 fit unknown)", "compare": _compare(rotation, sel)}
+    if approvals is not None:
+        sel["approval"] = {k: approvals.get(k) for k in ("state", "block", "approved_block", "note")} | {
+            "experiment": (approvals.get("experiment") or {}).get("experiment_id")
+        }
     if m == MODE_LIVE:
         return _live(rotation, sel, catalog, rows, skill_ceiling, target_date) | {"selection": sel}
     return rotation | {"selection": sel}
@@ -784,9 +866,109 @@ def snapshot_fields(rotation: dict[str, Any]) -> dict[str, Any]:
 
 
 def fallback_note_line(pick: dict[str, Any] | None, fallbacks_: list[dict[str, Any]] | None) -> str | None:
-    """RENDER HOOK (#5771 owns the note): the one Hevy-note line naming the pick's ranked fallbacks — "If taken: X, then
-    Y." None when there is no fallback. Not yet on the wire."""
+    """The slot's recorded fallback line — "If taken: X, then Y." (`hevy_note_grammar.fallback_line`), library titles. None
+    when there is no fallback. The WIRE line is `note_fallbacks` -> `lift_note.fit_fallback` (catalog titles, the budget)."""
+    from training import hevy_note_grammar
+
     names = [str(f.get("title") or f.get("movement_id")) for f in fallbacks_ or [] if f.get("catalog_key")]
     if not pick or not names:
         return None
-    return "If taken: " + ", then ".join(names[:2]) + "."
+    return hevy_note_grammar.fallback_line(names)
+
+
+# ── the Hevy note's fallback line (#5771) ────────────────────────────────────
+def _library_fallbacks(key: str, env: dict[str, Any]) -> list[str]:
+    """The served key's library `fallbacks` (ranked same-stimulus at build time), as catalog keys, kept only when each one
+    is usable today: available at home_gym (inventory + learned unavailability; contention never removes one), not
+    pain-excluded, not `not_for_you_now`, no locked gate, and PRESCRIBABLE with the served lift's volume signature — an
+    anchor's fallback that would move the week's counts is not named (owner brief, 2026-11-11)."""
+    from training import variant_rotation as vr
+
+    lid = env["idx"]["to_lib"].get(key)
+    mv = xl.movements(env["lib"])
+    if not lid or lid not in mv:
+        return []
+    spec = {
+        "muscle": None,
+        "patterns": [],
+        "signature": vr.volume_signature(key, env["catalog"]),
+        "hevy_types": sorted({str(t) for t in vr.LOADED_HEVY_TYPES + ((env["catalog"].get(key) or {}).get("hevy_type"),) if t}),
+    }
+    ctx = {**env, "spec": spec, "floor": None, "floor_members": None}
+    out = []
+    for fb in mv[lid].get("fallbacks") or []:
+        m = fb.get("movement_id")
+        ck = env["idx"]["to_cat"].get(m or "")
+        if m in mv and ck and ck != key and _exclusion(m, mv[m], ck, ctx) is None:
+            out.append(ck)
+    return out
+
+
+def _slot_fallbacks(key: str, sel: dict[str, Any], role: str | None) -> list[str] | None:
+    """The served key's ranked fallbacks from its slot's selection (live: the slot serves its pick, or a ledger-held
+    fallback — then the pick leads the rest), as catalog keys; None when no slot of the served role serves `key`."""
+    for s in sel.get("slots") or []:
+        if role and s.get("role") != role:
+            continue
+        pick = (s.get("pick") or {}).get("catalog_key")
+        rest = [f.get("catalog_key") for f in s.get("fallbacks") or [] if f.get("catalog_key")]
+        if pick == key:
+            return rest
+        if key in rest:
+            return [k for k in [pick] + rest if k and k != key]
+    return None
+
+
+def note_fallbacks(
+    rotation: dict[str, Any] | None,
+    served_keys: list[str],
+    catalog: dict[str, Any],
+    *,
+    skill_ceiling: int = 2,
+    lib: Any = ...,
+    overlay: Any = ...,
+) -> dict[str, Any]:
+    """Per served lift, the ranked same-stimulus fallback titles its Hevy note names (`lift_note.fit_fallback`, owner ruling
+    2026-11-11 on #5771): `{"mode", "render", "by_key": {served key: [Hevy title, ...]}}`.
+
+    An accessory slot's list is its selection's (the slot's next eligible candidates, equipment-disjoint first); any other
+    served lift (an anchor, or an accessory the #5075 pools serve in shadow) takes its library entry's ranked `fallbacks`,
+    filtered for today (`_library_fallbacks`). A movement served elsewhere in the session is never a fallback (that is a
+    second set of the same lift, not a swap). Unavailable is never named; contention-only equipment still is.
+
+    `render` is True only when the library is APPROVED (THE SWITCH): while it is `proposed` the lines are computed and
+    recorded (`inputs_snapshot["note_fallbacks"]`) but stay off the wire. Never raises: a failure is `state: failed`."""
+    sel = (rotation or {}).get("selection") or {}
+    m = sel.get("mode") or MODE_NO_LIBRARY
+    if m == MODE_NO_LIBRARY:
+        return {"issue": "#5771", "mode": m, "render": False, "by_key": {}}
+    try:
+        lib = load_library_failsoft() if lib is ... else lib
+        if not isinstance(lib, dict):
+            return {"issue": "#5771", "mode": MODE_NO_LIBRARY, "render": False, "by_key": {}}
+        overlay = load_overlay_failsoft() if overlay is ... else overlay
+        from training import variant_rotation as vr
+
+        env = {
+            "lib": lib,
+            "catalog": catalog,
+            "overlay": overlay,
+            "inventory": None,
+            "idx": key_index(lib, catalog),
+            "ceiling": skill_ceiling,
+            "missing": vr.not_available(),
+        }
+        role = ((rotation or {}).get("slots") or [{}])[0].get("role")
+        served = set(served_keys)
+        by_key: dict[str, list[str]] = {}
+        for key in served_keys:
+            ranked = _slot_fallbacks(key, sel, role)
+            if ranked is None:
+                ranked = _library_fallbacks(key, env)
+            titles = [str((catalog.get(k) or {}).get("title") or k) for k in ranked if k not in served]
+            if titles:
+                by_key[key] = titles[:MAX_FALLBACKS]
+    except Exception as e:  # noqa: BLE001 — a fallback line never blocks a draft
+        logger.warning(f"selection_engine: note fallbacks failed ({type(e).__name__}: {e}) — no fallback line")
+        return {"issue": "#5771", "mode": m, "render": False, "state": "failed", "error": f"{type(e).__name__}: {e}"[:200], "by_key": {}}
+    return {"issue": "#5771", "mode": m, "render": m == MODE_LIVE, "by_key": by_key}

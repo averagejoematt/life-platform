@@ -24,6 +24,8 @@ _ALLOWED_FILES = {
     os.path.join(ROOT, "tests", "test_hevy_commit_readback_3718.py"),
     os.path.join(ROOT, "tests", "test_adherence_calc.py"),
     os.path.join(ROOT, "tests", "test_hevy_adherence_wiring.py"),
+    # #5796 — replays real performed workouts through adherence_calc (the read side, as test_adherence_calc does).
+    os.path.join(ROOT, "tests", "test_prescription_reconciliation_5796.py"),
     # #417 2b end-to-end restamp test asserts on the compiled wire body's
     # exercise_template_id to prove the recommended-branch push actually works.
     os.path.join(ROOT, "tests", "test_hevy_restamp.py"),

@@ -84,16 +84,16 @@ def test_logged_day_has_no_absent_food_behaviors():
 
 def test_food_components_score_the_wire_row():
     d = _details()
-    # #5095: the reference is the ONE calorie target (charter nutrition.calories; ~1,500 since charter 1.21.0, owner
-    # ruling 2026-10-23 R1): |1561 - 1500| / 1500 = 4.07 % against a 20 % band -> 100 - 20.3 = 79.7
-    assert target_kcal("2026-10-17") == 1500
-    assert d["calorie_adherence"]["score"] == 79.7
+    # #5095: the reference is the ONE calorie target (charter nutrition.calories: the ~1,500 base served at the 1,600
+    # any-day floor, owner ruling 2026-11-11 #5794): |1561 - 1600| / 1600 = 2.44 % against a 20 % band -> 100 - 12.2 = 87.8
+    assert target_kcal("2026-10-17") == 1600
+    assert d["calorie_adherence"]["score"] == 87.8
     # 133 g / 170 g target, perfect at 1.2x -> 65.2
     assert d["protein_total"]["score"] == 65.2
     # #5214: feedings are the protein engine's (charter threshold) — the one timed row carries 0 g -> 0 feedings -> 0.0
     assert d["protein_distribution"]["score"] == 0.0
-    # 8 of 14 days (1,407 1,632 1,622 1,512 1,512 1,579 1,460 1,561) within 10 % of 1,500 kcal
-    assert d["consistency"]["score"] == 57.1
+    # 7 of 14 days within 10 % of the 1,600 kcal served target (#5794; it was 8 of 14 against 1,500)
+    assert d["consistency"]["score"] == 50.0
 
 
 def test_shared_accessor_resolves_by_presence():

@@ -30,6 +30,7 @@ from training import (
     load_ramp,
     program_structure,
     routine_generator as _rg,
+    rpe_calibration,
     selection_engine,
     variant_rotation,
     warmup_sets,
@@ -191,18 +192,29 @@ def _compose_notes(
     history_index: dict[str, list],
     target_date: str,
     rotation: dict[str, Any] | None = None,
+    deload: bool = False,
+    red_day: bool = False,
 ) -> dict[str, Any]:
     """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record.
-    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`)."""
+    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`). #5771: each lift's ranked
+    same-stimulus fallback (`selection_engine.note_fallbacks`) — on the wire once the library is approved, recorded either way.
+    #5797 (owner ruling 2026-11-11): then the RPE calibration line on a due non-barbell exposure (`rpe_calibration`) —
+    never on a deload or a red day; it outranks the fallback line; its marks and the calibration report ride the record."""
     movements = load_catalog.get("movements") or {}
-    return lift_note.compose_blocks(
+    fb = selection_engine.note_fallbacks(rotation, [str(b.movement_key) for b in blocks], movements)
+    record = lift_note.compose_blocks(
         blocks,
         movements,
         load_floors=load_floors,
         history_index=history_index,
         target_date=target_date,
         rotations=variant_rotation.swaps(rotation, movements),
+        fallbacks=fb["by_key"] if fb.get("render") else None,
     )
+    ctx = {"deload": deload, "red_day": red_day, "load_floors": load_floors, "history_index": history_index, "target_date": target_date}
+    cal = rpe_calibration.mark_session(blocks, movements, note_record=record, context=ctx)
+    record[rpe_calibration.SNAPSHOT_KEY] = {**cal, "report": rpe_calibration.report(history_index, movements)}
+    return record | {"note_fallbacks": fb}
 
 
 def _sequence_line(day_entry: dict[str, Any]) -> str:
@@ -276,8 +288,13 @@ def _prescription(
     movements = catalog.get("movements") or {}
     in_block = in_block_variant.performed_in_block(block_workouts, movements, inputs.target_date)
     rotation = variant_rotation.for_session(
-        {**day_entry, "date": inputs.target_date}, movements, rows=inputs.rotation_rows, skill_ceiling=skill_ceiling, select=True
-    )  # #5773: the selection engine — shadow while the library is proposed
+        {**day_entry, "date": inputs.target_date},
+        movements,
+        rows=inputs.rotation_rows,
+        skill_ceiling=skill_ceiling,
+        block_workouts=block_workouts,  # #5774: the kettlebell slot's entry exposures are counted from the record
+        select=True,  # #5773: the selection engine — shadow while the library is proposed
+    )
     rx = program_structure.session_prescription_for_role(
         day_entry["session_role"],
         deload=deload,
@@ -365,7 +382,7 @@ def full_body_routines(
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation)
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload, drop_accessories)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],

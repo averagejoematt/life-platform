@@ -339,15 +339,17 @@ def test_above_the_ceiling_the_charter_warns_and_never_pushes_food_up():
 
 def test_the_charter_is_re_targeted_to_1500_and_a_pre_re_target_record_is_not_the_base():
     c = ti.settings()
-    assert c["target_kcal"] == 1500 and c["band_kcal"][0] < 1500 < c["band_kcal"][1]
+    # #5794 (owner ruling 2026-11-11): the habit band runs from the any-day to the lifting-day floor, above the base
+    assert c["target_kcal"] == 1500 and c["band_kcal"] == [1600.0, 1900.0]
     assert c["records_from_version"] == tc.charter_value("nutrition.calories.records_from_version")
     old = {**prev_hold("in", kcal=2100), "charter_version": "1.19.1"}
     cfg = {**CFG, "target_kcal": c["target_kcal"], "band_kcal": c["band_kcal"], "records_from_version": c["records_from_version"]}
     d = decide(trend_lb_wk=3.2, history=[old], cfg=cfg)
     assert (d["base_kcal"], d["inputs"]["base_source"]) == (1500, "charter nutrition.calories.target_kcal")
-    assert ct.resolve(WEEK, titration_reader=lambda week: old)["kcal"] == 1500, "the resolver skips the pre-re-target record too"
+    # base_kcal: the served kcal is then clamped at the day's floor (#5794), a different rule
+    assert ct.resolve(WEEK, titration_reader=lambda week: old)["base_kcal"] == 1500, "the resolver skips the pre-re-target record too"
     # main's 1.20.0 (#5261, food_delivery) predates the re-target, which landed as 1.21.0: its records are not the base either
-    assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.20.0"})["kcal"] == 1500
+    assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.20.0"})["base_kcal"] == 1500
     assert ct.resolve(WEEK, titration_reader=lambda week: {**old, "charter_version": "1.21.0"})["kcal"] == 2100
 
 

@@ -83,7 +83,7 @@ IC29_FLAG_SEVERITIES = ("MODERATE", "SEVERE")
 
 # The inputs this module reads. Every key is optional; an absent one lands in `unknown`.
 INPUT_KEYS = (
-    "window_end",  # YYYY-MM-DD, the last day of the 14-day series (informational)
+    "window_end",  # YYYY-MM-DD, the last day of the 14-day series (the floor-clamp re-read's date, #5794)
     "intake_kcal_by_day",  # 14 entries oldest->newest, None for an unlogged day
     "protein_g_by_day",  # 14 entries oldest->newest, None for an unlogged day
     "fat_g_by_day",  # 14 entries oldest->newest, None for an unlogged day (#5102)
@@ -106,6 +106,12 @@ INPUT_KEYS = (
     "metabolic_adaptation_flag",  # bool derived from the severity by the caller, or None
     "training_above_prescription_weeks",  # int, or None when the platform has no such read yet
     "estimated_maintenance_kcal",  # optional, for sizing a diet break
+    "last_weighin_date",  # #5802: weigh_in_dark's input (health.tripwire_readers)
+    "sleep_hours_by_day",  # #5802: 14 entries oldest->newest (Whoop sleep_duration_hours), None for an unmeasured night
+    "rhr_by_day",  # #5802: same shape (Whoop resting_heart_rate) — the medical stop line's RHR arm
+    "lab_draws",  # #5802: every labs draw, chronological — the medical stop lines' lab arms
+    "mood_instrument",  # #5802: injected by the check-in lane (#5819); never resolved here
+    "joy_answers",  # #5802: injected by the check-in lane (#5819); never resolved here
 )
 
 
@@ -124,6 +130,8 @@ def _energy(inputs: dict[str, Any] | None = None) -> dict[str, Any]:
     e["floor_any_day"] = r["floor_any_day_kcal"] or e["floor_any_day"]
     e["floor_lifting_day"] = r["floor_lifting_day_kcal"] or e["floor_lifting_day"]
     e["target_kcal"], e["target_source"] = r["kcal"], r["source"]
+    # the titrated BASE is what a calorie step moves; the served day is that base clamped at its floor (#5794)
+    e["base_kcal"] = r.get("base_kcal")
     # owner ruling 2026-10-23 R1 (#5091): the energy floors and the rate-ceiling flags stay, as WARNINGS — a breach is
     # reported, never a veto or an automatic "eat more"; one calorie step everywhere (#5205): the titration cap
     e["floors_are_warnings"] = charter_value("nutrition.calories.floor_role") == "warning"
@@ -144,7 +152,7 @@ def _overshoot_cap_flag(
     """The over-the-cap run as a flag: a WARNING under owner ruling 2026-10-23 R1 (`above_ceiling_action` warn — food is
     not pushed up), else a `change` of the one calorie step (#5205) from the 14-day mean."""
     step, warn = energy.get("step_kcal"), energy.get("ceiling_is_warning")
-    base = energy.get("target_kcal")  # the resolver's target (#5095), never the logged mean (#5325): the step moves the PLAN
+    base = energy.get("base_kcal")  # the resolver's titrated base (#5095, #5794), never the logged mean (#5325): the step moves the PLAN
     to = (base + step) if (base is not None and step is not None and not warn) else None
     return _flag(
         "rate_over_cap_consecutive_weeks",
@@ -160,7 +168,7 @@ def _overshoot_cap_flag(
 def _overshoot_to_text(energy: dict[str, Any]) -> str:
     """The decision option's destination — the resolver's target + one step, exactly as
     `_overshoot_cap_flag` computes `to` (#5325 box 3), never the logged mean."""
-    base, step = energy.get("target_kcal"), energy.get("step_kcal")
+    base, step = energy.get("base_kcal"), energy.get("step_kcal")
     return f"to {base + step:.0f}" if (base is not None and step is not None) else "from an unknown target"
 
 
@@ -892,6 +900,39 @@ def _break_options(inputs: dict[str, Any]) -> list[str]:
     ]
 
 
+FLOOR_CLAMP_REREAD_PATH = "nutrition.calories.floor_clamp_reread"
+FLOOR_CLAMP_REREAD_ID = "floor_clamp_reread"
+
+
+def _floor_clamp_reread(inputs: dict[str, Any], energy: dict[str, Any]) -> dict[str, Any] | None:
+    """The owner's re-read rule on the clamped floors (owner ruling 2026-11-11, #5794): from the charter's `reread_on`
+    date, a 14-day loss rate under `decide_below_lb_per_wk` is a PENDING owner decision; before it, or at or above the
+    rate, None. An unreadable rule, date or rate is `unevaluable`, never a silent pass."""
+    rule = charter_value(FLOOR_CLAMP_REREAD_PATH) or {}
+    on, below = str(rule.get("reread_on") or "")[:10], _num(rule.get("decide_below_lb_per_wk"))
+    end, loss = str(inputs.get("window_end") or "")[:10], _loss_rate(inputs)
+    missing = [k for k, ok in (("reread_on", on), ("decide_below_lb_per_wk", below is not None), ("window_end", end)) if not ok]
+    if missing:
+        return {"state": "unevaluable", "trigger": {"id": FLOOR_CLAMP_REREAD_ID}, "unknown": missing}
+    if end < on:
+        return None
+    if loss is None:
+        return {"state": "unevaluable", "trigger": {"id": FLOOR_CLAMP_REREAD_ID}, "unknown": ["weight_trend_lb_wk"]}
+    if loss >= below:
+        return None
+    lift, rest = energy.get("floor_lifting_day"), energy.get("floor_any_day")
+    return _decision(
+        FLOOR_CLAMP_REREAD_ID,
+        {"loss_rate_14d_lb_wk": loss, "decide_below_lb_per_wk": below, "reread_on": on, "window_end": end},
+        provenance=f"owner ruling 2026-11-11 (#5794): charter {FLOOR_CLAMP_REREAD_PATH}",
+        options=[
+            f"keep the clamped floors (lifting day {lift} kcal, every other day {rest} kcal)",
+            "change the floors: a charter ruling on floor_lifting_day_kcal / floor_any_day_kcal",
+        ],
+        decision=f"14-day loss {loss} lb/wk under {below} lb/wk at the {on} re-read of the clamped floors — keep or change them",
+    )
+
+
 def decisions_offered(
     verdicts: list[dict[str, Any]], inputs: dict[str, Any], *, already_logged: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -1034,11 +1075,21 @@ def decisions_offered(
                 decision=f"get_deficit_sustainability CRITICAL ({inputs.get('degraded_count')} of 5 channels) — refeed or diet break, the owner's call",
             ),
         )
+
+    # 5. the floor-clamp re-read (owner ruling 2026-11-11, #5794)
+    reread = _floor_clamp_reread(inputs, energy)
+    if reread is not None and reread["state"] == "pending":
+        emit(FLOOR_CLAMP_REREAD_ID, reread)
+    elif reread is not None:
+        out.append(reread)
     return out
 
 
 def block(inputs: dict[str, Any], *, already_logged: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """The whole owner-facing block: verdicts + decisions, one call."""
+    from health import tripwire_readers  # imported here: tripwire_readers reads this module's helpers
+
     res = run(inputs)
     res["decisions_offered"] = decisions_offered(res["verdicts"], inputs, already_logged=already_logged or [])
+    res["tripwire_reports"] = tripwire_readers.evaluate(inputs)  # #5802: report-only rows for the tripwires nothing else read
     return res

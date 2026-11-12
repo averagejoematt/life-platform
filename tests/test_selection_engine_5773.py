@@ -269,7 +269,12 @@ def test_preacher_curl_barbell_is_unlocked_by_the_owner_ruling():
 def test_every_gated_movement_is_locked_until_5772():
     sel = _week()
     gated = {k for k, e in LIB0["movements"].items() if se.locked_gates(e, LIB0)}
-    assert gated and not (_served_anywhere(sel) & gated)
+    # #5774 (owner ruling 2026-11-11): an OWNER-pinned slot is the owner's word, not the engine's pick — the kettlebell slot
+    # serves the KB swing (gated `chain_kb_swing` until #5772 evaluates gates) after its KB-deadlift entry; the engine
+    # never selects a gated movement for a slot it chooses
+    chosen = {"slots": [s for s in sel["slots"] if not s.get("pinned")]}
+    assert gated and not (_served_anywhere(chosen) & gated)
+    assert {s["slot_id"] for s in sel["slots"] if s.get("pinned")} == set(vr.PINNED_SLOTS)
     assert se.locked_gates(LIB0["movements"]["squat_barbell"], LIB0) == []  # a clinical cue never locks
 
 

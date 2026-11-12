@@ -879,10 +879,21 @@ def test_5374_a_machine_swap_reads_the_performed_note_against_the_prescribed_clo
     assert tread["units_differ"] == ["level", "%"]
     assert "mean_level_delta" not in tread and "top_level_delta" not in tread
     assert shape["cycling"]["status"] == "performed_unread" and shape["cycling"]["substituted_by"] == "treadmill"
-    # mutation control: the pre-fix record never read the treadmill note, and every verdict is identical either way
+    # mutation control: the pre-fix record never read the treadmill note and graded the block `no`. His note logs no RPE and
+    # the treadmill ran the served 30 min: #5796's third state (owner ruling 2026-11-11) — done, effort not logged, never
+    # `yes`; the lifting verdict and the set measures are the pre-fix ones
     before = _without_extra_read(monkeypatch, ir, performed)
     assert "treadmill" not in before["as_prescribed_by_kind"]["cardio"]["shape"]
-    assert _verdicts(before) == _verdicts(out)
+    assert before["as_prescribed_by_kind"]["cardio"]["verdict"] == "no"
+    assert tread["counts_as_performed"] is False and tread["counting"]["state"] == "done_effort_not_logged"
+    cardio_after = out["as_prescribed_by_kind"]["cardio"]
+    assert cardio_after["verdict"] == "done_effort_not_logged" and cardio_after["effort_not_logged"] == {"cycling": "treadmill"}
+    assert "substituted_by" not in cardio_after
+    assert out["as_prescribed"]["cardio_verdict"] == "done_effort_not_logged"
+    for key in ("overall_pct", "intensity_adherence", "missing", "extra"):
+        assert out[key] == before[key], key
+    assert out["as_prescribed_by_kind"]["lifting"] == before["as_prescribed_by_kind"]["lifting"]
+    assert out["as_prescribed"]["verdict"] == before["as_prescribed"]["verdict"]
     assert out["missing"] == ["cycling"] and out["extra"] == ["243710DE"]
 
 

@@ -204,4 +204,5 @@ def test_the_tool_schema_exposes_dry_run():
 
     props = TOOLS["plan_next_session"]["schema"]["inputSchema"]["properties"]
     assert props["dry_run"]["type"] == "boolean" and "would_write" in props["dry_run"]["description"]
-    assert set(props) == {"target_date", "routine_id", "veto_override", "dry_run"}
+    assert set(props) == {"target_date", "routine_id", "veto_override", "dry_run", "detail"}  # #5803: detail='summary'|'full'
+    assert props["detail"]["enum"] == ["full", "summary"]

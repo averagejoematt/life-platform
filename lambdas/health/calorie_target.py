@@ -16,9 +16,11 @@ ORDER (first hit wins):
   2. the charter's ``nutrition.calories`` block (config/training_charter.json): ``target_kcal``
      inside ``prescribed_band_kcal`` (owner ruling 2026-10-23 R1, #5091: stay ~1,500).
 A titration record written under a charter version before ``records_from_version`` is not read (a
-record from before the re-target is not the base). The energy floors are WARNINGS (owner ruling R1:
-kept, not removed, never a clamp): a resolved target, or a typed day, under its floor carries the
-gap in ``floor_warnings`` and in ``provenance`` — nothing lifts it to the floor. An unreadable
+record from before the re-target is not the base). The served target is CLAMPED at the day's floor
+(owner ruling 2026-11-11, #5794, option A): a lifting day never serves under ``floor_lifting_day_kcal``
+and every other day never under ``floor_any_day_kcal`` (the rest-day floor). ``base_kcal`` keeps the
+titrated base, ``floor_clamp_kcal`` states the lift and ``provenance`` says it applied. The floors stay
+WARNINGS only for GRADING logged days (``floor_role``, the critics). An unreadable
 charter resolves to ``kcal: None`` with ``source: "unavailable"`` — never a remembered number
 (ADR-104); every reader treats None as "no target", not zero.
 
@@ -129,12 +131,19 @@ def _grams(kcal: float, protein_g: float, fat_g: float) -> float:
     return max(0.0, (kcal - 4 * protein_g - 9 * fat_g) / 4)
 
 
+def day_floor(day_type: Optional[str], floors: Dict[str, Any]) -> Optional[float]:
+    """The floor a served day is clamped at (owner ruling 2026-11-11, #5794): ``floor_lifting_day_kcal`` on a lifting
+    day, ``floor_any_day_kcal`` (the rest-day floor) on every other day; None when the charter carries neither."""
+    floor_any, floor_lift = _num(floors.get("floor_any_day_kcal")), _num(floors.get("floor_lifting_day_kcal"))
+    return floor_lift if (day_type == "lifting" and floor_lift is not None) else floor_any
+
+
 def _apply_day_type(
     out: Dict[str, Any], base: Optional[float], day_type: Optional[str], week_types: Optional[Sequence[str]], read: CharterReader
 ) -> None:
     dt = day_type if day_type in DAY_TYPES else "unknown"
     out["day_type"], out["uplift_kcal"], out["split"], out["pre_post_session"] = dt, 0, None, None
-    out["floor_warnings"] = []
+    out["floor_clamp_kcal"] = 0
     cfg = read(TRAINING_DAY_PATH)
     cfg = cfg if isinstance(cfg, dict) else {}
     if base is None:
@@ -149,18 +158,17 @@ def _apply_day_type(
     # a planned maintenance date (#5107) is the whole day's estimated burn: no lifting uplift on top of it
     delta = (_num(cfg.get("lifting_uplift_kcal")) or 0.0) if dt == "lifting" and not out.get("maintenance_day") else 0.0
     final = base + delta
-    floor_any, floor_lift = _num(out.get("floor_any_day_kcal")), _num(out.get("floor_lifting_day_kcal"))
-    floor = floor_lift if (dt == "lifting" and floor_lift is not None) else floor_any
-    out["balance_held"] = final >= base  # the training-day rule held: no planned day under its base target
-    if floor is not None and final < floor:
-        # owner ruling 2026-10-23 R1 (#5091): the floors stay as WARNINGS — reported, never a clamp that raises the target
-        warning = f"{dt} day {int(round(final))} kcal is {int(round(floor - final))} kcal under its {int(floor)} kcal floor (a warning, not a clamp)"
-        out["floor_warnings"].append(warning)
-        out["provenance"] += f"; {warning}"
-    out["kcal"] = int(round(final))
-    out["uplift_kcal"] = int(round(final - base))
+    out["uplift_kcal"] = int(round(delta))
     if delta:
         out["provenance"] += f"; {dt} day {out['uplift_kcal']:+d} kcal (training_day rule, no rest-day payback)"
+    floor = day_floor(dt, out)
+    if floor is not None and final < floor:
+        # owner ruling 2026-11-11 (#5794, option A): the served target is clamped at the day's floor, never under it
+        out["floor_clamp_kcal"] = int(round(floor - final))
+        out["provenance"] += f"; clamped {int(round(final))} -> {int(floor)} kcal at the {dt} day floor (owner ruling 2026-11-11, #5794)"
+        final = floor
+    out["balance_held"] = final >= base  # the training-day rule held: no planned day under its base target
+    out["kcal"] = int(round(final))
     if p_low is not None and fat_g is not None:
         out["split"] = {
             "protein_g": int(round(p_low)),
@@ -223,8 +231,9 @@ def resolve(
 ) -> Dict[str, Any]:
     """The calorie target for ``day``: ``{kcal, band_low, band_high, floor_any_day_kcal,
     floor_lifting_day_kcal, source, provenance, charter_version, week, day_type, base_kcal,
-    uplift_kcal, split}``. ``kcal`` is the FINAL kcal for the day; with no ``day_type`` (every caller
-    before #5101) the day is ``unknown`` and ``kcal`` is the base — nothing else changes.
+    uplift_kcal, floor_clamp_kcal, split}``. ``kcal`` is the FINAL kcal for the day, never under the day's floor
+    (#5794); with no ``day_type`` (every caller before #5101) the day is ``unknown``: the base, clamped at the
+    any-day floor.
 
     ``source`` is ``"titration"``, ``"charter"`` or ``"unavailable"``. ``provenance`` says where the
     number came from in words, including a floor clamp when one applied."""
@@ -325,7 +334,7 @@ def target_kcal(day: DayLike = None, **readers: Any) -> Optional[int]:
 
 
 def calorie_band(day: DayLike = None, **readers: Any) -> Optional[tuple]:
-    """The calorie habit's floor and ceiling for ``day`` (#5099: ``prescribed_band_kcal``, centred on the target, moved
+    """The calorie habit's floor and ceiling for ``day`` (#5099: ``prescribed_band_kcal``, the any-day to the lifting-day floor since #5794, moved
     with it by a titration record): ``(band_low, band_high)``, or None when either edge is unresolved."""
     r = resolve(day, **readers)
     lo, hi = r.get("band_low"), r.get("band_high")

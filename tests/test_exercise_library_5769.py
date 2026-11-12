@@ -224,9 +224,13 @@ _READS_LIBRARY = re.compile(
 
 # #5773: the selection engine is the ONE drafting-path reader, and it changes a live draft only when the library is
 # `approved` (shadow while `proposed` — tests/test_selection_engine_5773.py holds that switch). Its critic reads through it.
+# #5772: the weekly gate evaluator's leg reads the library to RECORD gate states (owner-only rows); an unlock reaches
+# `plan_next_session` only through a claim-once row the leg creates while the library is `approved`, and that read side
+# never opens the library (the pure evaluator lambdas/training/exercise_gates.py reads nothing).
 _SANCTIONED_READERS = {
     os.path.join("lambdas", "training", "selection_engine.py"),
     os.path.join("lambdas", "training", "selection_critic.py"),
+    os.path.join("mcp", "exercise_gates_leg.py"),  # #5772
 }
 
 

@@ -94,6 +94,8 @@ METRIC_WORDS: dict = {
 # behaviour (experiment.measurable_metrics.METRIC_SUBDOMAIN).
 ACTION_SUBDOMAINS = frozenset({"calories", "protein", "training"})
 CONDITIONS = {"at_least": ">=", "at_most": "<="}
+REQUIRED_KEY = "public_brief_required_metrics"  # config/personas.json: the inputs a coach's brief cannot do without
+HELD_FOR_INPUTS = "required_inputs_absent"  # run_coach's reason when one of them has no observation for the cycle
 
 #: Words that would point at a partner, a relationship or another person — never in a brief (fail closed).
 RELATIONSHIP_WORDS = re.compile(
@@ -118,6 +120,16 @@ def coach_metrics(coach_id: str, personas: Optional[dict] = None) -> list:
     p = _personas(personas).get(coach_id) or {}
     eligible = set(POL.eligible_metrics())
     return [m for m in (p.get("public_brief_metrics") or []) if m in eligible and m in METRIC_WORDS]
+
+
+def required_metrics(coach_id: str, personas: Optional[dict] = None) -> list:
+    """The inputs a coach's brief cannot be written without (``public_brief_required_metrics``, config/personas.json).
+
+    Each must have an observation for the cycle; when one is absent the coach is HELD with the missing names, never
+    briefed from the metrics that remain (a glucose coach with no glucose readings is not a calories brief). A listed
+    metric that is not one of the coach's eligible inputs can never be observed, so it holds the coach (fail closed)."""
+    p = _personas(personas).get(coach_id) or {}
+    return [str(m) for m in (p.get(REQUIRED_KEY) or [])]
 
 
 def brief_coaches(personas: Optional[dict] = None) -> list:
@@ -701,6 +713,9 @@ def run_coach(
     persona = _personas(personas).get(coach_id) or {}
     metrics = coach_metrics(coach_id, personas)
     obs = observe(metrics, cycle, readings)
+    missing = [m for m in required_metrics(coach_id, personas) if m not in {o["metric"] for o in obs}]
+    if missing:  # before any model call: no brief from substitute metrics under this coach's name
+        return {"status": "held", "reason": HELD_FOR_INPUTS, "missing": missing, "evidence_written": evidence_n}
     if not obs:
         return {"status": "insufficient_data", "evidence_written": evidence_n}
     prev = next((r for r in rows if str(r.get("sk")) == POL.brief_sk(_day(cycle, -POL.CYCLE_DAYS))), None)
@@ -751,7 +766,7 @@ def run_coach(
             return {"status": "exists", "evidence_written": evidence_n}
         for n, change in enumerate(sections["position_changes"]):
             _put_new(table, revision_row(coach_id, (prior or {})["brief_cycle"], cycle, change, provenance, n))
-    return {
+    out = {
         "status": "written" if persist else "dry_run",
         "sk": brief["sk"],
         "interpretations": len(sections["interpretations"]),
@@ -761,6 +776,24 @@ def run_coach(
         "dropped": dropped,
         "evidence_written": evidence_n,
         **cost,
+    }
+    if not persist:  # the rehearsal reports what each check decided — counts and classes only, never the words
+        out["checks"] = dry_run_checks(coach_id, brief, calls)
+    return out
+
+
+def dry_run_checks(coach_id: str, brief: dict, calls: list) -> dict:
+    """What the publication and provenance checks decided for a brief that was NOT written (dry run): the brief's
+    provenance verdict, and each call's class now (dark) and by its structure once the switch is on."""
+    from common import prediction_publication as PP
+
+    pk = f"COACH#{coach_id}"
+    return {
+        "brief_provenance_publishable": NP.is_publishable(brief),
+        "call_provenance_publishable": [NP.is_publishable(c[2]) for c in calls],
+        "calls_gradeable": [str((c[2].get("filing") or {}).get("verdict")) == "gradeable" for c in calls],
+        "call_class_now": [list(PP.classify_call(pk, c[2])) for c in calls],
+        "call_class_when_live": [list(PP.classify_call(pk, {**c[2], "source": None})) for c in calls],
     }
 
 
@@ -826,3 +859,85 @@ def run(
     except Exception as e:  # noqa: BLE001
         logger.warning("[public_brief] run failed: %s", e, exc_info=True)
         return {"status": "error", "error": str(e)}
+
+
+# ── the Lambda door and the run stamp (the dead-man's input) ──────────────────────────────────
+#: ``COACH#public_brief / RUN#<cycle>``: one row per scheduled cycle, overwritten by a later re-run of the same cycle, with
+#: each coach's outcome. ``operational.public_brief_qa`` (nightly qa-smoke) reds when the row is missing after the
+#: Monday deadline or when a coach's outcome is not a sanctioned one. A dry run never stamps.
+RUN_PK = "COACH#public_brief"
+RUN_SK_PREFIX = "RUN#"
+_ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def run_sk(cycle: str) -> str:
+    return f"{RUN_SK_PREFIX}{cycle}"
+
+
+def _outcome(res: Any) -> dict:
+    res = res if isinstance(res, dict) else {}
+    out = {"status": str(res.get("status") or "unknown")}
+    for k in ("reason", "missing"):
+        if res.get(k):
+            out[k] = res[k] if k == "missing" else str(res[k])
+    return out
+
+
+def stamp_run(table: Any, today: str, result: dict, merge: bool = False) -> bool:
+    """Write the cycle's run stamp (fail-soft: a stamp that cannot be written leaves the dead-man to report the gap).
+    ``merge``: a re-run of named coaches replaces only their outcomes in the cycle's existing stamp."""
+    cycle = result.get("cycle") or POL.cycle_of(today)
+    if cycle < POL.FIRST_CYCLE:
+        return False  # no cycle is due before the first; nothing for the dead-man to read
+    results = {cid: _outcome(r) for cid, r in (result.get("results") or {}).items()}
+    if merge:
+        try:
+            prev = table.get_item(Key={"pk": RUN_PK, "sk": run_sk(cycle)}).get("Item") or {}
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[public_brief] run stamp unreadable for %s: %s", cycle, e)
+            return False
+        if not singleton_visible(prev):  # absent, or tombstoned by a reset: a partial re-run never stands in for the cycle's run
+            return False
+        results = {**_plain(prev.get("results") or {}), **results}
+    row = {
+        "pk": RUN_PK,
+        "sk": run_sk(cycle),
+        "brief_cycle": cycle,
+        "run_on": today,
+        "status": str(result.get("status") or "unknown"),
+        "results": results,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    for k in ("reason", "feature", "error"):
+        if result.get(k):
+            row[k] = str(result[k])[:300]
+    try:
+        table.put_item(Item=_ddb(row))
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[public_brief] run stamp not written for %s: %s", cycle, e)
+        return False
+
+
+def handle_event(table: Any, event: dict) -> dict:
+    """The Lambda's ``{"mode": "public_brief"}`` door.
+
+    ``today`` (ISO day) is accepted ONLY with ``dry_run: true`` — it rehearses a future cycle through the real Lambda
+    (real reads, one real model call per coach) without writing anything; a ``today`` without ``dry_run`` is refused
+    before any read or call, so the override can never write a brief, a call or a stamp for a cycle that is not today's.
+    """
+    dry_run = bool(event.get("dry_run"))
+    today = event.get("today")
+    if today is not None:
+        if not dry_run:
+            return {"status": "refused", "reason": "today_override_requires_dry_run"}
+        if not isinstance(today, str) or not _ISO_DAY.match(today):
+            return {"status": "refused", "reason": "malformed_today"}
+    if dry_run:
+        return run(table, today=today, coach_ids=event.get("coach_ids"), persist=False)
+    from common.pacific_time import pacific_today
+
+    today = pacific_today()
+    result = run(table, today=today, coach_ids=event.get("coach_ids"), persist=True)
+    stamp_run(table, today, result, merge=bool(event.get("coach_ids")))
+    return result

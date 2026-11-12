@@ -1130,9 +1130,9 @@ def test_nutrition_macro_grid_arithmetic():
     assert f"Protein/{hb.PLAN_DAILY_PROTEIN_MIN_G}g" in html
     assert ">55g</p>" in html and ">121g</p>" in html  # round(55.2), round(120.6)
     assert "Fiber: 31g" in html
-    # cal_pct = round(1485 / 1500 * 100) = 99 -> inside 85..110 -> green (#5095: the ONE target, ~1,500 since charter
-    # 1.21.0, owner ruling 2026-10-23 R1)
-    assert hb.target_kcal() == 1500
+    # cal_pct = round(1485 / 1600 * 100) = 93 -> inside 85..110 -> green (#5095: the ONE target; the ~1,500 base is
+    # served at the 1,600 any-day floor, owner ruling 2026-11-11 #5794)
+    assert hb.target_kcal() == 1600
     # prot_pct = round(185.4 / 170 * 100) = round(109.06) = 109 -> >= 95 -> green
     assert html.count("#22c55e") >= 2
 

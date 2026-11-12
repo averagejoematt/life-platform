@@ -26,6 +26,7 @@ sys.path.insert(0, str(REPO / "lambdas"))
 sys.path.insert(0, str(REPO))
 
 from training import cardio_menu, cardio_note, recent_aerobic  # noqa: E402
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 from training.training_charter import charter_value  # noqa: E402
 
@@ -61,7 +62,7 @@ def test_every_menu_entry_has_one_prescription_the_pick_and_the_note_share():
         assert (pick["movement_key"], pick["modality"], pick["intensity"]) == (machine, rx["modality"], rx["intensity"]), (kind, machine)
         assert pick["stage1_pick"]["movement_key"] == stale["movement_key"]
         note, audit = cardio_note.compose(movement_key=machine, minutes=rx["minutes"], target_date=DAY, kind=kind)
-        line1 = note.split("\n")[0]
+        line1 = _wc(note).split("\n")[0]
         assert line1.startswith(cardio_note.machine_for(machine)), (kind, machine, line1)
         rpe = re.search(r"RPE \d(?:–\d)?", rx["intensity"]).group(0)
         assert rpe in line1, (kind, machine, line1)  # the pick's RPE is the note's
@@ -78,7 +79,7 @@ def test_the_block_duration_is_clamped_to_the_charter_cap(monkeypatch):
     block, pick = _tempo_on_bike(monkeypatch)
     assert [s.duration_seconds for s in block.sets] == [cap * 60]
     # the block's minutes are the set row's (#5428: line 1 never restates them), and no label claims 40
-    assert " min ·" not in block.notes.split("\n")[0] and "hard flat 40" not in block.notes and "40 min" not in block.notes
+    assert " min ·" not in _wc(block.notes).split("\n")[0] and "hard flat 40" not in block.notes and "40 min" not in block.notes
     assert pick["menu"]["minutes"] == cap
 
 
