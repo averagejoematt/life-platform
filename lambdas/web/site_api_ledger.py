@@ -172,6 +172,18 @@ def _supplement_stack_match(exp_name: str, registry: dict) -> bool:
     return False
 
 
+def _finding_provenance(item: dict, pair: dict) -> dict:
+    """2026-11-11: the method each method-versioned metric of the pair was computed under, as the weekly record stamped
+    it (public_correlations already withheld an unstamped one) — so a downstream reader (the Laboratory's snapshot) can
+    hold the same rule without the record — and the run's trailing window (consecutive weeks share most of their days)."""
+    stamps = item.get("metric_methods") if isinstance(item.get("metric_methods"), dict) else {}
+    return {
+        "metric_methods": {k: stamps[k] for k in (pair.get("metric_a"), pair.get("metric_b")) if k in stamps},
+        "window_start": item.get("start_date"),
+        "window_end": item.get("end_date"),
+    }
+
+
 def discoveries(*, _g) -> dict:
     """
     GET /api/discoveries
@@ -371,13 +383,11 @@ def discoveries(*, _g) -> dict:
             # `continue` on every real record (structurally always []); a
             # hypothetical legacy flat-list record is still accepted, the same way
             # site_api_discovery.correlations() handles both shapes.
-            if isinstance(corrs, dict):  # owner rulings 2026-11-03/05: public pairs, FDR re-run over them
-                pairs = list(_activity_publication.public_correlations(corrs, metric_methods=item.get("metric_methods")).values())
-            elif isinstance(corrs, list):
-                pairs = _activity_publication.public_correlations(corrs, metric_methods=item.get("metric_methods"))
-            else:
+            if not isinstance(corrs, (dict, list)):
                 continue
-            for c in pairs:
+            # owner rulings 2026-11-03/05: public pairs, FDR re-run over them; 2026-11-11: method-stamped records only
+            pairs = _activity_publication.public_correlations(corrs, metric_methods=item.get("metric_methods"))
+            for c in pairs.values() if isinstance(pairs, dict) else pairs:
                 if not isinstance(c, dict):
                     continue
                 if not (c.get("fdr_significant") or c.get("significant")):
@@ -388,29 +398,19 @@ def discoveries(*, _g) -> dict:
                 # hypothetical legacy flat-list record.
                 r = c.get("pearson_r", c.get("r", 0)) or 0
                 n = c.get("n_days", c.get("n", 0)) or 0
-                # #3445: the autocorrelation-corrected effective n, NOT raw n — feeds
-                # correlation_evidence's level/score so a claim isn't graded on a
-                # sample size larger than the data's real independent information.
+                # #3445: the autocorrelation-corrected effective n, NOT raw n — feeds correlation_evidence's level/score
+                # so a claim isn't graded on a sample size larger than the data's real independent information.
                 n_eff = c.get("n_eff")
                 direction = "positively" if r > 0 else "negatively"
-                # #1372 Evidence Bar: pass the stored FDR verdict through honestly —
-                # a legacy record with only the pre-FDR `significant` flag serves
-                # fdr_significant=None ("not checked"), never a fake pass.
+                # #1372 Evidence Bar: pass the stored FDR verdict through honestly — a legacy record with only the
+                # pre-FDR `significant` flag serves fdr_significant=None ("not checked"), never a fake pass.
                 fdr_flag = c.get("fdr_significant")
-                # 2026-11-11: the method each method-versioned metric of the pair was computed under, as the record
-                # stamped it (public_correlations already withheld an unstamped one) — so a downstream reader (the
-                # Laboratory's snapshot) can hold the same rule without the record.
-                stamps = item.get("metric_methods") if isinstance(item.get("metric_methods"), dict) else {}
-                pair_methods = {k: stamps[k] for k in (c.get("metric_a"), c.get("metric_b")) if k in stamps}
                 ai_findings.append(
                     {
                         "week": week,
                         "metric_a": a,
                         "metric_b": b,
-                        "metric_methods": pair_methods,
-                        # the run's trailing window, as stored: consecutive weeks share most of their days
-                        "window_start": item.get("start_date"),
-                        "window_end": item.get("end_date"),
+                        **_finding_provenance(item, c),
                         "r": round(r, 2) if r else 0,
                         "n": n,
                         "n_eff": n_eff,
