@@ -26,127 +26,10 @@
         "keys": {
           "categories": {
             "keys": {
-              "antioxidant": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              },
-              "caffeine": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              },
-              "cancer_risk": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              },
-              "cardiovascular": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              },
               "exercise": {
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -155,23 +38,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -180,23 +46,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -205,23 +54,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -230,23 +62,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -255,23 +70,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -280,48 +78,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              },
-              "other": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -330,48 +86,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              },
-              "statin_response": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -380,23 +94,6 @@
                 "keys": {
                   "n": {
                     "type": "integer"
-                  },
-                  "risk_levels": {
-                    "keys": {
-                      "favorable": {
-                        "type": "integer"
-                      },
-                      "mixed": {
-                        "type": "integer"
-                      },
-                      "neutral": {
-                        "type": "integer"
-                      },
-                      "unfavorable": {
-                        "type": "integer"
-                      }
-                    },
-                    "type": "object"
                   }
                 },
                 "type": "object"
@@ -406,6 +103,14 @@
           },
           "disclosure": {
             "type": "string"
+          },
+          "other_categories_combined": {
+            "keys": {
+              "n": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
           },
           "risk_summary": {
             "keys": {

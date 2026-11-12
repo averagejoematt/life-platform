@@ -4,10 +4,15 @@ Split out of ``site_api_vitals.py`` (#1654 — god-module breakup). One seam: **
 measured chemistry**, and it is the module carrying the platform's hardest privacy
 absolutes:
 
-  * `/api/genome_risks` publishes AGGREGATES ONLY (counts + risk levels + the
-    disclosure saying why detail is absent). Named genes, rsids, per-variant
-    summaries and implications must NEVER reach the response — a Tier-2 owner-only
-    boundary, and any per-variant publication is a PRE-13 decision.
+  * `/api/genome_risks` publishes AGGREGATES ONLY: the total, the overall
+    risk_summary, a per-category COUNT for categories of at least
+    ``GENOME_MIN_PUBLIC_CATEGORY_N`` variants, one unnamed combined count for the
+    rest, and the disclosure saying why detail is absent. No per-category risk
+    result is ever served (a 1-variant category's distribution IS that variant's
+    readout), and pharmacogenomic category names are never served. Named genes,
+    rsids, per-variant summaries and implications must NEVER reach the response —
+    a Tier-2 owner-only boundary, and any per-variant publication is a PRE-13
+    decision.
   * `/api/labs` runs every panel through ``_strip_genetic_biomarkers``
     (``_GENETIC_CATEGORY_RE`` / ``_GENETIC_TEXT_RE``) so a pharmacogenomic marker
     filed as an ordinary lab cannot leak through the labs door instead.
@@ -57,29 +62,43 @@ from web.site_api_common import (
 # ════════════════════════════════════════════════════════════════════════
 
 
+# A category is named publicly only when it holds at least this many variants.
+# Below it, even a bare count sits too close to one person's individual result,
+# so the variant folds into one unnamed combined count instead (owner ruling
+# 2026-11-11: remove sensitive genetic info, fail closed).
+GENOME_MIN_PUBLIC_CATEGORY_N = 5
+
+# Category names that are never published whatever their size: a drug-response
+# or pharmacogenomic grouping is clinical-deliberation-adjacent on its own. Such
+# a category folds into the combined count. Fail closed: widen, never narrow.
+_GENOME_UNNAMEABLE_CATEGORY_RE = _re.compile(r"statin|pharmaco|drug|medication|response", _re.IGNORECASE)
+
+
 def genome_risks(*, _g) -> dict:
     """
     GET /api/genome_risks
-    Returns genome risk AGGREGATES grouped by category. Cache: 86400s (24h).
+    Returns genome COUNTS. Cache: 86400s (24h).
 
-    PRIVACY ABSOLUTE — no genetic IDENTIFIER may reach this public payload.
-    The docstring here used to say "no raw genotypes exposed", which was true
-    and beside the point: this endpoint served 111 dbSNP `rsid` values and 93
-    `gene` names, each paired with the owner's personal risk classification, to
-    any unauthenticated caller. An rsID IS the identifier — it is what
-    `_GENETIC_TEXT_RE` (line ~2450 of this same file) exists to keep out of the
-    public labs payload, what `docs/DATA_GOVERNANCE.md` classes Tier 2
-    owner-only, and what #920/#945 purged from three other surfaces. This
-    handler was simply never brought under the rule (guard-the-instance, not
-    the set), and PRE-13 — the review that would decide whether ANY of this may
-    be published — is still deferred. Until that decision is Matthew's to make
-    explicitly, the public shape is aggregate-only:
+    PRIVACY ABSOLUTE — no genetic IDENTIFIER and no per-category RESULT may
+    reach this public payload. Per-variant detail (rsid, gene, summary,
+    implications) was withdrawn 2026-08-02; it is Tier 2 owner-only under
+    docs/DATA_GOVERNANCE.md and any publication is a PRE-13 decision.
 
-      per category: how many variants, and the risk-level distribution.
+    2026-11-11 (owner ruling): the per-category ``risk_levels`` distribution is
+    withdrawn too. Several categories held one or two variants, so the
+    distribution WAS an individual variant's readout, and one category name
+    (statin response) was clinical-deliberation-adjacent by itself. The public
+    shape is now:
 
-    That keeps the honest reader-facing fact ("the genome has been analysed and
-    here is the shape of it") without publishing which variants he carries.
-    Restoring per-variant detail is a PRE-13 decision, not a code change.
+      total_snps                 — how many variants were analysed
+      risk_summary               — the overall distribution across all of them
+                                   (an aggregate over 111 variants names nothing)
+      categories.<name>.n        — a COUNT only, and only for a category with at
+                                   least GENOME_MIN_PUBLIC_CATEGORY_N variants
+                                   and an innocuous name
+      other_categories_combined.n — every remaining variant, one unnamed count
+
+    No per-category risk result is served at any size.
     """
     table = _g["table"]
 
@@ -90,35 +109,50 @@ def genome_risks(*, _g) -> dict:
     if not items:
         # No genome uploaded yet — shaped-empty 200 so the page shows "not yet published".
         return _ok(
-            {"genome": {"total_snps": 0, "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}, "categories": {}}},
+            {
+                "genome": {
+                    "total_snps": 0,
+                    "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0},
+                    "categories": {},
+                    "other_categories_combined": {"n": 0},
+                }
+            },
             cache_seconds=3600,
         )
 
-    categories: dict[str, dict[str, Any]] = {}
+    counts: dict[str, int] = {}
     risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
 
     for snp in items:
-        cat = snp.get("category", "other")
+        cat = str(snp.get("category") or "other")
         risk = snp.get("risk_level", "neutral")
         risk_summary[risk] = risk_summary.get(risk, 0) + 1
-        # Aggregate ONLY — never the rsid, the gene, or the per-variant free
-        # text (summary/implications carried genotype calls). Counting a
-        # category is a fact about the analysis; naming a variant is a fact
-        # about the person.
-        bucket = categories.setdefault(cat, {"n": 0, "risk_levels": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}})
-        bucket["n"] += 1
-        bucket["risk_levels"][risk] = bucket["risk_levels"].get(risk, 0) + 1
+        # COUNT only — never the rsid, the gene, the per-variant free text, or the
+        # per-category risk distribution.
+        counts[cat] = counts.get(cat, 0) + 1
+
+    categories: dict[str, dict[str, Any]] = {}
+    combined = 0
+    for cat, n in sorted(counts.items()):
+        if n >= GENOME_MIN_PUBLIC_CATEGORY_N and not _GENOME_UNNAMEABLE_CATEGORY_RE.search(cat):
+            categories[cat] = {"n": n}
+        else:
+            combined += n
 
     return _ok(
         {
             "genome": {
                 "total_snps": len(items),
                 "risk_summary": risk_summary,
-                "categories": dict(sorted(categories.items())),
+                "categories": categories,
+                "other_categories_combined": {"n": combined},
                 "disclosure": (
-                    "Per-variant detail (identifiers, genes, and their individual readouts) is deliberately "
-                    "not published: genome variants are owner-only under this platform's data-governance tiers. "
-                    "These are counts of what was analysed, not which variants he carries."
+                    "Only counts are published: how many variants were analysed, the overall spread of results "
+                    "across all of them, and how many fall in each larger category. Per-variant detail "
+                    "(identifiers, genes, individual readouts) and per-category results are deliberately not "
+                    "published; smaller categories are folded into one unnamed count, because a small category's "
+                    "result would reveal an individual variant. Genome variants are owner-only under this "
+                    "platform's data-governance tiers."
                 ),
             }
         },

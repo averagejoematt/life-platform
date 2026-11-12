@@ -185,12 +185,20 @@ function renderCategories(categories) {
     return;
   }
 
-  // Sort categories: most unfavorable first
-  const catOrder = Object.entries(categories).sort((a, b) => {
-    const aU = a[1].filter(s => s.risk_level === 'unfavorable').length;
-    const bU = b[1].filter(s => s.risk_level === 'unfavorable').length;
-    return bU - aU;
-  });
+  // Privacy (owner ruling 2026-11-11): each category is now {n} only — no
+  // per-category risk result is published, categories under 5 variants and any
+  // drug-response category fold into one unnamed `other_categories_combined`
+  // count. Detect the aggregate shape BEFORE sorting: the old comparator called
+  // .filter on each value, which throws on an object.
+  const entries = Object.entries(categories);
+  const isAggregate = entries.length && !Array.isArray(entries[0][1]);
+  const catOrder = isAggregate
+    ? entries.sort((a, b) => ((b[1] && b[1].n) || 0) - ((a[1] && a[1].n) || 0))
+    : entries.sort((a, b) => {
+        const aU = a[1].filter(s => s.risk_level === 'unfavorable').length;
+        const bU = b[1].filter(s => s.risk_level === 'unfavorable').length;
+        return bU - aU;
+      });
 
   // Privacy absolute (2026-08-02): /api/genome_risks now publishes AGGREGATES
   // only — per-variant identifiers (rsid, gene) and their readouts are
@@ -198,20 +206,20 @@ function renderCategories(categories) {
   // it may be published is a deferred PRE-13 decision. Each category is now
   // {n, risk_levels} rather than an array of SNPs, so render the shape we
   // actually get instead of throwing on .filter of an object.
-  const isAggregate = catOrder.length && !Array.isArray(catOrder[0][1]);
   if (isAggregate) {
-    container.innerHTML = catOrder.map(([cat, agg]) => {
-      const levels = (agg && agg.risk_levels) || {};
-      const n = (agg && agg.n) || 0;
-      const shown = activeFilter === 'all' ? n : (levels[activeFilter] || 0);
-      if (!shown) return '';
-      return `<div class="category">
+    if (activeFilter !== 'all') {
+      container.innerHTML = '<p>Results are published only as the overall totals above; per-category results are not published.</p>';
+      return;
+    }
+    const combined = (genomeData && genomeData.other_categories_combined && genomeData.other_categories_combined.n) || 0;
+    const rows = catOrder.map(([cat, agg]) => [cat, (agg && agg.n) || 0]);
+    if (combined) rows.push(['smaller categories, combined', combined]);
+    container.innerHTML = rows.filter(([, n]) => n).map(([cat, n]) => `<div class="category">
         <div class="category__header">
           <div class="category__name">${cat}</div>
-          <div class="category__count">${shown} variant${shown !== 1 ? 's' : ''}</div>
+          <div class="category__count">${n} variant${n !== 1 ? 's' : ''}</div>
         </div>
-      </div>`;
-    }).join('') || '<p>No variants in this risk band.</p>';
+      </div>`).join('') || '<p>No genome categories found.</p>';
     return;
   }
 
