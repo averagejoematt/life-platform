@@ -26,6 +26,19 @@ from mcp import idempotency as _idem
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
 
+# The `get_decisions` input table — moved here from mcp/registry.py to pay that module's #1665 size ceiling for
+# get_advice_link_queue (the #4036 pattern: the schema NAME stays in the registry). A LITERAL dict, because
+# scripts/generate_mcp_tool_catalog.py reads it by ast.literal_eval.
+GET_DECISIONS_INPUT = {
+    "type": "object",
+    "properties": {
+        "days": {"type": "integer", "description": "Look back N days (default 30)."},
+        "pillar": {"type": "string", "description": "Filter by pillar (e.g. 'sleep', 'nutrition')."},
+        "outcome_only": {"type": "boolean", "description": "If true, only return decisions with recorded outcomes."},
+    },
+    "required": [],
+}
+
 
 def _get_table():
     return _table_ref

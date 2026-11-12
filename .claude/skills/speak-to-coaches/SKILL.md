@@ -72,6 +72,13 @@ disagrees with and what it missed, then call `log_field_note_response` with `wee
 missed). This only works if that week's AI Lab Notes already exist — if `get_field_notes`
 comes back empty, say so and skip this step rather than inventing a response target.
 
+### 5b. Optional: what he did with the coaches' asks
+
+If Matthew wants to settle the coaches' recent asks, call `get_advice_link_queue` (read-only; `coach_id` from
+`$ARGUMENTS` if given). Take the asks in its order, one at a time, and ask what he did with each. Record only what he
+says, in his words, by the route its `how_to_record` names. Its `context_not_evidence` block (workouts, meals,
+habits) is never evidence that he acted on an ask: never put it in his mouth and never link from it.
+
 ### 6. Close out
 
 Briefly summarize what got logged this session (which questions answered/skipped, any
