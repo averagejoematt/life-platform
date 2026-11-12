@@ -120,10 +120,13 @@ def _cap(text: Any, n: int = _TEXT_CAP) -> Any:
     return text[: n - 1] + "…"
 
 
-def _pick(src: Any, keys: tuple[str, ...]) -> dict[str, Any] | None:
-    if not isinstance(src, dict):
-        return None
+def _fields(src: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
     return {k: _cap(src.get(k)) for k in keys if k in src}
+
+
+def _pick(src: Any, keys: tuple[str, ...]) -> dict[str, Any] | None:
+    """`_fields` of a value that may not be a dict (None then)."""
+    return _fields(src, keys) if isinstance(src, dict) else None
 
 
 def _small(v: Any) -> bool:
@@ -170,13 +173,13 @@ def _red_team(crit: Any) -> dict[str, Any] | None:
     if not isinstance(crit, dict):
         return None
     changes = crit.get("changes") or []
-    rt = _pick(
+    rt = _fields(
         crit,
         ("routine_id", "routine_version", "written", "verdict_state", "veto", "next", "model_ran", "model_paused_reason", "model_step"),
     )
     rt["verdicts"] = [_verdict(v, changes) for v in crit.get("verdicts") or [] if isinstance(v, dict)]
     rt["changes"] = [
-        {**_pick(c, ("critic", "field", "to", "applied")), "reason": _cap(c.get("reason"), _SHORT_CAP)}
+        {**_fields(c, ("critic", "field", "to", "applied")), "reason": _cap(c.get("reason"), _SHORT_CAP)}
         for c in changes[:_LIST_CAP]
         if isinstance(c, dict)
     ]
@@ -221,40 +224,43 @@ def _tripwires(block: dict[str, Any]) -> dict[str, Any]:
 
 
 def _week_commitments(wc: Any) -> dict[str, Any] | None:
-    out = _pick(wc, ("verdict", "blocking", "warnings", "evaluated_from"))
-    if out is not None:
-        out["rows"] = [
-            {**_pick(r, ("id", "verdict", "blocking")), "detail": _cap(r.get("detail"), _SHORT_CAP)}
-            for r in wc.get("rows") or []
-            if isinstance(r, dict)
-        ]
+    if not isinstance(wc, dict):
+        return None
+    out = _fields(wc, ("verdict", "blocking", "warnings", "evaluated_from"))
+    out["rows"] = [
+        {**_fields(r, ("id", "verdict", "blocking")), "detail": _cap(r.get("detail"), _SHORT_CAP)}
+        for r in wc.get("rows") or []
+        if isinstance(r, dict)
+    ]
     return out
 
 
 def _deload(block: dict[str, Any]) -> dict[str, Any] | None:
     d = block.get("deload_recommendation") or (block.get("session") or {}).get("deload_recommendation")
-    out = _pick(d, ("active", "reasons", "applied", "applied_on", "proposed_response", "triggers_unwired"))
-    if out is not None:
-        out["unread"] = ((d.get("event_signals") or {}).get("unread")) or []
+    if not isinstance(d, dict):
+        return None
+    out = _fields(d, ("active", "reasons", "applied", "applied_on", "proposed_response", "triggers_unwired"))
+    out["unread"] = ((d.get("event_signals") or {}).get("unread")) or []
     return out
 
 
 def _steps(block: dict[str, Any]) -> dict[str, Any] | None:
     ramp = block.get("steps_ramp")
-    out = _pick(ramp, ("steps_target_line", "state", "today_target", "floor", "held_by"))
-    if out is not None:
-        out["walk_to_close_gap"] = _pick(ramp.get("walk_to_close_gap"), ("state", "goal", "projected_steps", "gap", "walk_minutes", "line"))
+    if not isinstance(ramp, dict):
+        return None
+    out = _fields(ramp, ("steps_target_line", "state", "today_target", "floor", "held_by"))
+    out["walk_to_close_gap"] = _pick(ramp.get("walk_to_close_gap"), ("state", "goal", "projected_steps", "gap", "walk_minutes", "line"))
     return out
 
 
 def _recent_aerobic(ra: Any) -> dict[str, Any] | None:
-    out = _pick(ra, ("state", "cardio_pick"))
-    if out is None:
+    if not isinstance(ra, dict):
         return None
+    out = _fields(ra, ("state", "cardio_pick"))
     rows = [r for r in ra.get("rows") or [] if isinstance(r, dict)]
     out["rows"] = [
         {
-            **_pick(r, ("date", "weekday", "modality", "moving_min", "avg_hr")),
+            **_fields(r, ("date", "weekday", "modality", "moving_min", "avg_hr")),
             "flags": sorted(k for k, v in (r.get("flags") or {}).items() if v),
         }
         for r in rows[-_LIST_CAP:]
@@ -265,18 +271,20 @@ def _recent_aerobic(ra: Any) -> dict[str, Any] | None:
 
 
 def _rate_target(rt: Any) -> dict[str, Any] | None:
-    out = _pick(rt, ("low_lb_wk", "high_lb_wk", "target_lb_wk", "target_pct_bw_wk", "cap_lb_wk", "owner_to_resolve"))
-    if out is not None:
-        out.update(_pick(rt.get("band"), ("floor_pct_bodyweight_per_wk", "ceiling_pct_bodyweight_per_wk")) or {})
-        out["protein_gate_state"] = (rt.get("protein_gate") or {}).get("state")
+    if not isinstance(rt, dict):
+        return None
+    out = _fields(rt, ("low_lb_wk", "high_lb_wk", "target_lb_wk", "target_pct_bw_wk", "cap_lb_wk", "owner_to_resolve"))
+    out.update(_pick(rt.get("band"), ("floor_pct_bodyweight_per_wk", "ceiling_pct_bodyweight_per_wk")) or {})
+    out["protein_gate_state"] = (rt.get("protein_gate") or {}).get("state")
     return out
 
 
 def _nutrition(nc: Any) -> dict[str, Any] | None:
-    out = _pick(nc, ("veto", "model_ran", "model_paused_reason", "error"))
-    if out is not None:
-        out["verdicts"] = [_verdict(v) for v in nc.get("verdicts") or [] if isinstance(v, dict)]
-        out["floor_misses"] = [_cap(m) for m in (nc.get("floor_misses") or [])[:_LIST_CAP]]
+    if not isinstance(nc, dict):
+        return None
+    out = _fields(nc, ("veto", "model_ran", "model_paused_reason", "error"))
+    out["verdicts"] = [_verdict(v) for v in nc.get("verdicts") or [] if isinstance(v, dict)]
+    out["floor_misses"] = [_cap(m) for m in (nc.get("floor_misses") or [])[:_LIST_CAP]]
     return out
 
 
@@ -286,7 +294,7 @@ def _training_phase(tp: Any) -> dict[str, Any] | None:
     out = {k: _cap(v) for k, v in tp.items() if k != "value"}
     val = tp.get("value")
     if isinstance(val, dict):
-        out.update(_pick(val, ("phase", "phase_title", "since", "pending", "next_phase", "next_phase_title", "next_verdict")))
+        out.update(_fields(val, ("phase", "phase_title", "since", "pending", "next_phase", "next_phase_title", "next_verdict")))
         out["closest_unmet_gate"] = _pick(val.get("closest_unmet_gate"), ("id", "verdict", "detail", "metric", "threshold"))
     return out
 
@@ -304,7 +312,8 @@ def _omitted(out: dict[str, Any], block: dict[str, Any]) -> dict[str, Any]:
 
 def summarize(out: dict[str, Any]) -> dict[str, Any]:
     """The declared compact view of one full `plan_next_session` result. Pure: reads `out`, writes nothing."""
-    block = out.get("constraint_block") if isinstance(out.get("constraint_block"), dict) else {}
+    cb = out.get("constraint_block")
+    block: dict[str, Any] = cb if isinstance(cb, dict) else {}
     walking = _pick(block.get("walking"), ("state", "now_hr_wk", "floor_hr_wk", "gap_hr_wk", "pct_of_floor"))
     stage = 2 if "critics" in out else 1
     summary = {
