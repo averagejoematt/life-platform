@@ -481,7 +481,7 @@ def _owner_pinned(slot: dict[str, Any], ctx: dict[str, Any], pin: dict[str, Any]
     accessory, or one of the slot's eligible candidates. An approved movement the slot can no longer serve (equipment,
     pain, a lock, the catalog) is REFUSED, never forced: the record says why and drafting keeps the pool's variant."""
     eligible, excluded = candidates(ctx)
-    ranked = sorted(eligible, key=lambda c: rank_key(c, recent, week_taken))
+    ranked = sorted(eligible, key=lambda c: rank_key(c, recent))
     ck = str(pin.get("catalog_key") or "")
     meta = {k: pin.get(k) for k in ("source", "approved_block")} | {"catalog_key": ck, "experiment": pin.get("experiment")}
     hit = next((c for c in ranked if c["catalog_key"] == ck), None)
@@ -491,7 +491,8 @@ def _owner_pinned(slot: dict[str, Any], ctx: dict[str, Any], pin: dict[str, Any]
     if hit is None:
         why = next((x["why"] for x in excluded if x.get("catalog_key") == ck), "not a candidate for this slot's muscle and job")
         return select_slot(slot, ctx, recent, week_taken) | {"owner_pin": meta | {"state": "refused", "why": why}}
-    pick = hit | {"c_reason": c_reason(hit, excluded, pinned=True), "novel_terms": _novel_terms(hit)}
+    # an owner-approved pick is exempt from no-repeats, as a pin is (#5773 x #5776)
+    pick = hit | {"c_reason": c_reason(hit, excluded, pinned=True), "novel_terms": _novel_terms(hit), "week_repeat": None}
     return {
         "slot_id": slot["slot_id"],
         "role": slot["role"],
@@ -691,7 +692,7 @@ def select_week(
             p = _pinned(slot, ctx) | {"spec": ctx["spec"]}
         elif (owner_pins or {}).get(slot["slot_id"]):
             p = _owner_pinned(slot, ctx, (owner_pins or {})[slot["slot_id"]], recent, taken)
-            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent, taken))
+            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent))
         else:
             p = select_slot(slot, ctx, recent, taken)
             full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent))
