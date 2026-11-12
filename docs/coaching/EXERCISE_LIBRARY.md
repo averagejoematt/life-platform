@@ -21,6 +21,9 @@ records `inputs_snapshot.library_version`. Gate evaluation is #5772; note render
 | `deploy/write_exercise_library_overlay.py` | Writer for the OWNER-PRIVATE overlay. Dry-run by default (counts only); `--out FILE`; `--apply` PUTs to S3. |
 | `scripts/check_library_gates_private.py` | Private-side gate completeness check (prints ids + missing field names only). |
 | `scripts/approve_exercise_library.py` | The only sanctioned `proposed -> approved` flip. |
+| `scripts/library_evidence_review.py` | Per-block evidence review: re-verifies citations, decides proposals from the allow-listed sources, opens the owner's PR (#5778). |
+| `config/evidence_source_allowlist.json` | The allow-listed source set (channels, designs, named reviewers, denied hosts). |
+| `deploy/exercise_library_reviews.json` (+ `.py`) | The accepted-review ledger the builder re-applies. |
 
 ## Public vs private
 
@@ -79,6 +82,33 @@ python3 deploy/build_exercise_library.py                  # dry-run summary
 python3 deploy/build_exercise_library.py --write
 python3 deploy/write_exercise_library_overlay.py --out /tmp/overlay.json   # dry-run + local file
 ```
+
+## Evidence review (per block, #5778)
+
+`scripts/library_evidence_review.py`, run from the training-review skill (§6) once per block — no schedule.
+It PROPOSES; the owner accepts by merging the PR it opens; it never merges and never pushes main.
+
+- **Re-verification.** Every registered citation is resolved live: DOI via Crossref, PMID via PubMed E-utilities,
+  title + first author + year matched, the PMID's DOI cross-checked, a retraction / erratum / comment pubtype
+  rejected. `not_found` or retracted on every citation behind an A/B row proposes that row's downgrade to C; a
+  `mismatch` is reported for a `correct_citation`; `unreachable` changes nothing. Exit 1 on a definitive failure.
+- **Allow-listed sources only** — `config/evidence_source_allowlist.json` (hand-owned; a change to it is a reviewed
+  PR): channels `pubmed`, `crossref`, `reviewer` (a named evidence-based reviewer's peer-reviewed paper, cited by its
+  DOI/PMID). No social media, blogs or bare URLs (a denied host is rejected by name). Study designs and the tiers
+  each may back: randomized trial A/B; controlled trial, meta-analysis, systematic review B; narrative review and
+  position stand context only, and only with a named reviewer among the authors.
+- **Verification before tier.** A proposed citation registers only if it resolves live with a DOI. It backs a
+  tier only with a verified PMID, `abstract_read: true` and a design the allowlist permits; otherwise the row stays
+  C. Every proposed change carries its citation. Nothing is invented: the optional `--discover` PubMed search is
+  a reading list built from the library's own targets, never a change, and no model is used.
+- **Outputs.** Dry-run by default (prints the report + diff, writes nothing); `--out DIR` writes
+  `proposal.json` + `library.diff`; `--open-pr --issue N` makes a locked lane off `origin/main`
+  (`scripts/lane_worktree.py`), edits `config/exercise_library.json` (patch version bump + a `change_log` line) and
+  appends one record to `deploy/exercise_library_reviews.json`, commits through `deploy/agent_commit.sh` (named paths only), pushes the lane branch and
+  runs `gh pr create`.
+- **Durable across rebuilds.** `deploy/build_exercise_library.py` re-applies the ledger
+  (`deploy/exercise_library_reviews.py`): its citations beside the curation's, its candidates beside `EXPANSION`,
+  its tier changes over the derived rows.
 
 ## Approval (the owner's step)
 

@@ -161,6 +161,28 @@ hand-edit a prediction row.
 4. Say what you stored, the tab you added, the issues filed and the charter proposals awaiting
    his word, and stamp the charter version the retro was graded against (`charter_version`).
 
+## 6. The exercise library evidence review (#5778)
+
+Once per block, after the retro: propose library changes for the owner to merge. No schedule runs it.
+
+```bash
+python3 scripts/library_evidence_review.py                                     # re-verify the registered citations (dry-run)
+python3 scripts/library_evidence_review.py --discover --out <scratch dir>      # + a PubMed reading list since the last review
+python3 scripts/library_evidence_review.py --proposals <file> --out <scratch dir>  # decide a proposal file; prints the diff
+python3 scripts/library_evidence_review.py --proposals <file> --open-pr --issue <N>  # the PR for the owner
+```
+
+The reading list is reading, never a change. For each paper worth acting on, read the abstract, then write it into
+a proposal file (`add_citation` with `study_design` and `abstract_read: true`, then the `set_tier` /
+`add_candidate` it supports — shape in the script's docstring). Sources come only from
+`config/evidence_source_allowlist.json`: PubMed / Crossref records, or a paper a named reviewer there surfaced —
+cited by its DOI/PMID, never the reviewer's post. Never type a citation from memory and never let a model write
+one: the script verifies every DOI/PMID live and rejects anything that does not resolve with a matching title,
+first author and year; a rejected citation leaves its row C. A re-verification failure on an existing citation is
+reported (exit 1) and, when the row has no other citation, proposed as a downgrade to C. Read the dry run to him;
+open the PR only on his word, and never merge it — his merge is the acceptance. The library is public: no load,
+bodyweight or note text in a proposal.
+
 ## Guardrails
 
 - Owner-only from end to end: the RETRO# row, the PANEL# rows, the May tracker and the review doc
