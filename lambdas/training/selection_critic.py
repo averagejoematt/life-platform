@@ -23,7 +23,7 @@ committed), else `week_commitments.evaluate` over the draft's rotation record wi
 routine read), else the rotation record's own #5759 stamp (`kettlebell_weekly`, `family_floors`). A WARN row (the
 kettlebell switch before its date) is reported, never a fail; a week that could not be read is `not_evaluated`, named.
 
-`verdict`: fail (a blocking weekly check) > change (any exercise) > pass. `as_critic_verdict` maps it onto the stage-2
+`verdict`: fail (a blocking weekly check) > change (any exercise) > pass. `stage2` (`as_critic_verdict`) maps it onto the stage-2
 critic shape (`coach.critics.deterministic_verdict`'s keys) for the Coaching Room lane's registry (#5784) — and honours
 the engine's switch: while the library is `proposed` a flip is reported (`shadow_changes`), never applied. No model call;
 no clock; no I/O (the charter's `equipment.not_available` list is read once when `missing` is not passed). Never imports
@@ -297,7 +297,7 @@ def evaluate(
     rows, week_source = week(ir, library, catalog, week_commitments)
     failed = [r for r in rows if r["verdict"] == "fail"]
     overall = "fail" if failed else ("change" if any(v["verdict"] == "change" for v in verdicts) else "pass")
-    return {
+    out = {
         "critic": CRITIC,
         "issue": ISSUE,
         "verdict": overall,
@@ -310,6 +310,7 @@ def evaluate(
         "week_rows": rows,
         "week_source": week_source,
     }
+    return out | {"stage2": as_critic_verdict(out)}  # the stage-2 verdict the registry appends (#5784)
 
 
 def _named(s: dict[str, Any]) -> list[dict[str, Any]]:

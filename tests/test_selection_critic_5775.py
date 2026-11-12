@@ -119,6 +119,7 @@ def test_the_flip_is_a_stage2_change_on_the_exercise_index():
     ir = _ir()
     out = _run(ir)
     cv = critic.as_critic_verdict(out)
+    assert out["stage2"] == cv  # evaluate carries the stage-2 verdict the registry appends (#5784)
     idx = [e.movement_key for e in ir.exercises].index("triceps_rope_pushdown")
     fields = {cv["field"]: cv["to"]} | {a["field"]: a["to"] for a in cv.get("additional_changes") or []}
     assert cv["critic"] == "selection" and cv["verdict"] == "change"
