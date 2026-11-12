@@ -94,7 +94,7 @@ def test_endpoint_arm_coverage_check_fires_on_uncovered_routes(tmp_path):
 def test_endpoint_arm_fires_on_a_planted_genetic_tell():
     """Regression guard (#1945 AC4): a payload carrying the #1943 leak class must
     red — both as a value tell and as a key tell."""
-    payload = json.dumps({"snps": [{"rsid": "rs429358", "genotype": "C/T", "note": "heterozygous"}]})
+    payload = json.dumps({"snps": [{"rsid": "rs0000000", "genotype": "X/Y", "note": "heterozygous"}]})
     arms = {arm for arm, _ in guard.scan_endpoint_payload(payload, vice=[], literals=[])}
     assert "pii-genetic" in arms, "value-level genetic tell (rsID/genotype) must fire"
     assert "pii-genetic-key" in arms, "key-level genetic tell (rsid field) must fire"
@@ -209,7 +209,7 @@ def test_every_endpoint_violation_names_its_path_and_never_its_value():
             "b": [{"contact": email}],
             "c": ssn,
             "d": "born in 1985",
-            "e": "rs429358",
+            "e": "rs0000000",
             email: 1,
         }
     )
@@ -270,7 +270,7 @@ def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes(
 
     def stub_fetch(fetch_path):
         fetched.append(fetch_path)
-        return 200, {"user": {"birth_year": 1985}, "snp": "rs429358"}, None
+        return 200, {"user": {"birth_year": 1985}, "snp": "rs0000000"}, None
 
     res = guard.scan_endpoints("https://unit-test.invalid", fetcher=stub_fetch)
     arms = {arm for _, arm, _ in res["violations"]}
@@ -286,7 +286,7 @@ def test_guard_genetic_vocabulary_covers_the_platform_definition():
     lambdas/web/site_api_vitals._GENETIC_TEXT_RE and
     tests/test_public_genetic_privacy_absolute._GENETIC_KEY_RE encode — drift here
     means the arms silently diverged from the labs/genome absolutes."""
-    for probe in ("genotype", "rs429358", "allele"):
+    for probe in ("genotype", "rs0000000", "allele"):
         assert guard._GENETIC_VALUE_RE.search(probe), f"value tell must match {probe!r}"
     for key in ("rsid", "genotype", "snp_id", "allele", "gene", "genes", "gene_name", "rs123"):
         assert guard._GENETIC_KEY_RE.search(key), f"key tell must match key {key!r}"

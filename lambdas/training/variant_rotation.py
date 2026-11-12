@@ -622,14 +622,21 @@ def for_session(
     rows: list[dict[str, Any]] | None = None,
     read: bool = True,
     skill_ceiling: int = 2,
+    select: bool = False,
 ) -> dict[str, Any]:
     """`plan` for the served session, with the ledger read here (fail-soft) unless `rows` is injected or `read` is False
-    (the plan view: no hidden DDB read — `ledger: not_read`, the rotation computed)."""
+    (the plan view: no hidden DDB read — `ledger: not_read`, the rotation computed). `select` (a draft) runs the #5773
+    selection engine over it: SHADOW beside these pools while the exercise library is proposed, LIVE once approved."""
     pos = position(day_entry)
     state = "injected" if rows is not None else "not_read"
     if rows is None and read and pos is not None:
         rows, state = load_rows_failsoft(pos["block"])
-    return plan(day_entry, catalog_movements, rows=rows, ledger_state=state, skill_ceiling=skill_ceiling)
+    out = plan(day_entry, catalog_movements, rows=rows, ledger_state=state, skill_ceiling=skill_ceiling)
+    if not select:
+        return out
+    from training import selection_engine
+
+    return selection_engine.apply(out, catalog_movements, rows=rows, skill_ceiling=skill_ceiling, target_date=_draft_day(day_entry))
 
 
 def week_volume(catalog_movements: dict[str, Any], variants_by_role: dict[str, dict[str, str]], skill_ceiling: int = 2) -> dict[str, Any]:

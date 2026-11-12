@@ -38,7 +38,7 @@ def test_the_scope_matrix():
         assert room_scope({"WEB_ROOM": "cr1"}, committed) == "cr1"
     assert room_scope({}, "off") == "off"
     assert room_scope({}, "cr1") == "cr1"  # the committed launch switch
-    for v in ("", "0", "true", "yes", " 1", "CR1", "cr2", "all"):
+    for v in ("", "0", "true", "yes", " 1", "CR1", "CR2", "cr3", "all"):
         assert room_scope({"WEB_ROOM": v}, "off") == "off", v
     assert room_scope({}, "CR1") == "off" and room_scope({}, "on") == "off", "only the literal 'cr1' publishes"
     assert room_all({"WEB_ROOM": "1"}, "off") and not room_all({"WEB_ROOM": "cr1"}, "off") and not room_all({}, "cr1")
@@ -145,7 +145,7 @@ def test_a_cr1_published_scan_still_refuses_cr2_cr3_and_private_output(tmp_path,
 
 def test_the_owned_paths_check_refuses_an_invalid_switch(tmp_path, monkeypatch):
     good = www_owned_paths.load()
-    for bad in ("on", True, None, "cr2"):
+    for bad in ("on", True, None, "cr3", "all"):
         data = {**good, "room_public": bad}
         monkeypatch.setattr(www_owned_paths, "load", lambda path=None, data=data: data)
         issues = check_www_build.check_owned_paths({}, str(tmp_path))

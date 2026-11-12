@@ -292,7 +292,7 @@ These are the items that failed tonight in the MCP. After the patches deploy, ru
 # Omega-3 Repletion 60-day
 life-platform:create_experiment \
   name="Omega-3 Repletion 60-day" \
-  hypothesis="Daily 3g+ EPA+DHA from verified third-party-tested liquid fish oil for 60 days will raise omega_3_index from 3.3% to ≥5.4%. Genome-adjusted target accounts for FADS2 A;G — preformed EPA/DHA bypasses the 26.7% conversion penalty." \
+  hypothesis="Daily 3g+ EPA+DHA from verified third-party-tested liquid fish oil for 60 days will raise omega_3_index from 3.3% to ≥5.4%. [genetic detail removed 2026-11-11: genotype data is owner-only]" \
   experiment_type="measurable" \
   duration_tier="60-day deep dive" \
   planned_duration_days=60 \
@@ -309,7 +309,7 @@ life-platform:create_experiment \
   planned_duration_days=60 \
   start_date="2026-05-04" \
   tags='["supplements", "vitamin_d", "fh_2026_response", "patrick"]' \
-  notes="FH 2026 finding: vitamin_d_25oh 117 (2025) → 28 (2026). Collapse = stopped supplementing + Seattle winter. CYP2R1 G;G genotype: genuinely lower set point, requires higher maintenance dose. Target is 50, not 100. K2 essential due to VKORC1 sensitivity. Recheck at 8 weeks."
+  notes="FH 2026 finding: vitamin_d_25oh 117 (2025) → 28 (2026). Collapse = stopped supplementing + Seattle winter. [genetic detail removed 2026-11-11: genotype data is owner-only] Recheck at 8 weeks."
 
 # Evening Glucose CGM Block 14-day
 life-platform:create_experiment \
@@ -333,8 +333,8 @@ life-platform:create_todoist_task \
   priority=1
 
 life-platform:create_todoist_task \
-  content="Schedule PCP appointment to discuss rosuvastatin 5mg" \
-  description="Bring FH 2026 report (s3://matthew-life-platform/raw/matthew/labs/2026-04-03/) and [genetic detail removed 2026-11-11: genotype data is owner-only]. Board verdict: 4-2 in favor of starting now. ApoB 116, IR Score 75, Lp-PLA2 137 are the data points to anchor the conversation." \
+  content="[clinical follow-up task removed 2026-11-11: treatment deliberation is owner-only]" \
+  description="[removed 2026-11-11: treatment deliberation and the lipid values behind it are owner-only]" \
   due_date="2026-05-06" \
   priority=2
 

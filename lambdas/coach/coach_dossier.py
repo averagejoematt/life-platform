@@ -80,7 +80,7 @@ CORRECTION_ACTIONS = ("retract", "correct")
 # sentence built around "homozygous"/"allele" is a genotype claim even without an
 # rs-id. A false positive only withholds a dossier line, never mutates memory.
 GENOTYPE_PATTERNS = (
-    re.compile(r"\brs\d{3,}\b", re.IGNORECASE),  # dbSNP ids — rs429358 etc.
+    re.compile(r"\brs\d{3,}\b", re.IGNORECASE),  # dbSNP ids — rs<digits>
     re.compile(r"\b(?:APOE|APO-?E4?|MTHFR|COMT|FTO|CYP\d\w*)\b", re.IGNORECASE),
     re.compile(r"\b[eEε]\s?[234]\s?/\s?[eEε]\s?[234]\b"),  # allele pairs — e3/e4
     re.compile(r"ε\s?[234]\b"),  # bare epsilon allele

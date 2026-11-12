@@ -30,6 +30,25 @@ calls get the time left before that deadline as their wait (`model_budget_secs`)
 
 State lives in ContextVars, so it belongs to the thread running the tool (the handler's worker
 thread) and is dropped when the call returns.
+
+#5813 — THE STAGE-1 READ SET. A second read-only profile (draft_custom f4569682, 2026-11-11: ~440 AWS
+calls, 14-21 s on a laptop) found the duplicates that were left, now memoized here per call:
+
+  * `training_notes_health` (the note layer's ~28-query health sweep) ran once in stage 1 and once
+    more per DRAFTED exercise inside `tool_get_exercise_notes` — 252 of the call's queries;
+  * `core.query_source` read the same (source, window) for several readers — the deficit tool, the
+    reference, the walking layer, the readiness streak each re-read Strava / Hevy / Whoop / Habitify;
+  * the template alias registry (`tools_strength.template_alias_map`, three S3 reads) once per drafted
+    exercise's history read.
+
+Each of these hands every caller its OWN copy (`memoized_copy`). Nothing is cached across calls.
+
+THE READER CLOCK. `reading(name)` times one stage-1 reader (`tools_plan._read` wraps every labelled
+read in it; the few readers that are not a `_read` carry `timed`). Only the OUTERMOST reader is
+timed, so the parts never sum past the whole, and nothing is recorded once stage 2 starts
+(`stage_1_done`). `plan_call` puts the result on the call's output as `timing_ms`: every name in
+`STAGE_1_READERS` (0 when it did not run), `other` (stage-1 time no named reader accounts for) and
+`total`, under `stage_1`, beside the call's `total`.
 """
 
 from __future__ import annotations
@@ -39,6 +58,7 @@ import functools
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
+from decimal import Decimal
 from typing import Any, Callable, Iterator
 
 ANCHOR_INDEXES = "anchor_indexes"
@@ -47,6 +67,47 @@ HEVY_ALL_PHASES = "hevy_all_phases"
 # gate's floors (`v03_load_rule`, `_in_block_performed`) on a draft_custom stage 2. Its consumers are not all checked
 # read-only, so every caller gets its OWN copy (`memoized_copy`): the read is shared, the rows never are.
 BLOCK_WORKOUTS = "block_workouts"
+# #5813: the per-call memos for the stage-1 duplicates (module docstring). Every caller gets its own copy.
+NOTES_HEALTH = "notes_health"
+SOURCE_RANGE = "source_range"
+ALIAS_MAP = "alias_map"
+_CALL_KINDS = (ANCHOR_INDEXES, BLOCK_WORKOUTS, NOTES_HEALTH, SOURCE_RANGE, ALIAS_MAP)
+
+# #5813: the stage-1 readers `timing_ms.stage_1` always names — the `_read` labels stage 1 uses (directly, and through
+# `_owner_word_records`, `plan_event_reads`, `_read_guidance_cap`, `_attach_session_loads`) and the `timed` readers.
+# A reader not listed still lands under its own name; tests/test_stage1_reads_5813.py holds this list to the `_read` set.
+STAGE_1_READERS = (
+    "reference",
+    "recovery_tier",
+    "acwr_flag",
+    "muscle_volume",
+    "protein_days_missed_7d",
+    "dxa_scans",
+    "loss_rate",
+    "readiness_low_streak_days",
+    "notes_layer_health",
+    "pain_dismissals",
+    "deload_records",
+    "disruption_records",
+    "sick_days",
+    "deficit",
+    "steps_window",
+    "training_memory_constraints",
+    "draft_evidence",
+    "pain_evidence_scope",
+    "walk_hr_wk_now",
+    "recent_aerobic",
+    "hevy_workouts_rotation_window",
+    "hevy_workouts_prescription_window",
+    "catalog",
+    "block_workouts",
+    "guidance_cap",
+    "session_loads",
+    "morning_note",
+    "coach_context",
+    "calibration_due",
+    "withings_full_scans",
+)
 
 # Must sit below the handler's cap with room for what follows the write (one put_versioned, the
 # coach-thread put, the notes block, the response): tests/test_plan_stage2_latency_5313.py holds it there.
@@ -56,6 +117,7 @@ MODEL_RESERVE_SECS = 2.0
 
 _ACTIVE: ContextVar[dict[str, dict[Any, Any]] | None] = ContextVar("plan_call_memo", default=None)
 _STARTED: ContextVar[float | None] = ContextVar("plan_call_started", default=None)
+_READERS: ContextVar[dict[str, Any] | None] = ContextVar("plan_call_readers", default=None)
 
 
 @contextmanager
@@ -85,11 +147,49 @@ def memoized(kind: str, key: Any, fn: Callable[..., Any], *args: Any, **kwargs: 
     return value
 
 
+_ATOMS = (str, int, float, bool, type(None), Decimal)
+
+
+def _copy(value: Any) -> Any:
+    """A deep copy of a read result. Rows are JSON-shaped (dict / list / tuple of scalars), so they are copied by a plain
+    walk, several times faster than `copy.deepcopy` on the ~2,000-row reads this memo holds (#5813); anything else falls
+    back to `copy.deepcopy`. Values never alias each other inside a read, so the walk loses nothing deepcopy keeps."""
+    if isinstance(value, _ATOMS):
+        return value
+    if type(value) is dict:
+        return {k: _copy(v) for k, v in value.items()}
+    if type(value) is list:
+        return [_copy(v) for v in value]
+    if type(value) is tuple:
+        return tuple(_copy(v) for v in value)
+    return copy.deepcopy(value)
+
+
 def memoized_copy(kind: str, key: Any, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     """`memoized`, handing every caller a deep copy — for a value whose consumers may mutate it."""
     if (_ACTIVE.get() or {}).get(kind) is None:
         return fn(*args, **kwargs)
-    return copy.deepcopy(memoized(kind, key, fn, *args, **kwargs))
+    return _copy(memoized(kind, key, fn, *args, **kwargs))
+
+
+MISS = object()
+
+
+def memo_get(kind: str, key: Any) -> Any:
+    """A copy of the value memoized under (kind, key), else `MISS` — always `MISS` outside a scope for `kind`. For a
+    reader whose read must stay inline (an AST guard names the function that holds it); pair with `memo_put`."""
+    memo = (_ACTIVE.get() or {}).get(kind)
+    if memo is None or key not in memo:
+        return MISS
+    return _copy(memo[key])
+
+
+def memo_put(kind: str, key: Any, value: Any) -> Any:
+    """Store a copy of `value` under (kind, key) while a scope for `kind` is open; return `value` itself."""
+    memo = (_ACTIVE.get() or {}).get(kind)
+    if memo is not None:
+        memo[key] = _copy(value)
+    return value
 
 
 def anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
@@ -103,16 +203,79 @@ def anchor_indexes() -> tuple[dict[str, list], dict[str, float]]:
     return history, weights
 
 
+def notes_health(table: Any) -> dict[str, Any]:
+    """`training.training_notes.training_notes_health(table)`, once per plan call (#5813) — read through the module
+    at call time, so a test's patch of it still applies; each caller gets its own copy."""
+    from training import training_notes
+
+    with reading("notes_layer_health"):
+        return memoized_copy(NOTES_HEALTH, ("health", id(table)), training_notes.training_notes_health, table)
+
+
+@contextmanager
+def reading(name: str) -> Iterator[None]:
+    """Time one stage-1 reader under `name` — only the outermost, only inside a plan call, only before stage 2."""
+    rec = _READERS.get()
+    if rec is None or rec["depth"] or rec["stage_1_end"] is not None:
+        yield
+        return
+    rec["depth"] += 1
+    t0 = time.monotonic()
+    try:
+        yield
+    finally:
+        rec["depth"] -= 1
+        rec["ms"][name] = rec["ms"].get(name, 0.0) + (time.monotonic() - t0) * 1000
+
+
+def timed(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """`reading(name)` around every call of the decorated reader."""
+
+    def deco(fn: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            with reading(name):
+                return fn(*args, **kwargs)
+
+        return wrapper
+
+    return deco
+
+
+def stage_1_done() -> None:
+    """Mark the end of stage 1 (stage 2 starts here); later reads are stage 2's own (`critics.timing_ms`)."""
+    rec = _READERS.get()
+    if rec is not None and rec["stage_1_end"] is None:
+        rec["stage_1_end"] = time.monotonic()
+
+
+def _timing(rec: dict[str, Any]) -> dict[str, Any]:
+    end = time.monotonic()
+    stage_1_ms = ((rec["stage_1_end"] or end) - rec["t0"]) * 1000
+    readers = {name: round(rec["ms"].get(name, 0.0)) for name in STAGE_1_READERS}
+    readers.update({name: round(ms) for name, ms in rec["ms"].items() if name not in readers})
+    named = sum(rec["ms"].values())
+    stage_1 = {**readers, "other": max(0, round(stage_1_ms - named)), "total": round(stage_1_ms)}
+    return {"stage_1": stage_1, "total": round((end - rec["t0"]) * 1000)}
+
+
 def plan_call(fn: Callable[..., Any]) -> Callable[..., Any]:
-    """Run `fn` as one plan call: the clock stamped, the `anchor_indexes` and `block_workouts` memos open."""
+    """Run `fn` as one plan call: the clock stamped, the per-call memos open, the stage-1 readers timed (`timing_ms`)."""
 
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        token = _STARTED.set(time.monotonic())
+        t0 = time.monotonic()
+        token = _STARTED.set(t0)
+        rec: dict[str, Any] = {"t0": t0, "ms": {}, "depth": 0, "stage_1_end": None}
+        rtoken = _READERS.set(rec)
         try:
-            with scope(ANCHOR_INDEXES, BLOCK_WORKOUTS):
-                return fn(*args, **kwargs)
+            with scope(*_CALL_KINDS):
+                out = fn(*args, **kwargs)
+            if isinstance(out, dict) and "error" not in out:
+                out["timing_ms"] = _timing(rec)
+            return out
         finally:
+            _READERS.reset(rtoken)
             _STARTED.reset(token)
 
     return wrapper

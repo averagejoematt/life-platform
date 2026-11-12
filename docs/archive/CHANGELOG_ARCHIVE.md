@@ -11,9 +11,9 @@
 - Seeded 5 One Medical / LabCorp blood draws to `USER#matthew#SOURCE#labs`
 - 2019-05-01: 35 biomarkers, 0 out of range
 - 2020-10-20: 35 biomarkers, 0 out of range
-- 2021-10-20: 34 biomarkers, 2 out of range (total cholesterol 212↑, LDL 126↑)
-- 2022-06-01: 33 biomarkers, 2 out of range (total cholesterol 201↑, LDL 135↑)
-- 2024-06-01: 45 biomarkers + WBC differential, 2 out of range (total cholesterol 206↑, LDL 124↑)
+- 2021-10-20: 34 biomarkers, 2 out of range (lipid values removed 2026-11-11)
+- 2022-06-01: 33 biomarkers, 2 out of range (lipid values removed 2026-11-11)
+- 2024-06-01: 45 biomarkers + WBC differential, 2 out of range (lipid values removed 2026-11-11)
 - All use identical biomarker key names as Function Health draws for seamless cross-provider trending
 - Labs partition now: 8 items total (5 GP + 2 Function Health + 1 metadata)
 - Full labs timeline: 7 blood draws spanning 6 years (2019–2025)

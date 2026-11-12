@@ -376,6 +376,30 @@ def first_brief_cycle(path: str = BRIEF_POLICY) -> str | None:
     return m.group(1) if m else None
 
 
+def _correction(c: Any) -> dict | None:
+    """A served dated correction (``narrative_annotations.annotated_words``' annotation), or None when malformed."""
+    if not isinstance(c, dict) or c.get("kind") != "correction":
+        return None
+    note = _text(c.get("note"))
+    if not note or not _day(c.get("annotated_at")):
+        return None
+    rows = []
+    for x in c.get("corrections") or []:
+        if not isinstance(x, dict) or not _text(x.get("figure")):
+            return None
+        rows.append({k: _text(str(x.get(k))) if x.get(k) is not None else "" for k in ("figure", "unit", "as_cited", "record_now")})
+    if not rows:
+        return None
+    return {
+        "id": c.get("id") if isinstance(c.get("id"), str) else None,
+        "annotated_at": _day(c.get("annotated_at")),
+        "read_written_at": _instant(c.get("read_written_at")),
+        "note": note,
+        "corrections": rows,
+        "supersedes": c.get("supersedes") if isinstance(c.get("supersedes"), str) else None,
+    }
+
+
 def _approved_words(payload: Any) -> dict:
     """The served approved historical words, or an absence (the route is dark, or did not answer)."""
     if (
@@ -404,19 +428,25 @@ def _approved_words(payload: Any) -> dict:
     for r in payload["lead_reads"]:
         if not isinstance(r, dict) or not _text(r.get("text")) or not _day(r.get("date")):
             continue
-        reads.append(
-            {
-                "date": _day(r.get("date")),
-                "text": _text(r.get("text")),
-                "generated_at": _instant(r.get("generated_at")),
-                "data_through": _day(r.get("data_through")),
-                "cited": [
-                    {"metric": _text(c.get("metric")), "value": _text(str(c.get("value") or "")), "as_of": _day(c.get("as_of"))}
-                    for c in r.get("cited") or []
-                    if isinstance(c, dict) and _text(c.get("metric"))
-                ],
-            }
-        )
+        read = {
+            "date": _day(r.get("date")),
+            "text": _text(r.get("text")),
+            "generated_at": _instant(r.get("generated_at")),
+            "data_through": _day(r.get("data_through")),
+            "cited": [
+                {"metric": _text(c.get("metric")), "value": _text(str(c.get("value") or "")), "as_of": _day(c.get("as_of"))}
+                for c in r.get("cited") or []
+                if isinstance(c, dict) and _text(c.get("metric"))
+            ],
+        }
+        if "correction" in r:
+            # an annotated read (common/narrative_annotations.py) is served ONLY with its dated correction: a read
+            # whose correction does not carry through whole is dropped, never shown as bare words
+            corr = _correction(r.get("correction"))
+            if corr is None:
+                continue
+            read["correction"] = corr
+        reads.append(read)
     reads.sort(key=lambda r: r["date"], reverse=True)
     out = {
         "state": "ok",
@@ -688,13 +718,33 @@ def _walk_strings(node: Any):
             yield from _walk_strings(v)
 
 
-def resolve_and_validate(payload: dict, public: dict[str, list[dict]]) -> dict:
+#: CR3's parts of the file (the docket): dropped from a CR2 build, which publishes no docket (owner, 2026-11-10 item 8
+#: and 2026-11-11 second message: CR3 stays unpublished until properly sourced disagreement records exist).
+CR3_FILE_KEYS = ("docket_entries", "docket_counts", "docket_disclosure")
+CR3_COACH_KEYS = ("docket", "docket_positions")
+
+
+def without_cr3(payload: dict) -> dict:
+    """The file with every CR3 (docket) part removed — keys gone, not emptied, so a CR2 dist cannot carry one."""
+    out = {k: v for k, v in payload.items() if k not in CR3_FILE_KEYS}
+    if isinstance(out.get("coaches"), dict):
+        out["coaches"] = {
+            pid: ({k: v for k, v in c.items() if k not in CR3_COACH_KEYS} if isinstance(c, dict) else c)
+            for pid, c in out["coaches"].items()
+        }
+    return out
+
+
+def resolve_and_validate(payload: dict, public: dict[str, list[dict]], cr3: bool = True) -> dict:
     """Keep only coaches that are public Coach objects in this snapshot; check the shape the room reads; refuse a file
-    that names a private family anywhere (the producer's own belt, checked again on the whole file).
+    that names a private family anywhere (the producer's own belt, checked again on the whole file). ``cr3=False`` (a
+    CR2 build, published or private) drops the docket entirely (``without_cr3``).
 
     Raises ValueError (the caller maps it to SchemaError) on a malformed ok payload."""
     if payload.get("state") != "ok":
         return payload
+    if not cr3:
+        payload = without_cr3(payload)
     coaches = payload.get("coaches")
     if not isinstance(coaches, dict):
         raise ValueError("coach_room.json: an ok file needs a coaches object")
@@ -705,11 +755,12 @@ def resolve_and_validate(payload: dict, public: dict[str, list[dict]]) -> dict:
     entries = payload.get("docket_entries", [])
     if not isinstance(entries, list):
         raise ValueError("coach_room.json: docket_entries must be a list")
-    payload["docket_entries"] = [
-        d
-        for d in entries
-        if isinstance(d, dict) and isinstance(d.get("id"), str) and d.get("coach_a") in public_ids and d.get("coach_b") in public_ids
-    ]
+    if cr3:
+        payload["docket_entries"] = [
+            d
+            for d in entries
+            if isinstance(d, dict) and isinstance(d.get("id"), str) and d.get("coach_a") in public_ids and d.get("coach_b") in public_ids
+        ]
     for pid, c in payload["coaches"].items():
         counts = (c.get("asks") or {}).get("commitment_counts")
         if counts is not None and not all(isinstance(counts.get(k), int) for k in counts):

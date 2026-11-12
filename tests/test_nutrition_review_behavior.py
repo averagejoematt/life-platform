@@ -690,13 +690,13 @@ def test_cgm_days_come_back_in_date_order():
 
 
 def test_genome_context_carries_gene_risk_summary_and_category():
-    ctx = m.extract_genome_context([{"gene": "MTHFR", "risk_level": "elevated", "summary": "reduced folate", "category": "metabolism"}])
-    assert ctx == [{"gene": "MTHFR", "risk": "elevated", "summary": "reduced folate", "category": "metabolism"}]
+    ctx = m.extract_genome_context([{"gene": "GENEA", "risk_level": "elevated", "summary": "synthetic summary", "category": "metabolism"}])
+    assert ctx == [{"gene": "GENEA", "risk": "elevated", "summary": "synthetic summary", "category": "metabolism"}]
 
 
 def test_a_snp_missing_a_field_reports_absence_rather_than_a_placeholder():
-    ctx = m.extract_genome_context([{"gene": "FADS2"}])
-    assert ctx[0]["gene"] == "FADS2"
+    ctx = m.extract_genome_context([{"gene": "GENEB"}])
+    assert ctx[0]["gene"] == "GENEB"
     assert ctx[0]["risk"] is None and ctx[0]["summary"] is None
 
 
@@ -1036,8 +1036,8 @@ def test_a_week_without_cgm_says_so_rather_than_omitting_the_key():
 
 
 def test_the_prompt_carries_the_nutrient_relevant_genome_variants():
-    p = _payload(genome_snps=[{"gene": "MTHFR", "risk_level": "elevated", "category": "metabolism"}])
-    assert p["genome_nutrient_snps"][0]["gene"] == "MTHFR"
+    p = _payload(genome_snps=[{"gene": "GENEA", "risk_level": "elevated", "category": "metabolism"}])
+    assert p["genome_nutrient_snps"][0]["gene"] == "GENEA"
 
 
 def test_a_week_without_a_dexa_scan_reports_dexa_as_absent(frozen_clock):
@@ -1332,9 +1332,9 @@ def test_call_anthropic_propagates_failure_so_the_caller_can_degrade(monkeypatch
 
 def test_query_all_returns_every_page_not_just_the_first(monkeypatch):
     pk = f"USER#{m.USER_ID}#SOURCE#genome"
-    table = FakeTable(pages_by_pk={pk: [[{"gene": "MTHFR"}], [{"gene": "FADS2"}], [{"gene": "VKORC1"}]]})
+    table = FakeTable(pages_by_pk={pk: [[{"gene": "GENEA"}], [{"gene": "GENEB"}], [{"gene": "GENEC"}]]})
     monkeypatch.setattr(m, "table", table)
-    assert [i["gene"] for i in m.query_all("genome")] == ["MTHFR", "FADS2", "VKORC1"]
+    assert [i["gene"] for i in m.query_all("genome")] == ["GENEA", "GENEB", "GENEC"]
 
 
 def test_query_all_converts_dynamodb_decimals_to_numbers(monkeypatch):
@@ -1391,17 +1391,17 @@ def test_gather_keeps_only_the_nutrition_relevant_genome_variants(monkeypatch, f
     table = FakeTable(
         items_by_pk={
             pk: [
-                {"gene": "MTHFR", "category": "nutrient_metabolism"},
-                {"gene": "APOE", "category": "neuro"},
-                {"gene": "LPA", "category": "lipids"},
-                {"gene": "SLC30A8", "category": "metabolism"},
+                {"gene": "GENEA", "category": "nutrient_metabolism"},
+                {"gene": "GENEB", "category": "neuro"},
+                {"gene": "GENEC", "category": "lipids"},
+                {"gene": "GENED", "category": "metabolism"},
             ]
         }
     )
     monkeypatch.setattr(m, "table", table)
     monkeypatch.setattr(m, "fetch_profile", lambda: dict(PROFILE))
     genes = [g["gene"] for g in m.gather_nutrition_data()["genome_snps"]]
-    assert genes == ["MTHFR", "LPA", "SLC30A8"]
+    assert genes == ["GENEA", "GENEC", "GENED"]
 
 
 def test_gather_picks_the_most_recent_lab_draw(monkeypatch, frozen_clock):
