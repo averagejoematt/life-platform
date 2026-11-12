@@ -142,11 +142,16 @@ def test_the_any_day_floor_is_a_clamp_on_the_served_target_5794():
     assert (r["kcal"], r["floor_clamp_kcal"]) == (2100, 0) and "clamped" not in r["provenance"], "at or above the floor: no clamp"
 
 
-def test_the_live_charter_is_re_targeted_to_1500_with_a_band_centred_on_it():
+def test_the_live_charter_is_re_targeted_to_1500_and_its_band_spans_the_floors_5794():
     r = ct.resolve(FIXTURE_DAY)
     base = r["base_kcal"]
-    assert (base, r["source"]) == (1500, "charter") and r["band_low"] < base < r["band_high"]
-    assert base - r["band_low"] == r["band_high"] - base, "#5099: the band is centred on the target"
+    assert (base, r["source"]) == (1500, "charter")
+    # owner ruling 2026-11-11 (#5794): the habit band is raised to [any-day floor, lifting-day floor], so a served
+    # rest day and a served lifting day both read in band; the titrated base sits under it by design
+    floors = (tc.charter_value("nutrition.calories.floor_any_day_kcal"), tc.charter_value("nutrition.calories.floor_lifting_day_kcal"))
+    assert (r["band_low"], r["band_high"]) == floors == (1600, 1900)
+    lift = ct.resolve(FIXTURE_DAY, day_type="lifting")["kcal"]
+    assert r["band_low"] <= r["kcal"] <= r["band_high"] and r["band_low"] <= lift <= r["band_high"], "an on-plan day reads in band"
     floor = tc.charter_value("nutrition.calories.floor_any_day_kcal")
     assert r["kcal"] == floor and r["floor_clamp_kcal"] == floor - base, "#5794: 1,500 sits under the any-day floor: served at it"
     assert ct.calorie_band(FIXTURE_DAY) == (r["band_low"], r["band_high"])
@@ -173,7 +178,7 @@ def test_the_public_charter_carries_the_block_and_the_redlines_read_it():
     block = tc.charter_value(ct.CHARTER_PATH)
     assert block and ct.target_kcal(FIXTURE_DAY) == max(block["target_kcal"], block["floor_any_day_kcal"]), "#5794: clamped at the floor"
     lo, hi = block["prescribed_band_kcal"]
-    assert lo <= block["target_kcal"] <= hi, "panel default R1: the target sits in the prescribed band"
+    assert lo <= ct.target_kcal(FIXTURE_DAY) <= hi, "#5794: the served target sits in the prescribed band"
     energy = owner_redlines.REDLINES["energy_floor_kcal"]
     assert energy["prescribed"] == block["prescribed_band_kcal"] and energy["opening_kcal"] == block["target_kcal"]
     assert (energy["floor_any_day"], energy["floor_lifting_day"]) == (block["floor_any_day_kcal"], block["floor_lifting_day_kcal"])

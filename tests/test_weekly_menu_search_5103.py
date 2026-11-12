@@ -60,6 +60,20 @@ def _bundled_charter_only(monkeypatch):
     # clamp (owner ruling 2026-11-11, #5794) is held off here so each trap stays the trap it was built as. The clamp
     # itself is tests/test_kcal_floor_clamp_5794.py's.
     monkeypatch.setattr(ct, "day_floor", lambda *_a, **_k: None)
+    # ... and against the pre-#5794 habit band [1400, 1600] (its half-width is the day's kcal tolerance): the owner
+    # raised the band to [1600, 1900] on 2026-11-11, which widens the tolerance and dissolves the traps.
+    real = tc.charter_value
+    old = [1400, 1600]
+
+    def _pre_5794(path, *a, **k):
+        v = real(path, *a, **k)
+        if path == "nutrition.calories.prescribed_band_kcal":
+            return list(old)
+        if path == "nutrition.calories" and isinstance(v, dict):
+            return {**v, "prescribed_band_kcal": list(old)}
+        return v
+
+    monkeypatch.setattr(tc, "charter_value", _pre_5794)
     tc.reset_cache()
     yield
     tc.reset_cache()

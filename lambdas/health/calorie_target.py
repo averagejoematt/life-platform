@@ -334,7 +334,7 @@ def target_kcal(day: DayLike = None, **readers: Any) -> Optional[int]:
 
 
 def calorie_band(day: DayLike = None, **readers: Any) -> Optional[tuple]:
-    """The calorie habit's floor and ceiling for ``day`` (#5099: ``prescribed_band_kcal``, centred on the target, moved
+    """The calorie habit's floor and ceiling for ``day`` (#5099: ``prescribed_band_kcal``, the any-day to the lifting-day floor since #5794, moved
     with it by a titration record): ``(band_low, band_high)``, or None when either edge is unresolved."""
     r = resolve(day, **readers)
     lo, hi = r.get("band_low"), r.get("band_high")

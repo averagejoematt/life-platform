@@ -279,12 +279,15 @@ def check_target_resolved(f: dict[str, Any]) -> tuple[float, str]:
 
 
 def check_in_band(f: dict[str, Any]) -> tuple[float, str]:
+    """Each day's SERVED target (the base clamped at its floor, #5794) inside its band — the owner raised the band to the
+    floors the same day (2026-11-11) so an on-plan day reads in band; the titrated base sits under it by design."""
+
     def inside(d: dict[str, Any]) -> bool:
-        base, lo, hi = _n(d.get("base_kcal")), _n(d.get("band_low")), _n(d.get("band_high"))
-        return base is not None and lo is not None and hi is not None and lo <= base <= hi
+        kcal, lo, hi = _n(d.get("kcal")), _n(d.get("band_low")), _n(d.get("band_high"))
+        return kcal is not None and lo is not None and hi is not None and lo <= kcal <= hi
 
     ok = [d for d in f["days"] if inside(d)]
-    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days have a base target inside their stated band"
+    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days have a served target inside their stated band"
 
 
 def _floor_for(d: dict[str, Any], r: dict[str, Any]) -> float | None:

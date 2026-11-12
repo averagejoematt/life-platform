@@ -234,7 +234,7 @@ REDLINES: dict[str, dict[str, Any]] = {
             "~2,000 kcal reproduced the campaign, and 1,500 was estimated to cost training carbohydrate and 3–6 lb more lean (from practice, not "
             "a citation). The floors are WARNINGS for logged days (`floor_role`): a logged day under `floor_any_day` / `floor_lifting_day` is reported "
             "honestly and visibly, never vetoed; the SERVED target is clamped at the day's floor (owner ruling 2026-11-11, #5794); the 7-day-mean floor is reported, not enforced. `prescribed` is the "
-            "calorie band centred on the target (#5099); a titration record (health.titration) moves it, never silently."
+            "calorie band (#5099; the any-day to the lifting-day floor since owner ruling 2026-11-11, #5794); a titration record (health.titration) moves it, never silently."
         ),
     },
     "protein_floor_g": {
