@@ -629,7 +629,12 @@ def _lint_cues(rt: LintRoutine, bodies: list[str], out: list[Problem], not_check
                 out.append(Problem("L8", where, f"a {wrong[0]} cue on a {ex.family} exercise"))
             if ex.family not in seen:
                 lines = body.split("\n")[1:]
-                free = [ln for ln in lines if not g.REASON_RE.match(ln) and not ln.startswith("W set:") and ln not in prep_family]
+                # #5771: the fallback line (`If taken: …`) names other exercises; it is never the family's cue
+                free = [
+                    ln
+                    for ln in lines
+                    if not g.REASON_RE.match(ln) and not ln.startswith("W set:") and ln not in prep_family and not g.FALLBACK_RE.match(ln)
+                ]
                 if ex.family not in present and not free:
                     out.append(Problem("L8", where, f"first {ex.family} exercise without its cue ({g.FAMILY_CUES[ex.family]!r})"))
                 seen.add(ex.family)

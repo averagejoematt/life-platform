@@ -631,7 +631,8 @@ def _importers(root: pathlib.Path, scan_dirs=("lambdas", "mcp")) -> list[str]:
     return sorted(hits)
 
 
-ALLOWED_IMPORTERS = ["mcp/nutrition_critics_inputs.py"]
+# #5802: `health.tripwire_readers` reads the critics' helpers and is called only from `nutrition_critics.block` and plan_engine
+ALLOWED_IMPORTERS = sorted(["lambdas/health/tripwire_readers.py", "mcp/nutrition_critics_inputs.py"])
 
 
 def test_only_the_mcp_resolver_imports_nutrition_critics():
@@ -727,6 +728,7 @@ def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_rea
         "macrofactor": [{"date": k, "total_calories_kcal": 1533, "total_protein_g": 146} for k in KEYS],
         "hevy": [{"date": k, "exercises": [{"name": "Squat (Barbell)", "sets": [{"reps": 5, "weight_kg": 80}]}]} for k in KEYS[::2]],
         "withings": [{"date": k, "weight_lbs": 320 - 0.4 * i} for i, k in enumerate(KEYS)],
+        "whoop": [{"date": k, "sleep_duration_hours": 7.2} for k in KEYS],  # #5802: the sleep tripwire's nights
     }
     monkeypatch.setattr(nci, "query_source", lambda source, start, end: rows[source])
     monkeypatch.setattr("training.routine_title._load_routine_index", lambda start: [])  # #4312: the complement split's index read
@@ -735,6 +737,7 @@ def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_rea
     monkeypatch.setattr(nci, "_guidance_cap", lambda: None)  # #5074: the clinical record states no cap (the read succeeded)
     monkeypatch.setattr(nci, "already_logged", lambda days=14: [])
     monkeypatch.setattr(nci.shared_quantities, "dxa_scans", lambda end: [])  # #4166: no scan on file -> tier unknown
+    monkeypatch.setattr(nci, "_lab_draws", lambda: [])  # #5802: the medical stop lines' panel — read, empty
     out = nci.block("2026-09-20", deficit_severity="SUSTAINABLE", degraded_count=0)
     md = next(v for v in out["verdicts"] if v["critic"] == "muscle_defense")
     # owner ruling 2026-10-23 R1: 1,533 kcal sits on the ~1,500 target (the energy floor is a warning); 146 g protein is not
@@ -742,6 +745,10 @@ def test_the_resolver_block_carries_the_verdicts_and_names_what_it_could_not_rea
     assert set(out["inputs_unresolved"]) == {"metabolic_adaptation"}, "only the reader that failed is named"
     assert "metabolic_adaptation_severity" in next(v for v in out["verdicts"] if v["critic"] == "deficit_advocate")["unknown"]
     assert out["window_end"] == "2026-09-20" and out["model_ran"] is False
+    # #5802: the report-only rows ride the same block — sleep read clear off the Whoop nights, the weigh-in fresh
+    reports = {r["id"]: r for r in out["tripwire_reports"]}
+    assert reports["sleep"]["state"] == "clear" and reports["weigh_in_dark"]["state"] == "clear"
+    assert all(r["report_only"] for r in out["tripwire_reports"])
 
 
 def test_the_resolver_block_never_raises_when_every_reader_raises(monkeypatch):
@@ -754,7 +761,8 @@ def test_the_resolver_block_never_raises_when_every_reader_raises(monkeypatch):
     monkeypatch.setattr(nci, "already_logged", lambda days=14: None)
     out = nci.block("2026-09-20")
     assert [v["verdict"] for v in out["verdicts"]] == ["approve", "approve", "approve"]
-    assert set(out["inputs_unresolved"]) >= {"macrofactor", "hevy", "withings", "walking_volume", "decisions"}
+    assert set(out["inputs_unresolved"]) >= {"macrofactor", "hevy", "withings", "whoop", "walking_volume", "decisions"}
+    assert {r["state"] for r in out["tripwire_reports"]} == {"unknown"}, "an unreadable input is never a pass (#5802)"
     assert all(d["state"] == "unevaluable" for d in out["decisions_offered"])
 
 
