@@ -224,9 +224,13 @@ _READS_LIBRARY = re.compile(
 
 # #5773: the selection engine is the ONE drafting-path reader, and it changes a live draft only when the library is
 # `approved` (shadow while `proposed` — tests/test_selection_engine_5773.py holds that switch). Its critic reads through it.
+# #5772: the weekly gate evaluator's leg reads the library to RECORD gate states (owner-only rows); an unlock reaches
+# `plan_next_session` only through a claim-once row the leg creates while the library is `approved`, and that read side
+# never opens the library (the pure evaluator lambdas/training/exercise_gates.py reads nothing).
 _SANCTIONED_READERS = {
     os.path.join("lambdas", "training", "selection_engine.py"),
     os.path.join("lambdas", "training", "selection_critic.py"),
+    os.path.join("mcp", "exercise_gates_leg.py"),  # #5772
 }
 
 
@@ -309,10 +313,15 @@ def test_clinical_cue_never_locks():
 
 
 def test_not_for_you_now_entries_carry_reason_and_unlock():
+    # owner ruling 2026-11-11 (#5773) unlocked the only entry (Preacher Curl (Barbell)), so the set may be empty;
+    # the schema rule is held on a planted entry instead
     nfy = {k: e["not_for_you_now"] for k, e in MV.items() if e["not_for_you_now"]}
-    assert nfy
     for k, v in nfy.items():
         assert v["reason_code"] and v["unlock_condition"], k
+    assert MV["preacher_curl_barbell"]["not_for_you_now"] is None
+    lib = copy.deepcopy(LIB)
+    lib["movements"]["preacher_curl_barbell"]["not_for_you_now"] = {"reason_code": "x"}
+    assert any("not_for_you_now needs" in e for e in xl.validate(lib))
 
 
 # ── fallbacks + availability ───────────────────────────────────────────────────────────────────────────────────

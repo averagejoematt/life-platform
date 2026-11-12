@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import warmup_sets
+from training import session_time, warmup_sets
 from training.training_charter import charter_value, charter_version
 
 # ── the session's LENGTH ─────────────────────────────────────────────────────
@@ -26,17 +26,23 @@ from training.training_charter import charter_value, charter_version
 # stretching are NOT lifting minutes — they have their own caps (one cardio block, stretching), enforced on the routine's
 # blocks by `enforce_session_shape` / reported by `session_shape_problems`.
 SESSION_TIME_MODEL: dict[str, Any] = {
-    "set_seconds": 45,
-    "provenance": "platform-proposed",
-    "stated": "2026-10-18",
-    "issue": "#5069",
+    # #5799: MEASURED — the median of his matched Hevy sessions (`session_time.MEASURED_SET_SECONDS`, with its n and as-of
+    # date); the platform-proposed 45 s retired with it (`retired`). Re-derive with scripts/derive_session_time_model.py.
+    "set_seconds": session_time.MEASURED_SET_SECONDS["set_seconds"],
+    "provenance": "measured",
+    "measured": session_time.MEASURED_SET_SECONDS,
+    "issue": "#5799",
     "rule": (
         "lifting minutes = sum over exposures of (working sets + warm-up sets) x (set_seconds + the exposure's rest_seconds) / 60; "
         "warm-ups in a PRESCRIPTION are assumed for every anchor in warmup_sets' compound families (the first gets the full "
         "climb, later ones one set) — an upper bound, since a light lift under the warm-up floor gets none; in a ROUTINE the "
-        "warm-up sets are counted as written. Cardio and stretching blocks are excluded (their own caps)."
+        "warm-up sets are counted as written. A drop-set row carries no rest. Cardio and stretching blocks are excluded (their own caps)."
     ),
-    "note": "45 s is the platform's time under load + set-up for a 4–15 rep set; re-derive from his Hevy set timestamps when the data allows (ADR-105).",
+    "note": (
+        "set_seconds absorbs everything a session spends per set beyond the prescribed rest (set-up, the set, a longer rest than "
+        "written): his measured lifting seconds per set less the routine's mean rest per set (`session_time.measure`)."
+    ),
+    "retired": {"set_seconds": 45, "provenance": "platform-proposed", "stated": "2026-10-18", "issue": "#5069"},
 }
 
 
@@ -73,7 +79,10 @@ def session_minutes_estimate(exposures: list[dict[str, Any]]) -> dict[str, Any]:
     fill action anywhere downstream."""
     set_s = int(SESSION_TIME_MODEL["set_seconds"])
     warm = _assumed_warmups(exposures)
-    seconds = sum((len(e["sets"]) + w) * (set_s + int(e.get("rest_seconds") or 0)) for e, w in zip(exposures, warm))
+    seconds = sum(
+        (len(e["sets"]) + w) * (set_s + int(e.get("rest_seconds") or 0)) - _drop_rows(e["sets"]) * int(e.get("rest_seconds") or 0)
+        for e, w in zip(exposures, warm)
+    )
     minutes = round(seconds / 60.0, 1)
     hi = lifting_minutes_cap()
     return {
@@ -86,6 +95,87 @@ def session_minutes_estimate(exposures: list[dict[str, Any]]) -> dict[str, Any]:
         "excludes": "cardio and stretching (their own caps)",
         "charter_version": charter_version(),
     }
+
+
+def _drop_rows(sets: list[Any]) -> int:
+    """Drop-set rows: each follows its working set with no rest (`short_on_time`)."""
+    kinds = (s.get("kind") if isinstance(s, dict) else getattr(s, "type", None) for s in sets or [])
+    return sum(1 for k in kinds if k in ("drop", "dropset"))
+
+
+def _slot(e: dict[str, Any]) -> str | None:
+    return e.get("slot") or e.get("movement_key")
+
+
+def _unpair(exposures: list[dict[str, Any]], superset_id: Any) -> None:
+    """A superset member was cut: its partner runs alone again, with its own rest back."""
+    for e in exposures:
+        if superset_id is not None and e.get("superset_id") == superset_id:
+            e.pop("superset_id")
+            if "rest_unpaired_seconds" in e:
+                e["rest_seconds"] = e.pop("rest_unpaired_seconds")
+
+
+def pair_supersets(exposures: list[dict[str, Any]], measured: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """#5799: pair accessories as the charter's antagonist supersets (`split.supersets.pairs`), IN PLACE, when the estimate
+    or the role's trailing measured median (`session_time.role_median_minutes`) is over the lifting ceiling; None otherwise.
+
+    Runs BEFORE `trim_to_time`. A pair shares one `superset_id`, the second member moves to sit right after the first, and the
+    first member's rest goes (Hevy rests after the pair, on the second's timer; each member's own rest is kept as
+    `rest_unpaired_seconds` in case a trim cuts its partner). Pairs are by template slot, so a rotated movement keeps its
+    pair. Anchors are never paired."""
+    before = session_minutes_estimate(exposures)
+    cap = before["cap"]
+    over_measured = bool(measured and measured.get("median_minutes") is not None and float(measured["median_minutes"]) > cap)
+    if before["within_cap"] and not over_measured:
+        return None
+    paired: list[dict[str, Any]] = []
+    for pair in charter_value("split.supersets.pairs") or []:
+        free = [e for e in exposures if e.get("kind") == "accessory" and e.get("movement_key") and e.get("superset_id") is None]
+        a = next((e for e in free if _slot(e) in pair["first"]), None)
+        b = next((e for e in free if _slot(e) in pair["second"]), None)
+        if a is None or b is None:
+            continue
+        sid = len(paired) + 1
+        exposures.remove(b)
+        exposures.insert(exposures.index(a) + 1, b)
+        a["superset_id"] = b["superset_id"] = sid
+        a["rest_unpaired_seconds"], b["rest_unpaired_seconds"] = a.get("rest_seconds"), b.get("rest_seconds")
+        b["rest_seconds"] = max(int(a.get("rest_seconds") or 0), int(b.get("rest_seconds") or 0))
+        a["rest_seconds"] = 0
+        paired.append({"superset_id": sid, "pair": pair["name"], "movements": [a["movement_key"], b["movement_key"]]})
+    if not paired:
+        return None
+    order = {sid: n for n, sid in enumerate(dict.fromkeys(e["superset_id"] for e in exposures if e.get("superset_id")), start=1)}
+    for e in exposures:  # numbered in the order Hevy shows them
+        if e.get("superset_id"):
+            e["superset_id"] = order[e["superset_id"]]
+    for p in paired:
+        p["superset_id"] = order[p["superset_id"]]
+    paired.sort(key=lambda p: p["superset_id"])
+    return {
+        "trigger": "estimate" if not before["within_cap"] else "measured_median",
+        "measured": measured,
+        "estimate_before_min": before["lifting_minutes"],
+        "estimate_after_min": session_minutes_estimate(exposures)["lifting_minutes"],
+        "cap_minutes": cap,
+        "pairs": paired,
+        "rule": "antagonist accessory pairs share one superset before any accessory is cut; anchors never (charter split.supersets, #5799)",
+    }
+
+
+def short_on_time(exposures: list[dict[str, Any]]) -> list[str]:
+    """#5799: the OWNER-SELECTABLE short-on-time variant, IN PLACE — never a default (charter `split.supersets.drop_sets`).
+    Each multi-set rep-range accessory runs one working set, then one drop set (the same reps, no rest between). Anchors and
+    carries are unchanged. Returns the movement keys it changed."""
+    changed: list[str] = []
+    for e in exposures:
+        sets = e.get("sets") or []
+        if e.get("kind") != "accessory" or e.get("intensity") == "carry" or len(sets) < 2 or not sets[0].get("reps"):
+            continue
+        e["sets"] = [dict(sets[0]), {"kind": "drop", "reps": list(sets[0]["reps"])}]
+        changed.append(str(e.get("movement_key")))
+    return changed
 
 
 def trim_to_time(exposures: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -101,7 +191,9 @@ def trim_to_time(exposures: list[dict[str, Any]]) -> dict[str, Any] | None:
         idx = next((i for i in range(len(exposures) - 1, -1, -1) if exposures[i]["kind"] == "accessory"), None)
         if idx is None:
             break
-        dropped.append(exposures.pop(idx).get("movement_key"))
+        cut = exposures.pop(idx)
+        _unpair(exposures, cut.get("superset_id"))  # #5799: a cut superset member leaves its partner alone
+        dropped.append(cut.get("movement_key"))
         est = session_minutes_estimate(exposures)
     return {
         "cap_minutes": before["cap"],
@@ -111,6 +203,17 @@ def trim_to_time(exposures: list[dict[str, Any]]) -> dict[str, Any] | None:
         "over_cap_after_trim": not est["within_cap"],
         "rule": "accessories first, last-listed first; anchors are never cut for time (charter split.session_minutes.lifting_ceiling, owner rulings 5 + A4)",
     }
+
+
+def fit_to_time(
+    exposures: list[dict[str, Any]], measured_minutes: dict[str, Any] | None = None, short_on_time_variant: bool = False
+) -> dict[str, Any]:
+    """#5799: fit a prescription to the ceiling, IN PLACE, in order: the owner-selected drop-set variant (only when
+    `short_on_time_variant`), the antagonist supersets (`pair_supersets`, `measured_minutes` = the role's trailing measured
+    median), then the accessory trim (`trim_to_time`). Returns each step's record."""
+    drop_sets = short_on_time(exposures) if short_on_time_variant else None
+    supersets = pair_supersets(exposures, measured_minutes)
+    return {"short_on_time": drop_sets, "supersets": supersets, "time_trim": trim_to_time(exposures)}
 
 
 LOADED_TIMED_TYPES: frozenset[str] = frozenset({"weight_duration", "short_distance_weight"})
@@ -174,7 +277,8 @@ def routine_minutes(blocks: list[Any], catalog_movements: dict[str, Any]) -> dic
     for b in blocks:
         kind = _block_kind(b, catalog_movements)
         if kind == "lifting":
-            lifting_s += len(getattr(b, "sets", None) or []) * (set_s + int(getattr(b, "rest_seconds", None) or 0))
+            sets, rest = list(getattr(b, "sets", None) or []), int(getattr(b, "rest_seconds", None) or 0)
+            lifting_s += len(sets) * (set_s + rest) - _drop_rows(sets) * rest
         elif kind == "cardio":
             cardio.append({"movement_key": b.movement_key, "minutes": round(_block_seconds(b) / 60.0, 1)})
         elif kind == "unclassified":

@@ -85,17 +85,6 @@ def _served_anywhere(sel: dict) -> set:
     return out
 
 
-def _with_overhead_catalog(cat: dict) -> dict:
-    """Give the A-tier Overhead Triceps Extension (Cable) a catalog entry (it has none: its Hevy id is an alias)."""
-    tid = LIB0["movements"]["overhead_triceps_extension_cable"]["template_id"]
-    cat["overhead_triceps_extension_cable"] = {
-        **cat["triceps_extension_cable"],
-        "title": "Overhead Triceps Extension (Cable)",
-        "hevy_template_id_hint": tid,
-    }
-    return cat
-
-
 # ── tier order (must-fail controls) ──────────────────────────────────────────
 def test_tier_a_beats_b_and_c_for_the_slot_muscle():
     s = _slot(_week(), "lower_heavy.calf_raise_machine")
@@ -111,20 +100,24 @@ def test_tier_a_beats_b_and_c_for_the_slot_muscle():
     assert s2["pick"]["tier"] == "B"
 
 
-def test_the_overhead_triceps_extension_wins_once_the_catalog_can_write_it():
-    """The owner's specimen: the A-tier overhead extension outranks every C triceps movement the pool held."""
+def test_the_overhead_triceps_extension_wins_now_the_catalog_writes_it():
+    """The owner's specimen: the A-tier overhead extension outranks every C triceps movement the pool held — for real,
+    on the shipped catalog, since the 2026-11-11 split gave it its own entry (B5EFBF9C)."""
+    assert CAT0["overhead_triceps_extension_cable"]["hevy_template_id_hint"] == "B5EFBF9C"
     s = _slot(_week(), "upper_heavy.cable_tricep_pushdown")
-    assert s["pick"]["tier"] == "C"
-    assert s["pick"]["c_reason"]["code"] == "not_prescribable"
-    assert s["above_pick"][0]["movement_id"] == "overhead_triceps_extension_cable"
-    s2 = _slot(_week(cat=_with_overhead_catalog(_cat())), "upper_heavy.cable_tricep_pushdown")
-    assert s2["pick"]["movement_id"] == "overhead_triceps_extension_cable" and s2["pick"]["tier"] == "A"
+    assert s["pick"]["movement_id"] == "overhead_triceps_extension_cable" and s["pick"]["tier"] == "A"
+    assert s["pick"]["c_reason"] is None
+    # control: without the catalog entry it is ranked but never served (the pre-split state)
+    cat = _cat()
+    del cat["overhead_triceps_extension_cable"]
+    s2 = _slot(_week(cat=cat), "upper_heavy.cable_tricep_pushdown")
+    assert s2["pick"]["tier"] == "C" and s2["pick"]["c_reason"]["code"] == "not_prescribable"
+    assert s2["above_pick"][0]["movement_id"] == "overhead_triceps_extension_cable"
     # control: demote it to C -> it no longer wins on tier
     lib = _lib()
     for r in lib["movements"]["overhead_triceps_extension_cable"]["hypertrophy"]:
         r["tier"] = "C"
-    s3 = _slot(_week(lib=lib, cat=_with_overhead_catalog(_cat())), "upper_heavy.cable_tricep_pushdown")
-    assert s3["pick"]["tier"] == "C"
+    assert _slot(_week(lib=lib), "upper_heavy.cable_tricep_pushdown")["pick"]["tier"] == "C"
 
 
 def test_tier_for_reads_the_slot_muscle_and_its_sub_targets():
@@ -156,7 +149,7 @@ def test_c_reason_names_the_blocked_higher_tier_or_the_gap():
 
 
 def test_critic_changes_a_c_pick_served_where_an_a_is_selectable():
-    cat = _with_overhead_catalog(_cat())
+    cat = _cat()
     lib = _lib()
     sel = _week(lib=lib, cat=cat)
     rot = vr.plan(WEEK7, cat, role="upper_heavy", rows=[], ledger_state="injected")
@@ -245,9 +238,31 @@ def test_a_stale_overlay_pain_tag_is_not_trusted_to_exclude():
 
 
 def test_not_for_you_now_excludes_as_its_own_verdict():
-    e = LIB0["movements"]["preacher_curl_barbell"]
+    lib = _lib()
+    e = lib["movements"]["preacher_curl_dumbbell"]
+    e["not_for_you_now"] = {"reason_code": "planted", "unlock_condition": "a test"}
     assert se.not_for_you_now(e) and se.pain_exclusion(e, None) is None
-    assert "preacher_curl_barbell" not in _served_anywhere(_week())
+    assert "preacher_curl_dumbbell" not in _served_anywhere(_week(lib=lib))
+    assert "preacher_curl_dumbbell" in _served_anywhere(_week())  # control: unplanted, it serves
+
+
+def test_preacher_curl_barbell_is_unlocked_by_the_owner_ruling():
+    """Owner ruling 2026-11-11: the library's only not_for_you_now is lifted; a real pain-class note still excludes it."""
+    e = LIB0["movements"]["preacher_curl_barbell"]
+    assert e["not_for_you_now"] is None and LIB0["change_log"][-1]["by"].startswith("owner ruling 2026-11-11")
+    assert se.not_for_you_now(e) is None
+    # first logged 2026-10-26, after the catalog's last build (history_through 2026-10-18): the catalog cannot write it
+    # until the next catalog rebuild — a planted catalog entry stands in for that rebuild here
+    cat = _cat()
+    cat["preacher_curl_barbell"] = {
+        **cat["preacher_curl_dumbbell"],
+        "title": "Preacher Curl (Barbell)",
+        "hevy_template_id_hint": e["template_id"],
+    }
+    sel = _week(cat=cat)
+    assert "preacher_curl_barbell" in _served_anywhere(sel)
+    ov = _pain_overlay(e["template_id"], {"pain_flag": 1})
+    assert "preacher_curl_barbell" not in _served_anywhere(_week(cat=cat, overlay=ov))  # a real pain note still excludes
 
 
 # ── gates: unknown = locked ──────────────────────────────────────────────────
@@ -377,6 +392,81 @@ def test_only_accessory_slots_are_selected_anchors_stay_fixed():
 
 def test_selection_is_deterministic():
     assert json.dumps(_week(), sort_keys=True) == json.dumps(_week(), sort_keys=True)
+
+
+# ── variety: best per slot, no repeats per week (owner ruling 2026-11-11) ──
+CURL_SLOTS = ("upper_heavy.db_curl", "shoulders_arms.db_curl", "upper_volume.db_curl")
+
+
+def test_three_curl_slots_get_three_different_curls():
+    sel = _week()
+    picks = [_slot(sel, sid)["pick"] for sid in CURL_SLOTS]
+    assert len({p["catalog_key"] for p in picks}) == 3, [p["title"] for p in picks]
+    # evidence still ranks each slot: the first curl slot takes the slot's best, the later ones the next-best
+    assert picks[0]["week_repeat"] is None
+    for p in picks[1:]:
+        assert p["week_repeat"]["code"] == "week_repeat" and picks[0]["movement_id"] in p["week_repeat"]["skipped"]
+    assert se.TIER_RANK[picks[0]["tier"]] <= min(se.TIER_RANK[p["tier"]] for p in picks[1:])
+
+
+def test_no_movement_fills_two_unpinned_slots_in_one_week():
+    sel = _week()
+    keys = [s["pick"]["catalog_key"] for s in sel["slots"] if s.get("pick") and not s.get("pinned")]
+    assert len(keys) == len(set(keys))
+
+
+def _slot_ctx(slot_id: str) -> tuple[dict, dict]:
+    lib, cat = _lib(), _cat()
+    env = {"lib": lib, "catalog": cat, "overlay": None, "inventory": None, "idx": se.key_index(lib, cat), "ceiling": 2, "missing": []}
+    slot = next(s for s in vr.slots() if s["slot_id"] == slot_id)
+    return slot, se._ctx(slot, env, 2)
+
+
+def test_a_taken_best_passes_to_the_next_best_and_a_repeat_only_when_none_is_left():
+    slot, ctx = _slot_ctx("upper_heavy.db_curl")
+    free = se.select_slot(slot, ctx, set(), set())
+    best = free["pick"]["catalog_key"]
+    nxt = se.select_slot(slot, ctx, set(), {best})
+    assert nxt["pick"]["catalog_key"] != best and nxt["pick"]["week_repeat"]["code"] == "week_repeat"
+    every = {c for c in (se.key_index(ctx["lib"], ctx["catalog"])["to_cat"].values())}
+    stuck = se.select_slot(slot, ctx, set(), every)
+    assert stuck["pick"]["catalog_key"] == best and stuck["pick"]["week_repeat"]["code"] == "week_repeat_unavoidable"
+
+
+def test_a_c_pick_below_a_taken_a_or_b_names_week_repeat():
+    pick = {"tier": "C", "movement_id": "c"}
+    skipped = [{"tier": "B", "movement_id": "b", "title": "B one"}]
+    assert se.c_reason(pick, [], skipped=skipped)["code"] == "week_repeat"
+    assert se.c_reason(pick, [])["code"] == "library_gap"  # control: nothing skipped
+
+
+def test_the_lengthened_swap_never_makes_a_week_repeat():
+    def c(mid, bias):
+        return {
+            "movement_id": mid,
+            "catalog_key": mid,
+            "title": mid,
+            "tier": "C",
+            "n1": {"score": 0},
+            "length_bias": bias,
+            "novel": False,
+            "equipment": [],
+            "exposures": 1,
+        }
+
+    spec = {"muscle": "biceps"}
+    a = {"slot_id": "s1", "spec": spec, "pick": c("mid_a", "mid") | {"c_reason": None, "week_repeat": None}}
+    b = {"slot_id": "s2", "spec": spec, "pick": c("long_b", "lengthened") | {"c_reason": None, "week_repeat": None}}
+    b["pick"]["length_bias"] = "mid"  # neither pick lengthened; s1's only lengthened alternative is s2's own pick
+    full = {"s1": [c("mid_a", "mid"), c("long_b", "lengthened")], "s2": [c("long_b", "lengthened")]}
+    rows = se._lengthened_pass([a, b], full)
+    assert a["pick"]["movement_id"] == "mid_a"  # s1 did not take s2's movement
+    assert {r["muscle"]: r["state"] for r in rows}["biceps"] in ("adjusted", "unmet")
+
+
+def test_owner_pinned_slots_are_exempt():
+    pinned = _slot(_week(), "shoulders_arms.farmers_walk")
+    assert pinned["pick"]["catalog_key"] == "farmers_walk" and pinned["pick"]["week_repeat"] is None
 
 
 # ── the switch: shadow while proposed, live only when approved ───────────────

@@ -30,7 +30,9 @@ from training import (
     load_ramp,
     program_structure,
     routine_generator as _rg,
+    rpe_calibration,
     selection_engine,
+    session_time,
     variant_rotation,
     warmup_sets,
 )
@@ -97,7 +99,11 @@ def _blocks_from_prescription(
             (
                 Set(type="normal", distance_meters=int(sp["distance_meters"]))
                 if sp.get("distance_meters")
-                else Set(type="normal", rep_range_start=sp["reps"][0], rep_range_end=sp["reps"][1])
+                else Set(
+                    type="dropset" if sp.get("kind") == "drop" else "normal",  # #5799: the owner-selected short-on-time row
+                    rep_range_start=sp["reps"][0],
+                    rep_range_end=sp["reps"][1],
+                )
             )
             for sp in sets_spec
         ]
@@ -125,6 +131,7 @@ def _blocks_from_prescription(
                 movement_key=key,
                 sets=sets,
                 rest_seconds=e["rest_seconds"],
+                superset_id=e.get("superset_id"),  # #5799: the charter's antagonist pair (`session_shape.pair_supersets`)
                 notes=notes,
                 joint_friendly_score=mdef.get("joint_friendly_score", 3),
                 skill_tier=mdef.get("skill_tier", 1),
@@ -191,10 +198,14 @@ def _compose_notes(
     history_index: dict[str, list],
     target_date: str,
     rotation: dict[str, Any] | None = None,
+    deload: bool = False,
+    red_day: bool = False,
 ) -> dict[str, Any]:
     """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record.
     #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`). #5771: each lift's ranked
-    same-stimulus fallback (`selection_engine.note_fallbacks`) — on the wire once the library is approved, recorded either way."""
+    same-stimulus fallback (`selection_engine.note_fallbacks`) — on the wire once the library is approved, recorded either way.
+    #5797 (owner ruling 2026-11-11): then the RPE calibration line on a due non-barbell exposure (`rpe_calibration`) —
+    never on a deload or a red day; it outranks the fallback line; its marks and the calibration report ride the record."""
     movements = load_catalog.get("movements") or {}
     fb = selection_engine.note_fallbacks(rotation, [str(b.movement_key) for b in blocks], movements)
     record = lift_note.compose_blocks(
@@ -206,6 +217,9 @@ def _compose_notes(
         rotations=variant_rotation.swaps(rotation, movements),
         fallbacks=fb["by_key"] if fb.get("render") else None,
     )
+    ctx = {"deload": deload, "red_day": red_day, "load_floors": load_floors, "history_index": history_index, "target_date": target_date}
+    cal = rpe_calibration.mark_session(blocks, movements, note_record=record, context=ctx)
+    record[rpe_calibration.SNAPSHOT_KEY] = {**cal, "report": rpe_calibration.report(history_index, movements)}
     return record | {"note_fallbacks": fb}
 
 
@@ -294,6 +308,7 @@ def _prescription(
         skill_ceiling=skill_ceiling,
         in_block=in_block,
         accessory_variants=rotation["variants"],
+        measured_minutes=session_time.role_median_minutes(block_workouts, day_entry["session_role"]),  # #5799
     )
     return in_block, rotation, rx
 
@@ -374,7 +389,7 @@ def full_body_routines(
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation)
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload, drop_accessories)
 
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],

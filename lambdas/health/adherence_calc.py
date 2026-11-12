@@ -50,8 +50,9 @@ Movement matching: by Hevy exercise_template_id when present; falls back to
 title prefix on the catalog title.
 
 TEMPLATE-ID ALIASES (#3929). Hevy's own catalog carries the same movement under more
-than one exercise_template_id (specimen: `21310F5F` "Triceps Extension (Cable)" vs
-`B5EFBF9C` "Overhead Triceps Extension (Cable)" — one movement, two ids). Matched by
+than one exercise_template_id (the original specimen, `21310F5F` "Triceps Extension (Cable)" vs
+`B5EFBF9C` "Overhead Triceps Extension (Cable)", was SPLIT by owner ruling 2026-11-11 (#5773) into
+two movements — the registry's `split` map records it). Matched by
 raw template_id alone, a performed set logged under the alias id scored as BOTH one
 missing (the prescribed id never seen performed) and one extra (the alias id never
 seen prescribed) — a single real movement double-penalized. `config/hevy_template_aliases.json`
@@ -350,14 +351,18 @@ def _normalize_alias_title(title: str) -> str:
     return " ".join(words)
 
 
-def find_alias_candidates(titles: dict[str, str], known_aliases: dict[str, str] | None = None) -> list[dict[str, Any]]:
+def find_alias_candidates(
+    titles: dict[str, str], known_aliases: dict[str, str] | None = None, known_split: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """Report UNCONFIRMED alias candidates — never applied to scoring (shrink-only-honest,
     #3929's acceptance: "an unrecognized template pairing is reported as a candidate,
     never silently merged"). `titles` is `{exercise_template_id: title}` (e.g. from
     `config/hevy_template_aliases.json`'s own `titles` map, or a Hevy template-index
     walk); `known_aliases` is the registry's confirmed `aliases` map, used only to
     exclude ids the registry already accounts for so the output is the unconfirmed
-    residue a human still needs to review.
+    residue a human still needs to review. `known_split` is the registry's `split` map
+    (ids the owner ruled a DIFFERENT movement from their former canonical, #5773): those
+    ids are never re-proposed.
 
     A group of >=2 template ids that normalize (see `_normalize_alias_title`) to the
     same core title is a candidate. This function performs NO resolution — it is a
@@ -375,7 +380,7 @@ def find_alias_candidates(titles: dict[str, str], known_aliases: dict[str, str] 
     for key, ids in groups.items():
         if len(ids) < 2:
             continue
-        unconfirmed = sorted(tid for tid in ids if tid not in known_aliases)
+        unconfirmed = sorted(tid for tid in ids if tid not in known_aliases and tid not in (known_split or {}))
         if len(unconfirmed) < 2:
             continue  # the registry already accounts for every id but one in this group
         candidates.append({"normalized_title": key, "template_ids": unconfirmed})
@@ -961,6 +966,19 @@ def find_workout_for_routine(ir: RoutineSpec, workouts: list[dict[str, Any]]) ->
     return None, None
 
 
+def _session_time(performed: dict[str, Any], ir: RoutineSpec | None) -> dict[str, Any] | None:
+    """#5799: the session's measured lifting minutes beside its routine's estimate and the ceiling (`training.session_time`).
+    Fail-soft: a measurement error leaves the field None and never costs the adherence record."""
+    try:
+        from training import session_time
+
+        movements = ((_load_catalog() or {}).get("movements") or {}) if ir is not None else {}
+        return session_time.measure(performed, ir, movements)
+    except Exception as e:  # noqa: BLE001 — a projection; never break ingestion
+        logger.warning("session_time measure failed (non-fatal): %s", type(e).__name__)
+        return None
+
+
 def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
     """On-ingest deviation readback (#412): match a performed Hevy workout to the plan
     that was pushed for it, and compute programmed-vs-performed adherence.
@@ -999,7 +1017,7 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
                     "matched_routine_id": None,
                     "candidate_routine_ids": [getattr(c, "routine_id", None) for c in candidates],
                 }
-            return {**base, "status": "ad_hoc", "matched_routine_id": None}
+            return {**base, "status": "ad_hoc", "matched_routine_id": None, "session_time": _session_time(performed, None)}
 
         return {
             **base,
@@ -1008,6 +1026,7 @@ def derive_adherence(raw_workout: dict[str, Any]) -> dict[str, Any] | None:
             "match_method": match_method,
             "routine_target_date": getattr(ir, "target_date", None),
             **calculate_adherence(ir, performed),
+            "session_time": _session_time(performed, ir),  # #5799: measured lifting minutes vs the estimate and the ceiling
         }
     except Exception as e:  # noqa: BLE001 — deviation is a projection; never break ingestion
         logger.warning("adherence derive failed (non-fatal): %s", e)

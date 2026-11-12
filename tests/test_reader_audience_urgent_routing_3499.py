@@ -59,7 +59,14 @@ so the cross-check is a fact on the record, not a promise:
     site-api-throttles               -> [...:life-platform-alerts-digest, ...:life-platform-alerts]
     routed: 11  registry: 11  missing: []   (2026-09-14, aws-cdk-lib 2.268.0)
 
-v1.0.0 — 2026-09-14 (#3499, epic #3489)
+#5821 (2026-11-11) SPLIT the facet: `READER_AUDIENCE_DIGEST_ONLY` members keep the
+escalation tag but not the urgent route (`site-api-invocation-spike`, owner ruling), and
+`site-api-p95-latency-high` left the facet for its 3-of-3 sibling
+`site-api-p95-latency-sustained`. "Every member reaches the urgent topic" now reads "every
+member of `urgent_routed_reader_alarms()`"; the digest-only half is pinned by
+tests/test_inbox_noise_alarms_5821.py.
+
+v1.0.0 — 2026-09-14 (#3499, epic #3489) · v1.1.0 — 2026-11-11 (#5821)
 """
 
 from __future__ import annotations
@@ -80,7 +87,7 @@ for _p in (CDK_DIR, SCRIPTS_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from platform_model_alarms import READER_AUDIENCE_ALARMS  # noqa: E402
+from platform_model_alarms import READER_AUDIENCE_ALARMS, urgent_routed_reader_alarms  # noqa: E402
 
 WORKFLOW = os.path.join(ROOT, ".github", "workflows", "remediation-agent.yml")
 OPERATIONAL_STACK = os.path.join(CDK_DIR, "stacks", "operational_stack.py")
@@ -299,7 +306,11 @@ def test_the_synthesized_template_agrees_with_the_ast_derivation():
 
     missing = sorted(set(READER_AUDIENCE_ALARMS) - set(seen))
     assert not missing, f"facet members absent from the synthesized Monitoring/Serve templates: {missing}"
-    unrouted = sorted(n for n, actions in seen.items() if not any(str(a).endswith(f":{URGENT_TOPIC}") for a in actions))
+    unrouted = sorted(
+        n
+        for n, actions in seen.items()
+        if n in urgent_routed_reader_alarms() and not any(str(a).endswith(f":{URGENT_TOPIC}") for a in actions)
+    )
     assert not unrouted, f"synthesized AlarmActions do NOT include the urgent topic for: {unrouted}"
     # additive, never destructive: the ADR-052 digest record each declaration asked for survives
     lost = sorted(n for n, actions in seen.items() if not any(str(a).endswith(":life-platform-alerts-digest") for a in actions))

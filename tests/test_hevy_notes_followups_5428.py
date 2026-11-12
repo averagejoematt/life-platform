@@ -28,6 +28,8 @@ import sys
 from contextlib import ExitStack
 from unittest.mock import patch
 
+import pytest
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -82,6 +84,15 @@ def test_the_banned_scan_fails_the_archived_originals():
         "3 sets of 8-15 @ RPE 8-9; last set RPE 9-10. Last: 15 lb x 15/15/15 (4 Oct).",
     ]
     assert all(banned_hits([o]) for o in originals), [o for o in originals if not banned_hits([o])]
+
+
+@pytest.fixture(autouse=True)
+def _charter_not_available_as_of_10_26():
+    """These tests replay the generator at its 2026-10-26 position, when the charter's equipment.not_available list was
+    empty. The owner's 2026-11-11 equipment ruling (#5771, charter 1.45.0) later marked preacher_curl_machine unavailable;
+    the replay keeps that date's list so it pins the rotation as it was served, not today's pool."""
+    with patch("training.variant_rotation.not_available", return_value=[]):
+        yield
 
 
 # ── 1. the rotation, through the real generator at the 10-26 position ─────────────────────────────────────────────

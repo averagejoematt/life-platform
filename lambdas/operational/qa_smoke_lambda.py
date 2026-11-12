@@ -70,6 +70,7 @@ from operational import (
     pending_writes_qa,  # noqa: E402  (#4078 dead-man: queued chat writes left unresolved)
     phase_eval_qa,  # noqa: E402  (#5575 dead-man: the weekly phase evaluation row)
     planning_loop_qa,  # noqa: E402  (#5761 dead-man: every week's tracker row + panel grade)
+    public_brief_qa,  # noqa: E402  (dead-man: the Monday public-safe coaching brief, 2026-11-12)
     qa_check_edge_429,  # noqa: E402
     qa_check_oauth_door,  # noqa: E402
     raw_archive_qa,  # noqa: E402
@@ -1174,6 +1175,7 @@ def check_steps():
         ("coach_checkin_queue_age", lambda: coach_checkin_queue_qa.check_queue_age(table, Check, CONTENT_TRUTH)),  # #5127
         ("phase_eval_liveness", lambda: phase_eval_qa.check_phase_eval_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5575 dead-man
         ("planning_loop_liveness", lambda: planning_loop_qa.check_planning_loop_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5761
+        ("public_brief_liveness", lambda: public_brief_qa.check_public_brief_liveness(table, Check, CONTENT_TRUTH, pt_now)),
         # #3829 dead-man: coach-ensemble-digest writes exactly one ENSEMBLE#digest row per cycle on EVERY
         # non-crashing path (including the budget-tier pause), so a missing CYCLE# row is unambiguous. Two of
         # four cycles were missing for eight days with nothing reporting it but a DLQ alarm a human read at wrap.

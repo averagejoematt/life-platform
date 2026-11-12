@@ -266,6 +266,17 @@ def _phase_leg(week_end: str | None) -> dict[str, Any]:
     return weekly_leg(week_end)
 
 
+def _exercise_gates_leg(week_end: str | None) -> dict[str, Any]:
+    """#5772: the exercise library's weekly gate evaluation rides this run too (the #5575 ruling: an existing weekly
+    job). Fail-soft exactly like `_phase_leg`: a failure is named on the summary, never the grade's status or datapoint."""
+    try:
+        from mcp.exercise_gates_leg import weekly_leg
+    except Exception as e:  # noqa: BLE001 — named on the result
+        return {"outcome": "failed", "error": type(e).__name__}
+    out = weekly_leg(week_end)
+    return {k: out.get(k) for k in ("outcome", "error", "sk", "counts", "newly_unlocked", "announce")}  # counts + ids only
+
+
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled/on-demand entry. Never raises: a failure is logged by class and emits the datapoint at 0."""
     try:
@@ -278,6 +289,7 @@ def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     dep = result.get("departures") or {}
     summary["departures"] = {k: dep.get(k) for k in ("committed", "draft_custom")} if dep else None  # #5761: counts only in the log
     summary["phase"] = _phase_leg((event or {}).get("week_end"))  # #5575: fail-soft, never the grade's status or datapoint
+    summary["exercise_gates"] = _exercise_gates_leg((event or {}).get("week_end"))  # #5772: fail-soft, counts + ids only
     food = result.get("food") or {}
     summary["food"] = {k: food.get(k) for k in ("overall", "target_met", "degraded_reasons", "basis", "menu")} if food else None
     logger.info("PANEL_WEEKLY_GRADE %s", json.dumps(summary, default=str)[:4000])
