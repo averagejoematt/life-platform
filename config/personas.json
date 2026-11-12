@@ -46,6 +46,9 @@
         "hrv",
         "resting_heart_rate",
         "recovery_score"
+      ],
+      "public_brief_required_metrics": [
+        "sleep_duration_hours"
       ]
     },
     "training_coach": {
@@ -95,6 +98,9 @@
         "total_calories_kcal",
         "total_protein_g",
         "weight_lbs"
+      ],
+      "public_brief_required_metrics": [
+        "total_calories_kcal"
       ]
     },
     "mind_coach": {
@@ -151,6 +157,9 @@
         "weight_lbs",
         "resting_heart_rate",
         "hrv"
+      ],
+      "public_brief_required_metrics": [
+        "steps"
       ]
     },
     "glucose_coach": {
@@ -177,6 +186,9 @@
         "blood_glucose_avg",
         "blood_glucose_std_dev",
         "total_calories_kcal"
+      ],
+      "public_brief_required_metrics": [
+        "blood_glucose_avg"
       ]
     },
     "labs_coach": {

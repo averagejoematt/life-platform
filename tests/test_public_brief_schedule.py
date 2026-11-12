@@ -38,7 +38,7 @@ def test_the_handler_dispatches_the_mode_and_only_the_mode(monkeypatch):
     seen = []
     monkeypatch.setattr(public_brief, "run", lambda table, **kw: seen.append(kw) or {"status": "ok"})
     assert CHS.lambda_handler({"mode": "public_brief", "dry_run": True}, None) == {"status": "ok"}
-    assert seen == [{"coach_ids": None, "persist": False}]
+    assert seen == [{"today": None, "coach_ids": None, "persist": False}]
     monkeypatch.setattr(CHS, "ALL_COACH_IDS", [])
     CHS.lambda_handler({"coach_ids": []}, None)  # the Sunday compression run
     assert len(seen) == 1
