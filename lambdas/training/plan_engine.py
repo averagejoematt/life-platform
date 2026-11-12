@@ -346,6 +346,15 @@ def _pain_read_failed(scope: dict[str, Any] | None, layer_status: str | None, in
     return layer_status in (None, "dark", "unknown") and (input_states.get("pain_layer_status") or {}).get("state") == READ_FAILED
 
 
+def floor_days_state(days_missed_7d: int | None) -> str:
+    """THE `protein_floor_missed` evaluation (tripped | clear | unknown) against its own `threshold_days`; the fuel loop
+    (#5792, `mcp.fuel_loop`) reads the fat and fibre floors' day counts through it too, so there is one comparison."""
+    if days_missed_7d is None:
+        return "unknown"
+    t = next(x for x in owner_redlines.engine_evaluated_tripwires() if x["id"] == "protein_floor_missed")
+    return "tripped" if int(days_missed_7d) >= int(t["threshold_days"]) else "clear"
+
+
 # _tripwire_states — two rules kept as a comment (the #4880 function-length ratchet charges a docstring, #5001):
 #
 # #4051 closes the hole under the `unknown` and `dismissed_by_owner` rules of the docstring: a `clear` (or `unknown`) pain row is only
@@ -442,12 +451,12 @@ def _tripwire_states(
         label = st.get("state")
         return _row(tid, "unknown", None, f"{label}: {why}" if (label and why and label != NOT_SUPPLIED) else fallback)
 
-    t = by_id["protein_floor_missed"]
     if protein_days_missed_7d is None:
         out.append(_missing("protein_floor_missed", "no intake rollup for the trailing 7d"))
     else:
-        tripped = protein_days_missed_7d >= t["threshold_days"]
-        out.append(_row("protein_floor_missed", "tripped" if tripped else "clear", f"{protein_days_missed_7d} of 7 days below floor"))
+        out.append(
+            _row("protein_floor_missed", floor_days_state(protein_days_missed_7d), f"{protein_days_missed_7d} of 7 days below floor")
+        )
 
     t = by_id["readiness_floor"]
     if readiness_low_streak_days is None:

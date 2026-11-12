@@ -251,18 +251,17 @@ def test_preacher_curl_barbell_is_unlocked_by_the_owner_ruling():
     e = LIB0["movements"]["preacher_curl_barbell"]
     assert e["not_for_you_now"] is None and LIB0["change_log"][-1]["by"].startswith("owner ruling 2026-11-11")
     assert se.not_for_you_now(e) is None
-    # first logged 2026-10-26, after the catalog's last build (history_through 2026-10-18): the catalog cannot write it
-    # until the next catalog rebuild — a planted catalog entry stands in for that rebuild here
+    # first logged 2026-10-26; the 2026-11-12 catalog rebuild (history through 2026-11-11) writes it under its own id.
+    # Like every barbell movement it is skill tier 3, so the week grid's skill ceiling 2 (program_conflicts: tier-3
+    # barbell accessories wait on the Sports Medicine seat) keeps it off drafts, as it does the barbell and EZ-bar curls.
+    assert CAT0["preacher_curl_barbell"]["hevy_template_id_hint"] == e["template_id"]
+    assert CAT0["preacher_curl_barbell"]["skill_tier"] == 3
     cat = _cat()
-    cat["preacher_curl_barbell"] = {
-        **cat["preacher_curl_dumbbell"],
-        "title": "Preacher Curl (Barbell)",
-        "hevy_template_id_hint": e["template_id"],
-    }
-    sel = _week(cat=cat)
-    assert "preacher_curl_barbell" in _served_anywhere(sel)
+    assert "preacher_curl_barbell" not in _served_anywhere(_week(cat=cat))  # ceiling 2: held by the tier rule, not the library
+    sel = _week(cat=cat, skill_ceiling=3)
+    assert "preacher_curl_barbell" in _served_anywhere(sel)  # the library and catalog no longer block it
     ov = _pain_overlay(e["template_id"], {"pain_flag": 1})
-    assert "preacher_curl_barbell" not in _served_anywhere(_week(cat=cat, overlay=ov))  # a real pain note still excludes
+    assert "preacher_curl_barbell" not in _served_anywhere(_week(cat=cat, overlay=ov, skill_ceiling=3))  # a real pain note still excludes
 
 
 # ── gates: unknown = locked ──────────────────────────────────────────────────

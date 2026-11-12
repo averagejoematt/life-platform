@@ -546,7 +546,7 @@ def journey_timeline(*, _g) -> dict:
         for item in _decimal_to_float(corr_resp.get("Items", [])):
             week = item.get("week", item.get("sk", "").replace("WEEK#", ""))
             end_d = item.get("end_date", "")
-            corrs = _activity_publication.public_correlations(item.get("correlations", {}))
+            corrs = _activity_publication.public_correlations(item.get("correlations", {}), metric_methods=item.get("metric_methods"))
             if not isinstance(corrs, dict):
                 continue
             for label, data in corrs.items():
