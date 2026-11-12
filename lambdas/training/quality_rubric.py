@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from typing import Any
 
-RUBRIC_VERSION = "1.0.0"
+RUBRIC_VERSION = "1.0.1"  # 1.0.1: the delt heads join the isolation class (#5857 target audit); weights unchanged
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
@@ -50,7 +50,8 @@ LOAD_STEPS = ("free_weight", "cable", "machine_selectorized", "machine_plate_loa
 # The target muscle's strength-curve class. ISOLATION: a single-joint upper-body muscle whose resistance should stay high
 # into the lengthened range (a cable or selectorized machine does; a dumbbell's torque falls off at one end). LOADED: the
 # lower body, the back and the presses, where a free weight or a machine both load the working range.
-ISOLATION_MUSCLES = ("chest", "shoulders", "biceps", "triceps", "forearms")
+ISOLATION_MUSCLES = ("chest", "shoulders", "side_delts", "rear_delts", "front_delts", "biceps", "triceps", "forearms")
+# The three delt heads (#5857 target audit) sit in the class `shoulders` held: a vocabulary split, not a weight change.
 PROFILE_FIT: dict[str, dict[str, int]] = {
     "isolation": {"cable": 3, "machine_selectorized": 3, "machine_plate_loaded": 2, "free_weight": 2, "band": 1, "bodyweight": 1},
     "loaded": {
@@ -74,6 +75,16 @@ TOP_BAND_SHORTFALL: dict[str, str] = {
     "abs": "the library records no lengthened, externally loaded ab movement: its ab work is bodyweight flexion "
     "(shortened or unknown length bias, bodyweight resistance), so the best rubric score is A (the cable and machine "
     "crunches). A stretched-position loaded ab movement would be an expansion candidate — owner decision.",
+    "side_delts": "the length rule records every lateral raise but the single-arm cable one as shortened-bias (the "
+    "machine lateral raise scores A, the dumbbell C), so only the cable lateral raise reaches S. A lean-away or "
+    "behind-the-back cable lateral would be an expansion candidate; the stretch weight is the board's v2 call.",
+    "rear_delts": "the length rule records every reverse fly and face pull as shortened-bias; only the machine reverse fly "
+    "(mid, high stability) reaches S. The stretch weight for rear-delt work is the board's v2 call.",
+    "front_delts": "presses are recorded mid-bias and the free-weight presses moderate or low stability, so only the "
+    "machine shoulder press reaches S (the front delt is also trained by every chest press).",
+    "glutes": "the hip thrusts, bridges and kickbacks are recorded shortened-bias, and the glutes' lengthened loaders "
+    "(deep squats, lunges, RDLs) are filed under quads and hamstrings by the target audit, so only the curtsy lunge "
+    "reaches S. Whether a squat or lunge should also rate for the glutes is an owner/board call.",
 }
 MAX_SCORE = max(STRETCH.values()) + max(STABILITY.values()) + 3 + max(SKILL.values()) + 1
 

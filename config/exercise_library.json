@@ -20,7 +20,7 @@
    "version": "0.2.0",
    "date": "2026-11-12",
    "by": "#5857 (owner note 2026-11-12, PROPOSAL for the owner's review with the library)",
-   "what": "Tiers grade QUALITY, not evidence: every per-target row's `tier` is S/A/B/C/D, derived by the written rubric (`quality_rubric`, docs/coaching/EXERCISE_LIBRARY.md) from length_bias, stability, resistance_profile, skill_complexity and joint_stress; `evidence_confidence` (rct_direct | rct_characteristic | consensus | none_reviewed) is its own field, and a direct trial moves a row at most one band, recorded with its citation (`evidence_adjustment`). The A/B/C evidence grade and `evidence_quality` are retired. Attribute rules: a named machine reads `machine_selectorized` (was `unknown`); the pec deck reads `lengthened` (was `unknown`).",
+   "what": "Tiers grade QUALITY, not evidence: every per-target row's `tier` is S/A/B/C/D, derived by the written rubric (`quality_rubric`, docs/coaching/EXERCISE_LIBRARY.md) from length_bias, stability, resistance_profile, skill_complexity and joint_stress; `evidence_confidence` (rct_direct | rct_characteristic | consensus | none_reviewed) is its own field, and a direct trial moves a row at most one band, recorded with its citation (`evidence_adjustment`). The A/B/C evidence grade and `evidence_quality` are retired. Attribute rules: a named machine reads `machine_selectorized` (was `unknown`); the pec deck reads `lengthened` (was `unknown`). Target-label audit (owner-approved on PR #5858): Hevy's raw muscle label is replaced by the reviewed target for every row in deploy/exercise_library_targets.py, each with its reason and recorded on the entry as `target.audit`; the shoulder splits into side_delts / rear_delts / front_delts, shrugs move to traps, and compound or conditioning movements to full_body (no single-muscle tier).",
    "rule": "rubric weights are PROPOSED — owner to confirm; status stays proposed"
   }
  ],
@@ -44,8 +44,8 @@
   "hypertrophy_rows_by_tier": {
    "S": 75,
    "A": 75,
-   "B": 92,
-   "C": 237,
+   "B": 93,
+   "C": 236,
    "D": 103
   },
   "hypertrophy_rows_by_evidence_confidence": {
@@ -89,7 +89,7 @@
   "attribute_rule": "derived by rule unless deploy/exercise_library_curation.py overrides; `unknown` = the rule cannot say"
  },
  "quality_rubric": {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "provenance": "proposed weights (#5857, 2026-11-12) — owner to confirm",
   "terms": {
    "stretch": {
@@ -113,6 +113,9 @@
     "isolation_muscles": [
      "chest",
      "shoulders",
+     "side_delts",
+     "rear_delts",
+     "front_delts",
      "biceps",
      "triceps",
      "forearms"
@@ -1360,11 +1363,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_dumbbell",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]
@@ -1379,11 +1382,15 @@
     "exposures": 96
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [
      "biceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a reverse fly / face pull / rear-delt row: rear delts"
+    }
    },
    "family": "corrective",
    "length_bias": "shortened",
@@ -1402,7 +1409,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -1429,7 +1436,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "scarecrow",
+     "movement_id": "band_pullaparts",
      "reason": "same_stimulus"
     }
    ]
@@ -1578,9 +1585,13 @@
     "exposures": 75
    },
    "target": {
-    "primary": "back",
+    "primary": "traps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a shrug / trap raise: traps, not the lats or the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -1599,7 +1610,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "traps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -1622,12 +1633,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "shrug_machine",
+     "movement_id": "seated_shrugs",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "side_lateral_raises",
-     "reason": "same_target"
+     "movement_id": "db_haney_shrugs",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -1773,9 +1784,13 @@
     "exposures": 72
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a lateral raise: side delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -1794,7 +1809,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -1817,7 +1832,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bent_over_lateral_raise",
+     "movement_id": "side_lateral_raises",
      "reason": "same_stimulus"
     },
     {
@@ -2294,11 +2309,15 @@
     "exposures": 50
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -2318,7 +2337,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -3293,9 +3312,13 @@
     "exposures": 25
    },
    "target": {
-    "primary": "back",
+    "primary": "traps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a shrug / trap raise: traps, not the lats or the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -3314,7 +3337,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "traps",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -3341,8 +3364,8 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "side_lateral_raises",
-     "reason": "same_target"
+     "movement_id": "seated_shrugs",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -3419,9 +3442,13 @@
     "exposures": 24
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a front raise: front delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -3440,7 +3467,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -3459,15 +3486,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "face_pull",
+     "movement_id": "landmine_pushaway_presses",
      "reason": "same_target"
     },
     {
-     "movement_id": "lateral_raise_machine",
+     "movement_id": "military_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "upright_row_barbell",
+     "movement_id": "overhead_press_barbell",
      "reason": "same_target"
     }
    ]
@@ -3588,16 +3615,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "band_pullaparts",
-     "reason": "same_stimulus"
+     "movement_id": "rotator_cuff_external_rotation",
+     "reason": "same_target"
     },
     {
-     "movement_id": "face_pull",
-     "reason": "same_stimulus"
+     "movement_id": "db_external_rotation",
+     "reason": "same_target"
     },
     {
-     "movement_id": "chest_supported_reverse_fly_dumbbell",
-     "reason": "same_stimulus"
+     "movement_id": "external_rotation",
+     "reason": "same_target"
     }
    ]
   },
@@ -3611,9 +3638,13 @@
     "exposures": 24
    },
    "target": {
-    "primary": "triceps",
+    "primary": "back",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "triceps",
+     "reason": "a straight-arm pushdown (Hevy filed it under triceps): the lats"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -3632,10 +3663,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "triceps",
+     "target": "back",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 9,
+     "rubric_score": 8,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -3651,16 +3682,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "tricep_pushaway",
-     "reason": "same_stimulus"
+     "movement_id": "lat_pulldown_cable",
+     "reason": "same_target"
     },
     {
-     "movement_id": "tricep_pushaways",
-     "reason": "same_stimulus"
+     "movement_id": "dumbbell_row",
+     "reason": "same_target"
     },
     {
-     "movement_id": "kneeling_tricep_pushaway",
-     "reason": "same_stimulus"
+     "movement_id": "lat_pulldown_close_grip_cable",
+     "reason": "same_target"
     }
    ]
   },
@@ -3674,9 +3705,13 @@
     "exposures": 22
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -3695,7 +3730,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -3999,12 +4034,16 @@
     "exposures": 19
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps",
      "abs"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "strength_anchor",
    "length_bias": "mid",
@@ -4024,7 +4063,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -4863,9 +4902,13 @@
     "exposures": 12
    },
    "target": {
-    "primary": "abs",
+    "primary": "full_body",
     "secondary": [],
-    "region": "cardio"
+    "region": "full_body",
+    "audit": {
+     "from": "abs",
+     "reason": "a farmer's carry trains grip, traps and trunk (Hevy filed it under abs): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "not_applicable",
@@ -4884,7 +4927,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "abs",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -4911,7 +4954,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kettlebell_suitcase_carry",
+     "movement_id": "db_gun_carries",
      "reason": "same_stimulus"
     }
    ]
@@ -5039,11 +5082,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_squat_and_press",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_barbell",
+     "movement_id": "bulgarian_split_squat_dumbbell",
      "reason": "same_stimulus"
     }
    ]
@@ -5121,9 +5164,13 @@
     "exposures": 11
    },
    "target": {
-    "primary": "abs",
+    "primary": "full_body",
     "secondary": [],
-    "region": "core"
+    "region": "full_body",
+    "audit": {
+     "from": "abs",
+     "reason": "a deep-squat mobility reach (Hevy filed it under abs): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -5142,7 +5189,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "abs",
+     "target": "full_body",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 10,
@@ -5161,16 +5208,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "side_bend_dumbbell",
-     "reason": "same_target"
+     "movement_id": "cable_squat_to_standing_row",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "farmers_walk",
-     "reason": "same_target"
+     "movement_id": "reverse_lunge_curls",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "torso_rotation",
-     "reason": "same_target"
+     "movement_id": "landmine_squat_and_press",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -5184,9 +5231,13 @@
     "exposures": 11
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -5205,7 +5256,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -5224,15 +5275,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -5638,9 +5689,13 @@
     "exposures": 10
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a lateral raise: side delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -5659,7 +5714,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 10,
@@ -5682,11 +5737,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bent_over_lateral_raise",
+     "movement_id": "bent_arm_lateral_raises",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bent_arm_lateral_raises",
+     "movement_id": "lateral_raise_cable_single_arm",
      "reason": "same_stimulus"
     }
    ]
@@ -5749,7 +5804,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_squat_and_press",
+     "movement_id": "single_leg_press",
      "reason": "same_stimulus"
     }
    ]
@@ -5808,11 +5863,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_trap_raises_retreats",
+     "movement_id": "superman",
      "reason": "same_target"
     },
     {
-     "movement_id": "superman",
+     "movement_id": "banded_retractions",
      "reason": "same_target"
     }
    ]
@@ -5827,13 +5882,17 @@
     "exposures": 10
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [
      "back",
      "biceps",
      "forearms"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an upright row: side delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -5852,7 +5911,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -5871,16 +5930,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_rear_delt_rows",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "db_abduction_rows",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_row_ups",
-     "reason": "same_stimulus"
+     "movement_id": "lateral_raise_dumbbell",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "lateral_raise_machine",
+     "reason": "same_target"
     }
    ]
   },
@@ -5942,11 +6001,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_dumbbell",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]
@@ -6005,11 +6064,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_trap_raises_retreats",
+     "movement_id": "superman",
      "reason": "same_target"
     },
     {
-     "movement_id": "superman",
+     "movement_id": "banded_retractions",
      "reason": "same_target"
     }
    ]
@@ -6201,11 +6260,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_dumbbell",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]
@@ -6422,9 +6481,13 @@
     "exposures": 8
    },
    "target": {
-    "primary": "glutes",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "glutes",
+     "reason": "a lateral squat (Hevy filed it under glutes): quads and adductors lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -6443,7 +6506,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "glutes",
+     "target": "quadriceps",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -6462,16 +6525,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_bench_front_squats",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_hyperextension",
-     "reason": "same_target"
+     "movement_id": "zercher_squat",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "deadlift_barbell",
-     "reason": "same_target"
+     "movement_id": "reverse_lunge_barbell",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -6548,9 +6611,13 @@
     "exposures": 8
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a step-up: the quads lead; Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -6570,7 +6637,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -6932,9 +6999,13 @@
     "exposures": 7
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -6953,7 +7024,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -6972,15 +7043,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -6995,9 +7066,13 @@
     "exposures": 7
    },
    "target": {
-    "primary": "biceps",
+    "primary": "back",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "biceps",
+     "reason": "a scapular mobility drill (Hevy filed it under biceps): the upper back"
+    }
    },
    "family": "corrective",
    "length_bias": "not_applicable",
@@ -7016,7 +7091,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "biceps",
+     "target": "back",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -7035,15 +7110,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_gun_carries",
+     "movement_id": "dead_arm_scap_rows",
      "reason": "same_target"
     },
     {
-     "movement_id": "cable_stretch_curls",
+     "movement_id": "hanging_scap_pulls",
      "reason": "same_target"
     },
     {
-     "movement_id": "hammer_curl_dumbbell",
+     "movement_id": "scap_pulldowns",
      "reason": "same_target"
     }
    ]
@@ -7164,15 +7239,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "farmers_walk",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "cable_pallof_press",
      "reason": "same_target"
     },
     {
      "movement_id": "ab_wheel",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "suitcase_carry",
      "reason": "same_target"
     }
    ]
@@ -7250,9 +7325,13 @@
     "exposures": 7
    },
    "target": {
-    "primary": "other",
+    "primary": "abs",
     "secondary": [],
-    "region": "full_body"
+    "region": "core",
+    "audit": {
+     "from": "other",
+     "reason": "a crunch variation (Hevy filed it under other)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -7271,7 +7350,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "other",
+     "target": "abs",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -7291,15 +7370,15 @@
    "fallbacks": [
     {
      "movement_id": "side_bend_dumbbell",
-     "reason": "same_family"
-    },
-    {
-     "movement_id": "cable_pull_through",
-     "reason": "same_family"
+     "reason": "same_target"
     },
     {
      "movement_id": "torso_rotation",
-     "reason": "same_family"
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "cable_twist_up_to_down",
+     "reason": "same_target"
     }
    ]
   },
@@ -7502,9 +7581,13 @@
     "exposures": 7
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a reverse fly / face pull / rear-delt row: rear delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -7523,7 +7606,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -7542,16 +7625,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "upright_row_barbell",
-     "reason": "same_stimulus"
+     "movement_id": "face_pull",
+     "reason": "same_target"
     },
     {
-     "movement_id": "banded_row_ups",
-     "reason": "same_stimulus"
+     "movement_id": "bent_over_lateral_raise",
+     "reason": "same_target"
     },
     {
-     "movement_id": "db_abduction_rows",
-     "reason": "same_stimulus"
+     "movement_id": "rear_delt_fly",
+     "reason": "same_target"
     }
    ]
   },
@@ -7609,11 +7692,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "band_pullaparts",
+     "movement_id": "db_external_rotation",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_external_rotation",
+     "movement_id": "external_rotation",
      "reason": "same_target"
     }
    ]
@@ -7676,11 +7759,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_dumbbell",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]
@@ -7867,12 +7950,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "rotational_single_arm_press",
+     "movement_id": "external_rotation",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "external_rotation",
-     "reason": "same_stimulus"
+     "movement_id": "scarecrow",
+     "reason": "same_target"
     }
    ]
   },
@@ -7949,11 +8032,15 @@
     "exposures": 6
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -7972,7 +8059,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -8144,11 +8231,15 @@
     "exposures": 6
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [
      "back"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a reverse fly / face pull / rear-delt row: rear delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -8168,7 +8259,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -8274,9 +8365,13 @@
     "exposures": 6
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -8295,7 +8390,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -8314,15 +8409,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -8503,7 +8598,7 @@
    },
    "fallbacks": [
     {
-     "movement_id": "bird_dog",
+     "movement_id": "walking_hip_circles",
      "reason": "same_target"
     },
     {
@@ -8707,7 +8802,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -8722,11 +8817,15 @@
     "exposures": 6
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -8745,7 +8844,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -8982,15 +9081,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "squat_barbell",
+     "movement_id": "banded_overhead_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bulgarian_split_squat_dumbbell",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "banded_er_pause_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -9045,15 +9144,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
+     "movement_id": "single_db_press_outs",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "banded_prone_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "banded_er_step_outs",
      "reason": "same_target"
     }
    ]
@@ -9259,11 +9358,15 @@
     "exposures": 5
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [
      "back"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a band pull-apart: rear delts"
+    }
    },
    "family": "corrective",
    "length_bias": "not_applicable",
@@ -9282,7 +9385,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -9301,7 +9404,7 @@
    },
    "fallbacks": [
     {
-     "movement_id": "scarecrow",
+     "movement_id": "doorway_face_pulls",
      "reason": "same_stimulus"
     },
     {
@@ -9324,9 +9427,13 @@
     "exposures": 5
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a bent-over lateral raise is a reverse fly: rear delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -9345,7 +9452,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -9364,16 +9471,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "lateral_raise_dumbbell",
-     "reason": "same_stimulus"
+     "movement_id": "face_pull",
+     "reason": "same_target"
     },
     {
-     "movement_id": "lateral_raise_machine",
-     "reason": "same_stimulus"
+     "movement_id": "db_rear_delt_rows",
+     "reason": "same_target"
     },
     {
-     "movement_id": "bent_arm_lateral_raises",
-     "reason": "same_stimulus"
+     "movement_id": "chest_supported_reverse_fly_dumbbell",
+     "reason": "same_target"
     }
    ]
   },
@@ -9387,9 +9494,13 @@
     "exposures": 5
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an abduction row (elbows out and up): side delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -9408,7 +9519,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -9427,16 +9538,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "banded_row_ups",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "upright_row_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_rear_delt_rows",
-     "reason": "same_stimulus"
+     "movement_id": "lateral_raise_machine",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "side_lateral_raises",
+     "reason": "same_target"
     }
    ]
   },
@@ -9450,9 +9561,13 @@
     "exposures": 5
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a lateral raise: side delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -9471,7 +9586,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -9490,15 +9605,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "sword_raise",
+     "movement_id": "lateral_raise_machine",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "upright_row_barbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "side_lateral_raises",
      "reason": "same_target"
     }
    ]
@@ -9513,9 +9628,13 @@
     "exposures": 5
    },
    "target": {
-    "primary": "biceps",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "biceps",
+     "reason": "a carry (Hevy filed it under biceps): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "not_applicable",
@@ -9534,10 +9653,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "biceps",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
-     "rubric_score": 6,
+     "rubric_score": 7,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -9555,16 +9674,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "angels_and_devils",
-     "reason": "same_target"
+     "movement_id": "farmers_walk_8d414b80",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_stretch_curls",
-     "reason": "same_target"
+     "movement_id": "sandbag_carry",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "ez_bar_biceps_curl",
-     "reason": "same_target"
+     "movement_id": "farmers_walk",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -9708,9 +9827,13 @@
     "exposures": 5
    },
    "target": {
-    "primary": "triceps",
+    "primary": "back",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "triceps",
+     "reason": "a row (Hevy filed it under triceps): the back"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -9730,10 +9853,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "triceps",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 9,
+     "target": "back",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 10,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -9749,16 +9872,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "triceps_extension_cable",
-     "reason": "same_target"
+     "movement_id": "seated_cable_row_bar_grip",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_pushdown",
-     "reason": "same_target"
+     "movement_id": "t_bar_row",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "tricep_pushdown",
-     "reason": "same_target"
+     "movement_id": "bent_over_row_barbell",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -9772,9 +9895,13 @@
     "exposures": 5
    },
    "target": {
-    "primary": "chest",
+    "primary": "rear_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "chest",
+     "reason": "a face pull (Hevy filed it under chest): rear delts"
+    }
    },
    "family": "corrective",
    "length_bias": "not_applicable",
@@ -9793,7 +9920,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "chest",
+     "target": "rear_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -9812,16 +9939,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_ucv_raise",
-     "reason": "same_target"
+     "movement_id": "band_pullaparts",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "prone_w_raise",
-     "reason": "same_target"
+     "movement_id": "chest_supported_reverse_fly_dumbbell",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "bench_press_barbell",
-     "reason": "same_target"
+     "movement_id": "rear_delt_reverse_fly_machine",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -10002,15 +10129,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "glute_ham_raise",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "banded_static_bridge_curls",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "physio_ball_glute_ham_raise",
      "reason": "same_target"
     }
    ]
@@ -10402,15 +10529,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "landmine_power_twists",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "dead_arm_scap_rows",
      "reason": "same_target"
     },
     {
      "movement_id": "hanging_scap_pulls",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "scap_pulldowns",
      "reason": "same_target"
     }
    ]
@@ -10602,11 +10729,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "t_spine_rotations",
+     "movement_id": "angels_and_devils",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_scap_rows",
+     "movement_id": "t_spine_rotations",
      "reason": "same_target"
     }
    ]
@@ -10671,11 +10798,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     },
     {
-     "movement_id": "straight_leg_deadlift",
+     "movement_id": "single_leg_rdl_dumbbell",
      "reason": "same_target"
     }
    ]
@@ -10690,9 +10817,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "back",
+    "primary": "traps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a shrug / trap raise: traps, not the lats or the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -10711,7 +10842,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "traps",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -10730,15 +10861,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "rope_pulling",
+     "movement_id": "eccentric_trap_raises",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_urlachers",
+     "movement_id": "shrug_barbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "superman",
+     "movement_id": "shrug_dumbbell",
      "reason": "same_target"
     }
    ]
@@ -11077,9 +11208,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "chest",
+    "primary": "rear_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "chest",
+     "reason": "a prone UCV raise (Hevy filed it under chest): rear delts and lower traps"
+    }
    },
    "family": "corrective",
    "length_bias": "not_applicable",
@@ -11098,7 +11233,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "chest",
+     "target": "rear_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -11117,15 +11252,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "band_pullaparts",
+     "reason": "same_target"
+    },
+    {
      "movement_id": "doorway_face_pulls",
      "reason": "same_target"
     },
     {
      "movement_id": "prone_w_raise",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "bench_press_barbell",
      "reason": "same_target"
     }
    ]
@@ -11203,9 +11338,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "forearms",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a hang: grip, not the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -11224,7 +11363,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "forearms",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -11243,15 +11382,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
+     "movement_id": "overhand_reverse_barbell_wiring_out",
      "reason": "same_target"
     },
     {
-     "movement_id": "sword_raise",
+     "movement_id": "switch_grip_barbell_wiring_out",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "underhand_barbell_wiring_out",
      "reason": "same_target"
     }
    ]
@@ -11310,11 +11449,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "double_swings",
+     "movement_id": "jane_fondas",
      "reason": "same_target"
     },
     {
-     "movement_id": "hip_buck",
+     "movement_id": "double_swings",
      "reason": "same_target"
     }
    ]
@@ -11394,9 +11533,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "full_body",
     "secondary": [],
-    "region": "lower"
+    "region": "full_body",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a hip-mobility hurdle drill: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -11415,7 +11558,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -11434,15 +11577,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "db_shot_put",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "kettlebell_thrusters",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "landmine_pivot_press",
      "reason": "same_target"
     }
    ]
@@ -11457,9 +11600,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "triceps",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "triceps",
+     "reason": "an inchworm is a mobility flow (Hevy filed it under triceps): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "corrective",
    "length_bias": "not_applicable",
@@ -11478,7 +11625,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "triceps",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -11497,15 +11644,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "triceps_pushdown",
+     "movement_id": "farmers_walk",
      "reason": "same_target"
     },
     {
-     "movement_id": "tricep_pushdown",
+     "movement_id": "db_gun_carries",
      "reason": "same_target"
     },
     {
-     "movement_id": "shoulder_pushdown",
+     "movement_id": "db_overhead_farmers_carry",
      "reason": "same_target"
     }
    ]
@@ -11520,9 +11667,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "glutes",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a side-lying leg raise: glute medius (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -11541,7 +11692,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "glutes",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -11560,15 +11711,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "cable_pull_through",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "double_db_frog_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "standing_banded_fondas",
      "reason": "same_target"
     }
    ]
@@ -11710,9 +11861,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "shoulders",
+     "reason": "lunge + reach (Hevy filed it under shoulders): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -11731,7 +11886,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "full_body",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -11750,16 +11905,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "kneeling_straight_arm_pulldown",
-     "reason": "same_target"
+     "movement_id": "cable_squat_to_standing_row",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "lateral_raise_cable_single_arm",
-     "reason": "same_target"
+     "movement_id": "reverse_lunge_curls",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "face_pull",
-     "reason": "same_target"
+     "movement_id": "landmine_squat_and_press",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -11773,9 +11928,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -11794,7 +11953,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -11813,15 +11972,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "sword_raise",
+     "movement_id": "push_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "rotational_single_arm_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "z_press",
      "reason": "same_target"
     }
    ]
@@ -11880,15 +12039,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_cossack_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_bench_front_squats",
+     "movement_id": "alternating_db_curtsy_lunges",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "hip_band_ladder",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "walking_hip_circles",
      "reason": "same_target"
     }
    ]
@@ -11903,9 +12062,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "chest",
+    "primary": "rear_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "chest",
+     "reason": "a prone W raise (Hevy filed it under chest): rear delts and the cuff"
+    }
    },
    "family": "corrective",
    "length_bias": "not_applicable",
@@ -11924,7 +12087,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "chest",
+     "target": "rear_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -11943,15 +12106,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "band_pullaparts",
+     "reason": "same_target"
+    },
+    {
      "movement_id": "doorway_face_pulls",
      "reason": "same_target"
     },
     {
      "movement_id": "db_ucv_raise",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "bench_press_barbell",
      "reason": "same_target"
     }
    ]
@@ -12033,11 +12196,15 @@
     "exposures": 4
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [
      "back"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a reverse fly / face pull / rear-delt row: rear delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -12056,7 +12223,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -12079,11 +12246,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "scarecrow",
+     "movement_id": "chest_supported_reverse_fly_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "chest_supported_reverse_fly_dumbbell",
+     "movement_id": "band_pullaparts",
      "reason": "same_stimulus"
     }
    ]
@@ -12161,11 +12328,15 @@
     "exposures": 4
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -12184,7 +12355,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -12270,11 +12441,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "banded_prone_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "banded_er_step_outs",
      "reason": "same_target"
     }
    ]
@@ -12354,9 +12525,13 @@
     "exposures": 4
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -12375,7 +12550,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -12398,11 +12573,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "step_up",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "banded_overhead_squats",
      "reason": "same_target"
     }
    ]
@@ -12468,7 +12643,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_trap_raises_retreats",
+     "movement_id": "banded_retractions",
      "reason": "same_target"
     }
    ]
@@ -12531,7 +12706,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "shoulder_pushdown",
+     "movement_id": "triceps_rope_pushdown",
      "reason": "same_stimulus"
     }
    ]
@@ -12594,7 +12769,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "shoulder_pushdown",
+     "movement_id": "triceps_rope_pushdown",
      "reason": "same_stimulus"
     }
    ]
@@ -12660,7 +12835,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -12675,9 +12850,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -12696,7 +12875,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -12719,11 +12898,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "step_up",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leaning_step_ups",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -12778,15 +12957,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "sword_raise",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "single_db_press_outs",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "db_over_and_backs",
      "reason": "same_target"
     }
    ]
@@ -12994,9 +13173,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "forearms",
+    "primary": "biceps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "forearms",
+     "reason": "a hammer curl (Hevy filed it under forearms): the elbow flexors"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -13015,7 +13198,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "forearms",
+     "target": "biceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -13034,15 +13217,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "forearm_curl",
+     "movement_id": "21s",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "no_money_zottman_curls",
+     "movement_id": "3d_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_wrist_curl",
+     "movement_id": "banded_curls",
      "reason": "same_stimulus"
     }
    ]
@@ -13057,9 +13240,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a side lunge: quads and adductors lead (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -13078,7 +13265,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -13097,15 +13284,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -13120,9 +13307,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "glutes",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "glutes",
+     "reason": "a front squat (Hevy filed it under glutes): the quads lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -13141,7 +13332,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "glutes",
+     "target": "quadriceps",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -13160,16 +13351,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_hyperextension",
-     "reason": "same_target"
+     "movement_id": "zercher_squat",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "deadlift_barbell",
-     "reason": "same_target"
+     "movement_id": "reverse_lunge_barbell",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -13183,9 +13374,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -13204,7 +13399,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -13223,15 +13418,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "step_up",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "banded_overhead_squats",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "banded_er_pause_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "leaning_speed_step_ups",
      "reason": "same_stimulus"
     }
    ]
@@ -13294,8 +13489,8 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "rotational_single_arm_press",
-     "reason": "same_stimulus"
+     "movement_id": "scarecrow",
+     "reason": "same_target"
     }
    ]
   },
@@ -13373,9 +13568,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "other",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "full_body"
+    "region": "upper",
+    "audit": {
+     "from": "other",
+     "reason": "a push press (Hevy filed it under other): front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -13394,10 +13593,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "other",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
-     "rubric_score": 7,
+     "rubric_score": 6,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -13413,16 +13612,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cable_pull_through",
-     "reason": "same_family"
+     "movement_id": "push_press",
+     "reason": "same_target"
     },
     {
-     "movement_id": "torso_rotation",
-     "reason": "same_family"
+     "movement_id": "rotational_single_arm_press",
+     "reason": "same_target"
     },
     {
-     "movement_id": "rope_pulling",
-     "reason": "same_family"
+     "movement_id": "z_press",
+     "reason": "same_target"
     }
    ]
   },
@@ -13436,9 +13635,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -13457,7 +13660,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -13476,15 +13679,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "sword_raise",
+     "movement_id": "push_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "rotational_single_arm_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "z_press",
      "reason": "same_target"
     }
    ]
@@ -13801,12 +14004,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "rotational_single_arm_press",
+     "movement_id": "rotator_cuff_external_rotation",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "rotator_cuff_external_rotation",
-     "reason": "same_stimulus"
+     "movement_id": "scarecrow",
+     "reason": "same_target"
     }
    ]
   },
@@ -13820,9 +14023,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "abs",
+    "primary": "full_body",
     "secondary": [],
-    "region": "cardio"
+    "region": "full_body",
+    "audit": {
+     "from": "abs",
+     "reason": "a farmer's carry trains grip, traps and trunk (Hevy filed it under abs): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "not_applicable",
@@ -13841,7 +14048,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "abs",
+     "target": "full_body",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 2,
@@ -13864,11 +14071,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "suitcase_carry",
+     "movement_id": "db_gun_carries",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kettlebell_suitcase_carry",
+     "movement_id": "db_overhead_farmers_carry",
      "reason": "same_stimulus"
     }
    ]
@@ -13991,15 +14198,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "leg_swings",
      "reason": "same_target"
     },
     {
      "movement_id": "nsfw",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "banded_static_bridge_curls",
      "reason": "same_target"
     }
    ]
@@ -14128,7 +14335,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -14407,9 +14614,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -14429,7 +14640,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -14537,9 +14748,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -14558,7 +14773,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -14577,15 +14792,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -14600,9 +14815,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a step-up: the quads lead; Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -14622,7 +14841,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -14711,11 +14930,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_squat_and_press",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_barbell",
+     "movement_id": "bulgarian_split_squat_dumbbell",
      "reason": "same_stimulus"
     }
    ]
@@ -14906,15 +15125,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "ring_inverted_rows",
-     "reason": "same_stimulus"
+     "movement_id": "bench_press_barbell",
+     "reason": "same_target"
     },
     {
-     "movement_id": "high_cable_row",
-     "reason": "same_stimulus"
+     "movement_id": "incline_bench_press_dumbbell",
+     "reason": "same_target"
     },
     {
-     "movement_id": "doorway_face_pulls",
+     "movement_id": "cable_fly_crossovers",
      "reason": "same_target"
     }
    ]
@@ -14992,12 +15211,16 @@
     "exposures": 3
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps",
      "quadriceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -15016,7 +15239,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -15039,11 +15262,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "sword_raise",
+     "movement_id": "modified_db_bradford_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "db_push_press",
      "reason": "same_target"
     }
    ]
@@ -15301,15 +15524,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_hip_circles",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "walking_reverse_lunge_and_twist",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "seated_leg_curl",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "lying_leg_curl_machine",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -15324,9 +15547,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "traps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a shrug / trap raise: traps, not the lats or the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -15345,10 +15572,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "traps",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
+     "rubric_score": 9,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -15364,16 +15591,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_haney_shrugs",
+     "movement_id": "shrug_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "face_pull",
-     "reason": "same_target"
+     "movement_id": "shrug_machine",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "lateral_raise_machine",
-     "reason": "same_target"
+     "movement_id": "shrug_dumbbell",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -15387,9 +15614,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -15408,7 +15639,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -15516,9 +15747,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "back",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a lateral raise (Hevy filed it under back): side delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -15537,7 +15772,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "side_delts",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 10,
@@ -15556,16 +15791,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "shrug_barbell",
-     "reason": "same_target"
+     "movement_id": "lateral_raise_dumbbell",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "shrug_dumbbell",
-     "reason": "same_target"
+     "movement_id": "bent_arm_lateral_raises",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "row_and_kickback",
-     "reason": "same_target"
+     "movement_id": "lateral_raise_cable_single_arm",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -15622,15 +15857,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "bulgarian_split_squat_jump",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_step_up",
+     "movement_id": "hang_clean_and_lunge_complex",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "3_way_lunge",
+     "movement_id": "landmine_jump_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -15759,7 +15994,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "double_swings",
+     "movement_id": "jane_fondas",
      "reason": "same_target"
     }
    ]
@@ -15837,9 +16072,13 @@
     "exposures": 3
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -15858,7 +16097,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -15877,15 +16116,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -16007,16 +16246,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "farmers_walk_8d414b80",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "sandbag_carry",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "kettlebell_suitcase_carry",
      "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bridge_and_reach_over",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "plank",
+     "reason": "same_target"
     }
    ],
    "curation_note": "logged with a dumbbell or a kettlebell; the kettlebell form is `kettlebell_suitcase_carry`"
@@ -16073,15 +16312,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "db_step_up",
+     "reason": "same_target"
+    },
+    {
      "movement_id": "step_up",
      "reason": "same_target"
     },
     {
-     "movement_id": "hip_drops",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "squat_barbell",
+     "movement_id": "sprinter_switches",
      "reason": "same_target"
     }
    ]
@@ -16207,7 +16446,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -16541,9 +16780,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -16562,7 +16805,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -16604,9 +16847,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "glutes",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a clamshell: glute medius (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -16625,7 +16872,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "glutes",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -16644,15 +16891,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "cable_pull_through",
      "reason": "same_target"
     },
     {
-     "movement_id": "leg_swings",
+     "movement_id": "double_db_frog_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "nsfw",
+     "movement_id": "jane_fondas",
      "reason": "same_target"
     }
    ]
@@ -16730,9 +16977,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -16751,7 +17002,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -16774,11 +17025,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "step_up",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leaning_step_ups",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -16833,15 +17084,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "sword_raise",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "single_db_press_outs",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "db_over_and_backs",
      "reason": "same_target"
     }
    ]
@@ -16959,16 +17210,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_abduction_rows",
-     "reason": "same_stimulus"
+     "movement_id": "scarecrow",
+     "reason": "same_target"
     },
     {
-     "movement_id": "upright_row_barbell",
-     "reason": "same_stimulus"
+     "movement_id": "er_wall_slides",
+     "reason": "same_target"
     },
     {
-     "movement_id": "db_rear_delt_rows",
-     "reason": "same_stimulus"
+     "movement_id": "rotator_cuff_external_rotation",
+     "reason": "same_target"
     }
    ]
   },
@@ -16982,9 +17233,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "abs",
+    "primary": "hamstrings",
     "secondary": [],
-    "region": "core"
+    "region": "lower",
+    "audit": {
+     "from": "abs",
+     "reason": "a bridge leg curl (Hevy filed it under abs): the hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -17003,7 +17258,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "abs",
+     "target": "hamstrings",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -17026,12 +17281,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_bridge_curls",
+     "movement_id": "single_leg_slick_floor_bridge_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "side_bend_dumbbell",
-     "reason": "same_target"
+     "movement_id": "banded_bridge_curls",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -17108,12 +17363,16 @@
     "exposures": 2
    },
    "target": {
-    "primary": "glutes",
+    "primary": "abs",
     "secondary": [
      "hamstrings",
      "shoulders"
     ],
-    "region": "lower"
+    "region": "core",
+    "audit": {
+     "from": "glutes",
+     "reason": "a bird dog is an anti-rotation core drill (Hevy filed it under glutes)"
+    }
    },
    "family": "core_anti_movement",
    "length_bias": "not_applicable",
@@ -17132,7 +17391,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "glutes",
+     "target": "abs",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -17153,16 +17412,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "hip_band_ladder",
-     "reason": "same_target"
+     "movement_id": "cable_pallof_press",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "deadlift_barbell",
-     "reason": "same_target"
+     "movement_id": "ab_wheel",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_kickback_machine",
-     "reason": "same_target"
+     "movement_id": "pallof_press",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -17290,7 +17549,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -17505,9 +17764,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "back",
+    "primary": "chest",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a low-to-high cable crossover is a fly (Hevy filed it under back): the chest"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -17526,10 +17789,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "chest",
      "tier": "S",
      "rubric_tier": "S",
-     "rubric_score": 12,
+     "rubric_score": 13,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -17545,16 +17808,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "lat_pulldown_cable",
-     "reason": "same_target"
+     "movement_id": "incline_chest_fly_dumbbell",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "lat_pulldown_close_grip_cable",
-     "reason": "same_target"
+     "movement_id": "chest_fly_dumbbell",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "pullover_dumbbell",
-     "reason": "same_target"
+     "movement_id": "db_floor_flyes",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -17568,9 +17831,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a front raise: front delts"
+    }
    },
    "family": "corrective",
    "length_bias": "not_applicable",
@@ -17589,7 +17856,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -17608,15 +17875,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "scarecrow",
+     "movement_id": "shoulder_press_dumbbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "er_wall_slides",
+     "movement_id": "front_raise_dumbbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "rotator_cuff_external_rotation",
+     "movement_id": "military_press",
      "reason": "same_target"
     }
    ]
@@ -17744,15 +18011,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_hip_circles",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "walking_reverse_lunge_and_twist",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "seated_leg_curl",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "lying_leg_curl_machine",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -17767,9 +18034,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "traps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a shrug / trap raise: traps, not the lats or the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -17788,10 +18059,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
-     "tier": "C",
-     "rubric_tier": "C",
-     "rubric_score": 7,
+     "target": "traps",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 8,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -17807,16 +18078,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "seated_shrugs",
+     "movement_id": "shrug_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "face_pull",
-     "reason": "same_target"
+     "movement_id": "shrug_machine",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "lateral_raise_machine",
-     "reason": "same_target"
+     "movement_id": "shrug_dumbbell",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -17874,11 +18145,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "banded_prone_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "banded_er_step_outs",
      "reason": "same_target"
     }
    ]
@@ -17957,9 +18228,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -17978,7 +18253,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -17997,15 +18272,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "step_up",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "banded_overhead_squats",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "banded_er_pause_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "leaning_speed_step_ups",
      "reason": "same_stimulus"
     }
    ]
@@ -18020,9 +18295,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "calves",
+    "primary": "full_body",
     "secondary": [],
-    "region": "lower"
+    "region": "full_body",
+    "audit": {
+     "from": "calves",
+     "reason": "single-leg RDL + calf raise (Hevy filed it under calves): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -18041,7 +18320,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "calves",
+     "target": "full_body",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -18060,16 +18339,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "standing_calf_raise_machine",
-     "reason": "same_stimulus"
+     "movement_id": "bottomed_out_squat_reaches",
+     "reason": "same_target"
     },
     {
-     "movement_id": "calf_press_machine",
-     "reason": "same_stimulus"
+     "movement_id": "lunge_and_reach_bodyweight",
+     "reason": "same_target"
     },
     {
-     "movement_id": "standing_calf_raise_barbell",
-     "reason": "same_stimulus"
+     "movement_id": "cable_squat_to_standing_row",
+     "reason": "same_target"
     }
    ]
   },
@@ -18277,9 +18556,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -18298,7 +18581,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -18385,11 +18668,11 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cross_body_hammer_curls",
+     "movement_id": "dead_arm_hang",
      "reason": "same_target"
     },
     {
-     "movement_id": "alternating_side_kickthrough",
+     "movement_id": "dead_arm_switch_grip_hang",
      "reason": "same_target"
     },
     {
@@ -18540,9 +18823,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -18561,7 +18848,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -18580,15 +18867,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -18842,7 +19129,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -18969,15 +19256,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "angels_and_devils",
+     "reason": "same_target"
+    },
+    {
      "movement_id": "t_spine_rotations",
      "reason": "same_target"
     },
     {
      "movement_id": "dead_arm_scap_rows",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "scap_pulldowns",
      "reason": "same_target"
     }
    ]
@@ -19032,15 +19319,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "db_step_up",
+     "reason": "same_target"
+    },
+    {
      "movement_id": "step_up",
      "reason": "same_target"
     },
     {
-     "movement_id": "wall_sit",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "squat_barbell",
+     "movement_id": "banded_overhead_squats",
      "reason": "same_target"
     }
    ]
@@ -19358,15 +19645,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "sword_raise",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "single_db_press_outs",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "banded_prone_press",
      "reason": "same_target"
     }
    ]
@@ -19581,9 +19868,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an L raise: side delts with the front delt"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -19602,7 +19893,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -19621,15 +19912,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "sword_raise",
+     "movement_id": "lateral_raise_machine",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "upright_row_barbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "side_lateral_raises",
      "reason": "same_target"
     }
    ]
@@ -19644,9 +19935,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a step-up: the quads lead; Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -19665,7 +19960,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 4,
@@ -19876,15 +20171,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "sword_raise",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "single_db_press_outs",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "banded_prone_press",
      "reason": "same_target"
     }
    ]
@@ -20006,15 +20301,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "leg_swings",
      "reason": "same_target"
     },
     {
      "movement_id": "nsfw",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "glute_ham_raise",
      "reason": "same_target"
     }
    ]
@@ -20161,9 +20456,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -20182,7 +20481,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -20205,11 +20504,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "step_up",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "banded_overhead_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -20408,15 +20707,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_hip_circles",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "walking_reverse_lunge_and_twist",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "seated_leg_curl",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "lying_leg_curl_machine",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -20431,11 +20730,15 @@
     "exposures": 2
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [
      "back"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a reverse fly / face pull / rear-delt row: rear delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -20454,7 +20757,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -20481,7 +20784,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "scarecrow",
+     "movement_id": "band_pullaparts",
      "reason": "same_stimulus"
     }
    ]
@@ -20496,9 +20799,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "rear_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a reverse fly / face pull / rear-delt row: rear delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -20517,7 +20824,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "rear_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -20691,9 +20998,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "chest",
+    "primary": "back",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "chest",
+     "reason": "an inverted row (Hevy filed it under chest): the back"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -20713,7 +21024,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "chest",
+     "target": "back",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -20732,16 +21043,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "high_cable_row",
+     "movement_id": "dumbbell_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bench_press_barbell",
-     "reason": "same_target"
+     "movement_id": "seated_cable_row_bar_grip",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_bench_press_barbell",
-     "reason": "same_target"
+     "movement_id": "t_bar_row",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -20952,9 +21263,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a side lunge: quads and adductors lead (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -20973,7 +21288,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -20992,15 +21307,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -21055,15 +21370,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "glute_ham_raise",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "banded_static_bridge_curls",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "physio_ball_glute_ham_raise",
      "reason": "same_target"
     }
    ]
@@ -21078,9 +21393,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a wall sit: the quads (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -21099,7 +21418,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 4,
@@ -21122,11 +21441,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "step_up",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "banded_overhead_squats",
      "reason": "same_target"
     }
    ]
@@ -21255,7 +21574,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -21334,9 +21653,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "abs",
+    "primary": "hamstrings",
     "secondary": [],
-    "region": "core"
+    "region": "lower",
+    "audit": {
+     "from": "abs",
+     "reason": "a bridge leg curl (Hevy filed it under abs): the hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -21355,7 +21678,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "abs",
+     "target": "hamstrings",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -21382,8 +21705,8 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "side_bend_dumbbell",
-     "reason": "same_target"
+     "movement_id": "single_leg_slick_floor_bridge_curl",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -21397,9 +21720,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -21418,7 +21745,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -21437,15 +21764,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "squat_barbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bulgarian_split_squat_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "db_alt_reverse_sprinter_lunges",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "3_way_lunge",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_reverse_lunge",
      "reason": "same_stimulus"
     }
    ]
@@ -21577,7 +21904,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -21635,15 +21962,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "doorway_face_pulls",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "db_ucv_raise",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "bench_press_barbell",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "incline_bench_press_dumbbell",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "cable_fly_crossovers",
      "reason": "same_target"
     }
    ]
@@ -21772,7 +22099,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -21850,9 +22177,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -21871,7 +22202,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -21890,15 +22221,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -22236,9 +22567,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "glutes",
     "secondary": [],
-    "region": "cardio"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a hip-circle walk: the glutes (Hevy filed it under hamstrings)"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "not_applicable",
@@ -22257,7 +22592,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "glutes",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -22276,15 +22611,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "seated_leg_curl",
+     "movement_id": "hip_band_ladder",
      "reason": "same_target"
     },
     {
-     "movement_id": "lying_leg_curl_machine",
+     "movement_id": "deadlift_barbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "glute_kickback_machine",
      "reason": "same_target"
     }
    ]
@@ -22365,9 +22700,13 @@
     "exposures": 2
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "full_body",
     "secondary": [],
-    "region": "cardio"
+    "region": "full_body",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "lunge + trunk rotation: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "not_applicable",
@@ -22386,7 +22725,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "full_body",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -22405,15 +22744,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "cable_squat_to_standing_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_step_up",
+     "movement_id": "reverse_lunge_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "3_way_lunge",
+     "movement_id": "landmine_squat_and_press",
      "reason": "same_stimulus"
     }
    ]
@@ -23013,9 +23352,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "glutes",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a curtsy lunge: the glutes (medius) lead (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -23034,7 +23377,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "glutes",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -23053,16 +23396,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
+     "movement_id": "reverse_hyperextension",
+     "reason": "same_target"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
-     "reason": "same_stimulus"
+     "movement_id": "deadlift_barbell",
+     "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
-     "reason": "same_stimulus"
+     "movement_id": "glute_kickback_machine",
+     "reason": "same_target"
     }
    ]
   },
@@ -23076,9 +23419,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "forearms",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "forearms",
+     "reason": "an animal-flow kickthrough (Hevy filed it under forearms): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -23097,7 +23444,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "forearms",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -23116,15 +23463,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cross_body_hammer_curls",
+     "movement_id": "db_shot_put",
      "reason": "same_target"
     },
     {
-     "movement_id": "no_money_zottman_curls",
+     "movement_id": "kettlebell_thrusters",
      "reason": "same_target"
     },
     {
-     "movement_id": "overhand_reverse_barbell_wiring_out",
+     "movement_id": "landmine_pivot_press",
      "reason": "same_target"
     }
    ]
@@ -23195,7 +23542,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -23273,9 +23620,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "abs",
+    "primary": "hamstrings",
     "secondary": [],
-    "region": "core"
+    "region": "lower",
+    "audit": {
+     "from": "abs",
+     "reason": "a bridge leg curl (Hevy filed it under abs): the hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -23294,7 +23645,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "abs",
+     "target": "hamstrings",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -23317,12 +23668,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_static_bridge_curls",
+     "movement_id": "single_leg_slick_floor_bridge_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "side_bend_dumbbell",
-     "reason": "same_target"
+     "movement_id": "banded_static_bridge_curls",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -23336,9 +23687,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -23358,7 +23713,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -23377,15 +23732,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leaning_speed_step_ups",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -23918,9 +24273,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a lateral raise: side delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -23939,7 +24298,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -23962,7 +24321,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bent_over_lateral_raise",
+     "movement_id": "side_lateral_raises",
      "reason": "same_stimulus"
     },
     {
@@ -24220,11 +24579,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_dumbbell",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]
@@ -24348,15 +24707,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_reverse_lunge_and_twist",
+     "movement_id": "split_squat_jumps",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "hang_clean_and_lunge_complex",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_er_pause_squats",
+     "movement_id": "landmine_jump_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -24371,9 +24730,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -24392,7 +24755,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -24411,15 +24774,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -24497,9 +24860,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "triceps",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "triceps",
+     "reason": "squat + row (Hevy filed it under triceps): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -24518,10 +24885,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "triceps",
+     "target": "full_body",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 11,
+     "rubric_score": 10,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -24537,16 +24904,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "lying_db_tricep_extension",
-     "reason": "same_target"
+     "movement_id": "bottomed_out_squat_reaches",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_dip_assisted",
-     "reason": "same_target"
+     "movement_id": "lunge_and_reach_bodyweight",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "bench_dip",
-     "reason": "same_target"
+     "movement_id": "reverse_lunge_curls",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -24931,7 +25298,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_target"
     }
    ]
@@ -25072,9 +25439,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "biceps",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "biceps",
+     "reason": "curl + press (Hevy filed it under biceps): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -25093,10 +25464,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "biceps",
+     "target": "full_body",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
+     "rubric_score": 9,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -25112,16 +25483,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "ez_bar_biceps_curl",
+     "movement_id": "kettlebell_step_back_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_barbell",
-     "reason": "same_stimulus"
+     "movement_id": "landmine_squat_and_press",
+     "reason": "same_target"
     },
     {
-     "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
+     "movement_id": "bottomed_out_squat_reaches",
+     "reason": "same_target"
     }
    ]
   },
@@ -25135,9 +25506,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "adductors",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "an adductor slide: the adductors (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -25156,7 +25531,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "adductors",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -25175,16 +25550,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_swings",
-     "reason": "same_target"
+     "movement_id": "cable_pull_through",
+     "reason": "same_family"
     },
     {
-     "movement_id": "nsfw",
-     "reason": "same_target"
+     "movement_id": "torso_rotation",
+     "reason": "same_family"
     },
     {
-     "movement_id": "hurdle_over_unders",
-     "reason": "same_target"
+     "movement_id": "rope_pulling",
+     "reason": "same_family"
     }
    ]
   },
@@ -25305,11 +25680,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "double_swings",
+     "movement_id": "jane_fondas",
      "reason": "same_target"
     },
     {
-     "movement_id": "hip_buck",
+     "movement_id": "double_swings",
      "reason": "same_target"
     }
    ]
@@ -25368,11 +25743,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_trap_raises_retreats",
+     "movement_id": "superman",
      "reason": "same_target"
     },
     {
-     "movement_id": "superman",
+     "movement_id": "banded_retractions",
      "reason": "same_target"
     }
    ]
@@ -25387,9 +25762,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -25408,7 +25787,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -25427,15 +25806,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "step_up",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "banded_overhead_squats",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "banded_er_pause_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "leaning_speed_step_ups",
      "reason": "same_stimulus"
     }
    ]
@@ -25494,11 +25873,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "banded_prone_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "banded_er_step_outs",
      "reason": "same_target"
     }
    ]
@@ -25704,9 +26083,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead carry (Hevy filed it under shoulders): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "not_applicable",
@@ -25725,10 +26108,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
-     "rubric_score": 6,
+     "rubric_score": 7,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -25746,16 +26129,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "scarecrow",
-     "reason": "same_target"
+     "movement_id": "farmers_walk_8d414b80",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "er_wall_slides",
-     "reason": "same_target"
+     "movement_id": "sandbag_carry",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "rotator_cuff_external_rotation",
-     "reason": "same_target"
+     "movement_id": "farmers_walk",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -25832,9 +26215,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -25853,7 +26240,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -25872,15 +26259,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "sword_raise",
+     "movement_id": "push_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "rotational_single_arm_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_prone_press",
+     "movement_id": "z_press",
      "reason": "same_target"
     }
    ]
@@ -25895,9 +26282,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "other",
+    "primary": "full_body",
     "secondary": [],
-    "region": "full_body"
+    "region": "full_body",
+    "audit": {
+     "from": "other",
+     "reason": "a shot-put throw: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -25916,7 +26307,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "other",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -25935,16 +26326,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cable_pull_through",
-     "reason": "same_family"
+     "movement_id": "hurdle_over_unders",
+     "reason": "same_target"
     },
     {
-     "movement_id": "torso_rotation",
-     "reason": "same_family"
+     "movement_id": "alternating_side_kickthrough",
+     "reason": "same_target"
     },
     {
-     "movement_id": "rope_pulling",
-     "reason": "same_family"
+     "movement_id": "kettlebell_thrusters",
+     "reason": "same_target"
     }
    ]
   },
@@ -26021,9 +26412,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -26042,7 +26437,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 8,
@@ -26150,9 +26545,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a squat pattern: the quads lead; Hevy filed it under another muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -26171,7 +26570,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -26190,15 +26589,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -26345,9 +26744,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "back",
+    "primary": "forearms",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a hang: grip, not the back"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -26366,7 +26769,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "forearms",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -26385,15 +26788,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "rope_pulling",
+     "movement_id": "overhand_reverse_barbell_wiring_out",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_urlachers",
+     "movement_id": "switch_grip_barbell_wiring_out",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_trap_raises_retreats",
+     "movement_id": "underhand_barbell_wiring_out",
      "reason": "same_target"
     }
    ]
@@ -26518,15 +26921,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_hip_circles",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "walking_reverse_lunge_and_twist",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "seated_leg_curl",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "lying_leg_curl_machine",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -26541,9 +26944,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "other",
+    "primary": "chest",
     "secondary": [],
-    "region": "full_body"
+    "region": "upper",
+    "audit": {
+     "from": "other",
+     "reason": "a push-up (Hevy filed it under other): the chest"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -26562,7 +26969,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "other",
+     "target": "chest",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -26585,16 +26992,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "side_bend_dumbbell",
-     "reason": "same_family"
+     "movement_id": "incline_db_squeeze_press",
+     "reason": "same_target"
     },
     {
-     "movement_id": "cable_pull_through",
-     "reason": "same_family"
+     "movement_id": "floor_press_dumbbell",
+     "reason": "same_target"
     },
     {
-     "movement_id": "torso_rotation",
-     "reason": "same_family"
+     "movement_id": "alternate_db_press_neutral_grip",
+     "reason": "same_target"
     }
    ]
   },
@@ -26741,9 +27148,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -26762,7 +27173,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -26781,15 +27192,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -27036,15 +27447,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
+     "movement_id": "single_db_press_outs",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "banded_prone_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_hang",
+     "movement_id": "banded_er_step_outs",
      "reason": "same_target"
     }
    ]
@@ -27059,9 +27470,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "back",
+    "primary": "traps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a shrug / trap raise: traps, not the lats or the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -27080,7 +27495,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "traps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -27099,15 +27514,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "rope_pulling",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "banded_trap_raises_retreats",
      "reason": "same_target"
     },
     {
-     "movement_id": "superman",
+     "movement_id": "shrug_barbell",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "shrug_machine",
      "reason": "same_target"
     }
    ]
@@ -27122,9 +27537,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "abs",
     "secondary": [],
-    "region": "lower"
+    "region": "core",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a mountain climber: the core (Hevy filed it under hamstrings)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -27143,7 +27562,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "abs",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -27162,15 +27581,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "side_bend_dumbbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "torso_rotation",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "cable_twist_up_to_down",
      "reason": "same_target"
     }
    ]
@@ -27296,12 +27715,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cross_body_hammer_curls",
-     "reason": "same_stimulus"
+     "movement_id": "dead_arm_hang",
+     "reason": "same_target"
     },
     {
-     "movement_id": "no_money_zottman_curls",
-     "reason": "same_stimulus"
+     "movement_id": "dead_arm_switch_grip_hang",
+     "reason": "same_target"
     }
    ]
   },
@@ -27488,15 +27907,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "leg_swings",
      "reason": "same_target"
     },
     {
      "movement_id": "nsfw",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "glute_ham_raise",
      "reason": "same_target"
     }
    ]
@@ -27835,12 +28254,16 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "chest",
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a handstand push-up is an overhead press pattern: front delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -27859,7 +28282,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -27948,15 +28371,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_reverse_lunge_and_twist",
+     "movement_id": "split_squat_jumps",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "bulgarian_split_squat_jump",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_step_up",
+     "movement_id": "single_leg_squat_with_jump",
      "reason": "same_stimulus"
     }
    ]
@@ -28163,9 +28586,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "chest",
+    "primary": "back",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "chest",
+     "reason": "a row (Hevy filed it under chest): the back"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -28184,10 +28611,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "chest",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 10,
+     "target": "back",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 9,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -28203,16 +28630,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "ring_inverted_rows",
+     "movement_id": "dumbbell_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bench_press_barbell",
-     "reason": "same_target"
+     "movement_id": "t_bar_row",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_bench_press_barbell",
-     "reason": "same_target"
+     "movement_id": "bent_over_row_barbell",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -28482,9 +28909,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "glutes",
+    "primary": "abs",
     "secondary": [],
-    "region": "lower"
+    "region": "core",
+    "audit": {
+     "from": "glutes",
+     "reason": "a plank hold (Hevy filed it under glutes): the abs"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -28503,7 +28934,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "glutes",
+     "target": "abs",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -28522,15 +28953,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cable_pull_through",
+     "movement_id": "side_bend_dumbbell",
      "reason": "same_target"
     },
     {
-     "movement_id": "double_db_frog_press",
+     "movement_id": "torso_rotation",
      "reason": "same_target"
     },
     {
-     "movement_id": "standing_banded_fondas",
+     "movement_id": "cable_twist_up_to_down",
      "reason": "same_target"
     }
    ]
@@ -28545,9 +28976,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a front raise: front delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -28567,7 +29002,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -28586,15 +29021,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "face_pull",
+     "movement_id": "landmine_pushaway_presses",
      "reason": "same_target"
     },
     {
-     "movement_id": "lateral_raise_machine",
+     "movement_id": "military_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "upright_row_barbell",
+     "movement_id": "overhead_press_barbell",
      "reason": "same_target"
     }
    ]
@@ -29103,15 +29538,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_hip_circles",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "walking_reverse_lunge_and_twist",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "seated_leg_curl",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "lying_leg_curl_machine",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -29177,7 +29612,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -29255,9 +29690,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "full_body",
     "secondary": [],
-    "region": "lower"
+    "region": "full_body",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "lunge + curl (Hevy filed it under hamstrings): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -29276,7 +29715,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "full_body",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 10,
@@ -29295,15 +29734,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "single_leg_slick_floor_bridge_curl",
+     "movement_id": "curl_and_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "lying_leg_curl_machine",
+     "movement_id": "landmine_squat_and_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "prone_leg_curl",
+     "movement_id": "farmers_walk",
      "reason": "same_target"
     }
    ]
@@ -29318,9 +29757,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "shoulders",
+     "reason": "squat + press: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -29339,10 +29782,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
-     "rubric_score": 6,
+     "rubric_score": 7,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -29358,15 +29801,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
+     "movement_id": "hurdle_over_unders",
      "reason": "same_target"
     },
     {
-     "movement_id": "sword_raise",
+     "movement_id": "alternating_side_kickthrough",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "db_shot_put",
      "reason": "same_target"
     }
    ]
@@ -29444,9 +29887,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "back",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a straight-arm pulldown (Hevy filed it under shoulders): the lats"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -29465,10 +29912,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "back",
      "tier": "S",
      "rubric_tier": "S",
-     "rubric_score": 13,
+     "rubric_score": 12,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -29484,16 +29931,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "lunge_and_reach_bodyweight",
-     "reason": "same_target"
+     "movement_id": "lat_pulldown_cable",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "lateral_raise_dumbbell",
-     "reason": "same_target"
+     "movement_id": "lat_pulldown_close_grip_cable",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "shoulder_press_dumbbell",
-     "reason": "same_target"
+     "movement_id": "pullover_dumbbell",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -29555,7 +30002,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "shoulder_pushdown",
+     "movement_id": "triceps_rope_pushdown",
      "reason": "same_stimulus"
     }
    ]
@@ -29745,15 +30192,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_reverse_lunge_and_twist",
+     "movement_id": "split_squat_jumps",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "bulgarian_split_squat_jump",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_step_up",
+     "movement_id": "single_leg_squat_with_jump",
      "reason": "same_stimulus"
     }
    ]
@@ -29817,7 +30264,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "double_swings",
+     "movement_id": "jane_fondas",
      "reason": "same_target"
     }
    ]
@@ -29896,9 +30343,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "back",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "back",
+     "reason": "a rotational landmine press: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -29918,7 +30369,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -29937,15 +30388,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "rope_pulling",
+     "movement_id": "hurdle_over_unders",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_urlachers",
+     "movement_id": "alternating_side_kickthrough",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_trap_raises_retreats",
+     "movement_id": "db_shot_put",
      "reason": "same_target"
     }
    ]
@@ -29960,9 +30411,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "back",
+    "primary": "abs",
     "secondary": [],
-    "region": "upper"
+    "region": "core",
+    "audit": {
+     "from": "back",
+     "reason": "a rotational core movement (Hevy filed it under back)"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -29982,7 +30437,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "abs",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -30001,16 +30456,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "t_spine_rotations",
+     "movement_id": "side_bend_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "rope_pulling",
-     "reason": "same_target"
+     "movement_id": "torso_rotation",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_urlachers",
-     "reason": "same_target"
+     "movement_id": "russian_twist_bodyweight",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -30024,12 +30479,16 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "chest",
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -30049,7 +30508,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 10,
@@ -30091,9 +30550,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -30113,7 +30576,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -30132,15 +30595,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "face_pull",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "lateral_raise_dumbbell",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "front_raise_dumbbell",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "incline_db_front_raises",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "shoulder_press_dumbbell",
      "reason": "same_target"
     }
    ]
@@ -30266,15 +30729,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_reverse_lunge_and_twist",
+     "movement_id": "split_squat_jumps",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "bulgarian_split_squat_jump",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_step_up",
+     "movement_id": "single_leg_squat_with_jump",
      "reason": "same_stimulus"
     }
    ]
@@ -30289,9 +30752,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "full_body",
     "secondary": [],
-    "region": "lower"
+    "region": "full_body",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "squat + press: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -30311,7 +30778,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -30330,15 +30797,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "hurdle_over_unders",
      "reason": "same_target"
     },
     {
-     "movement_id": "leg_swings",
+     "movement_id": "alternating_side_kickthrough",
      "reason": "same_target"
     },
     {
-     "movement_id": "nsfw",
+     "movement_id": "db_shot_put",
      "reason": "same_target"
     }
    ]
@@ -30404,7 +30871,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -30529,11 +30996,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_dumbbell",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]
@@ -30925,7 +31392,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -30991,7 +31458,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -31069,9 +31536,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "forearms",
+    "primary": "biceps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "forearms",
+     "reason": "a Zottman curl (Hevy filed it under forearms): the elbow flexors"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -31090,7 +31561,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "forearms",
+     "target": "biceps",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -31109,15 +31580,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "forearm_curl",
+     "movement_id": "21s",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cross_body_hammer_curls",
+     "movement_id": "3d_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_wrist_curl",
+     "movement_id": "banded_curls",
      "reason": "same_stimulus"
     }
    ]
@@ -31132,9 +31603,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -31153,7 +31628,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 12,
@@ -31172,15 +31647,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -31369,15 +31844,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cross_body_hammer_curls",
+     "movement_id": "dead_arm_hang",
      "reason": "same_target"
     },
     {
-     "movement_id": "alternating_side_kickthrough",
+     "movement_id": "dead_arm_switch_grip_hang",
      "reason": "same_target"
     },
     {
-     "movement_id": "no_money_zottman_curls",
+     "movement_id": "db_wrist_curl",
      "reason": "same_target"
     }
    ]
@@ -31461,9 +31936,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -31482,7 +31961,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -31691,15 +32170,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "glute_ham_raise",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "banded_static_bridge_curls",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "physio_ball_glute_ham_raise",
      "reason": "same_target"
     }
    ]
@@ -31769,7 +32248,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -32024,15 +32503,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "doorway_face_pulls",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "db_ucv_raise",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "bench_press_barbell",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "incline_bench_press_dumbbell",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "cable_fly_crossovers",
      "reason": "same_target"
     }
    ]
@@ -32693,7 +33172,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -32708,9 +33187,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "biceps",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "biceps",
+     "reason": "lunge + curl (Hevy filed it under biceps): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -32729,10 +33212,10 @@
    ],
    "hypertrophy": [
     {
-     "target": "biceps",
+     "target": "full_body",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 10,
+     "rubric_score": 11,
      "evidence_confidence": "none_reviewed",
      "citations": [],
      "last_reviewed": "unreviewed"
@@ -32748,16 +33231,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "preacher_curl_barbell",
-     "reason": "same_target"
+     "movement_id": "bottomed_out_squat_reaches",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "behind_the_back_curl_cable",
-     "reason": "same_target"
+     "movement_id": "lunge_and_reach_bodyweight",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "ez_bar_biceps_curl",
-     "reason": "same_target"
+     "movement_id": "cable_squat_to_standing_row",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -32771,9 +33254,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -32792,7 +33279,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -32811,15 +33298,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bulgarian_split_squat_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "3_way_lunge",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_reverse_lunge",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]
@@ -32948,7 +33435,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -33074,11 +33561,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "t_spine_rotations",
+     "movement_id": "angels_and_devils",
      "reason": "same_target"
     },
     {
-     "movement_id": "dead_arm_scap_rows",
+     "movement_id": "t_spine_rotations",
      "reason": "same_target"
     }
    ]
@@ -33093,9 +33580,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -33114,7 +33605,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -33133,16 +33624,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "rotator_cuff_external_rotation",
-     "reason": "same_stimulus"
+     "movement_id": "arnold_press_dumbbell",
+     "reason": "same_target"
     },
     {
-     "movement_id": "db_external_rotation",
-     "reason": "same_stimulus"
+     "movement_id": "modified_db_bradford_press",
+     "reason": "same_target"
     },
     {
-     "movement_id": "external_rotation",
-     "reason": "same_stimulus"
+     "movement_id": "db_push_press",
+     "reason": "same_target"
     }
    ]
   },
@@ -33219,11 +33710,15 @@
     "exposures": 1
    },
    "target": {
-    "primary": "back",
+    "primary": "full_body",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "back",
+     "reason": "row + kickback: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -33242,7 +33737,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -33261,15 +33756,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "shrug_barbell",
+     "movement_id": "bottomed_out_squat_reaches",
      "reason": "same_target"
     },
     {
-     "movement_id": "side_lateral_raises",
+     "movement_id": "hurdle_over_unders",
      "reason": "same_target"
     },
     {
-     "movement_id": "shrug_machine",
+     "movement_id": "inchworms",
      "reason": "same_target"
     }
    ]
@@ -33410,9 +33905,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "abs",
+    "primary": "full_body",
     "secondary": [],
-    "region": "core"
+    "region": "full_body",
+    "audit": {
+     "from": "abs",
+     "reason": "a sandbag carry (Hevy filed it under abs): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "not_applicable",
@@ -33431,7 +33930,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "abs",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -33456,11 +33955,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "suitcase_carry",
+     "movement_id": "db_gun_carries",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kettlebell_suitcase_carry",
+     "movement_id": "db_overhead_farmers_carry",
      "reason": "same_stimulus"
     }
    ]
@@ -33475,9 +33974,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "other",
+    "primary": "full_body",
     "secondary": [],
-    "region": "full_body"
+    "region": "full_body",
+    "audit": {
+     "from": "other",
+     "reason": "a sandbag shouldering: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -33496,7 +33999,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "other",
+     "target": "full_body",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 2,
@@ -33515,16 +34018,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "side_bend_dumbbell",
-     "reason": "same_family"
+     "movement_id": "hurdle_over_unders",
+     "reason": "same_target"
     },
     {
-     "movement_id": "cable_pull_through",
-     "reason": "same_family"
+     "movement_id": "alternating_side_kickthrough",
+     "reason": "same_target"
     },
     {
-     "movement_id": "torso_rotation",
-     "reason": "same_family"
+     "movement_id": "db_shot_put",
+     "reason": "same_target"
     }
    ]
   },
@@ -33790,11 +34293,15 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -33814,7 +34321,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -33921,9 +34428,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "back",
+    "primary": "traps",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "back",
+     "reason": "a shrug / trap raise: traps, not the lats or the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "shortened",
@@ -33942,7 +34453,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "back",
+     "target": "traps",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 3,
@@ -33969,8 +34480,8 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "side_lateral_raises",
-     "reason": "same_target"
+     "movement_id": "seated_shrugs",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -34049,12 +34560,16 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "chest",
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -34074,7 +34589,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 10,
@@ -34116,9 +34631,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a lunge / split squat: the quads lead (glutes second); Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -34137,7 +34656,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
      "rubric_score": 11,
@@ -34156,15 +34675,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "split_squat_switches",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_front_rack",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -34282,16 +34801,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "kettlebell_step_back_curl",
+     "movement_id": "banded_static_bridge_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "lying_leg_curl_machine",
-     "reason": "same_target"
+     "movement_id": "banded_bridge_curls",
+     "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_leg_curl",
-     "reason": "same_target"
+     "movement_id": "slick_floor_bridge_hammer_curls",
+     "reason": "same_stimulus"
     }
    ]
   },
@@ -34348,15 +34867,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "walking_reverse_lunge_and_twist",
+     "movement_id": "split_squat_jumps",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "hang_clean_and_lunge_complex",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_er_pause_squats",
+     "movement_id": "landmine_jump_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -34434,9 +34953,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "full_body",
     "secondary": [],
-    "region": "lower"
+    "region": "full_body",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a balance drill: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -34455,7 +34978,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "full_body",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 4,
@@ -34474,15 +34997,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
+     "movement_id": "db_shot_put",
      "reason": "same_target"
     },
     {
-     "movement_id": "banded_overhead_squats",
+     "movement_id": "kettlebell_thrusters",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "landmine_pivot_press",
      "reason": "same_target"
     }
    ]
@@ -34548,7 +35071,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -34563,9 +35086,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "glutes",
+    "primary": "full_body",
     "secondary": [],
-    "region": "lower"
+    "region": "full_body",
+    "audit": {
+     "from": "glutes",
+     "reason": "a sledgehammer swing: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -34584,7 +35111,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "glutes",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -34603,16 +35130,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "deadlift_barbell",
-     "reason": "same_stimulus"
+     "movement_id": "db_shot_put",
+     "reason": "same_target"
     },
     {
-     "movement_id": "deadlift_trap_bar",
-     "reason": "same_stimulus"
+     "movement_id": "kettlebell_thrusters",
+     "reason": "same_target"
     },
     {
-     "movement_id": "deadlift_dumbbell",
-     "reason": "same_stimulus"
+     "movement_id": "landmine_pivot_press",
+     "reason": "same_target"
     }
    ]
   },
@@ -34755,9 +35282,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "chest",
+    "primary": "full_body",
     "secondary": [],
-    "region": "upper"
+    "region": "full_body",
+    "audit": {
+     "from": "chest",
+     "reason": "a crawl (Hevy filed it under chest): a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -34776,7 +35307,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "chest",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -34795,15 +35326,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "incline_db_squeeze_press",
+     "movement_id": "db_shot_put",
      "reason": "same_target"
     },
     {
-     "movement_id": "floor_press_dumbbell",
+     "movement_id": "kettlebell_thrusters",
      "reason": "same_target"
     },
     {
-     "movement_id": "alternate_db_press_neutral_grip",
+     "movement_id": "landmine_pivot_press",
      "reason": "same_target"
     }
    ]
@@ -34924,15 +35455,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_step_up",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "leg_swings",
      "reason": "same_target"
     },
     {
      "movement_id": "nsfw",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "banded_static_bridge_curls",
      "reason": "same_target"
     }
    ]
@@ -34947,9 +35478,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "hamstrings",
+    "primary": "quadriceps",
     "secondary": [],
-    "region": "lower"
+    "region": "lower",
+    "audit": {
+     "from": "hamstrings",
+     "reason": "a step-up: the quads lead; Hevy filed it under hamstrings"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -34968,7 +35503,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "hamstrings",
+     "target": "quadriceps",
      "tier": "D",
      "rubric_tier": "D",
      "rubric_score": 4,
@@ -35182,15 +35717,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cross_body_hammer_curls",
+     "movement_id": "dead_arm_hang",
      "reason": "same_target"
     },
     {
-     "movement_id": "alternating_side_kickthrough",
+     "movement_id": "dead_arm_switch_grip_hang",
      "reason": "same_target"
     },
     {
-     "movement_id": "no_money_zottman_curls",
+     "movement_id": "db_wrist_curl",
      "reason": "same_target"
     }
    ]
@@ -35205,9 +35740,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "back",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a thoracic-extension drill: the upper back, not the delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -35226,7 +35765,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "back",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -35245,15 +35784,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "arnold_press_dumbbell",
+     "movement_id": "rope_pulling",
      "reason": "same_target"
     },
     {
-     "movement_id": "sword_raise",
+     "movement_id": "db_urlachers",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "banded_retractions",
      "reason": "same_target"
     }
    ]
@@ -35268,9 +35807,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "other",
+    "primary": "full_body",
     "secondary": [],
-    "region": "full_body"
+    "region": "full_body",
+    "audit": {
+     "from": "other",
+     "reason": "squat + press: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -35289,7 +35832,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "other",
+     "target": "full_body",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 6,
@@ -35308,16 +35851,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "side_bend_dumbbell",
-     "reason": "same_family"
+     "movement_id": "hurdle_over_unders",
+     "reason": "same_target"
     },
     {
-     "movement_id": "cable_pull_through",
-     "reason": "same_family"
+     "movement_id": "alternating_side_kickthrough",
+     "reason": "same_target"
     },
     {
-     "movement_id": "torso_rotation",
-     "reason": "same_family"
+     "movement_id": "db_shot_put",
+     "reason": "same_target"
     }
    ]
   },
@@ -35445,7 +35988,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "shoulder_pushdown",
+     "movement_id": "triceps_extension_cable",
      "reason": "same_target"
     }
    ]
@@ -35690,15 +36233,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "cross_body_hammer_curls",
+     "movement_id": "dead_arm_hang",
      "reason": "same_target"
     },
     {
-     "movement_id": "alternating_side_kickthrough",
+     "movement_id": "dead_arm_switch_grip_hang",
      "reason": "same_target"
     },
     {
-     "movement_id": "no_money_zottman_curls",
+     "movement_id": "db_wrist_curl",
      "reason": "same_target"
     }
    ]
@@ -35827,7 +36370,7 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_target"
     }
    ]
@@ -35890,7 +36433,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -36031,9 +36574,13 @@
     "exposures": 1
    },
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -36052,7 +36599,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -36075,11 +36622,11 @@
      "reason": "same_target"
     },
     {
-     "movement_id": "sword_raise",
+     "movement_id": "modified_db_bradford_press",
      "reason": "same_target"
     },
     {
-     "movement_id": "db_cheat_laterals",
+     "movement_id": "db_push_press",
      "reason": "same_target"
     }
    ]
@@ -36257,7 +36804,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -36960,11 +37507,15 @@
    "source": "expansion",
    "template_id": "6433CD93",
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "an overhead / shoulder press: the front delts lead"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "mid",
@@ -36983,7 +37534,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 7,
@@ -37192,15 +37743,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "farmers_walk",
-     "reason": "same_target"
-    },
-    {
      "movement_id": "bridge_and_reach_over",
      "reason": "same_target"
     },
     {
      "movement_id": "plank",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "cable_pallof_press",
      "reason": "same_target"
     }
    ]
@@ -37210,12 +37761,16 @@
    "source": "expansion",
    "template_id": "983274DD",
    "target": {
-    "primary": "quadriceps",
+    "primary": "full_body",
     "secondary": [
      "shoulders",
      "glutes"
     ],
-    "region": "full_body"
+    "region": "full_body",
+    "audit": {
+     "from": "quadriceps",
+     "reason": "squat + press: a compound or conditioning movement: graded against no single muscle"
+    }
    },
    "family": "carry_conditioning",
    "length_bias": "mid",
@@ -37235,7 +37790,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "quadriceps",
+     "target": "full_body",
      "tier": "B",
      "rubric_tier": "B",
      "rubric_score": 9,
@@ -37256,15 +37811,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "bottomed_out_squat_reaches",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "linear_leg_press",
+     "movement_id": "lunge_and_reach_bodyweight",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_horizontal_machine",
+     "movement_id": "walking_reverse_lunge_and_twist",
      "reason": "same_stimulus"
     }
    ]
@@ -37571,7 +38126,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ]
@@ -37582,11 +38137,15 @@
    "template_id": "0EFE8162",
    "expansion_origin": "movement_catalog:pike_pushup",
    "target": {
-    "primary": "shoulders",
+    "primary": "front_delts",
     "secondary": [
      "triceps"
     ],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a pike push-up is an overhead press pattern: front delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "unknown",
@@ -37605,7 +38164,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "front_delts",
      "tier": "C",
      "rubric_tier": "C",
      "rubric_score": 5,
@@ -37813,12 +38372,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cross_body_hammer_curls",
-     "reason": "same_stimulus"
+     "movement_id": "dead_arm_hang",
+     "reason": "same_target"
     },
     {
-     "movement_id": "no_money_zottman_curls",
-     "reason": "same_stimulus"
+     "movement_id": "dead_arm_switch_grip_hang",
+     "reason": "same_target"
     }
    ]
   },
@@ -37827,9 +38386,13 @@
    "source": "expansion",
    "template_id": "DE68C825",
    "target": {
-    "primary": "shoulders",
+    "primary": "side_delts",
     "secondary": [],
-    "region": "upper"
+    "region": "upper",
+    "audit": {
+     "from": "shoulders",
+     "reason": "a lateral raise: side delts"
+    }
    },
    "family": "hypertrophy",
    "length_bias": "lengthened",
@@ -37848,7 +38411,7 @@
    ],
    "hypertrophy": [
     {
-     "target": "shoulders",
+     "target": "side_delts",
      "tier": "S",
      "rubric_tier": "S",
      "rubric_score": 13,
@@ -37875,7 +38438,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bent_over_lateral_raise",
+     "movement_id": "side_lateral_raises",
      "reason": "same_stimulus"
     }
    ]
@@ -38052,11 +38615,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_squat_and_press",
+     "movement_id": "squat_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_barbell",
+     "movement_id": "bulgarian_split_squat_dumbbell",
      "reason": "same_stimulus"
     }
    ]
@@ -38366,16 +38929,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "farmers_walk",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "farmers_walk_8d414b80",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "suitcase_carry",
      "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bridge_and_reach_over",
+     "reason": "same_target"
+    },
+    {
+     "movement_id": "plank",
+     "reason": "same_target"
     }
    ]
   },
@@ -38432,11 +38995,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_dumbbell",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ]

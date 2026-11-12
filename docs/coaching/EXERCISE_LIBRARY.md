@@ -17,6 +17,7 @@ records `inputs_snapshot.library_version`. Gate evaluation is #5772; note render
 | `config/exercise_library.json` | The PUBLIC library (built; committed). |
 | `deploy/build_exercise_library.py` | Builder: read-only Hevy history Query + `config/movement_catalog.json` + curation. Preserves `version` / `change_log` / `status`. |
 | `deploy/exercise_library_curation.py` | The hand-authored half: equipment vocabulary, verified citations and each row's evidence, gates, per-template overrides, expansion candidates. |
+| `deploy/exercise_library_targets.py` | The reviewed target-label audit (#5857): library key -> audited primary target + reason. |
 | `lambdas/training/quality_rubric.py` | The quality-tier rubric (#5857): weights, bands, the one-band evidence rule. Pure. |
 | `lambdas/training/exercise_library.py` | Loader, schema check, gate rules, fallbacks, swap-note classifier, private-overlay join (fail-closed), private gate check. |
 | `deploy/write_exercise_library_overlay.py` | Writer for the OWNER-PRIVATE overlay. Dry-run by default (counts only); `--out FILE`; `--apply` PUTs to S3. |
@@ -52,7 +53,7 @@ carry_conditioning | core_anti_movement | skill_athletic | corrective) · `lengt
 `evidence_confidence`, `evidence_adjustment` when a direct trial moved it, `citations`, `last_reviewed`) · `gates` ·
 `not_for_you_now` · `availability.home_gym` · `fallbacks` (ranked). Attributes a rule cannot know are `unknown`.
 
-## Quality tiers (#5857, rubric v1.0.0 — PROPOSED)
+## Quality tiers (#5857, rubric v1.0.1 — PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -68,7 +69,7 @@ same table as its `quality_rubric` block). Per (movement, target muscle), the su
 |---|---|---|
 | stretch (weighted highest) | `length_bias` | lengthened 5 · mid 3 · shortened 1 · unknown / not_applicable 0 |
 | stability (the target muscle is the limiter) | `stability` | high 3 · moderate 2 · low 1 · unknown 0 |
-| resistance profile (fit to the target's strength curve) | `resistance_profile` | single-joint upper-body targets (chest, shoulders, biceps, triceps, forearms): cable / selectorized machine 3 · plate-loaded machine / free weight 2 · band / bodyweight 1. Everything else: free weight / any machine 3 · cable 2 · band / bodyweight / sled 1. Unknown 0 |
+| resistance profile (fit to the target's strength curve) | `resistance_profile` | single-joint upper-body targets (chest, the delts — side, rear, front, or shoulders — biceps, triceps, forearms): cable / selectorized machine 3 · plate-loaded machine / free weight 2 · band / bodyweight 1. Everything else: free weight / any machine 3 · cable 2 · band / bodyweight / sled 1. Unknown 0 |
 | progressability (load steps, low skill) | `skill_complexity` + profile | skill low 2 · moderate 1 · high 0, +1 when the resistance loads in small external steps (free weight, cable, machine) |
 | joint stress (a penalty) | `joint_stress` | -2 per joint rated high, -1 once when any joint is rated moderate |
 
@@ -88,8 +89,26 @@ triceps extension +1 (Maeo 2023), the seated leg curl +1 and the lying leg curl 
 **Derived, never authored.** The builder writes `rubric_score`, `rubric_tier` and `tier` last, from the final
 attributes; `exercise_library.validate` re-derives every row, so a hand-edited tier is a schema error
 (`tests/test_quality_tiers_5857.py`, with its must-fail control). A muscle whose S band holds fewer than two selectable
-movements names why in `quality_rubric.TOP_BAND_SHORTFALL` (today: abs — no lengthened, externally loaded ab movement is
-recorded).
+movements names why in `quality_rubric.TOP_BAND_SHORTFALL` (today: abs, side delts, rear delts, front delts and glutes —
+each with the attribute reason; the guard reds a short muscle that is not named, and a stale entry).
+
+## Target-label audit (#5857, owner-approved on PR #5858)
+
+A movement's `target.primary` came through raw from Hevy's own muscle label, and the rubric grades a movement against that
+muscle — so a straight-arm pulldown was rated as a shoulder exercise, a high cable row as chest, every lunge as hamstrings
+and a squat-to-row as triceps. `deploy/exercise_library_targets.py` is the reviewed table (`TARGET_OVERRIDES`, library
+key -> audited primary + a one-line reason). The builder applies it after the rule derivation and the curation and before
+any tier is derived: the primary and region move, every hypertrophy row on the old primary moves with it (a sub-target
+row such as `triceps_long_head` stays), and the entry records `target.audit {from, reason}`. A key not in the library is
+a hard stop; `tests/test_target_audit_5857.py` holds the library to the table both ways and pins the table's size, so an
+override cannot vanish silently.
+
+Vocabulary beyond Hevy's muscles: `side_delts`, `rear_delts`, `front_delts` (a rotator-cuff or general shoulder drill stays
+`shoulders`); `traps` (shrugs, trap raises); `adductors`; and `full_body` — a compound or conditioning movement (a
+squat-to-row, a lunge-curl, a thruster, a carry), graded against no single muscle, so it never sits in a single-muscle
+tier and never matches a muscle slot. **Vocabulary gap:** the charter's volume landmarks still group the side and rear
+delts as one (`volume_priorities.sets_per_wk.side_rear_delts`, `block_model` maps it to `shoulders`) and have no front-delt
+or traps landmark; the split lives in the library only.
 
 **How selection reads it** (`selection_engine.rank_key`): quality tier first, then his N=1 fit, then variety (the
 movement this slot served least recently first, then not served by any slot in the lookback), with evidence confidence

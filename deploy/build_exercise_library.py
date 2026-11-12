@@ -55,6 +55,7 @@ sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(o
 
 import exercise_library_curation as cur  # noqa: E402
 import exercise_library_reviews as reviews  # noqa: E402
+import exercise_library_targets as targets  # noqa: E402
 from training import (
     exercise_library as lib_rules,  # noqa: E402
     quality_rubric,  # noqa: E402
@@ -95,15 +96,20 @@ BUILDER_CHANGE_LOG = [
         "skill_complexity and joint_stress; `evidence_confidence` (rct_direct | rct_characteristic | consensus | "
         "none_reviewed) is its own field, and a direct trial moves a row at most one band, recorded with its citation "
         "(`evidence_adjustment`). The A/B/C evidence grade and `evidence_quality` are retired. Attribute rules: a named "
-        "machine reads `machine_selectorized` (was `unknown`); the pec deck reads `lengthened` (was `unknown`).",
+        "machine reads `machine_selectorized` (was `unknown`); the pec deck reads `lengthened` (was `unknown`). Target-label audit (owner-approved on PR #5858): "
+        "Hevy's raw muscle label is replaced by the reviewed target for every row in deploy/exercise_library_targets.py, each "
+        "with its reason and recorded on the entry as `target.audit`; the shoulder splits into side_delts / rear_delts / "
+        "front_delts, shrugs move to traps, and compound or conditioning movements to full_body (no single-muscle tier).",
         "rule": "rubric weights are PROPOSED — owner to confirm; status stays proposed",
     }
 ]
 
 
 def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
-    """The header with every builder-owned change-log line present once and `version` at the highest line."""
-    log = list(head.get("change_log") or [])
+    """The header with every builder-owned change-log line present once (a line with the builder's version AND `by` is the
+    builder's own, so it is rewritten to the current text; any other line is never touched) and `version` at the highest."""
+    own = {(x["version"], x["by"]): x for x in BUILDER_CHANGE_LOG}
+    log = [dict(own.get((str(x.get("version")), str(x.get("by"))), x)) for x in head.get("change_log") or []]
     have = {str(x.get("version")) for x in log}
     log += [dict(x) for x in BUILDER_CHANGE_LOG if x["version"] not in have]
 
@@ -711,6 +717,22 @@ def _resolved_gates(movements: dict[str, dict[str, Any]], tid_to_key: dict[str, 
     return gates_out
 
 
+def apply_target_audit(movements: dict[str, dict[str, Any]], overrides: dict[str, tuple[str, str]] | None = None) -> None:
+    """The reviewed target-label audit (`deploy/exercise_library_targets.py`, #5857), in place: the audited primary and its
+    region, every hypertrophy row whose target was the old primary moved with it (a sub-target row is left alone), and
+    `target.audit` {from, reason} recorded. A key not in the library is a hard stop — an override never vanishes silently."""
+    table = targets.TARGET_OVERRIDES if overrides is None else overrides
+    missing = sorted(k for k in table if k not in movements)
+    if missing:
+        raise SystemExit(f"target audit: overrides for movements not in the library: {missing}")
+    for key, (primary, reason) in table.items():
+        e = movements[key]
+        old = str((e.get("target") or {}).get("primary") or "unknown")
+        region = _REGION.get(primary) or targets.AUDIT_REGIONS.get(primary, "full_body")
+        e["target"] = {**(e.get("target") or {}), "primary": primary, "region": region, "audit": {"from": old, "reason": reason}}
+        e["hypertrophy"] = [r | {"target": primary} if r.get("target") == old else r for r in e.get("hypertrophy") or []]
+
+
 def build_library(
     current: dict[str, Any] | None, history: dict[str, Any], catalog: dict[str, Any], aliases: dict[str, str]
 ) -> dict[str, Any]:
@@ -719,6 +741,7 @@ def build_library(
     no_template = _expansion_entries(entries, merged_into_history)
     movements, tid_to_key = _keyed_movements(entries, no_template)
     gates_out = _resolved_gates(movements, tid_to_key)
+    apply_target_audit(movements)  # #5857: Hevy's raw muscle label -> the reviewed target, before any tier is derived
     missing = reviews.apply_evidence_changes(movements, reviews.ledger_evidence_changes(_ledger()))
     if missing:
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")

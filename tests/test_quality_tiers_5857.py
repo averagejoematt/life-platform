@@ -41,7 +41,9 @@ SELECTABLE_EXCLUDED = ("skill_athletic", "strength_anchor")  # `selection_engine
 MAJOR_MUSCLES = {
     "chest": ("chest",),
     "back": ("back",),
-    "shoulders": ("shoulders",),
+    "side_delts": ("side_delts",),  # #5857 target audit: the shoulder split into its three heads
+    "rear_delts": ("rear_delts",),
+    "front_delts": ("front_delts",),
     "biceps": ("biceps",),
     "triceps": ("triceps",),
     "quadriceps": ("quadriceps",),
@@ -127,7 +129,14 @@ def test_the_builder_twice_over_the_same_inputs_writes_the_same_library(monkeypa
 
     monkeypatch.setattr(b, "_LEDGER", {"reviews": []})
     catalog = json.loads((REPO / "config" / "movement_catalog.json").read_text())
-    history = {"workouts": 0, "first": None, "last": "2026-11-11", "templates": {}}
+    # the history the committed library was built from, as the builder's summary shape (no AWS read)
+    hist = {e["template_id"]: e for e in MV.values() if e["source"] == "history"}
+    history = {
+        "workouts": LIB["_provenance"]["workouts"],
+        "first": LIB["_provenance"]["history_first"],
+        "last": LIB["_provenance"]["history_through"],
+        "templates": {tid: {**e["history"], "names": {e["title"]: e["history"]["exposures"]}} for tid, e in sorted(hist.items())},
+    }
     one = b.build_library(copy.deepcopy(LIB), history, catalog, {})
     two = b.build_library(copy.deepcopy(LIB), history, catalog, {})
     assert one == two and xl.validate(one) == []
