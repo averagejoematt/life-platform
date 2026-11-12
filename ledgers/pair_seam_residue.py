@@ -550,6 +550,13 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "2026-10-18",
         "reads resting_heart_rate_apple + date only; a writer rename degrades to an explicit 'unavailable', never a wrong value",
     ),
+    # get_advice_link_queue (2026-11-11): owner-facing CONTEXT only, never evidence. Reads `date`, `title`, `duration_sec`,
+    # `set_count`, `total_volume_kg` off per-workout rows (sk carries `#WORKOUT#`); every field is read with a default, so a
+    # writer rename shows a zero or a blank in a labelled context row and never reaches a stored record or a public surface.
+    "hevy::mcp/tools_advice_queue.py::read": (
+        "2026-11-11",
+        "context-only owner read of five per-workout fields, each defaulted; a writer drift degrades a context row, nothing is stored or published",
+    ),
     "hevy::mcp/tools_nutrition.py::read": (
         "2026-09-20",
         _HEVY_WORKED_SET_REASON,
