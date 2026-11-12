@@ -167,14 +167,22 @@ def mode(lib: dict[str, Any] | None) -> str:
 # ── the library <-> catalog join ─────────────────────────────────────────────
 def key_index(lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, dict[str, str]]:
     """`{"to_lib": catalog key -> library id, "to_cat": library id -> catalog key}` by Hevy template id (the catalog's
-    `hevy_template_id_hint`, the library's raw `template_id`). A library id that is itself a catalog key also joins."""
+    `hevy_template_id_hint`, the library's raw `template_id`). A library id that is itself a catalog key also joins. A
+    catalog entry with NO hint (resolved by title at commit, ADR-069 — `reverse_pec_deck`) joins the one library entry
+    whose title is the same, exactly (#5780: without it the incumbent of a slot had no library entry)."""
     by_tid: dict[str, str] = {}
+    by_title: dict[str, list[str]] = {}
     for k, e in xl.movements(lib).items():
         if e.get("template_id"):
             by_tid[str(e["template_id"]).upper()] = k
+        by_title.setdefault(str(e.get("title") or "").strip().lower(), []).append(k)
     to_lib: dict[str, str] = {}
     for ck, c in catalog.items():
-        lid = by_tid.get(str(c.get("hevy_template_id_hint") or "").upper()) or (ck if ck in xl.movements(lib) else None)
+        hint = str(c.get("hevy_template_id_hint") or "").upper()
+        same_title = by_title.get(str(c.get("title") or "").strip().lower()) or []
+        lid = by_tid.get(hint) or (ck if ck in xl.movements(lib) else None)
+        if not lid and not hint and str(c.get("title") or "").strip() and len(same_title) == 1:
+            lid = same_title[0]
         if lid:
             to_lib[ck] = lid
     to_cat: dict[str, str] = {}
