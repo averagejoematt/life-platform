@@ -297,8 +297,57 @@ PLAN_NEXT_SESSION_DESCRIPTION = (
     "OWNER OVERRIDE (#4076): if Matthew overrules one critic's veto, re-run stage 2 with "
     "veto_override={critic, owner_words} — his words verbatim; only that veto is lifted, every other "
     "critic's changes still apply, and the override is recorded on the routine and in the corrections ledger. "
-    "Never skip stage 2 to get past a veto."
+    "Never skip stage 2 to get past a veto. "
+    "DETAIL (#5803): detail='summary' returns a compact view (~15 KB against ~250-335 KB) — the session, every verdict, "
+    "the commit-binding status, tripwires and the lines to say — with `omitted` naming each key left out and how to "
+    "fetch it; detail='full' (the default) is the whole record."
 )
+
+# #5803: plan_next_session's input table, moved out of mcp/registry.py (the #1665 ceiling) beside its description.
+PLAN_NEXT_SESSION_INPUT = {
+    "type": "object",
+    "properties": {
+        "target_date": {"type": "string", "description": "Session date YYYY-MM-DD. Defaults to today (Pacific)."},
+        "routine_id": {
+            "type": "string",
+            "description": "Stage 2 (#3752): a drafted routine_id to red-team. Runs the four critics over disjoint evidence, applies their changes to the draft, stores the verdicts on it; a veto then blocks commit.",
+        },
+        "veto_override": {
+            "type": "object",
+            "description": (
+                "#4076, stage 2 only: Matthew overrules ONE vetoing critic. {critic: muscle_defense|joints_tendons|"
+                "rate_advocate|blueprint_historian, owner_words: his words VERBATIM, error_class?: corrections-ledger class}. "
+                "Only that critic's veto is marked overridden (recorded on the routine, in the Hevy notes and in the "
+                "corrections ledger); every other critic's changes still apply and any other veto still blocks."
+            ),
+            "properties": {
+                "critic": {"type": "string"},
+                "owner_words": {"type": "string"},
+                "error_class": {"type": "string"},
+            },
+        },
+        "dry_run": {
+            "type": "boolean",
+            "description": (
+                "#4076, stage 2 only: run the critics, the override and the changes exactly as a real run, but WRITE "
+                "NOTHING (no routine version or routine_index row, no coach thread row, no corrections-ledger row). "
+                "Every put it would make is returned under critics.would_write. Default false."
+            ),
+        },
+        "detail": {
+            "type": "string",
+            "enum": ["full", "summary"],
+            "description": (
+                "#5803: 'full' (default) is the whole result. 'summary' is the compact view a chat reads: the session, the "
+                "critics' verdicts (pass/veto + reasons), commit-binding status, tripwire states, the honesty and must_say "
+                "lines, week_commitments, calibration_due, training_phase, the steps walk, exercise_unlocks, the pre-draft "
+                "status and the deload recommendation, plus `omitted` naming every key left out and how to fetch it. Both "
+                "run the same tool: stage 2 still stores its FULL record, and commit binds to that, never to this view."
+            ),
+        },
+    },
+    "required": [],
+}
 
 GET_EXERCISE_HISTORY_DESCRIPTION = (
     "Every logged SET for one movement, across all time — the MEASURED record: date, load, reps, RPE, "
