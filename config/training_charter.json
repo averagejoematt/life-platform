@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.42.0",
+  "version": "1.44.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -285,8 +285,15 @@
     {
       "version": "1.42.0",
       "date": "2026-11-11",
-      "by": "owner ruling 2026-11-11 on #5797 (gate:owner): \"calibration sets ONLY on NON-BARBELL anchors (lat pulldown, one-arm DB row, machine press); the calibration set STOPS AT THE FIRST SLOW REP, NOT FAILURE\"; his standing no-grinding rule (2026-10-10) excludes barbell rep-outs",
-      "what": "Adds calibration.rpe, the RPE calibration set (#5797). On every third exposure (counted from 2026-11-11) of an eligible movement, the LAST back-off set (the last working set when the exposure has no back-offs; never the only working set) is a calibration set: before it he logs, in the Hevy set's RPE field, the RPE he predicts for the row's top rep; he then does reps until the first slow rep (rep speed visibly drops), never to failure, and logs the reps done. Predicted reps in reserve = 10 - that RPE; actual = reps done + rir_at_first_slow_rep - the row's top rep; the error is actual - predicted, reported per movement and pooled (n stated; descriptive under min_n). The RPE-adjusted e1RM (training.load_ramp) adds a movement's mean error to its RIR only once n >= min_n AND the interval excludes zero, recorded on hold.rpe_basis. Never on a barbell (equipment barbell is refused even if listed), a deload week, a red day, an OD1-capped exposure (1 to 3 after a layoff), a first session back, a lift with no PREVIOUS, or the tired-day floor variant. eligible, every_nth_exposure and the stop rule are the owner's; rir_at_first_slow_rep, min_n, interval_pct and min_working_sets are platform defaults, labelled, pending his ruling.",
+      "by": "#5796 (epic #5050); no new owner ruling: the new number is a platform default named as one, pending his ruling",
+      "what": "Adds progression.set_raise_proposal: a movement performed above its prescribed working sets in each of the last weeks_running (3) complete weeks becomes a PROPOSAL to raise its prescription, read by training.self_added_volume and carried on the plan's constraint block beside the ceiling-change proposal, with the weeks' prescribed and performed sets and the headroom under the volume_ceiling redline. It never changes a prescription; the owner approves.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.44.0",
+      "date": "2026-11-11",
+      "by": "owner ruling 2026-11-11 on #5797 (gate:owner): \"calibration sets ONLY on NON-BARBELL anchors (lat pulldown, one-arm DB row, machine press); the calibration set STOPS AT THE FIRST SLOW REP, NOT FAILURE\"; his standing no-grinding rule (2026-10-10) excludes barbell rep-outs; rir_at_first_slow_rep 2 confirmed by the owner 2026-11-11",
+      "what": "Adds calibration.rpe, the RPE calibration set (#5797). On every third exposure (counted from 2026-11-11) of an eligible movement, the LAST back-off set (the last working set when the exposure has no back-offs; never the only working set) is a calibration set: before it he logs, in the Hevy set's RPE field, the RPE he predicts for the row's top rep; he then does reps until the first slow rep (rep speed visibly drops), never to failure, and logs the reps done. Predicted reps in reserve = 10 - that RPE; actual = reps done + rir_at_first_slow_rep - the row's top rep; the error is actual - predicted, reported per movement and pooled (n stated; descriptive under min_n). The RPE-adjusted e1RM (training.load_ramp) adds a movement's mean error to its RIR only once n >= min_n AND the interval excludes zero, recorded on hold.rpe_basis. Never on a barbell (equipment barbell is refused even if listed), a deload week, a red day, an OD1-capped exposure (1 to 3 after a layoff), a first session back, a lift with no PREVIOUS, or the tired-day floor variant. eligible, every_nth_exposure, the stop rule and rir_at_first_slow_rep (owner-confirmed 2026-11-11) are the owner's; min_n, interval_pct and min_working_sets are platform defaults, labelled, pending his ruling.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -681,6 +688,12 @@
       "provenance": "owner",
       "stated": "2026-09-30",
       "ruling": "#4503 OD5"
+    },
+    "set_raise_proposal": {
+      "weeks_running": 3,
+      "when": "a movement's performed working sets exceed its prescribed working sets in each of the last weeks_running complete Mon-Sun weeks (training.self_added_volume, from adherence's stored per-movement counts)",
+      "effect": "proposes prescribing the fewest working sets he performed in any session of the run, with the headroom under the volume_ceiling redline; a proposal only, the owner approves it",
+      "provenance": "platform default (#5796), pending his ruling"
     },
     "self_raised_load": {
       "rule": "a load the owner raised himself, logged at or under the movement's effort ceiling (an overage within `effort_ceilings.overage_tolerance_rpe` is not a breach), becomes the next floor and is graded `progressed` — a named state, never folded into an adherence percentage",
@@ -1370,7 +1383,7 @@
         "the Minimum Viable Session (the tired-day floor variant)",
         "a note with no room for the line (deferred, recorded)"
       ],
-      "provenance": "eligible, every_nth_exposure, the stop rule and the barbell exclusion: owner ruling 2026-11-11 (#5797); rir_at_first_slow_rep, min_n, interval_pct, min_working_sets: platform defaults (min_n and interval_pct from TB-6 of the closed epic #4425), pending his ruling"
+      "provenance": "eligible, every_nth_exposure, the stop rule and the barbell exclusion: owner ruling 2026-11-11 (#5797); rir_at_first_slow_rep: owner-confirmed 2026-11-11; min_n, interval_pct, min_working_sets: platform defaults (min_n and interval_pct from TB-6 of the closed epic #4425), pending his ruling"
     }
   },
   "concession_ledger": {

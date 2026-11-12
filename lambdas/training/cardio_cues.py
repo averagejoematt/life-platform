@@ -109,6 +109,8 @@ def _plan_audit(hist: dict[str, Any], audits: list[dict[str, Any]], placed: list
         # #5505: the offers he missed this week and the ones dropped past the re-offer allowance (counted as done)
         "missed_kinds": hist["missed_kinds"],
         "dropped_kinds": hist["dropped_kinds"],
+        # #5796: swaps done with no effort logged — their own count, never conditioning and never a miss
+        "effort_not_logged_kinds": hist.get("effort_not_logged_kinds", []),
         # the gym cardio minutes this routine adds to the day's steps/movement goal (#5076 -> #5056)
         "movement_minutes": cardio_menu.movement_minutes(exercises),
     }

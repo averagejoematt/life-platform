@@ -54,6 +54,7 @@ from training import (  # noqa: E402
     cardio_progression as cp,
     exercise_history as eh,
 )
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 
 from mcp import tools_hevy_routine as t  # noqa: E402
 
@@ -213,7 +214,7 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     # the level is still DERIVED from the last ride (level 15, 19 Sep) — the "Last: …" sentence is not printed
     # (#5076: line 1's level is the placed kind's — a tempo rides one above — so the HELD level is the derivation)
     # #5428: line 1 is "Recumbent · L<n> · RPE …" (no minutes, no speed, no recovery answer); the held level is the audit's
-    assert bike.notes.startswith("Recumbent · L") and ir.inputs_snapshot["cardio_notes"][0]["hold_level"] == 15
+    assert _wc(bike.notes).startswith("Recumbent · L") and ir.inputs_snapshot["cardio_notes"][0]["hold_level"] == 15
     assert "Last:" not in bike.notes
     # the strength block is untouched by the cardio arm — it never reaches a barbell; the only clause on
     # the bench is #5049's warm-up movement cue (a 155 lb bench gets the climb), never on the cardio block
@@ -224,7 +225,14 @@ def test_a_chat_drafted_cycling_block_carries_the_SAME_note_the_cron_path_stamps
     # the cardio arm wrote nothing on it
     own = session_block.split(next(b for b in ir.exercises if b.movement_key == "barbell_bench_press").notes)[1].split("\n")
     # (its RPE 8–9 is the session line's: re-grade #3 prints it once, so line 1 here is the cue)
-    assert "RPE 8–9" not in own and own[-1] in ("Breathe out on the press.", cue_clause("bench") + " Breathe out on the press."), own
+    # #5817 (owner ruling 2026-11-11, #5779 D8): the barbell bench is an anchor, so its one sheet cue rides ahead of the
+    # press cue; the cue line is still the bench's own, from the strength composer, never the cardio arm's
+    from training.form_cue_sheets import anchor_note_cue
+
+    sheet = anchor_note_cue("barbell_bench_press")
+    press = "Breathe out on the press."
+    allowed = (press, f"{sheet} {press}", cue_clause("bench") + " " + press, cue_clause("bench") + f" {sheet} {press}")
+    assert "RPE 8–9" not in own and own[-1] in allowed and sheet in own[-1], own
     assert not [ln for ln in own if cn.LINE1_RE.match(ln)]
     assert CUE_MARKER not in bike.notes
     assert out["cardio_cues"] == 1
@@ -245,9 +253,9 @@ def test_a_chat_drafted_treadmill_block_gets_its_OWN_shape_not_the_bikes():
     # menu's band, so the walk starts at the band's floor incline at that speed
     # #5428: speed and grade prescribed (settings), `today` because his own logged walks differ; no HR on the wire
     # #5428 re-grade: the walk's 4–6 band is clipped to its talk words' row (full sentences = RPE 4–5, standard §3.7)
-    assert tread.notes.split("\n")[0] == "Treadmill · today 2.8 mph, 8% · RPE 4–5 (full sentences)"
+    assert _wc(tread.notes).split("\n")[0] == "Treadmill · today 2.8 mph, 8% · RPE 4–5 (full sentences)"
     assert "bpm" not in tread.notes and "HR" not in tread.notes
-    assert cn.LINE1_RE.match(tread.notes.split("\n")[0])
+    assert cn.LINE1_RE.match(_wc(tread.notes).split("\n")[0])
     assert "level" not in tread.notes.lower()  # no level exists in his treadmill notes; none may be implied
     assert out["cardio_cues"] == 1
 
@@ -264,7 +272,7 @@ def test_the_authors_own_note_is_replaced_by_the_prescription_and_kept_on_the_sn
         [{"movement_key": "cycling", "notes": "Level 10 flat, 40 min, hold 115-120 bpm", "sets": [{"duration_seconds": 2400}]}]
     )
     bike = ir.exercises[0]
-    assert bike.notes.startswith("Recumbent · L15 · RPE 4–5 (full sentences)")  # the author's "flat" stands: an easy block
+    assert _wc(bike.notes).startswith("Recumbent · L15 · RPE 4–5 (full sentences)")  # the author's "flat" stands: an easy block
     assert "hold 115-120 bpm" not in bike.notes
     rep = ir.inputs_snapshot["cardio_notes_replaced"]
     assert [(r["movement_key"], r["notes"]) for r in rep] == [("cycling", "Level 10 flat, 40 min, hold 115-120 bpm")]
@@ -301,7 +309,7 @@ def test_the_cue_is_on_the_PERSISTED_draft_because_that_is_what_commit_pushes():
                 "exercises": [{"movement_key": "cycling", "sets": [{"duration_seconds": 2700}]}],
             }
         )
-    assert persisted["notes"][0].startswith("Recumbent · L") and cn.LINE1_RE.match(persisted["notes"][0].split("\n")[0])
+    assert _wc(persisted["notes"][0]).startswith("Recumbent · L") and cn.LINE1_RE.match(_wc(persisted["notes"][0]).split("\n")[0])
 
 
 def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count():
@@ -322,7 +330,7 @@ def test_a_strength_only_chat_draft_reports_zero_rather_than_omitting_the_count(
         block, own = session_block.split(b.notes)
         # exercise 1's effort is the session line's when the bands match (re-grade #3: printed once)
         assert block == session_block.block_of(ir) and (
-            own.split("\n")[0].startswith("RPE ") or session_block.session_effort(block)
+            _wc(own).split("\n")[0].startswith("RPE ") or session_block.session_effort(block)
         ), b.notes
         assert not [ln for ln in own.split("\n") if cn.LINE1_RE.match(ln)]
 

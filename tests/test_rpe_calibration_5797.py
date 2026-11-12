@@ -76,6 +76,9 @@ def test_the_charter_lists_the_owners_non_barbell_anchors_and_no_barbell():
         assert cat[key]["equipment"] != "barbell", key
         assert rpe_calibration.eligible(key, cat[key])[0], key
     assert "barbell" in p["never_equipment"] and "no grinding" in p["standing_rule"]
+    # owner ruling 2026-11-11: the slow-rep reserve is his number; the statistics defaults stay labelled as the platform's
+    assert p["rir_at_first_slow_rep"] == 2 and "rir_at_first_slow_rep: owner-confirmed 2026-11-11" in p["provenance"]
+    assert "min_n, interval_pct, min_working_sets: platform defaults" in p["provenance"]
 
 
 def test_the_line_is_one_phone_line_never_says_failure_and_lints_clean():

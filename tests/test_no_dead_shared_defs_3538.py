@@ -93,14 +93,8 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
-    "lambdas/training/exercise_library.py:n1_view": (
-        "#5769 (owner requirement 2026-11-11): the selection-time join of the public exercise library with the owner-private overlay, fail-closed; the library is proposed and nothing in the drafting path may read it yet (tests/test_exercise_library_5769.py asserts that). Pinned by tests/test_exercise_library_5769.py. Delete this entry when the selection story (#5771/#5773) calls it."
-    ),
     "lambdas/common/goals_field_privacy.py:is_named": (
         "Owner ruling 2026-11-10 (6): the coverage guard's predicate - every config/user_goals.json field is named by the field review (tests/test_goals_field_privacy.py). Delete this entry if the guard moves into a script."
-    ),
-    "lambdas/common/narrative_annotations.py:annotated_words": (
-        "Owner ruling 2026-11-10 (4): the one serving path for an annotated CR2 read (words + dated correction), dark until the owner approves an annotation and the CR2 route is wired; pinned by tests/test_narrative_annotations.py. Delete this entry when the route calls it."
     ),
     "lambdas/coach/grade_corrections.py:apply_baseline_correction": (
         "Owner ruling 2026-11-09 (third, A): the one writer, called only by the owner-authorised, dry-run-by-default apply driver kept with its backup and plan off-repo (~/Documents/Claude/coaching-room-2026-11/writes_2026-11-09b/tools/apply_A.py); pinned by tests/test_baseline_corrections_and_families.py. Delete this entry when an in-repo caller lands."

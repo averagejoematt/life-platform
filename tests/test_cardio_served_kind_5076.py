@@ -37,6 +37,7 @@ sys.path.insert(0, str(REPO / "lambdas"))
 sys.path.insert(0, str(REPO))
 
 from training import cardio_menu as cm, exercise_history as eh, training_charter as tc  # noqa: E402
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
 from mcp.recovery_authoring import derive_training_context  # noqa: E402
@@ -196,7 +197,7 @@ def test_the_performed_tempo_counts_and_the_week_moves_to_its_intervals(monkeypa
     assert "cycling" in tc.charter_value("cardio_menu.blocks.intervals.machines")
     assert "treadmill" not in tc.charter_value("cardio_menu.blocks.intervals.machines")
     assert audit["off_default"]["charter"] == "cardio_menu.blocks.intervals.machines"
-    line1, line2 = block.notes.split("\n")[:2]
+    line1, line2 = _wc(block.notes).split("\n")[:2]
     # #5428: the dose is the easy/hard levels and the hard RPE (no bike speed); line 2 is the ride clock with every start
     assert re.match(r"^Recumbent · L\d+/L\d+ · hard RPE 8 \(a few words\)$", line1) and "mph" not in block.notes
     # (#5428 re-grade #6, 2026-11-08: the rep length comes first, then its level — `2 min at L13 from min 6, …`)
@@ -243,7 +244,7 @@ def test_a_shoulders_arms_day_on_fresh_legs_serves_the_incline_walk_with_its_dos
     lo, hi = cm.wire_band("incline_treadmill_walk")
     assert (lo, hi) == (4, 5) and tuple(tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.rpe")) == (4, 6)
     # #5428: speed + grade (settings), no minutes on line 1; `today` only when his own logged walks differ
-    line1 = block.notes.split("\n")[0]
+    line1 = _wc(block.notes).split("\n")[0]
     assert line1.removeprefix("Treadmill · ").removeprefix("today ") == f"{float(lo_s):.1f} mph, {lo_i:g}% · RPE {lo}–{hi} (full sentences)"
     assert [s.duration_seconds for s in block.sets] == [minutes * 60]
     assert audit["incline_pct"] == lo_i and audit["mph"] == lo_s

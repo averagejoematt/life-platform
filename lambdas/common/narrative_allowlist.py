@@ -36,8 +36,9 @@ from typing import Any, Iterator, NamedTuple, Optional
 
 from common import narrative_provenance as NP
 
-#: The CR2 publication switch for these words. OFF until the owner's CR2 GO (tests pin it off on main).
-CR2_PUBLIC = False
+#: The CR2 publication switch for these words. ON since the owner's CR2 GO (ruling 2026-11-11, second message, item 1);
+#: it opens nothing outside the CR2 scope, which only ``/api/coach_room_words`` enters.
+CR2_PUBLIC = True
 SCOPE_CR2 = "cr2"
 PRODUCER = "owner_allowlist.cr2_historical_2026-11-09"
 APPROVED_AT = "2026-11-09"
@@ -322,6 +323,30 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+PRODUCER_ANNOTATED = "owner_allowlist.cr2_annotated_2026-11-11"
+ANNOTATED_APPROVED_AT = "2026-11-11"
+
+
+def record_for_annotated(item: Any, pk: Any = None) -> Optional[dict]:
+    """The provenance record an owner-approved ANNOTATED read is published under — or None (withheld).
+
+    Only when ``narrative_annotations.annotated_words`` would serve the pair (CR2 on and in scope, an approved
+    annotation, the words byte-identical, nothing private named, the cited block public): the words then reach the
+    route, which serves them only WITH their dated correction. Never for a row that is also on ``APPROVED``."""
+    if not active() or not isinstance(item, dict) or NP.PROVENANCE_KEY in item:
+        return None
+    from common import narrative_annotations as NANN
+
+    if (str(item.get("pk", pk) or ""), str(item.get("sk") or "")) in INDEX:
+        return None
+    if NANN.annotated_words(item, pk) is None:
+        return None
+    from coach.lead_daily_read import provenance_for
+
+    families = list(provenance_for(item.get("cited") or [])["families"])
+    return {"v": NP.SCHEMA_VERSION, "families": families, "producer": PRODUCER_ANNOTATED, "stamped_at": ANNOTATED_APPROVED_AT}
+
+
 def record_for(item: Any, pk: Any = None) -> Optional[dict]:
     """The provenance record an approved, unchanged, unrecorded row is published under — or None (withheld)."""
     if not active() or not isinstance(item, dict) or NP.PROVENANCE_KEY in item:
@@ -365,8 +390,15 @@ def note_served(item: Any, pk: Any = None) -> None:
     """Record that the gate published ``item``'s approved words in this request (only an approved row, in scope)."""
     if not active() or not isinstance(item, dict):
         return
-    entry = INDEX.get((str(item.get("pk", pk) or ""), str(item.get("sk") or "")))
+    key = (str(item.get("pk", pk) or ""), str(item.get("sk") or ""))
+    entry = INDEX.get(key)
     if entry is None:
+        # an approved annotated read (served by the route only with its dated correction)
+        from common import narrative_annotations as NANN
+
+        a = NANN.INDEX.get(key)
+        if a is not None and a.owner_approved and NANN.annotated_words(item, pk) is not None:
+            _SERVED.add(a.text_sha256)
         return
     text = item.get(entry.field)
     if isinstance(text, str) and _sha(text) == entry.text_sha256:

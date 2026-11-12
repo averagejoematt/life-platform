@@ -55,6 +55,10 @@ MOBILITY_MAX_LINES = 2
 LINE_MAX_CHARS = 120  # no single line longer than three phone lines
 ROUTINE_TOTAL_MAX_CHARS = 1600
 CLOCK_MAX_LEVELS = 3
+# #5796 (owner ruling 2026-11-11): a drafted cardio note opens with this line, a prompt he overwrites with the effort he
+# rode at ("RPE 7"). Hevy's wire has an `rpe` slot on a duration set, but none of his timed sets has ever carried one, so the
+# note is where cardio effort is logged. Not counted in the cardio line or character budgets (an input field, not prose).
+CARDIO_RPE_CAPTURE_LINE = "RPE _"
 
 
 def phone_lines(text: str) -> int:

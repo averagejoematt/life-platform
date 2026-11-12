@@ -13,6 +13,7 @@ the W rows and the PREVIOUS column, so the note carries only what a row cannot:
     RPE a–b[, last set RPE c–d]     line 1, always — the charter's band (`session_cues.exposure_cue`)
     ‹one reason›                    only when a row moves more than one step from PREVIOUS, or the scheme changes
     ‹one cue›                       the first exercise of a movement family (`movement_cues`)
+                                    + an anchor lift's one sheet cue (`form_cue_sheets`, #5817)
 
 A movement with no session on file, or none in `STALE_AFTER_DAYS`, is the pick-load form: a no-load W row of 8 ahead
 of the engine's start load, and `W set: up to 8 easy reps, test the load.` (`find the load.` when the rows carry
@@ -38,7 +39,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from training import hevy_note_grammar, movement_cues
+from training import form_cue_sheets, hevy_note_grammar, movement_cues
 from training.rep_scheme import LB_IN_KG, implement_step_lb
 from training.session_cues import effort_line, exposure_cue
 
@@ -493,13 +494,24 @@ def _ex1_room() -> int:
     return min(hevy_note_grammar.LIFT_MAX_LINES, hevy_note_grammar.EX1_MAX_LINES - 1 - hevy_note_grammar.phone_lines(block))
 
 
-def _cue_for(family: str | None, entry: dict[str, Any], lines: list[str], room: int) -> str:
+def _cue_for(family: str | None, entry: dict[str, Any], lines: list[str], room: int, sheet_cue: str = "") -> str:
     """The family cue, with the #5049 prep clause when the note still fits its budget with it (R8: one prep cue per
-    compound family, "if overkill skip"); a reason line no longer drops the prep by itself."""
+    compound family, "if overkill skip"); a reason line no longer drops the prep by itself.
+
+    `sheet_cue` (#5817, owner ruling 2026-11-11 D8): an anchor lift's one still-visible cue from its cue sheet
+    (`form_cue_sheets.anchor_note_cue`) rides between the prep clause and the family cue. It outranks the prep clause
+    and never displaces the family breathing cue (standard §6.1): `prep + sheet + family`, then `sheet + family`, then
+    the family cue's own forms. Empty for every non-anchor, which is then exactly the old two-step choice."""
     with_prep = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=True)
-    if hevy_note_grammar.phone_lines("\n".join(lines + [with_prep])) <= room:
-        return with_prep
-    return movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=False)
+    bare = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=False)
+    tries = [with_prep]
+    if sheet_cue and bare:
+        prefix = with_prep[: -len(bare)]  # the prep clause and its space, or "" when the family has none
+        tries = [f"{prefix}{sheet_cue} {bare}", f"{sheet_cue} {bare}", with_prep]
+    for line in tries:
+        if hevy_note_grammar.phone_lines("\n".join(lines + [line])) <= room:
+            return line
+    return bare
 
 
 def compose_blocks(
@@ -599,9 +611,13 @@ def compose_blocks(
         pick_line = (_pick_result_line(block, entry) if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""
         body = [x for x in (line1, lead, line2, own.get("conditional"), pick_line) if x]  # #5782: the caller's if-then
         cue = own.get("line") or ""
+        room = _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES
+        sheet_cue = "" if cue else form_cue_sheets.anchor_note_cue(key, entry)  # #5817: an author's own cue wins
         if family and family not in seen_families:
-            cue = cue or _cue_for(family, entry, body, _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES)
+            cue = cue or _cue_for(family, entry, body, room, sheet_cue)
             seen_families.add(family)
+        elif sheet_cue and hevy_note_grammar.phone_lines("\n".join(body + [sheet_cue])) <= room:
+            cue = sheet_cue  # an anchor after its family's first exercise: its sheet cue alone (the family cue was given)
         block.notes = "\n".join(body + ([cue] if cue else []))
         notes[key] = {
             "note": block.notes,

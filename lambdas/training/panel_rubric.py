@@ -45,9 +45,10 @@ from typing import Any, Callable
 
 from common import repo_config
 
-from training import block_model, progression_record, routine_ir, session_shape
+from training import block_model, progression_record, routine_ir, session_shape, week_floors
 from training.rep_scheme import LB_IN_KG
 from training.training_charter import charter_value
+from training.week_commitments import CORRECTIVE as _CORRECTIVE, rotation_problem  # #5774: one definition, gate + grade
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +63,7 @@ _TRAPS = re.compile(r"shrug", re.I)
 _CORE = re.compile(r"crunch|pallof|dead bug|plank|leg raise|ab wheel|bird dog|carry", re.I)
 _CARRY = re.compile(r"carry|farmer|suitcase", re.I)
 _FARMERS = re.compile(r"farmer", re.I)
-_KETTLEBELL = re.compile(r"kettlebell", re.I)
 _UNILATERAL_LOWER = re.compile(r"split squat|lunge|single leg|step.?up|bulgarian|pistol", re.I)
-_CORRECTIVE = re.compile(r"face pull|pallof|rear delt|reverse fly|external rotation|band pull|dead bug|bird dog|scap", re.I)
 _HINGE = re.compile(r"deadlift|\brdl\b|hip thrust|good morning|swing", re.I)
 _SQUAT = re.compile(r"squat|leg press|lunge", re.I)
 _RPE = re.compile(r"\b(?:RPE|RIR)\s*(?:<=|≤|<|~)?\s*(\d+(?:\.\d)?)", re.I)
@@ -243,27 +242,6 @@ def check_rep_ranges(f: dict[str, Any]) -> tuple[float, str]:
     return _share(ranged, working), f"{ranged} of {working} working sets carry a rep range at least 2 reps wide"
 
 
-def rotation_problem(rot: Any) -> str | None:
-    """#5759: why one draft's rotation record (`variant_rotation.plan`) is NOT on the charter cadence, or None when it is:
-    the program week known, the rotation not refused, and past block 1's first phase every slot with another pool member
-    serving a variant that differs from the phase before. Absence is not credit."""
-    if not isinstance(rot, dict):
-        return "no rotation record on the draft"
-    pos = rot.get("position")
-    if not pos:
-        return "the program week was unknown, so the template served"
-    if (rot.get("volume_check") or {}).get("unchanged") is False:
-        return "the rotation was refused (the week's counts would move)"
-    if int(pos.get("step") or 0) <= 0:
-        return None  # block 1's first phase serves the template as written
-    held = [
-        str(s.get("slot_id"))
-        for s in rot.get("slots") or []
-        if s.get("source") != "pinned" and len(s.get("pool") or []) >= 2 and s.get("variant") == s.get("previous")
-    ]
-    return f"held at a phase boundary: {', '.join(held)}" if held else None
-
-
 def check_accessory_rotation(f: dict[str, Any]) -> tuple[float, str]:
     """#5759: scored from the DRAFTS — the share of the week's lifting drafts whose rotation record is on the charter cadence."""
     rots = f.get("rotations") or {}
@@ -424,7 +402,8 @@ def check_steps_floor(f: dict[str, Any]) -> tuple[float, str]:
 
 
 def check_carries_or_kb(f: dict[str, Any]) -> tuple[float, str]:
-    n = sum(1 for r in f["lifts"] if _CARRY.search(r["title"]) or _KETTLEBELL.search(r["title"]) or r["equipment"] == "kettlebell")
+    # #5774: a kettlebell movement is `week_floors.is_kettlebell` (the stage-1 gate's own definition), never a second regex
+    n = sum(1 for r in f["lifts"] if _CARRY.search(r["title"]) or week_floors.is_kettlebell(r["key"], {r["key"]: r}))
     return _tiered(n, 1), f"{n} carry/kettlebell movements this week"
 
 

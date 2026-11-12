@@ -28,7 +28,11 @@ import {
   CR1_MARKERS,
   CR23_DATA_FILES,
   CR23_DATA_KEYS,
+  CR2_MARKERS,
+  CR3_DATA_KEYS,
   ROOM_DATA_KEYS,
+  ROOM_PUBLIC_VALUES,
+  publishedMarkers,
   ROOM_MARKER,
   ROOM_PRIVATE_MARKER,
   ROOM_ROUTES,
@@ -50,14 +54,18 @@ export function walk(dir, out = []) {
 }
 const files = (dist) => walk(dist).map((p) => posix(relative(dist, p)));
 
-/** The room routes the committed switch does NOT publish ("off": all of them; "cr1": the CR2/CR3 routes). */
+/** The releases the committed switch publishes ("off": none; "cr1": CR1; "cr2": CR1 + CR2). CR3 never. */
+const publishedReleases = (committed) => (committed === "cr2" ? ["cr1", "cr2"] : committed === "cr1" ? ["cr1"] : []);
+/** The room routes the committed switch does NOT publish ("off": all of them; "cr1": CR2/CR3's; "cr2": CR3's). */
 export function gatedRoutes(committed = committedRoomPublic()) {
-  return committed === "cr1" ? ROOM_ROUTES.filter((r) => r.release !== "cr1") : [...ROOM_ROUTES];
+  const on = publishedReleases(committed);
+  return ROOM_ROUTES.filter((r) => !on.includes(r.release));
 }
 /** The room-only data keys a dist may not carry under the committed switch. */
-export const gatedKeys = (committed = committedRoomPublic()) => (committed === "cr1" ? [...CR23_DATA_KEYS] : [...ROOM_DATA_KEYS]);
+export const gatedKeys = (committed = committedRoomPublic()) =>
+  committed === "cr2" ? [...CR3_DATA_KEYS] : committed === "cr1" ? [...CR23_DATA_KEYS] : [...ROOM_DATA_KEYS];
 /** The room marker values a dist may carry under the committed switch (none while off). */
-export const allowedMarkers = (committed = committedRoomPublic()) => (committed === "cr1" ? [...CR1_MARKERS] : []);
+export const allowedMarkers = (committed = committedRoomPublic()) => publishedMarkers(committed);
 /** The CR2/CR3 routes — never in any CR1 build, private or published. */
 export const cr23Routes = () => ROOM_ROUTES.filter((r) => r.release !== "cr1");
 
@@ -158,7 +166,7 @@ export function feeds(dist) {
 export function ownedPaths(owned = JSON.parse(readFileSync(join(WWW, "owned_paths.json"), "utf8"))) {
   const leaks = [];
   // the file's own switch decides which room paths it may name: none while off, the CR1 pages once "cr1"
-  const routes = gatedRoutes(owned.room_public === "cr1" ? "cr1" : "off");
+  const routes = gatedRoutes(ROOM_PUBLIC_VALUES.includes(owned.room_public) ? owned.room_public : "off");
   for (const key of ["routes", "static_routes", "route_patterns", "files"]) {
     // a gated room path, or anything under one, with or without its leading slash (`[param]` = one segment)
     const rxs = routes.map((r) => new RegExp(`^/?${roomPathPattern(r.path.slice(1))}`));
@@ -230,6 +238,28 @@ export function cr1Leaks(dist) {
   return leaks;
 }
 
+/**
+ * A CR2 dist (the committed `room_public: "cr2"`, or WEB_ROOM=cr2) carries nothing of CR3: no docket page, no link to
+ * one, no CR3 marker, no CR3-only (docket) key, no room data file. On a whole-room (WEB_ROOM=1) dist it is meant to red.
+ */
+export function cr2Leaks(dist) {
+  const leaks = [];
+  const routes = ROOM_ROUTES.filter((r) => r.release === "cr3");
+  for (const path of roomPaths(dist, routes)) if (existsSync(join(dist, path, "index.html"))) leaks.push(`${path}: a CR3 page in the dist`);
+  const linkRx = routes.map((r) => new RegExp(`href="[^"]*${roomPathPattern(r.path.slice(0, -1))}/?(?:[#?][^"]*)?"`));
+  const allowed = [...CR1_MARKERS, ...CR2_MARKERS];
+  for (const rel of files(dist)) {
+    if (CR23_DATA_FILES.some((f) => rel === f || rel.endsWith(`/${f}`))) leaks.push(`${rel}: the room's data file`);
+    if (!/\.(html|json|js|xml|txt)$/.test(rel)) continue;
+    const text = readFileSync(join(dist, rel), "utf8");
+    for (const k of CR3_DATA_KEYS) if (text.includes(`"${k}"`) || text.includes(`&quot;${k}&quot;`) || text.includes(`&#34;${k}&#34;`)) leaks.push(`${rel}: carries the CR3-only key "${k}"`);
+    if (!rel.endsWith(".html")) continue;
+    if (linkRx.some((rx) => rx.test(text))) leaks.push(`${rel}: links a CR3 page`);
+    for (const m of text.matchAll(MARKER_RX)) if (!allowed.includes(m[1])) leaks.push(`${rel}: carries the CR3 marker ${ROOM_MARKER}="${m[1]}"`);
+  }
+  return leaks;
+}
+
 /** Every check over one dist (+ the committed owned_paths.json). */
 export async function audit(dist, owned) {
   return {
@@ -239,7 +269,8 @@ export async function audit(dist, owned) {
     feeds: feeds(dist),
     ownedPaths: ownedPaths(owned),
     orphanChunks: orphanChunks(dist),
-    cr1Leaks: cr1Leaks(dist),
+    // the release bar of the committed switch: a CR2 build carries nothing of CR3; any other, nothing of CR2/CR3
+    releaseLeaks: committedRoomPublic() === "cr2" ? cr2Leaks(dist) : cr1Leaks(dist),
   };
 }
 

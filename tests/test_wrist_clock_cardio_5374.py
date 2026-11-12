@@ -31,6 +31,7 @@ from training import (
     training_charter as tc,  # noqa: E402
     wrist_clock as wc,  # noqa: E402
 )
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 from training.training_notes import performed_shape  # noqa: E402
 
@@ -42,7 +43,10 @@ CYCLING_TID = "D8F7F851"  # config/movement_catalog.json -> movements.cycling
 
 
 def _compose(kind, machine, minutes, facts=None, **kw):
-    return cn.compose(movement_key=machine, minutes=minutes, target_date=DAY, kind=kind, facts=facts, **kw)
+    # #5796: every drafted note opens with the RPE capture prompt; these tests read the prescription after it
+    note, audit = cn.compose(movement_key=machine, minutes=minutes, target_date=DAY, kind=kind, facts=facts, **kw)
+    assert note.startswith(cn.hevy_note_grammar.CARDIO_RPE_CAPTURE_LINE + "\n"), note
+    return cn.without_capture(note), audit
 
 
 def _cases():
@@ -62,7 +66,7 @@ def test_every_kind_machine_pair_renders_one_clock_on_the_grid_with_at_most_thre
     offenders = []
     for kind, machine, facts, minutes in _cases():
         note, audit = _compose(kind, machine, minutes, facts)
-        line1 = note.split("\n")[0]
+        line1 = _wc(note).split("\n")[0]
         why = f"{kind}/{machine}/{minutes}/{facts}: {note!r}"
         if not cn.LINE1_RE.match(line1) or re.search(r"\b\d+ min\b", line1):
             offenders.append(f"line 1 off the grammar or restating minutes — {why}")
@@ -127,7 +131,7 @@ def test_no_note_says_program_or_preset():
 
 def _shape(kind, machine="cycling", minutes=30, facts=None):
     note, audit = _compose(kind, machine, minutes, {"last_level": 10} if facts is None else facts)
-    return cn.clock_of(note, minutes), note.split("\n")[0], audit
+    return cn.clock_of(note, minutes), _wc(note).split("\n")[0], audit
 
 
 def test_easy_and_the_incline_walk_hold_one_level_and_carry_no_clock_line():
@@ -144,7 +148,7 @@ def test_tempo_holds_the_menus_tempo_level_with_its_talk_test():
     assert shape["levels"] == [10 + cm.TEMPO_LEVEL_STEP] == [audit["level"]]
     lo, hi = tc.charter_value("cardio_menu.blocks.tempo.rpe")
     assert f"RPE {lo}–{hi} ({tc.charter_value('cardio_menu.blocks.tempo.talk_test')})" in line1
-    assert line1 == f"Recumbent · L{10 + cm.TEMPO_LEVEL_STEP} · RPE {lo}–{hi} (short phrases)"
+    assert _wc(line1) == f"Recumbent · L{10 + cm.TEMPO_LEVEL_STEP} · RPE {lo}–{hi} (short phrases)"
     assert audit["clock_rule"] == "at min 5 and 15, full sentences → one level up, a few words → one down"
     assert shape["check_in_every"] == cn.TEMPO_CHECK_EVERY_MIN
 
@@ -159,7 +163,7 @@ def test_hills_climb_and_descend_on_the_step_minutes_and_the_treadmill_climbs_th
     assert "the hill program" not in line1
     # #5428 re-grade: steady + 2 (≤ 3 levels, standard §3.7) and the talk words' band (short phrases = RPE 6–7)
     assert cn.HILL_CLIMB_STEPS == g.CLOCK_MAX_LEVELS - 1
-    assert line1 == "Recumbent · L10 → L12 · RPE 6–7 (short phrases)"
+    assert _wc(line1) == "Recumbent · L10 → L12 · RPE 6–7 (short phrases)"
     # the treadmill: from the walk's dose, `HILL_WALK_CLIMB_STEPS` charter steps up and back (grades, not levels)
     t_shape, t_line, audit = _shape("hills", "treadmill", facts={})
     step = tc.charter_value("cardio_menu.blocks.incline_treadmill_walk.step.incline_pct")
@@ -186,7 +190,7 @@ def test_intervals_are_the_menus_set_sprinted_on_the_clock():
 def test_with_no_level_on_record_the_rule_rides_his_own_base():
     note, _ = _compose("intervals", "cycling", 30, {})
     shape = cn.clock_of(note, 30)
-    assert note.split("\n")[0] == "Recumbent · your level · hard RPE 8 (a few words)"
+    assert _wc(note).split("\n")[0] == "Recumbent · your level · hard RPE 8 (a few words)"
     # #5428 re-grade #2: the easy level is named for the warm-up and cool-down too
     # re-grade #6 (2026-11-08): the rep length first, then the level ("hard" with no level on record)
     assert note.split("\n")[1] == "⌚ ride clock: 2 min hard from min 6, 10, 14, 18, 22; else easy (full sentences)"

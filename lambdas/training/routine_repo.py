@@ -143,6 +143,20 @@ def stamp_charter_version(ir: RoutineSpec) -> RoutineSpec:
     return ir
 
 
+def stamp_library_version(ir: RoutineSpec) -> RoutineSpec:
+    """#5773: every drafted plan names the exercise-library version it was made under (`inputs_snapshot.library_version`),
+    as it names the charter's. Fail-soft — an unreadable library stamps None, which says so; it never blocks a draft."""
+    from training import selection_engine
+
+    try:
+        version = selection_engine.library_version()
+    except Exception as e:  # noqa: BLE001 — recording only
+        logger.warning(f"library_version stamp failed ({type(e).__name__}: {e}); stamped None")
+        version = None
+    ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "library_version": version}
+    return ir
+
+
 def stamp_progression_basis(ir: RoutineSpec) -> RoutineSpec:
     """#5762: every drafted plan records, per movement, the progression basis it applied and whether it was a
     `step_due` step (`inputs_snapshot.progression_basis`, `training.progression_record`). Fail-soft — a record that
@@ -179,6 +193,7 @@ def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     new draft at it would resurrect an archived routine rather than create today's.
     """
     stamp_charter_version(ir)
+    stamp_library_version(ir)
     stamp_progression_basis(ir)
     existing = get_current(ir.routine_id)
     if not existing:

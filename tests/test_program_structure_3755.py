@@ -298,7 +298,8 @@ def test_a_full_body_week_generates_through_the_module_grid(monkeypatch):
     # done (lower-heavy, upper-volume) -> week 1's third is lower-volume.
     third = _gen("2026-09-28", [_lift("2026-09-24"), _lift("2026-09-26")])[0]
     assert third.archetype == "lower" and third.variant == "ideal"
-    assert 12 <= sum(len(e.sets) for e in third.exercises) <= 18
+    # #5774: the kettlebell slot is a fifth exercise, so a fifth warm-up set; the working sets are unchanged (14)
+    assert 12 <= sum(len(e.sets) for e in third.exercises) <= 19
     assert any(r.startswith("week grid source=module") for r in third.rationale)
     assert any("session_role=lower_volume" in r for r in third.rationale)
     assert any(r.startswith("session sequence: week 1 · session 3 of 4 · lower-volume, block 1") for r in third.rationale)

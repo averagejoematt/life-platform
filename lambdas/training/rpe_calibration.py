@@ -17,8 +17,8 @@ already fills, read as a prediction on this one set. The rows are not changed an
 Hevy's `failure` type).
 
 THE PAIR (`pair`). predicted RIR = 10 - logged RPE; actual RIR = reps done + `rir_at_first_slow_rep` - the row's top rep
-(a slow rep is not failure, so the reps he had left after it are the charter's labelled platform default, not
-measured); error = actual - predicted. Positive: he had more in reserve than he predicted.
+(a slow rep is not failure, so the reps he had left after it are the charter's value, owner-confirmed 2026-11-11 —
+an assumption, not measured); error = actual - predicted. Positive: he had more in reserve than he predicted.
 
 WHERE A PAIR LIVES. The mark (which set, which top rep) is on the draft (`inputs_snapshot.rpe_calibration.marks`) and on
 its owner-only `routine_index` row (`routine_repo.versioned_items`); the performed set is his Hevy workout. The one history

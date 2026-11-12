@@ -1,6 +1,6 @@
 """Exercise library v0.1 (#5769): schema, coverage, citations, privacy, gates, fallbacks, availability, overlay.
 
-# premerge-gate: sweeps lambdas/ and mcp/ to prove nothing in the drafting path imports the proposed library yet
+# premerge-gate: sweeps lambdas/ and mcp/ to prove nothing but the selection engine (#5773) reads the proposed library
 """
 
 from __future__ import annotations
@@ -222,6 +222,14 @@ _READS_LIBRARY = re.compile(
 )
 
 
+# #5773: the selection engine is the ONE drafting-path reader, and it changes a live draft only when the library is
+# `approved` (shadow while `proposed` — tests/test_selection_engine_5773.py holds that switch). Its critic reads through it.
+_SANCTIONED_READERS = {
+    os.path.join("lambdas", "training", "selection_engine.py"),
+    os.path.join("lambdas", "training", "selection_critic.py"),
+}
+
+
 def test_nothing_in_the_drafting_path_imports_the_library():
     me = os.path.join(ROOT, "lambdas", "training", "exercise_library.py")
     offenders = []
@@ -229,7 +237,7 @@ def test_nothing_in_the_drafting_path_imports_the_library():
         for dirpath, _dirs, files in os.walk(os.path.join(ROOT, top)):
             for fn in files:
                 path = os.path.join(dirpath, fn)
-                if not fn.endswith(".py") or path == me:
+                if not fn.endswith(".py") or path == me or os.path.relpath(path, ROOT) in _SANCTIONED_READERS:
                     continue
                 with open(path, encoding="utf-8", errors="ignore") as f:
                     text = f.read()
