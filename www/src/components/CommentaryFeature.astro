@@ -1,0 +1,36 @@
+---
+// The published historical commentary, featured where a reader meets the coaches (CR2, owner ruling 2026-11-11, second
+// message: "the reader must not click through nine near-empty coach profiles to find Eli's substantive material").
+// SELF-GATING: with CR2 off (src/lib/room.js) it renders nothing and reads nothing, so the page is byte-identical. No
+// <style>, no <script>. It names the one coach whose past words are published and says plainly that no other coach's
+// are; it never implies the others' commentary is equivalent, absent from the record, or that their performance is
+// unknown — their measured record sits in the list above it.
+import { COMMENTARY_NOTE, featuredCommentary } from "../lib/coach_room.js";
+import { roomCr2 } from "../lib/room.js";
+import { loadAll, loadCoachRoom } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+const on = roomCr2();
+const feat = on ? featuredCommentary(await loadCoachRoom()) : null;
+const coach = feat ? ((await loadAll()).get("coach", feat.id) as any) : null;
+const name = coach ? coach.name : null;
+const role = coach && coach.tier === "lead" ? "the lead coach" : "a coach";
+const reads = feat ? feat.words.reads.length : 0;
+const lead = feat && feat.coverage && feat.coverage.heading ? feat.coverage.heading : `${feat ? feat.count : 0} published`;
+---
+
+{
+  feat && name && (
+    <div data-room="coach-entry" data-commentary-feature style={compact ? "margin-top:14px;border-top:1px solid var(--ink);padding-top:12px;display:flex;flex-direction:column;gap:6px" : "display:flex;flex-direction:column;gap:8px;border-left:3px solid var(--ink);padding-left:14px"}>
+      <p class="label">{COMMENTARY_NOTE.label}</p>
+      <p style={compact ? "font-size:15px;line-height:1.45" : "font-size:17px;line-height:1.45"}>
+        <b>{name}</b>, {role}: {lead}, published as written{feat.corrected > 0 ? `, ${feat.corrected} with a dated correction` : ""}. {feat.others === 0 ? "No other coach's historical commentary is currently published" : `${feat.others} other ${feat.others === 1 ? "coach has" : "coaches have"} a smaller published set on ${feat.others === 1 ? "its" : "their"} record ${feat.others === 1 ? "page" : "pages"}`}; each coach's measured record is on its page.
+      </p>
+      <a href={href(`/system/coaches/${feat.id}/record/#approved-words`)} style="font-size:14px;font-weight:700">Read {name}'s {reads === 1 ? "daily read" : "daily reads"} →</a>
+    </div>
+  )
+}

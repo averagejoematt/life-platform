@@ -137,7 +137,8 @@ def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED, error_label, input_status
 
     try:
-        value = fn(*a, **kw)
+        with plan_call_scope.reading(name):  # #5813: timed per reader on `timing_ms.stage_1`
+            value = fn(*a, **kw)
     except Exception as e:  # noqa: BLE001 — reported in the block, never swallowed (#4072)
         logger.warning("plan_next_session input %s read failed: %s", name, e)
         return None, input_status(READ_FAILED, error=error_label(e))
@@ -440,6 +441,7 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
         r["pain_flag_any"] = bool(f.get("pain_flag_any"))
         r["pain_dates"] = f.get("pain_dates") or []
         r["pain_notes"] = f.get("pain_notes") or []  # #4174: the words tie a note to its site
+        r["not_pain_notes"] = f.get("not_pain_notes") or []  # #5800: discomfort / form-or-equipment — listed only
         r["sessions_with_notes"] = f.get("sessions_with_notes")
     scope = {
         # `read` is the only value `plan_engine._evidence_scope_read` accepts, and it also
@@ -452,6 +454,8 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
         "phases_read": phases,
         "movements_considered": len(considered),
         "movements_flagged": sum(1 for r in considered if r.get("pain_flag_any")),
+        # #5800: the net's discomfort and form/equipment notes — shown to the coaches here, acted on nowhere
+        "not_acted_on": [{"movement": r["label"], **n} for r in considered for n in r.get("not_pain_notes") or []],
         "note_layer_status": layer_status,
         "reason": (
             f"{len(considered)} movement(s) performed in {start}..{target_date} were checked against the derived note layer"
@@ -726,12 +730,11 @@ def tool_plan_next_session(args):
     layer_status = LAYER_UNKNOWN
     status["pain_layer_status"] = st(plan_engine.MEASURED)
     try:
-        from training.training_notes import training_notes_health
-
         from mcp.config import table
         from mcp.core import derived_layer_status
+        from mcp.plan_call_scope import notes_health  # #5813: the one health sweep per call
 
-        layer_status = derived_layer_status(training_notes_health(table))[0]
+        layer_status = derived_layer_status(notes_health(table))[0]
     except Exception as e:  # noqa: BLE001
         status["pain_layer_status"] = st(READ_FAILED, error=plan_engine.error_label(e))
 

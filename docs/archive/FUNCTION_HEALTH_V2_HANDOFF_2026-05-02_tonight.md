@@ -193,7 +193,7 @@ Custom component: a horizontal threshold-band gauge.
 - Three bands with distinct colors (e.g. green / amber / red, but check existing site palette)
 - Marker at current value (75)
 - Text below: "Insulin Resistance Score 75 — definitively insulin resistant. Combines fasting insulin 14.3 (5.7× rise from 2.5 last year) and elevated C-peptide 2.26."
-- Link/cross-ref to: ApoB 116/111, Lp-PLA2 137, Vitamin D collapse, Testosterone collapse (the "metabolic constellation")
+- Link/cross-ref to: ApoB [lipid values removed 2026-11-11], Lp-PLA2 137, Vitamin D collapse, Testosterone collapse (the "metabolic constellation")
 
 **B. Cardio IQ panel rendering (15 biomarkers)**
 
@@ -202,7 +202,7 @@ Standard panel-table format, but with Cardio IQ-specific reference ranges (these
 Biomarkers to render (from the handover OOR list, plus the in-range Cardio IQ ones from `draw_2026_04_03.py`):
 - Insulin Resistance Score (75, OOR)
 - Lp-PLA2 Activity (137, OOR)
-- ApoB Cardio IQ (111, OOR)
+- ApoB Cardio IQ (OOR)
 - C-peptide (2.26, OOR)
 - Plus the in-range Cardio IQ biomarkers (ApoE eval, HDL Function, Fibrinogen, Adiponectin, MPO, TMAO — values from `backfill/draw_2026_04_03.py`)
 
@@ -227,7 +227,7 @@ Time-series Chart.js charts for the year-over-year movers identified by `get_lab
 - Testosterone total (577 → 361)
 - Omega-3 index (7.8% → 3.3%)
 - Vitamin D 25-OH (117 → 28)
-- ApoB (history → 116)
+- ApoB (history)
 - GGT (history → current)
 
 Use existing Chart.js infrastructure already on the labs page. One chart per biomarker, 8-point time series.

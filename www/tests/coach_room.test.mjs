@@ -150,3 +150,45 @@ test("dates inside a served sentence are put in words", () => {
   assert.equal(datesInWords("at 2026-10-12T03:04:05+00:00 it stopped"), "at 12 October 2026 it stopped");
   assert.equal(datesInWords(null), "");
 });
+
+// ── CR2 published (owner ruling 2026-11-11, second message, items 2-4) ─────────────────────────────────────────────
+import { NO_HISTORICAL_COMMENTARY, correctionOf, featuredCommentary, historicalCommentary } from "../src/lib/coach_room.js";
+
+const readOf = (date, extra = {}) => ({ date, text: `Read ${date}.`, generated_at: `${date}T17:00:00Z`, data_through: date, cited: [], ...extra });
+const wordsFile = (coaches) => ({ state: "ok", coaches });
+
+test("CR2 · the exact sentence for a coach without published historical commentary", () => {
+  assert.equal(NO_HISTORICAL_COMMENTARY, "No historical commentary from this coach is currently published.");
+  for (const entry of [null, {}, { approved_words: { state: "ok", sealed_calls: [], lead_reads: [] } }]) {
+    assert.notEqual(historicalCommentary(entry).state, "published");
+  }
+});
+
+test("CR2 · an annotated read shows only WITH its dated correction; a broken correction drops the read (control)", () => {
+  const good = { kind: "correction", annotated_at: "2026-11-11", note: "Correction added 11 November 2026. A note." };
+  assert.deepEqual(correctionOf(good), { day: "11 November 2026", note: good.note });
+  assert.equal(correctionOf(undefined), null, "a read with no correction is an ordinary read");
+  assert.equal(correctionOf({ annotated_at: "2026-11-11" }), false, "a correction without its note is unusable");
+  const entry = {
+    approved_words: {
+      state: "ok",
+      sealed_calls: [],
+      lead_window: { from: "2026-10-01", to: "2026-11-03", written: 28 },
+      lead_reads: [readOf("2026-10-03"), readOf("2026-10-02", { correction: good }), readOf("2026-10-01", { correction: { note: "" } })],
+    },
+  };
+  const h = historicalCommentary(entry);
+  assert.equal(h.state, "published");
+  assert.equal(h.count, 2, "the read whose correction did not carry is not shown at all");
+  assert.equal(h.corrected, 1);
+  assert.equal(h.coverage.heading, "2 of 28 earlier reads");
+});
+
+test("CR2 · the featured commentary names the coach with the most published items and counts the others", () => {
+  const lead = { approved_words: { state: "ok", sealed_calls: [], lead_reads: [readOf("2026-10-01"), readOf("2026-10-02")] } };
+  const none = { approved_words: { state: "ok", sealed_calls: [], lead_reads: [] } };
+  const f = featuredCommentary(wordsFile({ eli_marsh: lead, sleep_coach: none, glucose_coach: {} }));
+  assert.equal(f.id, "eli_marsh");
+  assert.equal(f.others, 0);
+  assert.equal(featuredCommentary(wordsFile({ sleep_coach: none })), null, "the control: nothing published, nothing featured");
+});

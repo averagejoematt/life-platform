@@ -122,7 +122,22 @@
         "value": "68",
         "as_of": "2026-10-23"
        }
-      ]
+      ],
+      "correction": {
+       "id": "ann-fixture-lead",
+       "annotated_at": "2026-11-11",
+       "read_written_at": "2026-10-24T17:07:05+00:00",
+       "note": "Correction added 11 November 2026. These words are shown exactly as written. Since then the record has changed: a synthetic fixture figure now reads 2, not 1. Synthetic layout text for the build tests.",
+       "corrections": [
+        {
+         "figure": "a synthetic fixture figure",
+         "unit": "",
+         "as_cited": "1",
+         "record_now": "2"
+        }
+       ],
+       "supersedes": null
+      }
      },
      {
       "date": "2026-10-19",

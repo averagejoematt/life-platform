@@ -47,6 +47,8 @@ _ALLOWED_FILES = {
     # the routine-write schema this isolation rule guards. Grandfathered.
     os.path.join(ROOT, "lambdas", "training", "hevy_common.py"),
     os.path.join(ROOT, "tests", "test_hevy_common.py"),
+    # #5801 — wire-shaped inbound Hevy workouts as fixtures for the read-only volume-response report.
+    os.path.join(ROOT, "tests", "test_volume_response_5801.py"),
 }
 
 _KEY = "exercise_template_id"

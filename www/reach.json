@@ -61,10 +61,15 @@
     "/system/",
     "/system/calibration/",
     "/system/coaches/eli_marsh/",
+    "/system/coaches/eli_marsh/record/",
     "/system/coaches/glucose_coach/",
+    "/system/coaches/glucose_coach/record/",
     "/system/coaches/nutrition_coach/",
+    "/system/coaches/nutrition_coach/record/",
     "/system/coaches/sleep_coach/",
+    "/system/coaches/sleep_coach/record/",
     "/system/coaches/training_coach/",
+    "/system/coaches/training_coach/record/",
     "/system/ledger/",
     "/system/ledger/disagreements/protein-deep-sleep-2026-10-29/",
     "/system/ledger/glucose-20260920-cgm01/",
@@ -85,5 +90,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 64
+  "transitive_count": 69
 }
