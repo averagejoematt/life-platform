@@ -925,7 +925,7 @@ def test_the_live_rides_join_through_the_store_and_the_0928_ride_needs_the_whoop
     t = _live_4412_table()
     j29 = store.derive(t, "matthew", _live_hevy("2026-09-29"))
     (b29,) = j29["blocks"]
-    assert j29["version"] == "cardio-hr@1.1.0"
+    assert j29["version"] == "cardio-hr@1.2.0"
     assert (b29["state"], b29["hr_coverage"], b29["avg_hr"], b29["max_hr"], b29["hr_source"]) == ("joined", 0.551, 109.0, 139, "WHOOP")
     assert [a["whoop_workout_id"] for a in b29["hr_activities"]] == ["d49d8bac-e0f4-4d80-9828-29840bc361cf"]
     assert b29["zone_seconds"] is None  # WHOOP's zone minutes read 0 at avg 109 — not used, never prorated

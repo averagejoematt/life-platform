@@ -85,7 +85,7 @@ def test_no_public_payload_declares_a_genetic_identifier_field(schema_path):
     )
 
 
-def test_the_genome_endpoint_serves_aggregates_only():
+def test_the_genome_endpoint_serves_no_genetic_finding():
     """Direct guard on the handler that failed, independent of schema capture
     (a schema is only as fresh as its last run)."""
     import sys
@@ -100,7 +100,19 @@ def test_the_genome_endpoint_serves_aggregates_only():
     handler = handler_source("site_api_vitals", "handle_genome_risks")
     for forbidden in ('"gene"', '"rsid"', '"summary"', '"implications"'):
         assert forbidden not in handler, f"handle_genome_risks emits {forbidden} — that identifies the variant"
-    assert '"total_snps"' in handler and '"risk_levels"' in handler, "the aggregate shape must survive"
+    # 2026-11-11 owner ruling: aggregates are genetic findings too. The handler
+    # publishes a status and a disclosure and never reads the genome partition.
+    for forbidden in (
+        '"total_snps"',
+        '"risk_summary"',
+        '"risk_levels"',
+        '"categories"',
+        "table.query",
+        "SOURCE#genome",
+        "}genome",
+        "_decimal_to_float",
+    ):
+        assert forbidden not in handler, f"handle_genome_risks still carries {forbidden}"
     assert "disclosure" in handler, "the payload must say WHY detail is absent, not just omit it"
 
 
@@ -136,3 +148,138 @@ def test_aggregate_keys_are_not_flagged():
     ok = {"shape": {"keys": {"genome": {"keys": {"total_snps": {"type": "integer"}}}}}}
     offenders = [k for _jp, k in _walk_keys(ok["shape"]) if _GENETIC_KEY_RE.search(k) and k not in _AGGREGATE_KEYS]
     assert offenders == [], "a count of variants is not an identifier"
+
+
+# ── 2026-11-11 owner ruling: /api/genome_risks publishes no genetic finding at all ──
+#
+# Individual variants, inferred outcomes, genetic risk categories and
+# personalised risk summaries are private by default, and aggregation does not
+# make them safe. The payload is {"genome": {"status", "disclosure"}} and nothing
+# else. `_genome_violations` is the rule. It runs against the real handler, the
+# captured schema, and two must-fail controls: the pre-fix {n, risk_levels}
+# shape and the interim n>=5 counts-only shape. Both controls must be rejected.
+
+_ALLOWED_GENOME_KEYS = {"status", "disclosure"}
+
+
+def _genome_violations(genome) -> list[str]:
+    out = []
+    if not isinstance(genome, dict):
+        return [f"genome is {type(genome).__name__}, not the status object"]
+    extra = set(genome) - _ALLOWED_GENOME_KEYS
+    if extra:
+        out.append(f"genome serves keys beyond status/disclosure: {sorted(extra)}")
+
+    def walk(node, path):
+        if isinstance(node, bool):
+            return
+        if isinstance(node, (int, float)):
+            out.append(f"numeric genetic field at {path}")
+        elif isinstance(node, dict):
+            for k, v in node.items():
+                if k in ("categories", "risk_levels", "risk_summary", "other_categories_combined") or "statin" in k.lower():
+                    out.append(f"category/risk key {k!r} at {path}")
+                walk(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                walk(v, f"{path}[{i}]")
+
+    walk(genome, "genome")
+    for k in ("status", "disclosure"):
+        if k in genome and not isinstance(genome[k], str):
+            out.append(f"genome.{k} is not a string")
+    return out
+
+
+def _synthetic_genome_items():
+    """Synthetic rows shaped like the live partition. No real variant data."""
+    plan = {"caffeine": 1, "antioxidant": 2, "statin_response": 3, "exercise": 6, "longevity": 20}
+    levels = ["unfavorable", "mixed", "neutral", "favorable"]
+    items, i = [], 0
+    for cat, n in plan.items():
+        for _ in range(n):
+            items.append({"pk": "USER#matthew#SOURCE#genome", "sk": f"SNP#{i}", "category": cat, "risk_level": levels[i % 4]})
+            i += 1
+    return items
+
+
+class _FakeTable:
+    def __init__(self, items):
+        self._items = items
+        self.queried = 0
+
+    def query(self, **_kw):
+        self.queried += 1
+        return {"Items": list(self._items)}
+
+
+def _serve_genome(table):
+    import sys
+
+    sys.path.insert(0, str(_REPO / "lambdas"))
+    from web import site_api_biomarkers as bio
+
+    resp = bio.genome_risks(_g={"table": table})
+    body = resp["body"]
+    return (json.loads(body) if isinstance(body, str) else body)["genome"]
+
+
+def test_genome_handler_publishes_status_only_and_never_reads_the_partition():
+    table = _FakeTable(_synthetic_genome_items())
+    genome = _serve_genome(table)
+    assert _genome_violations(genome) == [], _genome_violations(genome)
+    assert genome["status"] == "private" and genome["disclosure"]
+    assert table.queried == 0, "the public genome handler must not even read the owner-only partition"
+    blob = json.dumps(genome).lower()
+    for gone in ("caffeine", "antioxidant", "statin", "exercise", "longevity", "unfavorable", "favorable", "snp"):
+        assert gone not in blob, f"{gone!r} reached the public genome payload"
+
+
+def test_captured_genome_schema_declares_status_and_disclosure_only():
+    shape = json.loads((_SCHEMA_DIR / "api_genome_risks.json").read_text())["shape"]
+    genome = shape["keys"]["genome"]["keys"]
+    assert set(genome) == _ALLOWED_GENOME_KEYS, f"captured schema declares {sorted(genome)}"
+    assert all(node.get("type") == "string" for node in genome.values()), "a genome field is not a string"
+
+
+def _old_shape():
+    old = {"total_snps": 0, "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}, "categories": {}}
+    for row in _synthetic_genome_items():
+        old["total_snps"] += 1
+        old["risk_summary"][row["risk_level"]] += 1
+        b = old["categories"].setdefault(
+            row["category"], {"n": 0, "risk_levels": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}}
+        )
+        b["n"] += 1
+        b["risk_levels"][row["risk_level"]] += 1
+    return old
+
+
+def test_must_fail_control_the_pre_fix_shape_is_rejected():
+    found = "\n".join(_genome_violations(_old_shape()))
+    assert "numeric genetic field" in found and "risk_levels" in found and "statin" in found and "categories" in found
+
+
+def test_must_fail_control_the_interim_counts_only_shape_is_rejected():
+    """The n>=5 counts-only shape briefly proposed on 2026-11-11 (categories.<name>.n
+    plus an unnamed combined count, total and risk_summary kept). The owner ruled
+    aggregates private too, so the rule must reject it."""
+    old = _old_shape()
+    interim = {
+        "total_snps": old["total_snps"],
+        "risk_summary": old["risk_summary"],
+        "categories": {k: {"n": v["n"]} for k, v in old["categories"].items() if v["n"] >= 5 and "statin" not in k},
+        "other_categories_combined": {"n": sum(v["n"] for k, v in old["categories"].items() if v["n"] < 5 or "statin" in k)},
+        "disclosure": "counts only",
+    }
+    found = "\n".join(_genome_violations(interim))
+    assert "numeric genetic field" in found and "categories" in found and "risk_summary" in found
+
+
+def test_supplements_route_never_passes_a_genome_variant_list_through():
+    """/api/supplements carried `genome_snps` straight from the supplement registry
+    (empty today). A populated registry would publish variant-to-supplement links,
+    so the public route serves an empty list whatever the registry holds."""
+    src = (_REPO / "lambdas" / "web" / "site_api_protocols.py").read_text()
+    assert 'registry.get("genome_snps"' not in src, "/api/supplements passes the registry's genome_snps through"
+    assert '"genome_snps": [],' in src

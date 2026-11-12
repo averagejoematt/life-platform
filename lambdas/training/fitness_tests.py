@@ -4,7 +4,9 @@ WHY THIS EXISTS
   Before #5078 the calibration loop measured the scale only: nothing stored or read a fitness test, so
   "is he fitter" was inferred. The owner's direction (2026-10-18, the elite-panel review) is a battery
   on a fixed cadence: a 6-minute walk for distance, a 20-minute bike at RPE 6 for distance, a dead
-  hang for time and the assistance an assisted pull-up needs. The tests feed the May tracker (#5073)
+  hang for time and the assistance an assisted pull-up needs. #5798 adds the fixed-WORKLOAD cardio test: the
+  treadmill, 20 minutes at one fixed speed and incline, mean heart rate over minutes 10-20 with the RPE beside it
+  (a measurement, never an effort gate; compared only within one heart-rate regime and one setting). The tests feed the May tracker (#5073)
   and the coach packet.
 
 EVERY RULE IS CHARTER DATA (`calibration.fitness_tests`, read through `charter_value`): the cadence
@@ -57,6 +59,8 @@ STORE = f"{PK} / {SK_PREFIX}<YYYY-MM-DD> — CROSS_PHASE (ADR-077), Tier owner-o
 UPCOMING, DUE, OVERDUE, MISSED, UNKNOWN = "upcoming", "due", "overdue", "missed", "unknown"
 MEASURED, ABSENT, READ_FAILED = "measured", "absent", "read_failed"
 EXPLICIT, HEVY = "explicit", "hevy"
+INVALID = "invalid"
+"""A fixed-workload test whose heart rate could not be joined (#5798): stored as an attempt with a reason, never as a value."""
 
 BATTERY_TITLE = "FITNESS TESTS"
 """The title prefix of the drafted test-day routine — and the marker that makes a Hevy workout a battery."""
@@ -154,6 +158,11 @@ def build_battery_record(
         note = str((notes or {}).get(tid) or "").strip()
         if note:
             row["notes"] = note[:500]
+        if spec[tid].get("hevy_field") == "final_window_hr":  # the fixed workload: its setting and RPE ride beside the heart rate (#5798)
+            from training import cardio_menu
+
+            row["setting"] = setting_label(spec[tid])
+            row["rpe"] = cardio_menu.logged_rpe(note)
         tests[tid] = row
     return {
         "sk": sk,
@@ -218,20 +227,53 @@ def _hevy_value(row: Mapping[str, Any], sets: list[Mapping[str, Any]]) -> Option
     return None
 
 
-def _exercise_test(ex: Mapping[str, Any], ids: Mapping[str, tuple[set[str], str]]) -> Optional[str]:
+def _exercise_tests(ex: Mapping[str, Any], ids: Mapping[str, tuple[set[str], str]]) -> list[str]:
+    """Every test the exercise's machine can carry. Two tests share the treadmill (the 6-minute walk and the fixed
+    20-minute test, #5798); each one's own duration and field decide whether the sets are its result."""
     tid_ = str(ex.get("template_id") or "")  # the stored shape (hevy_common._normalize_exercise); the wire's key stays in the compiler
     name = str(ex.get("name") or ex.get("title") or "").strip().lower()
-    for test_id, (tids, title) in ids.items():
-        if (tid_ and tid_ in tids) or (title and name == title):
-            return test_id
-    return None
+    return [t for t, (tids, title) in ids.items() if (tid_ and tid_ in tids) or (title and name == title)]
+
+
+def _fixed_workload_row(spec: Mapping[str, Any], workout: Mapping[str, Any], index: int, ex: Mapping[str, Any]) -> Optional[dict[str, Any]]:
+    """The fixed-workload test from one Hevy treadmill block (#5798): mean heart rate over the charter's window, from the
+    stored cardio-HR join (`cardio_hr.final_window`), with the RPE from the block's note. None when the block is not a
+    ~20-minute block; `state: invalid` (no value) when the heart-rate join did not hold."""
+    from training import cardio_hr, cardio_menu
+
+    want = _f(spec.get("duration_s")) or 0.0
+    total = sum(_dur(s) or 0.0 for s in _working(ex.get("sets") or []))
+    if not want or abs(total - want) > want * DURATION_TOLERANCE:
+        return None
+    block = cardio_hr.block_for(workout, index) or {}
+    fw = block.get("final_window") if isinstance(block.get("final_window"), Mapping) else None
+    base: dict[str, Any] = {
+        "unit": spec.get("unit"),
+        "protocol_version": None,
+        "source": HEVY,
+        "setting": setting_label(spec),
+        "rpe": cardio_menu.logged_rpe(str(ex.get("notes") or "")),
+    }
+    mean = _f((fw or {}).get("mean_hr"))
+    if fw and fw.get("state") == "joined" and mean is not None:
+        return {**base, "value": mean, "hr_coverage": fw.get("hr_coverage"), "hr_source": fw.get("hr_source"), "hr_basis": fw.get("basis")}
+    why = str((fw or {}).get("reason") or block.get("reason") or "no heart-rate join on this block")
+    return {**base, "value": None, "state": INVALID, "reason": why, "hr_coverage": (fw or {}).get("hr_coverage")}
+
+
+def setting_label(spec: Mapping[str, Any]) -> Optional[str]:
+    """The fixed workload as one comparable string ('3.2 mph / 3.5 %'): results are compared only at the same setting."""
+    st = spec.get("setting")
+    if not isinstance(st, Mapping) or st.get("speed_mph") is None:
+        return None
+    return f"{st['speed_mph']} mph / {st.get('incline_pct')} %"
 
 
 def from_hevy(
     items: Iterable[Mapping[str, Any]], movements: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None
 ) -> dict[str, dict[str, Any]]:
     """{date: {test id: row}} read from Hevy per-workout rows (the stored shape: `exercises[].sets[]` with
-    `distance_m`, `duration_sec`, `weight_kg`, `reps`). A workout is a battery when its title carries
+    `distance_m`, `duration_sec`, `weight_kg`, `reps`; the fixed-workload test also reads the row's `cardio_hr`). A workout is a battery when its title carries
     `BATTERY_TITLE` or it logs at least `HEVY_MIN_TESTS` tests; anything else is ordinary training."""
     p = protocol() if proto is None else proto
     spec, ids = tests_spec(p), template_ids(movements, p)
@@ -241,13 +283,16 @@ def from_hevy(
         if date is None:
             continue
         found: dict[str, Any] = {}
-        for ex in it.get("exercises") or []:
-            test_id = _exercise_test(ex, ids)
-            if test_id is None:
-                continue
-            v = _hevy_value(spec[test_id], _working(ex.get("sets") or []))
-            if v is not None and (test_id not in found or _better(spec[test_id], v, found[test_id]["value"])):
-                found[test_id] = {"value": v, "unit": spec[test_id].get("unit"), "protocol_version": None, "source": HEVY}
+        for i, ex in enumerate(it.get("exercises") or []):
+            for test_id in _exercise_tests(ex, ids):
+                if spec[test_id].get("hevy_field") == "final_window_hr":
+                    row = _fixed_workload_row(spec[test_id], it, i, ex)
+                    if row is not None and (test_id not in found or (found[test_id].get("value") is None and row.get("value") is not None)):
+                        found[test_id] = row
+                    continue
+                v = _hevy_value(spec[test_id], _working(ex.get("sets") or []))
+                if v is not None and (test_id not in found or _better(spec[test_id], v, found[test_id]["value"])):
+                    found[test_id] = {"value": v, "unit": spec[test_id].get("unit"), "protocol_version": None, "source": HEVY}
         titled = BATTERY_TITLE.lower() in str(it.get("workout_name") or it.get("title") or "").lower()
         if found and (titled or len(found) >= HEVY_MIN_TESTS):
             out.setdefault(date, {}).update(found)
@@ -274,25 +319,62 @@ def batteries(records: Iterable[Mapping[str, Any]] | None, hevy: Mapping[str, Ma
 
 
 # ── trend ────────────────────────────────────────────────────────────────────────────────
+def _series_key(row: Mapping[str, Any], date: str, test: Mapping[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    """What a result may be compared with (#5798): for a regime-bound test, only results in the same heart-rate regime
+    (the newest `health.hr_regime` marker on or before the test date) at the same fixed setting."""
+    if not test.get("regime_bound"):
+        return (None, None)
+    from health import hr_regime
+
+    marker = hr_regime.latest_marker(date)
+    return (str(marker["date"]) if marker else None, row.get("setting"))
+
+
 def trend(batts: list[Mapping[str, Any]], proto: Optional[Mapping[str, Any]] = None, as_of: Optional[str] = None) -> dict[str, Any]:
-    """Per test: latest, previous, delta and whether it moved the better way. A test never logged is `absent`."""
+    """Per test: latest, previous, delta and whether it moved the better way. A test never logged is `absent`.
+
+    A regime-bound test (the fixed-workload treadmill, #5798) compares only within one heart-rate regime and one
+    fixed setting: the first result after a marker (or at a new setting) is `first`, never a delta against an earlier
+    regime. An `invalid` attempt (no heart-rate join) has no value; when it is the newest attempt the cell says so."""
     spec = tests_spec(proto)
     rows = [b for b in batts if as_of is None or str(b.get("date")) <= as_of]
     out: dict[str, Any] = {}
     for tid, row in spec.items():
-        hist = [(b["date"], b["tests"][tid]) for b in rows if tid in (b.get("tests") or {})]
+        attempts = [(b["date"], b["tests"][tid]) for b in rows if tid in (b.get("tests") or {})]
+        hist = [(d, r) for d, r in attempts if r.get("state") != INVALID and r.get("value") is not None]
         base = {"label": row.get("label"), "unit": row.get("unit"), "better": row.get("better")}
+        if not attempts:
+            out[tid] = {"state": ABSENT, **base, "detail": "never logged"}
+            continue
+        if attempts[-1][1].get("state") == INVALID:
+            d, r = attempts[-1]
+            out[tid] = {
+                "state": INVALID,
+                **base,
+                "latest_attempt": {"date": d, "weekday": pacific_weekday(d), "source": r.get("source"), "reason": r.get("reason")},
+                "detail": "the newest attempt has no usable heart-rate join — stored invalid, never as a value",
+            }
+            continue
         if not hist:
             out[tid] = {"state": ABSENT, **base, "detail": "never logged"}
             continue
-        (ld, lr), prev = hist[-1], (hist[-2] if len(hist) > 1 else None)
+        ld, lr = hist[-1]
+        key = _series_key(lr, ld, row)
+        same = [(d, r) for d, r in hist if _series_key(r, d, row) == key]
+        prev = same[-2] if len(same) > 1 else None
         cell: dict[str, Any] = {
             "state": MEASURED,
             **base,
             "latest": {"date": ld, "weekday": pacific_weekday(ld), "value": lr.get("value"), "source": lr.get("source")},
         }
+        if row.get("regime_bound"):
+            cell["latest"]["rpe"] = lr.get("rpe")
+            cell["latest"]["setting"] = lr.get("setting")
+            cell["compared_within"] = {"hr_regime_marker": key[0], "setting": key[1]}
         if prev is None:
             cell.update(previous=None, delta=None, direction="first")
+            if row.get("regime_bound") and len(hist) > 1:
+                cell["detail"] = "first result in this heart-rate regime at this setting — earlier results are not compared"
         else:
             pv, lv = float(prev[1]["value"]), float(lr["value"])
             delta = round(lv - pv, 1)
@@ -302,6 +384,8 @@ def trend(batts: list[Mapping[str, Any]], proto: Optional[Mapping[str, Any]] = N
                 delta=delta,
                 direction=direction,
             )
+            if row.get("regime_bound"):
+                cell["previous"]["rpe"] = prev[1].get("rpe")
         out[tid] = cell
     return out
 
