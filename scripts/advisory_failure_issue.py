@@ -10,10 +10,13 @@ work items:
 
   --mode file     (the workflow FAILED) Search open issues carrying the
                   MARKER_LABEL for this workflow's HTML-comment marker.
-                  Found → comment the new run link on it (one open issue per
-                  workflow — repeats never spam duplicates). Not found →
-                  create one, ADR-099-shaped body (what failed, run link,
-                  first-failure timestamp).
+                  Found → ONCE PER EPISODE (#5821): rewrite the issue
+                  body's `Last failing run:` line (a body edit sends no
+                  notification) and comment only when the failure summary
+                  CHANGED since the last recorded one. Not found → create
+                  one, ADR-099-shaped body (what failed, run link,
+                  first-failure timestamp). One open issue per workflow —
+                  repeats never spam duplicates.
   --mode recover  (the workflow SUCCEEDED) If this workflow's auto-filed
                   issue is open, comment the recovery run link and CLOSE it;
                   otherwise no-op. This is the documented close policy: an
@@ -25,6 +28,19 @@ Called by the composite action .github/actions/advisory-failure-issue (which
 maps job.status → mode). Stdlib-only (urllib, repo convention); the GitHub
 token comes from env GITHUB_TOKEN (needs issues:write). The dedup/orchestration
 logic is pure and offline-tested in tests/test_advisory_failure_issue.py.
+
+ONE NOTIFICATION PER EPISODE (#5821, owner ruling 2026-11-11). Until #5821 every
+repeat failure commented `Still failing — <ts>` on the open tracker, so a nightly
+workflow that stayed red sent the owner one GitHub notification a day for the life
+of the episode (#5558: a comment every day for ten days). The first filing and the
+recovery comment carry the information; a repeat is the same message with a new run
+link. So a repeat now edits a marker-delimited block in the BODY instead
+(`LAST_RUN_START`..`LAST_RUN_END`: last failing run, trigger, failing runs counted
+this episode), and records a short hash of the summary (`summary_marker`). It
+comments again only when the summary changes (a different failure inside the same
+open episode), on recovery, or on a NEW episode (the issue was closed, so the next
+red files a fresh one). A tracker filed before #5821 carries no hash: its summary
+counts as unchanged when the body already holds it (`**What failed:** …`).
 
 Error posture: in file mode an API failure exits 1 (the run is already red —
 the annotation shows filing failed rather than faking success); in recover
@@ -54,8 +70,10 @@ Two consequences for anyone editing `build_issue_body` below:
 """
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -112,20 +130,95 @@ Actions run history (the silent-failure class in docs/INCIDENT_LOG.md,
 
 **Close policy:** auto-closes on the next green run of this workflow
 (scheduled or `workflow_dispatch`). Repeat failures comment here instead of
-filing duplicates — one open issue per workflow. Closing by hand without
+filing duplicates — one open issue per workflow — and only when the failure
+changes; an unchanged repeat updates a `Last failing run:` line in this body. Closing by hand without
 fixing just means the next failure files a fresh issue.
 
 **outcome_if_fixed:** this advisory surface is back to silently green instead of silently red.
 
 {issue_marker(slug)}
+{summary_marker(summary)}
 """
 
 
 def build_failure_comment(run_url, ts, event_name, summary=""):
-    lines = [f"Still failing — {ts} (trigger: `{event_name}`): {run_url}"]
+    lines = [f"Still failing, with a changed failure — {ts} (trigger: `{event_name}`): {run_url}"]
     if summary:
         lines.append(f"\n{summary}")
     return "\n".join(lines)
+
+
+# ── #5821: one notification per episode — the body carries the repeats ──────
+
+LAST_RUN_START = "<!-- advisory-last-run:start -->"
+LAST_RUN_END = "<!-- advisory-last-run:end -->"
+_SUMMARY_MARKER_RE = re.compile(r"<!-- advisory-summary: ([0-9a-f]+) -->")
+_RUN_COUNT_RE = re.compile(r"failing runs counted here: (\d+)")
+
+
+def _normalise(text):
+    return " ".join((text or "").split())
+
+
+def summary_hash(summary):
+    """A short, whitespace-insensitive fingerprint of the failure summary."""
+    return hashlib.sha256(_normalise(summary).encode()).hexdigest()[:16]
+
+
+def summary_marker(summary):
+    return f"<!-- advisory-summary: {summary_hash(summary)} -->"
+
+
+def summary_changed(body, summary):
+    """Did the failure summary change since the last one this issue recorded?
+
+    Reads the hash marker; a pre-#5821 tracker has none, and then its summary is
+    unchanged iff the body already contains it (`**What failed:** <summary>`), so the
+    first repeat after this lands edits the body instead of commenting.
+    """
+    body = body or ""
+    m = _SUMMARY_MARKER_RE.search(body)
+    if m:
+        return m.group(1) != summary_hash(summary)
+    if not _normalise(summary):
+        return False
+    return _normalise(summary) not in _normalise(body)
+
+
+def _runs_so_far(body):
+    block = _last_run_block_of(body)
+    m = _RUN_COUNT_RE.search(block) if block else None
+    return int(m.group(1)) if m else 1  # the filing run itself is run 1
+
+
+def _last_run_block_of(body):
+    body = body or ""
+    i, j = body.find(LAST_RUN_START), body.find(LAST_RUN_END)
+    return body[i : j + len(LAST_RUN_END)] if 0 <= i < j else ""
+
+
+def build_last_run_block(run_url, ts, event_name, runs):
+    return (
+        f"{LAST_RUN_START}\n"
+        f"**Last failing run:** {ts} (trigger: `{event_name}`): {run_url} — failing runs counted here: {runs}. "
+        "_Updated in place on every repeat failure (a body edit sends no notification, #5821); "
+        "a comment is posted only when the failure changes, and on recovery._\n"
+        f"{LAST_RUN_END}"
+    )
+
+
+def update_body_for_repeat(body, run_url, ts, event_name, summary):
+    """The issue body with its last-run block and summary marker rewritten in place."""
+    body = body or ""
+    block = build_last_run_block(run_url, ts, event_name, _runs_so_far(body) + 1)
+    old = _last_run_block_of(body)
+    body = body.replace(old, block) if old else body.rstrip("\n") + "\n\n" + block + "\n"
+    marker = summary_marker(summary)
+    if _SUMMARY_MARKER_RE.search(body):
+        body = _SUMMARY_MARKER_RE.sub(marker, body, count=1)
+    else:
+        body = body.rstrip("\n") + "\n" + marker + "\n"
+    return body
 
 
 def build_recovery_comment(run_url, ts):
@@ -142,7 +235,11 @@ def exit_code_for_error(mode):
 
 
 def run(mode, slug, workflow_name, summary, run_url, event_name, client, now_iso=None):
-    """Orchestrate one file/recover pass. Returns 'created:N' | 'commented:N' | 'closed:N' | 'noop'."""
+    """Orchestrate one file/recover pass.
+
+    Returns 'created:N' | 'updated:N' (repeat, body edited, no notification) |
+    'commented:N' (repeat with a changed failure) | 'closed:N' | 'noop'.
+    """
     if mode not in ("file", "recover"):
         raise ValueError(f"unknown mode: {mode!r}")
     now_iso = now_iso or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -150,8 +247,14 @@ def run(mode, slug, workflow_name, summary, run_url, event_name, client, now_iso
 
     if mode == "file":
         if existing is not None:
-            client.comment(existing["number"], build_failure_comment(run_url, now_iso, event_name, summary))
-            return f"commented:{existing['number']}"
+            number = existing["number"]
+            body = existing.get("body") or ""
+            changed = summary_changed(body, summary)
+            client.update_issue_body(number, update_body_for_repeat(body, run_url, now_iso, event_name, summary))
+            if changed:
+                client.comment(number, build_failure_comment(run_url, now_iso, event_name, summary))
+                return f"commented:{number}"
+            return f"updated:{number}"
         client.ensure_label(MARKER_LABEL, MARKER_LABEL_COLOR, MARKER_LABEL_DESCRIPTION)
         created = client.create_issue(
             title=build_issue_title(workflow_name),
@@ -212,6 +315,9 @@ class GitHubClient:
 
     def comment(self, number, body):
         return self._request("POST", f"/repos/{self.repo}/issues/{number}/comments", {"body": body})
+
+    def update_issue_body(self, number, body):
+        return self._request("PATCH", f"/repos/{self.repo}/issues/{number}", {"body": body})
 
     def close_issue(self, number):
         return self._request("PATCH", f"/repos/{self.repo}/issues/{number}", {"state": "closed"})

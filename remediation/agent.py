@@ -19,6 +19,8 @@ Flow per run:
        - Operational remediations (clear stale alarm / drain stale DLQ msg / re-run
          gap-fill): done directly via the scoped role.
   4. Claude emits a JSON summary; we render + email it (SES) and write the audit log.
+     The email is SKIPPED when the needs-human hand-off is unchanged since the last send
+     (#5821, remediation/email_gate.py); the audit log is always written.
 
 Triggered by: schedule (daily sweep) or repository_dispatch (urgent_alarm).
 Auth: AWS OIDC (Bedrock + read-only diagnosis + scoped ops). Model: Sonnet 4.6.
@@ -29,11 +31,11 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import boto3
-
 import drift_report
+import email_gate
 import signal_identity
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -738,7 +740,7 @@ async def run_agent(prompt):
     mutate AWS. `disallowed_tools` is best-effort defense-in-depth. We accumulate
     text across all messages and tolerate the SDK's ResultMessage protocol /
     end-of-stream exceptions so a partial run still produces a report."""
-    from claude_agent_sdk import query, ClaudeAgentOptions  # installed in the workflow
+    from claude_agent_sdk import ClaudeAgentOptions, query  # installed in the workflow
 
     options = ClaudeAgentOptions(
         permission_mode="bypassPermissions",
@@ -920,6 +922,11 @@ def email_report(report, mode):
     nh = report.get("needs_human", [])
     stale = report.get("stale", [])
     unt = report.get("untriaged", [])
+    # #5821: one email per CHANGE in the hand-off, not one per run.
+    send, why = email_gate.should_send(report, email_gate.load_last_sent(_s3, LOG_BUCKET), os.environ.get("GITHUB_EVENT_NAME", ""))
+    if not send:
+        print(f"report email skipped: {why}")
+        return False
     subj = f"🤖 Remediation [{mode}]: {len(af)} fixed, {len(prs)} PRs, {len(nh)} need you"
     if unt:
         subj += f", {len(unt)} untriaged"
@@ -951,9 +958,12 @@ def email_report(report, mode):
             Destination={"ToAddresses": [RECIPIENT]},
             Content={"Simple": {"Subject": {"Data": subj[:99]}, "Body": {"Html": {"Data": html}}}},
         )
-        print(f"report emailed: {subj}")
+        print(f"report emailed: {subj} ({why})")
     except Exception as e:
         print(f"[warn] SES send: {e}")
+        return False
+    email_gate.save_last_sent(_s3, LOG_BUCKET, report, f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}")
+    return True
 
 
 def _citations_and_predicate():
