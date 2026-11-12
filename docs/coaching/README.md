@@ -98,4 +98,5 @@ the owner's walking-first rule is owner-ruled (2026-10-23, #5091: keep the steps
 is made Friday night for the coming week, carried by every calorie surface through
 `health.calorie_target`, and shown with its reason in the Saturday nutrition-review email. The
 weekly refit runs on owner ruling 2026-10-23 R1 (#5091): the target stays ~1,500, losing faster than the band
-ceiling holds and WARNS (food is never pushed up on its own), and the energy floors are warnings, never a clamp.
+ceiling holds and WARNS (food is never pushed up on its own), and the served target is clamped at the day's energy floor (owner ruling 2026-11-11, #5794;
+logged days are still graded against the floors as warnings).

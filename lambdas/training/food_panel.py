@@ -279,12 +279,15 @@ def check_target_resolved(f: dict[str, Any]) -> tuple[float, str]:
 
 
 def check_in_band(f: dict[str, Any]) -> tuple[float, str]:
+    """Each day's SERVED target (the base clamped at its floor, #5794) inside its band — the owner raised the band to the
+    floors the same day (2026-11-11) so an on-plan day reads in band; the titrated base sits under it by design."""
+
     def inside(d: dict[str, Any]) -> bool:
-        base, lo, hi = _n(d.get("base_kcal")), _n(d.get("band_low")), _n(d.get("band_high"))
-        return base is not None and lo is not None and hi is not None and lo <= base <= hi
+        kcal, lo, hi = _n(d.get("kcal")), _n(d.get("band_low")), _n(d.get("band_high"))
+        return kcal is not None and lo is not None and hi is not None and lo <= kcal <= hi
 
     ok = [d for d in f["days"] if inside(d)]
-    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days have a base target inside their stated band"
+    return _over_week(len(ok), f), f"{len(ok)} of {len(f['days'])} days have a served target inside their stated band"
 
 
 def _floor_for(d: dict[str, Any], r: dict[str, Any]) -> float | None:
@@ -486,19 +489,21 @@ def check_training_day_fuel(f: dict[str, Any]) -> tuple[float, str]:
 def check_week_balanced(f: dict[str, Any]) -> tuple[float, str]:
     """The week follows the training-day rule (owner ruling 2026-10-23, #5091): every lifting day is its base plus the
     charter uplift and every other day is its base — no rest day paid back below the target, so the week averages above
-    the base by design. `balance_held` on every day says the resolver held the rule."""
+    the base by design — each clamped up to its day's floor (owner ruling 2026-11-11, #5794). `balance_held` on every day
+    says the resolver held the rule."""
     kcal = [k for k in (_n(d.get("kcal")) for d in f["days"]) if k is not None]
     base = [b for b in (_n(d.get("base_kcal")) for d in f["days"]) if b is not None]
     if len(f["days"]) < WEEK_DAYS or len(kcal) != len(f["days"]) or len(base) != len(f["days"]):
         return 0.0, f"{len(f['days'])} days, some without a target — the week's balance cannot be read"
     uplift = _n(charter_value("nutrition.training_day.lifting_uplift_kcal")) or 0.0
-    want = [(b + uplift if d.get("day_type") == "lifting" else b) for d, b in zip(f["days"], base)]
+    rule = [(b + uplift if d.get("day_type") == "lifting" else b) for d, b in zip(f["days"], base)]
+    want = [max(w, _floor_for(d, f["rules"]) or w) for d, w in zip(f["days"], rule)]  # #5794: the served day is clamped at its floor
     off = [f"{d.get('date')} {k:g} (rule {w:g})" for d, k, w in zip(f["days"], kcal, want) if abs(k - w) > 0.5]
     held = all(d.get("balance_held") is True for d in f["days"])
     ok = held and not off
     gap = (sum(kcal) - sum(base)) / WEEK_DAYS
     return (10.0 if ok else 0.0), (
-        f"the week averages {round(gap):+d} kcal/day on its base (lifting +{uplift:g}, rest days at the base); "
+        f"the week averages {round(gap):+d} kcal/day on its base (lifting +{uplift:g}, rest days at the base, each day clamped at its floor); "
         f"every day balance_held = {held}" + (f"; off the rule: {off[:7]}" if off else "")
     )
 

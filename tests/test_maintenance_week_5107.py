@@ -162,10 +162,14 @@ def test_the_resolver_serves_maintenance_on_exactly_the_window_dates():
     assert "planned maintenance date" in on["provenance"] and on.get("maintenance_day") is True
     assert (on["band_low"], on["band_high"]) == (d["maintenance_band_low"], d["maintenance_band_high"])
     off = ct.resolve("2026-12-22", titration_reader=rd, day_type="lifting")
-    assert off["kcal"] == 1500 + tc.charter_value("nutrition.training_day.lifting_uplift_kcal") and not off.get("maintenance_day")
+    # off the window: the base + the lifting uplift, served at the lifting-day floor when under it (#5794)
+    lift = max(
+        1500 + tc.charter_value("nutrition.training_day.lifting_uplift_kcal"), tc.charter_value("nutrition.calories.floor_lifting_day_kcal")
+    )
+    assert off["kcal"] == lift and off["base_kcal"] == 1500 and not off.get("maintenance_day")
     blind = decide(ti.settings(reader()), WK1, estimate={})
     r = ct.resolve("2026-12-25", titration_reader=lambda week: blind)
-    assert r["kcal"] == 1500 and "no readable maintenance estimate" in r["provenance"]
+    assert r["base_kcal"] == 1500 and "no readable maintenance estimate" in r["provenance"]
 
 
 def test_the_record_round_trips_through_the_dynamodb_wire():

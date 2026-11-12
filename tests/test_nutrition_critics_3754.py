@@ -50,7 +50,10 @@ PROTEIN = rl.REDLINES["protein_floor_g"]
 LIFTS = rl.REDLINES["lifting_sessions_per_wk"]
 TW = {t["id"]: t for t in rl.TRIPWIRES}
 LO, HI = ENERGY["prescribed"]
-MID = (LO + HI) // 2  # the band's centre: the target (#5099, owner ruling 2026-10-23 R1)
+MID = (LO + HI) // 2  # the band's centre: an in-band intake (#5099)
+BASE = nc.calorie_target.resolve("2026-11-11")[
+    "base_kcal"
+]  # the titrated base a calorie step moves (#5794: the band no longer centres on it)
 STEP = int(nc.charter_value("nutrition.titration.max_step_kcal"))  # the ONE calorie step (#5205)
 
 
@@ -187,7 +190,7 @@ def test_overshoot_two_weeks_over_cap_after_week_4_is_a_warning_quoting_the_sche
 
 def test_overshoot_under_the_pre_ruling_posture_is_a_change_of_the_one_step(pre_ruling):
     f = _overshoot_flag()
-    assert f["severity"] == "change" and f["to"] == MID + STEP
+    assert f["severity"] == "change" and f["to"] == BASE + STEP
 
 
 @pytest.mark.parametrize("over", [{"weeks_since_genesis": 3}, {"weekly_loss_rates_lb_wk": [2.0, 4.0]}])
@@ -521,7 +524,7 @@ def test_rate_overshoot_option_reads_the_target_not_the_logged_mean_5325():
     )
     offered = nc.decisions_offered(nc.run(inputs)["verdicts"], inputs, already_logged=[])
     (d,) = [d for d in offered if d["trigger"]["id"] == "rate_overshoot"]
-    assert any(f"to {MID + STEP}" in o for o in d["options"]), d["options"]
+    assert any(f"to {BASE + STEP}" in o for o in d["options"]), d["options"]
     assert not any(f"to {MID - 400 + STEP}" in o for o in d["options"]), "the logged mean must not set the destination"
 
 
@@ -803,7 +806,7 @@ def test_overshoot_to_reads_the_resolver_target_not_the_logged_mean(pre_ruling):
         )
     )
     (f,) = _flags(p, "rate_over_cap_consecutive_weeks")
-    assert f["to"] == MID + STEP and f["to"] != (MID - 400) + STEP
+    assert f["to"] == BASE + STEP and f["to"] != (MID - 400) + STEP
 
 
 def test_approve_beside_an_over_cap_warning_states_the_run_in_its_rationale():
