@@ -580,11 +580,37 @@ def _ledger() -> dict[str, Any]:
     return _LEDGER
 
 
+ADDITIONS_MODULE = "exercise_library_additions"  # deploy/exercise_library_additions.py (epic #5861 lane L2), optional
+
+
+def library_additions() -> list[dict[str, Any]]:
+    """THE library-expansion hook (#5861): new canonical movements from `deploy/exercise_library_additions.py`.
+
+    Contract: that module exposes `ADDITIONS: list[dict]`, each entry in the curation's `EXPANSION` shape (built the way
+    `exercise_library_curation._x` builds one: `key`, `title`, `template_id` or None + `template_note`, and any attribute
+    the rules cannot know — `target`, `family`, `length_bias`, `resistance_profile`, `stability`, `joint_stress`,
+    `skill_complexity`, `equipment`, `gates`), plus the #5861 evaluation fields the objective rubrics read when present:
+    `category`, `trunk_function`, `functions`, `canonical`, `variant`, `objective_inputs` (see
+    `training.quality_rubric.OBJECTIVE_INPUTS`). An absent module is no additions. A key that is already a curated
+    candidate is a hard stop — an addition never silently replaces a reviewed entry."""
+    import importlib.util
+
+    if importlib.util.find_spec(ADDITIONS_MODULE) is None:
+        return []
+    mod = importlib.import_module(ADDITIONS_MODULE)
+    adds = [dict(x) for x in getattr(mod, "ADDITIONS", [])]
+    clash = sorted({x["key"] for x in adds} & {x["key"] for x in cur.EXPANSION})
+    if clash:
+        raise SystemExit(f"library additions: keys already curated in EXPANSION: {clash}")
+    return adds
+
+
 def _expansion_list() -> list[dict[str, Any]]:
-    """The curation's candidates, then the ledger's accepted ones (a ledger key already curated is a replacement)."""
+    """The curation's candidates, then the #5861 additions, then the ledger's accepted ones (a ledger key already listed
+    is a replacement)."""
     extra = reviews.ledger_candidates(_ledger())
     keys = {x["key"] for x in extra}
-    return [x for x in cur.EXPANSION if x["key"] not in keys] + extra
+    return [x for x in cur.EXPANSION + library_additions() if x["key"] not in keys] + extra
 
 
 def library_citations() -> dict[str, dict[str, Any]]:
