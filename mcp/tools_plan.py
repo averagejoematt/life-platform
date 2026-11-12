@@ -45,7 +45,7 @@ from typing import Any, Optional
 
 from common.pacific_time import pacific_today
 
-from mcp import plan_call_scope  # #5313: one read per plan call, the call clock, stage 2's write deadline
+from mcp import plan_call_scope, plan_summary  # #5313 one read per plan call + the write deadline; #5803 the summary view
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
 from mcp.plan_helpers import (  # noqa: F401 (#4149)
@@ -625,6 +625,7 @@ _STAGE_2_HOW_TO_USE = (
 )
 
 
+@plan_summary.detail_mode  # #5803: detail='summary' — the compact view, projected from the full result after it is built
 @plan_call_scope.plan_call  # #5313
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
