@@ -64,6 +64,7 @@ def serve(rows: list, get_call: Callable[[str, str], Optional[dict]], today: str
     briefs: dict = {}
     evidence: dict = {}
     revisions: dict = {}
+    disputes: dict = {}
     for r in rows or []:
         sk = str((r or {}).get("sk") or "")
         if not sk.startswith(POL.BRIEF_SK_PREFIX) or _withheld(r):
@@ -74,6 +75,8 @@ def serve(rows: list, get_call: Callable[[str, str], Optional[dict]], today: str
             evidence.setdefault(cycle, {})[r.get("recommendation_id")] = r
         elif POL.REVISION_TAG in sk:
             revisions.setdefault(cycle, []).append(r)
+        elif POL.DISPUTE_TAG in sk:
+            disputes.setdefault(cycle, []).append(r)
         elif sk == POL.brief_sk(cycle):
             briefs[cycle] = r
     out = []
@@ -107,8 +110,30 @@ def serve(rows: list, get_call: Callable[[str, str], Optional[dict]], today: str
                     {k: v.get(k) for k in ("target", "kind", "text", "reason", "revised_in_cycle", "generated_at")}
                     for v in sorted(revisions.get(cycle, []), key=lambda x: str(x.get("sk")))
                 ],
+                "disputes": _disputes(disputes.get(cycle, []), get_call),
             }
         )
+    return out
+
+
+def _disputes(rows: list, get_call: Callable[[str, str], Optional[dict]]) -> list:
+    """A disagreement is served only whole: both sides' calls must be served by the ledger, else it is omitted."""
+    out = []
+    for d in sorted(rows, key=lambda x: str(x.get("sk"))):
+        sides = []
+        for side in d.get("sides") or []:
+            call = get_call(str(side.get("coach_id") or ""), str(side.get("prediction_id") or ""))
+            if not isinstance(call, dict) or _withheld(call) or not call.get("claim_natural"):
+                break
+            sides.append(
+                {
+                    **{k: side.get(k) for k in ("coach_id", "prediction_id", "claim", "cited_observations")},
+                    "ledger": {"status": call.get("status"), "outcome_date": call.get("outcome_date")},
+                }
+            )
+        if len(sides) == 2 and len(d.get("sides") or []) == 2:
+            crit = d.get("criterion") or {}
+            out.append({"metric": d.get("metric"), "criterion": {k: crit.get(k) for k in ("rule", "kind", "window_days")}, "sides": sides})
     return out
 
 

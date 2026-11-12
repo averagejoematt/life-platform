@@ -834,15 +834,22 @@
     },
     "site-api-invocation-spike": {
       "audience": "reader",
+      "audience_routing_ruling": "#5821 (owner ruling 2026-11-11) \u2014 a traffic counter, not a broken door: 200/5 min is about the p95 of ordinary 5-minute traffic, so it flapped 51 times in 7 days and every email duplicated a digest line. Escalation on first red is kept; the urgent email is not.",
       "audience_ruling": "serve_stack \u2014 an invocation spike on the reader-facing API (capacity/DoS blast radius reaches readers).",
       "kind": "metric",
-      "routing": "digest+urgent",
+      "routing": "digest",
       "stack": "serve_stack",
       "via": "declaration"
     },
     "site-api-p95-latency-high": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "serve_stack",
+      "via": "declaration"
+    },
+    "site-api-p95-latency-sustained": {
       "audience": "reader",
-      "audience_ruling": "serve_stack \u2014 p95 latency a reader directly experiences loading the site.",
+      "audience_ruling": "serve_stack \u2014 p95 latency a reader directly experiences loading the site, held for 15 minutes (3 of 3 five-minute periods, #5821); the single-period `site-api-p95-latency-high` is its digest-only early signal and carries no audience tag.",
       "kind": "metric",
       "routing": "digest+urgent",
       "stack": "serve_stack",
@@ -1111,7 +1118,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 149,
+    "alarms": 150,
     "emf_namespaces": 34,
     "schedules": 97,
     "secrets": 30
@@ -4258,6 +4265,13 @@
       "lambda": null,
       "module": "lambdas/reading/reading_resonance.py",
       "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/block_design_review.py",
+      "partition": "training_constraints",
       "via": "pk"
     },
     {
@@ -8255,11 +8269,11 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 149,
+      "alarms": 150,
       "alarms_by_routing": {
-        "digest": 104,
+        "digest": 106,
         "digest+paging": 2,
-        "digest+urgent": 11,
+        "digest+urgent": 10,
         "paging": 2,
         "urgent": 27,
         "via-composite": 3
@@ -8269,7 +8283,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 786,
+      "edges": 787,
       "lambdas": 107,
       "mcp_tool_modules": 40,
       "mcp_tools": 91,
@@ -8284,8 +8298,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 394,
-        "sites_resolved": 986,
-        "sites_total": 1380
+        "sites_resolved": 987,
+        "sites_total": 1381
       },
       "schedule_resolution": {
         "dynamic": 0,

@@ -291,7 +291,9 @@ def targets(kcal: Optional[float], read: Optional[CharterReader] = None) -> dict
     band = read("nutrition.calories.prescribed_band_kcal")
     edges = [_num(x) for x in band] if isinstance(band, (list, tuple)) and len(band) == 2 else []
     lo, hi = (edges[0], edges[1]) if len(edges) == 2 else (None, None)
-    half = (hi - lo) / 2 if lo is not None and hi is not None and hi >= lo else None  # the band's half-width, centred on the target
+    half = (
+        (hi - lo) / 2 if lo is not None and hi is not None and hi >= lo else None
+    )  # the band's half-width, applied around the day's target
     window = read("nutrition.eating_window") or {}
     return {
         "kcal": int(round(kcal)) if kcal is not None else None,

@@ -302,13 +302,22 @@ def test_a_session_trained_inside_its_ceiling_reads_yes():
 # Specimen (the issue's own): prescribed `21310F5F` ("Triceps Extension (Cable)") vs
 # performed `B5EFBF9C` ("Overhead Triceps Extension (Cable)") — one physical movement,
 # two Hevy catalog ids. The registry is `config/hevy_template_aliases.json`, seeded
-# with exactly this pair; these tests exercise the SHIPPED config, not a synthetic one,
-# except where a test is explicitly about the pre-fix (registry-absent) contrast.
+# with exactly this pair — until the owner ruling 2026-11-11 (#5773) SPLIT it into two
+# movements (the registry's `split` map). The resolution MECHANISM is still tested on
+# this pair, now as a synthetic registry (`_SPECIMEN_REGISTRY`); the shipped registry
+# is tested for the split itself (`test_the_shipped_registry_keeps_the_split_pair_apart`).
 #
 # `tmpl:<id>` is the existing ADR-069 escape hatch in `_ir_movement_to_template` — used
 # here so the specimen needs no `config/movement_catalog.json` entry of its own (the
 # real Hevy catalog has no `movements` entry for either triceps-extension id today).
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+_SPECIMEN_REGISTRY = {"aliases": {"B5EFBF9C": "tmpl:21310F5F"}}  # the #3929 pair, before the 2026-11-11 split
+
+
+def _specimen_registry(monkeypatch) -> None:
+    monkeypatch.setattr(adherence_calc, "_load_template_aliases", lambda: _SPECIMEN_REGISTRY)
 
 
 def _triceps_alias_ir() -> RoutineSpec:
@@ -324,9 +333,9 @@ def _triceps_alias_performed() -> dict:
     return {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": [{}, {}, {}]}]}
 
 
-def test_template_alias_resolves_before_missing_and_extra():
-    """Acceptance: a planted alias pair yields ZERO missing/extra, under the shipped
-    (not monkeypatched) registry."""
+def test_template_alias_resolves_before_missing_and_extra(monkeypatch):
+    """Acceptance: a planted alias pair yields ZERO missing/extra."""
+    _specimen_registry(monkeypatch)
     result = calculate_adherence(_triceps_alias_ir(), _triceps_alias_performed())
     assert result["missing"] == []
     assert result["extra"] == []
@@ -340,7 +349,6 @@ def test_template_alias_fix_scores_at_or_above_the_broken_pre_fix_value(monkeypa
     for contrast. The alias-resolved score must read AT OR ABOVE that broken value,
     never below it."""
     ir, performed = _triceps_alias_ir(), _triceps_alias_performed()
-    real_load_aliases = adherence_calc._load_template_aliases
 
     monkeypatch.setattr(adherence_calc, "_load_template_aliases", lambda: {})
     broken = calculate_adherence(ir, performed)
@@ -348,12 +356,21 @@ def test_template_alias_fix_scores_at_or_above_the_broken_pre_fix_value(monkeypa
     assert broken["extra"] == ["B5EFBF9C"]
     assert broken["overall_pct"] < 100.0
 
-    monkeypatch.setattr(adherence_calc, "_load_template_aliases", real_load_aliases)
+    _specimen_registry(monkeypatch)
     fixed = calculate_adherence(ir, performed)
     assert fixed["overall_pct"] >= broken["overall_pct"]
     assert fixed["overall_pct"] == 100.0
     assert fixed["missing"] == []
     assert fixed["extra"] == []
+
+
+def test_the_shipped_registry_keeps_the_split_pair_apart():
+    """Owner ruling 2026-11-11 (#5773): the overhead cable extension is its own movement. Under the SHIPPED registry a
+    prescribed neutral-arm extension done as the overhead one is one missing + one extra — they no longer fold."""
+    reg = adherence_calc._load_template_aliases()
+    assert "B5EFBF9C" not in reg["aliases"] and reg["split"]["B5EFBF9C"]["was_alias_of"] == "tmpl:21310F5F"
+    result = calculate_adherence(_triceps_alias_ir(), _triceps_alias_performed())
+    assert result["missing"] == ["tmpl:21310F5F"] and result["extra"] == ["B5EFBF9C"]
 
 
 def test_unresolvable_alias_movement_key_fails_open(monkeypatch):
@@ -383,6 +400,14 @@ def test_find_alias_candidates_excludes_an_already_confirmed_pair():
     assert candidates == []
 
 
+def test_find_alias_candidates_never_reproposes_a_split_pair():
+    """#5773: a pair the owner split is never proposed again — and the shipped registry's own split map does it."""
+    titles = {"21310F5F": "Triceps Extension (Cable)", "B5EFBF9C": "Overhead Triceps Extension (Cable)"}
+    reg = adherence_calc._load_template_aliases()
+    assert adherence_calc.find_alias_candidates(titles, known_aliases=reg["aliases"], known_split=reg["split"]) == []
+    assert adherence_calc.find_alias_candidates(titles, known_aliases=reg["aliases"]) != []  # control: without it, proposed
+
+
 def test_find_alias_candidates_never_merges_a_genuinely_different_movement():
     """Negative control: incline vs flat bench are DIFFERENT movements (see
     `config/movement_catalog.json` — different default rep ranges, different primary
@@ -398,14 +423,15 @@ def test_find_alias_candidates_never_merges_a_genuinely_different_movement():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_accessory_with_no_prescribed_ceiling_defaults_to_rpe_9_and_lowers_adherence():
+def test_accessory_with_no_prescribed_ceiling_defaults_to_rpe_9_and_lowers_adherence(monkeypatch):
     """THE ISSUE'S OWN SPECIMEN (#4073): an isolation accessory with no exercise/routine
     RPE note, logged at RPE 9.5, used to read `status: unprescribed` and drop out of the
     intensity dimension entirely — so an RPE-9.5 isolation set never touched the verdict.
     The movement is the SAME triceps-extension alias pair #3929 already resolves (`tmpl:
     21310F5F` prescribed, `B5EFBF9C` performed — the shipped, not monkeypatched, registry),
     so this one fixture proves BOTH halves of #4073 at once: the alias still resolves
-    (zero missing/extra) AND the unprescribed ceiling now grades."""
+    (zero missing/extra) AND the unprescribed ceiling now grades. Since the 2026-11-11 split
+    (#5773) the pair is a synthetic registry here, not the shipped one."""
     ir = RoutineSpec(
         routine_id="r-accessory-default",
         target_date="2026-09-15",
@@ -413,6 +439,7 @@ def test_accessory_with_no_prescribed_ceiling_defaults_to_rpe_9_and_lowers_adher
         exercises=[ExerciseBlock(movement_key="tmpl:21310F5F", sets=[Set(), Set(), Set()])],
     )
     performed = {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": _sets(9.5, 9.0, 8.0)}]}
+    _specimen_registry(monkeypatch)
     result = calculate_adherence(ir, performed)
 
     # Alias resolution (#3929) still holds — this is not a regression of that fix.
@@ -451,6 +478,7 @@ def test_accessory_default_breach_still_grades_no_when_the_tolerance_is_zero(mon
         archetype="push",
         exercises=[ExerciseBlock(movement_key="tmpl:21310F5F", sets=[Set(), Set(), Set()])],
     )
+    _specimen_registry(monkeypatch)
     result = calculate_adherence(ir, {"exercises": [{"exercise_template_id": "B5EFBF9C", "sets": _sets(9.5, 9.0, 8.0)}]})
     assert result["movements"][0]["intensity"]["sets_over_ceiling"] == 1
     assert result["as_prescribed"]["verdict"] == "no"

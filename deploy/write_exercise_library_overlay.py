@@ -27,6 +27,9 @@ WHAT IT HOLDS (keyed by Hevy template id, joined to the public library at select
     `scripts/check_library_gates_private.py` fails until he sets them). A value already in the existing overlay
     is preserved — a re-run never wipes an owner-set threshold.
   * `not_for_you_now_detail` — the coded evidence behind each public `not_for_you_now`.
+  * `technique_confirmations` — library movement id -> {confirmed_on, source}: the owner's technique confirmations, which
+    the `owner_confirmation` gate reads as met (#5772). Seeded from `OWNER_TECHNIQUE_CONFIRMATIONS`; one already in the
+    existing overlay is preserved, so a re-run never drops one. Harder skill steps still follow their chain gates.
 
 Read-only inputs: the Hevy partition (the same Query the library builder uses), the Withings partition, the
 existing overlay (S3 GetObject), `config/exercise_library.json`, `config/training_charter.json`.
@@ -52,6 +55,25 @@ _WORKOUT_SK = re.compile(r"^DATE#(\d{4}-\d{2}-\d{2})#WORKOUT#(.+)$")
 _DELETE_SK = re.compile(r"^DELETE#WORKOUT#(.+)$")
 LEGACY_TOMBSTONE = "legacy_daily_aggregate_superseded_by_per_workout"
 PROGRAM_NOTE_REPEATS = 3
+
+# Owner ruling 2026-11-11 (on PR #5824 / #5772): he CONFIRMS his clean technique — the clean he logs now (`clean`, the
+# Hevy "Clean" template) and the hang power clean (`hang_power_clean`, logged under Hevy's "Hang Clean"). Only the
+# owner_confirmation gate reads this; the clean's bodyweight and chain gates still apply.
+OWNER_TECHNIQUE_CONFIRMATIONS: dict[str, dict[str, str]] = {
+    "clean": {"confirmed_on": "2026-11-11", "source": "owner ruling 2026-11-11"},
+    "hang_power_clean": {"confirmed_on": "2026-11-11", "source": "owner ruling 2026-11-11"},
+}
+
+
+def technique_confirmations(lib: dict[str, Any], existing: dict[str, Any] | None) -> dict[str, dict[str, str]]:
+    """Existing confirmations first (never dropped), then the seeded owner rulings; ids must be library movements."""
+    known = xl.movements(lib)
+    prior = (existing or {}).get("technique_confirmations") or {}
+    out = {k: v for k, v in prior.items() if k in known and isinstance(v, dict)}
+    for k, v in OWNER_TECHNIQUE_CONFIRMATIONS.items():
+        if k in known:
+            out.setdefault(k, dict(v))
+    return dict(sorted(out.items()))
 
 
 def _f(v: Any) -> float:
@@ -227,6 +249,7 @@ def build_overlay(lib, charter, workouts, weight_index, existing) -> tuple[dict[
         "gates": gates,
         "gate_thresholds": {gid: row for gid, row in gates.items() if row["kind"] == "bodyweight_threshold"},
         "not_for_you_now_detail": nfy,
+        "technique_confirmations": technique_confirmations(lib, existing),
     }
     summary = {
         "workouts_read": len(workouts),
@@ -242,6 +265,7 @@ def build_overlay(lib, charter, workouts, weight_index, existing) -> tuple[dict[
         "gates": len(gates),
         "gates_with_null_value": sorted(g for g, r in gates.items() if r.get("value") is None),
         "not_for_you_now_detail": len(nfy),
+        "technique_confirmations": sorted(overlay["technique_confirmations"]),
     }
     return overlay, summary
 

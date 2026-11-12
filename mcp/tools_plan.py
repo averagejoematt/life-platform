@@ -45,7 +45,7 @@ from typing import Any, Optional
 
 from common.pacific_time import pacific_today
 
-from mcp import plan_call_scope  # #5313: one read per plan call, the call clock, stage 2's write deadline
+from mcp import plan_call_scope, plan_summary  # #5313 one read per plan call + the write deadline; #5803 the summary view
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
 from mcp.plan_helpers import (  # noqa: F401 (#4149)
@@ -124,6 +124,17 @@ def _training_phase_field() -> dict[str, Any]:
 
     value, status = phase_brief_field()
     return {**status, "value": value}
+
+
+def _training_fields(*, stage_1: bool, dry_run: bool) -> dict[str, Any]:
+    """#5576 `training_phase` + #5772 `exercise_unlocks` — a newly unlocked movement is announced ONCE: stage 1 claims
+    the record (`exercise_gates_leg.unlock_announcements_field`), stage 2 and a dry run read without claiming."""
+    from mcp.exercise_gates_leg import unlock_announcements_field
+
+    return {
+        "training_phase": _training_phase_field(),
+        "exercise_unlocks": unlock_announcements_field(claim_rows=stage_1 and not dry_run),
+    }
 
 
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
@@ -625,6 +636,7 @@ _STAGE_2_HOW_TO_USE = (
 )
 
 
+@plan_summary.detail_mode  # #5803: detail='summary' — the compact view, projected from the full result after it is built
 @plan_call_scope.plan_call  # #5313
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
@@ -925,7 +937,7 @@ def tool_plan_next_session(args):
     out["nutrition_critics"] = nutrition  # #3754: built above (#5802), the same block get_deficit_sustainability carries
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
-    out["training_phase"] = _training_phase_field()  # #5576: the computed phase, the next one, the closest unmet gate + value
+    out.update(_training_fields(stage_1=ir is None, dry_run=bool(args.get("dry_run"))))  # #5576 training_phase + #5772 exercise_unlocks
     out["calibration_due"] = calibration_due_field(target_date)  # #5760: tape / photos / battery due, named until logged
     attach_coach_context(out, target_date, constraint_block=block, packet_reason=PACKET_NOT_REREAD)  # #5071/#5200
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding

@@ -742,6 +742,21 @@ the restored ref to push back) can be re-uploaded once new bytes exist but never
 CLOSED 2026-08-31 as the completed silent-failure-floor epic; a live rule pointing at a
 closed issue is a rule with no owner, and #3652 found it that way.
 
+**The v9 deploy waits for the Site API it reads (2026-11-12, run 43124939822).** The v9
+build exports its snapshot from, and its smoke judges, the LIVE Site API — whose code ships
+only through CI's fleet deploy or `deploy/deploy_site_api.sh`. A merge that changed both
+(#5827: a flag flip on an already-registered route) smoke-failed against the old API while
+CI sat behind an owner-required IAM diff; the rollback was correctly declined (`api:1`), the
+run stayed red. `web-preview-deploy.yml`'s `api-readiness` job now compares the live
+bundle's `build_info.json` commit with the commit the Site API owes (the stale-Lambda
+dead-man's own derivation) and, when behind, **defers** — nothing synced, nothing rolled
+back — instead of waiting. `web-deploy-resume.yml` (every CI/CD completion + hourly) and the
+laptop deploy scripts re-dispatch the deferred deploy once the API lands; a deferral older
+than 8 h reds the resume run. Break-glass: dispatch with `api_readiness=skip`. Logic and
+tests: `deploy/www_api_readiness.py`, `tests/test_www_api_readiness.py`. Route-level
+deferral (`deploy/api_deploy_sequencing.json`) still covers `site/**`, which this gate does
+not.
+
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 
 Concurrent PRs each commit **generator output** (doc-sync literals in

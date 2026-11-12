@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.43.0",
+  "version": "1.47.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -295,6 +295,34 @@
       "by": "owner ruling 2026-11-11 (#5798, setting owner-confirmed 2026-11-11: the fixed-workload cardio test is the treadmill, 20 minutes at a fixed speed and incline; the bike test stays as it is)",
       "what": "calibration.fitness_tests gains treadmill_20min_fixed (protocol_version 1 -> 2): 20 minutes on the treadmill at ONE fixed speed and incline, mean heart rate over minutes 10 to 20 (lower is better) with the logged RPE beside it. The setting (3.2 mph, 3.5 % incline) was proposed by the platform from his treadmill history and is OWNER-CONFIRMED 2026-11-11; it stays fixed across tests, and a changed setting starts a new comparison series. Heart rate is a MEASUREMENT here, never an effort gate: it builds the baseline after the 2026-10-10 heart-rate regime marker. A test with no usable heart-rate join is stored invalid, never as a value; no result before the marker is compared with one after it. It rides the battery's cadence, test day and dead-man; the order places it before the bike test.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.44.0",
+      "date": "2026-11-11",
+      "by": "owner ruling 2026-11-11 on #5797 (gate:owner): \"calibration sets ONLY on NON-BARBELL anchors (lat pulldown, one-arm DB row, machine press); the calibration set STOPS AT THE FIRST SLOW REP, NOT FAILURE\"; his standing no-grinding rule (2026-10-10) excludes barbell rep-outs; rir_at_first_slow_rep 2 confirmed by the owner 2026-11-11",
+      "what": "Adds calibration.rpe, the RPE calibration set (#5797). On every third exposure (counted from 2026-11-11) of an eligible movement, the LAST back-off set (the last working set when the exposure has no back-offs; never the only working set) is a calibration set: before it he logs, in the Hevy set's RPE field, the RPE he predicts for the row's top rep; he then does reps until the first slow rep (rep speed visibly drops), never to failure, and logs the reps done. Predicted reps in reserve = 10 - that RPE; actual = reps done + rir_at_first_slow_rep - the row's top rep; the error is actual - predicted, reported per movement and pooled (n stated; descriptive under min_n). The RPE-adjusted e1RM (training.load_ramp) adds a movement's mean error to its RIR only once n >= min_n AND the interval excludes zero, recorded on hold.rpe_basis. Never on a barbell (equipment barbell is refused even if listed), a deload week, a red day, an OD1-capped exposure (1 to 3 after a layoff), a first session back, a lift with no PREVIOUS, or the tired-day floor variant. eligible, every_nth_exposure, the stop rule and rir_at_first_slow_rep (owner-confirmed 2026-11-11) are the owner's; min_n, interval_pct and min_working_sets are platform defaults, labelled, pending his ruling.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.45.0",
+      "date": "2026-11-12",
+      "by": "owner ruling 2026-11-11 (equipment policy, #5771): no preacher curl machine at home_gym (owner note 2026-11-08)",
+      "what": "equipment.not_available gains preacher_curl_machine so the current rotation pools stop serving it before the exercise library is approved (the selection engine already excludes it through the library's learned availability).",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.46.0",
+      "date": "2026-11-11",
+      "by": "owner ruling 2026-11-11 on #5794 (option A)",
+      "what": "The served calorie target is CLAMPED at the day's floor: a lifting day never serves under floor_lifting_day_kcal (1,900) and every other day (rest, travel, disrupted, unknown) never under floor_any_day_kcal (1,600), the rest-day floor the owner named. No new key: floor_any_day_kcal already is the floor the resolver applied to every non-lifting day, so it is reused, not renamed (its readers in the critics, the redlines and the coach facts are unchanged). health.calorie_target.resolve clamps; the planned-day floor_warnings entry it stamped (\"a warning, not a clamp\") is retired, not kept beside the clamp. floor_role stays 'warning': it now governs only the GRADING of logged days (a logged day under its floor is reported, never vetoed); the 7-day-mean floor stays reported. The titrated base is unchanged and still stated (base_kcal); the clamp's lift is floor_clamp_kcal. Re-read rule (floor_clamp_reread): 14 days after the ruling (reread_on 2026-11-25), when the shared 14-day loss rate is below 3.0 lb/wk, nutrition_critics.decisions_offered surfaces an owner decision (trigger floor_clamp_reread) in the existing decision channel (get_deficit_sustainability and the plan's nutrition_critics block); it never moves a number on its own. Second ruling the same day (#5794, PR #5830): the calorie habit band prescribed_band_kcal is RAISED [1400, 1600] -> [1600, 1900] so an on-plan day (1,600 rest, 1,900 lifting) reads in band; it is no longer centred on the base (scoring, the critics, the titration offset and the menu and travel-day tolerance read it as before). Untyped days serve 1,600 everywhere and the clamp is undated (a recomputed past day grades against it, as under R1): both owner-confirmed.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.47.0",
+      "date": "2026-11-11",
+      "by": "owner goal 2026-11-11 (#5799: measure lifting minutes against the 75-min ceiling; over it, antagonist supersets for accessories; drop sets only as an owner-selectable short-on-time variant) and owner ruling 2026-11-11 on PR #5811: GO, provided every pair is two non-competing accessories and no main lift is paired; no pair beyond these two without his approval",
+      "what": "Adds split.session_minutes.measured_min_sessions (10, platform-proposed: two passes of the five-session sequence) and measured_rule: the per-set time model is re-derived from his measured Hevy sessions and the platform's 45 s constant retires. Adds split.supersets: the antagonist pairs (curl + triceps; lateral raise + rear delt), applied ahead of the accessory time trim when a draft runs over the lifting ceiling, anchors never; drop sets only as an owner-selectable short-on-time variant.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
   "governing_goal": {
@@ -346,7 +374,34 @@
       "lifting_ceiling": 75,
       "lifting_rule": "a ceiling, not a target: no lifting floor; a session under the ceiling is reported as its length and never filled with sets (owner ruling A4, 2026-10-24, #5318)",
       "cardio_block_max": 30,
-      "stretching_max": 10
+      "stretching_max": 10,
+      "measured_min_sessions": 10,
+      "measured_rule": "lifting minutes are MEASURED from his Hevy log: the workout's end minus start, less the logged durations of its timed (cardio, stretching) blocks; Hevy carries no per-set timestamps. Once measured_min_sessions matched sessions exist, the per-set time model (session_shape.SESSION_TIME_MODEL.set_seconds) is their median, recorded with n and as-of date (#5799)"
+    },
+    "supersets": {
+      "pairs": [
+        {
+          "name": "curl + triceps",
+          "first": [
+            "db_curl"
+          ],
+          "second": [
+            "cable_tricep_pushdown"
+          ]
+        },
+        {
+          "name": "lateral raise + rear delt",
+          "first": [
+            "db_lateral_raise"
+          ],
+          "second": [
+            "reverse_pec_deck",
+            "face_pull"
+          ]
+        }
+      ],
+      "rule": "when a draft's lifting estimate, or the trailing measured median for its session role, is over lifting_ceiling, the generator pairs these accessory slots as antagonist supersets (one Hevy superset_id, the first member's rest moved to the second) BEFORE the time trim cuts any accessory. Pairs are by template slot, so a rotated movement keeps its pair. Anchors are never supersetted. Owner ruling 2026-11-11 (PR #5811): every pair is two non-competing accessories, no main lift is paired, and no pair is added without his approval.",
+      "drop_sets": "only as the owner-selectable short-on-time variant of a draft (each accessory: one working set, then one drop set); never a default"
     },
     "minimum_session": {
       "minutes": 20,
@@ -1042,7 +1097,7 @@
   },
   "equipment": {
     "assumed": "full commercial club — machines, cables, plate-loaded, T-bar, dumbbells to heavy, kettlebells, sled, full cardio deck",
-    "not_available": [],
+    "not_available": ["preacher_curl_machine"],
     "owner_editable": [
       "not_available"
     ],
@@ -1368,6 +1423,42 @@
     "block_retro": {
       "every_weeks": 6,
       "scorecard_rows": 13
+    },
+    "rpe": {
+      "_note": "The RPE calibration set (#5797). Read ONLY through training.rpe_calibration; the RPE-adjusted e1RM (training.load_ramp.achieved_hold) is its one consumer of the error.",
+      "eligible": [
+        "lat_pulldown",
+        "one_arm_db_row",
+        "machine_chest_press",
+        "machine_shoulder_press"
+      ],
+      "eligible_basis": "the owner's three non-barbell anchors (2026-11-11): lat pulldown, one-arm DB row, machine press; 'machine press' maps to both catalog machine presses (machine_chest_press, the bench family's machine member; machine_shoulder_press, the overhead-press slot's first member)",
+      "never_equipment": [
+        "barbell"
+      ],
+      "standing_rule": "no grinding (owner, 2026-10-10, restated in the 2026-11-11 ruling): no barbell rep-out and no set taken to failure. A calibration set is never placed on a barbell movement, even one listed in `eligible`, and it stops at the first slow rep",
+      "every_nth_exposure": 3,
+      "exposures_counted_from": "2026-11-11",
+      "set": "the last back-off set; on an exposure with no back-offs, the last working set; never the only working set (min_working_sets), so the top set the gain and stall rules read is never the calibration set",
+      "min_working_sets": 2,
+      "stop_rule": "first_slow_rep",
+      "stop_rule_text": "reps until the first rep whose speed visibly drops; never to failure, never a grind",
+      "capture": "Hevy set RPE = the RPE he predicts, BEFORE the set, for the row's top rep; Hevy reps = the reps done to the first slow rep. No new field and no new app: he already logs RPE in the Hevy set's RPE field",
+      "rir_at_first_slow_rep": 2,
+      "min_n": 6,
+      "interval_pct": 80,
+      "adjust_when": "n >= min_n and the interval excludes zero: the movement's mean error (actual - predicted reps in reserve) is added to the RIR of every RPE-logged set the hold reads; never above the load he moved (the hold's own bound)",
+      "never_when": [
+        "a barbell movement",
+        "a deload week",
+        "a red day (recovery red or ACWR high)",
+        "an OD1-capped exposure (1 to 3 after a layoff)",
+        "a first session back after a long layoff",
+        "a lift with no PREVIOUS",
+        "the Minimum Viable Session (the tired-day floor variant)",
+        "a note with no room for the line (deferred, recorded)"
+      ],
+      "provenance": "eligible, every_nth_exposure, the stop rule and the barbell exclusion: owner ruling 2026-11-11 (#5797); rir_at_first_slow_rep: owner-confirmed 2026-11-11; min_n, interval_pct, min_working_sets: platform defaults (min_n and interval_pct from TB-6 of the closed epic #4425), pending his ruling"
     }
   },
   "concession_ledger": {
@@ -1414,17 +1505,24 @@
     "calories": {
       "target_kcal": 1500,
       "prescribed_band_kcal": [
-        1400,
-        1600
+        1600,
+        1900
       ],
       "floor_any_day_kcal": 1600,
       "floor_lifting_day_kcal": 1900,
       "floor_7d_mean_kcal": 1800,
       "floor_role": "warning",
+      "floor_clamp_reread": {
+        "ruled_on": "2026-11-11",
+        "reread_on": "2026-11-25",
+        "decide_below_lb_per_wk": 3.0,
+        "rate_read": "the shared 14-day loss rate (mcp.shared_quantities.loss_rate_lb_wk), the critics' weight_trend_lb_wk",
+        "rule": "owner ruling 2026-11-11 (#5794): from reread_on (14 days after ruled_on) a 14-day loss rate below decide_below_lb_per_wk surfaces an owner decision (nutrition_critics.decisions_offered, trigger floor_clamp_reread): keep the clamped floors or change them. The decision is offered, never taken; nothing moves on its own"
+      },
       "planned_minimum_any_weight_kcal": 1400,
       "records_from_version": "1.21.0",
       "resolver": "health.calorie_target.resolve",
-      "reading": "target_kcal is the day's calorie target (owner ruling R1 2026-10-23: stay ~1,500). A titration record for the week outranks it, unless it was written under a charter version before records_from_version (a record from before the re-target is not the base). The floors are WARNINGS (floor_role): nothing clamps a target up to a floor; a resolved target or a planned day under its floor carries a floor warning, and the critics grade logged days against them, visibly. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced. prescribed_band_kcal is the calorie habit's floor and ceiling, centred on the target (#5099).",
+      "reading": "target_kcal is the day's calorie target (owner ruling R1 2026-10-23: stay ~1,500). A titration record for the week outranks it, unless it was written under a charter version before records_from_version (a record from before the re-target is not the base). The served target is CLAMPED at the day's floor (owner ruling 2026-11-11, #5794, option A): a lifting day is never served under floor_lifting_day_kcal and every other day never under floor_any_day_kcal (the rest-day floor); base_kcal keeps the titrated base and floor_clamp_kcal states the lift. floor_role ('warning') governs the GRADING of logged days: the critics grade logged days against the floors, visibly, never as a veto. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced. prescribed_band_kcal is the calorie habit's floor and ceiling (#5099): since owner ruling 2026-11-11 (#5794) it runs from the any-day floor to the lifting-day floor, so an on-plan rest or lifting day reads in band; a titration record moves it by the same offset it moves the target.",
       "provenance": "owner",
       "derived_by": "owner ruling 2026-10-23 R1 (#5091) on the target and the band; the floors are the red-team consensus 2026-09-22 (physician + nutritionist), kept as warnings by the same ruling",
       "stated": "2026-10-23"

@@ -23,7 +23,7 @@ A field can pass the Hevy API and still never reach the gym floor. #3938 is the 
 | `effort_ceiling` | #5058 | `effort_ceilings (via routine_title / program_structure cues)` | note | `routine.exercises[].notes` | 'RPE a-b' in the session line and the slot cue | no RPE field on the routine wire; the note |
 | `rep_range` | #5052 | `the slot's rep scheme` | native | `routine.exercises[].sets[].rep_range` | the set row's reps column ('6-10') | - |
 | `rest_seconds` | - | `the block's rest` | native | `routine.exercises[].rest_seconds` | the exercise's rest timer | - |
-| `superset_id` | - | `the block's superset` | native | `routine.exercises[].superset_id` | the exercises grouped as a superset | - |
+| `superset_id` | #5799 | `session_shape.pair_supersets` | native | `routine.exercises[].superset_id` | the exercises grouped as a superset | - |
 | `minimum_session` | #5088 #5428 | `disruption.to_routine` | note | `routine.exercises[0].notes (head) + routine.exercises[].notes` | the session block's 'Minimum · ' / 'Travel · ' session line on exercise 1 | the title is the convention's at commit (Phase - Type - N - Y); the label rides the session line |
 | `charter_version` | #5068 #5085 | `training_charter.charter_version` | not_shown | `none (inputs_snapshot.charter_version + inputs_snapshot.nightly_predraft.charter_version)` | not shown in any Hevy note or footer; the IR and the pre-draft's draft mark carry it | - |
 

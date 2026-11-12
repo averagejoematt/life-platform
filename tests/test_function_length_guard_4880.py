@@ -182,9 +182,8 @@ FUNCTION_LENGTH_COUNTS = {
     "scripts/apply_branch_protection.py::main": 165,
     "scripts/check_alarm_citations.py::render": 169,
     "scripts/coach_sim_analyze.py::write_report": 195,
-    "scripts/generate_platform_model.py::render_doc": 208,
+    "scripts/generate_platform_model.py::render_doc": 197,
     "scripts/monthly_close.py::main": 159,
-    "scripts/platform_model_alarms.py::extract_alarms": 151,
 }
 
 
