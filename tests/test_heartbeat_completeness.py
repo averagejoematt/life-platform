@@ -813,8 +813,11 @@ COVERAGE = {
         CENSUS,
         "2026-07-19",
         "Context compaction only; a missed run means coaches read slightly longer raw history — no correctness impact. "
-        "Its Monday public-brief schedule (2026-11-09 E) is a budget-pause class AI narrative: a missed week is a dated "
-        "gap in /api/coach_brief's cycles and is never backfilled.",
+        "Its Monday public-brief schedule (2026-11-09 E) is NOT waived (2026-11-12): handle_event stamps "
+        "COACH#public_brief/RUN#<cycle> with each coach's outcome, and the nightly qa-smoke leg public_brief_liveness "
+        "(operational/public_brief_qa.py) FAILs when the stamp is missing after the Monday deadline, the run errored or "
+        "a coach was held/errored without a sanctioned reason.",
+        "qa-smoke-failures",
     ),
     "weekly-digest": (
         CENSUS,

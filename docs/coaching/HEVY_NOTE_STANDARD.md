@@ -95,7 +95,13 @@ Dumbbells under 40 lb or a machine: next step only. One load change per lift.
 RPE ‹a–b›[, last set RPE ‹c–d›]        line 1, always
 ‹one reason›                            optional, only when it changes what he does
 ‹one cue›                               optional (§4), first exercise of a family only
+If taken: ‹X›, then ‹Y›.                 the fallback line, when it fits (below)
 ```
+
+**The fallback line (owner ruling 2026-11-11, #5771).** Every lift names its ranked same-stimulus fallback, so a missing or taken item is a swap, not a hole: `If taken: Lateral Raise (Machine), then Lateral Raise (Cable).` — at most two Hevy titles, best first, always the LAST line (`hevy_note_grammar.fallback_line`). It is not a reason (it never takes the reason slot) and not a cue (lint L8 never counts it as one).
+- **Where the names come from** (`selection_engine.note_fallbacks`): an accessory slot's selection (its next eligible candidates, equipment-disjoint first); any other lift, an anchor included, its exercise-library entry's ranked fallbacks, kept only when each is usable today and keeps the lift's volume signature — an anchor whose fallbacks would all move the week's counts carries no line. Equipment the gym does not have (the inventory, or a learned "gym doesn't have X" note) is never named; contention ("X was taken", "no bench free") never removes a name. A lift served elsewhere in the session is not a fallback. Location is `home_gym`; the gym is never named.
+- **On the wire only once the library is approved.** While it is `proposed` the names are recorded on `inputs_snapshot["note_fallbacks"]` (`render: false`) and the note is unchanged.
+- **Priority when the budget (§7) is short:** the optional prep clause goes first; then the fallback line, two names to one, then gone; then an anchor's sheet cue. The family breathing / bracing cue never goes (§6.1). Same order when a critic clause overflows the note later (`session_block._fit`). A carry keeps its own four-line note (§3.5) and carries no fallback line.
 
 **Reasons:**
 - `Lighter: chase 12.`
@@ -119,6 +125,8 @@ RPE ‹a–b›[, last set RPE ‹c–d›]        line 1, always
 - **A stale PREVIOUS still shows in Hevy.** A row more than one step from it gets a reason, never `New:` (lint L4). With rows that carry a load that reason is now the layoff line above (a stale PREVIOUS is past the OD1 line, so the lift is a first session back); `Lighter: first time in ‹gap›.` remains only over unloaded rows.
 - **One exception inside a step (owner ruling 2026-10-30, #5428): the same load as a PREVIOUS that ran to RPE 10 gets `Same load: aim to leave one more rep.`** Two of the four 10-30 graders read a bare same-load row after a grind as a copy of the grind; the reason says the intent is a lower effort at the same load. A re-entry lift keeps its layoff clause instead (§6.3). (The same day the owner declined a blanket layoff cap; his 2026-11-10 ruling eases the FIRST session back after a long layoff only — the rule above.)
 - A reason never repeats a number the rows already show.
+
+**The RPE calibration line (owner ruling 2026-11-11, #5797; charter `calibration.rpe`).** On every third exposure of a non-barbell eligible lift (lat pulldown, one-arm DB row, the machine presses), the note gains one last line: `Last set to first slow rep; RPE = guess.` It is not a reason (it never explains a load) and it never says failure: the set stops at the first rep whose speed visibly drops (his standing no-grinding rule, 2026-10-10). The Hevy set's RPE field holds his prediction for the row's top rep; its reps hold what he did. Never on a barbell, a deload week, a red day, a capped or first-back exposure, a lift with no PREVIOUS, or a one-set lift; a note with no room for it under §7's budget defers it (`training.rpe_calibration`).
 
 ### 3.3 Pick-load (no history, or stale history)
 
@@ -317,7 +325,7 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 | L5 | Loadable steps on every working and W row of a barbell or dumbbell. W rows ascend below the work. |
 | L6 | One effort expression on a lift's line 1; exercise 1 does not repeat the session line's. |
 | L7 | Budgets (§7). |
-| L8 | Safety facts (§6): the first exercise of each family carries a cue and no cue comes from another family (the family comes from the catalog's anchor family, or a caller's classifier; an unknown family is reported "not checked"); a prep cue sits on its own family; no HR as the lead cardio target. |
+| L8 | Safety facts (§6): the first exercise of each family carries a cue (a fallback line, `If taken: …`, is never counted as one — #5771) and no cue comes from another family (the family comes from the catalog's anchor family, or a caller's classifier; an unknown family is reported "not checked"); a prep cue sits on its own family; no HR as the lead cardio target. |
 | L9 | Clock lines: every number is a level, a grade or carries `min`; ≤ 3 levels, counting the levels a span or a ladder climbs through (the escape line's are not counted: it swaps the hard level for one beside it, so the ride as ridden still uses three — re-grade #6); a tempo, hill or interval ride has a clock line; intervals list their start minutes, put the hard level at his steady level + 2 (owner ruling 2026-11-08) and every other minute at the steady level with its talk words, never set a level beside the rep length (`L12 2 min`), check the talk test as rep 1 ends (never `at min ‹n›`), and move the reps one level up on full sentences and one level down on can't talk — still over the steady level. |
 | L10 | An `After:` line exactly when a Hevy block follows the cardio. |
 | L11 | `per hand` on dumbbell and carry loads only; no `pins` on a dumbbell lift; no `later sets` on a one-set lift; a carry row is a whole step count and its note names no metres (and says where the steps go); no mph off the treadmill. |
@@ -335,7 +343,7 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 - an unloadable 192.9 back-off; W rows that don't climb
 - two efforts on line 1
 - exercise 1 off the first screen; a lift note over 4 lines
-- HR as the lead target; the first press without its cue; a cue from the wrong family; a prep cue on the wrong lift
+- HR as the lead target; the first press without its cue; the first press with a fallback line in place of its cue (#5771); a cue from the wrong family; a prep cue on the wrong lift
 - a clock number without `min`; four levels; a tempo ride with no clock line; intervals without start minutes
 - a missing After line; an After line with nothing after
 - re-grade #2 (`REGRADE_2_MUTATIONS`, each asserting its own message): `New` over a PREVIOUS; a drop past a step with only the W line; `find the load` over a loaded row; a held top-of-range PREVIOUS at 8.5 with no reason; pins on a dumbbell; `later sets` on a one-set lift; the load rule on a one-set exercise 1; exercise 1's effort twice; a hold reason against the load rule; a carry with no adjust rule; a carry with a last load and no start; easy interval minutes with no talk words; an escape that steps down to the recovery level; an escape with no too-hard branch; no load rule for a one-set exercise 1's other lifts; a feeler W line with no result rule; a carry's start load only in the note; the old load rule; metres on a carry; a carry row of 45.72 steps; easy cardio promised over intervals; between below steady; no warm-up / cool-down level; a talk check at a bare minute; a two-level escape

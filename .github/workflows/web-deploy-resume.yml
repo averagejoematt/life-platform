@@ -1,0 +1,60 @@
+# Resume a deferred v9 deploy once the Site API it waited on is live (2026-11-12, run 43124939822).
+#
+# web-preview-deploy.yml DEFERS (syncs nothing, rolls nothing back) when the live Site API bundle does
+# not yet contain the commit the Site API owes — the Site API's code ships through CI's fleet deploy or a
+# laptop deploy/deploy_site_api.sh, never through the site workflow. This workflow closes the loop:
+# when the newest decisive v9 run is a deferral and the API is now ready, it dispatches ONE v9 deploy.
+#
+#   workflow_run  every CI/CD completion on main — the fleet deploy is the usual way the API lands
+#   schedule      the backstop: a laptop deploy whose own `resume` call failed, a cdk deploy, or a race
+#                 with an in-flight v9 run; also the dead-man — a deferral older than
+#                 STALE_DEFERRAL_HOURS reds this run (a red scheduled run is the owner's email)
+#
+# A SEPARATE workflow, deliberately: inside web-preview-deploy.yml a trigger on every CI/CD completion
+# would share the `v9-deploy` concurrency group and could displace a pending real deploy; inside
+# ci-cd.yml it would grow the ratcheted file and run before CI's own smoke/rollback had settled.
+# Read-only AWS (lambda:GetFunction); the only write is the workflow dispatch. Logic and tests:
+# deploy/www_api_readiness.py, tests/test_www_api_readiness.py.
+
+name: v9 deploy resume (after the Site API lands)
+
+on:
+  workflow_run:
+    workflows: ["CI/CD"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # OIDC → the read-only role (lambda:GetFunction for the live build sha)
+  actions: write    # read v9 run history; dispatch web-preview-deploy.yml
+
+concurrency:
+  group: web-deploy-resume
+  cancel-in-progress: false
+
+env:
+  AWS_ACCOUNT_ID: "205930651321"
+  AWS_REGION: us-west-2
+
+jobs:
+  resume:
+    name: Resume a deferred v9 deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0   # the owed commit is git history; the script refuses a shallow clone
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Dispatch the deferred v9 deploy if the Site API is now ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 deploy/www_api_readiness.py resume

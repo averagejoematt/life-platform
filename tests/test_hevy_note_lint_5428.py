@@ -344,6 +344,13 @@ MUTATIONS: list[tuple[str, str, Mut, str]] = [
         "L8",
     ),
     ("the first press without its cue", "2026-10-26", _note(0, lambda n: n.replace("\nBreathe out on the press.", "")), "L8"),
+    # #5771: a fallback line (`If taken: …`) names other lifts — it never stands in for the family's cue
+    (
+        "the first press with a fallback line in place of its cue",
+        "2026-10-26",
+        _note(0, lambda n: n.replace("\nBreathe out on the press.", "\nIf taken: Chest Press (Machine).")),
+        "L8",
+    ),
     (
         "a cue from the wrong family",
         "2026-10-26",

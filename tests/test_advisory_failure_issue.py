@@ -11,6 +11,9 @@ scheduled workflows via .github/actions/advisory-failure-issue.
 The dedup contract under test (the issue's acceptance criteria):
   - one open issue per workflow — a repeat failure COMMENTS on the existing
     open issue instead of filing a duplicate;
+  - #5821: ONE notification per episode — an unchanged repeat edits the body's
+    `Last failing run:` line (no notification) and does NOT comment; a changed
+    failure summary comments; recovery still comments + closes;
   - a different workflow's open issue is never mistaken for ours;
   - recovery (a green run) comments + closes the open issue, and is a no-op
     when nothing is open.
@@ -52,6 +55,7 @@ class FakeClient:
         self.comments = []
         self.closed = []
         self.labels_ensured = []
+        self.body_updates = []
 
     def _maybe_fail(self, op):
         if self.fail_on == op:
@@ -73,6 +77,13 @@ class FakeClient:
     def comment(self, number, body):
         self._maybe_fail("comment")
         self.comments.append({"number": number, "body": body})
+
+    def update_issue_body(self, number, body):
+        self._maybe_fail("update_body")
+        self.body_updates.append({"number": number, "body": body})
+        for issue in self.open_issues:
+            if issue["number"] == number:
+                issue["body"] = body
 
     def close_issue(self, number):
         self._maybe_fail("close")
@@ -147,14 +158,95 @@ def test_file_mode_creates_issue_when_none_open():
     assert result.startswith("created:")
 
 
-def test_file_mode_comments_on_existing_issue_instead_of_duplicating():
-    client = FakeClient(open_issues=[_issue(41, SLUG)])
+def test_file_mode_updates_existing_issue_instead_of_duplicating():
+    """An open tracker whose summary is already in its body: no duplicate, no comment —
+    the body's `Last failing run:` line carries the new run link (#5821)."""
+    client = FakeClient(open_issues=[_issue(41, SLUG, extra={"body": f"**What failed:** s\n{afi.issue_marker(SLUG)}"})])
     result = afi.run("file", SLUG, NAME, "s", RUN_URL, "schedule", client, now_iso=NOW)
     assert client.created == []  # THE dedup assertion: no duplicate issue
+    assert client.comments == []
+    assert [u["number"] for u in client.body_updates] == [41]
+    assert RUN_URL in client.body_updates[0]["body"] and "**Last failing run:**" in client.body_updates[0]["body"]
+    assert afi.issue_marker(SLUG) in client.body_updates[0]["body"], "the body edit must keep the dedup marker"
+    assert result == "updated:41"
+
+
+# ── #5821: one notification per failure episode ─────────────────────────────
+
+SUMMARY = "A nightly check failed, or declined to look. Re-run the command named in the job log."
+RUN_2 = "https://github.com/averagejoematt/life-platform/actions/runs/222"
+RUN_3 = "https://github.com/averagejoematt/life-platform/actions/runs/333"
+
+
+def _episode(summaries_and_runs):
+    """File a fresh tracker, then replay repeat failures against the SAME open issue."""
+    client = FakeClient()
+    afi.run("file", SLUG, NAME, SUMMARY, RUN_URL, "schedule", client, now_iso=NOW)
+    created = client.created[0]
+    client.open_issues.append(
+        {"number": 901, "state": "open", "title": created["title"], "body": created["body"], "labels": [{"name": afi.MARKER_LABEL}]}
+    )
+    results = [afi.run("file", SLUG, NAME, summ, run, "schedule", client, now_iso=NOW) for summ, run in summaries_and_runs]
+    return client, results
+
+
+def test_a_second_and_third_consecutive_failure_do_not_comment():
+    client, results = _episode([(SUMMARY, RUN_2), (SUMMARY, RUN_3)])
+    assert client.comments == [], "an unchanged repeat failure posted a comment — one notification a day, the #5821 noise"
+    assert results == ["updated:901", "updated:901"]
+    body = client.open_issues[0]["body"]
+    assert RUN_3 in body and RUN_2 not in body, "the body's last-run line must point at the LATEST failing run"
+    assert "failing runs counted here: 3" in body
+    assert body.count(afi.LAST_RUN_START) == 1, "the last-run block is rewritten in place, never stacked"
+    assert "**Close policy:**" in body and afi.issue_marker(SLUG) in body, "the tracker contract survives the edit"
+
+
+def test_whitespace_only_summary_differences_are_not_a_change():
+    reflowed = SUMMARY.replace(". ", ".\n  ")
+    client, _ = _episode([(reflowed, RUN_2)])
+    assert client.comments == []
+
+
+def test_a_changed_failure_summary_still_comments():
+    """NEGATIVE CONTROL: a different failure inside the same open episode notifies once."""
+    client, results = _episode([(SUMMARY, RUN_2), ("A different check failed: alarm-census only-live.", RUN_3)])
+    assert results == ["updated:901", "commented:901"]
+    assert len(client.comments) == 1 and RUN_3 in client.comments[0]["body"]
+    # ...and repeating the NEW summary is quiet again
+    afi.run("file", SLUG, NAME, "A different check failed: alarm-census only-live.", RUN_URL, "schedule", client, now_iso=NOW)
     assert len(client.comments) == 1
-    assert client.comments[0]["number"] == 41
-    assert RUN_URL in client.comments[0]["body"]
-    assert result == "commented:41"
+
+
+def test_recovery_still_comments_and_closes_after_a_quiet_episode():
+    client, _ = _episode([(SUMMARY, RUN_2)])
+    result = afi.run("recover", SLUG, NAME, "", RUN_3, "schedule", client, now_iso=NOW)
+    assert result == "closed:901" and client.closed == [901]
+    assert len(client.comments) == 1 and "Recovered" in client.comments[0]["body"]
+
+
+def test_a_new_episode_files_a_fresh_issue():
+    client, _ = _episode([(SUMMARY, RUN_2)])
+    afi.run("recover", SLUG, NAME, "", RUN_3, "schedule", client, now_iso=NOW)
+    client.open_issues = []  # the recovery closed it
+    result = afi.run("file", SLUG, NAME, SUMMARY, RUN_URL, "schedule", client, now_iso=NOW)
+    assert result.startswith("created:") and len(client.created) == 2
+
+
+def test_a_pre_5821_tracker_with_its_summary_in_the_body_is_quiet():
+    """#5558's shape: filed before #5821, no hash marker, summary in `**What failed:**`."""
+    legacy = f"Auto-filed by …\n\n**What failed:** {SUMMARY}\n\n**Close policy:** …\n{afi.issue_marker(SLUG)}\n"
+    client = FakeClient(open_issues=[_issue(5558, SLUG, extra={"body": legacy})])
+    assert afi.run("file", SLUG, NAME, SUMMARY, RUN_2, "schedule", client, now_iso=NOW) == "updated:5558"
+    assert client.comments == []
+    assert afi.summary_marker(SUMMARY) in client.open_issues[0]["body"]
+
+
+def test_mutation_the_pre_5821_orchestration_comments_on_every_repeat(monkeypatch):
+    """MUTATION: make every repeat count as changed (the pre-#5821 behaviour) — the quiet
+    control must then see comments, so it is not wired to nothing."""
+    monkeypatch.setattr(afi, "summary_changed", lambda body, summary: True)
+    client, _ = _episode([(SUMMARY, RUN_2), (SUMMARY, RUN_3)])
+    assert len(client.comments) == 2
 
 
 def test_file_mode_ignores_other_workflows_issue_and_creates_ours():

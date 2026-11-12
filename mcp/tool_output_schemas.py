@@ -36,6 +36,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mcp.plan_summary import SUMMARY_KEYS as _SUMMARY_KEYS  # #5803: the declared summary key set, one source
+
 _STR = {"type": "string"}
 _NUM = {"type": "number"}
 _OBJ = {"type": "object"}
@@ -138,7 +140,7 @@ _MANAGE_HEVY_ROUTINE = _obj({"status": _STR, "routine_id": _STR, "target_date": 
 
 _WORKOUT_DETAIL = _obj({"workout": _OBJ}, ["workout"])
 
-_PLAN_NEXT_SESSION = _obj(
+_PLAN_NEXT_SESSION_FULL = _obj(
     {
         "target_date": _STR,
         "constraint_block": _OBJ,
@@ -152,6 +154,37 @@ _PLAN_NEXT_SESSION = _obj(
     },
     ["target_date", "constraint_block", "protein_days_measured_7d", "how_to_use", "_disclaimer", "nutrition_critics"],
 )
+# #5803: detail='summary' — the declared key set (mcp/plan_summary.py SUMMARY_KEYS), every key on every summary.
+_PLAN_NEXT_SESSION_SUMMARY = _obj(
+    {
+        "detail": {"type": "string", "enum": ["summary"]},
+        "target_date": _STR,
+        "stage": _NUM,
+        "how_to_use": _STR,
+        "session": _opt(_OBJ),
+        "red_team": _opt(_OBJ),
+        "predraft": _opt(_OBJ),
+        "walking": _opt(_OBJ),
+        "tripwires": _OBJ,
+        "honesty": _ARR,
+        "must_say": _ARR,
+        "week_commitments": _opt(_OBJ),
+        "deload_recommendation": _opt(_OBJ),
+        "calibration_due": _opt(_OBJ),
+        "training_phase": _opt(_OBJ),
+        "exercise_unlocks": _opt(_OBJ),
+        "steps": _opt(_OBJ),
+        "recent_aerobic": _opt(_OBJ),
+        "rate_target": _opt(_OBJ),
+        "nutrition_verdicts": _opt(_OBJ),
+        "inputs_failed": _OBJ,
+        "morning_note": _opt(_OBJ),
+        "omitted": _OBJ,
+        "_disclaimer": _STR,
+    },
+    list(_SUMMARY_KEYS),
+)
+_PLAN_NEXT_SESSION = {"type": "object", "anyOf": [_PLAN_NEXT_SESSION_FULL, _PLAN_NEXT_SESSION_SUMMARY]}
 
 _WORKOUTS = _obj(
     {

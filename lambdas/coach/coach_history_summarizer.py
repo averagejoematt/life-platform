@@ -1591,7 +1591,7 @@ def lambda_handler(event, context):
     if event.get("mode") == "public_brief":  # owner ruling 2026-11-09 (third, E): its own Monday schedule, its own inputs
         from coach import public_brief
 
-        return public_brief.run(table, coach_ids=event.get("coach_ids"), persist=not event.get("dry_run"))
+        return public_brief.handle_event(table, event)  # today= only with dry_run; stamps the cycle's run for its dead-man
 
     try:
         coach_ids = event.get("coach_ids", ALL_COACH_IDS)

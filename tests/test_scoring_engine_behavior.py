@@ -244,7 +244,10 @@ class TestScoreNutrition:
 
         monkeypatch.setattr(se, "target_kcal", calorie_target.target_kcal)  # this test reads the LIVE charter, unpinned
         lo, hi = calorie_target.calorie_band(DATE)
-        assert lo < calorie_target.target_kcal(DATE) < hi
+        r = calorie_target.resolve(DATE)
+        # owner ruling 2026-11-11 (#5794): the band runs from the any-day floor to the lifting-day floor; the served
+        # (clamped) target sits inside it and the titrated base sits under it by design
+        assert r["base_kcal"] < lo <= calorie_target.target_kcal(DATE) <= hi
 
         def cal(kcal):
             return se.score_nutrition({"date": DATE, "macrofactor": {"total_calories_kcal": kcal}}, _NUTRITION_PROFILE)[1]
@@ -255,6 +258,8 @@ class TestScoreNutrition:
         assert over["cal_band_hit"] is False and over["cal_score"] < under["cal_score"], "a surplus is still penalised harder"
         # mutation control: the pre-#5099 symmetric tolerance scored a day ~7 % under the target as 100
         assert cal(round(calorie_target.target_kcal(DATE) * 0.93))["cal_score"] < 100
+        # #5794: eating the old 1,500 base is now under the habit band — a miss, never a hit
+        assert cal(r["base_kcal"])["cal_band_hit"] is False
 
     def test_a_logged_day_carrying_no_usable_macro_field_drops_the_component(self):
         assert se.score_nutrition({"macrofactor": {"meals": 3}}, _NUTRITION_PROFILE)[0] is None
