@@ -270,7 +270,7 @@ PLATFORM_STATS = {
     "review_grade": "B+",
     "review_grade_distribution": "A- 3 · B+ 10 · B 2 · B- 2 (17 lenses, 2026-10-31)",
     "active_secrets": 30,  # #3690: was 21; 28 -> 29 with life-platform/ip-hash-salt (#3620); 29 -> 30 with life-platform/progress-photos-signing (#3760). model/platform_model.json cost_surface.secrets
-    "site_pages": 105,  # #3690: was 77; qa/qa_manifest.py is the single page registry. 93 -> 95 with /start/ and /coaches/ (#4588); 95 -> 99 with the v9 /system/ pages (#5534 cut-over); 100 with /data/journey/ (#5579); 101 with the sampled day page (#5585); 100 with /story/theme-river/ unpublished (journal-derived, owner rulings 2026-11-03/05); 102 with /data/lab/ + /data/lab/protocols/ (Laboratory L1 live, owner GO 2026-11-09); 103 with /story/so-far/ (Human Story HS1 live, owner GO 2026-11-09); 105 with /system/calibration/ + /system/ledger/refuted/ (Coaching Room CR1 live, owner GO 2026-11-10)
+    "site_pages": 106,  # #3690: was 77; qa/qa_manifest.py is the single page registry. 93 -> 95 with /start/ and /coaches/ (#4588); 95 -> 99 with the v9 /system/ pages (#5534 cut-over); 100 with /data/journey/ (#5579); 101 with the sampled day page (#5585); 100 with /story/theme-river/ unpublished (journal-derived, owner rulings 2026-11-03/05); 102 with /data/lab/ + /data/lab/protocols/ (Laboratory L1 live, owner GO 2026-11-09); 103 with /story/so-far/ (Human Story HS1 live, owner GO 2026-11-09); 105 with /system/calibration/ + /system/ledger/refuted/ (Coaching Room CR1 live, owner GO 2026-11-10); 106 with /data/lab/findings/ (findings over time, 2026-11-11)
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

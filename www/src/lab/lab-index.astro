@@ -14,6 +14,7 @@ import {
   experimentHasPage,
   findingText,
   labCounts,
+  findingsOverTime,
   latestFindings,
   pillarWords,
   testHasPage,
@@ -39,6 +40,8 @@ const ready = xs.filter((x) => x.group === "ready");
 const done = xs.filter((x) => x.group === "done");
 const backlog = byPillar(xs.filter((x) => x.group === "backlog"));
 const learned = latestFindings(lab.lab_findings);
+const over = findingsOverTime(lab.lab_findings);
+const heldAll = over.pairs.filter((p) => p.summary.key === "held").length;
 const groups = ((lab.lab_protocols || {}).groups || []) as any[];
 const inUse = groups.reduce((s, g) => s + g.items.filter((i: any) => !i.paused).length, 0);
 const paused = groups.reduce((s, g) => s + g.items.filter((i: any) => i.paused).length, 0);
@@ -174,6 +177,16 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
               Pairs of readings that moved together, found by the weekly correlation run after correcting for how many pairs it tried. A correlation, not an
               experiment: it says two things travel together, not that one causes the other.
             </p>
+            {over.pairs.length > 0 && (
+              <p style="font-size:15px;margin-bottom:12px">
+                <a href={href("/data/lab/findings/")}>
+                  How the findings held across the {num(over.weeks.length)} weekly runs →
+                </a>{" "}
+                <span class="muted" style="font-size:14px">
+                  {num(over.pairs.length)} {over.pairs.length === 1 ? "pair" : "pairs"} listed more than once; {num(heldAll)} held every week.
+                </span>
+              </p>
+            )}
             {learned.items.length ? (
               <>
                 <div class="rows">
@@ -181,7 +194,7 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                     <div>
                       <span style="font-size:14px">{findingText(f)}</span>
                       <span class="mono" style="font-size:12px">
-                        listed {num(f.seen)} of {num(learned.weeks)} weeks
+                        listed {num(f.seen)} of {num(f.of)} {f.of === 1 ? "week" : "weeks"}
                       </span>
                     </div>
                   ))}
@@ -196,7 +209,7 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                         <div>
                           <span style="font-size:14px">{findingText(f)}</span>
                           <span class="mono" style="font-size:12px">
-                            listed {num(f.seen)} of {num(learned.weeks)} weeks
+                            listed {num(f.seen)} of {num(f.of)} {f.of === 1 ? "week" : "weeks"}
                           </span>
                         </div>
                       ))}

@@ -433,6 +433,31 @@ def correlation_pair_is_public(pair: Any) -> bool:
     )
 
 
+# A metric whose stored value changed METHOD on the owner's rulings 2026-11-05/06, with the public method versions a
+# weekly_correlations record must stamp (``metric_methods``) before a pair naming it is published. A record computed
+# before the public method carries the method-1 value — the day grade WITH its journal component
+# (``scoring_engine.score_journal``), habit_pct over every habit, the Morning/Evening Journal habits among them — and
+# stamps nothing, so its pairs naming these metrics are withheld (fail closed: a missing or unknown stamp is private).
+# Held equal to ``health.day_grade_public.METHOD_VERSIONS`` / ``health.habit_pct_public.METHOD_VERSION`` by
+# tests/test_lab_findings_over_time.py (this module cannot import ``health``: day_grade_public imports it).
+PUBLIC_METRIC_METHODS: dict[str, tuple[str, ...]] = {
+    "day_grade": ("day-grade-public-v1",),
+    "habit_pct": ("habit-pct-public-v1",),
+}
+
+
+def correlation_pair_method_is_public(pair: Any, metric_methods: Any) -> bool:
+    """Every method-versioned metric the pair names is stamped with a public method by its record."""
+    if not isinstance(pair, Mapping):
+        return False
+    stamps = metric_methods if isinstance(metric_methods, Mapping) else {}
+    for m in (pair.get("metric_a", pair.get("field_a")), pair.get("metric_b", pair.get("field_b"))):
+        versions = PUBLIC_METRIC_METHODS.get(str(m or "").strip())
+        if versions is not None and stamps.get(str(m).strip()) not in versions:
+            return False
+    return True
+
+
 def _pair_p_value(pair: Mapping) -> Optional[float]:
     """The pair's stored two-tailed p, else the one the compute would have stored (on n_eff)."""
     from common import stats_core
@@ -447,17 +472,24 @@ def _pair_p_value(pair: Mapping) -> Optional[float]:
         return None
 
 
-def public_correlations(correlations: Any, alpha: float = 0.05) -> Any:
+def public_correlations(correlations: Any, alpha: float = 0.05, metric_methods: Any = None) -> Any:
     """A stored ``weekly_correlations.correlations`` value (the label-keyed map, or the legacy list) with
     every pair that names a private metric omitted — and the Benjamini-Hochberg correction re-run over the
     PUBLIC pairs only. BH ranks every p-value in its family, so without the re-run a public pair's
-    ``fdr_significant`` could move with a private pair's p-value. Same shape out; the stored row is untouched."""
+    ``fdr_significant`` could move with a private pair's p-value. Same shape out; the stored row is untouched.
+
+    ``metric_methods`` is the RECORD's stamp (``weekly_correlations.metric_methods``): a pair naming a
+    method-versioned metric (``PUBLIC_METRIC_METHODS``) is published only when the stamp names its public method.
+    Omitted, every such pair is withheld (fail closed)."""
     from common import stats_core
 
+    def keep(v: Any) -> bool:
+        return correlation_pair_is_public(v) and correlation_pair_method_is_public(v, metric_methods)
+
     if isinstance(correlations, Mapping):
-        items = [(k, dict(v)) for k, v in correlations.items() if correlation_pair_is_public(v)]
+        items = [(k, dict(v)) for k, v in correlations.items() if keep(v)]
     elif isinstance(correlations, list):
-        items = [(i, dict(v)) for i, v in enumerate(correlations) if correlation_pair_is_public(v)]
+        items = [(i, dict(v)) for i, v in enumerate(correlations) if keep(v)]
     else:
         return correlations
     pvals = [_pair_p_value(v) for _k, v in items]
