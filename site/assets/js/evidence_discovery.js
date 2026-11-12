@@ -187,7 +187,9 @@ export function wireDiscoveries(root = document) {
   });
 }
 
-export function renderGenome(d) { const g = d.genome || d; const rs = g.risk_summary || {}; const cats = Object.fromEntries(Object.entries(g.categories || {}).map(([k, v]) => [k, v && typeof v === "object" ? v.n : v])); if (g.other_categories_combined && g.other_categories_combined.n) cats["smaller categories, combined"] = g.other_categories_combined.n; const head = figs([g.total_snps != null && fig(fmt(g.total_snps), "SNPs analysed"), rs.unfavorable != null && fig(rs.unfavorable, "unfavorable"), rs.favorable != null && fig(rs.favorable, "favorable")]); const cs = Object.keys(cats).length ? sec("Variants analysed, by category", kvtable(cats)) : ""; if (!head.includes("fig-v") && !cs) return empty("Genome not yet published."); return head + cs + note("Genotype is predisposition, not destiny — context for the biomarkers."); }
+// Privacy absolute (owner ruling 2026-11-11): /api/genome_risks publishes no genetic finding —
+// only {status, disclosure}. Render the disclosure and nothing else, even if a payload carried more.
+export function renderGenome(d) { const g = (d && d.genome) || d || {}; return empty(typeof g.disclosure === "string" && g.disclosure ? g.disclosure : "Genome analysis is owner-only. No genetic findings are published."); }
 
 export async function renderChallenges(d) {
   const [cur, catalog] = await Promise.all([tryJSON("/api/current_challenge"), tryJSON("/api/challenge_catalog")]);

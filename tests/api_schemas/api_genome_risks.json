@@ -24,113 +24,11 @@
       },
       "genome": {
         "keys": {
-          "categories": {
-            "keys": {
-              "exercise": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "immune": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "lipids": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "longevity": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "metabolism": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "miscellaneous": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "nutrient_metabolism": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "sleep": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "taste": {
-                "keys": {
-                  "n": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
           "disclosure": {
             "type": "string"
           },
-          "other_categories_combined": {
-            "keys": {
-              "n": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          },
-          "risk_summary": {
-            "keys": {
-              "favorable": {
-                "type": "integer"
-              },
-              "mixed": {
-                "type": "integer"
-              },
-              "neutral": {
-                "type": "integer"
-              },
-              "unfavorable": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          },
-          "total_snps": {
-            "type": "integer"
+          "status": {
+            "type": "string"
           }
         },
         "type": "object"

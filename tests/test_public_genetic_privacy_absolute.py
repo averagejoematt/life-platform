@@ -85,7 +85,7 @@ def test_no_public_payload_declares_a_genetic_identifier_field(schema_path):
     )
 
 
-def test_the_genome_endpoint_serves_aggregates_only():
+def test_the_genome_endpoint_serves_no_genetic_finding():
     """Direct guard on the handler that failed, independent of schema capture
     (a schema is only as fresh as its last run)."""
     import sys
@@ -100,10 +100,19 @@ def test_the_genome_endpoint_serves_aggregates_only():
     handler = handler_source("site_api_vitals", "handle_genome_risks")
     for forbidden in ('"gene"', '"rsid"', '"summary"', '"implications"'):
         assert forbidden not in handler, f"handle_genome_risks emits {forbidden} — that identifies the variant"
-    assert '"total_snps"' in handler and '"risk_summary"' in handler, "the aggregate shape must survive"
-    # 2026-11-11: the per-category risk distribution is withdrawn — a 1-variant
-    # category's distribution IS that variant's readout.
-    assert '"risk_levels"' not in handler, "handle_genome_risks emits a per-category risk_levels distribution"
+    # 2026-11-11 owner ruling: aggregates are genetic findings too. The handler
+    # publishes a status and a disclosure and never reads the genome partition.
+    for forbidden in (
+        '"total_snps"',
+        '"risk_summary"',
+        '"risk_levels"',
+        '"categories"',
+        "table.query",
+        "SOURCE#genome",
+        "}genome",
+        "_decimal_to_float",
+    ):
+        assert forbidden not in handler, f"handle_genome_risks still carries {forbidden}"
     assert "disclosure" in handler, "the payload must say WHY detail is absent, not just omit it"
 
 
@@ -141,49 +150,50 @@ def test_aggregate_keys_are_not_flagged():
     assert offenders == [], "a count of variants is not an identifier"
 
 
-# ── 2026-11-11 owner ruling: no per-category result, no small category, no drug-response name ──
+# ── 2026-11-11 owner ruling: /api/genome_risks publishes no genetic finding at all ──
 #
-# /api/genome_risks served `categories.<name>.risk_levels` for every category.
-# Five categories held one or two variants, so that distribution WAS one
-# variant's individual result, and a `statin_response` category named a
-# clinical deliberation on its own. The public shape is now counts only: a
-# category is named only at n >= GENOME_MIN_PUBLIC_CATEGORY_N with an
-# innocuous name, and every other variant folds into one unnamed count.
-#
-# `_genome_violations` is the rule; it is run against the real handler (via a
-# synthetic table), against the captured schema, and — as the must-fail
-# control — against the pre-fix shape, which it must reject.
+# Individual variants, inferred outcomes, genetic risk categories and
+# personalised risk summaries are private by default, and aggregation does not
+# make them safe. The payload is {"genome": {"status", "disclosure"}} and nothing
+# else. `_genome_violations` is the rule. It runs against the real handler, the
+# captured schema, and two must-fail controls: the pre-fix {n, risk_levels}
+# shape and the interim n>=5 counts-only shape. Both controls must be rejected.
 
-_MIN_N = 5
+_ALLOWED_GENOME_KEYS = {"status", "disclosure"}
 
 
-def _genome_violations(genome: dict) -> list[str]:
+def _genome_violations(genome) -> list[str]:
     out = []
-    cats = genome.get("categories") or {}
-    for name, body in cats.items():
-        if "statin" in name.lower():
-            out.append(f"category name {name!r} names a drug response")
-        if not isinstance(body, dict):
-            out.append(f"category {name!r} is not a count object")
-            continue
-        if "risk_levels" in body:
-            out.append(f"category {name!r} serves a per-category risk_levels distribution")
-        extra = set(body) - {"n"}
-        if extra:
-            out.append(f"category {name!r} serves {sorted(extra)} beyond its count")
-        n = body.get("n")
-        if not isinstance(n, int) or n < _MIN_N:
-            out.append(f"category {name!r} is served with n={n!r} (< {_MIN_N})")
-    combined = genome.get("other_categories_combined")
-    if combined is not None and set(combined) - {"n"}:
-        out.append(f"other_categories_combined serves {sorted(set(combined) - {'n'})} beyond its count")
+    if not isinstance(genome, dict):
+        return [f"genome is {type(genome).__name__}, not the status object"]
+    extra = set(genome) - _ALLOWED_GENOME_KEYS
+    if extra:
+        out.append(f"genome serves keys beyond status/disclosure: {sorted(extra)}")
+
+    def walk(node, path):
+        if isinstance(node, bool):
+            return
+        if isinstance(node, (int, float)):
+            out.append(f"numeric genetic field at {path}")
+        elif isinstance(node, dict):
+            for k, v in node.items():
+                if k in ("categories", "risk_levels", "risk_summary", "other_categories_combined") or "statin" in k.lower():
+                    out.append(f"category/risk key {k!r} at {path}")
+                walk(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                walk(v, f"{path}[{i}]")
+
+    walk(genome, "genome")
+    for k in ("status", "disclosure"):
+        if k in genome and not isinstance(genome[k], str):
+            out.append(f"genome.{k} is not a string")
     return out
 
 
 def _synthetic_genome_items():
-    """Synthetic rows shaped like the live partition: tiny categories (1, 2),
-    a 3-variant statin_response, and larger ones. No real variant data."""
-    plan = {"caffeine": 1, "antioxidant": 2, "statin_response": 3, "exercise": 6, "longevity": 20, "big_drug_response": 7}
+    """Synthetic rows shaped like the live partition. No real variant data."""
+    plan = {"caffeine": 1, "antioxidant": 2, "statin_response": 3, "exercise": 6, "longevity": 20}
     levels = ["unfavorable", "mixed", "neutral", "favorable"]
     items, i = [], 0
     for cat, n in plan.items():
@@ -196,67 +206,71 @@ def _synthetic_genome_items():
 class _FakeTable:
     def __init__(self, items):
         self._items = items
+        self.queried = 0
 
     def query(self, **_kw):
+        self.queried += 1
         return {"Items": list(self._items)}
 
 
-def _serve_genome(items):
+def _serve_genome(table):
     import sys
 
     sys.path.insert(0, str(_REPO / "lambdas"))
     from web import site_api_biomarkers as bio
 
-    resp = bio.genome_risks(_g={"table": _FakeTable(items)})
+    resp = bio.genome_risks(_g={"table": table})
     body = resp["body"]
     return (json.loads(body) if isinstance(body, str) else body)["genome"]
 
 
-def test_genome_handler_serves_no_small_category_no_risk_levels_no_statin_name():
-    items = _synthetic_genome_items()
-    genome = _serve_genome(items)
+def test_genome_handler_publishes_status_only_and_never_reads_the_partition():
+    table = _FakeTable(_synthetic_genome_items())
+    genome = _serve_genome(table)
     assert _genome_violations(genome) == [], _genome_violations(genome)
-    # Positive shape: the large innocuous categories survive as counts...
-    assert genome["categories"] == {"exercise": {"n": 6}, "longevity": {"n": 20}}
-    # ...and every other variant (1 + 2 + 3 small, 7 drug-named) folds into one unnamed count.
-    assert genome["other_categories_combined"] == {"n": 13}
-    assert genome["total_snps"] == len(items)
-    assert sum(genome["risk_summary"].values()) == len(items)
-    # Nothing about the folded categories survives anywhere in the payload.
+    assert genome["status"] == "private" and genome["disclosure"]
+    assert table.queried == 0, "the public genome handler must not even read the owner-only partition"
     blob = json.dumps(genome).lower()
-    for gone in ("caffeine", "antioxidant", "statin", "drug", "risk_levels"):
+    for gone in ("caffeine", "antioxidant", "statin", "exercise", "longevity", "unfavorable", "favorable", "snp"):
         assert gone not in blob, f"{gone!r} reached the public genome payload"
 
 
-def test_genome_handler_empty_partition_keeps_the_same_shape():
-    genome = _serve_genome([])
-    assert _genome_violations(genome) == []
-    assert genome["categories"] == {} and genome["other_categories_combined"] == {"n": 0}
-
-
-def test_captured_genome_schema_has_no_risk_levels_and_no_statin_category():
+def test_captured_genome_schema_declares_status_and_disclosure_only():
     shape = json.loads((_SCHEMA_DIR / "api_genome_risks.json").read_text())["shape"]
-    cats = shape["keys"]["genome"]["keys"]["categories"]["keys"]
-    assert cats, "the captured schema lost its categories — the scan below would be vacuous"
-    for name, node in cats.items():
-        assert "statin" not in name.lower(), f"captured schema publishes category {name!r}"
-        assert set(node.get("keys", {})) == {"n"}, f"captured schema category {name!r} serves {sorted(node.get('keys', {}))}"
-    keys = [k for _jp, k in _walk_keys(shape)]
-    assert "risk_levels" not in keys, "the captured /api/genome_risks schema still declares risk_levels"
+    genome = shape["keys"]["genome"]["keys"]
+    assert set(genome) == _ALLOWED_GENOME_KEYS, f"captured schema declares {sorted(genome)}"
+    assert all(node.get("type") == "string" for node in genome.values()), "a genome field is not a string"
 
 
-def test_must_fail_control_the_pre_fix_shape_is_rejected():
-    """The pre-2026-11-11 payload, rebuilt from the same synthetic rows: per-category
-    {n, risk_levels} for every category. The rule must reject it on all three
-    counts — or it proves nothing about the live endpoint."""
-    old = {"total_snps": 0, "categories": {}}
+def _old_shape():
+    old = {"total_snps": 0, "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}, "categories": {}}
     for row in _synthetic_genome_items():
+        old["total_snps"] += 1
+        old["risk_summary"][row["risk_level"]] += 1
         b = old["categories"].setdefault(
             row["category"], {"n": 0, "risk_levels": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}}
         )
         b["n"] += 1
         b["risk_levels"][row["risk_level"]] += 1
-    found = "\n".join(_genome_violations(old))
-    assert "risk_levels" in found
-    assert "n=1" in found and "n=2" in found
-    assert "statin" in found
+    return old
+
+
+def test_must_fail_control_the_pre_fix_shape_is_rejected():
+    found = "\n".join(_genome_violations(_old_shape()))
+    assert "numeric genetic field" in found and "risk_levels" in found and "statin" in found and "categories" in found
+
+
+def test_must_fail_control_the_interim_counts_only_shape_is_rejected():
+    """The n>=5 counts-only shape briefly proposed on 2026-11-11 (categories.<name>.n
+    plus an unnamed combined count, total and risk_summary kept). The owner ruled
+    aggregates private too, so the rule must reject it."""
+    old = _old_shape()
+    interim = {
+        "total_snps": old["total_snps"],
+        "risk_summary": old["risk_summary"],
+        "categories": {k: {"n": v["n"]} for k, v in old["categories"].items() if v["n"] >= 5 and "statin" not in k},
+        "other_categories_combined": {"n": sum(v["n"] for k, v in old["categories"].items() if v["n"] < 5 or "statin" in k)},
+        "disclosure": "counts only",
+    }
+    found = "\n".join(_genome_violations(interim))
+    assert "numeric genetic field" in found and "categories" in found and "risk_summary" in found
