@@ -29,6 +29,7 @@ import copy
 import json
 import os
 import re
+import sys
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -40,6 +41,7 @@ os.environ.setdefault("TABLE_NAME", "test-table")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
+import boto3  # noqa: E402
 import botocore.client  # noqa: E402
 import common.pacific_time as pacific_time  # noqa: E402
 from boto3.dynamodb.conditions import ConditionBase  # noqa: E402
@@ -58,9 +60,11 @@ from mcp import (  # noqa: E402
 # +2 (#5774, owner ruling 2026-11-11 item 2): the week-commitment check reads the program week's committed routines once per
 # stage-1 call (`week_commitments.attach`: one routine-index Query + one GetItem for the routine this fixture holds) — a
 # new read the ruling requires (departures count at the week level), not a memo that stopped holding.
+# +1 (#5802, owner veto 2026-11-11): the medical stop lines' labs panel — ONE new partition read per call
+# (`nutrition_critics_inputs._lab_draws`), not a duplicate a memo could fold; the Whoop nights ride the existing memo.
 # +1 (#5772): `exercise_unlocks` queries the `EXGATE#ANNOUNCE#` claim-once rows — ONE begins_with Query no other stage-1
-# reader touches (a new read, not a lost memo). MEASURED on the merged tree: 100 calls (99 on main + this one).
-MAX_STAGE_1_DDB_CALLS = 100
+# reader touches (a new read, not a lost memo). MEASURED on the merged tree (with #5802's labs read): see the pin below.
+MAX_STAGE_1_DDB_CALLS = 101
 
 _TARGET = "2026-09-20"
 _NOW = datetime(2026, 9, 20, 19, 0, tzinfo=timezone.utc)  # noon Pacific on the target day — the clock is frozen
@@ -253,6 +257,30 @@ class _FakeAws:
         return {"Items": copy.deepcopy(rows), "Count": len(rows)}
 
 
+_REPO = Path(__file__).resolve().parents[1]
+_TABLE_ATTRS = ("table", "_table", "_ddb_table")
+
+
+def _own_the_tables(st: ExitStack) -> None:
+    """Point every loaded repo module's module-level DynamoDB table at a REAL boto3 Table, so every read goes through
+    the botocore fake below. A test elsewhere in the same xdist worker may have left a stand-in there — CI, 2026-11-12:
+    `tests/test_mcp_oauth.py::setup_function` assigns `core.table = _FakeTable()` (no `query`) and never restores it, so
+    every query_source reader failed before reaching the fake, both arms made the same 33 calls, and the memo
+    comparison went vacuous (#5813)."""
+    real = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME") or "test-table")
+    roots = (str(_REPO / "mcp"), str(_REPO / "lambdas"))
+    for mod in list(sys.modules.values()):
+        path = str(getattr(mod, "__file__", None) or "")
+        if not path.startswith(roots):
+            continue
+        for attr in _TABLE_ATTRS:
+            value = getattr(mod, attr, None)
+            if value is None or callable(value) or isinstance(value, (str, bytes, int, float, dict, list, tuple)):
+                continue
+            if any(hasattr(value, m) for m in ("query", "get_item", "put_item")) or "Table" in type(value).__name__:
+                st.enter_context(patch.object(mod, attr, real))
+
+
 def _stage1(routine: bool = True, memos: bool = True) -> tuple[dict, int, int]:
     """(stage-1 output, DynamoDB calls before stage 2 starts, all calls) for one plan call on the fixture."""
     fake = _FakeAws(_world())
@@ -268,6 +296,7 @@ def _stage1(routine: bool = True, memos: bool = True) -> tuple[dict, int, int]:
     kinds = plan_call_scope._CALL_KINDS if memos else (plan_call_scope.ANCHOR_INDEXES, plan_call_scope.BLOCK_WORKOUTS)
     with ExitStack() as st:
         st.enter_context(patch.object(botocore.client.BaseClient, "_make_api_call", lambda self, op, params: fake(self, op, params)))
+        _own_the_tables(st)
         st.enter_context(patch.object(pacific_time, "datetime", _Frozen))
         st.enter_context(patch("urllib.request.urlopen", side_effect=no_network))
         st.enter_context(patch.object(plan_call_scope, "_CALL_KINDS", kinds))
@@ -276,6 +305,10 @@ def _stage1(routine: bool = True, memos: bool = True) -> tuple[dict, int, int]:
         args = {"target_date": _TARGET, **({"routine_id": "r-5813"} if routine else {})}
         out = tp.tool_plan_next_session(args)
     assert "error" not in out, out
+    # The world must actually be READ: a reader that fails before reaching the fake makes no call in either arm, and a
+    # count comparison over two failed reads proves nothing (the CI flake this guard names).
+    failed = sorted(k for k, v in (out["constraint_block"].get("inputs") or {}).items() if (v or {}).get("state") == "read_failed")
+    assert not failed, f"fixture readers failed instead of reading the fake world: {failed}"
     return out, seen.get("at_stage_2", len(fake.ddb_calls)), len(fake.ddb_calls)
 
 

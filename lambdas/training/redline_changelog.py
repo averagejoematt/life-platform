@@ -52,4 +52,8 @@ CHANGELOG_V2_TO_V3: list[str] = [
     "2026-10-18 (#5070, owner ruling): NO scheduled or automatic deload — the program-week-6 / block-lock deload (#4161) is "
     "retired; fatigue signals (performance drop, readiness streak, soreness/pain notes) become a RECOMMENDATION on the plan "
     "packet and in the critic's verdict, and a deload applies (-40 % sets, loads held, 7 days) only on the owner's recorded word",
+    "2026-11-11 (#5802, owner rulings on the tripwire audit): leverage_not_deterioration DELETED — its action was 'log it; no "
+    "action', so its sentence is folded into anchor_lift_strength_drop's note; post_goal_walking KEPT, dormant until the "
+    "maintenance phase (`dormant_until`); deletion VETOED for medical_stop_lines, mood_declared, joy and lean_mass — readers "
+    "built instead (mood_declared and joy over the check-in lane's input, #5819)",
 ]

@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.42.0",
+  "version": "1.43.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -287,6 +287,13 @@
       "date": "2026-11-11",
       "by": "#5796 (epic #5050); no new owner ruling: the new number is a platform default named as one, pending his ruling",
       "what": "Adds progression.set_raise_proposal: a movement performed above its prescribed working sets in each of the last weeks_running (3) complete weeks becomes a PROPOSAL to raise its prescription, read by training.self_added_volume and carried on the plan's constraint block beside the ceiling-change proposal, with the weeks' prescribed and performed sets and the headroom under the volume_ceiling redline. It never changes a prescription; the owner approves.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.43.0",
+      "date": "2026-11-11",
+      "by": "owner ruling 2026-11-11 (#5798, setting owner-confirmed 2026-11-11: the fixed-workload cardio test is the treadmill, 20 minutes at a fixed speed and incline; the bike test stays as it is)",
+      "what": "calibration.fitness_tests gains treadmill_20min_fixed (protocol_version 1 -> 2): 20 minutes on the treadmill at ONE fixed speed and incline, mean heart rate over minutes 10 to 20 (lower is better) with the logged RPE beside it. The setting (3.2 mph, 3.5 % incline) was proposed by the platform from his treadmill history and is OWNER-CONFIRMED 2026-11-11; it stays fixed across tests, and a changed setting starts a new comparison series. Heart rate is a MEASUREMENT here, never an effort gate: it builds the baseline after the 2026-10-10 heart-rate regime marker. A test with no usable heart-rate join is stored invalid, never as a value; no result before the marker is compared with one after it. It rides the battery's cadence, test day and dead-man; the order places it before the bike test.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -1270,11 +1277,12 @@
       "every_weeks": 6,
       "battery": [
         "6-minute walk",
+        "20-minute treadmill at a fixed workload (heart rate, RPE)",
         "20-minute bike at RPE 6",
         "dead hang",
         "assisted pull-up assistance"
       ],
-      "protocol_version": "1",
+      "protocol_version": "2",
       "aligned_to": "the block: a battery is due in the program week that closes each block (program week a whole multiple of every_weeks)",
       "early_days_credited": 7,
       "grace_weeks": 1,
@@ -1293,6 +1301,7 @@
         "dead_hang",
         "assisted_pull_up",
         "minimum_session",
+        "treadmill_20min_fixed",
         "bike_20min_rpe6"
       ],
       "tests": {
@@ -1305,6 +1314,24 @@
           "hevy_field": "distance_m",
           "protocol": "Treadmill at 0 % incline, no handrails, no running: the fastest steady walk you can hold for 6 minutes. Log the distance.",
           "hevy": "a Treadmill set of about 6 minutes with a distance"
+        },
+        "treadmill_20min_fixed": {
+          "label": "20-minute fixed treadmill",
+          "catalog_key": "treadmill",
+          "unit": "bpm",
+          "better": "lower",
+          "duration_s": 1200,
+          "hevy_field": "final_window_hr",
+          "window_from_s": 600,
+          "window_to_s": 1200,
+          "regime_bound": true,
+          "setting": {
+            "speed_mph": 3.2,
+            "incline_pct": 3.5,
+            "provenance": "owner-confirmed 2026-11-11 (platform-proposed from the median of his recent steady treadmill blocks (2026-10-26 to 2026-11-09, five blocks of 30 to 45 minutes with a logged speed and incline: 3.2 mph and 3.5 % incline)). Keep it fixed across tests; a changed setting starts a new series."
+          },
+          "protocol": "Treadmill, 20 minutes at 3.2 mph and 3.5 % incline, never changed. Start a watch workout. Note RPE at the end.",
+          "hevy": "a Treadmill set of about 20 minutes; heart rate over minutes 10 to 20 joins from the watch, RPE from the note"
         },
         "bike_20min_rpe6": {
           "label": "20-minute bike at RPE 6",

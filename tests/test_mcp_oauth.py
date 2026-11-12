@@ -69,9 +69,17 @@ class _FakeTable:
         return {"Attributes": dict(item)} if ReturnValues == "ALL_NEW" else {}
 
 
+_REAL_TABLE = core.table
+
+
 def setup_function(_fn):
     core.table = _FakeTable()  # fresh store per test
     h._BEARER_TOKEN_CACHE.clear()
+
+
+def teardown_function(_fn):
+    # #5813: restore the module's table — a leaked query-less fake broke every later query_source reader on this worker
+    core.table = _REAL_TABLE
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

@@ -361,9 +361,9 @@ class IngestionStack(Stack):
                 "SECRET_NAME": "life-platform/hevy",
                 "S3_BUCKET": "matthew-life-platform",
                 "TABLE_NAME": TABLE_NAME,
-                # #5795: start the nightly pre-draft on the ingest of a loaded session — OFF until the owner flips it
-                # to "on" after approving the PredraftOnIngestInvoke grant (role_policies_ingestion.ingestion_hevy_backfill)
-                "PREDRAFT_ON_INGEST": "off",
+                # #5795: start the nightly pre-draft on the ingest of a loaded session. ON by owner ruling 2026-11-12,
+                # after the PredraftOnIngestInvoke grant was deployed and verified (role_policies_ingestion.ingestion_hevy_backfill)
+                "PREDRAFT_ON_INGEST": "on",
             },
             custom_policies=rp.ingestion_hevy_backfill(),
             **shared,
