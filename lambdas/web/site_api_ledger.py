@@ -372,9 +372,9 @@ def discoveries(*, _g) -> dict:
             # hypothetical legacy flat-list record is still accepted, the same way
             # site_api_discovery.correlations() handles both shapes.
             if isinstance(corrs, dict):  # owner rulings 2026-11-03/05: public pairs, FDR re-run over them
-                pairs = list(_activity_publication.public_correlations(corrs).values())
+                pairs = list(_activity_publication.public_correlations(corrs, metric_methods=item.get("metric_methods")).values())
             elif isinstance(corrs, list):
-                pairs = _activity_publication.public_correlations(corrs)
+                pairs = _activity_publication.public_correlations(corrs, metric_methods=item.get("metric_methods"))
             else:
                 continue
             for c in pairs:
@@ -397,11 +397,20 @@ def discoveries(*, _g) -> dict:
                 # a legacy record with only the pre-FDR `significant` flag serves
                 # fdr_significant=None ("not checked"), never a fake pass.
                 fdr_flag = c.get("fdr_significant")
+                # 2026-11-11: the method each method-versioned metric of the pair was computed under, as the record
+                # stamped it (public_correlations already withheld an unstamped one) — so a downstream reader (the
+                # Laboratory's snapshot) can hold the same rule without the record.
+                stamps = item.get("metric_methods") if isinstance(item.get("metric_methods"), dict) else {}
+                pair_methods = {k: stamps[k] for k in (c.get("metric_a"), c.get("metric_b")) if k in stamps}
                 ai_findings.append(
                     {
                         "week": week,
                         "metric_a": a,
                         "metric_b": b,
+                        "metric_methods": pair_methods,
+                        # the run's trailing window, as stored: consecutive weeks share most of their days
+                        "window_start": item.get("start_date"),
+                        "window_end": item.get("end_date"),
                         "r": round(r, 2) if r else 0,
                         "n": n,
                         "n_eff": n_eff,

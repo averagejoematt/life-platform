@@ -435,7 +435,9 @@ def _ask_fetch_computed_reads() -> dict:
         )
         pairs: dict = {}
         for item in _decimal_to_float(resp.get("Items", [])):
-            corrs = _activity_publication.public_correlations(item.get("correlations", {}))  # owner rulings 2026-11-03/05
+            corrs = _activity_publication.public_correlations(  # owner rulings 2026-11-03/05; method stamp 2026-11-11
+                item.get("correlations", {}), metric_methods=item.get("metric_methods")
+            )
             if not isinstance(corrs, dict):
                 continue
             for label, data in corrs.items():
