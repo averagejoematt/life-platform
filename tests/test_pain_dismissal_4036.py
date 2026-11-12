@@ -79,8 +79,6 @@ def _tripwires(*, note_dates, dismissals):
         pain_flag_instances=[{"movement": RDL, "note_dates": list(note_dates)}],
         pain_dismissals=dismissals,
         pain_layer_status="ok",
-        weight_stall_days=0,
-        adherence_on_plan=True,
     )
 
 
@@ -432,8 +430,6 @@ def _cycling_tripwires(dismissals):
         pain_flag_instances=[dict(CYCLING_INSTANCE)],
         pain_dismissals=dismissals,
         pain_layer_status="ok",
-        weight_stall_days=0,
-        adherence_on_plan=True,
     )
 
 
@@ -585,8 +581,6 @@ def _slot_row(dismissals, *, linked=True):
             pain_flag_instances=[_slot_instance(linked=linked)],
             pain_dismissals=dismissals,
             pain_layer_status="degraded",
-            weight_stall_days=0,
-            adherence_on_plan=True,
         )
     )
 

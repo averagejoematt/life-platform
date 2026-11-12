@@ -323,3 +323,51 @@ def test_a_rendered_routine_with_calibration_lines_lints_clean_with_one_session_
     assert res.ok, res.lines()
     assert _block_count(body) == 1
     assert ir.inputs_snapshot["rpe_calibration"]["report"]["pooled"]["n"] == 0  # nothing performed yet: n stated, absent
+
+
+# ── #5797 x #5771: the calibration line outranks the fallback line in the 4-line budget ─────────────────────────────
+
+
+def _fb_note(lines: list[str], names: list[str]):
+    from training import lift_note
+
+    cue, fb = lift_note.fit_fallback(lines, "", names, hevy_note_grammar.LIFT_MAX_LINES)
+    return "\n".join(lines + ([fb] if fb else [])), {"note": "", "layoff_return": False, "fallback": {"names": names, "line": fb or None}}
+
+
+def _mark_with_fallback(note: str, record: dict, block_key: str = "lat_pulldown"):
+    block = _block(block_key)
+    block.notes = note
+    out_record = {"lift_notes": {block_key: record}, "previous_loads": {block_key: {"date": "2026-11-15"}}}
+    ctx = {"deload": False, "red_day": False, "load_floors": {}, "history_index": _history("PULLDOWN", DUE), "target_date": DAY}
+    with patch.object(rpe_calibration, "params", return_value=_p()):
+        out = rpe_calibration.mark_session([ExerciseBlock(movement_key="first"), block], CATALOG, note_record=out_record, context=ctx)
+    return block, out, out_record["lift_notes"][block_key]
+
+
+def test_with_room_both_lines_render_and_the_fallback_stays_last():
+    names = ["Pull Up (Assisted)"]
+    note, rec = _fb_note(["RPE 8–9"], names)
+    assert note.splitlines()[-1].startswith("If taken: ")
+    block, out, rec = _mark_with_fallback(note, rec)
+    lines = block.notes.splitlines()
+    assert lines[-2] == LINE and lines[-1].startswith("If taken: ") and out["marks"]
+    assert hevy_note_grammar.phone_lines(block.notes) <= hevy_note_grammar.LIFT_MAX_LINES
+    assert rec["fallback"]["line"] == lines[-1] and "yielded_to" not in rec["fallback"]
+
+
+def test_a_full_budget_drops_the_fallback_first_never_the_calibration_line():
+    names = ["Pull Up (Assisted)", "Seated Cable Row - V Grip (Cable)"]
+    note, rec = _fb_note(["RPE 8–9", "Volume day: chase 12.", "Breathe out on the pull."], names)
+    assert note.splitlines()[-1].startswith("If taken: ")  # the fallback fitted on its own (4 phone lines)
+    block, out, rec = _mark_with_fallback(note, rec)
+    assert block.notes.splitlines() == ["RPE 8–9", "Volume day: chase 12.", "Breathe out on the pull.", LINE]
+    assert out["marks"] and rec["fallback"] == {"names": names, "line": None, "yielded_to": "rpe_calibration"}
+    assert hevy_note_grammar.phone_lines(block.notes) <= hevy_note_grammar.LIFT_MAX_LINES
+
+
+def test_mutation_control_appending_without_the_priority_overruns_the_budget():
+    """Proves the test above can fail: the naive append (calibration line after the fallback) is 5 phone lines."""
+    names = ["Pull Up (Assisted)", "Seated Cable Row - V Grip (Cable)"]
+    note, _ = _fb_note(["RPE 8–9", "Volume day: chase 12.", "Breathe out on the pull."], names)
+    assert hevy_note_grammar.phone_lines(f"{note}\n{LINE}") > hevy_note_grammar.LIFT_MAX_LINES

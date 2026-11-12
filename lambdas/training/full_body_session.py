@@ -196,10 +196,12 @@ def _compose_notes(
     red_day: bool = False,
 ) -> dict[str, Any]:
     """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record.
-    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`).
+    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`). #5771: each lift's ranked
+    same-stimulus fallback (`selection_engine.note_fallbacks`) — on the wire once the library is approved, recorded either way.
     #5797 (owner ruling 2026-11-11): then the RPE calibration line on a due non-barbell exposure (`rpe_calibration`) —
-    never on a deload or a red day; its marks and the per-movement calibration report ride the record."""
+    never on a deload or a red day; it outranks the fallback line; its marks and the calibration report ride the record."""
     movements = load_catalog.get("movements") or {}
+    fb = selection_engine.note_fallbacks(rotation, [str(b.movement_key) for b in blocks], movements)
     record = lift_note.compose_blocks(
         blocks,
         movements,
@@ -207,11 +209,12 @@ def _compose_notes(
         history_index=history_index,
         target_date=target_date,
         rotations=variant_rotation.swaps(rotation, movements),
+        fallbacks=fb["by_key"] if fb.get("render") else None,
     )
     ctx = {"deload": deload, "red_day": red_day, "load_floors": load_floors, "history_index": history_index, "target_date": target_date}
     cal = rpe_calibration.mark_session(blocks, movements, note_record=record, context=ctx)
     record[rpe_calibration.SNAPSHOT_KEY] = {**cal, "report": rpe_calibration.report(history_index, movements)}
-    return record
+    return record | {"note_fallbacks": fb}
 
 
 def _sequence_line(day_entry: dict[str, Any]) -> str:

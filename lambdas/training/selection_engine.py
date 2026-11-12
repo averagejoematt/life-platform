@@ -35,7 +35,8 @@ ranks the exercise library (#5769, `config/exercise_library.json`) per slot, det
                   and a cue sheet (`form_cue_sheets`); a new movement with no cue sheet is not a candidate.
     fallbacks   = every pick carries its ranked same-stimulus fallbacks (the slot's next eligible candidates, those that
                   share no equipment with the pick first, so a missing item is a swap and not the same hole). The
-                  Hevy-note line is `fallback_note_line` — a render hook, not yet on the wire (#5771 owns the note).
+                  Hevy note names them (#5771, `note_fallbacks` -> `lift_note.fit_fallback`: `If taken: X, then Y.`),
+                  on the wire only once the library is approved; `fallback_note` records the slot's line.
 
 Anchors are not slots (`variant_rotation`): they stay fixed for the block. Pinned slots keep their pin (`owner_pin`).
 
@@ -569,7 +570,7 @@ def _trim(p: dict[str, Any]) -> dict[str, Any]:
         "muscle": (p.get("spec") or {}).get("muscle"),
         "ranked_top": (p.get("ranked") or [])[:5],
         "excluded_counts": counts,
-        "fallback_note": fallback_note_line(pick, p.get("fallbacks")),  # the render hook's line, recorded (not yet on the wire)
+        "fallback_note": fallback_note_line(pick, p.get("fallbacks")),  # the slot's line, recorded (#5771 renders note_fallbacks)
     }
 
 
@@ -749,9 +750,109 @@ def snapshot_fields(rotation: dict[str, Any]) -> dict[str, Any]:
 
 
 def fallback_note_line(pick: dict[str, Any] | None, fallbacks_: list[dict[str, Any]] | None) -> str | None:
-    """RENDER HOOK (#5771 owns the note): the one Hevy-note line naming the pick's ranked fallbacks — "If taken: X, then
-    Y." None when there is no fallback. Not yet on the wire."""
+    """The slot's recorded fallback line — "If taken: X, then Y." (`hevy_note_grammar.fallback_line`), library titles. None
+    when there is no fallback. The WIRE line is `note_fallbacks` -> `lift_note.fit_fallback` (catalog titles, the budget)."""
+    from training import hevy_note_grammar
+
     names = [str(f.get("title") or f.get("movement_id")) for f in fallbacks_ or [] if f.get("catalog_key")]
     if not pick or not names:
         return None
-    return "If taken: " + ", then ".join(names[:2]) + "."
+    return hevy_note_grammar.fallback_line(names)
+
+
+# ── the Hevy note's fallback line (#5771) ────────────────────────────────────
+def _library_fallbacks(key: str, env: dict[str, Any]) -> list[str]:
+    """The served key's library `fallbacks` (ranked same-stimulus at build time), as catalog keys, kept only when each one
+    is usable today: available at home_gym (inventory + learned unavailability; contention never removes one), not
+    pain-excluded, not `not_for_you_now`, no locked gate, and PRESCRIBABLE with the served lift's volume signature — an
+    anchor's fallback that would move the week's counts is not named (owner brief, 2026-11-11)."""
+    from training import variant_rotation as vr
+
+    lid = env["idx"]["to_lib"].get(key)
+    mv = xl.movements(env["lib"])
+    if not lid or lid not in mv:
+        return []
+    spec = {
+        "muscle": None,
+        "patterns": [],
+        "signature": vr.volume_signature(key, env["catalog"]),
+        "hevy_types": sorted({str(t) for t in vr.LOADED_HEVY_TYPES + ((env["catalog"].get(key) or {}).get("hevy_type"),) if t}),
+    }
+    ctx = {**env, "spec": spec, "floor": None, "floor_members": None}
+    out = []
+    for fb in mv[lid].get("fallbacks") or []:
+        m = fb.get("movement_id")
+        ck = env["idx"]["to_cat"].get(m or "")
+        if m in mv and ck and ck != key and _exclusion(m, mv[m], ck, ctx) is None:
+            out.append(ck)
+    return out
+
+
+def _slot_fallbacks(key: str, sel: dict[str, Any], role: str | None) -> list[str] | None:
+    """The served key's ranked fallbacks from its slot's selection (live: the slot serves its pick, or a ledger-held
+    fallback — then the pick leads the rest), as catalog keys; None when no slot of the served role serves `key`."""
+    for s in sel.get("slots") or []:
+        if role and s.get("role") != role:
+            continue
+        pick = (s.get("pick") or {}).get("catalog_key")
+        rest = [f.get("catalog_key") for f in s.get("fallbacks") or [] if f.get("catalog_key")]
+        if pick == key:
+            return rest
+        if key in rest:
+            return [k for k in [pick] + rest if k and k != key]
+    return None
+
+
+def note_fallbacks(
+    rotation: dict[str, Any] | None,
+    served_keys: list[str],
+    catalog: dict[str, Any],
+    *,
+    skill_ceiling: int = 2,
+    lib: Any = ...,
+    overlay: Any = ...,
+) -> dict[str, Any]:
+    """Per served lift, the ranked same-stimulus fallback titles its Hevy note names (`lift_note.fit_fallback`, owner ruling
+    2026-11-11 on #5771): `{"mode", "render", "by_key": {served key: [Hevy title, ...]}}`.
+
+    An accessory slot's list is its selection's (the slot's next eligible candidates, equipment-disjoint first); any other
+    served lift (an anchor, or an accessory the #5075 pools serve in shadow) takes its library entry's ranked `fallbacks`,
+    filtered for today (`_library_fallbacks`). A movement served elsewhere in the session is never a fallback (that is a
+    second set of the same lift, not a swap). Unavailable is never named; contention-only equipment still is.
+
+    `render` is True only when the library is APPROVED (THE SWITCH): while it is `proposed` the lines are computed and
+    recorded (`inputs_snapshot["note_fallbacks"]`) but stay off the wire. Never raises: a failure is `state: failed`."""
+    sel = (rotation or {}).get("selection") or {}
+    m = sel.get("mode") or MODE_NO_LIBRARY
+    if m == MODE_NO_LIBRARY:
+        return {"issue": "#5771", "mode": m, "render": False, "by_key": {}}
+    try:
+        lib = load_library_failsoft() if lib is ... else lib
+        if not isinstance(lib, dict):
+            return {"issue": "#5771", "mode": MODE_NO_LIBRARY, "render": False, "by_key": {}}
+        overlay = load_overlay_failsoft() if overlay is ... else overlay
+        from training import variant_rotation as vr
+
+        env = {
+            "lib": lib,
+            "catalog": catalog,
+            "overlay": overlay,
+            "inventory": None,
+            "idx": key_index(lib, catalog),
+            "ceiling": skill_ceiling,
+            "missing": vr.not_available(),
+        }
+        role = ((rotation or {}).get("slots") or [{}])[0].get("role")
+        served = set(served_keys)
+        by_key: dict[str, list[str]] = {}
+        for key in served_keys:
+            ranked = _slot_fallbacks(key, sel, role)
+            if ranked is None:
+                ranked = _library_fallbacks(key, env)
+            titles = [str((catalog.get(k) or {}).get("title") or k) for k in ranked if k not in served]
+            if titles:
+                by_key[key] = titles[:MAX_FALLBACKS]
+    except Exception as e:  # noqa: BLE001 — a fallback line never blocks a draft
+        logger.warning(f"selection_engine: note fallbacks failed ({type(e).__name__}: {e}) — no fallback line")
+        return {"issue": "#5771", "mode": m, "render": False, "state": "failed", "error": f"{type(e).__name__}: {e}"[:200], "by_key": {}}
+    return {"issue": "#5771", "mode": m, "render": m == MODE_LIVE, "by_key": by_key}

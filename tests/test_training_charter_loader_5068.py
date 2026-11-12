@@ -178,8 +178,6 @@ def test_plan_engine_stamps_the_charter_version():
         anchor_lift_drop_sessions=1,
         pain_flag_sites=[],
         pain_layer_status="ok",
-        weight_stall_days=3,
-        adherence_on_plan=True,
     )
     assert (
         block["charter_version"] == tc.charter_version() == json.loads((_REPO / "config" / "training_charter.json").read_text())["version"]

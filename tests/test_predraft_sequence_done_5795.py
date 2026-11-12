@@ -359,14 +359,14 @@ def test_the_poll_summary_carries_the_trigger(monkeypatch):
     assert "tombstones" in body and "cardio_hr_rejoin" in body
 
 
-# ── the CDK side: OWNER-REQUIRED additive IAM, flag shipped OFF ─────────────────────────────
+# ── the CDK side: OWNER-REQUIRED additive IAM; flag ON (owner ruling 2026-11-12) ─────────────────────────────
 
 
-def test_cdk_grants_only_the_warmer_and_ships_the_flag_off():
+def test_cdk_grants_only_the_warmer_and_ships_the_flag_on():
     src = (REPO / "cdk" / "stacks" / "role_policies_ingestion.py").read_text()
     body = src.split("def ingestion_hevy_backfill", 1)[1].split("\ndef ", 1)[0]
     assert 'sid="PredraftOnIngestInvoke"' in body and 'actions=["lambda:InvokeFunction"]' in body
     assert f'function:{invoke_gate.WARMER_FUNCTION_NAME}"' in body and "function:*" not in body
     stack = (REPO / "cdk" / "stacks" / "ingestion_stack.py").read_text()
     hevy = stack.split('"HevyBackfill"', 1)[1].split("custom_policies", 1)[0]
-    assert f'"{predraft_trigger.FLAG_ENV}": "off"' in hevy
+    assert f'"{predraft_trigger.FLAG_ENV}": "on"' in hevy

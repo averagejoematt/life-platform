@@ -131,14 +131,34 @@ def _note_room(index: int) -> int:
     return lift_note._ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES
 
 
+def _with_line(note: str, record: dict[str, Any] | None, room: int) -> str | None:
+    """The note with the calibration line, or None when even the line alone does not fit (the set is deferred).
+
+    PRIORITY (#5797 x #5771): on the calibration set's exercise the calibration line OUTRANKS the fallback line
+    (`If taken: X, then Y.`, `lift_note.fit_fallback`). The fallback stays LAST; it is re-fitted under the line (two names,
+    then one) and is the first thing to go. Every other line — effort, reason, cue — is untouched. A fallback that yields
+    is recorded on the lift's record (`fallback.line` None, `fallback.yielded_to`)."""
+    from training import hevy_note_grammar as g, lift_note
+
+    lines = note.split("\n") if note else []
+    fb_old = lines.pop() if lines and g.FALLBACK_RE.match(lines[-1]) else ""
+    base = lines + [NOTE_LINE]
+    if g.phone_lines("\n".join(base)) > room:
+        return None
+    fb_rec = (record or {}).get("fallback") if record is not None else None
+    fb_line = lift_note.fit_fallback(base, "", (fb_rec or {}).get("names"), room)[1] if fb_old else ""
+    if fb_old and fb_line != fb_old and fb_rec is not None:
+        fb_rec.update(line=fb_line or None, yielded_to="rpe_calibration")
+    return "\n".join(base + ([fb_line] if fb_line else []))
+
+
 def mark_session(blocks: list[Any], catalog_movements: dict[str, Any], *, note_record: dict[str, Any], context: dict[str, Any]) -> dict:
     """IN PLACE: give each due exposure its calibration line and return the snapshot record {marks, skipped}.
 
     `context`: deload, red_day, load_floors, history_index, target_date. Runs after `lift_note.compose_blocks`, whose
     record (`note_record`) says which lifts are layoff returns and which have a PREVIOUS. A note with no room for the
-    line under the Hevy note budget defers the set (recorded) rather than overrun the budget."""
-    from training import hevy_note_grammar
-
+    line under the Hevy note budget defers the set (recorded) rather than overrun the budget; the calibration line outranks
+    the #5771 fallback line (`_with_line`)."""
     p = params()
     marks: list[dict[str, Any]] = []
     skipped: dict[str, str] = {}
@@ -154,13 +174,16 @@ def mark_session(blocks: list[Any], catalog_movements: dict[str, Any], *, note_r
             "tid": entry.get("hevy_template_id_hint"),
         }
         why = _skip_reason(key, block, entry, ctx, p)
-        if why is None and hevy_note_grammar.phone_lines(f"{block.notes}\n{NOTE_LINE}") > _note_room(index):
+        notes = (
+            _with_line(str(block.notes or ""), (note_record.get("lift_notes") or {}).get(key), _note_room(index)) if why is None else None
+        )
+        if why is None and notes is None:
             why = "no room for the line under the note budget (deferred)"
         if why is not None:
             if key in (p.get("eligible") or []):
                 skipped[key] = why
             continue
-        block.notes = f"{block.notes}\n{NOTE_LINE}" if block.notes else NOTE_LINE
+        block.notes = notes
         work = _working(block.sets)
         marks.append(
             {
