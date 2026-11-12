@@ -111,3 +111,26 @@ def test_the_owners_specimens_moved():
     assert {k: MV[k]["target"]["primary"] for k in want} == want
     # no shoulder movement graded as a generic "shoulders" outranks the split: the delt work lives in its three heads
     assert {e["target"]["primary"] for e in MV.values() if "lateral raise" in e["title"].lower()} <= {"side_delts", "rear_delts"}
+
+
+def _attribute_offenders(movements: dict) -> list[str]:
+    off = []
+    for key, (attrs, reason) in targets.ATTRIBUTE_OVERRIDES.items():
+        e = movements[key]
+        if (e.get("attribute_audit") or {}).get("reason") != reason:
+            off.append(f"{key}: attribute_audit does not record the reviewed reason")
+        for field, value in attrs.items():
+            have = e.get(field)
+            joints = field == "joint_stress" and any((have or {}).get(j) != v for j, v in value.items())
+            if joints or (field != "joint_stress" and have != value):
+                off.append(f"{key}.{field}: {have!r} != {value!r}")
+    return off
+
+
+def test_every_attribute_override_is_applied_and_recorded():
+    """Board rec 5's reviewed attribute fixes (owner ruling 2026-11-12) hold in the library, recorded with their reason."""
+    assert _attribute_offenders(MV) == []
+    # control: the weighted dip reverted to the raw rule (a selectorized machine) is named
+    bad = copy.deepcopy(MV)
+    bad["chest_dip_weighted"]["resistance_profile"] = "machine_selectorized"
+    assert any(o.startswith("chest_dip_weighted.resistance_profile") for o in _attribute_offenders(bad))

@@ -141,14 +141,15 @@ def test_tier_for_reads_the_slot_muscle_and_its_sub_targets():
 
 
 # ── C only with a recorded reason ────────────────────────────────────────────
-def test_every_c_pick_in_the_week_carries_a_recorded_reason():
+def test_every_pick_outside_s_and_a_carries_a_recorded_reason():
+    """Owner ruling 2026-11-12 (board rec 2): S and A are both programmable; a pick outside S∪A needs a recorded reason."""
     sel = _week()
-    c_picks = [s for s in sel["slots"] if s.get("pick") and s["pick"]["tier"] == "C"]
-    assert c_picks, "the live library has C-only slots; this test must see them"
-    for s in c_picks:
+    reasoned = [s for s in sel["slots"] if s.get("pick") and s["pick"]["tier"] in se.REASONED_TIERS]
+    assert reasoned, "the live library has slots served outside S∪A (owner pins at least); this test must see them"
+    for s in reasoned:
         assert s["pick"]["c_reason"] and s["pick"]["c_reason"]["code"] in se.C_REASONS, s["slot_id"]
     for s in sel["slots"]:
-        if s.get("pick") and s["pick"]["tier"] != "C":
+        if s.get("pick") and s["pick"]["tier"] in se.PROGRAMMABLE_TIERS:
             assert s["pick"]["c_reason"] is None
 
 
@@ -158,7 +159,10 @@ def test_c_reason_names_the_blocked_higher_tier_or_the_gap():
     blocked = [{"tier": "B", "movement_id": "b", "title": "B one", "code": "equipment", "why": "x unavailable"}]
     assert se.c_reason(pick, blocked)["code"] == "equipment"
     assert se.c_reason(pick, [], pinned=True)["code"] == "owner_pin"
-    assert se.c_reason({"tier": "B", "movement_id": "y"}, blocked) is None
+    assert se.c_reason({"tier": "A", "movement_id": "y"}, blocked) is None  # S and A are programmable: no reason owed
+    # a pick outside S∪A below an eligible pool member names it as `pool_fit`, never a false library gap
+    peer = [{"tier": "A", "movement_id": "a", "title": "A one"}]
+    assert se.c_reason({"tier": "B", "movement_id": "y"}, [], pooled=peer)["code"] == "pool_fit"
 
 
 def test_critic_changes_a_c_pick_served_where_an_a_is_selectable():
@@ -240,7 +244,9 @@ def test_discomfort_and_form_notes_never_exclude():
     assert "pain_flag" not in form
     for tags in (discomfort, form):
         sig = {t: 1 for t in tags}
-        assert base in _served_anywhere(_week(overlay=_pain_overlay(tid, sig))), tags
+        s = _slot(_week(overlay=_pain_overlay(tid, sig)), "upper_heavy.db_curl")
+        # never EXCLUDED (discomfort is an N=1 demotion, which inside the S∪A pool may move the pick — owner ruling 2026-11-12)
+        assert s["excluded_counts"] == _slot(_week(), "upper_heavy.db_curl")["excluded_counts"], tags
 
 
 def test_a_stale_overlay_pain_tag_is_not_trusted_to_exclude():
@@ -349,7 +355,7 @@ def test_variety_rotates_a_slot_within_its_band_by_its_own_history():
     # control: without the slot term (global recency only) every member is `recent` and the slot holds band[0]
     real = se.rank_key
     try:
-        se.rank_key = lambda c, recent, slot_last=None: real(c, recent)  # type: ignore[assignment]
+        se.rank_key = lambda c, recent, slot_last=None, pool=None: real(c, recent, None, pool)  # type: ignore[assignment]
         assert _slot(_week(rows=rows), "upper_heavy.db_curl")["pick"]["movement_id"] == band[0]
     finally:
         se.rank_key = real

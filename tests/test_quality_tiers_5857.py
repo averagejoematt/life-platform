@@ -68,7 +68,7 @@ def _top_band(lib: dict, targets: tuple[str, ...]) -> list[str]:
     for k, e in lib["movements"].items():
         if e["family"] in SELECTABLE_EXCLUDED or e["target"]["primary"] not in targets:
             continue
-        if any(r["tier"] == "S" for r in e["hypertrophy"] if r["target"].startswith(targets)):
+        if any(r["tier"] in ("S", "A") for r in e["hypertrophy"] if r["target"].startswith(targets)):
             out.append(k)
     return out
 
@@ -143,26 +143,97 @@ def test_the_builder_twice_over_the_same_inputs_writes_the_same_library(monkeypa
     assert _derivation_offenders(one) == []
 
 
-def test_bands_not_a_single_winner_every_major_muscle_has_two_in_s_or_names_why():
+def test_bands_not_a_single_winner_every_major_muscle_has_two_programmable_or_names_why():
+    """Owner ruling 2026-11-12 (board rec 2): S and A are both programmable, so the bar is >= 2 in S∪A per major muscle."""
     short = {m: _top_band(LIB, t) for m, t in MAJOR_MUSCLES.items() if len(_top_band(LIB, t)) < 2}
     assert set(short) == set(qr.TOP_BAND_SHORTFALL), (short, sorted(qr.TOP_BAND_SHORTFALL))
     assert all(qr.TOP_BAND_SHORTFALL[m].strip() for m in short)
     # the owner's specimen: triceps no longer has a single top-band movement
     assert len(_top_band(LIB, ("triceps",))) >= 2
-    # control: collapse triceps' S band to the overhead extension alone -> the muscle is short and unnamed -> red
+    # control: collapse triceps' S∪A to the overhead extension alone -> the muscle is short and unnamed -> red
     bad = copy.deepcopy(LIB)
     for k, e in bad["movements"].items():
         if k != "overhead_triceps_extension_cable" and e["target"]["primary"] == "triceps":
             for r in e["hypertrophy"]:
-                r["tier"] = "A" if r["tier"] == "S" else r["tier"]
+                r["tier"] = "B" if r["tier"] in ("S", "A") else r["tier"]
     assert len(_top_band(bad, ("triceps",))) == 1 and "triceps" not in qr.TOP_BAND_SHORTFALL
 
 
 def test_the_library_carries_its_rubric_and_the_doc_names_its_version():
     assert LIB["quality_rubric"] == qr.rubric_doc()
-    assert LIB["quality_rubric"]["provenance"].endswith("owner to confirm")
-    assert f"rubric v{qr.RUBRIC_VERSION}" in DOC and "proposed weights — owner to confirm" in DOC
-    for term in ("stretch", "stability", "resistance profile", "progressability", "joint stress"):
+    assert "owner ruling 2026-11-12" in LIB["quality_rubric"]["provenance"]
+    assert f"rubric v{qr.RUBRIC_VERSION}" in DOC and "Standing principles" in DOC
+    for term in ("stretch", "stability", "resistance profile", "progressability", "carryover", "joint stress"):
         assert term in DOC.lower(), term
     for floor, tier in qr.BANDS:
         assert f"{tier} >= {floor}" in DOC, (tier, floor)
+
+
+# ── rubric v2 (owner ruling 2026-11-12: all eight board recommendations) ─────────────────────────────────────────────
+_PROFILES = ("free_weight", "machine_selectorized", "machine_plate_loaded", "cable")
+
+
+def _best_score(job: str, profile: str, target: str) -> int:
+    """The best score any movement with this job, profile and target can reach (every other attribute at its best)."""
+    e = {
+        "job": job,
+        "resistance_profile": profile,
+        "length_bias": "lengthened",
+        "stability": "high",
+        "skill_complexity": "low",
+        "joint_stress": dict.fromkeys(("spinal_load", "shear", "wrist", "elbow", "shoulder"), "low"),
+    }
+    return qr.score(e, target)
+
+
+def _equipment_offenders() -> list[str]:
+    out = []
+    for target in ("chest", "back", "quadriceps", "hamstrings", "front_delts"):
+        best = {p: _best_score("compound", p, target) - (qr.FREE_WEIGHT_CARRYOVER if p == "free_weight" else 0) for p in _PROFILES}
+        if len(set(best.values())) != 1:
+            out.append(f"compound {target}: best score by equipment {best}")
+    for k, e in MV.items():  # principle 4: swapping equipment moves a movement at most 2 points
+        for r in e["hypertrophy"]:
+            scores = [qr.score(e | {"resistance_profile": p}, r["target"]) for p in _PROFILES]
+            if max(scores) - min(scores) > 2:
+                out.append(f"{k}/{r['target']}: equipment swap moves it {max(scores) - min(scores)} points")
+    return out
+
+
+def test_no_equipment_class_wins_by_construction():
+    """Standing principle 4: for a compound, the best achievable score is the same for free weight, machine and cable
+    before the free-weight carryover point; and no equipment swap moves any movement more than 2 points."""
+    assert _equipment_offenders() == []
+
+
+def test_control_v1_press_as_fly_classing_goes_red(monkeypatch):
+    """v1 scored every press by its muscle's curve (a chest press as a fly). Reintroduce that and the guard goes red."""
+    monkeypatch.setattr(qr, "job", lambda entry: "isolation")
+    assert any(o.startswith("compound chest") for o in _equipment_offenders())
+
+
+def test_every_s_and_a_row_has_rated_joints_and_the_board_anchors_hold():
+    """Board rec 5: no S or A row carries an unknown joint. The board's expected anchors under v2 (verified, not forced)."""
+    unrated = [
+        k
+        for k, e in MV.items()
+        if e["family"] not in SELECTABLE_EXCLUDED
+        and any(r["tier"] in "SA" for r in e["hypertrophy"])
+        and "unknown" in e["joint_stress"].values()
+    ]
+    assert unrated == []
+    want = {
+        ("incline_bench_press_dumbbell", "chest"): "S",
+        ("bench_press_barbell", "chest"): "A",
+        ("squat_barbell", "quadriceps"): "A",
+        ("romanian_deadlift_barbell", "hamstrings"): "A",
+        ("hack_squat_machine", "quadriceps"): "S",
+        ("lat_pulldown_cable", "back"): "S",
+        ("butterfly_pec_deck", "chest"): "S",
+        ("seated_leg_curl", "hamstrings"): "S",
+        ("rear_delt_reverse_fly_machine", "rear_delts"): "S",
+    }
+    got = {(k, t): next(r["tier"] for r in MV[k]["hypertrophy"] if r["target"] == t) for k, t in want}
+    assert got == want
+    assert MV["incline_bench_press_dumbbell"]["job"] == "compound" and MV["butterfly_pec_deck"]["job"] == "isolation"
+    assert qr.components(MV["squat_barbell"], "glutes")["stretch"] == qr.STRETCH["mid"], "no stretch premium for glutes"

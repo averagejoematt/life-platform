@@ -98,6 +98,12 @@ COMMITMENTS: list[dict[str, Any]] = [
         "merges": "training/panel_rubric.py::rotation_problem (the accessory_rotation_drafted criterion, now here)",
     },
     {
+        "id": "free_weight_compounds",
+        "seats": {"dan_john": "a free-weight press, pull, squat and hinge weekly"},
+        "enforce": "exercise-library approval (WARN while it is proposed: today's #5075 pools serve no free-weight pull)",
+        "merges": "training/week_floors.py::free_weight_compounds (#5857, owner ruling 2026-11-12, board rec 4; anchors count)",
+    },
+    {
         "id": "side_rear_delt_band",
         "seats": {"rp_israetel": "rising volume on shoulders"},
         "band": "volume_priorities.sets_per_wk." + BAND,
@@ -120,8 +126,8 @@ def ledger_line(seats: dict[str, str]) -> str:
 def rotation_problem(rot: Any) -> str | None:
     """#5759: why one draft's rotation record (`variant_rotation.plan`) is NOT on the charter cadence, or None when it is:
     the program week known, the rotation not refused, and past block 1's first phase every slot with another pool member
-    serving a variant that differs from the phase before — except a hold owner ruling B accepts (#5856, 2026-11-12: the held
-    pick is the only member of the slot's best servable quality band; `rotation_holds` records it). Absence is not credit."""
+    serving a variant that differs from the phase before — except a hold owner ruling B accepts (#5856, 2026-11-12, amended:
+    the held pick is the single servable member of the slot's S∪A pool; `rotation_holds` records it). Absence is not credit."""
     if not isinstance(rot, dict):
         return "no rotation record on the draft"
     pos = rot.get("position")
@@ -147,10 +153,13 @@ def _held(rot: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _sole_best(slot: dict[str, Any]) -> bool:
-    """Owner ruling B on #5856 (2026-11-12): a held pick is accepted when it is the ONLY member of the slot's best servable
-    quality band (`selection_engine.top_band`). A band with two or more members still rotates."""
+    """Owner ruling B on #5856 (2026-11-12), amended the same day (board rec 3): a held pick is accepted only when it is the
+    SINGLE servable member of the slot's S∪A pool (`selection_engine.top_band.sa_members`). Two or more still rotate. When
+    S∪A holds NO servable member this week (every one excluded or already served by another slot), the slot's own pool
+    stands in for it: a single servable pool member is accepted, recorded the same way."""
     band = slot.get("top_band") or {}
-    return list(band.get("members") or []) == [slot.get("variant")]
+    members = list(band.get("sa_members") or []) or list(band.get("members") or [])
+    return members == [slot.get("variant")]
 
 
 def rotation_holds(rot: Any) -> list[str]:
@@ -158,7 +167,9 @@ def rotation_holds(rot: Any) -> list[str]:
     if not isinstance(rot, dict):
         return []
     return [
-        f"{s.get('slot_id')} (tier {(s.get('top_band') or {}).get('tier')}, the band's only member)" for s in _held(rot) if _sole_best(s)
+        f"{s.get('slot_id')} (tier {(s.get('top_band') or {}).get('tier')}, the only servable S/A member)"
+        for s in _held(rot)
+        if _sole_best(s)
     ]
 
 
@@ -310,6 +321,20 @@ def _band(c: dict[str, Any], served: list[dict[str, Any]], catalog: dict[str, An
     return _row(c, MET if inside else BLOCK, f"{row['member_sets']} sets a week against the charter band [{lo}, {hi}]")
 
 
+def _free_weight(c: dict[str, Any], served: list[dict[str, Any]], lib: Any, catalog: dict[str, Any], status: str | None) -> dict[str, Any]:
+    """Owner ruling 2026-11-12 (board rec 4): a free-weight compound press, pull, squat and hinge every program week, anchors
+    counting. It BLOCKS once the exercise library is approved (the selection then fills the slots) and WARNS before."""
+    if not isinstance((lib or {}).get("movements"), dict):
+        return _row(c, NOT_EVALUATED, "no exercise library on this bundle to read job / pattern from")
+    groups = week_floors.free_weight_compounds(served, lib, catalog)
+    missing = [g for g, hits in groups.items() if not hits]
+    if missing:
+        armed = status == week_floors.LIBRARY_APPROVED
+        tail = "" if armed else " — a warning until the exercise library is approved"
+        return _row(c, BLOCK if armed else WARN, f"no free-weight compound {' / '.join(missing)} this week{tail}")
+    return _row(c, MET, "; ".join(f"{g}: {', '.join(hits)}" for g, hits in groups.items()))
+
+
 def _rotation(c: dict[str, Any], rot: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(rot, dict):
         return _row(c, NOT_EVALUATED, "no rotation record for the week")
@@ -350,6 +375,7 @@ def evaluate(
             _corrective(by_id["corrective"], served, catalog),
             _stretch(by_id["stretch_position"], served, lib),
             _rotation(by_id["rotation"], rotation),
+            _free_weight(by_id["free_weight_compounds"], served, lib, catalog, status),
             _band(by_id["side_rear_delt_band"], served, catalog),
         ]
         verdict = "fail" if any(r["blocking"] for r in rows) else "pass"

@@ -53,44 +53,100 @@ carry_conditioning | core_anti_movement | skill_athletic | corrective) · `lengt
 `evidence_confidence`, `evidence_adjustment` when a direct trial moved it, `citations`, `last_reviewed`) · `gates` ·
 `not_for_you_now` · `availability.home_gym` · `fallbacks` (ranked). Attributes a rule cannot know are `unknown`.
 
-## Quality tiers (#5857, rubric v1.0.1 — PROPOSED)
+## Quality tiers (#5857, rubric v2.0.0 — owner ruling 2026-11-12)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
 band had one member or none. Owner, 2026-11-12: *"if we are saying there is only one S tier tricep exercise in the
 world, that sounds slightly off … there may be a best of the best, but there may be some in that same territory to
-justify S-tier."* So each per-target row's `tier` is now a band S/A/B/C/D that a written rubric derives from the
-attributes the library already records, and evidence strength is its own field beside it.
+justify S-tier."* So each per-target row's `tier` is a band S/A/B/C/D that a written rubric derives from the attributes
+the library records, and evidence strength is its own field beside it. Rubric v1 (stretch first, one set of terms for
+every movement) was red-teamed by a board the owner convened; on 2026-11-12 he adopted all eight of its
+recommendations, and v2 is the result (`lambdas/training/quality_rubric.py`; the library carries the same table as its
+`quality_rubric` block).
 
-**The rubric — proposed weights — owner to confirm** (`lambdas/training/quality_rubric.py`; the library carries the
-same table as its `quality_rubric` block). Per (movement, target muscle), the sum of:
+**Scored against the job.** Each movement carries a `job` — `compound` or `isolation` — set by the builder from its
+movement pattern (`exercise_library.movement_pattern`: presses, dips, push-ups, rows, pulldowns, squats, lunges, hinges,
+carries and Olympic lifts are compound; a pullover, a straight-arm pull and a Pallof press are isolation), never from the
+muscle's name. v1 scored every press as if it were a fly; v2 does not. Per (movement, target):
 
-| Term | Field | Points |
-|---|---|---|
-| stretch (weighted highest) | `length_bias` | lengthened 5 · mid 3 · shortened 1 · unknown / not_applicable 0 |
-| stability (the target muscle is the limiter) | `stability` | high 3 · moderate 2 · low 1 · unknown 0 |
-| resistance profile (fit to the target's strength curve) | `resistance_profile` | single-joint upper-body targets (chest, the delts — side, rear, front, or shoulders — biceps, triceps, forearms): cable / selectorized machine 3 · plate-loaded machine / free weight 2 · band / bodyweight 1. Everything else: free weight / any machine 3 · cable 2 · band / bodyweight / sled 1. Unknown 0 |
-| progressability (load steps, low skill) | `skill_complexity` + profile | skill low 2 · moderate 1 · high 0, +1 when the resistance loads in small external steps (free weight, cable, machine) |
-| joint stress (a penalty) | `joint_stress` | -2 per joint rated high, -1 once when any joint is rated moderate |
+| Term | Field | Isolation | Compound |
+|---|---|---|---|
+| stretch | `length_bias` | lengthened 5 · mid 3 · shortened 1 · unknown 0 | the same |
+| stability (the target is the limiter) | `stability` | high 3 · moderate 2 · low 1 | high 2 · moderate 2 · low 1 (stabiliser demand is part of the job) |
+| resistance profile | `resistance_profile` | single-joint upper-body targets (chest, the delts, biceps, triceps, forearms): cable / selectorized machine 3 · plate-loaded machine / free weight 2 · band / bodyweight 1. Other targets: free weight / any machine 3 · cable 2 · band / bodyweight / sled 1 | free weight / any machine / cable 3 · band / bodyweight / sled 1 |
+| progressability | `skill_complexity` + profile | skill low 2 · moderate 1 · high 0, +1 for small external load steps | the same |
+| carryover | `resistance_profile` | — | +1 for a free-weight compound |
+| joint stress (a penalty) | `joint_stress` | −2 per joint rated high, −1 once for any joint rated moderate **or unknown**; the total never below −2 | the same |
 
-Maximum 14. **Bands:** S >= 12 · A >= 10 · B >= 8 · C >= 5 · D below. Bands, not a single winner: every movement that
-reaches a band shares it. An `unknown` attribute scores 0 — the rubric never guesses what the library cannot state.
+Maximum 14 for both jobs. **Bands:** S >= 12 · A >= 10 · B >= 8 · C >= 5 · D below. An unknown attribute never helps: a
+positive term scores 0 and an unknown joint counts as moderate. **No stretch premium for the glutes** (`STRETCH_CAPS`:
+their stretch term is capped at mid; Plotkin 2023 found the shortened hip thrust equal to the lengthened back squat).
 
 **Evidence** is `evidence_confidence`: `rct_direct` (a randomized trial of this target with this movement or its
 defining variable) · `rct_characteristic` (a trial of the movement's defining characteristic: training length, joint
 angle) · `consensus` (a named evidence-based reviewer's peer-reviewed position) · `none_reviewed`. Anything above
 `none_reviewed` cites a reference whose DOI/PMID resolved (Crossref + PubMed) and whose abstract was read. **Only a direct
 trial may move a row, and only one band** from its rubric tier, recorded on the row as `evidence_adjustment {bands,
-citation, why}`: +1 when the trial found this movement grew the target more than a compared movement or range, -1 when
-less; equal or uncompared growth moves nothing; a move past S or D is capped. The shipped adjustments: the overhead cable
-triceps extension +1 (Maeo 2023), the seated leg curl +1 and the lying leg curl -1 (Maeo 2021), the standing calf raises
-+1 (Kinoshita 2023).
+citation, why}`: +1 when the trial found this movement grew the target more than a compared movement or range, −1 when
+less, and +1 for **equivalence** (`basis: equivalence`, `comparator`) when the movement it matched sits in a higher tier
+for the same target (checked library-wide by `exercise_library.validate`); a move past S or D is capped. The shipped
+adjustments: the overhead cable triceps extension +1 (Maeo 2023), the seated leg curl +1 and the lying leg curl −1
+(Maeo 2021), the standing calf raises +1 (Kinoshita 2023). No equivalence row ships: the hip thrust's comparator (the back
+squat, for the glutes) rates B, the hip thrust's own tier, so parity earns nothing. Citations the board named from
+memory go through the evidence-review allowlist before they back any row.
 
-**Derived, never authored.** The builder writes `rubric_score`, `rubric_tier` and `tier` last, from the final
-attributes; `exercise_library.validate` re-derives every row, so a hand-edited tier is a schema error
-(`tests/test_quality_tiers_5857.py`, with its must-fail control). A muscle whose S band holds fewer than two selectable
-movements names why in `quality_rubric.TOP_BAND_SHORTFALL` (today: abs, side delts, rear delts, front delts and glutes —
-each with the attribute reason; the guard reds a short muscle that is not named, and a stale entry).
+**Derived, never authored.** The builder writes `job`, `pattern`, `rubric_score`, `rubric_tier` and `tier` last, from the
+final attributes; `exercise_library.validate` re-derives every row, so a hand-edited tier is a schema error
+(`tests/test_quality_tiers_5857.py`, with its must-fail control). A muscle whose programmable pool (S and A) holds fewer
+than two selectable movements names why in `quality_rubric.TOP_BAND_SHORTFALL` (today: abs and rear delts).
+
+**How selection reads it** (`selection_engine`): **S and A are both programmable.** A slot's pool is its top two
+non-empty bands (`pool_tiers`); inside the pool it ranks his N=1 fit first, then slot variety (the movement this slot
+served least recently first, then not served by any slot in the lookback), then the tier as a tie-break, then evidence.
+A pick outside S∪A is served only with a recorded reason (`C_REASONS`: every earlier code kept, plus `pool_fit` for a
+pick that ranked first inside its pool over a higher-tier peer).
+
+**Rotation (owner ruling B on #5856, amended 2026-11-12).** Once the library is approved, the nippard `rotation`
+commitment accepts a pick held at a phase boundary only when it is the single servable member of its slot's S∪A pool
+(`selection_engine.top_band.sa_members`; when S∪A has no servable member that week, the slot's own pool stands in), and
+the hold is recorded on the rotation row. Two or more members rotate.
+
+**Weekly free-weight floor (owner ruling 2026-11-12).** Every program week serves at least one free-weight compound for
+each of press, pull, squat and hinge; anchors count (`week_floors.free_weight_compounds`, stage-1 row
+`free_weight_compounds`, the charter's `dan_john` ledger line). It warns while the library is proposed and blocks once
+it is approved. Finding: today's program meets press, squat and hinge through its anchors but serves no free-weight
+back pull (its rows and pulldown are machine/cable anchors), so approval would block every week until the owner rules.
+
+**Attribute audit (owner ruling 2026-11-12, blocking before approval).** `deploy/exercise_library_targets.py` carries
+the reviewed `ATTRIBUTE_OVERRIDES` (the weighted chest dip is a free-weight dip, not a selectorized machine; the dumbbell
+lateral raise's stability re-checked as moderate) and `JOINT_RATINGS_BY_PATTERN`, which rates every joint still `unknown`
+on a movement whose pattern it covers, one reason per row; a rated joint is never overwritten, and each fill is recorded
+on the entry as `attribute_audit`. No S or A row carries an unknown joint (`tests/test_quality_tiers_5857.py`).
+
+## Standing principles (owner ruling 2026-11-12)
+
+These bind every later library and tier decision.
+
+1. **The tier answers one question:** how good is this movement's hypertrophy stimulus for this target, in this job. It
+   is never a verdict on a program's anchors and never ranks across jobs (a press is not compared with a fly).
+2. **Classify by what the movement does.** Compounds and isolations are scored on terms that fit each, by movement
+   pattern, never by muscle name alone.
+3. **Missing data never helps.** An unknown attribute scores no better than a known moderate one: positive terms score
+   0, penalty terms count as moderate. A row with unknown joints can't hold S over a fully rated rival.
+4. **No equipment class wins by construction.** Swapping equipment (machine, free weight, cable) on the same pattern may
+   move a movement at most ±2 points, and for a compound the best achievable score is the same for each class before the
+   free-weight carryover point (held by `test_no_equipment_class_wins_by_construction`). Each pattern's top two bands
+   should hold both a machine/cable and a free-weight member where the library has one, or the doc names why.
+5. **Evidence moves bands only through direct trials, by one band,** and equivalence counts. A stretch or stability
+   weight is not applied to a muscle where a direct trial contradicts it (the glutes today). Every citation resolves and
+   is read, as the evidence review requires.
+6. **The person lives outside the tier.** Body mass, balance, pain, availability, a clinical history (as a cue, never a
+   cap) and enjoyment belong in gates, cues, N=1 fit and selection, never in the quality score.
+7. **The top two bands are programmable.** S is first among equals, not exclusive. A single-member S band is a reason to
+   rotate through A, not to hold.
+8. **Every weight change ships with its diff:** a before/after band table of every movement that moves, a version bump,
+   and the owner's sign-off before anything serves.
 
 ## Target-label audit (#5857, owner-approved on PR #5858)
 

@@ -717,6 +717,51 @@ def _resolved_gates(movements: dict[str, dict[str, Any]], tid_to_key: dict[str, 
     return gates_out
 
 
+COMPOUND_PATTERNS = ("horizontal_press", "vertical_press", "squat", "hinge", "vertical_pull", "horizontal_pull", "olympic", "carry")
+_ISOLATION_TITLE = re.compile(r"pullover|straight arm|press ?outs?|calf|pallof", re.I)  # a pullover / straight-arm pull is single-joint
+_PRESS_TITLE = re.compile(r"\bpress(es)?\b|\bdips?\b|thruster|push ?ups?|pushups?", re.I)
+
+
+def job_and_pattern(e: dict[str, Any]) -> tuple[str, str]:
+    """The movement's JOB (compound | isolation) and pattern, by what it does (owner ruling 2026-11-12, board rec 1):
+    `exercise_library.movement_pattern` over the title; a press, dip, push-up or thruster whose title the pattern table
+    misses is a compound `press`; a pullover or straight-arm pull is isolation. Never by muscle name."""
+    title = str(e.get("title") or "")
+    pattern = lib_rules.movement_pattern(title)
+    if _ISOLATION_TITLE.search(title):
+        return "isolation", pattern
+    if pattern in COMPOUND_PATTERNS:
+        return "compound", pattern
+    if _PRESS_TITLE.search(title):
+        return "compound", pattern if pattern in ("horizontal_press", "vertical_press") else "press"
+    return "isolation", pattern
+
+
+def apply_attribute_audit(movements: dict[str, dict[str, Any]]) -> None:
+    """The reviewed attribute audit (`deploy/exercise_library_targets.py`, owner ruling 2026-11-12, board rec 5), in place:
+    each `ATTRIBUTE_OVERRIDES` row replaces the named attributes (a joint_stress map merges joint by joint); then every
+    joint still `unknown` on a movement whose pattern has a reviewed `JOINT_RATINGS_BY_PATTERN` row takes that rating — a
+    rated joint is never overwritten. Each change is recorded on the entry as `attribute_audit`. A missing key is a hard stop."""
+    missing = sorted(k for k in targets.ATTRIBUTE_OVERRIDES if k not in movements)
+    if missing:
+        raise SystemExit(f"attribute audit: overrides for movements not in the library: {missing}")
+    for key, (attrs, reason) in targets.ATTRIBUTE_OVERRIDES.items():
+        e = movements[key]
+        for field, value in attrs.items():
+            e[field] = {**(e.get(field) or {}), **value} if field == "joint_stress" else value
+        e["attribute_audit"] = {"fields": sorted(attrs), "reason": reason}
+    for e in movements.values():
+        rule = targets.joint_rating(e, lib_rules.movement_pattern(str(e.get("title") or "")))
+        if not rule:
+            continue
+        js = dict(e.get("joint_stress") or {})
+        filled = sorted(j for j, v in js.items() if v == "unknown" and j in rule[0])
+        if filled:
+            e["joint_stress"] = {j: (rule[0][j] if j in filled else v) for j, v in js.items()}
+            e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+            e["attribute_audit"]["joints_rated"] = {"joints": filled, "rule": rule[1]}
+
+
 def apply_target_audit(movements: dict[str, dict[str, Any]], overrides: dict[str, tuple[str, str]] | None = None) -> None:
     """The reviewed target-label audit (`deploy/exercise_library_targets.py`, #5857), in place: the audited primary and its
     region, every hypertrophy row whose target was the old primary moved with it (a sub-target row is left alone), and
@@ -742,6 +787,9 @@ def build_library(
     movements, tid_to_key = _keyed_movements(entries, no_template)
     gates_out = _resolved_gates(movements, tid_to_key)
     apply_target_audit(movements)  # #5857: Hevy's raw muscle label -> the reviewed target, before any tier is derived
+    apply_attribute_audit(movements)  # #5857 rubric v2 (board rec 5): reviewed attribute fixes + joint ratings
+    for e in movements.values():
+        e["job"], e["pattern"] = job_and_pattern(e)
     missing = reviews.apply_evidence_changes(movements, reviews.ledger_evidence_changes(_ledger()))
     if missing:
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")
@@ -830,6 +878,8 @@ _ORDER = (
     "history",
     "target",
     "family",
+    "job",
+    "pattern",
     "length_bias",
     "resistance_profile",
     "stability",

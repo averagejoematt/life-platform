@@ -1,6 +1,8 @@
 """selection_critic.py — the deterministic stage-2 `selection` critic, as a pure function (#5775 S6; first cut #5773).
 
-WHAT IT ASKS, PER SLOT. Was a HIGHER-TIER movement available for this accessory slot? "Available" means not excluded by
+WHAT IT ASKS, PER SLOT. Was a HIGHER-TIER movement available for this accessory slot, outside the slot's programmable pool
+(owner ruling 2026-11-12: a slot's top two non-empty bands are both programmable, so a pick inside them stands as
+`pool_fit`)? "Available" means not excluded by
 one of the exclusions the critic honours (`HONORED_EXCLUSIONS` — a locked gate, a pain flag, equipment, the library's
 not-for-you-now, the catalog unable to write it, the week's family floor), not held off by an owner pin or approval
 (`owner_pin`), and not already served elsewhere this program week (`week_repeat`, owner ruling 2026-11-11: no repeats per
@@ -142,6 +144,12 @@ def judge_slot(
     above = sorted((c for c in pool if se.TIER_RANK[c["tier"]] < se.TIER_RANK[tier]), key=lambda c: se.rank_key(c, set()))
     open_ = [c for c in above if _blocker(c, taken) is None]
     best = _best(open_, prefer)
+    # owner ruling 2026-11-12 (board rec 2): the slot's top two non-empty bands are both programmable — a pick inside that
+    # pool stands even with a higher-tier member open (it ranked first on N=1 fit or slot variety)
+    servable = [c for c in pool if c is served or _blocker(c, taken) is None]
+    if best and served is not None and tier in se.pool_tiers(servable):
+        why = f"{title} (tier {tier}) is inside the slot's top-two-band pool {list(se.pool_tiers(servable))}; {best['title']} (tier {best['tier']}) is its peer"
+        return base | {"verdict": "pass", "stands": "pool_fit", "blocked": best["movement_id"], "why": why}
     if best:
         why = f"{best['title']} (tier {best['tier']}) was available for {slot.get('slot_id')} — {title} is tier {tier} with no exclusion"
         return base | _flip(best, why)
@@ -165,7 +173,8 @@ def _record_slot(key: str, entry: dict[str, Any], slot: dict[str, Any], rec: dic
     if not pick:
         return {"verdict": "not_evaluated", "why": "no selection record for this slot"}
     served = se.tier_for(entry, (rec or {}).get("muscle") or ((entry.get("target") or {}).get("primary")))
-    if se.TIER_RANK[served] > se.TIER_RANK[pick["tier"]]:
+    pool = ((rec or {}).get("top_band") or {}).get("tiers") or [pick["tier"]]
+    if served not in pool and se.TIER_RANK[served] > se.TIER_RANK[pick["tier"]]:
         return {"verdict": "change", "why": f"tier {served} served where tier {pick['tier']} is selectable", "to": pick.get("catalog_key")}
     if se.is_novel(entry, None) and not (pick.get("catalog_key") == key and pick.get("novel_terms")):
         return {"verdict": "change", "why": "new to him with no recorded novel-again caps and cue sheet", "to": pick.get("catalog_key")}

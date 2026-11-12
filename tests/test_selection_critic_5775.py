@@ -31,9 +31,11 @@ from training import (  # noqa: E402
     selection_engine as se,
     training_charter as tc,
     variant_rotation as vr,
+    week_commitments as wc,
 )
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
+_REAL_FREE_WEIGHT = wc._free_weight  # the unpinned row, for the finding's own test
 LIB0 = json.loads((REPO / "config" / "exercise_library.json").read_text())
 CAT0 = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
 WEEK7 = {"week": 7, "block": 2, "session_role": "upper_heavy", "date": "2026-11-12"}  # block 2, phase 1 (rotation step 2)
@@ -59,6 +61,10 @@ def _offline(monkeypatch):
     monkeypatch.setattr(xl, "_overlay_from_s3", lambda: None)
     tc.reset_cache()
     se._LIB_CACHE.clear()
+    # #5857 FINDING, pinned here so the slot tests read the slot: the approved program serves no free-weight PULL (its rows
+    # are machine/cable anchors), so the free-weight compound floor blocks every approved week until the owner rules on it
+    # (test_the_free_weight_pull_finding_blocks_the_approved_week names it). Every other commitment is evaluated for real.
+    monkeypatch.setattr(wc, "_free_weight", lambda c, *a: wc._row(c, wc.MET, "pinned for the slot tests (#5857 finding)"))
     yield
     tc.reset_cache()
     se._LIB_CACHE.clear()
@@ -177,8 +183,10 @@ def test_a_locked_gate_keeps_the_pick():
 def test_a_pain_flag_keeps_the_pick():
     v = _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone(), overlay=_pain(OHE)), TRI)
     assert v["verdict"] == "pass" and v["stands"] == "pain_swap" and v["blocked"] == OHE, v
-    # control: a stale overlay (written before #5806's pain_class) is not trusted to exclude -> the flip is back
-    assert _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone(), overlay=_pain(OHE, classed=False)), TRI)["to"] == OHE
+    # control: a stale overlay (written before #5806's pain_class) is not trusted to exclude -> OHE is an open S peer again;
+    # the A pick stands inside the S∪A pool (owner ruling 2026-11-12), naming OHE as its peer, never as pain-excluded
+    v2 = _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone(), overlay=_pain(OHE, classed=False)), TRI)
+    assert v2["stands"] == "pool_fit" and v2["blocked"] == OHE, v2
 
 
 def test_absent_equipment_keeps_the_pick():
@@ -220,6 +228,9 @@ def test_dropping_the_pain_exclusion_flips_into_the_pain_flagged_movement(monkey
     pain-flagged movement — exactly the outcome test_a_pain_flag_keeps_the_pick forbids."""
     monkeypatch.setattr(critic, "HONORED_EXCLUSIONS", tuple(c for c in critic.HONORED_EXCLUSIONS if c != "pain_swap"))
     v = _slot(_run(_ir(cable_tricep_pushdown=NEXT_TRI), lib=_ohe_alone(), overlay=_pain(OHE)), TRI)
+    assert v["stands"] == "pool_fit" and v["blocked"] == OHE, v  # OHE read as an available peer, not as pain-excluded
+    # and with a pick OUTSIDE the pool the same mutation flips INTO the pain-flagged movement
+    v = _slot(_run(_ir(cable_tricep_pushdown="triceps_rope_pushdown"), lib=_ohe_alone(), overlay=_pain(OHE)), TRI)
     assert v["verdict"] == "change" and v["to"] == OHE
 
 
@@ -268,3 +279,12 @@ def test_the_critic_makes_no_model_call_and_reads_no_clock():
     mods = [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
     mods += [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
     assert not [m for m in mods if m.split(".")[0] in ("ai", "coach", "boto3", "datetime", "time")], mods
+
+
+def test_the_free_weight_pull_finding_blocks_the_approved_week(monkeypatch):
+    """#5857 finding (owner ruling 2026-11-12, board rec 4): the program's pulls are machine/cable anchors, so the approved
+    week misses the free-weight compound floor on PULL only, and the critic fails on it. Press, squat and hinge are met."""
+    monkeypatch.setattr(wc, "_free_weight", _REAL_FREE_WEIGHT)
+    out = _run(_best_ir())
+    assert out["verdict"] == "fail" and [r["check"] for r in out["week"]] == ["free_weight_compounds"], out["week"]
+    assert out["week"][0]["why"] == "no free-weight compound pull this week"

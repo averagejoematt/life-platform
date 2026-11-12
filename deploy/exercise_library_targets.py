@@ -203,3 +203,93 @@ AUDIT_REGIONS: dict[str, str] = {
     "adductors": "lower",
     FULL: "full_body",
 }
+
+
+# ── the attribute audit (owner ruling 2026-11-12 on #5857, board recommendation 5 — blocking before approval) ────────────
+# Rubric v2 counts an unknown joint as moderate, so every S/A row must carry rated joints, and two recorded attributes the
+# board found wrong are fixed. Two layers, both applied by `deploy/build_exercise_library.py::apply_attribute_audit`:
+#   * ATTRIBUTE_OVERRIDES — per movement, the named attributes replaced (a joint_stress map merges), one reason each;
+#   * JOINT_RATINGS_BY_PATTERN — per movement pattern (and a title refinement), the rating that fills a joint still
+#     `unknown`; a joint the curation or the rules already rated is never overwritten. One reason per row.
+_L, _M, _H = "low", "moderate", "high"
+
+
+def _js(spinal: str, shear: str, wrist: str, elbow: str, shoulder: str) -> dict[str, str]:
+    return {"spinal_load": spinal, "shear": shear, "wrist": wrist, "elbow": elbow, "shoulder": shoulder}
+
+
+ATTRIBUTE_OVERRIDES: dict[str, tuple[dict, str]] = {
+    "chest_dip_weighted": (
+        {
+            "resistance_profile": "free_weight",
+            "stability": "moderate",
+            "equipment": ["dip_station", "weight_plate"],
+            "joint_stress": _js(_L, _L, _L, _M, _H),
+        },
+        "a weighted dip is bodyweight plus a hung plate on the dip bars, not a selectorized machine; the shoulder is loaded "
+        "deep in extension at the bottom (high), the elbow moderately",
+    ),
+    "lateral_raise_dumbbell": (
+        {"stability": "moderate", "joint_stress": _js(_L, _L, _L, _L, _L)},
+        "re-checked: a standing dumbbell lateral raise is light, the trunk is braced and the side delt is the limiter "
+        "(moderate, not low); no joint is loaded hard",
+    ),
+}
+
+# (pattern, title regex or None, joint ratings, reason) — the first matching row wins
+JOINT_RATINGS_BY_PATTERN: list[tuple[str, str | None, dict[str, str], str]] = [
+    ("chest_fly", None, _js(_L, _L, _L, _L, _M), "a fly loads the shoulder at stretch; trunk supported"),
+    ("horizontal_press", r"push ?ups?|pushups?", _js(_L, _L, _M, _L, _M), "a push-up loads the wrist in extension and the shoulder"),
+    ("horizontal_press", None, _js(_L, _L, _L, _L, _M), "a press loads the shoulder; the trunk is supported on a bench or pad"),
+    ("vertical_press", r"seated|machine", _js(_L, _L, _L, _L, _M), "a seated overhead press loads the shoulder; the trunk is supported"),
+    ("vertical_press", None, _js(_M, _L, _L, _L, _M), "a standing overhead press loads the shoulder and the spine"),
+    ("press", None, _js(_L, _L, _L, _L, _M), "a press loads the shoulder"),
+    ("vertical_pull", None, _js(_L, _L, _L, _L, _M), "a pull from overhead loads the shoulder in flexion"),
+    (
+        "horizontal_pull",
+        r"bent over|dead row|gorilla|renegade|meadows|landmine|barbell",
+        _js(_M, _M, _L, _L, _L),
+        "an unsupported bent-over row loads the spine isometrically",
+    ),
+    ("horizontal_pull", None, _js(_L, _L, _L, _L, _L), "a supported, seated or cable row: the trunk is braced on a pad or seat"),
+    ("squat", r"leg press|hack|pendulum|belt|smith|machine", _js(_L, _L, _L, _L, _L), "a machine squat: the spine is unloaded"),
+    ("squat", r"barbell|front rack|zercher", _js(_M, _L, _L, _L, _L), "a barbell squat or lunge loads the spine"),
+    ("squat", r"goblet|front squat", _js(_M, _L, _L, _L, _L), "a front-loaded squat loads the spine moderately"),
+    ("squat", None, _js(_L, _L, _L, _L, _L), "a dumbbell, kettlebell or bodyweight squat, lunge or step-up: load hangs at the sides"),
+    ("hinge", r"single leg|banded|good morning", _js(_L, _L, _L, _L, _L), "a light or single-leg hinge"),
+    ("hinge", None, _js(_M, _M, _L, _L, _L), "a loaded hinge shears and loads the lumbar spine"),
+    ("leg_curl", None, _js(_L, _L, _L, _L, _L), "a leg curl: machine-supported, no upper-body or spinal load"),
+    ("leg_extension", None, _js(_L, _L, _L, _L, _L), "a leg extension: seated, no upper-body or spinal load"),
+    ("calf", r"standing|donkey", _js(_M, _L, _L, _L, _L), "a standing calf raise loads the spine through the shoulders or the bar"),
+    ("calf", None, _js(_L, _L, _L, _L, _L), "a seated or press calf raise: the spine is unloaded"),
+    ("hip_extension", r"back extension|hyperextension|reverse hyper", _js(_M, _L, _L, _L, _L), "a back extension loads the lumbar spine"),
+    ("hip_extension", None, _js(_L, _L, _L, _L, _L), "a hip thrust, bridge or kickback: the spine is supported"),
+    ("curl", r"preacher|scott", _js(_L, _L, _L, _M, _L), "a preacher curl loads the elbow at full extension"),
+    ("curl", r"cheat", _js(_M, _L, _L, _L, _L), "a cheat curl loads the spine through the swing"),
+    ("curl", None, _js(_L, _L, _L, _L, _L), "a curl: no joint loaded hard"),
+    ("triceps_extension", r"dip", _js(_L, _L, _L, _M, _M), "a dip loads the shoulder in extension and the elbow"),
+    (
+        "triceps_extension",
+        r"overhead|skull|lying|french|jm",
+        _js(_L, _L, _L, _M, _L),
+        "an overhead or lying extension loads the elbow at stretch",
+    ),
+    ("triceps_extension", None, _js(_L, _L, _L, _L, _L), "a pushdown, pushaway or kickback: no joint loaded hard"),
+    ("lateral_raise", r"upright", _js(_L, _L, _L, _L, _M), "an upright row loads the shoulder in internal rotation"),
+    ("lateral_raise", None, _js(_L, _L, _L, _L, _L), "a lateral raise: light, no joint loaded hard"),
+    ("rear_delt", None, _js(_L, _L, _L, _L, _L), "a reverse fly or face pull: light, no joint loaded hard"),
+    ("shrug", None, _js(_M, _L, _L, _L, _L), "a shrug loads the spine through the arms"),
+]
+
+
+def joint_rating(e: dict, pattern: str) -> tuple[dict[str, str], str] | None:
+    """The reviewed joint rating for a movement's pattern (and title), or None when no row covers it."""
+    import re
+
+    title = str(e.get("title") or "")
+    if pattern == "other" and re.search(r"\bpress(es)?\b", title, re.I) and not re.search(r"press ?outs?|leg press|calf", title, re.I):
+        pattern = "press"
+    for pat, rx, ratings, reason in JOINT_RATINGS_BY_PATTERN:
+        if pat == pattern and (rx is None or re.search(rx, title, re.I)):
+            return ratings, reason
+    return None

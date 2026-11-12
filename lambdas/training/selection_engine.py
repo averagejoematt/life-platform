@@ -19,21 +19,24 @@ ranks the exercise library (#5769, `config/exercise_library.json`) per slot, det
                     * PRESCRIBABLE — a movement-catalog entry with the slot's volume signature (`variant_rotation`), the
                       generator's skill ceiling and a loaded rep template (or the template accessory's own Hevy type). A library movement the catalog cannot write
                       is RANKED and reported (`above_pick`), never served.
-    rank        = QUALITY tier for the slot's muscle (S over A over B over C over D — the library's rubric tier, #5857)
-                  -> N=1 fit from the owner-private overlay (progression, pain history, sentiment; swap-out frequency
+    pool        = the slot's top two non-empty quality bands (owner ruling 2026-11-12: S and A are both programmable); a
+                  candidate outside the pool ranks after every pool member, by tier
+    rank        = inside the pool: N=1 fit from the owner-private overlay (progression, pain history, sentiment; swap-out frequency
                      demotes; an absent overlay is `unknown`, score 0 — never an error)
                   -> variety (the movement THIS SLOT served least recently in the last VARIETY_LOOKBACK_BLOCKS blocks of the
                      rotation ledger first, #5857: slots sharing one band each rotate within it; then not served by any
                      slot in that window; then
                      familiar before new-to-him; then history exposures)
+                  -> the QUALITY tier (S over A, the library's rubric tier, #5857) as a tie-break
                   -> evidence confidence, a tie-break only (rct_direct over rct_characteristic over consensus over
                      none_reviewed — evidence is shown beside the tier, never used as it)
     no repeats  = best per slot, NO REPEATS PER WEEK (owner ruling 2026-11-11): a movement another slot already serves
                   this program week is passed over and the next-best eligible candidate fills the later slot, recorded
                   as `week_repeat` (a repeat only when nothing else is left: `week_repeat_unavoidable`). Pins are exempt.
-    C / D       = served only with a recorded reason (`C_REASONS`, on the pick as `c_reason`): a higher-tier candidate for the
-                  slot exists and is excluded by equipment, pain, a locked gate, or the catalog; the slot is an owner pin
-                  or the skill track; or the library holds no higher-tier movement for the slot's job (`library_gap`).
+    B / C / D   = (outside S∪A) served only with a recorded reason (`C_REASONS`, on the pick as `c_reason`): a higher-tier
+                  candidate for the slot exists and is excluded by equipment, pain, a locked gate, or the catalog; it ranked
+                  below on fit inside the pool (`pool_fit`); the slot is an owner pin or the skill track; or the library
+                  holds no higher-tier movement for the slot's job (`library_gap`).
     lengthened  = each muscle gets at least one lengthened-bias movement per week: when a muscle's picks hold none, the
                   first slot of that muscle whose candidates hold a lengthened movement at the SAME tier and N=1 score
                   takes it (variety never outranks tier or fit). An unmet muscle is reported, never forced.
@@ -87,7 +90,9 @@ MODE_LIVE = "live"
 MODE_SHADOW = "shadow"
 MODE_NO_LIBRARY = "no_library"
 TIER_RANK = {"S": 0, "A": 1, "B": 2, "C": 3, "D": 4}  # the library's QUALITY tier (#5857, `quality_rubric`)
-REASONED_TIERS = ("C", "D")  # a pick at these tiers is served only with a recorded reason (`c_reason`)
+PROGRAMMABLE_TIERS = ("S", "A")  # owner ruling 2026-11-12 (board rec 2): S and A are both programmable
+REASONED_TIERS = ("B", "C", "D")  # a pick outside S∪A is served only with a recorded reason (`c_reason`)
+POOL_BANDS = 2  # a slot's pool is its top two non-empty bands
 UNRATED_TIER = "D"  # a movement with no hypertrophy row for the slot's muscle
 EVIDENCE_RANK = {"rct_direct": 0, "rct_characteristic": 1, "consensus": 2, "none_reviewed": 3}  # a tie-break, never the tier
 VARIETY_LOOKBACK_BLOCKS = 1  # the ledger read window (`variant_rotation.load_rows`: this block and the one before)
@@ -111,6 +116,7 @@ C_REASONS: dict[str, str] = {
     "weekly_floor": "a higher-tier movement for this slot exists but the slot serves the week's family floor (#5759)",
     "not_for_you_now": "a higher-tier movement for this slot exists but the library marks it not-for-you-now (unlock recorded)",
     "week_repeat": "every higher-tier movement for this slot already fills another slot this program week (no repeats)",
+    "pool_fit": "a member of the slot's top-two-band pool, ranked below this pick on N=1 fit or slot variety (owner ruling 2026-11-12)",
 }
 """Why a C or D movement is served (the codes predate the S-D quality tiers, #5857, and are unchanged). `equipment`, `pain_swap`, `owner_pin` and `skill_track` are the owner's (2026-11-11);
 `gate_locked`, `not_prescribable`, `library_gap`, `weekly_floor` and `not_for_you_now` are platform-proposed; `week_repeat`
@@ -404,7 +410,16 @@ def candidates(ctx: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str
     return eligible, excluded
 
 
-def rank_key(c: dict[str, Any], recent: set[str], slot_last: dict[str, int] | None = None) -> tuple[Any, ...]:
+def pool_tiers(eligible: list[dict[str, Any]]) -> tuple[str, ...]:
+    """The slot's top two NON-EMPTY quality bands among its eligible candidates (owner ruling 2026-11-12, board rec 2: S
+    and A are both programmable — S is first among equals, not exclusive)."""
+    present = sorted({c["tier"] for c in eligible}, key=lambda t: TIER_RANK[t])
+    return tuple(present[:POOL_BANDS])
+
+
+def rank_key(
+    c: dict[str, Any], recent: set[str], slot_last: dict[str, int] | None = None, pool: tuple[str, ...] | None = None
+) -> tuple[Any, ...]:
     """Quality tier, then N=1 fit, then variety (the slot's least-recently-served first, then not served by any slot in
     the lookback, familiar before new, more exposures), then evidence confidence as a tie-break, then the id
     (deterministic). No-repeats-per-week is not a rank term: it is a rule over the ranked list (`select_slot`).
@@ -415,14 +430,36 @@ def rank_key(c: dict[str, Any], recent: set[str], slot_last: dict[str, int] | No
     ck = c.get("catalog_key") or ""
     ev = EVIDENCE_RANK.get(str(c.get("evidence")), len(EVIDENCE_RANK))
     last = (slot_last or {}).get(ck, -1)
-    return (TIER_RANK[c["tier"]], -c["n1"]["score"], last, ck in recent, c["novel"], -c["exposures"], ev, c["movement_id"])
+    tier = TIER_RANK[c["tier"]]
+    if pool is not None:  # the slot's pool (`pool_tiers`): N=1 fit, then slot variety, then tier as a tie-break
+        inside = c["tier"] in pool
+        return (
+            0 if inside else 1,
+            0 if inside else tier,
+            -c["n1"]["score"],
+            last,
+            tier,
+            ck in recent,
+            c["novel"],
+            -c["exposures"],
+            ev,
+            c["movement_id"],
+        )
+    return (tier, -c["n1"]["score"], last, ck in recent, c["novel"], -c["exposures"], ev, c["movement_id"])
 
 
 def c_reason(
-    pick: dict[str, Any], excluded: list[dict[str, Any]], *, pinned: bool = False, skipped: list[dict[str, Any]] | None = None
+    pick: dict[str, Any],
+    excluded: list[dict[str, Any]],
+    *,
+    pinned: bool = False,
+    skipped: list[dict[str, Any]] | None = None,
+    pooled: list[dict[str, Any]] | None = None,
 ) -> dict[str, str] | None:
-    """The recorded reason a C or D pick is served (None for an S/A/B pick). The best higher-tier movement the slot could
-    not serve names it — an exclusion, or a movement another slot already serves this week (`skipped`, `week_repeat`)."""
+    """The recorded reason a pick outside S∪A is served (None for an S or A pick; owner ruling 2026-11-12). The best
+    higher-tier movement the slot could not serve names it — an exclusion, or a movement another slot already serves this
+    week (`skipped`, `week_repeat`) — else a higher-tier member of the slot's own pool that ranked below it on N=1 fit or
+    slot variety (`pool_fit`), else `library_gap`."""
     if pick["tier"] not in REASONED_TIERS:
         return None
     if pinned:
@@ -436,6 +473,12 @@ def c_reason(
     if above:
         x = above[0]
         return {"code": x["code"], "why": f"{x['title']} (tier {x['tier']}): {x['why']}", "blocked": x["movement_id"]}
+    higher = sorted(
+        (c for c in pooled or [] if TIER_RANK[c["tier"]] < TIER_RANK[pick["tier"]]), key=lambda c: (TIER_RANK[c["tier"]], c["movement_id"])
+    )
+    if higher:
+        x = higher[0]
+        return {"code": "pool_fit", "why": f"{x['title']} (tier {x['tier']}): {C_REASONS['pool_fit']}", "blocked": x["movement_id"]}
     return {"code": "library_gap", "why": C_REASONS["library_gap"]}
 
 
@@ -474,7 +517,8 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], wee
     """One slot's selection: the ranked eligible candidates, the pick, its C-reason, its fallbacks, the exclusions."""
     eligible, excluded = candidates(ctx)
     mine = ctx.get("slot_last") or {}
-    ranked = sorted(eligible, key=lambda c: rank_key(c, recent, mine))
+    pool = pool_tiers(eligible)
+    ranked = sorted(eligible, key=lambda c: rank_key(c, recent, mine, pool))
     # owner ruling 2026-11-11: best per slot, NO REPEATS PER WEEK — a movement another slot already serves this program week
     # is passed over and the next-best eligible candidate fills this slot (`week_repeat`); a repeat only when none is left
     open_ = [c for c in ranked if (c.get("catalog_key") or "") not in week_taken]
@@ -503,8 +547,13 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], wee
     )
     return {
         **base,
-        "pick": pick | {"c_reason": c_reason(pick, excluded, skipped=skipped), "novel_terms": _novel_terms(pick), "week_repeat": repeat},
-        "top_band": top_band(pick, open_ or ranked),
+        "pick": pick
+        | {
+            "c_reason": c_reason(pick, excluded, skipped=skipped, pooled=[c for c in eligible if c["tier"] in pool]),
+            "novel_terms": _novel_terms(pick),
+            "week_repeat": repeat,
+        },
+        "top_band": top_band(pick, open_ or ranked, pool),
         "fallbacks": fallbacks(pick, ranked, novel_budget=budget),
         "ranked": [c["movement_id"] for c in ranked],
         "above_pick": [{k: x[k] for k in ("movement_id", "title", "tier", "code", "why")} for x in above],
@@ -512,11 +561,14 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], wee
     }
 
 
-def top_band(pick: dict[str, Any], servable: list[dict[str, Any]]) -> dict[str, Any]:
-    """The pick's tier and every servable candidate sharing it (catalog keys, rank order) — what the rotation commitment
-    reads for owner ruling B on #5856 (2026-11-12): a held best-tier pick is accepted only when its band has ONE member."""
-    keys = [str(c.get("catalog_key")) for c in servable if c["tier"] == pick["tier"] and c.get("catalog_key")]
-    return {"tier": pick["tier"], "members": keys}
+def top_band(pick: dict[str, Any], servable: list[dict[str, Any]], pool: tuple[str, ...] = ()) -> dict[str, Any]:
+    """The slot's programmable pool as the rotation commitment reads it (owner ruling B on #5856, amended 2026-11-12): the
+    pool's tiers, its servable members, and its S∪A members (catalog keys, rank order) — a held pick is accepted only when
+    it is the single servable member of S∪A."""
+    tiers = tuple(pool) or (pick["tier"],)
+    members = [str(c.get("catalog_key")) for c in servable if c["tier"] in tiers and c.get("catalog_key")]
+    sa = [str(c.get("catalog_key")) for c in servable if c["tier"] in PROGRAMMABLE_TIERS and c.get("catalog_key")]
+    return {"tier": pick["tier"], "tiers": list(tiers), "members": members, "sa_members": sa}
 
 
 def _owner_pinned(slot: dict[str, Any], ctx: dict[str, Any], pin: dict[str, Any], recent: set[str], week_taken: set[str]) -> dict[str, Any]:
@@ -614,6 +666,11 @@ def _ctx(slot: dict[str, Any], env: dict[str, Any], step: int) -> dict[str, Any]
     floor = fam if fam in WEEKLY_FAMILY_FLOORS and step > 0 else None
     spec = slot_spec(slot, env["catalog"], env["lib"], env["idx"])
     return {**env, "spec": spec, "floor": floor, "floor_members": family_members(floor) if floor else None}
+
+
+def _pool_ranked(eligible: list[dict[str, Any]], recent: set[str], slot_last: dict[str, int]) -> list[dict[str, Any]]:
+    pool = pool_tiers(eligible)
+    return sorted(eligible, key=lambda c: rank_key(c, recent, slot_last, pool))
 
 
 def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
@@ -765,10 +822,10 @@ def select_week(
             p = _pinned(slot, ctx) | {"spec": ctx["spec"]}
         elif (owner_pins or {}).get(slot["slot_id"]):
             p = _owner_pinned(slot, ctx, (owner_pins or {})[slot["slot_id"]], recent, taken)
-            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent, ctx["slot_last"]))
+            full[slot["slot_id"]] = _pool_ranked(candidates(ctx)[0], recent, ctx["slot_last"])
         else:
             p = select_slot(slot, ctx, recent, taken)
-            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent, ctx["slot_last"]))
+            full[slot["slot_id"]] = _pool_ranked(candidates(ctx)[0], recent, ctx["slot_last"])
         if p.get("pick") and p["pick"].get("catalog_key"):
             taken.add(p["pick"]["catalog_key"])
         picked.append(p)

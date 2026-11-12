@@ -168,6 +168,27 @@ def _err(errors: list[str], where: str, msg: str) -> None:
     errors.append(f"{where}: {msg}")
 
 
+def _equivalence_errors(lib: dict[str, Any]) -> list[str]:
+    """An equivalence adjustment (#5857 rubric v2, board rec 6) names a comparator whose tier for the same target sits
+    ABOVE this row's rubric tier — parity with a higher-tier movement is what earns the +1."""
+    out: list[str] = []
+    mv = lib["movements"]
+    for mid, e in mv.items():
+        for row in e.get("hypertrophy") or []:
+            adj = row.get("evidence_adjustment") or {}
+            if adj.get("basis") != "equivalence":
+                continue
+            comp = next(
+                (r for r in (mv.get(adj.get("comparator")) or {}).get("hypertrophy") or [] if r.get("target") == row.get("target")), None
+            )
+            order = quality_rubric.QUALITY_TIERS
+            if comp is None or order.index(str(comp.get("tier"))) >= order.index(str(row.get("rubric_tier"))):
+                out.append(
+                    f"movements.{mid}: equivalence with {adj.get('comparator')!r} needs a higher-tier comparator for {row.get('target')}"
+                )
+    return out
+
+
 def _hypertrophy_row_errors(errors: list[str], w: str, e: dict[str, Any], row: dict[str, Any], citations: Any) -> None:
     """One per-target row (#5857): a quality tier S-D the rubric derives (plus at most one recorded evidence band), and
     its evidence confidence beside it. Evidence above `none_reviewed` cites a registered reference and carries a date."""
@@ -275,6 +296,8 @@ def validate(lib: dict[str, Any]) -> list[str]:
                 _err(errors, w, "a history entry carries its logged template_id")
         if e.get("family") not in FAMILIES:
             _err(errors, w, f"family {e.get('family')!r}")
+        if e.get("job") not in quality_rubric.JOBS:
+            _err(errors, w, f"job {e.get('job')!r} (compound | isolation, #5857 rubric v2)")
         if e.get("length_bias") not in LENGTH_BIAS:
             _err(errors, w, f"length_bias {e.get('length_bias')!r}")
         if e.get("resistance_profile") not in RESISTANCE_PROFILES:
@@ -321,6 +344,7 @@ def validate(lib: dict[str, Any]) -> list[str]:
             _err(errors, w, "impact movement without its charter gate")
         if requires_skill_gate(e) and not kinds & {"chain_prerequisite", "owner_confirmation", "charter_gate"}:
             _err(errors, w, "skill movement without a chain / owner-confirmation / charter gate")
+    errors += _equivalence_errors(lib)
     return errors
 
 
