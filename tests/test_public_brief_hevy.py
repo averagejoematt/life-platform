@@ -1,4 +1,7 @@
-"""tests/test_public_brief_hevy.py — Eli Marsh's brief from Hevy's recorded sessions (owner approval 2026-11-12).
+"""tests/test_public_brief_hevy.py — the training brief from Hevy's recorded sessions (owner approval 2026-11-12).
+
+Owner ruling 2026-11-13: the training contribution is Max Reyes's (physical_coach), never the head coach's — Eli Marsh
+keeps his own historical words and head-coach role and carries no Hevy metric.
 
 Pins, offline (no AWS; Bedrock replaced by a canned reply):
 
@@ -15,8 +18,8 @@ Pins, offline (no AWS; Bedrock replaced by a canned reply):
      falling one). "Zone 2 volume" / "walking volume" never bind to it (bare "volume" names nothing).
   4. NO CLAIM HEVY CANNOT EVIDENCE. Effort, RPE, intensity, technique, pain, injury, soreness, fatigue and strength
      words drop the item; the prompt says so; a clean item passes (control).
-  5. THE SWITCH. ``public_brief_enabled`` puts a non-operational coach in the brief and ``false`` takes it out (the rest
-     of the brief untouched); Eli is held, not substituted, when Hevy has too few sessions.
+  5. THE OWNER AND THE SWITCH. Only Max carries the Hevy metric and the head coach is not in the brief; ``false`` takes
+     a coach out (the rest of the brief untouched); Max is held, not substituted, when Hevy has too few sessions.
 """
 
 import json
@@ -44,7 +47,8 @@ from common import activity_publication as AP, narrative_provenance as NP, publi
 from experiment import measurable_metrics as MM  # noqa: E402
 from test_public_brief import Table, _reply  # noqa: E402
 
-ELI = "eli_marsh"
+COACH = "physical_coach"  # owner ruling 2026-11-13: the training brief is Max Reyes's seat, never the head coach's
+HEAD = "eli_marsh"
 CYCLE = "2026-11-16"
 METRIC = "total_volume_kg"
 
@@ -87,8 +91,7 @@ def test_the_metric_is_derived_eligible_through_the_policy():
 def test_must_fail_control_hevy_private_drops_it(monkeypatch):
     real = AP.source_class
     monkeypatch.setattr(AP, "source_class", lambda s: NP.PRIVATE if s == "hevy" else real(s))
-    assert METRIC not in POL.eligible_metrics() and PB.coach_metrics(ELI) == []
-    assert ELI not in PB.brief_coaches()
+    assert METRIC not in POL.eligible_metrics() and METRIC not in PB.coach_metrics(COACH)
 
 
 def _served_workout_fields():
@@ -165,7 +168,7 @@ def _tol(_m):
     ],
 )
 def test_rendered_calls_file_gradeable(pred):
-    row = PB.file_call(ELI, CYCLE, "p1", pred, _tol, {})
+    row = PB.file_call(COACH, CYCLE, "p1", pred, _tol, {})
     assert row is not None and row["filing"]["verdict"] == "gradeable" and row["status"] == "pending"
     assert "lifting volume" in row["claim_natural"].lower() and row["evaluation"]["metric"] == METRIC
 
@@ -178,7 +181,7 @@ def test_bare_volume_never_binds_to_hevy_lifting_volume(claim):
 
 def _call(direction):
     return {
-        "coach_id": ELI,
+        "coach_id": COACH,
         "created_date": CYCLE,
         "phase": "experiment",
         "claim_natural": f"Per-session lifting volume will {'rise' if direction == 'up' else 'fall'} over the next 21 days.",
@@ -218,22 +221,29 @@ def test_control_a_recorded_volume_sentence_passes():
 
 
 def test_the_prompt_forbids_unevidenced_training_claims_and_plans_as_done():
-    sp = PB.system_prompt({"name": "Eli Marsh", "title": "Head Coach"}, [METRIC], [METRIC])
+    sp = PB.system_prompt({"name": "Max Reyes", "title": "Performance — Training, Cardio & Mobility"}, [METRIC], [METRIC])
     assert "Hevy recorded" in sp and "RPE" in sp and "planned or recommended session" in sp
 
 
 # ── 5. the switch and the run ───────────────────────────────────────────────────────────────
 def _personas(enabled=True):
-    p = dict(persona_registry.personas()[ELI])
+    p = dict(persona_registry.personas()[COACH])
     p[PB.ENABLED_KEY] = enabled
-    return {ELI: p, "nutrition_coach": persona_registry.personas()["nutrition_coach"]}
+    return {COACH: p, "nutrition_coach": persona_registry.personas()["nutrition_coach"]}
 
 
-def test_eli_is_enabled_by_config_and_disabled_by_config_alone():
-    assert ELI in PB.brief_coaches() and persona_registry.personas()[ELI].get("operational") is False
-    assert ELI in PB.brief_coaches(_personas(True))
+def test_the_training_metric_is_max_reyes_and_never_the_head_coach():
+    ps = persona_registry.personas()
+    assert METRIC in PB.coach_metrics(COACH) and ps[COACH]["name"] == "Max Reyes"
+    assert HEAD not in PB.brief_coaches() and METRIC not in PB.coach_metrics(HEAD)
+    assert [c for c in PB.brief_coaches() if METRIC in PB.coach_metrics(c)] == [COACH]
+
+
+def test_the_training_coach_is_enabled_by_config_and_disabled_by_config_alone():
+    assert COACH in PB.brief_coaches()
+    assert COACH in PB.brief_coaches(_personas(True))
     off = PB.brief_coaches(_personas(False))
-    assert ELI not in off and "nutrition_coach" in off  # the rest of the brief is untouched
+    assert COACH not in off and "nutrition_coach" in off  # the rest of the brief is untouched
 
 
 def test_an_explicit_false_takes_an_operational_coach_out_and_a_non_bool_fails_closed():
@@ -248,7 +258,7 @@ def _readings_from(rows):
     return lambda m, s, e: MTS.window_readings(t, "matthew", m, s, e) if m == METRIC else []
 
 
-def _eli_draft(mean):
+def _training_draft(mean):
     return {
         "interpretations": [{"text": f"Per-session lifting volume averaged {mean} kg over the last 7 days.", "cites": ["o1"]}],
         "predictions": [
@@ -273,27 +283,30 @@ def _eli_draft(mean):
     }
 
 
-def _eli_run(rows, persist=False):
+def _training_run(rows, persist=False):
     readings = _readings_from(rows)
     obs = PB.observe([METRIC], CYCLE, readings)
     mean = obs[0]["last7"]["mean"] if obs else 0
-    invoke = _reply(_eli_draft(mean))
+    invoke = _reply(_training_draft(mean))
     out = PB.run(
         Table(),
         today=CYCLE,
-        coach_ids=[ELI],
+        coach_ids=[COACH],
         persist=persist,
         invoke=invoke,
         allow=lambda f: True,
         readings=readings,
         tolerance_for=_tol,
-        personas={ELI: persona_registry.personas()[ELI]},
+        # Max's Hevy contribution in isolation: his other inputs (steps, weight, RHR, HRV) are other tests' business.
+        personas={
+            COACH: {**persona_registry.personas()[COACH], "public_brief_metrics": [METRIC], "public_brief_required_metrics": [METRIC]}
+        },
     )
-    return out["results"].get(ELI), invoke
+    return out["results"].get(COACH), invoke
 
 
-def test_eli_dry_run_files_gradeable_dark_calls_from_hevy():
-    res, invoke = _eli_run(HEVY_ROWS)
+def test_training_dry_run_files_gradeable_dark_calls_from_hevy():
+    res, invoke = _training_run(HEVY_ROWS)
     assert res["status"] == "dry_run" and len(invoke.calls) == 1
     assert (res["interpretations"], res["predictions"], res["recommendations"]) == (1, 1, 1)
     chk = res["checks"]
@@ -304,8 +317,8 @@ def test_eli_dry_run_files_gradeable_dark_calls_from_hevy():
     assert "private words" not in json.dumps(invoke.calls)
 
 
-def test_eli_is_held_not_substituted_when_hevy_has_too_few_sessions():
+def test_training_is_held_not_substituted_when_hevy_has_too_few_sessions():
     rows = [r for r in HEVY_ROWS if r["date"] < "2026-11-11"]  # 2 loaded sessions in the last 7 days (3 needed)
-    res, invoke = _eli_run(rows)
+    res, invoke = _training_run(rows)
     assert res == {"status": "held", "reason": PB.HELD_FOR_INPUTS, "missing": [METRIC], "evidence_written": 0}
     assert invoke.calls == []

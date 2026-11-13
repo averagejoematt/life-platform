@@ -157,10 +157,12 @@
         "steps",
         "weight_lbs",
         "resting_heart_rate",
-        "hrv"
+        "hrv",
+        "total_volume_kg"
       ],
       "public_brief_required_metrics": [
-        "steps"
+        "steps",
+        "total_volume_kg"
       ]
     },
     "glucose_coach": {
@@ -413,13 +415,6 @@
       "name": "Eli Marsh",
       "type": "meta",
       "operational": false,
-      "public_brief_enabled": true,
-      "public_brief_metrics": [
-        "total_volume_kg"
-      ],
-      "public_brief_required_metrics": [
-        "total_volume_kg"
-      ],
       "lead": true,
       "domain": "orchestration",
       "short_bio": "Principal Investigator — runs the experiment and the coaching staff. A generalist across sleep, training, nutrition, metabolic and mental health who turns his specialists' reads into one coherent plan, and Matthew's single point of contact.",
