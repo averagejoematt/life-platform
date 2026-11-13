@@ -198,7 +198,8 @@ def test_a_single_leg_lever_stack_is_not_s_the_kickbacks_are_a():
     e = copy.deepcopy(MV["glute_kickback_machine"])  # control: with a high ceiling it reaches S again
     e["objective_inputs"]["ceiling"] = "high"
     assert qr.quality_tier(e, e["hypertrophy"][0]) == "S"
-    assert _tier(MV["hip_thrust_machine"], "glutes") == "S", "the loadable glute lift keeps its S"
+    # FIX2-DATA: the machine hip thrust ties the trial-backed barbell hip thrust (evidence ordering), it no longer outranks it
+    assert _tier(MV["hip_thrust_machine"], "glutes") == _tier(MV["hip_thrust_barbell"], "glutes") == "A"
 
 
 def test_joint_capacity_work_is_never_functional_s():
@@ -216,7 +217,9 @@ def test_the_traps_short_rom_is_not_penalised_and_a_shrug_is_grip_limited():
     for k in ("shrug_barbell", "shrug_dumbbell", "seated_shrugs"):
         assert qr.components(MV[k], "traps")["stretch"] == qr.STRETCH["mid"], k
         assert _tier(MV[k], "traps") == "B" and MV[k]["objective_inputs"]["limiter"] == "grip", k
-    assert qr.components({"length_bias": "unknown"}, "traps")["stretch"] == 0, "an unknown length still never helps"
+    # FIX2-DATA (rubric 3.2.0): an unknown length scores the neutral mid, never a penalty — and never helps reach S
+    assert qr.components({"length_bias": "unknown"}, "traps")["stretch"] == qr.NEUTRAL["stretch"]
+    assert not qr.s_criteria({"length_bias": "unknown"}, {"target": "traps"})["inputs_known"]
     e = copy.deepcopy(MV["shrug_barbell"])  # control: the penalty back (shortened scores 1)
     saved = dict(qr.STRETCH_NOT_ESTABLISHED)
     qr.STRETCH_NOT_ESTABLISHED.clear()

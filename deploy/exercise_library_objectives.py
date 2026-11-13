@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+import exercise_library_input_review as input_review
 import exercise_library_targets as targets
 from training import quality_rubric as rubric
 
@@ -109,9 +110,11 @@ _LOCOMOTION_RE = re.compile(r"walk\w*|carry|carries|farmers|sled|crawl\w*|bear|m
 _OFFSET_RE = re.compile(r"suitcase|offset|single arm|one arm|1 arm|overhead|renegade|landmine", re.I)
 # #5861 L6: loaded work for a small stabiliser that controls a joint the big lifts load — rotator-cuff rotation, lower-trap
 # and serratus scapular control, tibialis / ankle, the adductor isometric — rated on functional, never on growth alone
+# #5861 FIX2-DATA (red team: "a mobility A for a face pull is an odd classification"): the face pull, the band pull-apart and
+# the prone W / UCV / scarecrow cuff raises are the same class — loaded control of the cuff and scapula, no range trained
 _JOINT_CAPACITY_RE = re.compile(
     r"(?:external|internal) rotation|rotator cuff|\by raises?\b|trap ?3|serratus|push ?up plus|tibialis|"
-    r"inversion|eversion|copenhagen|scap(?:ular)? (?:push|pull|row)",
+    r"inversion|eversion|copenhagen|scap(?:ular)? (?:push|pull|row)|face pulls?|pull ?aparts?|\bw raises?\b|\bucv\b|scarecrow",
     re.I,
 )
 _POWER_RE = re.compile(
@@ -251,10 +254,10 @@ def _conditioning(e: dict[str, Any]) -> dict[str, str] | None:
 
 _MOBILITY_TYPE_RULES: list[tuple[str, str]] = [
     (r"bird dog|dead bug|balance|scap\w*|hip band|bridge and reach", "motor_control"),
-    (
-        r"external rotation|internal rotation|rotator cuff|ucv|w raise|y raise|face pulls?|pull ?aparts?|cossack|dead hang|scarecrow",
-        "loaded",
-    ),
+    # LOADED mobility = strength through an end range the movement takes the joint into (the cossack's abducted hip, the
+    # hang's flexed shoulder). #5861 FIX2-DATA: cuff rotations, face pulls, pull-aparts and W / UCV / scarecrow raises train no
+    # range — they are joint capacity (rated on functional), so the class leaves mobility, not one key at a time
+    (r"cossack|dead hang", "loaded"),
     (r"stretch\w*|90/90|couch|pry", "passive"),
     (
         r"cars\b|mobility|wall slides|t spine|thoracic|leg swings|angels and devils|inchworms?|hurdle|squat reaches|kickthrough|hip circles",
@@ -265,7 +268,7 @@ _MOBILITY_TYPE_RULES: list[tuple[str, str]] = [
 
 def _mobility(e: dict[str, Any]) -> str | None:
     t = str(e.get("title") or "")
-    if e.get("category") not in ("mobility", "rehab_control") and not re.search(r"cossack|face pulls?|dead hang", t, re.I):
+    if e.get("category") not in ("mobility", "rehab_control") and not re.search(r"cossack|dead hang", t, re.I):
         return None
     return next((v for pat, v in _MOBILITY_TYPE_RULES if re.search(pat, t, re.I)), None)
 
@@ -327,6 +330,7 @@ def evaluate_entry(key: str, e: dict[str, Any], hyp_row: Any) -> None:
     e["category"] = "strength" if key in targets.STRENGTH_LIFTS else category(e)
     if key in targets.CATEGORY_OVERRIDES:
         e["category"] = targets.CATEGORY_OVERRIDES[key][0]
+    e["category"] = (input_review.REVIEW.get(key) or {}).get("category") or e["category"]
     declared = e.get("expansion_profile") if isinstance(e.get("expansion_profile"), dict) else {}
     if declared.get("category") in rubric.CATEGORIES:  # #5861 L6: an L2 addition's declared type is reviewed data, not a title guess
         e["category"] = declared["category"]
@@ -344,7 +348,13 @@ def evaluate_entry(key: str, e: dict[str, Any], hyp_row: Any) -> None:
         inp |= vals
         e.setdefault("attribute_audit", {"fields": [], "reason": ""})
         e["attribute_audit"]["inputs"] = {"fields": sorted(vals), "reason": reason}
-    inp["reviewed"] = bool(authored) or key in targets.REVIEWED_KEYS or key in targets.INPUT_OVERRIDES
+    inp |= input_review.inputs_for(key)
+    if key in input_review.REVIEW:
+        e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+        e["attribute_audit"]["review"] = input_review.audit_record(key)
+    # #5861 FIX2-DATA: a one-field INPUT_OVERRIDES row is a correction, not a review of every input — reviewed means the
+    # movement is in a reviewed table (the #5861 pass, the FIX2 pass) or was authored whole (an L2 addition)
+    inp["reviewed"] = bool(authored) or key in targets.REVIEWED_KEYS or key in input_review.REVIEW
     e["objective_inputs"] = inp
     have = {r.get("target") for r in e.get("hypertrophy") or []}
     for target, limiter, reason in targets.SECONDARY_ROWS.get(key, []):
@@ -406,6 +416,7 @@ def apply(movements: dict[str, dict[str, Any]], hyp_row: Any) -> dict[str, dict[
     Returns the canonical-family index."""
     for table in REVIEWED_TABLES:
         _hard_stop(table, getattr(targets, table), movements)
+    _hard_stop("input_review.REVIEW", input_review.REVIEW, movements)
     for key, e in movements.items():
         evaluate_entry(key, e, hyp_row)
     index = apply_canonical(movements)

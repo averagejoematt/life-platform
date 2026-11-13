@@ -60,11 +60,12 @@ carry_conditioning | core_anti_movement | skill_athletic | corrective) · `lengt
 loaded_stabilisation) · `functions` where present (hip_flexion | grip | wrist_flexion | wrist_extension |
 forearm_rotation) · `canonical` (the family head's key) and `variant` ({axis: value}, or `{duplicate_of}` on an exact
 duplicate) · `objective_inputs` (below) · `ratings` {hypertrophy, strength, functional, conditioning, mobility}, each
-`{tier: S-D | null, basis: [...], evidence_confidence}` (hypertrophy also `target` and `by_target`). A hypertrophy row the
+`{tier: S-D | null, basis: [...], evidence_confidence, provisional}` (hypertrophy also `target` and `by_target`; each
+rated hypertrophy row also `provisional` and, when true, `provisional_why`). A hypertrophy row the
 objective does not apply to carries `tier: null`, `applicable: false` and its reason. The top level carries
 `canonical_families`.
 
-## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.1.0, PROPOSED)
+## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.2.0, PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -83,15 +84,17 @@ muscle's name. v1 scored every press as if it were a fly; v2 does not. Per (move
 
 | Term | Field | Isolation | Compound |
 |---|---|---|---|
-| stretch | `length_bias` | lengthened 5 · mid 3 · shortened 1 · unknown 0 | the same |
+| stretch | `length_bias` | lengthened 5 · mid 3 · shortened 1 · unknown 3 (neutral, 3.2.0) | the same |
 | stability (the target is the limiter) | `stability` | high 3 · moderate 2 · low 1 | high 2 · moderate 2 · low 1 (stabiliser demand is part of the job) |
 | resistance profile | `resistance_profile` | single-joint upper-body targets (chest, the delts, biceps, triceps, forearms): cable / selectorized machine 3 · plate-loaded machine / free weight 2 · band / bodyweight 1. Other targets: free weight / any machine 3 · cable 2 · band / bodyweight / sled 1 | free weight / any machine / cable 3 · band / bodyweight / sled 1 |
 | progressability | `skill_complexity` + profile | skill low 2 · moderate 1 · high 0, +1 for small external load steps | the same |
 | carryover | `resistance_profile` | — | +1 for a free-weight compound |
 | joint stress (a penalty) | `joint_stress` | −2 per joint rated high, −1 once for any joint rated moderate **or unknown**; the total never below −2 | the same |
 
-Maximum 14 for both jobs. **Bands:** S >= 12 · A >= 10 · B >= 8 · C >= 5 · D below. An unknown attribute never helps: a
-positive term scores 0 and an unknown joint counts as moderate. **No stretch premium for the glutes** (`STRETCH_CAPS`:
+Maximum 14 for both jobs. **Bands:** S >= 12 · A >= 10 · B >= 8 · C >= 5 · D below. **Unknown is not poor (3.2.0):** a term
+whose input is `unknown` scores its NEUTRAL value (`quality_rubric.NEUTRAL`, the middle of its range: stretch 3, stability 2,
+resistance profile 2, progressability 2, joint stress −1, carryover 0), never less — a fully unknown movement lands at B — and an
+unknown never helps reach S (the `inputs_known` S criterion). See "Second red team" below. **No stretch premium for the glutes** (`STRETCH_CAPS`:
 their stretch term is capped at mid; Plotkin 2023 found the shortened hip thrust equal to the lengthened back squat).
 
 **Evidence** is `evidence_confidence`: `rct_direct` (a randomized trial of this target with this movement or its
@@ -154,6 +157,9 @@ These bind every later library and tier decision.
    pattern, never by muscle name alone.
 3. **Missing data never helps.** An unknown attribute scores no better than a known moderate one: positive terms score
    0, penalty terms count as moderate. A row with unknown joints can't hold S over a fully rated rival.
+   *Proposed amendment (#5861 FIX2-DATA, rubric 3.2.0 — needs the owner's sign-off):* missing data never helps AND never
+   hurts — an unknown term scores the middle of its range (neutral), the row is marked `provisional`, and it can never
+   reach S. The second red team showed "scores 0" had turned unreviewed movements into C/D verdicts.
 4. **No equipment class wins by construction.** Swapping equipment (machine, free weight, cable) on the same pattern may
    move a movement at most ±2 points, and for a compound the best achievable score is the same for each class before the
    free-weight carryover point (held by `test_no_equipment_class_wins_by_construction`). Each pattern's top two bands
@@ -228,9 +234,10 @@ rated once, 3.1.0); the table above applies only to what it does not model (carr
 drills, bodyweight circuits).
 
 **E. Mobility / joint function.** Applies to mobility, rehab/control and loaded end-range movements. Loaded (strength
-through range plus control: cuff rotations, face pulls, a cossack squat, a dead hang) A; active or motor control B;
+through an end range the movement takes the joint into: a cossack squat, a dead hang) A; active or motor control B;
 passive C. S needs specificity to a RECORDED limitation, which is owner-private N=1 data, so the public library never
-awards a mobility S.
+awards a mobility S. Cuff rotations, face pulls, band pull-aparts and prone W / UCV / scarecrow raises train no range: they
+are joint capacity, rated on functional (3.2.0, by class).
 
 **Evidence confidence** stays separate from every tier. Hypertrophy rows keep `rct_direct` / `rct_characteristic` /
 `consensus` / `none_reviewed` with their citations. The other four objectives are practitioner-consensus heuristics:
@@ -289,9 +296,9 @@ H / St / F / C / M, "-" = not applicable):
 | Bird dog / side plank / cuff D | bird_dog, side_plank, rotator_cuff_external_rotation | D / D / D | F C, M B / F B / F B, M - | rehab and control work, rated on functional, never on growth; cuff rotation is joint capacity, not mobility (3.1.0) |
 | Cossack and unusual lunges S for quads | db_cossack_squats, 3_way_lunge, offset_lunges, drop_step_lunges, … | S | quads B (cossack: adductors A, M A; offset: F S) | balance or mobility, not the quads, ends the set; DB held lower-body work has a moderate ceiling. Squats, leg press and split squats now sit above them (A) |
 | All cardio D | treadmill, cycling (= recumbent_bike), elliptical, rowing_machine, air_bike, walking, running | D | H - · C S / S / A / A / B / C / C | rated on conditioning only, by lane L4's cardio model (walking: hard to dose and progress; running: high impact) |
-| No S glute | hip_thrust_machine, glute_kickback_machine, hip_thrust_barbell | A / A / B | S / A / A | glute length fixed at mid both ways (Plotkin 2023); the hip thrust machine meets every S criterion; the kickback stack's load ceiling is moderate (3.1.0: a single-leg lever stack caps the absolute load), so A; the barbell hip thrust's moderate skill and stability hold it at A |
+| No S glute | hip_thrust_machine, glute_kickback_machine, hip_thrust_barbell | A / A / B | A / A / A | glute length fixed at mid both ways (Plotkin 2023); the kickback stack's load ceiling is moderate (3.1.0: a single-leg lever stack caps the absolute load), so A; the barbell hip thrust's moderate skill and stability hold it at A, and (3.2.0, evidence ordering) the untested machine form ties it rather than outranking the movement the trial tested — so no glute S: the glute pool is the A band (owner decision noted below) |
 | Weak adductors | db_cossack_squats, sumo squats, side lunges, squat_barbell | — | adductors A / A / B / A | reviewed secondary rows; adduction machines and Copenhagen work are lane L2's additions |
-| Inconsistent rear delts | rear_delt_reverse_fly_machine / _cable / rear_delt_fly / face_pull | S / B / C / B | S / A / B / B (face pull M A) | the cable fly is mid-length like the machine; the dumbbell flies are dumbbells; the face pull's cuff work is rated on joint function |
+| Inconsistent rear delts | rear_delt_reverse_fly_machine / _cable / rear_delt_fly / face_pull | S / B / C / B | S / A / B / B (face pull F B) | the cable fly is mid-length like the machine; the dumbbell flies are dumbbells; the face pull's cuff work is joint capacity, rated on functional (3.2.0) |
 
 **S census.** `_provenance.s_census` reports, per objective and muscle, how many movements are S and how many distinct
 canonical families they are. No quota: every S already met every S criterion of its objective. `tests/test_objective_ratings_5861.py`
@@ -327,6 +334,56 @@ always said never reaches S; the code now enforces that (functional A). S stays 
 `family_sustainability`, so the cardio model rates them once. *Cardio-model note (lane L4's file, not edited here):* the model still reads
 the row's session count (N=1 sustainability) to award S; a public tier should not depend on one person's history, so the better fix is for
 `cardio_model` to expose sustainability as a separate N=1 input (the private overlay) and cap the public tier at A.
+
+## Second red team: unreviewed is not poor (#5861 FIX2-DATA, rubric v3.2.0 — PROPOSED)
+
+The second red team cross-tabbed hypertrophy tier against `objective_inputs.reviewed`: every S/A/B row was reviewed and nearly
+every C/D row was not, so "C/D" meant "nobody filled in the inputs", not "poor exercise" (Glute Ham Raise D, Shrug (Machine) D).
+The owner's brief forbids that: evidence and input confidence are separate from exercise quality.
+
+**1. Unknown scores neutral, and the row says it is provisional.** A term whose input is `unknown` scores `NEUTRAL` (the middle of
+its range), never less, so an unreviewed movement is never pushed below what its class supports — a fully unknown movement is B,
+the middle band. It never helps either: S needs `inputs_known`, and an unknown ceiling or limiter keeps the B cap. Every rating
+that rests on title-rule (unreviewed) inputs — or, for a hypertrophy row, on an input still unknown — carries `provisional: true`
+and `provisional_why`, shown beside the tier and `evidence_confidence`. A placeholder, not a verdict. (Heuristic, labelled.)
+
+**2. The reviewed-input pass** (`deploy/exercise_library_input_review.py`, `REVIEW`: per movement the attributes and inputs a hand
+review set, or confirmed, and one reason): every movement logged on 3+ days inside the library's 5-year window, every movement
+in an S/A band on any objective, the red team's named rows, and every reviewed movement still carrying an unknown. A one-field
+`INPUT_OVERRIDES` row no longer implies a full review (the machine hip thrust's limiter fix had marked all its inputs reviewed).
+Fourteen logged custom templates that are not growth movements are typed by what they are (mobility drills, cuff and scapular
+control, trunk endurance, a plyometric, a rope pull), so they leave the hypertrophy table instead of sitting in it at D.
+Where the title does not identify the movement (`double_db_frog_press`, `hip_buck`, `nsfw`) or the equipment is unrecorded
+(`21s`, `shoulder_press`, `overhead_tricep_extension`), the review leaves the unknown and the row stays provisional with the
+reason: the owner can name them. Guards: `tests/test_unreviewed_not_poor_5861.py`.
+
+| Hypertrophy rows (rated) | before: reviewed / title-rule | after: reviewed / title-rule / provisional |
+|---|---|---|
+| S | 50 / 0 | 49 / 0 / 0 |
+| A | 108 / 0 | 121 / 0 / 2 |
+| B | 146 / 0 | 166 / 52 / 61 |
+| C | 13 / 84 | 19 / 44 / 47 |
+| D | 1 / 63 | 0 / 0 / 0 |
+
+Movements logged on 3+ days in the window: 230; inputs reviewed 152 before, 230 after; 6 still provisional (the six above).
+Every S/A rating on every objective rests on reviewed inputs. The remaining title-rule rows are movements he has not used (B or
+C, provisional): no S/A, so no programmable pool holds one.
+
+**3. Evidence ordering.** An untested form of a trial-backed movement ties the tested form at best, never outranks it
+(`EVIDENCE_FORMS` -> `evidence_ceiling` on the form's row, a cap in `hypertrophy_caps`). The barbell hip thrust carries the direct
+trial (Plotkin 2023); the machine hip thrust scored S on heuristic points (pin-stack stability, a smaller load step) with no trial,
+so it now ties the barbell at A. Evidence does not lift the barbell form: the trial's comparator (the back squat) rates B for the
+glutes, so equivalence earns no band. A trial that ranked a movement LOWER (`bands: -1`) anchors nothing.
+
+**4. The named rows.** Glute Ham Raise D -> A (bodyweight knee flexion from full extension, thighs pinned, a ladder; reviewed).
+Shrug (Machine) D -> B (a guided shrug, grip-limited like every shrug). Face pull mobility A -> n/a, functional B: cuff, face-pull,
+pull-apart and W / UCV / scarecrow work trains no range, so the class left loaded mobility. Pull-up A vs pulldown S, kept: the
+bodyweight pull-up's load ceiling is the body (moderate) and S needs a high ceiling; its progression past bodyweight is the
+weighted pull-up, which is S beside the pulldown — the criteria rank the forms, not the pattern.
+
+**5. `programming_settings`** (top level): the programming lane's library-carried settings with their owner-pending defaults
+(`session_cap_includes_cardio: false`, `symptom_line`, `short_week_rule: skip_shoulders_arms`, `behind_schedule_week: false`).
+Written once by the builder; a value on disk (an owner's ruling) survives every rebuild.
 
 ## Target-label audit (#5857, owner-approved on PR #5858)
 

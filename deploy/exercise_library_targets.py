@@ -464,8 +464,11 @@ STRENGTH_LIFTS: dict[str, str] = {
 
 # library key -> (category, reason): where the title rule mislabels the movement's TYPE
 CATEGORY_OVERRIDES: dict[str, tuple[str, str]] = {
-    "face_pull": ("hypertrophy", "a face pull trains the rear delts (rated there) and the cuff (rated on mobility / joint function)"),
-    "doorway_face_pulls": ("hypertrophy", "a face pull trains the rear delts (rated there) and the cuff (mobility / joint function)"),
+    "face_pull": ("hypertrophy", "a face pull trains the rear delts (rated there) and the cuff (joint capacity, rated on functional)"),
+    "doorway_face_pulls": (
+        "hypertrophy",
+        "a face pull trains the rear delts (rated there) and the cuff (joint capacity, rated on functional)",
+    ),
     "cable_stretch_curls": ("hypertrophy", "a stretch-position cable curl, not a stretch"),
     "cable_stretch_front_raises": ("hypertrophy", "a stretch-position cable front raise, not a stretch"),
     "hover_hold": ("rehab_control", "a hover hold is a plank: low-load trunk control"),
@@ -497,14 +500,6 @@ INPUT_OVERRIDES: dict[str, tuple[dict, str]] = {
     "chin_up_assisted": ({"ceiling": "moderate"}, "an assisted chin-up is a regression: its ceiling is the unassisted chin-up"),
     "triceps_dip_assisted": ({"ceiling": "moderate"}, "an assisted dip is a regression: its ceiling is the unassisted dip"),
     # ── #5861 FIX-DATA ──
-    "rotator_cuff_external_rotation": (
-        {"mobility": None},
-        "cuff external rotation is loaded JOINT CAPACITY (rated on functional), not a mobility movement: it trains no range (red team)",
-    ),
-    "db_external_rotation": (
-        {"mobility": None},
-        "cuff external rotation is loaded JOINT CAPACITY (rated on functional), not a mobility movement: it trains no range (red team)",
-    ),
     "dead_arm_hang": ({"mobility": "loaded"}, "the dead hang's variant: loaded shoulder and grip control (the head is rated loaded)"),
     "dead_arm_switch_grip_hang": (
         {"mobility": "loaded"},

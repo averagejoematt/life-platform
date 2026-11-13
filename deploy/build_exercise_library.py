@@ -54,6 +54,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(os.path.abspath(__file__))]
 
 import exercise_library_curation as cur  # noqa: E402
+import exercise_library_input_review as input_review  # noqa: E402
 import exercise_library_objectives as objectives  # noqa: E402
 import exercise_library_reviews as reviews  # noqa: E402
 import exercise_library_targets as targets  # noqa: E402
@@ -119,7 +120,30 @@ BUILDER_CHANGE_LOG = [
         "length rules, Pallof press target, rear-delt fly attributes.",
         "rule": "rubric 3.0.0 terms and objective inputs are PROPOSED — owner to confirm; status stays proposed",
     },
+    {
+        "version": "0.3.1",
+        "date": "2026-11-12",
+        "by": "#5861 FIX2-DATA (second red team 2026-11-12, PROPOSAL for the owner's review with the library)",
+        "what": "Unreviewed is not poor (rubric 3.2.0): an unknown input scores its term's NEUTRAL value (a fully unknown movement "
+        "lands at B), never helps reach S (`inputs_known`), and every rating on unreviewed or unknown inputs carries "
+        "`provisional: true` (+ `provisional_why`). A reviewed-input pass (deploy/exercise_library_input_review.py) covers every "
+        "movement logged on 3+ days in the window, every S/A movement and the red team's named rows (Glute Ham Raise, Shrug "
+        "(Machine)); a one-field input override no longer implies a full review. Evidence ordering: an untested form of a "
+        "trial-backed movement ties it at best (the machine hip thrust no longer outranks the barbell hip thrust). Cuff, face-pull "
+        "and pull-apart work leave loaded mobility (joint capacity, on functional). `programming_settings` carries the "
+        "programming lane's owner-pending defaults.",
+        "rule": "rubric 3.2.0 and the review pass are PROPOSED — owner to confirm; status stays proposed",
+    },
 ]
+
+# #5861 FIX2-DATA: the programming lane's library-carried settings (`training.live_program.SETTINGS_DEFAULTS` reads them).
+# OWNER DECISIONS PENDING — these are the defaults, written once; a value on disk (an owner's ruling) is kept by every rebuild.
+PROGRAMMING_SETTINGS_DEFAULTS: dict[str, Any] = {
+    "session_cap_includes_cardio": False,
+    "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
+    "short_week_rule": "skip_shoulders_arms",
+    "behind_schedule_week": False,
+}
 
 
 def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
@@ -803,6 +827,7 @@ def apply_attribute_audit(movements: dict[str, dict[str, Any]]) -> None:
         for field, value in attrs.items():
             e[field] = {**(e.get(field) or {}), **value} if field == "joint_stress" else value
         e["attribute_audit"] = {"fields": sorted(attrs), "reason": reason}
+    input_review.apply_attributes(movements)  # #5861 FIX2-DATA: the reviewed-input pass (attributes half)
     for e in movements.values():
         rule = targets.joint_rating(e, lib_rules.movement_pattern(str(e.get("title") or "")))
         if not rule:
@@ -941,6 +966,7 @@ def build_library(
             "evaluated_by": "#5772 (next story); v0.1 only defines gates",
         },
         "gates": gates_out,
+        "programming_settings": PROGRAMMING_SETTINGS_DEFAULTS | dict((current or {}).get("programming_settings") or {}),
         "canonical_families": families,
         "movements": movements,
     }
