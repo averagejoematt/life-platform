@@ -68,7 +68,7 @@ FATIGUE_COST_BASIS = (
     "heuristic: +1 compound, +1 free weight or bodyweight (stability + systemic cost), +1 moderate/high spinal load; "
     "+2 more on a high spinal load while the fatigue model flags axial stacking"
 )
-LIVE_PICK_KEYS = ("objective", "fatigue_cost", "discomfort", "trend", "rotation", "repeat")
+LIVE_PICK_KEYS = ("objective", "canonical", "fatigue_cost", "discomfort", "trend", "rotation", "repeat")
 LIVE_GATES_SOURCE = "#5772's stored evaluation (#5861, live): only `unlocked` opens; no fresh evaluation = locked"
 
 
@@ -91,6 +91,8 @@ def objective_tier(entry: dict[str, Any], objective: str, muscle: str | None) ->
             ranked = sorted((t for t in tiers if t in se.TIER_RANK), key=lambda t: se.TIER_RANK[t])
             if ranked:
                 return ranked[0]
+            if ((entry.get("ratings") or {}).get(objective) or {}).get("tier", "") is None:
+                return None  # L1: hypertrophy not applicable (cardio, carries, control work) — never read as D under live
         return se.tier_for(entry, str(muscle or ""))
     t = fn(entry, objective, muscle) if callable(fn) else (((entry.get("ratings") or {}).get(objective) or {}).get("tier"))
     return t if t in se.TIER_RANK else None
@@ -123,6 +125,7 @@ def decorate(c: dict[str, Any], entry: dict[str, Any], ctx: dict[str, Any]) -> d
     return c | {
         "tier": tier,
         "objective": objective,
+        "canonical": family(c.get("movement_id"), c.get("catalog_key"), ctx["lib"]),
         "fatigue_cost": fatigue_cost(entry, bool(policy.get("stacking"))),
         "discomfort": hurts,
         "trend": sig.get("trend") or "unknown",
@@ -160,7 +163,7 @@ def count_pick(p: dict[str, Any], policy: dict[str, Any] | None, ctx: dict[str, 
     if policy is None:
         return
     pick = p["pick"]
-    policy["week_counts"][pick["catalog_key"]] += 1
+    policy["week_counts"][pick.get("canonical") or family(pick.get("movement_id"), pick.get("catalog_key"), ctx["lib"])] += 1
     if (p.get("owner_pin") or {}).get("state") == "held" and "rotation" not in pick:
         prev = previous_variant(ctx.get("slot_last") or {})
         same = prev in (None, pick["catalog_key"])
@@ -262,23 +265,36 @@ def _trigger(prev: str, eligible: list[dict[str, Any]], excluded: list[dict[str,
     return None, c, trend
 
 
+def family(movement_id: Any, catalog_key: Any, lib: dict[str, Any] | None) -> str:
+    """The movement's CANONICAL family (L1's alias layer, `exercise_library.canonical_of`): the within-week repetition rule
+    compares families, so an alias or a grip variant of a movement already served is a repeat, not a peer. Falls back to
+    the catalog key when the library cannot place it."""
+    from training import exercise_library as xl
+
+    return str((xl.canonical_of(lib or {}, str(movement_id)) if movement_id else None) or catalog_key or movement_id or "")
+
+
+def _fam(c: dict[str, Any]) -> str:
+    return str(c.get("canonical") or c.get("catalog_key") or "")
+
+
 def _choose(ranked: list[dict[str, Any]], counts: Counter, skip: str | None) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
     """The best candidate under the live repetition rule (module doc 4), and the repetition record."""
     pool = [c for c in ranked if c.get("catalog_key") != skip] or ranked
     if not pool:
         return None, None
     best = pool[0]
-    n = counts[best.get("catalog_key") or ""]
+    n = counts[_fam(best)]
     if n == 0:
         return best, None
-    peer = next((c for c in pool if c["tier"] == best["tier"] and counts[c.get("catalog_key") or ""] == 0), None)
+    peer = next((c for c in pool if c["tier"] == best["tier"] and counts[_fam(c)] == 0), None)
     if peer:
         why = f"{best['title']} already serves another slot this week; {peer['title']} is a same-band peer — no pointless duplication"
         return peer, {"code": "week_repeat_avoided", "why": why}
     if n < MAX_WEEKLY_EXPOSURES:
         why = f"the best band has no unserved member: a second weekly exposure of {best['title']} beats a lower-band movement"
         return best, {"code": "repeat_beneficial", "why": why}
-    rest = next((c for c in pool if counts[c.get("catalog_key") or ""] < MAX_WEEKLY_EXPOSURES), best)
+    rest = next((c for c in pool if counts[_fam(c)] < MAX_WEEKLY_EXPOSURES), best)
     return rest, {"code": "week_repeat_cap", "why": f"{best['title']} already serves {n} slots this week (cap {MAX_WEEKLY_EXPOSURES})"}
 
 
@@ -303,10 +319,10 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> 
         }
     trigger, held, trend = _trigger(prev, eligible, excluded, pool, ctx) if prev else (None, None, None)
     repeat = None
-    if held is not None and trigger is None and counts[prev or ""] < MAX_WEEKLY_EXPOSURES:
+    if held is not None and trigger is None and counts[_fam(held)] < MAX_WEEKLY_EXPOSURES:
         chosen = held
         rotation = {"action": "hold", "previous": prev, "reason": HOLD_REASONS.get(str(trend), HOLD_REASONS["unknown"]), "trend": trend}
-        if counts[prev or ""]:
+        if counts[_fam(held)]:
             repeat = {"code": "repeat_beneficial", "why": f"{held['title']} is held here while it progresses and serves another slot too"}
     else:
         chosen, repeat = _choose(ranked, counts, prev if trigger else None)
@@ -318,7 +334,7 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> 
             else {"action": "initial", "previous": None, "why": "no earlier phase in the ledger for this slot"}
         )
     assert chosen is not None
-    skipped = [c for c in ranked[: ranked.index(chosen)] if counts[c.get("catalog_key") or ""] > 0]
+    skipped = [c for c in ranked[: ranked.index(chosen)] if counts[_fam(c)] > 0]
     pick = chosen | {
         "c_reason": se.c_reason(chosen, excluded, skipped=skipped, pooled=[c for c in eligible if c["tier"] in pool]),
         "novel_terms": se._novel_terms(chosen),

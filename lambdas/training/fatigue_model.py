@@ -448,6 +448,17 @@ def _swaps(movs: dict[str, dict[str, Any]], stacking: list[dict[str, Any]], inde
     return out
 
 
+FATIGUE_LEVELS = {"recovered": "low", "normal": "normal", "strained": "elevated", "overreached": "high"}
+"""L5's interface (the unwired loss-rate band proposal's `fatigue_level`, vocabulary low | normal | elevated | high): the
+recovery state mapped one-to-one. `elevated` is that proposal's watch, `high` (a recommended deload) its slow-down. Named,
+never imported: no live module reads the rate proposal before the owner decides (L5's own guard)."""
+
+
+def fatigue_level(state: str | None) -> str | None:
+    """L5's `fatigue_level` for a recovery state (`FATIGUE_LEVELS`); None when unknown."""
+    return FATIGUE_LEVELS.get(str(state)) if state else None
+
+
 def assess(
     *,
     workouts: list[dict[str, Any]] | None,
@@ -481,6 +492,7 @@ def assess(
         "version": VERSION,
         "as_of": as_of,
         "state": state,
+        "fatigue_level": fatigue_level(state),  # L5's loss-rate proposal input (vocabulary: FATIGUE_LEVELS)
         "action": "deload_recommended" if deload else ("reduce" if reduce else "maintain"),
         "reduce_sets": reduce,
         "never_adds": True,
@@ -540,7 +552,7 @@ def apply_to_session(rx: dict[str, Any], rotation: dict[str, Any] | None, assess
             e["cue"] = exposure_cue(e["intensity"], e["sets"])
         out["total_sets"] = sum(len(e["sets"]) for e in out["exposures"])
         out["session_minutes"] = session_minutes_estimate(out["exposures"])
-    keep = ("state", "action", "reduce_sets", "strain_signals", "swaps", "deload", "version")
+    keep = ("state", "fatigue_level", "action", "reduce_sets", "strain_signals", "swaps", "deload", "version")
     out["fatigue"] = {k: assessment.get(k) for k in keep} | {"sets_removed": removed}
     return out
 

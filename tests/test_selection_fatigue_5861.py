@@ -476,3 +476,30 @@ def test_cron_live_inputs_respect_the_hr_regime_window_and_fail_soft(monkeypatch
     monkeypatch.setattr(cron, "_z2_minutes_7d", lambda d: 100.0)
     inputs = cron._gather_inputs(AS_OF, False)
     assert (inputs.recovery_tier, inputs.acwr_flag, inputs.volume_7d) == ("yellow", "safe", {})
+
+
+def test_repetition_compares_canonical_families_not_raw_keys():
+    def c(k, fam, t="S"):
+        return {"catalog_key": k, "title": k, "tier": t, "movement_id": k, "canonical": fam}
+
+    ranked = [c("a_grip", "a"), c("a_alias", "a"), c("b", "b")]
+    pick, why = sl._choose(ranked, Counter({"a": 1}), None)
+    assert pick["catalog_key"] == "b" and why["code"] == "week_repeat_avoided"  # an alias of a served family is a repeat
+    raw = [{k: v for k, v in x.items() if k != "canonical"} for x in ranked]
+    assert sl._choose(raw, Counter({"a": 1}), None)[0]["catalog_key"] == "a_grip"  # control: raw keys miss the family
+
+
+def test_live_counts_never_exceed_two_per_canonical_family():
+    sel = _live()
+    fams = Counter(
+        (s.get("pick") or {}).get("canonical") for s in sel["slots"] if not s.get("pinned") and (s.get("pick") or {}).get("canonical")
+    )
+    assert fams and max(fams.values()) <= sl.MAX_WEEKLY_EXPOSURES
+
+
+def test_hypertrophy_not_applicable_is_never_a_hypertrophy_candidate_under_live():
+    carry = LIB0["movements"]["farmers_walk"]
+    if ((carry.get("ratings") or {}).get("hypertrophy") or {}).get("tier", "x") is not None:
+        pytest.skip("this library rates the carry for hypertrophy")
+    assert sl.objective_tier(carry, "hypertrophy", "full_body") is None
+    assert se.tier_for(carry, "full_body") == "D"  # control: the shadow reader still calls it D

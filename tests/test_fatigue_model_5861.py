@@ -303,3 +303,19 @@ def test_hevy_cardio_blocks_feed_the_cardio_seam():
     assert load["minutes"] == 80 and load["hr_used"] is False
     assert fm.cardio_state(load) in ("high", "moderate", "low")
     assert fm.hevy_cardio_load([{"date": "2026-11-10", "exercises": [_ex("T_LR", 10, 12)]}], LIB, as_of=AS_OF) is None  # control
+
+
+def test_the_recovery_state_maps_onto_the_rate_policys_fatigue_vocabulary():
+    import inspect
+
+    from health import rate_policy
+
+    assert "fatigue_level" in inspect.signature(rate_policy.propose_band).parameters
+    assert set(fm.FATIGUE_LEVELS.values()) == {"low", "normal", "elevated", "high"}
+    two_days = [_w("2026-11-05", _ex("T_LR", 10, 12)), _w("2026-11-10", _ex("T_LR", 10, 12))]
+    assert _assess(workouts=two_days, planned_per_week=1)["fatigue_level"] == "low"
+    assert _assess(readiness="red", sleep_hours=4.0)["fatigue_level"] == "elevated"
+    assert _assess(readiness="red", sleep_hours=4.0, cardio_load={"state": "high"})["fatigue_level"] == "high"
+    assert fm.fatigue_level(None) is None and fm.fatigue_level("bogus") is None
+    # the level drives the rate policy's own fatigue signal: high slows, elevated watches
+    assert rate_policy._fatigue("high")["state"] == "slow" and rate_policy._fatigue("elevated")["state"] == "watch"
