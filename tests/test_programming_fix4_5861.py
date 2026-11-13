@@ -276,7 +276,11 @@ def test_the_week_never_passes_the_weekly_hard_set_redline(weeks):
     old = {"press_sets": 1, "priority_add_rule": "volume", "priority_muscles": ["chest", "back", "quadriceps", "hamstrings"]}
     raw = _week(
         "a_large_deficit_experienced",
-        {(lshape, "week_ceiling"): lambda env, adds: [], (lrules, "deadlifts"): lambda w, c: False},
+        {
+            (lshape, "week_ceiling"): lambda env, adds: [],
+            (lrules, "deadlifts"): lambda w, c: False,
+            (__import__("training.live_stimulus").live_stimulus, "parity"): lambda env, adds: [],  # FIX7: parity trims too
+        },
         old | {"session_cap_includes_cardio": False, "heavy_day_deadlift_shape": "as_today"},
     )
     assert over_redline(raw["week"]) > 0

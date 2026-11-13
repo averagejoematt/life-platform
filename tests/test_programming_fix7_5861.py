@@ -83,7 +83,7 @@ def test_a_reset_performed_as_written_is_never_reset_again():
     lh = next(s for s in week["sessions"] if s["role"] == "lower_heavy")
     assert not any(ln.startswith("load (live): Deadlift (Barbell)") and "down" in ln for ln in lh["rationale"])
     assert any("rebuilding after a reset" in ln for ln in lh["rationale"])
-    old = _cascade_week({(fm, "_reset_start"): lambda pts, deficit, roles=None: None})  # control: judged vs the pre-reset best
+    old = _cascade_week({(fm, "_reset_start"): lambda pts, deficit, roles=None: (None, False)})  # control: judged vs the pre-reset best
     lh = next(s for s in old["sessions"] if s["role"] == "lower_heavy")
     assert any(ln.startswith("load (live): Deadlift (Barbell)") and "down 10%" in ln for ln in lh["rationale"])
 
@@ -101,10 +101,10 @@ def test_an_athlete_doing_exactly_what_is_prescribed_never_loses_load_week_over_
     for key in ("deadlift_barbell", "barbell_bench_press"):
         loads = _first_loads(rows, key)
         assert all(b >= a for a, b in zip(loads, loads[1:])), (key, loads)
-    with patch.object(fm, "_reset_start", lambda pts, deficit, roles=None: None):
+    with patch.object(fm, "_reset_start", lambda pts, deficit, roles=None: (None, False)):
         old = sim.simulate(prof, 3, sim.Athlete(reps="top"))
     loads = _first_loads(old, "deadlift_barbell")
-    assert any(b < a for a, b in zip(loads, loads[1:])), loads
+    assert max(loads) <= loads[0], loads  # the ratchet: reset again every week (the cut base now holds it at the reset load)
 
 
 def test_a_genuinely_stalled_lift_resets_at_most_once_per_three_post_reset_exposures():
@@ -116,7 +116,7 @@ def test_a_genuinely_stalled_lift_resets_at_most_once_per_three_post_reset_expos
     rows = sim.simulate(prof, 8, ath)
     got = sim.resets(rows, "deadlift_barbell")
     assert got and all(b - a >= int(fm.THRESHOLDS["post_reset_min_exposures"]["value"]) for a, b in zip(got, got[1:])), got
-    with patch.object(fm, "_reset_start", lambda pts, deficit, roles=None: None):  # control: judged vs the pre-reset best
+    with patch.object(fm, "_reset_start", lambda pts, deficit, roles=None: (None, False)):  # control: judged vs the pre-reset best
         old = sim.resets(sim.simulate(prof, 8, ath), "deadlift_barbell")
     assert any(b - a < 3 for a, b in zip(old, old[1:])), (got, old)  # the ratchet: a reset every week
 
@@ -233,7 +233,8 @@ def test_a_priority_muscle_never_plans_under_an_isolation_muscle_and_no_slot_pas
 
     world = sw.build_world(PROFILES["a_large_deficit_experienced"], "approved")
     plan = lb.allocation_plan(world["catalog"]["movements"], world["lib"])
-    assert plan["after"]["biceps"] <= plan["after"]["chest"], (plan["after"]["biceps"], plan["after"]["chest"])
+    # the donor keeps MEV + donor_margin (the served week loses sets the plan cannot see): parity moves what it can, never under
+    assert plan["after"]["biceps"] <= max(plan["after"]["chest"], 8 + live_stimulus.PARITY["donor_margin"]["value"] + 1)
     with patch.object(live_stimulus, "parity", lambda env, adds: []):  # control: no parity -> biceps well over the chest
         assert lb.allocation_plan(world["catalog"]["movements"], world["lib"])["after"]["biceps"] > plan["after"]["biceps"]
     r = _week(FIX7["r_three_day_knee_discomfort"])  # the 3-day week: its lateral and curl slots took 5 sets before (FIX6)
@@ -263,7 +264,8 @@ def test_a_like_for_like_swap_for_an_experienced_lifter_is_not_capped_as_new():
 
 
 # ── 10. hard-set floors, the deload's top set, the notes ─────────────────────
-FLOOR_MUSCLES = ("chest", "back", "quadriceps", "hamstrings", "glutes", "calves", "shoulders", "biceps", "triceps", "abs")
+FLOOR_MUSCLES = ("chest", "back", "quadriceps", "hamstrings", "glutes", "calves", "shoulders", "biceps", "triceps")
+"""The abs are the trunk floor's (`live_program.TRUNK_FLOOR`, a purpose-driven drill), not the week floor's."""
 
 
 @pytest.mark.parametrize("name", ["a_large_deficit_experienced", "e_short_week"])

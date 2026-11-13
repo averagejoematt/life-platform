@@ -823,7 +823,7 @@ def guard_loads(
         prev_kg = float(prev["lb"]) * 0.45359237
         if d["mode"] == "down":  # #5861 FIX7: a cut is taken off this rep band's own last top load, never a volume day's lighter one
             hi_reps = max((int(getattr(s, "rep_range_end", 0) or 0) for s in work), default=0)
-            prev_kg = max(prev_kg, band_top_kg(history_index.get(tid) or [], target_date, hi_reps))
+            prev_kg = band_top_kg(history_index.get(tid) or [], target_date, hi_reps) or prev_kg
         cap = prev_kg if d["mode"] == "hold" else _floor_to_implement(prev_kg * (1 - d["pct"] / 100.0), entry.get("equipment"))
         top = max(float(s.weight_kg) for s in work)
         if (top - cap) / 0.45359237 < 0.5:  # under half a pound apart: the same load on the rack
@@ -855,19 +855,19 @@ def guard_loads(
 
 
 def band_top_kg(rows: list[dict[str, Any]], target_date: str, rep_hi: int, days: int = 14) -> float:
-    """The heaviest top set of this lift's exposures in the last `days` whose top-set reps sit in the exposure's rep band (at most
+    """The top set of this lift's LATEST exposure in the last `days` whose top-set reps sit in the exposure's rep band (at most
     rep_hi + 2): the base a cut is taken from when the latest exposure was another day's lighter, higher-rep work (0.0 = none)."""
     from common.pacific_time import shift_day_key
 
-    since, out = shift_day_key(target_date, -days), 0.0
-    for r in rows or []:
+    since = shift_day_key(target_date, -days)
+    for r in sorted(rows or [], key=lambda r: str(r.get("date") or ""), reverse=True):
         if not since <= str(r.get("date") or "") < target_date:
             continue
         sets = [x for x in r.get("sets") or [] if x.get("weight_kg") and x.get("reps")]
         top = max(sets, key=lambda x: float(x["weight_kg"]), default=None)
         if top and rep_hi and int(top["reps"]) <= rep_hi + 2:
-            out = max(out, float(top["weight_kg"]))
-    return out
+            return float(top["weight_kg"])
+    return 0.0
 
 
 def _floor_to_implement(kg: float, equipment: str | None) -> float:

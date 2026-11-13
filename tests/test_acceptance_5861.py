@@ -547,7 +547,7 @@ def test_c3_a_progressing_movement_is_held_not_rotated(weeks):
     def strict(pts, e1):  # control: the pre-L6 trend (latest strictly beats every earlier exposure)
         return e1[-1] > max(e1[:-1])
 
-    off = _week_of("a_large_deficit_experienced", {(fm, "_recent_best"): strict})
+    off = _week_of("a_large_deficit_experienced", {(fm, "_recent_best"): strict, (fm, "_load_pr"): lambda pts: False})
     stalls = [ln for s in off["week"]["sessions"] for ln in s["selection"] if "rotate: stall" in ln]
     assert stalls, "the strict trend reads a twice-a-week progressing movement as a stall"
 

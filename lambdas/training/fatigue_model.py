@@ -170,6 +170,9 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
 """Every threshold the model judges by, with its label and basis. Nothing is `validated` today (no outcome trial behind
 any number); a threshold is promoted to `validated` only with a verified citation."""
 
+RESET_MIN_KG = 4.5
+"""#5861 FIX7, heuristic (part of `reset_detect_pct`): a load drop under ~10 lb is an implement step on a light lift (dumbbells,
+a stack), never read as a reset — a stall reset or a cut on an anchor is 10%+ of a working load."""
 CARDIO_LOAD_STATES = ("low", "moderate", "high")
 AXIAL_PATTERNS = ("squat", "hinge")
 SWAP_FATIGUE_ORDER = ("free_weight", "bodyweight", "machine_plate_loaded", "cable", "machine_selectorized")
@@ -305,8 +308,8 @@ def _reset_start(
     for k in range(1, len(pts)):
         j = next((i for i in range(k - 1, -1, -1) if _comparable(pts[i], pts[k], roles[i], roles[k])), None)
         before, now = (pts[j][3] if j is not None else None), pts[k][3]
-        if j is None or before is None or now is None or now > before * (1 - drop):
-            continue
+        if j is None or before is None or now is None or now > before * (1 - drop) or before - now < RESET_MIN_KG:
+            continue  # not a drop — or one implement step on a light lift (a 2.5-lb dumbbell jump is noise, not a reset)
         if pts[k][2] is not None and float(pts[k][2]) >= 9.0:
             continue  # a lighter load ground out at RPE 9+ is a regression, never a reset done as written
         if start is not None and k - start < need:

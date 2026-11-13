@@ -14,7 +14,7 @@ needs demanding resistance work. The rules here, every number a labelled heurist
      today's own isolation slot for it (never past slot_max sets), else a low-fatigue isolation for it (a leg extension for the
      quadriceps at RPE 8-9 — the driver's preferred lever over cutting `press_sets`; a fly, a pushdown, a calf raise, a crunch),
      priority muscles first, while the session set cap and the weekly redline have room. A 3-day week's full-body day carries
-     chest / triceps / calves / abs this way.
+     chest / triceps / calves this way (the abs are the trunk floor's).
   4. PRIORITY PARITY (`parity`, PARITY). In the week's allocation a priority muscle never ends with fewer sets than a non-priority
      ISOLATION muscle (the sixth red team: chest 8 vs biceps 11): the donor's surplus isolation sets move to the priority muscle's
      own isolation slot (net zero, never past the 3-set slot maximum), else they are trimmed — never under the donor's MEV.
@@ -51,10 +51,11 @@ FAST_CUT: dict[str, dict[str, Any]] = {
 }
 WEEK_FLOOR: dict[str, dict[str, Any]] = {
     "muscles": {
-        "value": ["quadriceps", "chest", "triceps", "calves", "abs", "biceps", "shoulders", "hamstrings", "glutes"],
+        "value": ["quadriceps", "chest", "triceps", "calves", "biceps", "shoulders", "hamstrings", "glutes"],
         "label": HEURISTIC,
         "basis": "the muscles with an MEV landmark the week's last session can still top up with low-fatigue isolation (back is "
-        "carried by the anchors); priority muscles (`priority_muscles`) go first",
+        "carried by the anchors; the abs are the trunk floor's — `live_program.TRUNK_FLOOR`, purpose-driven); priority muscles "
+        "(`priority_muscles`) go first",
     },
     "hard_rpe": {"value": 8.0, "label": HEURISTIC, "basis": "a hard set is a working set at RPE >= 8 (about 2 in reserve), or unlogged"},
     "add_sets": {"value": 2, "label": HEURISTIC, "basis": "an added low-fatigue isolation slot is two sets at RPE 8-9"},
@@ -335,9 +336,9 @@ PARITY: dict[str, dict[str, Any]] = {
         "of them (the shoulders are pressed and their rear-delt work is kept: they stay out); a donor keeps MEV + donor_margin",
     },
     "donor_margin": {
-        "value": 1,
+        "value": 2,
         "label": HEURISTIC,
-        "basis": "a donor keeps MEV + 1 on the plan: the served week loses sets to swaps and the time trim the plan cannot see",
+        "basis": "a donor keeps MEV + 2 on the plan: the served week loses sets to swaps and the time trim the plan cannot see",
     },
 }
 

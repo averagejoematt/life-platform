@@ -286,7 +286,6 @@ def for_live_draft(
         from training import live_rulings  # #5861 FIX6 ruling 3: AFTER the dip's lighter week, so it is never undone
 
         lines += live_rulings.arms_top_up(out, ctx, block_workouts)
-        lines += live_stimulus.week_floor(out, ctx, block_workouts, set_cap)  # FIX7: every muscle with an MEV reaches it in HARD sets
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -315,6 +314,11 @@ def for_live_draft(
             _refit(out)
         except Exception as e:  # noqa: BLE001 — never blocks a draft
             lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
+    if ctx is not None:  # FIX7: every muscle with an MEV reaches it in HARD sets — after the trunk floor, never on a bad day
+        from training import live_stimulus
+
+        lines += live_stimulus.week_floor(out, ctx, block_workouts, set_cap)
+        _refit(out)
     lines += live_rules.fit_set_cap(out, set_cap)  # FIX5: every live session within the session set ceiling (a crash before)
     _refit(out)
     from training import live_rulings  # #5861 FIX6 ruling 16: evidence confidence + data completeness, visible
