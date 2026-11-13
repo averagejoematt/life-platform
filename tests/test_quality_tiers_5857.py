@@ -22,6 +22,7 @@ import json
 import os
 import pathlib
 import sys
+from unittest.mock import patch
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
@@ -238,7 +239,10 @@ def test_every_s_and_a_row_has_rated_joints_and_the_board_anchors_hold():
     got = {(k, t): next(r["tier"] for r in MV[k]["hypertrophy"] if r["target"] == t) for k, t in want}
     assert got == want
     assert MV["incline_bench_press_dumbbell"]["job"] == "compound" and MV["butterfly_pec_deck"]["job"] == "isolation"
-    # #5861 FIX6 (owner ruling 17): the glute stretch term sits at its TOP for any known length — no premium between glute
-    # movements and no cost against other muscles (the trial: length does not decide glute growth)
-    assert qr.components(MV["squat_barbell"], "glutes")["stretch"] == qr.STRETCH["lengthened"], "no stretch premium for glutes"
-    assert qr.components(MV["hip_thrust_barbell"], "glutes")["stretch"] == qr.STRETCH["lengthened"]
+    # #5861 FIX7 (rubric 3.5.0, ruling 17 as written: "the same standard as other muscles"): glute length is scored like
+    # every muscle's — the squat's lengthened glute loading earns the stretch term, the shortened hip thrust does not; the hip
+    # thrust's tier comes from its direct trial (equivalence with the squat), never from a stretch credit
+    assert qr.components(MV["squat_barbell"], "glutes")["stretch"] == qr.STRETCH["lengthened"]
+    assert qr.components(MV["hip_thrust_barbell"], "glutes")["stretch"] == qr.STRETCH["shortened"]
+    with patch.dict(qr.STRETCH_CAPS, {"glutes": ("lengthened", "x", "the 3.4.0 override")}):  # control: the old override
+        assert qr.components(MV["hip_thrust_barbell"], "glutes")["stretch"] == qr.STRETCH["lengthened"]

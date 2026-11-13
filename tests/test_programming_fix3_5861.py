@@ -241,7 +241,7 @@ def test_one_s_per_canonical_family_per_objective():
     # before -> after (FIX3): hypertrophy 49 -> 34, strength 10 -> 10, functional 10 -> 9 (exact duplicates share one rating)
     # FIX4 -3: the landmine presses and the trap pulldown read a moderate load ceiling (fourth red team: generous S)
     # FIX6 +2: owner ruling 17 (the glute S standard) — the barbell and machine hip thrusts meet every S criterion
-    assert s_counts(LIB0) == {"hypertrophy": 32, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}
+    assert s_counts(LIB0) == {"hypertrophy": 30, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}  # FIX7: -2 glute S
     pull = LIB0["movements"]["lat_pulldown_close_grip_cable"]
     assert pull["ratings"]["hypertrophy"]["tier"] == "A" and any("S quota" in b for b in pull["ratings"]["hypertrophy"]["basis"])
     assert LIB0["movements"]["lat_pulldown_cable"]["ratings"]["hypertrophy"]["tier"] == "S"  # the family's one S

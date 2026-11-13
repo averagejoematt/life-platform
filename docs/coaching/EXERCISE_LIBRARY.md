@@ -65,7 +65,7 @@ rated hypertrophy row also `provisional` and, when true, `provisional_why`). A h
 objective does not apply to carries `tier: null`, `applicable: false` and its reason. The top level carries
 `canonical_families`.
 
-## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.4.0, PROPOSED)
+## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.5.0, PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -147,6 +147,20 @@ bodyweight -> weighted, kneeling -> standing; `objective_inputs.ladder`) earns t
 term is FIXED at mid for any known length, not only capped: the trial that removed the stretch premium (the shortened hip
 thrust matched the lengthened squat) equally removes the shortened penalty. Then the points band is held under the
 categorical caps below (Objectives).
+
+## Rubric v3.5.0 — ruling 17 applied as written (#5861 FIX7 — PROPOSED)
+
+The sixth red team found the 3.4.0 glute override (stretch term at its top for any known glute length) was not "the same standard
+as other muscles": it gave shortened-position glute work a lengthened premium no other muscle gets, and squat-depth evidence points
+the other way for the glutes. `STRETCH_CAPS` is now empty and glute rows score length like every muscle (lengthened 5 · mid 3 ·
+short 1). The barbell hip thrust (shortened: B on points) reaches **A** through its direct trial's equivalence with the back squat,
+whose glute row is A (the rubric's +1 for a higher-tier comparator, `plotkin2023_hip_thrust_vs_squat`, already in the library);
+the untested machine form ties it at A. No glute row is S. Tier changes (glutes): hip thrust barbell S→A, hip thrust machine
+S→A, cable kickback A→B, DB hip thrust A→C, conventional / dumbbell / trap-bar deadlift A→B, glute bridge B→C, single-leg glute
+bridge B→C, kneeling banded hip thrust B→C, step-up B→C. Unchanged on review: the DB lateral raise stays B (shortened resistance
+profile; the cable and machine forms rate higher; no verified lengthened-loading trial for the DB form), walking stays
+conditioning C (the objective rating is population-level; this client's brisk walking is credited as moderate work by the
+recorded-intensity path, ruling 12, not by the rating), the machine kickbacks stay A (stable, machine resistance profile).
 
 ## Owner rulings 2026-11-13 (#5861 FIX6, rubric v3.4.0 — PROPOSED)
 

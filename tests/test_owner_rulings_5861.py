@@ -405,16 +405,19 @@ def test_ruling_16_every_served_movement_shows_tier_evidence_and_completeness(we
 
 
 # ── ruling 17: the glute S standard ─────────────────────────────────────────────────────────────────────────────────────────
-def test_ruling_17_glute_s_needs_no_exercise_specific_trial():
+def test_ruling_17_glute_tiers_follow_the_same_standard_as_every_muscle():
+    """#5861 FIX7 (rubric 3.5.0; the sixth red team on ruling 17): "the same evidence + personal-fit standard as other muscles" —
+    glute length is scored like every muscle's (lengthened 5 / mid 3 / short 1), so no shortened glute lift earns a stretch credit
+    and no glute S is manufactured; the barbell hip thrust reaches A through its direct trial's equivalence with the back squat
+    (the rubric's +1 for a higher-tier comparator), and its untested machine form ties it, never above."""
     mv = LIB0["movements"]
     tiers = {k: next((r["tier"] for r in e.get("hypertrophy") or [] if r["target"] == "glutes"), None) for k, e in mv.items()}
-    assert sorted(k for k, t in tiers.items() if t == "S") == ["hip_thrust_barbell", "hip_thrust_machine"]
+    assert sorted(k for k, t in tiers.items() if t == "S") == []
     row = mv["hip_thrust_barbell"]["hypertrophy"][0]
-    assert qr.capped_tier(mv["hip_thrust_barbell"], row) == "S" and not row.get("evidence_adjustment")  # the points path, no +1
-    for k in ("glute_kickback_machine", "cable_kickback", "bulgarian_split_squat_dumbbell"):
-        assert tiers[k] == "A" and not all(qr.s_criteria(mv[k], mv[k]["hypertrophy"][0]).values()), k  # an unmet S criterion
-    with patch.dict(qr.STRETCH_CAPS, {"glutes": ("mid", "x", "the old cap")}):  # control: the old cap -> no glute S on points
-        assert qr.capped_tier(mv["hip_thrust_barbell"], row) != "S"
+    assert qr.capped_tier(mv["hip_thrust_barbell"], row) == "B" and row["evidence_adjustment"]["comparator"] == "squat_barbell"
+    assert tiers["hip_thrust_barbell"] == "A" == tiers["hip_thrust_machine"] and tiers["cable_kickback"] == "B"
+    with patch.dict(qr.STRETCH_CAPS, {"glutes": ("lengthened", "x", "the 3.4.0 override")}):  # control: the override -> S again
+        assert qr.quality_tier(mv["hip_thrust_barbell"], row) == "S"
 
 
 # ── ruling 18: every heuristic labelled, with its block-retro metric ────────────────────────────────────────────────────────
