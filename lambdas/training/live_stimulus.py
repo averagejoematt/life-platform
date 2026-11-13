@@ -64,6 +64,13 @@ WEEK_FLOOR: dict[str, dict[str, Any]] = {
         "basis": "an added low-fatigue isolation slot is two hard sets (the session's isolation effort)",
     },
     "slot_max": {"value": 3, "label": HEURISTIC, "basis": "an existing slot takes sets only up to 3 (4+ in one slot is junk volume)"},
+    "time_margin": {
+        "value": 8,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX8: the routine as written (its warm-ups, a first exposure's find-the-load set) runs ~10 min over the "
+        "prescription's estimate on the sample weeks (71 -> 81 min on one volume morning): the floor adds only while the estimate "
+        "stays this far under the cap, so the time fit never trades a needed template set for a floor set",
+    },
     "keys": {
         "value": {
             "quadriceps": ["leg_extension_machine", "single_leg_extension"],
@@ -143,13 +150,14 @@ def _hard_logged(workouts: Any, ctx: dict[str, Any], since: str, day: str) -> di
                 continue
             prim = live_week.LANDMARK_OF.get(str(row["primary"]), str(row["primary"]))
             out[prim] = out.get(prim, 0.0) + len(hard)
-            for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in row.get("secondary") or []} - {prim}:
-                out[sec] = out.get(sec, 0.0) + 0.5 * len(hard)
+            for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in row.get("secondary") or []} - {prim, "abs"}:
+                out[sec] = out.get(sec, 0.0) + 0.5 * len(hard)  # FIX8 (ruling #8): indirect trunk loading is never an ab set
     return out
 
 
-def _today(rx: dict[str, Any], ctx: dict[str, Any]) -> dict[str, float]:
-    """Landmark muscle -> today's planned hard sets (an exposure capped under hard_rpe does not count)."""
+def _today(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any = None) -> dict[str, float]:
+    """Landmark muscle -> today's planned hard sets (an exposure capped under hard_rpe does not count; #5861 FIX8: nor one whose
+    sets cannot be hard — a first exposure, a layoff return — when the record is given: `hard_capable`)."""
     from training import live_week
 
     lib, cat = ctx.get("lib") or {}, ctx.get("catalog") or {}
@@ -159,21 +167,79 @@ def _today(rx: dict[str, Any], ctx: dict[str, Any]) -> dict[str, float]:
             e.get("live_effort") is not None and int(e["live_effort"]) < float(WEEK_FLOOR["hard_rpe"]["value"])
         ):
             continue
+        if workouts is not None and not e.get("live_familiar") and not hard_capable(str(e.get("movement_key")), ctx, workouts):
+            continue
         n = len(e.get("sets") or [])
         prim = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
         out[prim] = out.get(prim, 0.0) + n
         entry = (lib.get("movements") or {}).get((ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or "") or {}
-        for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in (entry.get("target") or {}).get("secondary") or []} - {prim}:
-            out[sec] = out.get(sec, 0.0) + 0.5 * n
+        for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in (entry.get("target") or {}).get("secondary") or []} - {prim, "abs"}:
+            out[sec] = out.get(sec, 0.0) + 0.5 * n  # FIX8 (ruling #8): indirect trunk loading is never an ab set
     return out
 
 
-def last_session(ctx: dict[str, Any], role: str | None) -> bool:
-    """`role` is the week's last drafted session (the split order without the week's skipped roles)."""
-    from training import program_structure as ps
+UPPER = ("chest", "back", "shoulders", "biceps", "triceps")
+"""#5861 FIX8: the upper-body landmark muscles — topped up on the week's last UPPER session (`floor_muscles`)."""
+
+
+def floor_muscles(ctx: dict[str, Any], role: str | None) -> list[str]:
+    """WEEK_FLOOR's muscles THIS session may top up (#5861 FIX8, a sensible day — the seventh red team: a curl added to leg day
+    after Thursday's allocation took it). A week of 4+ split sessions: the week's last UPPER session (upper / shoulders+arms)
+    carries the upper muscles, the week's last session the lower muscles and the abs (`abs_direct_sets_per_week`); a shorter
+    (full-body) week: its last session carries all. Priority muscles first; [] on any other session."""
+    from training import live_shape, program_structure as ps
 
     left = [r for r in ps.SPLIT_ROLES if r not in set(ctx.get("week_skip") or ())]
-    return bool(left) and role == left[-1]
+    s = live_shape._settings(ctx.get("lib"))
+    base = list(WEEK_FLOOR["muscles"]["value"]) + (["abs"] if int(s.get("abs_direct_sets_per_week", 4) or 0) else [])
+    uppers = [r for r in left if r.startswith("upper") or r == "shoulders_arms"]
+    split = len(left) >= 4 and bool(uppers)
+    mine = [m for m in base if not split or m not in UPPER] if left and role == left[-1] else []
+    mine += [m for m in base if m in UPPER and m not in mine] if split and role == uppers[-1] else []
+    prio = [str(m) for m in s.get("priority_muscles") or []]
+    return sorted(mine, key=lambda m: (m not in prio, base.index(m)))
+
+
+def abs_target(ctx: dict[str, Any]) -> float:
+    """Owner ruling #8 (fix round 8): the week's DIRECT ab sets — `abs_direct_sets_per_week` (default 4), half on a week of 1-3
+    mornings or a dip week (a reduction the ruling allows); 0 turns the abs out of the floor."""
+    from training import live_shape, program_structure as ps
+
+    n = float(live_shape._settings(ctx.get("lib")).get("abs_direct_sets_per_week", 4) or 0)
+    left = [r for r in ps.SPLIT_ROLES if r not in set(ctx.get("week_skip") or ())]
+    short = len(left) <= 3 or ctx.get("week_mode") not in (None, "short")
+    return float(int(n // 2)) if short else n
+
+
+def hard_capable(key: str, ctx: dict[str, Any], workouts: Any) -> str | None:
+    """#5861 FIX8 (the seventh red team: the floor added RPE-7 curls that never counted): `key` can be prescribed at RPE >= 8 —
+    `recent` when its template is logged at least the OD1 exposure-cap count (`layoff_tiers.EXPOSURE_CAPS`) in the block's
+    record (past any re-entry cap), `pattern` when another template of the same library pattern and landmark muscle is (familiar
+    by pattern: `live_familiar` lifts the novelty / layoff cap), else None (the floor never adds a set that cannot be hard)."""
+    from training import fatigue_model as fm, live_week
+    from training.layoff_tiers import EXPOSURE_CAPS
+
+    lib, cat = ctx.get("lib") or {}, ctx.get("catalog") or {}
+    idx = fm.library_index(lib)
+    tid = str((cat.get(key) or {}).get("hevy_template_id_hint") or "").upper()
+    counts: dict[str, int] = {}
+    for w in workouts or []:
+        for x in w.get("exercises") or []:
+            t = str(x.get("template_id") or "").upper()
+            counts[t] = counts.get(t, 0) + 1
+    if tid and counts.get(tid, 0) >= int(EXPOSURE_CAPS["exposures"]):
+        return "recent"
+    if tid and counts.get(tid, 0) and ctx.get("layoff"):  # a first session back (RPE 8) after a layoff (live_progress)
+        return "pattern"
+    mine = idx.get(tid) or {}
+    muscle = live_week.landmark_muscle(key, cat, lib)
+    need = int(live_week.FAMILIAR_SWAP["min_exposures"]["value"])
+    for t, n in counts.items():
+        row = idx.get(t) or {}
+        if t != tid and n >= need and row.get("pattern") and row.get("pattern") == mine.get("pattern"):
+            if live_week.LANDMARK_OF.get(str(row.get("primary")), str(row.get("primary"))) == muscle:
+                return "pattern"
+    return None
 
 
 def _flagged(entry: dict[str, Any], flags: list[dict[str, Any]]) -> bool:
@@ -183,7 +249,9 @@ def _flagged(entry: dict[str, Any], flags: list[dict[str, Any]]) -> bool:
     return any(_stress(entry, j) >= 1 for f in flags for j in f.get("joints") or [])
 
 
-def _iso_for(muscle: str, ctx: dict[str, Any], taken: set[str], flags: list[dict[str, Any]] | None = None) -> str | None:
+def _iso_for(
+    muscle: str, ctx: dict[str, Any], taken: set[str], flags: list[dict[str, Any]] | None = None, workouts: Any = None
+) -> str | None:
     """A servable low-fatigue isolation for `muscle`: WEEK_FLOOR keys first, then the most-logged isolation the library places
     on it (machine / cable first)."""
     from training import live_session, live_week, selection_engine as se
@@ -211,6 +279,7 @@ def _iso_for(muscle: str, ctx: dict[str, Any], taken: set[str], flags: list[dict
             or se.pain_exclusion(entry, ctx.get("overlay"))
             or live_session._servable(key, ctx)
             or _flagged(entry, flags or [])
+            or hard_capable(key, ctx, workouts) is None  # FIX8: only a set that can be hard
         ):
             continue
         return key
@@ -223,7 +292,8 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     from training.program_structure import EXPOSURES
 
     day = str(ctx.get("target_date") or "")
-    if not day or not last_session(ctx, rx.get("session_role")) or live_rules.bad_day(rx) or rx.get("live_fast_cut"):
+    mine = floor_muscles(ctx, rx.get("session_role"))  # FIX8: the week's last upper session tops up the upper muscles
+    if not day or not mine or live_rules.bad_day(rx) or rx.get("live_fast_cut"):
         return []  # a fast cut's answer IS less accessory volume (FAST_CUT): the floor never adds it back
     logged = _hard_logged(workouts, ctx, lb.week_start(day), day)
     from training import live_program
@@ -231,8 +301,7 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     ctx["block_tids"] = {str(x.get("template_id") or "").upper() for w in workouts or [] for x in w.get("exercises") or []}
     flags = live_program.joint_flags(ctx, workouts, (ctx.get("discomfort") or set()) | (ctx.get("light_discomfort") or set()))
     marks = block_model.load_landmarks() or {}
-    prio = [str(m) for m in live_shape._settings(ctx.get("lib")).get("priority_muscles") or []]
-    order = sorted(WEEK_FLOOR["muscles"]["value"], key=lambda m: (m not in prio, WEEK_FLOOR["muscles"]["value"].index(m)))
+    order = mine
     week_sets = sum(
         len(st)
         for st in [
@@ -242,15 +311,18 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
             for x in w.get("exercises") or []
         ]
     )
-    room = lambda add: (set_cap is None or sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= int(set_cap)) and (  # noqa: E731
-        week_sets + sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= live_shape.week_redline()
+    room = (
+        lambda add: (set_cap is None or sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= int(set_cap))
+        and (week_sets + sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= live_shape.week_redline())  # noqa: E731
+        and _time_room(rx, add)
     )
     cat, lib, lines = ctx.get("catalog") or {}, ctx.get("lib") or {}, []
     taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     slot_max, add_n = int(WEEK_FLOOR["slot_max"]["value"]), int(WEEK_FLOOR["add_sets"]["value"])
+    level = "MEV" if ctx.get("week_mode") in (None, "short") else "MV"  # FIX8: a dip week is a recovery week (ruling 2): MV
     for m in order:
-        mev = float((marks.get(m) or {}).get("MEV") or 0)
-        have = logged.get(m, 0.0) + _today(rx, ctx).get(m, 0.0)
+        mev = abs_target(ctx) if m == "abs" else float((marks.get(m) or {}).get(level) or 0)
+        have = logged.get(m, 0.0) + _today(rx, ctx, workouts).get(m, 0.0)
         if not mev or have >= mev:
             continue
         need = int(-(-(mev - have) // 1))
@@ -262,6 +334,7 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
                 and e.get("sets")
                 and e.get("live_effort") is None
                 and live_week.landmark_muscle(e.get("movement_key"), cat, lib) == m
+                and hard_capable(str(e.get("movement_key")), ctx, workouts)  # FIX8: a layoff-capped slot's sets would not count
             ),
             None,
         )
@@ -269,22 +342,25 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
             give = min(need, slot_max - len(slot["sets"]))
             if give > 0 and room(give):
                 slot["sets"].extend(dict(slot["sets"][-1]) for _ in range(give))
+                slot.update({"live_familiar": True} if hard_capable(str(slot["movement_key"]), ctx, workouts) == "pattern" else {})
                 lines.append(
                     f"week floor (live): {m} {have:g} hard sets this week < MEV {mev:g} — {(cat.get(slot['movement_key']) or {}).get('title')} +{give} set(s) (WEEK_FLOOR, heuristic)"
                 )
                 if have + give >= mev:
                     continue
                 have += give  # the slot is full and the muscle still short: a second low-fatigue isolation follows
-        key = _iso_for(m, ctx, taken, flags)
+        key = _iso_for(m, ctx, taken, flags, workouts)
         if key is None:
             continue
+        familiar = hard_capable(key, ctx, workouts) == "pattern"  # FIX8: familiar by pattern -> worked at target
         if not room(add_n):  # no room: a donor whose muscle stays at MEV without it gives its slot (a 3-day week's full-body day)
-            donor = _donor(rx, ctx, logged, marks, m)
+            donor = _donor(rx, ctx, logged, marks, m, workouts)
             if donor is None:
                 continue
             taken.add(key)
             was = (cat.get(donor["movement_key"]) or {}).get("title") or donor["movement_key"]
             donor.update({"movement_key": key, "kind": "accessory", "pattern": None, "intensity": "accessory", "live_added": "week_floor"})
+            donor.update({"live_familiar": True} if familiar else {})
             donor["sets"] = [{"kind": "working", "reps": [10, 15]} for _ in donor.get("sets") or []]
             donor.pop("template_id", None)
             lines.append(
@@ -304,25 +380,51 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
                 "rest_seconds": int(EXPOSURES["accessory"]["rest_seconds"]),
                 "live_added": "week_floor",
                 "live_cost": "low",
+                **({"live_familiar": True} if familiar else {}),
             }
         )
         lines.append(
             f"added (live): {(cat.get(key) or {}).get('title') or key} {add_n} x 10-15 — {m} {have:g} hard sets this week < MEV {mev:g}: the week's last session carries it (WEEK_FLOOR, heuristic)"
         )
+    if "abs" in mine and logged.get("abs", 0.0) < abs_target(ctx):
+        for e in rx["exposures"]:  # FIX8: the week's only direct ab work is never what the time fit drops (`live_week._fixed`)
+            if live_week.landmark_muscle(e.get("movement_key"), cat, lib) == "abs" and e.get("intensity") != "carry":
+                e["live_keep"] = "abs"
     return lines
 
 
-def _donor(rx: dict[str, Any], ctx: dict[str, Any], logged: dict[str, float], marks: dict[str, Any], muscle: str) -> dict[str, Any] | None:
+def _time_room(rx: dict[str, Any], add: int) -> bool:
+    """#5861 FIX8 (WEEK_FLOOR time_margin): `add` more accessory sets keep the prescription's estimate (`session_shape.
+    session_minutes_estimate`) at least time_margin under the session's cap — a floor set the time fit would only trade for a
+    template set another muscle needs is not added (the seventh red team: the abs top-up cost the calves their block)."""
+    from training.program_structure import EXPOSURES
+    from training.session_shape import SESSION_TIME_MODEL, session_minutes_estimate
+
+    cap = float(rx.get("live_session_cap") or session_minutes_estimate(rx.get("exposures") or [])["cap"])
+    per = (int(SESSION_TIME_MODEL["set_seconds"]) + int(EXPOSURES["accessory"]["rest_seconds"])) / 60.0
+    est = float(session_minutes_estimate(rx.get("exposures") or [])["lifting_minutes"]) + add * per
+    return est <= cap - float(WEEK_FLOOR["time_margin"]["value"])
+
+
+def _donor(
+    rx: dict[str, Any], ctx: dict[str, Any], logged: dict[str, float], marks: dict[str, Any], muscle: str, workouts: Any = None
+) -> dict[str, Any] | None:
     """A partner anchor or accessory today whose landmark muscle stays at or over its MEV (and over the needy muscle's count)
     without it — the slot a muscle under MEV may take when the session has no room; the biggest surplus first."""
     from training import live_week
 
     lib, cat = ctx.get("lib") or {}, ctx.get("catalog") or {}
-    today = _today(rx, ctx)
+    today = _today(rx, ctx, workouts)
     best, surplus = None, 0.0
+    fixed = live_week._fixed(rx)  # #5861 FIX8: an owner-pinned slot (the kettlebell slot) is never a donor
     for e in rx.get("exposures") or []:
         if not (e.get("live_full_body") or e.get("kind") == "accessory") or e.get("intensity") == "carry" or e.get("live_added"):
             continue
+        if str(e.get("movement_key")) in fixed or e.get("live_kb"):
+            continue
+        entry = (lib.get("movements") or {}).get((ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or "") or {}
+        if (entry.get("target") or {}).get("primary") == "rear_delts":
+            continue  # owner ruling #9: the rear delt is read on its own — its slot never donates to another muscle
         d = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
         mev = float((marks.get(d) or {}).get("MEV") or 0)
         left = logged.get(d, 0.0) + today.get(d, 0.0) - len(e.get("sets") or [])

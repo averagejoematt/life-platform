@@ -85,4 +85,14 @@ BUILDER_CHANGE_LOG = [
         "(and the barbell bench's wrist) rated by implement; `programming_settings.hard_conditioning_doses` 1 (owner ruling).",
         "rule": "configuration and data only — status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.3.5",
+        "date": "2026-11-13",
+        "by": "#5861 FIX8 (the seventh red team, PROPOSAL for the owner's review with the library)",
+        "what": "`programming_settings.abs_direct_sets_per_week` 4 (owner ruling #8, fix round 8): direct ab sets count in the "
+        "weekly volume — ~4 challenging DIRECT sets a week (loaded ab work or trunk stabilisation), fewer on a 1-3 morning week, "
+        "none added on a strained day; indirect trunk loading from compounds never counts; the week's only direct ab work is never "
+        "what the time fit drops.",
+        "rule": "an owner-ruled default — configuration only; status stays proposed until the owner approves the library",
+    },
 ]

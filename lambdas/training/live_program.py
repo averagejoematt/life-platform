@@ -133,6 +133,8 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
     "symptom_line": "",  # #5861 FIX6: owner ruling 10 — no symptom warning line (the `extended` preset stays available)
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
+    "abs_direct_sets_per_week": 4,  # #5861 FIX8, owner ruling #8: ~4 challenging DIRECT ab sets a week (0 = off)
+    "sequence_rule_from": None,  # #5861 FIX8, ruling #4: was never read (absent here) — None = the Monday after `approved_on`
 }
 """Library-carried settings (`config/exercise_library.json` `programming_settings`), read with these defaults when absent.
 `session_cap_includes_cardio` False keeps today's 75-min LIFTING cap with the cardio block apart; True makes the cap cover lifting
@@ -771,7 +773,7 @@ def load_decision(
     if noisy:
         return {"mode": "hold", "pct": 0, "why": "trend down, effort fine"}
     if state in LOAD_POLICY["hold_states"]["value"] or mark.get("hold"):
-        return {"mode": "hold", "pct": 0, "why": "recovery first"}
+        return {"mode": "hold", "pct": 0, "why": "first session back" if e.get("live_first_back") else "recovery first"}
     if trend == "stalled":
         return {"mode": "hold", "pct": 0, "why": "stalled, no step"}
     if rpe is not None and float(rpe) >= float(LOAD_POLICY["grind_rpe"]["value"]) and reps and rep_lo and int(reps) <= int(rep_lo):
@@ -794,8 +796,7 @@ def guard_loads(
     Never raises a load. Returns the decisions (also on `rx[live_session.MARK]["load_guard"]`)."""
     if not is_live(rx):
         return []
-    from training import live_session as ls, live_week
-    from training.exercise_history import previous_load
+    from training import live_progress, live_session as ls, live_week
 
     live_week.kb_seed(blocks, rx, history_index, movements, target_date, rationale)  # the bell he swings, never "find the load"
     trends = (rx.get(ls.MARK) or {}).get("trends") or {}
@@ -816,15 +817,24 @@ def guard_loads(
         # #5861 FIX7: the PRESCRIBED floor, not one the double progression just raised (#5057 "aim for more reps"): reps under a
         # floor raised today are the progression's ask, never effort evidence of a regression (the multi-week simulation's cut)
         reps += [int(s["reps"][0]) for s in e.get("sets") or [] if s.get("reps")]
-        prev = previous_load(history_index, tid, target_date)
+        hi_reps = max((int(getattr(s, "rep_range_end", 0) or 0) for s in work), default=0)
+        # #5861 FIX8: every reference (hold, cut base, effort evidence) is this SESSION ROLE's own last top set — never a volume
+        # day's lighter load on a heavy day; none in the window -> no load change (live_progress.ROLE_REF)
+        prev = live_progress.reference(rx, history_index, tid, target_date, min(reps) if reps else None, hi_reps)
         d = load_decision(e, trends.get(tid), prev, state, min(reps) if reps else None)
-        if not d or prev is None:
+        second = live_progress.second_lift(e, prev, min(reps) if reps else None, entry.get("equipment"))  # FIX8: its own cap's load
+        if prev is None:
             continue
         prev_kg = float(prev["lb"]) * 0.45359237
-        if d["mode"] == "down":  # #5861 FIX7: a cut is taken off this rep band's own last top load, never a volume day's lighter one
-            hi_reps = max((int(getattr(s, "rep_range_end", 0) or 0) for s in work), default=0)
-            prev_kg = band_top_kg(history_index.get(tid) or [], target_date, hi_reps) or prev_kg
-        cap = prev_kg if d["mode"] == "hold" else _floor_to_implement(prev_kg * (1 - d["pct"] / 100.0), entry.get("equipment"))
+        cap = (
+            1e9
+            if d is None
+            else prev_kg if d["mode"] == "hold" else _floor_to_implement(prev_kg * (1 - d["pct"] / 100.0), entry.get("equipment"))
+        )
+        if second and float(second["cap_kg"]) < cap:
+            d, cap = second, float(second["cap_kg"])
+        if d is None:
+            continue
         top = max(float(s.weight_kg) for s in work)
         if (top - cap) / 0.45359237 < 0.5:  # under half a pound apart: the same load on the rack
             continue
@@ -846,28 +856,18 @@ def guard_loads(
         lb = lambda kg: f"{round(kg / 0.45359237 * 2) / 2:g} lb"  # noqa: E731
         rationale.append(
             f"load (live): {(entry.get('title') or b.movement_key)} {lb(top)} -> {lb(cap)} — {d['mode']}"
-            + (f" {d['pct']}% under the last top set ({prev['lb']:g} lb)" if d["pct"] else " at the last top set")
-            + f": {d['why']} (last {prev['lb']:g} lb x {prev.get('reps')} @ RPE {prev.get('rpe')}; LOAD_POLICY, heuristic)"
+            + (
+                f" {d['pct']}% under the last top set ({prev['lb']:g} lb)"
+                if d["pct"]
+                else "" if d["mode"] == "cap" else " at the last top set"
+            )
+            + f": {'the second lift, its own effort cap (SECOND_LIFT)' if d.get('second') else d['why']} (last "
+            + f"{(prev.get('role') or 'same-band').replace('_', ' ')} {prev['lb']:g} lb x {prev.get('reps')} @ RPE {prev.get('rpe')}; "
+            + "LOAD_POLICY, ROLE_REF, heuristic)"
         )
     if ls.MARK in rx:
         rx[ls.MARK]["load_guard"] = out
     return out
-
-
-def band_top_kg(rows: list[dict[str, Any]], target_date: str, rep_hi: int, days: int = 14) -> float:
-    """The top set of this lift's LATEST exposure in the last `days` whose top-set reps sit in the exposure's rep band (at most
-    rep_hi + 2): the base a cut is taken from when the latest exposure was another day's lighter, higher-rep work (0.0 = none)."""
-    from common.pacific_time import shift_day_key
-
-    since = shift_day_key(target_date, -days)
-    for r in sorted(rows or [], key=lambda r: str(r.get("date") or ""), reverse=True):
-        if not since <= str(r.get("date") or "") < target_date:
-            continue
-        sets = [x for x in r.get("sets") or [] if x.get("weight_kg") and x.get("reps")]
-        top = max(sets, key=lambda x: float(x["weight_kg"]), default=None)
-        if top and rep_hi and int(top["reps"]) <= rep_hi + 2:
-            return float(top["weight_kg"])
-    return 0.0
 
 
 def _floor_to_implement(kg: float, equipment: str | None) -> float:
@@ -887,6 +887,10 @@ def _floor_to_implement(kg: float, equipment: str | None) -> float:
 def _clause(d: dict[str, Any]) -> str:
     from training import session_block
 
+    if d.get("second"):  # #5861 FIX8: the capped second lift quotes its own day's last set
+        from training.live_progress import second_clause
+
+        return second_clause(d)
     if d.get("stall"):
         lo, hi = d["stall"]
         return f"Now aiming {lo}–{hi}: stalled, lighter reset."
@@ -985,7 +989,8 @@ def aerobic(inputs: Any) -> dict[str, Any] | None:
     line = rec.get("line") or "no recorded walks read: intensity unknown, nothing credited"
     if w.get("steps_per_day") is not None:
         line += f"; steps ~{w['steps_per_day']}/day reported as activity, not aerobic credit"
-    return {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": w["moderate_min_per_wk"], "line": line}
+    out = {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": w["moderate_min_per_wk"], "line": line}
+    return out | {"steps_per_day": w.get("steps_per_day")}  # #5861 FIX8: ruling 12 — unknown intensity is never a deficit
 
 
 def rate_line(fatigue: dict[str, Any] | None, sleep_hours: Any) -> str | None:

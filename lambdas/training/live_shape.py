@@ -76,7 +76,26 @@ WALK_PROMPT: dict[str, dict[str, Any]] = {
         "addition); under the default cap a larger gap still earns an easy ride, a smaller one is the walk's",
     },
     "min_minutes": {"value": 15, "label": HEURISTIC, "basis": "a gap under 15 minutes is noise against the recorded walking: no prompt"},
+    "active_steps": {
+        "value": 7500,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX8 (owner ruling 12; the seventh red team: a 14k-step walker served easy rides and a 40-min walk prompt): "
+        "when the recorded workouts leave the week short but the steps average at least ~7,500/day (the conventional 'somewhat "
+        "active' line, a population heuristic), the aerobic minutes are UNKNOWN, not missing — reported, never turned into a gap. "
+        "A purposeful aerobic prompt needs short recorded minutes AND low steps",
+    },
 }
+
+
+def intensity_unknown(aer: dict[str, Any] | None) -> bool:
+    """WALK_PROMPT active_steps (ruling 12): the recorded minutes leave the week short, but the steps say he is moving — the
+    intensity is unknown, so there is no gap to close."""
+    from training import cardio_model
+
+    a = aer or {}
+    steps = a.get("steps_per_day")
+    short = int(a.get("walking_min_per_wk") or 0) < int(cardio_model.WEEKLY_MODERATE_MIN[0])
+    return bool(short and steps is not None and float(steps) >= float(WALK_PROMPT["active_steps"]["value"]))
 
 
 def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -292,25 +311,55 @@ def next_drop(
         if lm and m != "abs" and left >= float(lm["MEV"]):
             cand = (left - float(lm["MEV"]), i)
             best = cand if best is None or cand > best else best
-    i = best[1] if best else acc[-1]
+    if best is None:  # #5861 FIX8: none stays at MEV — the LOWEST-PRIORITY accessory goes (a non-priority muscle, the one
+        prio = [str(p) for p in _settings(lib).get("priority_muscles") or []]  # nearest its MEV after the drop), never last-listed
+
+        def harm(i: int) -> tuple[int, float, int]:
+            m = live_week.landmark_muscle(blocks[i].movement_key, movements, lib)
+            left = week[m] - taken[m] - warmup_sets.working_set_count(blocks[i].sets)
+            return (int(m in prio), -(left - float((marks.get(m) or {}).get("MEV") or 0)), -i)
+
+        best = (0.0, min(acc, key=harm))
+    i = best[1]
     m = live_week.landmark_muscle(blocks[i].movement_key, movements, lib)
     taken[m] += warmup_sets.working_set_count(blocks[i].sets)
     return i
+
+
+def precious(block: Any, movements: dict[str, Any], taken: Counter, rx: dict[str, Any] | None = None) -> bool:
+    """#5861 FIX8: dropping `block` would take a PRIORITY muscle under its MEV for the week (`taken` already counts it off) —
+    the time fit trims the anchors' back-offs (TIME_FIT) before it goes."""
+    from training import block_model, live_week, selection_engine as se
+    from training.live_rulings import ARMS_FLOOR
+
+    lib = se.load_library_failsoft() or {}
+    m = live_week.landmark_muscle(block.movement_key, movements, lib)
+    prio = [str(p) for p in _settings(lib).get("priority_muscles") or []]
+    mark = (rx or {}).get("live_session") or {}
+    marks = (block_model.load_landmarks() or {}).get(m) or {}
+    left = live_week.week_sets(movements, lib, rx)[m] - taken[m]
+    if m in prio and left < float(marks.get("MEV") or 0):
+        return True
+    # a week without shoulders+arms (ruling 3): its arms floor — MV on a dip week, MEV on a short week — is a floor too
+    arms = "shoulders_arms" in set(mark.get("week_skip") or ()) and m in ARMS_FLOOR["muscles"]["value"]
+    return arms and left < float(marks.get("MV" if mark.get("week_mode") not in (None, "short") else "MEV") or 0)
 
 
 # ── 3. order and the heavy pull ──────────────────────────────────────────────
 def order_lower_volume(rx: dict[str, Any]) -> list[str]:
     """IN PLACE: on the lower-volume day the squat anchor comes before the hinge anchor (the RDL tires the erectors the squat
     needs). Returns the rationale lines."""
-    if rx.get("session_role") != "lower_volume":
-        return []
     ex = rx["exposures"]
+    full = any(e.get("live_full_body") for e in ex)  # #5861 FIX8: a full-body day's guest squat and hinge too (seventh red team)
+    if rx.get("session_role") != "lower_volume" and not full:
+        return []
     hinge = next((i for i, e in enumerate(ex) if e.get("kind") == "anchor" and e.get("pattern") == "hinge"), None)
     squat = next((i for i, e in enumerate(ex) if e.get("kind") == "anchor" and e.get("pattern") == "squat"), None)
     if hinge is None or squat is None or squat < hinge:
         return []
     ex.insert(hinge, ex.pop(squat))
-    return ["order (live): the squat before the hinge on lower volume — the RDL tires the erectors the squat needs"]
+    day = "on lower volume" if rx.get("session_role") == "lower_volume" else "on a full-body day"
+    return [f"order (live): the squat before the hinge {day} — the RDL tires the erectors the squat needs"]
 
 
 def deadlift_shape(rx: dict[str, Any], lib: dict[str, Any] | None = None) -> list[str]:
@@ -337,7 +386,7 @@ def aerobic_gap(live: dict[str, Any], today_minutes: int = 0) -> int | None:
     from training import cardio_model, live_balance
 
     aer = live.get("aerobic") or {}
-    if not aer:
+    if not aer or intensity_unknown(aer):  # FIX8 (ruling 12): steps of unknown intensity are never a manufactured deficit
         return None
     since, day = live_balance.week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
     done = sum(
@@ -411,3 +460,52 @@ def kb_under_strain(rx: dict[str, Any]) -> list[str]:
         return []
     rx["exposures"] = [e for e in rx["exposures"] if e.get("slot") != KB_SLOT_KEY]
     return [f"dropped (live): the kettlebell slot — {fat.get('state') or fat.get('action')} day (kb_slot_under_strain=drop)"]
+
+
+# ── 5. the 75-minute ceiling on a short week (#5861 FIX8) ───────────────────
+TIME_FIT: dict[str, dict[str, Any]] = {
+    "guest_min_sets": {
+        "value": 1,
+        "label": "heuristic",
+        "basis": "#5861 FIX8 (seventh red team: 1-2 morning weeks drafted 78-83 min): a full-body day's GUEST anchors (the partner "
+        "role's, `live_rules.full_body`) give their back-off sets first, down to the top set — the session's own anchors keep theirs",
+    },
+    "anchor_min_sets": {
+        "value": 2,
+        "label": "heuristic",
+        "basis": "#5861 FIX8: when every accessory has gone and the routine still runs long, each anchor gives back-off sets down to "
+        "its top set and one more (the deload shape's compound floor, `live_program.DELOAD_SHAPE` compound_sets) — never past the cap",
+    },
+}
+
+
+def trim_anchor_backoffs(
+    blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], cap: int, guests: bool, priority: bool = True
+) -> list[str]:
+    """IN PLACE (TIME_FIT, live only — `live_session.fit_routine`): back-off sets come off the anchors, last-listed first, until the
+    routine fits `cap` — the full-body day's guest anchors (down to guest_min_sets) when `guests`, else every anchor (down to
+    anchor_min_sets), a PRIORITY muscle's anchor last and only when `priority`. Returns the titles that gave sets."""
+    from training import warmup_sets
+    from training.session_shape import routine_minutes
+
+    guest = {str(e.get("movement_key")) for e in rx.get("exposures") or [] if e.get("live_full_body")}
+    floor = int(TIME_FIT["guest_min_sets" if guests else "anchor_min_sets"]["value"])
+    pool = [b for b in blocks if str(b.rationale_tag or "").startswith("anchor:") and (str(b.movement_key) in guest if guests else True)]
+    from training import live_week, selection_engine as se
+
+    lib = se.load_library_failsoft() or {}
+    prio = {str(m) for m in _settings(lib).get("priority_muscles") or []}
+    # a priority muscle's anchor (the bench for the chest, the squat for the quadriceps) gives its back-offs last
+    pool = [b for b in pool if priority and live_week.landmark_muscle(b.movement_key, movements, lib) in prio] + [
+        b for b in pool if live_week.landmark_muscle(b.movement_key, movements, lib) not in prio
+    ]
+    gave: list[str] = []
+    while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
+        pick = next((b for b in reversed(pool) if warmup_sets.working_set_count(b.sets) > floor), None)
+        if pick is None:
+            break
+        last = max(i for i, s in enumerate(pick.sets) if not warmup_sets.is_warmup(s))
+        pick.sets = list(pick.sets[:last]) + list(pick.sets[last + 1 :])
+        title = str((movements.get(pick.movement_key) or {}).get("title") or pick.movement_key)
+        gave.append(title)
+    return gave

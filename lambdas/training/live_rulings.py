@@ -315,14 +315,9 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
     done: dict[str, float] = {}
     for m, n in done_raw.items():
         done[live_week.LANDMARK_OF.get(m, m)] = done.get(live_week.LANDMARK_OF.get(m, m), 0.0) + float(n)
-    today: dict[str, float] = {}
-    for e in rx["exposures"]:
-        n = len(e.get("sets") or [])
-        prim = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
-        today[prim] = today.get(prim, 0.0) + n
-        entry = (lib.get("movements") or {}).get((ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or "") or {}
-        for sec in {live_week.LANDMARK_OF.get(str(s), str(s)) for s in (entry.get("target") or {}).get("secondary") or []} - {prim}:
-            today[sec] = today.get(sec, 0.0) + n * 0.5
+    from training import live_stimulus
+
+    today = live_stimulus._today(rx, ctx, workouts)  # #5861 FIX8: today's HARD sets — a layoff-capped slot does not count
     marks, cap, lines = block_model.load_landmarks() or {}, int(ARMS_FLOOR["add_per_slot"]["value"]), []
     level = "MEV" if ctx.get("week_mode") in (None, "short") else "MV"  # a dip week is a recovery week: maintenance is the floor
     for m in ARMS_FLOOR["muscles"]["value"]:
@@ -332,12 +327,25 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
             (
                 e
                 for e in rx["exposures"]
-                if e.get("kind") == "accessory" and e.get("sets") and live_week.landmark_muscle(e.get("movement_key"), cat, lib) == m
+                if e.get("kind") == "accessory"
+                and e.get("sets")
+                and live_week.landmark_muscle(e.get("movement_key"), cat, lib) == m
+                and live_stimulus.hard_capable(str(e.get("movement_key")), ctx, workouts)  # FIX8: a capped slot's sets never count
             ),
             None,
         )
-        if have >= mev or slot is None:
+        if have >= mev:
             continue
+        if slot is None:  # #5861 FIX8 (seventh red team: a dip week left the shoulders at 3 hard sets six weeks running)
+            slot = _arms_slot(rx, ctx, workouts, m)
+            if slot is None:
+                continue
+            lines.append(
+                f"added (live): {(cat.get(slot['movement_key']) or {}).get('title')} 2 x 10-15 — {m} has no slot today (ARMS_FLOOR)"
+            )
+        slot["live_keep"] = m  # FIX8: the floor's slot is what the time fit and the set cap take last
+        if live_stimulus.hard_capable(str(slot.get("movement_key")), ctx, workouts) == "pattern":
+            slot["live_familiar"] = True  # familiar by pattern: worked at target, not the layoff cap
         from training.live_balance import SLOT_MAX  # #5861 FIX7: the top-up respects the 3-set slot maximum
 
         add = min(cap, int(-(-(mev - have) // 1)), max(0, SLOT_MAX - len(slot["sets"])))
@@ -350,6 +358,62 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
             "set(s), counted from the record (ARMS_FLOOR, heuristic)"
         )
     return lines
+
+
+def arms_keep(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str]:
+    """IN PLACE, #5861 FIX8 (the seventh red team: an alternate-week misser sat at 3 shoulder hard sets six weeks running): in a
+    week that skips shoulders+arms, each upper session keeps ONE hard-capable isolation slot per ARMS_FLOOR muscle (`live_keep`):
+    the time fit trims the anchors' back-offs (live_shape.TIME_FIT) before it drops one. Returns the rationale lines."""
+    if "shoulders_arms" not in set(ctx.get("week_skip") or ()) or not str(rx.get("session_role") or "").startswith("upper"):
+        return []
+    from training import live_stimulus, live_week
+
+    lib, cat, kept = ctx.get("lib") or {}, ctx.get("catalog") or {}, []
+    for m in ARMS_FLOOR["muscles"]["value"]:
+        slot = next(
+            (
+                e
+                for e in rx["exposures"]
+                if e.get("kind") == "accessory"
+                and e.get("sets")
+                and live_week.landmark_muscle(e.get("movement_key"), cat, lib) == m
+                and live_stimulus.hard_capable(str(e.get("movement_key")), ctx, workouts)
+            ),
+            None,
+        )
+        if slot is not None and not slot.get("live_keep"):
+            slot["live_keep"] = m
+            if live_stimulus.hard_capable(str(slot.get("movement_key")), ctx, workouts) == "pattern":
+                slot["live_familiar"] = True  # familiar by pattern: worked at target
+            kept.append(f"{m}: {(cat.get(slot['movement_key']) or {}).get('title') or slot['movement_key']}")
+    return [f"arms kept (live): {'; '.join(kept)} — a week without the arms day keeps one slot each (ARMS_FLOOR)"] if kept else []
+
+
+def _arms_slot(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, muscle: str) -> dict[str, Any] | None:
+    """#5861 FIX8: a two-set low-fatigue isolation for an ARMS_FLOOR muscle with no slot today (`live_stimulus._iso_for`: one
+    that can be hard), appended to the session; None when nothing is servable."""
+    from training import live_stimulus
+    from training.program_structure import EXPOSURES
+
+    taken = {str(e.get("movement_key")) for e in rx["exposures"]}
+    key = live_stimulus._iso_for(muscle, ctx, taken, None, workouts)
+    if key is None:
+        return None
+    e = {
+        "kind": "accessory",
+        "pattern": None,
+        "slot": f"arms_floor_{muscle}",
+        "intensity": "accessory",
+        "movement_key": key,
+        "resolution_note": None,
+        "sets": [{"kind": "working", "reps": [10, 15]} for _ in range(2)],
+        "rest_seconds": int(EXPOSURES["accessory"]["rest_seconds"]),
+        "live_added": "arms_floor",
+        "live_cost": "low",
+    }
+    e |= {"live_familiar": True} if live_stimulus.hard_capable(key, ctx, workouts) == "pattern" else {}
+    rx["exposures"].append(e)
+    return e
 
 
 def _role_sets(rows: list[dict[str, Any]], deltas: dict[tuple[str, str], int], role: str) -> int:
@@ -402,6 +466,8 @@ def purposeful_cardio(kind: str, live: dict[str, Any], hard_kinds: tuple[str, ..
         ]
     tracked = aer.get("line") or "walking outside the gym is tracked apart"
     why = "the recorded aerobic minutes cover the week" if gap is not None else "no aerobic record read — nothing is assumed"
+    if gap is None and live_shape.intensity_unknown(aer):  # FIX8 (ruling 12): steps reported, intensity unknown, no deficit
+        why = f"steps ~{aer.get('steps_per_day')}/day, intensity unknown — reported, not a deficit"
     return False, [f"cardio (live): no {kind} block — no named purpose today: {why} ({tracked})"]
 
 

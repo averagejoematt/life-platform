@@ -276,7 +276,11 @@ def for_live_draft(
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
         lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
+        from training import live_progress  # #5861 FIX8 (owner ruling #10): each lift's first session back after 10+ days off
+
+        back = live_progress.first_back(out, ctx, block_workouts)  # before the plan: no stall reset on a first session back
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
+        lines += back
         from training import live_stimulus  # #5861 FIX7: a fast cut with broad regression answers with volume, never load
 
         lines += live_stimulus.fast_cut(out, sig, inputs)
@@ -285,7 +289,7 @@ def for_live_draft(
         lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
         from training import live_rulings  # #5861 FIX6 ruling 3: AFTER the dip's lighter week, so it is never undone
 
-        lines += live_rulings.arms_top_up(out, ctx, block_workouts)
+        lines += live_rulings.arms_top_up(out, ctx, block_workouts) + live_rulings.arms_keep(out, ctx, block_workouts)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -334,6 +338,7 @@ def for_live_draft(
         ),
         "conditioning_host": live_balance.conditioning_host((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),
         "week_skip": list((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),  # FIX6: the time trim's week count
+        "week_mode": (ctx or {}).get("week_mode"),  # FIX8: the arms floor's level in the time fit (`live_shape.precious`)
     }
     rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
@@ -343,6 +348,13 @@ def for_live_draft(
 
         rate += live_stimulus.rate_suffix(out)  # FIX7: the advisory line names the fast-cut answer
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
+    from training import live_progress
+
+    tids = {
+        str((catalog_movements or {}).get(str(e.get("movement_key")), {}).get("hevy_template_id_hint") or "").upper()
+        for e in out["exposures"]
+    }
+    out[MARK]["refs"] = live_progress.role_refs(block_workouts, tids - {""})  # FIX8: the load guard's role-keyed references
     return out
 
 
@@ -457,20 +469,33 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     before, dropped = shape["lifting_minutes"], []
     trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
     gone = Counter(trimmed)  # #5861 FIX4: what the drop order counts as off (the trimmed sets + every dropped accessory)
+    guests = live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=True)  # FIX8: a full-body day's guest back-offs
+    fixed = live_week._fixed(rx)
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
-        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx), rx)  # FIX4: largest surplus over MEV first
+        idx = live_shape.next_drop(blocks, movements, gone, fixed, rx)  # FIX4: largest surplus over MEV first
         if idx is None:
             break
+        # FIX8: before a kept slot (a floor's, the only ab work) or a priority muscle's last sets under MEV go, the back-offs
+        if str(blocks[idx].movement_key) in fixed or live_shape.precious(blocks[idx], movements, gone, rx):
+            guests += live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False, priority=False)
+            if routine_minutes(blocks, movements)["lifting_minutes"] <= cap:
+                break
         cut = blocks.pop(idx)
         _unpair(blocks, getattr(cut, "superset_id", None))
         dropped.append((movements.get(cut.movement_key) or {}).get("title") or cut.movement_key)
     dropped += live_shape.no_single_sets(blocks, movements)
+    anchors = live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False)  # FIX8: the ceiling holds, always
     from training import warmup_sets
 
     new = program_structure.enforce_session_shape(blocks, movements) | {
         "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     }
     how = [", ".join(f"{n} {m}" for m, n in sorted(trimmed.items())) + " set(s) off (surplus over MEV first)"] if trimmed else []
+    how += (  # FIX8: before "dropped …", which ends the line's list of whole exercises
+        [f"anchor back-offs off: {', '.join(f'{n} {k}' for k, n in Counter(guests + anchors).items())} (TIME_FIT)"]
+        if guests + anchors
+        else []
+    )
     how += [f"dropped {', '.join(dropped)}"] if dropped else []
     line = f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min lifting cap — {'; '.join(how)} -> ~{new['lifting_minutes']} min"
     rx[MARK]["lines"].append(line)  # `rationale_lines` writes it

@@ -94,7 +94,14 @@ def test_ruling_1_the_whole_morning_fits_and_no_needed_set_is_cut_for_cardio(wee
         assert all(p["morning_minutes"] <= 75.05 for p in w["m"]["per_session"]), name
         cuts = [ln for ln in _room_cuts(w["week"]) if "over MAV" not in ln or "dropped" in ln]
         assert cuts == [], name
-    old = _week("e_short_week", settings={"cardio_room_takes": "as_fix5"})  # control: the fifth round's room-making cuts sets
+    # control: the fifth round's room-making cuts sets (#5861 FIX8: on a LOW-steps week — a high-steps week of unknown
+    # intensity has no aerobic gap to make room for, ruling 12; and the arms floor's kept slots unprotected, `arms_keep`)
+    old = _week(
+        "e_short_week",
+        {(lr, "arms_keep"): lambda rx, ctx, workouts: []},
+        settings={"cardio_room_takes": "as_fix5"},
+        profile=PROFILES["e_short_week"] | {"steps_per_day": 4000},
+    )
     assert _room_cuts(old["week"])
 
 
@@ -165,8 +172,9 @@ def test_ruling_5_squat_and_deadlift_are_never_both_maximal_and_the_lead_alterna
     assert lh["deadlift_barbell"]["working_sets"] == 2  # top set + one back-off (heavy_day_deadlift_shape)
     nxt = _week(
         "a",
-        profile=PROFILES["a_large_deficit_experienced"]
-        | {"days": [sw._day(d, 7) for d in PROFILES["a_large_deficit_experienced"]["days"]]},
+        profile=PROFILES["a_large_deficit_experienced"]  # the record moves with the week (#5861 FIX8: else a 10-day gap is a
+        | {"days": [sw._day(d, 7) for d in PROFILES["a_large_deficit_experienced"]["days"]]}  # return week, every lift at 7-8)
+        | {"as_of": sw._day(PROFILES["a_large_deficit_experienced"]["as_of"], 7)},
     )
     lh2 = {x["key"]: x for x in _lifts(nxt["week"], "lower_heavy")}
     assert _effort_top(lh2["squat_barbell"]["hevy_note"]) == 9 and _effort_top(lh2["deadlift_barbell"]["hevy_note"]) == 8  # alternates
@@ -509,7 +517,15 @@ def test_ruling_3_the_last_upper_session_tops_up_an_arm_the_week_actually_left_u
         "session_role": "upper_volume",
         "exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working", "reps": [8, 15]}] * 2}],
     }
-    lines = lr.arms_top_up(rx, ctx, [])
+    tid = str(cat["db_curl"]["hevy_template_id_hint"]).upper()  # #5861 FIX8: a slot tops up only when its sets can be hard —
+    rec = [  # logged 3 times before this week (past any re-entry cap), so the added set counts
+        {"date": d, "title": "UPPER-VOLUME", "exercises": [{"template_id": tid, "sets": [{"weight_kg": 12.0, "reps": 10, "rpe": 8.0}]}]}
+        for d in ("2026-10-29", "2026-11-05", "2026-11-12")
+    ]
+    lines = lr.arms_top_up(rx, ctx, rec)
     assert len(rx["exposures"][0]["sets"]) == 3 and lines and "biceps" in lines[0]  # 2 today < MEV 8 -> +1: SLOT_MAX 3 (FIX7)
     normal = copy.deepcopy(rx) | {"exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working"}] * 2}]}
-    assert lr.arms_top_up(normal, ctx | {"week_skip": ()}, []) == [] and len(normal["exposures"][0]["sets"]) == 2  # control
+    assert lr.arms_top_up(normal, ctx | {"week_skip": ()}, rec) == [] and len(normal["exposures"][0]["sets"]) == 2  # control
+    capped = copy.deepcopy(rx) | {"exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working"}] * 2}]}
+    lr.arms_top_up(capped, ctx, [])  # FIX8 control: never logged -> its sets could not be hard -> no top-up onto it
+    assert len(capped["exposures"][0]["sets"]) == 2

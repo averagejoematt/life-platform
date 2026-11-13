@@ -54,8 +54,8 @@ LANDMARKS = json.loads((REPO / "config" / "training_landmarks.json").read_text()
 PROFILES = sw.load_profiles()
 
 
-def _week(name: str, patches: dict | None = None, settings: dict | None = None, record=None) -> dict:
-    prof = PROFILES[name]
+def _week(name: str, patches: dict | None = None, settings: dict | None = None, record=None, profile: dict | None = None) -> dict:
+    prof = profile or PROFILES[name]
     with patch.dict(sw.SETTINGS, settings or {}):
         world = sw.build_world(prof, "approved")
         if record is not None:
@@ -309,10 +309,20 @@ def test_an_adherence_dip_changes_the_week_fewer_shorter_sessions_anchored():
     full_anchor = {
         s["role"]: [x["working_sets"] for x in s["lifts"] if str(x["tag"]).startswith("anchor:")] for s in full["week"]["sessions"]
     }
+    from training import live_shape
+
+    keep = int(live_shape.TIME_FIT["anchor_min_sets"]["value"])
     for s in w["sessions"]:
-        assert [x["working_sets"] for x in s["lifts"] if str(x["tag"]).startswith("anchor:")] == full_anchor[s["role"]], s["role"]
+        # #5861 FIX8 (the seventh red team: a dip week left the shoulders at 3 hard sets): the anchors are whole UNLESS the 60-min
+        # cap would otherwise drop the arms floor's kept slot — then a back-off goes first (TIME_FIT), never below top + one
+        mine = [x["working_sets"] for x in s["lifts"] if str(x["tag"]).startswith("anchor:")]
+        assert len(mine) == len(full_anchor[s["role"]]) and all(n >= min(f, keep) for n, f in zip(mine, full_anchor[s["role"]])), s["role"]
+        if mine != full_anchor[s["role"]]:
+            assert any("anchor back-offs off" in ln and "TIME_FIT" in ln for ln in s["rationale"]), s["role"]
         acc = [x for x in s["lifts"] if str(x["tag"]).startswith("accessory:") and not str(x["tag"]).endswith(":carry")]
-        assert all(x["working_sets"] <= lb.ADHERENCE_DIP["accessory_sets"]["value"] for x in acc), s["role"]
+        # #5861 FIX8: except a slot the arms floor topped up to maintenance (ruling 3's MV on a dip week, "top-up (live)")
+        topped = {ln.split(" — ", 1)[1].split(" +", 1)[0] for ln in s["rationale"] if ln.startswith("top-up (live)") and " — " in ln}
+        assert all(x["working_sets"] <= lb.ADHERENCE_DIP["accessory_sets"]["value"] or x["title"] in topped for x in acc), s["role"]
     sets = lambda wk: sum(x["working_sets"] for x in _lifts(wk))  # noqa: E731
     assert sets(w) <= 0.75 * sets(full["week"])  # meaningfully less, not two sets off
     # control: today's answer (two sets off, five full sessions) through the setting
@@ -361,7 +371,7 @@ def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
     # #5861 FIX6: the fifth round's gap rule, held under its own setting — owner ruling 4 (purposeful cardio only) is the
     # default and serves NO easy block at all (`test_owner_rulings_5861.py`)
     old = {"cardio_purpose_only": False, "session_cap_includes_cardio": False, "cardio_room_takes": "as_fix5"}
-    week = _walker_week(10000, old)
+    week = _walker_week(5000, old)  # #5861 FIX8: LOW steps — a 10k walker's unknown-intensity steps are no gap (ruling 12)
     kinds = [s["cardio"].get("kind") for s in week["sessions"]]
     easy = [k for k in kinds if k and k not in lp.HARD_KINDS]
     total = sum(int(s["cardio"].get("minutes") or 0) for s in week["sessions"])
@@ -371,10 +381,10 @@ def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
 
     # control: no gap rule (FIX4: nor the walk prompt's "a small gap is the walk's")
     every = _walker_week(
-        10000, old, patches={(lb, "easy_gap"): lambda kind, live: (True, []), (live_shape, "walk_covers"): lambda kind, live: None}
+        5000, old, patches={(lb, "easy_gap"): lambda kind, live: (True, []), (live_shape, "walk_covers"): lambda kind, live: None}
     )
     assert sum(1 for s in every["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS) > len(easy)
-    shared = _walker_week(10000, old | {"session_cap_includes_cardio": True})
+    shared = _walker_week(5000, old | {"session_cap_includes_cardio": True})
     full = {s["role"]: s["lifting_minutes"] for s in week["sessions"]}
     for s in shared["sessions"]:
         if s["role"] != "shoulders_arms":  # only the host trims lifting for its block
@@ -403,10 +413,18 @@ def test_the_short_week_under_the_shared_cap_keeps_a_real_aerobic_block(weeks):
     # #5861 FIX6 (owner ruling 1: no strength work a muscle needs is cut to make room): the fifth round's room-making
     # (`cardio_room_takes: as_fix5`) is what buys a 20-min block on the short week's host; the ruled default does not
     old = {"session_cap_includes_cardio": True, "cardio_room_takes": "as_fix5"}
-    e = _week("e_short_week", settings=old)["week"]
+    low = PROFILES["e_short_week"] | {"steps_per_day": 5000}  # #5861 FIX8: a LOW-steps week (high steps are no gap, ruling 12)
+    from training import live_rulings  # #5861 FIX8: and the arms floor's kept slots open to it (`arms_keep` protects them now)
+
+    e = _week("e_short_week", {(live_rulings, "arms_keep"): lambda rx, ctx, w: []}, settings=old, profile=low)["week"]
     assert max(s["cardio"].get("minutes") or 0 for s in e["sessions"]) >= lw.CARDIO_ROOM["min_block"]["value"]
     assert lb.conditioning_host("shoulders_arms") == "upper_volume" and lb.conditioning_host(None) == "shoulders_arms"
-    stuck = _week("e_short_week", {(lb, "conditioning_host"): lambda skipped: "shoulders_arms"}, old)
+    stuck = _week(
+        "e_short_week",
+        {(lb, "conditioning_host"): lambda skipped: "shoulders_arms", (live_rulings, "arms_keep"): lambda rx, ctx, w: []},
+        old,
+        profile=low,
+    )
     assert max(s["cardio"].get("minutes") or 0 for s in stuck["week"]["sessions"]) == 0  # control: the skipped day as host
 
 

@@ -19,8 +19,9 @@ THE SHORT WEEK'S INPUT. Production has no "mornings this week" record; `days_ava
 (`program_structure.NOMINAL_LIFTING_DAYS`) not covered by a dated charter travel window (`travel.windows`). The sample
 generator passes its profile's day count. A per-week declared count would be better — the owner's call (named on the PR).
 
-`sequence_rule_from` (library `programming_settings`, default None = from the block start): the first Monday the rule
-judges. Set it to the approval's Monday so weeks served before the flip keep the positions they were credited at.
+`sequence_rule_from` (library `programming_settings`) or, by default, the Monday AFTER the library's `approved_on` stamp
+(owner ruling #4, fix round 8: `rule_from`): the first Monday the rule judges — never applied retroactively. Approving the
+library stamps `approved_on` (an OWNER ACTION with the status flip); with neither, the rule judges from the block start.
 
 Every rule is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
 """
@@ -83,6 +84,19 @@ def _settings(lib: dict[str, Any] | None) -> dict[str, Any]:
     return live_program.settings(lib)
 
 
+def rule_from(lib: dict[str, Any] | None) -> str | None:
+    """The first Monday the sequence rules judge (owner ruling #4, fix round 8): `sequence_rule_from` when set, else the Monday
+    AFTER the library's `approved_on` stamp (the approval day itself is never re-judged; earlier history is kept for baselines
+    and analysis, never re-sequenced). None (no stamp, no setting) = from the block start, the pre-ruling behaviour."""
+    from common.pacific_time import shift_day_key
+
+    since = _settings(lib).get("sequence_rule_from")
+    if since:
+        return monday_of(str(since))
+    stamp = (lib or {}).get("approved_on")
+    return shift_day_key(monday_of(str(stamp)), 7) if stamp else None
+
+
 def monday_of(day: str) -> str:
     from training.live_balance import week_start
 
@@ -132,8 +146,8 @@ def week_plan(monday: str, workouts: Any, lib: dict[str, Any] | None, days: int 
     available (default `days_available`)."""
     if not _live(lib):
         return None
-    since = _settings(lib).get("sequence_rule_from")
-    if since and monday < monday_of(str(since)):
+    since = rule_from(lib)
+    if since and monday < since:
         return None
     short = plan_for_days(days_available(monday) if days is None else int(days), lib)
     if short:

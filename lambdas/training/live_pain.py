@@ -20,6 +20,10 @@ heuristic, safety kept):
      served by any library movement for that muscle that loads every flagged joint LOW; for a PRIORITY muscle with no LOW member,
      the lowest-stress member strictly under the flagged lift's own stress (`priority_ceiling`) at RPE <= 8 with the stop line — a
      priority muscle is never taken to zero sets by one flag.
+  5. THE SPINE IS ONE JOINT (`spine_reach`, SPINE_REACH, #5861 FIX8). A low-back flag above the mild line reaches every lift
+     that loads the spine at moderate or more whatever its pattern group (squat, hinge, RDL, good morning, bent-over row): each
+     is served as a same-family pain-free route (a supported / machine member LOW on the spine) when one exists, else the
+     muscle's route, at RPE <= 8 with the stop line and no in-session load step — the week never zeroes a priority muscle.
   4. THE ASSESS LINE ON ITS OWN LIFT. "Still hurts 2 sessions? Get it assessed." prints on the flagged lift (or what stands in
      for it), never on an unrelated one (`assess_target`).
 """
@@ -48,6 +52,16 @@ PAIN_SCOPE: dict[str, dict[str, Any]] = {
         "value": "low",
         "label": HEURISTIC,
         "basis": "a variant or muscle route must load every flagged joint LOW (the library's joint-stress ratings)",
+    },
+}
+
+SPINE_REACH: dict[str, dict[str, Any]] = {
+    "level": {
+        "value": 1,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX8: a low-back flag above the mild line reaches every lift whose library spinal load is moderate (1) or "
+        "high (2), whatever its pattern group — the spine is one structure; the squat/hinge split is a programming grouping, not "
+        "an anatomical one (practitioner consensus; the seventh red team)",
     },
 }
 
@@ -99,16 +113,29 @@ def hit(
         if f["movement_id"] == swapped and f["movement_id"] != mid and all(_stress(entry, j) == 0 for j in f["joints"]):
             return ("variant", f, f["joints"][0])  # the session fit already put a member LOW on the flagged joint in its place
         for j in f["joints"]:
+            spine = spine_reach(entry, f, j)  # #5861 FIX8: a back flag reaches every spine-loading lift, whatever its pattern group
             if f.get("scope") == "lift":
                 reach = own
             else:
-                reach = own or (_group(entry.get("pattern")) == f["group"] and _stress(entry, j) >= level)
+                reach = own or spine or (_group(entry.get("pattern")) == f["group"] and _stress(entry, j) >= level)
             if not reach:
                 continue
-            tier = "avoid" if f["tier"] == "avoid" and (own or _group(entry.get("pattern")) == f["group"]) else "reduce"
+            tier = "avoid" if f["tier"] == "avoid" and (own or spine or _group(entry.get("pattern")) == f["group"]) else "reduce"
             if best is None or (tier == "avoid" and best[0] != "avoid"):
                 best = (tier, f, j)
     return best
+
+
+def spine_reach(entry: dict[str, Any], f: dict[str, Any], joint: str) -> bool:
+    """SPINE_REACH (module doc 5): a pattern-scoped flag on the spine (`spinal_load`, a low-back note) above the mild line
+    reaches `entry` when it loads the spine at moderate or more — a squat flag reaches the deadlift, the RDL, the good morning and
+    the bent-over row; the pain rule's pattern group alone stopped at the squat (the seventh red team's blocking finding)."""
+    from training.live_program import PAIN_RULE
+
+    if joint != "spinal_load" or f.get("scope") == "lift" or _stress(entry, "spinal_load") < int(SPINE_REACH["level"]["value"]):
+        return False
+    sev = f.get("severity")
+    return f.get("tier") == "avoid" or (sev is not None and float(sev) > float(PAIN_RULE["mild_max"]["value"]))
 
 
 def variant(e: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], taken: set[str], joints: list[str]) -> str | None:

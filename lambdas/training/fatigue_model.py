@@ -376,7 +376,9 @@ def _judge(
     groups: dict[str, list[int]] = {}
     for i, r in enumerate(roles or [""] * len(pts)):
         groups.setdefault(r or "", []).append(i)
-    if deficit and all(_held([pts[i] for i in ix], [e1[i] for i in ix]) for ix in groups.values()):
+    span = THRESHOLDS["trend_recent_days"]["value"]  # #5861 FIX8: a role group with no exposure in the recent window is history,
+    live = {r: ix for r, ix in groups.items() if any((_ago(str(pts[-1][0]), str(pts[i][0])) or 0) < span for i in ix)}  # not a veto
+    if deficit and live and all(_held([pts[i] for i in ix], [e1[i] for i in ix]) for ix in live.values()):
         band = THRESHOLDS["deficit_hold_pct"]["value"]
         return {"trend": "holding", "why": f"in a deficit: e1RM within {band:.0%} of its best at steady effort — maintained, not stalled"}
     return {"trend": "stalled", "why": f"no new best e1RM over the last {len(pts)} exposures at working effort"}
@@ -391,6 +393,13 @@ def _held(pts: list[tuple[str, float | None, float | None, float | None, int | N
     if adj[-1] < adj[best] * (1 - float(THRESHOLDS["deficit_hold_pct"]["value"])):
         return False
     rpe_now, rpe_best = pts[-1][2], pts[best][2]
+    # #5861 FIX8 (seventh red team: a steady athlete reset in a deficit): effort drift is the SAME load x reps logged harder
+    # (`rpe_drift`'s own definition) — a lighter, higher-rep set at its own prescribed RPE is not drift; its effort is already in
+    # the effort-adjusted e1RM above
+    same = pts[-1][3] is not None and pts[best][3] is not None and abs(float(pts[-1][3]) - float(pts[best][3])) < 0.5
+    same = same and pts[-1][4] == pts[best][4]
+    if not same:
+        return True
     return rpe_now is None or rpe_best is None or float(rpe_now) - float(rpe_best) < float(THRESHOLDS["rpe_drift"]["value"])
 
 

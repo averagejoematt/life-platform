@@ -428,6 +428,41 @@ training. Every rule below is live-only and a labelled heuristic registered in `
   An unconfirmed deload keeps one anchor top set at RPE 8 (`DELOAD_TOP_SET`). The sample week's note lint is blocking for
   L1 / L6 / L12 (`sample_weeks_5861.STRICT_LINT_CODES`, `--strict-lint`).
 
+## 4g. The seventh red team's week and the owner's fix-round-8 rulings (`live_progress`, FIX8, 2026-11-13)
+
+All live-only (the library stays `proposed`); `tests/test_programming_fix8_5861.py` holds each rule with a must-fail control.
+
+- **Role-keyed references** (`live_progress.reference`, ROLE_REF). Every hold, cut and second-lift reference is the latest top set
+  of the SAME session role (a heavy day reads its last heavy day); a row with no readable role counts only inside today's rep band;
+  none in 28 days -> no load change. Replaces FIX7's `band_top_kg` (deleted). The record-seeded athlete
+  (`progression_sim_5861.Physiological`, ported from the red team) shows no heavy-day fall over 8 weeks for a steady or gaining
+  athlete in a 1 %BW/wk deficit.
+- **Deficit hold** (`fatigue_model._held`): effort drift is the same load x reps logged harder; a lighter, higher-rep set at its own
+  RPE is not drift (its effort is in the effort-adjusted e1RM). A steady athlete no longer stall-resets.
+- **The second lift's own load** (`live_progress.second_lift`): the capped non-lead heavy lift takes the load its RPE 7-8 cap
+  implies from its own same-role e1RM; its note quotes its own day's set.
+- **The spine is one joint** (`live_pain.spine_reach`): a low-back flag above the mild line reaches every spine-loading lift
+  (moderate+), whatever its pattern group, served by the existing pain-free route search (RPE <= 8, stop line, no step).
+- **The 75-minute ceiling always holds** (`live_shape.trim_anchor_backoffs`, TIME_FIT): a full-body day's guest anchors give
+  back-offs first; a kept slot or a priority muscle's last sets under MEV go only after the non-priority anchors' back-offs; a
+  priority muscle's anchor gives last. Checked over every public and stress profile under both cap settings.
+- **The hard-set floor is an outcome** (`live_stimulus`): it adds only sets that can be hard (`hard_capable`: logged past the OD1
+  re-entry caps, or familiar by pattern), on the week's last upper session for upper muscles and the last session for the rest,
+  within a time margin; counts only hard-capable sets today. Direct abs: `abs_direct_sets_per_week` (owner ruling #8, default 4,
+  half on a 1-3 morning or dip week); indirect trunk loading never counts; the only direct ab work is never what the time fit
+  drops.
+- **First session back** (`live_progress.first_back`, owner ruling #10): after 10+ days with no session, each lift's first
+  session back stops at RPE 8 at its same-role load, no increase, no step; nothing else changes (no week-long deload).
+- **Dip weeks keep the arms at maintenance** (`live_rulings.arms_keep`, ARMS_FLOOR counted in hard sets).
+- **Unknown-intensity steps** (ruling 12, `live_shape.intensity_unknown`): short recorded minutes with ~7,500+ steps/day is
+  unknown, not a gap — no easy ride, no walk prompt; a low-steps week still gets one.
+- **Record hygiene** (`cardio_model.dedupe_strava`, `walks_beside_the_gym`): a re-upload counted once; a walk absorbed by an
+  over-long gym record credited on its own evidence.
+- **Owner rulings of fix round 8**: the swing never fills the KB hinge slot (it drops, no makeup; the swing stays gated); delt
+  heads measured apart (`sample_weeks_5861.DELT_CREDIT`: pressing -> front, rowing -> rear, configurable); shoulders stay out of
+  PARITY; 1-5 declared mornings verified as outcomes; `live_sequence.rule_from` = the Monday AFTER the library's `approved_on`
+  stamp (an owner action with the flip; `sequence_rule_from` overrides) — never retroactive.
+
 ## Block-retro hooks (ruling 18)
 
 Every heuristic the live engine reads is labelled `heuristic` in its table and is re-tuned at a block retro (the

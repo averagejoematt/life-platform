@@ -329,7 +329,11 @@ def _fixed(rx: dict[str, Any]) -> set[str]:
 
     role = str(rx.get("session_role") or "")
     pinned = {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{role}.")}
-    return {str(e.get("movement_key")) for e in rx.get("exposures") or [] if e.get("slot") in pinned or e.get("live_added")}
+    return {
+        str(e.get("movement_key"))
+        for e in rx.get("exposures") or []
+        if e.get("slot") in pinned or e.get("live_added") or e.get("live_keep")  # FIX8: + the week's only direct ab work
+    }
 
 
 def _trim_one(blocks: list[Any], movements: dict[str, Any], lib: dict[str, Any], env: tuple, tiers: tuple) -> bool:
@@ -626,6 +630,7 @@ def familiar_swap(e: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> bool
 
 
 FAMILIAR_LINE = "Familiar swap: set 1 finds the load."
+FAMILIAR_PATTERN_LINE = "Familiar pattern: set 1 finds the load."  # #5861 FIX8: a familiar-by-pattern lift that is not a swap
 
 
 def familiar_note(note: str, e: dict[str, Any]) -> str:
@@ -642,7 +647,8 @@ def familiar_note(note: str, e: dict[str, Any]) -> str:
     if lines and g.EFFORT_RE.match(lines[0]):
         top = max(float(x) for x in __import__("re").findall(r"\d+(?:\.\d+)?", lines[0].split(",")[0]))
         lines[0] = want if top < min(cap, 8) else lines[0]
-    lines = [FAMILIAR_LINE if g.LAYOFF_RE.match(ln) or g.PICK_LOAD_OPEN_TAIL in ln else ln for ln in lines]
+    say = FAMILIAR_LINE if e.get("live_swap") else FAMILIAR_PATTERN_LINE
+    lines = [say if g.LAYOFF_RE.match(ln) or g.PICK_LOAD_OPEN_TAIL in ln else ln for ln in lines]
     return sb._join(block, list(dict.fromkeys(lines)))
 
 

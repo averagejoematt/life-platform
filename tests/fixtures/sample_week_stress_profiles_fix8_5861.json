@@ -1,0 +1,97 @@
+{
+  "_comment": "#5861 FIX8: synthetic stress profiles (no person's numbers) from the seventh red team: a two-week layoff, sharp low-back pain on the squat (5-day and 1-day weeks), a 2-day week with a shoulder flag on the press, a first week back after an illness",
+  "as_of": "2026-11-16",
+  "position": {
+    "week": 10,
+    "block": 2
+  },
+  "defaults": {
+    "roles": [
+      "upper_heavy",
+      "lower_heavy",
+      "shoulders_arms",
+      "upper_volume",
+      "lower_volume"
+    ],
+    "days": [
+      "2026-11-16",
+      "2026-11-17",
+      "2026-11-18",
+      "2026-11-19",
+      "2026-11-20"
+    ],
+    "bodyweight_lb": 250,
+    "readiness": "green",
+    "sleep_hours": 7.5,
+    "acwr": "safe",
+    "steps_per_day": 14000,
+    "trend": "progressing",
+    "trend_overrides": {},
+    "discomfort": [],
+    "pain": [],
+    "unavailable_equipment": [],
+    "sessions_last_14d": 10,
+    "hard_cardio_minutes_7d": 40
+  },
+  "profiles": {
+    "w_layoff_two_weeks": {
+      "label": "(w) FIX8: no session in the last 14 days (a two-week layoff), green",
+      "story": "layoff",
+      "sessions_last_14d": 0,
+      "hard_cardio_minutes_7d": 0
+    },
+    "x_sharp_low_back_5day": {
+      "label": "(x) FIX8: 5-day week, sharp low-back pain 6/10 on the squat",
+      "story": "back",
+      "pain": [
+        {
+          "movement": "squat_barbell",
+          "note": "sharp low back pain 6/10 coming out of the hole"
+        }
+      ]
+    },
+    "y_one_day_low_back": {
+      "label": "(y) FIX8: 1-day week, sharp low-back pain 6/10 on the squat",
+      "story": "one morning",
+      "roles": [
+        "upper_heavy"
+      ],
+      "days": [
+        "2026-11-16"
+      ],
+      "pain": [
+        {
+          "movement": "squat_barbell",
+          "note": "sharp low back pain 6/10 coming out of the hole"
+        }
+      ]
+    },
+    "z_two_day_shoulder_press": {
+      "label": "(z) FIX8: 2-day week, shoulder pain 5/10 on the overhead press",
+      "story": "two mornings",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-19"
+      ],
+      "pain": [
+        {
+          "movement": "machine_shoulder_press",
+          "note": "shoulder pain 5/10 overhead"
+        }
+      ]
+    },
+    "z2_back_after_illness": {
+      "label": "(z2) FIX8: first week back after an illness (1 session in 14 days), yellow, short sleep",
+      "story": "illness",
+      "sessions_last_14d": 1,
+      "readiness": "yellow",
+      "sleep_hours": 6.8,
+      "hard_cardio_minutes_7d": 0,
+      "steps_per_day": 5000
+    }
+  }
+}
