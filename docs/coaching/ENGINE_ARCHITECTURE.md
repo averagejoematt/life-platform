@@ -307,8 +307,10 @@ layer — one person's usage count is fit, not modality quality.
   performed blocks of the same kind — symptoms, recovery and LOGGED effort first (an unlogged RPE holds), then duration (+5
   min, within the menu's cap), then frequency, then intensity; a frequency or intensity step is named for the owner (the
   charter's placement owns frequency);
-- **cardio room under the shared cap** (`live_week.make_cardio_room`, `CARDIO_ROOM`): on the conditioning host (and on any
-  day the steps do not cover the easy volume) the charter's antagonist supersets pair first, then sets come off the muscles
+- **cardio room under the shared cap** (`live_week.make_cardio_room`, `CARDIO_ROOM`): on the conditioning host only (third red
+  team: with the conservative steps credit an uncovered week is common, and trimming every morning for an easy block gutted the
+  lifting — an easy block now takes only the room left, and only while the week's aerobic gap needs it, `live_balance.easy_gap`)
+  the charter's antagonist supersets pair first, then sets come off the muscles
   over MAV (they buy the whole block), then the largest surplus over MEV (it buys the 20-minute minimum) — the red team's
   shared-cap week served a 13-minute stub while the delts sat at 18 sets (MAV 16);
 - the loss-rate band (`health.rate_policy.propose_band`) appears in the rationale as ADVISORY text only — nothing reads it back,
