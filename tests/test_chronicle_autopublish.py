@@ -1,6 +1,6 @@
-"""SS-01 — the chronicle auto-publish sweep: a daily fail-safe so a draft never stays
-dark if the approve link isn't clicked. Tests stale-draft detection + that the sweep
-reuses the approve publish path (and respects dry-run)."""
+"""SS-01 — the chronicle stale-draft sweep. Until 2026-11-13 it published a draft nobody approved after 48 h; the
+owner then ruled that elapsed time is never consent, so it holds and pages instead and never publishes. Tests the
+stale-draft window, that the sweep writes nothing on either path, and the tombstone guards (#3485)."""
 
 import importlib.util
 import json
@@ -49,8 +49,8 @@ def test_missing_or_old_timestamp_is_skipped(mod):
     assert stale == []
 
 
-def test_sweep_publishes_via_approve_path(mod):
-    # #4694: only an AUDITED draft publishes itself — the desk's record carries style notes only, and the text is clean
+def test_sweep_never_publishes_even_an_audited_draft(mod):
+    """Owner ruling 2026-11-13: the very draft SS-01 used to publish (audited, style notes only) is held, not shipped."""
     draft = {
         "sk": "DATE#2026-06-10",
         "date": "2026-06-10",
@@ -61,49 +61,29 @@ def test_sweep_publishes_via_approve_path(mod):
         "content_markdown": "He trained four times and slept well on the rest days.",
         "desk_findings_json": json.dumps({"post": ["craft: body is 812 words; the standard is 850-1300"], "episode": []}),
     }
-    with (
-        mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
-        mock.patch.object(mod, "_publish_to_s3", return_value=["/journal/posts.json"]) as pub,
-        mock.patch.object(mod, "_invalidate_cloudfront") as inval,
-        mock.patch.object(mod, "_mark_published") as markp,
-        mock.patch.object(mod, "_invoke_email_sender") as sender,
-    ):
-        out = mod._sweep_stale_drafts(48)
-    pub.assert_called_once_with(draft, failures=[])  # #4729: the fail-soft collector rides as a keyword
-    inval.assert_called_once()
-    markp.assert_called_once_with("2026-06-10")
-    sender.assert_called_once()  # one delivery trigger for the batch
-    assert out == [{"date": "2026-06-10", "week": 1}]
-
-
-def test_sweep_dry_run_publishes_nothing(mod):
-    draft = {
-        "sk": "DATE#2026-06-10",
-        "date": "2026-06-10",
-        "status": "draft",
-        "generated_at": _iso(72),
-        "week_number": 1,
-        "content_markdown": "He trained four times.",
-        "desk_findings_json": json.dumps({"post": [], "episode": []}),  # #4694: an audited draft
-    }
-    with (
-        mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
-        mock.patch.object(mod, "_publish_to_s3") as pub,
-        mock.patch.object(mod, "_mark_published") as markp,
-        mock.patch.object(mod, "_invoke_email_sender") as sender,
-    ):
-        out = mod._sweep_stale_drafts(48, dry_run=True)
-    pub.assert_not_called()
-    markp.assert_not_called()
-    sender.assert_not_called()
-    assert out == [{"date": "2026-06-10", "week": 1, "dry_run": True}]
+    for dry_run in (False, True):
+        with (
+            mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
+            mock.patch.object(mod, "_publish_to_s3") as pub,
+            mock.patch.object(mod, "_invalidate_cloudfront") as inval,
+            mock.patch.object(mod, "_mark_published") as markp,
+            mock.patch.object(mod, "_invoke_email_sender") as sender,
+            mock.patch.object(mod, "_invoke_coach_panel_podcast") as podcast,
+        ):
+            out = mod._sweep_stale_drafts(48, dry_run=dry_run)
+        pub.assert_not_called()
+        inval.assert_not_called()
+        markp.assert_not_called()
+        sender.assert_not_called()
+        podcast.assert_not_called()
+        assert out == [{"date": "2026-06-10", "week": 1, "blocking": 0}]
 
 
 def test_handler_routes_scheduled_event_to_sweep(mod):
     with mock.patch.object(mod, "_sweep_stale_drafts", return_value=[]) as sweep:
         resp = mod.lambda_handler({"source": "aws.events", "detail-type": "Scheduled Event"}, None)
     sweep.assert_called_once()
-    assert resp["statusCode"] == 200 and "swept" in resp
+    assert resp["statusCode"] == 200 and resp["swept"] == [] and resp["held"] == []
 
 
 # ── #3485: the sweep, the publish path and the recap honour the wipe's tombstone ──
@@ -175,7 +155,7 @@ def test_sweep_reports_the_refusal_and_publishes_nothing_else_for_that_row(mod):
         mock.patch.object(mod, "_invoke_email_sender") as sender,
     ):
         out = mod._sweep_stale_drafts(48)
-    assert out == []
+    assert [r["date"] for r in out] == ["2026-09-01"]  # held and named; nothing written
     recap.assert_not_called()
     markp.assert_not_called()
     elena.assert_not_called()

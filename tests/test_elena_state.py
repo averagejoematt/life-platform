@@ -207,14 +207,15 @@ def test_updater_requires_a_date():
 
 
 def test_both_publish_paths_invoke_the_updater():
-    # #4593: approve click + stale-draft sweep both go through the ONE side-effect owner, which invokes her updater
-    owner_block = APPROVE_SRC[APPROVE_SRC.index("def publish_side_effects") : APPROVE_SRC.index("# AUTO-PUBLISH SWEEP")]
+    # #4593: the approve click goes through the ONE side-effect owner, which invokes her updater. Owner ruling
+    # 2026-11-13: the stale-draft sweep no longer publishes, so it must not reach the owner (or her update) at all.
+    owner_block = APPROVE_SRC[APPROVE_SRC.index("def publish_side_effects") : APPROVE_SRC.index("# STALE-DRAFT SWEEP")]
     assert "_invoke_elena_state_updater(date_str)" in owner_block
     approve_block = APPROVE_SRC[APPROVE_SRC.index('if action == "approve"') :]
     assert "publish_side_effects(item, date_str)" in approve_block
     sweep_block = APPROVE_SRC[APPROVE_SRC.index("def _sweep_stale_drafts") : APPROVE_SRC.index("def lambda_handler")]
-    assert "publish_side_effects(item, date_str, defer=DEFERRABLE)" in sweep_block
-    assert "elena_state" not in sweep_block, "the sweep must not defer or decline her update"
+    assert "publish_side_effects" not in sweep_block, "the sweep publishes nothing (owner ruling 2026-11-13)"
+    assert "elena_state" not in sweep_block, "the sweep never touches her memory"
     # wednesday direct-publish (non-preview branch only)
     assert "_invoke_elena_state_updater(date_str)" in CHRONICLE_SRC
     preview_branch = CHRONICLE_SRC[CHRONICLE_SRC.index("if _preview:") : CHRONICLE_SRC.index("    else:\n        # ── Standard flow")]
