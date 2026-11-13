@@ -426,7 +426,7 @@ training. Every rule below is live-only and a labelled heuristic registered in `
 - **Hard-set floors** (`live_stimulus.WEEK_FLOOR`): the week's last session counts each muscle's HARD sets and tops a muscle
   under MEV up (its own slot to 3 sets, else a logged low-fatigue isolation; a 3-day week's full-body day takes a donor's slot).
   An unconfirmed deload keeps one anchor top set at RPE 8 (`DELOAD_TOP_SET`). The sample week's note lint is blocking for
-  L1 / L6 / L12 (`sample_weeks_5861.BLOCKING_LINT_RULES`, `--strict-lint`).
+  L1 / L6 / L12 (`sample_weeks_5861.STRICT_LINT_CODES`, `--strict-lint`).
 
 ## Block-retro hooks (ruling 18)
 
@@ -467,7 +467,7 @@ holds each key to a labelled table and to this list.
 | `live_stimulus.WEEK_FLOOR` | weekly HARD sets per muscle vs MEV, and the floor muscles' e1RM / rep PRs |
 | `live_stimulus.DELOAD_TOP_SET` | readiness and first-set reps the week after an unconfirmed-deload week |
 | `live_stimulus.PARITY` | priority-muscle sets vs the donors' and both muscles' rep PRs |
-| `live_week.FAMILIAR_SWAP` | RPE logged on a familiar swap's first 2 exposures (over target = restore the novelty cap) |
+| `live_week.FAMILIAR_SWAP` | RPE logged on a familiar swap's first sessions (over target = restore the novelty cap) |
 
 ## 5. Progression
 

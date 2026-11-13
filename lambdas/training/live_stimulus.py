@@ -58,7 +58,11 @@ WEEK_FLOOR: dict[str, dict[str, Any]] = {
         "(`priority_muscles`) go first",
     },
     "hard_rpe": {"value": 8.0, "label": HEURISTIC, "basis": "a hard set is a working set at RPE >= 8 (about 2 in reserve), or unlogged"},
-    "add_sets": {"value": 2, "label": HEURISTIC, "basis": "an added low-fatigue isolation slot is two sets at RPE 8-9"},
+    "add_sets": {
+        "value": 2,
+        "label": HEURISTIC,
+        "basis": "an added low-fatigue isolation slot is two hard sets (the session's isolation effort)",
+    },
     "slot_max": {"value": 3, "label": HEURISTIC, "basis": "an existing slot takes sets only up to 3 (4+ in one slot is junk volume)"},
     "keys": {
         "value": {

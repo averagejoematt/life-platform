@@ -89,7 +89,7 @@ FAMILIAR_SWAP: dict[str, dict[str, Any]] = {
     "min_exposures": {
         "value": 3,
         "label": HEURISTIC,
-        "basis": "#5861 FIX7 (sixth red team: a DB row for a barbell lifter capped RPE 7 for 3 exposures): a swap into the SAME "
+        "basis": "#5861 FIX7 (sixth red team: a DB row for a barbell lifter capped at the novelty effort on its first sessions): a swap into the SAME "
         "movement pattern (barbell / dumbbell / machine / cable variants) for a lift logged 3+ times in the block is familiar — "
         "set 1 finds the load, then the sets work at target; the novelty cap is for a new movement pattern, not a new implement",
     },

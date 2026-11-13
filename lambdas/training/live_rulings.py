@@ -175,7 +175,7 @@ def lead_lift(rx: dict[str, Any], ctx: dict[str, Any], trends: dict[str, str] | 
         else "the lead alternates by ISO week (the tie-break)"
     )
     return [
-        f"lead lift (live): {names[lead]} leads this week at the session's effort (RPE 8-9), {names[other]} capped at RPE {lo}-{hi} — "
+        f"lead lift (live): {names[lead]} leads this week at the session's full effort, {names[other]} capped at RPE {lo}-{hi} — "
         f"never both maximal in one session; {how} (LEAD_LIFT, heuristic; lead_lift_rule=alternate_weekly)"
     ]
 
@@ -487,7 +487,7 @@ HEURISTIC_HOOKS: dict[str, str] = {
     "live_stimulus.WEEK_FLOOR": "weekly HARD sets per muscle vs MEV, and the floor muscles' e1RM / rep PRs",
     "live_stimulus.DELOAD_TOP_SET": "readiness and first-set reps the week after an unconfirmed-deload week",
     "live_stimulus.PARITY": "priority-muscle sets vs the donors' and both muscles' rep PRs",
-    "live_week.FAMILIAR_SWAP": "RPE logged on a familiar swap's first 2 exposures (over target = restore the novelty cap)",
+    "live_week.FAMILIAR_SWAP": "RPE logged on a familiar swap's first sessions (over target = restore the novelty cap)",
 }
 """Ruling 18: every labelled heuristic table the live engine reads -> the metric that should re-tune it at a block retro.
 Provenance (owner rulings 2026-11-13, FIX7 follow-up): `hard_conditioning_doses` = 1 is ruled (a setting, re-tuned on

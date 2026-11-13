@@ -130,7 +130,7 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
     "post_reset_min_exposures": {
         "value": 3,
         "label": HEURISTIC,
-        "basis": "#5861 FIX7: after a reset no stall (or regression) call before 3 exposures since it, the reset session included — "
+        "basis": "#5861 FIX7: after a reset no stall (or regression) call until the post_reset_min_exposures count of sessions since it, the reset session included — "
         "a reset is a short rebuild, not a weekly cut: a lift resets at most once per 3 post-reset exposures",
     },
     "deficit_hold_pct": {

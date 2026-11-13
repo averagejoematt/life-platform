@@ -48,16 +48,14 @@ class Athlete:
     capped at the range top) at RPE 9 when that is at or under the range floor, else 8.5 — a genuine stall, whatever the load."""
 
     def perform(self, session: dict[str, Any], day: str, role: str) -> dict[str, Any]:
-        keys = {str(lift.get("key")) for lift in session.get("lifts") or []}
-        by_tid = {}
-        for lift, ex in zip(session.get("lifts") or [], [w for w in session.get("wire") or [] if _not_cardio(w)]):
-            by_tid[str(ex.get("exercise_template_id"))] = str(lift.get("key"))
+        from training import routine_generator as rg
+
+        catalog = rg._load_json("movement_catalog.json")["movements"]
+        wires = [w for w in session.get("wire") or [] if _not_cardio(w)]
         exercises = []
-        for ex in session.get("wire") or []:
-            if not _lifting(ex):
-                continue
-            tid = str(ex.get("exercise_template_id") or "")
-            key = by_tid.get(tid, "")
+        for lift, ex in zip(session.get("lifts") or [], wires):
+            key = str(lift.get("key"))
+            tid = sw._tid(catalog, key) or key
             sets = []
             for s in ex.get("sets") or []:
                 rr = s.get("rep_range") or {}
@@ -67,13 +65,13 @@ class Athlete:
                     lb = float(s["weight_kg"]) * LB_PER_KG
                     can = max(1, min(int(rr["end"]), int(30 * (self.capacity[key] / lb - 1))))
                     reps, rpe = can, (9.0 if can <= int(rr["start"]) else 8.5)
-                elif key in self.stalled and key in keys:
+                elif key in self.stalled:
                     reps, rpe = max(1, int(rr["start"]) - 1), 9.5
                 else:
                     reps, rpe = int(rr["end"] if self.reps == "top" else rr["start"]), self.rpe
                 sets.append({"type": "normal", "weight_kg": round(float(s["weight_kg"]), 3), "reps": reps, "rpe": rpe})
             if sets:
-                exercises.append({"name": key or tid, "template_id": tid, "notes": "", "sets": sets})
+                exercises.append({"name": key, "template_id": tid, "notes": "", "sets": sets})
         return sw._workout(day, role, exercises)
 
 

@@ -598,13 +598,13 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
     }
 
 
-BLOCKING_LINT_RULES = ("L1", "L6", "L12")
+STRICT_LINT_CODES = ("L1", "L6", "L12")
 """#5861 FIX7: the note-lint rules the live sample week treats as BLOCKING (`lint_problems`, `--strict-lint`, the acceptance test):
 a banned phrase (L1) and exercise 1 opening without its effort-bearing session line (L6 / L12 — the lower-heavy squat note the
 sixth red team found). The other rules are reported, not blocking, until their pre-existing proposed-mode findings are paid down."""
 
 
-def lint_problems(week: dict[str, Any], rules: tuple[str, ...] = BLOCKING_LINT_RULES) -> list[str]:
+def lint_problems(week: dict[str, Any], rules: tuple[str, ...] = STRICT_LINT_CODES) -> list[str]:
     """The note linter (`hevy_note_lint.lint_wire`) over every session's compiled wire: the problems in `rules`."""
     from training import hevy_note_lint
 
@@ -959,7 +959,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mode", default="approved", choices=("approved", "proposed"))
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--set", action="append", default=[], help="a library programming setting for this run, key=true|false|text")
-    ap.add_argument("--strict-lint", action="store_true", help="exit 1 on a BLOCKING_LINT_RULES problem in any drafted week")
+    ap.add_argument("--strict-lint", action="store_true", help="exit 1 on a STRICT_LINT_CODES problem in any drafted week")
     args = ap.parse_args(argv)
     for kv in args.set:
         k, _, v = kv.partition("=")
