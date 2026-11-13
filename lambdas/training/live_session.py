@@ -396,7 +396,7 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
     gone = Counter(trimmed)  # #5861 FIX4: what the drop order counts as off (the trimmed sets + every dropped accessory)
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
-        idx = live_shape.next_drop(blocks, movements, gone)  # FIX4: the largest surplus over MEV first, then last-listed
+        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx))  # FIX4: largest surplus over MEV first
         if idx is None:
             break
         cut = blocks.pop(idx)

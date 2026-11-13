@@ -268,15 +268,17 @@ def no_single_sets(blocks: list[Any], movements: dict[str, Any]) -> list[str]:
     return out
 
 
-def next_drop(blocks: list[Any], movements: dict[str, Any], taken: Counter) -> int | None:
+def next_drop(blocks: list[Any], movements: dict[str, Any], taken: Counter, fixed: set[str] | None = None) -> int | None:
     """The accessory block the time fit drops next (live): one whose muscle stays at or over its MEV for the week without it,
-    the largest surplus first; else the last-listed accessory (today's order). `taken` (IN PLACE) counts the sets already off
-    per landmark muscle. None when no accessory is left."""
+    the largest surplus first; else the last-listed accessory (today's order). An owner-pinned slot or a live addition
+    (`fixed`: the carry, the kettlebell slot, the trunk floor) goes only when nothing else is left. `taken` (IN PLACE) counts the
+    sets already off per landmark muscle. None when no accessory is left."""
     from training import block_model, live_week, selection_engine as se, warmup_sets
 
     lib = se.load_library_failsoft() or {}
     week, marks = live_week.week_sets(movements, lib), block_model.load_landmarks() or {}
     acc = [i for i, b in enumerate(blocks) if str(b.rationale_tag or "").startswith("accessory:")]
+    acc = [i for i in acc if blocks[i].movement_key not in (fixed or set())] or acc
     if not acc:
         return None
     best = None
