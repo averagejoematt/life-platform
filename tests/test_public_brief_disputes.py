@@ -273,3 +273,47 @@ def test_evidence_and_brief_lookups_skip_dispute_rows():
     sk = POL.dispute_sk(CYCLE, PAIR, "weight_lbs")
     assert not POL.is_brief_sk(sk) and not POL.is_brief_sk(sk, CYCLE)
     assert POL.is_brief_sk(POL.brief_sk(CYCLE), CYCLE) and not POL.is_brief_sk(POL.evidence_sk(CYCLE, "r1"))
+
+
+# ── the settled sample (scripts/public_brief_dispute_sample.py, read-only) ──────────────────
+def _sample(table, **kw):
+    sys.path.insert(0, os.path.join(_REPO, "scripts"))
+    import public_brief_dispute_sample as S
+
+    before = len(table.puts)
+    rows = S.sample(table, [FIRST, LATER], **kw)
+    assert len(table.puts) == before  # reads only
+    return rows
+
+
+def _grade(table, pid_coach, status, notes='{"algo_version": "x"}'):
+    pid, coach = pid_coach
+    row = table.store[(f"COACH#{coach}", f"PREDICTION#{pid}")]
+    row.update(status=status, outcome=status, outcome_date="2026-12-15", outcome_notes=notes)
+
+
+def test_a_dispute_is_sampled_only_once_both_sides_are_settled():
+    _out, _i, table = _run()
+    (row,) = _dispute_rows(table)
+    sides = [(s["prediction_id"], s["coach_id"]) for s in row["sides"]]
+    assert _sample(table) == []  # nothing settled: nothing is manufactured
+    (pending,) = _sample(table, include_pending=True)
+    assert pending["settled"] is False and [s["status"] for s in pending["sides"]] == ["pending", "pending"]
+    _grade(table, sides[0], "confirmed")
+    assert _sample(table) == []  # one side settled is not a settled dispute
+    _grade(table, sides[1], "inconclusive", '{"grading_open": true}')  # provisional: still open
+    assert _sample(table) == []
+    _grade(table, sides[1], "refuted")
+    (got,) = _sample(table)
+    assert got["settled"] is True and got["metric"] == "weight_lbs" and got["criterion"]["rule"] == DISP.OPPOSITE_DIRECTION
+    assert [s["claim"] for s in got["sides"]] == [s["claim"] for s in row["sides"]]
+    assert [s["status"] for s in got["sides"]] == ["confirmed", "refuted"]
+    for s in got["sides"]:  # the frozen test of each side, as filed
+        assert s["frozen_evaluation"]["metric"] == "weight_lbs" and s["frozen_evaluation"]["window_end"]
+        assert s["filing"]["verdict"] == "gradeable"
+    assert _sample(table, cycle="2026-11-23") == [] and len(_sample(table, cycle=CYCLE)) == 1
+
+
+def test_a_brief_or_evidence_row_is_never_a_sampled_dispute():
+    assert DISP.is_dispute_sk(POL.dispute_sk(CYCLE, PAIR, "weight_lbs"))
+    assert not DISP.is_dispute_sk(POL.brief_sk(CYCLE)) and not DISP.is_dispute_sk(POL.evidence_sk(CYCLE, "r1"))

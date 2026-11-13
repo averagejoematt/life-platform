@@ -139,6 +139,7 @@ _METRIC_SUBDOMAIN = {
     "total_calories_kcal": "calories",
     "total_protein_g": "protein",
     "steps": "training",
+    "total_volume_kg": "training",
 }
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)

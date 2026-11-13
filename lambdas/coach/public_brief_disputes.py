@@ -178,3 +178,47 @@ def dispute_row(coach_id: str, cycle: str, mine: tuple, theirs: dict, rule: str,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         NP.PROVENANCE_KEY: prov,
     }
+
+
+# ── the settled sample (read-only; scripts/public_brief_dispute_sample.py) ──────────────────────
+#: The ledger fields a sample row carries for each side: its grade and the grader's own record of it. Never a field the
+#: dispute row does not already point at; nothing here writes.
+LEDGER_FIELDS = ("status", "outcome_date", "outcome_notes", "quality_flags", "evaluator_version")
+
+
+def is_dispute_sk(sk: Any) -> bool:
+    return str(sk or "").startswith(POL.BRIEF_SK_PREFIX) and POL.DISPUTE_TAG in str(sk)
+
+
+def sample_row(dispute: dict, ledger: dict) -> dict:
+    """One dispute as a sample row: the frozen criterion, and per side its rendered claim, its frozen evaluation and its
+    ledger grade. ``ledger`` maps ``prediction_id`` -> the stored PREDICTION# row (absent when not found). ``settled`` is
+    True only when BOTH sides carry a settled grade (``coach.grade_corrections.is_settled``)."""
+    from coach.grade_corrections import is_settled
+
+    sides = []
+    for s in dispute.get("sides") or []:
+        row = ledger.get(s.get("prediction_id")) or {}
+        sides.append(
+            {
+                "coach_id": s.get("coach_id"),
+                "prediction_id": s.get("prediction_id"),
+                "claim": s.get("claim"),
+                "cited_observations": s.get("cited_observations"),
+                "frozen_evaluation": row.get("evaluation") or s.get("evaluation"),
+                "filing": {k: (row.get("filing") or {}).get(k) for k in ("verdict", "window_start", "window_end", "filing_rules_version")},
+                **{k: row.get(k) for k in LEDGER_FIELDS},
+                "found": bool(row),
+                "settled": bool(row) and is_settled(row),
+            }
+        )
+    return {
+        "brief_cycle": dispute.get("brief_cycle"),
+        "metric": dispute.get("metric"),
+        "pair": dispute.get("pair"),
+        "filed_by": dispute.get("coach_id"),
+        "criterion": dispute.get("criterion"),
+        "generated_at": dispute.get("generated_at"),
+        "sides": sides,
+        "settled": len(sides) == 2 and all(s["settled"] for s in sides),
+    }

@@ -56,6 +56,7 @@ METRIC_WORDS = {
     "blood_glucose_avg": "average blood glucose",
     "blood_glucose_std_dev": "blood-glucose swings",
     "body_fat_pct": "body-fat percentage",
+    "total_volume_kg": "per-session lifting volume",
 }
 
 #: The unit each METRIC_WORDS measure is read in, for a number printed beside its words (a bet's
@@ -76,6 +77,7 @@ METRIC_UNITS = {
     "blood_glucose_avg": " mg/dL",
     "blood_glucose_std_dev": " mg/dL",
     "body_fat_pct": "%",
+    "total_volume_kg": " kg",
 }
 
 
