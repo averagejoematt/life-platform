@@ -124,8 +124,8 @@ def lead_blocked(e: dict[str, Any], trend: str | None) -> str | None:
     retreat, or a pain/discomfort effort cap at or under RPE 7 — else None."""
     if (e.get("live_load") or {}).get("pct"):
         return str((e.get("live_load") or {}).get("why") or "cut")
-    if e.get("live_rebuild") or trend in ("rebuilding", "returning"):
-        return "rebuilding after a reset" if trend != "returning" else "building back after a load drop"
+    if e.get("live_rebuild") or trend == "rebuilding":  # a load drop with no reset scheme (`returning`) only defers the stall call
+        return "rebuilding after a reset"
     if trend == "regressing":
         return "regressing"
     if e.get("live_retreated"):
