@@ -118,7 +118,7 @@ const RUNGS = [
   {
     key: "subscriber",
     name: "Subscriber",
-    blurb: "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new. Double opt-in, unsubscribe anytime.",
+    blurb: "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new. Double opt-in, unsubscribe anytime.",
     cta: { href: "#main", label: "Follow by email ↑" },
   },
   {
