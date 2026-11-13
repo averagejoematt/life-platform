@@ -90,13 +90,22 @@ class Physiological:
     seed: dict[str, float] = field(default_factory=dict)
 
     def start(self, record: list[dict[str, Any]]) -> None:
-        for w in sorted(record, key=lambda w: w["date"]):
+        """Seed each lift's true e1RM from its STRONGEST effort-adjusted set in the record's last 28 days (a heavy day and a volume
+        day of one lift are one strength — seeding from the latest exposure alone under-reads a lift whose last day was the
+        lighter one, the red team's own calibration lesson)."""
+        days = sorted(str(w.get("date") or "")[:10] for w in record if w.get("date"))
+        since = sw._day(days[-1], -28) if days else ""
+        for w in record:
+            if str(w.get("date") or "")[:10] < since:
+                continue
             for x in w["exercises"]:
-                st = [s for s in x["sets"] if s.get("weight_kg") and s.get("reps")]
-                if st:
-                    top = max(st, key=lambda s: float(s["weight_kg"]))
-                    rir = 10 - float(top.get("rpe") or 8)
-                    self.seed[str(x["template_id"]).upper()] = float(top["weight_kg"]) * LB_PER_KG * (1 + (int(top["reps"]) + rir) / 30)
+                for s in x["sets"]:
+                    if not (s.get("weight_kg") and s.get("reps")) or str(s.get("type") or "normal") == "warmup":
+                        continue
+                    rir = 10 - min(10.0, max(6.0, float(s.get("rpe") or 8)))
+                    e1 = float(s["weight_kg"]) * LB_PER_KG * (1 + (int(s["reps"]) + rir) / 30)
+                    tid = str(x["template_id"]).upper()
+                    self.seed[tid] = max(self.seed.get(tid, 0.0), e1)
 
     def next_week(self) -> None:
         for k in self.true:

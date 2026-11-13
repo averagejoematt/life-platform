@@ -422,6 +422,9 @@ def _donor(
             continue
         if str(e.get("movement_key")) in fixed or e.get("live_kb"):
             continue
+        entry = (lib.get("movements") or {}).get((ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or "") or {}
+        if (entry.get("target") or {}).get("primary") == "rear_delts":
+            continue  # owner ruling #9: the rear delt is read on its own — its slot never donates to another muscle
         d = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
         mev = float((marks.get(d) or {}).get("MEV") or 0)
         left = logged.get(d, 0.0) + today.get(d, 0.0) - len(e.get("sets") or [])

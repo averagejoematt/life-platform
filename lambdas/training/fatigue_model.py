@@ -376,7 +376,9 @@ def _judge(
     groups: dict[str, list[int]] = {}
     for i, r in enumerate(roles or [""] * len(pts)):
         groups.setdefault(r or "", []).append(i)
-    if deficit and all(_held([pts[i] for i in ix], [e1[i] for i in ix]) for ix in groups.values()):
+    span = THRESHOLDS["trend_recent_days"]["value"]  # #5861 FIX8: a role group with no exposure in the recent window is history,
+    live = {r: ix for r, ix in groups.items() if any((_ago(str(pts[-1][0]), str(pts[i][0])) or 0) < span for i in ix)}  # not a veto
+    if deficit and live and all(_held([pts[i] for i in ix], [e1[i] for i in ix]) for ix in live.values()):
         band = THRESHOLDS["deficit_hold_pct"]["value"]
         return {"trend": "holding", "why": f"in a deficit: e1RM within {band:.0%} of its best at steady effort — maintained, not stalled"}
     return {"trend": "stalled", "why": f"no new best e1RM over the last {len(pts)} exposures at working effort"}
