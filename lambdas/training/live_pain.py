@@ -152,10 +152,10 @@ def variant(e: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], ta
 def priority_ceiling(e: dict[str, Any], ctx: dict[str, Any], f: dict[str, Any]) -> int | None:
     """For a PRIORITY muscle (`priority_muscles`) with no LOW route: the stress ceiling a relaxed route may carry on the flagged
     joint — strictly under the flagged movement's own (a leg press, not the back squat, for a knee) — else None."""
-    from training import live_program, live_week
+    from training import live_settings, live_volume
 
-    muscle = live_week.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
-    if muscle not in [str(m) for m in live_program.settings(ctx.get("lib")).get("priority_muscles") or []]:
+    muscle = live_volume.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
+    if muscle not in [str(m) for m in live_settings.settings(ctx.get("lib")).get("priority_muscles") or []]:
         return None
     flagged = (ctx["lib"].get("movements") or {}).get(f["movement_id"]) or {}
     worst = min((_stress(flagged, j) for j in f["joints"]), default=-1)
@@ -166,9 +166,9 @@ def muscle_route(e: dict[str, Any], ctx: dict[str, Any], taken: set[str], joints
     """Any servable library movement whose landmark muscle is the dropped lift's and that loads every flagged joint at or under
     `ceiling` (LOW by default; `priority_ceiling` for a priority muscle) (module doc 3), best hypertrophy tier first, then the
     most familiar."""
-    from training import live_session, live_week, selection_engine as se, selection_live
+    from training import live_session, live_volume, selection_engine as se, selection_live
 
-    muscle = live_week.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
+    muscle = live_volume.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
     to_cat = {lid: k for k, lid in ctx["idx"]["to_lib"].items()}
     rank = {t: i for i, t in enumerate("SABCD")}
     out = []
@@ -176,7 +176,7 @@ def muscle_route(e: dict[str, Any], ctx: dict[str, Any], taken: set[str], joints
         key = to_cat.get(lid)
         if not key or key in taken or entry.get("pattern") in ("carry", "cardio", "other"):
             continue
-        if live_week.landmark_muscle(key, ctx["catalog"], ctx["lib"]) != muscle:
+        if live_volume.landmark_muscle(key, ctx["catalog"], ctx["lib"]) != muscle:
             continue
         if any(not 0 <= _stress(entry, j) <= ceiling for j in joints):
             continue

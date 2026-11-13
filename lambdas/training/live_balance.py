@@ -46,65 +46,15 @@ Every number here is a labelled PLATFORM HEURISTIC (practitioner consensus at be
 from __future__ import annotations
 
 import re
-from collections import Counter
 from typing import Any
 
 ISSUE = "#5861"
 HEURISTIC = "heuristic"
-KB_SLOT_KEY = "kettlebell_swing"
-"""The template slot the owner pinned (#5774): it serves the KB deadlift, then the swing (`kb_entry`)."""
-KB_HOME = "lower_volume"
-"""Where the program's templates place the kettlebell slot (`program_structure.SESSION_TEMPLATES`)."""
-SETTINGS_DEFAULTS: dict[str, Any] = {
-    "kb_slot_role": KB_HOME,
-    "kb_slot_when_stacked": "move",
-    "kb_slot_move_to": ["shoulders_arms", "upper_volume"],
-    "kb_deadlift_template_id": None,
-    "pain_assess_line": "Still hurts 2 sessions? Get it assessed.",
-    "priority_muscles": ["chest", "quadriceps"],  # #5861 FIX6: owner ruling 9 (2026-11-13: quads a priority with chest)
-    "adherence_response": "short_week",
-    "body_fat_tier": None,
-    "rate_band_mode": "advisory",
-}
-"""Library-carried settings (`programming_settings`), merged into `live_program.settings`. `kb_slot_role` is today's placement
-(owner pin); `kb_slot_when_stacked` `move` | `drop`; `kb_deadlift_template_id` None = the owner-ruled Sumo Deadlift stand-in;
-`kb_slot_move_to` the sessions it may move to, in order (under the shared cap the conditioning host is passed over: its minutes
-are the aerobic block's); `pain_assess_line` "" turns the line off; `adherence_response` `short_week` (the default response to a dip) | `trim_sets`
-(today's two sets off); `body_fat_tier` None = unknown; `rate_band_mode` `advisory` | `structured`."""
-ALLOCATION: dict[str, dict[str, Any]] = {
-    "over_mav_floor": {
-        "value": 2,
-        "label": HEURISTIC,
-        "basis": "an isolation slot giving sets for an over-MAV muscle keeps at least two working sets (the slot keeps its stimulus)",
-    },
-    "priority_margin": {
-        "value": 1,
-        "label": HEURISTIC,
-        "basis": "third red team (2026-11-13): a priority muscle 'at MEV' is at risk on any trimmed week; a muscle at or under "
-        "MEV + 1 takes the freed sets first (retention of chest, back, quadriceps and hamstrings before any delt surplus). "
-        "SUPERSEDED under live by #5861 FIX4 (`live_shape.VOLUME` priority_margin 2): kept for the record, no longer read",
-    },
-    "add_per_slot": {"value": 1, "label": HEURISTIC, "basis": "one added set per accessory slot a week (no slot doubles)"},
-}
-ADHERENCE_DIP: dict[str, dict[str, Any]] = {
-    "session_minutes": {
-        "value": 60,
-        "label": HEURISTIC,
-        "basis": "after a dip (5+ of the fortnight's 10 planned sessions missed) a ~60-minute morning is easier to keep than a "
-        "75-minute one; the anchors keep every set (strength is retained on the heavy work), the accessories carry the cut",
-    },
-    "accessory_sets": {"value": 2, "label": HEURISTIC, "basis": "every accessory at two working sets — the maintenance dose"},
-}
 HOST_ROLE = "shoulders_arms"
-SLOT_MAX = 3
-"""#5861 FIX7 (sixth red team: 5 lateral-raise sets in one slot; ARMS_FLOOR's own basis calls 4+ in a slot junk volume): no live
-addition takes an isolation slot past 3 working sets (a template slot already over it keeps its own count). Heuristic."""
-
-
-def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
-    from training import live_program, selection_engine as se
-
-    return live_program.settings(lib if lib is not None else se.load_library_failsoft())
+PAIN_ASSESS_LINE = "Still hurts 2 sessions? Get it assessed."
+"""The one neutral line a standing pain flag puts on its flagged lift (no diagnosis, no number)."""
+EASY_MIN_BLOCK = 20
+"""Heuristic: the shortest easy aerobic block worth its warm-up (practitioner consensus: 20-30 min continuous)."""
 
 
 def _entry(key: str | None, ctx: dict[str, Any]) -> dict[str, Any]:
@@ -123,18 +73,6 @@ def spine_loading(entry: dict[str, Any] | None) -> bool:
 
 
 # ── 2. the kettlebell slot's placement ───────────────────────────────────────
-def _template_spine(role: str, catalog: dict[str, Any], lib: dict[str, Any]) -> int:
-    """Spine-loading exposures the role's template serves, the kettlebell slot aside."""
-    from training import program_structure as ps, selection_engine as se
-
-    idx = se.key_index(lib, catalog)
-    rx = ps.session_prescription_for_role(role, catalog_movements=catalog)
-    mv = lib.get("movements") or {}
-    return sum(
-        1
-        for e in rx["exposures"]
-        if e.get("slot") != KB_SLOT_KEY and spine_loading(mv.get(idx["to_lib"].get(str(e.get("movement_key")))) or {})
-    )
 
 
 def _skip_set(skipped: Any) -> set[str]:
@@ -144,99 +82,10 @@ def _skip_set(skipped: Any) -> set[str]:
     return {str(skipped)} if isinstance(skipped, str) else {str(r) for r in skipped}
 
 
-def kb_placement(lib: dict[str, Any], catalog: dict[str, Any], skipped: Any = None) -> dict[str, Any]:
-    """{home, host, why}: where the kettlebell slot serves this week. `home` is `kb_slot_role` (today's placement); when that
-    session's template already holds STACK_RULE axial_per_session spine-loading lifts, the slot moves to `kb_slot_move_to`
-    (`kb_slot_when_stacked` `move`, when that session has room and is drafted this week) or is dropped (`drop`, or no room).
-    `skipped` is a role this week does not draft (the short week's)."""
-    from training import live_program
-
-    s = _settings(lib)
-    cap = int(live_program.STACK_RULE["axial_per_session"]["value"])
-    home = str(s["kb_slot_role"] or KB_HOME)
-    gone = _skip_set(skipped)
-    if home not in gone and _template_spine(home, catalog, lib) < cap:
-        return {"home": home, "host": home, "why": None}
-    move_to = s["kb_slot_move_to"]
-    targets = [str(t) for t in ([move_to] if isinstance(move_to, str) else (move_to or []))]
-    busy = conditioning_host(skipped) if s.get("session_cap_includes_cardio") else None  # the shared cap's aerobic minutes
-    why = f"{home} already holds {cap} spine-loading squat/hinge lifts (STACK_RULE, heuristic)"
-    if home in gone:  # #5861 FIX5: the home session is not drafted this week
-        why = f"{home} is not drafted this week"
-    for to in targets if s["kb_slot_when_stacked"] == "move" else []:
-        if to not in gone | {busy, home} and _template_spine(to, catalog, lib) < cap:
-            return {"home": home, "host": to, "why": why + f": the kettlebell slot moves to {to} (kb_slot_when_stacked=move)"}
-    how = "kb_slot_when_stacked=drop" if s["kb_slot_when_stacked"] != "move" else "no move-to session is drafted with room"
-    return {"home": home, "host": None, "why": why + f": the kettlebell slot is dropped this week ({how})"}
-
-
-def place_kb(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str]:
-    """IN PLACE: the kettlebell slot leaves a session that is not its host this week and joins the host (`kb_placement`).
-    The movement it serves follows `kb_entry` (the KB deadlift until two are logged, then the swing). Returns the lines."""
-    from training import kb_entry, live_program as lp, program_structure as ps
-
-    role = str(rx.get("session_role") or "")
-    skipped = ctx.get("week_skip") or (lp.SHORT_WEEK_SKIP if ctx.get("short_week_host") else None)  # FIX5: the week's skips
-    p = kb_placement(ctx["lib"], ctx["catalog"], skipped)
-    lines: list[str] = []
-    here = [e for e in rx["exposures"] if e.get("slot") == KB_SLOT_KEY]
-    if here and role != p["host"]:
-        rx["exposures"] = [e for e in rx["exposures"] if e.get("slot") != KB_SLOT_KEY]
-        title = (ctx["catalog"].get(here[0].get("movement_key")) or {}).get("title") or here[0].get("movement_key")
-        verb = f"moved (live): {title} -> {p['host']}" if p["host"] else f"dropped (live): {title}"
-        lines.append(f"{verb} — {p['why'] or 'kb_slot_role=' + str(p['home'])}")
-    if role == p["host"] and not any(e.get("slot") == KB_SLOT_KEY for e in rx["exposures"]):
-        tmpl = ps.session_prescription_for_role(KB_HOME, catalog_movements=ctx["catalog"])
-        slot = next((e for e in tmpl["exposures"] if e.get("slot") == KB_SLOT_KEY), None)
-        if slot is not None:
-            n = kb_exposures(workouts, ctx.get("target_date"), ctx["lib"])
-            key: str | None = kb_entry.served(n)
-            filler = None
-            if key == kb_entry.ENTRY:  # #5861 FIX5: the KB deadlift as filler -> the swing, else the slot is not added
-                from training.live_rules import kb_choice
-
-                key, filler = kb_choice(ctx, workouts)
-            if key is None:
-                return lines + [f"kettlebell slot (live): not added on {role} — {filler}"]
-            rx["exposures"].append(dict(slot, movement_key=key, live_added="kb_slot_moved"))
-            title = (ctx["catalog"].get(key) or {}).get("title") or key
-            lines.append(f"added (live): {title} — the kettlebell slot's host this week ({p['why'] or 'kb_slot_role'})")
-            lines += [f"kettlebell slot (live): {filler}"] if filler else []
-    return lines
-
-
-def kb_exposures(workouts: Any, before: str | None, lib: dict[str, Any] | None = None) -> int | None:
-    """KB-deadlift entry exposures logged, under the stand-in template and the owner's custom one when set."""
-    from training import kb_entry
-
-    custom = _settings(lib).get("kb_deadlift_template_id")
-    ids = (kb_entry.ENTRY_TEMPLATE_ID,) + ((str(custom).upper(),) if custom else ())
-    return kb_entry.exposures(workouts, before, template_ids=ids)
-
-
-def kb_note_line(lib: dict[str, Any] | None = None) -> str:
-    """The implement line: the stand-in names its Hevy title; a custom template needs no explanation."""
-    from training import live_week
-
-    if _settings(lib).get("kb_deadlift_template_id"):
-        return "KB deadlift — one kettlebell."
-    return str(live_week.KB_SLOT["implement_line"]["value"])
-
-
 def template_resolver(resolve: Any, lib: dict[str, Any] | None = None) -> Any:
-    """The compiler's movement -> Hevy template resolver, with the KB deadlift written under `kb_deadlift_template_id` when
-    the library is APPROVED and the owner set one; otherwise `resolve` itself (today's Sumo Deadlift stand-in, unchanged)."""
-    from training import kb_entry, selection_engine as se
-
-    lib = lib if lib is not None else se.load_library_failsoft()
-    tid = _settings(lib).get("kb_deadlift_template_id") if se.mode(lib) == se.MODE_LIVE else None
-    if not tid:
-        return resolve
-
-    def _resolve(movement_key: str) -> str:
-        return str(tid) if movement_key == kb_entry.ENTRY else resolve(movement_key)
-
-    return _resolve
+    """The compiler's movement -> Hevy template resolver, unchanged. Fix round 9 deleted the kettlebell-template setting (owner
+    ruling #2: no KB Deadlift template unless he logs it regularly); the cron and MCP call sites outside this lane keep the seam."""
+    return resolve
 
 
 # ── 3. pain that persists ────────────────────────────────────────────────────
@@ -245,7 +94,7 @@ def pain_assess(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, A
     `pain_assess_line` (`live_assess`) and the rationale says how many sessions logged it. Off when the setting is ""."""
     from training.training_notes_pain import pain_class
 
-    line = str(_settings(ctx["lib"]).get("pain_assess_line") or "").strip()
+    line = PAIN_ASSESS_LINE
     pains = [f for f in flags if f.get("source") == "pain"]
     if not line or not pains or not rx.get("exposures"):
         return []
@@ -278,218 +127,9 @@ def assess_note(note: str, line: str) -> str:
 
 
 # ── 4. volume by priority ────────────────────────────────────────────────────
-def _template_rows(catalog: dict[str, Any], lib: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every template exposure of the week: role, slot, kind, movement, sets, its landmark muscle, its secondaries."""
-    from training import live_week, program_structure as ps, selection_engine as se
-
-    idx = se.key_index(lib, catalog)
-    rows = []
-    for role in ps.SPLIT_ROLES:
-        for e in ps.session_prescription_for_role(role, catalog_movements=catalog)["exposures"]:
-            key = e.get("movement_key")
-            prim = live_week.landmark_muscle(key, catalog, lib)
-            entry = ((lib.get("movements") or {}).get(idx["to_lib"].get(str(key))) or {}) if key else {}
-            secs = [live_week.LANDMARK_OF.get(str(s), str(s)) for s in (entry.get("target") or {}).get("secondary") or []]
-            sets = len(e.get("sets") or [])
-            if role == "shoulders_arms" and e.get("kind") == "anchor" and e.get("pattern") == "overhead_press":
-                sets = max(sets, _press_sets(lib))  # #5861 FIX4: the press option counts in the week's allocation (a trade, not extra)
-            rows.append(
-                {
-                    "role": role,
-                    "slot": e.get("slot"),
-                    "kind": e.get("kind"),
-                    "intensity": e.get("intensity"),
-                    "key": key,
-                    "sets": sets,
-                    "muscle": prim,
-                    "secondary": [m for m in secs if m != prim],
-                }
-            )
-    return rows
-
-
-def _press_sets(lib: dict[str, Any] | None) -> int:
-    """The live option `programming_settings.press_sets` (#5861 FIX6, owner ruling 6: absent = the ruled 3; 1 = the charter's
-    one set)."""
-    return int(_settings(lib).get("press_sets") or 1)
-
-
-def _sum(rows: list[dict[str, Any]], deltas: dict[tuple[str, str], int]) -> Counter:
-    out: Counter = Counter()
-    for r in rows:
-        n = r["sets"] + deltas.get((r["role"], str(r["slot"])), 0)
-        out[r["muscle"]] += n
-        for m in r["secondary"]:
-            out[m] += n * 0.5
-    return out
-
-
-def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any = None) -> dict[str, Any]:
-    """The week's set allocation (module doc 4), from the five templates: {deltas: {(role, slot): +/-n}, before, after,
-    lines}. Pure over the catalog and the library; the same for every session of the week. `skipped` (#5861 FIX4): a role
-    this week does not draft (the short week's) — its sets neither count toward the week nor give or take."""
-    from training import block_model, selection_live
-
-    rows = [r for r in _template_rows(catalog, lib) if r["role"] not in _skip_set(skipped)]
-    marks = block_model.load_landmarks() or {}
-    priority = [str(m) for m in _settings(lib).get("priority_muscles") or []]
-    pinned = {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES}
-    floor = int(ALLOCATION["over_mav_floor"]["value"])
-    from training import live_rulings  # #5861 FIX6 ruling 6: the press's extra sets come from the lateral raises first
-
-    deltas: dict[tuple[str, str], int] = live_rulings.press_trade(rows, lib)
-    freed = 0
-    while True:  # 1. every muscle over its MAV gives isolation sets, the largest slot first, latest in the week on a tie
-        week = _sum(rows, deltas)
-        over = [r for r in rows if r["kind"] == "accessory" and r["slot"] not in pinned and r["intensity"] != "carry"]
-        over = [r for r in over if r["muscle"] in marks and week[r["muscle"]] > float(marks[r["muscle"]]["MAV"])]
-        over = [r for r in over if r["sets"] + deltas.get((r["role"], str(r["slot"])), 0) > floor]
-        if not over:
-            break
-        r = max(over, key=lambda r: (r["sets"] + deltas.get((r["role"], str(r["slot"])), 0), rows.index(r)))
-        deltas[(r["role"], str(r["slot"]))] = deltas.get((r["role"], str(r["slot"])), 0) - 1
-        freed += 1
-    from training import live_shape  # #5861 FIX4: at-MAV donors, MEV + 2 recipients, the quadriceps slot, the weekly redline
-
-    env = {"rows": rows, "deltas": deltas, "marks": marks, "pinned": pinned, "priority": priority, "freed": freed}
-    adds = live_shape.reallocate(env | {"catalog": catalog, "lib": lib})
-    from training import live_rulings  # #5861 FIX6 ruling 3: a week without shoulders+arms holds them at MEV, counted
-
-    floor_lines = live_rulings.short_week_floor(env, adds) if _skip_set(skipped) else []
-    from training import live_stimulus  # #5861 FIX7: a priority muscle never under a non-priority isolation muscle
-
-    floor_lines += live_stimulus.parity(env, adds)
-    ceiling_lines = floor_lines + live_shape.week_ceiling(env, adds)
-    before, after = _sum(rows, {}), _sum(rows, deltas)
-    for a in adds:
-        after[a["muscle"]] += a["sets"]
-    lines = [
-        f"{role}.{slot} {'+' if d > 0 else ''}{d} set(s)"
-        for (role, slot), d in sorted(
-            deltas.items(), key=lambda kv: (list(dict.fromkeys(r["role"] for r in rows)).index(kv[0][0]), kv[0][1])
-        )
-        if d
-    ]
-    lines += [f"{a['role']}.{a['slot']} +{a['sets']} set(s) ({a['key']})" for a in adds] + ceiling_lines
-    out = {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines, "adds": adds}
-    parity: set[tuple[str, str]] = env.get("parity") or set()
-    return out | {"parity": sorted(parity)}
-
-
-def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
-    """IN PLACE: this session's share of the week's allocation (`allocation_plan`): a slot's working sets go down (the last
-    working set) or up (a copy of it). Returns the lines (the week's reason on each)."""
-    from training import block_model
-
-    plan_ = ctx.get("allocation") or allocation_plan(ctx["catalog"], ctx["lib"], _skipped(ctx))
-    ctx["allocation"] = plan_
-    role = str(rx.get("session_role") or "")
-    marks = block_model.load_landmarks() or {}
-    lines = []
-    for e in rx["exposures"]:
-        d = plan_["deltas"].get((role, str(e.get("slot"))), 0)
-        sets = e.get("sets") or []
-        parity = (role, str(e.get("slot"))) in {tuple(k) for k in plan_.get("parity") or []}  # FIX7: a net-zero move stands
-        if d > 0 and not parity and _muscle(e, ctx) in (ctx.get("stimulus_hold") or set()):
-            d = 0  # #5861 FIX6 (ruling 9): a progressing priority muscle at MEV takes no extra sets (`live_rulings.stimulus_gate`)
-        if not d or not sets:
-            continue
-        was = len(sets)
-        if d < 0 and was + d <= 0:  # #5861 FIX4: the weekly redline drops a whole accessory (drop, don't shave)
-            e["live_alloc_drop"] = True
-        for _ in range(abs(d)):
-            if d > 0:
-                if len(sets) >= max(was, SLOT_MAX):  # #5861 FIX7: an added set never takes a slot past 3 (4+ is junk volume)
-                    break
-                sets.append(dict(sets[-1]))
-            elif len(sets) > int(ALLOCATION["over_mav_floor"]["value"]):
-                sets.pop()
-        m = _muscle(e, ctx)
-        lm = marks.get(m) or {}
-        why = (
-            f"{m} {plan_['before'][m]:g} (MAV {lm.get('MAV')}) gives sets to the priority muscles and the weekly redline"
-            if d < 0
-            else f"{m} at {plan_['before'][m]:g} (MEV {lm.get('MEV')}): a priority muscle takes the freed sets first"
-        )
-        title = (ctx["catalog"].get(e.get("movement_key")) or {}).get("title") or e.get("movement_key")
-        lines.append(
-            f"allocation (live): {title} {was} -> {0 if e.get('live_alloc_drop') else len(sets)} sets — {why} (ALLOCATION, heuristic)"
-        )
-    rx["exposures"] = [e for e in rx["exposures"] if not e.get("live_alloc_drop")]
-    return lines
-
-
-def _skipped(ctx: dict[str, Any]) -> Any:
-    """The role(s) a short / dip week does not draft (#5861 FIX5: the week plan's), else None."""
-    from training.live_program import SHORT_WEEK_SKIP
-
-    return tuple(ctx.get("week_skip") or ()) or (SHORT_WEEK_SKIP if ctx.get("short_week_host") else None)
-
-
-def _muscle(e: dict[str, Any], ctx: dict[str, Any]) -> str:
-    from training import live_week
-
-    return live_week.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
-
-
-def allocated_week(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any = None) -> Counter:
-    """The program week's sets per landmark muscle AFTER the allocation (`live_week.week_sets` reads it). `skipped` (#5861 FIX6):
-    the roles this week does not draft — so a time trim never reads a skipped day's sets as surplus."""
-    return Counter(allocation_plan(catalog, lib, skipped)["after"])
 
 
 # ── 5. the adherence dip ─────────────────────────────────────────────────────
-def adherence_response(workouts: Any, as_of: str, lib: dict[str, Any] | None = None) -> dict[str, Any] | None:
-    """{missed, planned, performed, mode} after a dip: `behind` (the keep-the-anchors week, `behind_schedule_week`) or `dip`
-    (the default `adherence_response` `short_week`); None when adherence is fine, unread, or the response is `trim_sets`."""
-    from training import live_week
-
-    s = _settings(lib)
-    monday = week_start(as_of)  # judged ONCE a week, as of its Monday: every morning of the week gets the same answer
-    # #5861 FIX5: on the record BEFORE the Monday — the week's own sessions never flip its answer (the sequence reads it too)
-    workouts = None if workouts is None else [w for w in workouts if str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < monday]
-    if s.get("behind_schedule_week"):
-        got = live_week.behind_schedule(workouts, monday, lib)
-        return {**got, "mode": "behind"} if got else None
-    if s.get("adherence_response") != "short_week":
-        return None
-    got = live_week.behind_schedule(workouts, monday, lib, force=True)
-    return {**got, "mode": "dip"} if got else None
-
-
-def week_start(day: str) -> str:
-    """The Monday of `day`'s calendar week (a dip read on Thursday would count Monday-Wednesday's own sessions and flip the
-    answer mid-week); `day` itself when it does not parse."""
-    from common.pacific_time import parse_day_key, shift_day_key
-
-    d = parse_day_key(str(day)[:10])
-    return shift_day_key(d.isoformat(), -d.weekday()) if d else day
-
-
-def lighter_week(rx: dict[str, Any], ctx: dict[str, Any], dip: dict[str, Any] | None) -> list[str]:
-    """IN PLACE, the default dip response: every anchor whole, every accessory (bar a pinned slot) at ADHERENCE_DIP
-    accessory_sets, the routine fitted to its session_minutes (`live_session.fit_routine`); the trunk floor waits."""
-    if not dip or dip.get("mode") != "dip":
-        return []
-    from training import selection_live
-
-    role = str(rx.get("session_role") or "")
-    pinned = {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{role}.")}
-    n = int(ADHERENCE_DIP["accessory_sets"]["value"])
-    off = 0
-    for e in rx["exposures"]:
-        if e.get("kind") == "accessory" and e.get("slot") not in pinned and e.get("intensity") != "carry":
-            while len(e.get("sets") or []) > n:
-                e["sets"].pop()
-                off += 1
-    ctx["behind"] = dip  # the trunk floor waits (live_program.trunk_floor)
-    minutes = int(ADHERENCE_DIP["session_minutes"]["value"])
-    rx.setdefault("live_session_cap", minutes)
-    return [
-        f"adherence dip (live): {dip['performed']} of {dip['planned']} planned sessions done in 14 days — a shorter week he can "
-        f"keep: anchors whole, accessories at {n} sets ({off} off), ~{minutes} min (adherence_response=short_week, ADHERENCE_DIP, "
-        "heuristic)"
-    ]
 
 
 # ── 6. the library fallback ──────────────────────────────────────────────────
@@ -497,12 +137,12 @@ def library_fallbacks(e: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     """An accessory's last resort after its slot's ranked fallbacks: the library's members of the same movement pattern
     whose landmark muscle is the slot's, best hypertrophy tier for that muscle first, then familiar first. Catalog-writable
     only (the generator can write it). Equipment, pain, gates and the joint limits are judged by the caller."""
-    from training import live_week, selection_live
+    from training import live_volume, selection_live
 
     if e.get("kind") != "accessory":
         return []
     cur = _entry(e.get("movement_key"), ctx) or _entry(e.get("slot"), ctx)
-    pattern, muscle = cur.get("pattern"), _muscle(e, ctx)
+    pattern, muscle = cur.get("pattern"), live_volume.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
     if not pattern or pattern in ("carry", "cardio", "other"):
         return []
     to_cat = {lid: k for k, lid in ctx["idx"]["to_lib"].items()}
@@ -512,7 +152,7 @@ def library_fallbacks(e: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
         key = to_cat.get(lid)
         if not key or entry.get("pattern") != pattern:
             continue
-        if live_week.landmark_muscle(key, ctx["catalog"], ctx["lib"]) != muscle:
+        if live_volume.landmark_muscle(key, ctx["catalog"], ctx["lib"]) != muscle:
             continue
         tier = selection_live.objective_tier(entry, "hypertrophy", muscle)
         if tier is None:
@@ -617,7 +257,7 @@ def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
     gap — the guideline floor less the walking credit less every block performed this week (since its Monday) — is at least
     CARDIO_ROOM's minimum block. Steps first, then only the structured minutes that close the gap (third red team: the
     conservative credit must not turn into an easy block every morning). A hard kind, or unread steps: (True, [])."""
-    from training import cardio_model, live_program, live_week
+    from training import cardio_model, live_program, live_sequence
 
     aer = live.get("aerobic") or {}
     if kind in live_program.HARD_KINDS or not aer or aer.get("volume_covered"):
@@ -629,7 +269,7 @@ def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
             f"cardio (live): no easy block — steps ~{aer.get('steps_per_day')}/day, intensity unknown: reported, not a deficit "
             "(ruling 12; WALK_PROMPT active_steps, heuristic)"
         ]
-    since, day = week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
+    since, day = live_sequence.week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
     done = sum(
         int(r.get("duration_sec") or 0) // 60
         for rows in (live.get("by_machine") or {}).values()
@@ -638,7 +278,7 @@ def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
     )
     walk = int(aer.get("walking_min_per_wk") or 0)
     gap = int(cardio_model.WEEKLY_MODERATE_MIN[0]) - walk - done
-    floor = int(live_week.CARDIO_ROOM["min_block"]["value"])
+    floor = EASY_MIN_BLOCK
     if gap < floor:
         return False, [
             f"cardio (live): no easy block — recorded walking (~{walk} moderate min/wk credited) and {done} min of blocks this "
@@ -652,9 +292,9 @@ def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
 def min_block(kind: str, hard_min: int) -> int:
     """The shortest block worth serving under the shared cap: CARDIO_ROOM's minimum for an easy block (a stub is worthless),
     `hard_min` for a conditioning block (its intervals or tempo still fit)."""
-    from training import live_program, live_week
+    from training import live_program
 
-    return hard_min if kind in live_program.HARD_KINDS else int(live_week.CARDIO_ROOM["min_block"]["value"])
+    return hard_min if kind in live_program.HARD_KINDS else EASY_MIN_BLOCK
 
 
 def _unavailable(key: str, lib: dict[str, Any] | None) -> bool:
@@ -692,13 +332,3 @@ def machine_label(notes: str, lib: dict[str, Any] | None) -> str:
 
 
 # ── 9. the rate band, by setting ─────────────────────────────────────────────
-def rate_band(fatigue: dict[str, Any] | None, sleep_hours: Any, lib: dict[str, Any] | None = None) -> dict[str, Any]:
-    """`health.rate_policy.propose_band` with the owner's `body_fat_tier` (None = unknown, today) and `rate_band_mode`."""
-    from health import rate_policy
-
-    s = _settings(lib)
-    short = sleep_hours is not None and float(sleep_hours) < 6.5
-    band = rate_policy.propose_band(
-        body_fat_tier=s.get("body_fat_tier") or None, fatigue_level=(fatigue or {}).get("fatigue_level"), recovery_low=short or None
-    )
-    return {**band, "mode": str(s.get("rate_band_mode") or "advisory"), "body_fat_tier": s.get("body_fat_tier") or "unknown"}

@@ -831,9 +831,9 @@ def _effort_conflicts(week: dict[str, Any]) -> list[str]:
 
 
 def _redline() -> int:
-    from training.live_shape import week_redline
+    from training import owner_redlines
 
-    return week_redline()
+    return int(owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"][1])
 
 
 def _session_effort_conflicts(week: dict[str, Any]) -> list[str]:
