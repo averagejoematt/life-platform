@@ -54,7 +54,7 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
 4) | False (the fifth round's easy-gap block); `cardio_room_takes` `over_mav_only` (ruling 1: no strength work a muscle needs is
 cut for cardio) | `as_fix5`; `lead_lift_rule` `alternate_weekly` (ruling 5) | `off`; `press_sets` 3 (ruling 6: 2-3 sets; 1 = the
 charter's one set); `priority_add_rule` `stimulus_and_performance` (ruling 9) | `volume`; `rate_ceiling_pct_bw` 1.0 (ruling 11,
-advisory only); `hard_conditioning_doses` 1 (#5861 FIX7, OWNER DECISION: the shared cap's one hard dose a week; 2 adds a second
+advisory only); `hard_conditioning_doses` 1 (#5861 FIX7, owner ruling 2026-11-13: the shared cap's one hard dose a week, kept a setting; 2 adds a second
 hard block on `SECOND_HOST`, never the heavy lower day or the session before it — the sixth red team's option, not the default)."""
 SECOND_HOST = "upper_volume"
 """The second hard dose's morning under `hard_conditioning_doses` 2: never the heavy lower day nor the session before it (the
@@ -489,6 +489,9 @@ HEURISTIC_HOOKS: dict[str, str] = {
     "live_stimulus.PARITY": "priority-muscle sets vs the donors' and both muscles' rep PRs",
     "live_week.FAMILIAR_SWAP": "RPE logged on a familiar swap's first 2 exposures (over target = restore the novelty cap)",
 }
-"""Ruling 18: every labelled heuristic table the live engine reads -> the metric that should re-tune it at a block retro. The
+"""Ruling 18: every labelled heuristic table the live engine reads -> the metric that should re-tune it at a block retro.
+Provenance (owner rulings 2026-11-13, FIX7 follow-up): `hard_conditioning_doses` = 1 is ruled (a setting, re-tuned on
+`live_week.CARDIO_ROOM`'s metric), and ruling 17 is clarified — glute stretch credit only for genuinely lengthened loading
+(`quality_rubric.STRETCH_CAPS` empty, rubric 3.5.0), not a heuristic and so not a hook. The
 doc's "Block-retro hooks" table lists each key (tests/test_owner_rulings_5861.py holds the doc and this dict to each other, and
 each key to a real labelled table)."""

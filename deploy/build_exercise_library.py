@@ -116,7 +116,11 @@ OWNER_RULED_SETTINGS: dict[str, Any] = {
     "rate_ceiling_pct_bw": 1.0,  # ruling 11: ~1 % of current bodyweight a week, the advisory upper planning reference
     "symptom_line": "",  # ruling 10 (follow-up): no symptom warning line on any session
     "symptom_line_on_lifting_days": False,  # ruling 10
+    "hard_conditioning_doses": 1,  # owner ruling 2026-11-13 (FIX7 follow-up): one hard conditioning dose a week; kept a setting
 }
+"""#5861 FIX7 also records the owner's 2026-11-13 clarification of ruling 17 (no setting: the rubric itself, quality_rubric 3.5.0):
+glute stretch credit only for genuinely lengthened loading, the same standard as every muscle — short-range glute lifts (kickbacks,
+hip thrust variants) earn no stretch credit (`quality_rubric.STRETCH_CAPS` empty)."""
 
 
 def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:

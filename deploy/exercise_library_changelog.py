@@ -76,4 +76,13 @@ BUILDER_CHANGE_LOG = [
         "objective (ruling 16).",
         "rule": "rulings are configuration only — status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.3.4",
+        "date": "2026-11-13",
+        "by": "#5861 FIX7 (the sixth red team; owner rulings of 2026-11-13: hard_conditioning_doses = 1, ruling 17 clarified)",
+        "what": "Rubric 3.5.0: glute stretch credit only for genuinely lengthened loading, the same standard as every muscle (owner "
+        "ruling 2026-11-13) — the barbell hip thrust A by its trial's equivalence with the squat, no glute S; the press family's elbow "
+        "(and the barbell bench's wrist) rated by implement; `programming_settings.hard_conditioning_doses` 1 (owner ruling).",
+        "rule": "configuration and data only — status stays proposed until the owner approves the library",
+    },
 ]

@@ -103,7 +103,9 @@ FREE_WEIGHT_CARRYOVER = 1  # a free-weight compound's carryover; the ONLY term w
 # any known glute length: it cannot separate glute movements, and it no longer costs them. Every S criterion and the S quota
 # still apply unchanged (unknown length still scores 0 -> NEUTRAL).
 STRETCH_CAPS: dict[str, tuple[str, str, str]] = {}
-"""3.5.0 (#5861 FIX7, the sixth red team on ruling 17): EMPTY. The 3.4.0 glute override held the stretch term at its top for any
+"""3.5.0 (#5861 FIX7, the sixth red team on ruling 17; owner ruling 2026-11-13 clarifying ruling 17: "glute stretch credit only
+for genuinely lengthened loading, the same standard as other muscles; short-range lifts (kickbacks, hip thrust variants) earn no
+stretch credit"): EMPTY. The 3.4.0 glute override held the stretch term at its top for any
 known glute length — not "the same standard as other muscles" (ruling 17's words): it credited shortened-position glute work
 (kickbacks, the machine hip thrust) with a lengthened premium no other muscle gets, and squat-depth work points the other way
 for the glutes. Glute rows now score length like every muscle (lengthened 5 · mid 3 · short 1); the barbell hip thrust's S is
