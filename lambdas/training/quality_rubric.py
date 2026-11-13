@@ -205,7 +205,10 @@ FUNCTIONS = ("hip_flexion", "grip", "wrist_flexion", "wrist_extension", "forearm
 LEVELS = ("low", "moderate", "high")
 LIMITERS = ("target", "balance", "grip", "mobility", "trunk", "other_muscle", "technique", "cardio")
 OVERLOAD = ("maximal", "submaximal", "bodyweight", "light")
-FUNCTIONAL_QUALITIES = ("unilateral", "balance", "carry", "locomotion", "trunk_stability", "multiplanar", "power")
+FUNCTIONAL_QUALITIES = ("unilateral", "balance", "carry", "locomotion", "trunk_stability", "multiplanar", "power", "joint_capacity")
+"""`joint_capacity` (#5861 L6): loaded work for a small stabiliser controlling a joint the big lifts load (rotator-cuff rotation,
+lower-trap / serratus scapular control, tibialis and ankle, the adductor isometric). One quality: B loadable, C otherwise —
+it never reaches S (S still needs a carry or single-leg work under travel or trunk load)."""
 MOBILITY_TYPES = ("passive", "active", "loaded", "motor_control")
 CONDITIONING_KEYS = ("aerobic", "control", "impact", "recovery")
 # Each movement's `objective_inputs` (the builder derives them by rule; the reviewed layer overrides): field -> allowed values.

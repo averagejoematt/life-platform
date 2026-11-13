@@ -25,9 +25,9 @@ import functools
 from typing import Any
 
 from training import (
-    fatigue_model,
     in_block_variant,
     lift_note,
+    live_session,
     load_ramp,
     program_structure,
     routine_generator as _rg,
@@ -253,6 +253,11 @@ def _fit_session_shape(
         rationale.append(
             f"OVER the {caps['session_minutes']}-min lifting cap at ~{shape['lifting_minutes']} min — anchors are never cut for time; flagged"
         )
+    # #5861 L6, live only: a fatigue-trimmed lift says so on its note; the routine as written (warm-ups included) is fitted to the
+    # ceiling, accessories first; then the live fit's and the fatigue model's lines. Shadow: nothing changes, `shape` returns.
+    live_session.annotate_blocks(blocks, rx)
+    shape = live_session.fit_routine(blocks, rx, int(caps["session_minutes"]), load_catalog.get("movements") or {}, rationale, shape)
+    rationale += live_session.rationale_lines(rx)
     return shape
 
 
@@ -311,7 +316,8 @@ def _prescription(
         accessory_variants=rotation["variants"],
         measured_minutes=session_time.role_median_minutes(block_workouts, day_entry["session_role"]),  # #5799
     )
-    rx = fatigue_model.for_live_draft(rx, rotation, inputs, block_workouts)  # #5861 L3: LIVE only — in shadow it returns rx itself
+    # #5861 L3/L6: LIVE only — equipment and pain on every exposure, then the fatigue model; in shadow it returns rx itself
+    rx = live_session.for_live_draft(rx, rotation, inputs, block_workouts, movements)
     return in_block, rotation, rx
 
 
@@ -341,13 +347,13 @@ def full_body_routines(
         f"archetype={archetype}; program=v{program_structure.PROGRAM_VERSION}; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
     ]
     rationale.append(_sequence_line(day_entry))
-    rationale += rotation["rationale"]
+    rationale += live_session.rotation_lines(rotation)  # #5861 L6: live drops the pool lines the selection replaced
     if deload and rx.get("deload_trim"):
         t = rx["deload_trim"]
         rationale.append(f"deload: sets {t['sets_before']} -> {t['sets_after']} ({t['pct']}%), loads held")
     if day_entry.get("optional"):
         rationale.append(f"OPTIONAL session — {day_entry.get('gate') or 'not required this week'}")
-    drop_accessories = autoreg <= _AUTOREG_DROP_ACCESSORIES_AT
+    drop_accessories = live_session.drop_accessories(autoreg, rx, rationale, _AUTOREG_DROP_ACCESSORIES_AT)  # shadow: as before
     if drop_accessories:
         rationale.append("recovery/ACWR red: accessories dropped (§3 — the first thing dropped on a bad day); anchors unchanged")
     z2_floor = week_cfg.get("z2_floor_minutes", 90)
@@ -400,8 +406,8 @@ def full_body_routines(
     }
     total_sets = sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     assert total_sets <= caps["total_sets"], f"BUG: total_sets {total_sets} > cap {caps['total_sets']}"
-    shape = _fit_session_shape(blocks, rx, caps, load_catalog, rationale)  # #5069: the charter's session shape
-    est_minutes = shape["lifting_minutes"]
+    shape = _fit_session_shape(blocks, rx, caps, load_catalog, rationale)  # #5069: the charter's session shape (#5861 L6 live fit)
+    est_minutes, total_sets = shape["lifting_minutes"], shape.get("working_sets", total_sets)  # #5861 L6: after a live time fit
 
     budget_used: dict[str, int] = {}
     for b in blocks:

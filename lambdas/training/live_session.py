@@ -1,0 +1,339 @@
+"""live_session.py — the session-level half of the LIVE policy (#5861 L6): what the drafted session itself must respect
+once the exercise library is `approved` (`selection_engine.mode() == "live"`). In shadow every function here returns its
+input untouched, before reading anything (tests/test_no_live_change_5861_l6.py proves the served drafts byte-identical).
+
+WHY IT EXISTS. The integrated engine was run over synthetic sample weeks (scripts/sample_weeks_5861.py) and inspected like a
+coach would. Four things the selection engine cannot see — it ranks accessory slots, like for like — broke the session:
+
+  1. EQUIPMENT AND PAIN ON EVERY EXPOSURE. The selection excludes an unavailable or pain-flagged movement from an accessory
+     slot, but an ANCHOR is resolved by `program_structure` from its catalog list, and a slot with no eligible candidate
+     falls back to the template's accessory: both could prescribe a machine the gym lacks or the press his pain note named.
+     Here every exposure is checked against the library's home_gym availability (`selection_engine.availability`) and the
+     #5806 pain class (`selection_engine.pain_exclusion`): an anchor takes the next member of its pattern that is available,
+     pain-free and prescribable; an accessory takes the slot's first usable selection fallback; with neither the exposure is
+     SKIPPED and said so — never an impossible or painful prescription, never a filler.
+  2. ONE GRADED REDUCER. Today a red readiness tier (or an ACWR "high") drops EVERY accessory (`_autoreg_multiplier` 0.6).
+     Both are HR-derived (Whoop recovery, Whoop strain), and HR is not effort evidence until a post-regime baseline exists
+     (owner ruling); a red week stripped the aesthetic day to one press set and left every muscle under its MEV. Under live
+     the fatigue model is the one reducer: readiness and ACWR are ONE vote among its independent strain signals (sleep, cardio
+     load, weekly sets, strength trend, effort drift), and two or more take accessory sets off in steps, anchors held.
+  3. THE 75-MINUTE CEILING ON THE ROUTINE AS WRITTEN. The prescription is fitted to the ceiling before the warm-up pass, which
+     adds a "find the load" set to every movement with no recent load — so a session with new accessories ran ~80 minutes.
+     Here the routine's own minutes (`session_shape.routine_minutes`, warm-ups as written) are fitted: accessories go,
+     last-listed first; anchors never (the charter's rule, `trim_to_time`).
+  4. ONE STORY. The rotation's pool lines ("rotated: X -> Y") describe the #5075 pools the live selection replaced; under live
+     only the selection's own lines are kept, and every live change (a fatigue reduction, a skipped or swapped exposure, a
+     time trim) is written into the rationale and onto the first lift's Hevy note.
+
+Every rule here is a heuristic over existing owner rulings (75-minute ceiling, accessories first, anchors never cut, the pain
+class, home_gym availability); none is a new number.
+"""
+
+from __future__ import annotations
+
+import copy
+from typing import Any
+
+ISSUE = "#5861"
+MODE_LIVE = "live"
+MARK = "live_session"
+"""The prescription key that says this draft ran the live session fit (absent in shadow, so every later hook is a no-op)."""
+POOL_LINE_PREFIXES = ("rotated:", "held:")
+GRADED_MARK = "live: one HR-derived vote"
+"""The rationale words a live draft writes when readiness/ACWR reached the drop line; `routine_title.format_why_note` reads
+them so the WHY line never says "deloading today" for a session the fatigue model only trimmed."""
+SKILL_CEILING = 2  # the week grid's accessory ceiling (#4080); the four core anchor families resolve at the ruling's own
+
+
+def is_live(rotation: dict[str, Any] | None) -> bool:
+    return ((rotation or {}).get("selection") or {}).get("mode") == MODE_LIVE
+
+
+# ── 1. equipment and pain on every exposure ──────────────────────────────────
+STRESS_ORDER = {"low": 0, "moderate": 1, "high": 2}
+JOINTS = ("shoulder", "elbow", "wrist", "spinal_load", "shear")
+NOT_LIFTS = ("duration", "distance_duration", "short_distance_weight", "weight_duration", "floors_duration", "steps_duration")
+
+
+def _entry(key: str | None, ctx: dict[str, Any]) -> dict[str, Any] | None:
+    lid = ctx["idx"]["to_lib"].get(str(key)) if key else None
+    return (ctx["lib"].get("movements") or {}).get(lid) if lid else None
+
+
+def _blocked(key: str | None, ctx: dict[str, Any], anchor: bool) -> tuple[str, str] | None:
+    """(code, why) when `key` can't be prescribed today — `equipment` (home_gym), `pain` (a #5806 pain-class note) or, on an
+    anchor, `discomfort` (two discomfort-class notes in 14 days: an accessory's own discomfort is the selection's call) —
+    else None. A movement the library can't place is judged by nothing (the selection's own rule)."""
+    from training import selection_engine as se
+
+    if not key or key not in ctx["catalog"]:
+        return ("catalog", "not in the movement catalog")
+    entry = _entry(key, ctx)
+    if entry is None:
+        return None
+    why = se.availability(entry, ctx["lib"], ctx["overlay"])
+    if why:
+        return ("equipment", why)
+    why = se.pain_exclusion(entry, ctx["overlay"])
+    if why:
+        return ("pain", why)
+    if anchor and str(entry.get("template_id") or "").upper() in ctx["discomfort"]:
+        return ("discomfort", "two discomfort-class notes on it inside 14 days (fatigue_model, heuristic)")
+    return None
+
+
+def _worst_joint(entry: dict[str, Any] | None) -> tuple[str, int] | None:
+    stress = (entry or {}).get("joint_stress") or {}
+    known = [(j, STRESS_ORDER[str(stress.get(j))]) for j in JOINTS if str(stress.get(j)) in STRESS_ORDER]
+    return max(known, key=lambda x: x[1]) if known else None
+
+
+def _anchor_candidates(e: dict[str, Any], ctx: dict[str, Any], role: str | None) -> list[str]:
+    """The role's own pinned members for the pattern (`anchor_keys`), else the pattern's listed members (moderate members
+    first on a moderate exposure), then every catalog movement of that anchor family, best strength-then-hypertrophy rating
+    first — the order the anchor lists themselves encode."""
+    from training import program_structure as ps
+
+    a = ps.ANCHORS.get(str(e.get("pattern"))) or {}
+    pinned = list(((ps.SESSION_TEMPLATES.get(str(role)) or {}).get("anchor_keys") or {}).get(str(e.get("pattern"))) or [])
+    keys = list(a.get("moderate_catalog_keys") or []) if e.get("intensity") == "moderate" else []
+    keys = pinned + keys + list(a.get("catalog_keys") or [])
+    rank = {t: i for i, t in enumerate("SABCD")}
+
+    def tier(k: str) -> tuple[int, int, str]:
+        r = (_entry(k, ctx) or {}).get("ratings") or {}
+        return (rank.get(str((r.get("strength") or {}).get("tier")), 9), rank.get(str((r.get("hypertrophy") or {}).get("tier")), 9), k)
+
+    family = sorted((k for k, c in ctx["catalog"].items() if c.get("anchor_family") == e.get("pattern")), key=tier)
+    return list(dict.fromkeys(keys + family))
+
+
+def _slot_fallbacks(e: dict[str, Any], rotation: dict[str, Any]) -> list[str]:
+    sel = (rotation.get("selection") or {}).get("slots") or []
+    role = ((rotation.get("slots") or [{}])[0]).get("role")
+    hit: dict[str, Any] = next((s for s in sel if s.get("role") == role and s.get("incumbent") == e.get("slot")), {})
+    return [str(f["catalog_key"]) for f in hit.get("fallbacks") or [] if f.get("catalog_key")]
+
+
+def _replacement(e: dict[str, Any], code: str, ctx: dict[str, Any], rotation: dict[str, Any], taken: set[str]) -> str | None:
+    """The first usable replacement: for an anchor its pattern's members (`_anchor_candidates`) at the ceiling the anchor
+    resolves at (the #4080 exemption for the four core families only); for an accessory the slot's selection fallbacks.
+    After a PAIN or DISCOMFORT flag the replacement must load the flagged movement's worst joint strictly less (the library's
+    joint-stress ratings) — another press with the same shoulder stress is not an answer to a shoulder pain note."""
+    from training import program_conflicts
+
+    anchor = e.get("kind") == "anchor"
+    ruling = program_conflicts.ANCHOR_SKILL_CEILING_RULING
+    exempt = anchor and e.get("pattern") in ruling["exempt_families"]
+    ceiling = int(ruling["effective_ceiling"]) if exempt else ctx["ceiling"]
+    worst = _worst_joint(_entry(e.get("movement_key"), ctx)) if code in ("pain", "discomfort") else None
+    pool = _anchor_candidates(e, ctx, ctx.get("role")) if anchor else _slot_fallbacks(e, rotation)
+    for k in pool:
+        c = ctx["catalog"].get(k) or {}
+        if k in taken or int(c.get("skill_tier", 99)) > ceiling or c.get("hevy_type") in NOT_LIFTS:
+            continue
+        if worst and STRESS_ORDER.get(str(((_entry(k, ctx) or {}).get("joint_stress") or {}).get(worst[0])), 9) >= worst[1]:
+            continue
+        if _blocked(k, ctx, anchor) is None and _servable(k, ctx) is None:
+            return k
+    return None
+
+
+def _servable(key: str, ctx: dict[str, Any]) -> str | None:
+    """A REPLACEMENT must also be servable the way the selection serves one: no locking gate (fail-closed here — the swap
+    never opens a gate the selection has not) and no `not_for_you_now`. The served movement itself is never re-judged on these."""
+    from training import selection_engine as se
+
+    entry = _entry(key, ctx)
+    if entry is None:
+        return None
+    return ("gate locked" if se.locked_gates(entry, ctx["lib"]) else None) or se.not_for_you_now(entry)
+
+
+def fit_exposures(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
+    """IN PLACE on `rx["exposures"]`: every exposure the gym can't serve or his pain note names is swapped (module doc 1) or
+    skipped. Returns the rationale lines. Sets, reps, rest and the slot are kept; only the movement changes."""
+    lines: list[str] = []
+    keep: list[dict[str, Any]] = []
+    taken = {str(e.get("movement_key")) for e in rx["exposures"] if e.get("movement_key")}
+    for e in rx["exposures"]:
+        hit = _blocked(e.get("movement_key"), ctx, e.get("kind") == "anchor") if e.get("movement_key") else None
+        if not hit:
+            keep.append(e)
+            continue
+        code, why = hit
+        old = e["movement_key"]
+        new = _replacement(e, code, ctx, rotation, taken)
+        name = (ctx["catalog"].get(old) or {}).get("title") or old
+        if new:
+            taken.add(new)
+            keep.append(e | {"movement_key": new, "template_id": None, "live_swap": {"from": old, "code": code}})
+            lines.append(f"swapped (live): {name} -> {(ctx['catalog'].get(new) or {}).get('title') or new} — {code}: {why}")
+        elif code == "discomfort":
+            keep.append(e)
+            lines.append(f"kept (live): {name} — {why}, but no member loads its joints less; the fatigue model weighs it")
+        else:
+            lines.append(
+                f"skipped (live): {name} — {code}: {why}; "
+                + (
+                    "no usable member of its pattern loads that joint less"
+                    if code != "equipment"
+                    else "no member of its pattern is available"
+                )
+                + " — nothing fills it"
+            )
+    rx["exposures"] = [{k: v for k, v in e.items() if not (k == "template_id" and v is None)} for e in keep]
+    return lines
+
+
+def for_live_draft(
+    rx: dict[str, Any],
+    rotation: dict[str, Any] | None,
+    inputs: Any,
+    block_workouts: list[dict[str, Any]] | None,
+    catalog_movements: dict[str, Any] | None = None,
+) -> dict:
+    """The draft path's live hook (`full_body_session._prescription`): equipment and pain on every exposure, then the fatigue
+    model (`fatigue_model.for_live_draft`, its one graded reduction). In shadow: `rx` itself, nothing read. Never raises."""
+    if not is_live(rotation):
+        return rx
+    from training import fatigue_model
+
+    out = copy.deepcopy(rx)
+    lines: list[str] = []
+    try:
+        from training import selection_engine as se
+
+        lib = se.load_library_failsoft() or {}
+        catalog = catalog_movements or {}
+        sig = fatigue_model.movement_signals(block_workouts, as_of=str(getattr(inputs, "target_date", ""))) if block_workouts else {}
+        hurts = {
+            tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
+        }
+        ctx = {
+            "lib": lib,
+            "catalog": catalog,
+            "idx": se.key_index(lib, catalog),
+            "overlay": se.load_overlay_failsoft(),
+            "ceiling": SKILL_CEILING,
+            "role": rx.get("session_role"),
+            "discomfort": hurts,
+        }
+        lines += fit_exposures(out, rotation or {}, ctx)
+        _refit(out)
+    except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
+        lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
+        out = copy.deepcopy(rx)
+    before = [len(x["sets"]) for x in out["exposures"]]
+    out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts)
+    for x, n in zip(out["exposures"], before):
+        if len(x["sets"]) < n:
+            x["live_reduced"] = n - len(x["sets"])
+    out[MARK] = {"issue": ISSUE, "lines": lines}
+    return out
+
+
+def _refit(rx: dict[str, Any]) -> None:
+    from training.session_cues import exposure_cue
+    from training.session_shape import session_minutes_estimate
+
+    for e in rx["exposures"]:
+        e["cue"] = exposure_cue(e["intensity"], e["sets"])
+    rx["total_sets"] = sum(len(e["sets"]) for e in rx["exposures"])
+    rx["session_minutes"] = session_minutes_estimate(rx["exposures"])
+
+
+# ── 2. one graded reducer ────────────────────────────────────────────────────
+def drop_accessories(autoreg: float, rx: dict[str, Any], rationale: list[str], drop_at: float) -> bool:
+    """Shadow: today's rule exactly (`autoreg <= drop_at`, 0.6, drops every accessory). Live: never wholesale — the fatigue
+    model's graded reduction already took its sets (module doc 2), and the HR-derived tier is one of its votes."""
+    if MARK not in rx:
+        return autoreg <= drop_at
+    if autoreg <= drop_at:
+        fat = rx.get("fatigue") or {}
+        rationale.append(
+            f"readiness/ACWR at the drop line (autoreg {autoreg:.2f}) — {GRADED_MARK} in the fatigue model, not a "
+            f"wholesale accessory drop; the model reads {fat.get('state') or 'unknown'} and took {fat.get('sets_removed') or 0} "
+            "accessory set(s), anchors held"
+        )
+    return False
+
+
+# ── 3. the 75-minute ceiling on the routine as written ───────────────────────
+def _unpair(blocks: list[Any], sid: Any) -> None:
+    from training.program_structure import EXPOSURES
+
+    for b in blocks:
+        if sid is not None and getattr(b, "superset_id", None) == sid:
+            b.superset_id = None
+            if not getattr(b, "rest_seconds", None):
+                b.rest_seconds = int(EXPOSURES["accessory"]["rest_seconds"])
+
+
+def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict[str, Any], rationale: list[str], shape: dict) -> dict:
+    """IN PLACE: under live, drop accessory blocks, last-listed first, until the routine's minutes as written (warm-ups
+    included) fit `cap`; anchors never. Returns the session shape (re-measured when anything went). Shadow: `shape`."""
+    if MARK not in rx or shape.get("lifting_minutes") is None or shape["lifting_minutes"] <= cap:
+        return shape
+    from training import program_structure
+    from training.session_shape import routine_minutes
+
+    before, dropped = shape["lifting_minutes"], []
+    while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
+        idx = next((i for i in range(len(blocks) - 1, -1, -1) if str(blocks[i].rationale_tag or "").startswith("accessory:")), None)
+        if idx is None:
+            break
+        cut = blocks.pop(idx)
+        _unpair(blocks, getattr(cut, "superset_id", None))
+        dropped.append((movements.get(cut.movement_key) or {}).get("title") or cut.movement_key)
+    from training import warmup_sets
+
+    new = program_structure.enforce_session_shape(blocks, movements) | {
+        "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
+    }
+    line = f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min lifting cap — dropped {', '.join(dropped)} -> ~{new['lifting_minutes']} min"
+    rx[MARK]["lines"].append(line)  # `rationale_lines` writes it
+    rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]
+    return new
+
+
+# ── 4. one story ─────────────────────────────────────────────────────────────
+def rotation_lines(rotation: dict[str, Any]) -> list[str]:
+    """The rotation's rationale. Live: the #5075 pool lines for slots the selection served are dropped (they name movements
+    the session does not serve); the selection's own lines say what serves and why. Shadow: unchanged."""
+    lines = list(rotation.get("rationale") or [])
+    if not is_live(rotation) or rotation.get("source") != "selection":
+        return lines
+    served = {s.get("slot_id") for s in rotation.get("slots") or [] if s.get("source") in ("selection", "ledger", "owner_approved")}
+    return [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
+
+
+def rationale_lines(rx: dict[str, Any]) -> list[str]:
+    """The live fit's lines and the fatigue model's decision, for the rationale. Shadow: []."""
+    if MARK not in rx:
+        return []
+    out = list(rx[MARK]["lines"])
+    fat = rx.get("fatigue") or {}
+    if fat:
+        sig = ", ".join(fat.get("strain_signals") or []) or "none"
+        out.append(
+            f"fatigue (live): {fat.get('state')} — strain signals: {sig}; {fat.get('action')}"
+            + (f", {fat.get('sets_removed')} accessory set(s) off, anchors held" if fat.get("sets_removed") else "")
+            + ("; a deload is RECOMMENDED — it applies only on your word" if (fat.get("deload") or {}).get("recommended") else "")
+        )
+    return out
+
+
+def annotate_blocks(blocks: list[Any], rx: dict[str, Any]) -> None:
+    """IN PLACE, live only: each lift the fatigue model took sets from says so on its own Hevy note, in the critic-change
+    grammar (`session_block.applied_clause` — "2 sets today: recovery."). Matched by movement key (unique in a session).
+    Shadow: nothing."""
+    if MARK not in rx:
+        return
+    from training import session_block, warmup_sets
+
+    cut = {e.get("movement_key") for e in rx.get("exposures") or [] if e.get("live_reduced")}
+    for b in blocks:
+        if b.movement_key in cut:
+            clause = session_block.applied_clause("set_count", working_sets=warmup_sets.working_set_count(b.sets), reason="recovery")
+            b.notes = session_block.add_reason(b.notes, clause)

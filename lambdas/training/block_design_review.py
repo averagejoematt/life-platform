@@ -180,7 +180,12 @@ def why(slot: Mapping[str, Any], recent: set[str], replaced: Mapping[str, Any]) 
         parts.append(f"{p.get('tier')} because {p['c_reason'].get('code')}: {p['c_reason'].get('why')}")
     if slot.get("lengthened_swap"):
         parts.append(f"taken as the week's lengthened-bias movement for {muscle}")
-    if p.get("catalog_key") == replaced.get("catalog_key"):
+    rot = p.get("rotation") or {}  # #5861 L6: a LIVE pick carries its hold/rotate decision; a shadow pick never does
+    if rot.get("action") == "hold":
+        now = f"held: {rot.get('reason')} (trend {rot.get('trend') or 'unknown'}) — the live policy rotates only for a named trigger"
+    elif rot.get("action") == "rotate":
+        now = f"rotates for a named trigger — {rot.get('trigger')}: {rot.get('why')}; it replaces {replaced.get('title')} ({replaced.get('source')})"
+    elif p.get("catalog_key") == replaced.get("catalog_key"):
         now = f"it holds from last block ({replaced.get('source')}); nothing ranked above it is servable"
     else:
         now = f"block start: the slot rotates, and it now outranks {replaced.get('title')} ({replaced.get('source')})"

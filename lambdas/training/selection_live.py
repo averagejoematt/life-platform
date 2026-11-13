@@ -256,13 +256,18 @@ def _trigger(prev: str, eligible: list[dict[str, Any]], excluded: list[dict[str,
         return "stall", c, trend
     if (c["n1"].get("components") or {}).get("swap_out") == -1:
         return "adherence", c, trend
-    if c["tier"] not in pool:
-        return "pool_change", c, trend
+    if c["tier"] not in pool and any(x["tier"] in pool and _open(x, policy) for x in eligible):
+        return "pool_change", c, trend  # #5861 L6: only when a better band is SERVABLE this week (not every member at its cap)
     pos = policy.get("position") or {}
     if int(pos.get("phase") or 0) == 1 and int(pos.get("step") or 0) > 0 and trend != "progressing":
         if held_weeks(policy.get("rows"), pos, ctx["slot_id"], prev) >= MAX_HOLD_WEEKS:
             return "block_end_review", c, trend
     return None, c, trend
+
+
+def _open(c: dict[str, Any], policy: dict[str, Any]) -> bool:
+    """The candidate can still take a slot this week under the repetition cap (`MAX_WEEKLY_EXPOSURES`)."""
+    return (policy.get("week_counts") or Counter())[_fam(c)] < MAX_WEEKLY_EXPOSURES
 
 
 def family(movement_id: Any, catalog_key: Any, lib: dict[str, Any] | None) -> str:

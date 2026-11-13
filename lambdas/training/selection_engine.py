@@ -366,9 +366,9 @@ def _exclusion(lid: str, e: dict[str, Any], ck: str | None, ctx: dict[str, Any])
     if ctx["floor_members"] is not None and ck not in ctx["floor_members"]:
         return "weekly_floor", f"not a {ctx['floor']} member — the weekly floor serves only its family here (#5759)"
     if is_novel(e, ctx["catalog"].get(ck or "")):
-        from training import form_cue_sheets
+        from training import selection_cue_sheets  # #5861 L6: the form-guidance sheets + the selection's own
 
-        if form_cue_sheets.sheet_for(str(e.get("title") or "")) is None:
+        if selection_cue_sheets.sheet_for(str(e.get("title") or "")) is None:
             return "not_prescribable", "new to him and no cue sheet exists for it"
     return None
 
@@ -506,12 +506,12 @@ def fallbacks(pick: dict[str, Any], ranked: list[dict[str, Any]], *, novel_budge
 def _novel_terms(pick: dict[str, Any]) -> dict[str, Any] | None:
     if not pick.get("novel"):
         return None
-    from training import form_cue_sheets, layoff_tiers
+    from training import layoff_tiers, selection_cue_sheets
 
     return {
         "caps": dict(layoff_tiers.EXPOSURE_CAPS),
         "ruling": layoff_tiers.OD1_RULING,
-        "cue_sheet": form_cue_sheets.sheet_for(str(pick["title"] or "")),
+        "cue_sheet": selection_cue_sheets.sheet_for(str(pick["title"] or "")),
     }
 
 

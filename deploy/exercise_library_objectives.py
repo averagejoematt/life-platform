@@ -25,6 +25,7 @@ import re
 from typing import Any
 
 import exercise_library_targets as targets
+from training import quality_rubric as rubric
 
 # ── category, trunk function, distinct functions ──────────────────────────────────────────────────────────────────
 _MOBILITY_RE = re.compile(
@@ -105,6 +106,13 @@ _UNILATERAL_RE = re.compile(
 _MULTIPLANAR_RE = re.compile(r"lateral|side lunge|alt side|cossack|curtsy|3 way|rotational|crossover|drop step|skater|twist", re.I)
 _LOCOMOTION_RE = re.compile(r"walk\w*|carry|carries|farmers|sled|crawl\w*|bear|march", re.I)
 _OFFSET_RE = re.compile(r"suitcase|offset|single arm|one arm|1 arm|overhead|renegade|landmine", re.I)
+# #5861 L6: loaded work for a small stabiliser that controls a joint the big lifts load — rotator-cuff rotation, lower-trap
+# and serratus scapular control, tibialis / ankle, the adductor isometric — rated on functional, never on growth alone
+_JOINT_CAPACITY_RE = re.compile(
+    r"(?:external|internal) rotation|rotator cuff|\by raises?\b|trap ?3|serratus|push ?up plus|tibialis|"
+    r"inversion|eversion|copenhagen|scap(?:ular)? (?:push|pull|row)",
+    re.I,
+)
 _POWER_RE = re.compile(
     r"clap|high pulls?|shouldering|jump\w*|hops?|bound\w*|pogos?|plyo\w*|clean|snatch|jerk|swing|slam\w*|throw\w*|toss|shot put|sprint\w*",
     re.I,
@@ -194,7 +202,9 @@ def _functional(e: dict[str, Any]) -> list[str]:
         q.add("multiplanar")
     if cat == "athletic" and _POWER_RE.search(t):
         q.add("power")
-    return [x for x in ("unilateral", "balance", "carry", "locomotion", "trunk_stability", "multiplanar", "power") if x in q]
+    if _JOINT_CAPACITY_RE.search(t) or e.get("pattern") == "shoulder_rotation":
+        q.add("joint_capacity")
+    return [x for x in rubric.FUNCTIONAL_QUALITIES if x in q]
 
 
 # modality -> (aerobic, intensity control, impact, recovery demand); heuristics, first match wins
@@ -299,7 +309,10 @@ def evaluate_entry(key: str, e: dict[str, Any], hyp_row: Any) -> None:
     e["category"] = "strength" if key in targets.STRENGTH_LIFTS else category(e)
     if key in targets.CATEGORY_OVERRIDES:
         e["category"] = targets.CATEGORY_OVERRIDES[key][0]
-    tf = trunk_function(e)
+    declared = e.get("expansion_profile") if isinstance(e.get("expansion_profile"), dict) else {}
+    if declared.get("category") in rubric.CATEGORIES:  # #5861 L6: an L2 addition's declared type is reviewed data, not a title guess
+        e["category"] = declared["category"]
+    tf = declared.get("trunk_function") if declared.get("trunk_function") in rubric.TRUNK_FUNCTIONS else trunk_function(e)
     if tf:
         e["trunk_function"] = tf
     fns = functions(e)

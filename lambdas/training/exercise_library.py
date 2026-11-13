@@ -587,14 +587,21 @@ def classify_availability_note(text: str) -> list[dict[str, str]]:
 # ── fallbacks ────────────────────────────────────────────────────────────────────────────────────────────────────
 _PATTERNS: tuple[tuple[str, str], ...] = (
     ("calf", r"calf"),
+    # #5861 L6: a reverse Nordic is a knee EXTENSION (it was read as a leg curl); internal/external rotation is the cuff (it
+    # was read as trunk rotation); a curl-up is trunk flexion (it was read as a biceps curl); a band walk is hip abduction
+    # (any "walk" was read as cardio)
+    ("leg_extension", r"leg extension|sissy|reverse nordic|spanish squat"),
     ("leg_curl", r"leg curl|nordic|hamstring curl"),
-    ("leg_extension", r"leg extension|sissy"),
+    ("shoulder_rotation", r"(?:external|internal) rotation|rotator cuff"),
+    ("hip_abduction", r"hip abduction|band walks?|monster walk|lateral (?:band )?steps?|clam ?shell"),
+    ("hip_adduction", r"hip adduction|copenhagen"),
     ("hip_extension", r"hip thrust|glute bridge|back extension|hyperextension|pull through|kickback|rear kick|reverse hyper"),
     ("hinge", r"deadlift|\brdl\b|good morning|swing"),
     ("squat", r"squat|leg press|lunge|step up|split"),
     ("vertical_pull", r"pull ?up|chin ?up|pulldown|pullover"),
     ("horizontal_pull", r"\brows?\b|rowing|t bar"),
     ("triceps_extension", r"tricep|triceps|skull|pushdown|push ?away|kickback|jm press|dip"),
+    ("core_flexion_curl_up", r"curl[- ]ups?\b"),
     ("curl", r"curl|21s"),
     ("vertical_press", r"overhead press|shoulder press|military press|arnold|landmine press|pike|handstand"),
     ("lateral_raise", r"lateral raise|upright row|y raise"),
@@ -604,7 +611,7 @@ _PATTERNS: tuple[tuple[str, str], ...] = (
     ("carry", r"carry|carries|farmers|suitcase|sled|prowler"),
     ("core_anti", r"plank|pallof|dead bug|bird dog|ab wheel|rollout"),
     ("core_flexion", r"crunch|sit up|v up|leg raise|knee raise|rotation|twist|side bend|oblique"),
-    ("cardio", r"treadmill|cycling|bike|elliptical|rowing machine|stair|walk"),
+    ("cardio", r"treadmill|cycling|bike|elliptical|rowing machine|stair|\bwalk(?:ing|s)?\b"),
     ("olympic", r"clean|snatch|jerk|high pull"),
     ("shrug", r"shrug"),
 )
@@ -614,7 +621,7 @@ def movement_pattern(title: str) -> str:
     t = (title or "").lower()
     for name, pat in _PATTERNS:
         if re.search(pat, t):
-            return name
+            return "core_flexion" if name == "core_flexion_curl_up" else name
     return "other"
 
 
