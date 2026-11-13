@@ -40,7 +40,7 @@ SHORT_WEEK_PLANS: dict[int, dict[str, Any]] = {
         "partners": {},
         "host": "lower_volume",
         "label": HEURISTIC,
-        "basis": "four mornings: shoulders+arms goes first (L5's rule) — both lower days and both upper days keep their anchors; "
+        "basis": "four mornings: the shoulders_arms role goes first (L5's rule) — both lower days and both upper days keep their anchors; "
         "the delts and arms sit at their floor for one week",
     },
     3: {
@@ -48,15 +48,15 @@ SHORT_WEEK_PLANS: dict[int, dict[str, Any]] = {
         "partners": {"lower_volume": "upper_volume"},
         "host": "lower_volume",
         "label": HEURISTIC,
-        "basis": "three mornings: upper heavy, lower heavy, then a FULL-BODY day (lower volume + the upper-volume anchors) — legs "
-        "and the upper body each train twice (an A/B/full week; practitioner consensus: two exposures a week per muscle)",
+        "basis": "three mornings: the heavy upper and heavy lower roles, then a FULL-BODY day (the lower_volume role + the "
+        "upper_volume anchors) — legs and the upper body each train twice (an A/B/full week; practitioner consensus)",
     },
     2: {
         "skip": ("shoulders_arms", "upper_volume", "lower_volume"),
         "partners": {"upper_heavy": "lower_volume", "lower_heavy": "upper_volume"},
         "host": "lower_heavy",
         "label": HEURISTIC,
-        "basis": "two mornings: two FULL-BODY days (upper heavy + the lower-volume anchors; lower heavy + the upper-volume "
+        "basis": "two mornings: two FULL-BODY days (upper_heavy + the lower_volume anchors; lower_heavy + the upper_volume "
         "anchors) — never an upper half and a lower half (the fifth red team's 2-day week: chest 2 sets, abs 0)",
     },
     1: {
@@ -64,7 +64,7 @@ SHORT_WEEK_PLANS: dict[int, dict[str, Any]] = {
         "partners": {"upper_heavy": "lower_volume"},
         "host": "upper_heavy",
         "label": HEURISTIC,
-        "basis": "one morning: one full-body session (upper heavy + the lower-volume anchors) — a holding week",
+        "basis": "one morning: one full-body session (upper_heavy + the lower_volume anchors) — a holding week",
     },
 }
 """Mornings this week -> the plan. A partner role's ANCHORS join its host session (`live_rules.full_body`); the session set cap

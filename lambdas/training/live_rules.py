@@ -70,7 +70,7 @@ KB_FILLER: dict[str, Any] = {
     "label": HEURISTIC,
     "basis": "the kettlebell deadlift is an entry drill into the swing (owner ruling #5774); for a lifter whose record holds a "
     "loaded barbell or trap-bar deadlift it trains a hinge he already loads far heavier — one bell sits under a working effort "
-    "(fifth red team: a 2 x 6-8 'RPE 7-8' with one light bell is junk volume counted as glute sets). The swing serves when "
+    "(fifth red team: two sets with one light bell is junk volume counted as glute sets). The swing serves when "
     "servable; else the slot is dropped",
 }
 SELF_REPORT: dict[str, Any] = {

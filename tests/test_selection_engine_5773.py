@@ -264,12 +264,12 @@ def test_a_stale_overlay_pain_tag_is_not_trusted_to_exclude():
 
 
 def test_not_for_you_now_excludes_as_its_own_verdict():
-    lib = _lib()
+    lib = _preacher_s_lib()  # #5861 FIX5: the preacher family's S is the machine's; the dumbbell is planted back to the slot's S
     e = lib["movements"]["preacher_curl_dumbbell"]
     e["not_for_you_now"] = {"reason_code": "planted", "unlock_condition": "a test"}
     assert se.not_for_you_now(e) and se.pain_exclusion(e, None) is None
     assert "preacher_curl_dumbbell" not in _served_anywhere(_week(lib=lib))
-    assert "preacher_curl_dumbbell" in _served_anywhere(_week())  # control: unplanted, it serves
+    assert "preacher_curl_dumbbell" in _served_anywhere(_week(lib=_preacher_s_lib()))  # control: unplanted, it serves
 
 
 def test_preacher_curl_barbell_is_unlocked_by_the_owner_ruling():
@@ -379,9 +379,19 @@ def test_each_muscle_gets_a_lengthened_movement_or_says_why():
 
 
 # ── novelty budget ───────────────────────────────────────────────────────────
+def _preacher_s_lib() -> dict:
+    """The dumbbell preacher curl planted as the only S-tier curl (#5861 FIX5: its family's S is now the machine's)."""
+    lib = _lib()
+    for k, other in lib["movements"].items():
+        if other["target"]["primary"] == "biceps":
+            for r in other["hypertrophy"]:
+                r["tier"] = "S" if k == "preacher_curl_dumbbell" else ("A" if r["tier"] == "S" else r["tier"])
+    return lib
+
+
 def _novel_curl_lib() -> dict:
     """The dumbbell preacher curl as new to him AND the slot's only S-tier curl (the other S curls planted down to A)."""
-    lib = _lib()
+    lib = _preacher_s_lib()
     e = lib["movements"]["preacher_curl_dumbbell"]
     e["source"], e["history"] = "expansion", None
     for k, other in lib["movements"].items():
