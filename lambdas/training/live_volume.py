@@ -162,7 +162,8 @@ def targets(lib: dict[str, Any], mornings: int, high_fatigue: bool = False) -> d
             out[m] = {"floor": n, "aim": n, "cap": mav}
         elif short:
             floor = max(float(cfg.value("slot_min_sets")), math.ceil(mv * mornings / 3)) if (m in prio or m in MAJOR) else 0.0
-            out[m] = {"floor": floor, "aim": floor, "cap": mav}
+            aim = max(floor, math.ceil(mev * mornings / 3)) if m in prio else floor  # a priority muscle aims at MEV pro rata
+            out[m] = {"floor": floor, "aim": aim, "cap": mav}
         elif m in prio:
             out[m] = {"floor": mev, "aim": mev + round(float(cfg.value("priority_aim")) * (mav - mev)), "cap": mav}
         elif mornings == 4 and m in FOUR_DAY_MEV:  # ruling 3: the week without shoulders+arms holds them at MEV, counted
@@ -434,6 +435,39 @@ def apply(rx: dict[str, Any], ctx: dict[str, Any], plan: dict[str, Any]) -> list
                 }
             )
     return lines
+
+
+FULL_BODY_PAIRS: tuple[tuple[str, str], ...] = (("bench", "row"), ("squat", "vertical_pull"), ("hinge", "overhead_press"))
+"""A full-body morning's paired sets (anchor + its antagonist or the other half of the body, rest after the pair): what makes 4-6
+movements at 2-3 sets fit 75 minutes with the warm-ups as written. Heuristic (practitioner consensus: paired sets keep the
+work and save the rest)."""
+
+
+def pair_anchors(rx: dict[str, Any], plan: dict[str, Any]) -> list[str]:
+    """A full-body morning's paired sets (after the programming pass has ordered the session). Returns the line."""
+    if not (plan["week"].get("partners") or {}).get(str(rx.get("session_role") or "")):
+        return []
+    return _pair_anchors(rx["exposures"])
+
+
+def _pair_anchors(exposures: list[dict[str, Any]]) -> list[str]:
+    """IN PLACE: FULL_BODY_PAIRS on a full-body morning's anchors (superset ids above any accessory pair). Returns the line."""
+    sid = max([int(e.get("superset_id") or 0) for e in exposures] + [0])
+    done = []
+    for a_pat, b_pat in FULL_BODY_PAIRS:
+        free = [e for e in exposures if e.get("kind") == "anchor" and not e.get("superset_id")]
+        a = next((e for e in free if e.get("pattern") == a_pat), None)
+        b = next((e for e in free if e.get("pattern") == b_pat), None)
+        if a is None or b is None:
+            continue
+        sid += 1
+        exposures.remove(b)
+        exposures.insert(exposures.index(a) + 1, b)
+        a["superset_id"] = b["superset_id"] = sid
+        b["rest_seconds"] = max(int(a.get("rest_seconds") or 0), int(b.get("rest_seconds") or 0))
+        a["rest_seconds"] = 0
+        done.append(f"{a_pat} + {b_pat}")
+    return [f"paired sets (live): {', '.join(done)} — a full-body morning's rest taken after each pair"] if done else []
 
 
 def _resize(e: dict[str, Any], n: int) -> None:

@@ -271,6 +271,7 @@ def for_live_draft(
         lines += fit_exposures(out, rotation or {}, ctx)
         live_load.mark_novelty(out, ctx, block_workouts)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)
+        lines += live_volume.pair_anchors(out, plan)
         tids = {str(catalog.get(str(e.get("movement_key")), {}).get("hevy_template_id_hint") or "").upper() for e in out["exposures"]}
         anchors = _anchor_tids(catalog)
         hist = live_load.history(block_workouts, (tids | anchors) - {""})
