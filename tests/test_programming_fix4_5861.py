@@ -119,27 +119,36 @@ def test_knee_and_hip_are_in_the_library_by_class_and_never_in_the_rubric():
 
 
 def knee_breaches(w: dict) -> list[str]:
-    """A knee-pain week's breaches: a high-knee-stress lift served at all, or any knee-loading (moderate+) lift above RPE 7."""
+    """A knee-pain week's breaches (#5861 FIX7: the PROVOKING pattern, not every knee-loading lift): a high-knee-stress lift served
+    at all, or a squat-pattern (knee-dominant, the flag's group) lift loading the knee at moderate above RPE 8 — the pain-free /
+    priority route's cap. A hinge that loads the knee moderately is not the provoking pattern and keeps its effort."""
     out = []
     for s in w["week"]["sessions"]:
         for x in s["lifts"]:
-            knee = str((_entry(w, x["key"]).get("joint_stress") or {}).get("knee"))
-            if knee == "high" or (knee == "moderate" and _top_rpe(x["hevy_note"]) > 7):
+            e = _entry(w, x["key"])
+            knee = str((e.get("joint_stress") or {}).get("knee"))
+            squat = lp._group(e.get("pattern")) == "squat"
+            if knee == "high" or (squat and knee == "moderate" and _top_rpe(x["hevy_note"]) > 8):
                 out.append(f"{s['role']}: {x['key']} knee {knee} @ RPE {_top_rpe(x['hevy_note']):g}")
     return out
 
 
 def test_a_knee_flag_reduces_or_avoids_every_knee_dominant_pattern(weeks):
-    """Stress case g (knee pain 5/10 on the squat): no high-knee pattern served, every knee-loading lift at RPE <= 7. Control: the
-    note's site ignored (the old worst-joint inference) -> the flag reads 'spinal load' and lunges stay at RPE 8-9."""
+    """Stress case g (knee pain 5/10 on the squat): no high-knee pattern served, the knee-dominant (squat-pattern) work only as a
+    lower-knee-stress route at RPE <= 8 with the stop line; the quadriceps (a priority muscle) keep a route (#5861 FIX7: never zero
+    for a week on one flag). Control: the pain rule itself off -> knee-loading lifts at RPE 8-9."""
     for cap in (False, True):
         g = weeks[("g_knee_pain_garage_short", cap)]
         assert knee_breaches(g) == [], cap
         assert any("(knee, 5/10)" in ln for s in g["week"]["sessions"] for ln in s["rationale"])
-    # control (#5861 FIX5: with the note's site ignored the inferred joint now also avoids the squat pattern, so the old control
-    # no longer breaches): the pain rule itself off -> knee-loading lifts at RPE 8-9
+        quads = sw.hard_sets_by_muscle(g["week"], g["world"]["lib"], g["world"]["catalog"]["movements"]).get("quadriceps", 0)
+        assert quads > 0, (cap, quads)
     old = _week("g_knee_pain_garage_short", {(lp, "apply_joint_rule"): lambda rx, ctx, rot, flags: []})
     assert knee_breaches(old)
+    from training import live_pain
+
+    none = _week("g_knee_pain_garage_short", {(live_pain, "priority_ceiling"): lambda *a: None})  # control: no priority route
+    assert sw.hard_sets_by_muscle(none["week"], none["world"]["lib"], none["world"]["catalog"]["movements"]).get("quadriceps", 0) < quads
 
 
 # ── 2. mild pain keeps the lift lighter; the in-set stop line ────────────────
@@ -240,7 +249,9 @@ def test_the_session_line_never_contradicts_a_big_lift(weeks):
         (lsafe, "coherent_effort"): lambda blocks, rx: None,
         (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block, rx, blocks),
     }
-    assert session_conflicts(_week("g_knee_pain_garage_short", off)["week"])  # control: the per-lift guard only
+    assert session_conflicts(
+        _week("b_shoulder_flag_low_recovery", off)["week"]
+    )  # control: the per-lift guard only (FIX7: the knee case no longer caps the hinge)
 
 
 # ── 5. volume ────────────────────────────────────────────────────────────────

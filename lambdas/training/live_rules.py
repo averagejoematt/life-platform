@@ -201,7 +201,9 @@ def isolation_joint_cap(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dic
         entry = _entry(e.get("movement_key"), ctx)
         if entry.get("job") != "isolation" or e.get("intensity") == "carry":
             continue
-        from training.live_program import _group  # #5861 FIX7: only the provoking pattern's isolation — never a lift-only flag
+        from training.live_program import _group  # #5861 FIX7: above the mild line every same-joint isolation; at/under it only the
+
+        # provoking pattern's; a lift-only (<= 2/10 discomfort) flag never
 
         f = next(
             (
@@ -210,7 +212,7 @@ def isolation_joint_cap(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dic
                 for j in f["joints"]
                 if entry.get("pattern") in JOINT_ISOLATION.get(j, ())
                 and f.get("scope") != "lift"
-                and _group(entry.get("pattern")) == f.get("group")
+                and (f.get("tier") == "avoid" or _group(entry.get("pattern")) == f.get("group"))
             ),
             None,
         )

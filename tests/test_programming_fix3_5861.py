@@ -109,16 +109,37 @@ def test_shoulder_provoking_work_reaches_the_pain_rule_and_keeps_its_healthy_joi
     assert ir.apply_class_rules(mv)["shoulder_provoking"] == ["x"] and mv["y"]["joint_stress"]["shoulder"] == "high"
 
 
-def test_a_pain_flag_carries_the_persistence_line_and_the_setting_turns_it_off(weeks):
-    b = weeks[("b_shoulder_flag_low_recovery", False)]["week"]
+BENCH_PAIN = {"pain": [{"movement": "barbell_bench_press", "note": "shoulder pain 3/10 at the bottom of the bench"}]}
+
+
+def _pain_week(patches: dict | None = None, settings: dict | None = None) -> dict:
+    """Profile a with a mild (3/10) shoulder pain note on the bench: kept lighter, never swapped."""
+    prof = PROFILES["a_large_deficit_experienced"] | BENCH_PAIN
+    with patch.dict(sw.SETTINGS, settings or {}):
+        world = sw.build_world(prof, "approved")
+        ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()]
+        for p in ps_:
+            p.start()
+        try:
+            return sw.generate_week(prof, "approved", world)
+        finally:
+            for p in ps_:
+                p.stop()
+
+
+def test_a_pain_flag_carries_the_persistence_line_on_its_own_lift_only(weeks):
+    """#5861 FIX7 (sixth red team: the bench-elbow 'get it assessed' line printed on the squat and the RDL): the persistence line
+    rides the flagged lift (or what stands in for it) and nothing else; the setting turns it off."""
     line = lb.SETTINGS_DEFAULTS["pain_assess_line"]
-    for s in b["sessions"]:
-        notes = [x["hevy_note"] or "" for x in s["lifts"]]
-        assert sum(n.split("\n").count(line) for n in notes) == 1, s["role"]  # once a session, on a lift
-        assert any(ln.startswith("pain (live):") for ln in s["rationale"]), s["role"]
+    on = [x for x in _lifts(_pain_week()) if line in (x["hevy_note"] or "").split("\n")]
+    assert on and {x["key"] for x in on} == {"barbell_bench_press"}, [x["key"] for x in on]
     assert not any(line in (x["hevy_note"] or "") for x in _lifts(weeks[("a_large_deficit_experienced", False)]["week"]))  # no flag
-    off = _week("b_shoulder_flag_low_recovery", settings={"pain_assess_line": ""})  # control: the owner turns it off
-    assert not any(line in (x["hevy_note"] or "") for x in _lifts(off["week"]))
+    from training import live_pain
+
+    first = {(live_pain, "assess_target"): lambda rx, ctx, pains: rx["exposures"][0]}  # control: the old 'first lift' placement
+    assert {x["key"] for x in _lifts(_pain_week(first)) if line in (x["hevy_note"] or "")} - {"barbell_bench_press"}
+    off = _pain_week(settings={"pain_assess_line": ""})  # control: the owner turns it off
+    assert not any(line in (x["hevy_note"] or "") for x in _lifts(off))
 
 
 # ── 2. volume by priority ────────────────────────────────────────────────────
