@@ -99,6 +99,13 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "or the deficit, not the lifts: every load HOLDS and accessory volume comes down about a third",
         "retune": "block retro: anchor e1RM across the block vs sleep and loss rate",
     },
+    "decline_pct": {
+        "value": 0.02,
+        "group": "progression",
+        "basis": "an anchor is DECLINING when its same-role e1RM fell 2%+ over its last three exposures with no recovery between "
+        "(a level under an old best is not a decline: the one-rep-short lifter holds steady)",
+        "retune": "block retro: slump calls vs the next block's anchor e1RM",
+    },
     "slump_accessory_cut": {
         "value": 0.34,
         "group": "progression",

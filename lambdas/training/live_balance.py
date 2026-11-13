@@ -123,7 +123,10 @@ def assess_note(note: str, line: str) -> str:
     """The persistence line as the lift's last own line (never displacing the effort or a reason). Idempotent."""
     if not line or line in note.split("\n"):
         return note
-    return f"{note}\n{line}".strip() if note else line
+    from training import session_block as sb
+
+    block, own = sb.split(note or "")
+    return sb._join(block, sb._own_lines(block, own) + [line])  # fix round 9: the phone budget's fit (the fallback line yields)
 
 
 # ── 4. volume by priority ────────────────────────────────────────────────────

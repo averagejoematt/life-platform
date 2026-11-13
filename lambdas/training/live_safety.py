@@ -139,7 +139,11 @@ def no_step_keys(rx: dict[str, Any]) -> set[str]:
     deload shape, a lift already cut this week, a pain swap."""
     from training import live_session as ls
 
-    out = {str(d["key"]) for d in (rx.get(ls.MARK) or {}).get("load_guard") or [] if d.get("mode") != "up"}
+    out = {
+        str(d["key"])
+        for d in (rx.get(ls.MARK) or {}).get("load_guard") or []
+        if d.get("mode") in ("down", "second") or (d.get("mode") == "hold" and d.get("why") != "reps first")
+    }
     for e in rx.get("exposures") or []:
         swap = (e.get("live_swap") or {}).get("code")
         if e.get("live_load") or e.get("live_stop") or e.get("live_first_back") or swap in ("joint", "pain"):

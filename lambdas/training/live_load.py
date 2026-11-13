@@ -91,28 +91,38 @@ def e1rm(r: dict[str, Any]) -> float:
     return t["kg"] * (1 + (t["reps"] + 10.0 - min(10.0, max(6.0, rpe))) / 30.0)
 
 
+def reps_e1rm(r: dict[str, Any]) -> float:
+    """Plain Epley on the top set (load and reps only): the PERFORMANCE read, blind to the logged RPE (rules 2 and 4)."""
+    t = _top(r)
+    return t["kg"] * (1 + t["reps"] / 30.0)
+
+
 def effort_unknown(rows: list[dict[str, Any]]) -> bool:
-    """Rule 3: no RPE on any set of the recent exposures, or every set at >= implausible_rpe while the reps at the load rose."""
-    recent = rows[: int(cfg.value("step_down_exposures"))]
-    rpes = [s["rpe"] for r in recent for s in r["sets"]]
-    if not rpes or all(x is None for x in rpes):
-        return True
-    hi = float(cfg.value("implausible_rpe"))
-    if any(x is None or x < hi for x in rpes):
-        return False
-    pairs = list(zip(recent[1:], recent))  # (older, newer)
-    return any(_top(b)["kg"] >= _top(a)["kg"] - 0.2 and _top(b)["reps"] > _top(a)["reps"] for a, b in pairs) or len(recent) < 2
+    """Rule 3: the logged RPE carries no information — no RPE on any set of the window's same-role exposures, or every logged
+    set at >= implausible_rpe (a lifter who logs 10 on every set, whatever the reps). Progress then rides on reps and load only,
+    and the lift never steps down on effort."""
+    rpes = [s["rpe"] for r in rows for s in r["sets"]]
+    known = [x for x in rpes if x is not None]
+    return not known or all(x >= float(cfg.value("implausible_rpe")) for x in known)
 
 
 def step_down_due(rows: list[dict[str, Any]], target_rpe: float = TARGET_RPE) -> bool:
-    """Rule 2: the last `step_down_exposures` same-role exposures are each under the best e1RM before them and each logged every
-    set ABOVE the target RPE. One set at or under it vetoes; effort unknown vetoes."""
+    """Rule 2: the last `step_down_exposures` same-role exposures, all at ONE load (a step-down or any load change restarts the
+    count), each with fewer top-set reps than the best done at that same load before them AND each with every set logged ABOVE the
+    target RPE. One set at or under it vetoes; effort unknown vetoes."""
     n = int(cfg.value("step_down_exposures"))
     if len(rows) < n + 1 or effort_unknown(rows):
         return False
+    load = _top(rows[0])["kg"]
+    if any(abs(_top(r)["kg"] - load) > 0.2 for r in rows[:n]):
+        return False
+    base = [b for b in rows[n:] if abs(_top(b)["kg"] - load) <= 0.2]  # the best done AT THIS LOAD before the three
+    if not base:
+        return False
+    best = max(_top(b)["reps"] for b in base)
     for i in range(n):
-        r, before = rows[i], rows[i + 1 :]
-        if e1rm(r) >= max(e1rm(b) for b in before):
+        r = rows[i]
+        if _top(r)["reps"] >= best:
             return False
         if any(s["rpe"] is None or s["rpe"] <= target_rpe for s in r["sets"]):
             return False
@@ -127,11 +137,11 @@ def topped(r: dict[str, Any], rep_hi: int, target_rpe: float, unknown: bool) -> 
 
 
 def declining(rows: list[dict[str, Any]]) -> bool:
-    """A lift's latest same-role exposure sits under the best before it AND under the one before that (two in a row)."""
+    """A lift whose same-role e1RM fell `decline_pct`+ over its last three exposures and did not recover in between."""
     if len(rows) < 3:
         return False
-    best = max(e1rm(r) for r in rows[2:])
-    return e1rm(rows[0]) < best and e1rm(rows[1]) < best and e1rm(rows[0]) <= e1rm(rows[1])
+    drop = float(cfg.value("decline_pct"))
+    return reps_e1rm(rows[0]) <= reps_e1rm(rows[1]) and reps_e1rm(rows[0]) < reps_e1rm(rows[2]) * (1 - drop)
 
 
 def slump(hist: dict[str, list[dict[str, Any]]], anchor_tids: set[str], deficit: bool | None, target_date: str) -> dict[str, Any] | None:
@@ -168,6 +178,16 @@ def layoff(workouts: Any, target_date: str) -> dict[str, Any] | None:
         if da is not None and db is not None and (db - da).days >= int(cfg.value("layoff_days")):
             return {"gap_days": (db - da).days, "last": a, "end": b}
     return None
+
+
+def lead_rows(rows: list[dict[str, Any]], e: dict[str, Any]) -> list[dict[str, Any]]:
+    """The heavy-lower exposures in which this lift LED (owner ruling 5: the lead alternates by ISO week, `live_rulings.lead_of`):
+    a lead's load progresses from its own lead days, never from the capped second-lift day before it. All rows when none led."""
+    from training.live_rulings import lead_of
+
+    pattern = str(e.get("pattern") or "")
+    own = [r for r in rows if lead_of(r["date"]) == pattern]
+    return own or rows
 
 
 def _floor_to_implement(kg: float, equipment: str | None) -> float:
@@ -213,15 +233,12 @@ def decide(
             "clause": f"Lighter today: {cut[1]}.",
         }
     unknown = effort_unknown(rows)
-    if second_band:  # rule 6: its own e1RM at the lower band
+    if second_band:  # rule 6: its own e1RM at the lower band (a logged 9.5-10 read as 9: never a collapse on unreliable RPE)
         lo, hi = second_band
-        kg = _floor_to_implement(e1rm(rows[0]) / (1 + (rep_lo + 10.0 - (lo + hi) / 2) / 30.0), equipment)
-        return {
-            "kg": min(kg, last if not topped(rows[0], rep_hi, TARGET_RPE, unknown) else _step_up(last, equipment)),
-            "mode": "second",
-            "why": f"the second lift: RPE {lo}-{hi}",
-            "clause": f"RPE {lo}–{hi} today: the second lift.",
-        }
+        t = _top(rows[0])
+        best = t["kg"] * (1 + (t["reps"] + 10.0 - min(9.0, max(6.0, t["rpe"] if t["rpe"] is not None else 8.0))) / 30.0)
+        kg = min(_floor_to_implement(best / (1 + (rep_lo + 10.0 - (lo + hi) / 2) / 30.0), equipment), last)
+        return {"kg": kg, "mode": "second", "why": f"the second lift: RPE {lo}-{hi}", "clause": f"RPE {lo}–{hi} today: the second lift."}
     if first_back:
         return {"kg": last, "mode": "hold", "why": "first session back", "clause": "Same load: first session back."}
     if hold_all:
@@ -334,10 +351,11 @@ def set_loads(
         lo = lo if lo != 99 else hi
         rows = same_role(hist.get(tid) or [], role, target_date, lo, hi)
         band = tuple(e["live_effort_band"]) if e.get("live_lead") == "second" and e.get("live_effort_band") else None
+        led = lead_rows(rows, e) if e.get("live_lead") else rows  # rule 6: a lead progresses from its own LEAD exposures
         flag = e.get("live_load") or {}
         cut = (int(flag["pct"]), str(flag.get("why") or "joint flag")) if flag.get("pct") else None
         d = decide(
-            rows,
+            rows if band else led,
             lo,
             hi,
             entry.get("equipment"),
@@ -348,8 +366,12 @@ def set_loads(
         )
         if d is None:
             continue
+        engine = max(float(s.weight_kg) for s in work)
         for s in work:
             s.weight_kg = d["kg"]
+        # the note's reason line only where it changes what he reads: the engine's own load and reason stand when they agree
+        quiet = abs(engine - float(d["kg"])) < 0.2 and d["mode"] in ("up", "hold") and not e.get("live_first_back")
+        d = d | ({"clause": None} if quiet else {})
         rec = {"key": b.movement_key, **d, "last": {"date": rows[0]["date"], "role": rows[0]["role"], **_top(rows[0])}}
         out.append(rec)
         row = rows_out.get(b.movement_key)
@@ -359,13 +381,17 @@ def set_loads(
             row["progression"] = {**(row.get("progression") or {}), "basis": d["mode"], "changes": [], "live_guard": True}
         t = rec["last"]
         rationale.append(
-            f"load (live): {entry.get('title') or b.movement_key} {d['kg'] / KG_PER_LB:g} lb — {d['mode']}: {d['why']} (last "
-            f"{(t['role'] or 'same band').replace('_', ' ')} {t['kg'] / KG_PER_LB:.1f} lb x {t['reps']}"
+            f"load (live): {entry.get('title') or b.movement_key} {_lb(d['kg'])} lb — {d['mode']}: {d['why']} (last "
+            f"{(t['role'] or 'same band').replace('_', ' ')} {_lb(t['kg'])} lb x {t['reps']}"
             + (f" @ RPE {t['rpe']:g}" if t["rpe"] is not None else ", no RPE")
             + ")"
         )
     mark["load_guard"] = out
     return out
+
+
+def _lb(kg: float) -> str:
+    return f"{round(kg / KG_PER_LB * 2) / 2:g}"
 
 
 def slump_trim(rx: dict[str, Any]) -> list[str]:
