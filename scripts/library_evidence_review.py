@@ -607,6 +607,7 @@ def apply_review(lib: dict[str, Any], decided: dict[str, Any]) -> dict[str, Any]
         e["gates"] = [g for g in gates if g in b.cur.GATES and b.cur.GATES[g].get("applies_to") != "all"]
         e.setdefault("not_for_you_now", None)
         e["job"], e["pattern"] = b.job_and_pattern(e)  # rubric v2 scores by job (#5857)
+        b.objectives.evaluate_entry(x["key"], e, b.cur.hyp)  # #5861: category + objective inputs the rubrics read
         mv[x["key"]] = e
     missing = reviews.apply_evidence_changes(mv, acc["evidence_changes"])
     if missing:

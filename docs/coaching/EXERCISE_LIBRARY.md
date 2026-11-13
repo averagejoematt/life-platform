@@ -1,4 +1,4 @@
-# Exercise library (v0.2, PROPOSED) — #5769
+# Exercise library (v0.3, PROPOSED) — #5769, #5857, #5861
 
 The coaching team's menu, chosen **before** drafting: what Matthew has done (his full Hevy history),
 what he could do next (expansion candidates), what each movement trains, what it costs, what it needs,
@@ -17,8 +17,10 @@ records `inputs_snapshot.library_version`. Gate evaluation is #5772; note render
 | `config/exercise_library.json` | The PUBLIC library (built; committed). |
 | `deploy/build_exercise_library.py` | Builder: read-only Hevy history Query + `config/movement_catalog.json` + curation. Preserves `version` / `change_log` / `status`. |
 | `deploy/exercise_library_curation.py` | The hand-authored half: equipment vocabulary, verified citations and each row's evidence, gates, per-template overrides, expansion candidates. |
-| `deploy/exercise_library_targets.py` | The reviewed target-label audit (#5857): library key -> audited primary target + reason. |
-| `lambdas/training/quality_rubric.py` | The quality-tier rubric (#5857): weights, bands, the one-band evidence rule. Pure. |
+| `deploy/exercise_library_targets.py` | The reviewed layer: the target-label audit (#5857), attribute fixes, and (#5861) pattern fixes, categories, strength lifts, objective-input overrides, secondary target rows, canonical families and the reviewed-movement set — one reason per row. |
+| `deploy/exercise_library_objectives.py` | #5861: the rule half of the evaluation layer — category, trunk function, functions, objective inputs, the canonical layer. |
+| `deploy/exercise_library_additions.py` | #5861 lane L2 (optional): new canonical movements, read through `build_exercise_library.library_additions()`. |
+| `lambdas/training/quality_rubric.py` | The rubrics: hypertrophy (points + caps + S criteria, #5857/#5861), strength, functional, conditioning, mobility; `objective_tier()`. Pure. |
 | `lambdas/training/exercise_library.py` | Loader, schema check, gate rules, fallbacks, swap-note classifier, private-overlay join (fail-closed), private gate check. |
 | `deploy/write_exercise_library_overlay.py` | Writer for the OWNER-PRIVATE overlay. Dry-run by default (counts only); `--out FILE`; `--apply` PUTs to S3. |
 | `scripts/check_library_gates_private.py` | Private-side gate completeness check (prints ids + missing field names only). |
@@ -53,7 +55,16 @@ carry_conditioning | core_anti_movement | skill_athletic | corrective) · `lengt
 `evidence_confidence`, `evidence_adjustment` when a direct trial moved it, `citations`, `last_reviewed`) · `gates` ·
 `not_for_you_now` · `availability.home_gym` · `fallbacks` (ranked). Attributes a rule cannot know are `unknown`.
 
-## Quality tiers (#5857, rubric v2.0.0 — owner ruling 2026-11-12)
+#5861 adds: `category` (hypertrophy | strength | conditioning | athletic | mobility | rehab_control | carry) ·
+`trunk_function` on trunk work (loaded_flexion | anti_extension | anti_rotation | anti_lateral_flexion | rotation |
+loaded_stabilisation) · `functions` where present (hip_flexion | grip | wrist_flexion | wrist_extension |
+forearm_rotation) · `canonical` (the family head's key) and `variant` ({axis: value}, or `{duplicate_of}` on an exact
+duplicate) · `objective_inputs` (below) · `ratings` {hypertrophy, strength, functional, conditioning, mobility}, each
+`{tier: S-D | null, basis: [...], evidence_confidence}` (hypertrophy also `target` and `by_target`). A hypertrophy row the
+objective does not apply to carries `tier: null`, `applicable: false` and its reason. The top level carries
+`canonical_families`.
+
+## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.0.0, PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -99,7 +110,8 @@ memory go through the evidence-review allowlist before they back any row.
 **Derived, never authored.** The builder writes `job`, `pattern`, `rubric_score`, `rubric_tier` and `tier` last, from the
 final attributes; `exercise_library.validate` re-derives every row, so a hand-edited tier is a schema error
 (`tests/test_quality_tiers_5857.py`, with its must-fail control). A muscle whose programmable pool (S and A) holds fewer
-than two selectable movements names why in `quality_rubric.TOP_BAND_SHORTFALL` (today: abs and rear delts).
+than two selectable movements names why in `quality_rubric.TOP_BAND_SHORTFALL` (empty since #5861: the ab-wheel rollout
+and the cable reverse fly, once their attributes were reviewed, reach A beside the cable crunch and the machine reverse fly).
 
 **How selection reads it** (`selection_engine`): **S and A are both programmable.** A slot's pool is its top two
 non-empty bands (`pool_tiers`); inside the pool it ranks his N=1 fit first, then slot variety (the movement this slot
@@ -124,6 +136,14 @@ lateral raise's stability re-checked as moderate) and `JOINT_RATINGS_BY_PATTERN`
 on a movement whose pattern it covers, one reason per row; a rated joint is never overwritten, and each fill is recorded
 on the entry as `attribute_audit`. No S or A row carries an unknown joint (`tests/test_quality_tiers_5857.py`).
 
+**v3.0.0 changes to the points (#5861, PROPOSED).** Three terms changed, each for a stated reason: (1) a bodyweight
+*compound* scores 2, not 1, on resistance profile — body mass loads a pull-up's or a dip's working range well; its weak
+point is progression, which progressability already scores; (2) a calisthenics progression ladder (assisted ->
+bodyweight -> weighted, kneeling -> standing; `objective_inputs.ladder`) earns the load-step point; (3) the glute stretch
+term is FIXED at mid for any known length, not only capped: the trial that removed the stretch premium (the shortened hip
+thrust matched the lengthened squat) equally removes the shortened penalty. Then the points band is held under the
+categorical caps below (Objectives).
+
 ## Standing principles (owner ruling 2026-11-12)
 
 These bind every later library and tier decision.
@@ -147,6 +167,133 @@ These bind every later library and tier decision.
    rotate through A, not to hold.
 8. **Every weight change ships with its diff:** a before/after band table of every movement that moves, a version bump,
    and the owner's sign-off before anything serves.
+
+## Objectives (#5861, rubric v3.0.0 — PROPOSED, not live)
+
+**Verdict on the 14-point rubric.** It is fit for one job and was being used for five. As a *hypertrophy stimulus
+profile* for a loadable movement it holds up: its terms (length bias, stability, resistance-curve fit, progressability,
+joint stress), its job classing, "unknown never helps" and the one-band evidence rule are all kept. It was not fit as
+a universal quality score, for four reasons: (1) it rated carries, sleds, cardio, core control and cuff work on muscle
+growth, so they sat at C or D by construction; (2) it had no term for the overload ceiling, for what limits the set,
+or for stimulus-to-fatigue, so balance-limited lunges outscored the barbell squat and an assisted pull-up outscored the
+pull-up; (3) its inputs were mostly title-regex output; (4) a 14-point sum implies a precision the inputs do not have.
+So the points stay, for hypertrophy only, as one input, held under categorical caps; the other four objectives get
+their own small categorical rubrics. No objective is forced: `null` means "not applicable", never "bad".
+
+**The model.** Each movement records reviewed categorical `objective_inputs`; each objective's rubric
+(`training.quality_rubric`) turns them into a tier S-D or null and writes the `basis` it used. The builder writes
+`ratings`; `exercise_library.validate` re-derives them, so a hand-edited rating is a schema error. The one accessor for
+consumers is `quality_rubric.objective_tier(entry, objective, target=None)`. `hypertrophy[].tier` stays populated (it IS
+the hypertrophy objective's tier per target), so the selection engine and every existing reader keep working.
+
+| Input (`objective_inputs`) | Values | What it says |
+|---|---|---|
+| `ceiling` | high · moderate · low · unknown | can the TARGET be overloaded progressively, in small steps, to failure (the overload ceiling) |
+| `limiter` | target · balance · grip · mobility · trunk · other_muscle · technique · cardio | what ends the set for the primary target (a secondary row carries its own) |
+| `systemic_fatigue` | low · moderate · high | whole-body cost per hard set: the fatigue side of stimulus-to-fatigue |
+| `resistance_class` | maximal · submaximal · bodyweight · light | absolute loading class, for strength |
+| `strength_lift` | true / false | one of the primary strength lifts (`STRENGTH_LIFTS`) |
+| `ladder` | true / false | a calisthenics progression ladder exists |
+| `functional` | unilateral · balance · carry · locomotion · trunk_stability · multiplanar · power | the functional qualities it trains |
+| `conditioning` | {aerobic, control, impact, recovery} or null | the conditioning profile of a modality |
+| `mobility` | passive · active · loaded · motor_control or null | the mobility / joint-function type |
+| `reviewed` | true / false | checked by hand in the #5861 pass (else rule-derived only) |
+
+**A. Hypertrophy (per target muscle).** The v3 points band, then caps: a low or unknown ceiling, or a limiter that is
+not the target, holds the row at B; any unmet **S criterion** holds it at A. S needs ALL of: the points band is S; the
+ceiling is high; the target is the limiter; stability high or moderate (it can be taken near failure); systemic
+fatigue not high; no joint rated high. A direct trial still moves the capped tier at most one band, and never to S
+unless every S criterion holds. Not applicable (null) to categories conditioning, mobility, rehab_control, carry and
+athletic, to a `full_body` / `cardio` / `other` target, and to isometric trunk control (anti-rotation, anti-lateral
+flexion, loaded stabilisation).
+
+**B. Strength.** Applies to a loadable multi-joint strength pattern (squat, hinge, press, pull, carry). S = a primary
+strength lift + maximal resistance class + self-stabilised (free weight or bodyweight) + bilateral. A = maximal class
+(a plate-loaded machine, a non-primary barbell lift, a sled) or a bodyweight pull/dip ladder. B = submaximal (dumbbell,
+kettlebell, landmine, cable, selectorized). C = other bodyweight. D = light. Fatigue is reported in the basis and weighed
+by selection, never a demotion: the heavy lifts are costly and are still the strength lifts.
+
+**C. Functional.** Applies when the movement trains at least one functional quality. S = three or more qualities,
+loadable, not high-skill, no joint rated high, AND a carry or single-leg work under travel or trunk load. A = two or more
+loadable (or three or more). B = two, or one loadable. C = one.
+
+**D. Conditioning.** Applies to a conditioning modality (and to carries, sleds and athletic drills with a conditioning
+profile). S = aerobic stimulus high + intensity control high + impact low + recovery demand low. A = aerobic high + low
+impact, or aerobic moderate + low impact + low recovery demand. B = aerobic high, or moderate without high impact.
+C otherwise. Never penalised for lacking hypertrophy traits. **One rule per movement:** every modality the cardio model
+(`lambdas/training/cardio_model.py`, lane L4 — it owns cardio) rates is rated by it alone (`conditioning_rating`, with its
+N=1 sustainability from `history.exposures`); the table above applies only to what it does not model (carries, athletic
+drills, bodyweight circuits).
+
+**E. Mobility / joint function.** Applies to mobility, rehab/control and loaded end-range movements. Loaded (strength
+through range plus control: cuff rotations, face pulls, a cossack squat, a dead hang) A; active or motor control B;
+passive C. S needs specificity to a RECORDED limitation, which is owner-private N=1 data, so the public library never
+awards a mobility S.
+
+**Evidence confidence** stays separate from every tier. Hypertrophy rows keep `rct_direct` / `rct_characteristic` /
+`consensus` / `none_reviewed` with their citations. The other four objectives are practitioner-consensus heuristics:
+their rating reads `consensus` when the movement's inputs were reviewed and `none_reviewed` otherwise; no trial is
+claimed behind any single one of them.
+
+**Categories, trunk function, functions.** `category` is the movement's primary type (a label; the verdicts are the
+ratings). Trunk work also carries `trunk_function`, so a crunch (loaded flexion), an ab-wheel rollout (anti-extension), a
+Pallof press (anti-rotation), a side plank or suitcase carry (anti-lateral flexion), a twist (rotation) and a carry
+(loaded stabilisation) are told apart. Hip flexion and the forearm functions (grip, wrist flexion, wrist extension,
+forearm rotation) are their own `functions`, distinct from the target muscle.
+
+**The canonical layer.** `CANONICAL_FAMILIES` (`deploy/exercise_library_targets.py`) names a head per family, its exact
+duplicates (aliases: the same movement under another Hevy template, e.g. the two farmer's walks) and its variants with
+their axes (grip, stance, range, tempo, equipment, resistance, laterality: the eleven lat pulldowns, the six cable
+crossovers, the pull-up and push-up ladders). Every existing key and Hevy template id keeps its own entry and history;
+`exercise_library.canonical_of(lib, key_or_template_id)` resolves either to the head. An alias takes its head's reviewed
+attributes, so the same movement can never score twice. `tests/test_objective_ratings_5861.py` holds every pre-#5861 key
+and template id to resolve.
+
+**Limits — the tiers are not universal truths.** They are categorical judgements over recorded attributes, most of them
+practitioner consensus, a few backed by a direct trial. They rank movements *for an objective, for a typical trained
+adult*, not for everyone: a movement can be S for one objective and C or null for another, and that is the point. The
+bands carry no precision finer than their inputs; two movements in one band are not ranked against each other by the
+tier. They say nothing about dose, frequency or how a movement fits a session — that is selection, the fatigue model
+and the program.
+
+**How individual response modifies rankings.** The tier is the prior; the person decides. Inside a slot's programmable
+pool, the owner-private N=1 fit ranks first (progression on the movement, pain history, sentiment, swap-outs;
+`selection_engine.n1_fit`); a `pain`-class note excludes a movement; equipment availability and the gates remove what
+cannot be done; a mobility S exists only against a recorded limitation. A movement that keeps progressing for him
+outranks a higher-tier one that does not, and a pain signal outranks any tier.
+
+**The reviewed-attribute pass.** Fixed as data, each with a one-line reason in the reviewed layer: the walking lunge is
+no longer cardio (the `walking` word); the crossover step-up is a step-up, not a chest fly; the cuff external rotations
+are `shoulder_rotation`, not trunk flexion; the weighted push-up, pull-up and chin-up are free weight, like the weighted
+dip; push-ups and step-ups have a length rule (mid); the Pallof press targets the abs everywhere; the dumbbell rear-delt
+flies are dumbbells, the cable reverse fly is mid-length; the ab wheel is lengthened anti-extension; the linear leg press
+and the inverted row are typed by what they are; the triceps kickbacks are triceps extensions; the rowing machine is
+cardio; the military press is the barbell overhead press (an alias). `REVIEWED_KEYS` lists every movement checked by
+hand; a hypertrophy S/A/B row, or an S/A on another objective, outside it is red.
+
+**The owner's anomalies, worked through the framework** (before = rubric v2 hypertrophy tier; after = every objective,
+H / St / F / C / M, "-" = not applicable):
+
+| Anomaly | Movement | Before | After | Why |
+|---|---|---|---|---|
+| Weighted push-up D | push_up_weighted | D | H A · St B | free weight like the weighted dip; push-up length rule (mid); moderate ceiling holds it at A |
+| Pull-ups below pulldowns | pull_up / pull_up_weighted / pull_up_assisted / lat_pulldown_cable | B / B / S / S | H A, St A / H S, St S / H A, St B / H S, St B | body mass loads a compound; the ladder earns the load step; an assisted machine is a regression (moderate ceiling); the weighted pull-up is a primary strength lift |
+| DB lateral raise low | lateral_raise_dumbbell | B | H B | unchanged on purpose: its torque peaks at the shortened top; the cable (S) and machine (A) load the long range. N=1 fit ranks it inside the pool |
+| Step-ups D | step_up / db_step_up | D / C | H C, F B / H B, F A | step-up length rule (mid); balance is the limiter (B cap); rated on functional |
+| Walking lunge D | walking_lunge_dumbbell | D | H B · St B · F S | no longer cardio; balance limits the quads (B); single-leg work under travel is functional S |
+| Farmer's carry C (and its duplicate D) | farmers_walk, farmers_walk_8d414b80 | C / D | H - · St B · F S · C C (both) | an alias pair, one rating; a carry is never judged on hypertrophy |
+| Sled push / pull D | sled_push, sled_drag | D | H - · St A · F A · C B | category carry: loaded locomotion |
+| Ab wheel D | ab_wheel | D | H A · F B | lengthened anti-extension with a kneeling-to-standing ladder |
+| Bird dog / side plank / cuff D | bird_dog, side_plank, rotator_cuff_external_rotation | D / D / D | F C, M B / F B / M A | rehab and control work, rated on functional and joint function, never on growth |
+| Cossack and unusual lunges S for quads | db_cossack_squats, 3_way_lunge, offset_lunges, drop_step_lunges, … | S | quads B (cossack: adductors A, M A; offset: F S) | balance or mobility, not the quads, ends the set; DB held lower-body work has a moderate ceiling. Squats, leg press and split squats now sit above them (A) |
+| All cardio D | treadmill, cycling, elliptical, rowing_machine, air_bike, walking, running | D | H - · C S / S / A / A / B / C / C | rated on conditioning only, by lane L4's cardio model (walking: hard to dose and progress; running: high impact) |
+| No S glute | hip_thrust_machine, glute_kickback_machine, hip_thrust_barbell | A / A / B | S / S / A | glute length fixed at mid both ways (Plotkin 2023); the machines meet every S criterion; the barbell hip thrust's moderate skill and stability hold it at A |
+| Weak adductors | db_cossack_squats, sumo squats, side lunges, squat_barbell | — | adductors A / A / B / A | reviewed secondary rows; adduction machines and Copenhagen work are lane L2's additions |
+| Inconsistent rear delts | rear_delt_reverse_fly_machine / _cable / rear_delt_fly / face_pull | S / B / C / B | S / A / B / B (face pull M A) | the cable fly is mid-length like the machine; the dumbbell flies are dumbbells; the face pull's cuff work is rated on joint function |
+
+**S census.** `_provenance.s_census` reports, per objective and muscle, how many movements are S and how many distinct
+canonical families they are. No quota: every S already met every S criterion of its objective. `tests/test_objective_ratings_5861.py`
+re-checks each S against its criteria.
 
 ## Target-label audit (#5857, owner-approved on PR #5858)
 

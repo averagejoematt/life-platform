@@ -303,6 +303,8 @@ def _plant_top(lib: dict, keep: str, muscle: str, to: str) -> dict:
     for k, e in xl.movements(lib).items():
         if k != keep and (e.get("target") or {}).get("primary") == muscle:
             for r in e["hypertrophy"]:
+                if r["tier"] is None:  # #5861: hypertrophy does not apply to this row (never planted, never ranked)
+                    continue
                 r["tier"] = to if se.TIER_RANK[r["tier"]] < se.TIER_RANK[to] else r["tier"]
     return lib
 

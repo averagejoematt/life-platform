@@ -29,7 +29,7 @@ import exercise_library_targets as targets  # noqa: E402
 
 LIB = json.loads((REPO / "config" / "exercise_library.json").read_text())
 MV = LIB["movements"]
-AUDITED_OVERRIDES = 140  # 2026-11-12, the owner-approved audit on PR #5858; a change here is a reviewed change
+AUDITED_OVERRIDES = 141  # 2026-11-12: the owner-approved audit on PR #5858 (140) + #5861's Pallof press -> abs (reviewed)
 
 
 def _offenders(table: dict, movements: dict) -> list[str]:
