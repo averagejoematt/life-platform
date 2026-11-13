@@ -3300,7 +3300,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "moderate",
+    "elbow": "low",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -3414,7 +3414,17 @@
      "movement_id": "chest_press_machine",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "a dumbbell, machine-handle, cable or landmine press lets the grip and forearm rotate (neutral available): the elbow is low for every member, flat, incline or overhead alike (#5861 FIX7)"
+    }
+   }
   },
   "lat_pulldown_cable": {
    "title": "Lat Pulldown (Cable)",
@@ -4328,8 +4338,8 @@
    "joint_stress": {
     "spinal_load": "low",
     "shear": "low",
-    "wrist": "low",
-    "elbow": "low",
+    "wrist": "moderate",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -4459,6 +4469,13 @@
       "wrist"
      ],
      "rule": "a press loads the shoulder; the trunk is supported on a bench or pad"
+    },
+    "press_family": {
+     "joints": [
+      "elbow",
+      "wrist"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
@@ -4818,7 +4835,7 @@
     "spinal_load": "moderate",
     "shear": "low",
     "wrist": "low",
-    "elbow": "moderate",
+    "elbow": "low",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -4932,7 +4949,17 @@
      "movement_id": "seated_shoulder_press_machine",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "a dumbbell, machine-handle, cable or landmine press lets the grip and forearm rotate (neutral available): the elbow is low for every member, flat, incline or overhead alike (#5861 FIX7)"
+    }
+   }
   },
   "side_bend_dumbbell": {
    "title": "Side Bend (Dumbbell)",
@@ -8091,7 +8118,7 @@
     "spinal_load": "high",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -8226,6 +8253,12 @@
       "wrist"
      ],
      "rule": "a standing overhead press loads the shoulder and the spine"
+    },
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "an alias of overhead_press_barbell"
     }
    }
   },
@@ -8864,7 +8897,7 @@
     "spinal_load": "high",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -8998,6 +9031,12 @@
       "wrist"
      ],
      "rule": "a standing overhead press loads the shoulder and the spine"
+    },
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
@@ -44521,8 +44560,8 @@
    "joint_stress": {
     "spinal_load": "low",
     "shear": "low",
-    "wrist": "low",
-    "elbow": "low",
+    "wrist": "moderate",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -44650,6 +44689,13 @@
       "wrist"
      ],
      "rule": "a press loads the shoulder; the trunk is supported on a bench or pad"
+    },
+    "press_family": {
+     "joints": [
+      "elbow",
+      "wrist"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
@@ -57260,8 +57306,8 @@
    "joint_stress": {
     "spinal_load": "low",
     "shear": "low",
-    "wrist": "low",
-    "elbow": "low",
+    "wrist": "moderate",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -57392,6 +57438,13 @@
       "wrist"
      ],
      "rule": "a press loads the shoulder; the trunk is supported on a bench or pad"
+    },
+    "press_family": {
+     "joints": [
+      "elbow",
+      "wrist"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
