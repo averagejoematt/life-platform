@@ -754,8 +754,9 @@ CURATED: dict[str, dict] = {
         "skill_complexity": "low",
         "equipment": ["calf_raise_seated_machine"],
         "hypertrophy": [
+            # #5861 FIX-DATA: soleus ONLY. The bent knee takes the gastrocnemius out (it did not grow significantly seated in
+            # Kinoshita 2023 — a standing raise trains it), so a seated raise is never credited to it.
             hyp("soleus", "rct_direct", ["kinoshita2023_standing_calf"], "soleus grew similarly seated and standing"),
-            hyp("gastrocnemius", note="did not grow significantly seated in Kinoshita 2023 — prefer a standing raise for it"),
         ],
     },
     "91237BDD": {

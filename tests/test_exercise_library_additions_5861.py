@@ -250,6 +250,10 @@ def _coach_twins() -> set[str]:
     return {k for k in MINE if ((CATALOG.get("movements") or {}).get(k) or {}).get("provenance") == "coach_added"}
 
 
+# `family_sustainability` (#5861 FIX-DATA) exists only where the family has an addition as a member (cycling = recumbent_bike)
+_FAMILY_DERIVED = ("fallbacks", "family_sustainability")
+
+
 def test_existing_ids_and_history_are_unchanged(monkeypatch):
     without = _build(monkeypatch, additions=[])["movements"]
     twins = _coach_twins()
@@ -257,7 +261,8 @@ def test_existing_ids_and_history_are_unchanged(monkeypatch):
     moved = [
         k
         for k, e in without.items()
-        if k not in twins and {f: v for f, v in e.items() if f != "fallbacks"} != {f: v for f, v in MV[k].items() if f != "fallbacks"}
+        if k not in twins
+        and {f: v for f, v in e.items() if f not in _FAMILY_DERIVED} != {f: v for f, v in MV[k].items() if f not in _FAMILY_DERIVED}
     ]
     assert moved == []
 
