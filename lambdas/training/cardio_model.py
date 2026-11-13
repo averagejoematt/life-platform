@@ -606,6 +606,23 @@ def _apple_intensity(w: dict[str, Any]) -> tuple[str, str] | None:
     return None
 
 
+WALK_SPEED_MS = (0.83, 1.67)
+"""The walking metabolic equation's valid range (50-100 m/min). Outside it a recorded "walk" speed is a jog, a GPS artefact or a
+manual entry: intensity unknown."""
+
+
+def _walk_speed_intensity(a: dict[str, Any]) -> tuple[str, str] | None:
+    """(class, basis) for a recorded WALK from its moving speed: the standard walking metabolic equation on the flat
+    (VO2 = 0.1 x m/min + 3.5 ml/kg/min; METs = VO2 / 3.5 — practitioner consensus, no citation verified). Terrain is ignored, so
+    the estimate is a floor (a hill only raises it). None when the speed is not recorded or outside WALK_SPEED_MS."""
+    speed = _qty(a.get("average_speed_ms"))
+    sport = str(a.get("sport_type") or a.get("type") or "").lower()
+    if speed is None or sport not in ("walk", "hike") or not WALK_SPEED_MS[0] <= speed <= WALK_SPEED_MS[1]:
+        return None
+    mets = (0.1 * speed * 60 + 3.5) / 3.5
+    return ("moderate" if mets >= MODERATE_METS else "light"), f"walking speed {speed:.2f} m/s -> ~{mets:.1f} METs on the flat (a floor)"
+
+
 def _aerobic_family(family: str) -> bool:
     f = str(family or "")
     return f in AEROBIC_FAMILIES or (f.startswith("other:") and any(n in f for n in AEROBIC_OTHER))
@@ -625,6 +642,11 @@ def recorded_aerobic(
     from training import workout_identity as wi
 
     apple_by_id = {str(w.get("id") or k): w for row in apple or () for k, w in ((row.get("apple_workouts") or {}).items())}
+    strava_by_id = {
+        str(a.get("strava_id") or a.get("id")): a
+        for row in strava or ()
+        for a in (row.get("activities") if isinstance(row.get("activities"), list) else [row])
+    }
     idents = wi.resolve_workout_identities(apple=apple, strava=strava, hevy=hevy)
     credited = light = unknown = 0.0
     by_day: dict[str, float] = {}
@@ -640,6 +662,15 @@ def recorded_aerobic(
                 if src.startswith("apple")
                 for x in ids
                 if x in apple_by_id
+            ),
+            None,
+        ) or next(
+            (
+                _walk_speed_intensity(strava_by_id[x])
+                for src, ids in i["members"].items()
+                if src.startswith("strava")
+                for x in ids
+                if x in strava_by_id
             ),
             None,
         )

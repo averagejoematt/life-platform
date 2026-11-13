@@ -381,8 +381,9 @@ ruling.
 - **Aerobic credit from recorded sessions** (ruling 12). The 25 %-of-steps-over-5k credit is GONE. `cardio_model.recorded_aerobic`
   resolves Apple workouts, Strava and the Hevy record into ONE workout identity each (`training.workout_identity`); an identity
   holding a Hevy member is the gym's and is never credited again; an Apple member's METs (>= 3) or mean cadence (>= ~100 spm, a
-  population heuristic) classifies it; a Strava-only record carries no intensity the engine uses (heart rate is not effort
-  evidence) and is reported as "intensity unknown". Steps are reported as their own activity metric, never credited.
+  population heuristic) classifies it, else a recorded walk's moving speed through the walking metabolic equation on the flat
+  (valid 0.83-1.67 m/s; terrain ignored, so a floor). Heart rate is never effort evidence; anything else is reported as
+  "intensity unknown", not credited. Steps are reported as their own activity metric, never credited.
 - **Unconfirmed equipment is never served** (ruling 13): `selection_engine.availability` reads an `unknown` movement or item as
   unavailable on every live path (anchors, selection, slots, cardio machines) — tested over every drafted week.
 - **Evidence and completeness visible** (ruling 16): one `evidence (live)` line per session — each served movement's tier on its

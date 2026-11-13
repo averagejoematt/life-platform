@@ -276,18 +276,15 @@ def _apple(wid: str, start: str, minutes: int, mets: float | None = None, cadenc
     return {"apple_workouts": {wid: w}}
 
 
-def _strava(sid: str, start: str, minutes: int):
-    return {
-        "activities": [
-            {
-                "strava_id": sid,
-                "sport_type": "Walk",
-                "start_date": start,
-                "moving_time_seconds": minutes * 60,
-                "elapsed_time_seconds": minutes * 60,
-            }
-        ]
+def _strava(sid: str, start: str, minutes: int, speed: float | None = None):
+    a = {
+        "strava_id": sid,
+        "sport_type": "Walk",
+        "start_date": start,
+        "moving_time_seconds": minutes * 60,
+        "elapsed_time_seconds": minutes * 60,
     }
+    return {"activities": [a | ({"average_speed_ms": speed} if speed is not None else {})]}
 
 
 def test_ruling_12_recorded_minutes_with_intensity_count_once_and_steps_never_count():
@@ -296,15 +293,20 @@ def test_ruling_12_recorded_minutes_with_intensity_count_once_and_steps_never_co
         _apple("A2", "2026-11-11T15:00:00+00:00", 30, cadence=108),  # moderate by cadence (population heuristic)
         _apple("A3", "2026-11-12T15:00:00+00:00", 25, mets=2.2),  # light
     ]
-    strava = [_strava("S1", "2026-11-10T15:01:00+00:00", 39), _strava("S2", "2026-11-13T15:00:00+00:00", 45)]  # S1 = A1's copy
+    strava = [
+        _strava("S1", "2026-11-10T15:01:00+00:00", 39),  # A1's copy: one identity
+        _strava("S2", "2026-11-13T15:00:00+00:00", 45),  # no speed, no Apple copy: intensity unknown
+        _strava("S3", "2026-11-14T15:00:00+00:00", 30, speed=1.40),  # a brisk walk by its speed (walking equation, a floor)
+        _strava("S4", "2026-11-15T15:00:00+00:00", 20, speed=2.70),  # outside the walking equation's range: unknown
+    ]
     out = cm.recorded_aerobic(apple=apple, strava=strava, hevy=[])
     # A1 + its Strava copy S1 are ONE identity, timed by Strava's moving time (39, the resolver's precedence): 39 + 30 credited
-    assert out["credited_min"] == 69 and out["light_min"] == 25 and out["unknown_min"] == 45  # S2: no intensity -> reported
+    assert out["credited_min"] == 99 and out["light_min"] == 25 and out["unknown_min"] == 65  # S2, S4: reported, not credited
     assert out["hr_used"] is False and "intensity unknown" in out["line"]
     hevy = [{"workout_id": "H1", "start_time": "2026-11-10T14:55:00+00:00", "end_time": "2026-11-10T15:45:00+00:00",
              "exercises": [{"name": "Treadmill", "sets": [{"duration_sec": 2400, "rpe": 6}]}]}]  # fmt: skip
     gym = cm.recorded_aerobic(apple=apple, strava=strava, hevy=hevy)
-    assert gym["credited_min"] == 30  # the walk inside the gym block is the gym's: never counted twice
+    assert gym["credited_min"] == 60  # A1/S1 sit inside the gym block: the gym's, never counted twice
     dose = cm._walking_dose({d: 15000 for d in ("2026-11-10", "2026-11-11")})
     assert dose["moderate_min_per_wk"] == 0 and dose["steps_per_day"] == 15000  # steps reported, not credited
     with patch.object(cm, "MODERATE_METS", 10.0), patch.object(cm, "CADENCE_MODERATE_SPM", 200):  # control: the thresholds bite
