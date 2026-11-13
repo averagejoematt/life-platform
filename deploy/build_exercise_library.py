@@ -704,7 +704,8 @@ def _expansion_entries(entries: dict[str, dict[str, Any]], merged_into_history: 
     no_template: list[dict[str, Any]] = []
     for x in _expansion_list():
         tid = str(x.get("template_id") or "").upper()
-        if tid and tid in entries:
+        twin = tid in entries and str(entries[tid].get("expansion_origin") or "").startswith("movement_catalog:")
+        if tid and tid in entries and not (twin and x.get("expansion_profile")):  # #5861 L6: an addition owns its catalog twin
             if entries[tid]["source"] == "expansion" and x["key"] not in merged_into_history:
                 entries[tid] = _merge(entries[tid], x)
                 entries[tid]["gates"] = list(entries[tid].get("gates") or []) + list(x.get("gates") or [])

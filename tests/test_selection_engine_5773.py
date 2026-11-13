@@ -62,6 +62,12 @@ def _cat() -> dict:
     return copy.deepcopy(CAT0)
 
 
+def _cat_before_l6() -> dict:
+    """The catalog without #5861 L6's coach_added library movements (deploy/movement_catalog_additions.py) — the candidate
+    set these band-order tests were written against; a new S movement in the band is L6's, held by its own tests."""
+    return {k: v for k, v in _cat().items() if not str(v.get("notes") or "").startswith("coach_added #5861 L6")}
+
+
 def _pos() -> dict:
     return vr.position(WEEK7)
 
@@ -276,7 +282,7 @@ def test_preacher_curl_barbell_is_unlocked_by_the_owner_ruling():
     # barbell accessories wait on the Sports Medicine seat) keeps it off drafts, as it does the barbell and EZ-bar curls.
     assert CAT0["preacher_curl_barbell"]["hevy_template_id_hint"] == e["template_id"]
     assert CAT0["preacher_curl_barbell"]["skill_tier"] == 3
-    cat = _cat()
+    cat = _cat_before_l6()
     assert "preacher_curl_barbell" not in _served_anywhere(_week(cat=cat))  # ceiling 2: held by the tier rule, not the library
     sel = _week(cat=cat, skill_ceiling=3)
     assert "preacher_curl_barbell" in _served_anywhere(sel)  # the library and catalog no longer block it
@@ -326,7 +332,7 @@ def test_variety_demotes_a_movement_served_in_the_lookback():
     s = _slot(_week(), "upper_heavy.db_curl")
     pick = s["pick"]["catalog_key"]
     rows = [{"sk": vr.ledger_sk(1, "upper_heavy.db_curl"), "block": 1, "phase_2": {"variant": pick}}]
-    s2 = _slot(_week(rows=rows), "upper_heavy.db_curl")
+    s2 = _slot(_week(rows=rows, cat=_cat_before_l6()), "upper_heavy.db_curl")
     assert s2["pick"]["catalog_key"] != pick and s2["pick"]["tier"] == s["pick"]["tier"]
     # the current phase's own row is this draft's held pick, never a "recent use"
     assert se.recent_uses([{"block": 2, "phase_1": {"variant": pick}}], _pos()) == set()
@@ -335,7 +341,7 @@ def test_variety_demotes_a_movement_served_in_the_lookback():
 def test_variety_rotates_a_slot_within_its_band_by_its_own_history():
     """#5857: slots sharing one band (three curl slots, one S curl band) each served one member last phase, so a global
     `recent` ranks every member alike. The slot's OWN least-recently-served member leads, so each slot rotates."""
-    s = _slot(_week(), "upper_heavy.db_curl")
+    s = _slot(_week(cat=_cat_before_l6()), "upper_heavy.db_curl")
     band = [m for m in s["ranked_top"] if se.tier_for(LIB0["movements"][m], "biceps") == s["pick"]["tier"]]
     assert len(band) >= 3, band
     keys = {m: se.key_index(LIB0, CAT0)["to_cat"][m] for m in band}
@@ -351,13 +357,13 @@ def test_variety_rotates_a_slot_within_its_band_by_its_own_history():
         {"sk": vr.ledger_sk(1, "upper_volume.db_curl"), "block": 1, "phase_2": {"variant": keys[band[2]]}},
     ]
     assert se.slot_last_served(rows, _pos(), "upper_heavy.db_curl") == {keys[band[1]]: 101, keys[band[0]]: 102}
-    s2 = _slot(_week(rows=rows), "upper_heavy.db_curl")
+    s2 = _slot(_week(rows=rows, cat=_cat_before_l6()), "upper_heavy.db_curl")
     assert s2["pick"]["movement_id"] == band[2], "the member this slot never served leads"
     # control: without the slot term (global recency only) every member is `recent` and the slot holds band[0]
     real = se.rank_key
     try:
         se.rank_key = lambda c, recent, slot_last=None, pool=None: real(c, recent, None, pool)  # type: ignore[assignment]
-        assert _slot(_week(rows=rows), "upper_heavy.db_curl")["pick"]["movement_id"] == band[0]
+        assert _slot(_week(rows=rows, cat=_cat_before_l6()), "upper_heavy.db_curl")["pick"]["movement_id"] == band[0]
     finally:
         se.rank_key = real
 

@@ -231,7 +231,12 @@ MODALITIES: dict[str, dict[str, Any]] = {
 
 # library movement id -> modality (the rows on file today); anything else is read by title below
 LIBRARY_MODALITY = {
-    "cycling": "recumbent_bike",  # the menu's knee-sparing recumbent (cardio_note.MACHINES)
+    # #5861 L6 reconciled: ONE machine, two library rows. He rides the recumbent and logs it under Hevy's built-in "Cycling"
+    # (the menu's knee-sparing recumbent, cardio_note.MACHINES serves `cycling`); L2's `recumbent_bike` is the account's
+    # never-logged custom "Recumbent Bike" template for the same machine. Both name the one `recumbent_bike` modality; the
+    # menu keeps writing `cycling` (the template his history is on), and the two rate apart only by his N=1 sustainability.
+    "cycling": "recumbent_bike",
+    "recumbent_bike": "recumbent_bike",
     "treadmill": "treadmill_incline_walk",
     "walking": "walking",
     "elliptical_trainer": "elliptical",

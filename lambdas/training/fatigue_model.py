@@ -65,6 +65,13 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "basis": "the latest pair of exposures of a compound both more than 5% under its best earlier e1RM (Epley) in the window "
         "— the platform's existing practice line (critics_fatigue), not a citation and not his own variance",
     },
+    "trend_recent_days": {
+        "value": 14,
+        "label": HEURISTIC,
+        "basis": "double progression repeats a load while the reps climb, and a movement trained twice a week repeats it inside "
+        "one week, so a tie is not a stall: a movement PROGRESSES when its best e1RM in the last 14 days (back from its latest "
+        "exposure) beats its best before them, and STALLS when it does not (#5861 L6) — a fortnight of weekly sessions",
+    },
     "trend_min_exposures": {
         "value": MIN_SESSIONS,
         "label": HEURISTIC,
@@ -81,7 +88,11 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "basis": "two sessions with a discomfort-class note (training_notes_pain.pain_class) on one movement inside "
         "discomfort_window_days -> swap it for a lower-fatigue variant; a pain-class note already excludes (#5806)",
     },
-    "discomfort_window_days": {"value": 14, "label": HEURISTIC, "basis": "a fortnight: about a pair of sessions of a weekly movement"},
+    "discomfort_window_days": {
+        "value": 14,
+        "label": HEURISTIC,
+        "basis": "a fortnight, inclusive: a weekly movement's latest sessions sit 7 and 14 days back on its own weekday",
+    },
     "axial_stack_window_hours": {
         "value": 72,
         "label": HEURISTIC,
@@ -98,20 +109,24 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "value": "red",
         "label": HEURISTIC,
         "basis": "the readiness tier the draft carries (green >= 67 / yellow >= 34 / red, the vendor's own bands, "
-        "`mcp/tools_plan._recovery_tier`); red is one strain signal. Inside an HR regime marker's window it is unknown",
+        "`mcp/tools_plan._recovery_tier`); red is one strain signal. Inside an HR regime marker's window it is unknown. An ACWR "
+        "of high / very_high (Whoop strain, also HR-derived) votes in the SAME signal, never a second one (#5861 L6)",
     },
     "cardio_hard_minutes_high": {
         "value": 60,
         "label": HEURISTIC,
         "basis": "more hard cardio minutes (cardio_model.HARD_RPE or above) in the window than the charter's own conditioning "
-        "budget (two blocks a week of at most 30 min) reads as high cardio load",
+        "budget (two blocks a week of at most 30 min) reads as high cardio load. Walking from steps (`cardio_model.cardio_load` "
+        "steps_by_day) is counted and reported but is NOT a strain vote: a high daily step count is this trainee's baseline, and "
+        "a spike rule needs a personal multi-week baseline nobody has set (an owner decision, #5861 L6)",
     },
     "sleep_short_hours": {"value": 6.5, "label": HEURISTIC, "basis": "the charter's progression refusal text (sleep < 6.5 h)"},
     "adherence_low": {
         "value": 0.6,
         "label": HEURISTIC,
         "basis": "fewer than 60% of the planned sessions performed in 14 days: keep the plan short and never add — adherence "
-        "comes first for long-term results",
+        "comes first for long-term results. With no other reduction it takes one step (reduce_sets_per_step) of accessory sets off "
+        "(#5861 L6: the basis said 'short' and the code only reported it); anchors held",
     },
     "reduce_at_strain_signals": {
         "value": 2,
@@ -238,8 +253,8 @@ def _trend(points: list[tuple[str, float | None, float | None, float | None, int
     best_before = max(e1[:-2]) if len(e1) > 2 else e1[0]
     if len(e1) > 2 and all(v < best_before * (1 - drop) for v in e1[-2:]):
         return {"trend": "regressing", "why": f"the latest pair of exposures are both more than {drop:.0%} under the best before them"}
-    if e1[-1] > max(e1[:-1]):
-        return {"trend": "progressing", "why": "the latest top set is a new best e1RM in the window"}
+    if _recent_best(pts, e1):
+        return {"trend": "progressing", "why": f"a new best e1RM in the last {THRESHOLDS['trend_recent_days']['value']} days"}
     if len(pts) < THRESHOLDS["trend_min_exposures"]["value"]:
         return {"trend": "unknown", "why": "no new best yet, and below trend_min_exposures for a stall call"}
     try:  # #5057: the same load x reps at an easy RPE is the PRESCRIPTION holding still — a load step, never a rotation
@@ -250,6 +265,17 @@ def _trend(points: list[tuple[str, float | None, float | None, float | None, int
     if step is not None:
         return {"trend": "step_due", "why": "the prescription held still at an easy RPE — the load steps, the movement stays"}
     return {"trend": "stalled", "why": f"no new best e1RM over the last {len(pts)} exposures at working effort"}
+
+
+def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, int | None]], e1: list[float]) -> bool:
+    """`trend_recent_days`: the best e1RM inside the recent window (back from the latest exposure) beats the best before it.
+    With nothing before the window, any exposure after the first beating the first counts (a new movement climbing)."""
+    span = THRESHOLDS["trend_recent_days"]["value"]
+    recent = [v for p, v in zip(pts, e1) if (_ago(str(pts[-1][0]), str(p[0])) or 0) < span]
+    earlier = e1[: len(e1) - len(recent)]
+    if not earlier:
+        return max(e1[1:]) > e1[0]
+    return max(recent) > max(earlier)
 
 
 def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, window_days: int = 42) -> dict[str, dict[str, Any]]:
@@ -276,7 +302,8 @@ def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, windo
                     _int((top or {}).get("reps")),
                 )
             )
-        classes = [(day, pain_class(str(ex.get("notes") or ""))) for day, ex in rows if (_ago(as_of, day) or 0) < recent]
+        # #5861 L6: an INCLUSIVE fortnight — a weekly lift's previous two exposures sit 7 and 14 days back on its own weekday
+        classes = [(day, pain_class(str(ex.get("notes") or ""))) for day, ex in rows if (_ago(as_of, day) or 0) <= recent]
         out[tid] = {
             "exposures": len(rows),
             **_trend(points),
@@ -324,7 +351,14 @@ def axial_stacking(workouts: list[dict[str, Any]] | None, index: dict[str, dict[
     return out
 
 
-def hevy_cardio_load(workouts: list[dict[str, Any]] | None, lib: dict[str, Any] | None, *, as_of: str, days: int = 7) -> dict | None:
+def hevy_cardio_load(
+    workouts: list[dict[str, Any]] | None,
+    lib: dict[str, Any] | None,
+    *,
+    as_of: str,
+    days: int = 7,
+    steps_by_day: dict[str, Any] | None = None,
+) -> dict | None:
     """The cardio seam's live feed (L4): the Hevy record's timed cardio blocks in the window, as `cardio_model.cardio_load`
     sessions (`movement_id` + `entry`, minutes from the logged durations, the block's highest logged RPE). Walking and the
     other sources are the cardio model's own reads, not this one. None when the window holds no timed cardio."""
@@ -342,7 +376,9 @@ def hevy_cardio_load(workouts: list[dict[str, Any]] | None, lib: dict[str, Any] 
         rpes = [r for r in (_num(x.get("rpe")) for x in sets if isinstance(x, dict)) if r is not None]
         if secs > 0:
             sessions.append({"movement_id": mid, "entry": mv.get(mid), "minutes": secs / 60.0, "rpe": max(rpes) if rpes else None})
-    return cardio_model.cardio_load(sessions) if sessions else None
+    if not sessions and not steps_by_day:
+        return None
+    return cardio_model.cardio_load(sessions, steps_by_day=steps_by_day or None)  # #5861 L6: the walking dose rides apart
 
 
 def adherence(workouts: list[dict[str, Any]] | None, *, as_of: str, planned_per_week: int, days: int = 14) -> dict[str, Any]:
@@ -353,7 +389,16 @@ def adherence(workouts: list[dict[str, Any]] | None, *, as_of: str, planned_per_
     planned = planned_per_week * days // 7
     ratio = round(performed / planned, 2) if planned else None
     low = ratio is not None and ratio < THRESHOLDS["adherence_low"]["value"]
-    return {"state": "low" if low else "ok", "performed": performed, "planned": planned, "ratio": ratio}
+    # #5861 L6: the record is the BLOCK's — a block that started inside the window under-counts; only a record reaching back
+    # over the whole window may shorten a session (`assess`), so a block start is never read as missed sessions
+    oldest = max((_ago(as_of, _day(w)) or 0) for w in workouts) if workouts else 0
+    return {
+        "state": "low" if low else "ok",
+        "performed": performed,
+        "planned": planned,
+        "ratio": ratio,
+        "window_covered": oldest >= days - 1,
+    }
 
 
 # ── the decision ──────────────────────────────────────────────────────────────
@@ -380,6 +425,7 @@ def _signal(name: str, state: str, why: str, threshold: str | None) -> dict[str,
 
 def _systemic(
     readiness: str | None,
+    acwr: str | None,
     sleep_hours: float | None,
     cardio_load: dict[str, Any] | None,
     hard_sets: dict,
@@ -388,8 +434,11 @@ def _systemic(
 ) -> list[dict[str, Any]]:
     out = []
     tier = str(readiness or "").lower()
+    high_acwr = str(acwr or "").lower() in ("high", "very_high")
     if tier in ("green", "yellow", "red"):
-        out.append(_signal("readiness", "strain" if tier == "red" else "ok", f"readiness tier {tier}", "readiness_strain"))
+        # #5861 L6: ACWR (Whoop strain) and the readiness tier (Whoop recovery) are both HR-derived — ONE vote, never two
+        why = f"readiness tier {tier}" + (f", ACWR {acwr}" if high_acwr else "")
+        out.append(_signal("readiness", "strain" if tier == "red" or high_acwr else "ok", why, "readiness_strain"))
     else:
         out.append(_signal("readiness", "unknown", f"readiness {tier or 'not read'} — HR-derived tiers are not effort evidence", None))
     if sleep_hours is None:
@@ -400,11 +449,13 @@ def _systemic(
             _signal("sleep", "strain" if short else "ok", "short night" if short else "sleep at or over the line", "sleep_short_hours")
         )
     cl = cardio_state(cardio_load)
+    walk = (cardio_load or {}).get("walking") if isinstance(cardio_load, dict) else None
+    walked = f"; walking ~{walk['moderate_min_per_wk']} moderate min/wk from steps, counted, not a strain vote" if walk else ""
     out.append(
         _signal(
             "cardio_load",
             "strain" if cl == "high" else ("ok" if cl in CARDIO_LOAD_STATES else "unknown"),
-            f"cardio load {cl}",
+            f"cardio load {cl}{walked}",
             "cardio_hard_minutes_high",
         )
     )
@@ -467,6 +518,7 @@ def assess(
     readiness: str | None = None,
     sleep_hours: float | None = None,
     cardio_load: dict[str, Any] | None = None,
+    acwr: str | None = None,
     landmarks: dict[str, Any] | None = None,
     planned_per_week: int = 5,
     session_minutes: float | None = None,
@@ -478,14 +530,18 @@ def assess(
     hard = hard_sets_by_muscle(workouts, index, as_of=as_of)
     stacking = axial_stacking(workouts, index, as_of=as_of)
     adh = adherence(workouts, as_of=as_of, planned_per_week=planned_per_week)
-    signals = _systemic(readiness, sleep_hours, cardio_load, hard, landmarks, movs)
+    signals = _systemic(readiness, acwr, sleep_hours, cardio_load, hard, landmarks, movs)
     strain = [s["signal"] for s in signals if s["state"] == "strain"]
     regressing = any(s["signal"] == "strength" and s["state"] == "strain" for s in signals)
     bad_day = any(s["signal"] in ("readiness", "sleep") and s["state"] == "strain" for s in signals)
     deload = len(strain) >= THRESHOLDS["deload_at_strain_signals"]["value"] or (regressing and bad_day)
     step = THRESHOLDS["reduce_sets_per_step"]["value"]
     reduce = 0 if len(strain) < THRESHOLDS["reduce_at_strain_signals"]["value"] else min(6, step * (len(strain) - 1))
-    state = "overreached" if deload else ("strained" if reduce else ("normal" if strain or adh["state"] == "low" else "recovered"))
+    reasons = [f"{len(strain)} strain signals"] if reduce else []
+    strained = bool(reduce)  # the recovery STATE reads strain only; an adherence trim is not a recovery verdict
+    state = "overreached" if deload else ("strained" if strained else ("normal" if strain or adh["state"] == "low" else "recovered"))
+    if adh["state"] == "low" and adh.get("window_covered") and not reduce:  # #5861 L6: `adherence_low`'s "keep it short"
+        reduce, reasons = step, ["adherence low: a shorter session is easier to keep; anchors held"]
     over = session_minutes is not None and minutes_ceiling is not None and session_minutes > minutes_ceiling
     return {
         "issue": ISSUE,
@@ -495,6 +551,7 @@ def assess(
         "fatigue_level": fatigue_level(state),  # L5's loss-rate proposal input (vocabulary: FATIGUE_LEVELS)
         "action": "deload_recommended" if deload else ("reduce" if reduce else "maintain"),
         "reduce_sets": reduce,
+        "reduce_reasons": reasons,
         "never_adds": True,
         "maintain_strength": "a reduction takes accessory sets only; anchors and their top sets are held" if reduce else None,
         "swaps": _swaps(movs, stacking, index),
@@ -515,11 +572,11 @@ def assess(
 
 
 # ── the live draft hook ───────────────────────────────────────────────────────
-def trim_accessory_sets(exposures: list[dict[str, Any]], n: int) -> int:
-    """Take up to `n` sets off the accessories, IN PLACE: last-listed first, one set per pass, never below one set and never
-    a top set; anchors are never touched. Returns the sets removed."""
+def trim_accessory_sets(exposures: list[dict[str, Any]], n: int, order: list[dict[str, Any]] | None = None) -> int:
+    """Take up to `n` sets off the accessories, IN PLACE: in `order` (default last-listed first), one set per pass, never below
+    one set and never a top set; anchors are never touched. Returns the sets removed."""
     removed = 0
-    order = [e for e in exposures if e.get("kind") == "accessory"][::-1]
+    order = order if order is not None else [e for e in exposures if e.get("kind") == "accessory"][::-1]
     progressed = True
     while removed < n and progressed:
         progressed = False
@@ -534,7 +591,9 @@ def trim_accessory_sets(exposures: list[dict[str, Any]], n: int) -> int:
     return removed
 
 
-def apply_to_session(rx: dict[str, Any], rotation: dict[str, Any] | None, assessment: dict[str, Any] | None) -> dict[str, Any]:
+def apply_to_session(
+    rx: dict[str, Any], rotation: dict[str, Any] | None, assessment: dict[str, Any] | None, trim_order: Any = None
+) -> dict[str, Any]:
     """The live draft's reduction: with the selection LIVE and an assessment that recommends `reduce` (or a deload, whose
     reduction is applied while the deload itself waits for his word), take `reduce_sets` accessory sets off a COPY of the
     prescription and record it as `fatigue`. In shadow (or with no assessment) the prescription is returned untouched —
@@ -543,7 +602,8 @@ def apply_to_session(rx: dict[str, Any], rotation: dict[str, Any] | None, assess
         return rx
     out = copy.deepcopy(rx)
     n = int(assessment.get("reduce_sets") or 0)
-    removed = trim_accessory_sets(out["exposures"], n) if n > 0 else 0
+    order = trim_order(out["exposures"]) if callable(trim_order) else None  # #5861 L6: surplus-first, else last-listed first
+    removed = trim_accessory_sets(out["exposures"], n, order) if n > 0 else 0
     if removed:
         from training.session_cues import exposure_cue
         from training.session_shape import session_minutes_estimate
@@ -552,12 +612,14 @@ def apply_to_session(rx: dict[str, Any], rotation: dict[str, Any] | None, assess
             e["cue"] = exposure_cue(e["intensity"], e["sets"])
         out["total_sets"] = sum(len(e["sets"]) for e in out["exposures"])
         out["session_minutes"] = session_minutes_estimate(out["exposures"])
-    keep = ("state", "fatigue_level", "action", "reduce_sets", "strain_signals", "swaps", "deload", "version")
+    keep = ("state", "fatigue_level", "action", "reduce_sets", "reduce_reasons", "strain_signals", "swaps", "deload", "version")
     out["fatigue"] = {k: assessment.get(k) for k in keep} | {"sets_removed": removed}
     return out
 
 
-def for_live_draft(rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: Any, block_workouts: list[dict[str, Any]] | None) -> dict:
+def for_live_draft(
+    rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: Any, block_workouts: list[dict[str, Any]] | None, trim_order: Any = None
+) -> dict:
     """The draft path's hook (`full_body_session._prescription`): LIVE only — assess from what the draft already carries
     (the generator inputs' readiness tier, the block's Hevy record, the library, the landmarks, the session estimate) and
     apply the reduction. In shadow it returns `rx` itself before reading anything. Never raises: a failure keeps `rx`."""
@@ -573,8 +635,10 @@ def for_live_draft(rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: 
             lib=lib,
             as_of=as_of,
             readiness=getattr(inputs, "recovery_tier", None),
+            acwr=getattr(inputs, "acwr_flag", None),  # #5861 L6: the autoreg key (`high` / `very_high`), one HR-derived vote
             sleep_hours=getattr(inputs, "sleep_hours", None),
-            cardio_load=getattr(inputs, "cardio_load", None) or hevy_cardio_load(block_workouts, lib, as_of=as_of),  # the L4 seam
+            cardio_load=getattr(inputs, "cardio_load", None)
+            or hevy_cardio_load(block_workouts, lib, as_of=as_of, steps_by_day=getattr(inputs, "steps_by_day", None)),  # the L4 seam
             landmarks=block_model.load_landmarks(),
             planned_per_week=len(program_structure.SPLIT_ROLES),
             session_minutes=(rx.get("session_minutes") or {}).get("lifting_minutes"),
@@ -585,4 +649,4 @@ def for_live_draft(rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: 
 
         logging.getLogger(__name__).warning(f"fatigue_model: assessment failed ({type(e).__name__}) — the draft is unchanged")
         return rx
-    return apply_to_session(rx, rotation, assessment)
+    return apply_to_session(rx, rotation, assessment, trim_order)

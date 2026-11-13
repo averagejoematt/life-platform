@@ -307,7 +307,8 @@ ANOMALIES = {  # key: (hypertrophy, strength, functional, conditioning, mobility
     "ab_wheel": ("A", None, "B", None, None),
     "bird_dog": (None, None, "C", None, "B"),
     "side_plank": (None, None, "B", None, None),
-    "rotator_cuff_external_rotation": (None, None, None, None, "A"),
+    # #5861 L6: cuff rotation is loaded joint-capacity work (FUNCTIONAL_QUALITIES `joint_capacity`) — functional B, never S
+    "rotator_cuff_external_rotation": (None, None, "B", None, "A"),
     "db_cossack_squats": ("B", "B", "A", None, "A"),
     "offset_lunges": ("B", "B", "S", None, None),
     "3_way_lunge": ("B", "B", "A", None, None),

@@ -1,0 +1,70 @@
+{
+  "_comment": "Epic #5861 L6: SYNTHETIC representative profiles for scripts/sample_weeks_5861.py and tests/test_acceptance_5861.py. No personal data: every number is invented for the scenario (a round synthetic body mass in lb only so the load floor has a weigh-in to read; generated loads are synthetic). Each profile names what its synthetic Hevy record shows; the generator turns it into workouts over the prior phase.",
+  "as_of": "2026-11-16",
+  "position": {"week": 10, "block": 2},
+  "defaults": {
+    "roles": ["upper_heavy", "lower_heavy", "shoulders_arms", "upper_volume", "lower_volume"],
+    "days": ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"],
+    "bodyweight_lb": 250,
+    "readiness": "green",
+    "sleep_hours": 7.5,
+    "acwr": "safe",
+    "steps_per_day": 14000,
+    "trend": "progressing",
+    "trend_overrides": {},
+    "discomfort": [],
+    "pain": [],
+    "unavailable_equipment": [],
+    "sessions_last_14d": 10,
+    "hard_cardio_minutes_7d": 40
+  },
+  "profiles": {
+    "a_large_deficit_experienced": {
+      "label": "(a) large deficit, experienced, 5 mornings, 75-min cap, high daily steps",
+      "story": "every lift progressing on double progression; green readiness, normal sleep; walks most of the day"
+    },
+    "b_shoulder_flag_low_recovery": {
+      "label": "(b) as (a) + a shoulder pain flag + a low-recovery week",
+      "story": "a pain-class note on the overhead press and on the dip; red readiness and short sleep this week",
+      "readiness": "red",
+      "sleep_hours": 5.6,
+      "pain": [{"movement": "machine_shoulder_press", "note": "sharp shoulder pain 6/10 on the press"}]
+    },
+    "c_equipment_limited": {
+      "label": "(c) equipment-limited: no selectorized/plate machines, no cable stack",
+      "story": "a garage-style setup: barbell, rack, benches, dumbbells, kettlebells, bands, a pull-up bar, a treadmill and an upright bike",
+      "unavailable_equipment": [
+        "ab_crunch_machine", "assisted_pullup_dip_machine", "belt_squat_machine", "biceps_curl_machine", "cable_stack",
+        "calf_raise_seated_machine", "calf_raise_standing_machine", "chest_press_machine", "decline_press_machine",
+        "glute_kickback_machine", "hack_squat_machine", "hip_abduction_machine", "hip_adduction_machine", "hip_thrust_machine",
+        "incline_press_machine", "lat_pulldown_station", "lateral_raise_machine", "leg_curl_lying", "leg_curl_seated",
+        "leg_extension_machine", "leg_press_machine", "machine_unspecified", "pec_deck", "pendulum_squat_machine",
+        "preacher_machine", "pullover_machine", "rear_delt_machine", "seated_row_machine", "shoulder_press_machine",
+        "smith_machine", "t_bar_row_machine", "torso_rotation_machine", "triceps_machine", "elliptical", "rower", "sled",
+        "stair_climber", "ski_erg", "recumbent_bike"
+      ]
+    },
+    "d_stalled_anchor_adherence_dip": {
+      "label": "(d) a stalled anchor + an adherence dip",
+      "story": "the bench and an accessory flat for three exposures at RPE 8-9; only 5 of the last 14 days' planned sessions done",
+      "trend_overrides": {"barbell_bench_press": "stalled", "*accessory_upper_heavy*": "stalled"},
+      "sessions_last_14d": 5
+    },
+    "e_short_week": {
+      "label": "(e) a 4-day short week",
+      "story": "travel takes Friday: four sessions this week",
+      "roles": ["upper_heavy", "lower_heavy", "shoulders_arms", "upper_volume"],
+      "days": ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19"]
+    },
+    "f_high_fatigue_poor_sleep": {
+      "label": "(f) high fatigue / poor sleep",
+      "story": "short nights, red readiness, a lot of hard cardio, compounds regressing, discomfort notes on the deadlift",
+      "readiness": "red",
+      "sleep_hours": 5.2,
+      "acwr": "danger",
+      "hard_cardio_minutes_7d": 95,
+      "trend": "regressing",
+      "discomfort": [{"movement": "deadlift_barbell", "note": "lower back a bit achy and tight today"}]
+    }
+  }
+}

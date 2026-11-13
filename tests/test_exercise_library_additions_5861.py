@@ -244,13 +244,20 @@ def test_a_mapped_template_is_a_real_hevy_template_or_an_account_custom():
 # ── no existing id / history moves; determinism; the live boundary ──────────────────────────────────────────────
 
 
+def _coach_twins() -> set[str]:
+    """Additions the movement catalog writes (#5861 L6, `deploy/movement_catalog_additions.py`): without the additions the
+    builder still enters each one, from its catalog entry, as a catalog-only expansion movement."""
+    return {k for k in MINE if ((CATALOG.get("movements") or {}).get(k) or {}).get("provenance") == "coach_added"}
+
+
 def test_existing_ids_and_history_are_unchanged(monkeypatch):
     without = _build(monkeypatch, additions=[])["movements"]
-    assert set(without) == set(MV) - set(MINE)
+    twins = _coach_twins()
+    assert set(without) == (set(MV) - set(MINE)) | twins
     moved = [
         k
         for k, e in without.items()
-        if {f: v for f, v in e.items() if f != "fallbacks"} != {f: v for f, v in MV[k].items() if f != "fallbacks"}
+        if k not in twins and {f: v for f, v in e.items() if f != "fallbacks"} != {f: v for f, v in MV[k].items() if f != "fallbacks"}
     ]
     assert moved == []
 
@@ -264,10 +271,15 @@ def test_the_committed_library_is_the_builders_output_and_the_build_is_determini
 
 def test_the_library_stays_proposed_so_nothing_is_live():
     assert LIB["status"] == "proposed" and se.mode(LIB) == "shadow"
-    cat_ids = {str(v["hevy_template_id_hint"]).upper() for v in (CATALOG.get("movements") or {}).values() if v.get("hevy_template_id_hint")}
-    assert (
-        not {str(e["template_id"]).upper() for e in MINE.values() if e["template_id"]} & cat_ids
-    )  # no catalog entry: the engine cannot write one
+    # #5861 L6: an addition reaches the catalog ONLY as a deliberate coach_added twin (deploy/movement_catalog_additions.py) — a
+    # built-in template, never a not_for_you_now movement — and even then it serves only once the library is approved
+    import movement_catalog_additions as mca
+
+    cat = CATALOG.get("movements") or {}
+    cat_ids = {str(v["hevy_template_id_hint"]).upper(): k for k, v in cat.items() if v.get("hevy_template_id_hint")}
+    written = {k for k, e in MINE.items() if e["template_id"] and str(e["template_id"]).upper() in cat_ids}
+    assert written == _coach_twins() and written <= {a[0] for a in mca.ADDITIONS}
+    assert all(not MINE[k].get("not_for_you_now") and len(MINE[k]["template_id"]) == 8 for k in written)
 
 
 def test_the_coverage_doc_is_the_modules_render():

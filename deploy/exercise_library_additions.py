@@ -305,11 +305,12 @@ _LOW_IMPACT_PROTOCOLS = ["easy_recovery", "moderate_continuous", "tempo_threshol
 # The reviewed objective inputs per addition (L1's `quality_rubric.OBJECTIVE_INPUTS`): (ceiling, limiter, resistance_class,
 # functional qualities, conditioning map, mobility type). Categorical practitioner judgements — the rubric turns them into tiers.
 _TS, _UL, _BAL, _LOC, _MP, _CARRY, _POW = "trunk_stability", "unilateral", "balance", "locomotion", "multiplanar", "carry", "power"
+_JC = "joint_capacity"  # #5861 L6: loaded work for a small joint stabiliser (quality_rubric.FUNCTIONAL_QUALITIES)
 _INPUTS: dict[str, dict[str, Any]] = {
     "standing_cable_chest_press": _inputs(_M, "balance", "submaximal", [_TS], None, None),
-    "chest_supported_y_raise_dumbbell": _inputs(_M, "target", "light", [], None, "motor_control"),
-    "cable_serratus_punch": _inputs(_M, "target", "light", [], None, "motor_control"),
-    "cable_internal_rotation": _inputs(_M, "target", "light", [], None, "motor_control"),
+    "chest_supported_y_raise_dumbbell": _inputs(_M, "target", "light", [_JC], None, "motor_control"),
+    "cable_serratus_punch": _inputs(_M, "target", "light", [_JC], None, "motor_control"),
+    "cable_internal_rotation": _inputs(_M, "target", "light", [_JC], None, "motor_control"),
     "wrist_extension_dumbbell": _inputs(_H, "target", "light", [], None, None),
     "wrist_roller": _inputs(_M, "target", "light", [], None, None),
     "forearm_rotation_dumbbell": _inputs(_L, "target", "light", [], None, None),
@@ -318,16 +319,16 @@ _INPUTS: dict[str, dict[str, Any]] = {
     "hand_gripper_squeeze": _inputs(_M, "target", "light", [], None, None),
     "band_finger_extension": _inputs(_L, "target", "light", [], None, None),
     "controlled_forward_step_down": _inputs(_M, "balance", "bodyweight", [_UL, _BAL], None, "motor_control"),
-    "spanish_squat": _inputs(_M, "target", "light", [], None, None),
+    "spanish_squat": _inputs(_M, "target", "light", [_JC], None, None),
     "sissy_squat": _inputs(_M, "target", "bodyweight", [], None, None),
     "band_assisted_reverse_nordic": _inputs(_M, "target", "bodyweight", [], None, "loaded"),
     "hip_abduction_machine": _inputs(_H, "target", "submaximal", [], None, None),
     "lateral_band_walks": _inputs(_L, "target", "light", [_LOC, _MP], None, None),
     "hip_airplane": _inputs(_L, "balance", "bodyweight", [_UL, _BAL, _MP], None, "motor_control"),
     "hip_adduction_machine": _inputs(_H, "target", "submaximal", [], None, None),
-    "copenhagen_side_plank": _inputs(_M, "target", "bodyweight", [_UL, _TS, _MP], None, None),
-    "tibialis_raise": _inputs(_M, "target", "bodyweight", [], None, None),
-    "banded_ankle_inversion_eversion": _inputs(_L, "target", "light", [], None, "motor_control"),
+    "copenhagen_side_plank": _inputs(_M, "target", "bodyweight", [_UL, _TS, _MP, _JC], None, None),
+    "tibialis_raise": _inputs(_M, "target", "bodyweight", [_JC], None, None),
+    "banded_ankle_inversion_eversion": _inputs(_L, "target", "light", [_JC], None, "motor_control"),
     "short_foot": _inputs(_L, "target", "light", [_BAL], None, "motor_control"),
     "reverse_crunch": _inputs(_M, "target", "bodyweight", [], None, None),
     "bear_crawl": _inputs(_L, "other_muscle", "bodyweight", [_LOC, _TS], _cond(_M, _M, _L, _M), None),
@@ -2684,7 +2685,10 @@ def _existing_titles_and_ids(library: dict[str, Any] | None, catalog: dict[str, 
         titles.setdefault(norm_title(e.get("title") or ""), k)
         if e.get("template_id"):
             ids.setdefault(str(e["template_id"]).upper(), k)
+    own = {str(a.get("key")) for a in globals().get("ADDITIONS", [])}
     for k, v in ((catalog or {}).get("movements") or {}).items():
+        if k in own and v.get("provenance") == "coach_added":
+            continue  # #5861 L6: the addition's own prescribable twin (deploy/movement_catalog_additions.py), not a duplicate
         titles.setdefault(norm_title(v.get("title") or ""), f"catalog:{k}")
         if v.get("hevy_template_id_hint"):
             ids.setdefault(str(v["hevy_template_id_hint"]).upper(), f"catalog:{k}")

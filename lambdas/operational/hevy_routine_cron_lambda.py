@@ -202,6 +202,8 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
     )
     if live.get("sleep_hours") is not None:
         setattr(inputs, "sleep_hours", live["sleep_hours"])  # read by fatigue_model.for_live_draft (live only)
+    if live.get("steps_by_day"):
+        setattr(inputs, "steps_by_day", live["steps_by_day"])  # #5861 L6: the walking dose, into cardio_model.cardio_load (live only)
     return inputs
 
 
@@ -246,6 +248,14 @@ def _live_inputs(target_date: str, read=None) -> dict[str, Any]:
     out["sleep_hours"] = float(sleep) if sleep is not None else None
     zone = _latest(_safe("computed_metrics", 2), "acwr_zone")
     out["acwr_flag"] = ACWR_ZONE_TO_AUTOREG.get(str(zone), "safe") if zone is not None else None
+    try:  # #5861 L6: the week's steps through the one steps-truth resolver, so the fatigue model counts the walking dose
+        from training import steps_resolver
+
+        sr = steps_resolver.steps_range(shift_day_key(target_date, -7), shift_day_key(target_date, -1), fetch=read, derived=False)
+        resolved = [d for d in sr.get("days") or [] if d.get("steps") is not None]  # steps-truth: steps_range output
+        out["steps_by_day"] = {d["date"]: d["steps"] for d in resolved}  # steps-truth: steps_resolver.steps_range output
+    except Exception as e:  # noqa: BLE001 — unread steps keep the walking dose out of the cardio load, said so in the model
+        logger.warning(f"live input read failed for steps: {type(e).__name__}")
     hevy = _safe("hevy", 7)
     if hevy is not None:
         sets = fatigue_model.hard_sets_by_muscle(hevy, fatigue_model.library_index(lib), as_of=target_date)
