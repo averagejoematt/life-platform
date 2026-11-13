@@ -32,6 +32,7 @@ class, home_gym availability); none is a new number.
 from __future__ import annotations
 
 import copy
+from collections import Counter
 from typing import Any
 
 ISSUE = "#5861"
@@ -51,7 +52,7 @@ def is_live(rotation: dict[str, Any] | None) -> bool:
 
 # ── 1. equipment and pain on every exposure ──────────────────────────────────
 STRESS_ORDER = {"low": 0, "moderate": 1, "high": 2}
-JOINTS = ("shoulder", "elbow", "wrist", "spinal_load", "shear")
+JOINTS = ("shoulder", "elbow", "wrist", "spinal_load", "shear", "knee", "hip")  # #5861 FIX4: knee + hip (the pain map)
 NOT_LIFTS = ("duration", "distance_duration", "short_distance_weight", "weight_duration", "floors_duration", "steps_duration")
 
 
@@ -75,7 +76,9 @@ def _blocked(key: str | None, ctx: dict[str, Any], anchor: bool) -> tuple[str, s
     if why:
         return ("equipment", why)
     why = se.pain_exclusion(entry, ctx["overlay"])
-    if why:
+    from training.live_safety import blocked_pain_is_mild
+
+    if why and not blocked_pain_is_mild(entry, ctx):  # #5861 FIX4: a mild (<= 3/10, not sharp) note keeps the lift, lighter
         return ("pain", why)
     if anchor and str(entry.get("template_id") or "").upper() in ctx["discomfort"]:
         return ("discomfort", "two discomfort-class notes on it inside 14 days (fatigue_model, heuristic)")
@@ -137,6 +140,10 @@ def _replacement(
     exempt = anchor and e.get("pattern") in ruling["exempt_families"]
     ceiling = int(ruling["effective_ceiling"]) if exempt else ctx["ceiling"]
     worst = _worst_joint(_entry(e.get("movement_key"), ctx)) if code in ("pain", "discomfort") else limit
+    if code == "pain":  # #5861 FIX4: the joint the pain NOTE names, when it names one the library rates
+        from training.live_safety import pain_limit
+
+        worst = pain_limit(_entry(e.get("movement_key"), ctx), ctx) or worst
     pool = _anchor_candidates(e, ctx, ctx.get("role")) if anchor else _slot_fallbacks(e, rotation)
     if not anchor:  # #5861 FIX3: then the library's same-pattern, same-muscle members (a banded curl for a garage leg curl)
         from training.live_balance import library_fallbacks
@@ -250,6 +257,9 @@ def for_live_draft(
             "short_week_host": getattr(inputs, "short_week", None),  # live_program.short_week_roles: the host session's role
             "target_date": str(getattr(inputs, "target_date", "") or ""),
         }
+        from training import live_safety  # #5861 FIX4: the pain note's site and the mild line, read once
+
+        ctx |= {"mild_pain": live_safety.mild_pain_tids(block_workouts), "pain_notes": live_safety.latest_notes(block_workouts)}
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
         lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
@@ -268,6 +278,9 @@ def for_live_draft(
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
+    from training import live_shape  # #5861 FIX4: the kettlebell slot under strain (kb_slot_under_strain)
+
+    lines += live_shape.kb_under_strain(out)
     if ctx is not None:
         try:  # the week's trunk-stability floor: purpose-driven, never on a strained day (live_program.trunk_floor)
             lines += live_program.trunk_floor(out, ctx, (out.get("fatigue") or {}).get("state"))
@@ -366,6 +379,14 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
 
     cap = min(int(cap), int(rx.get("live_session_cap") or cap))  # a behind-schedule session's ~45 min (live option)
     shape = live_week.make_cardio_room(blocks, rx, movements, cap, shape)  # shared cap: lifting gives sets for an aerobic block
+    from training import live_shape  # #5861 FIX4: drop, don't shave — no accessory left at one working set
+
+    singles = live_shape.no_single_sets(blocks, movements)
+    if singles:
+        from training import program_structure as _ps, warmup_sets as _ws
+
+        shape = _ps.enforce_session_shape(blocks, movements) | {"working_sets": sum(_ws.working_set_count(b.sets) for b in blocks)}
+        rx[MARK]["lines"].append(f"dropped (live): {', '.join(singles)} — one working set left: drop, don't shave (live_shape)")
     if shape["lifting_minutes"] <= cap:
         return shape
     from training import program_structure
@@ -373,13 +394,15 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
 
     before, dropped = shape["lifting_minutes"], []
     trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
+    gone = Counter(trimmed)  # #5861 FIX4: what the drop order counts as off (the trimmed sets + every dropped accessory)
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
-        idx = next((i for i in range(len(blocks) - 1, -1, -1) if str(blocks[i].rationale_tag or "").startswith("accessory:")), None)
+        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx))  # FIX4: largest surplus over MEV first
         if idx is None:
             break
         cut = blocks.pop(idx)
         _unpair(blocks, getattr(cut, "superset_id", None))
         dropped.append((movements.get(cut.movement_key) or {}).get("title") or cut.movement_key)
+    dropped += live_shape.no_single_sets(blocks, movements)
     from training import warmup_sets
 
     new = program_structure.enforce_session_shape(blocks, movements) | {

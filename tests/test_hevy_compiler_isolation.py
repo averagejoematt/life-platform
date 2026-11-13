@@ -51,6 +51,8 @@ _ALLOWED_FILES = {
     os.path.join(ROOT, "tests", "test_hevy_common.py"),
     # #5801 — wire-shaped inbound Hevy workouts as fixtures for the read-only volume-response report.
     os.path.join(ROOT, "tests", "test_volume_response_5801.py"),
+    # #5861 FIX4: asserts the sample wire carries real template ids (the nightly job's lookup), read-only
+    os.path.join(ROOT, "tests", "test_programming_fix4_5861.py"),
 }
 
 _KEY = "exercise_template_id"

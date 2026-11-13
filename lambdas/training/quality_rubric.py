@@ -161,12 +161,25 @@ def _ladder(entry: dict[str, Any]) -> bool:
     return bool((entry.get("objective_inputs") or {}).get("ladder"))
 
 
+RUBRIC_JOINTS = ("spinal_load", "shear", "wrist", "elbow", "shoulder")
+"""The joints the rubric's joint-cost term and S / functional-safety criteria read. #5861 FIX4: `knee` and `hip` joined the
+library's `joint_stress` map as a PAIN-MAP rating (what a painful knee or hip should avoid or reduce, read by the live pain rule,
+`live_program.joint_flags`) — not re-scored here: adding them to the joint cost would re-tier the lower-body rows, a separate
+reviewed change (owner decision)."""
+
+
+def rubric_joint_stress(entry: dict[str, Any]) -> dict[str, Any]:
+    """The `joint_stress` map restricted to RUBRIC_JOINTS (a missing joint reads absent, as before)."""
+    js = entry.get("joint_stress") or {}
+    return {j: js[j] for j in RUBRIC_JOINTS if j in js}
+
+
 def joint_penalty(entry: dict[str, Any]) -> int:
     """The joint-cost term. A joint raised only as a PAIN-MAP floor (`provocation_floor`, #5861 FIX3: abduction and rotation
     work rated at least moderate for the shoulder so a shoulder flag reaches it) is scored at its reviewed healthy-joint rating
     (`from`): the floor says what a painful shoulder should avoid, not that the movement costs a healthy one more."""
     floor = entry.get("provocation_floor") or {}
-    stress = {j: (floor[j].get("from") if isinstance(floor.get(j), dict) else v) for j, v in (entry.get("joint_stress") or {}).items()}
+    stress = {j: (floor[j].get("from") if isinstance(floor.get(j), dict) else v) for j, v in rubric_joint_stress(entry).items()}
     js = [str(v) for v in stress.values()] or ["unknown"]
     raw = JOINT_HIGH * js.count("high") + (JOINT_MODERATE if ("moderate" in js or "unknown" in js) else 0)
     return max(raw, JOINT_FLOOR)
@@ -174,7 +187,7 @@ def joint_penalty(entry: dict[str, Any]) -> int:
 
 def _unknown(entry: dict[str, Any], field: str) -> bool:
     if field == "joint_stress":
-        js = entry.get("joint_stress") or {}
+        js = rubric_joint_stress(entry)
         return not js or any(str(v) == "unknown" for v in js.values())
     return str(entry.get(field) or "unknown") == "unknown"
 
@@ -326,7 +339,7 @@ def s_criteria(entry: dict[str, Any], row: dict[str, Any]) -> dict[str, bool]:
         "target_is_limiter": _row_limiter(entry, row) == "target",
         "stable_to_failure": entry.get("stability") in ("high", "moderate"),
         "stimulus_to_fatigue": inp.get("systemic_fatigue") in ("low", "moderate"),
-        "no_high_joint_stress": "high" not in [str(v) for v in (entry.get("joint_stress") or {}).values()],
+        "no_high_joint_stress": "high" not in [str(v) for v in rubric_joint_stress(entry).values()],
         "reviewed_inputs": bool(inp.get("reviewed")),
         "inputs_known": not unknown_terms(entry) and str(inp.get("ceiling") or "unknown") != "unknown",
     }
@@ -497,7 +510,7 @@ def functional_rating(entry: dict[str, Any]) -> tuple[str | None, list[str]]:
         return None, ["not applicable: no functional quality (" + ", ".join(FUNCTIONAL_QUALITIES) + ")"]
     loadable = inp.get("ceiling") in ("moderate", "high")
     core = "carry" in q or ("unilateral" in q and bool({"locomotion", "trunk_stability"} & set(q)))
-    safe = entry.get("skill_complexity") != "high" and "high" not in [str(v) for v in (entry.get("joint_stress") or {}).values()]
+    safe = entry.get("skill_complexity") != "high" and "high" not in [str(v) for v in rubric_joint_stress(entry).values()]
     if len(q) >= 3 and loadable and safe and core and "joint_capacity" not in q:  # control work for one joint is never S
         tier = "S"
     elif (len(q) >= 2 and loadable) or len(q) >= 3:

@@ -9,12 +9,12 @@
     "history_through": "2026-11-11",
     "workouts": 535,
     "distinct_templates": 539,
-    "entries": 570,
+    "entries": 571,
     "reviewed": 27,
-    "coach_added": 27,
+    "coach_added": 28,
     "generated": 516,
     "entries_by_skill_tier": {
-      "1": 290,
+      "1": 291,
       "2": 211,
       "3": 69
     },
@@ -24,7 +24,7 @@
       "overhead_press": 11,
       "row": 26,
       "squat": 18,
-      "vertical_pull": 19
+      "vertical_pull": 20
     },
     "excluded_retired_template_ids": [],
     "metadata_unavailable_template_ids": [
@@ -1306,6 +1306,34 @@
       "first_done": null,
       "last_done": null,
       "anchor_family": null
+    },
+    "pull_up_band": {
+      "title": "Pull Up (Band)",
+      "hevy_template_id_hint": "56808FD2",
+      "provenance": "coach_added",
+      "notes": "coach_added #5861 L6: #5861 FIX4: the band rung of the pull-up ladder — a garage with a bar keeps a vertical pull (VERTICAL_PULL_FALLBACK); template id from Hevy's built-in index",
+      "primary_muscle": "back",
+      "secondary_muscles": [
+        "biceps",
+        "forearms"
+      ],
+      "volume_muscle": "Back",
+      "hevy_primary_muscle_group": "lats",
+      "hevy_type": "bodyweight_assisted",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:resistance_band",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "resistance_band",
+      "reviewed": false,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": "vertical_pull"
     },
     "squat_barbell": {
       "title": "Squat (Barbell)",

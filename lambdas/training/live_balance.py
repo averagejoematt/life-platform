@@ -81,7 +81,8 @@ ALLOCATION: dict[str, dict[str, Any]] = {
         "value": 1,
         "label": HEURISTIC,
         "basis": "third red team (2026-11-13): a priority muscle 'at MEV' is at risk on any trimmed week; a muscle at or under "
-        "MEV + 1 takes the freed sets first (retention of chest, back, quadriceps and hamstrings before any delt surplus)",
+        "MEV + 1 takes the freed sets first (retention of chest, back, quadriceps and hamstrings before any delt surplus). "
+        "SUPERSEDED under live by #5861 FIX4 (`live_shape.VOLUME` priority_margin 2): kept for the record, no longer read",
     },
     "add_per_slot": {"value": 1, "label": HEURISTIC, "basis": "one added set per accessory slot a week (no slot doubles)"},
 }
@@ -271,6 +272,9 @@ def _template_rows(catalog: dict[str, Any], lib: dict[str, Any]) -> list[dict[st
             prim = live_week.landmark_muscle(key, catalog, lib)
             entry = ((lib.get("movements") or {}).get(idx["to_lib"].get(str(key))) or {}) if key else {}
             secs = [live_week.LANDMARK_OF.get(str(s), str(s)) for s in (entry.get("target") or {}).get("secondary") or []]
+            sets = len(e.get("sets") or [])
+            if role == "shoulders_arms" and e.get("kind") == "anchor" and e.get("pattern") == "overhead_press":
+                sets = max(sets, _press_sets(lib))  # #5861 FIX4: the press option counts in the week's allocation (a trade, not extra)
             rows.append(
                 {
                     "role": role,
@@ -278,12 +282,17 @@ def _template_rows(catalog: dict[str, Any], lib: dict[str, Any]) -> list[dict[st
                     "kind": e.get("kind"),
                     "intensity": e.get("intensity"),
                     "key": key,
-                    "sets": len(e.get("sets") or []),
+                    "sets": sets,
                     "muscle": prim,
                     "secondary": [m for m in secs if m != prim],
                 }
             )
     return rows
+
+
+def _press_sets(lib: dict[str, Any] | None) -> int:
+    """The live option `programming_settings.press_sets` (absent = 1, the charter's one set)."""
+    return int(((lib or {}).get("programming_settings") or {}).get("press_sets") or 1)
 
 
 def _sum(rows: list[dict[str, Any]], deltas: dict[tuple[str, str], int]) -> Counter:
@@ -296,12 +305,13 @@ def _sum(rows: list[dict[str, Any]], deltas: dict[tuple[str, str], int]) -> Coun
     return out
 
 
-def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any]) -> dict[str, Any]:
+def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: str | None = None) -> dict[str, Any]:
     """The week's set allocation (module doc 4), from the five templates: {deltas: {(role, slot): +/-n}, before, after,
-    lines}. Pure over the catalog and the library; the same for every session of the week."""
+    lines}. Pure over the catalog and the library; the same for every session of the week. `skipped` (#5861 FIX4): a role
+    this week does not draft (the short week's) — its sets neither count toward the week nor give or take."""
     from training import block_model, selection_live
 
-    rows = _template_rows(catalog, lib)
+    rows = [r for r in _template_rows(catalog, lib) if r["role"] != skipped]
     marks = block_model.load_landmarks() or {}
     priority = [str(m) for m in _settings(lib).get("priority_muscles") or []]
     pinned = {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES}
@@ -318,17 +328,14 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any]) -> dict[str, A
         r = max(over, key=lambda r: (r["sets"] + deltas.get((r["role"], str(r["slot"])), 0), rows.index(r)))
         deltas[(r["role"], str(r["slot"]))] = deltas.get((r["role"], str(r["slot"])), 0) - 1
         freed += 1
-    margin = int(ALLOCATION["priority_margin"]["value"])
-    for m in priority:  # 2. the freed sets go to the priority muscles at or under MEV + margin, one per accessory slot
-        lm = marks.get(m) or {}
-        for r in [r for r in rows if r["kind"] == "accessory" and r["muscle"] == m and r["slot"] not in pinned]:
-            if freed <= 0 or not lm or _sum(rows, deltas)[m] > float(lm["MEV"]) + margin:
-                break
-            k = (r["role"], str(r["slot"]))
-            if deltas.get(k, 0) < int(ALLOCATION["add_per_slot"]["value"]):
-                deltas[k] = deltas.get(k, 0) + 1
-                freed -= 1
+    from training import live_shape  # #5861 FIX4: at-MAV donors, MEV + 2 recipients, the quadriceps slot, the weekly redline
+
+    env = {"rows": rows, "deltas": deltas, "marks": marks, "pinned": pinned, "priority": priority, "freed": freed}
+    adds = live_shape.reallocate(env | {"catalog": catalog, "lib": lib})
+    ceiling_lines = live_shape.week_ceiling(env, adds)
     before, after = _sum(rows, {}), _sum(rows, deltas)
+    for a in adds:
+        after[a["muscle"]] += a["sets"]
     lines = [
         f"{role}.{slot} {'+' if d > 0 else ''}{d} set(s)"
         for (role, slot), d in sorted(
@@ -336,7 +343,8 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any]) -> dict[str, A
         )
         if d
     ]
-    return {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines}
+    lines += [f"{a['role']}.{a['slot']} +{a['sets']} set(s) ({a['key']})" for a in adds] + ceiling_lines
+    return {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines, "adds": adds}
 
 
 def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
@@ -344,7 +352,7 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     working set) or up (a copy of it). Returns the lines (the week's reason on each)."""
     from training import block_model
 
-    plan_ = ctx.get("allocation") or allocation_plan(ctx["catalog"], ctx["lib"])
+    plan_ = ctx.get("allocation") or allocation_plan(ctx["catalog"], ctx["lib"], _skipped(ctx))
     ctx["allocation"] = plan_
     role = str(rx.get("session_role") or "")
     marks = block_model.load_landmarks() or {}
@@ -355,6 +363,8 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
         if not d or not sets:
             continue
         was = len(sets)
+        if d < 0 and was + d <= 0:  # #5861 FIX4: the weekly redline drops a whole accessory (drop, don't shave)
+            e["live_alloc_drop"] = True
         for _ in range(abs(d)):
             if d > 0:
                 sets.append(dict(sets[-1]))
@@ -363,13 +373,23 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
         m = _muscle(e, ctx)
         lm = marks.get(m) or {}
         why = (
-            f"{m} {plan_['before'][m]:g} > MAV {lm.get('MAV')} for the week"
+            f"{m} {plan_['before'][m]:g} (MAV {lm.get('MAV')}) gives sets to the priority muscles and the weekly redline"
             if d < 0
             else f"{m} at {plan_['before'][m]:g} (MEV {lm.get('MEV')}): a priority muscle takes the freed sets first"
         )
         title = (ctx["catalog"].get(e.get("movement_key")) or {}).get("title") or e.get("movement_key")
-        lines.append(f"allocation (live): {title} {was} -> {len(sets)} sets — {why} (ALLOCATION, heuristic)")
+        lines.append(
+            f"allocation (live): {title} {was} -> {0 if e.get('live_alloc_drop') else len(sets)} sets — {why} (ALLOCATION, heuristic)"
+        )
+    rx["exposures"] = [e for e in rx["exposures"] if not e.get("live_alloc_drop")]
     return lines
+
+
+def _skipped(ctx: dict[str, Any]) -> str | None:
+    """The role a short / dip week does not draft (its host is set), else None."""
+    from training.live_program import SHORT_WEEK_SKIP
+
+    return SHORT_WEEK_SKIP if ctx.get("short_week_host") else None
 
 
 def _muscle(e: dict[str, Any], ctx: dict[str, Any]) -> str:
@@ -529,10 +549,12 @@ def why_effort(why: str, ir: Any) -> str:
         return why
     first = next((ln for ln in str(getattr(exercises[0], "notes", "") or "").split("\n") if ln.strip()), "")
     eff = sb.session_effort(why)
-    if not eff or not g.EFFORT_RE.match(first.strip()) or first.strip() == eff:
-        return why
-    head, sep, rest = why.partition("\n")
-    return _day_line(head, first) + sep + rest
+    if eff and g.EFFORT_RE.match(first.strip()) and first.strip() != eff:
+        head, sep, rest = why.partition("\n")
+        why = _day_line(head, first) + sep + rest
+    from training.live_safety import fix_block  # #5861 FIX4: no step on a held exercise 1 / hold day; one effort across the session
+
+    return fix_block(why, rx, exercises)
 
 
 # ── 8. cardio: the host, the machine, its name ───────────────────────────────

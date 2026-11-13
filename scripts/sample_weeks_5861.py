@@ -347,6 +347,9 @@ def _cardio(ideal: Any, profile: dict[str, Any], day: str, cardio_index: dict[st
         return {"block": None, "error": f"{type(e).__name__}: {e}"}
     if live is not None:
         ideal.rationale = list(ideal.rationale or []) + list((pick or {}).get("live") or [])
+        from training.live_shape import walk_note
+
+        walk_note(ideal, (pick or {}).get("live"))  # gate_draft's own step (#5861 FIX4)
     if block is not None:
         ideal.exercises.append(block)
         dsc._refresh_session_shape(ideal)
@@ -515,7 +518,10 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
     from training.routine_title import format_why_note
 
     why = session_block.why_note_for(ideal, format_why_note(ideal))  # the draft path's own WHY line (hevy_routine_cron)
-    resolve = live_balance.template_resolver(lambda k: str((movements.get(k) or {}).get("hevy_template_id_hint") or k))  # the cron's
+    if RESOLVER["mode"] == "legacy":  # the base tree's simplified lookup: what the no-live-change pins were computed with
+        resolve = live_balance.template_resolver(lambda k: str((movements.get(k) or {}).get("hevy_template_id_hint") or k))
+    else:
+        resolve = cron_resolver(movements)  # #5861 FIX4: the nightly job's lookup (hevy_template_cache), offline
     body = hevy_compiler.to_create_body(ideal, resolve, why_note=why)
     wire_notes = [e.get("notes") or "" for e in body["routine"]["exercises"]]  # branchless: the IR's exercises, in order
     lifts = []
@@ -560,6 +566,42 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
         },
         "wire": body["routine"]["exercises"],
     }
+
+
+RESOLVER: dict[str, str] = {"mode": "cron"}
+"""`cron` (default): the compiled wire uses the nightly job's template lookup (`cron_resolver`). `legacy`: the base tree's own
+simplified lookup — `served_digest` uses it, because its pins were computed against the base tree's harness (an apples-to-apples
+proof that the SERVED draft did not move; the resolver is a harness component, not the draft)."""
+
+
+def cron_resolver(movements: dict[str, Any]) -> Any:
+    """The nightly job's movement -> Hevy template lookup (`hevy_routine_cron`: `live_balance.template_resolver(
+    hevy_template_cache.resolve_movement)`), offline: the S3 cache it reads is replaced by what `reconcile_custom` would have
+    cached for a title-only catalog entry (the library template of the same title, `_tid`), the catalog by this world's, and its
+    cache write-back is a no-op. A movement the lookup cannot map RAISES, as it does in the cron (the fourth red team: the old
+    resolver wrote a title-only entry's catalog KEY as its template id on the sample wire)."""
+    from unittest.mock import patch
+
+    from training import hevy_template_cache as htc, live_balance
+
+    cache = {
+        "version": 1,
+        "movements": {
+            k: {"hevy_template_id": _tid(movements, k), "source": "title (offline reconcile_custom)"}
+            for k, c in movements.items()
+            if not c.get("hevy_template_id_hint") and _tid(movements, k)
+        },
+    }
+
+    def resolve(key: str) -> str:
+        with (
+            patch.object(htc, "_load_cache", lambda: copy.deepcopy(cache)),
+            patch.object(htc, "_load_catalog", lambda: {"movements": movements}),
+            patch.object(htc, "_write_s3_json", lambda *a, **k: None),
+        ):
+            return htc.resolve_movement(key)
+
+    return live_balance.template_resolver(resolve)
 
 
 def _reps(sets: list[Any]) -> str:
@@ -659,6 +701,7 @@ def measure(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any], 
         "repeats": {k: n for k, n in Counter(keys).items() if n > 1},
         "new_this_week": sorted({x["key"] for s in week["sessions"] for x in s["lifts"] if "New:" in (x["hevy_note"] or "")}),
         "effort_conflicts": _effort_conflicts(week),
+        "session_effort_conflicts": _session_effort_conflicts(week),
         "aerobic": {
             "structured_min": sum(blocks),
             "blocks_20_plus": sum(1 for b in blocks if b >= 20),
@@ -673,6 +716,25 @@ def _effort_conflicts(week: dict[str, Any]) -> list[str]:
     from training.live_balance import effort_targets
 
     return [f"{s['role']}: {x['key']}" for s in week["sessions"] for x in s["lifts"] if len(effort_targets(x["hevy_note"])) > 1]
+
+
+def _redline() -> int:
+    from training.live_shape import week_redline
+
+    return week_redline()
+
+
+def _session_effort_conflicts(week: dict[str, Any]) -> list[str]:
+    """The session line against every big lift's own effort, across the session (#5861 FIX4, `live_safety.big_lift_conflicts`)."""
+    from types import SimpleNamespace
+
+    from training.live_safety import big_lift_conflicts
+
+    out = []
+    for s in week["sessions"]:
+        blocks = [SimpleNamespace(movement_key=x["key"], notes=x["hevy_note"], rationale_tag=x["tag"]) for x in s["lifts"]]
+        out += [f"{s['role']}: {c}" for c in big_lift_conflicts(blocks)]
+    return out
 
 
 # ── markdown ──────────────────────────────────────────────────────────────────
@@ -719,6 +781,9 @@ def render(week: dict[str, Any], m: dict[str, Any]) -> str:
     )
     lines.append(f"Repeated movements: {m['repeats'] or 'none'}; new this week: {', '.join(m['new_this_week']) or 'none'}")
     lines.append(f"Notes with more than one effort target: {', '.join(m['effort_conflicts']) or 'none'}")
+    lines.append(f"Session lines contradicting a big lift: {', '.join(m['session_effort_conflicts']) or 'none'}")
+    total = sum(p["working_sets"] for p in m["per_session"])
+    lines.append(f"Working sets this week: {total} (redline {_redline()})")
     return "\n".join(lines) + "\n"
 
 
@@ -748,6 +813,10 @@ LIVE_PREFIXES = (
     "moved (live)",
     "pain (live)",
     "adherence dip",
+    "no step (live)",
+    "order (live)",
+    "deadlift (live option)",
+    "walk (live)",
 )
 
 
@@ -766,7 +835,12 @@ def served_digest(mode: str = "proposed", profiles: dict[str, Any] | None = None
     import hashlib
 
     out = {}
-    for r in run(None, mode, profiles, prior="pools"):
+    RESOLVER["mode"] = "legacy"  # the pins' own harness (RESOLVER doc); restored below
+    try:
+        results = run(None, mode, profiles, prior="pools")
+    finally:
+        RESOLVER["mode"] = "cron"
+    for r in results:
         served = [{k: v for k, v in s.items() if k not in ("fatigue", "live_fit", "carry_m")} for s in r["week"]["sessions"]]
         out[r["week"]["profile"]] = hashlib.sha256(json.dumps(served, sort_keys=True, default=str).encode()).hexdigest()[:16]
     return out

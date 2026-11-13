@@ -1,0 +1,123 @@
+{
+ "_comment": "Epic #5861 FIX4: the fourth red team's three STRESS profiles, SYNTHETIC (no personal data: round invented body mass and steps; generated loads are synthetic). Same shape as sample_week_profiles_5861.json; read by tests/test_programming_fix4_5861.py and scripts/sample_weeks_5861.py --profile-file.",
+ "as_of": "2026-11-16",
+ "position": {
+  "week": 10,
+  "block": 2
+ },
+ "defaults": {
+  "roles": [
+   "upper_heavy",
+   "lower_heavy",
+   "shoulders_arms",
+   "upper_volume",
+   "lower_volume"
+  ],
+  "days": [
+   "2026-11-16",
+   "2026-11-17",
+   "2026-11-18",
+   "2026-11-19",
+   "2026-11-20"
+  ],
+  "bodyweight_lb": 250,
+  "readiness": "green",
+  "sleep_hours": 7.5,
+  "acwr": "safe",
+  "steps_per_day": 14000,
+  "trend": "progressing",
+  "trend_overrides": {},
+  "discomfort": [],
+  "pain": [],
+  "unavailable_equipment": [],
+  "sessions_last_14d": 10,
+  "hard_cardio_minutes_7d": 40
+ },
+ "profiles": {
+  "g_knee_pain_garage_short": {
+   "label": "(g) RT4 stress: garage + knee pain 5/10 on squat + 4-day week",
+   "story": "sharp-ish knee pain on the back squat, garage kit, travel Friday",
+   "unavailable_equipment": [
+    "ab_crunch_machine",
+    "assisted_pullup_dip_machine",
+    "belt_squat_machine",
+    "biceps_curl_machine",
+    "cable_stack",
+    "calf_raise_seated_machine",
+    "calf_raise_standing_machine",
+    "chest_press_machine",
+    "decline_press_machine",
+    "glute_kickback_machine",
+    "hack_squat_machine",
+    "hip_abduction_machine",
+    "hip_adduction_machine",
+    "hip_thrust_machine",
+    "incline_press_machine",
+    "lat_pulldown_station",
+    "lateral_raise_machine",
+    "leg_curl_lying",
+    "leg_curl_seated",
+    "leg_extension_machine",
+    "leg_press_machine",
+    "machine_unspecified",
+    "pec_deck",
+    "pendulum_squat_machine",
+    "preacher_machine",
+    "pullover_machine",
+    "rear_delt_machine",
+    "seated_row_machine",
+    "shoulder_press_machine",
+    "smith_machine",
+    "t_bar_row_machine",
+    "torso_rotation_machine",
+    "triceps_machine",
+    "elliptical",
+    "rower",
+    "sled",
+    "stair_climber",
+    "ski_erg",
+    "recumbent_bike"
+   ],
+   "pain": [
+    {
+     "movement": "squat_barbell",
+     "note": "knee pain 5/10 on the squat"
+    }
+   ],
+   "roles": [
+    "upper_heavy",
+    "lower_heavy",
+    "shoulders_arms",
+    "upper_volume"
+   ],
+   "days": [
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-18",
+    "2026-11-19"
+   ]
+  },
+  "h_heavy_walker": {
+   "label": "(h) RT4 stress: a heavy walker (synthetic 260 lb, 10.5k steps), mild elbow discomfort on skullcrusher",
+   "story": "a heavy trainee whose walking leaves a modest aerobic gap",
+   "bodyweight_lb": 260,
+   "steps_per_day": 10500,
+   "discomfort": [
+    {
+     "movement": "skullcrusher_dumbbell",
+     "note": "elbow a bit sore 2/10"
+    }
+   ]
+  },
+  "i_mild_pain_low_back": {
+   "label": "(i) RT4: low back pain 2/10 on deadlift",
+   "story": "mild back pain",
+   "pain": [
+    {
+     "movement": "deadlift_barbell",
+     "note": "low back pain 2/10 on the deadlift"
+    }
+   ]
+  }
+ }
+}

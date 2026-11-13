@@ -77,6 +77,9 @@ RESISTANCE_PROFILES = (
 STABILITY = ("high", "moderate", "low", "unknown")
 STRESS_LEVELS = ("low", "moderate", "high", "unknown")
 JOINT_STRESS_KEYS = ("spinal_load", "shear", "wrist", "elbow", "shoulder")
+PAIN_MAP_JOINTS = ("knee", "hip")
+"""#5861 FIX4: the knee and hip ratings the live pain rule reads (`deploy/exercise_library_input_review.KNEE_HIP`, a class rule);
+optional per entry, never read by the rubric's joint cost (`quality_rubric.RUBRIC_JOINTS`)."""
 SKILL = ("low", "moderate", "high")
 TIERS = quality_rubric.QUALITY_TIERS  # the QUALITY tier S-D, derived by the rubric (#5857) — never an evidence grade
 EVIDENCE_CONFIDENCE = quality_rubric.EVIDENCE_CONFIDENCE  # evidence strength, its own field beside the tier
@@ -312,8 +315,8 @@ def validate(lib: dict[str, Any]) -> list[str]:
         if e.get("skill_complexity") not in SKILL:
             _err(errors, w, f"skill_complexity {e.get('skill_complexity')!r}")
         js = e.get("joint_stress") or {}
-        if set(js) != set(JOINT_STRESS_KEYS) or any(v not in STRESS_LEVELS for v in js.values()):
-            _err(errors, w, "joint_stress needs exactly spinal_load/shear/wrist/elbow/shoulder in low|moderate|high|unknown")
+        if set(js) - set(PAIN_MAP_JOINTS) != set(JOINT_STRESS_KEYS) or any(v not in STRESS_LEVELS for v in js.values()):
+            _err(errors, w, "joint_stress needs exactly spinal_load/shear/wrist/elbow/shoulder (+ knee/hip) in low|moderate|high|unknown")
         tgt = e.get("target") or {}
         if not tgt.get("primary") or not tgt.get("region"):
             _err(errors, w, "target needs primary + region")

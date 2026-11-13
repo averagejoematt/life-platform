@@ -134,7 +134,8 @@ def test_the_week_is_allocated_by_priority_before_any_muscle_sits_over_mav():
     shoulders_first = copy.deepcopy(lib)
     shoulders_first["programming_settings"] = {**(lib.get("programming_settings") or {}), "priority_muscles": ["shoulders"]}
     assert lb.allocation_plan(CAT0, shoulders_first)["after"]["chest"] == plan["before"]["chest"]
-    with patch.dict(lb.ALLOCATION, {"over_mav_floor": {"value": 99}}):  # control: no slot may give -> delts stay over MAV
+    # control: no slot may give (and #5861 FIX4's weekly redline, which may drop a whole slot, off) -> delts stay over MAV
+    with patch.dict(lb.ALLOCATION, {"over_mav_floor": {"value": 99}}), patch("training.live_shape.week_ceiling", lambda env, adds: []):
         assert lb.allocation_plan(CAT0, lib)["after"]["shoulders"] > marks["shoulders"]["MAV"]
 
 
@@ -212,7 +213,8 @@ def s_counts(lib: dict) -> dict[str, int]:
 def test_one_s_per_canonical_family_per_objective():
     assert quota_violations(LIB0) == []
     # before -> after (FIX3): hypertrophy 49 -> 34, strength 10 -> 10, functional 10 -> 9 (exact duplicates share one rating)
-    assert s_counts(LIB0) == {"hypertrophy": 34, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}
+    # FIX4 -3: the landmine presses and the trap pulldown read a moderate load ceiling (fourth red team: generous S)
+    assert s_counts(LIB0) == {"hypertrophy": 31, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}
     pull = LIB0["movements"]["lat_pulldown_close_grip_cable"]
     assert pull["ratings"]["hypertrophy"]["tier"] == "A" and any("S quota" in b for b in pull["ratings"]["hypertrophy"]["basis"])
     assert LIB0["movements"]["lat_pulldown_cable"]["ratings"]["hypertrophy"]["tier"] == "S"  # the family's one S
@@ -324,7 +326,12 @@ def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
     total = sum(int(s["cardio"].get("minutes") or 0) for s in week["sessions"])
     assert easy and len(easy) < len([s for s in week["sessions"] if s["cardio"].get("kind") not in lp.HARD_KINDS])
     assert total + week["steps_credit"]["moderate_min_per_wk"] >= cm.WEEKLY_MODERATE_MIN[0]
-    every = _walker_week(10000, patches={(lb, "easy_gap"): lambda kind, live: (True, [])})  # control: no gap rule
+    from training import live_shape
+
+    # control: no gap rule (FIX4: nor the walk prompt's "a small gap is the walk's")
+    every = _walker_week(
+        10000, patches={(lb, "easy_gap"): lambda kind, live: (True, []), (live_shape, "walk_covers"): lambda kind, live: None}
+    )
     assert sum(1 for s in every["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS) > len(easy)
     shared = _walker_week(10000, {"session_cap_includes_cardio": True})
     full = {s["role"]: s["lifting_minutes"] for s in week["sessions"]}

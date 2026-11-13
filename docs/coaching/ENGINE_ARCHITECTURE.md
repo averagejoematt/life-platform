@@ -10,7 +10,11 @@
 > measured on the sample weeks and on the owner's private real-data run. **Updated a third time** (2026-11-13) for the THIRD
 > red team (graded B-): `live_balance` (volume by priority, one spine-loading definition and the kettlebell slot's placement,
 > pain persistence, the adherence dip, the library fallback, one effort target per lift, cardio host and machine) and the
-> library's S quota and two class rules (rubric 3.3.0) — §1–§10 and the new §4b, measured the same two ways.
+> library's S quota and two class rules (rubric 3.3.0) — §1–§10 and the new §4b, measured the same two ways. **Updated a fourth
+> time** (2026-11-13) for the FOURTH red team (graded B-, safety C): `live_safety` and `live_shape` (the pain site from the note,
+> knee and hip, mild pain kept lighter, no load step on a held lift, one effort across the session, the weekly redline, at-MAV
+> donors and the quadriceps slot, drop-don't-shave, squat before the hinge, the aerobic gap's walk, the stop line's wording) and
+> library 0.3.2 — the new §4c, measured on the sample weeks, three stress profiles and the owner's private run.
 > No personal data: every example is a synthetic profile (`tests/fixtures/sample_week_profiles_5861.json`).
 
 ## The principle
@@ -227,6 +231,64 @@ What the selection cannot see, because it ranks slots:
   set, then whole isolation accessories (largest week surplus over MEV first, never under MEV, never pinned) — so the shared-cap
   morning keeps a 20-minute block.
 
+## 4c. The fourth red team's week (`live_safety`, `live_shape`, 2026-11-13)
+
+Every rule is a labelled heuristic table (`live_safety.STOP_LINE`, `live_shape.VOLUME`, `QUAD_SLOT`, `WALK_PROMPT`); every owner
+decision is a library setting with today's default.
+
+- **The pain site comes from the note** (`live_safety.note_site`, `flag_joints`). The joint a pain or discomfort flag reaches is
+  the one the note NAMES (knee, hip, low back, shoulder, elbow, wrist — the earliest named wins); the flagged movement's worst
+  joint is the fallback only when none is named. The joint model gains the knee and the hip (library 0.3.2, a pain-map rating,
+  never the rubric's joint cost). A knee flag's pattern group is the knee-dominant group (squat, lunge, split squat, step-up,
+  leg extension) whatever lift the note was on. Above the mild line a high-stress movement with no low-stress member takes a
+  MODERATE one, reduced (10 % lighter, RPE <= 7); a regression the session fit already chose (a box squat for the squat) is kept,
+  reduced. Stress case (g), knee pain 5/10 on the squat in a garage: no high-knee movement served all week, every knee-loading
+  lift at RPE <= 7 (it served a Bulgarian split squat at RPE 8–9 and two more lunge patterns before).
+- **Mild pain keeps the lift** (`mild`, `mild_pain_tids`): a stated score at or under PAIN_RULE's 3/10, not sharp, keeps the
+  movement — in the session fit (`live_session._blocked`) AND the selection (`selection_live.build_policy` `mild_pain`, read by
+  `selection_engine._exclusion` under the live policy only) — and the pain rule reduces it. Every lift the pain rule touched
+  carries an in-set stop line: "Pain past N/10 or sharp → stop this lift." (N = 3, or the stated score when lower).
+- **No load step on a held lift** (`no_step`, `block_rule`). The session block's "Top reps at RPE 7 or less → +10 lb on later
+  sets" no longer heads a lift the engine held, cut, stall-reset or flagged: a held exercise 1 turns the rule to "Other lifts: …"
+  (or drops it when nothing else may step); any other held lift says "No load step today."; its own "Set 1: … on later sets"
+  line goes; a hold day (strain, overreach, a recommended deload) drops the rule and exercise 1 says "Loads stay as written
+  today." The rule is fitted on exercise 1's block or on the compiler's WHY line (`live_balance.why_effort` -> `fix_block`).
+- **One effort across the session** (`coherent_effort`, `coherent_head`, `big_lift_conflicts`). The session line states the band
+  every big lift (anchor) shares, or the day alone when they differ (each big lift then states its own target). The guard reads
+  the whole session, and the sample weeks report it (`session_effort_conflicts`).
+- **Volume** (`live_shape.reallocate`, `week_ceiling`, `add_slots`; inside `live_balance.allocation_plan`). Muscles AT their MAV give
+  isolation sets too (up to two a week, never a slot under two sets), and the priority muscles at or under MEV + 2 take them; the
+  quadriceps take a two-set isolation slot on the lower-volume day (leg extension first, else a leg press) when they sit there,
+  his history shows the movement (catalog sessions >= 3) and the gym has it; the week's planned working sets (templates +
+  allocation + added slots + the trunk floor) are held to the owner's redline (`owner_redlines` total_hard_sets_wk, 75) — one
+  isolation set at a time from the largest surplus over MEV, a slot at its floor going whole. A short week counts only the
+  roles it drafts. The press option's sets count in the week's allocation (a trade, not extra).
+- **Drop, don't shave** (`no_single_sets`, `next_drop`). The time fit and the cardio room never trim an accessory to one set: the
+  sets pass stops at two, then whole accessories go — the one whose muscle keeps the most surplus over MEV first (else the last
+  listed); a reduce trim never takes isolation under two sets; any one-set accessory left is dropped and its superset unpaired.
+  Under the shared cap, as the last resort before the minimum aerobic block is cut, a NON-priority isolation accessory may go
+  under its MEV (the shared cap is the owner's choice of conditioning).
+- **Order and the heavy pull** (`order_lower_volume`, `deadlift_shape`). On the lower-volume day the squat comes before the RDL. The
+  heavy-day squat + deadlift pairing stays (owner ruling #5694); `programming_settings.heavy_day_deadlift_shape` `as_today`
+  (default: top set + two back-offs) | `top_plus_backoff` (top set + one back-off — the fourth red team's recommendation).
+- **The aerobic gap** (`walk_covers`, `walk_prompt`, `walk_note`). On the conditioning host's morning, when the week's aerobic gap
+  (the guideline floor less the walking credit, every block done this week and today's block) is at least 15 minutes, ONE
+  optional walk is prescribed on exercise 1's note ("Optional today: brisk walk N min, any time.", N <= 40) — never a silent
+  shortfall, never a lifting cut. Under the default cap an easy ride is no longer added when one walk covers what is left
+  (<= 40 min). The walking credit itself stays a labelled heuristic (`cardio_model.STEPS_CREDIT_SHARE`, a quarter of the steps
+  over 5,000): cadence minutes from the watch would replace it where a source records them.
+- **The stop line** (`symptom_text`, `lifting_day_symptom`). `programming_settings.symptom_line` keeps its default wording; the
+  preset `extended` reads "Chest, breathing, dizzy, heart racing or irregular? Stop." / "Doesn't settle → get medical help.", and
+  `symptom_line_on_lifting_days` (default false) prints it on exercise 1 of every lifting morning. A test reads it on the routine
+  as compiled for Hevy (`hevy_compiler.to_create_body`, the nightly and MCP write path's payload builder).
+- **The kettlebell slot under strain** (`kb_under_strain`): `programming_settings.kb_slot_under_strain` `as_today` (default: the slot
+  follows its placement) | `drop`. **The fourth red team recommends `drop`**: a strained, overreached or deload-recommended week
+  drops the kettlebell hinge rather than relocating it.
+- **Fidelity.** The sample-week generator compiles with the nightly job's own template lookup (`hevy_template_cache.resolve_movement`
+  behind the KB template setting, offline: `scripts/sample_weeks_5861.cron_resolver`) — a title-only catalog entry no longer reaches
+  the wire as its catalog key. The no-live-change digests keep the base tree's harness lookup (`RESOLVER` `legacy`), the
+  harness their pins were computed with.
+
 ## 5. Progression
 
 **The live load guard** (`live_program.guard_loads`, after the floor and the double progression, before the back-offs and
@@ -320,7 +382,7 @@ layer — one person's usage count is fit, not modality quality.
 
 | Evidence-backed (verified citation, ±1 band) | Practitioner consensus (labelled) | Platform heuristic (labelled, owner-adjustable) |
 |---|---|---|
-| lengthened-position loading for some muscles; the glute stretch cap (Plotkin 2023); 14 direct-trial and 7 characteristic-trial hypertrophy rows | the functional, conditioning and mobility rubrics; joint-stress ratings; cue sheets; pain monitoring by a stated score | every fatigue threshold; the 14-day trend window; MAX_WEEKLY_EXPOSURES 2; MAX_HOLD_WEEKS 12; MAX_NEW_PER_WEEK 2 (new = not performed in RECENT_DAYS 28); upgrades at block start; the systemic-slump rule (4 lifts, half); fatigue cost; surplus-first trimming; the adherence step; `live_program` LOAD_POLICY (−10 % / −5 % / RPE 9.5 / RPE 9, evidence RPE 9, one retreat per 6 days), DELOAD_SHAPE, PAIN_RULE (3/10), STACK_RULE (2 per session, pinned light at RPE 7), STALL_RULE (+2 reps, −10 %), TRUNK_FLOOR, TRUNK_FALLBACK_ORDER, MIN_CARDIO_MINUTES 10; `live_week` KB_SLOT (RPE 7–8), CARDIO_ROOM (20-min block, 2-set floor), BEHIND_SCHEDULE (5 of 10 missed, ~45 min, 2 sets), NOVEL_START (6–8, RPE 7), VERTICAL_PULL_FALLBACK |
+| lengthened-position loading for some muscles; the glute stretch cap (Plotkin 2023); 14 direct-trial and 7 characteristic-trial hypertrophy rows | the functional, conditioning and mobility rubrics; joint-stress ratings; cue sheets; pain monitoring by a stated score | every fatigue threshold; the 14-day trend window; #5861 FIX4: `live_safety` SITE_WORDS, STOP_LINE, the moderate-member fallback; `live_shape` VOLUME (priority_margin 2, at_mav_give 2), QUAD_SLOT, WALK_PROMPT (15–40 min), the knee/hip pain map (library); MAX_WEEKLY_EXPOSURES 2; MAX_HOLD_WEEKS 12; MAX_NEW_PER_WEEK 2 (new = not performed in RECENT_DAYS 28); upgrades at block start; the systemic-slump rule (4 lifts, half); fatigue cost; surplus-first trimming; the adherence step; `live_program` LOAD_POLICY (−10 % / −5 % / RPE 9.5 / RPE 9, evidence RPE 9, one retreat per 6 days), DELOAD_SHAPE, PAIN_RULE (3/10), STACK_RULE (2 per session, pinned light at RPE 7), STALL_RULE (+2 reps, −10 %), TRUNK_FLOOR, TRUNK_FALLBACK_ORDER, MIN_CARDIO_MINUTES 10; `live_week` KB_SLOT (RPE 7–8), CARDIO_ROOM (20-min block, 2-set floor), BEHIND_SCHEDULE (5 of 10 missed, ~45 min, 2 sets), NOVEL_START (6–8, RPE 7), VERTICAL_PULL_FALLBACK |
 
 Volume landmarks (`config/training_landmarks.json`) are practitioner landmarks, not individual measurements.
 
@@ -372,6 +434,14 @@ Before flipping, the owner should decide (each is listed on the epic's PRs):
 - [ ] the novelty budget's reach: on the flip, the current phase's ledger (written in shadow by the #5075 calendar) is served
       only within the budget — the rest of the shadow rotation waits;
 - [ ] showing the loss-rate band as advisory text in the rationale (no nutrition change either way).
+- [ ] fourth red team settings, each at today's default and each alternative exercised in `tests/test_programming_fix4_5861.py`:
+      `heavy_day_deadlift_shape` (as_today | top_plus_backoff — recommended), `kb_slot_under_strain` (as_today | drop —
+      recommended), `symptom_line` (today's wording | `extended`, with racing/irregular heartbeat and a seek-care step),
+      `symptom_line_on_lifting_days` (false | true);
+- [ ] the knee/hip pain map (library 0.3.2, a class rule, not in the rubric's joint cost) and the fourth red team's heuristics:
+      the note-site words, the moderate-member fallback above the mild line, the stop line at 3/10, at-MAV donors (2 sets) and
+      the MEV + 2 priority margin, the quadriceps slot (history >= 3 sessions), the weekly redline from `owner_redlines`, the walk
+      prompt (15–40 min, on the conditioning host), drop-don't-shave.
 
 ## 10. How it is validated
 
@@ -397,6 +467,17 @@ Before flipping, the owner should decide (each is listed on the epic's PRs):
   allocation, the KB placement and template settings, the S quota, one effort target on every generated note, the adherence dip on a
   realistic irregular history, the steps credit, the garage leg curl, the short week's conditioning host, the machine and its name,
   and the owner settings.
+- The fourth red team's gates (2026-11-13), `tests/test_programming_fix4_5861.py`, over the six profiles AND three stress profiles
+  (`tests/fixtures/sample_week_stress_profiles_5861.json`: knee pain in a garage, a heavy walker, mild low-back pain) under both
+  cap settings, each with a control: no high-knee movement and no knee-loading lift above RPE 7 under a knee flag (control: the
+  note's site ignored); mild pain keeps the deadlift lighter with a stop line (control: the old exclusion); every pain-touched lift
+  carries a stop line; no "+N on later sets" reaches a held lift or a hold day (control: the rule fitted to nothing); no session
+  line contradicts a big lift (control: the per-lift guard only); the week never passes the 75-set redline (control: 76 fails, and
+  the ceiling off); no one-set accessory; squat before the hinge; the deadlift shape and the KB-under-strain settings both ways;
+  one optional walk under the shared cap (control: a silent shortfall); fewer bolt-on rides under the default cap; the stop line on
+  the Hevy payload, the extended wording and the lifting-day switch; the band pull-up; the corrected tiers; the deload's compound
+  RPE cap (the third red team's surviving M3 mutation, now red); the cron's template lookup on the sample wire. Acceptance c4 reads
+  the note text too ("loads never rise" includes the in-session step).
 - The second red team's gates (2026-11-13): d1 now checks the DISTRIBUTION (no major muscle over MAV while another is under
   MEV); b2 needs a 20-minute aerobic block or the steps-dose rationale, not any block; d2b keeps a squat and a hinge in every
   lower session (its control replays the old precedence that swapped the squat out); d3b keeps a 20-minute block under the

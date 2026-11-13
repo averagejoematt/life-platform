@@ -59,6 +59,12 @@ ADDITIONS: tuple[tuple[str, str, str, str], ...] = (
     ("pendulum_squat", "Pendulum Squat (Machine)", "30E293E3", "a top-rated machine squat; equipment state unknown"),
     ("chin_up", "Chin Up", "29083183", "the bodyweight vertical pull (gated by the library's bodyweight gate)"),
     ("pull_up_negative", "Negative Pull Up", "F60BDDF8", "the eccentric rung of the pull-up ladder (gated)"),
+    (
+        "pull_up_band",
+        "Pull Up (Band)",
+        "56808FD2",
+        "#5861 FIX4: the band rung of the pull-up ladder — a garage with a bar keeps a vertical pull (VERTICAL_PULL_FALLBACK)",
+    ),
     ("chest_supported_t_bar_row", "Chest Supported T Bar Row", "6A8D3193", "a loadable row with no spinal load"),
     ("pullover_machine", "Pullover (Machine)", "B123DD01", "a top-rated lat isolation; equipment state unknown"),
     ("incline_chest_press_machine", "Incline Chest Press (Machine)", "FBF92739", "a stable incline press; equipment state unknown"),

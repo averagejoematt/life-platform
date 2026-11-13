@@ -1572,6 +1572,21 @@ EXPANSION: list[dict] = [
         equipment=["pullup_bar", "plyo_box"],
         gates=["bw_pull", "chain_pull_negative"],
     ),
+    # #5861 FIX4 (fourth red team): the band rung — Hevy's BUILT-IN "Pull Up (Band)" (56808FD2, is_custom false in the template
+    # index). A garage with a bar and a band served the dumbbell pull-over (not a vertical pull) because no band rung existed.
+    _x(
+        "pull_up_band",
+        "Pull Up (Band)",
+        "56808FD2",
+        target={"primary": "back", "secondary": ["biceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _M, _M),
+        skill_complexity="moderate",
+        equipment=["pullup_bar", "resistance_band"],
+    ),
     _x(
         "pull_up",
         "Pull Up",
