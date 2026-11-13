@@ -222,7 +222,7 @@ PINNED = {
     "PATTERN_OVERRIDES": 23,  # #5861 FIX-DATA: +9 (side bends, the title-regex misses)
     "STRENGTH_LIFTS": 9,
     "CATEGORY_OVERRIDES": 14,  # +2 (the dead-hang variants)
-    "INPUT_OVERRIDES": 21,  # +10 (shrug grip limiter, kickback ceilings, cuff mobility n/a, the dead-hang variants)
+    "INPUT_OVERRIDES": 19,  # +10 (shrug grip limiter, kickback ceilings, cuff mobility n/a, the dead-hang variants); FIX2-DATA -2 (cuff mobility is the class rule now)
     "SECONDARY_ROWS": 6,
     "CANONICAL_FAMILIES": 49,  # +5 (one machine, one rating)
 }
@@ -271,13 +271,16 @@ def test_control_a_reverted_override_or_a_missing_movement_goes_red(monkeypatch)
 
 
 def _unreviewed(movements: dict) -> list[str]:
+    """#5861 FIX2-DATA: an unreviewed movement lands at the NEUTRAL band (B) marked provisional — so the reviewed-pass bar is
+    S and A on every objective (the programmable pools), and every unreviewed rating must say it is provisional."""
     return sorted(
         k
         for k, e in movements.items()
         if not e["objective_inputs"]["reviewed"]
         and (
-            any(t in ("S", "A", "B") for t in e["ratings"]["hypertrophy"]["by_target"].values())
+            any(t in ("S", "A") for t in e["ratings"]["hypertrophy"]["by_target"].values())
             or any(e["ratings"][o]["tier"] in ("S", "A") for o in ("strength", "functional", "conditioning", "mobility"))
+            or any(v["tier"] and not v["provisional"] for v in e["ratings"].values())
         )
     )
 
@@ -315,12 +318,12 @@ ANOMALIES = {  # key: (hypertrophy, strength, functional, conditioning, mobility
     "treadmill": (None, None, None, "A", None),  # #5861: the public conditioning tier caps at A (N=1 S is private)
     "walking": (None, None, None, "C", None),  # lane L4's cardio model owns the rating: hard to dose and progress
     "rowing_machine": (None, None, None, "A", None),
-    "hip_thrust_machine": ("S", None, None, None, None),
+    "hip_thrust_machine": ("A", None, None, None, None),  # FIX2-DATA: evidence ordering, ties the trial-backed barbell form
     "hip_thrust_barbell": ("A", None, None, None, None),
     "squat_barbell": ("A", "S", "B", None, None),
     "rear_delt_reverse_fly_machine": ("S", None, None, None, None),
     "rear_delt_reverse_fly_cable": ("A", None, None, None, None),
-    "face_pull": ("B", None, None, None, "A"),
+    "face_pull": ("B", None, "B", None, None),  # FIX2-DATA: cuff work is joint capacity (functional), not loaded mobility
 }
 
 

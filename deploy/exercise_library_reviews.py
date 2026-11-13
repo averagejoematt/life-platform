@@ -117,4 +117,27 @@ def finalize_tiers(movements: dict[str, dict[str, Any]]) -> None:
 
     for e in movements.values():
         e["hypertrophy"] = [quality_rubric.finalize_row(e, r) for r in e.get("hypertrophy") or []]
+    apply_evidence_ordering(movements)
+    for e in movements.values():
         e["ratings"] = quality_rubric.objective_ratings(e)
+
+
+def apply_evidence_ordering(movements: dict[str, dict[str, Any]]) -> None:
+    """#5861 FIX2-DATA: each untested form of a trial-backed movement (`exercise_library_input_review.EVIDENCE_FORMS`)
+    carries the tested row's tier as its `evidence_ceiling` for the trial's target, and is re-derived under it. Runs after
+    every row is final, so the tested tier is the one the library ships. A form with its own direct trial is left alone."""
+    import exercise_library_input_review as input_review
+    from training import quality_rubric
+
+    for tested, spec in input_review.EVIDENCE_FORMS.items():
+        anchor = next((r for r in movements[tested]["hypertrophy"] if r.get("target") == spec["target"]), None)
+        ceiling = quality_rubric.evidence_ceiling(anchor or {}, tested)
+        for form in spec["forms"]:
+            e = movements[form]
+            rows = []
+            for r in e.get("hypertrophy") or []:
+                r = {k: v for k, v in r.items() if k != "evidence_ceiling"}
+                if ceiling and r.get("target") == spec["target"] and r.get("evidence_confidence") not in quality_rubric.EVIDENCE_ADJUSTERS:
+                    r["evidence_ceiling"] = dict(ceiling)
+                rows.append(quality_rubric.finalize_row(e, r))
+            e["hypertrophy"] = rows
