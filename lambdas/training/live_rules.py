@@ -100,6 +100,12 @@ def _pinned(rx: dict[str, Any]) -> set[str]:
     return {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{role}.")}
 
 
+SURPLUS_FIRST: tuple[str, ...] = ("lateral_raise", "rear_delt", "reverse_pec_deck", "face_pull", "reverse_fly")
+"""#5861 FIX7 (sixth red team: the set cap took triceps under MEV while 5 lateral-raise sets stood): the session set cap trims the
+week's habitual surplus — side- and rear-delt isolation (the shoulders sit near MAV in every template week) — before any other
+accessory. Heuristic; re-tuned at the block retro with the allocation."""
+
+
 def fit_set_cap(rx: dict[str, Any], cap: Any) -> list[str]:
     """IN PLACE: hold the session at `cap` working sets (SET_CAP). Returns the rationale lines."""
     if not cap:
@@ -114,6 +120,7 @@ def fit_set_cap(rx: dict[str, Any], cap: Any) -> list[str]:
     pinned = _pinned(rx)
     acc = [e for e in reversed(ex) if e.get("kind") == "accessory" and not e.get("live_added") and e.get("slot") not in pinned]
     acc += [e for e in reversed(ex) if e.get("kind") == "accessory" and not e.get("live_added") and e.get("slot") in pinned]
+    acc.sort(key=lambda e: not any(k in str(e.get("movement_key")) for k in SURPLUS_FIRST))  # FIX7: delt surplus goes first
     for e in added:  # 1. live additions, whole
         if total <= int(cap):
             break

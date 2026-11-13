@@ -270,7 +270,10 @@ def short_week_floor(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[st
             if have >= float(lm["MEV"]):
                 break
             k = (r["role"], str(r["slot"]))
-            give = min(cap - max(deltas.get(k, 0), 0), int(-(-(float(lm["MEV"]) - have) // 1)))
+            from training.live_balance import SLOT_MAX  # #5861 FIX7: never past the 3-set slot maximum
+
+            room = max(0, SLOT_MAX - int(r["sets"]) - max(deltas.get(k, 0), 0))
+            give = min(cap - max(deltas.get(k, 0), 0), int(-(-(float(lm["MEV"]) - have) // 1)), room)
             if give <= 0:
                 continue
             deltas[k] = deltas.get(k, 0) + give
@@ -323,7 +326,11 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
         )
         if have >= mev or slot is None:
             continue
-        add = min(cap, int(-(-(mev - have) // 1)))
+        from training.live_balance import SLOT_MAX  # #5861 FIX7: the top-up respects the 3-set slot maximum
+
+        add = min(cap, int(-(-(mev - have) // 1)), max(0, SLOT_MAX - len(slot["sets"])))
+        if add <= 0:
+            continue
         slot["sets"].extend(dict(slot["sets"][-1]) for _ in range(add))
         title = (cat.get(slot.get("movement_key")) or {}).get("title") or slot.get("movement_key")
         lines.append(

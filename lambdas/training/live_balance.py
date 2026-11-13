@@ -96,6 +96,9 @@ ADHERENCE_DIP: dict[str, dict[str, Any]] = {
     "accessory_sets": {"value": 2, "label": HEURISTIC, "basis": "every accessory at two working sets — the maintenance dose"},
 }
 HOST_ROLE = "shoulders_arms"
+SLOT_MAX = 3
+"""#5861 FIX7 (sixth red team: 5 lateral-raise sets in one slot; ARMS_FLOOR's own basis calls 4+ in a slot junk volume): no live
+addition takes an isolation slot past 3 working sets (a template slot already over it keeps its own count). Heuristic."""
 
 
 def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -353,6 +356,9 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
     from training import live_rulings  # #5861 FIX6 ruling 3: a week without shoulders+arms holds them at MEV, counted
 
     floor_lines = live_rulings.short_week_floor(env, adds) if _skip_set(skipped) else []
+    from training import live_stimulus  # #5861 FIX7: a priority muscle never under a non-priority isolation muscle
+
+    floor_lines += live_stimulus.parity(env, adds)
     ceiling_lines = floor_lines + live_shape.week_ceiling(env, adds)
     before, after = _sum(rows, {}), _sum(rows, deltas)
     for a in adds:
@@ -365,7 +371,8 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
         if d
     ]
     lines += [f"{a['role']}.{a['slot']} +{a['sets']} set(s) ({a['key']})" for a in adds] + ceiling_lines
-    return {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines, "adds": adds}
+    out = {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines, "adds": adds}
+    return out | {"parity": sorted(env.get("parity") or [])}
 
 
 def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
@@ -381,7 +388,8 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     for e in rx["exposures"]:
         d = plan_["deltas"].get((role, str(e.get("slot"))), 0)
         sets = e.get("sets") or []
-        if d > 0 and _muscle(e, ctx) in (ctx.get("stimulus_hold") or set()):
+        parity = (role, str(e.get("slot"))) in {tuple(k) for k in plan_.get("parity") or []}  # FIX7: a net-zero move stands
+        if d > 0 and not parity and _muscle(e, ctx) in (ctx.get("stimulus_hold") or set()):
             d = 0  # #5861 FIX6 (ruling 9): a progressing priority muscle at MEV takes no extra sets (`live_rulings.stimulus_gate`)
         if not d or not sets:
             continue
@@ -390,6 +398,8 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
             e["live_alloc_drop"] = True
         for _ in range(abs(d)):
             if d > 0:
+                if len(sets) >= max(was, SLOT_MAX):  # #5861 FIX7: an added set never takes a slot past 3 (4+ is junk volume)
+                    break
                 sets.append(dict(sets[-1]))
             elif len(sets) > int(ALLOCATION["over_mav_floor"]["value"]):
                 sets.pop()

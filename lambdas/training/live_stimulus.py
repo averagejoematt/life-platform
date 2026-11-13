@@ -15,6 +15,9 @@ needs demanding resistance work. The rules here, every number a labelled heurist
      quadriceps at RPE 8-9 — the driver's preferred lever over cutting `press_sets`; a fly, a pushdown, a calf raise, a crunch),
      priority muscles first, while the session set cap and the weekly redline have room. A 3-day week's full-body day carries
      chest / triceps / calves / abs this way.
+  4. PRIORITY PARITY (`parity`, PARITY). In the week's allocation a priority muscle never ends with fewer sets than a non-priority
+     ISOLATION muscle (the sixth red team: chest 8 vs biceps 11): the donor's surplus isolation sets move to the priority muscle's
+     own isolation slot (net zero, never past the 3-set slot maximum), else they are trimmed — never under the donor's MEV.
   3. THE UNCONFIRMED DELOAD (`deload_top_set`, DELOAD_TOP_SET). A deload the fatigue model RECOMMENDS is not yet his word (charter
      deload.owner_gated): until he confirms it, each anchor keeps one top set at RPE 8 — the deload's RPE-7 cap applies only once
      confirmed.
@@ -302,3 +305,66 @@ def _donor(rx: dict[str, Any], ctx: dict[str, Any], logged: dict[str, float], ma
             continue
         best, surplus = e, left - mev
     return best
+
+
+PARITY: dict[str, dict[str, Any]] = {
+    "donors": {
+        "value": ["biceps", "triceps", "calves"],
+        "label": HEURISTIC,
+        "basis": "the non-priority muscles trained by isolation alone: a priority muscle never ends the week's allocation under any "
+        "of them (the shoulders are pressed too and stay out); a donor never goes under its own MEV",
+    },
+}
+
+
+def parity(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[str]:
+    """IN PLACE on env["deltas"] (`live_balance.allocation_plan`, PARITY, module doc 4): returns the plan lines; the recipient slot
+    keys go to env["parity"] (applied even when the stimulus gate holds the muscle — the move is net zero)."""
+    from training import live_balance as lb
+
+    rows, deltas, marks = env["rows"], env["deltas"], env["marks"]
+    prio = [p for p in env.get("priority") or [] if p in marks]
+    floor, lines = int(lb.ALLOCATION["over_mav_floor"]["value"]), []
+    env.setdefault("parity", set())
+    if not prio:
+        return []
+
+    def week() -> dict[str, float]:
+        w = lb._sum(rows, deltas)
+        for a in adds:
+            w[a["muscle"]] += a["sets"]
+        return w
+
+    def slot_sets(r: dict[str, Any]) -> int:
+        return int(r["sets"]) + deltas.get((r["role"], str(r["slot"])), 0)
+
+    for d in PARITY["donors"]["value"]:
+        mev = float((marks.get(d) or {}).get("MEV") or 0)
+        while True:
+            w = week()
+            low = min(prio, key=lambda p: (w[p], prio.index(p)))
+            if w[d] <= w[low] or w[d] - 1 < mev:
+                break
+            mine = [r for r in rows if r["kind"] == "accessory" and r["muscle"] == d and r["intensity"] != "carry" and slot_sets(r) > 0]
+            give = [r for r in mine if slot_sets(r) > floor]
+            whole = [r for r in mine if slot_sets(r) <= floor and w[d] - slot_sets(r) >= mev]  # drop, don't shave
+            if not give and not whole:
+                break
+            g = max(give, key=lambda r: (slot_sets(r), rows.index(r))) if give else max(whole, key=lambda r: rows.index(r))
+            n = 1 if give else slot_sets(g)
+            deltas[(g["role"], str(g["slot"]))] = deltas.get((g["role"], str(g["slot"])), 0) - n
+            moved = 0
+            for _ in range(n):
+                take = [
+                    r
+                    for r in rows
+                    if r["kind"] == "accessory" and r["muscle"] == low and r["intensity"] != "carry" and 0 < slot_sets(r) < lb.SLOT_MAX
+                ]
+                if not take or week()[low] >= week()[d]:
+                    break
+                t = min(take, key=lambda r: (slot_sets(r), rows.index(r)))
+                deltas[(t["role"], str(t["slot"]))] = deltas.get((t["role"], str(t["slot"])), 0) + 1
+                env["parity"].add((t["role"], str(t["slot"])))
+                moved += 1
+            lines.append(f"{g['role']}.{g['slot']} -{n}, {low} +{moved}: {low} (priority) never under {d} (PARITY, heuristic)")
+    return lines
