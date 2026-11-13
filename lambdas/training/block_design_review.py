@@ -553,6 +553,41 @@ def load_rows(block: int, table: Any = None, user_id: str = "matthew") -> list[d
     return list(table.query(KeyConditionExpression=cond).get("Items") or [])
 
 
+EVALUATION_SK_PREFIX = "EXGATE#EVAL#"  # #5772's weekly evaluation row (`mcp/exercise_gates_leg.SK_EVAL`)
+EVALUATION_MAX_AGE_DAYS = 14  # #5861 L3 (platform-proposed): an evaluation older than two weekly runs is stale -> locked
+
+
+def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
+    """#5861 L3: the newest #5772 gate evaluation for LIVE selection (read-only): `{state, row, week_end}`. `state` is
+    `read`, `stale` (its week ended more than EVALUATION_MAX_AGE_DAYS before `as_of`), `none` (nothing stored) or
+    `read_failed: <type>`. Only `read` carries a row — every other state is FAIL-CLOSED: the caller reads every locking
+    gate as locked, as before #5772 was read at all."""
+    from boto3.dynamodb.conditions import Key
+    from common.pacific_time import parse_day_key
+
+    try:
+        if table is None:
+            from training import exercise_history
+
+            table = exercise_history._table()
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(pk()) & Key("sk").begins_with(EVALUATION_SK_PREFIX), ScanIndexForward=False, Limit=1
+        )
+        items = resp.get("Items") or []
+    except Exception as e:  # noqa: BLE001 — an unread evaluation locks every gate, never blocks a draft
+        logger.warning("block_design_review: the gate evaluation read failed (%s) — every gate reads locked", type(e).__name__)
+        return {"state": f"read_failed: {type(e).__name__}", "row": None, "week_end": None}
+    if not items:
+        return {"state": "none", "row": None, "week_end": None}
+    row = json.loads(json.dumps(items[0], default=float))
+    end = str(row.get("week_end") or row.get("as_of") or "")[:10]
+    a, b = parse_day_key(str(as_of)[:10]), parse_day_key(end)  # calendar-day keys, never instants (#3609)
+    age = (a - b).days if a and b else None
+    if age is None or age > EVALUATION_MAX_AGE_DAYS:
+        return {"state": "stale", "row": None, "week_end": end or None}
+    return {"state": "read", "row": row, "week_end": end}
+
+
 def load_failsoft(block: int, table: Any = None) -> dict[str, Any]:
     """`resolve` over the stored rows; a failed read is `read_failed` (live drafting then serves the pools, said so)."""
     try:

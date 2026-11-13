@@ -80,7 +80,7 @@ import os
 import time
 from typing import Any
 
-from training import exercise_library as xl
+from training import exercise_library as xl, selection_live as live
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,7 @@ def availability(
 
 def locked_gates(entry: dict[str, Any], lib: dict[str, Any]) -> list[str]:
     """The entry's locking gates (every one LOCKED until #5772 — `GATES_SOURCE`). A clinical cue never locks; the two
-    global gates (pain, equipment) are evaluated here directly."""
+    global gates (pain, equipment) are evaluated here directly. LIVE reads the evaluation (`selection_live.gates`)."""
     gates = lib.get("gates") or {}
     return [g for g in entry.get("gates") or [] if (gates.get(g) or {}).get("locks") and gates[g].get("kind") not in GLOBAL_GATE_KINDS]
 
@@ -357,9 +357,9 @@ def _exclusion(lid: str, e: dict[str, Any], ck: str | None, ctx: dict[str, Any])
     why = availability(e, ctx["lib"], ctx["overlay"], ctx["inventory"])
     if why:
         return "equipment", why
-    gates = locked_gates(e, ctx["lib"])
+    gates = live.gates(lid, e, ctx)
     if gates:
-        return "gate_locked", f"gate {', '.join(gates)} locked ({GATES_SOURCE})"
+        return "gate_locked", f"gate {', '.join(gates)} locked ({live.LIVE_GATES_SOURCE if ctx.get('policy') else GATES_SOURCE})"
     why = _not_prescribable(ck, ctx["spec"], ctx["catalog"], ctx["ceiling"], ctx["missing"])
     if why:
         return "not_prescribable", why
@@ -401,10 +401,12 @@ def candidates(ctx: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str
         if xl.movement_pattern(str(e.get("title") or "")) not in spec["patterns"]:
             continue
         ck = ctx["idx"]["to_cat"].get(lid)
-        c = _candidate(lid, e, ck, ctx)
+        c = live.decorate(_candidate(lid, e, ck, ctx), e, ctx) if ctx.get("policy") else _candidate(lid, e, ck, ctx)
+        if c is None:  # #5861 L3, live only: not applicable to the slot's objective
+            continue
         hit = _exclusion(lid, e, ck, ctx)
         if hit:
-            excluded.append({**c, "code": hit[0], "why": hit[1], "gates": locked_gates(e, lib) if hit[0] == "gate_locked" else []})
+            excluded.append({**c, "code": hit[0], "why": hit[1], "gates": live.gates(lid, e, ctx) if hit[0] == "gate_locked" else []})
         else:
             eligible.append(c)
     return eligible, excluded
@@ -515,6 +517,8 @@ def _novel_terms(pick: dict[str, Any]) -> dict[str, Any] | None:
 
 def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], week_taken: set[str]) -> dict[str, Any]:
     """One slot's selection: the ranked eligible candidates, the pick, its C-reason, its fallbacks, the exclusions."""
+    if ctx.get("policy"):  # #5861 L3, LIVE only: hold while progressing, rotate for a named trigger, repeat when it helps
+        return live.select_slot(slot, ctx, recent)
     eligible, excluded = candidates(ctx)
     mine = ctx.get("slot_last") or {}
     pool = pool_tiers(eligible)
@@ -680,7 +684,11 @@ def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str
         group = [
             p
             for p in picked
-            if p.get("spec", {}).get("muscle") == muscle and p.get("pick") and not p.get("pinned") and not p.get("owner_pin")
+            if p.get("spec", {}).get("muscle") == muscle
+            and p.get("pick")
+            and not p.get("pinned")
+            and not p.get("owner_pin")
+            and not live.held(p)
         ]
         if any(p["pick"]["length_bias"] == "lengthened" for p in group):
             rows.append({"muscle": muscle, "state": "met"})
@@ -704,6 +712,7 @@ def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str
                     "c_reason": p["pick"]["c_reason"],
                     "novel_terms": _novel_terms(alt),
                     "week_repeat": p["pick"].get("week_repeat"),
+                    **{k: p["pick"][k] for k in ("rotation", "repeat") if k in p["pick"]},  # #5861 L3: a live pick only
                 }
                 p["fallbacks"] = fallbacks(p["pick"], full[p["slot_id"]], novel_budget=NOVELTY_PER_SLOT - int(alt["novel"]))
                 p["lengthened_swap"] = True
@@ -773,6 +782,7 @@ def _trim(p: dict[str, Any]) -> dict[str, Any]:
                 "novel_terms",
                 "week_repeat",
             )
+            + tuple(k for k in live.LIVE_PICK_KEYS if k in pick)  # #5861 L3: present on a LIVE pick only
         }
     locked = sorted(
         (x for x in p.get("excluded") or [] if x.get("code") == "gate_locked"), key=lambda x: (TIER_RANK[x["tier"]], x["movement_id"])
@@ -797,6 +807,7 @@ def select_week(
     skill_ceiling: int = 2,
     inventory: dict[str, Any] | None = None,
     owner_pins: dict[str, dict[str, Any]] | None = None,
+    policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Every accessory slot of the week ranked from the library. Pure (the caller loads library, overlay and ledger).
     `owner_pins` {slot_id: {catalog_key, source, approved_block, experiment}} are the block design review's approved
@@ -818,6 +829,7 @@ def select_week(
     full: dict[str, list[dict[str, Any]]] = {}
     for slot in vr.slots():
         ctx = _ctx(slot, env, step) | {"slot_last": slot_last_served(rows, position, slot["slot_id"])}
+        ctx |= {"policy": policy, "slot_id": slot["slot_id"]} if policy is not None else {}  # #5861 L3: `selection_live.build_policy`
         if slot["pinned"]:
             p = _pinned(slot, ctx) | {"spec": ctx["spec"]}
         elif (owner_pins or {}).get(slot["slot_id"]):
@@ -828,6 +840,7 @@ def select_week(
             full[slot["slot_id"]] = _pool_ranked(candidates(ctx)[0], recent, ctx["slot_last"])
         if p.get("pick") and p["pick"].get("catalog_key"):
             taken.add(p["pick"]["catalog_key"])
+            live.count_pick(p, policy, ctx)  # #5861 L3: live only (no policy = no-op)
         picked.append(p)
     lengthened = _lengthened_pass(picked, full)
     by_role: dict[str, dict[str, str]] = {}
@@ -851,7 +864,7 @@ def select_week(
         "novelty": {"per_slot": NOVELTY_PER_SLOT, "novel_picks": [p["slot_id"] for p in picked if (p.get("pick") or {}).get("novel")]},
         "skill_track": _skill_track(lib, env),
         "week_check": week_floors.check_week(served, [], catalog, status=lib.get("status")),  # #5759/#5774's own check, unchanged
-    }
+    } | (live.summary(policy) if policy is not None else {})
 
 
 # ── the switch: shadow beside the pools, live only for an approved library ───
@@ -914,6 +927,7 @@ def _live(
         extra = {"experiment": op["experiment"]} if op.get("experiment") else {}
         if chosen.get("top_band") and variant == pick:
             extra["top_band"] = chosen["top_band"]  # ruling B (#5856): the rotation commitment reads the band's size
+        extra |= live.decision(chosen) if variant == pick else {}  # #5861 L3: a live hold/rotation with its named trigger
         slots.append(s | {"variant": variant, "source": source, "pool": pool} | extra)
         if not held:
             writes.append(
@@ -943,6 +957,7 @@ def _line(s: dict[str, Any]) -> str:
     p = s.get("pick") or {}
     why = f" — {p.get('tier')} because {p['c_reason']['code']}: {p['c_reason']['why']}" if p.get("c_reason") else ""
     op = s.get("owner_pin") or {}
+    why += live.line_suffix(p)  # #5861 L3: a live pick's hold/rotation and repetition, "" otherwise
     if op.get("state") == "held":
         why += f" — owner-approved (block {op.get('approved_block')}, {op.get('source')})"
         if op.get("experiment"):
@@ -960,6 +975,7 @@ def apply(
     lib: Any = ...,
     overlay: Any = ...,
     approvals: dict[str, Any] | None = None,
+    block_workouts: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The rotation a draft serves, with the selection attached. `live` (an approved library) rewrites the served role's
     accessory variants; `shadow` leaves the #5075 pools serving and attaches the selection for comparison; `no_library`
@@ -975,7 +991,9 @@ def apply(
     try:
         overlay = load_overlay_failsoft() if overlay is ... else overlay
         pins = (approvals or {}).get("pins") if (approvals or {}).get("state") in APPROVAL_SERVES else None
-        sel = select_week(rotation.get("position"), catalog, lib, overlay, rows=rows, skill_ceiling=skill_ceiling, owner_pins=pins)
+        pos = rotation.get("position")
+        policy = live.for_apply(lib, pos, rows, block_workouts, target_date, approvals) if m == MODE_LIVE else None  # #5861
+        sel = select_week(pos, catalog, lib, overlay, rows=rows, skill_ceiling=skill_ceiling, owner_pins=pins, policy=policy)
     except Exception as e:  # noqa: BLE001 — the selection never blocks a draft
         logger.warning(f"selection_engine: the selection failed ({type(e).__name__}: {e}) — the #5075 pools serve")
         return rotation | {"selection": {"issue": ISSUE, "mode": m, "state": "failed", "error": f"{type(e).__name__}: {e}"[:200]}}

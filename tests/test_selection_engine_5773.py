@@ -27,6 +27,7 @@ from training import (
     routine_repo,  # noqa: E402
     selection_critic as critic,  # noqa: E402
     selection_engine as se,  # noqa: E402
+    selection_live,  # noqa: E402
     training_charter as tc,  # noqa: E402
     variant_rotation as vr,  # noqa: E402
 )
@@ -540,7 +541,10 @@ def test_proposed_library_runs_in_shadow_and_serves_the_pools():
 def test_approved_library_serves_the_selection_live():
     cat = _cat()
     rot = vr.plan(WEEK7, cat, role="upper_heavy", rows=[], ledger_state="injected")
-    sel = _week(lib=_lib("approved"))
+    # #5861 L3: live selection runs the live policy (no ledger, no Hevy record, no gate evaluation read: fail-closed)
+    lib = _lib("approved")
+    policy = selection_live.build_policy(lib, position=_pos(), rows=[], block_workouts=None, as_of="2026-11-12", gate_eval=None)
+    sel = _week(lib=lib, rows=[], policy=policy)
     out = se.apply(copy.deepcopy(rot), cat, rows=[], lib=_lib("approved"), overlay=None, target_date="2026-11-12")
     want = sel["variants_by_role"]["upper_heavy"]
     assert out["variants"] == want != rot["variants"]

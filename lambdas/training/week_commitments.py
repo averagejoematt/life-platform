@@ -137,8 +137,15 @@ def rotation_problem(rot: Any) -> str | None:
         return "the rotation was refused (the week's counts would move)"
     if int(pos.get("step") or 0) <= 0:
         return None  # block 1's first phase serves the template as written
-    held = [str(s.get("slot_id")) for s in _held(rot) if not _sole_best(s)]
+    held = [str(s.get("slot_id")) for s in _held(rot) if not _sole_best(s) and not _live_hold(s)]
     return f"held at a phase boundary: {', '.join(held)}" if held else None
+
+
+def _live_hold(slot: dict[str, Any]) -> bool:
+    """#5861 L3 (owner 2026-11-12: accessory rotation is "for a reason", not a fixed cadence): a hold the LIVE selection
+    recorded (`selection_engine._live` copies `rotation_decision` onto the slot — only an approved library writes it) is
+    accepted with its reason; the shadow cadence check is unchanged because a shadow slot never carries the key."""
+    return (slot.get("rotation_decision") or {}).get("action") == "hold"
 
 
 def _held(rot: dict[str, Any]) -> list[dict[str, Any]]:
@@ -327,6 +334,8 @@ def _free_weight(c: dict[str, Any], served: list[dict[str, Any]], lib: Any, cata
     if not isinstance((lib or {}).get("movements"), dict):
         return _row(c, NOT_EVALUATED, "no exercise library on this bundle to read job / pattern from")
     groups = week_floors.free_weight_compounds(served, lib, catalog)
+    if status == week_floors.LIBRARY_APPROVED:  # #5861 L3: live only — the floor is a strength/competence floor
+        groups = _with_bodyweight_pull(groups, served, lib, catalog)
     missing = [g for g, hits in groups.items() if not hits]
     if missing:
         armed = status == week_floors.LIBRARY_APPROVED
@@ -335,12 +344,33 @@ def _free_weight(c: dict[str, Any], served: list[dict[str, Any]], lib: Any, cata
     return _row(c, MET, "; ".join(f"{g}: {', '.join(hits)}" for g, hits in groups.items()))
 
 
+def _with_bodyweight_pull(groups: dict[str, list[str]], served: list[dict[str, Any]], lib: Any, catalog: dict[str, Any]) -> dict:
+    """#5861 L3 (live only): a pull-up or chin-up (a bodyweight vertical-pull compound for the back, loadable with a belt)
+    is a strength and competence pull — the free-weight floor's "pull" counts it. Before this, the library's
+    `bodyweight` profile kept every pull-up out of the floor (engine audit 2026-11-12, §2e)."""
+    out = {g: list(v) for g, v in groups.items()}
+    for s in served:
+        e = week_floors._library_entry(str(s.get("key") or ""), lib or {}, catalog)
+        if not e or e.get("job") != "compound" or e.get("resistance_profile") != "bodyweight":
+            continue
+        if e.get("pattern") == "vertical_pull" and (e.get("target") or {}).get("primary") in week_floors.FREE_WEIGHT_TARGETS["pull"]:
+            if str(e.get("title")) not in out["pull"]:
+                out["pull"].append(str(e.get("title")))
+    return out
+
+
 def _rotation(c: dict[str, Any], rot: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(rot, dict):
         return _row(c, NOT_EVALUATED, "no rotation record for the week")
     why = rotation_problem(rot)
     holds = rotation_holds(rot)
     met = "on the charter cadence" + (f"; held by owner ruling B (#5856, 2026-11-12): {', '.join(holds)}" if holds else "")
+    live = [
+        f"{s.get('slot_id')} ({(s.get('rotation_decision') or {}).get('reason')})"
+        for s in _held(rot)
+        if _live_hold(s) and not _sole_best(s)
+    ]
+    met += f"; held for a reason (#5861, live): {', '.join(live)}" if live else ""
     return _row(c, BLOCK if why else MET, why or met)
 
 
