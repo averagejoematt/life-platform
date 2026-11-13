@@ -64,7 +64,7 @@ TRUNK_FUNCTIONS = ("loaded_flexion", "anti_extension", "anti_rotation", "anti_la
 OBJECTIVES = ("hypertrophy", "strength", "functional", "conditioning", "mobility")
 PHASE_SUITABILITY = ("now", "later", "specialist")  # for the present weight-loss phase
 PROGRAMMING = ("auto_programmable", "readiness_gated")
-GATE_REASONS = ("bodyweight", "impact", "skill", "identified_need", "joint_tolerance", "equipment_unconfirmed")
+READINESS_CONDITIONS = ("bodyweight", "impact", "skill", "identified_need", "joint_tolerance", "equipment_unconfirmed")
 INFLUENCE = ("influences_current_program", "available_only")
 LATERALITY = ("bilateral", "unilateral", "alternating", "not_applicable")
 LEVELS = ("low", "moderate", "high")
@@ -145,7 +145,7 @@ def _v(name: str, axis: str, value: str, hevy: str | None = None, level: int | N
 
 # Readiness gates the library's own machinery does not already enforce (an unconfirmed equipment state is the
 # `equipment_available` gate's job, so it is not repeated here).
-_NFY_GATES = {
+_NFY_UNLOCK = {
     "bodyweight": "the movement's body-mass load is within the owner's readiness standard (owner-confirmable)",
     "impact": "the charter's plyometric gate opens and the owner confirms landing readiness",
     "skill": "the owner confirms the technique",
@@ -162,8 +162,8 @@ def _not_for_you_now(tid: str | None, gate: str | None) -> dict[str, str] | None
             "reason_code": "needs_custom_hevy_template",
             "unlock_condition": "the owner approves creating the Hevy custom template (#5861 owner approval list), then a catalog entry",
         }
-    if gate in _NFY_GATES:
-        return {"reason_code": f"readiness_gated_{gate}", "unlock_condition": _NFY_GATES[gate]}
+    if gate in _NFY_UNLOCK:
+        return {"reason_code": f"readiness_gated_{gate}", "unlock_condition": _NFY_UNLOCK[gate]}
     return None
 
 
@@ -2696,7 +2696,7 @@ def metadata_problems(additions: list[dict[str, Any]]) -> list[str]:
         out += [f"{k}: objective {o!r}" for o in p["objectives"] if o not in OBJECTIVES]
         out += [f"{k}: fit factor {f!r}" for f in p["personal_fit"] if f not in FIT_FACTORS]
         gr = p["programming"]["gate_reason"]
-        if (p["programming"]["mode"] == "readiness_gated") != (gr in GATE_REASONS):
+        if (p["programming"]["mode"] == "readiness_gated") != (gr in READINESS_CONDITIONS):
             out.append(f"{k}: a readiness-gated movement names a gate reason (and only it does)")
         if a.get("trunk_function") is not None and a["trunk_function"] not in TRUNK_FUNCTIONS:
             out.append(f"{k}: trunk_function {a['trunk_function']!r}")
