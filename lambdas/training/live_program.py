@@ -133,7 +133,8 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
     "symptom_line": "",  # #5861 FIX6: owner ruling 10 — no symptom warning line (the `extended` preset stays available)
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
-    "week_floor_includes_abs": True,  # #5861 FIX8: the abs join the week's hard-set floor (OWNER DECISION pending)
+    "abs_direct_sets_per_week": 4,  # #5861 FIX8, owner ruling #8: ~4 challenging DIRECT ab sets a week (0 = off)
+    "sequence_rule_from": None,  # #5861 FIX8, ruling #4: was never read (absent here) — None = the Monday after `approved_on`
 }
 """Library-carried settings (`config/exercise_library.json` `programming_settings`), read with these defaults when absent.
 `session_cap_includes_cardio` False keeps today's 75-min LIFTING cap with the cardio block apart; True makes the cap cover lifting
@@ -772,7 +773,7 @@ def load_decision(
     if noisy:
         return {"mode": "hold", "pct": 0, "why": "trend down, effort fine"}
     if state in LOAD_POLICY["hold_states"]["value"] or mark.get("hold"):
-        return {"mode": "hold", "pct": 0, "why": "return week" if e.get("live_return") else "recovery first"}
+        return {"mode": "hold", "pct": 0, "why": "first session back" if e.get("live_first_back") else "recovery first"}
     if trend == "stalled":
         return {"mode": "hold", "pct": 0, "why": "stalled, no step"}
     if rpe is not None and float(rpe) >= float(LOAD_POLICY["grind_rpe"]["value"]) and reps and rep_lo and int(reps) <= int(rep_lo):

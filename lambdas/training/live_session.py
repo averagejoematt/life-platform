@@ -269,7 +269,6 @@ def for_live_draft(
             "discomfort": hurts,
             "light_discomfort": light,  # FIX5: a joint-located "sore" at the mild line — the joint rule keeps it, lighter
             "target_date": str(getattr(inputs, "target_date", "") or ""),
-            "sick_days": getattr(inputs, "sick_days", None),  # #5861 FIX8: a declared illness opens the return week
         } | _week_ctx(week, inputs)
         from training import live_safety  # #5861 FIX4: the pain note's site and the mild line, read once
 
@@ -277,12 +276,11 @@ def for_live_draft(
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
         lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
-        from training import live_progress  # #5861 FIX8: the first week back after 10+ days off runs at RPE 7-8, no steps
+        from training import live_progress  # #5861 FIX8 (owner ruling #10): each lift's first session back after 10+ days off
 
-        back = live_progress.apply_return_week(out, ctx, block_workouts)  # before the plan: no stall reset in a return week
+        back = live_progress.first_back(out, ctx, block_workouts)  # before the plan: no stall reset on a first session back
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
         lines += back
-        live_progress.cap_return(out, ctx, block_workouts)  # the plan's own additions (the carry, a slot) at the band too
         from training import live_stimulus  # #5861 FIX7: a fast cut with broad regression answers with volume, never load
 
         lines += live_stimulus.fast_cut(out, sig, inputs)

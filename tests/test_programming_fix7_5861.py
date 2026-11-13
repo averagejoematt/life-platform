@@ -265,24 +265,21 @@ def test_a_like_for_like_swap_for_an_experienced_lifter_is_not_capped_as_new():
 
 # ── 10. hard-set floors, the deload's top set, the notes ─────────────────────
 FLOOR_MUSCLES = ("chest", "back", "quadriceps", "hamstrings", "glutes", "calves", "shoulders", "biceps", "triceps")
-"""The abs are the trunk floor's (`live_program.TRUNK_FLOOR`, a purpose-driven drill), not the week floor's."""
+"""#5861 FIX8: the abs are the week floor's by `abs_direct_sets_per_week` (owner ruling #8; tests/test_programming_fix8_5861.py)."""
 
 
 @pytest.mark.parametrize("name", ["a_large_deficit_experienced", "e_short_week"])
-def test_every_muscle_reaches_mev_in_hard_sets_or_the_week_names_why(name):
-    """A normal week: every muscle with an MEV reaches it in HARD sets (RPE >= 8), or the week's rationale names it (the floor's
-    printed line); the priority muscles reach it outright. Kills the HARD_RPE 8 -> 10 mutation (the sixth red team's survivor)."""
+def test_every_muscle_reaches_mev_in_hard_sets(name):
+    """A normal week: every muscle with an MEV reaches it in HARD sets — the sets PRESCRIBED at RPE >= 8, counted from the notes.
+    #5861 FIX8 (the seventh red team): no "or the rationale names it" escape — a printed floor line rescues nothing. Kills the
+    HARD_RPE 8 -> 10 mutation (the sixth red team's survivor)."""
     w = _week(PROFILES[name])
     from training import routine_generator as rg
 
     marks = sw.measure(w["week"], w["world"]["lib"], w["world"]["catalog"]["movements"], rg._load_json("training_landmarks.json"))[
         "landmarks"
     ]
-    lines = " ".join(ln for s in w["week"]["sessions"] for ln in s["rationale"])
-    for m in ("chest", "quadriceps"):
-        assert w["hard"].get(m, 0) >= marks[m]["MEV"], (m, w["hard"])
-    for m in FLOOR_MUSCLES:
-        assert w["hard"].get(m, 0) >= marks[m]["MEV"] or f"{m} " in lines and "WEEK_FLOOR" in lines, (m, w["hard"])
+    assert {m: w["hard"].get(m, 0) for m in FLOOR_MUSCLES if w["hard"].get(m, 0) < marks[m]["MEV"]} == {}
     with patch.object(sw, "HARD_RPE", 10):  # control: the threshold moved -> the floors fail
         assert sw.hard_sets_by_muscle(w["week"], w["world"]["lib"], w["world"]["catalog"]["movements"]).get("chest", 0) < 8
 

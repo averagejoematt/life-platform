@@ -773,7 +773,7 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
         {(lp, "trunk_floor"): lambda rx, ctx, state=None: [], (live_stimulus, "floor_muscles"): lambda ctx, role: []},
     )
     assert any(p.startswith("abs ") and "< MEV 4" in p for p in landmark_problems(no_floor["m"]))
-    # #5861 FIX8: with the trunk floor off, the week floor's abs (`week_floor_includes_abs`) still reach MEV — load-bearing
+    # #5861 FIX8: with the trunk floor off, the week floor's direct abs (`abs_direct_sets_per_week`) still reach MEV — load-bearing
     abs_only = _week_of("a_large_deficit_experienced", {(lp, "trunk_floor"): lambda rx, ctx, state=None: []})
     assert not any(p.startswith("abs ") for p in landmark_problems(abs_only["m"]))
     # a trimmed week takes sets from the muscle furthest above its MEV first (the delts), never past MRV anywhere

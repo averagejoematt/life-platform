@@ -757,7 +757,38 @@ def measure(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any], 
             "steps_per_day": (week.get("steps_credit") or {}).get("steps_per_day"),
         },
         "hard_sets": hard_sets_by_muscle(week, lib, catalog),
+        "delt_heads": delt_heads(week, lib, catalog),
     }
+
+
+DELT_CREDIT: dict[str, dict[str, float]] = {
+    "horizontal_press": {"front_delts": 0.5},
+    "horizontal_pull": {"rear_delts": 0.5},
+}
+"""#5861 FIX8 (owner ruling #9, fix round 8): the INDIRECT credit each delt head takes from a compound's working set, by library
+pattern — pressing loads the front delt, rowing the rear delt. Explicit and configurable (practitioner consensus, heuristic); a
+lift whose own target is a delt head counts 1.0 there (its direct work). Vertical presses target the front delt directly."""
+DELT_HEADS = ("front_delts", "side_delts", "rear_delts")
+
+
+def delt_heads(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, float]:
+    """Per delt head, the week's HARD sets (prescribed at RPE >= HARD_RPE): direct (the lift's library target is that head) 1.0,
+    indirect by DELT_CREDIT — each head assessed on its own, the shoulders never one number (ruling #9)."""
+    out = {h: 0.0 for h in DELT_HEADS}
+    for s in week["sessions"]:
+        for lift in s["lifts"]:
+            top = lift_effort(lift["hevy_note"])
+            if top is None or top < HARD_RPE:
+                continue
+            e = _lib_entry(lib, catalog, lift["key"])
+            prim = str((e.get("target") or {}).get("primary") or "")
+            n = float(lift["working_sets"])
+            if prim in out:
+                out[prim] += n
+                continue
+            for head, credit in (DELT_CREDIT.get(str(e.get("pattern"))) or {}).items():
+                out[head] += n * float(credit)
+    return {h: round(v, 1) for h, v in out.items()}
 
 
 HARD_RPE = 8
@@ -866,6 +897,8 @@ def render(week: dict[str, Any], m: dict[str, Any]) -> str:
     lines.append(f"Notes with more than one effort target: {', '.join(m['effort_conflicts']) or 'none'}")
     lines.append(f"Session lines contradicting a big lift: {', '.join(m['session_effort_conflicts']) or 'none'}")
     total = sum(p["working_sets"] for p in m["per_session"])
+    dh = m.get("delt_heads") or {}
+    lines.append("Delt heads (hard sets, direct + DELT_CREDIT indirect): " + ", ".join(f"{h.split('_')[0]} {v:g}" for h, v in dh.items()))
     lines.append(f"Working sets this week: {total} (redline {_redline()})")
     return "\n".join(lines) + "\n"
 

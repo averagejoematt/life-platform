@@ -150,8 +150,8 @@ def _hard_logged(workouts: Any, ctx: dict[str, Any], since: str, day: str) -> di
                 continue
             prim = live_week.LANDMARK_OF.get(str(row["primary"]), str(row["primary"]))
             out[prim] = out.get(prim, 0.0) + len(hard)
-            for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in row.get("secondary") or []} - {prim}:
-                out[sec] = out.get(sec, 0.0) + 0.5 * len(hard)
+            for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in row.get("secondary") or []} - {prim, "abs"}:
+                out[sec] = out.get(sec, 0.0) + 0.5 * len(hard)  # FIX8 (ruling #8): indirect trunk loading is never an ab set
     return out
 
 
@@ -173,8 +173,8 @@ def _today(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any = None) -> dic
         prim = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
         out[prim] = out.get(prim, 0.0) + n
         entry = (lib.get("movements") or {}).get((ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or "") or {}
-        for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in (entry.get("target") or {}).get("secondary") or []} - {prim}:
-            out[sec] = out.get(sec, 0.0) + 0.5 * n
+        for sec in {live_week.LANDMARK_OF.get(str(m), str(m)) for m in (entry.get("target") or {}).get("secondary") or []} - {prim, "abs"}:
+            out[sec] = out.get(sec, 0.0) + 0.5 * n  # FIX8 (ruling #8): indirect trunk loading is never an ab set
     return out
 
 
@@ -185,19 +185,30 @@ UPPER = ("chest", "back", "shoulders", "biceps", "triceps")
 def floor_muscles(ctx: dict[str, Any], role: str | None) -> list[str]:
     """WEEK_FLOOR's muscles THIS session may top up (#5861 FIX8, a sensible day — the seventh red team: a curl added to leg day
     after Thursday's allocation took it). A week of 4+ split sessions: the week's last UPPER session (upper / shoulders+arms)
-    carries the upper muscles, the week's last session the lower muscles and the abs (`week_floor_includes_abs`); a shorter
+    carries the upper muscles, the week's last session the lower muscles and the abs (`abs_direct_sets_per_week`); a shorter
     (full-body) week: its last session carries all. Priority muscles first; [] on any other session."""
     from training import live_shape, program_structure as ps
 
     left = [r for r in ps.SPLIT_ROLES if r not in set(ctx.get("week_skip") or ())]
     s = live_shape._settings(ctx.get("lib"))
-    base = list(WEEK_FLOOR["muscles"]["value"]) + (["abs"] if s.get("week_floor_includes_abs", True) else [])
+    base = list(WEEK_FLOOR["muscles"]["value"]) + (["abs"] if int(s.get("abs_direct_sets_per_week", 4) or 0) else [])
     uppers = [r for r in left if r.startswith("upper") or r == "shoulders_arms"]
     split = len(left) >= 4 and bool(uppers)
     mine = [m for m in base if not split or m not in UPPER] if left and role == left[-1] else []
     mine += [m for m in base if m in UPPER and m not in mine] if split and role == uppers[-1] else []
     prio = [str(m) for m in s.get("priority_muscles") or []]
     return sorted(mine, key=lambda m: (m not in prio, base.index(m)))
+
+
+def abs_target(ctx: dict[str, Any]) -> float:
+    """Owner ruling #8 (fix round 8): the week's DIRECT ab sets — `abs_direct_sets_per_week` (default 4), half on a week of 1-3
+    mornings or a dip week (a reduction the ruling allows); 0 turns the abs out of the floor."""
+    from training import live_shape, program_structure as ps
+
+    n = float(live_shape._settings(ctx.get("lib")).get("abs_direct_sets_per_week", 4) or 0)
+    left = [r for r in ps.SPLIT_ROLES if r not in set(ctx.get("week_skip") or ())]
+    short = len(left) <= 3 or ctx.get("week_mode") not in (None, "short")
+    return float(int(n // 2)) if short else n
 
 
 def hard_capable(key: str, ctx: dict[str, Any], workouts: Any) -> str | None:
@@ -218,7 +229,7 @@ def hard_capable(key: str, ctx: dict[str, Any], workouts: Any) -> str | None:
             counts[t] = counts.get(t, 0) + 1
     if tid and counts.get(tid, 0) >= int(EXPOSURE_CAPS["exposures"]):
         return "recent"
-    if tid and counts.get(tid, 0) and ctx.get("return_week"):  # the return week's RPE 7-8 band governs (live_progress)
+    if tid and counts.get(tid, 0) and ctx.get("layoff"):  # a first session back (RPE 8) after a layoff (live_progress)
         return "pattern"
     mine = idx.get(tid) or {}
     muscle = live_week.landmark_muscle(key, cat, lib)
@@ -310,7 +321,7 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     slot_max, add_n = int(WEEK_FLOOR["slot_max"]["value"]), int(WEEK_FLOOR["add_sets"]["value"])
     level = "MEV" if ctx.get("week_mode") in (None, "short") else "MV"  # FIX8: a dip week is a recovery week (ruling 2): MV
     for m in order:
-        mev = float((marks.get(m) or {}).get(level) or 0)
+        mev = abs_target(ctx) if m == "abs" else float((marks.get(m) or {}).get(level) or 0)
         have = logged.get(m, 0.0) + _today(rx, ctx, workouts).get(m, 0.0)
         if not mev or have >= mev:
             continue
@@ -375,7 +386,7 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
         lines.append(
             f"added (live): {(cat.get(key) or {}).get('title') or key} {add_n} x 10-15 — {m} {have:g} hard sets this week < MEV {mev:g}: the week's last session carries it (WEEK_FLOOR, heuristic)"
         )
-    if "abs" in mine and logged.get("abs", 0.0) < float((marks.get("abs") or {}).get("MEV") or 0):
+    if "abs" in mine and logged.get("abs", 0.0) < abs_target(ctx):
         for e in rx["exposures"]:  # FIX8: the week's only direct ab work is never what the time fit drops (`live_week._fixed`)
             if live_week.landmark_muscle(e.get("movement_key"), cat, lib) == "abs" and e.get("intensity") != "carry":
                 e["live_keep"] = "abs"

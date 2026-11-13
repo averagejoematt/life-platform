@@ -96,8 +96,6 @@ PROGRAMMING_SETTINGS_DEFAULTS: dict[str, Any] = {
     "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
-    # #5861 FIX8: the abs join the week's hard-set floor (the driver's recommendation, OWNER DECISION pending)
-    "week_floor_includes_abs": True,
 }
 # #5861 FIX6: THE OWNER'S RULINGS of 2026-11-13 on the decision register (configuration, NOT activation — `status` stays
 # `proposed`). Written over any earlier on-disk default by every rebuild: a ruling lives here, in the generator, and a later
@@ -119,6 +117,7 @@ OWNER_RULED_SETTINGS: dict[str, Any] = {
     "symptom_line": "",  # ruling 10 (follow-up): no symptom warning line on any session
     "symptom_line_on_lifting_days": False,  # ruling 10
     "hard_conditioning_doses": 1,  # owner ruling 2026-11-13 (FIX7 follow-up): one hard conditioning dose a week; kept a setting
+    "abs_direct_sets_per_week": 4,  # owner ruling #8 (fix round 8): ~4 challenging DIRECT ab sets a week, spread; indirect never
 }
 """#5861 FIX7 also records the owner's 2026-11-13 clarification of ruling 17 (no setting: the rubric itself, quality_rubric 3.5.0):
 glute stretch credit only for genuinely lengthened loading, the same standard as every muscle — short-range glute lifts (kickbacks,

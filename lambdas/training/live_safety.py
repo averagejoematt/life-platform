@@ -151,7 +151,7 @@ def no_step_keys(rx: dict[str, Any]) -> set[str]:
     out = {str(d["key"]) for d in (rx.get(ls.MARK) or {}).get("load_guard") or []}
     for e in rx.get("exposures") or []:
         swap = (e.get("live_swap") or {}).get("code")
-        if e.get("live_load") or e.get("live_retreated") or e.get("live_stop") or e.get("live_return") or swap in ("joint", "pain"):
+        if e.get("live_load") or e.get("live_retreated") or e.get("live_stop") or e.get("live_first_back") or swap in ("joint", "pain"):
             out.add(str(e.get("movement_key")))
     return out
 

@@ -315,8 +315,9 @@ def test_the_kettlebell_deadlift_is_never_filler_for_a_lifter_who_deadlifts():
     a = _week("a_large_deficit_experienced")["week"]
     assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(a)}
     assert any("filler" in ln for ln in _lines(a, "kettlebell slot (live)"))
-    swing = _week("a_large_deficit_experienced", {(se, "locked_gates"): lambda entry, lib: []})["week"]  # the swing's gate open
-    assert kb_entry.TARGET in {x["key"] for x in _lifts(swing)} and "kettlebell_deadlift" not in {x["key"] for x in _lifts(swing)}
+    # #5861 FIX8 (owner ruling #6): even with the swing's gate open, the swing never fills the slot — it drops, no makeup
+    swing = _week("a_large_deficit_experienced", {(se, "locked_gates"): lambda entry, lib: []})["week"]
+    assert kb_entry.TARGET not in {x["key"] for x in _lifts(swing)} and "kettlebell_deadlift" not in {x["key"] for x in _lifts(swing)}
     entry = _week("a_large_deficit_experienced", NODL)["week"]  # control: no barbell deadlift on record -> the entry drill serves
     assert "kettlebell_deadlift" in {x["key"] for x in _lifts(entry)}
     kb = LIB0["movements"]["kettlebell_deadlift"]["hypertrophy"][0]

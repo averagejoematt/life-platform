@@ -70,8 +70,9 @@ KB_FILLER: dict[str, Any] = {
     "label": HEURISTIC,
     "basis": "the kettlebell deadlift is an entry drill into the swing (owner ruling #5774); for a lifter whose record holds a "
     "loaded barbell or trap-bar deadlift it trains a hinge he already loads far heavier — one bell sits under a working effort "
-    "(fifth red team: two sets with one light bell is junk volume counted as glute sets). The swing serves when "
-    "servable; else the slot is dropped",
+    "(fifth red team: two sets with one light bell is junk volume counted as glute sets). The slot is then DROPPED, no makeup: "
+    "owner ruling #6 (fix round 8) — the swing is an optional power/conditioning movement, gated until readiness is shown, never "
+    "a replacement that fills the hinge slot (ruling 7: no eligible KB hinge, the slot drops)",
 }
 SELF_REPORT: dict[str, Any] = {
     "window_days": 14,
@@ -272,21 +273,18 @@ def deadlifts(workouts: Any, ctx: dict[str, Any]) -> bool:
 
 
 def kb_choice(ctx: dict[str, Any], workouts: Any) -> tuple[str | None, str | None]:
-    """(the movement the kettlebell slot serves in place of the KB deadlift, the reason) under KB_FILLER: the deadlift itself for a
-    lifter who does not deadlift (no reason), else the swing when servable (equipment, pain, gates), else None (drop the slot)."""
-    from training import kb_entry, live_session as ls
+    """(the movement the kettlebell slot serves, the reason) under KB_FILLER: the KB deadlift for a lifter who does not deadlift
+    (no reason), else None — the slot drops, no makeup. #5861 FIX8 (owner ruling #6): the swing never fills it."""
+    from training import kb_entry
 
     if not deadlifts(workouts, ctx):
         return kb_entry.ENTRY, None
-    swing = kb_entry.TARGET
-    if swing in ctx["catalog"] and ls._blocked(swing, ctx, False) is None and ls._servable(swing, ctx) is None:
-        return swing, "the KB deadlift is filler for a lifter who deadlifts — the swing serves (KB_FILLER, heuristic)"
-    return None, "the KB deadlift is filler for a lifter who deadlifts, and the swing is not servable (KB_FILLER, heuristic)"
+    return None, "the KB deadlift is filler for a lifter who deadlifts — the slot drops, the swing never fills it (KB_FILLER, ruling #6)"
 
 
 def kb_filler(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str]:
     """IN PLACE (KB_FILLER) on the slot in its HOME session (a relocated slot is chosen by `live_balance.place_kb` through
-    `kb_choice`): the KB deadlift becomes the swing, or the slot is dropped. Returns the rationale lines."""
+    `kb_choice`): the KB deadlift stays (a lifter who does not deadlift) or the slot is dropped. Returns the rationale lines."""
     from training import kb_entry
     from training.live_balance import KB_SLOT_KEY
 
@@ -298,11 +296,6 @@ def kb_filler(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[st
     key, why = kb_choice(ctx, workouts)
     if key == kb_entry.ENTRY:
         return []
-    if key:
-        for e in kb:
-            e["movement_key"] = key
-            e["live_kb_filler"] = True
-        return [f"kettlebell slot (live): {why}"]
     rx["exposures"] = [e for e in rx["exposures"] if e not in kb]
     return [f"dropped (live): the kettlebell slot — {why}"]
 
