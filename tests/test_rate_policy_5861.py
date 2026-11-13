@@ -151,7 +151,7 @@ def test_dry_run_script_runs_on_synthetic_profiles():
     assert all(p["applied"] is False for p in got.values())
 
 
-ADVISORY_READERS = {"lambdas/training/live_balance.py"}
+ADVISORY_READERS = {"lambdas/training/live_balance.py", "lambdas/training/live_rulings.py"}
 """The ONE module allowed to read the proposal (#5861 red team, fix 7; FIX3 moved the read into `live_balance.rate_band`, which
 adds the owner's `body_fat_tier` / `rate_band_mode` settings): `live_program.rate_line` renders the band as ADVISORY
 text in a LIVE draft's rationale. It never feeds the rate band, titration or a kcal target — wiring the band into nutrition
@@ -178,6 +178,11 @@ def test_no_live_path_reads_the_proposal():
     src = (REPO / "lambdas/training/live_balance.py").read_text()
     use = [ln.strip() for ln in src.splitlines() if "rate_policy." in ln]
     assert use and all("propose_band" in ln for ln in use), use  # the band proposal only
+    # #5861 FIX6 (owner ruling 11): the advisory ceiling, read once a week into a rationale line — never a kcal or target write
+    import re
+
+    calls = re.findall(r"rate_policy\.(\w+)\(", (REPO / "lambdas/training/live_rulings.py").read_text())
+    assert calls == ["advisory_ceiling"], calls
     imports = [ln for ln in src.splitlines() if ln.strip().startswith(("import ", "from "))]
     assert not [ln for ln in imports if "calorie_target" in ln or "titration" in ln], imports  # no kcal, no titration
     # control: a second reader planted in the set the sweep sees -> red

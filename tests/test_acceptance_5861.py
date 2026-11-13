@@ -246,7 +246,9 @@ def week_gaps(week: dict, lib: dict, catalog: dict) -> list[str]:
     served = [sw._lib_entry(lib, catalog, x["key"]) for x in _lifts(week)]
     out += [f"no {p}" for p, f in PATTERNS.items() if not any(f(e) for e in served)]
     hard = [s["cardio"].get("kind") for s in week["sessions"] if s["cardio"].get("kind") in ("tempo", "hills", "intervals")]
-    out += [] if len(hard) >= 2 else [f"{len(hard)} conditioning blocks (charter: 2)"]
+    # #5861 FIX6 (owner rulings 1 + 4): under the shared cap the week's conditioning dose rides the ONE host morning
+    need = 1 if lp.settings(lib).get("session_cap_includes_cardio") else 2
+    out += [] if len(hard) >= need else [f"{len(hard)} conditioning blocks (charter: {need})"]
     return out
 
 
@@ -305,8 +307,15 @@ def unprogrammed(week: dict, lib: dict, catalog: dict) -> list[str]:
     # OUTCOME: one block of at least CARDIO_ROOM's minimum, or the week's walking dose COMPUTED from its steps by the cardio
     # model's conservative credit (`week["steps_credit"]`, the generator's own call — never a rationale string)
     long_enough = any((s["cardio"].get("minutes") or 0) >= lw.CARDIO_ROOM["min_block"]["value"] for s in week["sessions"])
+    # #5861 FIX6 (ruling 4): a purposeful conditioning block counts at the shared cap's own minimum (the cap is the owner's)
+    long_enough = long_enough or any(
+        s["cardio"].get("kind") in lp.HARD_KINDS and (s["cardio"].get("minutes") or 0) >= lp.MIN_CARDIO_MINUTES for s in week["sessions"]
+    )
     steps_dose = float((week.get("steps_credit") or {}).get("moderate_min_per_wk") or 0) >= cm.WEEKLY_MODERATE_MIN[0]
-    if not (long_enough or steps_dose):
+    # #5861 FIX6 (rulings 1 + 4): when the shared cap leaves no conditioning room (the 4-day week), the served answer is the
+    # host morning's concrete walk — on the Hevy note he reads, not a rationale string
+    walk = any("Optional today: brisk walk" in (x["hevy_note"] or "") for s in week["sessions"] for x in s["lifts"][:1])
+    if not (long_enough or steps_dose or walk):
         out.append("aerobic")
     return out
 
@@ -339,7 +348,9 @@ def test_b2_unilateral_carry_trunk_and_aerobic_work_are_programmable(weeks):
     # control 4: a week whose only structured cardio is a 13-minute stub and whose steps credit under the guideline floor
     stub = copy.deepcopy(weeks["a_large_deficit_experienced"]["week"])
     for s in stub["sessions"]:
-        s["cardio"] = {"key": "cycling", "kind": "tempo", "minutes": 13} if s["role"] == "shoulders_arms" else {}
+        s["cardio"] = {"key": "cycling", "kind": "easy", "minutes": 8} if s["role"] == "shoulders_arms" else {}
+        for x in s["lifts"]:  # FIX6: and no walk on the host's note
+            x["hevy_note"] = "\n".join(ln for ln in (x["hevy_note"] or "").split("\n") if "brisk walk" not in ln)
     stub["steps_credit"] = cm._walking_dose({d: 9000 for d in sw.steps_by_day(PROFILES["a_large_deficit_experienced"])})
     assert unprogrammed(stub, lib, cat) == ["aerobic"]
     # control 5: the engine's own sentence no longer passes the gate (the steps-dose line kept, the credit gone)
@@ -724,6 +735,7 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
         assert lm["shoulders"]["sets"] <= lm["shoulders"]["MAV"] and all(lm[p]["sets"] >= lm[p]["MEV"] for p in PRIORITY), name
     lop = copy.deepcopy(weeks["a_large_deficit_experienced"]["m"])  # control 1: the red team's week — delts 18, chest AT MEV
     lop["landmarks"]["shoulders"]["sets"], lop["landmarks"]["chest"]["sets"] = 18, 8
+    lop["landmarks"]["quadriceps"]["sets"] = 12  # FIX6: the ruled week holds a progressing quadriceps at MEV + 1 (ruling 9)
     assert misallocated(lop) == ["shoulders over MAV while chest is at or under MEV + 1"]
     # control 2: the week's allocation switched off -> the drafted week puts delts over MAV beside chest at its MEV
     raw = _week_of("a_large_deficit_experienced", {(lb, "allocate"): lambda rx, ctx: []})
@@ -866,8 +878,8 @@ def test_d2b_redundant_axial_fatigue_is_avoided_in_the_drafted_week(weeks):
     # #5861 FIX5: for a lifter who deadlifts the KB deadlift is filler — never served; the slot serves the swing or nothing
     assert "kettlebell_deadlift" not in {x["key"] for s in a["week"]["sessions"] for x in s["lifts"]}
     nodl = _week_of("a_large_deficit_experienced", {(lrules, "deadlifts"): lambda workouts, ctx: False})  # no barbell deadlift
-    sa = next(s for s in nodl["week"]["sessions"] if s["role"] == "shoulders_arms")
-    assert "kettlebell_deadlift" in {x["key"] for x in sa["lifts"]}  # ... the entry drill MOVES to its move-to session, not lost
+    moved = {x["key"] for s in nodl["week"]["sessions"] if s["role"] in ("shoulders_arms", "upper_volume") for x in s["lifts"]}
+    assert "kettlebell_deadlift" in moved  # ... the entry drill MOVES to its move-to session (FIX6: past the cap's host), not lost
     assert spine_class_split(a["world"]["lib"]) == []  # one spinal rating for the dumbbell-at-the-sides class
     bad = copy.deepcopy(a["world"]["lib"])  # control: the split squat back at moderate beside a low reverse lunge
     bad["movements"]["bulgarian_split_squat_dumbbell"]["joint_stress"]["spinal_load"] = "moderate"
@@ -945,8 +957,10 @@ def test_d3_every_session_fits_75_minutes_by_the_5799_model(weeks):
         assert len(rep) == len(w["week"]["sessions"]), n
         for (role, mins), s in zip(rep, w["week"]["sessions"]):
             assert abs(mins - (float(s["lifting_minutes"] or 0) + float(s["cardio"].get("minutes") or 0))) < 0.05, (n, role)
-    # control: the shared-cap reading of the default week finds the long mornings (the setting decides which one binds)
-    assert over_cap(weeks["a_large_deficit_experienced"]["week"], shared=True)
+    # control: the shared-cap reading of the LIFTING-cap week finds the long mornings (the setting decides which one binds;
+    # #5861 FIX6: the ruled default is the shared cap, so the control drafts the old setting)
+    with patch.dict(sw.SETTINGS, {"session_cap_includes_cardio": False, "cardio_purpose_only": False}):
+        assert over_cap(_week_of("a_large_deficit_experienced", {})["week"], shared=True)
     # stress: no load on file for anything (a first week back): every lift gets its "find the load" warm-up set as written,
     # the time the prescription's estimate does not see — the routine is still fitted to the ceiling, accessories first
     real = sw.history_index
@@ -979,10 +993,10 @@ def test_d3b_with_the_shared_cap_the_whole_morning_fits_and_conditioning_sits_on
             roles = {s["role"] for s in week["sessions"]}
             host = lb.conditioning_host(None if "shoulders_arms" in roles else "shoulders_arms")  # the short / dip week's host
             assert {s["role"] for s in week["sessions"] if s["cardio"].get("kind") in lp.HARD_KINDS} <= {host}, name
-            if name in ("a_large_deficit_experienced", "c_equipment_limited", "d_stalled_anchor_adherence_dip", "e_short_week"):
+            if name in ("a_large_deficit_experienced", "c_equipment_limited", "d_stalled_anchor_adherence_dip"):
                 # second red team: lifting gives over-MAV sets (after the charter's antagonist supersets) so the week keeps a
-                # real aerobic block — not the 13-minute stub the shared cap used to leave
-                assert max(s["cardio"].get("minutes") or 0 for s in week["sessions"]) >= lw.CARDIO_ROOM["min_block"]["value"], name
+                # real conditioning block — #5861 FIX6 (ruling 1): from supersets and over-MAV sets only, at the cap's minimum
+                assert max(s["cardio"].get("minutes") or 0 for s in week["sessions"]) >= lp.MIN_CARDIO_MINUTES, name
         # control: the cap's minute fit removed -> the 30-minute block overruns a long lifting day
         with patch.object(lp, "MIN_CARDIO_MINUTES", -(10**6)), patch.object(lp, "cardio_fit", lambda m, live: (m, [])):
             prof = PROFILES["a_large_deficit_experienced"]
@@ -991,7 +1005,12 @@ def test_d3b_with_the_shared_cap_the_whole_morning_fits_and_conditioning_sits_on
         with patch.object(lw, "make_cardio_room", lambda blocks, rx, mv, cap, shape: shape):
             prof = PROFILES["a_large_deficit_experienced"]
             week = sw.generate_week(prof, "approved", sw.build_world(prof, "approved"))
-            assert max(s["cardio"].get("minutes") or 0 for s in week["sessions"]) < lw.CARDIO_ROOM["min_block"]["value"]
+            room = max(s["cardio"].get("minutes") or 0 for s in week["sessions"])
+        prof = PROFILES["a_large_deficit_experienced"]
+        ruled = max(
+            s["cardio"].get("minutes") or 0 for s in sw.generate_week(prof, "approved", sw.build_world(prof, "approved"))["sessions"]
+        )
+        assert room < ruled  # the superset / over-MAV room buys the block its minutes
 
 
 def untrackable(week: dict, catalog: dict) -> list[str]:

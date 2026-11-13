@@ -206,7 +206,7 @@ def rank_key(c: dict[str, Any], recent: set[str], slot_last: dict[str, int], poo
     from training import selection_engine as se
 
     ck = c.get("catalog_key") or ""
-    inside = c["tier"] in pool
+    inside = c["tier"] in pool and not c.get("provisional")  # #5861 FIX6 ruling 16: a provisional rating is never proof of suitability
     tier = se.TIER_RANK[c["tier"]]
     return (
         0 if inside else 1,

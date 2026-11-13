@@ -223,7 +223,11 @@ def test_no_added_work_on_a_strained_overreached_or_deload_day():
         assert _added_on_bad_days(w) == [], name
     f = _week("f_high_fatigue_poor_sleep", NODL)["week"]
     assert "leg_extension_machine" not in {x["key"] for x in _lifts(f)}
-    off = _week("f_high_fatigue_poor_sleep", NODL | {(lrules, "no_added_work"): lambda rx: [], (lrules, "bad_day"): lambda rx: False})
+    off = _week(
+        "f_high_fatigue_poor_sleep",
+        NODL | {(lrules, "no_added_work"): lambda rx: [], (lrules, "bad_day"): lambda rx: False},
+        {"press_sets": 1},  # #5861 FIX6: the round-5 week (the press trade takes the freed sets the slot needs)
+    )
     assert "leg_extension_machine" in {x["key"] for x in _lifts(off["week"])}
 
 

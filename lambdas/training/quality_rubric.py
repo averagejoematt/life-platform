@@ -12,8 +12,8 @@ scored against the JOB it does: its `job` (compound | isolation, the builder's r
 name) picks the terms. Per (movement, target muscle), the sum of:
 
     term                 field                 isolation                              compound (multi-joint pattern)
-    stretch              `length_bias`         lengthened 5 · mid 3 · short 1         the same (glutes capped at mid:
-                                                                                       `STRETCH_CAPS`, no stretch premium)
+    stretch              `length_bias`         lengthened 5 · mid 3 · short 1         the same (glutes held at the top for any
+                                                                                       known length: `STRETCH_CAPS`, 3.4.0)
     stability            `stability`           high 3 · moderate 2 · low 1            high 2 · moderate 2 · low 1
     resistance profile   `resistance_profile`  fit to the target's curve (0-3,        free weight / any machine / cable 3 ·
                                                `PROFILE_FIT`)                         band / bodyweight / sled 1
@@ -49,7 +49,7 @@ from typing import Any
 
 from training import cardio_model
 
-RUBRIC_VERSION = "3.3.0"  # 3.3.0: #5861 FIX3 (one S per canonical family per objective: the S quota); 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
+RUBRIC_VERSION = "3.4.0"  # 3.4.0: #5861 FIX6 (owner ruling 17: the glute stretch term at its top, the same S standard; no provisional S on any objective); 3.3.0: #5861 FIX3 (one S per canonical family per objective: the S quota); 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
@@ -96,12 +96,18 @@ FREE_WEIGHT_CARRYOVER = 1  # a free-weight compound's carryover; the ONLY term w
 # target -> (the length_bias the stretch term is FIXED at, the citation, why). Owner ruling 2026-11-12 (board rec 6) capped
 # it; 3.0.0 (#5861) fixes it both ways: the trial that removed the stretch premium (the shortened hip thrust matched the
 # lengthened squat) equally removes the shortened penalty, so any KNOWN glute length scores mid (unknown still scores 0).
+# 3.4.0 (#5861 FIX6, owner ruling 17, 2026-11-13: "don't manufacture a glute S, but don't require an exercise-specific trial
+# as the only route to S either; the same evidence + personal-fit standard as other muscles"): at `mid` the term held every
+# glute row 2 points under the best row of any other muscle (a lengthened movement scores 5), so only a direct trial's +1
+# band could carry a glute row to S. The trial says length does not decide glute growth — so the term is held at its TOP for
+# any known glute length: it cannot separate glute movements, and it no longer costs them. Every S criterion and the S quota
+# still apply unchanged (unknown length still scores 0 -> NEUTRAL).
 STRETCH_CAPS: dict[str, tuple[str, str, str]] = {
     "glutes": (
-        "mid",
+        "lengthened",
         "plotkin2023_hip_thrust_vs_squat",
-        "no stretch premium and no shortened penalty for the glutes: the hip thrust (shortened) matched the back squat "
-        "(lengthened) for glute growth",
+        "length does not decide glute growth (the hip thrust, shortened, matched the back squat, lengthened): the stretch term "
+        "is held at its top for any known glute length — no premium between glute movements and no cost against other muscles",
     ),
 }
 # target -> why. 3.1.0 (#5861 FIX-DATA, red team: "shrugs at C: the stretch term penalises a movement whose short ROM is inherent"):
@@ -599,10 +605,29 @@ def objective_ratings(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
         quota = (entry.get("s_quota") or {}).get(obj)
         if tier == "S" and isinstance(quota, dict) and quota.get("holder"):
             tier, basis = "A", list(basis) + [f"cap A: {s_quota_why(quota)}"]
+        if tier == "S" and why:  # #5861 FIX6 (owner ruling 16): missing information never stands as proof — no provisional S
+            tier, basis = "A", list(basis) + ["cap A: provisional (inputs not reviewed) never reaches S"]
         cm = _cardio(entry) if obj == "conditioning" else None
         conf = cm["evidence_confidence"] if cm is not None else _confidence(entry, tier)
         out[obj] = {"tier": tier, "basis": basis, "evidence_confidence": conf, "provisional": why if tier else None}
     return out
+
+
+def completeness(entry: dict[str, Any]) -> tuple[int, int]:
+    """(known, read): how many of the inputs the rubric and the objective rubrics read are known for the movement (#5861 FIX6,
+    owner ruling 16: data completeness stays visible beside the tier; an unknown scores neutral and is never proof)."""
+    fields = sorted({f for fs in TERM_INPUTS.values() for f in fs})
+    known = sum(1 for f in fields if not _unknown(entry, f))
+    inp = _inputs(entry)
+    extra = ("ceiling", "limiter", "systemic_fatigue")
+    known += sum(1 for k in extra if str(inp.get(k) or "unknown") != "unknown")
+    return known, len(fields) + len(extra)
+
+
+def served_rating(entry: dict[str, Any], objective: str) -> tuple[str | None, str, bool]:
+    """(tier, evidence confidence, provisional) for the rationale's evidence line (`live_rulings.evidence_line`)."""
+    r = (entry.get("ratings") or objective_ratings(entry)).get(objective) or {}
+    return r.get("tier"), str(r.get("evidence_confidence") or "none_reviewed"), bool(r.get("provisional"))
 
 
 def objective_tier(entry: dict[str, Any], objective: str, target: str | None = None) -> str | None:

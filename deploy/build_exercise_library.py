@@ -97,6 +97,26 @@ PROGRAMMING_SETTINGS_DEFAULTS: dict[str, Any] = {
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
 }
+# #5861 FIX6: THE OWNER'S RULINGS of 2026-11-13 on the decision register (configuration, NOT activation — `status` stays
+# `proposed`). Written over any earlier on-disk default by every rebuild: a ruling lives here, in the generator, and a later
+# ruling edits this dict. Each key is read only under `selection_engine.mode() == "live"` (`training.live_program.settings`,
+# whose code defaults equal these — tests/test_owner_rulings_5861.py holds the two to each other).
+OWNER_RULED_SETTINGS: dict[str, Any] = {
+    "session_cap_includes_cardio": True,  # ruling 1: lifting + gym cardio share the 75-min cap
+    "adherence_response": "short_week",  # ruling 2: a 4-session week after missed sessions, no make-up sets
+    "short_week_rule": "skip_shoulders_arms",  # ruling 3: the 4-day week drops shoulders+arms (arms/shoulders held at MEV)
+    "cardio_purpose_only": True,  # ruling 4: a gym cardio block only for a named purpose (the week's conditioning dose)
+    "heavy_day_deadlift_shape": "top_plus_backoff",  # ruling 5: top set + one back-off
+    "lead_lift_rule": "alternate_weekly",  # ruling 5: one of squat / deadlift leads the heavy day, the other a band lower
+    "press_sets": 3,  # ruling 6: overhead press 2-3 weekly working sets, from redundant lateral-delt sets
+    "kb_slot_under_strain": "drop",  # ruling 7: no KB hinge on a strained week, no make-up
+    "priority_muscles": ["chest", "quadriceps"],  # ruling 9
+    "priority_add_rule": "stimulus_and_performance",  # ruling 9: an added slot only when stimulus AND performance say so
+    "rate_band_mode": "advisory",  # ruling 11: advisory upper reference, never applied
+    "rate_ceiling_pct_bw": 1.0,  # ruling 11: ~1 % of current bodyweight a week, the advisory upper planning reference
+    "symptom_line": "",  # ruling 10 (follow-up): no symptom warning line on any session
+    "symptom_line_on_lifting_days": False,  # ruling 10
+}
 
 
 def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
@@ -920,7 +940,9 @@ def build_library(
             "evaluated_by": "#5772 (next story); v0.1 only defines gates",
         },
         "gates": gates_out,
-        "programming_settings": PROGRAMMING_SETTINGS_DEFAULTS | dict((current or {}).get("programming_settings") or {}),
+        "programming_settings": PROGRAMMING_SETTINGS_DEFAULTS
+        | dict((current or {}).get("programming_settings") or {})
+        | OWNER_RULED_SETTINGS,
         "canonical_families": families,
         "movements": movements,
     }

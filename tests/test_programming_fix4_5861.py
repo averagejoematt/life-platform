@@ -258,7 +258,14 @@ def test_the_week_never_passes_the_weekly_hard_set_redline(weeks):
     one_over["sessions"][0]["lifts"][0]["working_sets"] += 76 - total
     assert over_redline(one_over) == 1
     # control 2: no ceiling (and the KB deadlift served, as it was before #5861 FIX5's filler rule) -> over the redline
-    raw = _week("a_large_deficit_experienced", {(lshape, "week_ceiling"): lambda env, adds: [], (lrules, "deadlifts"): lambda w, c: False})
+    # #5861 FIX6: the ruled week is leaner (the press-for-laterals trade, the stimulus gate), so the control also takes the
+    # fifth round's settings back (press_sets 1, the volume-driven quadriceps slot, the old room rule)
+    old = {"press_sets": 1, "priority_add_rule": "volume", "priority_muscles": ["chest", "back", "quadriceps", "hamstrings"]}
+    raw = _week(
+        "a_large_deficit_experienced",
+        {(lshape, "week_ceiling"): lambda env, adds: [], (lrules, "deadlifts"): lambda w, c: False},
+        old | {"session_cap_includes_cardio": False, "heavy_day_deadlift_shape": "as_today"},
+    )
     assert over_redline(raw["week"]) > 0
 
 
@@ -292,7 +299,13 @@ def test_priority_muscles_take_sets_from_muscles_at_mav_and_the_quadriceps_get_t
     lm = a["m"]["landmarks"]
     assert lm["shoulders"]["sets"] < lm["shoulders"]["MAV"] and lm["biceps"]["sets"] < lm["biceps"]["MAV"]
     lv = next(s for s in a["week"]["sessions"] if s["role"] == "lower_volume")
-    assert "leg_extension_machine" in {x["key"] for x in lv["lifts"]}  # his history shows it; the gym has it
+    # #5861 FIX6 (owner ruling 9): profile (a)'s squat is PROGRESSING with the quadriceps at MEV — the stimulus works, so the
+    # slot is not added (`live_rulings.stimulus_gate`); the volume rule (control) still adds it — his history shows it
+    assert "leg_extension_machine" not in {x["key"] for x in lv["lifts"]}
+    assert any(ln.startswith("priority (live): chest held") for s in a["week"]["sessions"] for ln in s["rationale"])
+    vol = _week("a_large_deficit_experienced", settings={"priority_add_rule": "volume", "press_sets": 1})["week"]  # the round-5 week
+    lv = next(s for s in vol["sessions"] if s["role"] == "lower_volume")
+    assert "leg_extension_machine" in {x["key"] for x in lv["lifts"]}
     plan = lb.allocation_plan(CAT0, copy.deepcopy(LIB0))
     assert plan["after"]["quadriceps"] > plan["before"]["quadriceps"] and plan["after"]["chest"] > plan["before"]["chest"]
     with patch.dict(lshape.QUAD_SLOT, {"history_min": 10**6}):  # control: no history -> no quadriceps slot
@@ -321,10 +334,12 @@ def test_the_heavy_day_deadlift_shape_is_a_setting(weeks):
         lh = next(s for s in week["sessions"] if s["role"] == "lower_heavy")
         return next(x for x in lh["lifts"] if x["key"] == "deadlift_barbell"), {x["key"] for x in lh["lifts"]}
 
-    today, keys = dl(weeks[("a_large_deficit_experienced", False)]["week"])
-    assert lshape.SETTINGS_DEFAULTS["heavy_day_deadlift_shape"] == "as_today" and today["working_sets"] == 3
-    alt, keys2 = dl(_week("a_large_deficit_experienced", settings={"heavy_day_deadlift_shape": "top_plus_backoff"})["week"])
-    assert alt["working_sets"] == 2 and "squat_barbell" in keys2  # top + one back-off; the pairing stays (#5694)
+    # #5861 FIX6 (owner ruling 5): top set + one back-off is the default; `as_today` (the control) keeps two back-offs
+    ruled, keys = dl(weeks[("a_large_deficit_experienced", False)]["week"])
+    assert lshape.SETTINGS_DEFAULTS["heavy_day_deadlift_shape"] == "top_plus_backoff" and ruled["working_sets"] == 2
+    assert "squat_barbell" in keys  # the pairing stays (#5694)
+    old, _keys2 = dl(_week("a_large_deficit_experienced", settings={"heavy_day_deadlift_shape": "as_today"})["week"])
+    assert old["working_sets"] == 3
 
 
 # ── 7. the aerobic gap ───────────────────────────────────────────────────────
@@ -346,15 +361,19 @@ def test_under_the_default_cap_a_small_gap_is_the_walks_not_another_ride(weeks):
     def easy(week):
         return sum(1 for s in week["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS)
 
-    h = weeks[("h_heavy_walker", False)]["week"]
-    more = _week("h_heavy_walker", {(lshape, "walk_covers"): lambda kind, live: None})["week"]  # control: rides close every gap
+    # #5861 FIX6: the fifth round's easy rides live under `cardio_purpose_only: False` (owner ruling 4 serves none by default)
+    old = {"session_cap_includes_cardio": False, "cardio_purpose_only": False}
+    near = {(lp, "aerobic"): lambda inputs: {"volume_covered": False, "walking_min_per_wk": 125, "line": "synthetic: 125 min recorded"}}
+    h = _week("h_heavy_walker", near, old)["week"]
+    more = _week("h_heavy_walker", near | {(lshape, "walk_covers"): lambda kind, live: None}, old)["week"]  # control: rides close every gap
     assert easy(h) < easy(more)
+    assert easy(weeks[("h_heavy_walker", False)]["week"]) == 0  # the ruled default: no easy ride fills a gap
     assert lshape.walk_covers("easy", {"settings": {"session_cap_includes_cardio": True}, "aerobic": {"walking_min_per_wk": 140}}) is None
     import inspect
 
     from training import cardio_model
 
-    assert "HEURISTIC" in inspect.getsource(cardio_model).split("STEPS_CREDIT_SHARE = ", 1)[1][:200]  # the credit stays labelled
+    assert "HEURISTIC" in inspect.getsource(cardio_model).split("CADENCE_MODERATE_SPM = ", 1)[0][-600:]  # the cadence stays labelled
 
 
 # ── 8. the stop line ─────────────────────────────────────────────────────────
@@ -369,19 +388,22 @@ def _cardio_wire_notes(week: dict, hard_only: bool = True) -> list[str]:
     return out
 
 
-def test_the_stop_line_reaches_the_hevy_payload_and_the_extended_wording_works():
-    default = lp.SETTINGS_DEFAULTS["symptom_line"]
-    assert default == "Chest, breathing, dizzy? Stop, log it."  # the owner's wording, unchanged
+def test_the_stop_line_is_off_by_default_and_a_wording_set_explicitly_reaches_the_hevy_payload():
+    """#5861 FIX6, owner ruling 10 ("we do not need to post symptom warnings"): no symptom line on any session by default. The
+    `extended` preset and the owner's own wording stay available and, when SET, reach the compiled Hevy payload."""
+    assert lp.SETTINGS_DEFAULTS["symptom_line"] == "" and lsafe.SETTINGS_DEFAULTS["symptom_line_on_lifting_days"] is False
+    words = ("Stop, log it", "dizzy", "heart racing", "medical help")
     a = _week("a_large_deficit_experienced")["week"]
     hard = _cardio_wire_notes(a)
-    assert hard and all(default in n for n in hard)
+    assert hard and not any(w in n for n in hard for w in words)  # the default: no warning line on the conditioning block
+    assert not any(w in (e.get("notes") or "") for s in a["sessions"] for e in s["wire"] for w in words)  # nor anywhere else
+    wording = "Chest, breathing, dizzy? Stop, log it."
     ext = _week("a_large_deficit_experienced", settings={"symptom_line": "extended"})["week"]
     notes = _cardio_wire_notes(ext)
-    assert any("heart racing or irregular" in n and "Doesn't settle → get medical help." in n for n in notes)
-    lifting = _week("a_large_deficit_experienced", settings={"symptom_line_on_lifting_days": True})["week"]
-    assert all(default in (s["wire"][0].get("notes") or "") for s in lifting["sessions"])  # exercise 1 of every morning
-    off = _week("a_large_deficit_experienced", settings={"symptom_line": ""})["week"]  # control: the line removed
-    assert not any(default in n for n in _cardio_wire_notes(off))
+    assert any("heart racing or irregular" in n and "Doesn't settle → get medical help." in n for n in notes)  # the preset, set
+    lifting = _week("a_large_deficit_experienced", settings={"symptom_line": wording, "symptom_line_on_lifting_days": True})["week"]
+    assert all(wording in (s["wire"][0].get("notes") or "") for s in lifting["sessions"])  # exercise 1 of every morning
+    assert all(wording in n for n in _cardio_wire_notes(lifting))  # control: a wording set explicitly prints
 
 
 # ── 9. the kettlebell slot under strain ──────────────────────────────────────
@@ -392,12 +414,12 @@ def test_the_kettlebell_slot_under_strain_is_a_setting(weeks):
     fourth and fifth red teams both recommend `drop`. The home case is exercised with the move and the stacking cap off."""
     nodl = {(lrules, "deadlifts"): lambda workouts, ctx: False}  # FIX5: a lifter with no barbell deadlift (else the KB DL is filler)
     f = _week("f_high_fatigue_poor_sleep", nodl)["week"]
-    assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(f)}  # moved to shoulders+arms, a deload-recommended day: waits
-    assert any(ln.startswith("waits (live): kettlebell_deadlift") for s in f["sessions"] for ln in s["rationale"])
+    assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(f)}  # a deload-recommended day: no KB hinge, no make-up
     home = nodl | {(lb, "_template_spine"): lambda role, catalog, lib: 0, (lp, "avoid_stacking"): lambda rx, ctx, rot, pinned: []}
-    kept = _week("f_high_fatigue_poor_sleep", home)["week"]  # today's default: the HOME slot follows its placement
+    # #5861 FIX6 (owner ruling 7): `drop` is the default; `as_today` (the control) keeps the HOME slot on the strained day
+    kept = _week("f_high_fatigue_poor_sleep", home, settings={"kb_slot_under_strain": "as_today"})["week"]
     assert "kettlebell_deadlift" in {x["key"] for s in kept["sessions"] if s["role"] == "lower_volume" for x in s["lifts"]}
-    drop = _week("f_high_fatigue_poor_sleep", home, settings={"kb_slot_under_strain": "drop"})["week"]
+    drop = _week("f_high_fatigue_poor_sleep", home)["week"]
     assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(drop)}
     assert any("kb_slot_under_strain=drop" in ln for s in drop["sessions"] for ln in s["rationale"])
     a = _week("a_large_deficit_experienced", nodl, settings={"kb_slot_under_strain": "drop"})["week"]  # control: a fresh week keeps it
@@ -460,5 +482,5 @@ def test_every_fix4_constant_is_labelled_and_every_default_is_todays():
         assert all(v["label"] == "heuristic" and v["basis"] for v in table.values())
     assert lshape.QUAD_SLOT["label"] == "heuristic" and lsafe.STOP_LINE["label"] == "heuristic"
     assert lsafe.SETTINGS_DEFAULTS == {"symptom_line_on_lifting_days": False}
-    assert lshape.SETTINGS_DEFAULTS == {"heavy_day_deadlift_shape": "as_today", "kb_slot_under_strain": "as_today"}
+    assert lshape.SETTINGS_DEFAULTS == {"heavy_day_deadlift_shape": "top_plus_backoff", "kb_slot_under_strain": "drop"}  # FIX6
     assert LIB0["status"] == "proposed"

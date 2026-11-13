@@ -174,10 +174,11 @@ def kb_seed(
         work = [s for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup"]
         if b.movement_key != kb_entry.ENTRY or not work or any(getattr(s, "weight_kg", None) for s in work):
             continue
-        custom = str(_settings().get("kb_deadlift_template_id") or "").upper() or None  # FIX3: his own KB template first
-        bell = (previous_load(history_index, custom, target_date) if custom else None) or previous_load(
-            history_index, kb_entry.ENTRY_TEMPLATE_ID, target_date
-        )
+        custom = str(_settings().get("kb_deadlift_template_id") or "").strip() or None  # FIX3: his own KB template first
+        # #5861 FIX6: a custom Hevy template id is a lower-case UUID and the history index keeps the id as logged — read it as
+        # given (and upper-cased, for a built-in-style id), never only upper-cased
+        mine = [previous_load(history_index, t, target_date) for t in dict.fromkeys((custom, (custom or "").upper())) if t]
+        bell = next((b for b in mine if b), None) or previous_load(history_index, kb_entry.ENTRY_TEMPLATE_ID, target_date)
         bell = bell or previous_load(history_index, swing, target_date)
         if not bell or not bell.get("lb"):
             continue
@@ -198,12 +199,14 @@ def landmark_muscle(key: str | None, catalog: dict[str, Any], lib: dict[str, Any
     return LANDMARK_OF.get(str(primary), str(primary))
 
 
-def week_sets(catalog: dict[str, Any], lib: dict[str, Any] | None) -> Counter:
+def week_sets(catalog: dict[str, Any], lib: dict[str, Any] | None, rx: dict[str, Any] | None = None) -> Counter:
     """The program week's planned sets per landmark muscle (primary 1.0, each secondary 0.5 — the fatigue model's convention),
-    from the five role templates AFTER the week's allocation by priority (#5861 FIX3, `live_balance.allocation_plan`)."""
+    from the five role templates AFTER the week's allocation by priority (#5861 FIX3, `live_balance.allocation_plan`). `rx`
+    (#5861 FIX6): the drafted session, whose live mark names the roles this week skips — a short week's count."""
     from training import live_balance
 
-    return live_balance.allocated_week(catalog, lib or {})
+    skip = tuple(((rx or {}).get("live_session") or {}).get("week_skip") or ()) or None
+    return live_balance.allocated_week(catalog, lib or {}, skip)
 
 
 def _hard_blocked(rx: dict[str, Any]) -> bool:
@@ -245,7 +248,8 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
     from training.session_shape import routine_minutes
 
     lib = se.load_library_failsoft() or {}
-    week, marks = week_sets(movements, lib), (block_model.load_landmarks() or {})
+    week, marks = week_sets(movements, lib, rx), (block_model.load_landmarks() or {})
+    over_mav_only = _settings().get("cardio_room_takes") == "over_mav_only"  # #5861 FIX6, owner ruling 1
     taken: Counter = Counter()
     before = shape["lifting_minutes"]
     paired = _pair_antagonists(blocks, rx) if shape["lifting_minutes"] > cap - reserve else []  # charter: pair before cutting
@@ -256,9 +260,10 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
             now = routine_minutes(blocks, movements)["lifting_minutes"]
             # sets over a muscle's MAV buy the WHOLE block (they add little); a surplus over MEV buys only the minimum block
             tiers = (0, 1) if now > cap - reserve else ((0,) if now > cap - full and floor > 1 else ())
+            tiers = tuple(t for t in tiers if t == 0) if over_mav_only else tiers  # FIX6 ruling 1: never sets a muscle needs
             if not tiers or not _trim_one(blocks, movements, lib, (week, marks, taken, floor, _fixed(rx)), tiers):
                 break
-    dropped = _drop_for_room(blocks, rx, movements, lib, (week, marks, taken), cap - reserve)  # FIX3: then a whole isolation
+    dropped = [] if over_mav_only else _drop_for_room(blocks, rx, movements, lib, (week, marks, taken), cap - reserve)  # FIX3
     if not taken and not paired:
         return shape
     new = program_structure.enforce_session_shape(blocks, movements) | {
@@ -357,7 +362,7 @@ def trim_sets_for_time(blocks: list[Any], rx: dict[str, Any], movements: dict[st
 
     lib = se.load_library_failsoft() or {}
     taken: Counter = Counter()
-    week, marks = week_sets(movements, lib), block_model.load_landmarks() or {}
+    week, marks = week_sets(movements, lib, rx), block_model.load_landmarks() or {}
     # every accessory down to CARDIO_ROOM min_sets; #5861 FIX4 retired the second pass to ONE set (one-set accessories and
     # superset halves are noise) — `fit_routine` then drops whole accessories, the largest surplus over MEV first
     for floor in (int(CARDIO_ROOM["min_sets"]["value"]),):  # #5861 FIX4: drop, don't shave — then whole accessories (fit_routine)
@@ -591,8 +596,9 @@ def press_sets(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     above 1, the shoulders+arms overhead-press anchor gets that many working sets. #5861 FIX4: the week's allocation counts them
     (`live_balance._template_rows`), so the trade lands on the week's delt isolation there. Returns the rationale lines."""
     from training import selection_engine as se
+    from training.live_balance import _press_sets  # #5861 FIX6: the ruled default (3) when the library omits the key
 
-    want = int(((se.load_library_failsoft() or {}).get("programming_settings") or {}).get("press_sets") or 1)  # absent = 1
+    want = _press_sets(se.load_library_failsoft())
     if want <= 1 or rx.get("session_role") != "shoulders_arms":
         return []
     press = next((e for e in rx["exposures"] if e.get("kind") == "anchor" and e.get("pattern") == "overhead_press"), None)

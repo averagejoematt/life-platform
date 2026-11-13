@@ -95,7 +95,10 @@ def test_the_kettlebell_slot_names_its_implement_caps_effort_and_loads_the_bell(
     "find the load". Control: the KB rules off -> no implement on the note and the load to find."""
     # FIX3 (third red team): the slot moves off lower volume (two spine-loading lifts already) to shoulders+arms by default
     # #5861 FIX5: the KB deadlift is served only to a lifter who does not deadlift a barbell (else it is filler: KB_FILLER)
-    nodl = _week("a_large_deficit_experienced", {(lrules, "deadlifts"): lambda workouts, ctx: False})
+    # #5861 FIX6: under the ruled shared cap the slot passes over the conditioning host — this test holds the default-cap placement
+    nodl = _week(
+        "a_large_deficit_experienced", {(lrules, "deadlifts"): lambda workouts, ctx: False}, {"session_cap_includes_cardio": False}
+    )
     kb = _lift(nodl["week"], "shoulders_arms", "kettlebell_deadlift")
     assert kb is not None and kb["title"] == "Sumo Deadlift"
     note = kb["hevy_note"]
@@ -104,6 +107,7 @@ def test_the_kettlebell_slot_names_its_implement_caps_effort_and_loads_the_bell(
     off = _week(
         "a_large_deficit_experienced",
         {(lw, "kb_slot"): lambda rx, ctx: [], (lw, "kb_seed"): lambda *a, **k: None, (lrules, "deadlifts"): lambda workouts, ctx: False},
+        {"session_cap_includes_cardio": False},
     )
     bare = _lift(off["week"], "shoulders_arms", "kettlebell_deadlift")["hevy_note"]
     assert lw.KB_SLOT["implement_line"]["value"] not in bare and "find the load" in bare
@@ -471,11 +475,13 @@ def test_a_new_movement_never_enters_at_a_strength_rep_range(weeks):
     assert _lift(off["week"], "lower_heavy", "machine_hip_thrust")["reps"] == "4-6"
 
 
-def test_the_press_sets_option_is_off_by_default_and_trades_a_face_pull_set():
-    """The week's one vertical-press set is a charter decision (`split.frequency.overhead_press_per_wk` 1, #5162). The live
-    option `press_sets` (default 1) raises it, taking each set from the face pull. Control: the default serves one set."""
-    a = _week("a_large_deficit_experienced")["week"]
-    on = _week("a_large_deficit_experienced", settings={"press_sets": 2})["week"]
+def test_the_press_sets_option_is_three_by_ruling_and_trades_lateral_raise_sets():
+    """The week's one vertical-press set was a charter decision (`split.frequency.overhead_press_per_wk` 1, #5162). Owner ruling 6
+    (2026-11-13, #5861 FIX6): 2-3 weekly working sets, reallocated from redundant lateral-delt work — `press_sets` defaults to 3
+    and the extra sets come off the LATERAL raises (`live_rulings.press_trade`), never the rear delts first. Control:
+    `press_sets: 1` serves the charter's one set."""
+    a = _week("a_large_deficit_experienced", settings={"press_sets": 1})["week"]
+    on = _week("a_large_deficit_experienced")["week"]
 
     def sa(week):
         s = next(s for s in week["sessions"] if s["role"] == "shoulders_arms")
@@ -486,7 +492,13 @@ def test_the_press_sets_option_is_off_by_default_and_trades_a_face_pull_set():
     # #5861 FIX4: the week's allocation counts the press option, so the trade lands on the week's delt isolation (whichever
     # day holds the surplus), not only this morning's face pull: the WEEK's sets and its shoulders stay put
     week_sets = lambda w: sum(x["working_sets"] for s in w["sessions"] for x in s["lifts"])  # noqa: E731
-    assert sa(on)[press] == 2 and week_sets(on) <= week_sets(a)
+    assert sa(on)[press] == 3 and week_sets(on) <= week_sets(a) + 2
+
+    def week_of(w, word):
+        return sum(x["working_sets"] for s in w["sessions"] for x in s["lifts"] if word in x["key"])
+
+    assert week_of(on, "lateral_raise") < week_of(a, "lateral_raise")  # the trade is the lateral raises'
+    assert week_of(on, "reverse_pec_deck") + week_of(on, "face_pull") >= 4  # the rear delts keep two sets twice a week
 
 
 # ── 7. behind schedule ───────────────────────────────────────────────────────
@@ -522,5 +534,5 @@ def test_every_live_week_constant_is_a_labelled_heuristic():
     for name in ("evidence_rpe", "one_retreat_per_week"):
         assert lp.LOAD_POLICY[name]["label"] == "heuristic"
     assert "pinned_light_rpe" not in lp.STACK_RULE  # FIX3: "kept light" was not a limit — the pinned slot moves or is dropped
-    assert lp.SETTINGS_DEFAULTS["behind_schedule_week"] is False and "press_sets" not in (LIB0.get("programming_settings") or {})
-    assert lp.SETTINGS_DEFAULTS["symptom_line"] == "Chest, breathing, dizzy? Stop, log it."  # the owner's wording decision is open
+    assert lp.SETTINGS_DEFAULTS["behind_schedule_week"] is False and (LIB0.get("programming_settings") or {})["press_sets"] == 3
+    assert lp.SETTINGS_DEFAULTS["symptom_line"] == ""  # #5861 FIX6, owner ruling 10: no symptom warning line by default

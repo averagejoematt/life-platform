@@ -64,4 +64,16 @@ BUILDER_CHANGE_LOG = [
         "pulldown moderate ceiling (S -> A), sleds submaximal (strength A -> B), Pallof rehab_control, ab wheel hypertrophy",
         "rule": "the knee/hip class rule and the input corrections are PROPOSED — owner to confirm; status stays proposed",
     },
+    {
+        "version": "0.3.3",
+        "date": "2026-11-13",
+        "by": "#5861 FIX6 (the owner's rulings of 2026-11-13 on the decision register — configuration, not activation)",
+        "what": "`programming_settings` carries the owner's ruled values (build_exercise_library.OWNER_RULED_SETTINGS): the shared "
+        "75-min cap, the 4-session short week, purposeful cardio only, top set + one back-off with a weekly lead lift, overhead "
+        "press 3 sets, no KB hinge under strain, chest + quadriceps priority by stimulus and performance, the advisory loss-rate "
+        "ceiling, no symptom warning line. Rubric 3.4.0: the glute stretch term at its top for any known length (ruling 17: the "
+        "same S standard as other muscles, no exercise-specific trial required); a provisional rating never reaches S on any "
+        "objective (ruling 16).",
+        "rule": "rulings are configuration only — status stays proposed until the owner approves the library",
+    },
 ]

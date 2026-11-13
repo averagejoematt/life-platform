@@ -271,6 +271,9 @@ def for_live_draft(
         lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
         behind = live_balance.adherence_response(block_workouts, ctx["target_date"], lib)  # FIX3: a dip changes the week
         lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
+        from training import live_rulings  # #5861 FIX6 ruling 3: AFTER the dip's lighter week, so it is never undone
+
+        lines += live_rulings.arms_top_up(out, ctx, block_workouts)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -286,7 +289,10 @@ def for_live_draft(
             x["live_reduced"] = n - len(x["sets"])
     from training import live_shape  # #5861 FIX4: the kettlebell slot under strain (kb_slot_under_strain)
 
-    lines += live_shape.kb_under_strain(out)
+    strained = live_shape.kb_under_strain(out)
+    if strained:  # #5861 FIX6: the slot dropped under strain (ruling 7) — its plan line "added ... host this week" goes with it
+        lines = [ln for ln in lines if not (ln.startswith("added (live)") and "kettlebell slot" in ln)]
+    lines += strained
     waits = live_rules.no_added_work(out)  # FIX5: nothing ADDED on a bad day — and the plan's "added" line for it goes
     gone = [str((catalog_movements or {}).get(k, {}).get("title") or k) for k in live_rules.waited(waits)]
     lines = [ln for ln in lines if not (ln.startswith("added (live)") and any(f": {t}" in ln for t in gone))] + waits
@@ -298,6 +304,9 @@ def for_live_draft(
             lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
     lines += live_rules.fit_set_cap(out, set_cap)  # FIX5: every live session within the session set ceiling (a crash before)
     _refit(out)
+    from training import live_rulings  # #5861 FIX6 ruling 16: evidence confidence + data completeness, visible
+
+    lines += live_rulings.evidence_line(out, ctx) if ctx is not None else []
     trends = {tid: str(v.get("trend")) for tid, v in (sig or {}).items()}
     extra = {
         "aerobic": live_program.aerobic(inputs),
@@ -307,8 +316,9 @@ def for_live_draft(
             getattr(inputs, "medical_stop_lines", None), block_workouts, getattr(inputs, "target_date", None)
         ),
         "conditioning_host": live_balance.conditioning_host((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),
+        "week_skip": list((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),  # FIX6: the time trim's week count
     }
-    rate = live_program.rate_line(out.get("fatigue"), getattr(inputs, "sleep_hours", None))
+    rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
     extra |= {"rate_band": band} if band["mode"] == "structured" else {}
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
@@ -322,7 +332,12 @@ def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
     from training.live_program import SHORT_WEEK_SKIP
 
     if week:
-        return {"short_week_host": week.get("host"), "week_skip": tuple(week.get("skip") or ()), "partner": week.get("partner")}
+        return {
+            "short_week_host": week.get("host"),
+            "week_skip": tuple(week.get("skip") or ()),
+            "partner": week.get("partner"),
+            "week_mode": week.get("mode"),  # #5861 FIX6: short (fewer mornings) or the dip's own mode — the arms top-up's target
+        }
     host = getattr(inputs, "short_week", None)
     return {"short_week_host": host, "week_skip": (SHORT_WEEK_SKIP,) if host else (), "partner": None}
 
@@ -422,7 +437,7 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
     gone = Counter(trimmed)  # #5861 FIX4: what the drop order counts as off (the trimmed sets + every dropped accessory)
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
-        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx))  # FIX4: largest surplus over MEV first
+        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx), rx)  # FIX4: largest surplus over MEV first
         if idx is None:
             break
         cut = blocks.pop(idx)

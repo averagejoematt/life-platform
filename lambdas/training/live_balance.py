@@ -61,7 +61,7 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
     "kb_slot_move_to": ["shoulders_arms", "upper_volume"],
     "kb_deadlift_template_id": None,
     "pain_assess_line": "Still hurts 2 sessions? Get it assessed.",
-    "priority_muscles": ["chest", "back", "quadriceps", "hamstrings"],
+    "priority_muscles": ["chest", "quadriceps"],  # #5861 FIX6: owner ruling 9 (2026-11-13: quads a priority with chest)
     "adherence_response": "short_week",
     "body_fat_tier": None,
     "rate_band_mode": "advisory",
@@ -309,8 +309,9 @@ def _template_rows(catalog: dict[str, Any], lib: dict[str, Any]) -> list[dict[st
 
 
 def _press_sets(lib: dict[str, Any] | None) -> int:
-    """The live option `programming_settings.press_sets` (absent = 1, the charter's one set)."""
-    return int(((lib or {}).get("programming_settings") or {}).get("press_sets") or 1)
+    """The live option `programming_settings.press_sets` (#5861 FIX6, owner ruling 6: absent = the ruled 3; 1 = the charter's
+    one set)."""
+    return int(_settings(lib).get("press_sets") or 1)
 
 
 def _sum(rows: list[dict[str, Any]], deltas: dict[tuple[str, str], int]) -> Counter:
@@ -334,7 +335,9 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
     priority = [str(m) for m in _settings(lib).get("priority_muscles") or []]
     pinned = {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES}
     floor = int(ALLOCATION["over_mav_floor"]["value"])
-    deltas: dict[tuple[str, str], int] = {}
+    from training import live_rulings  # #5861 FIX6 ruling 6: the press's extra sets come from the lateral raises first
+
+    deltas: dict[tuple[str, str], int] = live_rulings.press_trade(rows, lib)
     freed = 0
     while True:  # 1. every muscle over its MAV gives isolation sets, the largest slot first, latest in the week on a tie
         week = _sum(rows, deltas)
@@ -350,7 +353,10 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
 
     env = {"rows": rows, "deltas": deltas, "marks": marks, "pinned": pinned, "priority": priority, "freed": freed}
     adds = live_shape.reallocate(env | {"catalog": catalog, "lib": lib})
-    ceiling_lines = live_shape.week_ceiling(env, adds)
+    from training import live_rulings  # #5861 FIX6 ruling 3: a week without shoulders+arms holds them at MEV, counted
+
+    floor_lines = live_rulings.short_week_floor(env, adds) if _skip_set(skipped) else []
+    ceiling_lines = floor_lines + live_shape.week_ceiling(env, adds)
     before, after = _sum(rows, {}), _sum(rows, deltas)
     for a in adds:
         after[a["muscle"]] += a["sets"]
@@ -378,6 +384,8 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     for e in rx["exposures"]:
         d = plan_["deltas"].get((role, str(e.get("slot"))), 0)
         sets = e.get("sets") or []
+        if d > 0 and _muscle(e, ctx) in (ctx.get("stimulus_hold") or set()):
+            d = 0  # #5861 FIX6 (ruling 9): a progressing priority muscle at MEV takes no extra sets (`live_rulings.stimulus_gate`)
         if not d or not sets:
             continue
         was = len(sets)
@@ -416,9 +424,10 @@ def _muscle(e: dict[str, Any], ctx: dict[str, Any]) -> str:
     return live_week.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
 
 
-def allocated_week(catalog: dict[str, Any], lib: dict[str, Any]) -> Counter:
-    """The program week's sets per landmark muscle AFTER the allocation (`live_week.week_sets` reads it)."""
-    return Counter(allocation_plan(catalog, lib)["after"])
+def allocated_week(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any = None) -> Counter:
+    """The program week's sets per landmark muscle AFTER the allocation (`live_week.week_sets` reads it). `skipped` (#5861 FIX6):
+    the roles this week does not draft — so a time trim never reads a skipped day's sets as surplus."""
+    return Counter(allocation_plan(catalog, lib, skipped)["after"])
 
 
 # ── 5. the adherence dip ─────────────────────────────────────────────────────
@@ -613,11 +622,11 @@ def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
     floor = int(live_week.CARDIO_ROOM["min_block"]["value"])
     if gap < floor:
         return False, [
-            f"cardio (live): no easy block — steps (~{walk} moderate min/wk, conservatively credited) and {done} min of blocks this "
-            f"week leave {max(gap, 0)} min of the weekly {cardio_model.WEEKLY_MODERATE_MIN[0]}: under a {floor}-min block (steps first)"
+            f"cardio (live): no easy block — recorded walking (~{walk} moderate min/wk credited) and {done} min of blocks this "
+            f"week leave {max(gap, 0)} min of the weekly {cardio_model.WEEKLY_MODERATE_MIN[0]}: under a {floor}-min block (recorded walking first)"
         ]
     return True, [
-        f"cardio (live): easy block kept — the week is ~{gap} min short of {cardio_model.WEEKLY_MODERATE_MIN[0]} after ~{walk} min of steps and {done} min of blocks"
+        f"cardio (live): easy block kept — the week is ~{gap} min short of {cardio_model.WEEKLY_MODERATE_MIN[0]} after ~{walk} min of recorded walking and {done} min of blocks"
     ]
 
 

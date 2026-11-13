@@ -307,7 +307,19 @@ def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], row
     )
     setattr(inp, "sleep_hours", profile.get("sleep_hours"))
     setattr(inp, "steps_by_day", steps_by_day(profile))  # the cron's live input (steps_resolver), into cardio_model.cardio_load
+    setattr(inp, "weights_by_day", weights_by_day(profile, day))  # #5861 FIX6: the advisory loss-rate ceiling's weigh-ins (ruling 11)
+    if profile.get("aerobic_record"):
+        setattr(inp, "aerobic_record", profile["aerobic_record"])  # #5861 FIX6: recorded outside-the-gym minutes (ruling 12)
     return inp
+
+
+def weights_by_day(profile: dict[str, Any], day: str, days: int = 35) -> dict[str, float]:
+    """Synthetic weigh-ins for the 35 days before `day`: the profile's `bodyweight_lb` today, falling `weekly_loss_pct` (% of
+    bodyweight a week, default 0.8) — a straight line, so the ceiling's verdict is read off a known rate."""
+    bw, pct = float(profile.get("bodyweight_lb") or 0), float(profile.get("weekly_loss_pct", 0.8))
+    if not bw:
+        return {}
+    return {_day(day, -n): round(bw * (1 + pct / 100 * n / 7), 1) for n in range(1, days + 1)}
 
 
 def _layer(profile: dict[str, Any], day: str) -> dict[str, Any]:
@@ -473,7 +485,8 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
     out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
     from training import cardio_model
 
-    out["steps_credit"] = cardio_model._walking_dose(steps_by_day(p))  # the conservative walking credit (#5861 FIX3)
+    recorded = (p.get("aerobic_record") or {}).get("minutes_by_day") or None  # #5861 FIX6 (ruling 12): recorded minutes only
+    out["steps_credit"] = cardio_model._walking_dose(steps_by_day(p), recorded)  # steps reported, never credited
     return out | ({"short_week": short_line} if short_line else {})
 
 
@@ -710,8 +723,42 @@ def measure(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any], 
             "blocks_20_plus": sum(1 for b in blocks if b >= 20),
             "steps_credit_min_per_wk": (week.get("steps_credit") or {}).get("moderate_min_per_wk"),
             "steps_credit_source": (week.get("steps_credit") or {}).get("source"),
+            "steps_per_day": (week.get("steps_credit") or {}).get("steps_per_day"),
         },
+        "hard_sets": hard_sets_by_muscle(week, lib, catalog),
     }
+
+
+HARD_RPE = 8
+"""#5861 FIX6: a working set prescribed at RPE >= 8 (the top of its effort line) is a HARD set for the weekly count."""
+
+
+def lift_effort(note: str | None) -> float | None:
+    """The top of a lift's prescribed effort: its own effort line (`RPE a–b ...`), else the session line (`... · RPE a–b`)."""
+    import re
+
+    lines = [ln.strip() for ln in str(note or "").splitlines()]
+    own = next((ln for ln in lines if ln.startswith("RPE")), None) or next((ln for ln in lines if "· RPE" in ln), None)
+    m = re.search(r"RPE (\d+(?:\.\d+)?)(?:[–-](\d+(?:\.\d+)?))?", own or "")
+    return float(m.group(2) or m.group(1)) if m else None
+
+
+def hard_sets_by_muscle(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, float]:
+    """Weekly HARD sets (prescribed at RPE >= HARD_RPE) per landmark muscle, primary 1.0 and secondary 0.5 (`sets_by_muscle`)."""
+    out: Counter = Counter()
+    for s in week["sessions"]:
+        for lift in s["lifts"]:
+            top = lift_effort(lift["hevy_note"])
+            if top is None or top < HARD_RPE:
+                continue
+            t = _lib_entry(lib, catalog, lift["key"]).get("target") or {}
+            prim = LANDMARK_OF.get(str(t.get("primary")), str(t.get("primary") or "unplaced"))
+            out[prim] += lift["working_sets"]
+            for sec in t.get("secondary") or []:
+                m = LANDMARK_OF.get(str(sec), str(sec))
+                if m != prim:
+                    out[m] += lift["working_sets"] * SECONDARY_CREDIT
+    return {k: round(v, 1) for k, v in sorted(out.items())}
 
 
 def _effort_conflicts(week: dict[str, Any]) -> list[str]:
@@ -766,10 +813,11 @@ def render(week: dict[str, Any], m: dict[str, Any]) -> str:
         for ln in live_lines(s):
             lines.append(f"- live: {ln}")
         lines.append("")
-    lines.append("| muscle | sets/wk | MEV | MAV | MRV | verdict |")
-    lines.append("|---|---|---|---|---|---|")
+    lines.append("| muscle | sets/wk | hard sets (RPE 8+) | MEV | MAV | MRV | verdict |")
+    lines.append("|---|---|---|---|---|---|---|")
     for mus, v in m["landmarks"].items():
-        lines.append(f"| {mus} | {v['sets']} | {v['MEV']} | {v['MAV']} | {v['MRV']} | {v['verdict']} |")
+        hard = (m.get("hard_sets") or {}).get(mus, 0)
+        lines.append(f"| {mus} | {v['sets']} | {hard} | {v['MEV']} | {v['MAV']} | {v['MRV']} | {v['verdict']} |")
     extra = {k: v for k, v in m["sets_by_muscle"].items() if k not in m["landmarks"]}
     if extra:
         lines.append("")
@@ -779,8 +827,9 @@ def render(week: dict[str, Any], m: dict[str, Any]) -> str:
     lines.append("Morning minutes (lifting + cardio): " + "; ".join(f"{p['role']}: {p['morning_minutes']}" for p in m["per_session"]))
     a = m["aerobic"]
     lines.append(
-        f"Aerobic: structured {a['structured_min']} min ({a['blocks_20_plus']} block(s) of 20+ min) + steps credit "
-        f"~{a['steps_credit_min_per_wk']} moderate min/wk ({a['steps_credit_source']}, conservative)"
+        f"Aerobic: structured {a['structured_min']} min ({a['blocks_20_plus']} block(s) of 20+ min) + recorded credit "
+        f"~{a['steps_credit_min_per_wk']} moderate min/wk ({a['steps_credit_source']}); steps ~{a.get('steps_per_day')}/day "
+        "reported as activity, never credited (ruling 12)"
     )
     lines.append(f"Repeated movements: {m['repeats'] or 'none'}; new this week: {', '.join(m['new_this_week']) or 'none'}")
     lines.append(f"Notes with more than one effort target: {', '.join(m['effort_conflicts']) or 'none'}")
@@ -825,6 +874,11 @@ LIVE_PREFIXES = (
     "full body (live)",
     "capped (live)",
     "short week (live",
+    "lead lift (live)",  # #5861 FIX6
+    "top-up (live)",
+    "priority (live)",
+    "evidence (live)",
+    "loss rate (advisory",
 )
 
 

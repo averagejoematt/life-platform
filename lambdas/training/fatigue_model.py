@@ -458,7 +458,7 @@ def _systemic(
         )
     cl = cardio_state(cardio_load)
     walk = (cardio_load or {}).get("walking") if isinstance(cardio_load, dict) else None
-    walked = f"; walking ~{walk['moderate_min_per_wk']} moderate min/wk from steps, counted, not a strain vote" if walk else ""
+    walked = f"; steps ~{walk.get('steps_per_day')}/day reported (no aerobic credit, ruling 12), not a strain vote" if walk else ""
     out.append(
         _signal(
             "cardio_load",

@@ -48,7 +48,19 @@ def test_the_proposed_drafts_serve_exactly_what_the_base_tree_served():
 
 
 def _poisoned():
-    from training import live_balance, live_rules, live_safety, live_sequence, live_session, live_shape, live_week, selection_live
+    from health import rate_policy
+    from training import (
+        cardio_model,
+        live_balance,
+        live_rules,
+        live_rulings,
+        live_safety,
+        live_sequence,
+        live_session,
+        live_shape,
+        live_week,
+        selection_live,
+    )
 
     def boom(name):
         def _f(*a, **k):
@@ -119,6 +131,17 @@ def _poisoned():
         (live_sequence, "plan_for_days"),
         (live_sequence, "days_available"),
         (live_sequence, "entry_week"),
+        # #5861 FIX6: the owner's rulings of 2026-11-13 never run in shadow
+        (live_rulings, "lead_lift"),
+        (live_rulings, "stimulus_gate"),
+        (live_rulings, "short_week_floor"),
+        (live_rulings, "arms_top_up"),
+        (live_rulings, "press_trade"),
+        (live_rulings, "purposeful_cardio"),
+        (live_rulings, "evidence_line"),
+        (live_rulings, "rate_line"),
+        (cardio_model, "recorded_aerobic"),
+        (rate_policy, "advisory_ceiling"),
     ]
     return [patch.object(mod, name, boom(f"{mod.__name__}.{name}")) for mod, name in targets]
 
