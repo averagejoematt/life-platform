@@ -36,6 +36,7 @@ import sample_weeks_5861 as sw  # noqa: E402
 from training import (  # noqa: E402
     fatigue_model as fm,
     live_program as lp,
+    live_rules as lrules,
     live_week as lw,
     selection_engine as se,
     selection_live as sl,
@@ -93,12 +94,17 @@ def test_the_kettlebell_slot_names_its_implement_caps_effort_and_loads_the_bell(
     effort at RPE 7-8 (an entry drill — 7 when it is also the session's third hinge), and carry the bell he swings instead of
     "find the load". Control: the KB rules off -> no implement on the note and the load to find."""
     # FIX3 (third red team): the slot moves off lower volume (two spine-loading lifts already) to shoulders+arms by default
-    kb = _lift(weeks["a_large_deficit_experienced"]["week"], "shoulders_arms", "kettlebell_deadlift")
+    # #5861 FIX5: the KB deadlift is served only to a lifter who does not deadlift a barbell (else it is filler: KB_FILLER)
+    nodl = _week("a_large_deficit_experienced", {(lrules, "deadlifts"): lambda workouts, ctx: False})
+    kb = _lift(nodl["week"], "shoulders_arms", "kettlebell_deadlift")
     assert kb is not None and kb["title"] == "Sumo Deadlift"
     note = kb["hevy_note"]
     assert lw.KB_SLOT["implement_line"]["value"] in note.split("\n")
     assert note.startswith(("RPE 7\n", "RPE 7–8\n")) and "9–10" not in note and "find the load" not in note
-    off = _week("a_large_deficit_experienced", {(lw, "kb_slot"): lambda rx, ctx: [], (lw, "kb_seed"): lambda *a, **k: None})
+    off = _week(
+        "a_large_deficit_experienced",
+        {(lw, "kb_slot"): lambda rx, ctx: [], (lw, "kb_seed"): lambda *a, **k: None, (lrules, "deadlifts"): lambda workouts, ctx: False},
+    )
     bare = _lift(off["week"], "shoulders_arms", "kettlebell_deadlift")["hevy_note"]
     assert lw.KB_SLOT["implement_line"]["value"] not in bare and "find the load" in bare
 

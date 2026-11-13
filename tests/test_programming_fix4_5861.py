@@ -35,6 +35,7 @@ import sample_weeks_5861 as sw  # noqa: E402
 from training import (  # noqa: E402
     live_balance as lb,
     live_program as lp,
+    live_rules as lrules,
     live_safety as lsafe,
     live_shape as lshape,
     session_block as sb,
@@ -135,7 +136,9 @@ def test_a_knee_flag_reduces_or_avoids_every_knee_dominant_pattern(weeks):
         g = weeks[("g_knee_pain_garage_short", cap)]
         assert knee_breaches(g) == [], cap
         assert any("(knee, 5/10)" in ln for s in g["week"]["sessions"] for ln in s["rationale"])
-    old = _week("g_knee_pain_garage_short", {(lsafe, "note_site"): lambda note: None})
+    # control (#5861 FIX5: with the note's site ignored the inferred joint now also avoids the squat pattern, so the old control
+    # no longer breaches): the pain rule itself off -> knee-loading lifts at RPE 8-9
+    old = _week("g_knee_pain_garage_short", {(lp, "apply_joint_rule"): lambda rx, ctx, rot, flags: []})
     assert knee_breaches(old)
 
 
@@ -254,7 +257,8 @@ def test_the_week_never_passes_the_weekly_hard_set_redline(weeks):
     total = sum(x["working_sets"] for x in _lifts(one_over))
     one_over["sessions"][0]["lifts"][0]["working_sets"] += 76 - total
     assert over_redline(one_over) == 1
-    raw = _week("a_large_deficit_experienced", {(lshape, "week_ceiling"): lambda env, adds: []})  # control 2: no ceiling
+    # control 2: no ceiling (and the KB deadlift served, as it was before #5861 FIX5's filler rule) -> over the redline
+    raw = _week("a_large_deficit_experienced", {(lshape, "week_ceiling"): lambda env, adds: [], (lrules, "deadlifts"): lambda w, c: False})
     assert over_redline(raw["week"]) > 0
 
 
@@ -382,12 +386,21 @@ def test_the_stop_line_reaches_the_hevy_payload_and_the_extended_wording_works()
 
 # ── 9. the kettlebell slot under strain ──────────────────────────────────────
 def test_the_kettlebell_slot_under_strain_is_a_setting(weeks):
-    f = weeks[("f_high_fatigue_poor_sleep", False)]["week"]
-    assert "kettlebell_deadlift" in {x["key"] for x in _lifts(f)}  # today's default: the slot follows its placement
-    drop = _week("f_high_fatigue_poor_sleep", settings={"kb_slot_under_strain": "drop"})["week"]
+    """`kb_slot_under_strain` governs the slot in its HOME session. #5861 FIX5: a RELOCATED slot is added work and waits on a
+    strained / overreached / deload-recommended day whatever the setting (`live_rules.no_added_work`) — so the default week (its
+    home, lower volume, already holds two spine-loading lifts and the slot moves) serves no KB hinge on a bad day either way; the
+    fourth and fifth red teams both recommend `drop`. The home case is exercised with the move and the stacking cap off."""
+    nodl = {(lrules, "deadlifts"): lambda workouts, ctx: False}  # FIX5: a lifter with no barbell deadlift (else the KB DL is filler)
+    f = _week("f_high_fatigue_poor_sleep", nodl)["week"]
+    assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(f)}  # moved to shoulders+arms, a deload-recommended day: waits
+    assert any(ln.startswith("waits (live): kettlebell_deadlift") for s in f["sessions"] for ln in s["rationale"])
+    home = nodl | {(lb, "_template_spine"): lambda role, catalog, lib: 0, (lp, "avoid_stacking"): lambda rx, ctx, rot, pinned: []}
+    kept = _week("f_high_fatigue_poor_sleep", home)["week"]  # today's default: the HOME slot follows its placement
+    assert "kettlebell_deadlift" in {x["key"] for s in kept["sessions"] if s["role"] == "lower_volume" for x in s["lifts"]}
+    drop = _week("f_high_fatigue_poor_sleep", home, settings={"kb_slot_under_strain": "drop"})["week"]
     assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(drop)}
     assert any("kb_slot_under_strain=drop" in ln for s in drop["sessions"] for ln in s["rationale"])
-    a = _week("a_large_deficit_experienced", settings={"kb_slot_under_strain": "drop"})["week"]  # control: a fresh week keeps it
+    a = _week("a_large_deficit_experienced", nodl, settings={"kb_slot_under_strain": "drop"})["week"]  # control: a fresh week keeps it
     assert "kettlebell_deadlift" in {x["key"] for x in _lifts(a)}
 
 

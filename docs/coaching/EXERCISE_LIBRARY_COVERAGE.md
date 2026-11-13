@@ -242,7 +242,7 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 | 5 | cable rope hammer curl | candidate | VARIANT | P2 | `hammer_curl_dumbbell` | equipment: cable rope (Hevy `36E8F14E`) |
 | 5 | reverse-grip cable curl | candidate | VARIANT | P3 | `reverse_curl_dumbbell` | equipment: cable (Hevy `9F48F858`) |
 | 5 | reverse EZ curl | candidate | VARIANT | P3 | `reverse_curl_dumbbell` | equipment: EZ bar (Hevy `112FC6B7`) |
-| 5 | cable preacher curl | candidate | VARIANT | P3 | `preacher_curl_dumbbell` | equipment: cable |
+| 5 | cable preacher curl | candidate | VARIANT | P3 | `preacher_curl_machine` | equipment: cable |
 | 5 | incline cable curl | candidate | ALREADY_COVERED | P3 | `behind_the_back_curl_cable` | the same arm-behind-torso lengthened position |
 | 5 | Zottman curl | candidate | VARIANT | P3 | `bicep_curl_dumbbell` | grip: supinated up, pronated down (Hevy `123EE239`) |
 | 5 | single-arm supported cable curl | candidate | VARIANT | P3 | `bicep_curl_cable` | laterality: single-arm, arm supported (Hevy `B33B526E`) |

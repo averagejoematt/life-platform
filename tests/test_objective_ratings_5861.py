@@ -224,9 +224,9 @@ PINNED = {
     "CATEGORY_OVERRIDES": 16,  # +2 (the dead-hang variants); FIX4 +2 (the Pallof press and the ab wheel are not strength lifts)
     # +10 (shrug grip limiter, kickback ceilings, cuff mobility n/a, the dead-hang variants); FIX2-DATA -2 (cuff mobility is the class
     # rule now); FIX4 +4 (the landmine presses and the trap pulldown at a moderate ceiling, the band pull-up a regression)
-    "INPUT_OVERRIDES": 23,
+    "INPUT_OVERRIDES": 24,  # FIX5 +1 (the kettlebell deadlift: one bell, load ceiling low)
     "SECONDARY_ROWS": 6,
-    "CANONICAL_FAMILIES": 49,  # +5 (one machine, one rating)
+    "CANONICAL_FAMILIES": 50,  # +5 (one machine, one rating); FIX5 +1 (the preacher curl: one movement, three implements)
 }
 
 

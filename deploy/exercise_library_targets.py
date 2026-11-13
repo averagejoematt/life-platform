@@ -521,6 +521,12 @@ INPUT_OVERRIDES: dict[str, tuple[dict, str]] = {
         "Hevy's 'Trap Pulldown' reads as a scapular-depression pulldown (short range, the lower traps lead): it cannot load the lats "
         "to a lat pulldown's ceiling -> A, not S (fourth red team; the title is ambiguous, so the target is left as logged)",
     ),
+    # ── #5861 FIX5 (fifth red team) ──
+    "kettlebell_deadlift": (
+        {"ceiling": "low"},
+        "one kettlebell, held between the feet: the slot serves ONE bell (kb_entry, 'one kettlebell'), so the glutes cannot be "
+        "overloaded past it — a trained deadlifter meets the bell far below a working effort (fifth red team): load ceiling low",
+    ),
     "db_cossack_squats": ({"mobility": "loaded"}, "a cossack squat is loaded end-range hip abduction: strength through range"),
     "hip_thrust_machine": ({"limiter": "target"}, "the glutes end a hip-thrust set; the trunk is supported"),
     "kettlebell_turkish_get_up": (
@@ -588,6 +594,8 @@ CANONICAL_FAMILIES: dict[str, tuple[tuple[str, ...], dict[str, dict[str, str]]]]
     # #5861 FIX-DATA: one machine, one rating
     "lying_leg_curl_machine": (("prone_leg_curl",), {}),
     "seated_incline_curl_dumbbell": (("db_incline_curls",), {}),
+    # #5861 FIX5 (fifth red team: five biceps S families): a preacher curl is one movement on three implements
+    "preacher_curl_machine": ((), {"preacher_curl_dumbbell": {"equipment": "dumbbell"}, "preacher_curl_barbell": {"equipment": "ez_bar"}}),
     "gorilla_rows": ((), {"gorilla_row_kettlebell": {"equipment": "kettlebell"}}),
     "db_step_up": ((), {"step_up": {"resistance": "bodyweight"}}),
     "goblet_squat": ((), {"kettlebell_goblet_squat": {"equipment": "kettlebell"}}),

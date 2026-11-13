@@ -98,13 +98,13 @@
    ]
   },
   "h_heavy_walker": {
-   "label": "(h) RT4 stress: a heavy walker (synthetic 260 lb, 10.5k steps), mild elbow discomfort on skullcrusher",
+   "label": "(h) RT4 stress: a heavy walker (synthetic 260 lb, 10.5k steps), mild elbow discomfort on the overhead triceps extension",
    "story": "a heavy trainee whose walking leaves a modest aerobic gap",
    "bodyweight_lb": 260,
    "steps_per_day": 10500,
    "discomfort": [
     {
-     "movement": "skullcrusher_dumbbell",
+     "movement": "overhead_triceps_extension_cable",
      "note": "elbow a bit sore 2/10"
     }
    ]

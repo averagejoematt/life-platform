@@ -2095,7 +2095,7 @@ RECONCILIATION: list[dict[str, Any]] = [
     V(5, "cable rope hammer curl", "P2", "hammer_curl_dumbbell", "equipment", "cable rope", "36E8F14E"),
     V(5, "reverse-grip cable curl", "P3", "reverse_curl_dumbbell", "equipment", "cable", "9F48F858"),
     V(5, "reverse EZ curl", "P3", "reverse_curl_dumbbell", "equipment", "EZ bar", "112FC6B7"),
-    V(5, "cable preacher curl", "P3", "preacher_curl_dumbbell", "equipment", "cable"),
+    V(5, "cable preacher curl", "P3", "preacher_curl_machine", "equipment", "cable"),  # #5861 FIX5: the preacher family head
     C(5, "incline cable curl", "P3", "behind_the_back_curl_cable", "the same arm-behind-torso lengthened position"),
     V(5, "Zottman curl", "P3", "bicep_curl_dumbbell", "grip", "supinated up, pronated down", "123EE239"),
     V(5, "single-arm supported cable curl", "P3", "bicep_curl_cable", "laterality", "single-arm, arm supported", "B33B526E"),

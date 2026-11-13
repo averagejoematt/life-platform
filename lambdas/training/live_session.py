@@ -224,12 +224,16 @@ def for_live_draft(
     inputs: Any,
     block_workouts: list[dict[str, Any]] | None,
     catalog_movements: dict[str, Any] | None = None,
+    week: dict[str, Any] | None = None,
+    set_cap: int | None = None,
 ) -> dict:
     """The draft path's live hook (`full_body_session._prescription`): equipment and pain on every exposure, then the fatigue
-    model (`fatigue_model.for_live_draft`, its one graded reduction). In shadow: `rx` itself, nothing read. Never raises."""
+    model (`fatigue_model.for_live_draft`, its one graded reduction). In shadow: `rx` itself, nothing read. Never raises.
+    `week` (#5861 FIX5): the served day's week plan (`live_sequence.entry_week`, on the day entry) — its skipped roles, the
+    host of the carry and trunk floor, this session's full-body partner; `set_cap` the week grid's session set ceiling."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model, live_balance, live_program, live_week
+    from training import fatigue_model, live_balance, live_program, live_rules, live_week
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
@@ -243,9 +247,9 @@ def for_live_draft(
         sig: dict[str, Any] = (
             fatigue_model.movement_signals(block_workouts, as_of=str(getattr(inputs, "target_date", ""))) if block_workouts else {}
         )
-        hurts = {
-            tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
-        }
+        n_hurt = fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
+        hurts = {tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= n_hurt}
+        light = {tid for tid, v in sig.items() if v.get("light_sessions", 0) + v.get("discomfort_sessions", 0) >= n_hurt} - hurts
         ctx = {
             "lib": lib,
             "catalog": catalog,
@@ -254,12 +258,14 @@ def for_live_draft(
             "ceiling": SKILL_CEILING,
             "role": rx.get("session_role"),
             "discomfort": hurts,
-            "short_week_host": getattr(inputs, "short_week", None),  # live_program.short_week_roles: the host session's role
+            "light_discomfort": light,  # FIX5: a joint-located "sore" at the mild line — the joint rule keeps it, lighter
             "target_date": str(getattr(inputs, "target_date", "") or ""),
-        }
+        } | _week_ctx(week, inputs)
         from training import live_safety  # #5861 FIX4: the pain note's site and the mild line, read once
 
         ctx |= {"mild_pain": live_safety.mild_pain_tids(block_workouts), "pain_notes": live_safety.latest_notes(block_workouts)}
+        lines += [week["line"]] if (week or {}).get("line") else []
+        lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
         lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
@@ -281,24 +287,44 @@ def for_live_draft(
     from training import live_shape  # #5861 FIX4: the kettlebell slot under strain (kb_slot_under_strain)
 
     lines += live_shape.kb_under_strain(out)
+    waits = live_rules.no_added_work(out)  # FIX5: nothing ADDED on a bad day — and the plan's "added" line for it goes
+    gone = [str((catalog_movements or {}).get(k, {}).get("title") or k) for k in live_rules.waited(waits)]
+    lines = [ln for ln in lines if not (ln.startswith("added (live)") and any(f": {t}" in ln for t in gone))] + waits
     if ctx is not None:
         try:  # the week's trunk-stability floor: purpose-driven, never on a strained day (live_program.trunk_floor)
             lines += live_program.trunk_floor(out, ctx, (out.get("fatigue") or {}).get("state"))
             _refit(out)
         except Exception as e:  # noqa: BLE001 — never blocks a draft
             lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
+    lines += live_rules.fit_set_cap(out, set_cap)  # FIX5: every live session within the session set ceiling (a crash before)
+    _refit(out)
     trends = {tid: str(v.get("trend")) for tid, v in (sig or {}).items()}
     extra = {
         "aerobic": live_program.aerobic(inputs),
         "trends": trends,
-        "symptom_tripwire": live_week.symptom_gate(getattr(inputs, "medical_stop_lines", None)),  # the medical stop line, read
-        "conditioning_host": live_balance.conditioning_host(getattr(inputs, "short_week", None)),  # FIX3: the shared cap's host
+        # the medical stop line, read — and (FIX5) a symptom he logged on a Hevy note in the last fortnight
+        "symptom_tripwire": live_week.symptom_gate(
+            getattr(inputs, "medical_stop_lines", None), block_workouts, getattr(inputs, "target_date", None)
+        ),
+        "conditioning_host": live_balance.conditioning_host((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),
     }
     rate = live_program.rate_line(out.get("fatigue"), getattr(inputs, "sleep_hours", None))
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
     extra |= {"rate_band": band} if band["mode"] == "structured" else {}
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
     return out
+
+
+def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
+    """The week plan's context keys (#5861 FIX5): `short_week_host`, `week_skip` (the roles this week does not draft) and
+    `partner` (this session's full-body partner). Without a plan, the generator's old `short_week` attribute (a host role)
+    still reads as a shoulders+arms skip."""
+    from training.live_program import SHORT_WEEK_SKIP
+
+    if week:
+        return {"short_week_host": week.get("host"), "week_skip": tuple(week.get("skip") or ()), "partner": week.get("partner")}
+    host = getattr(inputs, "short_week", None)
+    return {"short_week_host": host, "week_skip": (SHORT_WEEK_SKIP,) if host else (), "partner": None}
 
 
 def surplus_first(catalog: dict[str, Any]) -> Any:

@@ -446,21 +446,24 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
     record = list(world["record"])
     sessions, cardio_index, prev = [], _cardio_index(record), None
     hidx = history_index(record, catalog["movements"], p["as_of"])
-    roles, short_line = list(p["roles"]), None
-    if mode == "approved" and len(p["days"]) < len(_all_roles()):  # a short week: the live rule picks the roles (L5)
-        from training import live_program
+    roles, short_line, plan = list(p["roles"]), None, None
+    if mode == "approved":  # #5861 FIX5: the PRODUCTION week plan (`live_sequence`, the cron's sequence reads the same one)
+        from training import live_sequence
 
-        roles, short_line = live_program.short_week_roles(list(_all_roles()), len(p["days"]), world["lib"])
-    if mode == "approved" and short_line is None:  # a dip: the default shorter week, or the keep-the-anchors option (FIX3)
-        from training import live_balance, live_week
-
-        roles, short_line = live_week.behind_schedule_roles(roles, live_balance.adherence_response(record, p["as_of"], world["lib"]))
+        days = len(p["days"])
+        live_roles, plan = live_sequence.week_roles(days, live_sequence.monday_of(p["days"][0]), record, world["lib"])
+        roles = live_roles if (plan or days < len(_all_roles())) else roles
+        short_line = (plan or {}).get("line") or (
+            f"short week (slide): {days} of {len(_all_roles())} sessions — the sequence slides" if days < len(_all_roles()) else None
+        )
     with offline(world["lib"], hidx, p["bodyweight_lb"], p["as_of"], world["overlay"]):
         for n, (role, day) in enumerate(zip(roles, p["days"][: len(roles)]), start=1):
             entry = _entry(role, p["position"]["week"], p["position"]["block"], n, prev)
+            if plan:
+                from training import live_sequence
+
+                entry["live_week"] = live_sequence.for_role(plan, role)  # what the cron's entry carries (live_sequence.serve)
             inp = _inputs(p, day, record, world["rows"])
-            if short_line and ("skip_shoulders_arms" in short_line or short_line.startswith(("behind schedule", "adherence dip"))):
-                setattr(inp, "short_week", roles[-1])  # the live short-week rule's host: the carry + trunk floor move here
             out = fbs.full_body_routines(inp, entry, rw.week, landmarks, catalog, rw, [], block_workouts=record)
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)
@@ -817,6 +820,11 @@ LIVE_PREFIXES = (
     "order (live)",
     "deadlift (live option)",
     "walk (live)",
+    "waits (live)",  # #5861 FIX5
+    "set cap (live)",
+    "full body (live)",
+    "capped (live)",
+    "short week (live",
 )
 
 
