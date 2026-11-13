@@ -170,7 +170,14 @@ def last_session(ctx: dict[str, Any], role: str | None) -> bool:
     return bool(left) and role == left[-1]
 
 
-def _iso_for(muscle: str, ctx: dict[str, Any], taken: set[str]) -> str | None:
+def _flagged(entry: dict[str, Any], flags: list[dict[str, Any]]) -> bool:
+    """The candidate loads a pain/discomfort-flagged joint at moderate or more (the week floor never adds work a flag would reach)."""
+    from training.live_program import _stress
+
+    return any(_stress(entry, j) >= 1 for f in flags for j in f.get("joints") or [])
+
+
+def _iso_for(muscle: str, ctx: dict[str, Any], taken: set[str], flags: list[dict[str, Any]] | None = None) -> str | None:
     """A servable low-fatigue isolation for `muscle`: WEEK_FLOOR keys first, then the most-logged isolation the library places
     on it (machine / cable first)."""
     from training import live_session, live_week, selection_engine as se
@@ -192,6 +199,7 @@ def _iso_for(muscle: str, ctx: dict[str, Any], taken: set[str]) -> str | None:
             se.availability(entry, lib, ctx.get("overlay"))
             or se.pain_exclusion(entry, ctx.get("overlay"))
             or live_session._servable(key, ctx)
+            or _flagged(entry, flags or [])
         ):
             continue
         return key
@@ -207,6 +215,9 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     if not day or not last_session(ctx, rx.get("session_role")) or live_rules.bad_day(rx):
         return []
     logged = _hard_logged(workouts, ctx, lb.week_start(day), day)
+    from training import live_program
+
+    flags = live_program.joint_flags(ctx, workouts, (ctx.get("discomfort") or set()) | (ctx.get("light_discomfort") or set()))
     marks = block_model.load_landmarks() or {}
     prio = [str(m) for m in live_shape._settings(ctx.get("lib")).get("priority_muscles") or []]
     order = sorted(WEEK_FLOOR["muscles"]["value"], key=lambda m: (m not in prio, WEEK_FLOOR["muscles"]["value"].index(m)))
@@ -250,7 +261,7 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
                     f"week floor (live): {m} {have:g} hard sets this week < MEV {mev:g} — {(cat.get(slot['movement_key']) or {}).get('title')} +{give} set(s) (WEEK_FLOOR, heuristic)"
                 )
                 continue
-        key = _iso_for(m, ctx, taken)
+        key = _iso_for(m, ctx, taken, flags)
         if key is None:
             continue
         if not room(add_n):  # no room: a donor whose muscle stays at MEV without it gives its slot (a 3-day week's full-body day)
@@ -312,7 +323,12 @@ PARITY: dict[str, dict[str, Any]] = {
         "value": ["biceps", "triceps", "calves"],
         "label": HEURISTIC,
         "basis": "the non-priority muscles trained by isolation alone: a priority muscle never ends the week's allocation under any "
-        "of them (the shoulders are pressed too and stay out); a donor never goes under its own MEV",
+        "of them (the shoulders are pressed and their rear-delt work is kept: they stay out); a donor keeps MEV + donor_margin",
+    },
+    "donor_margin": {
+        "value": 2,
+        "label": HEURISTIC,
+        "basis": "a donor keeps MEV + 2 on the plan: the served week loses sets to swaps and the time trim the plan cannot see",
     },
 }
 
@@ -343,11 +359,12 @@ def parity(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[str]:
         while True:
             w = week()
             low = min(prio, key=lambda p: (w[p], prio.index(p)))
-            if w[d] <= w[low] or w[d] - 1 < mev:
+            if w[d] <= w[low] or w[d] - 1 < mev + float(PARITY["donor_margin"]["value"]):
                 break
             mine = [r for r in rows if r["kind"] == "accessory" and r["muscle"] == d and r["intensity"] != "carry" and slot_sets(r) > 0]
             give = [r for r in mine if slot_sets(r) > floor]
-            whole = [r for r in mine if slot_sets(r) <= floor and w[d] - slot_sets(r) >= mev]  # drop, don't shave
+            keep = mev + float(PARITY["donor_margin"]["value"])
+            whole = [r for r in mine if slot_sets(r) <= floor and w[d] - slot_sets(r) >= keep]  # drop, don't shave
             if not give and not whole:
                 break
             g = max(give, key=lambda r: (slot_sets(r), rows.index(r))) if give else max(whole, key=lambda r: rows.index(r))

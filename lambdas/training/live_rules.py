@@ -182,7 +182,7 @@ def no_added_work(rx: dict[str, Any]) -> list[str]:
     quadriceps slot and a relocated kettlebell slot (the trunk floor checks `bad_day` itself). Returns the rationale lines."""
     if not bad_day(rx):
         return []
-    gone = [e for e in rx["exposures"] if e.get("live_added") in ("quad_slot", "kb_slot_moved")]
+    gone = [e for e in rx["exposures"] if e.get("live_added") in ("quad_slot", "kb_slot_moved", "week_floor")]  # FIX7: + floor
     if not gone:
         return []
     rx["exposures"] = [e for e in rx["exposures"] if e not in gone]

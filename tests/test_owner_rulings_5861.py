@@ -121,8 +121,15 @@ def test_ruling_3_the_four_day_week_keeps_shoulders_and_arms_at_mev(weeks):
     assert _arms_under_mev(e["m"]) == []
     plan = lb.allocation_plan(e["world"]["catalog"]["movements"], e["world"]["lib"], ("shoulders_arms",))
     assert any("ARMS_FLOOR" in ln for ln in plan["lines"])  # the counted check acted (triceps 7 -> 8 on the synthetic week)
-    off = _week(  # control: neither the plan floor nor the record top-up -> an arm under MEV
-        "e_short_week", {(lr, "short_week_floor"): lambda env, adds: [], (lr, "arms_top_up"): lambda rx, ctx, workouts: []}
+    from training import live_stimulus
+
+    off = _week(  # control: neither the plan floor, the record top-up nor the FIX7 week floor -> an arm under MEV
+        "e_short_week",
+        {
+            (lr, "short_week_floor"): lambda env, adds: [],
+            (lr, "arms_top_up"): lambda rx, ctx, workouts: [],
+            (live_stimulus, "week_floor"): lambda rx, ctx, workouts, cap: [],
+        },
     )
     assert _arms_under_mev(off["m"])
 
@@ -446,10 +453,10 @@ def test_ruling_18_every_heuristic_names_its_block_retro_metric_and_is_documente
 def test_ruling_18_fix6_heuristics_have_consequences():
     """Each FIX6 heuristic changes an outcome when mutated (its consequence test; the others' live in their rounds' files)."""
     assert lr.LEAD_LIFT and lr.ARMS_FLOOR and lr.PRIORITY_ADD  # exercised above: second_band, the floor off, progressing
-    env = {"rows": [{"role": "upper_heavy", "slot": "tri", "kind": "accessory", "intensity": None, "key": "t", "sets": 2, "muscle": "triceps", "secondary": []}],
+    env = {"rows": [{"role": "upper_heavy", "slot": "tri", "kind": "accessory", "intensity": None, "key": "t", "sets": 1, "muscle": "triceps", "secondary": []}],
            "deltas": {}, "marks": {"triceps": {"MEV": 8}}}  # fmt: skip
     lr.short_week_floor(env, [])
-    assert env["deltas"] == {("upper_heavy", "tri"): 2}
+    assert env["deltas"] == {("upper_heavy", "tri"): 2}  # 1 + 2 = 3, the slot maximum (#5861 FIX7, live_balance.SLOT_MAX)
     env["deltas"] = {}
     with patch.dict(lr.ARMS_FLOOR, {"add_per_slot": {"value": 1, "label": "heuristic", "basis": "mutation"}}):
         lr.short_week_floor(env, [])
@@ -496,6 +503,6 @@ def test_ruling_3_the_last_upper_session_tops_up_an_arm_the_week_actually_left_u
         "exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working", "reps": [8, 15]}] * 2}],
     }
     lines = lr.arms_top_up(rx, ctx, [])
-    assert len(rx["exposures"][0]["sets"]) == 4 and lines and "biceps" in lines[0]  # nothing logged: 2 today < MEV 8 -> +2
+    assert len(rx["exposures"][0]["sets"]) == 3 and lines and "biceps" in lines[0]  # 2 today < MEV 8 -> +1: SLOT_MAX 3 (FIX7)
     normal = copy.deepcopy(rx) | {"exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working"}] * 2}]}
     assert lr.arms_top_up(normal, ctx | {"week_skip": ()}, []) == [] and len(normal["exposures"][0]["sets"]) == 2  # control

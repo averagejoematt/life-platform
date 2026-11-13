@@ -543,6 +543,10 @@ def effort_targets(note: str | None) -> list[str]:
         m = g.CARRY_LINE1_RE.match(line.strip())
         if m:
             out.append(m.group("rpe"))
+    from training.live_safety import _within  # #5861 FIX7: a session SPAN its own band sits inside is refined, not contradicted
+
+    if eff and len(out) > 1 and all(_within(f"RPE {t}", eff) for t in out[1:]):
+        out = out[1:]
     return list(dict.fromkeys(out))
 
 

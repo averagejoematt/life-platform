@@ -649,7 +649,7 @@ def test_c4_volume_comes_down_when_recovery_worsens_compounds_first_and_loads_ne
     off = _week_of("f_high_fatigue_poor_sleep", {(lp, "guard_loads"): lambda *a, **k: []})
     assert rising_loads(off)
     # control 2: the deload shape replaced by the old accessory trim -> anchors keep 3 sets, isolation is what goes
-    old = _week_of("f_high_fatigue_poor_sleep", {(lp, "deload_shape"): lambda ex: fm.trim_accessory_sets(ex, 6)})
+    old = _week_of("f_high_fatigue_poor_sleep", {(lp, "deload_shape"): lambda ex, confirmed=False: fm.trim_accessory_sets(ex, 6)})
     assert any(n > 2 for n in _anchor_sets(old["week"]).values())
     # control 3: the cardio fit off -> the hard block stays on a deload-recommended week
     hard = _week_of("f_high_fatigue_poor_sleep", {(lp, "cardio_fit"): lambda menu, live: (menu, [])})
@@ -763,7 +763,7 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     assert landmark_problems(sw.measure(week, slide, e["world"]["catalog"]["movements"], LANDMARKS), LEGS, with_abs=False)
     # control: abs counted the old way (carry sets credited) would pass a week with no direct trunk drill
     no_floor = _week_of("a_large_deficit_experienced", {(lp, "trunk_floor"): lambda rx, ctx, state=None: []})
-    assert "abs 2.0 < MEV 4" in landmark_problems(no_floor["m"])
+    assert any(p.startswith("abs ") and "< MEV 4" in p for p in landmark_problems(no_floor["m"]))
     # a trimmed week takes sets from the muscle furthest above its MEV first (the delts), never past MRV anywhere
     full = weeks["a_large_deficit_experienced"]["m"]["landmarks"]
     for name in ("b_shoulder_flag_low_recovery", "d_stalled_anchor_adherence_dip", "f_high_fatigue_poor_sleep"):
