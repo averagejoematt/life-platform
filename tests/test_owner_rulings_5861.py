@@ -121,7 +121,9 @@ def test_ruling_3_the_four_day_week_keeps_shoulders_and_arms_at_mev(weeks):
     assert _arms_under_mev(e["m"]) == []
     plan = lb.allocation_plan(e["world"]["catalog"]["movements"], e["world"]["lib"], ("shoulders_arms",))
     assert any("ARMS_FLOOR" in ln for ln in plan["lines"])  # the counted check acted (triceps 7 -> 8 on the synthetic week)
-    off = _week("e_short_week", {(lr, "short_week_floor"): lambda env, adds: []})  # control: no floor -> an arm under MEV
+    off = _week(  # control: neither the plan floor nor the record top-up -> an arm under MEV
+        "e_short_week", {(lr, "short_week_floor"): lambda env, adds: [], (lr, "arms_top_up"): lambda rx, ctx, workouts: []}
+    )
     assert _arms_under_mev(off["m"])
 
 
@@ -476,3 +478,19 @@ def test_ruling_8_a_custom_kb_template_id_reads_its_history_as_logged():
     with patch.object(se, "load_library_failsoft", lambda: other):
         lw.kb_seed([blk2], {"exposures": [{"movement_key": "kettlebell_deadlift", "live_kb": True}]}, hidx_upper, {}, "2026-11-20", [])
     assert all(s.weight_kg is None for s in blk2.sets)
+
+
+def test_ruling_3_the_last_upper_session_tops_up_an_arm_the_week_actually_left_under_mev():
+    """The plan count reads the templates; `arms_top_up` reads the RECORD (what the week logged since Monday) — an earlier
+    morning's time trim (the owner's 4-day week dropped a curl on upper heavy) is made up on upper volume."""
+    world = sw.build_world(PROFILES["e_short_week"])
+    lib, cat = world["lib"], world["catalog"]["movements"]
+    ctx = {"lib": lib, "catalog": cat, "idx": se.key_index(lib, cat), "target_date": "2026-11-19", "week_skip": ("shoulders_arms",)}
+    rx = {
+        "session_role": "upper_volume",
+        "exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working", "reps": [8, 15]}] * 2}],
+    }
+    lines = lr.arms_top_up(rx, ctx, [])
+    assert len(rx["exposures"][0]["sets"]) == 4 and lines and "biceps" in lines[0]  # nothing logged: 2 today < MEV 8 -> +2
+    normal = copy.deepcopy(rx) | {"exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working"}] * 2}]}
+    assert lr.arms_top_up(normal, ctx | {"week_skip": ()}, []) == [] and len(normal["exposures"][0]["sets"]) == 2  # control

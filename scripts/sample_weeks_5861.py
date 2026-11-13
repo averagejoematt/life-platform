@@ -875,6 +875,7 @@ LIVE_PREFIXES = (
     "capped (live)",
     "short week (live",
     "lead lift (live)",  # #5861 FIX6
+    "top-up (live)",
     "priority (live)",
     "evidence (live)",
     "loss rate (advisory",

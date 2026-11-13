@@ -212,8 +212,9 @@ def anchor_trends(ctx: dict[str, Any], trends: dict[str, str], muscle: str) -> d
 # ── 3. the short week's arms and shoulders ───────────────────────────────────
 def short_week_floor(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[str]:
     """IN PLACE on env["deltas"] (`live_balance.allocation_plan`, only when a role is skipped): each ARMS_FLOOR muscle under its
-    MEV over the sessions left takes sets on its isolation slots there (at most add_per_slot each, earliest slot first) until
-    it reaches MEV. Returns the plan lines."""
+    MEV over the sessions left takes sets on its isolation slots there (at most add_per_slot each; the session with the fewest
+    planned sets first, so the floor does not push the heaviest morning past its time cap) until it reaches MEV. Returns the
+    plan lines."""
     from training import live_balance as lb
 
     rows, deltas, marks = env["rows"], env["deltas"], env["marks"]
@@ -223,7 +224,9 @@ def short_week_floor(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[st
         lm = marks.get(m) or {}
         if not lm:
             continue
-        for r in [r for r in rows if r["kind"] == "accessory" and r["muscle"] == m and r["intensity"] != "carry"]:
+        slots = [r for r in rows if r["kind"] == "accessory" and r["muscle"] == m and r["intensity"] != "carry"]
+        slots.sort(key=lambda r: (_role_sets(rows, deltas, r["role"]), rows.index(r)))  # the lightest session takes them first
+        for r in slots:
             have = lb._sum(rows, deltas)[m] + sum(a["sets"] for a in adds if a["muscle"] == m)
             if have >= float(lm["MEV"]):
                 break
@@ -234,6 +237,64 @@ def short_week_floor(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[st
             deltas[k] = deltas.get(k, 0) + give
             lines.append(f"{r['role']}.{r['slot']} +{give} set(s): {m} held at MEV {lm['MEV']} in the short week (ARMS_FLOOR, heuristic)")
     return lines
+
+
+TOP_UP_ROLE = "upper_volume"
+"""The short week's last upper session: where the arms floor is checked against what the week ACTUALLY logged."""
+
+
+def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str]:
+    """IN PLACE, a week that skips shoulders+arms, on its last upper session (TOP_UP_ROLE): each ARMS_FLOOR muscle is COUNTED —
+    the hard sets the week has logged since Monday (`fatigue_model.hard_sets_by_muscle`, direct 1.0 + indirect 0.5) plus today's
+    planned sets — and one under its MEV takes sets on today's isolation slot for it (at most ARMS_FLOOR add_per_slot). The plan
+    count (`short_week_floor`) reads the templates; this reads the record, so an earlier morning's time trim is made up here.
+    Returns the rationale lines."""
+    if "shoulders_arms" not in set(ctx.get("week_skip") or ()) or rx.get("session_role") != TOP_UP_ROLE:
+        return []
+    from training import block_model, fatigue_model as fm, live_balance as lb, live_week
+
+    lib, cat, day = ctx.get("lib") or {}, ctx.get("catalog") or {}, str(ctx.get("target_date") or "")
+    monday = lb.week_start(day)
+    logged = [w for w in workouts or [] if monday <= str(w.get("date") or "")[:10] < day]
+    done_raw = fm.hard_sets_by_muscle(logged, fm.library_index(lib), as_of=day, days=8) if logged else {}
+    done: dict[str, float] = {}
+    for m, n in done_raw.items():
+        done[live_week.LANDMARK_OF.get(m, m)] = done.get(live_week.LANDMARK_OF.get(m, m), 0.0) + float(n)
+    today: dict[str, float] = {}
+    for e in rx["exposures"]:
+        n = len(e.get("sets") or [])
+        prim = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
+        today[prim] = today.get(prim, 0.0) + n
+        entry = (lib.get("movements") or {}).get((ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or "") or {}
+        for sec in {live_week.LANDMARK_OF.get(str(s), str(s)) for s in (entry.get("target") or {}).get("secondary") or []} - {prim}:
+            today[sec] = today.get(sec, 0.0) + n * 0.5
+    marks, cap, lines = block_model.load_landmarks() or {}, int(ARMS_FLOOR["add_per_slot"]["value"]), []
+    for m in ARMS_FLOOR["muscles"]["value"]:
+        mev = float((marks.get(m) or {}).get("MEV") or 0)
+        have = done.get(m, 0.0) + today.get(m, 0.0)
+        slot = next(
+            (
+                e
+                for e in rx["exposures"]
+                if e.get("kind") == "accessory" and e.get("sets") and live_week.landmark_muscle(e.get("movement_key"), cat, lib) == m
+            ),
+            None,
+        )
+        if have >= mev or slot is None:
+            continue
+        add = min(cap, int(-(-(mev - have) // 1)))
+        slot["sets"].extend(dict(slot["sets"][-1]) for _ in range(add))
+        title = (cat.get(slot.get("movement_key")) or {}).get("title") or slot.get("movement_key")
+        lines.append(
+            f"top-up (live): {m} {done.get(m, 0.0):g} logged this week + {today.get(m, 0.0):g} today < MEV {mev:g} — {title} +{add} "
+            "set(s), counted from the record (ARMS_FLOOR, heuristic)"
+        )
+    return lines
+
+
+def _role_sets(rows: list[dict[str, Any]], deltas: dict[tuple[str, str], int], role: str) -> int:
+    """The planned working sets of one session (its template + the deltas so far)."""
+    return sum(int(r["sets"]) + deltas.get((r["role"], str(r["slot"])), 0) for r in rows if r["role"] == role)
 
 
 def press_trade(rows: list[dict[str, Any]], lib: dict[str, Any] | None) -> dict[tuple[str, str], int]:

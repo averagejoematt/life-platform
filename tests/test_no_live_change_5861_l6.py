@@ -135,6 +135,7 @@ def _poisoned():
         (live_rulings, "lead_lift"),
         (live_rulings, "stimulus_gate"),
         (live_rulings, "short_week_floor"),
+        (live_rulings, "arms_top_up"),
         (live_rulings, "press_trade"),
         (live_rulings, "purposeful_cardio"),
         (live_rulings, "evidence_line"),
