@@ -581,8 +581,8 @@ def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
         return {"state": "none", "row": None, "week_end": None}
     row = json.loads(json.dumps(items[0], default=float))
     end = str(row.get("week_end") or row.get("as_of") or "")[:10]
-    a, e = parse_day_key(str(as_of)[:10]), parse_day_key(end)  # calendar-day keys, never instants (#3609)
-    age = (a - e).days if a and e else None
+    a, b = parse_day_key(str(as_of)[:10]), parse_day_key(end)  # calendar-day keys, never instants (#3609)
+    age = (a - b).days if a and b else None
     if age is None or age > EVALUATION_MAX_AGE_DAYS:
         return {"state": "stale", "row": None, "week_end": end or None}
     return {"state": "read", "row": row, "week_end": end}
