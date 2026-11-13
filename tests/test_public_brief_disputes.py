@@ -48,7 +48,10 @@ DATA = dict(SERIES, steps=_series("2026-10-19", 28, 9000.0, 10.0))
 
 def _personas():
     ps = persona_registry.personas()
-    return {FIRST: ps[FIRST], LATER: ps[LATER]}  # registry order: nutrition before physical
+    # registry order: nutrition before physical. Max's Hevy requirement is test_public_brief_hevy.py's business; this
+    # fixture has no Hevy rows, so it is required-off here and his disputes are read on the shared metrics alone.
+    later = {**ps[LATER], "public_brief_required_metrics": ["steps"]}
+    return {FIRST: ps[FIRST], LATER: later}
 
 
 def readings(metric, start, end):
