@@ -416,8 +416,11 @@ def _donor(
     lib, cat = ctx.get("lib") or {}, ctx.get("catalog") or {}
     today = _today(rx, ctx, workouts)
     best, surplus = None, 0.0
+    fixed = live_week._fixed(rx)  # #5861 FIX8: an owner-pinned slot (the kettlebell slot) is never a donor
     for e in rx.get("exposures") or []:
         if not (e.get("live_full_body") or e.get("kind") == "accessory") or e.get("intensity") == "carry" or e.get("live_added"):
+            continue
+        if str(e.get("movement_key")) in fixed or e.get("live_kb"):
             continue
         d = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
         mev = float((marks.get(d) or {}).get("MEV") or 0)

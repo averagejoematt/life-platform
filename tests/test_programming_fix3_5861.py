@@ -320,7 +320,9 @@ def test_an_adherence_dip_changes_the_week_fewer_shorter_sessions_anchored():
         if mine != full_anchor[s["role"]]:
             assert any("anchor back-offs off" in ln and "TIME_FIT" in ln for ln in s["rationale"]), s["role"]
         acc = [x for x in s["lifts"] if str(x["tag"]).startswith("accessory:") and not str(x["tag"]).endswith(":carry")]
-        assert all(x["working_sets"] <= lb.ADHERENCE_DIP["accessory_sets"]["value"] for x in acc), s["role"]
+        # #5861 FIX8: except a slot the arms floor topped up to maintenance (ruling 3's MV on a dip week, "top-up (live)")
+        topped = {ln.split(" — ", 1)[1].split(" +", 1)[0] for ln in s["rationale"] if ln.startswith("top-up (live)") and " — " in ln}
+        assert all(x["working_sets"] <= lb.ADHERENCE_DIP["accessory_sets"]["value"] or x["title"] in topped for x in acc), s["role"]
     sets = lambda wk: sum(x["working_sets"] for x in _lifts(wk))  # noqa: E731
     assert sets(w) <= 0.75 * sets(full["week"])  # meaningfully less, not two sets off
     # control: today's answer (two sets off, five full sessions) through the setting
