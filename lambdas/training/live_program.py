@@ -1025,6 +1025,12 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     trip = live.get("tripwire")
     if trip:
         lines.append(live_week.review_line(trip))
+    hosts = live_rulings_hosts(live)
+    if role in hosts[1:] and kind not in HARD_KINDS and not trip and live.get("action") != "deload_recommended":
+        hard = next((k for k in ("intervals", "tempo", "hills") if cardio_menu.fits_machine(k, menu["machine"])), None)
+        if hard:  # FIX7 `hard_conditioning_doses` 2: the second host's block is the week's second hard dose
+            lines.append(f"cardio (live): {kind} -> {hard} — the week's second hard dose (hard_conditioning_doses=2)")
+            kind = hard
     if kind in HARD_KINDS:
         why = None
         if trip:
@@ -1037,7 +1043,7 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
             why = "recovery is strained (red readiness or a short night): easy work first, hard work waits"
         elif role == "lower_heavy" or _next_role(role) == "lower_heavy":
             why = "never on the heavy lower day or the session before it"
-        elif shared and role != live.get("host", SHORT_WEEK_SKIP):
+        elif shared and role not in live_rulings_hosts(live):  # FIX7: hard_conditioning_doses (default 1: the host only)
             why = f"the shared cap puts conditioning on {live.get('host', SHORT_WEEK_SKIP)}"
         if why:
             easy = "easy" if cardio_menu.fits_machine("easy", menu["machine"]) else "incline_treadmill_walk"
@@ -1071,13 +1077,22 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     lines += prog
     if shared and live.get("cap") and live.get("lifting_minutes") is not None:
         room = int(float(live["cap"]) - float(live["lifting_minutes"]))
-        if room < live_balance.min_block(kind, MIN_CARDIO_MINUTES):  # an easy stub under 20 min is worthless
+        gap = live_shape.aerobic_gap(live)  # FIX7: a week the record shows short takes the idle cap minutes (>= 10) as aerobic work
+        short = kind not in HARD_KINDS and gap is not None and gap >= int(live_shape.WALK_PROMPT["min_minutes"]["value"])
+        if room < (MIN_CARDIO_MINUTES if short else live_balance.min_block(kind, MIN_CARDIO_MINUTES)):  # else a stub under 20
             lines.append(f"cardio (live): no block — the shared {live['cap']}-min cap leaves {max(room, 0)} min after lifting")
             return None, lines + live_shape.walk_prompt(live)
         if room < minutes:
             lines.append(f"cardio (live): {minutes} -> {room} min — the shared {live['cap']}-min cap (session_cap_includes_cardio)")
             minutes = room
     return {**menu, "kind": kind, "live_minutes": minutes}, lines + live_shape.walk_prompt(live, minutes)
+
+
+def live_rulings_hosts(live: dict[str, Any]) -> list[str]:
+    """The week's hard-conditioning mornings (`live_rulings.conditioning_hosts` over the live host)."""
+    from training import live_rulings, selection_engine as se
+
+    return live_rulings.conditioning_hosts(str(live.get("host", SHORT_WEEK_SKIP)), se.load_library_failsoft())
 
 
 def cardio_note(notes: str, live: dict[str, Any] | None, kind: str) -> str:

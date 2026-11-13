@@ -48,12 +48,24 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
     "press_sets": 3,
     "priority_add_rule": "stimulus_and_performance",
     "rate_ceiling_pct_bw": 1.0,
+    "hard_conditioning_doses": 1,
 }
 """The owner's rulings of 2026-11-13 that had no setting before (OWNER DECISIONS, ruled): `cardio_purpose_only` True (ruling
 4) | False (the fifth round's easy-gap block); `cardio_room_takes` `over_mav_only` (ruling 1: no strength work a muscle needs is
 cut for cardio) | `as_fix5`; `lead_lift_rule` `alternate_weekly` (ruling 5) | `off`; `press_sets` 3 (ruling 6: 2-3 sets; 1 = the
 charter's one set); `priority_add_rule` `stimulus_and_performance` (ruling 9) | `volume`; `rate_ceiling_pct_bw` 1.0 (ruling 11,
-advisory only)."""
+advisory only); `hard_conditioning_doses` 1 (#5861 FIX7, OWNER DECISION: the shared cap's one hard dose a week; 2 adds a second
+hard block on `SECOND_HOST`, never the heavy lower day or the session before it — the sixth red team's option, not the default)."""
+SECOND_HOST = "upper_volume"
+"""The second hard dose's morning under `hard_conditioning_doses` 2: never the heavy lower day nor the session before it (the
+shoulders+arms host is the first)."""
+
+
+def conditioning_hosts(host: str, lib: dict[str, Any] | None = None) -> list[str]:
+    """The mornings that may hold HARD conditioning this week: the host, plus SECOND_HOST at `hard_conditioning_doses` 2."""
+    n = int(_settings(lib).get("hard_conditioning_doses") or 1)
+    return [host] + ([SECOND_HOST] if n >= 2 and SECOND_HOST != host else [])
+
 
 LEAD_LIFT: dict[str, dict[str, Any]] = {
     "second_band": {
@@ -379,9 +391,18 @@ def purposeful_cardio(kind: str, live: dict[str, Any], hard_kinds: tuple[str, ..
         return True, []
     if kind in hard_kinds:
         return True, [f"cardio (live): {kind} — purpose: the week's conditioning dose (cardio_purpose_only)"]
+    from training import live_shape  # #5861 FIX7: the RECORD names the purpose — a week short of its aerobic floor
+
     aer = live.get("aerobic") or {}
+    gap = live_shape.aerobic_gap(live)
+    if gap is not None and gap >= int(live_shape.WALK_PROMPT["min_minutes"]["value"]):
+        return True, [
+            f"cardio (live): {kind} — purpose: the week's aerobic floor, ~{gap} min short after the recorded, credited minutes "
+            "(cardio_purpose_only; the record names the purpose)"
+        ]
     tracked = aer.get("line") or "walking outside the gym is tracked apart"
-    return False, [f"cardio (live): no {kind} block — no named purpose today; easy aerobic is the walking outside the gym ({tracked})"]
+    why = "the recorded aerobic minutes cover the week" if gap is not None else "no aerobic record read — nothing is assumed"
+    return False, [f"cardio (live): no {kind} block — no named purpose today: {why} ({tracked})"]
 
 
 # ── 5. evidence and completeness, visible ───────────────────────────────────
