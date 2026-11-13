@@ -49,7 +49,7 @@ from typing import Any
 
 from training import cardio_model
 
-RUBRIC_VERSION = "3.5.0"  # 3.5.0: #5861 FIX7 (ruling 17 applied as written: the glute stretch override removed — length scored as for every muscle; S by the trial band only); 3.4.0: #5861 FIX6 (owner ruling 17: the glute stretch term at its top, the same S standard; no provisional S on any objective); 3.3.0: #5861 FIX3 (one S per canonical family per objective: the S quota); 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
+RUBRIC_VERSION = "3.6.0"  # 3.6.0: #5861 fix round 9 (bases state categorical inputs; no points arithmetic); 3.5.0: #5861 FIX7 (ruling 17 applied as written: the glute stretch override removed — length scored as for every muscle; S by the trial band only); 3.4.0: #5861 FIX6 (owner ruling 17: the glute stretch term at its top, the same S standard; no provisional S on any objective); 3.3.0: #5861 FIX3 (one S per canonical family per objective: the S quota); 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
@@ -438,13 +438,24 @@ def quality_tier(entry: dict[str, Any], row: dict[str, Any]) -> str | None:
 def _hyp_basis(entry: dict[str, Any], row: dict[str, Any]) -> list[str]:
     target = str(row.get("target") or "")
     c = components(entry, target)
-    out = [f"points {sum(c.values())}/{MAX_SCORE} -> {band(sum(c.values()))}: " + ", ".join(f"{k} {v}" for k, v in c.items())]
+    out = [f"stimulus profile {band(sum(c.values()))}: " + ", ".join(f"{k} {_reading(entry, k)}" for k in c)]
     out += [f"cap {t}: {why}" for t, why in hypertrophy_caps(entry, row)]
     adj = row.get("evidence_adjustment")
     out.append(
         f"evidence {row.get('evidence_confidence') or 'none_reviewed'}" + (f", {adj['bands']:+d} band" if isinstance(adj, dict) else "")
     )
     return out
+
+
+def _reading(entry: dict[str, Any], term: str) -> str:
+    """A rubric term as its categorical input (3.6.0, #5861 fix round 9: the basis states the inputs, never a points sum)."""
+    if term == "joint_stress":
+        js = [str(v) for v in rubric_joint_stress(entry).values()] or ["unknown"]
+        return next((lvl for lvl in ("high", "moderate", "unknown") if lvl in js), "low")
+    if term == "carryover":
+        return "free-weight compound" if job(entry) == "compound" and entry.get("resistance_profile") == "free_weight" else "none"
+    vals = [str(entry.get(f) or "unknown") for f in TERM_INPUTS[term]]
+    return vals[0] if len(vals) == 1 else "/".join(vals)
 
 
 def finalize_row(entry: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
