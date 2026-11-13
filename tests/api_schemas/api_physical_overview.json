@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/physical_overview",
   "is_prefix_sample": false,
   "path": "/api/physical_overview",
@@ -287,7 +287,98 @@
         "type": "string"
       },
       "tape_measurements": {
-        "type": "null"
+        "keys": {
+          "bicep_flexed_left_in": {
+            "type": "number"
+          },
+          "bicep_flexed_right_in": {
+            "type": "number"
+          },
+          "bicep_relaxed_left_in": {
+            "type": "number"
+          },
+          "bicep_relaxed_right_in": {
+            "type": "number"
+          },
+          "calf_left_in": {
+            "type": "number"
+          },
+          "calf_right_in": {
+            "type": "number"
+          },
+          "chest_in": {
+            "type": "number"
+          },
+          "derived": {
+            "keys": {
+              "bilateral_symmetry_bicep_in": {
+                "type": "number"
+              },
+              "bilateral_symmetry_thigh_in": {
+                "type": "number"
+              },
+              "limb_avg_in": {
+                "type": "number"
+              },
+              "trunk_sum_in": {
+                "type": "number"
+              },
+              "waist_height_ratio": {
+                "type": "number"
+              },
+              "waist_height_ratio_target": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "forearm_max_left_in": {
+            "type": "number"
+          },
+          "forearm_max_right_in": {
+            "type": "number"
+          },
+          "hips_in": {
+            "type": "number"
+          },
+          "measured_by": {
+            "type": "string"
+          },
+          "neck_in": {
+            "type": "number"
+          },
+          "session_date": {
+            "type": "string"
+          },
+          "session_number": {
+            "type": "number"
+          },
+          "shoulder_width_in": {
+            "type": "number"
+          },
+          "thigh_left_in": {
+            "type": "number"
+          },
+          "thigh_right_in": {
+            "type": "number"
+          },
+          "thigh_upper_left_in": {
+            "type": "number"
+          },
+          "thigh_upper_right_in": {
+            "type": "number"
+          },
+          "waist_iliac_crest_in": {
+            "type": "number"
+          },
+          "waist_narrowest_in": {
+            "type": "number"
+          },
+          "waist_navel_in": {
+            "type": "number"
+          }
+        },
+        "type": "object"
       },
       "tape_session_count": {
         "type": "integer"

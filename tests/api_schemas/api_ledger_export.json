@@ -1,6 +1,5 @@
 {
-  "_note": "#5532: first baseline written OFFLINE from the handler on fixture rows (route not yet deployed); deploy/capture_api_schemas.py reconciles it at the next live capture. 2026-11-01: `record_total` + `withheld.journal_silence` added \u2014 the route now counts what the journal-silence guard lets through (#5131) and names the rest. 2026-11-04 (owner ruling): `record_total` + `withheld` removed \u2014 a count of rows that speak of the journal moves with private activity. 2026-11-05 (owner ruling): `method` added \u2014 the call publication method every public count of calls is under.",
-  "captured_at": "2026-11-01T03:32:29.507818+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/ledger_export",
   "is_prefix_sample": false,
   "path": "/api/ledger_export",
@@ -12,6 +11,9 @@
             "type": "integer"
           },
           "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
             "type": "string"
           },
           "served_at": {
@@ -26,6 +28,9 @@
       "items": {
         "items": {
           "keys": {
+            "algo_version": {
+              "type": "string"
+            },
             "claim": {
               "type": "string"
             },
@@ -39,29 +44,105 @@
               "type": "number"
             },
             "corrections": {
-              "items": null,
-              "length_sample": 0,
+              "items": {
+                "keys": {
+                  "corrected_at": {
+                    "type": "string"
+                  },
+                  "corrected_outcome_date": {
+                    "type": "null"
+                  },
+                  "corrected_outcome_notes": {
+                    "type": "string"
+                  },
+                  "corrected_status": {
+                    "type": "string"
+                  },
+                  "evaluator_version": {
+                    "type": "string"
+                  },
+                  "explanation": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "original_outcome_date": {
+                    "type": "null"
+                  },
+                  "original_outcome_notes": {
+                    "type": "null"
+                  },
+                  "original_status": {
+                    "type": "string"
+                  },
+                  "published_on": {
+                    "type": "null"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "rules": {
+                    "items": {
+                      "keys": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "said_on": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "target_after": {
+                    "type": "null"
+                  },
+                  "target_before": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 1,
               "type": "array"
             },
             "due_date": {
               "type": "string"
             },
+            "evaluator_version": {
+              "type": "string"
+            },
             "grading": {
               "keys": {
                 "actual_text": {
-                  "type": "null"
+                  "type": "string"
                 },
                 "how": {
                   "type": "string"
                 },
                 "outcome_notes": {
-                  "type": "null"
+                  "type": "string"
                 },
                 "tolerance_text": {
                   "type": "string"
                 }
               },
               "type": "object"
+            },
+            "grading_held": {
+              "type": "boolean"
+            },
+            "grading_held_reason": {
+              "type": "string"
             },
             "item_id": {
               "type": "string"
@@ -90,12 +171,12 @@
               "type": "boolean"
             },
             "settled_date": {
-              "type": "null"
+              "type": "string"
             },
             "simple_guess": {
               "keys": {
                 "right": {
-                  "type": "null"
+                  "type": "boolean"
                 },
                 "short": {
                   "type": "string"
@@ -111,29 +192,27 @@
             },
             "status": {
               "type": "string"
+            },
+            "verification": {
+              "type": "null"
             }
           },
+          "optional": [
+            "grading_held",
+            "grading_held_reason"
+          ],
           "type": "object"
         },
         "length_sample": 100,
         "type": "array"
       },
       "method": {
-        "type": "object",
         "keys": {
-          "version": {
-            "type": "integer"
-          },
           "effective": {
             "type": "string"
           },
-          "note": {
-            "type": "string"
-          },
           "history": {
-            "type": "array",
             "items": {
-              "type": "object",
               "keys": {
                 "effective": {
                   "type": "string"
@@ -144,11 +223,20 @@
                 "version": {
                   "type": "integer"
                 }
-              }
+              },
+              "type": "object"
             },
-            "length_sample": 2
+            "length_sample": 2,
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
           }
-        }
+        },
+        "type": "object"
       },
       "page": {
         "type": "integer"
@@ -164,6 +252,23 @@
       },
       "total": {
         "type": "integer"
+      },
+      "verification_summary": {
+        "keys": {
+          "corrected": {
+            "type": "integer"
+          },
+          "could_not_verify": {
+            "type": "integer"
+          },
+          "none": {
+            "type": "integer"
+          },
+          "reproduced": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
       }
     },
     "type": "object"

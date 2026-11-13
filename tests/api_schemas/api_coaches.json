@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/coaches",
   "is_prefix_sample": false,
   "path": "/api/coaches",
@@ -25,11 +25,17 @@
       "coaches": {
         "items": {
           "keys": {
+            "absent": {
+              "type": "boolean"
+            },
             "board_role": {
               "type": "string"
             },
             "color": {
               "type": "string"
+            },
+            "comparison": {
+              "type": "null"
             },
             "domain": {
               "type": "string"
@@ -40,11 +46,23 @@
             "headline_stat": {
               "type": "string"
             },
+            "instrument": {
+              "type": "null"
+            },
+            "latest_checked": {
+              "type": "null"
+            },
             "name": {
               "type": "string"
             },
             "persona_id": {
               "type": "string"
+            },
+            "reason": {
+              "type": "null"
+            },
+            "record": {
+              "type": "null"
             },
             "short_bio": {
               "type": "string"
