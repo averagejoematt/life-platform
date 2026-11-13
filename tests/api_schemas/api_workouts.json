@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/workouts",
   "is_prefix_sample": false,
   "path": "/api/workouts",
@@ -26,8 +26,69 @@
         "type": "integer"
       },
       "workouts": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "duration_min": {
+              "type": "integer"
+            },
+            "exercise_count": {
+              "type": "number"
+            },
+            "exercises": {
+              "items": {
+                "keys": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "sets": {
+                    "items": {
+                      "keys": {
+                        "distance_m": {
+                          "type": "null"
+                        },
+                        "reps": {
+                          "type": "number"
+                        },
+                        "rpe": {
+                          "type": "null"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "weight_kg": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 9,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 10,
+              "type": "array"
+            },
+            "set_count": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            },
+            "total_volume_kg": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 20,
         "type": "array"
       }
     },

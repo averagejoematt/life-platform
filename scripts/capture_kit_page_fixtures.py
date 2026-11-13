@@ -12,7 +12,8 @@ This script is the only way that directory is written:
   * every route is fetched first, with read-only GETs against the live site, and nothing is
     written until every fetch has answered 200 with JSON;
   * the captured set is checked for one record (``record_disagreements`` below — the same
-    check tests/test_kit_page_fixtures_agree_4671.py holds the committed set to) and nothing
+    check tests/test_kit_page_fixtures_agree_4671.py holds the committed set to; a retired coach's
+    graded calls count by its ``retired`` predictions bucket, since it has no card) and nothing
     is written if it disagrees (a CloudFront copy one cache window older than its neighbour
     can do that: wait the window out and run again);
   * then every file is written, and ``_capture.json`` records the one capture time, the site
@@ -31,11 +32,19 @@ tests/test_site_api_routes.py, tests/test_edition_scorecard_4595.py, tests/test_
 be re-dated to that manifest in the same change — tests/test_kit_fixtures_fresh_4839.py reds when one is not
 — and the two derived files regenerated: ``python3 tests/test_edition_page_contract_4582.py >
 tests/fixtures/edition_contract_4582/editions.json`` and the scorecard fixture the JS test reads.
-The next recapture is dated on docs/OPERATING_CALENDAR.md (ritual ``preview-fixture-recapture``).
+FROZEN 2026-11-13 (owner ruling 2026-11-13, ADR-166). Both directories are historical evidence now: the v8
+kit pages they describe were superseded by the v9 build and are served only at /next/v8/ (noindex), and their
+tests pin the 2026-10-18 site's behaviour, which a recapture of today's site cannot exercise (the 11-06
+publication gate empties every coach line on the live wire). Each ``_capture.json`` carries a ``frozen`` block
+(the date, the reason, a sha256 per file); tests/test_kit_fixtures_fresh_4839.py holds every file to its lock
+and no longer applies the 30-day age rule to a frozen directory, and ``write``/``write_wire`` below refuse a
+frozen directory, so a re-run cannot overwrite the 10-18 evidence. ``--check`` still runs: it fetches the live
+routes and checks they agree with each other, writing nothing. The live API's freshness is held instead by
+tests/test_live_contract_shapes_fresh.py (the shape baselines of every route the v9 build reads, ritual
+``live-contract-recapture`` on docs/OPERATING_CALENDAR.md).
 
-Last recaptured: 2026-10-18 (#4839, #4864; the post-#4988 deploy recapture, #4580). tests/test_kit_fixtures_fresh_4839.py reds when
-``_capture.json`` is more than ``MAX_AGE_DAYS`` (30) days old, and when this line and the
-manifest name different days — re-run the script, then change the date here.
+Last recaptured: 2026-10-18 (#4839, #4864; the post-#4988 deploy recapture, #4580). The test still checks
+that this line and the manifest name the same day.
 
 Usage:
     python3 scripts/capture_kit_page_fixtures.py            # capture and write
@@ -101,6 +110,23 @@ def age_days(captured_at: str, now: datetime) -> float:
     """Days between the manifest's ``captured_at`` (UTC, ``%Y-%m-%dT%H:%M:%SZ``) and ``now`` (tz-aware)."""
     taken = datetime.strptime(captured_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
     return (now - taken).total_seconds() / 86400
+
+
+def frozen_lock(out_dir: str) -> dict | None:
+    """The ``frozen`` block of a directory's ``_capture.json``, or None when the directory is not frozen."""
+    path = os.path.join(out_dir, MANIFEST)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh).get("frozen")
+
+
+def _refuse_frozen(out_dir: str) -> None:
+    if frozen_lock(out_dir):
+        raise SystemExit(
+            f"capture_kit_page_fixtures: {os.path.relpath(out_dir, REPO)} is FROZEN as historical evidence "
+            "(owner ruling 2026-11-13, ADR-166) — nothing written. Use --check to probe the live routes."
+        )
 
 
 def moves_file(day: str) -> str:
@@ -172,6 +198,13 @@ def record_disagreements(fx: dict) -> list:
     listed = {c.get("persona_id"): c.get("record") for c in coaches if isinstance(c, dict)}
     right = sum((r or {}).get("confirmed") or 0 for r in listed.values())
     decided = sum((r or {}).get("n") or 0 for r in listed.values())
+    # A retired coach has no card on the Coaches list, but a call it sealed before retiring still counts in the
+    # predictions total once it is graded (Sarah Chen's 2026-09-06 steps call, graded 2026-11-10). Its bucket is
+    # added by name, from the predictions' own `retired` flag, so the sum stays exact rather than loosened.
+    for bucket in (fx["predictions.json"].get("by_coach") or {}).values():
+        if isinstance(bucket, dict) and bucket.get("retired") is True:
+            right += bucket.get("confirmed") or 0
+            decided += bucket.get("decided") or 0
     summed = (right, decided)
 
     if edition != predictions:
@@ -254,6 +287,7 @@ def wire_capture(base: str = BASE, now: datetime | None = None) -> tuple:
 
 
 def write_wire(bodies: dict, sources: dict, captured_at: str, base: str, out_dir: str = WIRE_DIR) -> None:
+    _refuse_frozen(out_dir)
     os.makedirs(out_dir, exist_ok=True)
     for key, body in bodies.items():
         with open(os.path.join(out_dir, f"{key}.json"), "w", encoding="utf-8") as fh:
@@ -269,6 +303,7 @@ def write_wire(bodies: dict, sources: dict, captured_at: str, base: str, out_dir
 
 
 def write(bodies: dict, sources: dict, captured_at: str, base: str, out_dir: str = FIXTURES_DIR) -> list:
+    _refuse_frozen(out_dir)
     os.makedirs(out_dir, exist_ok=True)
     stale = sorted(n for n in os.listdir(out_dir) if n.endswith(".json") and n != MANIFEST and n not in bodies)
     for name in stale:  # a file no capture writes is a file from another day
@@ -307,6 +342,8 @@ def main(argv=None) -> int:
     print(f"capture_kit_page_fixtures: {len(bodies)} files agree, {len(wire_bodies)} wire files fetched, captured {captured_at}")
     if args.check:
         return 0
+    _refuse_frozen(WIRE_DIR)
+    _refuse_frozen(args.out)
     write_wire(wire_bodies, wire_sources, captured_at, args.base)
     stale = write(bodies, sources, captured_at, args.base, args.out)
     for name in stale:
