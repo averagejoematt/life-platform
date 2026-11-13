@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/discoveries",
   "is_prefix_sample": false,
   "path": "/api/discoveries",
@@ -114,42 +114,95 @@
         "type": "array"
       },
       "ai_findings": {
-        "items": null,
-        "length_sample": 0,
-        "type": "array"
-      },
-      "inner_life": {
         "items": {
           "keys": {
-            "actionable": {
-              "type": "boolean"
-            },
             "body": {
               "type": "string"
             },
-            "category": {
-              "type": "string"
-            },
-            "confidence": {
-              "type": "string"
-            },
-            "date": {
-              "type": "string"
-            },
-            "pillars": {
-              "items": {
-                "type": "string"
+            "evidence": {
+              "keys": {
+                "ci95": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "length_sample": 2,
+                  "type": "array"
+                },
+                "ci_excludes_zero": {
+                  "type": "boolean"
+                },
+                "ci_width": {
+                  "type": "number"
+                },
+                "fdr_significant": {
+                  "type": "boolean"
+                },
+                "level": {
+                  "type": "string"
+                },
+                "n": {
+                  "type": "integer"
+                },
+                "n_eff": {
+                  "type": "number"
+                },
+                "score": {
+                  "type": "number"
+                }
               },
-              "length_sample": 7,
-              "type": "array"
+              "type": "object"
+            },
+            "metric_a": {
+              "type": "string"
+            },
+            "metric_b": {
+              "type": "string"
+            },
+            "metric_methods": {
+              "keys": {
+                "day_grade": {
+                  "type": "string"
+                },
+                "habit_pct": {
+                  "type": "string"
+                }
+              },
+              "optional": [
+                "day_grade",
+                "habit_pct"
+              ],
+              "type": "object"
+            },
+            "n": {
+              "type": "number"
+            },
+            "n_eff": {
+              "type": "number"
+            },
+            "r": {
+              "type": "number"
             },
             "title": {
+              "type": "string"
+            },
+            "week": {
+              "type": "string"
+            },
+            "window_end": {
+              "type": "string"
+            },
+            "window_start": {
               "type": "string"
             }
           },
           "type": "object"
         },
-        "length_sample": 1,
+        "length_sample": 35,
+        "type": "array"
+      },
+      "inner_life": {
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       }
     },

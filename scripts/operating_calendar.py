@@ -373,23 +373,23 @@ CALENDAR: dict[str, dict] = {
             "because the series count is only meaningful next to the dollars it explains."
         ),
     ),
-    "preview-fixture-recapture": _entry(
-        skill=None,  # not a command — a script run, recorded in the manifest the script writes
+    "live-contract-recapture": _entry(
+        skill=None,  # not a command — a script run, recorded in the snapshots the script writes
         cadence_days=25,
         grace_days=4,
         attendance=SESSION,
-        probe=(REGEX_IN_FILE, "tests/fixtures/kit_pages_4586/_capture.json", r'^ "captured_at": "(\d{4}-\d{2}-\d{2})T'),
+        probe=(REGEX_IN_FILE, "tests/api_schemas/api_edition.json", r'^  "captured_at": "(\d{4}-\d{2}-\d{2})T'),
         obligations=(
-            "Run `python3 scripts/capture_kit_page_fixtures.py` (read-only GETs of the live site: the kit pages "
-            "and the edition wire in one pass), then re-pin whatever a changed served shape reds to BEHAVIOUR, "
-            "never to the new capture's literal (the #4862 pattern), regenerate tests/fixtures/edition_contract_4582/"
-            "editions.json and the scorecard fixture, and change the 'Last recaptured' line in the script's docstring",
+            "Run `python3 tests/test_live_contract_shapes_fresh.py` for the two commands, run the `--check-drift` one "
+            "first (read-only GETs of every route the v9 site reads, shapes only) and read what moved — a removed key "
+            "a page still reads is a defect to fix, not a baseline to update — then run the capture one",
         ),
         reason=(
-            "#4864 (#4839): tests/test_kit_fixtures_fresh_4839.py reds main when the committed captures are over 30 "
-            "days old, by design — so the recapture is a dated task, not a surprise on main. The manifest the script "
-            "writes is the clock (the capture instant, not a file mtime), first captured 2026-10-13: due 2026-11-07, "
-            "overdue 2026-11-11 — the day the 30-day test would red."
+            "Owner ruling 2026-11-13: the v8 kit captures were frozen as historical evidence (ADR-166) and their 30-day "
+            "rule retired; the live API's freshness moved to tests/test_live_contract_shapes_fresh.py, which reds main "
+            "when any v9 route's shape baseline is over 30 days old — so the recapture is a dated task, not a surprise "
+            "on main. Re-pointed from `preview-fixture-recapture` (kit manifest probe, first captured 2026-10-13); the "
+            "probe reads /api/edition's baseline, which the one recapture command writes with the rest."
         ),
     ),
     # ── Quarterly ─────────────────────────────────────────────────────────────

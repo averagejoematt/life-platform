@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/mind_overview",
   "is_prefix_sample": false,
   "path": "/api/mind_overview",
@@ -43,9 +43,6 @@
       },
       "mind": {
         "keys": {
-          "avg_valence": {
-            "type": "null"
-          },
           "depth_counts": {
             "keys": {
               "deep": {
@@ -59,12 +56,6 @@
               }
             },
             "type": "object"
-          },
-          "energy_level": {
-            "type": "null"
-          },
-          "journal_entries_30d": {
-            "type": "integer"
           },
           "meaningful_pct": {
             "type": "integer"
@@ -83,9 +74,6 @@
             },
             "type": "object"
           },
-          "mood_entries_count": {
-            "type": "integer"
-          },
           "resist_rate_pct": {
             "type": "null"
           },
@@ -100,11 +88,6 @@
           }
         },
         "type": "object"
-      },
-      "mood_trend": {
-        "items": null,
-        "length_sample": 0,
-        "type": "array"
       },
       "vice_streaks": {
         "items": {
@@ -162,7 +145,7 @@
           },
           "type": "object"
         },
-        "length_sample": 13,
+        "length_sample": 29,
         "type": "array"
       }
     },

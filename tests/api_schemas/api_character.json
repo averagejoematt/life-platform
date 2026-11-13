@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/character",
   "is_prefix_sample": false,
   "path": "/api/character",
@@ -25,8 +25,68 @@
       "character": {
         "keys": {
           "active_effects": {
-            "items": null,
-            "length_sample": 0,
+            "items": {
+              "keys": {
+                "condition": {
+                  "type": "string"
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "fit_badge": {
+                  "type": "string"
+                },
+                "fit_ci_95": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "length_sample": 2,
+                  "type": "array"
+                },
+                "fit_n_eff": {
+                  "type": "number"
+                },
+                "fit_status": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "targets": {
+                  "keys": {
+                    "metabolic": {
+                      "keys": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "mind": {
+                      "keys": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "optional": [
+                    "metabolic",
+                    "mind"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 2,
             "type": "array"
           },
           "as_of_date": {
@@ -70,6 +130,32 @@
           "level": {
             "type": "number"
           },
+          "method": {
+            "keys": {
+              "basis": {
+                "type": "string"
+              },
+              "effective_from": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "notice": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "recalculated_on": {
+                "type": "null"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
           "tier": {
             "type": "string"
           },
@@ -100,7 +186,7 @@
             "items": {
               "type": "string"
             },
-            "length_sample": 4,
+            "length_sample": 1,
             "type": "array"
           },
           "note": {
@@ -177,23 +263,6 @@
                 "type": "object"
               },
               "macrofactor": {
-                "keys": {
-                  "age_hours": {
-                    "type": "number"
-                  },
-                  "latest_day": {
-                    "type": "string"
-                  },
-                  "stale_after_hours": {
-                    "type": "number"
-                  },
-                  "status": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "notion": {
                 "keys": {
                   "age_hours": {
                     "type": "number"
@@ -301,18 +370,16 @@
                   "items": {
                     "type": "string"
                   },
-                  "length_sample": 4,
+                  "length_sample": 3,
                   "type": "array"
                 },
                 "dark_sources": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "length_sample": 1,
+                  "items": null,
+                  "length_sample": 0,
                   "type": "array"
                 },
                 "days_dark": {
-                  "type": "integer"
+                  "type": "null"
                 },
                 "days_since_last_log": {
                   "type": "integer"
@@ -328,7 +395,7 @@
                   "type": "array"
                 },
                 "stale_hours": {
-                  "type": "integer"
+                  "type": "null"
                 },
                 "state": {
                   "type": "string"
@@ -343,7 +410,7 @@
               "items": {
                 "type": "string"
               },
-              "length_sample": 4,
+              "length_sample": 3,
               "type": "array"
             },
             "coverage_hold": {
@@ -358,7 +425,7 @@
                   "items": {
                     "type": "string"
                   },
-                  "length_sample": 4,
+                  "length_sample": 3,
                   "type": "array"
                 },
                 "dragging": {
