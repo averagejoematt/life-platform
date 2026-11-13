@@ -303,3 +303,13 @@ def test_every_p0_p1_addition_is_rated_on_some_objective_by_the_library():
     ]
     assert unrated == []
     assert all(MV[a["key"]]["objective_inputs"]["reviewed"] is True for a in adds.ADDITIONS)
+
+
+def test_cardio_protocol_ids_are_the_cardio_models_own():
+    """L4 owns the protocols (`cardio_model.PROTOCOLS`); a modality here only lists which of them it supports."""
+    from training import cardio_model as cm
+
+    assert set(adds.CARDIO_PROTOCOLS) == set(cm.PROTOCOLS)
+    for a in adds.ADDITIONS:
+        if a.get("cardio_protocols"):
+            assert cm._modality_of(MV[a["key"]], a["key"]) in cm.MODALITIES, a["key"]

@@ -419,12 +419,12 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 
 ## Cardio protocols by existing modality (data for the cardio model)
 
-- `walking`: easy_recovery_aerobic, moderate_continuous, progressive_endurance, incline_resistance_progression
-- `treadmill`: easy_recovery_aerobic, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance, incline_resistance_progression
-- `cycling`: easy_recovery_aerobic, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance, incline_resistance_progression
-- `elliptical_trainer`: easy_recovery_aerobic, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance, incline_resistance_progression
-- `rowing_machine`: easy_recovery_aerobic, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance
-- `air_bike`: easy_recovery_aerobic, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance
+- `walking`: easy_recovery, moderate_continuous, progressive_endurance, incline_resistance_progression
+- `treadmill`: easy_recovery, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance, incline_resistance_progression
+- `cycling`: easy_recovery, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance, incline_resistance_progression
+- `elliptical_trainer`: easy_recovery, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance, incline_resistance_progression
+- `rowing_machine`: easy_recovery, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance
+- `air_bike`: easy_recovery, moderate_continuous, tempo_threshold, structured_intervals, progressive_endurance
 
 ## Quality audit findings
 

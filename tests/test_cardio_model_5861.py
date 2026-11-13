@@ -94,7 +94,8 @@ def test_a_cardio_row_rated_d_for_hypertrophy_can_be_top_rated_for_conditioning(
     rows = {mid: e for mid, e in _LIB["movements"].items() if (e.get("target") or {}).get("primary") == "cardio"}
     tops = [mid for mid, e in rows.items() if (cm.conditioning_rating(e, mid) or {}).get("tier") in ("S", "A")]
     assert tops, "no cardio row rates A or better for conditioning"
-    assert all(e["hypertrophy"][0]["tier"] == "D" for mid, e in rows.items() if mid in tops)
+    # #5861 L1 rates cardio's hypertrophy row not-applicable (None); before L1 it read D — either way, never a growth tier
+    assert all(e["hypertrophy"][0]["tier"] in ("D", None) for mid, e in rows.items() if mid in tops)
 
 
 def test_the_cardio_model_never_imports_the_hypertrophy_rubric():

@@ -83313,7 +83313,7 @@
     }
    ],
    "cardio_protocols": [
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "structured_intervals"
    ],
@@ -84309,7 +84309,7 @@
     }
    ],
    "cardio_protocols": [
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "tempo_threshold",
     "structured_intervals",
@@ -86072,7 +86072,7 @@
     }
    ],
    "cardio_protocols": [
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "tempo_threshold",
     "structured_intervals",
@@ -86918,7 +86918,7 @@
     }
    ],
    "cardio_protocols": [
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "tempo_threshold",
     "structured_intervals",
@@ -87132,7 +87132,7 @@
     }
    ],
    "cardio_protocols": [
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "tempo_threshold",
     "structured_intervals",
@@ -87728,7 +87728,7 @@
     }
    ],
    "cardio_protocols": [
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "structured_intervals"
    ],
@@ -92124,7 +92124,7 @@
     }
    ],
    "cardio_protocols": [
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "progressive_endurance",
     "incline_resistance_progression"

@@ -86,7 +86,7 @@ INPUT_FIELDS = (
     "reviewed",
 )
 CARDIO_PROTOCOLS = (
-    "easy_recovery_aerobic",
+    "easy_recovery",
     "moderate_continuous",
     "tempo_threshold",
     "structured_intervals",
@@ -300,7 +300,7 @@ _NOW_CLAUSE = "fills a function nothing in the library serves, at low systemic c
 _AVAIL = "available_only"
 _INFL = "influences_current_program"
 _ALL_PROTOCOLS = list(CARDIO_PROTOCOLS)
-_LOW_IMPACT_PROTOCOLS = ["easy_recovery_aerobic", "moderate_continuous", "tempo_threshold", "structured_intervals", "progressive_endurance"]
+_LOW_IMPACT_PROTOCOLS = ["easy_recovery", "moderate_continuous", "tempo_threshold", "structured_intervals", "progressive_endurance"]
 
 # The reviewed objective inputs per addition (L1's `quality_rubric.OBJECTIVE_INPUTS`): (ceiling, limiter, resistance_class,
 # functional qualities, conditioning map, mobility type). Categorical practitioner judgements — the rubric turns them into tiers.
@@ -1353,7 +1353,7 @@ ADDITIONS: list[dict[str, Any]] = [
         gate="joint_tolerance",
         influence=(_AVAIL, "while body mass is high, the body itself is the load; incline walking progresses walking first"),
         variants=[_v("weighted-vest walking", "equipment", "vest instead of a pack")],
-        protocols=["easy_recovery_aerobic", "moderate_continuous", "progressive_endurance", "incline_resistance_progression"],
+        protocols=["easy_recovery", "moderate_continuous", "progressive_endurance", "incline_resistance_progression"],
     ),
     _add(
         "step_aerobics_low_impact",
@@ -1380,7 +1380,7 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "walking already covers this stimulus"),
-        protocols=["easy_recovery_aerobic", "moderate_continuous", "structured_intervals"],
+        protocols=["easy_recovery", "moderate_continuous", "structured_intervals"],
     ),
     _add(
         "arm_ergometer",
@@ -1407,7 +1407,7 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="equipment_unconfirmed",
         influence=(_AVAIL, "a lower-limb-injury fallback; small aerobic stimulus otherwise"),
-        protocols=["easy_recovery_aerobic", "moderate_continuous", "structured_intervals"],
+        protocols=["easy_recovery", "moderate_continuous", "structured_intervals"],
     ),
     # §18 mobility — never in a muscle-growth ranking; programmed only for an identified limitation or purpose.
     _add(
@@ -2284,7 +2284,7 @@ for _row_ in RECONCILIATION:
 
 # Data L4 (cardio model) reads: the protocols each EXISTING modality supports (the ADDs carry their own `cardio_protocols`).
 CARDIO_PROTOCOLS_BY_MODALITY: dict[str, list[str]] = {
-    "walking": ["easy_recovery_aerobic", "moderate_continuous", "progressive_endurance", "incline_resistance_progression"],
+    "walking": ["easy_recovery", "moderate_continuous", "progressive_endurance", "incline_resistance_progression"],
     "treadmill": list(CARDIO_PROTOCOLS),
     "cycling": list(CARDIO_PROTOCOLS),
     "elliptical_trainer": list(CARDIO_PROTOCOLS),
