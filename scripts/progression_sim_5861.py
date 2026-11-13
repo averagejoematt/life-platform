@@ -75,6 +75,67 @@ class Athlete:
         return sw._workout(day, role, exercises)
 
 
+@dataclass
+class Physiological:
+    """#5861 FIX8 — the seventh red team's RECORD-SEEDED athlete, ported: each lift has a TRUE e1RM (lb), seeded from the record's
+    latest top set (reps + reps in reserve, Epley), that drifts `drift` a week (0 steady, +0.005 gaining, -0.01 losing). Every
+    working set is performed at the prescribed load to the prescribed effort (reps in reserve = 10 - the note's top RPE): reps =
+    min(range top, reps-to-failure - RIR); a set it cannot take to the range floor at that effort is ground out at RIR 1.
+    `under`: one rep fewer and RPE +1 on every set. Unlike `Athlete`, the load matters — a heavy day served a volume day's load
+    is performed at an effort far under its band, which is what the role-blind guard did (the seventh red team)."""
+
+    drift: float = 0.0
+    under: bool = False
+    true: dict[str, float] = field(default_factory=dict)
+    seed: dict[str, float] = field(default_factory=dict)
+
+    def start(self, record: list[dict[str, Any]]) -> None:
+        for w in sorted(record, key=lambda w: w["date"]):
+            for x in w["exercises"]:
+                st = [s for s in x["sets"] if s.get("weight_kg") and s.get("reps")]
+                if st:
+                    top = max(st, key=lambda s: float(s["weight_kg"]))
+                    rir = 10 - float(top.get("rpe") or 8)
+                    self.seed[str(x["template_id"]).upper()] = float(top["weight_kg"]) * LB_PER_KG * (1 + (int(top["reps"]) + rir) / 30)
+
+    def next_week(self) -> None:
+        for k in self.true:
+            self.true[k] *= 1 + self.drift
+
+    def perform(self, session: dict[str, Any], day: str, role: str) -> dict[str, Any]:
+        import math
+
+        from training import routine_generator as rg
+
+        catalog = rg._load_json("movement_catalog.json")["movements"]
+        wires = [w for w in session.get("wire") or [] if _not_cardio(w)]
+        exercises = []
+        for lift, ex in zip(session.get("lifts") or [], wires):
+            key = str(lift.get("key"))
+            tid = sw._tid(catalog, key) or key
+            rir = max(0.0, 10.0 - (sw.lift_effort(lift.get("hevy_note")) or 8.0))
+            sets = []
+            for s in ex.get("sets") or []:
+                rr = s.get("rep_range") or {}
+                if s.get("type") == "warmup" or not s.get("weight_kg") or not rr:
+                    continue
+                lb = float(s["weight_kg"]) * LB_PER_KG
+                if key not in self.true:
+                    mid = (int(rr["start"]) + int(rr["end"])) / 2
+                    self.true[key] = self.seed.get(str(tid).upper()) or lb * (1 + (mid + 2) / 30)
+                rtf = max(0.0, 30 * (self.true[key] / lb - 1))
+                reps = min(int(rr["end"]), int(math.floor(rtf - rir + 1e-9)))
+                if reps < int(rr["start"]):
+                    reps = max(1, min(int(rr["start"]), int(math.floor(rtf - 1 + 1e-9))))
+                reps = max(1, reps - 1) if self.under else reps
+                rpe = min(10.0, 10.0 - (rtf - reps)) if rtf >= reps else 10.0
+                rpe = min(10.0, rpe + 1) if self.under else rpe
+                sets.append({"type": "normal", "weight_kg": round(float(s["weight_kg"]), 3), "reps": int(reps), "rpe": round(rpe * 2) / 2})
+            if sets:
+                exercises.append({"name": key, "template_id": tid, "notes": "", "sets": sets})
+        return sw._workout(day, role, exercises)
+
+
 def _not_cardio(ex: dict[str, Any]) -> bool:
     """A wire exercise the sample week lists as a lift (a cardio block's sets carry only a duration)."""
     return any((s.get("rep_range") or s.get("reps") or s.get("weight_kg") or s.get("distance_meters")) for s in ex.get("sets") or [])
@@ -99,26 +160,49 @@ def top_loads(week: dict[str, Any]) -> dict[str, list[float]]:
     return out
 
 
-def simulate(profile: dict[str, Any], weeks: int, athlete: Athlete | None = None) -> list[dict[str, Any]]:
-    """`weeks` drafted weeks, each performed by `athlete` and fed to the next. Returns per week: the date, each lift's top
-    prescribed loads, the trend the draft read for it (`live_session` trends) and the lower-heavy lead-lift line."""
+def simulate(profile: dict[str, Any], weeks: int, athlete: Athlete | Physiological | None = None, skip: Any = None) -> list[dict[str, Any]]:
+    """`weeks` drafted weeks, each performed by `athlete` and fed to the next (a week `skip(k)` names is drafted but NOT
+    performed: the alternate-week misser). Returns per week: the date, each lift's top prescribed loads, its reps, the roles,
+    the prescribed HARD sets per muscle (`sample_weeks_5861.hard_sets_by_muscle`) and the rationale."""
     athlete = athlete or Athlete()
     world = sw.build_world(profile, "approved")
+    if isinstance(athlete, Physiological):
+        athlete.start(world["record"])
     out = []
     for k in range(weeks):
         p = _shift(profile, k)
         world["profile"] = world["profile"] | {"days": p["days"], "as_of": p["as_of"]}
+        if isinstance(athlete, Physiological):
+            athlete.next_week()
         week = sw.generate_week(p, "approved", world, perform=athlete.perform)
-        world["record"] = list(world["record"]) + list(week["performed"])
+        skipped = bool(skip and skip(k))
+        if not skipped:
+            world["record"] = list(world["record"]) + list(week["performed"])
         out.append(
             {
                 "week": k,
                 "monday": p["days"][0],
+                "skipped": skipped,
+                "roles": [s["role"] for s in week["sessions"]],
                 "loads": top_loads(week),
                 "reps": {lift["key"]: lift["reps"] for s in week["sessions"] for lift in s["lifts"]},
+                "hard": sw.hard_sets_by_muscle(week, world["lib"], world["catalog"]["movements"]),
                 "rationale": {s["role"]: s["rationale"] for s in week["sessions"]},
             }
         )
+    return out
+
+
+def heavy_day_falls(rows: list[dict[str, Any]], keys: tuple[str, ...], limit: float = 0.10) -> dict[str, float]:
+    """#5861 FIX8 acceptance (the seventh red team): each key's HEAVY-day load (its first exposure of the week) as its largest
+    fall under its week-0 load, for every key whose fall exceeds `limit` — {} when none does."""
+    out = {}
+    for k in keys:
+        loads = [(r["loads"].get(k) or [None])[0] for r in rows]
+        base = loads[0]
+        worst = min((x for x in loads if x), default=base)
+        if base and worst and worst < base * (1 - limit):
+            out[k] = round(1 - worst / base, 3)
     return out
 
 
@@ -134,7 +218,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--profile-file", type=Path)
     ap.add_argument("--weeks", type=int, default=6)
     ap.add_argument("--loss-pct", type=float, default=None, help="weekly loss %%BW for the synthetic weigh-ins (0 = no deficit)")
-    ap.add_argument("--athlete", default="top", help="top | bottom | stalled:<key>[,<key>] | capacity:<key>=<e1rm lb>[,...]")
+    ap.add_argument(
+        "--athlete",
+        default="top",
+        help="top | bottom | stalled:<key>[,<key>] | capacity:<key>=<e1rm lb>[,...] | physio:<steady|gain|drop|under|skip_odd>",
+    )
     ap.add_argument("--keys", default="squat_barbell,deadlift_barbell,barbell_bench_press")
     a = ap.parse_args(argv)
     prof = sw.load_profiles(a.profile_file)[a.profile]
@@ -143,9 +231,13 @@ def main(argv: list[str] | None = None) -> int:
         ath = Athlete(stalled=set(a.athlete.split(":", 1)[1].split(",")))
     elif a.athlete.startswith("capacity:"):
         ath = Athlete(capacity={k: float(v) for k, v in (x.split("=") for x in a.athlete.split(":", 1)[1].split(","))})
+    elif a.athlete.startswith("physio:"):
+        mode = a.athlete.split(":", 1)[1]
+        ath = Physiological(drift={"gain": 0.005, "drop": -0.01}.get(mode, 0.0), under=mode == "under")
     else:
         ath = Athlete(reps=a.athlete)
-    rows = simulate(prof, a.weeks, ath)
+    skip = (lambda k: k % 2 == 1) if a.athlete == "physio:skip_odd" else None
+    rows = simulate(prof, a.weeks, ath, skip=skip)
     keys = a.keys.split(",")
     print("| week | monday | " + " | ".join(keys) + " |")
     print("|---|---|" + "---|" * len(keys))

@@ -493,12 +493,12 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
         "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     }
     how = [", ".join(f"{n} {m}" for m, n in sorted(trimmed.items())) + " set(s) off (surplus over MEV first)"] if trimmed else []
-    how += [f"dropped {', '.join(dropped)}"] if dropped else []
-    how += (
+    how += (  # FIX8: before "dropped …", which ends the line's list of whole exercises
         [f"anchor back-offs off: {', '.join(f'{n} {k}' for k, n in Counter(guests + anchors).items())} (TIME_FIT)"]
         if guests + anchors
         else []
     )
+    how += [f"dropped {', '.join(dropped)}"] if dropped else []
     line = f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min lifting cap — {'; '.join(how)} -> ~{new['lifting_minutes']} min"
     rx[MARK]["lines"].append(line)  # `rationale_lines` writes it
     rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]

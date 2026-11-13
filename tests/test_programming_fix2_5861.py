@@ -491,7 +491,10 @@ def test_the_press_sets_option_is_three_by_ruling_and_trades_lateral_raise_sets(
     assert sa(a)[press] == 1  # control: the charter's one set
     # #5861 FIX4: the week's allocation counts the press option, so the trade lands on the week's delt isolation (whichever
     # day holds the surplus), not only this morning's face pull: the WEEK's sets and its shoulders stay put
-    week_sets = lambda w: sum(x["working_sets"] for s in w["sessions"] for x in s["lifts"])  # noqa: E731
+    # #5861 FIX8: the upper sessions' sets — the lower-volume time fit (the week floor's abs, a calf block) moves on its own
+    week_sets = lambda w: sum(
+        x["working_sets"] for s in w["sessions"] if not s["role"].startswith("lower") for x in s["lifts"]
+    )  # noqa: E731
     assert sa(on)[press] == 3 and week_sets(on) <= week_sets(a) + 2
 
     def week_of(w, word):

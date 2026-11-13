@@ -855,7 +855,11 @@ def guard_loads(
         lb = lambda kg: f"{round(kg / 0.45359237 * 2) / 2:g} lb"  # noqa: E731
         rationale.append(
             f"load (live): {(entry.get('title') or b.movement_key)} {lb(top)} -> {lb(cap)} — {d['mode']}"
-            + (f" {d['pct']}% under the last top set ({prev['lb']:g} lb)" if d["pct"] else " at the last top set")
+            + (
+                f" {d['pct']}% under the last top set ({prev['lb']:g} lb)"
+                if d["pct"]
+                else "" if d["mode"] == "cap" else " at the last top set"
+            )
             + f": {'the second lift, its own RPE 7-8 cap (SECOND_LIFT)' if d.get('second') else d['why']} (last "
             + f"{(prev.get('role') or 'same-band').replace('_', ' ')} {prev['lb']:g} lb x {prev.get('reps')} @ RPE {prev.get('rpe')}; "
             + "LOAD_POLICY, ROLE_REF, heuristic)"

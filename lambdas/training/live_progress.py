@@ -155,7 +155,8 @@ def _e1rm_lb(ref: dict[str, Any]) -> float:
 
 def second_lift(e: dict[str, Any], ref: dict[str, Any] | None, rep_lo: int | None, equipment: str | None) -> dict[str, Any] | None:
     """SECOND_LIFT (module doc 2): the guard decision for a capped non-lead anchor whose engine load exceeds what its cap implies,
-    as {mode: down, pct, why, cap_kg} — or None (not the second lift, no same-role reference, or the load already fits)."""
+    as {mode: down (under the reference) | cap (a smaller step than the engine's), pct, why, cap_kg, second} — or None (not the second lift, no same-role reference, or the load already fits).
+    """
     if e.get("live_lead") != "second" or ref is None or not rep_lo:
         return None
     from training.live_program import _floor_to_implement
@@ -165,7 +166,8 @@ def second_lift(e: dict[str, Any], ref: dict[str, Any] | None, rep_lo: int | Non
     cap_kg = _floor_to_implement(target_lb * KG_PER_LB, equipment)
     pct = max(0, round(100 * (1 - cap_kg / (float(ref["lb"]) * KG_PER_LB))))
     rpe = f" @ {float(ref['rpe']):g}" if ref.get("rpe") is not None else ""
-    return {"mode": "down", "pct": pct, "why": f"last {ref['lb']:g}x{ref['reps']}{rpe}", "cap_kg": cap_kg, "second": True}
+    mode = "down" if pct > 0 else "cap"  # under the reference: a cut; over it: the step the cap allows, no more
+    return {"mode": mode, "pct": pct, "why": f"last {ref['lb']:g}x{ref['reps']}{rpe}", "cap_kg": cap_kg, "second": True}
 
 
 def second_clause(d: dict[str, Any]) -> str:

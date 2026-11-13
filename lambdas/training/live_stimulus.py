@@ -64,6 +64,13 @@ WEEK_FLOOR: dict[str, dict[str, Any]] = {
         "basis": "an added low-fatigue isolation slot is two hard sets (the session's isolation effort)",
     },
     "slot_max": {"value": 3, "label": HEURISTIC, "basis": "an existing slot takes sets only up to 3 (4+ in one slot is junk volume)"},
+    "time_margin": {
+        "value": 8,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX8: the routine as written (its warm-ups, a first exposure's find-the-load set) runs ~10 min over the "
+        "prescription's estimate on the sample weeks (71 -> 81 min on a lower-volume morning): the floor adds only while the estimate "
+        "stays this far under the cap, so the time fit never trades a needed template set for a floor set",
+    },
     "keys": {
         "value": {
             "quadriceps": ["leg_extension_machine", "single_leg_extension"],
@@ -148,8 +155,9 @@ def _hard_logged(workouts: Any, ctx: dict[str, Any], since: str, day: str) -> di
     return out
 
 
-def _today(rx: dict[str, Any], ctx: dict[str, Any]) -> dict[str, float]:
-    """Landmark muscle -> today's planned hard sets (an exposure capped under hard_rpe does not count)."""
+def _today(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any = None) -> dict[str, float]:
+    """Landmark muscle -> today's planned hard sets (an exposure capped under hard_rpe does not count; #5861 FIX8: nor one whose
+    sets cannot be hard — a first exposure, a layoff return — when the record is given: `hard_capable`)."""
     from training import live_week
 
     lib, cat = ctx.get("lib") or {}, ctx.get("catalog") or {}
@@ -158,6 +166,8 @@ def _today(rx: dict[str, Any], ctx: dict[str, Any]) -> dict[str, float]:
         if e.get("intensity") == "carry" or (
             e.get("live_effort") is not None and int(e["live_effort"]) < float(WEEK_FLOOR["hard_rpe"]["value"])
         ):
+            continue
+        if workouts is not None and not e.get("live_familiar") and not hard_capable(str(e.get("movement_key")), ctx, workouts):
             continue
         n = len(e.get("sets") or [])
         prim = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
@@ -290,8 +300,10 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
             for x in w.get("exercises") or []
         ]
     )
-    room = lambda add: (set_cap is None or sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= int(set_cap)) and (  # noqa: E731
-        week_sets + sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= live_shape.week_redline()
+    room = (
+        lambda add: (set_cap is None or sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= int(set_cap))
+        and (week_sets + sum(len(e.get("sets") or []) for e in rx["exposures"]) + add <= live_shape.week_redline())  # noqa: E731
+        and _time_room(rx, add)
     )
     cat, lib, lines = ctx.get("catalog") or {}, ctx.get("lib") or {}, []
     taken = {str(e.get("movement_key")) for e in rx["exposures"]}
@@ -299,7 +311,7 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     level = "MEV" if ctx.get("week_mode") in (None, "short") else "MV"  # FIX8: a dip week is a recovery week (ruling 2): MV
     for m in order:
         mev = float((marks.get(m) or {}).get(level) or 0)
-        have = logged.get(m, 0.0) + _today(rx, ctx).get(m, 0.0)
+        have = logged.get(m, 0.0) + _today(rx, ctx, workouts).get(m, 0.0)
         if not mev or have >= mev:
             continue
         need = int(-(-(mev - have) // 1))
@@ -331,7 +343,7 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
             continue
         familiar = hard_capable(key, ctx, workouts) == "pattern"  # FIX8: familiar by pattern -> worked at target
         if not room(add_n):  # no room: a donor whose muscle stays at MEV without it gives its slot (a 3-day week's full-body day)
-            donor = _donor(rx, ctx, logged, marks, m)
+            donor = _donor(rx, ctx, logged, marks, m, workouts)
             if donor is None:
                 continue
             taken.add(key)
@@ -370,13 +382,28 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     return lines
 
 
-def _donor(rx: dict[str, Any], ctx: dict[str, Any], logged: dict[str, float], marks: dict[str, Any], muscle: str) -> dict[str, Any] | None:
+def _time_room(rx: dict[str, Any], add: int) -> bool:
+    """#5861 FIX8 (WEEK_FLOOR time_margin): `add` more accessory sets keep the prescription's estimate (`session_shape.
+    session_minutes_estimate`) at least time_margin under the session's cap — a floor set the time fit would only trade for a
+    template set another muscle needs is not added (the seventh red team: the abs top-up cost the calves their block)."""
+    from training.program_structure import EXPOSURES
+    from training.session_shape import SESSION_TIME_MODEL, session_minutes_estimate
+
+    cap = float(rx.get("live_session_cap") or session_minutes_estimate(rx.get("exposures") or [])["cap"])
+    per = (int(SESSION_TIME_MODEL["set_seconds"]) + int(EXPOSURES["accessory"]["rest_seconds"])) / 60.0
+    est = float(session_minutes_estimate(rx.get("exposures") or [])["lifting_minutes"]) + add * per
+    return est <= cap - float(WEEK_FLOOR["time_margin"]["value"])
+
+
+def _donor(
+    rx: dict[str, Any], ctx: dict[str, Any], logged: dict[str, float], marks: dict[str, Any], muscle: str, workouts: Any = None
+) -> dict[str, Any] | None:
     """A partner anchor or accessory today whose landmark muscle stays at or over its MEV (and over the needy muscle's count)
     without it — the slot a muscle under MEV may take when the session has no room; the biggest surplus first."""
     from training import live_week
 
     lib, cat = ctx.get("lib") or {}, ctx.get("catalog") or {}
-    today = _today(rx, ctx)
+    today = _today(rx, ctx, workouts)
     best, surplus = None, 0.0
     for e in rx.get("exposures") or []:
         if not (e.get("live_full_body") or e.get("kind") == "accessory") or e.get("intensity") == "carry" or e.get("live_added"):

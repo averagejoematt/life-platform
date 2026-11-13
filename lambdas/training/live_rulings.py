@@ -315,16 +315,9 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
     done: dict[str, float] = {}
     for m, n in done_raw.items():
         done[live_week.LANDMARK_OF.get(m, m)] = done.get(live_week.LANDMARK_OF.get(m, m), 0.0) + float(n)
-    today: dict[str, float] = {}
-    for e in rx["exposures"]:
-        n = len(e.get("sets") or [])
-        prim = live_week.landmark_muscle(e.get("movement_key"), cat, lib)
-        today[prim] = today.get(prim, 0.0) + n
-        entry = (lib.get("movements") or {}).get((ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or "") or {}
-        for sec in {live_week.LANDMARK_OF.get(str(s), str(s)) for s in (entry.get("target") or {}).get("secondary") or []} - {prim}:
-            today[sec] = today.get(sec, 0.0) + n * 0.5
     from training import live_stimulus
 
+    today = live_stimulus._today(rx, ctx, workouts)  # #5861 FIX8: today's HARD sets — a layoff-capped slot does not count
     marks, cap, lines = block_model.load_landmarks() or {}, int(ARMS_FLOOR["add_per_slot"]["value"]), []
     level = "MEV" if ctx.get("week_mode") in (None, "short") else "MV"  # a dip week is a recovery week: maintenance is the floor
     for m in ARMS_FLOOR["muscles"]["value"]:
@@ -390,6 +383,8 @@ def arms_keep(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[st
         )
         if slot is not None and not slot.get("live_keep"):
             slot["live_keep"] = m
+            if live_stimulus.hard_capable(str(slot.get("movement_key")), ctx, workouts) == "pattern":
+                slot["live_familiar"] = True  # familiar by pattern: worked at target
             kept.append(f"{m}: {(cat.get(slot['movement_key']) or {}).get('title') or slot['movement_key']}")
     return [f"arms kept (live): {'; '.join(kept)} — a week without shoulders+arms keeps one slot each (ARMS_FLOOR)"] if kept else []
 

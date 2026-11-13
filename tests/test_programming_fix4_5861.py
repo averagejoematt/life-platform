@@ -366,12 +366,23 @@ def _walks(week: dict) -> list[str]:
 
 def test_an_uncovered_aerobic_gap_becomes_one_optional_walk_never_silence(weeks):
     """Shared cap, a heavy walker (h): the gap after steps and the one block is closed by ONE optional walk on the conditioning
-    host's morning (exercise 1's note), never a lifting cut. Control: the prompt off -> a silent shortfall."""
+    host's morning (exercise 1's note), never a lifting cut. Control: the prompt off -> a silent shortfall.
+    #5861 FIX8 (owner ruling 12; the seventh red team): steps of UNKNOWN intensity are reported, never a manufactured gap — a
+    10.5k-step walker with no recorded walks gets no prompt; the same week at LOW steps does."""
     h = weeks[("h_heavy_walker", True)]["week"]
-    assert _walks(h) == ["shoulders_arms"]
-    assert any(ln.startswith("walk (live): optional brisk walk") for s in h["sessions"] for ln in s["rationale"])
-    off = _week("h_heavy_walker", {(lshape, "walk_prompt"): lambda live, today_minutes=0: []}, {"session_cap_includes_cardio": True})
-    assert _walks(off["week"]) == []
+    assert _walks(h) == [] and not any(ln.startswith("walk (live)") for s in h["sessions"] for ln in s["rationale"])
+    assert any("intensity unknown" in ln for s in h["sessions"] for ln in s["rationale"])
+    ALL["h_low_steps"] = ALL["h_heavy_walker"] | {"steps_per_day": 5000}
+    try:
+        low = _week("h_low_steps", settings={"session_cap_includes_cardio": True})["week"]
+        assert _walks(low) == ["shoulders_arms"]
+        assert any(ln.startswith("walk (live): optional brisk walk") for s in low["sessions"] for ln in s["rationale"])
+        off = _week("h_low_steps", {(lshape, "walk_prompt"): lambda live, today_minutes=0: []}, {"session_cap_includes_cardio": True})
+        assert _walks(off["week"]) == []
+        unknown = _week("h_heavy_walker", {(lshape, "intensity_unknown"): lambda aer: False}, {"session_cap_includes_cardio": True})
+        assert _walks(unknown["week"]) == ["shoulders_arms"]  # control: the old reading manufactures the gap
+    finally:
+        ALL.pop("h_low_steps", None)
 
 
 def test_under_the_default_cap_a_small_gap_is_the_walks_not_another_ride(weeks):

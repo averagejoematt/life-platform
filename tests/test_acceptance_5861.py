@@ -48,6 +48,7 @@ from training import (  # noqa: E402
     live_rules as lrules,
     live_session as ls,
     live_shape,
+    live_stimulus,
     live_week as lw,
     program_structure as ps,
     selection_engine as se,
@@ -315,7 +316,11 @@ def unprogrammed(week: dict, lib: dict, catalog: dict) -> list[str]:
     # #5861 FIX6 (rulings 1 + 4): when the shared cap leaves no conditioning room (the 4-day week), the served answer is the
     # host morning's concrete walk — on the Hevy note he reads, not a rationale string
     walk = any("Optional today: brisk walk" in (x["hevy_note"] or "") for s in week["sessions"] for x in s["lifts"][:1])
-    if not (long_enough or steps_dose or walk):
+    # #5861 FIX8 (ruling 12): a week whose steps say he is moving (WALK_PROMPT active_steps) with no intensity recorded is
+    # REPORTED activity — the engine prescribes no walk to a 14k-step walker; a low-steps week still needs a block or a walk
+    steps = (week.get("steps_credit") or {}).get("steps_per_day")
+    reported = steps is not None and float(steps) >= float(live_shape.WALK_PROMPT["active_steps"]["value"])
+    if not (long_enough or steps_dose or walk or reported):
         out.append("aerobic")
     return out
 
@@ -351,7 +356,8 @@ def test_b2_unilateral_carry_trunk_and_aerobic_work_are_programmable(weeks):
         s["cardio"] = {"key": "cycling", "kind": "easy", "minutes": 8} if s["role"] == "shoulders_arms" else {}
         for x in s["lifts"]:  # FIX6: and no walk on the host's note
             x["hevy_note"] = "\n".join(ln for ln in (x["hevy_note"] or "").split("\n") if "brisk walk" not in ln)
-    stub["steps_credit"] = cm._walking_dose({d: 9000 for d in sw.steps_by_day(PROFILES["a_large_deficit_experienced"])})
+    # #5861 FIX8: LOW steps (under WALK_PROMPT active_steps) — a high-steps week is reported activity, not a gap (ruling 12)
+    stub["steps_credit"] = cm._walking_dose({d: 5000 for d in sw.steps_by_day(PROFILES["a_large_deficit_experienced"])})
     assert unprogrammed(stub, lib, cat) == ["aerobic"]
     # control 5: the engine's own sentence no longer passes the gate (the steps-dose line kept, the credit gone)
     talk = copy.deepcopy(stub)
@@ -762,8 +768,14 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     week = sw.generate_week(PROFILES["e_short_week"], "approved", e["world"] | {"lib": slide})
     assert landmark_problems(sw.measure(week, slide, e["world"]["catalog"]["movements"], LANDMARKS), LEGS, with_abs=False)
     # control: abs counted the old way (carry sets credited) would pass a week with no direct trunk drill
-    no_floor = _week_of("a_large_deficit_experienced", {(lp, "trunk_floor"): lambda rx, ctx, state=None: []})
+    no_floor = _week_of(
+        "a_large_deficit_experienced",
+        {(lp, "trunk_floor"): lambda rx, ctx, state=None: [], (live_stimulus, "floor_muscles"): lambda ctx, role: []},
+    )
     assert any(p.startswith("abs ") and "< MEV 4" in p for p in landmark_problems(no_floor["m"]))
+    # #5861 FIX8: with the trunk floor off, the week floor's abs (`week_floor_includes_abs`) still reach MEV — load-bearing
+    abs_only = _week_of("a_large_deficit_experienced", {(lp, "trunk_floor"): lambda rx, ctx, state=None: []})
+    assert not any(p.startswith("abs ") for p in landmark_problems(abs_only["m"]))
     # a trimmed week takes sets from the muscle furthest above its MEV first (the delts), never past MRV anywhere
     full = weeks["a_large_deficit_experienced"]["m"]["landmarks"]
     for name in ("b_shoulder_flag_low_recovery", "d_stalled_anchor_adherence_dip", "f_high_fatigue_poor_sleep"):
@@ -1074,7 +1086,13 @@ def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
             # #5861 FIX4: a priority muscle at or under MEV + live_shape VOLUME priority_margin without it takes freed sets (the
             # allocation's own rule: sets MOVED from a muscle at MAV, never new volume — the weekly redline holds the total)
             room = int(live_shape.VOLUME["priority_margin"]["value"]) if mu in PRIORITY else 0
-            if not lm or lm["sets"] - x["working_sets"] > lm["MEV"] + room or (not room and lm["sets"] - x["working_sets"] >= lm["MEV"]):
+            why = next((ln for ln in rat if ln.startswith(f"added (live): {x['title']} ")), "")
+            if "TRUNK_FLOOR" in why:
+                continue  # #5861 FIX8: the trunk floor's purpose is trunk FUNCTION (anti-rotation / anti-extension), not ab volume
+            have = lm["sets"] if lm else 0.0
+            if "WEEK_FLOOR" in why and lm:  # #5861 FIX8: the week floor's purpose is HARD sets — judged by the hard count
+                have = float((m.get("hard_sets") or {}).get(mu) or 0.0)
+            if not lm or have - x["working_sets"] > lm["MEV"] + room or (not room and have - x["working_sets"] >= lm["MEV"]):
                 out.append(f"{s['role']}: {x['key']} added for {mu}, already at MEV without it")
     out += [f"{mu} over MRV" for mu, v in m["landmarks"].items() if v["verdict"] == "over MRV"]
     # third red team: the template's OWN accessories could never be "filling" (the delt spread passed). An outcome now: a muscle
