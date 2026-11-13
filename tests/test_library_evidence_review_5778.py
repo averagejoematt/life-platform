@@ -398,7 +398,11 @@ def test_a_new_candidate_enters_valid_with_rule_fallbacks():
     e = after["movements"]["overhead_cable_extension_rope_test"]
     row = e["hypertrophy"][0]
     assert e["source"] == "expansion" and e["fallbacks"] and row["evidence_confidence"] == "rct_direct"
-    assert row["tier"] == row["rubric_tier"] == qr.rubric_tier(e, "triceps_long_head"), "the rubric derives a candidate's tier"
+    # the full derivation (points + caps): an unreviewed candidate is capped below S by the `reviewed_inputs` S criterion (#5861)
+    assert (
+        row["tier"] == row["rubric_tier"] == qr.objective_tier(e, "hypertrophy", "triceps_long_head")
+    ), "the rubric derives a candidate's tier"
+    assert qr.rubric_tier(e, "triceps_long_head") == "S" and row["tier"] == "A", "the points alone say S; the S criteria cap it"
     assert xl.validate(after) == []
     fidx = xl.fallback_index(after)
     for k, mv in after["movements"].items():

@@ -127,9 +127,18 @@ def test_one_machine_one_cardio_rating_and_the_cycling_pair_is_one_family():
     assert MV["cycling"]["ratings"]["conditioning"]["tier"] == MV["recumbent_bike"]["ratings"]["conditioning"]["tier"]
     assert MV["recumbent_bike"]["family_sustainability"] == MV["cycling"]["family_sustainability"]
     assert MV["recumbent_bike"]["equipment"] == MV["cycling"]["equipment"], "one machine, one equipment id"
+    # #5861 FIX-PROGRAMMING: the PUBLIC conditioning tier caps at A, so N=1 sustainability now shows only in the cardio
+    # model's `n1` field (the private / N=1 layer) — the family stand-in keeps that one machine, one rating too
+    from training import cardio_model as cm
+
+    def n1(e: dict) -> str:
+        return cm.conditioning_rating(qr._cardio_view(e), str(e.get("canonical") or "") or None)["n1"]["tier"]
+
+    assert n1(MV["recumbent_bike"]) == n1(MV["cycling"])
     alone = copy.deepcopy(MV["recumbent_bike"])  # control: without the family stand-in the row's own count rates it apart
     alone.pop("family_sustainability")
-    assert qr.objective_ratings(alone)["conditioning"]["tier"] != MV["cycling"]["ratings"]["conditioning"]["tier"]
+    assert n1(alone) != n1(MV["cycling"])
+    assert all(e["ratings"]["conditioning"]["tier"] != "S" for e in MV.values() if e.get("ratings", {}).get("conditioning"))
 
 
 # ── no twin on two tiers ─────────────────────────────────────────────────────────────────────────────────────────────

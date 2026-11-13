@@ -82,8 +82,8 @@
     "not_applicable": 417
    },
    "conditioning": {
-    "S": 3,
-    "A": 3,
+    "S": 0,
+    "A": 6,
     "B": 10,
     "C": 39,
     "D": 0,
@@ -319,17 +319,7 @@
      ]
     }
    },
-   "conditioning": {
-    "cardio": {
-     "s": 3,
-     "families": 2,
-     "movements": [
-      "cycling",
-      "recumbent_bike",
-      "treadmill"
-     ]
-    }
-   },
+   "conditioning": {},
    "mobility": {}
   },
   "canonical": {
@@ -4888,14 +4878,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "S",
+     "tier": "A",
      "basis": [
       "cardio_model (cardio-model@0.1.0) modality recumbent_bike",
       "high aerobic stimulus with fine, repeatable intensity control",
       "impact none",
       "lower-body interference low",
-      "recovery demand low",
-      "S: A-level stimulus and control, low impact, and a modality he sustains (10+ sessions on file)"
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },
@@ -6012,8 +6001,7 @@
       "moderate aerobic stimulus, moderate intensity control: hard to dose and progress",
       "impact none",
       "lower-body interference moderate",
-      "recovery demand moderate",
-      "N=1: established (31 sessions on file)"
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },
@@ -7784,14 +7772,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "S",
+     "tier": "A",
      "basis": [
       "cardio_model (cardio-model@0.1.0) modality treadmill_incline_walk",
       "high aerobic stimulus with fine, repeatable intensity control",
       "impact low",
       "lower-body interference low",
-      "recovery demand low",
-      "S: A-level stimulus and control, low impact, and a modality he sustains (10+ sessions on file)"
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },
@@ -12859,7 +12846,6 @@
       "impact high",
       "lower-body interference moderate",
       "recovery demand moderate",
-      "N=1: established (10 sessions on file)",
       "readiness-gated (charter_plyometric): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -22752,8 +22738,7 @@
       "moderate aerobic stimulus, low intensity control: hard to dose and progress",
       "impact low",
       "lower-body interference low",
-      "recovery demand low",
-      "N=1: tried (5 sessions on file)"
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },
@@ -32431,7 +32416,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (3 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -35953,7 +35937,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (2 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -36230,7 +36213,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (2 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -38239,7 +38221,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (2 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -41398,8 +41379,7 @@
       "high aerobic stimulus with fine, repeatable intensity control",
       "impact low",
       "lower-body interference low",
-      "recovery demand low",
-      "N=1: tried (2 sessions on file)"
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },
@@ -42068,7 +42048,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (2 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -42355,7 +42334,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (2 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -42499,7 +42477,6 @@
       "impact high",
       "lower-body interference moderate",
       "recovery demand moderate",
-      "N=1: established (10 sessions on file)",
       "readiness-gated (charter_plyometric): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -45982,7 +45959,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (2 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -47475,7 +47451,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (2 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -50121,7 +50096,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -50262,7 +50236,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -50779,7 +50752,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -53395,7 +53367,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -53689,7 +53660,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -61644,7 +61614,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -62640,7 +62609,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -62781,7 +62749,6 @@
       "impact high",
       "lower-body interference high",
       "recovery demand high",
-      "N=1: tried (1 sessions on file)",
       "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
@@ -73890,8 +73857,7 @@
       "high aerobic stimulus with fine, repeatable intensity control",
       "impact none",
       "lower-body interference moderate",
-      "recovery demand moderate",
-      "N=1: tried (1 sessions on file)"
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },
@@ -85080,14 +85046,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "S",
+     "tier": "A",
      "basis": [
       "cardio_model (cardio-model@0.1.0) modality recumbent_bike",
       "high aerobic stimulus with fine, repeatable intensity control",
       "impact none",
       "lower-body interference low",
-      "recovery demand low",
-      "S: A-level stimulus and control, low impact, and a modality he sustains (10+ sessions on file)"
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },

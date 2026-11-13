@@ -126,11 +126,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     # Epic #5861 lane L4 (cardio on its own model, built behind the library switch and deliberately wired into no
     # live drafting path; fixture-tested in tests/test_cardio_model_5861.py). Each names its first live caller.
-    "lambdas/training/cardio_model.py:aerobic_plan": (
-        "#5861 L4: steps-first aerobic planning (walking counted before any added cardio). First live caller: the "
-        "weekly-structure evaluation of epic #5861 (a 4+1 split) or the selection engine's live branch once the owner "
-        "approves the library; delete this entry when one lands."
-    ),
     "lambdas/training/cardio_model.py:conditioning_session": (
         "#5861 L4: the conditioning-day seam a 4+1 split needs (the audit: no conditioning-day prescription path "
         "existed). Deliberately not wired into live drafting; the first caller is the 4+1 day once the owner rules on "

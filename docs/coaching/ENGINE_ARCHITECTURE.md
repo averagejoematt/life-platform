@@ -4,6 +4,8 @@
 > approves the exercise library** (`config/exercise_library.json` `"status": "approved"`). Until then today's drafts are
 > served unchanged, byte for byte (`tests/test_no_live_change_5861_l6.py`, `tests/test_no_live_change_5861_l3.py`).
 > **Written:** 2026-11-12, against charter 1.49.0, library 0.2.0 (`proposed`), the #5799 time model (99 s a set, measured).
+> **Updated:** 2026-11-13 for the red-team programming fixes (`live_program`, §4–§7, §9): the generated weeks, not the
+> architecture, were graded C+; every change below is LIVE-only and measured on the sample weeks.
 > No personal data: every example is a synthetic profile (`tests/fixtures/sample_week_profiles_5861.json`).
 
 ## The principle
@@ -24,12 +26,15 @@ variant_rotation.for_session ──► selection_engine.apply ──► selectio
         ▼
 program_structure.session_prescription_for_role   anchors resolved, accessories placed, the #5799 time fit (estimate)
         ▼
-live_session.for_live_draft (LIVE)                 equipment + pain on EVERY exposure, then fatigue_model (one reducer)
+live_session.for_live_draft (LIVE)                 equipment + pain on EVERY exposure, then live_program.plan (pain by
+        │                                          joint, axial stacking, stall scheme, fatigue cost), then fatigue_model
+        │                                          (one reducer, compounds first / deload shape), then the trunk floor
         ▼
-full_body_session.full_body_routines               loads (load_ramp / load_progression), warm-ups, composed Hevy notes,
-        │                                          the routine's own time fit (LIVE), rationale
+full_body_session.full_body_routines               loads (load_ramp / load_progression, then the LIVE load guard),
+        │                                          warm-ups, composed Hevy notes, the routine's own time fit (LIVE), rationale
         ▼
-mcp.draft_standing_constraint.gate_draft           the session block, the cardio block (cardio_menu)
+mcp.draft_standing_constraint.gate_draft           the session block, the cardio block (cardio_menu, then the LIVE cardio
+        │                                          fit: live_program.cardio_fit / cardio_note)
         ▼
 hevy_compiler.to_create_body                        the routine as written to Hevy
 ```
@@ -120,9 +125,40 @@ What the selection cannot see, because it ranks slots:
 - **One story**: the rationale keeps the selection's lines (pick, tier, hold or rotate and why), the swaps, the time trim and
   the fatigue decision; a lift that lost sets for recovery says so on its own Hevy note ("2 sets today: recovery.").
 
+**The programming pass (`live_program`, red-team fixes, 2026-11-13).** Every rule is a labelled heuristic table in the module
+(`LOAD_POLICY`, `DELOAD_SHAPE`, `PAIN_RULE`, `STACK_RULE`, `STALL_RULE`, `TRUNK_FLOOR`, `TRUNK_FALLBACK_ORDER`), owner-adjustable:
+
+- **Pain by joint.** A pain flag (the classed overlay) or two discomfort notes on one movement reach EVERY movement that loads
+  the same joint at moderate or more, every session while the flag stands. The pain-monitoring rule: a stated score at or under
+  3/10 (and not "sharp") reduces — 10 % lighter, RPE ≤ 7 — on each joint-loading lift; above it, "sharp", or no number, the
+  movements in the flagged PATTERN GROUP (pressing, pulling, hinge, squat) are avoided (swapped for a member under moderate
+  stress on that joint, else skipped) and the rest are reduced.
+- **Axial stacking avoided, not only detected.** Past two spinal-loading squat/hinge compounds in one session the lowest
+  priority goes: an unpinned accessory first (a unilateral slot stays unilateral — a split squat becomes a reverse lunge),
+  then a non-heavy anchor, squat before hinge (a leg press keeps the squat stimulus). Owner-pinned slots (the kettlebell
+  slot) are never moved, so the week's third HINGE exposure is the pinned KB slot — an owner decision.
+- **Stalled anchors change.** A stalled anchor (no new best e1RM over 3+ exposures at working effort; never a `step_due`)
+  moves its rep range up 2 at 10 % less load ("Now aiming 6–8: stalled, lighter reset.").
+- **Function in the week.** The shoulders+arms session carries one trunk-STABILITY drill (anti-extension / anti-rotation /
+  anti-lateral flexion, never a carry; best functional tier, familiar first; skipped on a strained day, first to go on time).
+  A trunk slot whose movement the gym can't serve and with no same-function member takes the nearest dynamic trunk job
+  (`TRUNK_FALLBACK_ORDER`; a loaded or stable drill first; `bodyweight_weighted` accepted under live only).
+- **The short week** (`short_week_roles`, library `programming_settings.short_week_rule`, live default `skip_shoulders_arms`):
+  four mornings skip shoulders+arms, so both lower days keep 2x; the carry and the trunk floor move to the week's last
+  session. Delts and arms sit at their floor that week. The cron's session sequence still slides (it credits by position):
+  wiring the skip into `session_sequence` is an owner decision.
+
 ## 5. Progression
 
-Unchanged by the epic and live today: `load_progression` (double progression — the top of the range on two same-type
+**The live load guard** (`live_program.guard_loads`, after the floor and the double progression, before the back-offs and
+warm-ups): under live a load never steps UP on a regressing lift, a lift whose last top set was a grind (RPE 9+) at the bottom
+of its range, a stalled lift, or on a strained/overreached day — it holds at the last top set (where that set reached the top
+of the range at RPE ≤ 8.5, the session's own in-session step line stays: start where you were, step only if set 1 is easy).
+It steps DOWN 10 % on a regression, 5 % on an anchor whose last top set overshot its band (RPE ≥ 9.5), 10 % under a joint
+flag or a stall reset, rounded DOWN to the implement. The guarded load is written onto the floor audit row the commit gate
+reuses (`live_guard`, `floor_kg`), so a down-step is a recorded, sanctioned reduction — never a silent one. Shadow: untouched.
+
+Otherwise unchanged by the epic and live today: `load_progression` (double progression — the top of the range on two same-type
 exposures, then +2.5 % in 5-lb steps; RPE vetoes), `load_ramp` (the entry ramp to a share of band e1RM), the stall step
 (#5057: the same load × reps three times at an easy RPE steps the load — `step_due` HOLDS the movement), effort ceilings.
 
@@ -142,26 +178,43 @@ steps-truth resolver) and reported, but is not a strain vote — a high daily st
 | Strain signals | Action |
 |---|---|
 | 0–1 | maintain |
-| 2 | reduce: 2 accessory sets off, anchors and top sets held |
-| 3+ (or a regressing compound on a red/short-sleep day) | a deload is RECOMMENDED (applies only on the owner's recorded word); 4–6 accessory sets off meanwhile |
-| low adherence over a fully covered fortnight | one step off — a shorter session is easier to keep; never a recovery verdict |
+| 2 | reduce: 2 sets off, HIGH-FATIGUE WORK FIRST — compounds' back-offs (never below 2 sets, top set kept), then isolation surplus-first; no load steps up |
+| 3+ (or a regressing compound on a red/short-sleep day) | a deload is RECOMMENDED (applies only on the owner's recorded word); meanwhile the DELOAD SHAPE: every compound to 2 sets at RPE ≤ 7 with its load held or stepped down, isolation KEPT (≤ 2 sets, RPE ≤ 8), hard cardio turned easy |
+| low adherence over a fully covered fortnight | one step off ISOLATION only — a shorter session is easier to keep; never a recovery verdict, no load hold |
 
-**Where the sets come from** (L6): the accessory whose muscle the week loads furthest above its MEV landmark gives first
-(the delts, near MAV), so a recovery trim does not take a muscle sitting at its minimum effective dose below it first.
+**Why compounds first** (red team, 2026-11-12): the earlier order held every heavy compound (and loaded it heavier) and cut
+low-systemic-cost isolation — the wrong way round for "minimise unnecessary fatigue". The weekly SET count on the
+high-fatigue profile is not lower than before (59 vs 54: isolation is kept), but the systemic cost is: compounds at 2 sets,
+RPE 7, loads down 10 %, no intervals or tempo. Within isolation, the muscle furthest above its MEV gives first (L6).
 
 ## 7. Cardio (`cardio_model`, L4)
 
 Its own model: modalities rated on stimulus, control, impact, leg interference and recovery cost; protocols as data (easy,
 moderate continuous, tempo, structured intervals, progressive endurance, incline/resistance); steps counted before any added
-cardio; progression by duration, then frequency, then intensity; no heart-rate targets. The live cardio block is still the
-charter's menu (`cardio_menu`: two conditioning blocks a week, ≤ 30 min). Hevy's "Cycling" and the account's custom
-"Recumbent Bike" are one machine and one modality (`cardio_model.LIBRARY_MODALITY`).
+cardio; progression by duration, then frequency, then intensity; no heart-rate targets. Hevy's "Cycling" and the account's
+custom "Recumbent Bike" are one machine and one modality (`cardio_model.LIBRARY_MODALITY`). The PUBLIC conditioning tier caps
+at A: S-for-him (A-level, low impact, 10+ of his own sessions) is returned on the model's `n1` field only, for the private
+layer — one person's usage count is fit, not modality quality.
+
+**Wired under live** (`live_program.cardio_fit`, over the charter menu's pick in `draft_standing_constraint.cardio_block`):
+
+- a hard block (tempo, hills, intervals) turns easy under a recommended deload or when hard cardio is itself a strain signal,
+  never sits on the heavy lower day or the session before it, and — with the shared cap — sits only on shoulders+arms;
+- **steps first** (`cardio_model.aerobic_plan` over the steps the cron reads through the one steps resolver): an easy block is
+  dropped when the week's steps already cover the aerobic volume — the walking IS the easy aerobic; unread steps never count;
+- **`programming_settings.session_cap_includes_cardio`** (library setting, default `false` = today's 75-minute LIFTING cap
+  with the cardio block apart): `true` makes the 75 minutes cover lifting + cardio — a block shrinks to what lifting leaves,
+  under 10 minutes it is dropped — and hard conditioning lands on shoulders+arms;
+- a conditioning note ends with a generic symptom line, `programming_settings.symptom_line` (default "Chest, breathing,
+  dizzy? Stop, log it." — one phone line; no condition named, no heart-rate number);
+- the loss-rate band (`health.rate_policy.propose_band`) appears in the rationale as ADVISORY text only — nothing reads it back,
+  no kcal or titration changes.
 
 ## 8. Heuristic vs evidence-backed
 
 | Evidence-backed (verified citation, ±1 band) | Practitioner consensus (labelled) | Platform heuristic (labelled, owner-adjustable) |
 |---|---|---|
-| lengthened-position loading for some muscles; the glute stretch cap (Plotkin 2023); 14 direct-trial and 7 characteristic-trial hypertrophy rows | the functional, conditioning and mobility rubrics; joint-stress ratings; cue sheets | every fatigue threshold; the 14-day trend window; MAX_WEEKLY_EXPOSURES 2; MAX_HOLD_WEEKS 12; MAX_NEW_PER_WEEK 2; upgrades at block start; the systemic-slump rule (4 lifts, half); fatigue cost; surplus-first trimming; the adherence step |
+| lengthened-position loading for some muscles; the glute stretch cap (Plotkin 2023); 14 direct-trial and 7 characteristic-trial hypertrophy rows | the functional, conditioning and mobility rubrics; joint-stress ratings; cue sheets; pain monitoring by a stated score | every fatigue threshold; the 14-day trend window; MAX_WEEKLY_EXPOSURES 2; MAX_HOLD_WEEKS 12; MAX_NEW_PER_WEEK 2; upgrades at block start; the systemic-slump rule (4 lifts, half); fatigue cost; surplus-first trimming; the adherence step; `live_program` LOAD_POLICY (−10 % / −5 % / RPE 9.5 / RPE 9), DELOAD_SHAPE, PAIN_RULE (3/10), STACK_RULE (2 per session), STALL_RULE (+2 reps, −10 %), TRUNK_FLOOR, TRUNK_FALLBACK_ORDER, MIN_CARDIO_MINUTES 10 |
 
 Volume landmarks (`config/training_landmarks.json`) are practitioner landmarks, not individual measurements.
 
@@ -184,8 +237,16 @@ Before flipping, the owner should decide (each is listed on the epic's PRs):
 - [ ] the 31 custom Hevy templates L2 lists (Copenhagen, tibialis raise, step-down, serratus punch, …) — approve or not;
 - [ ] retiring ruling B and the 3-week forced rotation under live (holds replace them);
 - [ ] the HR leftovers L4 lists (`critics_aerobic`, `DAY_SHAPE`, `recent_aerobic`'s HR flag, `_recovery_tier`'s window);
-- [ ] the short-week rule (L5: skip shoulders + arms rather than slide the sequence) — today a short week leaves legs at once;
-- [ ] whether a fatigue-model reduction applies automatically (as built) — deloads stay his word either way.
+- [ ] the short-week rule (L5: skip shoulders + arms rather than slide the sequence) — built as a live option (default skip);
+      wiring it into `session_sequence` (which credits by position) is a separate change;
+- [ ] whether a fatigue-model reduction applies automatically (as built) — deloads stay his word either way;
+- [ ] `programming_settings.session_cap_includes_cardio` — `false` (75-min lifting + a separate block; mornings up to ~95 min
+      when a conditioning block lands) or `true` (75 minutes for everything; one hard block a week on shoulders+arms);
+- [ ] `programming_settings.symptom_line` — the wording of the generic stop-and-log line on conditioning notes;
+- [ ] the live heuristics in `live_program` (load down-steps, the deload shape, the 3/10 pain line, the stacking cap, the stall
+      reset, the trunk floor) — accept or adjust;
+- [ ] the week's third hinge exposure is the owner-pinned kettlebell slot (kept; the stacking rule never moves a pin);
+- [ ] showing the loss-rate band as advisory text in the rationale (no nutrition change either way).
 
 ## 10. How it is validated
 
@@ -194,3 +255,8 @@ Before flipping, the owner should decide (each is listed on the epic's PRs):
 - `scripts/sample_weeks_5861.py` — a full program week (five roles, cardio, Hevy notes as compiled) for six synthetic
   profiles, measured against the volume landmarks, the time model and axial stacking.
 - `tests/test_no_live_change_5861_l6.py` — the proposed-mode drafts pinned against the base tree.
+- The red-team outcome gates (2026-11-13), each with a must-fail control run: no load rises under overreach and compounds are
+  cut before isolation (c4, c4b); pain reaches every joint-loading movement (c2c); a stalled anchor changes its scheme (c5);
+  no session carries a third spinal-loading squat/hinge (d2b); the whole morning fits with the shared cap (d3b); abs reach
+  MEV from direct trunk work, not carries, and the short week keeps every leg muscle at MEV (d1); a WEEK programs single-leg,
+  carry, trunk-stability and aerobic work (b2); nothing is added without a landmark purpose (d5).

@@ -573,8 +573,10 @@ def assess(
 
 # ── the live draft hook ───────────────────────────────────────────────────────
 def trim_accessory_sets(exposures: list[dict[str, Any]], n: int, order: list[dict[str, Any]] | None = None) -> int:
-    """Take up to `n` sets off the accessories, IN PLACE: in `order` (default last-listed first), one set per pass, never below
-    one set and never a top set; anchors are never touched. Returns the sets removed."""
+    """Take up to `n` sets off, IN PLACE: in `order` (default: the accessories, last-listed first), one set per pass, never
+    below an exposure's `live_min_sets` (default one) and never a top set. The default order never touches an anchor; the
+    live order (`live_program.trim_order`, #5861 red team) takes compounds' back-offs first, never below two sets. Returns
+    the sets removed."""
     removed = 0
     order = order if order is not None else [e for e in exposures if e.get("kind") == "accessory"][::-1]
     progressed = True
@@ -584,7 +586,7 @@ def trim_accessory_sets(exposures: list[dict[str, Any]], n: int, order: list[dic
             if removed >= n:
                 break
             idx = [i for i, s in enumerate(e.get("sets") or []) if s.get("kind") != "top"]
-            if len(e.get("sets") or []) > 1 and idx:
+            if len(e.get("sets") or []) > int(e.get("live_min_sets") or 1) and idx:
                 e["sets"].pop(idx[-1])
                 removed += 1
                 progressed = True
@@ -602,8 +604,16 @@ def apply_to_session(
         return rx
     out = copy.deepcopy(rx)
     n = int(assessment.get("reduce_sets") or 0)
-    order = trim_order(out["exposures"]) if callable(trim_order) else None  # #5861 L6: surplus-first, else last-listed first
-    removed = trim_accessory_sets(out["exposures"], n, order) if n > 0 else 0
+    adh_only = any(str(r).startswith("adherence") for r in assessment.get("reduce_reasons") or [])
+    pick = getattr(trim_order, "adherence", None) if adh_only and callable(getattr(trim_order, "adherence", None)) else trim_order
+    order = pick(out["exposures"]) if callable(pick) else None  # #5861 L6: surplus-first, else last-listed first
+    shaped = assessment.get("action") == "deload_recommended" and any(e.get("live_cost") for e in out["exposures"])
+    if shaped:  # #5861 red team: a recommended deload cuts the compounds and keeps isolation (live_program.deload_shape)
+        from training import live_program
+
+        removed = live_program.deload_shape(out["exposures"])
+    else:
+        removed = trim_accessory_sets(out["exposures"], n, order) if n > 0 else 0
     if removed:
         from training.session_cues import exposure_cue
         from training.session_shape import session_minutes_estimate
@@ -613,7 +623,7 @@ def apply_to_session(
         out["total_sets"] = sum(len(e["sets"]) for e in out["exposures"])
         out["session_minutes"] = session_minutes_estimate(out["exposures"])
     keep = ("state", "fatigue_level", "action", "reduce_sets", "reduce_reasons", "strain_signals", "swaps", "deload", "version")
-    out["fatigue"] = {k: assessment.get(k) for k in keep} | {"sets_removed": removed}
+    out["fatigue"] = {k: assessment.get(k) for k in keep} | {"sets_removed": removed} | ({"shape": "deload_shape"} if shaped else {})
     return out
 
 

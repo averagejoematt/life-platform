@@ -76,10 +76,17 @@ def _day(d: str, n: int) -> str:
     return (date.fromisoformat(d) + timedelta(days=n)).isoformat()
 
 
+SETTINGS: dict[str, Any] = {}
+"""`--set key=value`: library `programming_settings` applied to the IN-MEMORY library only (live_program.SETTINGS_DEFAULTS), so
+both values of an owner-choice setting can be shown side by side; the committed file is never touched."""
+
+
 def approved_library(lib: dict[str, Any], profile: dict[str, Any], status: str = "approved") -> dict[str, Any]:
     """An in-memory copy with the live switch flipped and the profile's missing equipment marked unavailable."""
     out = copy.deepcopy(lib)
     out["status"] = status
+    if SETTINGS:
+        out["programming_settings"] = {**(out.get("programming_settings") or {}), **SETTINGS}
     items = (out.get("gym_inventory") or {}).get("items") or {}
     for eid in profile.get("unavailable_equipment") or []:
         items.setdefault(eid, {})["home_gym"] = {"state": "unavailable", "source": f"synthetic profile {profile['name']}"}
@@ -324,6 +331,9 @@ def _cardio(ideal: Any, profile: dict[str, Any], day: str, cardio_index: dict[st
 
     c = standing_constraints.active_constraint(day)
     constraint = ({**c, "stop_list": None, "memory_read": "not_read (synthetic)"}) if c else None
+    from training import live_program
+
+    live = live_program.cardio_context(ideal)  # the draft path's own live context (gate_draft), None in shadow
     try:
         block, pick = dsc.cardio_block(
             day,
@@ -332,9 +342,12 @@ def _cardio(ideal: Any, profile: dict[str, Any], day: str, cardio_index: dict[st
             layer=_layer(profile, day),
             cardio_index=cardio_index,
             previous=cardio_cues.previous_of(ideal, day),
+            live=live,
         )
     except Exception as e:  # noqa: BLE001 — reported in the week, never a lost sample
         return {"block": None, "error": f"{type(e).__name__}: {e}"}
+    if live is not None:
+        ideal.rationale = list(ideal.rationale or []) + list((pick or {}).get("live") or [])
     if block is not None:
         ideal.exercises.append(block)
         dsc._refresh_session_shape(ideal)
@@ -431,17 +444,25 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
     record = list(world["record"])
     sessions, cardio_index, prev = [], _cardio_index(record), None
     hidx = history_index(record, catalog["movements"], p["as_of"])
+    roles, short_line = list(p["roles"]), None
+    if mode == "approved" and len(p["days"]) < len(_all_roles()):  # a short week: the live rule picks the roles (L5)
+        from training import live_program
+
+        roles, short_line = live_program.short_week_roles(list(_all_roles()), len(p["days"]), world["lib"])
     with offline(world["lib"], hidx, p["bodyweight_lb"], p["as_of"], world["overlay"]):
-        for n, (role, day) in enumerate(zip(p["roles"], p["days"]), start=1):
+        for n, (role, day) in enumerate(zip(roles, p["days"]), start=1):
             entry = _entry(role, p["position"]["week"], p["position"]["block"], n, prev)
             inp = _inputs(p, day, record, world["rows"])
+            if short_line and "skip_shoulders_arms" in short_line:
+                setattr(inp, "short_week", roles[-1])  # the live short-week rule's host: the carry + trunk floor move here
             out = fbs.full_body_routines(inp, entry, rw.week, landmarks, catalog, rw, [], block_workouts=record)
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)
             sessions.append(_session(ideal, role, day, catalog["movements"], cardio))
             record.append(_performed(ideal, day, role, hidx, catalog["movements"]))  # the next morning's draft reads this session as done
             prev = {"session_role": role, "date": day, "title": role, "was": "synthetic"}
-    return {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
+    out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
+    return out | ({"short_week": short_line} if short_line else {})
 
 
 def _performed(ideal: Any, day: str, role: str, hidx: dict[str, list[dict[str, Any]]], catalog: dict[str, Any]) -> dict[str, Any]:
@@ -524,6 +545,12 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
         ),
         "rationale": list(ideal.rationale),
         "selection": [ln for ln in ideal.rationale if ln.startswith("selection:")],
+        # a carry's distance-typed sets (his steps in the distance box) — rendered, never part of the served digest
+        "carry_m": {
+            b.movement_key: int(getattr(b.sets[-1], "distance_meters", 0) or 0)
+            for b in ideal.exercises
+            if getattr(b.sets[-1] if b.sets else None, "distance_meters", None)
+        },
         "wire": body["routine"]["exercises"],
     }
 
@@ -629,21 +656,28 @@ def measure(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any], 
 # ── markdown ──────────────────────────────────────────────────────────────────
 def render(week: dict[str, Any], m: dict[str, Any]) -> str:
     lines = [f"### {week['label']} — mode `{week['mode']}`", "", f"_{week['story']}_", ""]
+    if week.get("short_week"):
+        lines += [f"_{week['short_week']}_", ""]
     for s, ps_ in zip(week["sessions"], m["per_session"]):
         lines.append(
             f"**{s['title']}** — {ps_['exercises']} exercises, {ps_['working_sets']} working sets, ~{s['lifting_minutes']} lifting min "
-            f"+ cardio {s['cardio'].get('key')} {s['cardio'].get('kind') or ''} {s['cardio'].get('minutes') or ''} min"
+            + (
+                f"+ cardio {s['cardio'].get('key')} {s['cardio'].get('kind') or ''} {s['cardio'].get('minutes') or ''} min"
+                if s["cardio"].get("key")
+                else "+ no cardio block"
+            )
         )
         for x in s["lifts"]:
             ss = f" (superset {x['superset']})" if x["superset"] else ""
-            lines.append(f"- {x['title']}: {x['working_sets']} x {x['reps']}{ss} — Hevy note: {_oneline(x['hevy_note'])}")
+            reps = x["reps"] or (f"{s['carry_m'][x['key']]} m" if (s.get("carry_m") or {}).get(x["key"]) else "")
+            lines.append(f"- {x['title']}: {x['working_sets']} x {reps}{ss} — Hevy note: {_oneline(x['hevy_note'])}")
         if s["cardio"].get("note"):
             lines.append(f"- cardio note: {_oneline(s['cardio']['note'])}")
         fat = s.get("fatigue") or {}
         if fat:
             lines.append(f"- fatigue: {fat.get('state')} / {fat.get('action')}, sets removed {fat.get('sets_removed')}")
-        for ln in s.get("live_fit_lines") or []:
-            lines.append(f"- live fit: {ln}")
+        for ln in live_lines(s):
+            lines.append(f"- live: {ln}")
         lines.append("")
     lines.append("| muscle | sets/wk | MEV | MAV | MRV | verdict |")
     lines.append("|---|---|---|---|---|---|")
@@ -659,6 +693,27 @@ def render(week: dict[str, Any], m: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+LIVE_PREFIXES = (
+    "swapped (live)",
+    "skipped (live)",
+    "kept (live)",
+    "reduced (live)",
+    "dropped (live)",
+    "stall (live)",
+    "load (live)",
+    "cardio (live)",
+    "time (live)",
+    "rate band",
+    "added (live)",
+    "trunk floor (live)",
+)
+
+
+def live_lines(session: dict[str, Any]) -> list[str]:
+    """The live programming lines of one drafted session (what the live policy changed and why); none in shadow."""
+    return [ln for ln in session.get("rationale") or [] if ln.startswith(LIVE_PREFIXES)]
+
+
 def _oneline(text: str | None) -> str:
     return " | ".join(ln.strip() for ln in str(text or "").splitlines() if ln.strip()) or "(none)"
 
@@ -670,7 +725,7 @@ def served_digest(mode: str = "proposed", profiles: dict[str, Any] | None = None
 
     out = {}
     for r in run(None, mode, profiles, prior="pools"):
-        served = [{k: v for k, v in s.items() if k not in ("fatigue", "live_fit")} for s in r["week"]["sessions"]]
+        served = [{k: v for k, v in s.items() if k not in ("fatigue", "live_fit", "carry_m")} for s in r["week"]["sessions"]]
         out[r["week"]["profile"]] = hashlib.sha256(json.dumps(served, sort_keys=True, default=str).encode()).hexdigest()[:16]
     return out
 
@@ -694,7 +749,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--profile-file", help="a profiles JSON outside the repo (same shape as the fixture)")
     ap.add_argument("--mode", default="approved", choices=("approved", "proposed"))
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--set", action="append", default=[], help="a library programming setting for this run, key=true|false|text")
     args = ap.parse_args(argv)
+    for kv in args.set:
+        k, _, v = kv.partition("=")
+        SETTINGS[k] = {"true": True, "false": False}.get(v.lower(), v)
     profiles = load_profiles(Path(args.profile_file)) if args.profile_file else None
     results = run(args.profile, args.mode, profiles)
     if args.json:
