@@ -380,7 +380,7 @@ def set_loads(
             row["live_load"] = rec
             row["progression"] = {**(row.get("progression") or {}), "basis": d["mode"], "changes": [], "live_guard": True}
         t = rec["last"]
-        rationale.append(
+        mark.setdefault("lines", []).append(
             f"load (live): {entry.get('title') or b.movement_key} {_lb(d['kg'])} lb — {d['mode']}: {d['why']} (last "
             f"{(t['role'] or 'same band').replace('_', ' ')} {_lb(t['kg'])} lb x {t['reps']}"
             + (f" @ RPE {t['rpe']:g}" if t["rpe"] is not None else ", no RPE")

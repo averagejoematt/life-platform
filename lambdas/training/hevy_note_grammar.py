@@ -84,7 +84,10 @@ LOW_ENERGY_LINE = "Low energy → first 2 lifts + easy cardio."
 # #5428 re-grade #2 (2026-10-31): a session whose only cardio is a hard kind (intervals, tempo, hills) has no easy cardio
 # to fall back on, so the line names the change instead of promising a block that is not there.
 LOW_ENERGY_HARD_CARDIO_LINE = "Low energy → first 2 lifts + cardio, no hard efforts."
-LOW_ENERGY_LINES = (LOW_ENERGY_LINE, LOW_ENERGY_HARD_CARDIO_LINE)
+LOW_ENERGY_LIFTS_LINE = "Low energy → first 2 lifts, then stop."
+"""#5861 fix round 9, LIVE only (`live_program.annotate`): a morning that hosts no cardio block (purposeful cardio, owner ruling 4)
+never promises 'easy cardio'. Shadow sessions never carry it (`low_energy_line` is unchanged)."""
+LOW_ENERGY_LINES = (LOW_ENERGY_LINE, LOW_ENERGY_HARD_CARDIO_LINE, LOW_ENERGY_LIFTS_LINE)
 HARD_CARDIO_KINDS = ("tempo", "hills", "intervals")  # `cardio_menu.HARD`
 
 

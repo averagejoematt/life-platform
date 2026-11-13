@@ -238,6 +238,8 @@ def why_effort(why: str, ir: Any) -> str:
         why = _day_line(head, first) + sep + rest
     from training.live_safety import fix_block  # #5861 FIX4: no step on a held exercise 1 / hold day; one effort across the session
 
+    if not sb.cardio_kinds_of(exercises):  # fix round 9 (ruling 4): a morning with no cardio block never promises easy cardio
+        why = "\n".join(g.LOW_ENERGY_LIFTS_LINE if ln == g.LOW_ENERGY_LINE else ln for ln in why.split("\n"))
     return fix_block(why, rx, exercises)
 
 

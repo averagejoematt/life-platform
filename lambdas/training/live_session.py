@@ -311,6 +311,7 @@ def for_live_draft(
         "week_skip": list(skip),
         "hist": hist,
         "hold_all": hold_all,
+        "layoff": (ctx or {}).get("layoff"),
     }
     from training import live_rulings
 
@@ -416,15 +417,74 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     session shape (re-measured when anything went). Shadow: `shape`."""
     if MARK not in rx or shape.get("lifting_minutes") is None:
         return shape
-    if shape["lifting_minutes"] <= cap:
-        return shape
-    from training import live_volume, program_structure, warmup_sets
+    if shape["lifting_minutes"] > cap:
+        from training import live_volume, program_structure, warmup_sets
 
-    rx[MARK]["lines"] += live_volume.time_fit(blocks, rx, movements, int(cap))
-    rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]
-    return program_structure.enforce_session_shape(blocks, movements) | {
-        "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
-    }
+        rx[MARK]["lines"] += live_volume.time_fit(blocks, rx, movements, int(cap))
+        rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]
+        shape = program_structure.enforce_session_shape(blocks, movements) | {
+            "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
+        }
+    rx[MARK]["summary"] = summary(blocks, rx, movements)
+    rx[MARK]["contradictions"] = contradictions(blocks, rx)
+    return shape
+
+
+def _title(key: Any, movements: dict[str, Any]) -> str:
+    return str((movements.get(str(key)) or {}).get("title") or key)
+
+
+def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
+    """The 3-5 rationale lines that change what he does today, generated from the FINAL routine (fix round 9: the rest of the
+    live lines stay on the record as `rx[MARK]["lines"]`, the debug view). Never a line about something the routine lacks."""
+    mark = rx.get(MARK) or {}
+    here = {b.movement_key for b in blocks}
+    exp = {e.get("movement_key"): e for e in rx.get("exposures") or [] if e.get("movement_key") in here}
+    out = [ln for ln in mark.get("lines") or [] if ln.startswith(("short week (live", "adherence dip week (live"))][:1]
+    guard = [d for d in mark.get("load_guard") or [] if d["key"] in here]
+    for mode, head in (("up", "heavier"), ("down", "lighter"), ("second", "RPE 7-8 (the second lift)")):
+        names = [_title(d["key"], movements) + (f" ({d['why']})" if mode == "down" else "") for d in guard if d["mode"] == mode]
+        if names:
+            out.append(f"today: {head}: {', '.join(names)}")
+    if mark.get("hold_all"):
+        out.append(f"today: every load held — {mark['hold_all']}")
+    back = [_title(k, movements) for k, e in exp.items() if e.get("live_first_back")]
+    new = [_title(k, movements) for k, e in exp.items() if e.get("live_new")]
+    if back:
+        out.append(
+            f"today: first session back after {((mark.get('layoff') or {}).get('gap_days')) or '10+'} days off — RPE 8, no step: {', '.join(back)}"
+        )
+    if new:
+        out.append(f"today: new to you, RPE 7 once: {', '.join(new)}")
+    gone = [ln for ln in mark.get("lines") or [] if ln.startswith(("skipped (live)", "swapped (live)"))]
+    out += [ln.split(" — ")[0].replace(" (live)", "") for ln in gone][:1]
+    fat = rx.get("fatigue") or {}
+    if fat.get("state") in ("strained", "overreached") or fat.get("sets_removed"):
+        out.append(f"today: recovery reads {fat.get('state')} — {fat.get('sets_removed') or 0} accessory set(s) off, anchors kept")
+    return out[:5]
+
+
+def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
+    """Where a lift's note says something its own rows or the live decision contradict (fix round 9, G): a heavier/lighter
+    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern.
+    [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)"""
+    from training import hevy_note_grammar as g
+
+    guard = {d["key"]: d for d in (rx.get(MARK) or {}).get("load_guard") or []}
+    exp = {e.get("movement_key"): e for e in rx.get("exposures") or []}
+    out = []
+    for i, b in enumerate(blocks):
+        note, d, e = str(getattr(b, "notes", "") or ""), guard.get(b.movement_key), exp.get(b.movement_key) or {}
+        work = [s for s in b.sets or [] if str(getattr(s, "type", "") or "normal") != "warmup"]
+        if d and d["mode"] == "up" and ("Lighter today" in note or "Same load" in note):
+            out.append(f"{b.movement_key}: steps up but the note holds or lightens it")
+        if d and d["mode"] == "down" and "Heavier" in note:
+            out.append(f"{b.movement_key}: steps down but the note says heavier")
+        if g.PICK_LOAD_OPEN_TAIL in note and work and all(getattr(s, "weight_kg", None) for s in work):
+            out.append(f"{b.movement_key}: 'find the load' over a written load")
+        if e.get("live_familiar") and not e.get("live_first_back") and ("first time in" in note or "session back after" in note):
+            out.append(f"{b.movement_key}: a layoff line on a familiar pattern")
+    return out
 
 
 # ── 4. one story ─────────────────────────────────────────────────────────────
@@ -452,10 +512,11 @@ def rotation_lines(rotation: dict[str, Any]) -> list[str]:
 
 
 def rationale_lines(rx: dict[str, Any]) -> list[str]:
-    """The live fit's lines and the fatigue model's decision, for the rationale. Shadow: []."""
+    """The rationale's live lines: the 3-5 that change what he does (`summary`, from the final routine) and the fatigue model's
+    decision; the rest of the live lines stay on the record (`rx[MARK]["lines"]`, the debug view). Shadow: []."""
     if MARK not in rx:
         return []
-    out = list(rx[MARK]["lines"])
+    out = list(rx[MARK].get("summary") or [])
     fat = rx.get("fatigue") or {}
     if fat:
         sig = ", ".join(fat.get("strain_signals") or []) or "none"

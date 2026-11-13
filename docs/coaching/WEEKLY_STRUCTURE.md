@@ -105,6 +105,50 @@ Three refinements are worth an owner decision. **None is built here.** Each woul
    day's deadlift to a top set plus one back-off before trimming volume anywhere else. Weekly hinge work is still the deadlift,
    the Romanian deadlift and the kettlebell swing.
 
+**Built since (#5861 fix round 9, live only).** Refinement 1 is the live week rule (`live_sequence`, `live_volume.SHORT_WEEKS`: four
+mornings skip shoulders + arms with the delts and arms held at MEV; one to three are full-body mornings); refinement 2 is the
+shared-cap conditioning host (`hard_conditioning_doses`); refinement 3 is the heavy day's top set + one back-off with one lift
+leading (owner ruling 5). The defaults the live engine reads are generated from the code below — this document states none of its
+own (`rate_policy`'s `body_fat_tier` is a function input, not a library setting).
+
+<!-- GENERATED:live_settings BEGIN -->
+| Setting | Default | Provenance | What it does |
+|---|---|---|---|
+| `session_cap_includes_cardio` | `True` | owner ruling 1 (2026-11-13) | lifting and gym cardio share the 75-minute cap; the conditioning dose takes only the minutes lifting leaves (no strength work is cut for cardio). False: the cap is lifting only and the cardio block sits apart |
+| `press_sets` | `3` | owner ruling 6 (2026-11-13) | overhead-press working sets on the shoulders+arms morning (2-3), taken from the side-delt (lateral raise) sets |
+| `priority_muscles` | `['chest', 'quadriceps']` | owner ruling 9 (2026-11-13) | muscles planned toward the middle of MEV-MAV (never under MEV in a normal week) and trimmed last for time |
+| `abs_direct_sets_per_week` | `4` | owner ruling #8 (fix round 8) | challenging DIRECT ab sets a week, spread over the mornings; indirect trunk loading never counts; halved on a short or high-fatigue week |
+| `hard_conditioning_doses` | `1` | owner follow-up ruling (2026-11-13) | hard conditioning blocks a week (the shoulders+arms morning hosts the first; 2 adds the upper-volume morning) |
+| `rate_ceiling_pct_bw` | `1.0` | owner ruling 11 (2026-11-13) | the ADVISORY upper planning reference for weekly loss, % of current bodyweight; never applied to a target |
+| `sequence_rule_from` | `None` | owner ruling #4 (fix round 8) | the first Monday the week rules judge; None = the Monday after the library's approval; earlier history is kept, never re-sequenced |
+
+| Heuristic | Value | Rule | Basis | Re-tuned on |
+|---|---|---|---|---|
+| `history_days` | `56` | progression | a same-role exposure in the last 8 weeks is a load reference; older, the engine's own ramp load stands | block retro: how often a lift returns after >8 weeks |
+| `step_down_exposures` | `3` | progression | a step-down needs three same-role exposures in a row under the previous best e1RM, each with its top set logged ABOVE the target RPE (one set at or under target vetoes it) — so a lift steps down at most once per three exposures | block retro: step-downs that were followed by a new best within 3 weeks (too eager) vs grinding sessions |
+| `step_down_pct` | `5` | progression | one step-down is 5% under the last top load (one implement step on most lifts), never 10%: a 3% e1RM drift is not answered with a 10% intensity cut | block retro: e1RM a month after each step-down |
+| `implausible_rpe` | `9.5` | progression | RPE missing on every set, or >= 9.5 on every set while reps at the load rise, is EFFORT UNKNOWN: the lift progresses on reps and load only and never steps down on effort | block retro: RPE calibration report (rpe_calibration) |
+| `slump_anchors` | `4` | progression | four or more anchors declining together (or, in a deficit, at least half of them) is systemic — sleep, recovery or the deficit, not the lifts: every load HOLDS and accessory volume comes down about a third | block retro: anchor e1RM across the block vs sleep and loss rate |
+| `decline_pct` | `0.02` | progression | an anchor is DECLINING when its same-role e1RM fell 2%+ over its last three exposures with no recovery between (a level under an old best is not a decline: the one-rep-short lifter holds steady) | block retro: slump calls vs the next block's anchor e1RM |
+| `slump_accessory_cut` | `0.34` | progression | the slump's volume answer: about a third of each accessory's working sets (never under 2); anchors keep theirs | block retro: recovery markers in the weeks after a slump hold |
+| `second_lift_band` | `[7, 8]` | progression | owner ruling 5: squat and deadlift never both maximal in one session; the lift that does not lead runs one band lower, loaded from its own same-role e1RM at that band | block retro: both lifts' e1RM trend under alternation |
+| `familiar_days` | `56` | novelty | a movement pattern logged in the last ~8 weeks is familiar (a biomechanically similar swap included): normal effort, no re-entry cap | block retro: first-exposure RPE vs the cap |
+| `new_pattern_rpe` | `7` | novelty | a NEW pattern runs one exposure at RPE <= 7 (technique, soreness); then normal effort | block retro: soreness / discomfort notes after a new pattern |
+| `layoff_days` | `10` | novelty | owner ruling #10 (fix round 8): after 10+ days with no session, each lift's FIRST session back runs at RPE 8 at its last same-role load, no step; normal progression from the next exposure | block retro: second-session performance after a layoff |
+| `first_back_rpe` | `8` | novelty | see layoff_days | see layoff_days |
+| `hard_rpe` | `8` | volume | a working set prescribed at RPE >= 8 (the top of its effort line) is a hard set; the ONE counter | block retro: logged RPE of prescribed hard sets |
+| `secondary_credit` | `0.5` | volume | a lift's secondary muscle takes half a set (the fatigue model's convention) | none (convention) |
+| `priority_aim` | `0.25` | volume | a priority muscle aims a quarter of the way from MEV to MAV (chest and quadriceps 8 -> 10): more than the minimum, never mechanical volume maximisation (ruling 9) | block retro: priority muscles' anchor progression |
+| `slot_max_sets` | `3` | volume | an accessory slot takes at most 3 working sets; 4+ in one slot is junk volume | none |
+| `slot_min_sets` | `2` | volume | an accessory or anchor never runs one working set: drop, don't shave | none |
+| `delt_heads` | `{'side_delts': 6, 'rear_delts': 4}` | volume | owner ruling #9: each delt head assessed apart, direct + indirect; the side delt (no compound trains it much) aims at 6 hard sets, the rear at 4 | block retro: lateral-raise and rear-delt progression |
+| `delt_credit` | `{'horizontal_press': {'front_delts': 0.5}, 'vertical_press': {'front_delts': 1.0, 'side_delts': 0.5}, 'horizontal_pull': {'rear_delts': 0.5}}` | volume | indirect delt-head credit by library pattern: pressing -> front (and, overhead, half a side), rowing -> rear (practitioner consensus; explicit so it can be argued with) | none (convention) |
+| `short_week_floor` | `3` | volume | a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / 3 hard sets (at least 2-3), full-body mornings of 4-6 movements at 2-3 sets — never a 1-set anchor | block retro: anchor e1RM after a short week |
+| `time_cap_minutes` | `75` | time | the owner's 75-minute morning, warm-ups included (#5799 time model, 99 s a set measured) | the #5799 measured set time |
+
+Time-fit order: accessory_backoff -> anchor_backoff -> priority_last_set.
+<!-- GENERATED:live_settings END -->
+
 A data-only alternative template set was **not** added. The recommended default is the existing templates, so no option needs to
 exist in code. Building option B would mean flagging shoulders + arms as the flex role, which is the short-week rule above. That
 rule belongs in `session_sequence`, behind an owner ruling.
