@@ -358,6 +358,7 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> 
             "excluded": excluded,
         }
     trigger, held, trend = _trigger(prev, eligible, excluded, pool, ctx) if prev else (None, None, None)
+    defer = held if trigger in DEFERRABLE_TRIGGERS and held is not None else None  # a discretionary rotation can wait a week
     repeat = None
     if held is not None and trigger is None and counts[_fam(held)] < MAX_WEEKLY_EXPOSURES:
         chosen = held
@@ -375,6 +376,19 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> 
             else {"action": "initial", "previous": None, "why": "no earlier phase in the ledger for this slot"}
         )
     assert chosen is not None
+    out = _slot_result(base, chosen, rotation, repeat, (ranked, eligible, excluded, pool, counts))
+    if defer is not None and defer is not chosen:
+        why = f"{NOVELTY_HOLD} ({trigger} waits)"
+        hold = {"action": "hold", "previous": prev, "reason": why, "trend": trend, "deferred_trigger": trigger}
+        out["novelty_hold"] = _slot_result(base, defer, hold, None, (ranked, eligible, excluded, pool, counts))
+    return out
+
+
+def _slot_result(base: dict[str, Any], chosen: dict[str, Any], rotation: dict[str, Any], repeat: Any, env: tuple) -> dict[str, Any]:
+    """One slot's selection record for `chosen` (the pick, its band, fallbacks and the ranking it came from)."""
+    from training import selection_engine as se
+
+    ranked, eligible, excluded, pool, counts = env
     skipped = [c for c in ranked[: ranked.index(chosen)] if counts[_fam(c)] > 0]
     pick = chosen | {
         "c_reason": se.c_reason(chosen, excluded, skipped=skipped, pooled=[c for c in eligible if c["tier"] in pool]),
@@ -395,6 +409,106 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> 
     }
 
 
+DEFERRABLE_TRIGGERS = ("stall", "adherence", "block_end_review", "pool_change")
+"""Rotations that may WAIT a week for the novelty budget, in the order they keep a place inside it (a stall is a progression
+problem now; an upgrade is never urgent). Pain, discomfort, equipment, no-longer-servable, fatigue, an owner request and the
+weekly repetition cap are FORCED: the previous movement cannot serve, so they always rotate (and still count)."""
+NOVELTY_HOLD = "novelty budget: the week already changes its quota of movements — this rotation waits"
+
+
+def served_key(p: dict[str, Any], policy: dict[str, Any]) -> str | None:
+    """What the slot SERVES this week under live (`selection_engine._live`): a budget hold (`novelty_serve`), else the rotation
+    ledger's variant for this phase when it is still one of the pick's eligible movements (the phase's first draft decided it —
+    possibly a shadow-era #5075 calendar rotation), else the pick; an approved pick is served as approved."""
+    from training import variant_rotation as vr
+
+    pick = p.get("pick") or {}
+    key, pos = pick.get("catalog_key"), policy.get("position") or {}
+    if not key or p.get("novelty_serve"):
+        return p.get("novelty_serve") or key
+    held = vr._ledger_variant(policy.get("rows"), int(pos.get("block") or 0), p["slot_id"], int(pos.get("phase") or 0)) if pos else None
+    return held if held and held in _eligible(p) else key
+
+
+def _eligible(p: dict[str, Any]) -> set[str]:
+    key = (p.get("pick") or {}).get("catalog_key")
+    if (p.get("owner_pin") or {}).get("state") == "held":
+        return {key} if key else set()
+    return {k for k in [key] + [f.get("catalog_key") for f in p.get("fallbacks") or []] if k}
+
+
+def last_phase_key(p: dict[str, Any], policy: dict[str, Any]) -> str | None:
+    """What the slot served LAST phase — the rotation ledger's previous phase (as `variant_rotation._slot_plan` reads it, the
+    "New: replaces …" line's own reference), else the live rotation's previous variant."""
+    from training import variant_rotation as vr
+
+    pos = policy.get("position") or {}
+    block, phase = int(pos.get("block") or 0), int(pos.get("phase") or 0)
+    pb, pp = (block, phase - 1) if phase > 1 else (block - 1, int(pos.get("phases_per_block") or 2))
+    led = vr._ledger_variant(policy.get("rows"), pb, p["slot_id"], pp) if pos and pb >= 1 else None
+    return led or ((p.get("pick") or {}).get("rotation") or {}).get("previous")
+
+
+RECENT_DAYS = 28  # heuristic: a movement performed in the last four weeks (this phase) is not new to him this week
+
+
+def changes_served(p: dict[str, Any], policy: dict[str, Any], catalog: dict[str, Any] | None = None) -> bool:
+    """The slot SERVES a movement this week that it did not serve last phase (`served_key` against `last_phase_key`, or a
+    never-logged first pick) AND that he has not performed in the last RECENT_DAYS (when the record was read) — what the
+    trainee meets as new this week: a "New: replaces" line and a load to find. A change made at the phase's start that he
+    has done since is last week's novelty, not this week's."""
+    served, prev = served_key(p, policy), last_phase_key(p, policy)
+    if not served or p.get("pinned"):
+        return False
+    new = served != prev if prev else bool((p.get("pick") or {}).get("novel"))
+    recent = policy.get("recent_tids")
+    tid = str(((catalog or {}).get(served) or {}).get("hevy_template_id_hint") or "").upper()
+    return new and not (recent is not None and tid and tid in recent)
+
+
+def _change_rank(p: dict[str, Any]) -> int:
+    rot = (p.get("pick") or {}).get("rotation") or {}
+    return {t: n for n, t in enumerate(DEFERRABLE_TRIGGERS)}.get(str(rot.get("trigger")), len(DEFERRABLE_TRIGGERS))
+
+
+def enforce_novelty(picked: list[dict[str, Any]], policy: dict[str, Any] | None, catalog: dict[str, Any] | None = None) -> list[str]:
+    """IN PLACE, live only (`selection_engine.select_week`, after every slot): MAX_NEW_PER_WEEK covers EVERY movement the served
+    week changes. Second red team: the owner's real run served four new movements against a budget of two — the budget counted
+    only never-logged picks, and the rotation ledger carried a shadow-era (#5075 calendar) phase decision forward, which
+    `_live` serves whenever it is one of the pick's fallbacks. Now a change whose last-phase movement can still serve here
+    (one of the slot's eligible movements) is OPTIONAL; any other is FORCED (pain, equipment, no longer servable) and keeps its
+    place. Past the budget the optional changes wait, lowest priority first (a stall keeps its place longest; a calendar
+    rotation the live policy never asked for waits first): the slot serves last phase's movement, said so. Returns the
+    deferred slot ids."""
+    if policy is None:
+        return []
+    changed = [i for i, p in enumerate(picked) if changes_served(p, policy, catalog)]
+
+    def optional(i: int) -> bool:
+        return last_phase_key(picked[i], policy) in _eligible(picked[i]) | {
+            (picked[i].get("novelty_hold") or {}).get("pick", {}).get("catalog_key")
+        }
+
+    forced = [i for i in changed if not optional(i)]
+    room = max(0, MAX_NEW_PER_WEEK - len(forced))
+    deferred = []
+    for i in sorted((i for i in changed if optional(i)), key=lambda i: (_change_rank(picked[i]), i))[room:]:
+        p, prev = picked[i], last_phase_key(picked[i], policy)
+        served = served_key(p, policy)
+        hold = p.get("novelty_hold")
+        p = {**hold} if hold and (hold.get("pick") or {}).get("catalog_key") == prev else p
+        rot = dict((p.get("pick") or {}).get("rotation") or {})
+        if NOVELTY_HOLD not in str(rot.get("reason") or ""):
+            rot["reason"] = f"{rot.get('reason') or rot.get('why') or 'hold'} — {NOVELTY_HOLD}"
+        rot["reason"] += f"; {served} waits, {prev} serves"
+        picked[i] = p | {"pick": {**p["pick"], "rotation": rot}, "novelty_deferred": True, "novelty_serve": prev}
+        deferred.append(p["slot_id"])
+    for p in picked:
+        p.pop("novelty_hold", None)  # the alternative is not part of the record
+    policy["novelty"] = {"changed": len(changed), "forced": len(forced), "deferred": deferred, "budget": MAX_NEW_PER_WEEK}
+    return deferred
+
+
 # ── the policy (built once per draft, live only) ─────────────────────────────
 def build_policy(
     lib: dict[str, Any],
@@ -409,8 +523,9 @@ def build_policy(
     and the fatigue model's swaps (from the Hevy record), the ledger rows and the position."""
     from training import fatigue_model as fm
 
-    signals, swaps, stacking = None, [], False
+    signals, swaps, stacking, recent = None, [], False, None
     if block_workouts is not None and as_of:
+        recent = _recent_tids(block_workouts, as_of)
         signals = fm.movement_signals(block_workouts, as_of=as_of)
         found = fm.axial_stacking(block_workouts, fm.library_index(lib), as_of=as_of)
         stacking = bool(found)
@@ -431,7 +546,20 @@ def build_policy(
         "rows": rows,
         "position": position,
         "week_counts": Counter(),
+        "recent_tids": recent,  # #5861 second red team: what he performed in RECENT_DAYS (the novelty budget's "new to him")
     }
+
+
+def _recent_tids(block_workouts: list[dict[str, Any]], as_of: str) -> set[str]:
+    from common.pacific_time import shift_day_key
+
+    since = shift_day_key(str(as_of)[:10], -RECENT_DAYS)
+    out = set()
+    for w in block_workouts or []:
+        day = str(w.get("date") or str(w.get("sk") or "")[5:15])[:10]
+        if since <= day < str(as_of)[:10]:
+            out |= {str(x.get("template_id") or "").upper() for x in w.get("exercises") or [] if x.get("template_id")}
+    return out
 
 
 def for_apply(lib: dict[str, Any], position: Any, rows: Any, block_workouts: Any, target_date: str | None, approvals: Any) -> dict:

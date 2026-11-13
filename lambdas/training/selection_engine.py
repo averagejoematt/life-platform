@@ -842,6 +842,7 @@ def select_week(
             taken.add(p["pick"]["catalog_key"])
             live.count_pick(p, policy, ctx)  # #5861 L3: live only (no policy = no-op)
         picked.append(p)
+    live.enforce_novelty(picked, policy, catalog)  # #5861 second red team: the budget covers every served change (live only; None = no-op)
     lengthened = _lengthened_pass(picked, full)
     by_role: dict[str, dict[str, str]] = {}
     for p in picked:
@@ -920,7 +921,8 @@ def _live(
         held = vr._ledger_variant(rows, pos["block"], s["slot_id"], pos["phase"])
         fb = [f.get("catalog_key") for f in chosen.get("fallbacks") or []]
         eligible = {pick} if op.get("state") == "held" else {pick} | set(fb)  # an approved pick is served as approved
-        variant = held if held and held in eligible else pick
+        # #5861 second red team: a ledger change past the week's novelty budget waits — the pick (the held movement) serves
+        variant = chosen.get("novelty_serve") or (held if held and held in eligible else pick)
         by_role.setdefault(s["role"], {})[s["incumbent"]] = variant
         pool = [k for k in [pick] + fb if k]
         source = "ledger" if variant == held else ("owner_approved" if op.get("state") == "held" else "selection")

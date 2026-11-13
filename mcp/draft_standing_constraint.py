@@ -161,6 +161,8 @@ def cardio_block(
         return None, {"state": "failed", "error": type(e).__name__}
     from training import live_program
 
+    if live is not None:  # #5861 second red team: the week-to-week progression reads his performed blocks (live only)
+        live = {**live, "by_machine": hist["by_machine"], "target_date": target_date}
     fitted, live_lines = live_program.cardio_fit(menu, live)  # shadow: (menu, [])
     if fitted is None:
         return None, {"state": "live_dropped", "live": live_lines}

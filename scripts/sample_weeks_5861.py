@@ -449,11 +449,15 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
         from training import live_program
 
         roles, short_line = live_program.short_week_roles(list(_all_roles()), len(p["days"]), world["lib"])
+    if mode == "approved" and short_line is None:  # the OFF-by-default behind-schedule option (live_week, owner decision)
+        from training import live_week
+
+        roles, short_line = live_week.behind_schedule_roles(roles, live_week.behind_schedule(record, p["as_of"], world["lib"]))
     with offline(world["lib"], hidx, p["bodyweight_lb"], p["as_of"], world["overlay"]):
-        for n, (role, day) in enumerate(zip(roles, p["days"]), start=1):
+        for n, (role, day) in enumerate(zip(roles, p["days"][: len(roles)]), start=1):
             entry = _entry(role, p["position"]["week"], p["position"]["block"], n, prev)
             inp = _inputs(p, day, record, world["rows"])
-            if short_line and "skip_shoulders_arms" in short_line:
+            if short_line and ("skip_shoulders_arms" in short_line or short_line.startswith("behind schedule")):
                 setattr(inp, "short_week", roles[-1])  # the live short-week rule's host: the carry + trunk floor move here
             out = fbs.full_body_routines(inp, entry, rw.week, landmarks, catalog, rw, [], block_workouts=record)
             ideal = out[0]
@@ -706,6 +710,15 @@ LIVE_PREFIXES = (
     "rate band",
     "added (live)",
     "trunk floor (live)",
+    "kettlebell slot (live)",
+    "kept light (live)",
+    "one cut a week (live)",
+    "cardio room (live)",
+    "cardio progression (live)",
+    "review (live)",
+    "behind schedule",
+    "new movement (live)",
+    "press (live option)",
 )
 
 

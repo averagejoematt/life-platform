@@ -48,7 +48,7 @@ def test_the_proposed_drafts_serve_exactly_what_the_base_tree_served():
 
 
 def _poisoned():
-    from training import live_session, selection_live
+    from training import live_session, live_week, selection_live
 
     def boom(name):
         def _f(*a, **k):
@@ -63,6 +63,19 @@ def _poisoned():
         (live_session, "_unpair"),
         (selection_live, "build_policy"),
         (selection_live, "select_slot"),
+        # #5861 second red team: the week-shaped live rules and the novelty budget's serve check never run in shadow
+        (selection_live, "changes_served"),
+        (live_week, "kb_slot"),
+        (live_week, "kb_seed"),
+        (live_week, "make_cardio_room"),
+        (live_week, "trim_sets_for_time"),
+        (live_week, "cardio_progress"),
+        (live_week, "behind_schedule"),
+        (live_week, "keep_the_anchors"),
+        (live_week, "novel_start"),
+        (live_week, "vertical_pull_fallback"),
+        (live_week, "press_sets"),
+        (live_week, "symptom_gate"),
     ]
     return [patch.object(mod, name, boom(f"{mod.__name__}.{name}")) for mod, name in targets]
 
