@@ -37,11 +37,12 @@ _ATHLETIC_CARDIO_RE = re.compile(r"sprints?|shuttle|5-10-5|s runs|box drill|shuf
 _LOADED_TRUNK_RE = re.compile(r"ab wheel|rollout|pallof|landmine 180|landmine rotation", re.I)
 _TRUNK_RULES: list[tuple[str, str]] = [
     (r"side plank|suitcase|copenhagen", "anti_lateral_flexion"),
+    (r"side bends?|side crunch", "lateral_flexion"),  # #5861 FIX-DATA: a side bend bends the spine sideways, it is not a crunch
     (r"pallof|bird dog|anti[- ]rotation|renegade", "anti_rotation"),
     (r"carry|carries|farmers", "loaded_stabilisation"),
     (r"twist|rotation|woodchop|landmine 180|windshield", "rotation"),
     (r"plank|hover hold|ab wheel|rollout|dead bug|hollow|body saw|mountain climbers?|long leg marches|canoes", "anti_extension"),
-    (r"crunch|sit ?up|v ?ups?|leg raise|knee raise|toes to bar|chinnies|heel taps|heels to the heavens|side bend", "loaded_flexion"),
+    (r"crunch|sit ?up|v ?ups?|leg raise|knee raise|toes to bar|chinnies|heel taps|heels to the heavens", "loaded_flexion"),
 ]
 _FUNCTION_RULES: list[tuple[str, str]] = [
     (r"knee raise|leg raise|knee drives?|march\w*|toes to bar|mountain climbers?|psoas|hip flexion", "hip_flexion"),
@@ -141,6 +142,22 @@ def _load_ceiling(e: dict[str, Any]) -> str:
     return "unknown"
 
 
+# #5861 FIX-DATA: the balance regex reads "lateral" for a lateral LUNGE; a lateral RAISE (or any upper-body isolation) is never
+# balance-limited — the side delt ends the set
+_UPPER_PATTERNS = (
+    "lateral_raise",
+    "rear_delt",
+    "chest_fly",
+    "curl",
+    "triceps_extension",
+    "horizontal_press",
+    "vertical_press",
+    "horizontal_pull",
+    "vertical_pull",
+    "shrug",
+)
+
+
 def _limiter(e: dict[str, Any]) -> str:
     t = str(e.get("title") or "")
     if e.get("category") == "conditioning":
@@ -153,7 +170,7 @@ def _limiter(e: dict[str, Any]) -> str:
         return "trunk"
     if re.search(r"hanging (?:leg|knee)|knee raise|leg raise", t, re.I):
         return "other_muscle"
-    if _BALANCE_RE.search(t) and e.get("stability") in ("low", "unknown"):
+    if _BALANCE_RE.search(t) and e.get("stability") in ("low", "unknown") and e.get("pattern") not in _UPPER_PATTERNS:
         return "balance"
     return "target"
 
@@ -300,8 +317,9 @@ def evaluate_entry(key: str, e: dict[str, Any], hyp_row: Any) -> None:
     reviewed secondary rows. Rule first, then the reviewed tables (each recorded on the entry). An authored
     `objective_inputs` (an L2 addition) is kept as authored and counts as reviewed. The canonical layer is library-wide
     (`apply_canonical`); a movement outside every family is its own canonical."""
-    if key in targets.PATTERN_OVERRIDES:
-        pattern, job, reason = targets.PATTERN_OVERRIDES[key]
+    row = targets.PATTERN_OVERRIDES.get(key) or targets.ADDITION_PATTERNS.get(key)
+    if row:
+        pattern, job, reason = row
         e["pattern"], e["job"] = pattern, job
         e.setdefault("attribute_audit", {"fields": [], "reason": ""})
         e["attribute_audit"]["pattern"] = {"pattern": pattern, "job": job, "reason": reason}
@@ -332,7 +350,51 @@ def evaluate_entry(key: str, e: dict[str, Any], hyp_row: Any) -> None:
     for target, limiter, reason in targets.SECONDARY_ROWS.get(key, []):
         if target not in have:
             e["hypertrophy"].append(hyp_row(target) | {"limiter": limiter, "attribution": reason})
+    sync_primary_row(e)
+    add_glute_row(e, hyp_row)
     e["canonical"] = key
+
+
+_GLUTE_LOADED_RE = re.compile(r"lunge|split squat|step ?ups?|stepup|bulgarian|curtsy", re.I)
+_GLUTE_EXCLUDED_RE = re.compile(r"jump|hop|plyo|thrust|curl|twist|snatch|clean|press|reach", re.I)
+
+
+def add_glute_row(e: dict[str, Any], hyp_row: Any) -> None:
+    """#5861 FIX-DATA (red team: "lunges have no glute row"). A loaded lunge, split squat or step-up trains the glutes beside the
+    quads (deep hip flexion under load; practitioner consensus, no trial claimed), yet only the BSS carried the row. Rule: a
+    quadriceps-primary squat-pattern lunge / split squat / step-up with no glute row gets one; the limiter is balance when the
+    movement is unstable (the set ends on balance, so the row is held at B), else the target. A jump, hop, press or complex is
+    skipped (rated on another objective)."""
+    t = str(e.get("title") or "")
+    if (e.get("target") or {}).get("primary") != "quadriceps" or e.get("pattern") != "squat" or e.get("category") != "hypertrophy":
+        return
+    if (
+        not _GLUTE_LOADED_RE.search(t)
+        or _GLUTE_EXCLUDED_RE.search(t)
+        or any(r.get("target") == "glutes" for r in e.get("hypertrophy") or [])
+    ):
+        return
+    limiter = "balance" if e.get("stability") in ("low", "unknown") else "target"
+    e["hypertrophy"].append(
+        hyp_row("glutes")
+        | {
+            "limiter": limiter,
+            "attribution": "a loaded lunge / split squat / step-up loads the glutes in deep hip flexion beside the quads",
+        }
+    )
+
+
+def sync_primary_row(e: dict[str, Any]) -> None:
+    """#5861 FIX-DATA: a movement's primary target must have a hypertrophy row. A Hevy muscle label that survived on the row
+    (a Pallof press carried `shoulders` under an `abs` primary) moves to the audited primary; the move is recorded on the row."""
+    p, rows = str((e.get("target") or {}).get("primary") or ""), e.get("hypertrophy") or []
+    if not p or not rows or any(_same_muscle(str(r.get("target")), p) for r in rows):
+        return
+    rows[0] = rows[0] | {"target": p, "target_synced_from": rows[0].get("target")}
+
+
+def _same_muscle(a: str, b: str) -> bool:
+    return a == b or a.startswith(b) or b.startswith(a) or (b == "calves" and a in ("gastrocnemius", "soleus"))
 
 
 REVIEWED_TABLES = ("PATTERN_OVERRIDES", "CATEGORY_OVERRIDES", "STRENGTH_LIFTS", "INPUT_OVERRIDES", "SECONDARY_ROWS", "REVIEWED_KEYS")
@@ -346,7 +408,28 @@ def apply(movements: dict[str, dict[str, Any]], hyp_row: Any) -> dict[str, dict[
         _hard_stop(table, getattr(targets, table), movements)
     for key, e in movements.items():
         evaluate_entry(key, e, hyp_row)
-    return apply_canonical(movements)
+    index = apply_canonical(movements)
+    apply_family_exposures(movements, index)
+    return index
+
+
+def apply_family_exposures(movements: dict[str, dict[str, Any]], index: dict[str, dict[str, Any]]) -> None:
+    """#5861 FIX-DATA: a canonical family of conditioning movements carries ONE `family_sustainability` (established | tried |
+    untried, by the cardio model's own threshold over the members' session counts SUMMED), so the cardio model rates the one
+    machine once (the recumbent bike and Hevy's "Cycling" were two rows on two tiers). A category, never a count (the library
+    holds no private numbers). Written only where a family has more than one conditioning member; `history` is untouched."""
+    from training import cardio_model
+
+    for e in movements.values():
+        e.pop("family_sustainability", None)
+        e.pop("family_exposures", None)
+    for head, fam in index.items():
+        members = [head, *fam["aliases"], *fam["variants"]]
+        if len(members) > 1 and all(movements[m].get("category") == "conditioning" for m in members):
+            total = sum(int((movements[m].get("history") or {}).get("exposures") or 0) for m in members)
+            level = "established" if total >= cardio_model.ESTABLISHED_EXPOSURES else ("tried" if total > 0 else "untried")
+            for m in members:
+                movements[m]["family_sustainability"] = level
 
 
 def apply_canonical(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -354,7 +437,8 @@ def apply_canonical(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str,
     axes; an exact duplicate (alias) takes the canonical's reviewed attributes. Returns the index written at the top level."""
     index: dict[str, dict[str, Any]] = {}
     seen: dict[str, str] = {}
-    for head, (aliases, variants) in targets.CANONICAL_FAMILIES.items():
+    soft = {h: f for h, f in targets.ADDITION_FAMILIES.items() if all(k in movements for k in [h, *f[0], *f[1]])}
+    for head, (aliases, variants) in {**targets.CANONICAL_FAMILIES, **soft}.items():
         _hard_stop(f"CANONICAL_FAMILIES[{head}]", [head, *aliases, *variants], movements)
         for k in [head, *aliases, *variants]:
             if k in seen:

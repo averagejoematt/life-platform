@@ -355,6 +355,8 @@ def test_variety_rotates_a_slot_within_its_band_by_its_own_history():
         },
         {"sk": vr.ledger_sk(1, "shoulders_arms.db_curl"), "block": 1, "phase_2": {"variant": keys[band[1]]}},
         {"sk": vr.ledger_sk(1, "upper_volume.db_curl"), "block": 1, "phase_2": {"variant": keys[band[2]]}},
+        # any further band member (a duplicate such as the DB incline curl, #5861 FIX-DATA) was served by some other slot
+        *[{"sk": vr.ledger_sk(1, f"other.curl_{i}"), "block": 1, "phase_2": {"variant": keys[m]}} for i, m in enumerate(band[3:])],
     ]
     assert se.slot_last_served(rows, _pos(), "upper_heavy.db_curl") == {keys[band[1]]: 101, keys[band[0]]: 102}
     s2 = _slot(_week(rows=rows, cat=_cat_before_l6()), "upper_heavy.db_curl")

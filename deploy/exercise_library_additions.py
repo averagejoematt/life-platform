@@ -62,7 +62,15 @@ TEMPLATE_INDEX_SOURCE = "s3://matthew-life-platform/config/hevy_template_index.j
 OUTCOMES = ("ADD", "VARIANT", "ALREADY_COVERED", "DEFER")
 PRIORITIES = ("P0", "P1", "P2", "P3")
 CATEGORIES = ("hypertrophy", "strength", "conditioning", "athletic", "mobility", "rehab_control", "carry")  # the #5861 contract
-TRUNK_FUNCTIONS = ("loaded_flexion", "anti_extension", "anti_rotation", "anti_lateral_flexion", "rotation", "loaded_stabilisation")
+TRUNK_FUNCTIONS = (
+    "loaded_flexion",
+    "lateral_flexion",
+    "anti_extension",
+    "anti_rotation",
+    "anti_lateral_flexion",
+    "rotation",
+    "loaded_stabilisation",
+)
 OBJECTIVES = ("hypertrophy", "strength", "functional", "conditioning", "mobility")
 PHASE_SUITABILITY = ("now", "later", "specialist")  # for the present weight-loss phase
 PROGRAMMING = ("auto_programmable", "readiness_gated")
@@ -1254,7 +1262,7 @@ ADDITIONS: list[dict[str, Any]] = [
         category="conditioning",
         attrs=("carry_conditioning", "not_applicable", "cardio_machine", _H, _js(_L, _L, _L, _L, _L)),
         skill=_L,
-        equipment=["recumbent_bike"],
+        equipment=["stationary_bike"],  # #5861 FIX-DATA: the machine he rides IS Hevy's "Cycling" (one machine, one equipment id)
         objectives=["conditioning"],
         lat="alternating",
         progression=(["resistance level", "duration", "cadence"], ["continuous or interval blocks"]),
@@ -1263,12 +1271,12 @@ ADDITIONS: list[dict[str, Any]] = [
         joint_notes="back-supported, no impact, low balance demand",
         levels=(["short easy bouts"], ["longer bouts", "intervals"]),
         alts=["cycling", "elliptical_trainer"],
-        fit=["knee_tolerance", "low_back_tolerance", "low_recovery_cost", "equipment_unconfirmed"],
+        fit=["knee_tolerance", "low_back_tolerance", "low_recovery_cost"],
         phase="now",
-        gate="equipment_unconfirmed",
+        gate=None,
         influence=(
             _AVAIL,
-            "named in the brief's modality list; equipment state unconfirmed, so it informs the cardio model only once confirmed",
+            "named in the brief's modality list; the same machine as `cycling` (one canonical family, one rating)",
         ),
         protocols=_ALL_PROTOCOLS,
     ),

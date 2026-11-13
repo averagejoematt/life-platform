@@ -64,7 +64,7 @@ duplicate) · `objective_inputs` (below) · `ratings` {hypertrophy, strength, fu
 objective does not apply to carries `tier: null`, `applicable: false` and its reason. The top level carries
 `canonical_families`.
 
-## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.0.0, PROPOSED)
+## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.1.0, PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -168,7 +168,7 @@ These bind every later library and tier decision.
 8. **Every weight change ships with its diff:** a before/after band table of every movement that moves, a version bump,
    and the owner's sign-off before anything serves.
 
-## Objectives (#5861, rubric v3.0.0 — PROPOSED, not live)
+## Objectives (#5861, rubric v3.1.0 — PROPOSED, not live)
 
 **Verdict on the 14-point rubric.** It is fit for one job and was being used for five. As a *hypertrophy stimulus
 profile* for a loadable movement it holds up: its terms (length bias, stability, resistance-curve fit, progressability,
@@ -202,7 +202,7 @@ the hypertrophy objective's tier per target), so the selection engine and every 
 **A. Hypertrophy (per target muscle).** The v3 points band, then caps: a low or unknown ceiling, or a limiter that is
 not the target, holds the row at B; any unmet **S criterion** holds it at A. S needs ALL of: the points band is S; the
 ceiling is high; the target is the limiter; stability high or moderate (it can be taken near failure); systemic
-fatigue not high; no joint rated high. A direct trial still moves the capped tier at most one band, and never to S
+fatigue not high; no joint rated high; the inputs were reviewed by hand (3.1.0). A direct trial still moves the capped tier at most one band, and never to S
 unless every S criterion holds. Not applicable (null) to categories conditioning, mobility, rehab_control, carry and
 athletic, to a `full_body` / `cardio` / `other` target, and to isometric trunk control (anti-rotation, anti-lateral
 flexion, loaded stabilisation).
@@ -214,7 +214,8 @@ kettlebell, landmine, cable, selectorized). C = other bodyweight. D = light. Fat
 by selection, never a demotion: the heavy lifts are costly and are still the strength lifts.
 
 **C. Functional.** Applies when the movement trains at least one functional quality. S = three or more qualities,
-loadable, not high-skill, no joint rated high, AND a carry or single-leg work under travel or trunk load. A = two or more
+loadable, not high-skill, no joint rated high, not joint-capacity work (3.1.0), AND a carry or single-leg work under
+travel or trunk load. A = two or more
 loadable (or three or more). B = two, or one loadable. C = one.
 
 **D. Conditioning.** Applies to a conditioning modality (and to carries, sleds and athletic drills with a conditioning
@@ -222,7 +223,8 @@ profile). S = aerobic stimulus high + intensity control high + impact low + reco
 impact, or aerobic moderate + low impact + low recovery demand. B = aerobic high, or moderate without high impact.
 C otherwise. Never penalised for lacking hypertrophy traits. **One rule per movement:** every modality the cardio model
 (`lambdas/training/cardio_model.py`, lane L4 — it owns cardio) rates is rated by it alone (`conditioning_rating`, with its
-N=1 sustainability from `history.exposures`); the table above applies only to what it does not model (carries, athletic
+N=1 sustainability from `history.exposures`, summed over the canonical family as `family_sustainability` so one machine is
+rated once, 3.1.0); the table above applies only to what it does not model (carries, athletic
 drills, bodyweight circuits).
 
 **E. Mobility / joint function.** Applies to mobility, rehab/control and loaded end-range movements. Loaded (strength
@@ -284,16 +286,47 @@ H / St / F / C / M, "-" = not applicable):
 | Farmer's carry C (and its duplicate D) | farmers_walk, farmers_walk_8d414b80 | C / D | H - · St B · F S · C C (both) | an alias pair, one rating; a carry is never judged on hypertrophy |
 | Sled push / pull D | sled_push, sled_drag | D | H - · St A · F A · C B | category carry: loaded locomotion |
 | Ab wheel D | ab_wheel | D | H A · F B | lengthened anti-extension with a kneeling-to-standing ladder |
-| Bird dog / side plank / cuff D | bird_dog, side_plank, rotator_cuff_external_rotation | D / D / D | F C, M B / F B / M A | rehab and control work, rated on functional and joint function, never on growth |
+| Bird dog / side plank / cuff D | bird_dog, side_plank, rotator_cuff_external_rotation | D / D / D | F C, M B / F B / F B, M - | rehab and control work, rated on functional, never on growth; cuff rotation is joint capacity, not mobility (3.1.0) |
 | Cossack and unusual lunges S for quads | db_cossack_squats, 3_way_lunge, offset_lunges, drop_step_lunges, … | S | quads B (cossack: adductors A, M A; offset: F S) | balance or mobility, not the quads, ends the set; DB held lower-body work has a moderate ceiling. Squats, leg press and split squats now sit above them (A) |
-| All cardio D | treadmill, cycling, elliptical, rowing_machine, air_bike, walking, running | D | H - · C S / S / A / A / B / C / C | rated on conditioning only, by lane L4's cardio model (walking: hard to dose and progress; running: high impact) |
-| No S glute | hip_thrust_machine, glute_kickback_machine, hip_thrust_barbell | A / A / B | S / S / A | glute length fixed at mid both ways (Plotkin 2023); the machines meet every S criterion; the barbell hip thrust's moderate skill and stability hold it at A |
+| All cardio D | treadmill, cycling (= recumbent_bike), elliptical, rowing_machine, air_bike, walking, running | D | H - · C S / S / A / A / B / C / C | rated on conditioning only, by lane L4's cardio model (walking: hard to dose and progress; running: high impact) |
+| No S glute | hip_thrust_machine, glute_kickback_machine, hip_thrust_barbell | A / A / B | S / A / A | glute length fixed at mid both ways (Plotkin 2023); the hip thrust machine meets every S criterion; the kickback stack's load ceiling is moderate (3.1.0: a single-leg lever stack caps the absolute load), so A; the barbell hip thrust's moderate skill and stability hold it at A |
 | Weak adductors | db_cossack_squats, sumo squats, side lunges, squat_barbell | — | adductors A / A / B / A | reviewed secondary rows; adduction machines and Copenhagen work are lane L2's additions |
 | Inconsistent rear delts | rear_delt_reverse_fly_machine / _cable / rear_delt_fly / face_pull | S / B / C / B | S / A / B / B (face pull M A) | the cable fly is mid-length like the machine; the dumbbell flies are dumbbells; the face pull's cuff work is rated on joint function |
 
 **S census.** `_provenance.s_census` reports, per objective and muscle, how many movements are S and how many distinct
 canonical families they are. No quota: every S already met every S criterion of its objective. `tests/test_objective_ratings_5861.py`
 re-checks each S against its criteria.
+
+## Red-team data fixes (#5861 FIX-DATA, rubric v3.1.0 — PROPOSED)
+
+An independent red team graded the integrated engine C+ and named library DATA errors (the attributes, not the formula, were the
+main source of wrong tiers). Each is fixed through a reviewed override with a one-line reason (`deploy/exercise_library_targets.py`,
+`deploy/exercise_library_objectives.py`, the curation layer), then the SAME class was swept library-wide. Guards:
+`tests/test_data_fixes_5861.py`.
+
+| Error class | Specimen | Fix | Swept |
+|---|---|---|---|
+| a bent-knee calf raise credited to the gastrocnemius | `seated_calf_raise` | soleus only (the row is removed in the curation layer) | every calf movement: only the seated raise is bent-knee |
+| a lateral side bend classed loaded flexion | `side_bend_dumbbell` | new trunk function `lateral_flexion`, pattern `core_lateral_flexion` | `saxon_side_bends`, `side_crunch_slow_cadence` |
+| a hypertrophy row on a muscle that is not the primary | the three Pallof presses (row `shoulders`, primary `abs`) | the row follows the audited primary (`sync_primary_row`) | the sled push / pull, the Turkish get-up, `dead_hang`, `hang_high_pull` |
+| a supported movement rated unstable | `spider_curl` (chest-supported), the bench-supported dumbbell flies, incline skull crusher | stability high / moderate | the whole `supported / incline / chest` title class |
+| naturally short ROM penalised | the shrugs (C) | `STRETCH_NOT_ESTABLISHED`: the traps' stretch term reads mid (a heuristic, no trial) and a heavy shrug is grip-limited (B) | traps only |
+| a lateral RAISE read as balance-limited | `bent_arm_lateral_raises`, `db_cheat_laterals` | the balance limiter never applies to an upper-body pattern | every `balance` limiter reviewed |
+| the title regex missed the pattern (a hyphen, a missing word) | `knee_push_up`, `elbows_tucked_db_bench`, the glute-ham raises, `front_raise_dumbbell` | reviewed `PATTERN_OVERRIDES` | every movement left at pattern `other` with a tier |
+| custom template with no equipment read as bodyweight | `shoulder_press`, `tricep_extension`, `overhead_tricep_extension`, `seated_bicep_curls`, `21s`, `one_arm_bench_press` | resistance `unknown` (a load is needed; the owner names it) | every bodyweight-resistance loaded-pattern movement |
+| one machine, two rows, two tiers | `prone_leg_curl` = the lying leg-curl machine; `db_incline_curls` = the seated incline curl; `gorilla_row_kettlebell` ~ the dumbbell gorilla row; `cycling` = `recumbent_bike` | canonical families (ids and history preserved); equipment fixed | every same-title / same-core pair |
+| the lunge family had no glute row | every loaded lunge / split squat / step-up | a glutes row (B: balance is the limiter, or target when stable) | `add_glute_row`, one rule |
+| cuff rotation is not mobility | the three cuff external rotations | `mobility` n/a (joint capacity, rated functional B) | the cuff family |
+
+**S is tightened, not quota-ed.** (1) S now also needs *reviewed* inputs (`reviewed_inputs`). (2) The glute kickback machine reached S
+with a high load ceiling; a single-leg lever stack caps the absolute load far below the glutes' capacity (the hip thrust carries the
+heavy loading), so its `ceiling` is moderate: A. (3) Copenhagen functional S: it carries the `joint_capacity` quality, which the rubric
+always said never reaches S; the code now enforces that (functional A). S stays rare: see the S census in `_provenance`.
+
+**One cardio rating per machine.** The recumbent bike and Hevy's "Cycling" are the same machine; they are one canonical family with one
+`family_sustainability`, so the cardio model rates them once. *Cardio-model note (lane L4's file, not edited here):* the model still reads
+the row's session count (N=1 sustainability) to award S; a public tier should not depend on one person's history, so the better fix is for
+`cardio_model` to expose sustainability as a separate N=1 input (the private overlay) and cap the public tier at A.
 
 ## Target-label audit (#5857, owner-approved on PR #5858)
 
