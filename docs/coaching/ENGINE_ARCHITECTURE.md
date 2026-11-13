@@ -423,6 +423,15 @@ holds each key to a labelled table and to this list.
 | `live_week.NOVEL_START` | RPE logged on a new movement's first 3 exposures |
 | `fatigue_model.THRESHOLDS` | strain calls vs the next session's first-set reps / RPE |
 | `quality_rubric.NEUTRAL` | how often a reviewed input moved a provisional row's tier |
+| `fatigue_model.THRESHOLDS.deficit_hold_pct` | anchor e1RM 3 and 6 weeks after a 'holding' read in a deficit vs after a reset (held = right; sliding = tighten the band) |
+| `fatigue_model.THRESHOLDS.post_reset_min_exposures` | e1RM over the exposures after each reset; resets per lift per block |
+| `fatigue_model.THRESHOLDS.reset_detect_pct` | resets the record shows vs the resets the engine prescribed (false reads = a volume day called a reset) |
+| `live_pain.PAIN_SCOPE` | pain-note recurrence within 2 sessions of a lift-only / pattern / pain-free-route answer, and the flagged muscle's hard sets |
+| `live_stimulus.FAST_CUT` | anchor e1RM in the 2 weeks after a fast-cut volume answer vs after a load cut |
+| `live_stimulus.WEEK_FLOOR` | weekly HARD sets per muscle vs MEV, and the floor muscles' e1RM / rep PRs |
+| `live_stimulus.DELOAD_TOP_SET` | readiness and first-set reps the week after an unconfirmed-deload week |
+| `live_stimulus.PARITY` | priority-muscle sets vs the donors' and both muscles' rep PRs |
+| `live_week.FAMILIAR_SWAP` | RPE logged on a familiar swap's first 2 exposures (over target = restore the novelty cap) |
 
 ## 5. Progression
 

@@ -69,7 +69,8 @@ WEEK_FLOOR: dict[str, dict[str, Any]] = {
         },
         "label": HEURISTIC,
         "basis": "the low-fatigue isolation preferred per muscle (machines and cables: low systemic and joint cost); else the most-logged "
-        "isolation the library places on that muscle",
+        "isolation the library places on that muscle — only a movement he has logged (a load on file: worked at target, never a "
+        "novelty-capped first exposure)",
     },
 }
 DELOAD_TOP_SET: dict[str, dict[str, Any]] = {
@@ -184,9 +185,14 @@ def _iso_for(muscle: str, ctx: dict[str, Any], taken: set[str], flags: list[dict
 
     lib, cat = ctx.get("lib") or {}, ctx.get("catalog") or {}
     to_lib = (ctx.get("idx") or {}).get("to_lib") or {}
-    pref = list((WEEK_FLOOR["keys"]["value"] or {}).get(muscle) or [])
-    rest = sorted((k for k in cat if k not in pref), key=lambda k: (-int((cat.get(k) or {}).get("sessions") or 0), k))
-    for key in pref + rest:
+    logged = lambda k: int((cat.get(k) or {}).get("sessions") or 0) > 0  # noqa: E731 — a logged movement has a load on file
+    recent = set(ctx.get("block_tids") or ())  # in the block's record: no layoff cap on its first exposure back
+    tid = lambda k: str((cat.get(k) or {}).get("hevy_template_id_hint") or "").upper()  # noqa: E731
+    pref = [k for k in (WEEK_FLOOR["keys"]["value"] or {}).get(muscle) or [] if logged(k)]
+    rest = sorted((k for k in cat if k not in pref and logged(k)), key=lambda k: (-int((cat.get(k) or {}).get("sessions") or 0), k))
+    order = pref + rest
+    order = [k for k in order if tid(k) in recent] + [k for k in order if tid(k) not in recent]
+    for key in order:
         entry = (lib.get("movements") or {}).get(to_lib.get(key) or "") or {}
         c = cat.get(key) or {}
         if key in taken or not entry or entry.get("job") != "isolation" or c.get("hevy_type") in live_session.NOT_LIFTS:
@@ -212,11 +218,12 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     from training.program_structure import EXPOSURES
 
     day = str(ctx.get("target_date") or "")
-    if not day or not last_session(ctx, rx.get("session_role")) or live_rules.bad_day(rx):
-        return []
+    if not day or not last_session(ctx, rx.get("session_role")) or live_rules.bad_day(rx) or rx.get("live_fast_cut"):
+        return []  # a fast cut's answer IS less accessory volume (FAST_CUT): the floor never adds it back
     logged = _hard_logged(workouts, ctx, lb.week_start(day), day)
     from training import live_program
 
+    ctx["block_tids"] = {str(x.get("template_id") or "").upper() for w in workouts or [] for x in w.get("exercises") or []}
     flags = live_program.joint_flags(ctx, workouts, (ctx.get("discomfort") or set()) | (ctx.get("light_discomfort") or set()))
     marks = block_model.load_landmarks() or {}
     prio = [str(m) for m in live_shape._settings(ctx.get("lib")).get("priority_muscles") or []]
@@ -260,7 +267,9 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
                 lines.append(
                     f"week floor (live): {m} {have:g} hard sets this week < MEV {mev:g} — {(cat.get(slot['movement_key']) or {}).get('title')} +{give} set(s) (WEEK_FLOOR, heuristic)"
                 )
-                continue
+                if have + give >= mev:
+                    continue
+                have += give  # the slot is full and the muscle still short: a second low-fatigue isolation follows
         key = _iso_for(m, ctx, taken, flags)
         if key is None:
             continue
@@ -326,9 +335,9 @@ PARITY: dict[str, dict[str, Any]] = {
         "of them (the shoulders are pressed and their rear-delt work is kept: they stay out); a donor keeps MEV + donor_margin",
     },
     "donor_margin": {
-        "value": 2,
+        "value": 1,
         "label": HEURISTIC,
-        "basis": "a donor keeps MEV + 2 on the plan: the served week loses sets to swaps and the time trim the plan cannot see",
+        "basis": "a donor keeps MEV + 1 on the plan: the served week loses sets to swaps and the time trim the plan cannot see",
     },
 }
 

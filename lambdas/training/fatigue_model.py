@@ -346,6 +346,8 @@ def _judge(
         return {"trend": "regressing", "why": f"the latest pair of exposures are both more than {drop:.0%} under the best before them"}
     if _recent_best(pts, e1):
         return {"trend": "progressing", "why": f"a new best e1RM in the last {THRESHOLDS['trend_recent_days']['value']} days"}
+    if _load_pr(pts):  # #5861 FIX7: a heavier top load at an equal e1RM is the double progression stepping, never a stall
+        return {"trend": "progressing", "why": "a heavier top load in the recent window at a held e1RM (the double progression's step)"}
     if len(pts) < THRESHOLDS["trend_min_exposures"]["value"]:
         return {"trend": "unknown", "why": "no new best yet, and below trend_min_exposures for a stall call"}
     try:  # #5057: the same load x reps at an easy RPE is the PRESCRIPTION holding still — a load step, never a rotation
@@ -404,6 +406,16 @@ def in_deficit(weights_by_day: Any) -> bool | None:
     (no live path reads the rate proposal: the rate-proposal guard)."""
     rate = loss_rate_pct(weights_by_day)
     return None if rate is None else rate >= float(THRESHOLDS["deficit_rate_pct_bw"]["value"])
+
+
+def _load_pr(pts: list[tuple[str, float | None, float | None, float | None, int | None]]) -> bool:
+    """The recent window's (`trend_recent_days`) heaviest top load beats every earlier one, its effort under a grind (RPE < 9)."""
+    span = THRESHOLDS["trend_recent_days"]["value"]
+    recent = [p for p in pts if (_ago(str(pts[-1][0]), str(p[0])) or 0) < span]
+    earlier = pts[: len(pts) - len(recent)]
+    loads = [float(p[3]) for p in earlier if p[3] is not None]
+    hit = [p for p in recent if p[3] is not None and (p[2] is None or float(p[2]) < 9.0)]
+    return bool(loads and hit) and max(float(p[3]) for p in hit) > max(loads) + 0.1
 
 
 def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, int | None]], e1: list[float]) -> bool:
