@@ -277,6 +277,9 @@ def for_live_draft(
         lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
+        from training import live_progress  # #5861 FIX8: the first week back after 10+ days off runs at RPE 7-8, no steps
+
+        lines += live_progress.apply_return_week(out, ctx, block_workouts)
         from training import live_stimulus  # #5861 FIX7: a fast cut with broad regression answers with volume, never load
 
         lines += live_stimulus.fast_cut(out, sig, inputs)
@@ -343,6 +346,13 @@ def for_live_draft(
 
         rate += live_stimulus.rate_suffix(out)  # FIX7: the advisory line names the fast-cut answer
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
+    from training import live_progress
+
+    tids = {
+        str((catalog_movements or {}).get(str(e.get("movement_key")), {}).get("hevy_template_id_hint") or "").upper()
+        for e in out["exposures"]
+    }
+    out[MARK]["refs"] = live_progress.role_refs(block_workouts, tids - {""})  # FIX8: the load guard's role-keyed references
     return out
 
 
