@@ -65,7 +65,7 @@ QUAD_SLOT: dict[str, Any] = {
     "label": HEURISTIC,
     "basis": "fourth red team: the leg extension (hypertrophy S for the rectus femoris) was never served — the selection swaps like for "
     "like and no template slot asks for a knee-extension isolation. When the quadriceps sit at or under MEV + priority_margin, "
-    "the lower-volume day (no quadriceps accessory) takes a two-set quadriceps isolation: the first of `keys` his history shows "
+    "the QUAD_SLOT `role` (its template has no quadriceps accessory) takes a two-set quadriceps isolation: the first of `keys` his history shows "
     "(logged on history_min+ days in the catalog) and the gym has; its sets come from the freed / at-MAV sets",
 }
 WALK_PROMPT: dict[str, dict[str, Any]] = {
