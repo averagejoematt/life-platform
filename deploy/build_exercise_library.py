@@ -116,7 +116,11 @@ OWNER_RULED_SETTINGS: dict[str, Any] = {
     "rate_ceiling_pct_bw": 1.0,  # ruling 11: ~1 % of current bodyweight a week, the advisory upper planning reference
     "symptom_line": "",  # ruling 10 (follow-up): no symptom warning line on any session
     "symptom_line_on_lifting_days": False,  # ruling 10
+    "hard_conditioning_doses": 1,  # owner ruling 2026-11-13 (FIX7 follow-up): one hard conditioning dose a week; kept a setting
 }
+"""#5861 FIX7 also records the owner's 2026-11-13 clarification of ruling 17 (no setting: the rubric itself, quality_rubric 3.5.0):
+glute stretch credit only for genuinely lengthened loading, the same standard as every muscle — short-range glute lifts (kickbacks,
+hip thrust variants) earn no stretch credit (`quality_rubric.STRETCH_CAPS` empty)."""
 
 
 def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
@@ -813,6 +817,26 @@ def apply_attribute_audit(movements: dict[str, dict[str, Any]]) -> None:
             e["attribute_audit"]["joints_rated"] = {"joints": filled, "rule": rule[1]}
 
 
+def apply_press_family(movements: dict[str, dict[str, Any]]) -> None:
+    """#5861 FIX7: the press family rated by implement, consistently (input_review.PRESS_FAMILY_JOINTS), after the class rules — a
+    rated joint the family rule names is overwritten (and recorded on `attribute_audit.press_family`)."""
+    for e in movements.values():
+        fam = input_review.press_family_joints(e)
+        js = dict(e.get("joint_stress") or {})
+        changed = sorted(j for j, v in (fam or ({}, ""))[0].items() if js.get(j) != v)
+        if fam and changed:
+            e["joint_stress"] = {**js, **{j: fam[0][j] for j in changed}}
+            e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+            e["attribute_audit"]["press_family"] = {"joints": changed, "rule": fam[1]}
+    for key, e in movements.items():  # an alias (variant.duplicate_of) carries its head's ratings — the schema's alias rule
+        head = movements.get(str((e.get("variant") or {}).get("duplicate_of") or ""))
+        rated = (head or {}).get("attribute_audit", {}).get("press_family")
+        if rated and e.get("joint_stress") != head["joint_stress"]:
+            e["joint_stress"] = dict(head["joint_stress"])
+            e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+            e["attribute_audit"]["press_family"] = {"joints": rated["joints"], "rule": f"an alias of {e['variant']['duplicate_of']}"}
+
+
 def apply_target_audit(movements: dict[str, dict[str, Any]], overrides: dict[str, tuple[str, str]] | None = None) -> None:
     """The reviewed target-label audit (`deploy/exercise_library_targets.py`, #5857), in place: the audited primary and its
     region, every hypertrophy row whose target was the old primary moved with it (a sub-target row is left alone), and
@@ -859,6 +883,7 @@ def build_library(
         e["job"], e["pattern"] = job_and_pattern(e)
     families = apply_evaluation_layer(movements)  # #5861: category, objective inputs, secondary rows, canonical layer
     input_review.apply_class_rules(movements)  # #5861 FIX3: shoulder-provoking work >= moderate; one spine-loading class
+    apply_press_family(movements)  # #5861 FIX7: elbow / wrist by implement across the press family (pain outcomes consistent)
     missing = reviews.apply_evidence_changes(movements, reviews.ledger_evidence_changes(_ledger()))
     if missing:
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")

@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.3.3",
+ "version": "0.3.4",
  "status": "proposed",
  "change_log": [
   {
@@ -50,6 +50,13 @@
    "by": "#5861 FIX6 (the owner's rulings of 2026-11-13 on the decision register — configuration, not activation)",
    "what": "`programming_settings` carries the owner's ruled values (build_exercise_library.OWNER_RULED_SETTINGS): the shared 75-min cap, the 4-session short week, purposeful cardio only, top set + one back-off with a weekly lead lift, overhead press 3 sets, no KB hinge under strain, chest + quadriceps priority by stimulus and performance, the advisory loss-rate ceiling, no symptom warning line. Rubric 3.4.0: the glute stretch term at its top for any known length (ruling 17: the same S standard as other muscles, no exercise-specific trial required); a provisional rating never reaches S on any objective (ruling 16).",
    "rule": "rulings are configuration only — status stays proposed until the owner approves the library"
+  },
+  {
+   "version": "0.3.4",
+   "date": "2026-11-13",
+   "by": "#5861 FIX7 (the sixth red team; owner rulings of 2026-11-13: hard_conditioning_doses = 1, ruling 17 clarified)",
+   "what": "Rubric 3.5.0: glute stretch credit only for genuinely lengthened loading, the same standard as every muscle (owner ruling 2026-11-13) — the barbell hip thrust A by its trial's equivalence with the squat, no glute S; the press family's elbow (and the barbell bench's wrist) rated by implement; `programming_settings.hard_conditioning_doses` 1 (owner ruling).",
+   "rule": "configuration and data only — status stays proposed until the owner approves the library"
   }
  ],
  "_provenance": {
@@ -70,19 +77,19 @@
    "history": 539
   },
   "hypertrophy_rows_by_tier": {
-   "S": 32,
-   "A": 145,
+   "S": 30,
+   "A": 142,
    "B": 215,
-   "C": 60,
+   "C": 65,
    "D": 0,
    "not_applicable": 210
   },
   "ratings_by_objective": {
    "hypertrophy": {
-    "S": 31,
-    "A": 139,
-    "B": 186,
-    "C": 60,
+    "S": 29,
+    "A": 136,
+    "B": 187,
+    "C": 64,
     "D": 0,
     "not_applicable": 210
    },
@@ -168,14 +175,6 @@
      "movements": [
       "calf_press_machine",
       "standing_calf_raise_machine"
-     ]
-    },
-    "glutes": {
-     "s": 2,
-     "families": 2,
-     "movements": [
-      "hip_thrust_barbell",
-      "hip_thrust_machine"
      ]
     },
     "hamstrings": {
@@ -389,7 +388,7 @@
   "attribute_rule": "derived by rule unless deploy/exercise_library_curation.py overrides; `unknown` = the rule cannot say"
  },
  "quality_rubric": {
-  "version": "3.4.0",
+  "version": "3.5.0",
   "provenance": "owner ruling 2026-11-12 on #5857: rubric v2, all eight board recommendations adopted",
   "job": {
    "field": "job",
@@ -407,13 +406,7 @@
      "mid": 3,
      "shortened": 1
     },
-    "fixed": {
-     "glutes": {
-      "at": "lengthened",
-      "citation": "plotkin2023_hip_thrust_vs_squat",
-      "why": "length does not decide glute growth (the hip thrust, shortened, matched the back squat, lengthened): the stretch term is held at its top for any known glute length — no premium between glute movements and no cost against other muscles"
-     }
-    },
+    "fixed": {},
     "not_established": {
      "traps": {
       "at": "mid",
@@ -1785,7 +1778,8 @@
   "priority_add_rule": "stimulus_and_performance",
   "rate_band_mode": "advisory",
   "rate_ceiling_pct_bw": 1.0,
-  "symptom_line_on_lifting_days": false
+  "symptom_line_on_lifting_days": false,
+  "hard_conditioning_doses": 1
  },
  "canonical_families": {
   "triceps_pushdown": {
@@ -2830,12 +2824,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -2847,13 +2841,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "B",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "B"
      },
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -3300,7 +3294,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "moderate",
+    "elbow": "low",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -3414,7 +3408,17 @@
      "movement_id": "chest_press_machine",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "a dumbbell, machine-handle, cable or landmine press lets the grip and forearm rotate (neutral available): the elbow is low for every member, flat, incline or overhead alike (#5861 FIX7)"
+    }
+   }
   },
   "lat_pulldown_cable": {
    "title": "Lat Pulldown (Cable)",
@@ -4328,8 +4332,8 @@
    "joint_stress": {
     "spinal_load": "low",
     "shear": "low",
-    "wrist": "low",
-    "elbow": "low",
+    "wrist": "moderate",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -4459,6 +4463,13 @@
       "wrist"
      ],
      "rule": "a press loads the shoulder; the trunk is supported on a bench or pad"
+    },
+    "press_family": {
+     "joints": [
+      "elbow",
+      "wrist"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
@@ -4818,7 +4829,7 @@
     "spinal_load": "moderate",
     "shear": "low",
     "wrist": "low",
-    "elbow": "moderate",
+    "elbow": "low",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -4932,7 +4943,17 @@
      "movement_id": "seated_shoulder_press_machine",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "a dumbbell, machine-handle, cable or landmine press lets the grip and forearm rotate (neutral available): the elbow is low for every member, flat, incline or overhead alike (#5861 FIX7)"
+    }
+   }
   },
   "side_bend_dumbbell": {
    "title": "Side Bend (Dumbbell)",
@@ -6821,10 +6842,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 14,
-     "points_tier": "S",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 1, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -6842,7 +6863,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 1, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -8091,7 +8112,7 @@
     "spinal_load": "high",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -8226,6 +8247,12 @@
       "wrist"
      ],
      "rule": "a standing overhead press loads the shoulder and the spine"
+    },
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "an alias of overhead_press_barbell"
     }
    }
   },
@@ -8573,12 +8600,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -8590,13 +8617,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "B",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "B"
      },
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -8864,7 +8891,7 @@
     "spinal_load": "high",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -8998,6 +9025,12 @@
       "wrist"
      ],
      "rule": "a standing overhead press loads the shoulder and the spine"
+    },
+    "press_family": {
+     "joints": [
+      "elbow"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
@@ -10432,12 +10465,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 9,
+     "points_tier": "B",
      "basis": [
-      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
+      "points 9/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -10449,13 +10482,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "B",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "B"
      },
      "basis": [
-      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
+      "points 9/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -11056,13 +11089,13 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "S",
-     "rubric_tier": "S",
-     "rubric_score": 14,
-     "points_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
-      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
+      "points 10/14 -> A: stretch 1, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "provisional": false,
@@ -11071,7 +11104,7 @@
      "last_reviewed": "unreviewed",
      "note": "machine form of the hip thrust; the trial used a barbell",
      "evidence_ceiling": {
-      "tier": "S",
+      "tier": "A",
       "movement": "hip_thrust_barbell",
       "citation": "plotkin2023_hip_thrust_vs_squat"
      }
@@ -11079,14 +11112,14 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "glutes",
      "by_target": {
-      "glutes": "S"
+      "glutes": "A"
      },
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
-      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
+      "points 10/14 -> A: stretch 1, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -15087,10 +15120,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 12,
-     "points_tier": "S",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -18799,12 +18832,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 12,
-     "points_tier": "S",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
+      "points 8/14 -> B: stretch 1, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -18816,13 +18849,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "B",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "B"
      },
      "basis": [
-      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
+      "points 8/14 -> B: stretch 1, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -21065,12 +21098,12 @@
     },
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 9,
-     "points_tier": "B",
+     "tier": "C",
+     "rubric_tier": "C",
+     "rubric_score": 7,
+     "points_tier": "C",
      "basis": [
-      "points 9/14 -> B: stretch 5, stability 1, resistance_profile 2, progressability 1, carryover 0, joint_stress 0",
+      "points 7/14 -> C: stretch 3, stability 1, resistance_profile 2, progressability 1, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -21090,7 +21123,7 @@
      "target": "quadriceps",
      "by_target": {
       "quadriceps": "C",
-      "glutes": "B"
+      "glutes": "C"
      },
      "basis": [
       "points 7/14 -> C: stretch 3, stability 1, resistance_profile 2, progressability 1, carryover 0, joint_stress 0",
@@ -22870,14 +22903,14 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "tier": "C",
+     "rubric_tier": "C",
+     "rubric_score": 7,
+     "points_tier": "C",
      "basis": [
-      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "points 7/14 -> C: stretch 1, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
       "cap A: S needs stable_to_failure",
-      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
+      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "provisional": false,
@@ -22885,7 +22918,7 @@
      "citations": [],
      "last_reviewed": "unreviewed",
      "evidence_ceiling": {
-      "tier": "S",
+      "tier": "A",
       "movement": "hip_thrust_barbell",
       "citation": "plotkin2023_hip_thrust_vs_squat"
      }
@@ -22893,15 +22926,15 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "C",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "C"
      },
      "basis": [
-      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "points 7/14 -> C: stretch 1, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
       "cap A: S needs stable_to_failure",
-      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
+      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -33698,10 +33731,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 14,
-     "points_tier": "S",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 1, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -33719,7 +33752,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 1, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -34151,13 +34184,13 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "S",
-     "rubric_tier": "S",
-     "rubric_score": 12,
-     "points_tier": "S",
+     "tier": "A",
+     "rubric_tier": "B",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
-      "evidence rct_direct"
+      "points 8/14 -> B: stretch 1, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "evidence rct_direct, +1 band"
      ],
      "provisional": false,
      "evidence_confidence": "rct_direct",
@@ -34165,19 +34198,26 @@
       "plotkin2023_hip_thrust_vs_squat"
      ],
      "last_reviewed": "2026-11-11",
+     "evidence_adjustment": {
+      "bands": 1,
+      "citation": "plotkin2023_hip_thrust_vs_squat",
+      "why": "the hip thrust grew the glutes as much as the back squat (Plotkin 2023): equivalence with a higher-tier comparator",
+      "basis": "equivalence",
+      "comparator": "squat_barbell"
+     },
      "note": "equal to the back squat for the glutes"
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "glutes",
      "by_target": {
-      "glutes": "S"
+      "glutes": "A"
      },
      "basis": [
-      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
-      "evidence rct_direct"
+      "points 8/14 -> B: stretch 1, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "evidence rct_direct, +1 band"
      ],
      "evidence_confidence": "rct_direct",
      "provisional": false
@@ -34439,12 +34479,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "tier": "C",
+     "rubric_tier": "C",
+     "rubric_score": 6,
+     "points_tier": "C",
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 6/14 -> C: stretch 1, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -34457,13 +34497,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "C",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "C"
      },
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 6/14 -> C: stretch 1, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -35139,10 +35179,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 13,
-     "points_tier": "S",
+     "rubric_score": 11,
+     "points_tier": "A",
      "basis": [
-      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -44374,10 +44414,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
+      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -44396,7 +44436,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
+      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -44521,8 +44561,8 @@
    "joint_stress": {
     "spinal_load": "low",
     "shear": "low",
-    "wrist": "low",
-    "elbow": "low",
+    "wrist": "moderate",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -44650,6 +44690,13 @@
       "wrist"
      ],
      "rule": "a press loads the shoulder; the trunk is supported on a bench or pad"
+    },
+    "press_family": {
+     "joints": [
+      "elbow",
+      "wrist"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
@@ -47265,10 +47312,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
+      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -57260,8 +57307,8 @@
    "joint_stress": {
     "spinal_load": "low",
     "shear": "low",
-    "wrist": "low",
-    "elbow": "low",
+    "wrist": "moderate",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -57392,6 +57439,13 @@
       "wrist"
      ],
      "rule": "a press loads the shoulder; the trunk is supported on a bench or pad"
+    },
+    "press_family": {
+     "joints": [
+      "elbow",
+      "wrist"
+     ],
+     "rule": "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)"
     }
    }
   },
@@ -59954,10 +60008,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
+      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -66016,12 +66070,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "tier": "C",
+     "rubric_tier": "C",
+     "rubric_score": 6,
+     "points_tier": "C",
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 6/14 -> C: stretch 1, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -66034,13 +66088,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "C",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "C"
      },
      "basis": [
-      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 6/14 -> C: stretch 1, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -77871,10 +77925,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 14,
+     "rubric_score": 12,
      "points_tier": "S",
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -77892,7 +77946,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -90038,10 +90092,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 13,
-     "points_tier": "S",
+     "rubric_score": 11,
+     "points_tier": "A",
      "basis": [
-      "points 13/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "points 11/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -90060,7 +90114,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 13/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "points 11/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -93503,12 +93557,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 9,
-     "points_tier": "B",
+     "tier": "C",
+     "rubric_tier": "C",
+     "rubric_score": 5,
+     "points_tier": "C",
      "basis": [
-      "points 9/14 -> B: stretch 5, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 5/14 -> C: stretch 1, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high, stable_to_failure, reviewed_inputs",
       "evidence none_reviewed"
@@ -93524,13 +93578,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "C",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "C"
      },
      "basis": [
-      "points 9/14 -> B: stretch 5, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 5/14 -> C: stretch 1, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high, stable_to_failure, reviewed_inputs",
       "evidence none_reviewed"

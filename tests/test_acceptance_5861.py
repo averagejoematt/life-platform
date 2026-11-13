@@ -453,52 +453,49 @@ def capped_at(note: str | None, rpe: float) -> bool:
 
 
 def joint_unprotected(week: dict, lib: dict, catalog: dict, joint: str, group: str) -> list[str]:
-    """Served lifts that load `joint` at moderate or more — or whose pattern provokes it (`PROVOKING`) — with no protection: a
-    same-group movement (the flagged pattern) still served, or another such lift served with no RPE cap at 7 or less on its
-    note (the pain-monitoring rule)."""
+    """#5861 FIX7 (the pain rule narrowed to what provokes it): served lifts that breach an above-the-mild-line flag on `joint` in
+    pattern group `group` — a member of the flagged pattern that still loads the joint at moderate or more (the provoking
+    pattern still served), or a `PROVOKING` same-joint isolation with no RPE 7 cap.
+    Lifts of OTHER patterns that load the joint are not breaches any more (the sixth red team: one flag capped every row)."""
     out = []
     for x in _lifts(week):
         e = sw._lib_entry(lib, catalog, x["key"])
         if not e or x["tag"].endswith(":carry"):
             continue
-        if lp._stress(e, joint) < 1 and e.get("pattern") not in PROVOKING.get(joint, ()):
-            continue
-        if lp._group(e.get("pattern")) == group:
+        if lp._group(e.get("pattern")) == group and lp._stress(e, joint) >= 1:
             out.append(f"{x['key']}: same pattern")
-        elif not capped_at(x["hevy_note"], 7):
+        elif e.get("pattern") in PROVOKING.get(joint, ()) and not capped_at(x["hevy_note"], 7):
             out.append(f"{x['key']}: no cap")
     return out
 
 
-def test_c2c_a_pain_flag_reaches_every_movement_loading_that_joint_all_week(weeks):
+def test_c2c_a_pain_flag_acts_on_the_provoking_pattern_and_keeps_the_muscle_trained(weeks):
     """Red team (PT): the shoulder pain flag (6/10, sharp) on the machine press removed the press and left the barbell bench,
-    incline press, flies and overhead extensions at RPE 8-10. Now every pressing movement that loads the shoulder is avoided
-    (swapped for a lower-shoulder-stress member or skipped) and every other shoulder-loading lift is capped at RPE 7 with a
-    lighter load, every session of the week. The rule's line (PAIN_RULE mild_max) is a labelled heuristic."""
+    incline press, flies and overhead extensions at RPE 8-10. Then (FIX2-FIX6) every shoulder-loading lift was capped all week —
+    the sixth red team: chest fell to 0 sets. #5861 FIX7: the PROVOKING pattern (the press group, loading the shoulder) is off;
+    a pain-free same-family member (low on the shoulder) stands in at RPE <= 8 with the stop line, so the chest keeps hard sets;
+    above the mild line the same-joint isolation (raises, rear-delt work) stays capped at RPE 7."""
     b = weeks["b_shoulder_flag_low_recovery"]
     lib, cat = b["world"]["lib"], b["world"]["catalog"]["movements"]
     assert joint_unprotected(b["week"], lib, cat, "shoulder", "press") == []
     assert {x["key"] for x in _lifts(b["week"])}.isdisjoint({"barbell_bench_press", "incline_db_press", "cable_chest_fly"})
-    assert any(ln.startswith("reduced (live)") for s in b["week"]["sessions"] for ln in s["rationale"])
+    hard = sw.hard_sets_by_muscle(b["week"], lib, cat)
+    assert hard.get("chest", 0) >= 4, hard  # the chest keeps a pain-free route every upper morning (was 0)
+    assert any("pain free variant" in ln for s in b["week"]["sessions"] for ln in s["rationale"])
     off = _week_of("b_shoulder_flag_low_recovery", {(lp, "apply_joint_rule"): lambda rx, ctx, rot, flags: []})  # control
     assert joint_unprotected(off["week"], lib, cat, "shoulder", "press")
-    # third red team: the lateral raise and the rear-delt fly are IN the gate (served, capped) — never invisible to it
+    from training import live_pain
+
+    nor = _week_of(
+        "b_shoulder_flag_low_recovery", {(live_pain, "variant"): lambda *a: None, (live_pain, "muscle_route"): lambda *a, **k: None}
+    )
+    assert sw.hard_sets_by_muscle(nor["week"], lib, cat).get("chest", 0) < hard["chest"]  # control: no route -> chest falls
     raises = [x for x in _lifts(b["week"]) if sw._lib_entry(lib, cat, x["key"]).get("pattern") in PROVOKING["shoulder"]]
-    capped = [x for x in raises if capped_at(x["hevy_note"], 7)]
-    assert any("lateral_raise" in x["key"] for x in raises) and capped == raises
-    # control: the shoulder data as it was (abduction / rear-delt work rated LOW) -> the rule leaves the lateral raise at RPE 9-10
-    old = copy.deepcopy(b["world"]["lib"])
-    for e in old["movements"].values():
-        if (e.get("provocation_floor") or {}).get("shoulder"):  # FIX5: an elbow-only floor is not the shoulder's
-            e["joint_stress"] = {**e["joint_stress"], "shoulder": e["provocation_floor"]["shoulder"]["from"]}
-    prof = PROFILES["b_shoulder_flag_low_recovery"]
-    # #5861 FIX5: the same-joint isolation cap (live_rules.isolation_joint_cap) is data-independent — the old data alone no longer
-    # uncaps the raise; with that cap off as well, the old failure returns
-    was = sw.generate_week(prof, "approved", b["world"] | {"lib": old})
-    assert not any("lateral_raise" in p and "no cap" in p for p in joint_unprotected(was, old, cat, "shoulder", "press"))
-    with patch.object(lrules, "isolation_joint_cap", lambda rx, ctx, flags: []):
-        was = sw.generate_week(prof, "approved", b["world"] | {"lib": old})
-    assert any("lateral_raise" in p and "no cap" in p for p in joint_unprotected(was, old, cat, "shoulder", "press"))
+    assert any("lateral_raise" in x["key"] for x in raises) and all(capped_at(x["hevy_note"], 7) for x in raises)
+    with patch.object(lrules, "isolation_joint_cap", lambda rx, ctx, flags: []):  # control: the isolation cap off -> uncapped
+        prof = PROFILES["b_shoulder_flag_low_recovery"]
+        was = sw.generate_week(prof, "approved", b["world"])
+    assert any("lateral_raise" in p and "no cap" in p for p in joint_unprotected(was, lib, cat, "shoulder", "press"))
     # the monitoring rule itself: a mild stated score reduces, a higher or 'sharp' one avoids
     flags = lambda note: lp.joint_flags(  # noqa: E731
         {"lib": lib, "overlay": b["world"]["overlay"], "idx": se.key_index(lib, cat)},
@@ -550,7 +547,7 @@ def test_c3_a_progressing_movement_is_held_not_rotated(weeks):
     def strict(pts, e1):  # control: the pre-L6 trend (latest strictly beats every earlier exposure)
         return e1[-1] > max(e1[:-1])
 
-    off = _week_of("a_large_deficit_experienced", {(fm, "_recent_best"): strict})
+    off = _week_of("a_large_deficit_experienced", {(fm, "_recent_best"): strict, (fm, "_load_pr"): lambda pts: False})
     stalls = [ln for s in off["week"]["sessions"] for ln in s["selection"] if "rotate: stall" in ln]
     assert stalls, "the strict trend reads a twice-a-week progressing movement as a stall"
 
@@ -652,7 +649,7 @@ def test_c4_volume_comes_down_when_recovery_worsens_compounds_first_and_loads_ne
     off = _week_of("f_high_fatigue_poor_sleep", {(lp, "guard_loads"): lambda *a, **k: []})
     assert rising_loads(off)
     # control 2: the deload shape replaced by the old accessory trim -> anchors keep 3 sets, isolation is what goes
-    old = _week_of("f_high_fatigue_poor_sleep", {(lp, "deload_shape"): lambda ex: fm.trim_accessory_sets(ex, 6)})
+    old = _week_of("f_high_fatigue_poor_sleep", {(lp, "deload_shape"): lambda ex, confirmed=False: fm.trim_accessory_sets(ex, 6)})
     assert any(n > 2 for n in _anchor_sets(old["week"]).values())
     # control 3: the cardio fit off -> the hard block stays on a deload-recommended week
     hard = _week_of("f_high_fatigue_poor_sleep", {(lp, "cardio_fit"): lambda menu, live: (menu, [])})
@@ -675,12 +672,20 @@ def test_c4b_the_load_guard_holds_and_steps_down_by_rule():
 
 def test_c5_a_stalled_anchor_changes_its_scheme(weeks):
     """Red team: the stalled bench stayed 3x4-6 'Heavier'. A stalled anchor now moves its rep range (and its load with it) —
-    the stall machinery's 'adjust the loading' answer, never more volume in a deficit."""
+    the stall machinery's 'adjust the loading' answer, never more volume in a deficit. #5861 FIX7: only OUTSIDE a deficit — in
+    a deficit (the profile's weigh-ins fall 0.8 %BW/week) the same flat e1RM at steady RPE is HELD (fatigue_model
+    deficit_hold_pct): the bench keeps 4-6 and no reset is written."""
     d = weeks["d_stalled_anchor_adherence_dip"]["week"]
     bench = next(x for s in d["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")
-    assert bench["reps"] == "6-8" and "Now aiming 6–8" in bench["hevy_note"]
-    off = _week_of("d_stalled_anchor_adherence_dip", {(lp, "stall_scheme"): lambda rx, ctx, trends: []})  # control
-    assert next(x for s in off["week"]["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")["reps"] == "4-6"
+    assert bench["reps"] == "4-6" and "Now aiming" not in bench["hevy_note"]  # held in a deficit
+    prof = PROFILES["d_stalled_anchor_adherence_dip"] | {"weekly_loss_pct": 0.0}
+    flat = sw.generate_week(prof, "approved", sw.build_world(prof, "approved"))
+    bench = next(x for s in flat["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")
+    assert bench["reps"] == "6-8" and "Now aiming 6–8" in bench["hevy_note"]  # no deficit: the stall resets
+    world = sw.build_world(prof, "approved")
+    with contextlib_patches({(lp, "stall_scheme"): lambda rx, ctx, trends: []}):  # control
+        off = sw.generate_week(prof, "approved", world)
+    assert next(x for s in off["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")["reps"] == "4-6"
 
 
 # ══ D. programming quality ═══════════════════════════════════════════════════
@@ -758,7 +763,7 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     assert landmark_problems(sw.measure(week, slide, e["world"]["catalog"]["movements"], LANDMARKS), LEGS, with_abs=False)
     # control: abs counted the old way (carry sets credited) would pass a week with no direct trunk drill
     no_floor = _week_of("a_large_deficit_experienced", {(lp, "trunk_floor"): lambda rx, ctx, state=None: []})
-    assert "abs 2.0 < MEV 4" in landmark_problems(no_floor["m"])
+    assert any(p.startswith("abs ") and "< MEV 4" in p for p in landmark_problems(no_floor["m"]))
     # a trimmed week takes sets from the muscle furthest above its MEV first (the delts), never past MRV anywhere
     full = weeks["a_large_deficit_experienced"]["m"]["landmarks"]
     for name in ("b_shoulder_flag_low_recovery", "d_stalled_anchor_adherence_dip", "f_high_fatigue_poor_sleep"):

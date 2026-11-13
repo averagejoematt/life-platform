@@ -245,10 +245,19 @@ def for_live_draft(
         lib = se.load_library_failsoft() or {}
         catalog = catalog_movements or {}
         sig: dict[str, Any] = (
-            fatigue_model.movement_signals(block_workouts, as_of=str(getattr(inputs, "target_date", ""))) if block_workouts else {}
+            fatigue_model.movement_signals(
+                block_workouts,
+                as_of=str(getattr(inputs, "target_date", "")),
+                deficit=fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)),  # #5861 FIX7: held in a deficit = held
+            )
+            if block_workouts
+            else {}
         )
         n_hurt = fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
         hurts = {tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= n_hurt}
+        from training import live_pain  # #5861 FIX7: discomfort at or under 2/10 keeps the lift (lighter), never swaps it out
+
+        hurts -= live_pain.low_discomfort(block_workouts)
         light = {tid for tid, v in sig.items() if v.get("light_sessions", 0) + v.get("discomfort_sessions", 0) >= n_hurt} - hurts
         ctx = {
             "lib": lib,
@@ -268,6 +277,9 @@ def for_live_draft(
         lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
+        from training import live_stimulus  # #5861 FIX7: a fast cut with broad regression answers with volume, never load
+
+        lines += live_stimulus.fast_cut(out, sig, inputs)
         lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
         behind = live_balance.adherence_response(block_workouts, ctx["target_date"], lib)  # FIX3: a dip changes the week
         lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
@@ -302,6 +314,11 @@ def for_live_draft(
             _refit(out)
         except Exception as e:  # noqa: BLE001 — never blocks a draft
             lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
+    if ctx is not None:  # FIX7: every muscle with an MEV reaches it in HARD sets — after the trunk floor, never on a bad day
+        from training import live_stimulus
+
+        lines += live_stimulus.week_floor(out, ctx, block_workouts, set_cap)
+        _refit(out)
     lines += live_rules.fit_set_cap(out, set_cap)  # FIX5: every live session within the session set ceiling (a crash before)
     _refit(out)
     from training import live_rulings  # #5861 FIX6 ruling 16: evidence confidence + data completeness, visible
@@ -321,6 +338,10 @@ def for_live_draft(
     rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
     extra |= {"rate_band": band} if band["mode"] == "structured" else {}
+    if rate:
+        from training import live_stimulus
+
+        rate += live_stimulus.rate_suffix(out)  # FIX7: the advisory line names the fast-cut answer
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
     return out
 

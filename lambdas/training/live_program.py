@@ -238,9 +238,10 @@ def trim_order(surplus: Any) -> Any:
 SHORT_WEEK_SKIP = "shoulders_arms"
 
 
-def deload_shape(exposures: list[dict[str, Any]]) -> int:
+def deload_shape(exposures: list[dict[str, Any]], confirmed: bool = False) -> int:
     """IN PLACE, a RECOMMENDED deload's reduction (applying the deload itself stays his word): every compound to
-    DELOAD_SHAPE compound_sets (back-offs go, the top set stays) at RPE <= compound_rpe, its load held or stepped down;
+    DELOAD_SHAPE compound_sets (back-offs go, the top set stays) at RPE <= compound_rpe — an ANCHOR at DELOAD_TOP_SET's RPE 8
+    until the owner confirms the deload (`confirmed`, #5861 FIX7) — its load held or stepped down;
     isolation is kept — at most isolation_max_sets, RPE <= isolation_rpe. Returns the sets removed."""
     removed = 0
     for e in exposures:
@@ -252,7 +253,12 @@ def deload_shape(exposures: list[dict[str, Any]]) -> int:
                     break
                 sets.pop(idx[-1])
                 removed += 1
-            e["live_effort"] = min(int(DELOAD_SHAPE["compound_rpe"]["value"]), int(e.get("live_effort") or 99))
+            rpe = int(DELOAD_SHAPE["compound_rpe"]["value"])
+            if e.get("kind") == "anchor" and not confirmed:  # #5861 FIX7: until he confirms the deload, the top set stays at RPE 8
+                from training.live_stimulus import DELOAD_TOP_SET
+
+                rpe = int(DELOAD_TOP_SET["rpe"]["value"])
+            e["live_effort"] = min(rpe, int(e.get("live_effort") or 99))
             e["live_load"] = {**(e.get("live_load") or {}), "hold": True, "why": "deload recommended"}
         elif e.get("intensity") != "carry":
             while len(sets) > int(DELOAD_SHAPE["isolation_max_sets"]["value"]):
@@ -300,21 +306,10 @@ def joint_flags(ctx: dict[str, Any], workouts: list[dict[str, Any]] | None, disc
                 "site": site,
             }
         )
+        from training import live_pain  # #5861 FIX7: the flag's reach — the flagged lift, or the provoking pattern
+
+        out[-1]["scope"] = live_pain.scope(out[-1], set(ctx.get("light_discomfort") or ()), tid)
     return out
-
-
-def _joint_hit(entry: dict[str, Any], flags: list[dict[str, Any]]) -> tuple[str, dict[str, Any], str] | None:
-    """(tier, flag, joint) for the strongest flag this movement falls under, else None."""
-    level = STRESS[str(PAIN_RULE["joint_level"]["value"])]
-    best = None
-    for f in flags:
-        for j in f["joints"]:
-            if _stress(entry, j) < level:
-                continue
-            tier = "avoid" if f["tier"] == "avoid" and _group(entry.get("pattern")) == f["group"] else "reduce"
-            if best is None or (tier == "avoid" and best[0] != "avoid"):
-                best = (tier, f, j)
-    return best
 
 
 def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], flags: list[dict[str, Any]]) -> list[str]:
@@ -322,15 +317,16 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
     the flagged PATTERN is off for the session — every member of the flag's pattern group that loads the joint at moderate or
     more is dropped, and so is the session fit's pain swap for the flagged movement itself (#5861 FIX5: no substitute of the
     same pattern); `reduce`: kept, marked for a load cut (`live_load`) and an RPE cap. Returns the rationale lines."""
-    from training import live_safety
+    from training import live_pain, live_safety
 
     if not flags:
         return []
     lines: list[str] = []
     keep = []
+    taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
-        hit = _joint_hit(entry, flags) if entry and e.get("intensity") != "carry" else None
+        hit = live_pain.hit(entry, e, flags, ctx) if entry and e.get("intensity") != "carry" else None  # FIX7: scoped
         swap_of = _avoided_swap(e, ctx, flags)
         if swap_of:
             lines.append(f"skipped (live): {entry.get('title') or e.get('movement_key')} — {swap_of}: the flagged pattern is off today")
@@ -342,8 +338,46 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
         name = entry.get("title") or e.get("movement_key")
         why = f"{f['source']} flag on {f['title']} ({joint.replace('_', ' ')}" + (f", {f['severity']:g}/10" if f["severity"] else "") + ")"
         stop = live_safety.stop_line(f["severity"])  # #5861 FIX4: every lift the pain rule touches carries an in-set stop line
-        if tier == "avoid":  # #5861 FIX5 (fifth red team): no moderate-stress member of the same pattern — the pattern is off
-            lines.append(f"skipped (live): {name} — {why}: above the mild line, the flagged pattern is off today — nothing fills it")
+        if tier == "variant":  # #5861 FIX7: the session fit's swap is already low on the flagged joint — the pain-free variant
+            keep.append(
+                e | {k: v for k, v in live_pain.serve_route(e, str(e["movement_key"]), f, "pain_free_variant").items() if k != "live_swap"}
+            )
+            lines.append(
+                f"kept (live): {name} — {why}: a pain-free variant (low on the flagged joint), RPE <= 8 with the stop line (PAIN_SCOPE)"
+            )
+            continue
+        if tier == "avoid":  # #5861 FIX7: the pattern is off today — a pain-free same-family member first, else the muscle's route
+            new, how = live_pain.variant(e, ctx, rotation, taken, f["joints"]), "pain_free_variant"
+            if not new:
+                new, how = live_pain.muscle_route(e, ctx, taken, f["joints"]), "muscle_route"
+            relax = None if new else live_pain.priority_ceiling(e, ctx, f)
+            if relax is not None:
+                new, how = live_pain.muscle_route(e, ctx, taken, f["joints"], relax), "priority_route"
+            if new:
+                taken.add(new)
+                served = live_pain.serve_route(e, new, f, how)
+                keep.append(served)
+                title = (ctx["catalog"].get(new) or {}).get("title") or new
+                lines.append(
+                    f"swapped (live): {name} -> {title} — {why}: above the mild line the provoking pattern is off today; "
+                    f"{how.replace('_', ' ')} ("
+                    + (
+                        "less stress on the flagged joint than the flagged lift"
+                        if how == "priority_route"
+                        else "low stress on the flagged joint"
+                    )
+                    + f"), RPE <= {served['live_effort']} with the stop line (PAIN_SCOPE, heuristic)"
+                )
+                continue
+            lines.append(f"skipped (live): {name} — {why}: above the mild line, the flagged pattern is off today — no pain-free route")
+            continue
+        if f.get("scope") == "lift":  # #5861 FIX7: <= 2/10 discomfort — the lift stays a hard set, load held, the stop line on
+            e["live_effort"] = min(int(live_pain.PAIN_SCOPE["variant_rpe"]["value"]), int(e.get("live_effort") or 99))
+            e["live_stop"] = stop
+            keep.append(e)
+            lines.append(
+                f"kept (live): {name} — {why}: low discomfort, this lift only — RPE <= 8, the stop line on (PAIN_SCOPE, heuristic)"
+            )
             continue
         e["live_load"] = {
             **(e.get("live_load") or {}),
@@ -369,6 +403,8 @@ def _avoided_swap(e: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, 
     f = next((f for f in flags if f["movement_id"] == mid and f["tier"] == "avoid"), None)
     if f is None or _group(src.get("pattern")) != _group(_entry(e.get("movement_key"), ctx).get("pattern")):
         return None
+    if all(_stress(_entry(e.get("movement_key"), ctx), j) == 0 for j in f["joints"]):
+        return None  # #5861 FIX7: a same-family member LOW on the flagged joint is the pain-free variant — it stands (live_pain)
     return f"stands in for {f['title']}, pain flag" + (f" {f['severity']:g}/10" if f["severity"] else "")
 
 
@@ -451,12 +487,20 @@ def stall_scheme(rx: dict[str, Any], ctx: dict[str, Any], trends: dict[str, str]
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
         tid = str(entry.get("template_id") or "").upper()
-        if e.get("kind") != "anchor" or trends.get(tid) != "stalled" or e.get("live_load") or e.get("live_retreated"):
+        rebuild = trends.get(tid) == "rebuilding"  # #5861 FIX7: after a reset the scheme stays, the load is never cut again
+        if e.get("kind") != "anchor" or trends.get(tid) not in ("stalled", "rebuilding") or e.get("live_load") or e.get("live_retreated"):
             continue
         for s in e.get("sets") or []:
             if s.get("reps"):
                 s["reps"] = [int(s["reps"][0]) + shift, int(s["reps"][1]) + shift]
         lo, hi = e["sets"][0]["reps"]
+        if rebuild:
+            e["live_rebuild"] = [lo, hi]
+            lines.append(
+                f"stall (live): {entry.get('title')} — rebuilding after a reset: rep range {lo}-{hi}, the load builds by double "
+                "progression, no second cut before 3 post-reset exposures (STALL_RULE; fatigue_model post_reset_min_exposures, heuristic)"
+            )
+            continue
         e["live_load"] = {"pct": int(STALL_RULE["load_pct"]["value"]), "why": "stall", "stall": [lo, hi]}
         lines.append(
             f"stall (live): {entry.get('title')} — no new best over 3+ exposures: rep range -> {lo}-{hi} at "
@@ -601,7 +645,9 @@ def _record_index(workouts: Any) -> dict[str, list[dict[str, Any]]]:
         for x in w.get("exercises") or []:
             sets = [s for s in x.get("sets") or [] if str(s.get("type") or "normal") != "warmup" and s.get("weight_kg")]
             if sets and x.get("template_id"):
-                idx.setdefault(str(x["template_id"]).upper(), []).append({"date": day, "sets": sets})
+                from training.fatigue_model import session_role  # #5861 FIX7: a heavy and a volume day are compared apart
+
+                idx.setdefault(str(x["template_id"]).upper(), []).append({"date": day, "sets": sets, "role": session_role(w)})
     for rows in idx.values():
         rows.sort(key=lambda r: r["date"], reverse=True)
     return idx
@@ -630,12 +676,14 @@ def mark_retreats(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, trends
             continue
         lo = ((e.get("sets") or [{}])[0].get("reps") or [None])[0]
         judged = e | {"live_cost": fatigue_cost(e, ctx), "live_retreated": False}
-        prior, done = previous_load(hist, tid, week[0]), previous_load(hist, tid, shift_day_key(week[0], 1))
+        first = next((r for r in hist[tid] if r["date"] == week[0]), {})
+        same = {tid: [r for r in hist[tid] if not first.get("role") or not r.get("role") or r["role"] == first["role"]]}
+        prior, done = previous_load(same, tid, week[0]), previous_load(same, tid, shift_day_key(week[0], 1))
         cut = (load_decision(judged, trends.get(tid), prior, None, lo) or {}).get("mode") == "down"
-        # the cut must have HAPPENED: the earlier exposure's top load sits under the session before it (a guard cut the engine's
-        # own lower load already met changed nothing, and holds nothing now)
-        cut = cut and prior is not None and done is not None and float(done["lb"]) < float(prior["lb"]) - 0.5
-        if cut or (e.get("kind") == "anchor" and trends.get(tid) == "stalled"):
+        # the cut must have HAPPENED: the earlier exposure's top load sits under the session before it in the SAME role (a guard
+        # cut the engine's own lower load already met changed nothing; #5861 FIX7: a volume day's lighter squat is no cut)
+        dropped = prior is not None and done is not None and float(done["lb"]) < float(prior["lb"]) - 0.5
+        if (cut and dropped) or (e.get("kind") == "anchor" and trends.get(tid) == "stalled" and dropped):
             e["live_retreated"] = True
             lines.append(
                 f"one cut a week (live): {entry.get('title') or e.get('movement_key')} — already cut or reset on {week[0]}; held "
@@ -679,7 +727,7 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     lines += stall_scheme(rx, ctx, trends)
     lines += short_week_carry(rx, ctx)
     lines += live_shape.deadlift_shape(rx, ctx["lib"]) + live_shape.order_lower_volume(rx)  # FIX4: the heavy pull, squat first
-    lines += live_rulings.lead_lift(rx, ctx)  # FIX6 ruling 5: squat and deadlift never both maximal in one session
+    lines += live_rulings.lead_lift(rx, ctx, trends)  # FIX6 ruling 5: squat and deadlift never both maximal in one session
     mark_costs(rx, ctx)
     return lines
 
@@ -707,7 +755,9 @@ def load_decision(
     if e.get("live_retreated"):
         return {"mode": "hold", "pct": 0, "why": "cut once already this week"}
     pct, why, noisy = 0, None, False
-    if trend == "regressing":
+    if trend == "regressing" and e.get("live_keep_intensity"):  # #5861 FIX7 FAST_CUT: volume came off, the anchor's load holds
+        noisy = True
+    elif trend == "regressing":
         if effort_evidence(previous, rep_lo):
             pct, why = int(LOAD_POLICY["regress_down_pct"]["value"]), "strength sliding"
         else:
@@ -763,11 +813,17 @@ def guard_loads(
         if not work:
             continue
         reps = [int(getattr(s, "rep_range_start", 0) or 0) for s in work]
+        # #5861 FIX7: the PRESCRIBED floor, not one the double progression just raised (#5057 "aim for more reps"): reps under a
+        # floor raised today are the progression's ask, never effort evidence of a regression (the multi-week simulation's cut)
+        reps += [int(s["reps"][0]) for s in e.get("sets") or [] if s.get("reps")]
         prev = previous_load(history_index, tid, target_date)
         d = load_decision(e, trends.get(tid), prev, state, min(reps) if reps else None)
         if not d or prev is None:
             continue
         prev_kg = float(prev["lb"]) * 0.45359237
+        if d["mode"] == "down":  # #5861 FIX7: a cut is taken off this rep band's own last top load, never a volume day's lighter one
+            hi_reps = max((int(getattr(s, "rep_range_end", 0) or 0) for s in work), default=0)
+            prev_kg = band_top_kg(history_index.get(tid) or [], target_date, hi_reps) or prev_kg
         cap = prev_kg if d["mode"] == "hold" else _floor_to_implement(prev_kg * (1 - d["pct"] / 100.0), entry.get("equipment"))
         top = max(float(s.weight_kg) for s in work)
         if (top - cap) / 0.45359237 < 0.5:  # under half a pound apart: the same load on the rack
@@ -796,6 +852,22 @@ def guard_loads(
     if ls.MARK in rx:
         rx[ls.MARK]["load_guard"] = out
     return out
+
+
+def band_top_kg(rows: list[dict[str, Any]], target_date: str, rep_hi: int, days: int = 14) -> float:
+    """The top set of this lift's LATEST exposure in the last `days` whose top-set reps sit in the exposure's rep band (at most
+    rep_hi + 2): the base a cut is taken from when the latest exposure was another day's lighter, higher-rep work (0.0 = none)."""
+    from common.pacific_time import shift_day_key
+
+    since = shift_day_key(target_date, -days)
+    for r in sorted(rows or [], key=lambda r: str(r.get("date") or ""), reverse=True):
+        if not since <= str(r.get("date") or "") < target_date:
+            continue
+        sets = [x for x in r.get("sets") or [] if x.get("weight_kg") and x.get("reps")]
+        top = max(sets, key=lambda x: float(x["weight_kg"]), default=None)
+        if top and rep_hi and int(top["reps"]) <= rep_hi + 2:
+            return float(top["weight_kg"])
+    return 0.0
 
 
 def _floor_to_implement(kg: float, equipment: str | None) -> float:
@@ -848,7 +920,7 @@ def _novel_cap(note: str, e: dict[str, Any]) -> str:
     from training import hevy_note_grammar as g
     from training.live_week import NOVEL_START
 
-    if g.PICK_LOAD_OPEN_TAIL not in note or e.get("live_kb"):
+    if g.PICK_LOAD_OPEN_TAIL not in note or e.get("live_kb") or e.get("live_familiar"):  # FIX7: a familiar swap works at target
         return note
     cap = int(NOVEL_START["rpe"]["value"])
     e["live_effort"] = min(cap, int(e.get("live_effort") or 99))
@@ -875,6 +947,8 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         e = by_key.get(b.movement_key) or {}
         d, cap = guard.get(b.movement_key), e.get("live_effort")
         clause = _clause(d) if d and not d.get("held_top") else None
+        if not clause and e.get("live_rebuild"):  # #5861 FIX7: the reset's rep range stays while the load builds back
+            clause = f"Now aiming {e['live_rebuild'][0]}–{e['live_rebuild'][1]}: rebuilding, add reps."
         if cap:
             b.notes = _cap_effort(b.notes or "", int(cap), clause, e.get("live_effort_band"))
         elif clause:
@@ -884,6 +958,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))  # FIX3
         b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # FIX4: the in-set stop line
         b.notes = _novel_cap(b.notes or "", e)  # FIX5: a lift with no load on file (new to him) starts at RPE <= 7
+        b.notes = live_week.familiar_note(b.notes or "", e)  # FIX7: a like-for-like swap works at target (FAMILIAR_SWAP)
     from training import live_safety, selection_engine as se  # #5861 FIX4: no load step on a held lift; one effort; stop line
 
     rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))
@@ -973,6 +1048,12 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     trip = live.get("tripwire")
     if trip:
         lines.append(live_week.review_line(trip))
+    hosts = live_rulings_hosts(live)
+    if role in hosts[1:] and kind not in HARD_KINDS and not trip and live.get("action") != "deload_recommended":
+        hard = next((k for k in ("intervals", "tempo", "hills") if cardio_menu.fits_machine(k, menu["machine"])), None)
+        if hard:  # FIX7 `hard_conditioning_doses` 2: the second host's block is the week's second hard dose
+            lines.append(f"cardio (live): {kind} -> {hard} — the week's second hard dose (hard_conditioning_doses=2)")
+            kind = hard
     if kind in HARD_KINDS:
         why = None
         if trip:
@@ -985,7 +1066,7 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
             why = "recovery is strained (red readiness or a short night): easy work first, hard work waits"
         elif role == "lower_heavy" or _next_role(role) == "lower_heavy":
             why = "never on the heavy lower day or the session before it"
-        elif shared and role != live.get("host", SHORT_WEEK_SKIP):
+        elif shared and role not in live_rulings_hosts(live):  # FIX7: hard_conditioning_doses (default 1: the host only)
             why = f"the shared cap puts conditioning on {live.get('host', SHORT_WEEK_SKIP)}"
         if why:
             easy = "easy" if cardio_menu.fits_machine("easy", menu["machine"]) else "incline_treadmill_walk"
@@ -1019,13 +1100,22 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     lines += prog
     if shared and live.get("cap") and live.get("lifting_minutes") is not None:
         room = int(float(live["cap"]) - float(live["lifting_minutes"]))
-        if room < live_balance.min_block(kind, MIN_CARDIO_MINUTES):  # an easy stub under 20 min is worthless
+        gap = live_shape.aerobic_gap(live)  # FIX7: a week the record shows short takes the idle cap minutes (>= 10) as aerobic work
+        short = kind not in HARD_KINDS and gap is not None and gap >= int(live_shape.WALK_PROMPT["min_minutes"]["value"])
+        if room < (MIN_CARDIO_MINUTES if short else live_balance.min_block(kind, MIN_CARDIO_MINUTES)):  # else a stub under 20
             lines.append(f"cardio (live): no block — the shared {live['cap']}-min cap leaves {max(room, 0)} min after lifting")
             return None, lines + live_shape.walk_prompt(live)
         if room < minutes:
             lines.append(f"cardio (live): {minutes} -> {room} min — the shared {live['cap']}-min cap (session_cap_includes_cardio)")
             minutes = room
     return {**menu, "kind": kind, "live_minutes": minutes}, lines + live_shape.walk_prompt(live, minutes)
+
+
+def live_rulings_hosts(live: dict[str, Any]) -> list[str]:
+    """The week's hard-conditioning mornings (`live_rulings.conditioning_hosts` over the live host)."""
+    from training import live_rulings, selection_engine as se
+
+    return live_rulings.conditioning_hosts(str(live.get("host", SHORT_WEEK_SKIP)), se.load_library_failsoft())
 
 
 def cardio_note(notes: str, live: dict[str, Any] | None, kind: str) -> str:

@@ -100,6 +100,12 @@ def _pinned(rx: dict[str, Any]) -> set[str]:
     return {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{role}.")}
 
 
+SURPLUS_FIRST: tuple[str, ...] = ("lateral_raise", "rear_delt", "reverse_pec_deck", "face_pull", "reverse_fly")
+"""#5861 FIX7 (sixth red team: the set cap took triceps under MEV while 5 lateral-raise sets stood): the session set cap trims the
+week's habitual surplus — side- and rear-delt isolation (the shoulders sit near MAV in every template week) — before any other
+accessory. Heuristic; re-tuned at the block retro with the allocation."""
+
+
 def fit_set_cap(rx: dict[str, Any], cap: Any) -> list[str]:
     """IN PLACE: hold the session at `cap` working sets (SET_CAP). Returns the rationale lines."""
     if not cap:
@@ -114,6 +120,7 @@ def fit_set_cap(rx: dict[str, Any], cap: Any) -> list[str]:
     pinned = _pinned(rx)
     acc = [e for e in reversed(ex) if e.get("kind") == "accessory" and not e.get("live_added") and e.get("slot") not in pinned]
     acc += [e for e in reversed(ex) if e.get("kind") == "accessory" and not e.get("live_added") and e.get("slot") in pinned]
+    acc.sort(key=lambda e: not any(k in str(e.get("movement_key")) for k in SURPLUS_FIRST))  # FIX7: delt surplus goes first
     for e in added:  # 1. live additions, whole
         if total <= int(cap):
             break
@@ -175,7 +182,7 @@ def no_added_work(rx: dict[str, Any]) -> list[str]:
     quadriceps slot and a relocated kettlebell slot (the trunk floor checks `bad_day` itself). Returns the rationale lines."""
     if not bad_day(rx):
         return []
-    gone = [e for e in rx["exposures"] if e.get("live_added") in ("quad_slot", "kb_slot_moved")]
+    gone = [e for e in rx["exposures"] if e.get("live_added") in ("quad_slot", "kb_slot_moved", "week_floor")]  # FIX7: + floor
     if not gone:
         return []
     rx["exposures"] = [e for e in rx["exposures"] if e not in gone]
@@ -201,7 +208,21 @@ def isolation_joint_cap(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dic
         entry = _entry(e.get("movement_key"), ctx)
         if entry.get("job") != "isolation" or e.get("intensity") == "carry":
             continue
-        f = next((f for f in flags for j in f["joints"] if entry.get("pattern") in JOINT_ISOLATION.get(j, ())), None)
+        from training.live_program import _group  # #5861 FIX7: above the mild line every same-joint isolation; at/under it only the
+
+        # provoking pattern's; a lift-only (<= 2/10 discomfort) flag never
+
+        f = next(
+            (
+                f
+                for f in flags
+                for j in f["joints"]
+                if entry.get("pattern") in JOINT_ISOLATION.get(j, ())
+                and f.get("scope") != "lift"
+                and (f.get("tier") == "avoid" or _group(entry.get("pattern")) == f.get("group"))
+            ),
+            None,
+        )
         if f is None or (int(e.get("live_effort") or 99) <= rpe and e.get("live_stop")):
             continue
         e["live_effort"] = min(rpe, int(e.get("live_effort") or 99))

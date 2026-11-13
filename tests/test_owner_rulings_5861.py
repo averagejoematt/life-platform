@@ -121,20 +121,31 @@ def test_ruling_3_the_four_day_week_keeps_shoulders_and_arms_at_mev(weeks):
     assert _arms_under_mev(e["m"]) == []
     plan = lb.allocation_plan(e["world"]["catalog"]["movements"], e["world"]["lib"], ("shoulders_arms",))
     assert any("ARMS_FLOOR" in ln for ln in plan["lines"])  # the counted check acted (triceps 7 -> 8 on the synthetic week)
-    off = _week(  # control: neither the plan floor nor the record top-up -> an arm under MEV
-        "e_short_week", {(lr, "short_week_floor"): lambda env, adds: [], (lr, "arms_top_up"): lambda rx, ctx, workouts: []}
+    from training import live_stimulus
+
+    off = _week(  # control: neither the plan floor, the record top-up nor the FIX7 week floor -> an arm under MEV
+        "e_short_week",
+        {
+            (lr, "short_week_floor"): lambda env, adds: [],
+            (lr, "arms_top_up"): lambda rx, ctx, workouts: [],
+            (live_stimulus, "week_floor"): lambda rx, ctx, workouts, cap: [],
+        },
     )
     assert _arms_under_mev(off["m"])
 
 
 # ── ruling 4: purposeful cardio only ─────────────────────────────────────────────────────────────────────────────────────────
 def test_ruling_4_no_cardio_block_without_a_named_purpose(weeks):
+    # #5861 FIX7: every served block names its purpose — the conditioning dose, or the RECORD's aerobic gap (an easy block where
+    # the recorded, credited minutes leave the week short); none fills a slot
     for name, w in weeks.items():
-        kinds = [s["cardio"].get("kind") for s in w["week"]["sessions"] if s["cardio"].get("key")]
-        assert all(k in lp.HARD_KINDS for k in kinds), (name, kinds)  # the conditioning dose only — never an easy filler
         for s in w["week"]["sessions"]:
-            if s["cardio"].get("kind") in lp.HARD_KINDS:
-                assert any("purpose: the week's conditioning dose" in ln for ln in s["rationale"]), name
+            if s["cardio"].get("key"):
+                assert any(ln.startswith("cardio (live):") and "purpose:" in ln for ln in s["rationale"]), (name, s["role"])
+    covered = {(lp, "aerobic"): lambda inputs: {"volume_covered": False, "walking_min_per_wk": 150, "line": "x"}}  # the record covers it
+    full = _week("a", covered, profile=PROFILES["a_large_deficit_experienced"])
+    kinds = [s["cardio"].get("kind") for s in full["week"]["sessions"] if s["cardio"].get("key")]
+    assert all(k in lp.HARD_KINDS for k in kinds), kinds  # a covered week: the conditioning dose only
     walker = PROFILES["a_large_deficit_experienced"] | {"steps_per_day": 6000}
     old = _week("a", settings={"cardio_purpose_only": False, "session_cap_includes_cardio": False}, profile=walker)  # control
     assert any(s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS for s in old["week"]["sessions"])
@@ -394,16 +405,19 @@ def test_ruling_16_every_served_movement_shows_tier_evidence_and_completeness(we
 
 
 # ── ruling 17: the glute S standard ─────────────────────────────────────────────────────────────────────────────────────────
-def test_ruling_17_glute_s_needs_no_exercise_specific_trial():
+def test_ruling_17_glute_tiers_follow_the_same_standard_as_every_muscle():
+    """#5861 FIX7 (rubric 3.5.0; the sixth red team on ruling 17): "the same evidence + personal-fit standard as other muscles" —
+    glute length is scored like every muscle's (lengthened 5 / mid 3 / short 1), so no shortened glute lift earns a stretch credit
+    and no glute S is manufactured; the barbell hip thrust reaches A through its direct trial's equivalence with the back squat
+    (the rubric's +1 for a higher-tier comparator), and its untested machine form ties it, never above."""
     mv = LIB0["movements"]
     tiers = {k: next((r["tier"] for r in e.get("hypertrophy") or [] if r["target"] == "glutes"), None) for k, e in mv.items()}
-    assert sorted(k for k, t in tiers.items() if t == "S") == ["hip_thrust_barbell", "hip_thrust_machine"]
+    assert sorted(k for k, t in tiers.items() if t == "S") == []
     row = mv["hip_thrust_barbell"]["hypertrophy"][0]
-    assert qr.capped_tier(mv["hip_thrust_barbell"], row) == "S" and not row.get("evidence_adjustment")  # the points path, no +1
-    for k in ("glute_kickback_machine", "cable_kickback", "bulgarian_split_squat_dumbbell"):
-        assert tiers[k] == "A" and not all(qr.s_criteria(mv[k], mv[k]["hypertrophy"][0]).values()), k  # an unmet S criterion
-    with patch.dict(qr.STRETCH_CAPS, {"glutes": ("mid", "x", "the old cap")}):  # control: the old cap -> no glute S on points
-        assert qr.capped_tier(mv["hip_thrust_barbell"], row) != "S"
+    assert qr.capped_tier(mv["hip_thrust_barbell"], row) == "B" and row["evidence_adjustment"]["comparator"] == "squat_barbell"
+    assert tiers["hip_thrust_barbell"] == "A" == tiers["hip_thrust_machine"] and tiers["cable_kickback"] == "B"
+    with patch.dict(qr.STRETCH_CAPS, {"glutes": ("lengthened", "x", "the 3.4.0 override")}):  # control: the override -> S again
+        assert qr.quality_tier(mv["hip_thrust_barbell"], row) == "S"
 
 
 # ── ruling 18: every heuristic labelled, with its block-retro metric ────────────────────────────────────────────────────────
@@ -446,10 +460,10 @@ def test_ruling_18_every_heuristic_names_its_block_retro_metric_and_is_documente
 def test_ruling_18_fix6_heuristics_have_consequences():
     """Each FIX6 heuristic changes an outcome when mutated (its consequence test; the others' live in their rounds' files)."""
     assert lr.LEAD_LIFT and lr.ARMS_FLOOR and lr.PRIORITY_ADD  # exercised above: second_band, the floor off, progressing
-    env = {"rows": [{"role": "upper_heavy", "slot": "tri", "kind": "accessory", "intensity": None, "key": "t", "sets": 2, "muscle": "triceps", "secondary": []}],
+    env = {"rows": [{"role": "upper_heavy", "slot": "tri", "kind": "accessory", "intensity": None, "key": "t", "sets": 1, "muscle": "triceps", "secondary": []}],
            "deltas": {}, "marks": {"triceps": {"MEV": 8}}}  # fmt: skip
     lr.short_week_floor(env, [])
-    assert env["deltas"] == {("upper_heavy", "tri"): 2}
+    assert env["deltas"] == {("upper_heavy", "tri"): 2}  # 1 + 2 = 3, the slot maximum (#5861 FIX7, live_balance.SLOT_MAX)
     env["deltas"] = {}
     with patch.dict(lr.ARMS_FLOOR, {"add_per_slot": {"value": 1, "label": "heuristic", "basis": "mutation"}}):
         lr.short_week_floor(env, [])
@@ -496,6 +510,6 @@ def test_ruling_3_the_last_upper_session_tops_up_an_arm_the_week_actually_left_u
         "exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working", "reps": [8, 15]}] * 2}],
     }
     lines = lr.arms_top_up(rx, ctx, [])
-    assert len(rx["exposures"][0]["sets"]) == 4 and lines and "biceps" in lines[0]  # nothing logged: 2 today < MEV 8 -> +2
+    assert len(rx["exposures"][0]["sets"]) == 3 and lines and "biceps" in lines[0]  # 2 today < MEV 8 -> +1: SLOT_MAX 3 (FIX7)
     normal = copy.deepcopy(rx) | {"exposures": [{"kind": "accessory", "movement_key": "db_curl", "sets": [{"kind": "working"}] * 2}]}
     assert lr.arms_top_up(normal, ctx | {"week_skip": ()}, []) == [] and len(normal["exposures"][0]["sets"]) == 2  # control

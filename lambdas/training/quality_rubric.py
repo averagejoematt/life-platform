@@ -12,8 +12,8 @@ scored against the JOB it does: its `job` (compound | isolation, the builder's r
 name) picks the terms. Per (movement, target muscle), the sum of:
 
     term                 field                 isolation                              compound (multi-joint pattern)
-    stretch              `length_bias`         lengthened 5 · mid 3 · short 1         the same (glutes held at the top for any
-                                                                                       known length: `STRETCH_CAPS`, 3.4.0)
+    stretch              `length_bias`         lengthened 5 · mid 3 · short 1         the same (glutes too since 3.5.0:
+                                                                                       `STRETCH_CAPS` is empty, ruling 17)
     stability            `stability`           high 3 · moderate 2 · low 1            high 2 · moderate 2 · low 1
     resistance profile   `resistance_profile`  fit to the target's curve (0-3,        free weight / any machine / cable 3 ·
                                                `PROFILE_FIT`)                         band / bodyweight / sled 1
@@ -49,7 +49,7 @@ from typing import Any
 
 from training import cardio_model
 
-RUBRIC_VERSION = "3.4.0"  # 3.4.0: #5861 FIX6 (owner ruling 17: the glute stretch term at its top, the same S standard; no provisional S on any objective); 3.3.0: #5861 FIX3 (one S per canonical family per objective: the S quota); 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
+RUBRIC_VERSION = "3.5.0"  # 3.5.0: #5861 FIX7 (ruling 17 applied as written: the glute stretch override removed — length scored as for every muscle; S by the trial band only); 3.4.0: #5861 FIX6 (owner ruling 17: the glute stretch term at its top, the same S standard; no provisional S on any objective); 3.3.0: #5861 FIX3 (one S per canonical family per objective: the S quota); 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
@@ -102,14 +102,15 @@ FREE_WEIGHT_CARRYOVER = 1  # a free-weight compound's carryover; the ONLY term w
 # band could carry a glute row to S. The trial says length does not decide glute growth — so the term is held at its TOP for
 # any known glute length: it cannot separate glute movements, and it no longer costs them. Every S criterion and the S quota
 # still apply unchanged (unknown length still scores 0 -> NEUTRAL).
-STRETCH_CAPS: dict[str, tuple[str, str, str]] = {
-    "glutes": (
-        "lengthened",
-        "plotkin2023_hip_thrust_vs_squat",
-        "length does not decide glute growth (the hip thrust, shortened, matched the back squat, lengthened): the stretch term "
-        "is held at its top for any known glute length — no premium between glute movements and no cost against other muscles",
-    ),
-}
+STRETCH_CAPS: dict[str, tuple[str, str, str]] = {}
+"""3.5.0 (#5861 FIX7, the sixth red team on ruling 17; owner ruling 2026-11-13 clarifying ruling 17: "glute stretch credit only
+for genuinely lengthened loading, the same standard as other muscles; short-range lifts (kickbacks, hip thrust variants) earn no
+stretch credit"): EMPTY. The 3.4.0 glute override held the stretch term at its top for any
+known glute length — not "the same standard as other muscles" (ruling 17's words): it credited shortened-position glute work
+(kickbacks, the machine hip thrust) with a lengthened premium no other muscle gets, and squat-depth work points the other way
+for the glutes. Glute rows now score length like every muscle (lengthened 5 · mid 3 · short 1); the barbell hip thrust's S is
+carried by its direct trial's evidence band (`plotkin2023_hip_thrust_vs_squat`), not by a stretch credit. The table stays (a
+reviewed, cited cap may return) and an empty one changes nothing."""
 # target -> why. 3.1.0 (#5861 FIX-DATA, red team: "shrugs at C: the stretch term penalises a movement whose short ROM is inherent"):
 # a muscle whose length bias is not an established driver of growth (and whose movements are short by nature) scores the stretch term
 # at mid, no premium and no penalty. A HEURISTIC, labelled as one: no trial is claimed. Unknown length still scores 0.

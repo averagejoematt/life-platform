@@ -30,6 +30,8 @@ tier (`adjust`): +1 when the trial found it grew the target more than a compared
 
 from __future__ import annotations
 
+from typing import Any
+
 REVIEWED_ON = "2026-11-11"
 
 EQUIPMENT_VOCABULARY: dict[str, str] = {
@@ -492,7 +494,7 @@ def hyp(
     confidence: str = "none_reviewed",
     cites: list[str] | None = None,
     note: str | None = None,
-    adjust: tuple[int, str, str] | None = None,
+    adjust: tuple[Any, ...] | None = None,
 ) -> dict:
     """One per-target hypertrophy row's EVIDENCE half (#5857). The quality tier is not written here: the builder derives
     `rubric_score`, `rubric_tier` and `tier` from the movement's attributes (`training.quality_rubric`). `adjust` is
@@ -505,6 +507,8 @@ def hyp(
     }
     if adjust:
         row["evidence_adjustment"] = {"bands": adjust[0], "citation": adjust[1], "why": adjust[2]}
+        if len(adjust) > 3:  # #5861 FIX7: an equivalence adjustment names its basis and the higher-tier comparator it matched
+            row["evidence_adjustment"] |= {"basis": adjust[3], "comparator": adjust[4]}
     if note:
         row["note"] = note
     return row
@@ -517,6 +521,15 @@ _OVERHEAD_UP = (+1, _MAEO23, "overhead arm position grew the triceps more than t
 _SEATED_UP = (+1, _MAEO21, "seated grew the hamstrings more than prone (Maeo 2021)")
 _PRONE_DOWN = (-1, _MAEO21, "prone grew the hamstrings less than seated (Maeo 2021)")
 _STANDING_UP = (+1, _KINO23, "standing grew the gastrocnemius more than seated (Kinoshita 2023)")
+_HIP_THRUST_EQ = (
+    +1,
+    "plotkin2023_hip_thrust_vs_squat",
+    "the hip thrust grew the glutes as much as the back squat (Plotkin 2023): equivalence with a higher-tier comparator",
+    "equivalence",
+    "squat_barbell",
+)
+"""#5861 FIX7 (ruling 17 applied as written, rubric 3.5.0): the barbell hip thrust's glute row scores length like every muscle
+(shortened: B on points); its direct trial matched the back squat, whose glute row sits higher — the rubric's equivalence +1."""
 
 
 # Keyed by Hevy template id (upper). Each value overrides the derived attribute of the same name.
@@ -684,7 +697,15 @@ CURATED: dict[str, dict] = {
         "joint_stress": js(_L, _L, _L, _L, _L),
         "skill_complexity": "moderate",
         "equipment": ["barbell", "bench_flat"],
-        "hypertrophy": [hyp("glutes", "rct_direct", ["plotkin2023_hip_thrust_vs_squat"], "equal to the back squat for the glutes")],
+        "hypertrophy": [
+            hyp(
+                "glutes",
+                "rct_direct",
+                ["plotkin2023_hip_thrust_vs_squat"],
+                "equal to the back squat for the glutes",
+                adjust=_HIP_THRUST_EQ,
+            )
+        ],
     },
     "68CE0B9B": {
         "family": "hypertrophy",

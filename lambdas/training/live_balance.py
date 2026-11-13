@@ -96,6 +96,9 @@ ADHERENCE_DIP: dict[str, dict[str, Any]] = {
     "accessory_sets": {"value": 2, "label": HEURISTIC, "basis": "every accessory at two working sets — the maintenance dose"},
 }
 HOST_ROLE = "shoulders_arms"
+SLOT_MAX = 3
+"""#5861 FIX7 (sixth red team: 5 lateral-raise sets in one slot; ARMS_FLOOR's own basis calls 4+ in a slot junk volume): no live
+addition takes an isolation slot past 3 working sets (a template slot already over it keeps its own count). Heuristic."""
 
 
 def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -253,15 +256,12 @@ def pain_assess(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, A
         for x in w.get("exercises") or []
         if str(x.get("template_id") or "").upper() in tids and x.get("notes") and pain_class(str(x["notes"]))
     }
-    hit = next(
-        (
-            e
-            for e in rx["exposures"]
-            if (e.get("live_swap") or {}).get("code") == "joint" or "flag" in str((e.get("live_load") or {}).get("why"))
-        ),
-        None,
-    )
-    (hit or rx["exposures"][0])["live_assess"] = line
+    from training import live_pain  # #5861 FIX7: the assess line only on the flagged lift (or what stands in for it)
+
+    hit = live_pain.assess_target(rx, ctx, pains)
+    if hit is None:
+        return []
+    hit["live_assess"] = line
     names = ", ".join(sorted(str(f.get("title")) for f in pains))
     return [f"pain (live): {names} — logged on {len(days)} session(s); the note says: {line} (pain_assess_line)"]
 
@@ -356,6 +356,9 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
     from training import live_rulings  # #5861 FIX6 ruling 3: a week without shoulders+arms holds them at MEV, counted
 
     floor_lines = live_rulings.short_week_floor(env, adds) if _skip_set(skipped) else []
+    from training import live_stimulus  # #5861 FIX7: a priority muscle never under a non-priority isolation muscle
+
+    floor_lines += live_stimulus.parity(env, adds)
     ceiling_lines = floor_lines + live_shape.week_ceiling(env, adds)
     before, after = _sum(rows, {}), _sum(rows, deltas)
     for a in adds:
@@ -368,7 +371,9 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
         if d
     ]
     lines += [f"{a['role']}.{a['slot']} +{a['sets']} set(s) ({a['key']})" for a in adds] + ceiling_lines
-    return {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines, "adds": adds}
+    out = {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines, "adds": adds}
+    parity: set[tuple[str, str]] = env.get("parity") or set()
+    return out | {"parity": sorted(parity)}
 
 
 def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
@@ -384,7 +389,8 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     for e in rx["exposures"]:
         d = plan_["deltas"].get((role, str(e.get("slot"))), 0)
         sets = e.get("sets") or []
-        if d > 0 and _muscle(e, ctx) in (ctx.get("stimulus_hold") or set()):
+        parity = (role, str(e.get("slot"))) in {tuple(k) for k in plan_.get("parity") or []}  # FIX7: a net-zero move stands
+        if d > 0 and not parity and _muscle(e, ctx) in (ctx.get("stimulus_hold") or set()):
             d = 0  # #5861 FIX6 (ruling 9): a progressing priority muscle at MEV takes no extra sets (`live_rulings.stimulus_gate`)
         if not d or not sets:
             continue
@@ -393,6 +399,8 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
             e["live_alloc_drop"] = True
         for _ in range(abs(d)):
             if d > 0:
+                if len(sets) >= max(was, SLOT_MAX):  # #5861 FIX7: an added set never takes a slot past 3 (4+ is junk volume)
+                    break
                 sets.append(dict(sets[-1]))
             elif len(sets) > int(ALLOCATION["over_mav_floor"]["value"]):
                 sets.pop()
@@ -536,6 +544,10 @@ def effort_targets(note: str | None) -> list[str]:
         m = g.CARRY_LINE1_RE.match(line.strip())
         if m:
             out.append(m.group("rpe"))
+    from training.live_safety import _within  # #5861 FIX7: a session SPAN its own band sits inside is refined, not contradicted
+
+    if eff and len(out) > 1 and all(_within(f"RPE {t}", eff) for t in out[1:]):
+        out = out[1:]
     return list(dict.fromkeys(out))
 
 

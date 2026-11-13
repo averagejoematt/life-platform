@@ -85,6 +85,15 @@ NOVEL_START: dict[str, dict[str, Any]] = {
     },
     "rpe": {"value": 7, "label": HEURISTIC, "basis": "the novel-again cap (OD1)"},
 }
+FAMILIAR_SWAP: dict[str, dict[str, Any]] = {
+    "min_exposures": {
+        "value": 3,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX7 (sixth red team: a DB row for a barbell lifter capped at the novelty effort on its first sessions): a swap into the SAME "
+        "movement pattern (barbell / dumbbell / machine / cable variants) for a lift logged 3+ times in the block is familiar — "
+        "set 1 finds the load, then the sets work at target; the novelty cap is for a new movement pattern, not a new implement",
+    },
+}
 VERTICAL_PULL_FALLBACK: tuple[str, ...] = (
     "pull_up_band",
     "chin_up_band",
@@ -273,8 +282,8 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
     how += [", ".join(f"{n} {m}" for m, n in sorted(taken.items())) + " set(s) off (over MAV first)"] if taken else []
     how += [f"dropped {', '.join(dropped)}"] if dropped else []
     (rx.get("live_session") or {}).setdefault("lines", []).append(
-        f"cardio room (live): ~{before} -> ~{new['lifting_minutes']} min lifting — {'; '.join(how)} — so a {reserve}+ min aerobic "
-        f"block fits the shared {cap}-min cap (CARDIO_ROOM, heuristic)"
+        f"cardio room (live): ~{before} -> ~{new['lifting_minutes']} min lifting — {'; '.join(how)} — room for the aerobic block "
+        f"inside the shared {cap}-min cap (CARDIO_ROOM, heuristic; the block's minutes are its own line)"
     )
     return new
 
@@ -578,7 +587,19 @@ def novel_start(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
             continue
         tid = str((ctx["catalog"].get(e.get("movement_key")) or {}).get("hevy_template_id_hint") or "").upper()
         reps = [s.get("reps") for s in e.get("sets") or [] if s.get("reps")]
-        if (tid and tid in seen) or not reps:
+        if not reps:
+            continue
+        if familiar_swap(e, ctx, workouts):  # #5861 FIX7: a like-for-like swap for a lifter who logs the pattern is not novel
+            e["live_familiar"] = True  # (seen this block or not: a layoff cap on it is lifted too, `familiar_note`)
+            if tid and tid in seen:
+                continue
+            title = (ctx["catalog"].get(e.get("movement_key")) or {}).get("title") or e.get("movement_key")
+            lines.append(
+                f"familiar swap (live): {title} — the same pattern as the {FAMILIAR_SWAP['min_exposures']['value']}+-exposure lift it "
+                "replaces: set 1 finds the load, then work at target (FAMILIAR_SWAP, heuristic)"
+            )
+            continue
+        if tid and tid in seen:
             continue
         low = int(reps[0][0]) < int(lo)  # #5861 FIX5: the RPE cap reaches every new movement, isolation too; reps move only below 6
         for s in e["sets"] if low else []:
@@ -589,6 +610,40 @@ def novel_start(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
         where = f"starts at {lo}-{hi} reps, RPE <= 7" if low else "starts at RPE <= 7"
         lines.append(f"new movement (live): {title} {where} — new to him this block (NOVEL_START, heuristic)")
     return lines
+
+
+def familiar_swap(e: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> bool:
+    """FAMILIAR_SWAP: the swapped-in movement shares the replaced one's library pattern, and the replaced one has
+    min_exposures+ logged exposures in the record."""
+    lib_of = lambda k: ((ctx["lib"].get("movements") or {}).get(ctx["idx"]["to_lib"].get(str(k)) or "") or {})  # noqa: E731
+    src = (e.get("live_swap") or {}).get("from")
+    old, new = lib_of(src), lib_of(e.get("movement_key"))
+    if not old or not new or not old.get("pattern") or old.get("pattern") != new.get("pattern"):
+        return False
+    tid = str(old.get("template_id") or "").upper()
+    n = sum(1 for w in workouts or [] for x in w.get("exercises") or [] if str(x.get("template_id") or "").upper() == tid)
+    return n >= int(FAMILIAR_SWAP["min_exposures"]["value"])
+
+
+FAMILIAR_LINE = "Familiar swap: set 1 finds the load."
+
+
+def familiar_note(note: str, e: dict[str, Any]) -> str:
+    """A FAMILIAR_SWAP exposure's note: no layoff / novelty cap — line 1 at the exposure's working effort (RPE 8–9, or its own
+    stricter cap: a pain variant's 8 stays) and the layoff line replaced by FAMILIAR_LINE."""
+    from training import hevy_note_grammar as g, session_block as sb
+
+    if not e.get("live_familiar"):
+        return note
+    block, own = sb.split(note or "")
+    lines = sb._own_lines(block, own)
+    cap = int(e.get("live_effort") or 9)
+    want = g.effort_line((8, 9) if cap >= 9 else cap)
+    if lines and g.EFFORT_RE.match(lines[0]):
+        top = max(float(x) for x in __import__("re").findall(r"\d+(?:\.\d+)?", lines[0].split(",")[0]))
+        lines[0] = want if top < min(cap, 8) else lines[0]
+    lines = [FAMILIAR_LINE if g.LAYOFF_RE.match(ln) or g.PICK_LOAD_OPEN_TAIL in ln else ln for ln in lines]
+    return sb._join(block, list(dict.fromkeys(lines)))
 
 
 def press_sets(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:

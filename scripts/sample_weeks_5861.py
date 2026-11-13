@@ -446,8 +446,12 @@ def _all_roles() -> tuple[str, ...]:
 
 
 # ── one week ──────────────────────────────────────────────────────────────────
-def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Every session of the profile's week, drafted through the real path (module doc). Pure over the fixture."""
+def generate_week(
+    profile: dict[str, Any], mode: str = "approved", world: dict[str, Any] | None = None, perform: Any = None
+) -> dict[str, Any]:
+    """Every session of the profile's week, drafted through the real path (module doc). Pure over the fixture. `perform`
+    (#5861 FIX7, `scripts/progression_sim_5861.py`): `(session, day, role) -> workout` records each drafted session as
+    performed (the prescription as written) instead of `_performed`; the week's performed rows come back as `performed`."""
     from training import full_body_session as fbs, routine_generator as rg
     from training.program_seam import resolve_week_grid
 
@@ -480,17 +484,25 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)
             sessions.append(_session(ideal, role, day, catalog["movements"], cardio))
-            record.append(_performed(ideal, day, role, hidx, catalog["movements"]))  # the next morning's draft reads this session as done
+            done = (
+                perform(sessions[-1], day, role)
+                if perform
+                else _performed(ideal, day, role, hidx, catalog["movements"], mode == "approved")
+            )
+            record.append(done)  # the next morning's draft reads this session as done
             prev = {"session_role": role, "date": day, "title": role, "was": "synthetic"}
     out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
     from training import cardio_model
 
     recorded = (p.get("aerobic_record") or {}).get("minutes_by_day") or None  # #5861 FIX6 (ruling 12): recorded minutes only
     out["steps_credit"] = cardio_model._walking_dose(steps_by_day(p), recorded)  # steps reported, never credited
+    out |= {"performed": record[len(world["record"]) :]} if perform else {}
     return out | ({"short_week": short_line} if short_line else {})
 
 
-def _performed(ideal: Any, day: str, role: str, hidx: dict[str, list[dict[str, Any]]], catalog: dict[str, Any]) -> dict[str, Any]:
+def _performed(
+    ideal: Any, day: str, role: str, hidx: dict[str, list[dict[str, Any]]], catalog: dict[str, Any], live: bool = False
+) -> dict[str, Any]:
     """The drafted session as performed (synthetic): each lift's working sets at its last synthetic load and the bottom of its
     rep range, RPE 8 — so the week's later drafts see it in the record (adherence, the trend, the 7-day sets)."""
     from training import warmup_sets
@@ -502,12 +514,14 @@ def _performed(ideal: Any, day: str, role: str, hidx: dict[str, list[dict[str, A
         n = warmup_sets.working_set_count(b.sets)
         reps = next((getattr(s, "rep_range_start", None) for s in b.sets if getattr(s, "rep_range_start", None)), None)
         if tid and last and reps and n:
+            top = lift_effort(getattr(b, "notes", None)) if live else None
+            rpe = min(8.0, top) if top else 8.0  # #5861 FIX7: a lift capped under RPE 8 is logged at its cap (the week floor reads it)
             exercises.append(
                 {
                     "name": b.movement_key,
                     "template_id": tid,
                     "notes": "",
-                    "sets": [{"type": "normal", "weight_kg": last, "reps": reps, "rpe": 8.0}] * n,
+                    "sets": [{"type": "normal", "weight_kg": last, "reps": reps, "rpe": rpe}] * n,
                 }
             )
     return _workout(day, role, exercises)
@@ -582,6 +596,23 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
         },
         "wire": body["routine"]["exercises"],
     }
+
+
+STRICT_LINT_CODES = ("L1", "L6", "L12")
+"""#5861 FIX7: the note-lint rules the live sample week treats as BLOCKING (`lint_problems`, `--strict-lint`, the acceptance test):
+a banned phrase (L1) and exercise 1 opening without its effort-bearing session line (L6 / L12 — the lower-heavy squat note the
+sixth red team found). The other rules are reported, not blocking, until their pre-existing proposed-mode findings are paid down."""
+
+
+def lint_problems(week: dict[str, Any], rules: tuple[str, ...] = STRICT_LINT_CODES) -> list[str]:
+    """The note linter (`hevy_note_lint.lint_wire`) over every session's compiled wire: the problems in `rules`."""
+    from training import hevy_note_lint
+
+    out = []
+    for s in week["sessions"]:
+        res = hevy_note_lint.lint_wire({"routine": {"title": s["title"], "exercises": s["wire"]}})
+        out += [f"{s['role']}: {ln}" for ln in res.lines() if ln.split(" ", 1)[0] in rules]
+    return out
 
 
 RESOLVER: dict[str, str] = {"mode": "cron"}
@@ -928,12 +959,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mode", default="approved", choices=("approved", "proposed"))
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--set", action="append", default=[], help="a library programming setting for this run, key=true|false|text")
+    ap.add_argument("--strict-lint", action="store_true", help="exit 1 on a STRICT_LINT_CODES problem in any drafted week")
     args = ap.parse_args(argv)
     for kv in args.set:
         k, _, v = kv.partition("=")
         SETTINGS[k] = {"true": True, "false": False}.get(v.lower(), v)
     profiles = load_profiles(Path(args.profile_file)) if args.profile_file else None
     results = run(args.profile, args.mode, profiles)
+    blocking = [f"{r['week']['profile']}/{p}" for r in results for p in lint_problems(r["week"])]
+    for p in blocking:
+        print(f"note lint (blocking): {p}", file=sys.stderr)
+    if args.strict_lint and blocking:
+        return 1
     if args.json:
         print(
             json.dumps([{"week": _jsonable(r["week"]), "measures": r["measures"]} for r in results], indent=1, sort_keys=True, default=str)

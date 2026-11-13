@@ -190,16 +190,16 @@ def test_control_without_the_ordering_the_machine_outranks_the_trial_again():
     # ordering bite — the untested machine form must never sit above it
     e = copy.deepcopy(MV["hip_thrust_machine"])
     row = {k: v for k, v in e["hypertrophy"][0].items() if k != "evidence_ceiling"}
-    assert qr.quality_tier(e, row) == "S"  # the point-sum artefact the red team named
+    assert qr.quality_tier(e, row) == "A"  # FIX7 (rubric 3.5.0): the machine's own points, no glute stretch override
     bad = copy.deepcopy(MV)
-    bad["hip_thrust_barbell"]["hypertrophy"][0]["tier"] = "A"
-    bad["hip_thrust_machine"]["hypertrophy"][0]["tier"] = "S"
+    bad["hip_thrust_barbell"]["hypertrophy"][0]["tier"] = "B"
+    bad["hip_thrust_machine"]["hypertrophy"][0]["tier"] = "A"
     assert _ordering_offenders(bad)
-    movements = copy.deepcopy(MV)  # and the builder pass re-derives it under the (A) ceiling
-    movements["hip_thrust_barbell"]["hypertrophy"][0]["tier"] = "A"
+    movements = copy.deepcopy(MV)  # and the builder pass re-derives it under the (B) ceiling
+    movements["hip_thrust_barbell"]["hypertrophy"][0]["tier"] = "B"
     movements["hip_thrust_machine"]["hypertrophy"] = [row]
     reviews.apply_evidence_ordering(movements)
-    assert movements["hip_thrust_machine"]["hypertrophy"][0]["tier"] == "A"
+    assert movements["hip_thrust_machine"]["hypertrophy"][0]["tier"] == "B"
 
 
 def test_a_negative_or_absent_trial_anchors_nothing():
