@@ -211,9 +211,12 @@ RATE_WEEKS = 4
 def weekly_rates(weights_by_day: Mapping[str, Any], weeks: int = RATE_WEEKS) -> list[dict[str, float]]:
     """Weekly loss rates, newest first: each week's mean weigh-in against the week before's (weeks end at the latest weigh-in).
     A week with no weigh-in ends the series. Loss is positive."""
-    from datetime import date, timedelta
+    from datetime import timedelta
 
-    days = {date.fromisoformat(str(k)[:10]): float(v) for k, v in (weights_by_day or {}).items() if v is not None}
+    from common.pacific_time import parse_day_key
+
+    parsed = {parse_day_key(str(k)[:10]): v for k, v in (weights_by_day or {}).items() if v is not None}
+    days = {d: float(v) for d, v in parsed.items() if d is not None}
     if not days:
         return []
     end = max(days)

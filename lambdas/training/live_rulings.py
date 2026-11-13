@@ -36,7 +36,6 @@ Every threshold is a labelled HEURISTIC (ruling 18), registered with the metric 
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Any
 
 ISSUE = "#5861"
@@ -68,7 +67,7 @@ ARMS_FLOOR: dict[str, dict[str, Any]] = {
     "muscles": {
         "value": ["shoulders", "biceps", "triceps"],
         "label": HEURISTIC,
-        "basis": "the muscles the shoulders+arms morning trains directly (owner ruling 3): a week that drops it holds each at MEV, "
+        "basis": "the muscles the arms-and-delts day trains directly (owner ruling 3): a week that drops it holds each at MEV, "
         "direct + indirect (secondary sets count half)",
     },
     "add_per_slot": {
@@ -99,11 +98,12 @@ def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
 # ── 1. the lead lift ──────────────────────────────────────────────────────────
 def lead_of(target_date: str) -> str:
     """`squat` on an even ISO week, `hinge` on an odd one (`lead_lift_rule: alternate_weekly`)."""
-    try:
-        week = date.fromisoformat(str(target_date)[:10]).isocalendar()[1]
-    except ValueError:
+    from common.pacific_time import parse_day_key
+
+    d = parse_day_key(str(target_date)[:10])
+    if d is None:
         return "squat"
-    return "squat" if week % 2 == 0 else "hinge"
+    return "squat" if d.isocalendar()[1] % 2 == 0 else "hinge"
 
 
 def lead_lift(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
@@ -403,7 +403,7 @@ HEURISTIC_HOOKS: dict[str, str] = {
     "rate_policy.SUSTAINED_WEEKS": "weeks above the ceiling that preceded an anchor decline, across blocks",
     "rate_policy.SIGNAL_STEP_PCT": "loss rate in weeks with 1, 2, 3 slow signals vs strength the following week",
     "live_program.LOAD_POLICY": "e1RM trend after a hold / step down vs after a step up",
-    "live_program.STALL_RULE": "e1RM over the 3 exposures after a stall reset",
+    "live_program.STALL_RULE": "e1RM over the exposures after a stall reset",
     "live_program.PAIN_RULE": "pain-note recurrence within 2 sessions of a reduce / avoid",
     "live_program.DELOAD_SHAPE": "readiness and first-set reps the week after a deload",
     "live_program.TRUNK_FLOOR": "trunk-drill progression and back-discomfort notes",
@@ -413,7 +413,7 @@ HEURISTIC_HOOKS: dict[str, str] = {
     "live_shape.QUAD_SLOT": "quadriceps anchor trend with the slot served",
     "live_shape.WALK_PROMPT": "walks logged after a prompt",
     "live_week.CARDIO_ROOM": "conditioning-block minutes delivered vs lifting minutes lost",
-    "live_week.NOVEL_START": "RPE logged on a new movement's first 3 exposures",
+    "live_week.NOVEL_START": "RPE logged on a new movement's first exposures",
     "fatigue_model.THRESHOLDS": "strain calls vs the next session's first-set reps / RPE",
     "quality_rubric.NEUTRAL": "how often a reviewed input moved a provisional row's tier",
 }
