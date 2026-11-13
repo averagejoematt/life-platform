@@ -294,3 +294,12 @@ def test_the_cardio_seam_reads_the_cardio_models_own_output():
     assert fm.cardio_state(None) is None and fm.cardio_state({"state": "low"}) == "low"
     sig = {s["signal"]: s["state"] for s in _assess(cardio_load=hard)["signals"]}
     assert sig["cardio_load"] == "strain"
+
+
+def test_hevy_cardio_blocks_feed_the_cardio_seam():
+    lib = {"movements": {"row": {"template_id": "T_ROW", "title": "Rowing Machine", "pattern": "cardio", "target": {"primary": "cardio"}}}}
+    block = {"template_id": "T_ROW", "sets": [{"type": "normal", "duration_seconds": 2400, "rpe": 9}, {"duration_seconds": 2400, "rpe": 8}]}
+    load = fm.hevy_cardio_load([{"date": "2026-11-10", "exercises": [block]}], lib, as_of=AS_OF)
+    assert load["minutes"] == 80 and load["hr_used"] is False
+    assert fm.cardio_state(load) in ("high", "moderate", "low")
+    assert fm.hevy_cardio_load([{"date": "2026-11-10", "exercises": [_ex("T_LR", 10, 12)]}], LIB, as_of=AS_OF) is None  # control

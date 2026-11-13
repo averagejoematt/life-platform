@@ -33,6 +33,8 @@ from __future__ import annotations
 import copy
 from typing import Any
 
+from training.stall_detector import MIN_SESSIONS
+
 ISSUE = "#5861"
 VERSION = "fatigue-model@0.1.0"
 HEURISTIC, VALIDATED = "heuristic", "validated"
@@ -51,7 +53,7 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "basis": "fractional-set convention: a hard set credits its primary muscle 1.0 and each secondary muscle 0.5 — a "
         "common counting convention, not a measured stimulus ratio",
     },
-    "weekly_sets_over": {
+    "muscle_sets_over_mrv": {
         "value": "MRV",
         "label": HEURISTIC,
         "basis": "weekly hard sets above the muscle's MRV landmark (config/training_landmarks.json — practitioner volume "
@@ -60,10 +62,14 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
     "e1rm_drop_pct": {
         "value": 0.05,
         "label": HEURISTIC,
-        "basis": "the latest two exposures of a compound both more than 5% under its best earlier e1RM (Epley) in the window "
+        "basis": "the latest pair of exposures of a compound both more than 5% under its best earlier e1RM (Epley) in the window "
         "— the platform's existing practice line (critics_fatigue), not a citation and not his own variance",
     },
-    "trend_min_exposures": {"value": 3, "label": HEURISTIC, "basis": "a trend claim needs three exposures (stall_detector.MIN_SESSIONS)"},
+    "trend_min_exposures": {
+        "value": MIN_SESSIONS,
+        "label": HEURISTIC,
+        "basis": "the stall detector's own trend floor (stall_detector.MIN_SESSIONS)",
+    },
     "rpe_drift": {
         "value": 1.0,
         "label": HEURISTIC,
@@ -75,7 +81,7 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "basis": "two sessions with a discomfort-class note (training_notes_pain.pain_class) on one movement inside "
         "discomfort_window_days -> swap it for a lower-fatigue variant; a pain-class note already excludes (#5806)",
     },
-    "discomfort_window_days": {"value": 14, "label": HEURISTIC, "basis": "two weeks: about two exposures of a weekly movement"},
+    "discomfort_window_days": {"value": 14, "label": HEURISTIC, "basis": "a fortnight: about a pair of sessions of a weekly movement"},
     "axial_stack_window_hours": {
         "value": 72,
         "label": HEURISTIC,
@@ -231,11 +237,11 @@ def _trend(points: list[tuple[str, float | None, float | None, float | None, int
     e1 = [float(p[1] or 0.0) for p in pts]
     best_before = max(e1[:-2]) if len(e1) > 2 else e1[0]
     if len(e1) > 2 and all(v < best_before * (1 - drop) for v in e1[-2:]):
-        return {"trend": "regressing", "why": f"the last two exposures are more than {drop:.0%} under the best before them"}
+        return {"trend": "regressing", "why": f"the latest pair of exposures are both more than {drop:.0%} under the best before them"}
     if e1[-1] > max(e1[:-1]):
         return {"trend": "progressing", "why": "the latest top set is a new best e1RM in the window"}
     if len(pts) < THRESHOLDS["trend_min_exposures"]["value"]:
-        return {"trend": "unknown", "why": "two exposures, no new best — below the three-exposure floor for a stall"}
+        return {"trend": "unknown", "why": "no new best yet, and below trend_min_exposures for a stall call"}
     try:  # #5057: the same load x reps at an easy RPE is the PRESCRIPTION holding still — a load step, never a rotation
         sp = [stall_detector.SessionPoint(date=d, load_kg=ld, reps=r, rpe=rpe) for d, _e, rpe, ld, r in pts]
         step = stall_detector.step_due(sp)
@@ -318,6 +324,27 @@ def axial_stacking(workouts: list[dict[str, Any]] | None, index: dict[str, dict[
     return out
 
 
+def hevy_cardio_load(workouts: list[dict[str, Any]] | None, lib: dict[str, Any] | None, *, as_of: str, days: int = 7) -> dict | None:
+    """The cardio seam's live feed (L4): the Hevy record's timed cardio blocks in the window, as `cardio_model.cardio_load`
+    sessions (`movement_id` + `entry`, minutes from the logged durations, the block's highest logged RPE). Walking and the
+    other sources are the cardio model's own reads, not this one. None when the window holds no timed cardio."""
+    from training import cardio_model
+
+    mv = (lib or {}).get("movements") or {}
+    index = library_index(lib)
+    sessions = []
+    for _day_, tid, ex in _exposures(workouts, as_of, days):
+        mid = (index.get(tid) or {}).get("movement_id")
+        if not mid or (index.get(tid) or {}).get("pattern") != "cardio":
+            continue
+        sets = ex.get("sets") or []
+        secs = sum(_num(x.get("duration_seconds")) or 0.0 for x in sets if isinstance(x, dict))
+        rpes = [r for r in (_num(x.get("rpe")) for x in sets if isinstance(x, dict)) if r is not None]
+        if secs > 0:
+            sessions.append({"movement_id": mid, "entry": mv.get(mid), "minutes": secs / 60.0, "rpe": max(rpes) if rpes else None})
+    return cardio_model.cardio_load(sessions) if sessions else None
+
+
 def adherence(workouts: list[dict[str, Any]] | None, *, as_of: str, planned_per_week: int, days: int = 14) -> dict[str, Any]:
     """Performed lifting sessions in the window against the plan's sessions per week (the split's role count)."""
     if workouts is None:
@@ -387,7 +414,7 @@ def _systemic(
             "weekly_sets",
             "strain" if over else ("ok" if landmarks else "unknown"),
             f"over MRV: {', '.join(over)}" if over else "no muscle over its MRV landmark",
-            "weekly_sets_over",
+            "muscle_sets_over_mrv",
         )
     )
     regress = sorted(t for t, s in movs.items() if s.get("trend") == "regressing")
@@ -528,13 +555,14 @@ def for_live_draft(rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: 
         from training import block_model, program_structure, selection_engine
         from training.training_charter import charter_value
 
+        lib, as_of = selection_engine.load_library_failsoft(), str(getattr(inputs, "target_date", ""))
         assessment = assess(
             workouts=block_workouts,
-            lib=selection_engine.load_library_failsoft(),
-            as_of=str(getattr(inputs, "target_date", "")),
+            lib=lib,
+            as_of=as_of,
             readiness=getattr(inputs, "recovery_tier", None),
             sleep_hours=getattr(inputs, "sleep_hours", None),
-            cardio_load=getattr(inputs, "cardio_load", None),  # THE CARDIO SEAM (L4 cardio_model)
+            cardio_load=getattr(inputs, "cardio_load", None) or hevy_cardio_load(block_workouts, lib, as_of=as_of),  # the L4 seam
             landmarks=block_model.load_landmarks(),
             planned_per_week=len(program_structure.SPLIT_ROLES),
             session_minutes=(rx.get("session_minutes") or {}).get("lifting_minutes"),

@@ -126,14 +126,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     # Epic #5861 lane L4 (cardio on its own model, built behind the library switch and deliberately wired into no
     # live drafting path; fixture-tested in tests/test_cardio_model_5861.py). Each names its first live caller.
-    "lambdas/training/cardio_model.py:conditioning_rating": (
-        "#5861 L4: the `ratings.conditioning` basis for the exercise library. First live caller: lane L1's builder "
-        "(deploy/build_exercise_library.py) filling `ratings.conditioning`; delete this entry when it lands."
-    ),
-    "lambdas/training/cardio_model.py:cardio_load": (
-        "#5861 L4: the cardio load interface the fatigue model reads. First live caller: lane L3's "
-        "lambdas/training/fatigue_model.py; delete this entry when it lands."
-    ),
     "lambdas/training/cardio_model.py:aerobic_plan": (
         "#5861 L4: steps-first aerobic planning (walking counted before any added cardio). First live caller: the "
         "weekly-structure evaluation of epic #5861 (a 4+1 split) or the selection engine's live branch once the owner "
