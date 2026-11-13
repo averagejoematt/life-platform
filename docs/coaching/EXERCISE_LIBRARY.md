@@ -220,8 +220,10 @@ loadable (or three or more). B = two, or one loadable. C = one.
 **D. Conditioning.** Applies to a conditioning modality (and to carries, sleds and athletic drills with a conditioning
 profile). S = aerobic stimulus high + intensity control high + impact low + recovery demand low. A = aerobic high + low
 impact, or aerobic moderate + low impact + low recovery demand. B = aerobic high, or moderate without high impact.
-C otherwise. Never penalised for lacking hypertrophy traits. The cardio model itself (doses, protocols, progression) is
-`lambdas/training/cardio_model.py` (lane L4); this rating is only the library's view of the modality.
+C otherwise. Never penalised for lacking hypertrophy traits. **One rule per movement:** every modality the cardio model
+(`lambdas/training/cardio_model.py`, lane L4 — it owns cardio) rates is rated by it alone (`conditioning_rating`, with its
+N=1 sustainability from `history.exposures`); the table above applies only to what it does not model (carries, athletic
+drills, bodyweight circuits).
 
 **E. Mobility / joint function.** Applies to mobility, rehab/control and loaded end-range movements. Loaded (strength
 through range plus control: cuff rotations, face pulls, a cossack squat, a dead hang) A; active or motor control B;
@@ -284,7 +286,7 @@ H / St / F / C / M, "-" = not applicable):
 | Ab wheel D | ab_wheel | D | H A · F B | lengthened anti-extension with a kneeling-to-standing ladder |
 | Bird dog / side plank / cuff D | bird_dog, side_plank, rotator_cuff_external_rotation | D / D / D | F C, M B / F B / M A | rehab and control work, rated on functional and joint function, never on growth |
 | Cossack and unusual lunges S for quads | db_cossack_squats, 3_way_lunge, offset_lunges, drop_step_lunges, … | S | quads B (cossack: adductors A, M A; offset: F S) | balance or mobility, not the quads, ends the set; DB held lower-body work has a moderate ceiling. Squats, leg press and split squats now sit above them (A) |
-| All cardio D | treadmill, cycling, elliptical, walking, rowing_machine, air_bike, … | D | H - · C S / S / S / A / A / A | rated on conditioning only |
+| All cardio D | treadmill, cycling, elliptical, rowing_machine, air_bike, walking, running | D | H - · C S / S / A / A / B / C / C | rated on conditioning only, by lane L4's cardio model (walking: hard to dose and progress; running: high impact) |
 | No S glute | hip_thrust_machine, glute_kickback_machine, hip_thrust_barbell | A / A / B | S / S / A | glute length fixed at mid both ways (Plotkin 2023); the machines meet every S criterion; the barbell hip thrust's moderate skill and stability hold it at A |
 | Weak adductors | db_cossack_squats, sumo squats, side lunges, squat_barbell | — | adductors A / A / B / A | reviewed secondary rows; adduction machines and Copenhagen work are lane L2's additions |
 | Inconsistent rear delts | rear_delt_reverse_fly_machine / _cable / rear_delt_fly / face_pull | S / B / C / B | S / A / B / B (face pull M A) | the cable fly is mid-length like the machine; the dumbbell flies are dumbbells; the face pull's cuff work is rated on joint function |

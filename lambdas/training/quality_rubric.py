@@ -42,6 +42,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from training import cardio_model
+
 RUBRIC_VERSION = "3.0.0"  # 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
@@ -392,9 +394,21 @@ def functional_rating(entry: dict[str, Any]) -> tuple[str | None, list[str]]:
     return tier, basis + ["rule: S = 3+ qualities, loadable, safe, a carry or single-leg under travel/trunk load; A = 2+ loadable"]
 
 
+def _cardio(entry: dict[str, Any]) -> dict[str, Any] | None:
+    """Lane L4's cardio model rating for this movement (it owns cardio), keyed by the canonical id; None = not a modality
+    it models."""
+    return cardio_model.conditioning_rating(entry, str(entry.get("canonical") or "") or None)
+
+
 def conditioning_rating(entry: dict[str, Any]) -> tuple[str | None, list[str]]:
-    """Aerobic stimulus, intensity control/progression, impact (joint tolerance), recovery demand. Never penalised for
-    lacking hypertrophy traits. S = high aerobic, high control, low impact, low recovery demand."""
+    """ONE conditioning rule per movement. A modality the cardio model knows (`training.cardio_model`, lane L4: every
+    cardio machine, walking, running, jump rope, sleds, the KB swing) is rated by it alone. Only a movement it does not
+    model (a carry, an athletic drill, a bodyweight circuit) falls back to this table: aerobic stimulus, intensity
+    control, impact, recovery demand; S = high aerobic, high control, low impact, low recovery demand. Never penalised for
+    lacking hypertrophy traits."""
+    cm = _cardio(entry)
+    if cm is not None:
+        return cm["tier"], [f"cardio_model ({cardio_model.CARDIO_MODEL_VERSION}) modality {cm['modality']}"] + list(cm["basis"])
     c = _inputs(entry).get("conditioning")
     if not isinstance(c, dict):
         return None, ["not applicable: not a conditioning modality"]
@@ -443,7 +457,9 @@ def objective_ratings(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
     for obj, rate in _RATERS.items():
         tier, basis = rate(entry)
-        out[obj] = {"tier": tier, "basis": basis, "evidence_confidence": _confidence(entry, tier)}
+        cm = _cardio(entry) if obj == "conditioning" else None
+        conf = cm["evidence_confidence"] if cm is not None else _confidence(entry, tier)
+        out[obj] = {"tier": tier, "basis": basis, "evidence_confidence": conf}
     return out
 
 

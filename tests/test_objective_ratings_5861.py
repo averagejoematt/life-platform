@@ -206,7 +206,10 @@ def test_control_a_dropped_key_or_a_rewritten_template_id_goes_red():
 def test_an_alias_never_scores_differently_from_its_canonical():
     for head, fam in LIB["canonical_families"].items():
         for a in fam["aliases"]:
-            assert MV[a]["ratings"] == MV[head]["ratings"], a
+            # the same tier and confidence on every objective; a basis may cite the alias's own template's N=1 count
+            assert {o: (r["tier"], r["evidence_confidence"]) for o, r in MV[a]["ratings"].items()} == {
+                o: (r["tier"], r["evidence_confidence"]) for o, r in MV[head]["ratings"].items()
+            }, a
             assert [r["tier"] for r in MV[a]["hypertrophy"]] == [r["tier"] for r in MV[head]["hypertrophy"]], a
     # control: an alias carrying different attributes is a schema error
     bad = copy.deepcopy(LIB)
@@ -309,7 +312,7 @@ ANOMALIES = {  # key: (hypertrophy, strength, functional, conditioning, mobility
     "offset_lunges": ("B", "B", "S", None, None),
     "3_way_lunge": ("B", "B", "A", None, None),
     "treadmill": (None, None, None, "S", None),
-    "walking": (None, None, None, "A", None),
+    "walking": (None, None, None, "C", None),  # lane L4's cardio model owns the rating: hard to dose and progress
     "rowing_machine": (None, None, None, "A", None),
     "hip_thrust_machine": ("S", None, None, None, None),
     "hip_thrust_barbell": ("A", None, None, None, None),
@@ -380,6 +383,25 @@ def test_an_addition_with_authored_inputs_is_rated_and_counts_as_reviewed():
     assert e["objective_inputs"]["reviewed"] is True and e["objective_inputs"]["ceiling"] == "high"
     r = qr.objective_ratings(e)
     assert r["hypertrophy"]["tier"] in qr.QUALITY_TIERS and r["functional"]["tier"] == "A"
+
+
+def test_conditioning_has_one_rule_per_movement_and_cardio_is_the_cardio_models():
+    """Lane L4 owns cardio: wherever `cardio_model.conditioning_rating` rates a movement, the library's rating IS it."""
+    from training import cardio_model as cm
+
+    off = []
+    for k, e in MV.items():
+        r = cm.conditioning_rating(e, e.get("canonical"))
+        if r is not None and (e["ratings"]["conditioning"]["tier"], e["ratings"]["conditioning"]["evidence_confidence"]) != (
+            r["tier"],
+            r["evidence_confidence"],
+        ):
+            off.append(k)
+    assert off == [] and MV["walking"]["ratings"]["conditioning"]["basis"][0].startswith("cardio_model")
+    # control: the library's own fallback table applied to a cardio row disagrees (walking: A there, C in the model)
+    alt = copy.deepcopy(MV["walking"])
+    alt["title"], alt["category"], alt["target"]["primary"], alt["canonical"] = "Walking", "carry", "full_body", "x"
+    assert qr.conditioning_rating(alt)[0] == "A" != MV["walking"]["ratings"]["conditioning"]["tier"]
 
 
 def test_the_walking_lunge_is_not_cardio_but_walking_is():
