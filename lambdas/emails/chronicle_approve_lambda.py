@@ -584,8 +584,8 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
         date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
         wk = item.get("week_number", "?")
         blocking = _audit_refusal(item)
-        # The token pages through the `chronicle-autopublish-held` alarm every day the week sits unapproved inside the
-        # window, and the line names the week and what the audit still finds (an approval needs those cleared too).
+        # The token raises the `chronicle-autopublish-held` alarm (the daily digest) every day the week sits unapproved
+        # inside the window, and the line names the week and what the audit still finds (an approval needs those too).
         logger.error(
             "%s Week %s (%s) held: unapproved for %sh, and elapsed time never publishes a chronicle (owner ruling "
             "2026-11-13); approve it from the preview email. The audit found %d blocking item(s). %s",
