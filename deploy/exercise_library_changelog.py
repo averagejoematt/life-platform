@@ -85,4 +85,12 @@ BUILDER_CHANGE_LOG = [
         "(and the barbell bench's wrist) rated by implement; `programming_settings.hard_conditioning_doses` 1 (owner ruling).",
         "rule": "configuration and data only — status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.3.5",
+        "date": "2026-11-13",
+        "by": "#5861 FIX8 (the seventh red team, PROPOSAL for the owner's review with the library)",
+        "what": "`programming_settings.week_floor_includes_abs` true (the driver's recommendation, owner to confirm): the week's "
+        "hard-set floor tops the abs up to MEV too, and the week's only direct ab work is never what the time fit drops.",
+        "rule": "a proposed default — status stays proposed until the owner approves the library",
+    },
 ]

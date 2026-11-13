@@ -138,7 +138,7 @@ def synthetic_record(profile: dict[str, Any], served: dict[str, list[tuple[str, 
     trends, its discomfort/pain notes on the last two exposures, its recent hard cardio, and its adherence."""
     start = _day(profile["as_of"], -7 * HISTORY_WEEKS)
     planned = [(w, i, role) for w in range(HISTORY_WEEKS) for i, role in enumerate(profile["defaults_roles"])]
-    keep = int(profile.get("sessions_last_14d") or 10)
+    keep = 10 if profile.get("sessions_last_14d") is None else int(profile["sessions_last_14d"])  # #5861 FIX8: 0 is a layoff
     recent = [x for x in planned if x[0] >= HISTORY_WEEKS - 2]
     # an adherence dip misses the END of the week first (late-week sessions slip), latest week first
     by_slip = sorted(recent, key=lambda x: (-x[1], -x[0]))

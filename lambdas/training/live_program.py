@@ -133,6 +133,7 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
     "symptom_line": "",  # #5861 FIX6: owner ruling 10 — no symptom warning line (the `extended` preset stays available)
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
+    "week_floor_includes_abs": True,  # #5861 FIX8: the abs join the week's hard-set floor (OWNER DECISION pending)
 }
 """Library-carried settings (`config/exercise_library.json` `programming_settings`), read with these defaults when absent.
 `session_cap_includes_cardio` False keeps today's 75-min LIFTING cap with the cardio block apart; True makes the cap cover lifting

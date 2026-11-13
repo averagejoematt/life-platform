@@ -176,16 +176,21 @@ def second_clause(d: dict[str, Any]) -> str:
     return line if len(line) <= session_block.CLAUSE_MAX_CHARS else "RPE 7–8 today: the second lift."
 
 
-def return_week(workouts: Any, target_date: str) -> dict[str, Any] | None:
-    """RETURN_WEEK (module doc 3): {gap_days, back_on} when this week is the first back after a gap of `gap_days`+ with no
-    logged session (the gap ending inside this week, today counting as the first session back when none is logged yet)."""
-    from common.pacific_time import parse_day_key
+def return_week(workouts: Any, target_date: str, sick_days: Any = None) -> dict[str, Any] | None:
+    """RETURN_WEEK (module doc 3): {gap_days, back_on, last} when this week is the first back after a gap of `gap_days`+ with no
+    logged session (the gap ending inside this week, today counting as the first session back when none is logged yet), or
+    after a DECLARED illness — a sick day (`sick_days`: the dates of `manage_sick_days` rows, when the caller read them) in the
+    two weeks before this week's Monday."""
+    from common.pacific_time import parse_day_key, shift_day_key
 
     from training.live_balance import week_start
 
     if not target_date:
         return None
     monday = week_start(target_date)
+    ill = sorted(str(d)[:10] for d in sick_days or () if shift_day_key(monday, -14) <= str(d)[:10] < target_date)
+    if ill:
+        return {"gap_days": 0, "back_on": target_date, "last": ill[-1], "illness": True}
     days = sorted(
         {_day(w) for w in workouts or [] if _day(w) and _day(w) < target_date and any(x.get("sets") for x in w.get("exercises") or [])}
     )
@@ -205,27 +210,42 @@ def apply_return_week(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) ->
     """IN PLACE (module doc 3): the return week caps every lift at the RETURN_WEEK band, marks it `live_return` (no load step,
     `live_safety.no_step_keys`; the load guard holds at the same-role reference) and lifts the novel-again cap on a lift whose
     pattern he trained in the record (`live_familiar`). Returns the rationale lines."""
-    back = return_week(workouts, str(ctx.get("target_date") or ""))
+    back = return_week(workouts, str(ctx.get("target_date") or ""), ctx.get("sick_days"))
     if not back:
         return []
+    ctx["return_week"] = back  # read by `live_stimulus.hard_capable`: the return week's band governs, not a per-lift cap
+    cap_return(rx, ctx, workouts)
+    lo, hi = (int(x) for x in RETURN_WEEK["rpe_band"]["value"])
+    why = (
+        f"a declared illness ({back['last']})"
+        if back.get("illness")
+        else f"{back['gap_days']} days without a session (last {back['last']})"
+    )
+    return [
+        f"return week (live): {why} — every lift at RPE {lo}-{hi}, no load "
+        "steps this week, back to normal next week; familiarity read by movement pattern (RETURN_WEEK, heuristic)"
+    ]
+
+
+def cap_return(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> None:
+    """IN PLACE, a return week only (`ctx["return_week"]`): every exposure — the plan's later additions too — at the RETURN_WEEK
+    band, marked `live_return`, familiar by pattern where he trained it."""
+    if not ctx.get("return_week"):
+        return
     lo, hi = (int(x) for x in RETURN_WEEK["rpe_band"]["value"])
     seen = _patterns_trained(workouts, ctx)
     for e in rx.get("exposures") or []:
+        e["live_return"] = True  # no in-session load step, the carry's included (`live_safety.no_step_keys`)
         if e.get("intensity") == "carry":
             continue
         e["live_effort"] = min(hi, int(e.get("live_effort") or 99))
         e["live_effort_band"] = [lo, hi]
-        e["live_return"] = True
         e["live_load"] = {**(e.get("live_load") or {}), "hold": True}
         entry = ((ctx.get("lib") or {}).get("movements") or {}).get(
             (ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key"))) or ""
         ) or {}
         if entry.get("pattern") in seen:
             e["live_familiar"] = True
-    return [
-        f"return week (live): {back['gap_days']} days without a session (last {back['last']}) — every lift at RPE {lo}-{hi}, no load "
-        "steps this week, back to normal next week; familiarity read by movement pattern (RETURN_WEEK, heuristic)"
-    ]
 
 
 def _patterns_trained(workouts: Any, ctx: dict[str, Any]) -> set[str]:

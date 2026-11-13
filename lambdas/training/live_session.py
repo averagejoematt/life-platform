@@ -269,6 +269,7 @@ def for_live_draft(
             "discomfort": hurts,
             "light_discomfort": light,  # FIX5: a joint-located "sore" at the mild line — the joint rule keeps it, lighter
             "target_date": str(getattr(inputs, "target_date", "") or ""),
+            "sick_days": getattr(inputs, "sick_days", None),  # #5861 FIX8: a declared illness opens the return week
         } | _week_ctx(week, inputs)
         from training import live_safety  # #5861 FIX4: the pain note's site and the mild line, read once
 
@@ -276,10 +277,12 @@ def for_live_draft(
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
         lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
-        lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
         from training import live_progress  # #5861 FIX8: the first week back after 10+ days off runs at RPE 7-8, no steps
 
-        lines += live_progress.apply_return_week(out, ctx, block_workouts)
+        back = live_progress.apply_return_week(out, ctx, block_workouts)  # before the plan: no stall reset in a return week
+        lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
+        lines += back
+        live_progress.cap_return(out, ctx, block_workouts)  # the plan's own additions (the carry, a slot) at the band too
         from training import live_stimulus  # #5861 FIX7: a fast cut with broad regression answers with volume, never load
 
         lines += live_stimulus.fast_cut(out, sig, inputs)
@@ -288,7 +291,7 @@ def for_live_draft(
         lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
         from training import live_rulings  # #5861 FIX6 ruling 3: AFTER the dip's lighter week, so it is never undone
 
-        lines += live_rulings.arms_top_up(out, ctx, block_workouts)
+        lines += live_rulings.arms_top_up(out, ctx, block_workouts) + live_rulings.arms_keep(out, ctx, block_workouts)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -337,6 +340,7 @@ def for_live_draft(
         ),
         "conditioning_host": live_balance.conditioning_host((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),
         "week_skip": list((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),  # FIX6: the time trim's week count
+        "week_mode": (ctx or {}).get("week_mode"),  # FIX8: the arms floor's level in the time fit (`live_shape.precious`)
     }
     rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured

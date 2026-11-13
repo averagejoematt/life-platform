@@ -367,6 +367,33 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
     return lines
 
 
+def arms_keep(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str]:
+    """IN PLACE, #5861 FIX8 (the seventh red team: an alternate-week misser sat at 3 shoulder hard sets six weeks running): in a
+    week that skips shoulders+arms, each upper session keeps ONE hard-capable isolation slot per ARMS_FLOOR muscle (`live_keep`):
+    the time fit trims the anchors' back-offs (live_shape.TIME_FIT) before it drops one. Returns the rationale lines."""
+    if "shoulders_arms" not in set(ctx.get("week_skip") or ()) or not str(rx.get("session_role") or "").startswith("upper"):
+        return []
+    from training import live_stimulus, live_week
+
+    lib, cat, kept = ctx.get("lib") or {}, ctx.get("catalog") or {}, []
+    for m in ARMS_FLOOR["muscles"]["value"]:
+        slot = next(
+            (
+                e
+                for e in rx["exposures"]
+                if e.get("kind") == "accessory"
+                and e.get("sets")
+                and live_week.landmark_muscle(e.get("movement_key"), cat, lib) == m
+                and live_stimulus.hard_capable(str(e.get("movement_key")), ctx, workouts)
+            ),
+            None,
+        )
+        if slot is not None and not slot.get("live_keep"):
+            slot["live_keep"] = m
+            kept.append(f"{m}: {(cat.get(slot['movement_key']) or {}).get('title') or slot['movement_key']}")
+    return [f"arms kept (live): {'; '.join(kept)} — a week without shoulders+arms keeps one slot each (ARMS_FLOOR)"] if kept else []
+
+
 def _arms_slot(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, muscle: str) -> dict[str, Any] | None:
     """#5861 FIX8: a two-set low-fatigue isolation for an ARMS_FLOOR muscle with no slot today (`live_stimulus._iso_for`: one
     that can be hard), appended to the session; None when nothing is servable."""

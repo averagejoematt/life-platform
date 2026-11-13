@@ -330,27 +330,36 @@ def precious(block: Any, movements: dict[str, Any], taken: Counter, rx: dict[str
     """#5861 FIX8: dropping `block` would take a PRIORITY muscle under its MEV for the week (`taken` already counts it off) —
     the time fit trims the anchors' back-offs (TIME_FIT) before it goes."""
     from training import block_model, live_week, selection_engine as se
+    from training.live_rulings import ARMS_FLOOR
 
     lib = se.load_library_failsoft() or {}
     m = live_week.landmark_muscle(block.movement_key, movements, lib)
     prio = [str(p) for p in _settings(lib).get("priority_muscles") or []]
-    mev = float(((block_model.load_landmarks() or {}).get(m) or {}).get("MEV") or 0)
-    return m in prio and live_week.week_sets(movements, lib, rx)[m] - taken[m] < mev
+    mark = (rx or {}).get("live_session") or {}
+    marks = (block_model.load_landmarks() or {}).get(m) or {}
+    left = live_week.week_sets(movements, lib, rx)[m] - taken[m]
+    if m in prio and left < float(marks.get("MEV") or 0):
+        return True
+    # a week without shoulders+arms (ruling 3): its arms floor — MV on a dip week, MEV on a short week — is a floor too
+    arms = "shoulders_arms" in set(mark.get("week_skip") or ()) and m in ARMS_FLOOR["muscles"]["value"]
+    return arms and left < float(marks.get("MV" if mark.get("week_mode") not in (None, "short") else "MEV") or 0)
 
 
 # ── 3. order and the heavy pull ──────────────────────────────────────────────
 def order_lower_volume(rx: dict[str, Any]) -> list[str]:
     """IN PLACE: on the lower-volume day the squat anchor comes before the hinge anchor (the RDL tires the erectors the squat
     needs). Returns the rationale lines."""
-    if rx.get("session_role") != "lower_volume":
-        return []
     ex = rx["exposures"]
+    full = any(e.get("live_full_body") for e in ex)  # #5861 FIX8: a full-body day's guest squat and hinge too (seventh red team)
+    if rx.get("session_role") != "lower_volume" and not full:
+        return []
     hinge = next((i for i, e in enumerate(ex) if e.get("kind") == "anchor" and e.get("pattern") == "hinge"), None)
     squat = next((i for i, e in enumerate(ex) if e.get("kind") == "anchor" and e.get("pattern") == "squat"), None)
     if hinge is None or squat is None or squat < hinge:
         return []
     ex.insert(hinge, ex.pop(squat))
-    return ["order (live): the squat before the hinge on lower volume — the RDL tires the erectors the squat needs"]
+    day = "on lower volume" if rx.get("session_role") == "lower_volume" else "on a full-body day"
+    return [f"order (live): the squat before the hinge {day} — the RDL tires the erectors the squat needs"]
 
 
 def deadlift_shape(rx: dict[str, Any], lib: dict[str, Any] | None = None) -> list[str]:

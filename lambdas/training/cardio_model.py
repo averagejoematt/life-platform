@@ -634,6 +634,107 @@ def _aerobic_family(family: str) -> bool:
     return f in AEROBIC_FAMILIES or (f.startswith("other:") and any(n in f for n in AEROBIC_OTHER))
 
 
+RECORD_HYGIENE: dict[str, dict[str, Any]] = {
+    "duplicate_seconds": {
+        "value": 1,
+        "label": "heuristic",
+        "basis": "#5861 FIX8 (seventh red team: an 11-12 walk re-uploaded on 11-13 with the same elapsed time and the same start "
+        "second, a whole number of hours later): two Strava records of one sport whose elapsed times agree within 1 s and whose "
+        "starts differ by whole hours (within 1 s) inside duplicate_window_hours, or whose distances also agree within 1%, are ONE "
+        "upload — the first is kept",
+    },
+    "duplicate_window_hours": {"value": 48, "label": "heuristic", "basis": "see duplicate_seconds"},
+    "beside_share": {
+        "value": 0.5,
+        "label": "heuristic",
+        "basis": "#5861 FIX8 (the seventh red team: a 60-min walk absorbed into a 2 h 50 min gym record): a recorded Strava walk "
+        "inside a gym identity is credited on its own evidence when it lies at least half OUTSIDE every Hevy session's clock, or "
+        "when the gym's own block of that family (Hevy's logged minutes, not the session clock) is under half the walk — the "
+        "gym's treadmill block is never a 60-min outdoor walk",
+    },
+}
+
+
+def _start_end(a: dict[str, Any]) -> tuple[Any, float]:
+    from training.workout_identity import _float, _parse
+
+    return _parse(a.get("start_date")), _float(a.get("elapsed_time_seconds") or a.get("elapsed_time"))
+
+
+def _same_upload(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """RECORD_HYGIENE duplicate_seconds: `b` is a second copy of `a`."""
+    sa, ea = _start_end(a)
+    sb, eb = _start_end(b)
+    sport = lambda x: str(x.get("sport_type") or x.get("type") or "").lower()  # noqa: E731
+    if sa is None or sb is None or not ea or sport(a) != sport(b) or abs(ea - eb) > float(RECORD_HYGIENE["duplicate_seconds"]["value"]):
+        return False
+    gap = abs((sb - sa).total_seconds())
+    if gap > float(RECORD_HYGIENE["duplicate_window_hours"]["value"]) * 3600:
+        return False
+    whole_hours = min(gap % 3600, 3600 - gap % 3600) <= float(RECORD_HYGIENE["duplicate_seconds"]["value"])
+    da, db = _qty(a.get("distance_m") or a.get("distance")), _qty(b.get("distance_m") or b.get("distance"))
+    same_distance = da is not None and db is not None and da > 0 and abs(da - db) <= 0.01 * da
+    return whole_hours or same_distance
+
+
+def dedupe_strava(rows: Iterable[dict[str, Any]] | None) -> tuple[list[dict[str, Any]], int]:
+    """(rows with each duplicate upload removed, how many were removed) — RECORD_HYGIENE; the first copy is kept."""
+    kept: list[dict[str, Any]] = []
+    out, dropped = [], 0
+    for row in rows or ():
+        acts = _activities(row)
+        mine = []
+        for a in acts:
+            if any(_same_upload(k, a) for k in kept):
+                dropped += 1
+                continue
+            kept.append(a)
+            mine.append(a)
+        if isinstance(row.get("activities"), list):
+            out.append({**row, "activities": mine})
+        elif mine:
+            out.append(row)
+    return out, dropped
+
+
+def walks_beside_the_gym(idents: list[dict[str, Any]], strava_by_id: dict[str, Any], hevy: Any) -> list[dict[str, Any]]:
+    """RECORD_HYGIENE beside_share: each Strava WALK inside a gym identity (one holding a Hevy member) that lies at least
+    beside_share outside every Hevy session's clock, as its own walking identity (the gym identity keeps the rest)."""
+    from datetime import timedelta
+
+    from training import workout_identity as wi
+
+    gym = wi._hevy_intervals(hevy)
+    out = []
+    for i in idents:
+        if "hevy" not in i["members"]:
+            continue
+        for src, ids in i["members"].items():
+            for x in ids if src.startswith("strava") else []:
+                a = strava_by_id.get(x) or {}
+                if str(a.get("sport_type") or a.get("type") or "").lower() not in ("walk", "hike"):
+                    continue
+                start, secs = _start_end(a)
+                if start is None or not secs:
+                    continue
+                end = start + timedelta(seconds=secs)
+                inside = sum(max(0.0, (min(end, b) - max(start, s)).total_seconds()) for s, b in gym)
+                share = float(RECORD_HYGIENE["beside_share"]["value"])
+                # outside the gym's clock, or longer than the gym's own block of that family (Hevy's minutes, not the clock's)
+                if inside / secs < share or float(i.get("seconds") or 0) < share * secs or i.get("family") != "walking":
+                    out.append(
+                        {
+                            "workout_identity": f"walk-beside:{x}",
+                            "family": "walking",
+                            "start": start.isoformat(),
+                            "end": end.isoformat(),
+                            "seconds": float(a.get("moving_time_seconds") or a.get("moving_time") or secs),
+                            "members": {src: [x]},
+                        }
+                    )
+    return out
+
+
 def recorded_aerobic(
     *,
     apple: Iterable[dict[str, Any]] | None = None,
@@ -648,8 +749,10 @@ def recorded_aerobic(
     from training import workout_identity as wi
 
     apple_by_id = {str(w.get("id") or k): w for row in apple or () for k, w in ((row.get("apple_workouts") or {}).items())}
+    strava, dupes = dedupe_strava(strava)  # #5861 FIX8: one upload, one walk (a re-upload or a time-zone-shifted copy)
     strava_by_id = {str(a.get("strava_id") or a.get("id")): a for row in strava or () for a in _activities(row)}
     idents = wi.resolve_workout_identities(apple=apple, strava=strava, hevy=hevy)
+    idents += walks_beside_the_gym(idents, strava_by_id, hevy)  # FIX8: a walk an over-long gym record absorbed is credited
     credited = light = unknown = 0.0
     by_day: dict[str, float] = {}
     sessions = []
@@ -688,6 +791,7 @@ def recorded_aerobic(
         sessions.append({"date": day, "family": i["family"], "minutes": round(minutes), "class": klass, "basis": basis})
     line = f"recorded outside the gym: {round(credited)} min credited (intensity evidence), {round(light)} min light"
     line += f", {round(unknown)} min intensity unknown (not credited)" if unknown else ""
+    line += f"; {dupes} duplicate upload(s) counted once" if dupes else ""
     return {
         "credited_min": round(credited),
         "light_min": round(light),

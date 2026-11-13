@@ -96,6 +96,8 @@ PROGRAMMING_SETTINGS_DEFAULTS: dict[str, Any] = {
     "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
+    # #5861 FIX8: the abs join the week's hard-set floor (the driver's recommendation, OWNER DECISION pending)
+    "week_floor_includes_abs": True,
 }
 # #5861 FIX6: THE OWNER'S RULINGS of 2026-11-13 on the decision register (configuration, NOT activation — `status` stays
 # `proposed`). Written over any earlier on-disk default by every rebuild: a ruling lives here, in the generator, and a later

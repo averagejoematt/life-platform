@@ -208,6 +208,8 @@ def hard_capable(key: str, ctx: dict[str, Any], workouts: Any) -> str | None:
             counts[t] = counts.get(t, 0) + 1
     if tid and counts.get(tid, 0) >= int(EXPOSURE_CAPS["exposures"]):
         return "recent"
+    if tid and counts.get(tid, 0) and ctx.get("return_week"):  # the return week's RPE 7-8 band governs (live_progress)
+        return "pattern"
     mine = idx.get(tid) or {}
     muscle = live_week.landmark_muscle(key, cat, lib)
     need = int(live_week.FAMILIAR_SWAP["min_exposures"]["value"])
@@ -294,8 +296,9 @@ def week_floor(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, set_cap: 
     cat, lib, lines = ctx.get("catalog") or {}, ctx.get("lib") or {}, []
     taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     slot_max, add_n = int(WEEK_FLOOR["slot_max"]["value"]), int(WEEK_FLOOR["add_sets"]["value"])
+    level = "MEV" if ctx.get("week_mode") in (None, "short") else "MV"  # FIX8: a dip week is a recovery week (ruling 2): MV
     for m in order:
-        mev = float((marks.get(m) or {}).get("MEV") or 0)
+        mev = float((marks.get(m) or {}).get(level) or 0)
         have = logged.get(m, 0.0) + _today(rx, ctx).get(m, 0.0)
         if not mev or have >= mev:
             continue

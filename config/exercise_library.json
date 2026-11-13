@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.3.4",
+ "version": "0.3.5",
  "status": "proposed",
  "change_log": [
   {
@@ -57,6 +57,13 @@
    "by": "#5861 FIX7 (the sixth red team; owner rulings of 2026-11-13: hard_conditioning_doses = 1, ruling 17 clarified)",
    "what": "Rubric 3.5.0: glute stretch credit only for genuinely lengthened loading, the same standard as every muscle (owner ruling 2026-11-13) — the barbell hip thrust A by its trial's equivalence with the squat, no glute S; the press family's elbow (and the barbell bench's wrist) rated by implement; `programming_settings.hard_conditioning_doses` 1 (owner ruling).",
    "rule": "configuration and data only — status stays proposed until the owner approves the library"
+  },
+  {
+   "version": "0.3.5",
+   "date": "2026-11-13",
+   "by": "#5861 FIX8 (the seventh red team, PROPOSAL for the owner's review with the library)",
+   "what": "`programming_settings.week_floor_includes_abs` true (the driver's recommendation, owner to confirm): the week's hard-set floor tops the abs up to MEV too, and the week's only direct ab work is never what the time fit drops.",
+   "rule": "a proposed default — status stays proposed until the owner approves the library"
   }
  ],
  "_provenance": {
@@ -1765,6 +1772,7 @@
   "symptom_line": "",
   "short_week_rule": "skip_shoulders_arms",
   "behind_schedule_week": false,
+  "week_floor_includes_abs": true,
   "adherence_response": "short_week",
   "cardio_purpose_only": true,
   "heavy_day_deadlift_shape": "top_plus_backoff",
