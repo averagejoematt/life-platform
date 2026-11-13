@@ -80,10 +80,6 @@ def _not_cardio(ex: dict[str, Any]) -> bool:
     return any((s.get("rep_range") or s.get("reps") or s.get("weight_kg") or s.get("distance_meters")) for s in ex.get("sets") or [])
 
 
-def _lifting(ex: dict[str, Any]) -> bool:
-    return any((s.get("rep_range") or s.get("reps")) for s in ex.get("sets") or [])
-
-
 def _shift(profile: dict[str, Any], weeks: int) -> dict[str, Any]:
     out = copy.deepcopy(profile)
     out["days"] = [sw._day(d, 7 * weeks) for d in profile["days"]]
