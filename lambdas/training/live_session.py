@@ -479,7 +479,7 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
             break
         # FIX8: before a kept slot (a floor's, the only ab work) or a priority muscle's last sets under MEV go, the back-offs
         if str(blocks[idx].movement_key) in fixed or live_shape.precious(blocks[idx], movements, gone, rx):
-            guests += live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False)
+            guests += live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False, priority=False)
             if routine_minutes(blocks, movements)["lifting_minutes"] <= cap:
                 break
         cut = blocks.pop(idx)

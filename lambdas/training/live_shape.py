@@ -479,16 +479,26 @@ TIME_FIT: dict[str, dict[str, Any]] = {
 }
 
 
-def trim_anchor_backoffs(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], cap: int, guests: bool) -> list[str]:
+def trim_anchor_backoffs(
+    blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], cap: int, guests: bool, priority: bool = True
+) -> list[str]:
     """IN PLACE (TIME_FIT, live only — `live_session.fit_routine`): back-off sets come off the anchors, last-listed first, until the
     routine fits `cap` — the full-body day's guest anchors (down to guest_min_sets) when `guests`, else every anchor (down to
-    anchor_min_sets). Returns the titles that gave sets."""
+    anchor_min_sets), a PRIORITY muscle's anchor last and only when `priority`. Returns the titles that gave sets."""
     from training import warmup_sets
     from training.session_shape import routine_minutes
 
     guest = {str(e.get("movement_key")) for e in rx.get("exposures") or [] if e.get("live_full_body")}
     floor = int(TIME_FIT["guest_min_sets" if guests else "anchor_min_sets"]["value"])
     pool = [b for b in blocks if str(b.rationale_tag or "").startswith("anchor:") and (str(b.movement_key) in guest if guests else True)]
+    from training import live_week, selection_engine as se
+
+    lib = se.load_library_failsoft() or {}
+    prio = {str(m) for m in _settings(lib).get("priority_muscles") or []}
+    # a priority muscle's anchor (the bench for the chest, the squat for the quadriceps) gives its back-offs last
+    pool = [b for b in pool if priority and live_week.landmark_muscle(b.movement_key, movements, lib) in prio] + [
+        b for b in pool if live_week.landmark_muscle(b.movement_key, movements, lib) not in prio
+    ]
     gave: list[str] = []
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
         pick = next((b for b in reversed(pool) if warmup_sets.working_set_count(b.sets) > floor), None)
