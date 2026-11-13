@@ -381,7 +381,7 @@ def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
             assert s["lifting_minutes"] >= full[s["role"]] - 0.05, s["role"]
         assert (
             not s["cardio"].get("minutes")
-            or s["cardio"]["minutes"] >= lw.CARDIO_ROOM["min_block"]["value"]
+            or s["cardio"]["minutes"] >= lp.MIN_CARDIO_MINUTES  # FIX7: a week the record shows short takes idle minutes >= 10
             or s["cardio"]["kind"] in lp.HARD_KINDS
         )
 

@@ -136,12 +136,16 @@ def test_ruling_3_the_four_day_week_keeps_shoulders_and_arms_at_mev(weeks):
 
 # ── ruling 4: purposeful cardio only ─────────────────────────────────────────────────────────────────────────────────────────
 def test_ruling_4_no_cardio_block_without_a_named_purpose(weeks):
+    # #5861 FIX7: every served block names its purpose — the conditioning dose, or the RECORD's aerobic gap (an easy block where
+    # the recorded, credited minutes leave the week short); none fills a slot
     for name, w in weeks.items():
-        kinds = [s["cardio"].get("kind") for s in w["week"]["sessions"] if s["cardio"].get("key")]
-        assert all(k in lp.HARD_KINDS for k in kinds), (name, kinds)  # the conditioning dose only — never an easy filler
         for s in w["week"]["sessions"]:
-            if s["cardio"].get("kind") in lp.HARD_KINDS:
-                assert any("purpose: the week's conditioning dose" in ln for ln in s["rationale"]), name
+            if s["cardio"].get("key"):
+                assert any(ln.startswith("cardio (live):") and "purpose:" in ln for ln in s["rationale"]), (name, s["role"])
+    covered = {(lp, "aerobic"): lambda inputs: {"volume_covered": False, "walking_min_per_wk": 150, "line": "x"}}  # the record covers it
+    full = _week("a", covered, profile=PROFILES["a_large_deficit_experienced"])
+    kinds = [s["cardio"].get("kind") for s in full["week"]["sessions"] if s["cardio"].get("key")]
+    assert all(k in lp.HARD_KINDS for k in kinds), kinds  # a covered week: the conditioning dose only
     walker = PROFILES["a_large_deficit_experienced"] | {"steps_per_day": 6000}
     old = _week("a", settings={"cardio_purpose_only": False, "session_cap_includes_cardio": False}, profile=walker)  # control
     assert any(s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS for s in old["week"]["sessions"])

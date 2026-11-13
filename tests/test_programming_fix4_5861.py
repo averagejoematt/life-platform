@@ -380,7 +380,10 @@ def test_under_the_default_cap_a_small_gap_is_the_walks_not_another_ride(weeks):
     h = _week("h_heavy_walker", near, old)["week"]
     more = _week("h_heavy_walker", near | {(lshape, "walk_covers"): lambda kind, live: None}, old)["week"]  # control: rides close every gap
     assert easy(h) < easy(more)
-    assert easy(weeks[("h_heavy_walker", False)]["week"]) == 0  # the ruled default: no easy ride fills a gap
+    # #5861 FIX7: under the ruled default an easy block needs a NAMED purpose — the record's aerobic gap; a record that covers
+    # the week (synthetic 140 recorded min: a 10-min gap, under the walk prompt floor) serves no easy ride
+    ruled = _week("h_heavy_walker", {(lp, "aerobic"): lambda inputs: {"volume_covered": False, "walking_min_per_wk": 140, "line": "x"}})
+    assert easy(ruled["week"]) == 0
     assert lshape.walk_covers("easy", {"settings": {"session_cap_includes_cardio": True}, "aerobic": {"walking_min_per_wk": 140}}) is None
     import inspect
 
