@@ -167,15 +167,17 @@ def second_lift(e: dict[str, Any], ref: dict[str, Any] | None, rep_lo: int | Non
     pct = max(0, round(100 * (1 - cap_kg / (float(ref["lb"]) * KG_PER_LB))))
     rpe = f" @ {float(ref['rpe']):g}" if ref.get("rpe") is not None else ""
     mode = "down" if pct > 0 else "cap"  # under the reference: a cut; over it: the step the cap allows, no more
-    return {"mode": mode, "pct": pct, "why": f"last {ref['lb']:g}x{ref['reps']}{rpe}", "cap_kg": cap_kg, "second": True}
+    band = (int(lo), int(hi))
+    return {"mode": mode, "pct": pct, "why": f"last {ref['lb']:g}x{ref['reps']}{rpe}", "cap_kg": cap_kg, "second": True, "band": band}
 
 
 def second_clause(d: dict[str, Any]) -> str:
     """The capped lift's one reason line: its own day's last set (module doc 2)."""
     from training import session_block
 
-    line = f"RPE 7–8 today: {d['why']}."
-    return line if len(line) <= session_block.CLAUSE_MAX_CHARS else "RPE 7–8 today: the second lift."
+    lo, hi = d.get("band") or (7, 8)
+    line = f"RPE {lo}–{hi} today: {d['why']}."
+    return line if len(line) <= session_block.CLAUSE_MAX_CHARS else f"RPE {lo}–{hi} today: the second lift."
 
 
 def layoff_end(workouts: Any, target_date: str) -> dict[str, Any] | None:
@@ -203,12 +205,13 @@ def first_back(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[s
         return []
     ctx["layoff"] = gap  # read by `live_stimulus.hard_capable`: a first-back set at RPE 8 still counts as hard
     since = {str(x.get("template_id") or "").upper() for w in workouts or [] if gap["end"] <= _day(w) for x in w.get("exercises") or []}
+    before = {str(x.get("template_id") or "").upper() for w in workouts or [] if _day(w) < gap["end"] for x in w.get("exercises") or []}
     seen, lib, cat = _patterns_trained(workouts, ctx), ctx.get("lib") or {}, ctx.get("catalog") or {}
     rpe, names = int(FIRST_BACK["rpe"]["value"]), []
     for e in rx.get("exposures") or []:
         tid = str((cat.get(str(e.get("movement_key"))) or {}).get("hevy_template_id_hint") or "").upper()
-        if not tid or tid in since or e.get("intensity") == "carry":
-            continue
+        if not tid or tid in since or tid not in before or e.get("intensity") == "carry":
+            continue  # a lift never logged is the novelty cap's (`live_week.novel_start`), not a return
         e["live_effort"] = min(rpe, int(e.get("live_effort") or 99))
         e["live_load"] = {**(e.get("live_load") or {}), "hold": True}
         e["live_first_back"] = True

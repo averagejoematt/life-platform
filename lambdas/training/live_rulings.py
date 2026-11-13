@@ -386,7 +386,7 @@ def arms_keep(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[st
             if live_stimulus.hard_capable(str(slot.get("movement_key")), ctx, workouts) == "pattern":
                 slot["live_familiar"] = True  # familiar by pattern: worked at target
             kept.append(f"{m}: {(cat.get(slot['movement_key']) or {}).get('title') or slot['movement_key']}")
-    return [f"arms kept (live): {'; '.join(kept)} — a week without shoulders+arms keeps one slot each (ARMS_FLOOR)"] if kept else []
+    return [f"arms kept (live): {'; '.join(kept)} — a week without the arms day keeps one slot each (ARMS_FLOOR)"] if kept else []
 
 
 def _arms_slot(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, muscle: str) -> dict[str, Any] | None:

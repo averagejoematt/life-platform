@@ -861,7 +861,7 @@ def guard_loads(
                 if d["pct"]
                 else "" if d["mode"] == "cap" else " at the last top set"
             )
-            + f": {'the second lift, its own RPE 7-8 cap (SECOND_LIFT)' if d.get('second') else d['why']} (last "
+            + f": {'the second lift, its own effort cap (SECOND_LIFT)' if d.get('second') else d['why']} (last "
             + f"{(prev.get('role') or 'same-band').replace('_', ' ')} {prev['lb']:g} lb x {prev.get('reps')} @ RPE {prev.get('rpe')}; "
             + "LOAD_POLICY, ROLE_REF, heuristic)"
         )

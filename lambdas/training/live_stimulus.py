@@ -68,7 +68,7 @@ WEEK_FLOOR: dict[str, dict[str, Any]] = {
         "value": 8,
         "label": HEURISTIC,
         "basis": "#5861 FIX8: the routine as written (its warm-ups, a first exposure's find-the-load set) runs ~10 min over the "
-        "prescription's estimate on the sample weeks (71 -> 81 min on a lower-volume morning): the floor adds only while the estimate "
+        "prescription's estimate on the sample weeks (71 -> 81 min on one volume morning): the floor adds only while the estimate "
         "stays this far under the cap, so the time fit never trades a needed template set for a floor set",
     },
     "keys": {
