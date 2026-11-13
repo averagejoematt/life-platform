@@ -237,6 +237,7 @@ def for_live_draft(
     lines: list[str] = []
     ctx: dict[str, Any] | None = None
     hold_all = None
+    plan_rows: dict[str, float] = {}
     lib: dict[str, Any] = {}
     catalog = catalog_movements or {}
     try:
@@ -266,6 +267,8 @@ def for_live_draft(
         mornings = int((week or {}).get("days") or 5)
         plan = live_volume.week_plan(catalog, lib, mornings)
         ctx["volume_plan"] = plan
+        role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
+        plan_rows = dict(live_volume._count(role_rows))
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
         lines += live_volume.apply(out, ctx, plan)
         lines += fit_exposures(out, rotation or {}, ctx)
@@ -312,6 +315,7 @@ def for_live_draft(
         "hist": hist,
         "hold_all": hold_all,
         "layoff": (ctx or {}).get("layoff"),
+        "plan_rows": plan_rows if ctx is not None else {},
     }
     from training import live_rulings
 
@@ -456,12 +460,35 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
         )
     if new:
         out.append(f"today: new to you, RPE 7 once: {', '.join(new)}")
+    out += _zero_by_design(blocks, rx, movements)
     gone = [ln for ln in mark.get("lines") or [] if ln.startswith(("skipped (live)", "swapped (live)"))]
     out += [ln.split(" — ")[0].replace(" (live)", "") for ln in gone][:1]
     fat = rx.get("fatigue") or {}
     if fat.get("state") in ("strained", "overreached") or fat.get("sets_removed"):
         out.append(f"today: recovery reads {fat.get('state')} — {fat.get('sets_removed') or 0} accessory set(s) off, anchors kept")
     return out[:5]
+
+
+def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
+    """Fix round 9 (F): a priority muscle the week's plan gives this morning that the pain rule took to ZERO is said plainly —
+    never "held" (the eighth red team's garage + sharp shoulder: chest 0 while a line claimed 8)."""
+    from training import live_settings, live_volume, selection_engine as se
+
+    lib = se.load_library_failsoft() or {}
+    plan = (rx.get(MARK) or {}).get("plan_rows") or {}
+    prio = [str(m) for m in live_settings.settings(lib).get("priority_muscles") or []]
+    final = live_volume.hard_sets(
+        (live_volume.lib_entry(b.movement_key, movements, lib), 1, None, b.movement_key, movements) for b in blocks
+    )
+    pain = [ln for ln in (rx.get(MARK) or {}).get("lines") or [] if ln.startswith("skipped (live)") and (" pain" in ln or "flag" in ln)]
+    out = []
+    for m in prio:
+        if plan.get(m) and not final.get(m) and pain:
+            out.append(
+                f"today: {m} 0 here by design — the pain rule took its pressing/squatting off and no lower-stress {m} "
+                "option is available; it returns when the flag clears"
+            )
+    return out
 
 
 def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
