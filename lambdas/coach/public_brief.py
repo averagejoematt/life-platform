@@ -33,7 +33,9 @@ THE ORDER (cost first, then honesty), per run:
   2. the cycle — only the cycle containing today, never before ``FIRST_CYCLE`` (no backfill, ever);
   3. evidence for earlier briefs whose recommendation windows have closed (deterministic, no model);
   4. an existing brief for this cycle is never rewritten (conditional put);
-  5. observations (deterministic) — too few readings, no call;
+  5. observations (deterministic) — too few readings, no call; a required input with no observation holds the coach
+     (``required_inputs_absent``), and so does one whose newest reading is older than the coach's
+     ``public_brief_fresh_within_days`` (``inputs_stale``) — never a brief from inputs that stopped before the run;
   6. ONE Haiku call through ``bedrock_client.invoke`` (one regeneration if the reply is unusable);
   7. item checks, fail closed: every number in the coach's words appears in the facts or the item's own structure; no
      private-activity words (``prediction_publication.words_name_private_activity``), no relationship words, nothing
@@ -106,6 +108,10 @@ REQUIRED_KEY = "public_brief_required_metrics"  # config/personas.json: the inpu
 #: when the coach is operational. ``false`` takes an operational coach out without touching anything else.
 ENABLED_KEY = "public_brief_enabled"
 HELD_FOR_INPUTS = "required_inputs_absent"  # run_coach's reason when one of them has no observation for the cycle
+#: config/personas.json: a coach whose required inputs must have a reading in the last N days before the run (a manual
+#: export such as MacroFactor's can leave a week with enough readings to observe that all stop days before the run).
+FRESH_KEY = "public_brief_fresh_within_days"
+HELD_STALE = "inputs_stale"  # run_coach's reason when a required input's newest reading is older than that floor
 
 #: Words that would point at a partner, a relationship or another person — never in a brief (fail closed).
 RELATIONSHIP_WORDS = re.compile(
@@ -157,6 +163,33 @@ def brief_enabled(p: Any) -> bool:
         return False
     flag = p.get(ENABLED_KEY)
     return flag if isinstance(flag, bool) else bool(p.get("operational")) and ENABLED_KEY not in p
+
+
+def fresh_within_days(coach_id: str, personas: Optional[dict] = None) -> Optional[int]:
+    """The coach's freshness requirement in days (``public_brief_fresh_within_days``), None when it declares none.
+    A declared value that is not a whole number of days >= 1 is returned as 0, which no reading can meet (fail closed)."""
+    p = _personas(personas).get(coach_id) or {}
+    if FRESH_KEY not in p:
+        return None
+    v = p.get(FRESH_KEY)
+    return v if isinstance(v, int) and not isinstance(v, bool) and v >= 1 else 0
+
+
+def fresh_floor(cycle: str, days: int) -> str:
+    """The oldest day a required input's newest reading may be for a run on ``cycle``'s Monday (``days`` before it)."""
+    return _day(cycle, -days)
+
+
+def stale_inputs(coach_id: str, obs: list, cycle: str, personas: Optional[dict] = None) -> list:
+    """The required inputs whose newest reading is older than the coach's freshness floor ([] when none, or when the
+    coach declares no requirement). Read from the observations' own ``latest`` day, so the hold judges exactly the
+    readings the brief would have been written from; never a value, only a day."""
+    days = fresh_within_days(coach_id, personas)
+    if days is None:
+        return []
+    floor = fresh_floor(cycle, days) if days else "9999-12-31"
+    latest = {o["metric"]: o["latest"]["date"] for o in obs}
+    return [m for m in required_metrics(coach_id, personas) if str(latest.get(m) or "") < floor]
 
 
 def brief_coaches(personas: Optional[dict] = None) -> list:
@@ -803,6 +836,16 @@ def run_coach(
     missing = [m for m in required_metrics(coach_id, personas) if m not in {o["metric"] for o in obs}]
     if missing:  # before any model call: no brief from substitute metrics under this coach's name
         return {"status": "held", "reason": HELD_FOR_INPUTS, "missing": missing, "evidence_written": evidence_n}
+    stale = stale_inputs(coach_id, obs, cycle, personas)
+    if stale:  # before any model call: a brief is never written from inputs that stopped days before the run
+        days = fresh_within_days(coach_id, personas) or 0
+        return {
+            "status": "held",
+            "reason": HELD_STALE,
+            "stale": stale,
+            "fresh_from": fresh_floor(cycle, days) if days else None,
+            "evidence_written": evidence_n,
+        }
     if not obs:
         return {"status": "insufficient_data", "evidence_written": evidence_n}
     prev = next((r for r in rows if str(r.get("sk")) == POL.brief_sk(_day(cycle, -POL.CYCLE_DAYS))), None)
@@ -1001,9 +1044,9 @@ def run_sk(cycle: str) -> str:
 def _outcome(res: Any) -> dict:
     res = res if isinstance(res, dict) else {}
     out = {"status": str(res.get("status") or "unknown")}
-    for k in ("reason", "missing"):
+    for k in ("reason", "missing", "stale", "fresh_from"):
         if res.get(k):
-            out[k] = res[k] if k == "missing" else str(res[k])
+            out[k] = res[k] if k in ("missing", "stale") else str(res[k])
     return out
 
 

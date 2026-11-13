@@ -28,6 +28,7 @@ import {
   NO_HISTORICAL_COMMENTARY,
   NOT_PUBLISHED,
   WHAT_MATT_DID_NOTE,
+  didSummary,
   approvedWords,
   askCountsText,
   readsCoverage,
@@ -174,7 +175,7 @@ const num1 = "font-size:15px;line-height:1.5";
       <div style="padding:18px 0;border-bottom:1px solid var(--rule)">
         <p class="label">The asks</p>
         <p style="font-size:20px;font-weight:700;margin-top:6px;line-height:1.25">{askCounts || "none served"}</p>
-        <p class="muted" style="font-size:13px;margin-top:4px">what Matt did: not recorded</p>
+        <p class="muted" style="font-size:13px;margin-top:4px" data-did-summary>{didSummary(asks)}</p>
       </div>
       <div style="padding:18px 0;border-bottom:1px solid var(--rule)" data-brief-fact>
         <p class="label">The public brief</p>
@@ -555,8 +556,8 @@ const num1 = "font-size:15px;line-height:1.5";
         asks.length > 0 && (
           <div class="scroll" tabindex="0" role="region" aria-label="The asks, newest first (scrolls sideways)">
             {asksAllGeneric && <p class="muted" style="font-size:14px;margin-bottom:8px" data-withheld>The words of these asks are not published; each row shows when it was asked, when it fell due, what the grader checked it against and what the check found.</p>}
-            <table style={`min-width:${asksAllGeneric ? 520 : 640}px`} data-asks>
-              <thead><tr><th>Asked</th>{!asksAllGeneric && <th>The ask</th>}<th>Due</th><th>Checked against</th><th>Grader's outcome</th></tr></thead>
+            <table style={`min-width:${asksAllGeneric ? 640 : 760}px`} data-asks>
+              <thead><tr><th>Asked</th>{!asksAllGeneric && <th>The ask</th>}<th>Due</th><th>Checked against</th><th>Grader's outcome</th><th>What Matt did</th></tr></thead>
               <tbody>
                 {asks.slice(0, ASKS_SHOWN).map((a: any) => (
                   <tr>
@@ -565,6 +566,7 @@ const num1 = "font-size:15px;line-height:1.5";
                     <td>{a.due}</td>
                     <td class="mono" style="font-size:12px">{a.checked}</td>
                     <td><span class="status">{a.outcome}</span>{a.settled ? <span class="muted" style="font-size:12px"> · {a.settled}</span> : ""}</td>
+                    <td style="font-size:13px" data-did>{a.did}</td>
                   </tr>
                 ))}
               </tbody>
@@ -578,7 +580,7 @@ const num1 = "font-size:15px;line-height:1.5";
             <summary style="cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center">Earlier asks ({asks.length - ASKS_SHOWN})</summary>
             <div class="rows" style="margin-top:6px">
               {asks.slice(ASKS_SHOWN).map((a: any) => (
-                <div><span style="font-size:13px">{a.asked} · due {a.due}{a.checked !== "not recorded" ? ` · ${a.checked}` : ""}</span><span class="mono" style="font-size:12px">{a.outcome}</span></div>
+                <div><span style="font-size:13px">{a.asked} · due {a.due}{a.checked !== "not recorded" ? ` · ${a.checked}` : ""}</span><span class="mono" style="font-size:12px">{a.outcome} · what Matt did: {a.did}</span></div>
               ))}
             </div>
           </details>

@@ -69,9 +69,14 @@ ASK = "commit_20261030_lights_out_by_22_30_on_weeknights"
 REGISTRY_MODULE = "lambdas/coach/advice_links.py"
 WRITER_MODULE = "mcp/tools_advice_links.py"
 READER_MODULE = "mcp/tools_decisions.py"
+#: The ONE reader of the ask-response family (owner 2026-11-12): the public projection and the owner's current answers.
+ASK_READER_MODULE = "lambdas/coach/ask_outcomes.py"
 #: mcp/idempotency.py names the sk shape in the tool's replay-semantics declaration (a string, no access).
-ALLOWED_TO_NAME = frozenset({REGISTRY_MODULE, WRITER_MODULE, READER_MODULE, "mcp/idempotency.py"})
-WRITER_FUNCTIONS = frozenset({(WRITER_MODULE, "tool_log_advice_link")})
+ALLOWED_TO_NAME = frozenset({REGISTRY_MODULE, WRITER_MODULE, READER_MODULE, ASK_READER_MODULE, "mcp/idempotency.py"})
+#: Each record constructor and the one function allowed to call it.
+WRITER_FUNCTIONS = frozenset(
+    {(WRITER_MODULE, "tool_log_advice_link", "build_link_record"), (WRITER_MODULE, "_log_ask_response", "build_ask_response")}
+)
 
 
 # ── the fake table: a query hook that evaluates the real boto3 Key condition ──────────────
@@ -245,10 +250,13 @@ def test_the_sk_is_deterministic_and_scoped_to_its_decision():
 
 def test_the_tool_schema_enums_equal_the_registry_both_ways():
     props = tal.LOG_ADVICE_LINK_INPUT["properties"]
-    assert props["state"]["enum"] == list(al.STATES)
+    assert props["state"]["enum"] == list(al.TOOL_STATES)
+    assert set(al.TOOL_STATES) == set(al.STATES) | set(al.ASK_RESPONSE_STATES)
     assert set(props["ref_kind"]["enum"]) == set(al.REF_KINDS)
     assert "enum" not in props["coach_id"], "coach ids derive from the persona registry at write — never a copy here"
-    assert set(tal.LOG_ADVICE_LINK_INPUT["required"]) == {"decision_sk", "coach_id", "ref_kind", "ref_id", "state"}
+    # decision_sk and state are required in code for a decision link; an ask needs neither (withdraw takes no state)
+    assert set(tal.LOG_ADVICE_LINK_INPUT["required"]) == {"coach_id", "ref_kind", "ref_id"}
+    assert props["withdraw"]["type"] == "boolean"
 
 
 def test_coach_ids_derive_from_the_persona_registry():
@@ -322,7 +330,7 @@ def _tracked_py() -> list[str]:
 
 
 def _names_the_family(src: str, tree: ast.AST) -> bool:
-    if "ADVICELINK" in src:
+    if "ADVICELINK" in src or "ASKRESPONSE" in src:
         return True
     for node in ast.walk(tree):
         if (
@@ -341,6 +349,9 @@ def _names_the_family(src: str, tree: ast.AST) -> bool:
 #: different vocabulary (remediation/signal_identity.py's alarm observations use `acted_on` as a dict
 #: key) and is deliberately not flagged.
 _ASSERTING = set(al.EVIDENCE_REQUIRED_STATES)
+#: A single assignment of any answer Matthew gives (not_yet_decided is his answer too, owner 2026-11-12) is flagged;
+#: the collection rule stays on the three asserting states so a three-state copy is still caught.
+_ASSIGNED = _ASSERTING | {al.NOT_YET_DECIDED}
 _STATE_NAMES = {"state", "advice_state"}
 #: The registry, and the writer's literal inputSchema enum (held equal to the registry above).
 _MAY_SPELL = {REGISTRY_MODULE, WRITER_MODULE}
@@ -355,11 +366,11 @@ def _assigns_an_asserting_state(tree: ast.AST) -> list[int]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Dict):
             for k, v in zip(node.keys, node.values):
-                if k is not None and _lit(k) in _STATE_NAMES and _lit(v) in _ASSERTING:
+                if k is not None and _lit(k) in _STATE_NAMES and _lit(v) in _ASSIGNED:
                     hits.append(node.lineno)
-        elif isinstance(node, ast.keyword) and node.arg in _STATE_NAMES and _lit(node.value) in _ASSERTING:
+        elif isinstance(node, ast.keyword) and node.arg in _STATE_NAMES and _lit(node.value) in _ASSIGNED:
             hits.append(node.value.lineno)
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)) and _lit(node.value) in _ASSERTING:
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)) and _lit(node.value) in _ASSIGNED:
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             for t in targets:
                 name = (
@@ -388,10 +399,9 @@ def test_only_the_owner_tool_writes_and_only_the_allowed_modules_name_the_family
         for fn in (n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))):
             for call in (c for c in ast.walk(fn) if isinstance(c, ast.Call)):
                 f = call.func
-                if (isinstance(f, ast.Attribute) and f.attr == "build_link_record") or (
-                    isinstance(f, ast.Name) and f.id == "build_link_record"
-                ):
-                    constructing.add((rel, fn.name))
+                name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", None)
+                if name in ("build_link_record", "build_ask_response"):
+                    constructing.add((rel, fn.name, name))
     assert naming <= ALLOWED_TO_NAME, f"modules naming the ADVICELINK# family outside the allowlist: {sorted(naming - ALLOWED_TO_NAME)}"
     assert naming == ALLOWED_TO_NAME, f"an allowed module stopped naming the family (vacuous guard?): {sorted(ALLOWED_TO_NAME - naming)}"
     assert (
@@ -423,7 +433,7 @@ def test_no_backfill_or_migration_of_advice_states_exists():
             continue
         if _names_the_family(src, tree):  # the ADVICELINK key family, or an import of the registry
             touching.add(p)
-    assert touching == {REGISTRY_MODULE}, f"an ops/compute module touches the advice-link family: {sorted(touching)}"
+    assert touching == {REGISTRY_MODULE, ASK_READER_MODULE}, f"an ops/compute module touches the advice-link family: {sorted(touching)}"
 
 
 _DECISIONS_PK_RE = re.compile(r"SOURCE#decisions|\}decisions\"|_decisions_pk\(")
@@ -457,6 +467,7 @@ def test_the_state_sweep_can_fail():
         'rec["state"] = "partially_followed"',
         "self.advice_state = 'acted_on'",
         'STATES = ("acted_on", "declined", "partially_followed")',
+        'row = {"state": "not_yet_decided"}',
     ]
     missed = [src for src in caught if not _assigns_an_asserting_state(ast.parse(src))]
     assert missed == []
@@ -481,81 +492,33 @@ def test_the_advice_queue_is_read_only_and_outside_the_family():
     assert not _assigns_an_asserting_state(tree)
 
 
-# ── a coach ASK (COMMITMENT#) as a reference: his words only (owner 2026-11-12) ─────────────
+# ── a coach ASK (COMMITMENT#) is answered by an ask response, never a decision link (owner 2026-11-12) ─
+# The ask-response behaviour itself (states, revisions, withdrawal, the public projection) is tests/test_ask_responses.py.
 
 
-def _ask_link(**over):
-    return _link(**{"coach_id": "sleep_coach", "ref_kind": "commitment", "ref_id": ASK, **over})
-
-
-def test_an_ask_is_linked_with_his_own_words_and_reads_back(table):
-    words = "I did lights out by 22:30 four of the five weeknights; Thursday ran late."
-    res = tal.tool_log_advice_link(_ask_link(state="partially_followed", evidence_text=words))
-    assert res["written"] is True and res["ref_kind"] == "commitment"
-    row = table.store[(PK, res["sk"])]
-    assert res["sk"] == f"ADVICELINK#2026-10-30T22:41:18.075Z#commitment#sleep_coach#{ASK}"
-    assert row["evidence"]["text"] == words and row["evidence"]["asserted_by"] == "owner" and row["recorded_by"] == "owner"
-    a = next(d for d in td.tool_get_decisions({"days": 3650})["decisions"] if d["sk"] == DEC_A)
-    assert a["advice_links"] == [al.owner_view(row)] and a["advice_links"][0]["state"] == "partially_followed"
-
-
-def test_an_ask_without_his_words_is_refused_must_fail_control(table):
-    """The must-fail control: every data-shaped 'evidence' for an ask is refused and nothing lands.
-    A reference alone (a workout id, a meal day, the grader's verdict) is what a data-derived link would carry."""
-    data_only = [
-        {},
-        {"evidence_text": "   "},
-        {"evidence_ref": "hevy workout 2026-10-31 (matches the ask)"},
-        {"evidence_ref": "grader_status: kept"},
-        {"evidence_ref": "macrofactor 2026-10-31", "evidence_text": ""},
-    ]
-    misses = []
-    for state in sorted(al.EVIDENCE_REQUIRED_STATES):
-        for ev in data_only:
-            res = tal.tool_log_advice_link(_ask_link(state=state, **ev))
-            if res.get("written") is not False or "evidence_text" not in res.get("error", ""):
-                misses.append((state, ev, res))
-    assert misses == []
-    assert _links_in(table) == []
-    # the same reference-only call on a non-ask kind is still accepted — the stricter rule is the ask's alone,
-    # so the refusal above is the words rule biting, not a broken fixture
-    assert tal.tool_log_advice_link(_link(state="declined", evidence_ref="journal 2026-10-31"))["written"] is True
-    # and an explicit unknown on an ask needs nothing (absence and unknown are the same answer)
-    assert tal.tool_log_advice_link(_ask_link(state="unknown"))["written"] is True
-
-
-def test_an_ask_reference_must_exist_for_the_named_coach(table):
-    misses = []
-    for over, fragment in [
-        ({"coach_id": "nutrition_coach"}, "no current-cycle commitment"),  # the ask is the sleep coach's
-        ({"ref_id": "commit_20261030_never_asked"}, "no current-cycle commitment"),
-        ({"ref_id": "COMMITMENT#commit_20261030_x"}, "ref_id"),
-        ({"ref_id": "pred_20261029_protein_first_meal_lifts_hrv"}, "ref_id"),
-    ]:
-        res = tal.tool_log_advice_link(_ask_link(evidence_text="I did it", **over))
-        if res.get("written") is not False or fragment not in res.get("error", ""):
-            misses.append((over, res))
-    assert misses == []
-    assert _links_in(table) == []
-
-
-def test_a_stored_ask_link_without_his_words_reads_unknown():
-    base = {
-        "pk": PK,
-        "sk": al.link_sk(DEC_A, "commitment", "sleep_coach", ASK),
-        "decision_sk": DEC_A,
-        "ref_kind": "commitment",
-        "state": "acted_on",
-        "recorded_by": "owner",
-    }
-    assert al.effective_state({**base, "evidence": {"reference": "hevy workout 2026-10-31"}}) == "unknown"
-    assert al.effective_state({**base, "evidence": {"text": "I did it"}}) == "acted_on"
+def test_an_ask_cannot_be_a_decision_link():
+    with pytest.raises(al.AdviceLinkError, match="ask response"):
+        al.build_link_record(
+            user_id="matthew",
+            decision_sk=DEC_A,
+            coach_id="sleep_coach",
+            ref_kind="commitment",
+            ref_id=ASK,
+            state="acted_on",
+            evidence={"text": "I did it"},
+            recorded_at="2026-10-31T00:00:00.000Z",
+        )
+    stray = {"pk": PK, "sk": al.link_sk(DEC_A, "commitment", "sleep_coach", ASK), "ref_kind": "commitment", "state": "acted_on"}
+    assert al.effective_state({**stray, "recorded_by": "owner", "evidence": {"text": "I did it"}}) == "unknown"
 
 
 def test_the_queue_points_at_the_ask_kind_the_registry_accepts():
-    """get_advice_link_queue's instructions name the ask kind; it must be a real REF_KINDS key that needs his words."""
+    """get_advice_link_queue's instructions name the ask kind; it must be a real REF_KINDS key answered by an ask response."""
     from mcp import tools_advice_queue as taq
 
     assert "log_advice_link" in taq.HOW_TO_RECORD and "ref_kind='commitment'" in taq.HOW_TO_RECORD
-    assert "commitment" in al.REF_KINDS and al.words_required("commitment")
-    assert not any(al.words_required(k) for k in ("prediction", "coach_output", "coach_action"))
+    assert "commitment" in al.REF_KINDS and al.answered_by_ask_response("commitment")
+    assert not any(al.answered_by_ask_response(k) for k in ("prediction", "coach_output", "coach_action"))
+    for state in al.ASK_RESPONSE_STATES:
+        assert state in taq.HOW_TO_RECORD, state
+    assert "withdraw=true" in taq.HOW_TO_RECORD and "never 'declined'" in taq.HOW_TO_RECORD
