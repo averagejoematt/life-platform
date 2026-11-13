@@ -42,6 +42,7 @@ def _row(**over):
         "content_html": "<p>Original text.</p>",
         "draft_journal_post_html": "<p>page</p>",
         "draft_email_html": "<p>mail</p>",
+        "desk_findings_json": '{"post": [], "episode": []}',  # owner ruling 2026-11-13: an approval needs a passing audit
     }
     row.update(over)
     return row

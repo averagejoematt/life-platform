@@ -511,14 +511,12 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AUTO-PUBLISH SWEEP (SS-01) — the self-sustaining fail-safe: a chronicle draft must
-# never stay dark just because the approve link wasn't clicked. A daily schedule
-# sweeps drafts older than the review window and publishes them via the SAME path the
-# approve click uses (privacy/vice guards already ran at draft time). "Editor review
-# window + a fail-safe" — how a real team keeps the weekly running.
-# #4694: the fail-safe publishes only what passes the deterministic audit
-# (content/autopublish_audit.py). A draft nobody approved and the audit did not pass
-# stays a draft, and the sweep says so loudly (HELD_TOKEN → an alarm) every day it waits.
+# STALE-DRAFT SWEEP (SS-01) — a reminder, never a publisher (owner ruling 2026-11-13).
+# Until 2026-11-13 a daily schedule published any draft older than the review window that passed the deterministic
+# audit (#4694), so a week could reach subscribers that nobody approved. The owner ruled that elapsed time is never
+# consent: the sweep now publishes NOTHING. Every draft still unapproved past the window is held loudly (HELD_TOKEN →
+# the `chronicle-autopublish-held` alarm) every day it waits, with the audit's verdict, so the page says what an
+# approval would still need. Publication takes the owner's approve click AND a passing audit (`approval_refusal`).
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -569,45 +567,38 @@ def _audit_refusal(item: dict) -> list[str]:
         return [f"the audit could not run: {exc}"]
 
 
+def approval_refusal(item: dict) -> list[str]:
+    """Owner ruling 2026-11-13: an approval publishes only a draft that ALSO passes the editorial, provenance and privacy
+    audit (content/autopublish_audit) — the desk's open findings, the reader door, the dated weekdays, private activity.
+    The craft hold is the one item an approval answers: it exists to wait for the owner's eye (#4545). Fail-closed like
+    the sweep: an audit that cannot run refuses."""
+    return [b for b in _audit_refusal(item) if not b.startswith("craft hold")]
+
+
 def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = False) -> list[dict]:
-    """Publish every stale draft that passes the deterministic audit (#4694) via the approve path; HOLD the rest
-    loudly. Returns what was (would be) published — a held week is not in it."""
-    drafts = _find_stale_drafts(hours, max_days)
-    published = []
-    for item in drafts:
+    """HOLD every draft unapproved past the review window, loudly; publish nothing (owner ruling 2026-11-13).
+
+    Returns the held weeks. ``dry_run`` is kept for the scheduled event's shape; the sweep writes nothing either way."""
+    held = []
+    for item in _find_stale_drafts(hours, max_days):
         date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
         wk = item.get("week_number", "?")
         blocking = _audit_refusal(item)
-        if blocking:
-            # #4694: a draft nobody approved and the audit did not pass stays a draft. Loud: the token below pages
-            # through the `chronicle-autopublish-held` alarm, every day the week sits unapproved inside the window,
-            # and this line names the week. The preview email's approve link still publishes it.
-            logger.error(
-                "%s Week %s (%s) held: unapproved for %sh and the audit found %d blocking item(s); approve it from the "
-                "preview email to publish. %s",
-                HELD_TOKEN,
-                wk,
-                date_str,
-                hours,
-                len(blocking),
-                blocking,
-            )
-            continue
-        if dry_run:
-            published.append({"date": date_str, "week": wk, "dry_run": True})
-            continue
-        try:
-            # #4593: the ONE side-effect owner; delivery + the Panel fire once for the batch below.
-            publish_side_effects(item, date_str, defer=DEFERRABLE)
-            published.append({"date": date_str, "week": wk})
-            logger.info("sweep: auto-published Week %s (%s) — no approval within %sh", wk, date_str, hours)
-        except Exception as exc:
-            logger.warning("sweep: auto-publish failed for %s: %s", date_str, exc)
-    if published and not dry_run:
-        _invoke_email_sender()  # one subscriber-delivery trigger for the batch
-        _invoke_coach_panel_podcast()  # #734: a published week earns a Panel episode
-    logger.info("chronicle auto-publish sweep: %d draft(s) handled (hours=%s, dry_run=%s)", len(published), hours, dry_run)
-    return published
+        # The token pages through the `chronicle-autopublish-held` alarm every day the week sits unapproved inside the
+        # window, and the line names the week and what the audit still finds (an approval needs those cleared too).
+        logger.error(
+            "%s Week %s (%s) held: unapproved for %sh, and elapsed time never publishes a chronicle (owner ruling "
+            "2026-11-13); approve it from the preview email. The audit found %d blocking item(s). %s",
+            HELD_TOKEN,
+            wk,
+            date_str,
+            hours,
+            len(blocking),
+            blocking,
+        )
+        held.append({"date": date_str, "week": wk, "blocking": len(blocking)})
+    logger.info("chronicle stale-draft sweep: %d draft(s) held, none published (hours=%s, dry_run=%s)", len(held), hours, dry_run)
+    return held
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -616,14 +607,14 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
 
 
 def lambda_handler(event: dict, context) -> dict:
-    """Approve/request-changes (Function-URL GET) — or a scheduled auto-publish sweep."""
+    """Approve/request-changes (Function-URL GET) — or the scheduled stale-draft sweep (it holds, never publishes)."""
     logger.info("chronicle-approve: invoked")
     # SS-01 — scheduled sweep (EventBridge sends {"sweep": true} or source=aws.events).
     if isinstance(event, dict) and (event.get("sweep") or event.get("source") == "aws.events"):
         hours = float(os.environ.get("CHRONICLE_AUTOPUBLISH_HOURS", "48"))
         max_days = float(os.environ.get("CHRONICLE_AUTOPUBLISH_MAX_DAYS", "10"))
-        published = _sweep_stale_drafts(hours, max_days, dry_run=bool(event.get("dry_run")))
-        return {"statusCode": 200, "swept": published}
+        held = _sweep_stale_drafts(hours, max_days, dry_run=bool(event.get("dry_run")))
+        return {"statusCode": 200, "swept": [], "held": held}
     try:
         return _handle(event)
     except Exception as exc:
@@ -723,6 +714,24 @@ def _handle(event: dict) -> dict:
 
     # ── Perform action ───────────────────────────────────────────────────────
     if action == "approve":
+        refusal = approval_refusal(item)
+        if refusal:
+            # Owner ruling 2026-11-13: approval AND a passing audit. Nothing is published; the row stays a draft.
+            import html as _html
+
+            logger.warning(
+                "chronicle-approve: approval of Week %s (%s) refused — the audit found %d item(s)", week_num, date_str, len(refusal)
+            )
+            items = "".join(f"<li>{_html.escape(str(r))}</li>" for r in refusal)
+            return _html_response(
+                409,
+                "Not Published",
+                '<div class="icon">🔒</div>'
+                "<h1>Not published: the audit is not clear</h1>"
+                f"<p>Week {week_num} needs your approval <em>and</em> a clean editorial, provenance and privacy audit. "
+                f"The audit still finds {len(refusal)} item(s). Nothing was published; the draft is unchanged.</p>"
+                f"<ul>{items}</ul>",
+            )
         logger.info("chronicle-approve: APPROVING Week %s (%s)", week_num, date_str)
 
         publish_side_effects(item, date_str)  # #4593: every side effect, none declined
