@@ -335,7 +335,9 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
     priority = [str(m) for m in _settings(lib).get("priority_muscles") or []]
     pinned = {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES}
     floor = int(ALLOCATION["over_mav_floor"]["value"])
-    deltas: dict[tuple[str, str], int] = {}
+    from training import live_rulings  # #5861 FIX6 ruling 6: the press's extra sets come from the lateral raises first
+
+    deltas: dict[tuple[str, str], int] = live_rulings.press_trade(rows, lib)
     freed = 0
     while True:  # 1. every muscle over its MAV gives isolation sets, the largest slot first, latest in the week on a tie
         week = _sum(rows, deltas)
@@ -420,9 +422,10 @@ def _muscle(e: dict[str, Any], ctx: dict[str, Any]) -> str:
     return live_week.landmark_muscle(e.get("movement_key"), ctx["catalog"], ctx["lib"])
 
 
-def allocated_week(catalog: dict[str, Any], lib: dict[str, Any]) -> Counter:
-    """The program week's sets per landmark muscle AFTER the allocation (`live_week.week_sets` reads it)."""
-    return Counter(allocation_plan(catalog, lib)["after"])
+def allocated_week(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any = None) -> Counter:
+    """The program week's sets per landmark muscle AFTER the allocation (`live_week.week_sets` reads it). `skipped` (#5861 FIX6):
+    the roles this week does not draft — so a time trim never reads a skipped day's sets as surplus."""
+    return Counter(allocation_plan(catalog, lib, skipped)["after"])
 
 
 # ── 5. the adherence dip ─────────────────────────────────────────────────────

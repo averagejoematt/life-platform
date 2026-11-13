@@ -203,6 +203,31 @@ def arms_count(after: dict[str, float], marks: dict[str, Any]) -> list[str]:
     return [f"{m} {float(after.get(m) or 0):g}/{(marks.get(m) or {}).get('MEV')}" for m in ARMS_FLOOR["muscles"]["value"]]
 
 
+def press_trade(rows: list[dict[str, Any]], lib: dict[str, Any] | None) -> dict[tuple[str, str], int]:
+    """The week's opening deltas (`live_balance.allocation_plan`): the overhead press's sets above the template's one (`press_sets`,
+    ruling 6) come off the LATERAL-raise slots first — one set at a time, the shoulders+arms slot first, never under two sets —
+    so the trade lands on redundant lateral-delt work, not the rear delts. Any shoulder surplus left is the allocation's."""
+    from training.live_balance import ALLOCATION
+
+    press = next((r for r in rows if r["role"] == "shoulders_arms" and r["kind"] == "anchor" and "press" in str(r["key"] or "")), None)
+    extra = (int(press["sets"]) - 1) if press else 0
+    floor = int(ALLOCATION["over_mav_floor"]["value"])
+    laterals = [r for r in rows if r["kind"] == "accessory" and "lateral_raise" in str(r["key"] or "")]
+    laterals.sort(key=lambda r: r["role"] != "shoulders_arms")
+    deltas: dict[tuple[str, str], int] = {}
+    while extra > 0:
+        open_ = [r for r in laterals if r["sets"] + deltas.get((r["role"], str(r["slot"])), 0) > floor]
+        if not open_:
+            break
+        for r in open_:
+            if extra <= 0:
+                break
+            k = (r["role"], str(r["slot"]))
+            deltas[k] = deltas.get(k, 0) - 1
+            extra -= 1
+    return deltas
+
+
 # ── 4. purposeful cardio ─────────────────────────────────────────────────────
 def purposeful_cardio(kind: str, live: dict[str, Any], hard_kinds: tuple[str, ...]) -> tuple[bool, list[str]]:
     """(keep, lines) under `cardio_purpose_only`: a hard block on the conditioning host keeps its purpose (the week's
@@ -218,9 +243,6 @@ def purposeful_cardio(kind: str, live: dict[str, Any], hard_kinds: tuple[str, ..
 
 
 # ── 5. evidence and completeness, visible ───────────────────────────────────
-OBJECTIVE_OF = {"anchor": "strength", "accessory": "hypertrophy"}
-
-
 def evidence_line(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     """One compact rationale line for the session: each served movement's tier on its slot's objective, evidence confidence
     and data completeness (`quality_rubric.completeness`); `provisional` spelled out. Read only — nothing ranks on it."""
@@ -233,8 +255,12 @@ def evidence_line(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
         entry = (lib.get("movements") or {}).get(lid or "") or {}
         if not entry:
             continue
-        objective = "functional" if e.get("intensity") == "carry" else OBJECTIVE_OF.get(str(e.get("kind")), "hypertrophy")
+        objective = "strength" if e.get("kind") == "anchor" and e.get("intensity") == "heavy" else "hypertrophy"
         tier, conf, prov = qr.served_rating(entry, objective)
+        for other in ("functional", "conditioning", "mobility", "strength"):  # a trunk drill, a carry: the objective it is rated on
+            if tier is None:
+                objective = other
+                tier, conf, prov = qr.served_rating(entry, other)
         known, read = qr.completeness(entry)
         parts.append(
             f"{entry.get('title') or lid} {objective} {tier or '-'}{' (provisional)' if prov else ''}, {conf}, data {known}/{read}"

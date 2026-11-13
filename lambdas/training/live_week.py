@@ -198,12 +198,14 @@ def landmark_muscle(key: str | None, catalog: dict[str, Any], lib: dict[str, Any
     return LANDMARK_OF.get(str(primary), str(primary))
 
 
-def week_sets(catalog: dict[str, Any], lib: dict[str, Any] | None) -> Counter:
+def week_sets(catalog: dict[str, Any], lib: dict[str, Any] | None, rx: dict[str, Any] | None = None) -> Counter:
     """The program week's planned sets per landmark muscle (primary 1.0, each secondary 0.5 — the fatigue model's convention),
-    from the five role templates AFTER the week's allocation by priority (#5861 FIX3, `live_balance.allocation_plan`)."""
+    from the five role templates AFTER the week's allocation by priority (#5861 FIX3, `live_balance.allocation_plan`). `rx`
+    (#5861 FIX6): the drafted session, whose live mark names the roles this week skips — a short week's count."""
     from training import live_balance
 
-    return live_balance.allocated_week(catalog, lib or {})
+    skip = tuple(((rx or {}).get("live_session") or {}).get("week_skip") or ()) or None
+    return live_balance.allocated_week(catalog, lib or {}, skip)
 
 
 def _hard_blocked(rx: dict[str, Any]) -> bool:
@@ -245,7 +247,7 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
     from training.session_shape import routine_minutes
 
     lib = se.load_library_failsoft() or {}
-    week, marks = week_sets(movements, lib), (block_model.load_landmarks() or {})
+    week, marks = week_sets(movements, lib, rx), (block_model.load_landmarks() or {})
     over_mav_only = _settings().get("cardio_room_takes") == "over_mav_only"  # #5861 FIX6, owner ruling 1
     taken: Counter = Counter()
     before = shape["lifting_minutes"]
@@ -359,7 +361,7 @@ def trim_sets_for_time(blocks: list[Any], rx: dict[str, Any], movements: dict[st
 
     lib = se.load_library_failsoft() or {}
     taken: Counter = Counter()
-    week, marks = week_sets(movements, lib), block_model.load_landmarks() or {}
+    week, marks = week_sets(movements, lib, rx), block_model.load_landmarks() or {}
     # every accessory down to CARDIO_ROOM min_sets; #5861 FIX4 retired the second pass to ONE set (one-set accessories and
     # superset halves are noise) — `fit_routine` then drops whole accessories, the largest surplus over MEV first
     for floor in (int(CARDIO_ROOM["min_sets"]["value"]),):  # #5861 FIX4: drop, don't shave — then whole accessories (fit_routine)

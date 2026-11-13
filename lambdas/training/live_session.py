@@ -310,6 +310,7 @@ def for_live_draft(
             getattr(inputs, "medical_stop_lines", None), block_workouts, getattr(inputs, "target_date", None)
         ),
         "conditioning_host": live_balance.conditioning_host((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),
+        "week_skip": list((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),  # FIX6: the time trim's week count
     }
     rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
@@ -425,7 +426,7 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
     gone = Counter(trimmed)  # #5861 FIX4: what the drop order counts as off (the trimmed sets + every dropped accessory)
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
-        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx))  # FIX4: largest surplus over MEV first
+        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx), rx)  # FIX4: largest surplus over MEV first
         if idx is None:
             break
         cut = blocks.pop(idx)
