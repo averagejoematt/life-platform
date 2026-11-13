@@ -1067,6 +1067,9 @@ def _blog_links_retired():
     return [Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(msg)]
 
 
+SWEEP_LAG_DAYS = 1  # the nightly pre-draft sweep (19:00 PT) runs between a draft turning ORPHAN_DRAFT_DAYS and this leg
+
+
 def check_orphan_routine_drafts():
     """#3772: routines still `draft` more than `ORPHAN_DRAFT_DAYS` (14, #4732: the sweep's own age) days after creation. The #3765 soft-timeout
     lands the draft and tells the client it timed out, so nothing ever lists it — one sat
@@ -1084,8 +1087,12 @@ def check_orphan_routine_drafts():
     from training.routine_repo import ORPHAN_DRAFT_DAYS, stale_draft_census
 
     c = Check("data:orphan_routine_drafts", "Orphaned routine drafts", CONTENT_TRUTH)
+    # The sweep archives at ORPHAN_DRAFT_DAYS at 19:00 PT; this leg runs at 11:30 PT, so a draft turning 14 that day was
+    # read here hours before its sweep ran — one false WARN per draft (2026-11-13 triage). Judging one day later gives
+    # the sweep its run first; a draft the sweep failed to archive still warns the next morning.
+    days = ORPHAN_DRAFT_DAYS + SWEEP_LAG_DAYS
     try:
-        census = stale_draft_census(older_than_days=ORPHAN_DRAFT_DAYS)
+        census = stale_draft_census(older_than_days=days)
     except Exception as e:  # noqa: BLE001
         return [c.warn(f"orphan-draft census errored (no verdict was reached): {e}")]
     live, history, w = census["live"], census["pre_genesis"], census["window"]
@@ -1098,12 +1105,12 @@ def check_orphan_routine_drafts():
         more = f" (+{len(live) - 5} more)" if len(live) > 5 else ""
         return [
             c.warn(
-                f"{len(live)} live-cycle routine draft(s) older than {ORPHAN_DRAFT_DAYS} days never committed or archived: {names}{more} — "
-                f"`manage_hevy_routine list start_date={w['genesis'] or w['start']} end_date={w['end']} status=draft older_than_days={ORPHAN_DRAFT_DAYS}` "
+                f"{len(live)} live-cycle routine draft(s) older than {days} days never committed or archived: {names}{more} — "
+                f"`manage_hevy_routine list start_date={w['genesis'] or w['start']} end_date={w['end']} status=draft older_than_days={days}` "
                 f"lists them (#3772); {window} (#4183)"
             )
         ]
-    return [c.ok(f"no live-cycle routine draft older than {ORPHAN_DRAFT_DAYS} days is left uncommitted (#3772); {window} (#4183).")]
+    return [c.ok(f"no live-cycle routine draft older than {days} days is left uncommitted (#3772); {window} (#4183).")]
 
 
 def check_pk_family_census():
