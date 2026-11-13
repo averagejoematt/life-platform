@@ -282,8 +282,8 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
     how += [", ".join(f"{n} {m}" for m, n in sorted(taken.items())) + " set(s) off (over MAV first)"] if taken else []
     how += [f"dropped {', '.join(dropped)}"] if dropped else []
     (rx.get("live_session") or {}).setdefault("lines", []).append(
-        f"cardio room (live): ~{before} -> ~{new['lifting_minutes']} min lifting — {'; '.join(how)} — so a {reserve}+ min aerobic "
-        f"block fits the shared {cap}-min cap (CARDIO_ROOM, heuristic)"
+        f"cardio room (live): ~{before} -> ~{new['lifting_minutes']} min lifting — {'; '.join(how)} — room for the aerobic block "
+        f"inside the shared {cap}-min cap (CARDIO_ROOM, heuristic; the block's minutes are its own line)"
     )
     return new
 

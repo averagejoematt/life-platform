@@ -238,9 +238,10 @@ def trim_order(surplus: Any) -> Any:
 SHORT_WEEK_SKIP = "shoulders_arms"
 
 
-def deload_shape(exposures: list[dict[str, Any]]) -> int:
+def deload_shape(exposures: list[dict[str, Any]], confirmed: bool = False) -> int:
     """IN PLACE, a RECOMMENDED deload's reduction (applying the deload itself stays his word): every compound to
-    DELOAD_SHAPE compound_sets (back-offs go, the top set stays) at RPE <= compound_rpe, its load held or stepped down;
+    DELOAD_SHAPE compound_sets (back-offs go, the top set stays) at RPE <= compound_rpe — an ANCHOR at DELOAD_TOP_SET's RPE 8
+    until the owner confirms the deload (`confirmed`, #5861 FIX7) — its load held or stepped down;
     isolation is kept — at most isolation_max_sets, RPE <= isolation_rpe. Returns the sets removed."""
     removed = 0
     for e in exposures:
@@ -252,7 +253,12 @@ def deload_shape(exposures: list[dict[str, Any]]) -> int:
                     break
                 sets.pop(idx[-1])
                 removed += 1
-            e["live_effort"] = min(int(DELOAD_SHAPE["compound_rpe"]["value"]), int(e.get("live_effort") or 99))
+            rpe = int(DELOAD_SHAPE["compound_rpe"]["value"])
+            if e.get("kind") == "anchor" and not confirmed:  # #5861 FIX7: until he confirms the deload, the top set stays at RPE 8
+                from training.live_stimulus import DELOAD_TOP_SET
+
+                rpe = int(DELOAD_TOP_SET["rpe"]["value"])
+            e["live_effort"] = min(rpe, int(e.get("live_effort") or 99))
             e["live_load"] = {**(e.get("live_load") or {}), "hold": True, "why": "deload recommended"}
         elif e.get("intensity") != "carry":
             while len(sets) > int(DELOAD_SHAPE["isolation_max_sets"]["value"]):
@@ -745,7 +751,9 @@ def load_decision(
     if e.get("live_retreated"):
         return {"mode": "hold", "pct": 0, "why": "cut once already this week"}
     pct, why, noisy = 0, None, False
-    if trend == "regressing":
+    if trend == "regressing" and e.get("live_keep_intensity"):  # #5861 FIX7 FAST_CUT: volume came off, the anchor's load holds
+        noisy = True
+    elif trend == "regressing":
         if effort_evidence(previous, rep_lo):
             pct, why = int(LOAD_POLICY["regress_down_pct"]["value"]), "strength sliding"
         else:

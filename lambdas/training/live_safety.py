@@ -55,7 +55,7 @@ STOP_LINE: dict[str, Any] = {
     "(3/10) or the stated score when lower: pain above it, or turning sharp, ends that lift for the day (practitioner consensus)",
 }
 NO_STEP_LINE = "No load step today."
-HOLD_DAY_LINE = "Loads stay as written today."
+HOLD_DAY_LINE = "No load steps today."  # #5861 FIX7: lint L1 bans "as written"
 SYMPTOM_PRESETS: dict[str, str] = {
     "extended": "Chest, breathing, dizzy, heart racing or irregular? Stop.\nDoesn't settle → get medical help.",
 }
@@ -156,7 +156,7 @@ def no_step_keys(rx: dict[str, Any]) -> set[str]:
     return out
 
 
-_LATER_SETS = re.compile(r"on later sets")
+_LATER_SETS = re.compile(r"on later sets|: \+\d+(?:\.\d+)? lb per hand")  # FIX7: a carry's in-session step too
 
 
 def _drop_step_lines(lines: list[str]) -> list[str]:
@@ -237,9 +237,21 @@ def big_lift_conflicts(blocks: list[Any], head: str | None = None) -> list[str]:
     out = []
     for b in blocks:
         own = _own_effort(b.notes)
-        if _is_big(b) and own and own != band:
+        if _is_big(b) and own and own != band and not _within(own, band):
             out.append(f"{b.movement_key}: {own} under '{band} on big lifts'")
     return out
+
+
+def _span(effort: str) -> tuple[float, float] | None:
+    """`RPE a–b` / `RPE a` -> (a, b)."""
+    nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", str(effort or ""))]
+    return (min(nums), max(nums)) if nums else None
+
+
+def _within(own: str, band: str) -> bool:
+    """#5861 FIX7: a big lift's own band INSIDE the session band refines it, never contradicts it (`RPE 7–8` under `RPE 7–9`)."""
+    a, b = _span(own), _span(band)
+    return bool(a and b and b[0] <= a[0] and a[1] <= b[1])
 
 
 def coherent_head(head: str, blocks: list[Any]) -> str:
@@ -252,9 +264,17 @@ def coherent_head(head: str, blocks: list[Any]) -> str:
         return head
     band = f"RPE {m.group('band')}"
     targets = {_own_effort(b.notes) or band for b in blocks if _is_big(b)}
+    if not targets:  # #5861 FIX7: no big lift today (a flagged anchor skipped): nothing to contradict — the line keeps its band
+        return head
     if len(targets) == 1:
         (t,) = targets
         return head if t == band else f"{m.group('day')} · {t} on big lifts"
+    spans = [_span(t) for t in targets]
+    if spans and all(
+        spans
+    ):  # #5861 FIX7: the span of the big lifts' bands (each states its own) — line 1 keeps its effort (lint L3/L6/L12)
+        lo, hi = min(x[0] for x in spans if x), max(x[1] for x in spans if x)
+        return f"{m.group('day')} · RPE {lo:g}–{hi:g} on big lifts"
     return m.group("day")
 
 
@@ -271,6 +291,12 @@ def coherent_effort(blocks: list[Any], rx: dict[str, Any]) -> None:
     new = coherent_head(head, blocks)
     band = sb.session_effort(head)
     if new == head or not band or sb.session_effort(new):
+        if band and new != head and sb.session_effort(new) != band:  # FIX7: a big lift that inherited the old band states it
+            for b in blocks[1:]:
+                if _is_big(b) and not _own_effort(b.notes):
+                    bl, ow = sb.split(b.notes or "")
+                    ow = f"{band}\n{ow}".strip()
+                    b.notes = (bl + "\n\n" + ow) if bl else ow
         if block and new != head:
             blocks[0].notes = new + block[len(head) :] + ("\n\n" + own if own.strip() else "")
         return

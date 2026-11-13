@@ -384,10 +384,8 @@ def _e1rm_rir(p: tuple[str, float | None, float | None, float | None, int | None
     return float(p[3]) * 2.20462262 * (1 + (int(p[4]) + rir) / 30.0)
 
 
-def in_deficit(weights_by_day: Any) -> bool | None:
-    """`deficit_rate_pct_bw`: the weekly loss between the oldest and the newest 7 days of the weigh-ins read (their means, per
-    week between them, as %BW of the newest mean); None with under two weeks of weigh-ins. Read here, not through the loss-rate
-    module (no live path reads the rate proposal: the rate-proposal guard)."""
+def loss_rate_pct(weights_by_day: Any) -> float | None:
+    """The weekly loss (%BW/week) between the oldest and the newest 7 days of the weigh-ins read; None under two weeks of them."""
     from common.pacific_time import parse_day_key
 
     days = {parse_day_key(str(k)[:10]): _num(v) for k, v in (weights_by_day or {}).items()} if isinstance(weights_by_day, dict) else {}
@@ -397,9 +395,15 @@ def in_deficit(weights_by_day: Any) -> bool | None:
     lo, hi = min(days), max(days)
     old = [v for d, v in days.items() if (d - lo).days < 7]
     new = [v for d, v in days.items() if (hi - d).days < 7]
-    weeks = (hi - lo).days / 7.0 - 1.0
-    rate = (sum(old) / len(old) - sum(new) / len(new)) / max(weeks, 1.0) / (sum(new) / len(new)) * 100
-    return rate >= float(THRESHOLDS["deficit_rate_pct_bw"]["value"])
+    weeks = max((hi - lo).days / 7.0 - 1.0, 1.0)
+    return (sum(old) / len(old) - sum(new) / len(new)) / weeks / (sum(new) / len(new)) * 100
+
+
+def in_deficit(weights_by_day: Any) -> bool | None:
+    """`deficit_rate_pct_bw` over `loss_rate_pct`; None under two weeks of weigh-ins. Read here, not through the loss-rate module
+    (no live path reads the rate proposal: the rate-proposal guard)."""
+    rate = loss_rate_pct(weights_by_day)
+    return None if rate is None else rate >= float(THRESHOLDS["deficit_rate_pct_bw"]["value"])
 
 
 def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, int | None]], e1: list[float]) -> bool:
@@ -759,7 +763,7 @@ def apply_to_session(
     if shaped:  # #5861 red team: a recommended deload cuts the compounds and keeps isolation (live_program.deload_shape)
         from training import live_program
 
-        removed = live_program.deload_shape(out["exposures"])
+        removed = live_program.deload_shape(out["exposures"], confirmed=bool(out.get("deload_trim")))  # FIX7: his word applies RPE 7
     else:
         removed = trim_accessory_sets(out["exposures"], n, order) if n > 0 else 0
     if removed:

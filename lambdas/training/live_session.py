@@ -277,12 +277,16 @@ def for_live_draft(
         lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
+        from training import live_stimulus  # #5861 FIX7: a fast cut with broad regression answers with volume, never load
+
+        lines += live_stimulus.fast_cut(out, sig, inputs)
         lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
         behind = live_balance.adherence_response(block_workouts, ctx["target_date"], lib)  # FIX3: a dip changes the week
         lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
         from training import live_rulings  # #5861 FIX6 ruling 3: AFTER the dip's lighter week, so it is never undone
 
         lines += live_rulings.arms_top_up(out, ctx, block_workouts)
+        lines += live_stimulus.week_floor(out, ctx, block_workouts, set_cap)  # FIX7: every muscle with an MEV reaches it in HARD sets
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -330,6 +334,10 @@ def for_live_draft(
     rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
     extra |= {"rate_band": band} if band["mode"] == "structured" else {}
+    if rate:
+        from training import live_stimulus
+
+        rate += live_stimulus.rate_suffix(out)  # FIX7: the advisory line names the fast-cut answer
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
     return out
 
