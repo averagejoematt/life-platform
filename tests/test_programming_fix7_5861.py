@@ -308,3 +308,13 @@ def test_the_live_weeks_pass_the_blocking_note_lint():
     assert sw.lint_problems(old), "control: the day-only head fails L6 / L12"
     for s in _week(PROFILES["a_large_deficit_experienced"])["week"]["sessions"]:
         assert not any("block fits" in ln for ln in s["rationale"])  # never "a 20+ min block fits" above a shorter block
+
+
+def test_a_heavy_and_a_volume_day_on_one_template_is_never_read_as_a_reset():
+    """Untitled history (no session role): a heavy day (6 reps) alternating with a lighter volume day (8 reps) on the same template
+    is two bands, not a reset after every volume day. Control: the two-band read off -> the volume day reads as a load drop."""
+    days = ["2026-10-20", "2026-10-23", "2026-10-27", "2026-10-30", "2026-11-03", "2026-11-06"]
+    pts = [(d, lb * (1 + r / 30), 8.0, lb * KG, r) for d, (lb, r) in zip(days, [(265, 6), (205, 8)] * 3)]
+    assert fm._reset_start(pts, None)[0] is None
+    with patch.object(fm, "_two_band", lambda pts, drop: False):
+        assert fm._reset_start(pts, None)[0] is not None

@@ -305,8 +305,9 @@ def _reset_start(
     start, scheme, drop = None, False, float(THRESHOLDS["reset_detect_pct"]["value"])
     need = int(THRESHOLDS["post_reset_min_exposures"]["value"])
     roles = roles or [""] * len(pts)
+    tight = _two_band(pts, drop)  # a heavy day and a volume day on one template (titles unread): compare within 1 rep only
     for k in range(1, len(pts)):
-        j = next((i for i in range(k - 1, -1, -1) if _comparable(pts[i], pts[k], roles[i], roles[k])), None)
+        j = next((i for i in range(k - 1, -1, -1) if _comparable(pts[i], pts[k], roles[i], roles[k], 1 if tight else 3)), None)
         before, now = (pts[j][3] if j is not None else None), pts[k][3]
         if j is None or before is None or now is None or now > before * (1 - drop) or before - now < RESET_MIN_KG:
             continue  # not a drop — or one implement step on a light lift (a 2.5-lb dumbbell jump is noise, not a reset)
@@ -319,11 +320,21 @@ def _reset_start(
     return start, scheme
 
 
-def _comparable(a: tuple[Any, ...], b: tuple[Any, ...], role_a: str, role_b: str) -> bool:
-    """Two exposures of one lift prescribed alike: the same session role when both are known, else top sets within 3 reps."""
+def _comparable(a: tuple[Any, ...], b: tuple[Any, ...], role_a: str, role_b: str, reps: int = 3) -> bool:
+    """Two exposures of one lift prescribed alike: the same session role when both are known, else top sets within `reps` reps."""
     if role_a and role_b:
         return role_a == role_b
-    return a[4] is not None and b[4] is not None and abs(int(a[4]) - int(b[4])) <= 3
+    return a[4] is not None and b[4] is not None and abs(int(a[4]) - int(b[4])) <= reps
+
+
+def _two_band(pts: list[tuple[str, float | None, float | None, float | None, int | None]], drop: float) -> bool:
+    """The window shows a lift trained in two bands (a heavy day and a lighter volume day): somewhere a 7%+ lighter exposure is
+    followed straight away by a climb back to the heavier load — never what a reset or a cut does."""
+    loads = [p[3] for p in pts]
+    return any(
+        a is not None and b is not None and c is not None and b <= a * (1 - drop) and c >= a * 0.97
+        for a, b, c in zip(loads, loads[1:], loads[2:])
+    )
 
 
 def session_role(workout: dict[str, Any]) -> str:
