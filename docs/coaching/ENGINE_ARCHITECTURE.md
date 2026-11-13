@@ -341,6 +341,87 @@ Every rule is a labelled heuristic table (`live_rules.SET_CAP`, `FULL_BODY`, `JO
   cardio, a review line). The platform tripwire's own palpitations and syncope arms (`health.tripwire_readers`) still read
   `unknown`: their canonical input is the check-in lane's (#5819).
 
+## 4e. The owner's rulings of 2026-11-13 (`live_rulings`, FIX6)
+
+Configuration, not activation: the library stays `proposed`. Each ruling is a library-carried setting
+(`deploy/build_exercise_library.py` `OWNER_RULED_SETTINGS`, written over any earlier on-disk default by every rebuild) with the
+same code default, read only under `mode() == "live"`. `tests/test_owner_rulings_5861.py` holds one outcome + one control per
+ruling.
+
+- **Shared 75-minute cap ON** (ruling 1, `session_cap_includes_cardio: true`). The host's cardio room comes from the charter's
+  supersets and from sets OVER a muscle's MAV only (`cardio_room_takes: over_mav_only`): no strength work a muscle needs is cut
+  for a cardio block. Consequence: on the synthetic normal week the conditioning block is ~18 min; on the 4-day week the host has
+  no room and the week's aerobic answer is the walk on the host's note (a tradeoff, stated, not hidden).
+- **The 4-session week after missed sessions** (ruling 2, `adherence_response: short_week`) and **the 4-day week drops
+  shoulders+arms** (ruling 3) with a COUNTED floor: shoulders, biceps and triceps (direct 1.0 + indirect 0.5) are held at MEV over
+  the sessions left (`short_week_floor`, `ARMS_FLOOR`); a time trim never reads a skipped day's sets as surplus
+  (`live_week.week_sets(rx=...)`).
+- **Purposeful cardio only** (ruling 4, `cardio_purpose_only: true`). A gym block exists only for the week's conditioning dose on
+  the conditioning host; no easy block fills a slot or a gap. Easy aerobic is the walking outside the gym, tracked apart.
+- **Top set + one back-off, one lead lift** (ruling 5, `heavy_day_deadlift_shape: top_plus_backoff`, `lead_lift_rule:
+  alternate_weekly`). The squat and the deadlift keep their pairing (#5694) but are never both maximal: one leads at the
+  session's RPE 8-9 and the other is capped at RPE 7-8 (`LEAD_LIFT`); the lead alternates by ISO week (even: squat, odd:
+  deadlift), so each lift gets a top-effort exposure every other week — its strength trend stays readable — and the second lift's
+  fatigue falls on the week it does not lead. A deadlift swapped out (a hip thrust under discomfort) is not a second maximal lift.
+- **Overhead press 3 sets** (ruling 6, `press_sets: 3`). The extra sets come off the LATERAL raises first (`press_trade`, never
+  under two sets), not the rear delts; the press progresses by double progression in 6-10 with the session's one-load-change rule,
+  and a strained / deload week takes a set off like any other lift.
+- **No KB hinge under strain** (ruling 7, `kb_slot_under_strain: drop`): the slot's sets leave the week, nothing makes them up.
+- **Priority by stimulus and performance** (ruling 9, `priority_muscles: [chest, quadriceps]`, `priority_add_rule:
+  stimulus_and_performance`). A priority muscle the week already holds at or over MEV whose anchor is PROGRESSING takes no extra
+  sets and no added slot (`stimulus_gate`, `PRIORITY_ADD`); under MEV, or with a stalled / regressing / unread anchor, the
+  allocation stands and the quadriceps take the low-fatigue isolation slot first.
+- **No symptom warning line** (ruling 10): `symptom_line` defaults to "" and `symptom_line_on_lifting_days` to false; the
+  `extended` preset stays available. The self-report gate (FIX5) still turns hard cardio easy, with one neutral reason line.
+- **The advisory loss-rate ceiling** (ruling 11, `rate_ceiling_pct_bw: 1.0`): `health.rate_policy.advisory_ceiling` — ~1 % of
+  the CURRENT 7-day mean weight a week (the absolute ceiling tapers as weight falls), a quarter-point lower per slow signal
+  (strength, fatigue, recovery, adherence; floor 0.5 %), past weeks judged against the base reference, and the single-fast-week
+  guard: muscle-loss risk only when the rate sat over the reference for 3 of the last 4 weeks AND strength is sliding. One line a
+  week on the upper-heavy draft; never applied (`calorie_target` is untouched).
+- **Aerobic credit from recorded sessions** (ruling 12). The 25 %-of-steps-over-5k credit is GONE. `cardio_model.recorded_aerobic`
+  resolves Apple workouts, Strava and the Hevy record into ONE workout identity each (`training.workout_identity`); an identity
+  holding a Hevy member is the gym's and is never credited again; an Apple member's METs (>= 3) or mean cadence (>= ~100 spm, a
+  population heuristic) classifies it; a Strava-only record carries no intensity the engine uses (heart rate is not effort
+  evidence) and is reported as "intensity unknown". Steps are reported as their own activity metric, never credited.
+- **Unconfirmed equipment is never served** (ruling 13): `selection_engine.availability` reads an `unknown` movement or item as
+  unavailable on every live path (anchors, selection, slots, cardio machines) — tested over every drafted week.
+- **Evidence and completeness visible** (ruling 16): one `evidence (live)` line per session — each served movement's tier on its
+  slot's objective, evidence confidence and data completeness (`quality_rubric.completeness`); a provisional rating never reaches
+  S on any objective and ranks outside the S/A pool.
+- **The glute S standard** (ruling 17, rubric 3.4.0): see docs/coaching/EXERCISE_LIBRARY.md "Owner rulings 2026-11-13".
+
+## Block-retro hooks (ruling 18)
+
+Every heuristic the live engine reads is labelled `heuristic` in its table and is re-tuned at a block retro (the
+`training-review` skill) on the metric below — never by a session's feel. `live_rulings.HEURISTIC_HOOKS` is the registry; a test
+holds each key to a labelled table and to this list.
+
+| Heuristic | Re-tune on |
+|---|---|
+| `live_rulings.LEAD_LIFT.second_band` | the non-lead lift's e1RM trend over the block (held = right; sliding = raise the cap a half band) |
+| `live_rulings.ARMS_FLOOR.add_per_slot` | short-week arm/shoulder e1RM and the next normal week's first-set reps |
+| `live_rulings.PRIORITY_ADD.progressing` | quadriceps anchor e1RM slope in weeks with vs without the added slot |
+| `cardio_model.MODERATE_METS` | Apple workout intensity vs the session RPE he logged, per modality |
+| `cardio_model.CADENCE_MODERATE_SPM` | his own walking cadence at a logged talk-test / RPE (the ~100 spm figure is a population heuristic) |
+| `cardio_model.RPE_MODERATE` | logged cardio RPE vs the talk test he notes |
+| `rate_policy.CEILING_TAPER` | 4-week loss rate vs anchor e1RM and lean-mass (DEXA) change at each block retro |
+| `rate_policy.SUSTAINED_WEEKS` | weeks above the ceiling that preceded an anchor decline, across blocks |
+| `rate_policy.SIGNAL_STEP_PCT` | loss rate in weeks with 1, 2, 3 slow signals vs strength the following week |
+| `live_program.LOAD_POLICY` | e1RM trend after a hold / step down vs after a step up |
+| `live_program.STALL_RULE` | e1RM over the 3 exposures after a stall reset |
+| `live_program.PAIN_RULE` | pain-note recurrence within 2 sessions of a reduce / avoid |
+| `live_program.DELOAD_SHAPE` | readiness and first-set reps the week after a deload |
+| `live_program.TRUNK_FLOOR` | trunk-drill progression and back-discomfort notes |
+| `live_balance.ALLOCATION` | weekly sets per muscle vs that muscle's e1RM / rep PRs |
+| `live_balance.ADHERENCE_DIP` | sessions completed in the 2 weeks after a short-week response |
+| `live_shape.VOLUME` | priority-muscle sets vs their anchor trend |
+| `live_shape.QUAD_SLOT` | quadriceps anchor trend with the slot served |
+| `live_shape.WALK_PROMPT` | walks logged after a prompt |
+| `live_week.CARDIO_ROOM` | conditioning-block minutes delivered vs lifting minutes lost |
+| `live_week.NOVEL_START` | RPE logged on a new movement's first 3 exposures |
+| `fatigue_model.THRESHOLDS` | strain calls vs the next session's first-set reps / RPE |
+| `quality_rubric.NEUTRAL` | how often a reviewed input moved a provisional row's tier |
+
 ## 5. Progression
 
 **The live load guard** (`live_program.guard_loads`, after the floor and the double progression, before the back-offs and
@@ -398,17 +479,15 @@ layer — one person's usage count is fit, not modality quality.
 
 - a hard block (tempo, hills, intervals) turns easy under a recommended deload or when hard cardio is itself a strain signal,
   never sits on the heavy lower day or the session before it, and — with the shared cap — sits only on shoulders+arms;
-- **steps first** (`cardio_model.aerobic_plan` over the steps the cron reads through the one steps resolver): an easy block is
-  dropped when the week's steps already cover the aerobic volume — the walking IS the easy aerobic; unread steps never count.
-  **The credit is conservative** (third red team: ">= 100 steps a minute" is a cadence, not a conversion — every step over 5,000 at
-  100 a minute read 344–630 "moderate" min/wk for a 12–15k walker): minutes recorded at a qualifying cadence count as they are
-  (`cadence_minutes_by_day`, where a source records them — none is wired today), otherwise `STEPS_CREDIT_SHARE` (a quarter, labelled
-  heuristic) of the steps over 5,000; a 14k-step synthetic week reads ~158 min/wk, not 630;
+- **recorded activity first** (`cardio_model.aerobic_plan`): #5861 FIX6 (owner ruling 12) REMOVED the steps credit (a quarter of
+  the steps over 5,000). The credit is recorded outside-the-gym minutes with intensity evidence (`cardio_model.recorded_aerobic`,
+  read by the cron as `aerobic_record`), then cadence-qualified minutes where a source records them; steps are reported, never
+  credited, and a day with only steps reads "intensity unknown". Under `cardio_purpose_only` (ruling 4) no easy block is served;
 - **`programming_settings.session_cap_includes_cardio`** (library setting, default `false` = today's 75-minute LIFTING cap
   with the cardio block apart): `true` makes the 75 minutes cover lifting + cardio — a block shrinks to what lifting leaves,
   under 10 minutes it is dropped — and hard conditioning lands on shoulders+arms;
-- a conditioning note ends with a generic symptom line, `programming_settings.symptom_line` (default "Chest, breathing,
-  dizzy? Stop, log it." — one phone line; no condition named, no heart-rate number; the wording is the owner's decision);
+- a conditioning note MAY end with a symptom line, `programming_settings.symptom_line` — #5861 FIX6 (owner ruling 10): the
+  default is "" (no warning line on any session); the `extended` preset and the owner's own wording print when set;
 - **hard work turns easy on a bad day** (second red team): a strained state, or a red-readiness / short-sleep strain signal,
   turns tempo / hills / intervals easy — not only a recommended deload (a red, 5.6-h week kept its intervals);
 - **the medical stop line is read** (`live_week.symptom_gate`). `owner_redlines.TRIPWIRES` `medical_stop_lines` is evaluated

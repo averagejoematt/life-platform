@@ -111,6 +111,15 @@ rule belongs in `session_sequence`, behind an owner ruling.
 
 ## Rate policy interface (brief §10)
 
+**#5861 FIX6 — the owner's ruling 11 (2026-11-13): the ADVISORY ceiling.** `rate_policy.advisory_ceiling(weights_by_day, ...)`
+states ~1 % of the CURRENT 7-day mean weight a week as the upper planning reference — not a rule, never applied. The absolute
+ceiling falls with the weight (1 % of a lighter body), a quarter of a point per slow signal (strength, fatigue, recovery,
+adherence; floor 0.5 %, `SIGNAL_STEP_PCT`, `CEILING_FLOOR_PCT`, heuristic). Past weeks are judged against the base reference, never
+today's signals. One unusually fast week is reported as such and is NOT a muscle-loss call: that needs the rate over the
+reference in `SUSTAINED_WEEKS` (3) of the last 4 weeks AND a sliding strength signal. The live draft prints it as one line a week
+(`live_rulings.rate_line`, the upper-heavy morning); the cron reads 35 days of weigh-ins for it (live only). `calorie_target`,
+titration and the live rate band are untouched. `propose_band` below is unchanged.
+
 `lambdas/health/rate_policy.py` proposes a target loss-rate **band in percent of bodyweight per week**. It reports the signal
 that drove the band and the reason. It is pure and deterministic, and no live module imports it (a test sweeps `lambdas/` and
 `mcp/` for any reader). The calorie target, the kcal floors, titration and the live rate band are unchanged.
