@@ -623,6 +623,12 @@ def _walk_speed_intensity(a: dict[str, Any]) -> tuple[str, str] | None:
     return ("moderate" if mets >= MODERATE_METS else "light"), f"walking speed {speed:.2f} m/s -> ~{mets:.1f} METs on the flat (a floor)"
 
 
+def _activities(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """A Strava day row's `activities`, or the row itself when it is a bare activity."""
+    acts = row.get("activities")
+    return list(acts) if isinstance(acts, list) else [row]
+
+
 def _aerobic_family(family: str) -> bool:
     f = str(family or "")
     return f in AEROBIC_FAMILIES or (f.startswith("other:") and any(n in f for n in AEROBIC_OTHER))
@@ -642,11 +648,7 @@ def recorded_aerobic(
     from training import workout_identity as wi
 
     apple_by_id = {str(w.get("id") or k): w for row in apple or () for k, w in ((row.get("apple_workouts") or {}).items())}
-    strava_by_id = {
-        str(a.get("strava_id") or a.get("id")): a
-        for row in strava or ()
-        for a in (row.get("activities") if isinstance(row.get("activities"), list) else [row])
-    }
+    strava_by_id = {str(a.get("strava_id") or a.get("id")): a for row in strava or () for a in _activities(row)}
     idents = wi.resolve_workout_identities(apple=apple, strava=strava, hevy=hevy)
     credited = light = unknown = 0.0
     by_day: dict[str, float] = {}
