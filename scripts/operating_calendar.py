@@ -454,19 +454,19 @@ CALENDAR: dict[str, dict] = {
         starts="2026-09-01",
         probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 30-day checkpoint: (\d{4}-\d{2}-\d{2})"),
         obligations=(
-            "Answer the 30-day section of docs/OPERATING_RHYTHM.md from OBSERVED behaviour "
+            "Answer the monthly use read in docs/OPERATING_RHYTHM.md from OBSERVED behaviour "
             "(which surfaces were opened, which were not, which coaches were texted) rather "
             "than from memory, and append the dated log line this probe reads",
-            "This is the first window in which a feature may be reconsidered at all — "
-            "anything wanted before it waits, and anything wanted at it is filed as an issue "
-            "with the lived usage that motivated it written into the body",
+            "Name what shipped in the month that has not been used once — each is a prune "
+            "candidate or an issue with the reason it is still wanted, never a silent keep",
         ),
         reason=(
-            "First occurrence 2026-10-01. From the 2026-09-01 launch the owner operates the "
-            "platform instead of building it daily, and Claude sessions go bug-fix-only. Both "
-            "failure modes of that switch are invisible from inside any single day: the rhythm "
-            "quietly lapses, or feature work quietly resumes one 'small' change at a time. A "
-            "dated checkpoint is the only thing that reads a month of behaviour as a month."
+            "First occurrence 2026-10-01, written for the 2026-09-01 'operate, don't build' plan "
+            "(Claude bug-fix-only, feature work frozen until this read). Owner ruling 2026-11-13: "
+            "that premise ended — the platform is in rapid development (owner ruling 2026-11-07) — "
+            "so the freeze gate is retired and the checkpoint is kept for what still holds: building "
+            "fast makes unused surfaces accumulate faster, and only a dated read of a month of real "
+            "use sees them. The clock was not reset by this change; it is overdue until it is run."
         ),
     ),
     "rhythm-checkpoint-60d": _entry(
@@ -477,19 +477,18 @@ CALENDAR: dict[str, dict] = {
         starts="2026-09-01",
         probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 60-day checkpoint: (\d{4}-\d{2}-\d{2})"),
         obligations=(
-            "Read September's close in docs/COST_TRACKER.md against what the platform "
+            "Read the latest closed month in docs/COST_TRACKER.md against what the platform "
             "actually DID for the owner that month — named, specific things, not a feeling; "
             "an honest 'nothing I can name' is a valid and important answer",
             "Append the dated log line this probe reads, with the two numbers (spend, and the "
-            "count of named returns) written down so the 90-day read has a prior",
+            "count of named returns) written down so the next read has a prior",
         ),
         reason=(
-            "First occurrence 2026-10-31, deliberately after the September cost close lands "
-            "rather than during it — the first full month of user-mode spend is the first "
-            "month whose cost can be read against use rather than against building. Cost "
-            "without a return read is half an instrument, which is how a platform stays "
-            "expensive and unquestioned (ADR-103/144's ledger asks the same question per "
-            "subsystem; this asks it once, for the whole thing, from the owner's chair)."
+            "First occurrence 2026-10-31. Cost without a return read is half an instrument, which is how a "
+            "platform stays expensive and unquestioned (ADR-103/144's ledger asks the same question per "
+            "subsystem; this asks it once, for the whole thing, from the owner's chair). Owner ruling "
+            "2026-11-13: kept through the rapid-development phase, where spend moves fastest; it reads "
+            "the latest closed month rather than September's. Not reset by this change."
         ),
     ),
     "rhythm-checkpoint-90d": _entry(
@@ -514,7 +513,9 @@ CALENDAR: dict[str, dict] = {
             "'I imagined I would need this', and every roadmap this platform has written from "
             "speculation has been re-written from usage within a cycle. Ninety days is also long "
             "enough that the checkpoint must be on a clock — nobody remembers a November date "
-            "they set in August."
+            "they set in August. Owner ruling 2026-11-13: in the rapid-development phase the roadmap "
+            "is no longer held for this date; the checkpoint stays as the usage-evidenced read of it "
+            "and the place the three rhythm rows are re-decided."
         ),
     ),
 }
