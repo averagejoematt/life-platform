@@ -234,48 +234,6 @@ MAX_SCHEDULE_AHEAD_DAYS = 120
 
 CALENDAR: dict[str, dict] = {
     # ── Weekly ────────────────────────────────────────────────────────────────
-    "fullreview-delta": _entry(
-        skill=REVIEW_SPINE,
-        lens="full",
-        cadence_days=7,
-        grace_days=3,
-        attendance=AUTONOMOUS,
-        probe=(NEWEST_DATED_FILE, "docs/reviews", r"^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partial)?\.json$"),
-        obligations=(
-            # Owner ruling 2026-11-06: a scheduled, REVIEW-ONLY classification review riding this clock rather than
-            # a schedule of its own. The script writes the proposal privately (never the repo, never public) and
-            # approves nothing; approval stays the owner's `approve` registry edit, landed by PR.
-            "Run `python3 scripts/prediction_publication_registry.py review` (read-only) and hand the owner the "
-            "private proposed-manifest path it prints — the calls, asks and bets waiting for publication review. "
-            "Approve nothing, and never copy the proposal's ids, words or size into the repo, a PR or the grades file",
-        ),
-        reason=(
-            "The one review family that was still alive at #2832's filing — weekly-ish and "
-            "shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to "
-            "session; any run of the `full` lens (full, delta or partial) resets this clock, "
-            "because the weekly claim is 'the platform was looked at', not 'the look was "
-            "small'. Delta mode itself is defined in the `full` rubric's § 'Delta mode' "
-            "(#3250) — the artifact this probe reads is named there, so the clock and the "
-            "procedure cannot drift apart."
-        ),
-        hold=(
-            "2026-09-19",
-            "2026-09-26",
-            "#3603 (PR #3904, merged 2026-09-19) rewrote the instrument this clock measures — "
-            "frozen anchors per run, the 28-day carry-forward cap, the planted calibration "
-            "controls, and the rubric text in SKILL.md + references/full.md — and the change "
-            "surface since the 2026-09-05 baseline is 896 files across every area, so more than "
-            "~70% of the panel qualifies. Both are the rubric's own 'delta is INVALID' tests "
-            "(references/full.md § Delta mode): a delta across an instrument rewrite measures the "
-            "rubric moving, and a delta touching nearly everything is a full run wearing worse "
-            "anchors. Decision (Session AL, 2026-09-19): do NOT run the overdue delta; the next "
-            "fullreview run is a NEW BASELINE under the rewritten instrument (a full, suffix-free "
-            "grades file, `method` naming #3904), and this clock is re-anchored once to 2026-09-26 "
-            "so the 2026-09-16 hard date is discharged by a written decision rather than a silent "
-            "lapse. Precedent: the 2026-08-27 hold for #3245 (#3250, Session I). One-time: after "
-            "2026-09-26 the ordinary cadence applies and a missed run reds like any other.",
-        ),
-    ),
     # ── Monthly ───────────────────────────────────────────────────────────────
     "fullreview-full": _entry(
         skill=REVIEW_SPINE,
@@ -284,12 +242,26 @@ CALENDAR: dict[str, dict] = {
         grace_days=7,
         attendance=SESSION,
         probe=(NEWEST_DATED_FILE, "docs/reviews", r"^fullreview_grades_(\d{4}-\d{2}-\d{2})\.json$"),
-        obligations=(),
+        obligations=(
+            # Owner ruling 2026-11-06: a scheduled, REVIEW-ONLY classification review riding this clock rather than
+            # a schedule of its own (moved here from the retired weekly clock, owner ruling 2026-11-13). The script
+            # writes the proposal privately (never the repo, never public) and approves nothing; approval stays the
+            # owner's `approve` registry edit, landed by PR.
+            "Run `python3 scripts/prediction_publication_registry.py review` (read-only) and hand the owner the "
+            "private proposed-manifest path it prints — the calls, asks and bets waiting for publication review. "
+            "Approve nothing, and never copy the proposal's ids, words or size into the repo, a PR or the grades file",
+        ),
         reason=(
             "Deltas drift: each one grades against the last, so a slow slide can stay "
             "invisible to every individual delta. A monthly FULL run re-grades every area "
             "from scratch. The probe deliberately excludes _delta/_partial filenames — only "
-            "a full-suffix-free grades file resets this clock."
+            "a full-suffix-free grades file resets this clock. Owner ruling 2026-11-13 (the review "
+            "cadence for rapid development): this monthly adversarial run is the ONE clocked full "
+            "review. The weekly `fullreview-delta` clock is retired (delta mode stays an on-demand "
+            "procedure); a full run is also owed after a material architectural or publication-policy "
+            "change, a focused `/review <lens>` after a serious privacy or integrity incident, and a "
+            "full run whenever the owner asks. Continuous coverage between runs is the automated gates "
+            "on every PR and deploy. The change reset no clock: the next calibrated run is the baseline."
         ),
     ),
     "accuracy-full": _entry(
@@ -644,7 +616,7 @@ carry_forward_report = _carry.carry_forward_report
 #: The two `full`-lens clocks read a calibration-aware probe. Wired here rather than at the
 #: CALENDAR literal because `calibrated_run` is defined below it; the set is explicit so a
 #: reader can see exactly which clocks a failed planted control stops (#3603).
-for _review_entry in ("fullreview-delta", "fullreview-full"):
+for _review_entry in ("fullreview-full",):
     CALENDAR[_review_entry]["qualifier"] = calibrated_run
 
 

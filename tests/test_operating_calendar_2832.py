@@ -77,7 +77,7 @@ def _registry():
 # exactly the lying-gauge shape this calendar exists to kill. craft-review and
 # proportionality-reread are deliberately absent (no history yet); their first real
 # run makes them eligible, never required.
-HISTORY = ("fullreview-delta", "fullreview-full", "accuracy-full", "sdlc-review", "frontier-plan")
+HISTORY = ("fullreview-full", "accuracy-full", "sdlc-review", "frontier-plan")
 
 
 # ── Registry well-formedness ──────────────────────────────────────────────────
@@ -131,12 +131,18 @@ def test_history_probe_resolves(name):
 def test_full_probe_rejects_delta_and_partial():
     """The monthly-full claim is load-bearing: a delta must NOT reset the full clock."""
     full_rx = re.compile(oc.CALENDAR["fullreview-full"]["probe"][2])
-    delta_rx = re.compile(oc.CALENDAR["fullreview-delta"]["probe"][2])
     assert full_rx.match("fullreview_grades_2026-08-16.json")
     assert not full_rx.match("fullreview_grades_2026-08-16_delta.json")
     assert not full_rx.match("fullreview_grades_2026-07-28_partial.json")
-    assert delta_rx.match("fullreview_grades_2026-08-16_delta.json")
-    assert delta_rx.match("fullreview_grades_2026-08-16.json"), "a full run also satisfies the weekly claim"
+
+
+def test_the_weekly_review_clock_is_retired_and_its_obligation_moved():
+    """Owner ruling 2026-11-13: one clocked full review (monthly). The weekly delta clock is gone, and the
+    publication-registry review it carried rides the monthly clock — the protection moved, it did not vanish."""
+    assert "fullreview-delta" not in oc.CALENDAR
+    obligations = oc.CALENDAR["fullreview-full"]["obligations"]
+    assert any("prediction_publication_registry.py review" in o and "Approve nothing" in o for o in obligations)
+    assert "material architectural or publication-policy change" in oc.CALENDAR["fullreview-full"]["reason"]
 
 
 # ── The SET guard (both directions) ───────────────────────────────────────────
@@ -462,31 +468,17 @@ def test_hold_is_dated_bounded_and_reasoned(name):
     assert re.search(r"#\d+", reason), f"{name}: a hold reason must name the issue that caused it"
 
 
-def test_the_fullreview_delta_hold_is_pinned():
-    """Same shape as test_anchor_is_not_refloated: the ONE hold in force is pinned here,
-    so renewing it is a deliberate, reviewed edit rather than a quiet date bump. The first
-    hold (2026-08-27 → 2026-09-06) was #3245's corpus rewrite (#3250). The hold now in force
-    is the second instance of the same rule: #3603 (PR #3904, 2026-09-19) rewrote the
-    instrument again — frozen anchors, the carry-forward cap, calibration controls — and
-    the change surface was the whole tree, so the next fullreview run is a NEW BASELINE,
-    not a delta. Renewing this pin is the reviewed edit; a third hold must replace it here."""
-    hold = oc.CALENDAR["fullreview-delta"]["hold"]
-    assert hold is not None, "the #3603 decision is recorded as a hold — deleting it silently re-opens the lapse"
-    assert hold[0] == "2026-09-19" and hold[1] == "2026-09-26"
-    assert "#3603" in hold[2] and "#3904" in hold[2] and "BASELINE" in hold[2]
-
-
 def test_delta_mode_is_a_defined_procedure():
     """#3250: the calendar entry named a procedure the rubric did not implement. The clock
     and the procedure must not drift apart, so the rubric has to define delta mode AND name
     the exact artifact filename this entry's probe reads. Resolved through the registry's
     lens discovery, so the assertion follows the rubric wherever it lives."""
-    rel_path = oc.review_lenses()[oc.CALENDAR["fullreview-delta"]["lens"]]
+    rel_path = oc.review_lenses()["full"]
     text = open(os.path.join(REPO, rel_path), encoding="utf-8").read()
     assert re.search(r"^##\s+Delta mode", text, re.M), f"{rel_path} must define delta mode as its own section"
-    assert "fullreview_grades_<date>_delta.json" in text, "delta mode must name the artifact the calendar probes"
-    probe_rx = re.compile(oc.CALENDAR["fullreview-delta"]["probe"][2])
-    assert probe_rx.match("fullreview_grades_2026-09-30_delta.json"), "the documented filename must satisfy the probe"
+    assert "fullreview_grades_<date>_delta.json" in text, "delta mode must name the artifact it writes"
+    full_rx = re.compile(oc.CALENDAR["fullreview-full"]["probe"][2])
+    assert not full_rx.match("fullreview_grades_2026-09-30_delta.json"), "an on-demand delta never resets the monthly clock"
 
 
 def test_every_calendared_rubric_names_the_artifact_its_probe_reads():
