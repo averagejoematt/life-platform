@@ -27,8 +27,10 @@ Every rule is a labelled PLATFORM HEURISTIC (practitioner consensus at best), ow
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
+logger = logging.getLogger(__name__)
 ISSUE = "#5861"
 HEURISTIC = "heuristic"
 
@@ -197,3 +199,27 @@ def serve(seq: dict[str, Any] | None, day: str, workouts: Any, lib: dict[str, An
         return seq
     week = entry_week(day, str(seq.get("session_role")), workouts, lib)
     return {**seq, "live_week": week} if week else seq
+
+
+def cron_skip(block_workouts: Any) -> tuple[Any, Any]:
+    """(the skip callable for the sequence, the library read) for `routine_generator._schedule_entry_for_date`; (None, lib) unless
+    the exercise library is approved — the sequence is then today's. Never raises."""
+    if block_workouts is None:
+        return None, None
+    try:
+        from training import selection_engine as se
+
+        lib = se.load_library_failsoft()
+        return sequence_skip(block_workouts, lib), lib
+    except Exception as e:  # noqa: BLE001 — the live week rule never blocks a draft
+        logger.warning(f"live week rule failed ({type(e).__name__}) — the sequence is served as it slides")
+        return None, None
+
+
+def cron_entry(seq: dict[str, Any], day: str, block_workouts: Any, lib: Any) -> dict[str, Any]:
+    """`serve`, never raising (the cron's step)."""
+    try:
+        return serve(seq, day, block_workouts, lib) or seq
+    except Exception as e:  # noqa: BLE001 — never blocks a draft
+        logger.warning(f"live week entry failed ({type(e).__name__})")
+        return seq

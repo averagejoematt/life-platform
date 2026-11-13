@@ -138,7 +138,7 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
 `session_cap_includes_cardio` False keeps today's 75-min LIFTING cap with the cardio block apart; True makes the cap cover lifting
 + cardio and puts hard conditioning on the shoulders+arms day. `symptom_line` is the owner's own wording (OWNER DECISION); the default is one phone line (<= 40 characters) so a tempo
 note stays inside its 6-line budget (hevy_note_lint L7) — a longer wording still prints, safety over the line budget.
-`short_week_rule` `skip_shoulders_arms` (L5's rule) or `slide` (today's sequence) — `short_week_roles`. Second red team (2026-11-13),
+`short_week_rule` `skip_shoulders_arms` (L5's rule) or `slide` (today's sequence) — `live_sequence.SHORT_WEEK_PLANS` (#5861 FIX5). Second red team (2026-11-13),
 both OWNER DECISIONS, both off by default: `behind_schedule_week` (live_week.behind_schedule: a shorter 'keep the anchors' week
 after a run of missed sessions) and `press_sets` (live_week.press_sets, read there with its default 1 — the charter's one set —
 until the library builder carries the key: the shoulders+arms press above one set)."""
@@ -234,25 +234,6 @@ def trim_order(surplus: Any) -> Any:
 
 
 SHORT_WEEK_SKIP = "shoulders_arms"
-
-
-def short_week_roles(roles: list[str], days: int, lib: dict[str, Any] | None = None) -> tuple[list[str], str | None]:
-    """L5's short-week rule as a LIVE option (WEEKLY_STRUCTURE.md refinement 1; library setting `short_week_rule`
-    `skip_shoulders_arms` by default under live; `slide` = today's behaviour): when a week holds fewer lifting mornings than roles, the
-    shoulders+arms session goes first, so both lower days keep their 2x a week and their sets; delts and arms fall to their
-    floor for that week; the carry and the trunk floor that ride shoulders+arms move to the week's last session (the draft's
-    `short_week` input names it). Returns (the roles drafted, the rationale line or None). The cron's session sequence still slides
-    (it credits by position) — wiring the skip into `session_sequence` is the owner's call (named on the PR)."""
-    rule = settings(lib)["short_week_rule"]
-    if days >= len(roles):
-        return roles[:days], None
-    if rule != "skip_shoulders_arms" or SHORT_WEEK_SKIP not in roles:
-        return roles[:days], f"short week (slide): {days} of {len(roles)} sessions — the sequence slides, {', '.join(roles[days:])} waits"
-    from training import live_sequence  # #5861 FIX5: the one week plan (2- and 3-day weeks are full-body; the line says so)
-
-    plan = live_sequence.plan_for_days(days, lib)
-    kept = [r for r in roles if not plan or r not in plan["skip"]][:days]
-    return kept, (plan or {}).get("line") or f"short week (live): {days} of {len(roles)} sessions"
 
 
 def deload_shape(exposures: list[dict[str, Any]]) -> int:
@@ -591,7 +572,7 @@ def trunk_floor(rx: dict[str, Any], ctx: dict[str, Any], state: str | None = Non
 
 
 def short_week_carry(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
-    """IN PLACE, live only: in a short week that skipped shoulders+arms (`short_week_roles`), the week's host session (its
+    """IN PLACE, live only: in a short week that skipped shoulders+arms (`live_sequence.SHORT_WEEK_PLANS`), the week's host session (its
     last) takes that day's carry exposure — the owner-pinned weekly carry (the concession ledger's "carries weekly") is not
     lost with the day. Returns the rationale lines."""
     from training import program_structure as ps

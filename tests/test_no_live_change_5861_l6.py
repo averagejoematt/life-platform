@@ -48,7 +48,7 @@ def test_the_proposed_drafts_serve_exactly_what_the_base_tree_served():
 
 
 def _poisoned():
-    from training import live_balance, live_safety, live_session, live_shape, live_week, selection_live
+    from training import live_balance, live_rules, live_safety, live_sequence, live_session, live_shape, live_week, selection_live
 
     def boom(name):
         def _f(*a, **k):
@@ -106,6 +106,19 @@ def _poisoned():
         (live_shape, "walk_prompt"),
         (live_shape, "walk_note"),
         (live_shape, "kb_under_strain"),
+        # #5861 FIX5: the fifth red team's live rules and the sequence's week plan never run in shadow
+        (live_rules, "full_body"),
+        (live_rules, "fit_set_cap"),
+        (live_rules, "no_added_work"),
+        (live_rules, "isolation_joint_cap"),
+        (live_rules, "kb_filler"),
+        (live_rules, "kb_choice"),
+        (live_rules, "note_class"),
+        (live_rules, "self_report"),
+        (live_sequence, "week_plan"),
+        (live_sequence, "plan_for_days"),
+        (live_sequence, "days_available"),
+        (live_sequence, "entry_week"),
     ]
     return [patch.object(mod, name, boom(f"{mod.__name__}.{name}")) for mod, name in targets]
 
@@ -122,3 +135,36 @@ def test_no_l6_live_only_code_runs_in_shadow():
                 assert not any(
                     ln.startswith(("swapped (live)", "skipped (live)", "time (live)", "fatigue (live)")) for ln in s["rationale"]
                 )
+
+
+def test_the_crons_session_sequence_is_unchanged_while_the_library_is_proposed():
+    """#5861 FIX5: the week rule is wired into the cron's sequence (`routine_generator._schedule_entry_for_date` ->
+    `session_sequence.next_session(skip=...)`, `live_sequence`) behind `mode() == "live"`. With the committed (proposed) library
+    the served entry is exactly `next_session` without a skip, on every day of a DIP week (the case the live rule changes) —
+    and the live week plan never runs. Control: the same record under an approved copy serves a different week (no
+    shoulders+arms) and carries `live_week`."""
+    import copy
+    import json
+
+    from training import live_sequence, routine_generator as rg, selection_engine as se, session_sequence as ss
+
+    prof = sw.load_profiles()["a_large_deficit_experienced"]
+    world = sw.build_world(prof, "proposed")
+    start = sw._day(prof["as_of"], -14)
+    keep = {sw._day(start, d) for d in (0, 3, 7, 8, 11)}  # five of ten mornings: a dip (tests/test_programming_fix3_5861.py)
+    record = [w for w in world["record"] if w["date"] < start or w["date"] in keep]
+    lib = json.loads((REPO / "config" / "exercise_library.json").read_text())
+    assert lib["status"] == "proposed"
+    week_cfg = {"schedule": {}}
+    days = [sw._day(prof["as_of"], n) for n in range(5)]
+    with (
+        patch.object(se, "load_library_failsoft", lambda: lib),
+        patch.object(live_sequence, "week_plan", lambda *a, **k: pytest.fail("the live week plan ran while the library is proposed")),
+    ):
+        served = [rg._schedule_entry_for_date(d, week_cfg, "module", record, []) for d in days]
+    assert served == [ss.next_session(d, record, []) for d in days]
+    assert all("live_week" not in e for e in served)
+    live = copy.deepcopy(lib) | {"status": "approved"}
+    with patch.object(se, "load_library_failsoft", lambda: live):
+        roles = [rg._schedule_entry_for_date(d, week_cfg, "module", record, []).get("live_week") for d in days]
+    assert all(r and "shoulders_arms" in r["skip"] for r in roles)  # control: live, the dip week skips shoulders+arms

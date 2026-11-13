@@ -264,7 +264,7 @@ def for_live_draft(
         from training import live_safety  # #5861 FIX4: the pain note's site and the mild line, read once
 
         ctx |= {"mild_pain": live_safety.mild_pain_tids(block_workouts), "pain_notes": live_safety.latest_notes(block_workouts)}
-        lines += [week["line"]] if (week or {}).get("line") else []
+        lines += [str((week or {})["line"])] if (week or {}).get("line") else []
         lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost

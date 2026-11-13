@@ -144,10 +144,12 @@ def _schedule_entry_for_date(
         from training import deload_word, session_sequence
 
         records = deload_records if deload_records is not None else deload_word.load_records_failsoft()  # #5070: his word
-        skip, lib = _live_week_rule(block_workouts)  # #5861 FIX5: LIVE only — the short / dip week's skipped roles; None today
+        from training import live_sequence  # #5861 FIX5: LIVE only — the short / dip week's skipped roles; None today
+
+        skip, lib = live_sequence.cron_skip(block_workouts)
         seq = session_sequence.next_session(target_date, block_workouts, records, skip=skip)
         if seq is not None and seq.get("source") == "session_sequence":
-            return _live_week_entry(seq, target_date, block_workouts, lib) if skip is not None else seq
+            return live_sequence.cron_entry(seq, target_date, block_workouts, lib) if skip is not None else seq
         if seq is not None:
             # #4110 review: a non-lifting placeholder that names the unreadable record — the one
             # outcome that cannot prescribe a session the sequence did not choose (walking is every day).
@@ -158,31 +160,6 @@ def _schedule_entry_for_date(
                 "label": "session sequence UNREADABLE — no lifting session drafted",
             }
     return dict(week_cfg["schedule"].get(str(dow)) or {})
-
-
-def _live_week_rule(block_workouts: list[dict[str, Any]] | None) -> tuple[Any, Any]:
-    """(#5861 FIX5) the live week rule's skip callable for the sequence and the library it read; (None, lib) unless the
-    exercise library is approved — the sequence is then today's. Never raises."""
-    if block_workouts is None:
-        return None, None
-    try:
-        from training import live_sequence, selection_engine as se
-
-        lib = se.load_library_failsoft()
-        return live_sequence.sequence_skip(block_workouts, lib), lib
-    except Exception as e:  # noqa: BLE001 — the live week rule never blocks a draft
-        logger.warning(f"live week rule failed ({type(e).__name__}) — the sequence is served as it slides")
-        return None, None
-
-
-def _live_week_entry(seq: dict[str, Any], target_date: str, block_workouts: Any, lib: Any) -> dict[str, Any]:
-    from training import live_sequence
-
-    try:
-        return live_sequence.serve(seq, target_date, block_workouts, lib) or seq
-    except Exception as e:  # noqa: BLE001 — never blocks a draft
-        logger.warning(f"live week entry failed ({type(e).__name__})")
-        return seq
 
 
 def _block_workouts_for(inputs: GeneratorInputs) -> list[dict[str, Any]] | None:

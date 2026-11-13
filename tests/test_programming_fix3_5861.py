@@ -273,6 +273,15 @@ def test_an_adherence_dip_changes_the_week_fewer_shorter_sessions_anchored():
     dip = _week("a_large_deficit_experienced", record=_irregular)
     w = dip["week"]
     assert w["short_week"].startswith("adherence dip (live, adherence_response=short_week)") and len(w["sessions"]) == 4
+    # #5861 FIX5 (fifth red team: this asserted the harness): the week is PRODUCTION's plan — the one the nightly sequence reads
+    # (`live_sequence.sequence_skip` -> `session_sequence.next_session`; served end to end in tests/test_programming_fix5_5861.py)
+    from training import live_sequence, session_sequence as ss
+
+    plan = live_sequence.week_plan("2026-11-16", dip["world"]["record"], dip["world"]["lib"])
+    assert plan and plan["mode"] == "dip" and plan["line"] == w["short_week"] and plan["skip"] == ("shoulders_arms",)
+    skip = live_sequence.sequence_skip(dip["world"]["record"], dip["world"]["lib"])
+    assert ss.next_session("2026-11-16", dip["world"]["record"], [], skip=skip)["session_role"] != "shoulders_arms"
+    assert live_sequence.week_plan("2026-11-16", full["world"]["record"], full["world"]["lib"]) is None  # control: no dip
     cap = lb.ADHERENCE_DIP["session_minutes"]["value"]
     assert all((s["lifting_minutes"] or 0) <= cap for s in w["sessions"])
     full_anchor = {
