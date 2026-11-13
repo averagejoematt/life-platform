@@ -111,8 +111,10 @@ def apply_evidence_changes(movements: dict[str, dict[str, Any]], changes: list[d
 
 
 def finalize_tiers(movements: dict[str, dict[str, Any]]) -> None:
-    """Every row's quality tier re-derived from the rubric plus its recorded evidence adjustment (#5857), in place."""
+    """Every row's quality tier re-derived from the rubric plus its recorded evidence adjustment (#5857), and every
+    objective rating from the #5861 rubrics (`ratings`, null where an objective does not apply), in place."""
     from training import quality_rubric
 
     for e in movements.values():
         e["hypertrophy"] = [quality_rubric.finalize_row(e, r) for r in e.get("hypertrophy") or []]
+        e["ratings"] = quality_rubric.objective_ratings(e)

@@ -54,6 +54,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(os.path.abspath(__file__))]
 
 import exercise_library_curation as cur  # noqa: E402
+import exercise_library_objectives as objectives  # noqa: E402
 import exercise_library_reviews as reviews  # noqa: E402
 import exercise_library_targets as targets  # noqa: E402
 from training import (
@@ -101,7 +102,23 @@ BUILDER_CHANGE_LOG = [
         "with its reason and recorded on the entry as `target.audit`; the shoulder splits into side_delts / rear_delts / "
         "front_delts, shrugs move to traps, and compound or conditioning movements to full_body (no single-muscle tier).",
         "rule": "rubric weights are PROPOSED — owner to confirm; status stays proposed",
-    }
+    },
+    {
+        "version": "0.3.0",
+        "date": "2026-11-12",
+        "by": "#5861 (owner brief 2026-11-12, PROPOSAL for the owner's review with the library)",
+        "what": "Five objectives rated separately (`ratings`: hypertrophy per target, strength, functional, conditioning, "
+        "mobility; null = not applicable, never forced), each by its own small categorical rubric (`quality_rubric`, rubric "
+        "3.0.0) over reviewed `objective_inputs`. Hypertrophy keeps the v2 points as its stimulus profile, capped by load "
+        "ceiling, limiter muscle and S criteria (stimulus-to-fatigue, stability, joints); body mass loads a bodyweight "
+        "compound, a calisthenics ladder earns the load-step point, and any known glute length scores mid. Every movement "
+        "gets a `category` (and `trunk_function` / `functions` where they apply), and a canonical layer (`canonical`, "
+        "`variant`, `canonical_families`) consolidates the duplicate pairs and near-identical variants while every key and "
+        "template id stays. Reviewed fixes: walking lunge no longer cardio, crossover step-up no longer a fly, cuff rotations "
+        "no longer trunk flexion, weighted push-up / pull-up / chin-up free weight like the weighted dip, step-up and push-up "
+        "length rules, Pallof press target, rear-delt fly attributes.",
+        "rule": "rubric 3.0.0 terms and objective inputs are PROPOSED — owner to confirm; status stays proposed",
+    },
 ]
 
 
@@ -216,6 +233,7 @@ _LENGTH_RULES: list[tuple[str, str]] = [
     (r"pec deck|butterfly", "lengthened"),  # #5857: the pec deck is a fly (it read `unknown` before)
     (r"hyperextension|back extension|pull ?up|chin ?up|pulldown|\bdips?\b|jefferson|zercher|goblet|front squat|\bsquat\b", "lengthened"),
     (r"bench press|chest press|shoulder press|overhead press|military press|\brow\b|rows\b|leg press|leg extension|curl\b|deadlift", "mid"),
+    (r"push ?ups?|pushups?|step ?ups?|stepup", "mid"),  # #5861: a push-up is a press; a step-up a knee-dominant squat (mid)
 ]
 
 
@@ -228,8 +246,16 @@ def _length_bias(title: str, family: str) -> str:
     return "unknown"
 
 
+_NOT_CARDIO_RE = re.compile(r"lunge|squat|hip circles?|carry|carries|farmers", re.I)
+
+
+def _is_cardio(title: str) -> bool:
+    """A cardio word, unless the title is a strength movement that happens to say "walking" (#5861: the walking lunge)."""
+    return bool(_CARDIO_RE.search(title)) and not _NOT_CARDIO_RE.search(title)
+
+
 def _family(title: str, meta: dict[str, Any]) -> str:
-    if (meta.get("primary_muscle") == "cardio") or _CARDIO_RE.search(title):
+    if (meta.get("primary_muscle") == "cardio") or _is_cardio(title):
         return "carry_conditioning"
     if lib_rules.requires_impact_gate({"title": title}) or _OLY_RE.search(title) or re.search(r"\b(slams?|throws?|toss)\b", title, re.I):
         return "skill_athletic"
@@ -253,7 +279,7 @@ def _equipment(title: str, hevy_eq: str | None, family: str) -> list[str]:
             if i not in out:
                 out.append(i)
 
-    if family == "carry_conditioning" and _CARDIO_RE.search(title):
+    if family == "carry_conditioning" and _is_cardio(title):
         for pat, eid in (
             (r"treadmill", "treadmill"),
             (r"cycling|bike|spinning", "stationary_bike"),
@@ -394,7 +420,7 @@ _SELECTORIZED = {
 
 def _resistance(equipment: list[str], hevy_eq: str | None, family: str, title: str) -> str:
     eq = set(equipment)
-    if family == "carry_conditioning" and _CARDIO_RE.search(title):
+    if family == "carry_conditioning" and _is_cardio(title):
         return "cardio_machine" if eq - {"bodyweight"} else "not_applicable"
     if "sled" in eq:
         return "sled"
@@ -505,7 +531,7 @@ def derive(tid: str, title: str, meta: dict[str, Any]) -> dict[str, Any]:
         "target": {
             "primary": primary,
             "secondary": list(meta.get("secondary_muscles") or []),
-            "region": "cardio" if family == "carry_conditioning" and _CARDIO_RE.search(title) else _REGION.get(primary, "full_body"),
+            "region": "cardio" if family == "carry_conditioning" and _is_cardio(title) else _REGION.get(primary, "full_body"),
         },
         "family": family,
         "length_bias": _length_bias(title, family),
@@ -555,7 +581,7 @@ def auto_gates(entry: dict[str, Any]) -> list[str]:
         "carry_conditioning",
         "skill_athletic",
     ) or lib_rules.requires_bodyweight_gate(entry):
-        if not (entry.get("family") == "carry_conditioning" and _CARDIO_RE.search(t)):
+        if not (entry.get("family") == "carry_conditioning" and _is_cardio(t)):
             g.append("clinical_cue_breathing")
     return g
 
@@ -804,6 +830,22 @@ def apply_target_audit(movements: dict[str, dict[str, Any]], overrides: dict[str
         e["hypertrophy"] = [r | {"target": primary} if r.get("target") == old else r for r in e.get("hypertrophy") or []]
 
 
+def apply_evaluation_layer(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """#5861, in place, before any tier is derived: the reviewed pattern fixes, category / trunk function / functions, the
+    objective inputs, the reviewed secondary target rows, then the canonical layer (aliases take their canonical's
+    attributes). Returns the canonical-family index (`canonical_families`)."""
+    return objectives.apply(movements, cur.hyp)
+
+
+def rating_counts(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Per objective, how many movements sit in each tier (and how many it does not apply to)."""
+    out: dict[str, dict[str, int]] = {}
+    for o in quality_rubric.OBJECTIVES:
+        c = Counter(str(e["ratings"][o]["tier"] or "not_applicable") for e in movements.values())
+        out[o] = {t: c.get(t, 0) for t in quality_rubric.QUALITY_TIERS + ("not_applicable",)}
+    return out
+
+
 def build_library(
     current: dict[str, Any] | None, history: dict[str, Any], catalog: dict[str, Any], aliases: dict[str, str]
 ) -> dict[str, Any]:
@@ -816,10 +858,11 @@ def build_library(
     apply_attribute_audit(movements)  # #5857 rubric v2 (board rec 5): reviewed attribute fixes + joint ratings
     for e in movements.values():
         e["job"], e["pattern"] = job_and_pattern(e)
+    families = apply_evaluation_layer(movements)  # #5861: category, objective inputs, secondary rows, canonical layer
     missing = reviews.apply_evidence_changes(movements, reviews.ledger_evidence_changes(_ledger()))
     if missing:
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")
-    reviews.finalize_tiers(movements)  # #5857: every row's quality tier from the rubric (+ at most one recorded band)
+    reviews.finalize_tiers(movements)  # #5857 + #5861: every row's tier (+ at most one recorded band) and every objective rating
 
     used_eq = sorted({x for e in movements.values() for x in e["equipment"]})
     inventory, cutoff = home_gym_inventory(movements, history, used_eq)
@@ -833,7 +876,7 @@ def build_library(
     for key in list(movements):
         movements[key] = _ordered(movements[key])
     head = with_builder_changes({k: (current or {}).get(k, v) for k, v in INITIAL_HEADER.items()})
-    tiers = Counter(r["tier"] for e in movements.values() for r in e["hypertrophy"])
+    tiers = Counter(r["tier"] or "not_applicable" for e in movements.values() for r in e["hypertrophy"])
     confidence = Counter(r["evidence_confidence"] for e in movements.values() for r in e["hypertrophy"])
     src = Counter(e["source"] for e in movements.values())
     return {
@@ -857,7 +900,14 @@ def build_library(
             "distinct_template_ids": len(history["templates"]),
             "movements": len(movements),
             "by_source": dict(sorted(src.items())),
-            "hypertrophy_rows_by_tier": {t: tiers.get(t, 0) for t in quality_rubric.QUALITY_TIERS},
+            "hypertrophy_rows_by_tier": {t: tiers.get(t, 0) for t in quality_rubric.QUALITY_TIERS + ("not_applicable",)},
+            "ratings_by_objective": rating_counts(movements),
+            "s_census": quality_rubric.s_census(movements),
+            "canonical": {
+                "families": len(families),
+                "aliases": sum(len(f["aliases"]) for f in families.values()),
+                "variants": sum(len(f["variants"]) for f in families.values()),
+            },
             "hypertrophy_rows_by_evidence_confidence": {c: confidence.get(c, 0) for c in quality_rubric.EVIDENCE_CONFIDENCE},
             "expansion_candidates_already_in_history": sorted(merged_into_history),
             "catalog_movements_not_in_current_history": sorted(catalog_only),
@@ -890,6 +940,7 @@ def build_library(
             "evaluated_by": "#5772 (next story); v0.1 only defines gates",
         },
         "gates": gates_out,
+        "canonical_families": families,
         "movements": movements,
     }
 
@@ -912,7 +963,14 @@ _ORDER = (
     "joint_stress",
     "skill_complexity",
     "equipment",
+    "category",
+    "trunk_function",
+    "functions",
+    "canonical",
+    "variant",
     "hypertrophy",
+    "ratings",
+    "objective_inputs",
     "other_evidence",
     "gates",
     "not_for_you_now",

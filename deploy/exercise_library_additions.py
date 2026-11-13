@@ -32,9 +32,11 @@ creating the template (`OWNER_TEMPLATE_APPROVALS`). No Hevy write happens here. 
 movement-catalog entry before it can write any movement (`selection_engine` `not_prescribable`), so nothing added here
 reaches a drafted session while the library is `proposed` — or after, until the catalog carries it.
 
-Evidence honesty: no citation is invented. Every rating here is `none_reviewed` with the basis stated as practitioner
-consensus — the library reserves `consensus` for a named reviewer's peer-reviewed position with a registered citation.
-Tiers are categorical with a stated basis; no point scores. No personal data: fit factors are generic conditions.
+Ratings: this module does not rate. Each addition authors the categorical `objective_inputs` L1's per-objective rubric
+reads (`quality_rubric.OBJECTIVE_INPUTS`), and the library derives every tier from them — one rating system, not two.
+Evidence honesty: no citation is invented; the inputs are practitioner-consensus judgements (the rubric's `consensus`
+means reviewed inputs, no trial claimed) and every hypertrophy row stays `none_reviewed`. No point scores. No personal
+data: fit factors are generic conditions.
 
     python3 deploy/exercise_library_additions.py --write-doc   # regenerate docs/coaching/EXERCISE_LIBRARY_COVERAGE.md
     python3 deploy/exercise_library_additions.py --check-doc   # exit 1 if the doc drifted from this module
@@ -70,6 +72,19 @@ LATERALITY = ("bilateral", "unilateral", "alternating", "not_applicable")
 LEVELS = ("low", "moderate", "high")
 VARIANT_AXES = ("grip", "stance", "range", "tempo", "equipment", "laterality", "level", "position", "direction", "load", "plane", "terrain")
 HEVY_KINDS = ("builtin", "custom_existing")
+# `quality_rubric.OBJECTIVE_INPUTS` field names (L1's contract), authored per addition below.
+INPUT_FIELDS = (
+    "ceiling",
+    "limiter",
+    "systemic_fatigue",
+    "resistance_class",
+    "strength_lift",
+    "ladder",
+    "functional",
+    "conditioning",
+    "mobility",
+    "reviewed",
+)
 CARDIO_PROTOCOLS = (
     "easy_recovery_aerobic",
     "moderate_continuous",
@@ -97,7 +112,7 @@ PROFILE_FIELDS: dict[str, str] = {
     "alternatives": "expansion_profile.alternatives",
     "evidence confidence": "expansion_profile.evidence_confidence",
     "personal-fit factors": "expansion_profile.personal_fit",
-    "type/category": "category",
+    "type/category": "expansion_profile.category",
     "suitability for the present weight-loss phase": "expansion_profile.phase_suitability",
     "auto-programmable vs readiness-gated": "expansion_profile.programming",
 }
@@ -126,13 +141,26 @@ def _js(spinal: str, shear: str, wrist: str, elbow: str, shoulder: str) -> dict[
     return {"spinal_load": spinal, "shear": shear, "wrist": wrist, "elbow": elbow, "shoulder": shoulder}
 
 
-def _r(tier: str | None, basis: str) -> dict[str, Any]:
-    """One objective rating in the #5861 contract shape. `None` tier = the objective does not apply (never forced)."""
-    return {"tier": tier, "basis": [basis], "evidence_confidence": "none_reviewed"}
+def _cond(aerobic: str, control: str, impact: str, recovery: str) -> dict[str, str]:
+    """The conditioning input map L1's conditioning rubric reads (`quality_rubric.CONDITIONING_KEYS`)."""
+    return {"aerobic": aerobic, "control": control, "impact": impact, "recovery": recovery}
 
 
-def _ratings(**given: tuple[str | None, str]) -> dict[str, dict[str, Any]]:
-    return {o: _r(*given[o]) if o in given else _r(None, "not an objective this movement serves") for o in OBJECTIVES}
+def _inputs(
+    ceiling: str, limiter: str, resistance_class: str, functional: list[str], conditioning: dict[str, str] | None, mobility: str | None
+) -> dict[str, Any]:
+    """The reviewed `objective_inputs` an addition carries (`quality_rubric.OBJECTIVE_INPUTS`); L1's builder keeps an authored
+    map on an expansion entry and rates every objective from it. `systemic_fatigue` is filled from the profile's fatigue."""
+    return {
+        "ceiling": ceiling,
+        "limiter": limiter,
+        "resistance_class": resistance_class,
+        "strength_lift": False,
+        "ladder": False,
+        "functional": list(functional),
+        "conditioning": conditioning,
+        "mobility": mobility,
+    }
 
 
 def _v(name: str, axis: str, value: str, hevy: str | None = None, level: int | None = None) -> dict[str, Any]:
@@ -193,11 +221,11 @@ def _add(
     phase: str,
     gate: str | None,
     influence: tuple[str, str],
-    ratings: dict[str, dict[str, Any]],
     trunk: str | None = None,
     gates: list[str] | None = None,
     variants: list[dict[str, Any]] | None = None,
     protocols: list[str] | None = None,
+    template_note: str | None = None,
 ) -> dict[str, Any]:
     """One new canonical movement, in the curation `EXPANSION` shape the builder hook reads, plus the #5861 fields.
     `attrs` = (family, length_bias, resistance_profile, setup stability, joint_stress) — the rubric's inputs."""
@@ -218,7 +246,7 @@ def _add(
         "equipment": list(equipment),
         "gates": list(gates or []),
         "category": category,
-        "functions": [function],
+        "objective_inputs": {**_INPUTS[key], "systemic_fatigue": fatigue[1], "reviewed": True},
         "expansion_profile": {
             "section": f"§{sec}",
             "priority": pri,
@@ -232,8 +260,10 @@ def _add(
             "joint_notes": joint_notes,
             "levels": {"regressions": list(levels[0]), "progressions": list(levels[1])},
             "alternatives": list(alts),
-            "evidence_confidence": "none_reviewed",
-            "evidence_basis": "practitioner consensus; no citation reviewed for this lane",
+            "evidence_confidence": "consensus",
+            "evidence_basis": "practitioner consensus over reviewed categorical inputs; no trial claimed, no citation added",
+            "category": category,
+            "trunk_function": trunk,
             "personal_fit": list(fit),
             "phase_suitability": phase,
             "programming": {"mode": "readiness_gated" if gate else "auto_programmable", "gate_reason": gate},
@@ -244,7 +274,6 @@ def _add(
                 "needs_custom_template": tid is None,
                 "prescribable": tid is not None,
             },
-            "ratings_proposed": ratings,
         },
     }
     nfy = _not_for_you_now(tid, gate)
@@ -256,6 +285,8 @@ def _add(
         )
     elif kind == "custom_existing":
         out["template_note"] = "a custom template already in the account (read-only template index); never logged"
+    if template_note:
+        out["template_note"] = template_note
     if trunk:
         out["trunk_function"] = trunk
     if variants:
@@ -270,6 +301,60 @@ _AVAIL = "available_only"
 _INFL = "influences_current_program"
 _ALL_PROTOCOLS = list(CARDIO_PROTOCOLS)
 _LOW_IMPACT_PROTOCOLS = ["easy_recovery_aerobic", "moderate_continuous", "tempo_threshold", "structured_intervals", "progressive_endurance"]
+
+# The reviewed objective inputs per addition (L1's `quality_rubric.OBJECTIVE_INPUTS`): (ceiling, limiter, resistance_class,
+# functional qualities, conditioning map, mobility type). Categorical practitioner judgements — the rubric turns them into tiers.
+_TS, _UL, _BAL, _LOC, _MP, _CARRY, _POW = "trunk_stability", "unilateral", "balance", "locomotion", "multiplanar", "carry", "power"
+_INPUTS: dict[str, dict[str, Any]] = {
+    "standing_cable_chest_press": _inputs(_M, "balance", "submaximal", [_TS], None, None),
+    "chest_supported_y_raise_dumbbell": _inputs(_M, "target", "light", [], None, "motor_control"),
+    "cable_serratus_punch": _inputs(_M, "target", "light", [], None, "motor_control"),
+    "cable_internal_rotation": _inputs(_M, "target", "light", [], None, "motor_control"),
+    "wrist_extension_dumbbell": _inputs(_H, "target", "light", [], None, None),
+    "wrist_roller": _inputs(_M, "target", "light", [], None, None),
+    "forearm_rotation_dumbbell": _inputs(_L, "target", "light", [], None, None),
+    "wrist_deviation_dumbbell": _inputs(_L, "target", "light", [], None, None),
+    "plate_pinch_hold": _inputs(_M, "grip", "light", [], None, None),
+    "hand_gripper_squeeze": _inputs(_M, "target", "light", [], None, None),
+    "band_finger_extension": _inputs(_L, "target", "light", [], None, None),
+    "controlled_forward_step_down": _inputs(_M, "balance", "bodyweight", [_UL, _BAL], None, "motor_control"),
+    "spanish_squat": _inputs(_M, "target", "light", [], None, None),
+    "sissy_squat": _inputs(_M, "target", "bodyweight", [], None, None),
+    "band_assisted_reverse_nordic": _inputs(_M, "target", "bodyweight", [], None, "loaded"),
+    "hip_abduction_machine": _inputs(_H, "target", "submaximal", [], None, None),
+    "lateral_band_walks": _inputs(_L, "target", "light", [_LOC, _MP], None, None),
+    "hip_airplane": _inputs(_L, "balance", "bodyweight", [_UL, _BAL, _MP], None, "motor_control"),
+    "hip_adduction_machine": _inputs(_H, "target", "submaximal", [], None, None),
+    "copenhagen_side_plank": _inputs(_M, "target", "bodyweight", [_UL, _TS, _MP], None, None),
+    "tibialis_raise": _inputs(_M, "target", "bodyweight", [], None, None),
+    "banded_ankle_inversion_eversion": _inputs(_L, "target", "light", [], None, "motor_control"),
+    "short_foot": _inputs(_L, "target", "light", [_BAL], None, "motor_control"),
+    "reverse_crunch": _inputs(_M, "target", "bodyweight", [], None, None),
+    "bear_crawl": _inputs(_L, "other_muscle", "bodyweight", [_LOC, _TS], _cond(_M, _M, _L, _M), None),
+    "suitcase_deadlift": _inputs(_M, "grip", "submaximal", [_UL, _TS], None, None),
+    "stability_ball_stir_the_pot": _inputs(_L, "target", "bodyweight", [_TS], None, None),
+    "mcgill_curl_up": _inputs(_L, "target", "light", [_TS], None, "motor_control"),
+    "standing_cable_knee_drive": _inputs(_M, "target", "light", [_UL, _BAL], None, None),
+    "front_rack_carry_kettlebell": _inputs(_M, "trunk", "submaximal", [_CARRY, _LOC, _TS], _cond(_M, _H, _L, _M), None),
+    "stair_machine": _inputs(_H, "cardio", "light", [_LOC], _cond(_H, _H, _L, _M), None),
+    "recumbent_bike": _inputs(_H, "cardio", "light", [], _cond(_M, _H, _L, _L), None),
+    "ski_erg": _inputs(_H, "cardio", "light", [], _cond(_H, _H, _L, _M), None),
+    "swimming": _inputs(_M, "technique", "light", [], _cond(_H, _M, _L, _M), None),
+    "rucking": _inputs(_M, "cardio", "light", [_CARRY, _LOC], _cond(_M, _H, _L, _M), None),
+    "step_aerobics_low_impact": _inputs(_L, "cardio", "light", [_LOC], _cond(_M, _M, _L, _L), None),
+    "arm_ergometer": _inputs(_M, "cardio", "light", [], _cond(_L, _H, _L, _L), None),
+    "knee_to_wall_dorsiflexion": _inputs(_L, "mobility", "light", [], None, "active"),
+    "hip_cars": _inputs(_L, "mobility", "light", [], None, "active"),
+    "shoulder_cars": _inputs(_L, "mobility", "light", [], None, "active"),
+    "adductor_rock_back": _inputs(_L, "mobility", "light", [], None, "active"),
+    "half_kneeling_hip_flexor_stretch": _inputs(_L, "mobility", "light", [], None, "passive"),
+    "wrist_extension_mobilization": _inputs(_L, "mobility", "light", [], None, "passive"),
+    "medicine_ball_chest_pass": _inputs(_M, "technique", "light", [_POW], None, None),
+    "medicine_ball_scoop_toss": _inputs(_M, "technique", "light", [_POW], None, None),
+    "low_box_step_off_landing": _inputs(_L, "technique", "bodyweight", [_POW, _BAL], None, "motor_control"),
+    "supine_deep_neck_flexor_nod": _inputs(_L, "target", "light", [], None, "motor_control"),
+    "neck_isometric_holds": _inputs(_L, "target", "light", [], None, "motor_control"),
+}
 
 ADDITIONS: list[dict[str, Any]] = [
     # §1 chest — one ADD: a standing (no-bench) press whose single-arm form adds anti-rotation; the rest are VARIANTs.
@@ -298,10 +383,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "chest pressing is already served by stable, more loadable presses"),
-        ratings=_ratings(
-            hypertrophy=("C", "standing stability limits the load the chest can be taken near failure with"),
-            functional=("B", "standing press with trunk bracing; anti-rotation when single-arm"),
-        ),
         variants=[
             _v("single-arm standing cable chest press", "laterality", "unilateral, adds an anti-rotation demand"),
             _v("chest-focused isometric cable press", "tempo", "isometric hold at mid-range"),
@@ -333,10 +414,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_INFL, "the only lower-trap upward-rotation movement; low-fatigue scapular work beside heavy pressing"),
-        ratings=_ratings(
-            functional=("A", "lower-trap upward rotation and scapular control for overhead work"),
-            hypertrophy=("C", "light loads; the lower trap is a small target"),
-        ),
         variants=[
             _v("trap-3 raise", "laterality", "single-arm, bent-over"),
             _v("standing cable Y raise", "equipment", "cable, standing", hevy="28927A36"),
@@ -368,10 +445,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_INFL, "the only loadable protraction movement; a low-fatigue shoulder-health accessory beside heavy pressing"),
-        ratings=_ratings(
-            functional=("A", "trains scapular protraction/upward rotation the presses barely load"),
-            hypertrophy=("D", "serratus growth is not its aim"),
-        ),
         variants=[_v("supine dumbbell serratus punch", "position", "supine, dumbbell", level=0)],
     ),
     _add(
@@ -399,7 +472,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "internal-rotation strength is rarely limiting; use on an identified need"),
-        ratings=_ratings(functional=("C", "rotator-cuff balance work, only with a reason")),
     ),
     # §7 forearms / grip / wrist — extension, rotation, deviation, pinch, crush and finger extension were unserved.
     _add(
@@ -427,7 +499,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "rows, deadlifts and carries already load the forearm; direct extensor work is optional"),
-        ratings=_ratings(hypertrophy=("B", "isolated wrist extensors"), functional=("B", "balances flexor-dominant grip work")),
         variants=[
             _v("barbell reverse wrist curl", "equipment", "barbell, seated", hevy="9202CC23"),
             _v("wrist extensor eccentric lowering", "tempo", "eccentric-only, assisted up"),
@@ -458,7 +529,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="equipment_unconfirmed",
         influence=(_AVAIL, "optional forearm endurance work; the equipment is unconfirmed"),
-        ratings=_ratings(hypertrophy=("C", "forearm pump work, hard to load precisely"), functional=("B", "flexor and extensor endurance")),
     ),
     _add(
         "forearm_rotation_dumbbell",
@@ -469,11 +539,11 @@ ADDITIONS: list[dict[str, Any]] = [
         aliases=["dumbbell pronation", "dumbbell supination", "forearm rotation with a lever"],
         target=("forearms", ["biceps"], "upper"),
         function="forearm_rotation",
-        category="rehab_control",
-        attrs=("corrective", "not_applicable", "free_weight", _H, _js(_L, _L, _M, _M, _L)),
+        category="hypertrophy",
+        attrs=("hypertrophy", "mid", "free_weight", _H, _js(_L, _L, _M, _M, _L)),
         skill=_L,
         equipment=["dumbbell", "bench_flat"],
-        objectives=["functional"],
+        objectives=["hypertrophy", "functional"],
         lat="unilateral",
         progression=(["grip further from the loaded end (longer lever)"], ["12-20"]),
         demand=_L,
@@ -485,7 +555,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "rotation strength is rarely the limiter; use for an elbow/forearm need"),
-        ratings=_ratings(functional=("C", "pronator/supinator strength, specialist")),
         variants=[
             _v("dumbbell supination", "direction", "supination"),
             _v("hammer-lever pronation/supination", "equipment", "sledgehammer or lever bar"),
@@ -500,11 +569,11 @@ ADDITIONS: list[dict[str, Any]] = [
         aliases=["radial deviation", "ulnar deviation", "wrist deviation"],
         target=("forearms", [], "upper"),
         function="wrist_deviation",
-        category="rehab_control",
-        attrs=("corrective", "not_applicable", "free_weight", _H, _js(_L, _L, _M, _L, _L)),
+        category="hypertrophy",
+        attrs=("hypertrophy", "mid", "free_weight", _H, _js(_L, _L, _M, _L, _L)),
         skill=_L,
         equipment=["dumbbell"],
-        objectives=["functional"],
+        objectives=["hypertrophy", "functional"],
         lat="unilateral",
         progression=(["lever length"], ["12-20"]),
         demand=_L,
@@ -516,7 +585,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "specialist wrist work with no current need"),
-        ratings=_ratings(functional=("D", "narrow, specialist function")),
         variants=[_v("dumbbell ulnar deviation", "direction", "ulnar")],
     ),
     _add(
@@ -544,7 +612,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "pinch is the one grip mode no current movement trains; optional"),
-        ratings=_ratings(strength=("B", "direct thumb/pinch strength"), functional=("B", "pinch is a distinct grip mode")),
     ),
     _add(
         "hand_gripper_squeeze",
@@ -571,7 +638,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="equipment_unconfirmed",
         influence=(_AVAIL, "crush grip is already trained by heavy pulling and carries"),
-        ratings=_ratings(strength=("C", "crush grip only")),
     ),
     _add(
         "band_finger_extension",
@@ -582,11 +648,11 @@ ADDITIONS: list[dict[str, Any]] = [
         aliases=["finger extensor band", "rubber-band finger opening"],
         target=("forearms", [], "upper"),
         function="finger_extension",
-        category="rehab_control",
-        attrs=("corrective", "not_applicable", "band", _H, _js(_L, _L, _L, _L, _L)),
+        category="hypertrophy",
+        attrs=("hypertrophy", "mid", "band", _H, _js(_L, _L, _L, _L, _L)),
         skill=_L,
         equipment=["resistance_band"],
-        objectives=["functional"],
+        objectives=["hypertrophy", "functional"],
         lat="unilateral",
         progression=(["band thickness"], ["15-30"]),
         demand=_L,
@@ -598,7 +664,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "balancing work only with a grip-related need"),
-        ratings=_ratings(functional=("D", "rehab balance for heavy gripping")),
     ),
     # §8 quadriceps — eccentric single-leg knee control and knee-dominant isometrics were unserved.
     _add(
@@ -626,11 +691,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_INFL, "the only eccentric single-leg knee-control movement; low load, regressed by step height"),
-        ratings=_ratings(
-            functional=("A", "stairs/descents: eccentric single-leg control and frontal-plane knee control"),
-            strength=("C", "low absolute load"),
-            hypertrophy=("C", "bodyweight, limited overload"),
-        ),
         variants=[
             _v("controlled lateral step-down", "direction", "lateral (frontal plane)"),
             _v("step-down with hand support", "level", "rack-assisted", level=0),
@@ -661,7 +721,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="identified_need",
         influence=(_AVAIL, "a knee-tolerance tool, programmed when the knee asks for it"),
-        ratings=_ratings(functional=("B", "knee-dominant isometric strength with low shear"), strength=("C", "isometric, low load")),
         variants=[_v("split-squat isometric hold", "tempo", "isometric, split stance")],
     ),
     _add(
@@ -689,7 +748,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="later",
         gate="joint_tolerance",
         influence=(_AVAIL, "the leg extension already trains the same lengthened rectus femoris with less knee stress"),
-        ratings=_ratings(hypertrophy=("B", "lengthened rectus femoris, hard to load")),
         variants=[_v("assisted sissy squat", "level", "rack-assisted", level=0)],
     ),
     _add(
@@ -717,11 +775,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="later",
         gate="joint_tolerance",
         influence=(_AVAIL, "knee-resilience work best added once kneeling and body mass allow it"),
-        ratings=_ratings(
-            functional=("B", "lengthened eccentric quad strength"),
-            hypertrophy=("C", "bodyweight, limited load"),
-            mobility=("C", "rectus femoris length under load"),
-        ),
     ),
     # §10 glutes — hip abduction (glute med/min) had no loadable movement; hip-rotation control and band work missing.
     _add(
@@ -749,10 +802,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_INFL, "the one loadable glute med/min movement — lateral hip strength for walking and single-leg work"),
-        ratings=_ratings(
-            hypertrophy=("A", "stable, loadable to near failure for the glute med/min"),
-            functional=("B", "lateral hip strength; open-chain"),
-        ),
         variants=[
             _v("standing cable hip abduction", "equipment", "cable, standing (adds stance-leg control)", hevy="C469EA70"),
             _v("side-lying weighted hip abduction", "position", "side-lying, ankle weight or plate", hevy="DC59D143"),
@@ -761,11 +810,11 @@ ADDITIONS: list[dict[str, Any]] = [
     ),
     _add(
         "lateral_band_walks",
-        "Lateral Band Walks",
+        "Banded Lateral Steps",
         ("EC02979E", "builtin"),
         sec=10,
         pri="P3",
-        aliases=["lateral band walk", "band side steps"],
+        aliases=["lateral band walks", "band side steps"],
         target=("hip_abductors", ["glutes"], "lower"),
         function="hip_abduction_closed_chain",
         category="rehab_control",
@@ -784,10 +833,8 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "warm-up activation; the machine carries the loadable work"),
-        ratings=_ratings(
-            functional=("C", "closed-chain abduction, low load"), hypertrophy=("D", "too light to train near failure usefully")
-        ),
         variants=[_v("monster walk", "direction", "diagonal forward/back")],
+        template_note="logs under Hevy's Lateral Band Walks; titled without 'walk' so no title rule reads it as cardio",
     ),
     _add(
         "hip_airplane",
@@ -814,7 +861,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "hip rotation control is useful, not urgent"),
-        ratings=_ratings(functional=("B", "single-leg hip rotation and balance control"), mobility=("C", "active hip rotation range")),
     ),
     # §11 adductors — no adduction movement existed beyond one slide; the machine is the loadable core, Copenhagen the resilience line.
     _add(
@@ -842,10 +888,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_INFL, "the one loadable adductor movement; adductors are large and nearly unserved"),
-        ratings=_ratings(
-            hypertrophy=("A", "stable, loadable to near failure for the adductors"),
-            functional=("B", "adduction strength for lateral stability"),
-        ),
         variants=[
             _v("standing cable hip adduction", "equipment", "cable, standing", hevy="22578A94"),
             _v("side-lying adduction raise", "position", "side-lying, bottom leg", level=0),
@@ -876,10 +918,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "adductor resilience line; the machine carries the current adductor work"),
-        ratings=_ratings(
-            functional=("A", "adductor strength with anti-lateral-flexion; groin resilience"),
-            strength=("C", "bodyweight isometric"),
-        ),
         trunk="anti_lateral_flexion",
         variants=[
             _v("supine adductor ball squeeze", "level", "isometric squeeze, supine", level=0),
@@ -899,7 +937,7 @@ ADDITIONS: list[dict[str, Any]] = [
         target=("tibialis", [], "lower"),
         function="ankle_dorsiflexion_strength",
         category="rehab_control",
-        attrs=("corrective", "not_applicable", "bodyweight", _H, _js(_L, _L, _L, _L, _L)),
+        attrs=("hypertrophy", "shortened", "bodyweight", _H, _js(_L, _L, _L, _L, _L)),
         skill=_L,
         equipment=["bodyweight"],
         objectives=["functional", "hypertrophy"],
@@ -914,9 +952,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_INFL, "serves the charter's lower-leg prep, which prescribes tibialis work with no movement behind it"),
-        ratings=_ratings(
-            functional=("A", "dorsiflexor strength for walking volume and the shin"), hypertrophy=("C", "bodyweight, small muscle")
-        ),
         variants=[
             _v("tibialis machine raise", "equipment", "tibialis machine or banded"),
             _v("single-leg tibialis raise", "laterality", "unilateral"),
@@ -947,7 +982,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "ankle rehab work, only with an ankle need"),
-        ratings=_ratings(functional=("C", "ankle stabiliser strength")),
         variants=[_v("resisted eversion", "direction", "eversion")],
     ),
     _add(
@@ -975,7 +1009,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "foot-control drill without a current need"),
-        ratings=_ratings(functional=("C", "intrinsic foot control")),
         variants=[_v("toe yoga", "level", "independent big-toe / lesser-toe control")],
     ),
     # §13 abs / deep core — every trunk function already had a movement; the ADDs are distinct tools, not gap fills.
@@ -1004,7 +1037,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "loaded spinal flexion is already served by the cable and machine crunch"),
-        ratings=_ratings(hypertrophy=("C", "bodyweight flexion, progressable by bench angle")),
         trunk="loaded_flexion",
     ),
     _add(
@@ -1032,7 +1064,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="later",
         gate="bodyweight",
         influence=(_AVAIL, "anti-rotation and locomotion are served lower-cost by the Pallof press and carries"),
-        ratings=_ratings(functional=("B", "contralateral coordination under anti-rotation"), conditioning=("C", "short, intense bouts")),
         trunk="anti_rotation",
         variants=[_v("bear plank", "level", "static, knees hovering", level=0)],
     ),
@@ -1061,7 +1092,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "anti-lateral flexion is already served by the suitcase carry without the extra hinge"),
-        ratings=_ratings(functional=("A", "anti-lateral flexion under a real hinge load"), strength=("C", "load is grip/side-limited")),
         trunk="anti_lateral_flexion",
     ),
     _add(
@@ -1089,7 +1119,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "anti-extension is already served by the ab wheel and plank"),
-        ratings=_ratings(functional=("B", "anti-extension against a moving base")),
         trunk="anti_extension",
     ),
     _add(
@@ -1117,7 +1146,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "a back-sensitive trunk-endurance option; the dead bug serves the general case"),
-        ratings=_ratings(functional=("C", "low-load trunk-flexor endurance")),
         trunk="anti_extension",
     ),
     # §15 hip flexors — the dedicated category had no loadable standing movement.
@@ -1146,9 +1174,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "hip-flexor work is generally optional; walking and knee raises already load it"),
-        ratings=_ratings(
-            functional=("B", "standing hip-flexion strength for gait and stairs"), hypertrophy=("C", "small, optional target")
-        ),
         variants=[
             _v("banded hip-flexion march", "equipment", "band around the feet, alternating"),
             _v("seated resisted hip-flexion raise", "position", "seated, end-range above 90 degrees"),
@@ -1181,11 +1206,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "the farmer's and suitcase carries already cover loaded carrying"),
-        ratings=_ratings(
-            functional=("A", "anterior load: anti-extension and upright posture under load"),
-            conditioning=("C", "carry conditioning"),
-            strength=("C", "load limited by the rack position"),
-        ),
         trunk="loaded_stabilisation",
         variants=[
             _v("single kettlebell front-rack carry", "laterality", "one bell (adds anti-lateral flexion)"),
@@ -1219,7 +1239,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="equipment_unconfirmed",
         influence=(_AVAIL, "a strong low-impact option, but the home_gym stair machine is unconfirmed"),
-        ratings=_ratings(conditioning=("A", "high aerobic stimulus with no impact"), functional=("B", "stair capacity")),
         variants=[_v("stair machine (floors)", "equipment", "floors counter", hevy="4377A52B")],
         protocols=_ALL_PROTOCOLS,
     ),
@@ -1251,7 +1270,6 @@ ADDITIONS: list[dict[str, Any]] = [
             _AVAIL,
             "named in the brief's modality list; equipment state unconfirmed, so it informs the cardio model only once confirmed",
         ),
-        ratings=_ratings(conditioning=("A", "lowest-impact, lowest-balance aerobic option; easy to dose")),
         protocols=_ALL_PROTOCOLS,
     ),
     _add(
@@ -1279,7 +1297,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="equipment_unconfirmed",
         influence=(_AVAIL, "rowing and the air bike already serve upper-body-inclusive conditioning"),
-        ratings=_ratings(conditioning=("B", "upper-body-inclusive aerobic work, no impact")),
         protocols=_LOW_IMPACT_PROTOCOLS,
     ),
     _add(
@@ -1307,7 +1324,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="equipment_unconfirmed",
         influence=(_AVAIL, "pool access is not part of home_gym"),
-        ratings=_ratings(conditioning=("B", "non-weight-bearing aerobic work; skill sets the dose")),
         variants=[_v("deep-water running", "equipment", "flotation belt, deep end")],
         protocols=_LOW_IMPACT_PROTOCOLS,
     ),
@@ -1336,7 +1352,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="later",
         gate="joint_tolerance",
         influence=(_AVAIL, "while body mass is high, the body itself is the load; incline walking progresses walking first"),
-        ratings=_ratings(conditioning=("B", "raises walking intensity without running"), functional=("B", "loaded locomotion")),
         variants=[_v("weighted-vest walking", "equipment", "vest instead of a pack")],
         protocols=["easy_recovery_aerobic", "moderate_continuous", "progressive_endurance", "incline_resistance_progression"],
     ),
@@ -1365,7 +1380,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate=None,
         influence=(_AVAIL, "walking already covers this stimulus"),
-        ratings=_ratings(conditioning=("C", "low-impact aerobic work; adherence-dependent")),
         protocols=["easy_recovery_aerobic", "moderate_continuous", "structured_intervals"],
     ),
     _add(
@@ -1393,7 +1407,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="equipment_unconfirmed",
         influence=(_AVAIL, "a lower-limb-injury fallback; small aerobic stimulus otherwise"),
-        ratings=_ratings(conditioning=("C", "small muscle mass limits the aerobic stimulus")),
         protocols=["easy_recovery_aerobic", "moderate_continuous", "structured_intervals"],
     ),
     # §18 mobility — never in a muscle-growth ranking; programmed only for an identified limitation or purpose.
@@ -1422,7 +1435,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="identified_need",
         influence=(_AVAIL, "used when squat or step-down depth is ankle-limited"),
-        ratings=_ratings(mobility=("A", "active dorsiflexion range; also a simple measure")),
         variants=[_v("bent-knee loaded dorsiflexion", "load", "half-kneeling, dumbbell on the knee (soleus)")],
     ),
     _add(
@@ -1450,7 +1462,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="identified_need",
         influence=(_AVAIL, "warm-up or limitation tool; walking_hip_circles already exists"),
-        ratings=_ratings(mobility=("B", "active hip range under control")),
     ),
     _add(
         "shoulder_cars",
@@ -1477,7 +1488,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="identified_need",
         influence=(_AVAIL, "warm-up or limitation tool"),
-        ratings=_ratings(mobility=("B", "active shoulder range under control")),
         variants=[_v("scapular CARs", "range", "scapula only")],
     ),
     _add(
@@ -1505,7 +1515,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="identified_need",
         influence=(_AVAIL, "used when squat depth is adductor/hip limited"),
-        ratings=_ratings(mobility=("B", "adductor length with hip flexion")),
     ),
     _add(
         "half_kneeling_hip_flexor_stretch",
@@ -1532,7 +1541,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="now",
         gate="identified_need",
         influence=(_AVAIL, "used for an identified hip-extension limitation"),
-        ratings=_ratings(mobility=("B", "hip-extension range with a glute contraction")),
         variants=[_v("couch stretch", "position", "back knee against the wall (rectus femoris)")],
     ),
     _add(
@@ -1560,7 +1568,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "only for a front-rack or push-up wrist limitation"),
-        ratings=_ratings(mobility=("C", "wrist-extension range")),
     ),
     # §19 power / athletic — optional; never auto-programmed in the current phase; skill + impact gates apply.
     _add(
@@ -1588,7 +1595,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="later",
         gate="skill",
         influence=(_AVAIL, "power work is not auto-programmed in the current phase"),
-        ratings=_ratings(strength=("C", "rate of force, not load"), functional=("B", "upper-body power with low impact")),
         variants=[_v("seated explosive med-ball press", "level", "seated, back supported", level=0)],
     ),
     _add(
@@ -1616,7 +1622,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="later",
         gate="skill",
         influence=(_AVAIL, "power work is not auto-programmed in the current phase"),
-        ratings=_ratings(functional=("B", "hip-extension power with no landing"), strength=("C", "rate of force, not load")),
         variants=[_v("medicine ball overhead throw", "direction", "backward overhead")],
     ),
     _add(
@@ -1644,7 +1649,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="later",
         gate="impact",
         influence=(_AVAIL, "the first rung of landing work, behind the charter's plyometric gate"),
-        ratings=_ratings(functional=("B", "deceleration and landing control")),
         gates=["charter_plyometric"],
         variants=[
             _v("squat snap-down landing", "level", "no box: fast drop into a stuck landing", level=0),
@@ -1678,7 +1682,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "optional, symptom-led"),
-        ratings=_ratings(functional=("C", "deep neck-flexor control")),
         variants=[_v("lying neck curl", "level", "loaded neck flexion", hevy="22FEDCA4", level=2)],
     ),
     _add(
@@ -1706,7 +1709,6 @@ ADDITIONS: list[dict[str, Any]] = [
         phase="specialist",
         gate="identified_need",
         influence=(_AVAIL, "optional, symptom-led"),
-        ratings=_ratings(functional=("C", "neck isometric strength")),
         variants=[_v("controlled neck rotation mobility", "range", "slow active rotation, mobility")],
     ),
 ]
@@ -2599,8 +2601,33 @@ QUALITY_FINDINGS: list[tuple[str, list[str], str, str]] = [
     ),
     (
         "misclassified_pattern",
-        ["band_assisted_reverse_nordic", "cable_internal_rotation", "mcgill_curl_up", "lateral_band_walks"],
-        "the title-regex pattern table reads 'reverse nordic' as leg_curl, 'internal rotation' as core_flexion, 'curl-up' as curl and 'band walks' as cardio; exercise_library.movement_pattern needs those phrases",
+        ["band_assisted_reverse_nordic", "cable_internal_rotation", "mcgill_curl_up"],
+        "the title-regex pattern table reads 'reverse nordic' as leg_curl, 'internal rotation' as core_flexion and 'curl-up' as "
+        "curl (and any title with 'walk', e.g. Hevy's Lateral Band Walks, as cardio — this lane titled its addition Banded "
+        "Lateral Steps); exercise_library.movement_pattern needs those phrases",
+        "L1",
+    ),
+    (
+        "contract_gap",
+        [
+            "controlled_forward_step_down",
+            "spanish_squat",
+            "bear_crawl",
+            "suitcase_deadlift",
+            "knee_to_wall_dorsiflexion",
+            "plate_pinch_hold",
+        ],
+        "the evaluation layer re-derives `category` by title rule and drops the category an addition declares (it keeps an "
+        "authored objective_inputs map only): e.g. the step-down and Spanish squat read hypertrophy, the dorsiflexion drill "
+        "rehab_control; honouring an authored category on expansion entries would fix the labels",
+        "L1",
+    ),
+    (
+        "contract_gap",
+        ["chest_supported_y_raise_dumbbell", "cable_serratus_punch", "cable_internal_rotation", "tibialis_raise"],
+        "the functional rubric's qualities have no joint-specific capacity/control term, so scapular, serratus, cuff and "
+        "tibialis work can only rate on mobility (motor control) or hypertrophy — the brief's 'cuff/scapular work is a separate "
+        "function' has no objective of its own yet",
         "L1",
     ),
     (
@@ -2682,7 +2709,7 @@ def metadata_problems(additions: list[dict[str, Any]]) -> list[str]:
         if not (lv["regressions"] or lv["progressions"]):
             out.append(f"{k}: no regression or progression path")
         checks = (
-            (a.get("category"), CATEGORIES, "category"),
+            (p.get("category"), CATEGORIES, "category"),
             (p.get("priority"), PRIORITIES, "priority"),
             (p.get("phase_suitability"), PHASE_SUITABILITY, "phase_suitability"),
             (_get(a, "expansion_profile.programming.mode"), PROGRAMMING, "programming"),
@@ -2698,10 +2725,11 @@ def metadata_problems(additions: list[dict[str, Any]]) -> list[str]:
         gr = p["programming"]["gate_reason"]
         if (p["programming"]["mode"] == "readiness_gated") != (gr in READINESS_CONDITIONS):
             out.append(f"{k}: a readiness-gated movement names a gate reason (and only it does)")
-        if a.get("trunk_function") is not None and a["trunk_function"] not in TRUNK_FUNCTIONS:
-            out.append(f"{k}: trunk_function {a['trunk_function']!r}")
-        if set(p["ratings_proposed"]) != set(OBJECTIVES) or all(r["tier"] is None for r in p["ratings_proposed"].values()):
-            out.append(f"{k}: ratings_proposed must rate every objective (None = not applicable) and at least one")
+        if p.get("trunk_function") is not None and p["trunk_function"] not in TRUNK_FUNCTIONS:
+            out.append(f"{k}: trunk_function {p['trunk_function']!r}")
+        inp = a.get("objective_inputs") or {}
+        if set(inp) != set(INPUT_FIELDS) or inp.get("reviewed") is not True:
+            out.append(f"{k}: objective_inputs must author every input field and be marked reviewed")
         if any(x not in CARDIO_PROTOCOLS for x in a.get("cardio_protocols") or []):
             out.append(f"{k}: unknown cardio protocol")
         h = p["hevy"]
@@ -2780,7 +2808,19 @@ def _summary_lines() -> list[str]:
     return lines
 
 
-def render_doc() -> str:
+def _ratings_cell(entry: dict[str, Any] | None) -> str:
+    """The library's per-objective tiers for one movement, H/S/F/C/M (`—` = not applicable, `?` = not built yet)."""
+    if not entry or not isinstance(entry.get("ratings"), dict):
+        return "?"
+    return "/".join(str((entry["ratings"].get(o) or {}).get("tier") or "—") for o in OBJECTIVES)
+
+
+def _category_cell(profile: dict[str, Any], entry: dict[str, Any] | None) -> str:
+    built = (entry or {}).get("category")
+    return profile["category"] + (f" (library: {built})" if built and built != profile["category"] else "")
+
+
+def render_doc(library: dict[str, Any] | None = None) -> str:
     """docs/coaching/EXERCISE_LIBRARY_COVERAGE.md, from the data above — never hand-edited."""
     adds = {a["key"]: a for a in ADDITIONS}
     out = [
@@ -2802,8 +2842,9 @@ def render_doc() -> str:
         "logged; one without needs a custom template the owner approves first. Either way the selection engine also "
         "needs a movement-catalog entry before it can write the movement.",
         "",
-        "**Evidence.** No citation is invented: every rating below is a categorical, practitioner-consensus judgement "
-        "with its basis stated (`evidence_confidence: none_reviewed`).",
+        "**Evidence.** No citation is invented. Each addition's categorical inputs are practitioner-consensus judgements; "
+        "the library's per-objective rubric turns them into the tiers shown (no trial claimed; hypertrophy rows stay "
+        "`none_reviewed`).",
         "",
         "## Summary",
         "",
@@ -2819,16 +2860,21 @@ def render_doc() -> str:
         "",
         "## New canonical movements",
         "",
-        "| Key | Title | § | Priority | Category | Function | Hevy template | Phase | Programming | Influence (why) |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "Ratings are the library's own (L1's per-objective rubric over the inputs authored here); `—` = not applicable. "
+        "Category is the one declared here, then the library's derived label where it differs.",
+        "",
+        "| Key | Title | § | Priority | Category | Function | Ratings (H/S/F/C/M) | Hevy template | Phase | Programming | Influence (why) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
+    built = (library or _load(LIBRARY_PATH) or {}).get("movements") or {}
     for k, a in adds.items():
         p = a["expansion_profile"]
         h = p["hevy"]
         tmpl = f"`{h['template']}` ({h['kind']})" if h["template"] else "none: custom template needed"
         prog = p["programming"]["mode"] + (f" ({p['programming']['gate_reason']})" if p["programming"]["gate_reason"] else "")
         out.append(
-            f"| `{k}` | {a['title']} | {p['section'].lstrip('§')} | {p['priority']} | {a['category']} | {p['movement_function']} | {tmpl} | "
+            f"| `{k}` | {a['title']} | {p['section'].lstrip('§')} | {p['priority']} | {_category_cell(p, built.get(k))} | "
+            f"{p['movement_function']} | {_ratings_cell(built.get(k))} | {tmpl} | "
             f"{p['phase_suitability']} | {prog} | {p['influence']['verdict']}: {p['influence']['why']} |"
         )
     out += ["", "## Owner approval list: custom Hevy templates needed", ""]

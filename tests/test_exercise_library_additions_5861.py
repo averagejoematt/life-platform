@@ -126,10 +126,10 @@ def test_every_addition_carries_the_twenty_fields():
 _METADATA_PLANTS = (
     (lambda a: a["expansion_profile"].pop("laterality"), "missing unilateral/bilateral"),
     (lambda a: a["expansion_profile"].update(objectives=[]), "missing objectives served"),
-    (lambda a: a.update(category="cardio"), "category"),
+    (lambda a: a["expansion_profile"].update(category="cardio"), "category"),
     (lambda a: a["expansion_profile"]["levels"].update(regressions=[], progressions=[]), "no regression or progression"),
     (lambda a: a["expansion_profile"]["fatigue"].update(systemic="extreme"), "fatigue.systemic"),
-    (lambda a: a["expansion_profile"]["ratings_proposed"].pop("mobility"), "rate every objective"),
+    (lambda a: a["objective_inputs"].pop("limiter"), "objective_inputs must author every input"),
     (lambda a: a["expansion_profile"]["personal_fit"].append("unlisted_factor"), "fit factor"),
 )
 
@@ -156,9 +156,10 @@ def test_influence_is_reserved_for_p0_p1_movements_suitable_now():
 def test_power_and_mobility_additions_are_never_auto_programmed():
     """Amendment 15 §18/§19: mobility only on an identified need; power work behind readiness gates, not this phase."""
     for a in adds.ADDITIONS:
-        if a["category"] in ("mobility", "athletic"):
+        cat = a["expansion_profile"]["category"]
+        if cat in ("mobility", "athletic"):
             assert a["expansion_profile"]["programming"]["mode"] == "readiness_gated", a["key"]
-        if a["category"] == "athletic":
+        if cat == "athletic":
             assert a["expansion_profile"]["phase_suitability"] != "now", a["key"]
 
 
@@ -267,3 +268,38 @@ def test_coverage_matrix_names_only_real_movements():
     assert bad == []
     assert all(k in keys for _, ks, _, _ in adds.QUALITY_FINDINGS for k in ks)
     assert set(adds.CARDIO_PROTOCOLS_BY_MODALITY) <= keys
+
+
+# ── L1's per-objective contract (objective_inputs authored here; the library's rubric rates them) ───────────────
+
+
+def test_authored_objective_inputs_use_l1s_vocabulary():
+    from training import quality_rubric as qr
+
+    bad = []
+    for a in adds.ADDITIONS:
+        inp = a["objective_inputs"]
+        if set(inp) != set(qr.OBJECTIVE_INPUTS):
+            bad.append((a["key"], "fields"))
+            continue
+        for f, allowed in qr.OBJECTIVE_INPUTS.items():
+            v = inp[f]
+            if f == "functional":
+                bad += [(a["key"], f, x) for x in v if x not in qr.FUNCTIONAL_QUALITIES]
+            elif f == "conditioning":
+                if v is not None and (set(v) != set(qr.CONDITIONING_KEYS) or any(x not in qr.LEVELS for x in v.values())):
+                    bad.append((a["key"], f, v))
+            elif v not in allowed:
+                bad.append((a["key"], f, v))
+    assert bad == []
+
+
+def test_every_p0_p1_addition_is_rated_on_some_objective_by_the_library():
+    """The library's own ratings (L1's rubric) reach every high-priority addition; an all-null P0/P1 is red."""
+    unrated = [
+        a["key"]
+        for a in adds.ADDITIONS
+        if a["expansion_profile"]["priority"] in ("P0", "P1") and not any((r or {}).get("tier") for r in MV[a["key"]]["ratings"].values())
+    ]
+    assert unrated == []
+    assert all(MV[a["key"]]["objective_inputs"]["reviewed"] is True for a in adds.ADDITIONS)

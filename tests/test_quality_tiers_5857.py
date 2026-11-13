@@ -75,7 +75,9 @@ def _top_band(lib: dict, targets: tuple[str, ...]) -> list[str]:
 
 def test_every_tier_is_the_rubric_plus_at_most_one_recorded_band():
     assert _derivation_offenders(LIB) == []
-    assert {r["tier"] for e in MV.values() for r in e["hypertrophy"]} <= set(qr.QUALITY_TIERS)
+    assert {r["tier"] for e in MV.values() for r in e["hypertrophy"]} <= set(qr.QUALITY_TIERS) | {None}
+    # #5861: None only on a row the hypertrophy objective does not apply to, and it says why
+    assert all(r.get("applicable") is False and r["basis"] for e in MV.values() for r in e["hypertrophy"] if r["tier"] is None)
     moved = [(k, r) for k, e in MV.items() for r in e["hypertrophy"] if r["tier"] != r["rubric_tier"]]
     assert all(r.get("evidence_adjustment") for _k, r in moved), "a row off its rubric tier carries its recorded adjustment"
     assert all(abs(qr.QUALITY_TIERS.index(r["tier"]) - qr.QUALITY_TIERS.index(r["rubric_tier"])) == 1 for _k, r in moved)
@@ -218,7 +220,7 @@ def test_every_s_and_a_row_has_rated_joints_and_the_board_anchors_hold():
         k
         for k, e in MV.items()
         if e["family"] not in SELECTABLE_EXCLUDED
-        and any(r["tier"] in "SA" for r in e["hypertrophy"])
+        and any(r["tier"] in ("S", "A") for r in e["hypertrophy"])
         and "unknown" in e["joint_stress"].values()
     ]
     assert unrated == []
