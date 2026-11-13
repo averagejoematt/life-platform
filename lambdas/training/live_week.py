@@ -174,10 +174,11 @@ def kb_seed(
         work = [s for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup"]
         if b.movement_key != kb_entry.ENTRY or not work or any(getattr(s, "weight_kg", None) for s in work):
             continue
-        custom = str(_settings().get("kb_deadlift_template_id") or "").upper() or None  # FIX3: his own KB template first
-        bell = (previous_load(history_index, custom, target_date) if custom else None) or previous_load(
-            history_index, kb_entry.ENTRY_TEMPLATE_ID, target_date
-        )
+        custom = str(_settings().get("kb_deadlift_template_id") or "").strip() or None  # FIX3: his own KB template first
+        # #5861 FIX6: a custom Hevy template id is a lower-case UUID and the history index keeps the id as logged — read it as
+        # given (and upper-cased, for a built-in-style id), never only upper-cased
+        mine = [previous_load(history_index, t, target_date) for t in dict.fromkeys((custom, (custom or "").upper())) if t]
+        bell = next((b for b in mine if b), None) or previous_load(history_index, kb_entry.ENTRY_TEMPLATE_ID, target_date)
         bell = bell or previous_load(history_index, swing, target_date)
         if not bell or not bell.get("lb"):
             continue

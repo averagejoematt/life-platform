@@ -171,6 +171,8 @@ _NUMBER_ALLOWED_PATHS = (
     re.compile(r"^gates\.[^.]+\.standard\.[a-z_]+$"),
     re.compile(r"^quality_rubric\."),  # #5857: the public rubric's weights and bands
     re.compile(r"^movements\.[^.]+\.hypertrophy\[\d+\]\.(rubric_score|evidence_adjustment\.bands)$"),
+    # #5861 FIX6: two owner-ruled programming settings (a set count, an advisory %-of-bodyweight reference) — no personal value
+    re.compile(r"^programming_settings\.(press_sets|rate_ceiling_pct_bw)$"),
 )
 _UNIT_NUMBER_RE = re.compile(r"\b\d{2,3}(?:\.\d)?\s*(?:lb|lbs|pounds|kg|kilos?)\b", re.I)
 

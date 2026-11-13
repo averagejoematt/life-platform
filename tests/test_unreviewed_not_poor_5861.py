@@ -186,13 +186,17 @@ def test_no_untested_form_outranks_the_trial_backed_movement():
 
 
 def test_control_without_the_ordering_the_machine_outranks_the_trial_again():
+    # #5861 FIX6 (ruling 17): the barbell hip thrust is S now, so the control holds the TRIAL-BACKED form at A to see the
+    # ordering bite — the untested machine form must never sit above it
     e = copy.deepcopy(MV["hip_thrust_machine"])
     row = {k: v for k, v in e["hypertrophy"][0].items() if k != "evidence_ceiling"}
     assert qr.quality_tier(e, row) == "S"  # the point-sum artefact the red team named
     bad = copy.deepcopy(MV)
+    bad["hip_thrust_barbell"]["hypertrophy"][0]["tier"] = "A"
     bad["hip_thrust_machine"]["hypertrophy"][0]["tier"] = "S"
     assert _ordering_offenders(bad)
-    movements = copy.deepcopy(MV)  # and the builder pass re-derives it under the ceiling
+    movements = copy.deepcopy(MV)  # and the builder pass re-derives it under the (A) ceiling
+    movements["hip_thrust_barbell"]["hypertrophy"][0]["tier"] = "A"
     movements["hip_thrust_machine"]["hypertrophy"] = [row]
     reviews.apply_evidence_ordering(movements)
     assert movements["hip_thrust_machine"]["hypertrophy"][0]["tier"] == "A"
@@ -247,8 +251,8 @@ def test_face_pull_and_the_cuff_class_are_joint_capacity_not_mobility():
 
 # ── 6. the programming lane's library-carried settings ──────────────────────────────────────────────────────────────────
 WANT_SETTINGS = {
-    "session_cap_includes_cardio": False,
-    "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
+    "session_cap_includes_cardio": True,  # #5861 FIX6: owner ruling 1 (2026-11-13)
+    "symptom_line": "",  # #5861 FIX6: owner ruling 10 — no symptom warning line
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
 }
@@ -258,7 +262,8 @@ def _settings_offenders(lib: dict, defaults: dict) -> list[str]:
     have = lib.get("programming_settings")
     if not isinstance(have, dict):
         return ["no programming_settings block"]
-    out = [f"{k}: {have.get(k)!r} != {v!r}" for k, v in WANT_SETTINGS.items() if have.get(k) != v or defaults.get(k) != v]
+    want = {**defaults, **builder.OWNER_RULED_SETTINGS} if defaults is builder.PROGRAMMING_SETTINGS_DEFAULTS else defaults
+    out = [f"{k}: {have.get(k)!r} != {v!r}" for k, v in WANT_SETTINGS.items() if have.get(k) != v or want.get(k) != v]
     out += [f"{k}: live_program default {v!r} differs" for k, v in live_program.SETTINGS_DEFAULTS.items() if have.get(k) != v]
     return out
 

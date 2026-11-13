@@ -170,42 +170,46 @@ def test_no_emitted_prescription_carries_a_heart_rate_target():
     assert load["hr_used"] is False and not _hr_mentions(load)
 
 
-# ── steps first ────────────────────────────────────────────────────────────────────────────────────────────
-def test_steps_cover_the_volume_and_nothing_is_added_without_a_purpose():
+# ── recorded activity first; steps reported, never credited (#5861 FIX6, owner ruling 12) ──────────────────────────────────
+def test_steps_alone_cover_nothing_and_nothing_is_added_without_a_purpose():
     plan = cm.aerobic_plan(HIGH_WALKER)
-    assert plan["volume_covered"] and plan["walking"]["moderate_min_per_wk"] >= cm.WEEKLY_MODERATE_MIN[0]
-    assert plan["additions"] == []
+    assert not plan["volume_covered"] and plan["walking"]["moderate_min_per_wk"] == 0  # 14k steps: intensity unknown
+    assert plan["walking"]["source"] == "intensity_unknown" and plan["walking"]["steps_per_day"] > 0  # still reported
+    assert [a["what"] for a in plan["additions"]] == ["walking"]  # recorded brisk walking first, never structured cardio
     assert any("fill a slot" in d for d in plan["declined"])
+    covered = cm.aerobic_plan(HIGH_WALKER, walk_minutes_by_day={d: 30 for d in HIGH_WALKER})  # recorded, with intensity
+    assert covered["volume_covered"] and covered["additions"] == []
 
 
 def test_a_low_step_week_adds_walking_first_never_structured_cardio_for_volume():
     plan = cm.aerobic_plan(LOW_WALKER)
     assert not plan["volume_covered"]
     assert plan["additions"] == [
-        {"what": "walking", "purpose": "weekly_aerobic_volume", "why": "raise daily steps before any added cardio"}
+        {"what": "walking", "purpose": "weekly_aerobic_volume", "why": "more recorded brisk walking before any added cardio"}
     ]
 
 
 def test_recorded_walk_minutes_replace_the_step_estimate():
     plan = cm.aerobic_plan(LOW_WALKER, walk_minutes_by_day={d: 40 for d in LOW_WALKER})
-    assert plan["walking"]["source"] == "walk_minutes" and plan["walking"]["moderate_min_per_wk"] == 280 and plan["volume_covered"]
+    assert plan["walking"]["source"] == "recorded_minutes" and plan["walking"]["moderate_min_per_wk"] == 280 and plan["volume_covered"]
 
 
 def test_structured_cardio_is_added_only_for_a_named_purpose_and_inside_the_menus_weekly_count():
     plan = cm.aerobic_plan(HIGH_WALKER, purposes=["intensity_domain"])
-    assert [a["protocol"] for a in plan["additions"]] == ["tempo_threshold"]
+    assert [a["protocol"] for a in plan["additions"] if a["what"] == "structured_cardio"] == ["tempo_threshold"]
     goal = cm.aerobic_plan(HIGH_WALKER, purposes=["conditioning_goal"])
     hard = [a for a in goal["additions"] if a["what"] == "structured_cardio"]
     assert len(hard) <= cardio_menu.conditioning_per_wk()
     full = cm.aerobic_plan(HIGH_WALKER, recent_protocols=["tempo_threshold", "structured_intervals"], purposes=["conditioning_goal"])
-    assert full["additions"] == []
+    assert [a for a in full["additions"] if a["what"] == "structured_cardio"] == []
     with pytest.raises(ValueError):
         cm.aerobic_plan(HIGH_WALKER, purposes=["fill_the_slot"])
 
 
 def test_poor_recovery_adds_no_hard_cardio():
     plan = cm.aerobic_plan(HIGH_WALKER, purposes=["conditioning_goal"], recovery="poor")
-    assert plan["additions"] == [] and all("recovery is poor" in d for d in plan["declined"])
+    assert [a for a in plan["additions"] if a["what"] == "structured_cardio"] == []
+    assert all("recovery is poor" in d for d in plan["declined"])
 
 
 # ── protocols progress by the stated rule ─────────────────────────────────────────────────────────────────
@@ -326,5 +330,5 @@ def test_cardio_load_weights_leg_cost_and_never_guesses_an_unlogged_effort():
     assert unknown["unknown_effort_minutes"] == 10 and unknown["session_rpe_au"] == 0 and unknown["impact_minutes"] == 10
     banded = cm.cardio_load([{"movement_id": "cycling", "minutes": 20, "protocol": "structured_intervals"}])
     assert banded["by_session"][0]["rpe_source"] == "protocol_band" and banded["hard_minutes"] == 20
-    walked = cm.cardio_load([], steps_by_day=HIGH_WALKER)
-    assert walked["walking"]["walking_au"] > 0 and walked["minutes"] == 0
+    walked = cm.cardio_load([], steps_by_day=HIGH_WALKER)  # #5861 FIX6: steps reported apart, never an aerobic credit
+    assert walked["walking"]["steps_per_day"] > 0 and walked["walking"]["moderate_min_per_wk"] == 0 and walked["minutes"] == 0

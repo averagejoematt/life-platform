@@ -198,8 +198,9 @@ def test_a_single_leg_lever_stack_is_not_s_the_kickbacks_are_a():
     e = copy.deepcopy(MV["glute_kickback_machine"])  # control: with a high ceiling it reaches S again
     e["objective_inputs"]["ceiling"] = "high"
     assert qr.quality_tier(e, e["hypertrophy"][0]) == "S"
-    # FIX2-DATA: the machine hip thrust ties the trial-backed barbell hip thrust (evidence ordering), it no longer outranks it
-    assert _tier(MV["hip_thrust_machine"], "glutes") == _tier(MV["hip_thrust_barbell"], "glutes") == "A"
+    # FIX2-DATA: the machine hip thrust ties the trial-backed barbell hip thrust (evidence ordering), it no longer outranks it.
+    # FIX6 (owner ruling 17, the glute S standard): both now meet every S criterion — the tie holds at S
+    assert _tier(MV["hip_thrust_machine"], "glutes") == _tier(MV["hip_thrust_barbell"], "glutes") == "S"
 
 
 def test_joint_capacity_work_is_never_functional_s():

@@ -384,6 +384,8 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     for e in rx["exposures"]:
         d = plan_["deltas"].get((role, str(e.get("slot"))), 0)
         sets = e.get("sets") or []
+        if d > 0 and _muscle(e, ctx) in (ctx.get("stimulus_hold") or set()):
+            d = 0  # #5861 FIX6 (ruling 9): a progressing priority muscle at MEV takes no extra sets (`live_rulings.stimulus_gate`)
         if not d or not sets:
             continue
         was = len(sets)

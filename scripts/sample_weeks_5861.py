@@ -485,7 +485,8 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
     out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
     from training import cardio_model
 
-    out["steps_credit"] = cardio_model._walking_dose(steps_by_day(p))  # #5861 FIX6 (ruling 12): steps reported, never credited
+    recorded = (p.get("aerobic_record") or {}).get("minutes_by_day") or None  # #5861 FIX6 (ruling 12): recorded minutes only
+    out["steps_credit"] = cardio_model._walking_dose(steps_by_day(p), recorded)  # steps reported, never credited
     return out | ({"short_week": short_line} if short_line else {})
 
 

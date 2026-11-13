@@ -243,9 +243,10 @@ def advisory_ceiling(
     strength_regressing: Optional[bool] = None,
 ) -> dict[str, Any]:
     """The ADVISORY upper planning reference (ruling 11): `pct_bw` of the current 7-day mean weight, less SIGNAL_STEP_PCT per
-    slow signal (floor CEILING_FLOOR_PCT); the observed weekly rates against it; and the single-fast-week guard — muscle-loss
-    RISK is named only when the rate sat over the ceiling for SUSTAINED_WEEKS of the last RATE_WEEKS AND the strength signal
-    is slow. Never a kcal number, never applied."""
+    slow signal (floor CEILING_FLOOR_PCT) — the forward planning ceiling; the observed weekly rates against the BASE reference
+    (`pct_bw`: past weeks are never judged by today's signals); and the single-fast-week guard — muscle-loss RISK is named
+    only when the rate sat over the reference for SUSTAINED_WEEKS of the last RATE_WEEKS AND the strength signal is slow.
+    Never a kcal number, never applied."""
     rates = weekly_rates(weights_by_day)
     strength = _strength(anchor_e1rm_change_pct)
     if anchor_e1rm_change_pct is None and strength_regressing is not None:  # the draft's read: the fatigue model's anchor trends
@@ -256,7 +257,7 @@ def advisory_ceiling(
     latest = [float(v) for _k, v in sorted((weights_by_day or {}).items())[-7:] if v is not None]
     current = rates[0]["mean_lb"] if rates else (sum(latest) / len(latest) if latest else None)
     ceiling = round(current * pct / 100, 2) if current else None
-    over = [r for r in rates if ceiling is not None and r["pct_bw"] > pct]
+    over = [r for r in rates if r["pct_bw"] > float(pct_bw)]  # the PAST weeks against the base reference, never today's signals
     strength_slow = "strength" in slow
     if not rates:
         verdict = "too few weigh-ins for a weekly rate"
@@ -264,8 +265,10 @@ def advisory_ceiling(
         verdict = f"over the ceiling {len(over)} of {len(rates)} weeks AND strength sliding: muscle-loss risk — slow the deficit (owner)"
     elif len(over) >= SUSTAINED_WEEKS:
         verdict = f"over the ceiling {len(over)} of {len(rates)} weeks, strength holding: watch, not a muscle-loss call"
-    elif rates[0]["pct_bw"] > pct:
+    elif rates[0]["pct_bw"] > float(pct_bw):
         verdict = "one fast week: not evidence of muscle loss (water, glycogen, scale noise) until the trend and strength agree"
+    elif rates[0]["pct_bw"] > pct:
+        verdict = f"inside the {float(pct_bw):g} %BW reference; today's slow signals put the planning ceiling under last week's rate"
     else:
         verdict = "inside the ceiling"
     line = (

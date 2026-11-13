@@ -320,8 +320,8 @@ ANOMALIES = {  # key: (hypertrophy, strength, functional, conditioning, mobility
     "treadmill": (None, None, None, "A", None),  # #5861: the public conditioning tier caps at A (N=1 S is private)
     "walking": (None, None, None, "C", None),  # lane L4's cardio model owns the rating: hard to dose and progress
     "rowing_machine": (None, None, None, "A", None),
-    "hip_thrust_machine": ("A", None, None, None, None),  # FIX2-DATA: evidence ordering, ties the trial-backed barbell form
-    "hip_thrust_barbell": ("A", None, None, None, None),
+    "hip_thrust_machine": ("S", None, None, None, None),  # FIX2-DATA: evidence ordering, ties the trial-backed barbell form
+    "hip_thrust_barbell": ("S", None, None, None, None),  # FIX6 (owner ruling 17): the glute S standard — every S criterion met
     "squat_barbell": ("A", "S", "B", None, None),
     "rear_delt_reverse_fly_machine": ("S", None, None, None, None),
     "rear_delt_reverse_fly_cable": ("A", None, None, None, None),

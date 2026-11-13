@@ -662,7 +662,8 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
 
     lines = live_shape.add_slots(rx, ctx)  # the quadriceps slot, BEFORE the pain rule so a knee flag reaches it
     gate = live_rulings.stimulus_gate(rx, ctx, trends)  # ruling 9: added only when stimulus AND performance ask for it
-    lines = [ln for ln in lines if not (gate and gate[0].startswith("priority (live): no ") and "QUAD_SLOT" in ln)] + gate
+    held = "quadriceps" in (ctx.get("stimulus_hold") or set())
+    lines = [ln for ln in lines if not (held and "QUAD_SLOT" in ln)] + gate
     lines += lb.place_kb(rx, ctx, workouts)  # FIX4: placed first, so a pain flag reaches the slot where it lands
     from training import live_rules  # #5861 FIX5
 

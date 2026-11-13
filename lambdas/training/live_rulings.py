@@ -84,7 +84,7 @@ PRIORITY_ADD: dict[str, dict[str, Any]] = {
     },
 }
 
-ANCHOR_OF = {"quadriceps": ("squat",)}
+ANCHOR_OF = {"quadriceps": ("squat",), "chest": ("bench",)}
 """Priority muscle -> the anchor patterns whose trend is its performance read."""
 
 
@@ -109,8 +109,17 @@ def lead_lift(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     second_band. Returns the rationale lines."""
     if rx.get("session_role") != "lower_heavy" or _settings(ctx.get("lib")).get("lead_lift_rule") != "alternate_weekly":
         return []
-    anchors = {e.get("pattern"): e for e in rx["exposures"] if e.get("kind") == "anchor" and e.get("pattern") in ("squat", "hinge")}
-    if len(anchors) < 2:
+    from training import live_balance
+
+    idx, movs = ctx.get("idx") or {}, (ctx.get("lib") or {}).get("movements") or {}
+    anchors = {
+        e.get("pattern"): e
+        for e in rx["exposures"]
+        if e.get("kind") == "anchor"
+        and e.get("pattern") in ("squat", "hinge")
+        and live_balance.spine_loading(movs.get((idx.get("to_lib") or {}).get(str(e.get("movement_key"))) or ""))
+    }
+    if len(anchors) < 2:  # a swapped-out deadlift (a hip thrust under discomfort) is not a second maximal lift
         return []
     lead = lead_of(str(ctx.get("target_date") or ""))
     second = anchors["hinge" if lead == "squat" else "squat"]
@@ -129,28 +138,57 @@ def lead_lift(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
 
 # ── 2. priority by stimulus and performance ──────────────────────────────────
 def stimulus_gate(rx: dict[str, Any], ctx: dict[str, Any], trends: dict[str, str]) -> list[str]:
-    """IN PLACE: an added priority slot (`live_added == "quad_slot"`) leaves when the week already holds its muscle at or over
-    MEV AND the muscle's anchor is progressing (`PRIORITY_ADD`). Returns the rationale lines."""
-    if _settings(ctx.get("lib")).get("priority_add_rule") != "stimulus_and_performance":
+    """IN PLACE: each priority muscle (`priority_muscles`) the week already holds at or over MEV whose anchor is PROGRESSING
+    (`PRIORITY_ADD`) is HELD — its added isolation slot (the quadriceps slot) leaves the session and the allocation's extra
+    sets for it are not applied (`ctx["stimulus_hold"]`, read by `live_balance.allocate`). Under MEV, or with a stalled,
+    regressing or unread anchor, the allocation stands (the low-fatigue slot first). Returns the rationale lines."""
+    s = _settings(ctx.get("lib"))
+    if s.get("priority_add_rule") != "stimulus_and_performance":
         return []
-    added = [e for e in rx["exposures"] if e.get("live_added") == "quad_slot"]
-    if not added:
-        return []
-    from training import block_model
+    from training import block_model, live_balance as lb
 
-    plan_ = ctx.get("allocation") or {}
-    mev = float(((block_model.load_landmarks() or {}).get("quadriceps") or {}).get("MEV") or 0)
-    before = float((plan_.get("before") or {}).get("quadriceps") or 0)
-    read = anchor_trends(ctx, trends, "quadriceps")
-    progressing = bool(read) and all(t == PRIORITY_ADD["progressing"]["value"] for t in read.values())
-    if before < mev or not progressing:
-        why = "under MEV" if before < mev else f"its anchor reads {', '.join(sorted(set(read.values()))) or 'unread'}"
-        return [f"priority (live): the quadriceps slot stays — {why} (priority_add_rule=stimulus_and_performance)"]
-    rx["exposures"] = [e for e in rx["exposures"] if e not in added]
-    return [
-        f"priority (live): no quadriceps slot — the week holds {before:g} sets (MEV {mev:g}) and {', '.join(sorted(read))} is "
-        "progressing: the stimulus works, more volume is not the goal (PRIORITY_ADD, heuristic; priority_add_rule=stimulus_and_performance)"
-    ]
+    plan_ = ctx.get("allocation") or lb.allocation_plan(ctx["catalog"], ctx["lib"], lb._skipped(ctx))
+    ctx["allocation"] = plan_
+    marks = block_model.load_landmarks() or {}
+    hold: set[str] = set()
+    lines = []
+    for m in [str(x) for x in s.get("priority_muscles") or [] if str(x) in ANCHOR_OF]:
+        mev = float((marks.get(m) or {}).get("MEV") or 0)
+        before = float((plan_.get("before") or {}).get(m) or 0)
+        added = after_add(plan_, m) > before
+        read = anchor_trends(ctx, trends, m)
+        progressing = bool(read) and all(t == PRIORITY_ADD["progressing"]["value"] for t in read.values())
+        if not added or before < mev or not progressing:
+            continue
+        hold.add(m)
+        if not _adds_here(plan_, m, str(rx.get("session_role") or ""), ctx):
+            continue  # said once, on the session that would have taken the sets
+        verb = "is" if len(read) == 1 else "are"
+        lines.append(
+            f"priority (live): {m} held at {before:g} sets (MEV {mev:g}) — {' and '.join(sorted(read))} {verb} progressing: the "
+            "stimulus works, no sets or slot added (PRIORITY_ADD, heuristic; priority_add_rule=stimulus_and_performance)"
+        )
+    ctx["stimulus_hold"] = hold
+    if "quadriceps" in hold:
+        rx["exposures"] = [e for e in rx["exposures"] if e.get("live_added") != "quad_slot"]
+    return lines
+
+
+def _adds_here(plan_: dict[str, Any], muscle: str, role: str, ctx: dict[str, Any]) -> bool:
+    """Whether the week's allocation gives `muscle` sets (or its added slot) in this session's role."""
+    from training import live_week
+
+    if any(a["role"] == role and a["muscle"] == muscle for a in plan_.get("adds") or []):
+        return True
+    return any(
+        r == role and d > 0 and live_week.landmark_muscle(slot, ctx["catalog"], ctx["lib"]) == muscle
+        for (r, slot), d in (plan_.get("deltas") or {}).items()
+    )
+
+
+def after_add(plan_: dict[str, Any], muscle: str) -> float:
+    """The muscle's planned weekly sets after the allocation (its added slot included)."""
+    return float((plan_.get("after") or {}).get(muscle) or 0)
 
 
 def anchor_trends(ctx: dict[str, Any], trends: dict[str, str], muscle: str) -> dict[str, str]:

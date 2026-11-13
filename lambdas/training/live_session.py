@@ -286,7 +286,10 @@ def for_live_draft(
             x["live_reduced"] = n - len(x["sets"])
     from training import live_shape  # #5861 FIX4: the kettlebell slot under strain (kb_slot_under_strain)
 
-    lines += live_shape.kb_under_strain(out)
+    strained = live_shape.kb_under_strain(out)
+    if strained:  # #5861 FIX6: the slot dropped under strain (ruling 7) — its plan line "added ... host this week" goes with it
+        lines = [ln for ln in lines if not (ln.startswith("added (live)") and "kettlebell slot" in ln)]
+    lines += strained
     waits = live_rules.no_added_work(out)  # FIX5: nothing ADDED on a bad day — and the plan's "added" line for it goes
     gone = [str((catalog_movements or {}).get(k, {}).get("title") or k) for k in live_rules.waited(waits)]
     lines = [ln for ln in lines if not (ln.startswith("added (live)") and any(f": {t}" in ln for t in gone))] + waits

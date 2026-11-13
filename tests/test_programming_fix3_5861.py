@@ -146,7 +146,7 @@ NODL = {(lrules, "deadlifts"): lambda workouts, ctx: False}
 
 
 def test_the_kettlebell_slot_moves_off_a_stacked_session_by_setting(weeks):
-    a = _week("a_large_deficit_experienced", NODL)["week"]
+    a = _week("a_large_deficit_experienced", NODL, {"session_cap_includes_cardio": False})["week"]  # FIX6: the default-cap placement
     where = {s["role"]: {x["key"] for x in s["lifts"]} for s in a["sessions"]}
     assert "kettlebell_deadlift" in where["shoulders_arms"] and "kettlebell_deadlift" not in where["lower_volume"]
     shared = _week("a_large_deficit_experienced", NODL, {"session_cap_includes_cardio": True})["week"]  # S+A keeps the cardio
@@ -219,7 +219,8 @@ def test_one_s_per_canonical_family_per_objective():
     assert quota_violations(LIB0) == []
     # before -> after (FIX3): hypertrophy 49 -> 34, strength 10 -> 10, functional 10 -> 9 (exact duplicates share one rating)
     # FIX4 -3: the landmine presses and the trap pulldown read a moderate load ceiling (fourth red team: generous S)
-    assert s_counts(LIB0) == {"hypertrophy": 30, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}
+    # FIX6 +2: owner ruling 17 (the glute S standard) — the barbell and machine hip thrusts meet every S criterion
+    assert s_counts(LIB0) == {"hypertrophy": 32, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}
     pull = LIB0["movements"]["lat_pulldown_close_grip_cable"]
     assert pull["ratings"]["hypertrophy"]["tier"] == "A" and any("S quota" in b for b in pull["ratings"]["hypertrophy"]["basis"])
     assert LIB0["movements"]["lat_pulldown_cable"]["ratings"]["hypertrophy"]["tier"] == "S"  # the family's one S
@@ -303,21 +304,23 @@ def test_an_adherence_dip_changes_the_week_fewer_shorter_sessions_anchored():
     )
 
 
-# ── 8. the steps credit ──────────────────────────────────────────────────────
-def test_the_steps_credit_is_conservative_and_cadence_minutes_count_first():
+# ── 8. the steps credit (#5861 FIX6, owner ruling 12: REMOVED — steps are reported, never credited) ──────────────────────
+def test_steps_earn_no_credit_and_cadence_minutes_count_first():
     days = sw.steps_by_day(PROFILES["a_large_deficit_experienced"])  # a 14k-step walker
     after = cm._walking_dose(days)
-    assert after["moderate_min_per_wk"] == 158 and after["source"] == "steps_heuristic" and "heuristic" in after["basis"][0]
-    with patch.object(cm, "STEPS_CREDIT_SHARE", 1.0):  # control: the old credit — every step over 5,000 at 100 a minute
-        assert cm._walking_dose(days)["moderate_min_per_wk"] == 630
+    assert after["moderate_min_per_wk"] == 0 and after["source"] == "intensity_unknown" and after["steps_per_day"] == 14000
+    assert not hasattr(cm, "STEPS_CREDIT_SHARE")  # the rejected 25 %-over-5k formula is gone, not parked
     cad = cm._walking_dose(days, cadence_minutes_by_day={d: 12 for d in days})  # minutes AT a qualifying cadence, where read
     assert cad["moderate_min_per_wk"] == 84 and cad["source"] == "cadence_minutes"
-    assert not cm.aerobic_plan({d: 10000 for d in days})["volume_covered"]  # 10k a day no longer 'covers' the week by itself
+    assert not cm.aerobic_plan({d: 30000 for d in days})["volume_covered"]  # no step count 'covers' the week by itself
 
 
 def _walker_week(steps: int, settings: dict | None = None, patches: dict | None = None) -> dict:
-    """Profile (a) with a different daily step count — a 10k walker's steps no longer cover the weekly floor."""
-    prof = PROFILES["a_large_deficit_experienced"] | {"steps_per_day": steps}
+    """Profile (a) with a different daily step count and ~88 recorded moderate walking minutes a week (#5861 FIX6: the credit
+    is recorded minutes with intensity evidence; steps alone earn none) — the walking no longer covers the weekly floor."""
+    days = sw.steps_by_day(PROFILES["a_large_deficit_experienced"])
+    record = {"minutes_by_day": {d: 88 / 7 for d in days}, "line": "recorded outside the gym: 88 min credited (synthetic)"}
+    prof = PROFILES["a_large_deficit_experienced"] | {"steps_per_day": steps, "aerobic_record": record}
     with patch.dict(sw.SETTINGS, settings or {}):
         world = sw.build_world(prof, "approved")
         ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()]
@@ -334,7 +337,10 @@ def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
     """Steps first, then only the structured minutes that close the gap to the weekly floor (cardio_model.WEEKLY_MODERATE_MIN):
     a 10k walker (~88 credited min) gets easy blocks until the week's blocks close the gap — not one every morning — and under
     the shared cap only the conditioning host buys room (an easy block takes what lifting leaves, else none)."""
-    week = _walker_week(10000)
+    # #5861 FIX6: the fifth round's gap rule, held under its own setting — owner ruling 4 (purposeful cardio only) is the
+    # default and serves NO easy block at all (`test_owner_rulings_5861.py`)
+    old = {"cardio_purpose_only": False, "session_cap_includes_cardio": False, "cardio_room_takes": "as_fix5"}
+    week = _walker_week(10000, old)
     kinds = [s["cardio"].get("kind") for s in week["sessions"]]
     easy = [k for k in kinds if k and k not in lp.HARD_KINDS]
     total = sum(int(s["cardio"].get("minutes") or 0) for s in week["sessions"])
@@ -344,10 +350,10 @@ def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
 
     # control: no gap rule (FIX4: nor the walk prompt's "a small gap is the walk's")
     every = _walker_week(
-        10000, patches={(lb, "easy_gap"): lambda kind, live: (True, []), (live_shape, "walk_covers"): lambda kind, live: None}
+        10000, old, patches={(lb, "easy_gap"): lambda kind, live: (True, []), (live_shape, "walk_covers"): lambda kind, live: None}
     )
     assert sum(1 for s in every["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS) > len(easy)
-    shared = _walker_week(10000, {"session_cap_includes_cardio": True})
+    shared = _walker_week(10000, old | {"session_cap_includes_cardio": True})
     full = {s["role"]: s["lifting_minutes"] for s in week["sessions"]}
     for s in shared["sessions"]:
         if s["role"] != "shoulders_arms":  # only the host trims lifting for its block
@@ -373,10 +379,13 @@ def test_an_equipment_limited_week_keeps_hamstring_knee_flexion_from_the_library
 
 # ── 10. cardio and the owner's settings ──────────────────────────────────────
 def test_the_short_week_under_the_shared_cap_keeps_a_real_aerobic_block(weeks):
-    e = weeks[("e_short_week", True)]["week"]
+    # #5861 FIX6 (owner ruling 1: no strength work a muscle needs is cut to make room): the fifth round's room-making
+    # (`cardio_room_takes: as_fix5`) is what buys a 20-min block on the short week's host; the ruled default does not
+    old = {"session_cap_includes_cardio": True, "cardio_room_takes": "as_fix5"}
+    e = _week("e_short_week", settings=old)["week"]
     assert max(s["cardio"].get("minutes") or 0 for s in e["sessions"]) >= lw.CARDIO_ROOM["min_block"]["value"]
     assert lb.conditioning_host("shoulders_arms") == "upper_volume" and lb.conditioning_host(None) == "shoulders_arms"
-    stuck = _week("e_short_week", {(lb, "conditioning_host"): lambda skipped: "shoulders_arms"}, {"session_cap_includes_cardio": True})
+    stuck = _week("e_short_week", {(lb, "conditioning_host"): lambda skipped: "shoulders_arms"}, old)
     assert max(s["cardio"].get("minutes") or 0 for s in stuck["week"]["sessions"]) == 0  # control: the skipped day as host
 
 
@@ -416,8 +425,9 @@ def test_every_fix3_constant_is_labelled_and_every_default_is_todays():
         for name, row in table.items():
             assert row["label"] == "heuristic" and row["basis"], name
     s = lp.settings(LIB0)
-    assert s["session_cap_includes_cardio"] is False and s["behind_schedule_week"] is False
-    assert s["symptom_line"] == "Chest, breathing, dizzy? Stop, log it." and s["kb_deadlift_template_id"] is None
+    # #5861 FIX6: the owner's rulings of 2026-11-13 — the shared cap ON (ruling 1), no symptom line (ruling 10)
+    assert s["session_cap_includes_cardio"] is True and s["behind_schedule_week"] is False
+    assert s["symptom_line"] == "" and s["kb_deadlift_template_id"] is None
     assert s["kb_slot_role"] == "lower_volume" == lb.KB_HOME and s["body_fat_tier"] is None and s["rate_band_mode"] == "advisory"
     assert ps.SESSION_TEMPLATES["lower_volume"]["accessories"].count(lb.KB_SLOT_KEY) == 1  # the template placement is today's
-    assert isinstance(cm.STEPS_CREDIT_SHARE, float) and 0 < cm.STEPS_CREDIT_SHARE < 1
+    assert cm.STEPS_PER_MODERATE_MIN == cm.CADENCE_MODERATE_SPM == 100  # a population heuristic, labelled (ruling 12)

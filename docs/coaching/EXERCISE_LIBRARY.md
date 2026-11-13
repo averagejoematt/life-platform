@@ -65,7 +65,7 @@ rated hypertrophy row also `provisional` and, when true, `provisional_why`). A h
 objective does not apply to carries `tier: null`, `applicable: false` and its reason. The top level carries
 `canonical_families`.
 
-## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.3.0, PROPOSED)
+## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.4.0, PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -95,7 +95,8 @@ Maximum 14 for both jobs. **Bands:** S >= 12 · A >= 10 · B >= 8 · C >= 5 · D
 whose input is `unknown` scores its NEUTRAL value (`quality_rubric.NEUTRAL`, the middle of its range: stretch 3, stability 2,
 resistance profile 2, progressability 2, joint stress −1, carryover 0), never less — a fully unknown movement lands at B — and an
 unknown never helps reach S (the `inputs_known` S criterion). See "Second red team" below. **No stretch premium for the glutes** (`STRETCH_CAPS`:
-their stretch term is capped at mid; Plotkin 2023 found the shortened hip thrust equal to the lengthened back squat).
+Plotkin 2023 found the shortened hip thrust equal to the lengthened back squat). Since rubric 3.4.0 (owner ruling 17,
+2026-11-13) the glute stretch term sits at its TOP for any known length, not at mid — see "Owner rulings 2026-11-13" below.
 
 **Evidence** is `evidence_confidence`: `rct_direct` (a randomized trial of this target with this movement or its
 defining variable) · `rct_characteristic` (a trial of the movement's defining characteristic: training length, joint
@@ -146,6 +147,23 @@ bodyweight -> weighted, kneeling -> standing; `objective_inputs.ladder`) earns t
 term is FIXED at mid for any known length, not only capped: the trial that removed the stretch premium (the shortened hip
 thrust matched the lengthened squat) equally removes the shortened penalty. Then the points band is held under the
 categorical caps below (Objectives).
+
+## Owner rulings 2026-11-13 (#5861 FIX6, rubric v3.4.0 — PROPOSED)
+
+- **Ruling 17 — the glute S standard.** "Don't manufacture a glute S, but don't require an exercise-specific trial as the only
+  route to S either; apply the same evidence + personal-fit standard as other muscles." At `mid` the stretch term held every glute
+  row two points under the best row of any other muscle (a lengthened movement scores 5), so only a direct trial's +1 band could
+  carry a glute row to S. The trial behind the cap says length does not decide glute growth, so the term now sits at its top for
+  any known glute length: it cannot separate glute movements and no longer costs them. Every S criterion and the S quota still
+  apply. Result: the barbell hip thrust (direct trial, reviewed inputs, high load ceiling, the glutes end the set, stable,
+  moderate fatigue) and the machine hip thrust (tied to it by the evidence ordering) reach S. The kickback machines and the cable
+  kickback stay A (load ceiling moderate: a single-leg lever caps the absolute load), the split squat and the dumbbell deadlift
+  stay A (ceiling / stability), the barbell squat, deadlift and trap-bar deadlift stay A (stability to failure, fatigue, joint
+  stress). Eleven glute rows moved B -> A and four C -> B on the same arithmetic; no tier of any other muscle moved.
+- **Ruling 16 — missing data stays visible and never proves suitability.** A provisional rating (inputs not reviewed, or still
+  unknown) never reaches S on ANY objective (`objective_ratings` caps it at A; no live row was provisional S), the live selection
+  ranks a provisional row outside the S/A pool (`selection_live`), and every live draft's rationale carries one `evidence (live)`
+  line naming each served movement's tier, evidence confidence and data completeness (`quality_rubric.completeness`).
 
 ## Standing principles (owner ruling 2026-11-12)
 
