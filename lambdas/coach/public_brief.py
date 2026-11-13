@@ -92,6 +92,9 @@ METRIC_WORDS: dict = {
     "steps": ("daily steps", "steps", 0),
     "total_calories_kcal": ("daily calories", "kcal", 0),
     "total_protein_g": ("daily protein", "g", 0),
+    # Hevy: one reading per performed session that logged load (measurable_metrics.row_is_reading) — never a day total,
+    # never a plan. "lifting volume" is the name filing_rules binds the call to (bare "volume" binds nothing).
+    "total_volume_kg": ("per-session lifting volume", "kg", 0),
     "weight_lbs": ("weight", "lb", 1),
 }
 # A recommendation's action check measures what HE does, not an outcome: the metrics whose ledger subdomain is a
@@ -99,12 +102,24 @@ METRIC_WORDS: dict = {
 ACTION_SUBDOMAINS = frozenset({"calories", "protein", "training"})
 CONDITIONS = {"at_least": ">=", "at_most": "<="}
 REQUIRED_KEY = "public_brief_required_metrics"  # config/personas.json: the inputs a coach's brief cannot do without
+#: config/personas.json: an explicit per-coach switch. A coach is in the brief when this is true, or — when it is absent —
+#: when the coach is operational. ``false`` takes an operational coach out without touching anything else.
+ENABLED_KEY = "public_brief_enabled"
 HELD_FOR_INPUTS = "required_inputs_absent"  # run_coach's reason when one of them has no observation for the cycle
 
 #: Words that would point at a partner, a relationship or another person — never in a brief (fail closed).
 RELATIONSHIP_WORDS = re.compile(
     r"\b(?:partner|girlfriend|boyfriend|wife|husband|spouse|fianc\w*|dating|date night|relationship\w*|"
     r"family|friends?|kids?|children|son|daughter|mother|father|mom|dad|parents?|brother|sister|colleague\w*|boss)\b",
+    re.I,
+)
+#: Training claims no brief input can evidence: the inputs are Hevy's recorded loads and reps (and the other coaches'
+#: measured metrics), so effort, RPE, intensity, technique, pain, injury, soreness, fatigue and strength or muscle gain
+#: are never stated — whichever coach writes them (fail closed: the item is dropped).
+UNEVIDENCED_TRAINING_WORDS = re.compile(
+    r"\b(?:rpe|perceived exertion|exertion|effort\w*|intensity|technique|form cues?|injur\w*|pain\w*|sore\w*|"
+    r"strain(?:ed|s)?|tendon\w*|fatigu\w*|stronger|weaker|strength gains?|1rm|one[- ]rep max|personal (?:best|record)s?|"
+    r"prs?|hypertroph\w*|muscle (?:growth|gain)s?)\b",
     re.I,
 )
 _ISO = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
@@ -136,10 +151,18 @@ def required_metrics(coach_id: str, personas: Optional[dict] = None) -> list:
     return [str(m) for m in (p.get(REQUIRED_KEY) or [])]
 
 
+def brief_enabled(p: Any) -> bool:
+    """The coach's ``public_brief_enabled`` when it is a bool; otherwise (absent) its ``operational`` flag."""
+    if not isinstance(p, dict):
+        return False
+    flag = p.get(ENABLED_KEY)
+    return flag if isinstance(flag, bool) else bool(p.get("operational")) and ENABLED_KEY not in p
+
+
 def brief_coaches(personas: Optional[dict] = None) -> list:
-    """Operational coaches with at least one eligible input, in registry order."""
+    """Coaches the brief is enabled for (``brief_enabled``) with at least one eligible input, in registry order."""
     ps = _personas(personas)
-    return [cid for cid, p in ps.items() if isinstance(p, dict) and p.get("operational") and coach_metrics(cid, ps)]
+    return [cid for cid, p in ps.items() if brief_enabled(p) and coach_metrics(cid, ps)]
 
 
 def action_metrics(metrics: Iterable[str]) -> list:
@@ -243,6 +266,9 @@ def system_prompt(persona: dict, metrics: list, actions: list, targets: Optional
         "- Never mention or guess at his feelings, mood, motivation, journal, diary, videos, check-ins, conversations, "
         "symptoms or private life, and never mention any other person. No medical diagnosis. Correlative only: never "
         "claim one thing caused another.\n"
+        "- Training facts are what Hevy recorded for sessions he performed (load and reps). Never mention effort, RPE, "
+        "intensity, technique, pain, injury, soreness, fatigue, strength or muscle gain, and never describe a planned or "
+        "recommended session as one he did.\n"
         f"- Plain words; at most {MAX_WORDS} words per text field.\n"
         "Return ONE JSON object and nothing else, with these keys:\n"
         f'- "interpretations": up to {MAX_ITEMS} of {{"text", "cites": [observation ids]}} — what the numbers say.\n'
@@ -320,6 +346,8 @@ def text_problems(text: Any, allowed: set, shown: str = "", today: Optional[str]
         reasons.append("private_activity_words")
     if RELATIONSHIP_WORDS.search(text):
         reasons.append("relationship_words")
+    if UNEVIDENCED_TRAINING_WORDS.search(text):
+        reasons.append("unevidenced_training_claim")
     try:
         from privacy.broadcast_sensitivity_gate import deterministic_findings
 
