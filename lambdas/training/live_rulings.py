@@ -236,11 +236,6 @@ def short_week_floor(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[st
     return lines
 
 
-def arms_count(after: dict[str, float], marks: dict[str, Any]) -> list[str]:
-    """The counted check behind ruling 3: `muscle sets/MEV` for each ARMS_FLOOR muscle (the plan line on a short week)."""
-    return [f"{m} {float(after.get(m) or 0):g}/{(marks.get(m) or {}).get('MEV')}" for m in ARMS_FLOOR["muscles"]["value"]]
-
-
 def press_trade(rows: list[dict[str, Any]], lib: dict[str, Any] | None) -> dict[tuple[str, str], int]:
     """The week's opening deltas (`live_balance.allocation_plan`): the overhead press's sets above the template's one (`press_sets`,
     ruling 6) come off the LATERAL-raise slots first — one set at a time, the shoulders+arms slot first, never under two sets —
