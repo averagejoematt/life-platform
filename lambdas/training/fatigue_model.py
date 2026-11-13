@@ -144,8 +144,8 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
     "deficit_rate_pct_bw": {
         "value": 0.25,
         "label": HEURISTIC,
-        "basis": "#5861 FIX7: a deficit is read when the mean weekly loss over the weigh-ins the draft read (rate_policy.weekly_rates) "
-        "is at least 0.25 %BW/week; no weekly rate = unknown (the stall rule then stands)",
+        "basis": "#5861 FIX7: a deficit is read when the weekly loss over the weigh-ins the draft read "
+        "between the oldest and newest week of weigh-ins read is at least 0.25 %BW/week; under two weeks of weigh-ins = unknown (the stall rule then stands)",
     },
     "sleep_short_hours": {"value": 6.5, "label": HEURISTIC, "basis": "the charter's progression refusal text (sleep < 6.5 h)"},
     "adherence_low": {
@@ -304,8 +304,8 @@ def _reset_start(
     for k in range(1, len(pts)):
         j = next((i for i in range(k - 1, -1, -1) if _comparable(pts[i], pts[k], roles[i], roles[k])), None)
         before, now = (pts[j][3] if j is not None else None), pts[k][3]
-        if before is None or now is None or now > before * (1 - drop):
-            continue
+        if before is None or now is None or now > before * (1 - drop) or (pts[k][2] is not None and float(pts[k][2]) >= 9.0):
+            continue  # not a drop — or a lighter load ground out at RPE 9+, which is a regression, never a reset done as written
         base = pts[(start or 0) : k]
         if start is not None and len(base) < need:
             continue  # still rebuilding from the last reset: a lighter session here is not a second reset
@@ -385,13 +385,21 @@ def _e1rm_rir(p: tuple[str, float | None, float | None, float | None, int | None
 
 
 def in_deficit(weights_by_day: Any) -> bool | None:
-    """`deficit_rate_pct_bw`: the mean weekly loss over the weigh-ins read (`rate_policy.weekly_rates`); None with no weekly rate."""
-    from health import rate_policy
+    """`deficit_rate_pct_bw`: the weekly loss between the oldest and the newest 7 days of the weigh-ins read (their means, per
+    week between them, as %BW of the newest mean); None with under two weeks of weigh-ins. Read here, not through the loss-rate
+    module (no live path reads the rate proposal: the rate-proposal guard)."""
+    from common.pacific_time import parse_day_key
 
-    rates = rate_policy.weekly_rates(weights_by_day or {}) if isinstance(weights_by_day, dict) else []
-    if not rates:
+    days = {parse_day_key(str(k)[:10]): _num(v) for k, v in (weights_by_day or {}).items()} if isinstance(weights_by_day, dict) else {}
+    days = {d: v for d, v in days.items() if d is not None and v}
+    if not days or (max(days) - min(days)).days < 13:
         return None
-    return sum(float(r["pct_bw"]) for r in rates) / len(rates) >= float(THRESHOLDS["deficit_rate_pct_bw"]["value"])
+    lo, hi = min(days), max(days)
+    old = [v for d, v in days.items() if (d - lo).days < 7]
+    new = [v for d, v in days.items() if (hi - d).days < 7]
+    weeks = (hi - lo).days / 7.0 - 1.0
+    rate = (sum(old) / len(old) - sum(new) / len(new)) / max(weeks, 1.0) / (sum(new) / len(new)) * 100
+    return rate >= float(THRESHOLDS["deficit_rate_pct_bw"]["value"])
 
 
 def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, int | None]], e1: list[float]) -> bool:

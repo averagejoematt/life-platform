@@ -300,21 +300,10 @@ def joint_flags(ctx: dict[str, Any], workouts: list[dict[str, Any]] | None, disc
                 "site": site,
             }
         )
+        from training import live_pain  # #5861 FIX7: the flag's reach — the flagged lift, or the provoking pattern
+
+        out[-1]["scope"] = live_pain.scope(out[-1], set(ctx.get("light_discomfort") or ()), tid)
     return out
-
-
-def _joint_hit(entry: dict[str, Any], flags: list[dict[str, Any]]) -> tuple[str, dict[str, Any], str] | None:
-    """(tier, flag, joint) for the strongest flag this movement falls under, else None."""
-    level = STRESS[str(PAIN_RULE["joint_level"]["value"])]
-    best = None
-    for f in flags:
-        for j in f["joints"]:
-            if _stress(entry, j) < level:
-                continue
-            tier = "avoid" if f["tier"] == "avoid" and _group(entry.get("pattern")) == f["group"] else "reduce"
-            if best is None or (tier == "avoid" and best[0] != "avoid"):
-                best = (tier, f, j)
-    return best
 
 
 def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], flags: list[dict[str, Any]]) -> list[str]:
@@ -322,15 +311,16 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
     the flagged PATTERN is off for the session — every member of the flag's pattern group that loads the joint at moderate or
     more is dropped, and so is the session fit's pain swap for the flagged movement itself (#5861 FIX5: no substitute of the
     same pattern); `reduce`: kept, marked for a load cut (`live_load`) and an RPE cap. Returns the rationale lines."""
-    from training import live_safety
+    from training import live_pain, live_safety
 
     if not flags:
         return []
     lines: list[str] = []
     keep = []
+    taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
-        hit = _joint_hit(entry, flags) if entry and e.get("intensity") != "carry" else None
+        hit = live_pain.hit(entry, e, flags, ctx) if entry and e.get("intensity") != "carry" else None  # FIX7: scoped
         swap_of = _avoided_swap(e, ctx, flags)
         if swap_of:
             lines.append(f"skipped (live): {entry.get('title') or e.get('movement_key')} — {swap_of}: the flagged pattern is off today")
@@ -342,8 +332,46 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
         name = entry.get("title") or e.get("movement_key")
         why = f"{f['source']} flag on {f['title']} ({joint.replace('_', ' ')}" + (f", {f['severity']:g}/10" if f["severity"] else "") + ")"
         stop = live_safety.stop_line(f["severity"])  # #5861 FIX4: every lift the pain rule touches carries an in-set stop line
-        if tier == "avoid":  # #5861 FIX5 (fifth red team): no moderate-stress member of the same pattern — the pattern is off
-            lines.append(f"skipped (live): {name} — {why}: above the mild line, the flagged pattern is off today — nothing fills it")
+        if tier == "variant":  # #5861 FIX7: the session fit's swap is already low on the flagged joint — the pain-free variant
+            keep.append(
+                e | {k: v for k, v in live_pain.serve_route(e, str(e["movement_key"]), f, "pain_free_variant").items() if k != "live_swap"}
+            )
+            lines.append(
+                f"kept (live): {name} — {why}: a pain-free variant (low on the flagged joint), RPE <= 8 with the stop line (PAIN_SCOPE)"
+            )
+            continue
+        if tier == "avoid":  # #5861 FIX7: the pattern is off today — a pain-free same-family member first, else the muscle's route
+            new, how = live_pain.variant(e, ctx, rotation, taken, f["joints"]), "pain_free_variant"
+            if not new:
+                new, how = live_pain.muscle_route(e, ctx, taken, f["joints"]), "muscle_route"
+            relax = None if new else live_pain.priority_ceiling(e, ctx, f)
+            if relax is not None:
+                new, how = live_pain.muscle_route(e, ctx, taken, f["joints"], relax), "priority_route"
+            if new:
+                taken.add(new)
+                served = live_pain.serve_route(e, new, f, how)
+                keep.append(served)
+                title = (ctx["catalog"].get(new) or {}).get("title") or new
+                lines.append(
+                    f"swapped (live): {name} -> {title} — {why}: above the mild line the provoking pattern is off today; "
+                    f"{how.replace('_', ' ')} ("
+                    + (
+                        "less stress on the flagged joint than the flagged lift"
+                        if how == "priority_route"
+                        else "low stress on the flagged joint"
+                    )
+                    + f"), RPE <= {served['live_effort']} with the stop line (PAIN_SCOPE, heuristic)"
+                )
+                continue
+            lines.append(f"skipped (live): {name} — {why}: above the mild line, the flagged pattern is off today — no pain-free route")
+            continue
+        if f.get("scope") == "lift":  # #5861 FIX7: <= 2/10 discomfort — the lift stays a hard set, load held, the stop line on
+            e["live_effort"] = min(int(live_pain.PAIN_SCOPE["variant_rpe"]["value"]), int(e.get("live_effort") or 99))
+            e["live_stop"] = stop
+            keep.append(e)
+            lines.append(
+                f"kept (live): {name} — {why}: low discomfort, this lift only — RPE <= 8, the stop line on (PAIN_SCOPE, heuristic)"
+            )
             continue
         e["live_load"] = {
             **(e.get("live_load") or {}),
@@ -369,6 +397,8 @@ def _avoided_swap(e: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, 
     f = next((f for f in flags if f["movement_id"] == mid and f["tier"] == "avoid"), None)
     if f is None or _group(src.get("pattern")) != _group(_entry(e.get("movement_key"), ctx).get("pattern")):
         return None
+    if all(_stress(_entry(e.get("movement_key"), ctx), j) == 0 for j in f["joints"]):
+        return None  # #5861 FIX7: a same-family member LOW on the flagged joint is the pain-free variant — it stands (live_pain)
     return f"stands in for {f['title']}, pain flag" + (f" {f['severity']:g}/10" if f["severity"] else "")
 
 
@@ -859,7 +889,7 @@ def _novel_cap(note: str, e: dict[str, Any]) -> str:
     from training import hevy_note_grammar as g
     from training.live_week import NOVEL_START
 
-    if g.PICK_LOAD_OPEN_TAIL not in note or e.get("live_kb"):
+    if g.PICK_LOAD_OPEN_TAIL not in note or e.get("live_kb") or e.get("live_familiar"):  # FIX7: a familiar swap works at target
         return note
     cap = int(NOVEL_START["rpe"]["value"])
     e["live_effort"] = min(cap, int(e.get("live_effort") or 99))
@@ -897,6 +927,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))  # FIX3
         b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # FIX4: the in-set stop line
         b.notes = _novel_cap(b.notes or "", e)  # FIX5: a lift with no load on file (new to him) starts at RPE <= 7
+        b.notes = live_week.familiar_note(b.notes or "", e)  # FIX7: a like-for-like swap works at target (FAMILIAR_SWAP)
     from training import live_safety, selection_engine as se  # #5861 FIX4: no load step on a held lift; one effort; stop line
 
     rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))

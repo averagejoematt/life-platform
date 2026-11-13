@@ -253,15 +253,12 @@ def pain_assess(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, A
         for x in w.get("exercises") or []
         if str(x.get("template_id") or "").upper() in tids and x.get("notes") and pain_class(str(x["notes"]))
     }
-    hit = next(
-        (
-            e
-            for e in rx["exposures"]
-            if (e.get("live_swap") or {}).get("code") == "joint" or "flag" in str((e.get("live_load") or {}).get("why"))
-        ),
-        None,
-    )
-    (hit or rx["exposures"][0])["live_assess"] = line
+    from training import live_pain  # #5861 FIX7: the assess line only on the flagged lift (or what stands in for it)
+
+    hit = live_pain.assess_target(rx, ctx, pains)
+    if hit is None:
+        return []
+    hit["live_assess"] = line
     names = ", ".join(sorted(str(f.get("title")) for f in pains))
     return [f"pain (live): {names} — logged on {len(days)} session(s); the note says: {line} (pain_assess_line)"]
 

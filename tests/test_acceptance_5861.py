@@ -675,12 +675,20 @@ def test_c4b_the_load_guard_holds_and_steps_down_by_rule():
 
 def test_c5_a_stalled_anchor_changes_its_scheme(weeks):
     """Red team: the stalled bench stayed 3x4-6 'Heavier'. A stalled anchor now moves its rep range (and its load with it) —
-    the stall machinery's 'adjust the loading' answer, never more volume in a deficit."""
+    the stall machinery's 'adjust the loading' answer, never more volume in a deficit. #5861 FIX7: only OUTSIDE a deficit — in
+    a deficit (the profile's weigh-ins fall 0.8 %BW/week) the same flat e1RM at steady RPE is HELD (fatigue_model
+    deficit_hold_pct): the bench keeps 4-6 and no reset is written."""
     d = weeks["d_stalled_anchor_adherence_dip"]["week"]
     bench = next(x for s in d["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")
-    assert bench["reps"] == "6-8" and "Now aiming 6–8" in bench["hevy_note"]
-    off = _week_of("d_stalled_anchor_adherence_dip", {(lp, "stall_scheme"): lambda rx, ctx, trends: []})  # control
-    assert next(x for s in off["week"]["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")["reps"] == "4-6"
+    assert bench["reps"] == "4-6" and "Now aiming" not in bench["hevy_note"]  # held in a deficit
+    prof = PROFILES["d_stalled_anchor_adherence_dip"] | {"weekly_loss_pct": 0.0}
+    flat = sw.generate_week(prof, "approved", sw.build_world(prof, "approved"))
+    bench = next(x for s in flat["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")
+    assert bench["reps"] == "6-8" and "Now aiming 6–8" in bench["hevy_note"]  # no deficit: the stall resets
+    world = sw.build_world(prof, "approved")
+    with contextlib_patches({(lp, "stall_scheme"): lambda rx, ctx, trends: []}):  # control
+        off = sw.generate_week(prof, "approved", world)
+    assert next(x for s in off["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")["reps"] == "4-6"
 
 
 # ══ D. programming quality ═══════════════════════════════════════════════════

@@ -255,6 +255,9 @@ def for_live_draft(
         )
         n_hurt = fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
         hurts = {tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= n_hurt}
+        from training import live_pain  # #5861 FIX7: discomfort at or under 2/10 keeps the lift (lighter), never swaps it out
+
+        hurts -= live_pain.low_discomfort(block_workouts)
         light = {tid for tid, v in sig.items() if v.get("light_sessions", 0) + v.get("discomfort_sessions", 0) >= n_hurt} - hurts
         ctx = {
             "lib": lib,
