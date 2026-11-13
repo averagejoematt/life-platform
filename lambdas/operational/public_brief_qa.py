@@ -13,7 +13,8 @@ THE VERDICT, for the newest DUE cycle (its Monday at 09:00 PT + ``GRACE_MINUTES`
     or a ``held`` for any reason other than its required inputs being absent; or an outcome of ``written``/``exists``
     with no ``PUBLIC_BRIEF#<cycle>`` row behind it.
   * WARN — the budget paused the run (a sanctioned tier state, ADR-125, but a missed week is never backfilled), or a
-    coach was held because its required inputs were absent (e.g. no glucose readings), or had too few readings.
+    coach was held because its required inputs were absent (e.g. no glucose readings) or stale (``inputs_stale``: no
+    reading in the coach's freshness window, e.g. no MacroFactor export since mid-week), or had too few readings.
   * OK — every brief coach has its brief row for the cycle.
 The stamp persists for the week, so a FAIL stays red until a re-run (``{"mode": "public_brief", "coach_ids": [...]}``)
 writes the missing briefs and merges its outcomes into the stamp. A dry run never stamps and is never judged.
@@ -86,6 +87,9 @@ def check_public_brief_liveness(table, check_cls, partition, pt_now, *, coaches=
             (written if row else bad).append(cid if row else f"{cid}={st} but no brief row")
         elif st == "held" and why == PB.HELD_FOR_INPUTS:
             warn.append(f"{cid}=held, required inputs absent: {', '.join(r.get('missing') or []) or 'unnamed'}")
+        elif st == "held" and why == PB.HELD_STALE:
+            stale = ", ".join(r.get("stale") or []) or "unnamed"
+            warn.append(f"{cid}=held, inputs stale ({stale}: no reading on or after {r.get('fresh_from') or 'the floor'})")
         elif st in SANCTIONED_WARN:
             warn.append(f"{cid}={st}")
         else:
@@ -97,3 +101,121 @@ def check_public_brief_liveness(table, check_cls, partition, pt_now, *, coaches=
     else:
         c.ok(f"public brief cycle {cycle}: all {len(written)} coach(es) briefed")
     return [c]
+
+
+# ── the pre-run signal: MacroFactor's manual export, needed by the Monday brief ─────────────────────
+#: MacroFactor arrives ONLY as a manual export landing in s3://<bucket>/uploads/macrofactor/ (the Dropbox poller or a
+#: hand upload; ``ingestion.macrofactor_lambda`` writes the rows). Nothing else refreshes it, so a week without an
+#: export holds the nutrition coach's brief (``inputs_stale`` / ``required_inputs_absent``) on Monday. This leg says so
+#: from Saturday, while there is still time to upload one. Advisory: it WARNs, never FAILs.
+EXPORT_WARN_DAYS = 3  # an export older than this from Saturday on is a WARN
+EXPORT_SOURCE = "macrofactor"
+UPLOAD_PREFIX = "uploads/macrofactor/"
+LOOKBACK_DAYS = 21
+
+
+def _watch_window(now_pt) -> bool:
+    """Saturday, Sunday, and Monday until the run's deadline (09:00 PT + grace)."""
+    if now_pt.weekday() in (5, 6):
+        return True
+    deadline = now_pt.replace(hour=DUE_HOUR_PT, minute=0, second=0, microsecond=0) + timedelta(minutes=GRACE_MINUTES)
+    return now_pt.weekday() == 0 and now_pt < deadline
+
+
+def _next_cycle(now_pt) -> str:
+    """The cycle whose Monday run is next (today's, when it is Monday before the deadline)."""
+    from common import public_brief_policy as POL
+
+    if _watch_window(now_pt) and now_pt.weekday() == 0:
+        return POL.cycle_of(now_pt.date())
+    return POL.cycle_of(now_pt.date() + timedelta(days=7))
+
+
+def _export_coaches(personas=None) -> list:
+    """``(coach_id, fresh_within_days)`` for each brief coach with a required input read from MacroFactor — derived from
+    the registry and the metric sources, never a hand list."""
+    from coach import public_brief as PB
+    from common import public_brief_policy as POL
+
+    out = []
+    for cid in PB.brief_coaches(personas):
+        if any(EXPORT_SOURCE in (POL.metric_sources(m) or []) for m in PB.required_metrics(cid, personas)):
+            out.append((cid, PB.fresh_within_days(cid, personas)))
+    return out
+
+
+def _export_rows(table, user_prefix, start, end):
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {":pk": f"{user_prefix}{EXPORT_SOURCE}", ":s": "DATE#" + start, ":e": "DATE#" + end + "~"},
+        "ProjectionExpression": "sk, #d, ingested_at, entries_count, food_log",
+        "ExpressionAttributeNames": {"#d": "date"},
+    }
+    items = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            return items
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def check_macrofactor_export_age(table, check_cls, partition, pt_now, *, user_prefix="USER#matthew#SOURCE#", bucket=None, personas=None):
+    """MacroFactor export age, needed by the Monday brief: the newest upload (the rows' ``ingested_at``) and the newest
+    LOGGED day (``coach.grading_quality.is_zero_entry_day``: a summary-only stub is not a logged day). From Saturday
+    until Monday's run it WARNs when the export is older than ``EXPORT_WARN_DAYS``, or when the logged days end before
+    the brief's freshness floor (so the coach would be held). Reports ages and days only — never an intake value."""
+    from datetime import timezone
+
+    from coach.grading_quality import is_zero_entry_day
+    from common.pacific_time import parse_iso_utc
+
+    c = check_cls("public_brief:macrofactor_export_age", "Data Freshness", partition)
+    now_pt = pt_now()
+    coaches = _export_coaches(personas)
+    if not coaches:
+        c.ok("no brief coach requires a MacroFactor input; the export is not watched")
+        return [c]
+    start = (now_pt.date() - timedelta(days=LOOKBACK_DAYS)).isoformat()
+    try:
+        rows = _export_rows(table, user_prefix, start, now_pt.date().isoformat())
+    except Exception as exc:  # noqa: BLE001
+        c.warn(f"MacroFactor export age unreadable (DDB error: {exc}) - check {UPLOAD_PREFIX} by hand before Monday's brief")
+        return [c]
+    stamps = sorted(str(r.get("ingested_at")) for r in rows if r.get("ingested_at"))
+    logged = sorted(str(r.get("date") or str(r.get("sk", ""))[5:15])[:10] for r in rows if not is_zero_entry_day(r))
+    where = f"s3://{bucket}/{UPLOAD_PREFIX}" if bucket else UPLOAD_PREFIX
+    cycle = _next_cycle(now_pt)
+    names = ", ".join(cid for cid, _ in coaches)
+    if not stamps:
+        age_txt, age_days = f"no upload in the last {LOOKBACK_DAYS} days", None
+    else:
+        last = parse_iso_utc(stamps[-1])
+        if last is None:
+            age_txt, age_days = f"last upload stamp unreadable ({stamps[-1][:32]})", None
+        else:
+            age_days = (now_pt.astimezone(timezone.utc) - last).total_seconds() / 86400
+            age_txt = f"export {age_days:.1f} d old (last upload {stamps[-1][:16]}Z)"
+    through = logged[-1] if logged else None
+    floors = [cycle_floor for cycle_floor in (_floor(cycle, d) for _cid, d in coaches) if cycle_floor]
+    floor = max(floors) if floors else None
+    head = f"MacroFactor {age_txt}, logged days through {through or 'none'}; needed by the {cycle} brief ({names})"
+    if not _watch_window(now_pt):
+        c.ok(head + " - watched from Saturday")
+        return [c]
+    problems = []
+    if age_days is None or age_days > EXPORT_WARN_DAYS:
+        problems.append(f"older than {EXPORT_WARN_DAYS} d")
+    if floor and now_pt.weekday() != 5 and (through is None or through < floor):
+        problems.append(f"no logged day on or after {floor}, so the coach would be held")
+    if problems:
+        c.warn(head + ": " + "; ".join(problems) + f" - upload a fresh MacroFactor export to {where} before Monday {DUE_HOUR_PT}:00 PT")
+    else:
+        c.ok(head)
+    return [c]
+
+
+def _floor(cycle, days):
+    from coach import public_brief as PB
+
+    return PB.fresh_floor(cycle, days) if days else None
