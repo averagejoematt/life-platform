@@ -273,15 +273,25 @@ def unprogrammable(lib: dict, catalog: dict) -> list[str]:
     return [n for n, f in need.items() if not any(f(e) for e in servable)]
 
 
+def single_leg(e: dict) -> bool:
+    """FIX-DATA's single-leg tag: a squat / step-down pattern, `unilateral` among its functional qualities, and a functional
+    rating of A or better — a real single-leg exposure, not any lower movement done one side at a time."""
+    return (
+        e.get("pattern") in ("squat", "step_down")
+        and "unilateral" in ((e.get("objective_inputs") or {}).get("functional") or [])
+        and ((e.get("ratings") or {}).get("functional") or {}).get("tier") in ("S", "A")
+    )
+
+
 def unprogrammed(week: dict, lib: dict, catalog: dict) -> list[str]:
     """Functions the drafted WEEK does not program (red team 2026-11-12: b2 only checked the library): a unilateral lower lift,
     a carry, a trunk-STABILITY drill that is not a carry (anti-extension / anti-rotation / anti-lateral flexion), and an
     aerobic block — a conditioning block, or easy work the steps already cover beside one."""
     served = [sw._lib_entry(lib, catalog, x["key"]) for x in _lifts(week)]
     out = []
-    if not any(PATTERNS["unilateral_lower"](e) for e in served):
+    if not any(single_leg(e) for e in served):
         out.append("unilateral")
-    if not any(PATTERNS["carry"](e) for e in served):
+    if not any(e.get("category") == "carry" and e.get("pattern") == "carry" for e in served):  # FIX-DATA's carry tag
         out.append("carry")
     if not any(e.get("trunk_function") in lp.TRUNK_FUNCTIONS and e.get("pattern") != "carry" for e in served):
         out.append("trunk_stability")
@@ -311,7 +321,7 @@ def test_b2_unilateral_carry_trunk_and_aerobic_work_are_programmable(weeks):
         s["lifts"] = [
             x
             for x in s["lifts"]
-            if not (PATTERNS["unilateral_lower"](sw._lib_entry(lib, cat, x["key"])) or PATTERNS["carry"](sw._lib_entry(lib, cat, x["key"])))
+            if not (single_leg(sw._lib_entry(lib, cat, x["key"])) or PATTERNS["carry"](sw._lib_entry(lib, cat, x["key"])))
         ]
     assert unprogrammed(bad_week, lib, cat) == ["unilateral", "carry"]
 
@@ -599,6 +609,9 @@ def landmark_problems(m: dict, muscles: tuple = MAJOR, with_abs: bool = True) ->
 def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     for name in ("a_large_deficit_experienced", "c_equipment_limited"):  # full weeks, nothing trimmed for recovery
         assert landmark_problems(weeks[name]["m"]) == [], name
+    # control: no trunk fallback -> the equipment-limited week's crunch slot stays empty and abs fall under MEV
+    bare = _week_of("c_equipment_limited", {(lp, "trunk_fallback"): lambda e, ctx, taken: None})
+    assert any(p.startswith("abs ") for p in landmark_problems(bare["m"]))
     # the SHORT week (4 mornings): legs keep 2x and every leg muscle stays at or over MEV (L5's rule, live default); chest and
     # back too. Delts and arms may sit at their floor for that week — the rule's stated cost, named here, not hidden
     e = weeks["e_short_week"]

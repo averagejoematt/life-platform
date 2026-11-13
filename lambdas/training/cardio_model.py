@@ -327,17 +327,22 @@ def _rate(modality: str, exposures: Any = None, joint_tolerance: str = "normal")
         f"recovery demand {m['recovery_demand']}",
     ]
     sustain = _sustainability(exposures)
+    # #5861 FIX-PROGRAMMING (red team): the PUBLIC conditioning tier caps at A — a modality's quality, not one person's use.
+    # N=1 sustainability (S for HIM: A-level, low impact, ESTABLISHED_EXPOSURES+ sessions of his own) rides the `n1` field
+    # only, for the private / N=1 layer; it never moves the public tier or enters the public basis.
+    n1 = {"sustainability": sustain, "tier": tier}
     if tier == "A" and m["impact"] in ("none", "low") and sustain == "established":
-        tier = "S"
-        basis.append(f"S: A-level stimulus and control, low impact, and a modality he sustains ({ESTABLISHED_EXPOSURES}+ sessions on file)")
-    elif sustain != "untried":
-        basis.append(f"N=1: {sustain} ({exposures} sessions on file)")
+        n1 = {
+            "sustainability": sustain,
+            "tier": "S",
+            "why": f"A-level, low impact, and a modality he sustains ({ESTABLISHED_EXPOSURES}+ sessions)",
+        }
     if joint_tolerance == "low" and m["impact"] == "moderate":
         tier = TIERS[min(len(TIERS) - 1, TIERS.index(tier) + 1)]
         basis.append("one band down: moderate impact while joint tolerance is low")
     if m.get("readiness_gate"):
         basis.append(f"readiness-gated ({m['readiness_gate']}): never auto-programmed while the gate is closed")
-    return {"tier": tier, "basis": basis, "evidence_confidence": EVIDENCE, "modality": modality}
+    return {"tier": tier, "basis": basis, "evidence_confidence": EVIDENCE, "modality": modality, "n1": n1}
 
 
 def conditioning_rating(entry: dict[str, Any] | None, movement_id: str | None = None) -> dict[str, Any] | None:

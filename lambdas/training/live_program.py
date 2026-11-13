@@ -438,6 +438,50 @@ TRUNK_FLOOR: dict[str, dict[str, Any]] = {
 TRUNK_FUNCTIONS = ("anti_extension", "anti_rotation", "anti_lateral_flexion")
 
 
+TRUNK_FALLBACK_ORDER: dict[str, tuple[str, ...]] = {
+    "loaded_flexion": ("loaded_flexion", "lateral_flexion", "rotation", "anti_extension", "anti_rotation", "anti_lateral_flexion"),
+    "lateral_flexion": ("lateral_flexion", "anti_lateral_flexion", "loaded_flexion", "rotation", "anti_rotation", "anti_extension"),
+    "rotation": ("rotation", "anti_rotation", "loaded_flexion", "lateral_flexion", "anti_extension", "anti_lateral_flexion"),
+}
+"""HEURISTIC (practitioner consensus, labelled): when a trunk slot's movement can't be served at home_gym and no member with
+the SAME trunk function is servable, the slot takes the nearest other dynamic trunk job in this order rather than leaving
+the week's only direct ab work empty (red team / FIX-DATA: an equipment-limited week lost its crunch slot)."""
+LIVE_TRUNK_HEVY_TYPES = ("weight_reps", "bodyweight_weighted", "reps_only")
+"""Under live a trunk fallback may be a loaded bodyweight movement (`bodyweight_weighted`, e.g. a weighted crunch) — the
+shadow selection's loaded-types rule (`variant_rotation.LOADED_HEVY_TYPES`) is unchanged."""
+
+
+def trunk_fallback(e: dict[str, Any], ctx: dict[str, Any], taken: set[str]) -> str | None:
+    """A live-only fallback for an unservable TRUNK accessory (`live_session.fit_exposures`): the best-tier servable movement
+    by TRUNK_FALLBACK_ORDER of the SLOT's trunk function (its template incumbent; else the served movement's), never a carry, familiar first. None when the exposure is not a
+    trunk slot or nothing is servable."""
+    from training import live_session as ls
+
+    tf = _entry(e.get("slot"), ctx).get("trunk_function") or _entry(e.get("movement_key"), ctx).get("trunk_function")  # the slot's job
+    order = TRUNK_FALLBACK_ORDER.get(str(tf))
+    if e.get("kind") != "accessory" or not order:
+        return None
+    to_cat = {lid: k for k, lid in ctx["idx"]["to_lib"].items()}
+    rank = {t: i for i, t in enumerate("SABCD")}
+    best = None
+    for lid, entry in sorted((ctx["lib"].get("movements") or {}).items()):
+        key = to_cat.get(lid)
+        c = ctx["catalog"].get(key or "") or {}
+        if not key or key in taken or entry.get("trunk_function") not in order or entry.get("pattern") == "carry":
+            continue
+        if c.get("hevy_type") not in LIVE_TRUNK_HEVY_TYPES or int(c.get("skill_tier", 99)) > ctx["ceiling"]:
+            continue
+        if ls._blocked(key, ctx, False) is not None or ls._servable(key, ctx) is not None:
+            continue
+        r = entry.get("ratings") or {}
+        tier = min(rank.get(str((r.get("hypertrophy") or {}).get("tier")), 9), rank.get(str((r.get("functional") or {}).get("tier")), 9))
+        loaded = c.get("hevy_type") != "reps_only"  # a loadable drill first: progression by load, not by reps alone
+        stable = {"high": 0, "moderate": 1}.get(str(entry.get("stability")), 2)  # a stable drill trains near failure safely
+        cand = (order.index(entry["trunk_function"]), not loaded, tier, stable, -int(c.get("sessions") or 0), key)
+        best = cand if best is None or cand < best else best
+    return best[-1] if best else None
+
+
 def trunk_floor(rx: dict[str, Any], ctx: dict[str, Any], state: str | None = None) -> list[str]:
     """IN PLACE, live only: on TRUNK_FLOOR's role, one trunk-stability exposure — the best FUNCTIONAL tier among the library's
     non-carry anti-movement drills that the gym has, the catalog can write and the selection could serve (familiar first: no
@@ -610,7 +654,7 @@ def guard_loads(
             row["floor_kg"] = min(float(row.get("floor_kg") or cap), cap)
             prog = row.get("progression") or {}
             row["progression"] = {**prog, "basis": "hold", "changes": [], "live_guard": True}
-        lb = lambda kg: f"{kg / 0.45359237:.0f} lb"  # noqa: E731
+        lb = lambda kg: f"{round(kg / 0.45359237 * 2) / 2:g} lb"  # noqa: E731
         rationale.append(
             f"load (live): {(entry.get('title') or b.movement_key)} {lb(top)} -> {lb(cap)} — {d['mode']}"
             + (f" {d['pct']}%" if d["pct"] else "")

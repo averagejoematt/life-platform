@@ -178,6 +178,11 @@ def fit_exposures(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, A
         old = e["movement_key"]
         new = _replacement(e, code, ctx, rotation, taken)
         name = (ctx["catalog"].get(old) or {}).get("title") or old
+        if not new and code == "equipment":  # a trunk slot keeps direct trunk work (live_program.TRUNK_FALLBACK_ORDER, heuristic)
+            from training import live_program
+
+            new = live_program.trunk_fallback(e, ctx, taken)
+            why = f"{why}; no same-function member — the nearest trunk job (TRUNK_FALLBACK_ORDER, heuristic)" if new else why
         if new:
             taken.add(new)
             keep.append(e | {"movement_key": new, "template_id": None, "live_swap": {"from": old, "code": code}})

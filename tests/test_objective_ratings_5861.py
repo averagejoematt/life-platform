@@ -312,7 +312,7 @@ ANOMALIES = {  # key: (hypertrophy, strength, functional, conditioning, mobility
     "db_cossack_squats": ("B", "B", "A", None, "A"),
     "offset_lunges": ("B", "B", "S", None, None),
     "3_way_lunge": ("B", "B", "A", None, None),
-    "treadmill": (None, None, None, "S", None),
+    "treadmill": (None, None, None, "A", None),  # #5861: the public conditioning tier caps at A (N=1 S is private)
     "walking": (None, None, None, "C", None),  # lane L4's cardio model owns the rating: hard to dose and progress
     "rowing_machine": (None, None, None, "A", None),
     "hip_thrust_machine": ("S", None, None, None, None),
