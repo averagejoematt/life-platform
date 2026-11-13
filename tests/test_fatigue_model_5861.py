@@ -283,3 +283,14 @@ def test_for_live_draft_never_raises(monkeypatch):
         recovery_tier = "red"
 
     assert fm.for_live_draft(rx, {"selection": {"mode": "live"}}, _In(), []) is rx
+
+
+def test_the_cardio_seam_reads_the_cardio_models_own_output():
+    from training import cardio_model
+
+    hard = cardio_model.cardio_load([{"modality": m, "minutes": 40, "rpe": 9} for m in ("rower", "rower")])
+    easy = cardio_model.cardio_load([{"modality": "rower", "minutes": 40, "rpe": 3}])
+    assert fm.cardio_state(hard) == "high" and fm.cardio_state(easy) == "moderate"  # control: the same minutes, easy
+    assert fm.cardio_state(None) is None and fm.cardio_state({"state": "low"}) == "low"
+    sig = {s["signal"]: s["state"] for s in _assess(cardio_load=hard)["signals"]}
+    assert sig["cardio_load"] == "strain"

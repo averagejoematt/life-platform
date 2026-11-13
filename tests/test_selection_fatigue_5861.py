@@ -177,6 +177,13 @@ def test_objective_tier_uses_the_l1_contract_when_it_lands(monkeypatch):
     assert sl.objective_tier(LIB0["movements"][PREV], "hypertrophy", "triceps") == "C"
 
 
+def test_the_objective_vocabulary_is_l1s():
+    from training import quality_rubric
+
+    theirs = getattr(quality_rubric, "OBJECTIVES", None)
+    assert theirs is None or tuple(theirs) == sl.OBJECTIVES
+
+
 def test_a_movement_not_applicable_to_the_slot_objective_is_never_a_candidate():
     lib = _lib() | {"selection_policy": {"slot_objectives": {SID: "conditioning"}}}
     s = _slot(_live(lib=lib))

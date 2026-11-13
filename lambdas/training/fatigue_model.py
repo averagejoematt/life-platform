@@ -13,8 +13,8 @@ WHAT IT READS (each optional; an unread input is `unknown`, never "fine"):
     readiness      the recovery tier the draft already carries (`green | yellow | red | re-baselining`); HR-derived tiers
                    are NOT effort evidence inside an HR regime marker's window (`re-baselining` reads unknown)
     sleep_hours    last night's sleep, when a caller read it
-    cardio_load    THE CARDIO SEAM (L4, `cardio_model`): `{"state": "low" | "moderate" | "high", "source": ...}` — the
-                   cardio + walking load the cardio model computes; `high` is one systemic strain signal
+    cardio_load    THE CARDIO SEAM (L4): `cardio_model.cardio_load(...)`'s output as it is (`hard_minutes`, `minutes`, ...),
+                   or `{"state": "low" | "moderate" | "high"}` — `cardio_state` reads either; `high` is one strain signal
     landmarks      `config/training_landmarks.json` `muscles` (MRV per muscle — practitioner landmarks, heuristic)
 
 WHAT IT RETURNS (`assess`): `state` (recovered | normal | strained | overreached), `action` (maintain | reduce |
@@ -93,6 +93,12 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "label": HEURISTIC,
         "basis": "the readiness tier the draft carries (green >= 67 / yellow >= 34 / red, the vendor's own bands, "
         "`mcp/tools_plan._recovery_tier`); red is one strain signal. Inside an HR regime marker's window it is unknown",
+    },
+    "cardio_hard_minutes_high": {
+        "value": 60,
+        "label": HEURISTIC,
+        "basis": "more hard cardio minutes (cardio_model.HARD_RPE or above) in the window than the charter's own conditioning "
+        "budget (two blocks a week of at most 30 min) reads as high cardio load",
     },
     "sleep_short_hours": {"value": 6.5, "label": HEURISTIC, "basis": "the charter's progression refusal text (sleep < 6.5 h)"},
     "adherence_low": {
@@ -324,6 +330,23 @@ def adherence(workouts: list[dict[str, Any]] | None, *, as_of: str, planned_per_
 
 
 # ── the decision ──────────────────────────────────────────────────────────────
+def cardio_state(load: dict[str, Any] | None) -> str | None:
+    """The cardio seam (L4): a given `state`, else `cardio_model.cardio_load`'s `hard_minutes` against
+    `cardio_hard_minutes_high`; None = unread."""
+    if not isinstance(load, dict):
+        return None
+    if load.get("state") in CARDIO_LOAD_STATES:
+        return str(load["state"])
+    hard = _num(load.get("hard_minutes"))
+    if hard is None:
+        return None
+    return (
+        "high"
+        if hard > THRESHOLDS["cardio_hard_minutes_high"]["value"]
+        else ("moderate" if (_num(load.get("minutes")) or 0) > 0 else "low")
+    )
+
+
 def _signal(name: str, state: str, why: str, threshold: str | None) -> dict[str, Any]:
     return {"signal": name, "state": state, "why": why, "threshold": threshold}
 
@@ -349,9 +372,14 @@ def _systemic(
         out.append(
             _signal("sleep", "strain" if short else "ok", "short night" if short else "sleep at or over the line", "sleep_short_hours")
         )
-    cl = (cardio_load or {}).get("state")
+    cl = cardio_state(cardio_load)
     out.append(
-        _signal("cardio_load", "strain" if cl == "high" else ("ok" if cl in CARDIO_LOAD_STATES else "unknown"), f"cardio load {cl}", None)
+        _signal(
+            "cardio_load",
+            "strain" if cl == "high" else ("ok" if cl in CARDIO_LOAD_STATES else "unknown"),
+            f"cardio load {cl}",
+            "cardio_hard_minutes_high",
+        )
     )
     over = sorted(m for m, n in hard_sets.items() if (((landmarks or {}).get(m) or {}).get("MRV") or 1e9) < n)
     out.append(

@@ -1,5 +1,6 @@
 """#5861 L3 — THE NO-LIVE-CHANGE PROOF: while the exercise library is `proposed`, every path L3 touched produces the output
-it produced before L3 (base `c97168868`, the #5857 integration branch), byte for byte.
+it produced before L3, byte for byte (base: the #5857 integration branch merged with L1's library, without L3's
+commits — `c97168868` first, then integration `5c4bd12d0` + L1 `fb354ceae` once L1 regenerated the library).
 
 Two halves:
   1. PINNED DIGESTS — sha256 of the shadow output, per family, over a fixed synthetic world (every rotation position of
@@ -46,12 +47,12 @@ from training import (
 )
 
 INPUTS = ("config/exercise_library.json", "config/movement_catalog.json", "config/training_charter.json")
-INPUT_SHA = "35d9aebe28d3535c"  # sha256 (first 16) of the three INPUTS, concatenated, when the pins were computed
+INPUT_SHA = "74ef624b2c3bdb16"  # sha256 (first 16) of the three INPUTS, concatenated, when the pins were computed
 PINNED = {
-    "for_session": "d4d3f08f8f981be3",
-    "select_week": "561116ff3b5f44f6",
+    "for_session": "721ef29afa496c7d",
+    "select_week": "692998fa930e8476",
     "commit": "e437491b8e81f8b4",
-    "note_fb": "d0bba5d70f4a6792",
+    "note_fb": "3f38f3926e815c16",
 }
 """Per family, the digest of every scenario's shadow output — identical on the base tree and on L3's (see the module doc)."""
 
