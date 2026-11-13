@@ -182,7 +182,12 @@ def _equivalence_errors(lib: dict[str, Any]) -> list[str]:
                 (r for r in (mv.get(adj.get("comparator")) or {}).get("hypertrophy") or [] if r.get("target") == row.get("target")), None
             )
             order = quality_rubric.QUALITY_TIERS
-            if comp is None or order.index(str(comp.get("tier"))) >= order.index(str(row.get("rubric_tier"))):
+            if (
+                comp is None
+                or comp.get("tier") not in order
+                or row.get("rubric_tier") not in order
+                or order.index(str(comp.get("tier"))) >= order.index(str(row.get("rubric_tier")))
+            ):
                 out.append(
                     f"movements.{mid}: equivalence with {adj.get('comparator')!r} needs a higher-tier comparator for {row.get('target')}"
                 )
@@ -192,8 +197,8 @@ def _equivalence_errors(lib: dict[str, Any]) -> list[str]:
 def _hypertrophy_row_errors(errors: list[str], w: str, e: dict[str, Any], row: dict[str, Any], citations: Any) -> None:
     """One per-target row (#5857): a quality tier S-D the rubric derives (plus at most one recorded evidence band), and
     its evidence confidence beside it. Evidence above `none_reviewed` cites a registered reference and carries a date."""
-    if row.get("tier") not in TIERS:
-        _err(errors, w, f"tier {row.get('tier')!r}")
+    if row.get("tier") not in TIERS and not (row.get("tier") is None and row.get("applicable") is False):
+        _err(errors, w, f"tier {row.get('tier')!r} (S-D, or None only on a not-applicable row, #5861)")
     for why in quality_rubric.derivation_problems(e, row):
         _err(errors, w, f"{row.get('target')}: {why}")
     if row.get("evidence_confidence") not in EVIDENCE_CONFIDENCE:
@@ -345,6 +350,61 @@ def validate(lib: dict[str, Any]) -> list[str]:
         if requires_skill_gate(e) and not kinds & {"chain_prerequisite", "owner_confirmation", "charter_gate"}:
             _err(errors, w, "skill movement without a chain / owner-confirmation / charter gate")
     errors += _equivalence_errors(lib)
+    errors += _evaluation_errors(lib)
+    return errors
+
+
+def canonical_of(lib: dict[str, Any], ref: str) -> Optional[str]:
+    """The canonical movement key for a library key OR a Hevy template id (#5861 alias layer); None when unknown. Every
+    pre-existing key and template id resolves: aliases and variants keep their own entries and name their canonical."""
+    mv = movements(lib)
+    e = mv.get(ref) or next((x for x in mv.values() if str(x.get("template_id") or "").upper() == str(ref).upper()), None)
+    return None if e is None else str(e.get("canonical") or next(k for k, x in mv.items() if x is e))
+
+
+def _input_ok(k: str, v: Any) -> bool:
+    """One objective input against its vocabulary: `functional` a list of qualities, `conditioning` None or a
+    {aerobic, control, impact, recovery} map of levels, every other input a single allowed value."""
+    allowed = quality_rubric.OBJECTIVE_INPUTS[k]
+    if k == "functional":
+        return isinstance(v, list) and all(x in allowed for x in v)
+    if k == "conditioning":
+        return v is None or (isinstance(v, dict) and set(v) == set(allowed) and all(x in quality_rubric.LEVELS for x in v.values()))
+    return v in allowed
+
+
+_ALIAS_SAME = ("family", "job", "pattern", "length_bias", "resistance_profile", "stability", "joint_stress", "skill_complexity")
+
+
+def _evaluation_errors(lib: dict[str, Any]) -> list[str]:
+    """#5861: category / trunk_function / functions in vocabulary, objective inputs well-formed, every rating what the
+    objective rubrics derive, and the canonical layer coherent (each canonical resolves; an alias carries its canonical's
+    attributes; the index and the entries agree)."""
+    errors: list[str] = []
+    qr = quality_rubric
+    mv = movements(lib)
+    for mid, e in mv.items():
+        w = f"movements.{mid}"
+        if e.get("category") not in qr.CATEGORIES:
+            _err(errors, w, f"category {e.get('category')!r}")
+        if "trunk_function" in e and e["trunk_function"] not in qr.TRUNK_FUNCTIONS:
+            _err(errors, w, f"trunk_function {e.get('trunk_function')!r}")
+        if any(f not in qr.FUNCTIONS for f in e.get("functions") or []):
+            _err(errors, w, f"functions {e.get('functions')!r}")
+        inp = e.get("objective_inputs") or {}
+        for k in qr.OBJECTIVE_INPUTS:
+            if k not in inp or not _input_ok(k, inp.get(k)):
+                _err(errors, w, f"objective_inputs.{k} {inp.get(k)!r}")
+        errors += [f"{w}: {why}" for why in qr.rating_problems(e)]
+        head = canonical_of(lib, mid)
+        if head not in mv:
+            _err(errors, w, f"canonical {e.get('canonical')!r} is not a library movement")
+        elif (e.get("variant") or {}).get("duplicate_of") and any(e.get(f) != mv[head].get(f) for f in _ALIAS_SAME):
+            _err(errors, w, f"an alias of {head} carries different attributes")
+    for head, fam in (lib.get("canonical_families") or {}).items():
+        for k in list(fam.get("aliases") or []) + list(fam.get("variants") or {}):
+            if (mv.get(k) or {}).get("canonical") != head:
+                _err(errors, f"canonical_families.{head}", f"{k} does not name {head} as its canonical")
     return errors
 
 
