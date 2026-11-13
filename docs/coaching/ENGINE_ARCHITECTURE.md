@@ -392,6 +392,42 @@ ruling.
   S on any objective and ranks outside the S/A pool.
 - **The glute S standard** (ruling 17, rubric 3.4.0): see docs/coaching/EXERCISE_LIBRARY.md "Owner rulings 2026-11-13".
 
+## 4f. The sixth red team's week (`live_pain`, `live_stimulus`, FIX7, 2026-11-13)
+
+The sixth red team graded the live engine C+: one progression defect (a stall-reset ratchet) and rules that each cut a little
+effort or volume until too little hard training was left. The owner's standard: eliminate unproductive fatigue, not hard
+training. Every rule below is live-only and a labelled heuristic registered in `HEURISTIC_HOOKS`.
+
+- **The stall is judged after the reset** (`fatigue_model._trend`, `_reset_start`). An exposure whose top load sits 7%+ under the
+  previous comparable exposure (same session role, else a top set within 3 reps) on a lift that was not climbing is the engine's
+  own reset; the trend is judged from there on, and with fewer than 3 exposures since it the lift reads `rebuilding` — the
+  reset's rep range stays, the load builds by double progression, no second cut. A heavier top load at a held e1RM is the double
+  progression stepping, never a stall. `scripts/progression_sim_5861.py` feeds drafted weeks back as the next week's record.
+- **A held e1RM in a deficit is maintained** (`deficit_hold_pct`): with the weigh-ins falling 0.25 %BW/week or more, an
+  effort-adjusted e1RM within 3% of its best at steady RPE reads `holding` — no reset; reps and effort keep building.
+- **The lead lift by state** (`live_rulings.lead_blocked`): a cut, reset, rebuilding, regressing or pain-capped lift never leads
+  the heavy lower day; the other leads at RPE 8-9. The ISO-week alternation is the tie-break.
+- **The pain rule acts on what provokes it** (`live_pain`): a discomfort note at or under 2/10 touches only its lift (a hard
+  set at RPE <= 8 with the stop line); above it the provoking PATTERN is capped; above the mild line a pain-free member of the
+  same family (low on the flagged joint) stands in at RPE <= 8, else the muscle's own low-stress route; a priority muscle is
+  never taken to zero. The "get it assessed" line rides the flagged lift only.
+- **The press family's joint ratings by implement** (`exercise_library_input_review.PRESS_FAMILY_JOINTS`, in the builder):
+  every barbell press loads the elbow moderately (and a barbell bench the wrist); dumbbell, machine, cable and landmine presses
+  load it low.
+- **Purposeful cardio reads the record**: an easy block's named purpose is the week's aerobic floor when the recorded,
+  credited minutes leave the week 15+ minutes short; the shared cap's idle minutes (10+) take it, else the walk prompt.
+  `hard_conditioning_doses` (default 1, OWNER DECISION) adds a second hard block on upper volume at 2.
+- **A fast cut with broad regression** (`live_stimulus.FAST_CUT`): ~1/3 of the accessory sets off, loads and intensity held,
+  the advisory line names it — instead of a blanket 10% load cut.
+- **Allocation**: a priority muscle never plans under a non-priority isolation muscle (`PARITY`, net-zero moves, donors keep
+  MEV + 1); no addition takes an isolation slot past 3 sets (`live_balance.SLOT_MAX`); the set cap trims delt surplus first.
+- **Familiar swaps** (`live_week.FAMILIAR_SWAP`): a same-pattern swap for a lift logged 3+ times works at target ("set 1 finds
+  the load"), no novelty or layoff cap.
+- **Hard-set floors** (`live_stimulus.WEEK_FLOOR`): the week's last session counts each muscle's HARD sets and tops a muscle
+  under MEV up (its own slot to 3 sets, else a logged low-fatigue isolation; a 3-day week's full-body day takes a donor's slot).
+  An unconfirmed deload keeps one anchor top set at RPE 8 (`DELOAD_TOP_SET`). The sample week's note lint is blocking for
+  L1 / L6 / L12 (`sample_weeks_5861.BLOCKING_LINT_RULES`, `--strict-lint`).
+
 ## Block-retro hooks (ruling 18)
 
 Every heuristic the live engine reads is labelled `heuristic` in its table and is re-tuned at a block retro (the

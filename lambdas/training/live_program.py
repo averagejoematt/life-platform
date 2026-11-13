@@ -645,7 +645,9 @@ def _record_index(workouts: Any) -> dict[str, list[dict[str, Any]]]:
         for x in w.get("exercises") or []:
             sets = [s for s in x.get("sets") or [] if str(s.get("type") or "normal") != "warmup" and s.get("weight_kg")]
             if sets and x.get("template_id"):
-                idx.setdefault(str(x["template_id"]).upper(), []).append({"date": day, "sets": sets})
+                from training.fatigue_model import session_role  # #5861 FIX7: a heavy and a volume day are compared apart
+
+                idx.setdefault(str(x["template_id"]).upper(), []).append({"date": day, "sets": sets, "role": session_role(w)})
     for rows in idx.values():
         rows.sort(key=lambda r: r["date"], reverse=True)
     return idx
@@ -674,12 +676,14 @@ def mark_retreats(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, trends
             continue
         lo = ((e.get("sets") or [{}])[0].get("reps") or [None])[0]
         judged = e | {"live_cost": fatigue_cost(e, ctx), "live_retreated": False}
-        prior, done = previous_load(hist, tid, week[0]), previous_load(hist, tid, shift_day_key(week[0], 1))
+        first = next((r for r in hist[tid] if r["date"] == week[0]), {})
+        same = {tid: [r for r in hist[tid] if not first.get("role") or not r.get("role") or r["role"] == first["role"]]}
+        prior, done = previous_load(same, tid, week[0]), previous_load(same, tid, shift_day_key(week[0], 1))
         cut = (load_decision(judged, trends.get(tid), prior, None, lo) or {}).get("mode") == "down"
-        # the cut must have HAPPENED: the earlier exposure's top load sits under the session before it (a guard cut the engine's
-        # own lower load already met changed nothing, and holds nothing now)
-        cut = cut and prior is not None and done is not None and float(done["lb"]) < float(prior["lb"]) - 0.5
-        if cut or (e.get("kind") == "anchor" and trends.get(tid) == "stalled"):
+        # the cut must have HAPPENED: the earlier exposure's top load sits under the session before it in the SAME role (a guard
+        # cut the engine's own lower load already met changed nothing; #5861 FIX7: a volume day's lighter squat is no cut)
+        dropped = prior is not None and done is not None and float(done["lb"]) < float(prior["lb"]) - 0.5
+        if (cut and dropped) or (e.get("kind") == "anchor" and trends.get(tid) == "stalled" and dropped):
             e["live_retreated"] = True
             lines.append(
                 f"one cut a week (live): {entry.get('title') or e.get('movement_key')} — already cut or reset on {week[0]}; held "
@@ -817,6 +821,9 @@ def guard_loads(
         if not d or prev is None:
             continue
         prev_kg = float(prev["lb"]) * 0.45359237
+        if d["mode"] == "down":  # #5861 FIX7: a cut is taken off this rep band's own last top load, never a volume day's lighter one
+            hi_reps = max((int(getattr(s, "rep_range_end", 0) or 0) for s in work), default=0)
+            prev_kg = max(prev_kg, band_top_kg(history_index.get(tid) or [], target_date, hi_reps))
         cap = prev_kg if d["mode"] == "hold" else _floor_to_implement(prev_kg * (1 - d["pct"] / 100.0), entry.get("equipment"))
         top = max(float(s.weight_kg) for s in work)
         if (top - cap) / 0.45359237 < 0.5:  # under half a pound apart: the same load on the rack
@@ -844,6 +851,22 @@ def guard_loads(
         )
     if ls.MARK in rx:
         rx[ls.MARK]["load_guard"] = out
+    return out
+
+
+def band_top_kg(rows: list[dict[str, Any]], target_date: str, rep_hi: int, days: int = 14) -> float:
+    """The heaviest top set of this lift's exposures in the last `days` whose top-set reps sit in the exposure's rep band (at most
+    rep_hi + 2): the base a cut is taken from when the latest exposure was another day's lighter, higher-rep work (0.0 = none)."""
+    from common.pacific_time import shift_day_key
+
+    since, out = shift_day_key(target_date, -days), 0.0
+    for r in rows or []:
+        if not since <= str(r.get("date") or "") < target_date:
+            continue
+        sets = [x for x in r.get("sets") or [] if x.get("weight_kg") and x.get("reps")]
+        top = max(sets, key=lambda x: float(x["weight_kg"]), default=None)
+        if top and rep_hi and int(top["reps"]) <= rep_hi + 2:
+            out = max(out, float(top["weight_kg"]))
     return out
 
 

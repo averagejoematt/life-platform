@@ -123,10 +123,9 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
     "reset_detect_pct": {
         "value": 0.07,
         "label": HEURISTIC,
-        "basis": "#5861 FIX7 (sixth red team: the reset ratchet): an exposure whose top working load sits 7%+ under the exposure "
-        "before it, on a lift whose trend before it was not climbing (not progressing / step_due), is the engine's own retreat (a STALL_RULE reset or a "
-        "LOAD_POLICY regression cut: ~10%, floored to the implement step) — the trend is judged from that exposure on, never "
-        "against the pre-reset best",
+        "basis": "#5861 FIX7 (sixth red team: the reset ratchet): an exposure whose top working load sits 7%+ under the comparable "
+        "exposure before it, not ground out (RPE < 9), is a load DROP — a STALL_RULE reset, a LOAD_POLICY cut or a deload (~10%, "
+        "floored to the implement step); the trend is judged from that exposure on, never against the pre-drop best",
     },
     "post_reset_min_exposures": {
         "value": 3,
@@ -279,39 +278,42 @@ def _trend(
     keep = [i for i, p in enumerate(points) if p[1] is not None]
     pts = [points[i] for i in keep]
     rl = [(roles or [])[i] if i < len(roles or []) else "" for i in keep]
-    start = _reset_start(pts, deficit, rl)
+    start, scheme = _reset_start(pts, deficit, rl)
     if start is None:
         return _judge(pts, deficit, rl)
     since, need = pts[start:], int(THRESHOLDS["post_reset_min_exposures"]["value"])
     reset = {"reset_at": pts[start][0], "since_reset": len(since)}
     if len(since) < need:
-        why = f"reset on {pts[start][0]}: {len(since)} of {need} exposures since — rebuilding, no stall call (post_reset_min_exposures)"
-        return {"trend": "rebuilding", "why": why, **reset}
+        trend = "rebuilding" if scheme else "returning"  # a stall reset's rep scheme stays; a cut / deload drop just builds back
+        why = f"a load drop on {pts[start][0]}: {len(since)} of {need} exposures since — {trend}, no stall call (post_reset_min_exposures)"
+        return {"trend": trend, "why": why, **reset}
     return _judge(since, deficit, rl[start:]) | reset
 
 
 def _reset_start(
     pts: list[tuple[str, float | None, float | None, float | None, int | None]], deficit: bool | None, roles: list[str] | None = None
-) -> int | None:
-    """Index of the latest exposure that was a reset (`reset_detect_pct`): its top load 7%+ under the latest COMPARABLE exposure
-    before it (`_comparable`: the same session role, else a top set within 3 reps — a volume day's lighter squat is not a reset
-    of the heavy day's) while the trend judged up to it (from the previous reset on, the same rule) was not climbing (stalled,
-    regressing, holding or too few exposures to call — the record may hold fewer exposures than the draft that reset it saw).
-    None = no reset in the window."""
-    start, drop = None, float(THRESHOLDS["reset_detect_pct"]["value"])
+) -> tuple[int | None, bool]:
+    """(index, scheme) of the latest load DROP in the window (`reset_detect_pct`): a top load 7%+ under the latest COMPARABLE
+    exposure before it (`_comparable`: the same session role, else a top set within 3 reps — a volume day's lighter squat is not a
+    drop from the heavy day's) and not ground out (RPE < 9: a lighter load ground out is a regression). Whatever made it — a stall
+    reset, a regression cut, a deload — judging the next exposures against the pre-drop best is the ratchet the sixth red team
+    proved. `scheme`: the drop came with MORE reps than the exposure before it (the stall reset's own signature: its rep scheme
+    stays while the load builds back). A drop inside the post-reset window is not a second drop. (None, False) = none."""
+    start, scheme, drop = None, False, float(THRESHOLDS["reset_detect_pct"]["value"])
     need = int(THRESHOLDS["post_reset_min_exposures"]["value"])
     roles = roles or [""] * len(pts)
     for k in range(1, len(pts)):
         j = next((i for i in range(k - 1, -1, -1) if _comparable(pts[i], pts[k], roles[i], roles[k])), None)
         before, now = (pts[j][3] if j is not None else None), pts[k][3]
-        if before is None or now is None or now > before * (1 - drop) or (pts[k][2] is not None and float(pts[k][2]) >= 9.0):
-            continue  # not a drop — or a lighter load ground out at RPE 9+, which is a regression, never a reset done as written
-        base = pts[(start or 0) : k]
-        if start is not None and len(base) < need:
-            continue  # still rebuilding from the last reset: a lighter session here is not a second reset
-        if _judge(base, deficit)["trend"] not in ("progressing", "step_due"):  # a drop off a lift that was not climbing
-            start = k
-    return start
+        if j is None or before is None or now is None or now > before * (1 - drop):
+            continue
+        if pts[k][2] is not None and float(pts[k][2]) >= 9.0:
+            continue  # a lighter load ground out at RPE 9+ is a regression, never a reset done as written
+        if start is not None and k - start < need:
+            continue  # still rebuilding from the last drop: a lighter session here is not a second one
+        start = k
+        scheme = pts[k][4] is not None and pts[j][4] is not None and int(pts[k][4] or 0) > int(pts[j][4] or 0)
+    return start, scheme
 
 
 def _comparable(a: tuple[Any, ...], b: tuple[Any, ...], role_a: str, role_b: str) -> bool:
@@ -387,11 +389,14 @@ def _e1rm_rir(p: tuple[str, float | None, float | None, float | None, int | None
 
 
 def loss_rate_pct(weights_by_day: Any) -> float | None:
-    """The weekly loss (%BW/week) between the oldest and the newest 7 days of the weigh-ins read; None under two weeks of them."""
+    """The weekly loss (%BW/week) between the oldest and the newest 7 days of the last 28 days of weigh-ins read; None under two
+    weeks of them."""
     from common.pacific_time import parse_day_key
 
     raw = {parse_day_key(str(k)[:10]): _num(v) for k, v in (weights_by_day or {}).items()} if isinstance(weights_by_day, dict) else {}
     days = {d: float(v) for d, v in raw.items() if d is not None and v}
+    if days:  # the last four weeks of weigh-ins only: the CURRENT rate, never the whole history's
+        days = {d: v for d, v in days.items() if (max(days) - d).days < 28}
     if not days or (max(days) - min(days)).days < 13:
         return None
     lo, hi = min(days), max(days)
