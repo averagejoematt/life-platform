@@ -69,6 +69,7 @@ FATIGUE_COST_BASIS = (
     "+2 more on a high spinal load while the fatigue model flags axial stacking"
 )
 LIVE_PICK_KEYS = ("objective", "fatigue_cost", "discomfort", "trend", "rotation", "repeat")
+LIVE_GATES_SOURCE = "#5772's stored evaluation (#5861, live): only `unlocked` opens; no fresh evaluation = locked"
 
 
 # ── facts per movement ────────────────────────────────────────────────────────
@@ -133,10 +134,50 @@ def gate_locked(entry: dict[str, Any], lib: dict[str, Any], mid: str, gate_eval:
     every locking gate (fail-closed)."""
     from training import block_design_review as bdr, selection_engine as se
 
-    gates = se._locking_gates(entry, lib)
+    gates = se.locked_gates(entry, lib)
     if not isinstance(gate_eval, dict):
         return gates
     return [g for g in gates if bdr.gate_state(gate_eval, g, mid).get("state") != "unlocked"]
+
+
+def gates(lid: str, entry: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
+    """The engine's gate predicate: the live evaluation (fail-closed) under a policy, else the #5773 rule (all locked)."""
+    from training import selection_engine as se
+
+    if ctx.get("policy"):
+        return gate_locked(entry, ctx["lib"], lid, ctx["policy"].get("gate_eval"))
+    return se.locked_gates(entry, ctx["lib"])
+
+
+def held(p: dict[str, Any]) -> bool:
+    """A slot the live policy HELD keeps its movement — the lengthened pass never undoes a hold. Never true in shadow."""
+    return ((p.get("pick") or {}).get("rotation") or {}).get("action") == "hold"
+
+
+def count_pick(p: dict[str, Any], policy: dict[str, Any] | None, ctx: dict[str, Any]) -> None:
+    """Count the pick toward the week's repetition rule; an owner pin or approval records its own rotation decision
+    (`owner_request` when it names a movement other than the slot's previous variant). No policy (shadow): nothing."""
+    if policy is None:
+        return
+    pick = p["pick"]
+    policy["week_counts"][pick["catalog_key"]] += 1
+    if (p.get("owner_pin") or {}).get("state") == "held" and "rotation" not in pick:
+        prev = previous_variant(ctx.get("slot_last") or {})
+        same = prev in (None, pick["catalog_key"])
+        pick["rotation"] = {"action": "hold" if same else "rotate", "previous": prev, "trigger": None if same else "owner_request"}
+
+
+def decision(chosen: dict[str, Any]) -> dict[str, Any]:
+    """The rotation slot's `rotation_decision` (read by `week_commitments._live_hold`) — {} for a shadow pick."""
+    rot = (chosen.get("pick") or {}).get("rotation")
+    return {"rotation_decision": rot} if rot else {}
+
+
+def line_suffix(p: dict[str, Any]) -> str:
+    """The draft rationale's words for a live pick's hold/rotation and repetition ("" for a shadow pick)."""
+    rot, rep = p.get("rotation") or {}, p.get("repeat") or {}
+    out = f" — {rot.get('action')}: {rot.get('reason') or rot.get('trigger') or rot.get('why')}" if rot else ""
+    return out + (f" — {rep['code']}: {rep['why']}" if rep.get("code") else "")
 
 
 def rank_key(c: dict[str, Any], recent: set[str], slot_last: dict[str, int], pool: tuple[str, ...]) -> tuple[Any, ...]:
@@ -332,8 +373,23 @@ def build_policy(
     }
 
 
+def for_apply(lib: dict[str, Any], position: Any, rows: Any, block_workouts: Any, target_date: str | None, approvals: Any) -> dict:
+    """`selection_engine.apply`'s live policy. The gate evaluation is read beside the approval (`variant_rotation.for_session`
+    read the ledger, so `approvals` is not None); an injected ledger reads neither and every gate stays locked."""
+    from training import block_design_review
+
+    as_of = target_date or (position or {}).get("date")
+    read = approvals is not None
+    gate_eval = block_design_review.load_gate_eval_failsoft(str(as_of or "")) if read else {"state": "not_read", "row": None}
+    return build_policy(lib, position=position, rows=rows, block_workouts=block_workouts, as_of=as_of, gate_eval=gate_eval)
+
+
 def summary(policy: dict[str, Any]) -> dict[str, Any]:
-    """The live policy's record on the selection (no rows, no counts)."""
+    """The live policy's fields on the selection record (no rows, no counts): `live_policy` and the live `gates_source`."""
+    return {"live_policy": _summary(policy), "gates_source": LIVE_GATES_SOURCE}
+
+
+def _summary(policy: dict[str, Any]) -> dict[str, Any]:
     return {
         "issue": ISSUE,
         "gates": f"evaluated ({policy.get('gate_eval_state')}); anything but a fresh read locks every gate",

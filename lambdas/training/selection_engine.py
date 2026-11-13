@@ -80,7 +80,7 @@ import os
 import time
 from typing import Any
 
-from training import exercise_library as xl
+from training import exercise_library as xl, selection_live as live
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,6 @@ PAIN_SOURCE = (
     "and form/equipment never exclude; a library not_for_you_now excludes as its own curated verdict"
 )
 GATES_SOURCE = "every locking gate reads LOCKED until #5772 evaluates gates (unknown input = locked)"
-LIVE_GATES_SOURCE = "#5772's stored evaluation (#5861, live): only `unlocked` opens; no fresh evaluation = locked"
 C_REASONS: dict[str, str] = {
     "equipment": "a higher-tier movement for this slot exists but is not available at home_gym",
     "pain_swap": "a higher-tier movement for this slot exists but is pain-excluded",
@@ -124,7 +123,6 @@ C_REASONS: dict[str, str] = {
 follows the owner's no-repeats ruling (2026-11-11): they name the higher-tier movement the slot could not serve."""
 PROGRESSION_DROP = 0.05  # platform-proposed: a latest band best >5 % under the best band's e1RM reads as regressing
 APPROVAL_SERVES = ("approved", "prior_block")  # `block_design_review.APPROVED` / `PRIOR_BLOCK` (#5776)
-LIVE_PICK_KEYS = ("objective", "fatigue_cost", "discomfort", "trend", "rotation", "repeat")  # `selection_live.LIVE_PICK_KEYS`
 SKILL_TRACK_VOLUME = {"sets_max": 2, "reps_max": 5, "rpe_max": 7, "provenance": "platform-proposed (#5773), low volume"}
 
 _LIB_TTL_S = 900
@@ -226,24 +224,11 @@ def availability(
     return None
 
 
-def _locking_gates(entry: dict[str, Any], lib: dict[str, Any]) -> list[str]:
-    gates = lib.get("gates") or {}
-    return [g for g in entry.get("gates") or [] if (gates.get(g) or {}).get("locks") and gates[g].get("kind") not in GLOBAL_GATE_KINDS]
-
-
 def locked_gates(entry: dict[str, Any], lib: dict[str, Any]) -> list[str]:
     """The entry's locking gates (every one LOCKED until #5772 — `GATES_SOURCE`). A clinical cue never locks; the two
-    global gates (pain, equipment) are evaluated here directly. LIVE (#5861) reads the evaluation instead
-    (`selection_live.gate_locked`, fail-closed)."""
-    return _locking_gates(entry, lib)
-
-
-def _gates_locked(lid: str, e: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
-    if ctx.get("policy"):  # #5861 L3, LIVE only: the stored #5772 evaluation, fail-closed
-        from training import selection_live
-
-        return selection_live.gate_locked(e, ctx["lib"], lid, ctx["policy"].get("gate_eval"))
-    return locked_gates(e, ctx["lib"])
+    global gates (pain, equipment) are evaluated here directly. LIVE reads the evaluation (`selection_live.gates`)."""
+    gates = lib.get("gates") or {}
+    return [g for g in entry.get("gates") or [] if (gates.get(g) or {}).get("locks") and gates[g].get("kind") not in GLOBAL_GATE_KINDS]
 
 
 def pain_source_state(overlay: dict[str, Any] | None) -> str:
@@ -372,9 +357,9 @@ def _exclusion(lid: str, e: dict[str, Any], ck: str | None, ctx: dict[str, Any])
     why = availability(e, ctx["lib"], ctx["overlay"], ctx["inventory"])
     if why:
         return "equipment", why
-    gates = _gates_locked(lid, e, ctx)
+    gates = live.gates(lid, e, ctx)
     if gates:
-        return "gate_locked", f"gate {', '.join(gates)} locked ({GATES_SOURCE if not ctx.get('policy') else LIVE_GATES_SOURCE})"
+        return "gate_locked", f"gate {', '.join(gates)} locked ({live.LIVE_GATES_SOURCE if ctx.get('policy') else GATES_SOURCE})"
     why = _not_prescribable(ck, ctx["spec"], ctx["catalog"], ctx["ceiling"], ctx["missing"])
     if why:
         return "not_prescribable", why
@@ -416,17 +401,12 @@ def candidates(ctx: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str
         if xl.movement_pattern(str(e.get("title") or "")) not in spec["patterns"]:
             continue
         ck = ctx["idx"]["to_cat"].get(lid)
-        c = _candidate(lid, e, ck, ctx)
-        if ctx.get("policy"):  # #5861 L3, LIVE only: the slot objective's tier and the fatigue facts (None = not applicable)
-            from training import selection_live
-
-            live = selection_live.decorate(c, e, ctx)
-            if live is None:
-                continue
-            c = live
+        c = live.decorate(_candidate(lid, e, ck, ctx), e, ctx) if ctx.get("policy") else _candidate(lid, e, ck, ctx)
+        if c is None:  # #5861 L3, live only: not applicable to the slot's objective
+            continue
         hit = _exclusion(lid, e, ck, ctx)
         if hit:
-            excluded.append({**c, "code": hit[0], "why": hit[1], "gates": _gates_locked(lid, e, ctx) if hit[0] == "gate_locked" else []})
+            excluded.append({**c, "code": hit[0], "why": hit[1], "gates": live.gates(lid, e, ctx) if hit[0] == "gate_locked" else []})
         else:
             eligible.append(c)
     return eligible, excluded
@@ -538,9 +518,7 @@ def _novel_terms(pick: dict[str, Any]) -> dict[str, Any] | None:
 def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], week_taken: set[str]) -> dict[str, Any]:
     """One slot's selection: the ranked eligible candidates, the pick, its C-reason, its fallbacks, the exclusions."""
     if ctx.get("policy"):  # #5861 L3, LIVE only: hold while progressing, rotate for a named trigger, repeat when it helps
-        from training import selection_live
-
-        return selection_live.select_slot(slot, ctx, recent)
+        return live.select_slot(slot, ctx, recent)
     eligible, excluded = candidates(ctx)
     mine = ctx.get("slot_last") or {}
     pool = pool_tiers(eligible)
@@ -699,11 +677,6 @@ def _pool_ranked(eligible: list[dict[str, Any]], recent: set[str], slot_last: di
     return sorted(eligible, key=lambda c: rank_key(c, recent, slot_last, pool))
 
 
-def _held(p: dict[str, Any]) -> bool:
-    """#5861 L3 (live only): a slot the live policy HELD keeps its movement — the lengthened pass never undoes a hold."""
-    return ((p.get("pick") or {}).get("rotation") or {}).get("action") == "hold"
-
-
 def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """Each muscle >= 1 lengthened-bias movement per week — inside the pick's tier and N=1 score only."""
     rows = []
@@ -715,7 +688,7 @@ def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str
             and p.get("pick")
             and not p.get("pinned")
             and not p.get("owner_pin")
-            and not _held(p)
+            and not live.held(p)
         ]
         if any(p["pick"]["length_bias"] == "lengthened" for p in group):
             rows.append({"muscle": muscle, "state": "met"})
@@ -735,13 +708,12 @@ def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str
                 None,
             )
             if alt:
-                old = p["pick"]
                 p["pick"] = alt | {
                     "c_reason": p["pick"]["c_reason"],
                     "novel_terms": _novel_terms(alt),
                     "week_repeat": p["pick"].get("week_repeat"),
+                    **{k: p["pick"][k] for k in ("rotation", "repeat") if k in p["pick"]},  # #5861 L3: a live pick only
                 }
-                p["pick"] |= {k: old[k] for k in ("rotation", "repeat") if k in old}  # #5861 L3: live only
                 p["fallbacks"] = fallbacks(p["pick"], full[p["slot_id"]], novel_budget=NOVELTY_PER_SLOT - int(alt["novel"]))
                 p["lengthened_swap"] = True
                 swapped = p["slot_id"]
@@ -810,7 +782,7 @@ def _trim(p: dict[str, Any]) -> dict[str, Any]:
                 "novel_terms",
                 "week_repeat",
             )
-            + tuple(k for k in LIVE_PICK_KEYS if k in pick)  # #5861 L3: present on a LIVE pick only
+            + tuple(k for k in live.LIVE_PICK_KEYS if k in pick)  # #5861 L3: present on a LIVE pick only
         }
     locked = sorted(
         (x for x in p.get("excluded") or [] if x.get("code") == "gate_locked"), key=lambda x: (TIER_RANK[x["tier"]], x["movement_id"])
@@ -838,8 +810,6 @@ def select_week(
     policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Every accessory slot of the week ranked from the library. Pure (the caller loads library, overlay and ledger).
-    `policy` (#5861 L3) is `selection_live.build_policy(...)`: given ONLY when the library is approved (`apply`, live) —
-    None is the #5773/#5857 selection exactly.
     `owner_pins` {slot_id: {catalog_key, source, approved_block, experiment}} are the block design review's approved
     picks (#5776, `block_design_review.resolve`): each such slot serves its approved movement (`_owner_pinned`)."""
     from training import variant_rotation as vr
@@ -859,8 +829,7 @@ def select_week(
     full: dict[str, list[dict[str, Any]]] = {}
     for slot in vr.slots():
         ctx = _ctx(slot, env, step) | {"slot_last": slot_last_served(rows, position, slot["slot_id"])}
-        if policy is not None:
-            ctx |= {"policy": policy, "slot_id": slot["slot_id"]}
+        ctx |= {"policy": policy, "slot_id": slot["slot_id"]} if policy is not None else {}  # #5861 L3: `selection_live.build_policy`
         if slot["pinned"]:
             p = _pinned(slot, ctx) | {"spec": ctx["spec"]}
         elif (owner_pins or {}).get(slot["slot_id"]):
@@ -871,8 +840,7 @@ def select_week(
             full[slot["slot_id"]] = _pool_ranked(candidates(ctx)[0], recent, ctx["slot_last"])
         if p.get("pick") and p["pick"].get("catalog_key"):
             taken.add(p["pick"]["catalog_key"])
-            if policy is not None:
-                _live_count(p, policy, ctx)
+            live.count_pick(p, policy, ctx)  # #5861 L3: live only (no policy = no-op)
         picked.append(p)
     lengthened = _lengthened_pass(picked, full)
     by_role: dict[str, dict[str, str]] = {}
@@ -881,11 +849,6 @@ def select_week(
     from training import week_floors
 
     served = [{"key": v, "slot_id": f"{r}.{inc}", "role": r} for r, m in by_role.items() for inc, v in m.items()]
-    extra: dict[str, Any] = {}
-    if policy is not None:
-        from training import selection_live
-
-        extra = {"live_policy": selection_live.summary(policy), "gates_source": LIVE_GATES_SOURCE}
     return {
         "issue": ISSUE,
         "library_version": library_version(lib),
@@ -901,20 +864,7 @@ def select_week(
         "novelty": {"per_slot": NOVELTY_PER_SLOT, "novel_picks": [p["slot_id"] for p in picked if (p.get("pick") or {}).get("novel")]},
         "skill_track": _skill_track(lib, env),
         "week_check": week_floors.check_week(served, [], catalog, status=lib.get("status")),  # #5759/#5774's own check, unchanged
-    } | extra
-
-
-def _live_count(p: dict[str, Any], policy: dict[str, Any], ctx: dict[str, Any]) -> None:
-    """#5861 L3 (live only): count the pick toward the week's repetition rule; an owner pin or approval records its own
-    rotation decision (`owner_request` when it names a movement other than the slot's previous variant)."""
-    from training import selection_live
-
-    pick = p["pick"]
-    policy["week_counts"][pick["catalog_key"]] += 1
-    if (p.get("owner_pin") or {}).get("state") == "held" and "rotation" not in pick:
-        prev = selection_live.previous_variant(ctx.get("slot_last") or {})
-        same = prev in (None, pick["catalog_key"])
-        pick["rotation"] = {"action": "hold" if same else "rotate", "previous": prev, "trigger": None if same else "owner_request"}
+    } | (live.summary(policy) if policy is not None else {})
 
 
 # ── the switch: shadow beside the pools, live only for an approved library ───
@@ -977,8 +927,7 @@ def _live(
         extra = {"experiment": op["experiment"]} if op.get("experiment") else {}
         if chosen.get("top_band") and variant == pick:
             extra["top_band"] = chosen["top_band"]  # ruling B (#5856): the rotation commitment reads the band's size
-        if (chosen.get("pick") or {}).get("rotation") and variant == pick:
-            extra["rotation_decision"] = chosen["pick"]["rotation"]  # #5861 L3: a hold/rotation with its named trigger
+        extra |= live.decision(chosen) if variant == pick else {}  # #5861 L3: a live hold/rotation with its named trigger
         slots.append(s | {"variant": variant, "source": source, "pool": pool} | extra)
         if not held:
             writes.append(
@@ -1008,11 +957,7 @@ def _line(s: dict[str, Any]) -> str:
     p = s.get("pick") or {}
     why = f" — {p.get('tier')} because {p['c_reason']['code']}: {p['c_reason']['why']}" if p.get("c_reason") else ""
     op = s.get("owner_pin") or {}
-    rot = p.get("rotation") or {}
-    if rot:  # #5861 L3 (live only)
-        why += f" — {rot.get('action')}: {rot.get('reason') or rot.get('trigger') or rot.get('why')}"
-    if (p.get("repeat") or {}).get("code"):
-        why += f" — {p['repeat']['code']}: {p['repeat']['why']}"
+    why += live.line_suffix(p)  # #5861 L3: a live pick's hold/rotation and repetition, "" otherwise
     if op.get("state") == "held":
         why += f" — owner-approved (block {op.get('approved_block')}, {op.get('source')})"
         if op.get("experiment"):
@@ -1031,7 +976,6 @@ def apply(
     overlay: Any = ...,
     approvals: dict[str, Any] | None = None,
     block_workouts: list[dict[str, Any]] | None = None,
-    gate_eval: Any = ...,
 ) -> dict[str, Any]:
     """The rotation a draft serves, with the selection attached. `live` (an approved library) rewrites the served role's
     accessory variants; `shadow` leaves the #5075 pools serving and attaches the selection for comparison; `no_library`
@@ -1047,13 +991,9 @@ def apply(
     try:
         overlay = load_overlay_failsoft() if overlay is ... else overlay
         pins = (approvals or {}).get("pins") if (approvals or {}).get("state") in APPROVAL_SERVES else None
-        # #5861 L3: the gate evaluation is read beside the approval (`variant_rotation.for_session` read the ledger), so an
-        # injected ledger reads neither and every gate stays locked (fail-closed)
-        ge = gate_eval if gate_eval is not ... else (... if approvals is not None else {"state": "not_read", "row": None})
-        policy = _live_policy(lib, rotation.get("position"), rows, block_workouts, target_date, ge) if m == MODE_LIVE else None
-        sel = select_week(
-            rotation.get("position"), catalog, lib, overlay, rows=rows, skill_ceiling=skill_ceiling, owner_pins=pins, policy=policy
-        )
+        pos = rotation.get("position")
+        policy = live.for_apply(lib, pos, rows, block_workouts, target_date, approvals) if m == MODE_LIVE else None  # #5861
+        sel = select_week(pos, catalog, lib, overlay, rows=rows, skill_ceiling=skill_ceiling, owner_pins=pins, policy=policy)
     except Exception as e:  # noqa: BLE001 — the selection never blocks a draft
         logger.warning(f"selection_engine: the selection failed ({type(e).__name__}: {e}) — the #5075 pools serve")
         return rotation | {"selection": {"issue": ISSUE, "mode": m, "state": "failed", "error": f"{type(e).__name__}: {e}"[:200]}}
@@ -1065,17 +1005,6 @@ def apply(
     if m == MODE_LIVE:
         return _live(rotation, sel, catalog, rows, skill_ceiling, target_date) | {"selection": sel}
     return rotation | {"selection": sel}
-
-
-def _live_policy(
-    lib: dict[str, Any], position: Any, rows: Any, block_workouts: Any, target_date: str | None, gate_eval: Any
-) -> dict[str, Any]:
-    """#5861 L3 — LIVE only: the gate evaluation (read here unless injected; fail-closed) and the Hevy record's signals."""
-    from training import block_design_review, selection_live
-
-    as_of = target_date or (position or {}).get("date")
-    ge = block_design_review.load_gate_eval_failsoft(str(as_of or "")) if gate_eval is ... else gate_eval
-    return selection_live.build_policy(lib, position=position, rows=rows, block_workouts=block_workouts, as_of=as_of, gate_eval=ge)
 
 
 def snapshot_fields(rotation: dict[str, Any]) -> dict[str, Any]:

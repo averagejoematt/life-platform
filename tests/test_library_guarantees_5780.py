@@ -545,17 +545,23 @@ def test_g4_the_served_week_still_meets_rotation_once_the_library_is_approved():
 def test_g4_control_rotation_without_ruling_b_or_with_a_wider_band_goes_red(monkeypatch):
     lib = _lib("approved")
     program = _serve_program(lib, CAT0, kb=kb_entry.ENTRY_EXPOSURES, day=BLOCK_DAY)
-    held = [(pos, rot) for pos, rot in program if wc.rotation_holds(rot)]
-    assert held, "the approved program exercises ruling B (a band with one servable member held at a boundary)"
+    # #5861 L3 (owner 2026-11-12: rotation "for a reason", ruling B re-examined): LIVE drafting holds a slot while no
+    # rotation trigger fires and records why (`rotation_decision`); ruling B's sole-member hold is subsumed by it
+    held = [(pos, rot) for pos, rot in program if any(wc._live_hold(s) for s in wc._held(rot))]
+    assert held, "the approved program holds slots at a phase boundary, each with its recorded reason"
     pos, rot = held[0]
     row = next(r for r in wc.evaluate(rot, CAT0, on=BLOCK_DAY, library=lib)["rows"] if r["id"] == "rotation")
-    assert row["verdict"] == wc.MET and "owner ruling B" in row["detail"], "the accepted hold is recorded, not silent"
-    # control 1: a held slot whose band has a SECOND member is not accepted — it must rotate
+    assert row["verdict"] == wc.MET and "held for a reason" in row["detail"], "the accepted hold is recorded, not silent"
+    # control 1: a held slot with NO recorded reason and a band with a second member is not accepted — it must rotate
     bad = copy.deepcopy(rot)
-    s = next(x for x in bad["slots"] if x.get("top_band") and x["variant"] == x.get("previous"))
-    s["top_band"]["members"] = list(s["top_band"]["members"]) + ["a_second_member"]
+    for s in wc._held(bad):
+        s.pop("rotation_decision", None)
+        s["top_band"] = dict(
+            s.get("top_band") or {}, members=[s["variant"], "a_second_member"], sa_members=[s["variant"], "a_second_member"]
+        )
     assert any(o.startswith("rotation: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=lib))
-    # control 2: the rotation check without ruling B -> the same approved program blocks stage 1 again
+    # control 2: the rotation check without the live-hold acceptance or ruling B -> the same approved program blocks again
+    monkeypatch.setattr(wc, "_live_hold", lambda slot: False)
     monkeypatch.setattr(wc, "_sole_best", lambda slot: False)
     assert any(o.startswith("rotation: block") for o in _commitment_offenders(rot, pos, on=BLOCK_DAY, lib=lib))
 

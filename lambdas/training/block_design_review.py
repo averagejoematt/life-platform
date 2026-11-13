@@ -562,9 +562,8 @@ def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
     `read`, `stale` (its week ended more than EVALUATION_MAX_AGE_DAYS before `as_of`), `none` (nothing stored) or
     `read_failed: <type>`. Only `read` carries a row — every other state is FAIL-CLOSED: the caller reads every locking
     gate as locked, as before #5772 was read at all."""
-    import datetime as dt
-
     from boto3.dynamodb.conditions import Key
+    from common.pacific_time import parse_day_key
 
     try:
         if table is None:
@@ -582,10 +581,8 @@ def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
         return {"state": "none", "row": None, "week_end": None}
     row = json.loads(json.dumps(items[0], default=float))
     end = str(row.get("week_end") or row.get("as_of") or "")[:10]
-    try:
-        age = (dt.date.fromisoformat(str(as_of)[:10]) - dt.date.fromisoformat(end)).days
-    except ValueError:
-        age = None
+    a, e = parse_day_key(str(as_of)[:10]), parse_day_key(end)  # calendar-day keys, never instants (#3609)
+    age = (a - e).days if a and e else None
     if age is None or age > EVALUATION_MAX_AGE_DAYS:
         return {"state": "stale", "row": None, "week_end": end or None}
     return {"state": "read", "row": row, "week_end": end}

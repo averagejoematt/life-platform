@@ -31,7 +31,6 @@ library `approved`); in shadow it returns the prescription untouched (the same o
 from __future__ import annotations
 
 import copy
-import datetime as _dt
 from typing import Any
 
 ISSUE = "#5861"
@@ -139,10 +138,10 @@ def _day(w: dict[str, Any]) -> str:
 
 
 def _ago(as_of: str, day: str) -> int | None:
-    try:
-        return (_dt.date.fromisoformat(as_of[:10]) - _dt.date.fromisoformat(day[:10])).days
-    except ValueError:
-        return None
+    from common.pacific_time import parse_day_key  # a calendar-day key, never an instant (#3609)
+
+    a, d = parse_day_key(str(as_of)[:10]), parse_day_key(str(day)[:10])
+    return (a - d).days if a and d else None
 
 
 def _working(sets: Any) -> list[dict[str, Any]]:
@@ -223,10 +222,11 @@ def _trend(points: list[tuple[str, float | None, float | None, float | None, int
     if len(pts) < 2:
         return {"trend": "unknown", "why": f"{len(pts)} exposure(s) with a readable top set"}
     drop = THRESHOLDS["e1rm_drop_pct"]["value"]
-    best_before = max(p[1] for p in pts[:-2]) if len(pts) > 2 else pts[0][1]
-    if len(pts) > 2 and all(p[1] < best_before * (1 - drop) for p in pts[-2:]):
+    e1 = [float(p[1] or 0.0) for p in pts]
+    best_before = max(e1[:-2]) if len(e1) > 2 else e1[0]
+    if len(e1) > 2 and all(v < best_before * (1 - drop) for v in e1[-2:]):
         return {"trend": "regressing", "why": f"the last two exposures are more than {drop:.0%} under the best before them"}
-    if pts[-1][1] > max(p[1] for p in pts[:-1]):
+    if e1[-1] > max(e1[:-1]):
         return {"trend": "progressing", "why": "the latest top set is a new best e1RM in the window"}
     if len(pts) < THRESHOLDS["trend_min_exposures"]["value"]:
         return {"trend": "unknown", "why": "two exposures, no new best — below the three-exposure floor for a stall"}
