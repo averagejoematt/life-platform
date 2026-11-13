@@ -4683,3 +4683,24 @@ STRUCTURAL_HAND_PROOFS["structural::test_anchor_cue_sheets_5817.py"] = {
     ),
     "proved_on": "2026-11-11",
 }
+
+STRUCTURAL_HAND_PROOFS["structural::test_rate_policy_5861.py"] = {
+    "gate_name": "test_rate_policy_5861.py",
+    "command": "python3 -m pytest tests/test_rate_policy_5861.py -q -p no:warnings   # baseline 11 passed",
+    "mutation": (
+        "M1 the strength signal never slows (`slow = False`); M2 adherence never slows (state 'ok' when a reason exists); "
+        "M3 an observed rate below the band lifts the band one rung; M4 a `time.time()` stamp in the proposal; M5 the "
+        "strength threshold restated as `5.0` instead of read from owner_redlines; M6 a `# from health import rate_policy` "
+        "line appended to lambdas/health/calorie_target.py (the no-live-reader sweep)."
+    ),
+    "observed": (
+        "2026-11-12, this lane. BASELINE 11 passed. M1: 4 failed. M2: 1 failed. M3: 2 failed (the below-band control and the "
+        "full signal grid). M4: 1 failed (test_deterministic). M5: 1 failed (test_strength_threshold_is_the_tripwires_own). "
+        "M6: 1 failed (test_no_live_path_reads_the_proposal). REVERTED 11 passed."
+    ),
+    "scope": (
+        "Repo-side only, synthetic profiles: the pure proposal and the import sweep of lambdas/ + mcp/. NOT SEEN: any live "
+        "output — nothing reads the proposal until the owner rules to wire it at health.titration.band_for."
+    ),
+    "proved_on": "2026-11-12",
+}
