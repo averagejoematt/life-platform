@@ -302,7 +302,7 @@ def test_priority_muscles_take_sets_from_muscles_at_mav_and_the_quadriceps_get_t
     # #5861 FIX6 (owner ruling 9): profile (a)'s squat is PROGRESSING with the quadriceps at MEV — the stimulus works, so the
     # slot is not added (`live_rulings.stimulus_gate`); the volume rule (control) still adds it — his history shows it
     assert "leg_extension_machine" not in {x["key"] for x in lv["lifts"]}
-    assert any(ln.startswith("priority (live): quadriceps held") for s in a["week"]["sessions"] for ln in s["rationale"])
+    assert any(ln.startswith("priority (live): chest held") for s in a["week"]["sessions"] for ln in s["rationale"])
     vol = _week("a_large_deficit_experienced", settings={"priority_add_rule": "volume", "press_sets": 1})["week"]  # the round-5 week
     lv = next(s for s in vol["sessions"] if s["role"] == "lower_volume")
     assert "leg_extension_machine" in {x["key"] for x in lv["lifts"]}

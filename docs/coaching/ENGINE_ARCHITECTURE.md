@@ -370,7 +370,8 @@ ruling.
 - **Priority by stimulus and performance** (ruling 9, `priority_muscles: [chest, quadriceps]`, `priority_add_rule:
   stimulus_and_performance`). A priority muscle the week already holds at or over MEV whose anchor is PROGRESSING takes no extra
   sets and no added slot (`stimulus_gate`, `PRIORITY_ADD`); under MEV, or with a stalled / regressing / unread anchor, the
-  allocation stands and the quadriceps take the low-fatigue isolation slot first.
+  allocation stands and the quadriceps take the low-fatigue isolation slot first. A week whose squat is the SECOND lift (RPE
+  7-8 under the lead-lift rule) never holds the quadriceps: less stimulus from the squat, so their added work stands.
 - **No symptom warning line** (ruling 10): `symptom_line` defaults to "" and `symptom_line_on_lifting_days` to false; the
   `extended` preset stays available. The self-report gate (FIX5) still turns hard cardio easy, with one neutral reason line.
 - **The advisory loss-rate ceiling** (ruling 11, `rate_ceiling_pct_bw: 1.0`): `health.rate_policy.advisory_ceiling` — ~1 % of

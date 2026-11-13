@@ -217,6 +217,11 @@ def test_ruling_9_a_progressing_priority_muscle_at_mev_takes_no_extra_volume(wee
     assert "leg_extension_machine" not in {x["key"] for x in _lifts(a["week"])}
     for mu in ("chest", "quadriceps"):
         assert a["m"]["landmarks"][mu]["sets"] >= a["m"]["landmarks"][mu]["MEV"], mu  # held AT MEV+, never under
+    held = lambda w, mu: any(ln.startswith(f"priority (live): {mu} held") for s in w["sessions"] for ln in s["rationale"])  # noqa: E731
+    assert held(a["week"], "chest") and not held(a["week"], "quadriceps")  # ISO week 47: the squat is the SECOND lift (RPE 7-8)
+    prof = PROFILES["a_large_deficit_experienced"]
+    nxt = _week("a", profile=prof | {"as_of": sw._day(prof["as_of"], 7), "days": [sw._day(d, 7) for d in prof["days"]]})["week"]
+    assert held(nxt, "quadriceps")  # week 48: the squat leads, progressing at MEV -> held
     f = weeks["f_high_fatigue_poor_sleep"]  # regressing: the stimulus is not working -> the allocation stands
     assert not any(ln.startswith("priority (live)") and "held" in ln for s in f["week"]["sessions"] for ln in s["rationale"])
     with patch.dict(lr.PRIORITY_ADD, {"progressing": {"value": "never", "label": "heuristic", "basis": "mutation"}}):  # control

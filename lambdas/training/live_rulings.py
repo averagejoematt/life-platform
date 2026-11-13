@@ -14,7 +14,9 @@ OWNER_RULED_SETTINGS) and their code defaults are `SETTINGS_DEFAULTS` below plus
   2. PRIORITY BY STIMULUS AND PERFORMANCE (`stimulus_gate`, ruling 9). A priority muscle's ADDED isolation slot (the
      quadriceps slot) stays only when the stimulus and the performance both ask for it: when the week already holds the
      muscle at or over MEV AND its anchor is progressing, nothing is added (more volume is not the goal; a progressing lift
-     at MEV is a working stimulus). A stalled, regressing or unread anchor, or a week under MEV, keeps the low-fatigue slot.
+     at MEV is a working stimulus). A stalled, regressing or unread anchor, or a week under MEV, keeps the low-fatigue slot —
+     and so does a week whose squat is the SECOND lift (the lead-lift rule caps it at RPE 7-8: less stimulus, so the
+     low-fatigue quadriceps work stands).
   3. THE SHORT WEEK'S ARMS AND SHOULDERS (`short_week_floor`, ruling 3). When a week drops shoulders+arms, the shoulders,
      biceps and triceps are COUNTED (direct sets 1.0, indirect 0.5 — the fatigue model's convention) over the sessions left;
      a muscle under its MEV takes sets on its isolation slots in those sessions until it reaches MEV (ARMS_FLOOR).
@@ -160,6 +162,8 @@ def stimulus_gate(rx: dict[str, Any], ctx: dict[str, Any], trends: dict[str, str
         progressing = bool(read) and all(t == PRIORITY_ADD["progressing"]["value"] for t in read.values())
         if not added or before < mev or not progressing:
             continue
+        if m == "quadriceps" and s.get("lead_lift_rule") == "alternate_weekly" and lead_of(str(ctx.get("target_date") or "")) != "squat":
+            continue  # the squat is the second lift this week (RPE 7-8): the low-fatigue quadriceps work stands (ruling 9 + 5)
         hold.add(m)
         if not _adds_here(plan_, m, str(rx.get("session_role") or ""), ctx):
             continue  # said once, on the session that would have taken the sets
