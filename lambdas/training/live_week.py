@@ -42,7 +42,7 @@ KB_SLOT: dict[str, dict[str, Any]] = {
     "effort": {
         "value": [7, 8],
         "label": HEURISTIC,
-        "basis": "the KB deadlift is the entry drill into the swing (kb_entry, owner ruling 2026-11-11): RPE 7-8 practises the "
+        "basis": "the KB deadlift is the entry drill into the swing (kb_entry, owner ruling 2026-11-11): this cap practises the "
         "hinge with one bell; it needs no grind, and the session already holds a loaded hinge",
     },
     "implement_line": {
