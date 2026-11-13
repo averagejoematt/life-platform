@@ -299,6 +299,45 @@ def test_the_steps_credit_is_conservative_and_cadence_minutes_count_first():
     assert not cm.aerobic_plan({d: 10000 for d in days})["volume_covered"]  # 10k a day no longer 'covers' the week by itself
 
 
+def _walker_week(steps: int, settings: dict | None = None, patches: dict | None = None) -> dict:
+    """Profile (a) with a different daily step count — a 10k walker's steps no longer cover the weekly floor."""
+    prof = PROFILES["a_large_deficit_experienced"] | {"steps_per_day": steps}
+    with patch.dict(sw.SETTINGS, settings or {}):
+        world = sw.build_world(prof, "approved")
+        ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()]
+        for p in ps_:
+            p.start()
+        try:
+            return sw.generate_week(prof, "approved", world)
+        finally:
+            for p in ps_:
+                p.stop()
+
+
+def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
+    """Steps first, then only the structured minutes that close the gap to the weekly floor (cardio_model.WEEKLY_MODERATE_MIN):
+    a 10k walker (~88 credited min) gets easy blocks until the week's blocks close the gap — not one every morning — and under
+    the shared cap only the conditioning host buys room (an easy block takes what lifting leaves, else none)."""
+    week = _walker_week(10000)
+    kinds = [s["cardio"].get("kind") for s in week["sessions"]]
+    easy = [k for k in kinds if k and k not in lp.HARD_KINDS]
+    total = sum(int(s["cardio"].get("minutes") or 0) for s in week["sessions"])
+    assert easy and len(easy) < len([s for s in week["sessions"] if s["cardio"].get("kind") not in lp.HARD_KINDS])
+    assert total + week["steps_credit"]["moderate_min_per_wk"] >= cm.WEEKLY_MODERATE_MIN[0]
+    every = _walker_week(10000, patches={(lb, "easy_gap"): lambda kind, live: (True, [])})  # control: no gap rule
+    assert sum(1 for s in every["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS) > len(easy)
+    shared = _walker_week(10000, {"session_cap_includes_cardio": True})
+    full = {s["role"]: s["lifting_minutes"] for s in week["sessions"]}
+    for s in shared["sessions"]:
+        if s["role"] != "shoulders_arms":  # only the host trims lifting for its block
+            assert s["lifting_minutes"] >= full[s["role"]] - 0.05, s["role"]
+        assert (
+            not s["cardio"].get("minutes")
+            or s["cardio"]["minutes"] >= lw.CARDIO_ROOM["min_block"]["value"]
+            or s["cardio"]["kind"] in lp.HARD_KINDS
+        )
+
+
 # ── 9. the garage leg curl ───────────────────────────────────────────────────
 def test_an_equipment_limited_week_keeps_hamstring_knee_flexion_from_the_library(weeks):
     c = weeks[("c_equipment_limited", False)]

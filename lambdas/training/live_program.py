@@ -953,11 +953,15 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
             "credited (cardio_model.aerobic_plan: steps first, no cardio added without a purpose)"
         )
         return None, lines
+    keep, gap = live_balance.easy_gap(kind, live)  # FIX3: an easy block closes the week's gap after the walking credit, no more
+    if not keep:
+        return None, lines + gap
+    lines += gap
     minutes, prog = live_week.cardio_progress(kind, live, cardio_menu.block_minutes(kind))  # week to week: cardio_model.progress
     lines += prog
     if shared and live.get("cap") and live.get("lifting_minutes") is not None:
         room = int(float(live["cap"]) - float(live["lifting_minutes"]))
-        if room < MIN_CARDIO_MINUTES:
+        if room < live_balance.min_block(kind, MIN_CARDIO_MINUTES):  # an easy stub under 20 min is worthless
             lines.append(f"cardio (live): no block — the shared {live['cap']}-min cap leaves {max(room, 0)} min after lifting")
             return None, lines
         if room < minutes:

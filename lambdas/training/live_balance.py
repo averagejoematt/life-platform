@@ -403,13 +403,10 @@ def adherence_response(workouts: Any, as_of: str, lib: dict[str, Any] | None = N
 def week_start(day: str) -> str:
     """The Monday of `day`'s calendar week (a dip read on Thursday would count Monday-Wednesday's own sessions and flip the
     answer mid-week); `day` itself when it does not parse."""
-    from datetime import date, timedelta
+    from common.pacific_time import parse_day_key, shift_day_key
 
-    try:
-        d = date.fromisoformat(str(day)[:10])
-    except ValueError:
-        return day
-    return (d - timedelta(days=d.weekday())).isoformat()
+    d = parse_day_key(str(day)[:10])
+    return shift_day_key(d.isoformat(), -d.weekday()) if d else day
 
 
 def lighter_week(rx: dict[str, Any], ctx: dict[str, Any], dip: dict[str, Any] | None) -> list[str]:
@@ -549,6 +546,44 @@ def conditioning_host(skipped: Any) -> str:
         return HOST_ROLE
     roles = [r for r in ps.SPLIT_ROLES if r != HOST_ROLE]
     return roles[(roles.index("lower_heavy") + 1) % len(roles)] if "lower_heavy" in roles else roles[-1]
+
+
+def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
+    """(keep, lines) for an EASY block when the week's steps do not cover the aerobic floor: the block stays only while the
+    gap — the guideline floor less the walking credit less every block performed this week (since its Monday) — is at least
+    CARDIO_ROOM's minimum block. Steps first, then only the structured minutes that close the gap (third red team: the
+    conservative credit must not turn into an easy block every morning). A hard kind, or unread steps: (True, [])."""
+    from training import cardio_model, live_program, live_week
+
+    aer = live.get("aerobic") or {}
+    if kind in live_program.HARD_KINDS or not aer or aer.get("volume_covered"):
+        return True, []
+    since, day = week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
+    done = sum(
+        int(r.get("duration_sec") or 0) // 60
+        for rows in (live.get("by_machine") or {}).values()
+        for r in rows or []
+        if since <= str(r.get("date") or "")[:10] < day
+    )
+    walk = int(aer.get("walking_min_per_wk") or 0)
+    gap = int(cardio_model.WEEKLY_MODERATE_MIN[0]) - walk - done
+    floor = int(live_week.CARDIO_ROOM["min_block"]["value"])
+    if gap < floor:
+        return False, [
+            f"cardio (live): no easy block — steps (~{walk} moderate min/wk, conservatively credited) and {done} min of blocks this "
+            f"week leave {max(gap, 0)} min of the weekly {cardio_model.WEEKLY_MODERATE_MIN[0]}: under a {floor}-min block (steps first)"
+        ]
+    return True, [
+        f"cardio (live): easy block kept — the week is ~{gap} min short of {cardio_model.WEEKLY_MODERATE_MIN[0]} after ~{walk} min of steps and {done} min of blocks"
+    ]
+
+
+def min_block(kind: str, hard_min: int) -> int:
+    """The shortest block worth serving under the shared cap: CARDIO_ROOM's minimum for an easy block (a stub is worthless),
+    `hard_min` for a conditioning block (its intervals or tempo still fit)."""
+    from training import live_program, live_week
+
+    return hard_min if kind in live_program.HARD_KINDS else int(live_week.CARDIO_ROOM["min_block"]["value"])
 
 
 def _unavailable(key: str, lib: dict[str, Any] | None) -> bool:

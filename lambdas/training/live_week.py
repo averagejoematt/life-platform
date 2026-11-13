@@ -219,14 +219,15 @@ def _hard_blocked(rx: dict[str, Any]) -> bool:
 
 def cardio_reserve(rx: dict[str, Any]) -> int:
     """Minutes the lifting leaves for cardio under the shared cap (`session_cap_includes_cardio`): CARDIO_ROOM min_block on the
-    conditioning host (shoulders+arms) when hard work is not blocked today, or on any day the week's steps do not cover the
-    easy aerobic volume; else 0 (no block will be served, so lifting keeps every set)."""
+    conditioning host (shoulders+arms, or the short / dip week's host) when hard work is not blocked today; else 0 (lifting keeps
+    every set; an easy block takes only the room lifting leaves, `live_balance.easy_gap` / `min_block`)."""
     if not _settings().get("session_cap_includes_cardio"):
         return 0
-    covered = ((rx.get("live_session") or {}).get("aerobic") or {}).get("volume_covered")
     on = (rx.get("live_session") or {}).get("conditioning_host") or "shoulders_arms"  # FIX3: the short week's host
     host = rx.get("session_role") == on and not _hard_blocked(rx)
-    return int(CARDIO_ROOM["min_block"]["value"]) if host or not covered else 0
+    # FIX3: only the host buys room — with the conservative steps credit an uncovered week is common, and trimming every
+    # morning's lifting for an easy block gutted the week (the walking gap is closed by walking first: live_balance.easy_gap)
+    return int(CARDIO_ROOM["min_block"]["value"]) if host else 0
 
 
 def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], cap: int, shape: dict) -> dict:
