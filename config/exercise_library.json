@@ -63,18 +63,18 @@
    "history": 539
   },
   "hypertrophy_rows_by_tier": {
-   "S": 31,
+   "S": 30,
    "A": 141,
-   "B": 217,
+   "B": 218,
    "C": 63,
    "D": 0,
    "not_applicable": 210
   },
   "ratings_by_objective": {
    "hypertrophy": {
-    "S": 30,
+    "S": 29,
     "A": 136,
-    "B": 189,
+    "B": 190,
     "C": 61,
     "D": 0,
     "not_applicable": 210
@@ -135,13 +135,12 @@
      ]
     },
     "biceps": {
-     "s": 6,
-     "families": 5,
+     "s": 5,
+     "families": 4,
      "movements": [
       "behind_the_back_curl_cable",
       "bicep_curl_machine",
       "db_incline_curls",
-      "preacher_curl_dumbbell",
       "preacher_curl_machine",
       "seated_incline_curl_dumbbell"
      ]
@@ -305,9 +304,9 @@
    "mobility": {}
   },
   "canonical": {
-   "families": 50,
+   "families": 51,
    "aliases": 25,
-   "variants": 67
+   "variants": 69
   },
   "hypertrophy_rows_by_evidence_confidence": {
    "rct_direct": 15,
@@ -1810,6 +1809,17 @@
    ],
    "variants": {}
   },
+  "preacher_curl_machine": {
+   "aliases": [],
+   "variants": {
+    "preacher_curl_dumbbell": {
+     "equipment": "dumbbell"
+    },
+    "preacher_curl_barbell": {
+     "equipment": "ez_bar"
+    }
+   }
+  },
   "gorilla_rows": {
    "aliases": [],
    "variants": {
@@ -2926,7 +2936,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -3047,6 +3057,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -3689,7 +3713,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -3812,6 +3836,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -6074,7 +6112,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -6197,6 +6235,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -6558,7 +6610,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -6681,6 +6733,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -9091,7 +9157,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -9201,7 +9267,25 @@
      "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
+    }
+   }
   },
   "triceps_extension_cable": {
    "title": "Triceps Extension (Cable)",
@@ -9974,7 +10058,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -10097,6 +10181,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -11209,7 +11307,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -11329,6 +11427,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -15554,7 +15666,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -15688,6 +15800,20 @@
      "inputs": [],
      "why": "confirmed: a kickback's torque peaks at lockout (short); standing, free (low stability)",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -15715,7 +15841,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -15839,6 +15965,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -16823,7 +16963,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -16952,6 +17092,20 @@
      "inputs": [],
      "why": "a concentration curl is seated with the elbow braced on the thigh: stable (high), the biceps loaded short",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -17141,7 +17295,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -17272,6 +17426,20 @@
      "inputs": [],
      "why": "a curl with the elbows pinned and the forearms rotated out: mid length",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -19400,7 +19568,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -19536,6 +19704,20 @@
      "inputs": [],
      "why": "a standing dumbbell curl: mid length",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -21312,7 +21494,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -21451,6 +21633,20 @@
      "inputs": [],
      "why": "21s are a partial-then-full curl: mid length. custom template with no equipment recorded: the load is unknown until the owner names it (scored neutral, provisional)",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -23738,7 +23934,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -23862,6 +24058,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -25234,7 +25444,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -25355,6 +25565,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -25841,7 +26065,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -25972,6 +26196,20 @@
      "inputs": [],
      "why": "a drag curl keeps the bar path against the body: a standing dumbbell curl, mid length",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -26151,7 +26389,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -26282,6 +26520,20 @@
      "inputs": [],
      "why": "a waiter curl holds one dumbbell by its head: a standing curl, mid length",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -29464,7 +29716,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -29584,6 +29836,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -29611,7 +29877,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -29734,6 +30000,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -30697,7 +30977,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -30828,6 +31108,20 @@
      "inputs": [],
      "why": "a cross-body hammer curl: a standing dumbbell curl, mid length",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -31556,7 +31850,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -31682,6 +31976,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -39099,7 +39407,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -39230,6 +39538,20 @@
      "inputs": [],
      "why": "a machine curl series through three arm positions: its length bias changes by position, so it stays unknown (scored neutral)",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -39868,7 +40190,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -39997,6 +40319,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -45626,7 +45962,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -45757,6 +46093,20 @@
      "pattern": "triceps_extension",
      "job": "isolation",
      "reason": "a triceps kickback, not a hip extension"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -47786,7 +48136,10 @@
     "preacher_bench"
    ],
    "category": "hypertrophy",
-   "canonical": "preacher_curl_barbell",
+   "canonical": "preacher_curl_machine",
+   "variant": {
+    "equipment": "ez_bar"
+   },
    "hypertrophy": [
     {
      "target": "biceps",
@@ -52360,7 +52713,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -52492,6 +52845,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -52667,7 +53034,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -52794,6 +53161,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -52821,7 +53202,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -52952,6 +53333,20 @@
      "inputs": [],
      "why": "a machine triceps extension: whether its arm position is overhead (long head lengthened) or in front is model-specific, so its length stays unknown (scored neutral) until the owner names the machine",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -55368,7 +55763,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -55497,6 +55892,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -55877,7 +56286,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -56007,6 +56416,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -56332,7 +56755,7 @@
     "spinal_load": "moderate",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -56459,6 +56882,20 @@
       "wrist"
      ],
      "rule": "a cheat curl loads the spine through the swing"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -56625,7 +57062,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -56751,6 +57188,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -57270,7 +57721,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -57396,6 +57847,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -57423,7 +57888,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -57552,6 +58017,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -58666,7 +59145,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -58787,6 +59266,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -60953,7 +61446,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -61081,6 +61574,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -62029,7 +62536,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -62156,6 +62663,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -68301,7 +68822,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -68433,6 +68954,20 @@
      "pattern": "triceps_extension",
      "job": "isolation",
      "reason": "a triceps kickback, not a hip extension"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -68611,7 +69146,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -68739,6 +69274,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -68766,7 +69315,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -68895,6 +69444,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -69083,7 +69646,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -69207,6 +69770,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -70392,7 +70969,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -70515,6 +71092,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -73916,7 +74507,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -74043,6 +74634,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -74074,7 +74679,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -74204,6 +74809,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -76590,16 +77209,20 @@
     "preacher_bench"
    ],
    "category": "hypertrophy",
-   "canonical": "preacher_curl_dumbbell",
+   "canonical": "preacher_curl_machine",
+   "variant": {
+    "equipment": "dumbbell"
+   },
    "hypertrophy": [
     {
      "target": "biceps",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 3, resistance_profile 2, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (preacher_curl_machine) per objective — preacher_curl_machine holds it; a variant",
       "evidence rct_characteristic"
      ],
      "provisional": false,
@@ -76607,18 +77230,23 @@
      "citations": [
       "sato2021_elbow_angle"
      ],
-     "last_reviewed": "2026-11-11"
+     "last_reviewed": "2026-11-11",
+     "s_quota": {
+      "holder": "preacher_curl_machine",
+      "family": "preacher_curl_machine"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "biceps",
      "by_target": {
-      "biceps": "S"
+      "biceps": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 3, resistance_profile 2, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (preacher_curl_machine) per objective — preacher_curl_machine holds it; a variant",
       "evidence rct_characteristic"
      ],
      "evidence_confidence": "rct_characteristic",
@@ -77495,7 +78123,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -77618,6 +78246,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -80470,7 +81112,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -80601,6 +81243,20 @@
       "wrist"
      ],
      "rule": "a curl: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -84666,7 +85322,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -84790,6 +85446,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -84817,7 +85487,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -84941,6 +85611,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -84968,7 +85652,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "low",
     "knee": "low",
     "hip": "low"
@@ -85095,6 +85779,20 @@
       "wrist"
      ],
      "rule": "a pushdown, pushaway or kickback: no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
     }
    }
   },
@@ -86743,7 +87441,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -86851,7 +87549,25 @@
      "movement_id": "preacher_curl_barbell",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
+    }
+   }
   },
   "belt_squat": {
    "title": "Belt Squat (Machine)",
@@ -89291,12 +90007,13 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
+     "tier": "B",
+     "rubric_tier": "B",
      "rubric_score": 11,
      "points_tier": "A",
      "basis": [
       "points 11/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -89308,13 +90025,14 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "B",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "B"
      },
      "basis": [
       "points 11/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -89360,7 +90078,7 @@
     }
    },
    "objective_inputs": {
-    "ceiling": "moderate",
+    "ceiling": "low",
     "limiter": "target",
     "systemic_fatigue": "moderate",
     "resistance_class": "submaximal",
@@ -89396,6 +90114,16 @@
     }
    ],
    "curation_note": "first link of the kettlebell chain (deadlift -> swing -> clean -> press/snatch)",
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "inputs": {
+     "fields": [
+      "ceiling"
+     ],
+     "reason": "one kettlebell, held between the feet: the slot serves ONE bell (kb_entry, 'one kettlebell'), so the glutes cannot be overloaded past it — a trained deadlifter meets the bell far below a working effort (fifth red team): load ceiling low"
+    }
+   },
    "template_match": {
     "title_all": [
      "kettlebell",
@@ -90769,7 +91497,7 @@
     "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
-    "elbow": "low",
+    "elbow": "moderate",
     "shoulder": "moderate",
     "knee": "low",
     "hip": "low"
@@ -90877,7 +91605,25 @@
      "movement_id": "hammer_curl_dumbbell",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "elbow_provoking",
+      "joint": "elbow",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "elbow": {
+     "from": "low",
+     "rule": "elbow_provoking"
+    }
+   }
   },
   "pendulum_squat": {
    "title": "Pendulum Squat (Machine)",

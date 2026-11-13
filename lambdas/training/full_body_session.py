@@ -297,7 +297,13 @@ def _session_loads(
 
 
 def _prescription(
-    inputs: GeneratorInputs, day_entry: dict[str, Any], catalog: dict[str, Any], block_workouts: Any, deload: bool, skill_ceiling: int
+    inputs: GeneratorInputs,
+    day_entry: dict[str, Any],
+    catalog: dict[str, Any],
+    block_workouts: Any,
+    deload: bool,
+    skill_ceiling: int,
+    week_cfg: dict[str, Any] | None = None,
 ) -> tuple[Any, dict[str, Any], dict[str, Any]]:
     """(in-block record, rotation, prescription) for the served role. #4409: within a block an ANCHOR slot keeps the variant
     he performed in it (`in_block_variant`); #5075: each ACCESSORY slot serves its rotation variant
@@ -322,7 +328,9 @@ def _prescription(
         measured_minutes=session_time.role_median_minutes(block_workouts, day_entry["session_role"]),  # #5799
     )
     # #5861 L3/L6: LIVE only — equipment and pain on every exposure, then the fatigue model; in shadow it returns rx itself
-    rx = live_session.for_live_draft(rx, rotation, inputs, block_workouts, movements)
+    # #5861 FIX5: the served day's week plan (`live_sequence`, carried on the entry) and the session set cap, read under live only
+    set_cap = (week_cfg or {}).get("session_set_ceiling")
+    rx = live_session.for_live_draft(rx, rotation, inputs, block_workouts, movements, week=day_entry.get("live_week"), set_cap=set_cap)
     return in_block, rotation, rx
 
 
@@ -343,7 +351,7 @@ def full_body_routines(
     archetype = program_structure.SESSION_TEMPLATES[role]["archetype"]
     deload = bool(day_entry.get("deload"))
     skill_ceiling = int(week_cfg.get("skill_ceiling", 2))
-    in_block, rotation, rx = _prescription(inputs, day_entry, catalog, block_workouts, deload, skill_ceiling)
+    in_block, rotation, rx = _prescription(inputs, day_entry, catalog, block_workouts, deload, skill_ceiling, week_cfg)
     # a kept title-only variant (ADR-069) loads from its wire template id; the snapshot keeps the catalog's own hash
     load_catalog = in_block_variant.with_performed_template_ids(catalog, rx, in_block)  # #4431: the one resolver
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)

@@ -134,7 +134,14 @@ def _template_spine(role: str, catalog: dict[str, Any], lib: dict[str, Any]) -> 
     )
 
 
-def kb_placement(lib: dict[str, Any], catalog: dict[str, Any], skipped: str | None = None) -> dict[str, Any]:
+def _skip_set(skipped: Any) -> set[str]:
+    """A role or roles this week does not draft (#5861 FIX5: a 2- or 3-day week skips more than one), as a set."""
+    if not skipped:
+        return set()
+    return {str(skipped)} if isinstance(skipped, str) else {str(r) for r in skipped}
+
+
+def kb_placement(lib: dict[str, Any], catalog: dict[str, Any], skipped: Any = None) -> dict[str, Any]:
     """{home, host, why}: where the kettlebell slot serves this week. `home` is `kb_slot_role` (today's placement); when that
     session's template already holds STACK_RULE axial_per_session spine-loading lifts, the slot moves to `kb_slot_move_to`
     (`kb_slot_when_stacked` `move`, when that session has room and is drafted this week) or is dropped (`drop`, or no room).
@@ -144,14 +151,17 @@ def kb_placement(lib: dict[str, Any], catalog: dict[str, Any], skipped: str | No
     s = _settings(lib)
     cap = int(live_program.STACK_RULE["axial_per_session"]["value"])
     home = str(s["kb_slot_role"] or KB_HOME)
-    if _template_spine(home, catalog, lib) < cap:
+    gone = _skip_set(skipped)
+    if home not in gone and _template_spine(home, catalog, lib) < cap:
         return {"home": home, "host": home, "why": None}
     move_to = s["kb_slot_move_to"]
     targets = [str(t) for t in ([move_to] if isinstance(move_to, str) else (move_to or []))]
     busy = conditioning_host(skipped) if s.get("session_cap_includes_cardio") else None  # the shared cap's aerobic minutes
     why = f"{home} already holds {cap} spine-loading squat/hinge lifts (STACK_RULE, heuristic)"
+    if home in gone:  # #5861 FIX5: the home session is not drafted this week
+        why = f"{home} is not drafted this week"
     for to in targets if s["kb_slot_when_stacked"] == "move" else []:
-        if to not in (skipped, busy, home) and _template_spine(to, catalog, lib) < cap:
+        if to not in gone | {busy, home} and _template_spine(to, catalog, lib) < cap:
             return {"home": home, "host": to, "why": why + f": the kettlebell slot moves to {to} (kb_slot_when_stacked=move)"}
     how = "kb_slot_when_stacked=drop" if s["kb_slot_when_stacked"] != "move" else "no move-to session is drafted with room"
     return {"home": home, "host": None, "why": why + f": the kettlebell slot is dropped this week ({how})"}
@@ -163,7 +173,7 @@ def place_kb(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str
     from training import kb_entry, live_program as lp, program_structure as ps
 
     role = str(rx.get("session_role") or "")
-    skipped = lp.SHORT_WEEK_SKIP if ctx.get("short_week_host") else None
+    skipped = ctx.get("week_skip") or (lp.SHORT_WEEK_SKIP if ctx.get("short_week_host") else None)  # FIX5: the week's skips
     p = kb_placement(ctx["lib"], ctx["catalog"], skipped)
     lines: list[str] = []
     here = [e for e in rx["exposures"] if e.get("slot") == KB_SLOT_KEY]
@@ -177,10 +187,18 @@ def place_kb(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str
         slot = next((e for e in tmpl["exposures"] if e.get("slot") == KB_SLOT_KEY), None)
         if slot is not None:
             n = kb_exposures(workouts, ctx.get("target_date"), ctx["lib"])
-            key = kb_entry.served(n)
+            key: str | None = kb_entry.served(n)
+            filler = None
+            if key == kb_entry.ENTRY:  # #5861 FIX5: the KB deadlift as filler -> the swing, else the slot is not added
+                from training.live_rules import kb_choice
+
+                key, filler = kb_choice(ctx, workouts)
+            if key is None:
+                return lines + [f"kettlebell slot (live): not added on {role} — {filler}"]
             rx["exposures"].append(dict(slot, movement_key=key, live_added="kb_slot_moved"))
             title = (ctx["catalog"].get(key) or {}).get("title") or key
             lines.append(f"added (live): {title} — the kettlebell slot's host this week ({p['why'] or 'kb_slot_role'})")
+            lines += [f"kettlebell slot (live): {filler}"] if filler else []
     return lines
 
 
@@ -305,13 +323,13 @@ def _sum(rows: list[dict[str, Any]], deltas: dict[tuple[str, str], int]) -> Coun
     return out
 
 
-def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: str | None = None) -> dict[str, Any]:
+def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any = None) -> dict[str, Any]:
     """The week's set allocation (module doc 4), from the five templates: {deltas: {(role, slot): +/-n}, before, after,
     lines}. Pure over the catalog and the library; the same for every session of the week. `skipped` (#5861 FIX4): a role
     this week does not draft (the short week's) — its sets neither count toward the week nor give or take."""
     from training import block_model, selection_live
 
-    rows = [r for r in _template_rows(catalog, lib) if r["role"] != skipped]
+    rows = [r for r in _template_rows(catalog, lib) if r["role"] not in _skip_set(skipped)]
     marks = block_model.load_landmarks() or {}
     priority = [str(m) for m in _settings(lib).get("priority_muscles") or []]
     pinned = {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES}
@@ -385,11 +403,11 @@ def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _skipped(ctx: dict[str, Any]) -> str | None:
-    """The role a short / dip week does not draft (its host is set), else None."""
+def _skipped(ctx: dict[str, Any]) -> Any:
+    """The role(s) a short / dip week does not draft (#5861 FIX5: the week plan's), else None."""
     from training.live_program import SHORT_WEEK_SKIP
 
-    return SHORT_WEEK_SKIP if ctx.get("short_week_host") else None
+    return tuple(ctx.get("week_skip") or ()) or (SHORT_WEEK_SKIP if ctx.get("short_week_host") else None)
 
 
 def _muscle(e: dict[str, Any], ctx: dict[str, Any]) -> str:
@@ -411,6 +429,8 @@ def adherence_response(workouts: Any, as_of: str, lib: dict[str, Any] | None = N
 
     s = _settings(lib)
     monday = week_start(as_of)  # judged ONCE a week, as of its Monday: every morning of the week gets the same answer
+    # #5861 FIX5: on the record BEFORE the Monday — the week's own sessions never flip its answer (the sequence reads it too)
+    workouts = None if workouts is None else [w for w in workouts if str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < monday]
     if s.get("behind_schedule_week"):
         got = live_week.behind_schedule(workouts, monday, lib)
         return {**got, "mode": "behind"} if got else None
@@ -564,9 +584,10 @@ def conditioning_host(skipped: Any) -> str:
     on #5076). The third red team's short week had no conditioning at all under the shared cap."""
     from training import program_structure as ps
 
-    if not skipped:
+    gone = _skip_set(skipped)
+    if HOST_ROLE not in gone:
         return HOST_ROLE
-    roles = [r for r in ps.SPLIT_ROLES if r != HOST_ROLE]
+    roles = [r for r in ps.SPLIT_ROLES if r not in (gone | {HOST_ROLE})] or [r for r in ps.SPLIT_ROLES if r not in gone]
     return roles[(roles.index("lower_heavy") + 1) % len(roles)] if "lower_heavy" in roles else roles[-1]
 
 

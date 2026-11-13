@@ -45,6 +45,7 @@ from training import (  # noqa: E402
     fatigue_model as fm,
     live_balance as lb,
     live_program as lp,
+    live_rules as lrules,
     live_session as ls,
     live_shape,
     live_week as lw,
@@ -477,10 +478,15 @@ def test_c2c_a_pain_flag_reaches_every_movement_loading_that_joint_all_week(week
     # control: the shoulder data as it was (abduction / rear-delt work rated LOW) -> the rule leaves the lateral raise at RPE 9-10
     old = copy.deepcopy(b["world"]["lib"])
     for e in old["movements"].values():
-        if e.get("provocation_floor"):
+        if (e.get("provocation_floor") or {}).get("shoulder"):  # FIX5: an elbow-only floor is not the shoulder's
             e["joint_stress"] = {**e["joint_stress"], "shoulder": e["provocation_floor"]["shoulder"]["from"]}
     prof = PROFILES["b_shoulder_flag_low_recovery"]
+    # #5861 FIX5: the same-joint isolation cap (live_rules.isolation_joint_cap) is data-independent — the old data alone no longer
+    # uncaps the raise; with that cap off as well, the old failure returns
     was = sw.generate_week(prof, "approved", b["world"] | {"lib": old})
+    assert not any("lateral_raise" in p and "no cap" in p for p in joint_unprotected(was, old, cat, "shoulder", "press"))
+    with patch.object(lrules, "isolation_joint_cap", lambda rx, ctx, flags: []):
+        was = sw.generate_week(prof, "approved", b["world"] | {"lib": old})
     assert any("lateral_raise" in p and "no cap" in p for p in joint_unprotected(was, old, cat, "shoulder", "press"))
     # the monitoring rule itself: a mild stated score reduces, a higher or 'sharp' one avoids
     flags = lambda note: lp.joint_flags(  # noqa: E731
@@ -617,7 +623,9 @@ def test_c4_volume_comes_down_when_recovery_worsens_compounds_first_and_loads_ne
     ws = {k: weeks[k] for k in ("a_large_deficit_experienced", "b_shoulder_flag_low_recovery", "f_high_fatigue_poor_sleep")}
     a, b, f = (w["week"] for w in ws.values())
     lib, cat = ws["f_high_fatigue_poor_sleep"]["world"]["lib"], ws["f_high_fatigue_poor_sleep"]["world"]["catalog"]["movements"]
-    assert _working_sets(f) < _working_sets(b) < _working_sets(a)
+    # #5861 FIX5: (b)'s sharp 6/10 shoulder flag now takes the whole pressing pattern off, so (b) and (f) are each under (a),
+    # not ordered against each other
+    assert _working_sets(f) < _working_sets(a) and _working_sets(b) < _working_sets(a)
     assert all(s["fatigue"]["action"] == "deload_recommended" for s in f["sessions"])  # recommended — applied only on his word
     assert rising_loads(ws["f_high_fatigue_poor_sleep"]) == [] and rising_loads(ws["b_shoulder_flag_low_recovery"]) == []
     assert not any("Heavier" in (x["hevy_note"] or "") for x in _lifts(f))
@@ -730,7 +738,7 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     # the SHORT week (4 mornings): legs keep 2x and every leg muscle stays at or over MEV (L5's rule, live default); chest and
     # back too. Delts and arms may sit at their floor for that week — the rule's stated cost, named here, not hidden
     e = weeks["e_short_week"]
-    assert e["week"].get("short_week", "").startswith("short week (live, skip_shoulders_arms)")
+    assert e["week"].get("short_week", "").startswith("short week (live, 4 of 5 mornings)")  # FIX5: live_sequence.SHORT_WEEK_PLANS
     assert landmark_problems(e["m"], LEGS + ("chest", "back"), with_abs=False) == []
     slide = copy.deepcopy(e["world"]["lib"])  # control: the sequence slides (today) -> legs fall under MEV
     slide["programming_settings"] = {"short_week_rule": "slide"}
@@ -781,8 +789,14 @@ def test_d2_redundant_axial_fatigue_is_detected():
     assert policy["stacking"] and sl.fatigue_cost(lib["movements"]["squat_barbell"], True) > sl.fatigue_cost(
         lib["movements"]["squat_barbell"], False
     )
-    with patch.object(fm, "AXIAL_PATTERNS", ()):  # control: the detector blind to squat/hinge
+    # control: the ONE spine-loading definition blind (#5861 FIX5: the detector reads it, no second definition) -> nothing found
+    with patch.object(lb, "spine_loading", lambda entry: False):
         assert fm.axial_stacking(rec, idx, as_of="2026-11-16") == []
+    # #5861 FIX5: the windows are the table's (the fifth red team: hard-coded 72 h / 48 h) — a 24 h window misses the squat
+    with patch.dict(fm.THRESHOLDS, {"axial_stack_window_hours": {**fm.THRESHOLDS["axial_stack_window_hours"], "value": 24}}):
+        assert {f["finding"] for f in fm.axial_stacking(rec, idx, as_of="2026-11-16")} == set()
+    with patch.dict(fm.THRESHOLDS, {"hinge_stack_window_hours": {**fm.THRESHOLDS["hinge_stack_window_hours"], "value": 24}}):
+        assert {f["finding"] for f in fm.axial_stacking(rec, idx, as_of="2026-11-16")} == {"axial_stacking"}
 
 
 def stacked_sessions(week: dict, lib: dict, catalog: dict) -> list[str]:
@@ -849,8 +863,11 @@ def test_d2b_redundant_axial_fatigue_is_avoided_in_the_drafted_week(weeks):
     lower_volume = next(s for s in a["week"]["sessions"] if s["role"] == "lower_volume")
     assert "squat_barbell" in {x["key"] for x in lower_volume["lifts"]}  # the squat stays
     assert "kettlebell_deadlift" not in {x["key"] for x in lower_volume["lifts"]}  # third red team: the pin MOVES (default)
-    sa = next(s for s in a["week"]["sessions"] if s["role"] == "shoulders_arms")
-    assert "kettlebell_deadlift" in {x["key"] for x in sa["lifts"]}  # ... to its move-to session, not lost
+    # #5861 FIX5: for a lifter who deadlifts the KB deadlift is filler — never served; the slot serves the swing or nothing
+    assert "kettlebell_deadlift" not in {x["key"] for s in a["week"]["sessions"] for x in s["lifts"]}
+    nodl = _week_of("a_large_deficit_experienced", {(lrules, "deadlifts"): lambda workouts, ctx: False})  # no barbell deadlift
+    sa = next(s for s in nodl["week"]["sessions"] if s["role"] == "shoulders_arms")
+    assert "kettlebell_deadlift" in {x["key"] for x in sa["lifts"]}  # ... the entry drill MOVES to its move-to session, not lost
     assert spine_class_split(a["world"]["lib"]) == []  # one spinal rating for the dumbbell-at-the-sides class
     bad = copy.deepcopy(a["world"]["lib"])  # control: the split squat back at moderate beside a low reverse lunge
     bad["movements"]["bulgarian_split_squat_dumbbell"]["joint_stress"]["spinal_load"] = "moderate"
@@ -858,7 +875,11 @@ def test_d2b_redundant_axial_fatigue_is_avoided_in_the_drafted_week(weeks):
     # control 1: the KB placement AND the stacking rule off -> lower volume serves three spine-loading lifts
     off = _week_of(
         "a_large_deficit_experienced",
-        {(lp, "avoid_stacking"): lambda rx, ctx, rot, pinned: [], (lb, "place_kb"): lambda rx, ctx, workouts: []},
+        {
+            (lp, "avoid_stacking"): lambda rx, ctx, rot, pinned: [],
+            (lb, "place_kb"): lambda rx, ctx, workouts: [],
+            (lrules, "deadlifts"): lambda workouts, ctx: False,  # FIX5: the KB deadlift is served (not filler) for the control
+        },
     )
     assert stacked_sessions(off["week"], off["world"]["lib"], off["world"]["catalog"]["movements"])
     # control 2: never the session's ONLY squat — three spine-loading anchors (one squat, two hinges): the rule moves a hinge;

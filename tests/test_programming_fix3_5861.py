@@ -41,6 +41,7 @@ from training import (  # noqa: E402
     kb_entry,
     live_balance as lb,
     live_program as lp,
+    live_rules as lrules,
     live_week as lw,
     program_structure as ps,
     quality_rubric as qr,
@@ -140,24 +141,28 @@ def test_the_week_is_allocated_by_priority_before_any_muscle_sits_over_mav():
 
 
 # ── 3. one spine-loading definition; the kettlebell slot ─────────────────────
+NODL = {(lrules, "deadlifts"): lambda workouts, ctx: False}
+"""#5861 FIX5: a lifter with no barbell deadlift on record — the KB deadlift is his entry drill (for a deadlifter it is filler)."""
+
+
 def test_the_kettlebell_slot_moves_off_a_stacked_session_by_setting(weeks):
-    a = weeks[("a_large_deficit_experienced", False)]["week"]
+    a = _week("a_large_deficit_experienced", NODL)["week"]
     where = {s["role"]: {x["key"] for x in s["lifts"]} for s in a["sessions"]}
     assert "kettlebell_deadlift" in where["shoulders_arms"] and "kettlebell_deadlift" not in where["lower_volume"]
-    shared = weeks[("a_large_deficit_experienced", True)]["week"]  # the shared cap keeps shoulders+arms for the aerobic block
+    shared = _week("a_large_deficit_experienced", NODL, {"session_cap_includes_cardio": True})["week"]  # S+A keeps the cardio
     where = {s["role"]: {x["key"] for x in s["lifts"]} for s in shared["sessions"]}
     assert "kettlebell_deadlift" in where["upper_volume"]
     drop = _week("a_large_deficit_experienced", settings={"kb_slot_when_stacked": "drop"})["week"]  # the alternative works
     assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(drop)}
     assert any(ln.startswith("dropped (live): Sumo Deadlift") for s in drop["sessions"] for ln in s["rationale"])
-    home = _week("a_large_deficit_experienced", settings={"kb_slot_role": "upper_volume"})["week"]  # a placement the owner picks
+    home = _week("a_large_deficit_experienced", NODL, settings={"kb_slot_role": "upper_volume"})["week"]  # a placement he picks
     assert "kettlebell_deadlift" in {x["key"] for s in home["sessions"] if s["role"] == "upper_volume" for x in s["lifts"]}
     for w in (a, shared, drop, home):  # every alternative keeps lower volume at two spine-loading lifts
         lv = next(s for s in w["sessions"] if s["role"] == "lower_volume")
         lib = LIB0
         assert sum(1 for x in lv["lifts"] if lb.spine_loading(sw._lib_entry(lib, CAT0, x["key"]))) <= 2
     # control: placement off -> the stacking rule must DROP the pinned third hinge (no "kept light" exemption any more)
-    off = _week("a_large_deficit_experienced", {(lb, "place_kb"): lambda rx, ctx, workouts: []})["week"]
+    off = _week("a_large_deficit_experienced", {(lb, "place_kb"): lambda rx, ctx, workouts: []} | NODL)["week"]
     lv = next(s for s in off["sessions"] if s["role"] == "lower_volume")
     assert "kettlebell_deadlift" not in {x["key"] for x in lv["lifts"]}
     assert any("the third spine-loading lift" in ln for ln in lv["rationale"])
@@ -214,7 +219,7 @@ def test_one_s_per_canonical_family_per_objective():
     assert quota_violations(LIB0) == []
     # before -> after (FIX3): hypertrophy 49 -> 34, strength 10 -> 10, functional 10 -> 9 (exact duplicates share one rating)
     # FIX4 -3: the landmine presses and the trap pulldown read a moderate load ceiling (fourth red team: generous S)
-    assert s_counts(LIB0) == {"hypertrophy": 31, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}
+    assert s_counts(LIB0) == {"hypertrophy": 30, "strength": 10, "functional": 9, "conditioning": 0, "mobility": 0}
     pull = LIB0["movements"]["lat_pulldown_close_grip_cable"]
     assert pull["ratings"]["hypertrophy"]["tier"] == "A" and any("S quota" in b for b in pull["ratings"]["hypertrophy"]["basis"])
     assert LIB0["movements"]["lat_pulldown_cable"]["ratings"]["hypertrophy"]["tier"] == "S"  # the family's one S
@@ -251,7 +256,7 @@ def test_every_generated_note_states_one_effort_target_per_lift(weeks):
     assert lb.effort_targets("RPE 8–9, last set RPE 9–10\nSet 1: 6 reps at RPE 7 or less → +10 lb.") == ["8–9"]  # a rule is no target
     # control: the WHY header left as composed -> the red team's first phone note ("RPE 8–9 on big lifts" ... "RPE 6–7")
     raw = _week("b_shoulder_flag_low_recovery", {(lb, "why_effort"): lambda why, ir_: why})
-    assert any("upper_heavy" in c for c in contradictory(raw["week"]))
+    assert contradictory(raw["week"])  # FIX5: (b)'s upper heavy now serves no press; its lower heavy squat (RPE 7) carries it
 
 
 # ── 7. the adherence dip, on a realistic history ─────────────────────────────
@@ -268,6 +273,15 @@ def test_an_adherence_dip_changes_the_week_fewer_shorter_sessions_anchored():
     dip = _week("a_large_deficit_experienced", record=_irregular)
     w = dip["week"]
     assert w["short_week"].startswith("adherence dip (live, adherence_response=short_week)") and len(w["sessions"]) == 4
+    # #5861 FIX5 (fifth red team: this asserted the harness): the week is PRODUCTION's plan — the one the nightly sequence reads
+    # (`live_sequence.sequence_skip` -> `session_sequence.next_session`; served end to end in tests/test_programming_fix5_5861.py)
+    from training import live_sequence, session_sequence as ss
+
+    plan = live_sequence.week_plan("2026-11-16", dip["world"]["record"], dip["world"]["lib"])
+    assert plan and plan["mode"] == "dip" and plan["line"] == w["short_week"] and plan["skip"] == ("shoulders_arms",)
+    skip = live_sequence.sequence_skip(dip["world"]["record"], dip["world"]["lib"])
+    assert ss.next_session("2026-11-16", dip["world"]["record"], [], skip=skip)["session_role"] != "shoulders_arms"
+    assert live_sequence.week_plan("2026-11-16", full["world"]["record"], full["world"]["lib"]) is None  # control: no dip
     cap = lb.ADHERENCE_DIP["session_minutes"]["value"]
     assert all((s["lifting_minutes"] or 0) <= cap for s in w["sessions"])
     full_anchor = {

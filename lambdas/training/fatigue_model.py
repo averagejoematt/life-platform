@@ -280,7 +280,8 @@ def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, 
 
 def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, window_days: int = 42) -> dict[str, dict[str, Any]]:
     """Template id -> {exposures, trend, why, discomfort_sessions, pain_sessions, rpe_drift} over the window (the block)."""
-    from training.training_notes_pain import DISCOMFORT, PAIN, pain_class
+    from training.live_rules import LIGHT, note_class  # #5861 FIX5: a joint-located "sore" at the mild line is light discomfort
+    from training.training_notes_pain import DISCOMFORT, PAIN
 
     recent = THRESHOLDS["discomfort_window_days"]["value"]
     by: dict[str, list[tuple[str, dict[str, Any]]]] = {}
@@ -303,11 +304,12 @@ def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, windo
                 )
             )
         # #5861 L6: an INCLUSIVE fortnight — a weekly lift's previous two exposures sit 7 and 14 days back on its own weekday
-        classes = [(day, pain_class(str(ex.get("notes") or ""))) for day, ex in rows if (_ago(as_of, day) or 0) <= recent]
+        classes = [(day, note_class(str(ex.get("notes") or ""))) for day, ex in rows if (_ago(as_of, day) or 0) <= recent]
         out[tid] = {
             "exposures": len(rows),
             **_trend(points),
             "discomfort_sessions": sum(1 for _d, c in classes if c == DISCOMFORT),
+            "light_sessions": sum(1 for _d, c in classes if c == LIGHT),  # FIX5: kept, lighter (the joint rule) — never swapped
             "pain_sessions": sum(1 for _d, c in classes if c == PAIN),
             "rpe_drift": _rpe_drift(points),
         }
@@ -335,17 +337,22 @@ def _rpe_drift(points: list[tuple[str, float | None, float | None, float | None,
 
 
 def axial_stacking(workouts: list[dict[str, Any]] | None, index: dict[str, dict[str, Any]], *, as_of: str) -> list[dict[str, Any]]:
-    """Redundant axial fatigue in the last 72 h: >= 3 free-weight squat/hinge compound exposures, or two heavy hinges in 48 h."""
+    """Redundant axial fatigue: >= axial_stack_count spine-loading squat/hinge exposures inside axial_stack_window_hours, or two
+    heavy hinges inside hinge_stack_window_hours. #5861 FIX5: ONE spine-loading definition (`live_balance.spine_loading`, the
+    stacking rule's and the gates'), and the windows are the table's values (the fifth red team: 72 h and 48 h were hard-coded)."""
+    from training.live_balance import spine_loading
+
     axial = []
-    for day, tid, ex in _exposures(workouts, as_of, 3):
+    for day, tid, ex in _exposures(workouts, as_of, int(THRESHOLDS["axial_stack_window_hours"]["value"]) // 24):
         row = index.get(tid) or {}
-        if row.get("pattern") in AXIAL_PATTERNS and row.get("job") == "compound" and row.get("resistance_profile") == "free_weight":
+        if spine_loading({"pattern": row.get("pattern"), "job": row.get("job"), "joint_stress": {"spinal_load": row.get("spinal_load")}}):
             if sum(1 for s in _working(ex.get("sets")) if _hard(s)) >= 2:
                 axial.append({"day": day, "movement_id": row.get("movement_id"), "pattern": row.get("pattern")})
     out = []
     if len(axial) >= THRESHOLDS["axial_stack_count"]["value"]:
         out.append({"finding": "axial_stacking", "exposures": axial, "threshold": "axial_stack_window_hours"})
-    hinges = [a for a in axial if a["pattern"] == "hinge" and (_ago(as_of, a["day"]) or 0) < 2]
+    hinge_days = int(THRESHOLDS["hinge_stack_window_hours"]["value"]) // 24
+    hinges = [a for a in axial if a["pattern"] == "hinge" and (_ago(as_of, a["day"]) or 0) < hinge_days]
     if len(hinges) >= 2:
         out.append({"finding": "hinge_stacking", "exposures": hinges, "threshold": "hinge_stack_window_hours"})
     return out
@@ -438,7 +445,8 @@ def _systemic(
     if tier in ("green", "yellow", "red"):
         # #5861 L6: ACWR (Whoop strain) and the readiness tier (Whoop recovery) are both HR-derived — ONE vote, never two
         why = f"readiness tier {tier}" + (f", ACWR {acwr}" if high_acwr else "")
-        out.append(_signal("readiness", "strain" if tier == "red" or high_acwr else "ok", why, "readiness_strain"))
+        strain = tier == str(THRESHOLDS["readiness_strain"]["value"]) or high_acwr  # #5861 FIX5: the table's tier, read
+        out.append(_signal("readiness", "strain" if strain else "ok", why, "readiness_strain"))
     else:
         out.append(_signal("readiness", "unknown", f"readiness {tier or 'not read'} — HR-derived tiers are not effort evidence", None))
     if sleep_hours is None:

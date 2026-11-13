@@ -446,11 +446,15 @@ def cardio_progress(kind: str, live: dict[str, Any], minutes: int) -> tuple[int,
 
 
 # ── 3. the medical stop line ─────────────────────────────────────────────────
-def symptom_gate(row: Any) -> dict[str, Any] | None:
+def symptom_gate(row: Any, workouts: Any = None, as_of: Any = None) -> dict[str, Any] | None:
     """The `medical_stop_lines` tripwire row (`health.tripwire_readers.medical_stop_lines`) -> {tripwire, lines} when TRIPPED,
-    else None. `unknown` (the self-report palpitations / syncope arms with no input) is never read as tripped or as clear."""
+    else None. `unknown` (the self-report palpitations / syncope arms with no input) is never read as tripped or as clear.
+    #5861 FIX5: those two arms' self-report — a symptom he logged on a Hevy note in the last fortnight (`live_rules.self_report`,
+    over `workouts` before `as_of`) — trips the draft's gate too."""
     if not isinstance(row, dict) or row.get("state") != "tripped":
-        return None
+        from training.live_rules import self_report
+
+        return self_report(workouts, as_of)
     arms = (row.get("observed") or {}).get("arms") or {}
     hit = sorted(k for k, a in arms.items() if isinstance(a, dict) and a.get("state") == "tripped")
     return {"tripwire": str(row.get("id") or "medical_stop_lines"), "lines": hit or ["a stop line"]}
@@ -569,14 +573,16 @@ def novel_start(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
             continue
         tid = str((ctx["catalog"].get(e.get("movement_key")) or {}).get("hevy_template_id_hint") or "").upper()
         reps = [s.get("reps") for s in e.get("sets") or [] if s.get("reps")]
-        if (tid and tid in seen) or not reps or int(reps[0][0]) >= int(lo):
+        if (tid and tid in seen) or not reps:
             continue
-        for s in e["sets"]:
+        low = int(reps[0][0]) < int(lo)  # #5861 FIX5: the RPE cap reaches every new movement, isolation too; reps move only below 6
+        for s in e["sets"] if low else []:
             if s.get("reps"):
                 s["reps"] = [int(lo), int(hi)]
         e["live_effort"] = min(int(NOVEL_START["rpe"]["value"]), int(e.get("live_effort") or 99))
         title = (ctx["catalog"].get(e.get("movement_key")) or {}).get("title") or e.get("movement_key")
-        lines.append(f"new movement (live): {title} starts at {lo}-{hi} reps, RPE <= 7 — new to him this block (NOVEL_START, heuristic)")
+        where = f"starts at {lo}-{hi} reps, RPE <= 7" if low else "starts at RPE <= 7"
+        lines.append(f"new movement (live): {title} {where} — new to him this block (NOVEL_START, heuristic)")
     return lines
 
 

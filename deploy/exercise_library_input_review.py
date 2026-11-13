@@ -394,6 +394,18 @@ SHOULDER_PROVOKING = {
     "rule (live_program.PAIN_RULE) then caps or avoids them. Practitioner consensus, not a trial.",
 }
 """Shoulder-provoking work: the shoulder joint stress is raised to at least `floor` (never lowered from high)."""
+ELBOW_PROVOKING = {
+    "patterns": ("triceps_extension", "curl"),
+    "not_title": r"wrist|forearm|bridge|step back",
+    "floor": _M,
+    "why": "fifth red team (2026-11-13): a pushdown, pushaway, kickback or curl rated the elbow LOW ('no joint loaded hard'), so "
+    "an elbow-pain flag swapped one loaded elbow extension for another and served it to failure. A loaded elbow extension or "
+    "flexion loads the elbow: the working joint is rated at least moderate as a PAIN-MAP floor (like the shoulder's), so the "
+    "pain rule caps or avoids it; the rubric's joint cost keeps the healthy-joint rating (`provocation_floor`). Wrist and "
+    "forearm curls (the wrist works) and the bridge / step-back 'curls' (a leg or a lunge) are not elbow work. Practitioner "
+    "consensus, not a trial.",
+}
+"""Elbow-dominant isolation (triceps extension, curl): the elbow joint stress is raised to at least `floor` (pain map only)."""
 SPINE_AT_SIDES = {
     "pattern": "squat",
     "equipment": ("dumbbell", "kettlebell"),
@@ -476,7 +488,7 @@ def apply_class_rules(movements: dict[str, dict[str, Any]]) -> dict[str, list[st
     tier is derived; each change is recorded on the row (`attribute_audit.class_rule`). Returns {rule: [keys changed]}."""
     import re
 
-    out: dict[str, list[str]] = {"shoulder_provoking": [], "spine_at_sides": [], "knee_hip": []}
+    out: dict[str, list[str]] = {"shoulder_provoking": [], "elbow_provoking": [], "spine_at_sides": [], "knee_hip": []}
     for key, e in sorted(movements.items()):
         js_ = dict(e.get("joint_stress") or {})
         dup = (e.get("variant") or {}).get("duplicate_of") if isinstance(e.get("variant"), dict) else None
@@ -491,6 +503,13 @@ def apply_class_rules(movements: dict[str, dict[str, Any]]) -> dict[str, list[st
             js_["shoulder"] = SHOULDER_PROVOKING["floor"]
             out["shoulder_provoking"].append(key)
             _record(e, "shoulder_provoking", "shoulder", SHOULDER_PROVOKING["floor"])
+        elbow = e.get("pattern") in ELBOW_PROVOKING["patterns"] and not re.search(ELBOW_PROVOKING["not_title"], title, re.I)
+        if elbow and _rank(js_.get("elbow", "unknown")) < _rank(ELBOW_PROVOKING["floor"]):  # #5861 FIX5: the elbow pain map
+            floor = e.get("provocation_floor") or {}
+            e["provocation_floor"] = {**floor, "elbow": {"from": str(js_.get("elbow", "unknown")), "rule": "elbow_provoking"}}
+            js_["elbow"] = ELBOW_PROVOKING["floor"]
+            out["elbow_provoking"].append(key)
+            _record(e, "elbow_provoking", "elbow", ELBOW_PROVOKING["floor"])
         eq = set(e.get("equipment") or [])
         at_sides = (
             e.get("pattern") == SPINE_AT_SIDES["pattern"]

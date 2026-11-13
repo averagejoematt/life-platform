@@ -15,6 +15,10 @@
 > knee and hip, mild pain kept lighter, no load step on a held lift, one effort across the session, the weekly redline, at-MAV
 > donors and the quadriceps slot, drop-don't-shave, squat before the hinge, the aerobic gap's walk, the stop line's wording) and
 > library 0.3.2 — the new §4c, measured on the sample weeks, three stress profiles and the owner's private run.
+> **Updated a fifth time** (2026-11-13) for the FIFTH red team (graded B-, "do not approve yet"): `live_rules` and `live_sequence`
+> (the session set cap, full-body short weeks, the pattern off above the mild line, nothing added on a bad day, the KB deadlift as
+> filler, light discomfort, the self-reported stop lines, the week rule wired into the cron's sequence) and library 0.3.2's elbow
+> pain map, KB-deadlift ceiling and preacher family — the new §4d.
 > No personal data: every example is a synthetic profile (`tests/fixtures/sample_week_profiles_5861.json`).
 
 ## The principle
@@ -289,6 +293,54 @@ decision is a library setting with today's default.
   the wire as its catalog key. The no-live-change digests keep the base tree's harness lookup (`RESOLVER` `legacy`), the
   harness their pins were computed with.
 
+## 4d. The fifth red team's week (`live_rules`, `live_sequence`, 2026-11-13)
+
+Every rule is a labelled heuristic table (`live_rules.SET_CAP`, `FULL_BODY`, `JOINT_ISOLATION`, `KB_FILLER`, `SELF_REPORT`,
+`live_sequence.SHORT_WEEK_PLANS`); every owner decision keeps today's default.
+
+- **The session set cap** (`fit_set_cap`). A 3-day week crashed the draft (`total_sets 23 > cap 20`): the short week's host took the
+  carry, the trunk floor and the kettlebell slot with no guard. Every live session is held to the week grid's
+  `session_set_ceiling`: live additions go first, then accessory sets to two, then whole accessories, then an anchor's back-offs —
+  never an anchor's top set. Fuzzed 1–5 mornings x both cap settings x every stress profile (`tests/test_programming_fix5_5861.py`).
+- **Short weeks are planned, not truncated** (`live_sequence.SHORT_WEEK_PLANS`). 4 mornings: shoulders+arms skipped. 3 mornings:
+  upper heavy, lower heavy, and a FULL-BODY lower volume (+ the upper-volume anchors at two sets) — legs and upper body each twice.
+  2 mornings: two full-body days (upper heavy + the lower-volume anchors; lower heavy + the upper-volume anchors), never an upper
+  half and a lower half. 1 morning: one full-body session. The line no longer claims "legs keep 2x" where it is false.
+- **The week rule is the cron's** (`live_sequence.week_plan`, `sequence_skip`, `serve`). The short-week and adherence-dip role
+  choices lived only in the sample generator. Now `routine_generator._schedule_entry_for_date` passes the live plan's skipped roles
+  to `session_sequence.next_session(skip=...)` (`ledger` / `classify_sessions` step over them, so the credit check reads the role
+  the plan served), and the entry carries `live_week` (host, full-body partner) into the draft. The generator reads the same plan.
+  Live only: with the library `proposed` the sequence is today's (`tests/test_no_live_change_5861_l6.py`). The dip is judged on
+  the record BEFORE the week's Monday. The short week's production input is the charter's dated travel windows
+  (`days_available`); `sequence_rule_from` (default: from the block start) is the first Monday the rule judges.
+- **Above the mild line the pattern is off** (`live_program.apply_joint_rule`). A stated score over 3/10, "sharp" or no number:
+  every member of the flag's pattern group that loads the joint at moderate or more is dropped for the session, and so is the
+  session fit's pain swap for the flagged movement — no moderate-stress substitute (FIX4 served a decline machine press at sharp
+  6/10 and 7/10 shoulder pain). **Same-joint isolation** (`isolation_joint_cap`, `JOINT_ISOLATION`): under any flag, every isolation
+  lift working the joint is capped at RPE 7 with the stop line, whatever the joint data says.
+- **The elbow pain map** (library, `exercise_library_input_review.ELBOW_PROVOKING`): every loaded triceps extension and curl reads
+  the elbow at least moderate (50 rows; wrist / forearm / bridge rows excluded) — a pain-map floor the rubric's joint cost does not
+  read (`provocation_floor`), so no tier moved. **New movements at RPE <= 7, isolation too** (`live_program._novel_cap`,
+  `live_week.novel_start`): a lift with no load on file ("find the load") starts at the novel-again cap.
+- **Nothing added on a bad day** (`no_added_work`, `bad_day`). On a strained, overreached or deload-recommended day the quadriceps
+  slot, the trunk floor and a RELOCATED kettlebell slot wait. `kb_slot_under_strain` (default `as_today`) still governs the slot in
+  its home session; today's templates never keep it there (lower volume already holds two spine-loading lifts), so the default week
+  serves no KB hinge on a bad day either way. **The fourth and fifth red teams both recommend `drop`.**
+- **The KB deadlift as filler** (`kb_choice`, `kb_filler`, `KB_FILLER`). For a lifter whose record holds a loaded barbell or
+  trap-bar deadlift, the KB deadlift (one bell) is filler: the swing serves when servable (equipment, pain, its gates), else the
+  slot is dropped. The swing's own chain gate (`chain_kb_swing`, the owner's #5774 entry: two KB deadlifts first) stays the
+  owner's: while it is locked, a deadlifter's slot is dropped. The library rates the KB deadlift's glute hypertrophy B (load
+  ceiling low: one bell — the rubric's cap), not A.
+- **"Sore" is discomfort** (`note_class`, `LIGHT`). A joint-located sore / achy / tight / cranky note at or under the mild line,
+  which the note layer leaves as nothing (#5800, unchanged), is light discomfort for the engine: two in a fortnight reach the joint
+  rule's reduce tier (10 % lighter, RPE <= 7, the stop line) — the lift is kept, never swapped.
+- **Thresholds that read** (`fatigue_model`): `readiness_strain` is the table's tier; the axial and hinge windows are the table's
+  hours; `axial_stacking` reads the ONE spine-loading definition (`live_balance.spine_loading`).
+- **The self-reported stop lines** (`self_report`, `SELF_REPORT`). The symptom line says "Stop, log it." A Hevy note in the last
+  fortnight naming a racing or irregular heartbeat, or fainting / near-fainting / dizziness, trips the draft's symptom gate (no hard
+  cardio, a review line). The platform tripwire's own palpitations and syncope arms (`health.tripwire_readers`) still read
+  `unknown`: their canonical input is the check-in lane's (#5819).
+
 ## 5. Progression
 
 **The live load guard** (`live_program.guard_loads`, after the floor and the double progression, before the back-offs and
@@ -438,6 +490,12 @@ Before flipping, the owner should decide (each is listed on the epic's PRs):
       `heavy_day_deadlift_shape` (as_today | top_plus_backoff — recommended), `kb_slot_under_strain` (as_today | drop —
       recommended), `symptom_line` (today's wording | `extended`, with racing/irregular heartbeat and a seek-care step),
       `symptom_line_on_lifting_days` (false | true);
+- [ ] fifth red team (each exercised in `tests/test_programming_fix5_5861.py`): `sequence_rule_from` — set it to the approval's
+      Monday so weeks served before the flip keep their credited positions (unset = the week rule judges every week since the block
+      start); the short week's input (today: the charter's travel windows — a per-week declared count would be better); the
+      `SHORT_WEEK_PLANS`; the pattern-off rule above 3/10; `kb_slot_under_strain` (both red teams: `drop`); the KB swing's chain gate
+      for a lifter who deadlifts (locked = no kettlebell slot); readers that still show the positional sequence (the site, the coach
+      packet, fitness tests) — the cron and the MCP draft serve the live one;
 - [ ] the knee/hip pain map (library 0.3.2, a class rule, not in the rubric's joint cost) and the fourth red team's heuristics:
       the note-site words, the moderate-member fallback above the mild line, the stop line at 3/10, at-MAV donors (2 sets) and
       the MEV + 2 priority margin, the quadriceps slot (history >= 3 sessions), the weekly redline from `owner_redlines`, the walk

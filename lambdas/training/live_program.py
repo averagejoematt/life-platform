@@ -138,7 +138,7 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
 `session_cap_includes_cardio` False keeps today's 75-min LIFTING cap with the cardio block apart; True makes the cap cover lifting
 + cardio and puts hard conditioning on the shoulders+arms day. `symptom_line` is the owner's own wording (OWNER DECISION); the default is one phone line (<= 40 characters) so a tempo
 note stays inside its 6-line budget (hevy_note_lint L7) — a longer wording still prints, safety over the line budget.
-`short_week_rule` `skip_shoulders_arms` (L5's rule) or `slide` (today's sequence) — `short_week_roles`. Second red team (2026-11-13),
+`short_week_rule` `skip_shoulders_arms` (L5's rule) or `slide` (today's sequence) — `live_sequence.SHORT_WEEK_PLANS` (#5861 FIX5). Second red team (2026-11-13),
 both OWNER DECISIONS, both off by default: `behind_schedule_week` (live_week.behind_schedule: a shorter 'keep the anchors' week
 after a run of missed sessions) and `press_sets` (live_week.press_sets, read there with its default 1 — the charter's one set —
 until the library builder carries the key: the shoulders+arms press above one set)."""
@@ -236,22 +236,6 @@ def trim_order(surplus: Any) -> Any:
 SHORT_WEEK_SKIP = "shoulders_arms"
 
 
-def short_week_roles(roles: list[str], days: int, lib: dict[str, Any] | None = None) -> tuple[list[str], str | None]:
-    """L5's short-week rule as a LIVE option (WEEKLY_STRUCTURE.md refinement 1; library setting `short_week_rule`
-    `skip_shoulders_arms` by default under live; `slide` = today's behaviour): when a week holds fewer lifting mornings than roles, the
-    shoulders+arms session goes first, so both lower days keep their 2x a week and their sets; delts and arms fall to their
-    floor for that week; the carry and the trunk floor that ride shoulders+arms move to the week's last session (the draft's
-    `short_week` input names it). Returns (the roles drafted, the rationale line or None). The cron's session sequence still slides
-    (it credits by position) — wiring the skip into `session_sequence` is the owner's call (named on the PR)."""
-    rule = settings(lib)["short_week_rule"]
-    if days >= len(roles):
-        return roles[:days], None
-    if rule != "skip_shoulders_arms" or SHORT_WEEK_SKIP not in roles:
-        return roles[:days], f"short week (slide): {days} of {len(roles)} sessions — the sequence slides, {', '.join(roles[days:])} waits"
-    kept = [r for r in roles if r != SHORT_WEEK_SKIP][:days]
-    return kept, f"short week (live, skip_{SHORT_WEEK_SKIP}): {days} of {len(roles)} sessions — {SHORT_WEEK_SKIP} skipped, legs keep 2x"
-
-
 def deload_shape(exposures: list[dict[str, Any]]) -> int:
     """IN PLACE, a RECOMMENDED deload's reduction (applying the deload itself stays his word): every compound to
     DELOAD_SHAPE compound_sets (back-offs go, the top set stays) at RPE <= compound_rpe, its load held or stepped down;
@@ -332,52 +316,32 @@ def _joint_hit(entry: dict[str, Any], flags: list[dict[str, Any]]) -> tuple[str,
 
 
 def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], flags: list[dict[str, Any]]) -> list[str]:
-    """IN PLACE: every exposure that loads a flagged joint (module doc 3). `avoid`: swapped for a member that loads that joint
-    less than moderate (`live_session._replacement` with the joint cap), else skipped; `reduce`: kept, marked for a load cut
-    (`live_load`) and an RPE cap. Returns the rationale lines."""
-    from training import live_safety, live_session as ls
+    """IN PLACE: every exposure that loads a flagged joint (module doc 3). `avoid` (above the mild line, "sharp" or no number):
+    the flagged PATTERN is off for the session — every member of the flag's pattern group that loads the joint at moderate or
+    more is dropped, and so is the session fit's pain swap for the flagged movement itself (#5861 FIX5: no substitute of the
+    same pattern); `reduce`: kept, marked for a load cut (`live_load`) and an RPE cap. Returns the rationale lines."""
+    from training import live_safety
 
     if not flags:
         return []
     lines: list[str] = []
     keep = []
-    taken = {str(e.get("movement_key")) for e in rx["exposures"] if e.get("movement_key")}
-    level = STRESS[str(PAIN_RULE["joint_level"]["value"])]
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
         hit = _joint_hit(entry, flags) if entry and e.get("intensity") != "carry" else None
+        swap_of = _avoided_swap(e, ctx, flags)
+        if swap_of:
+            lines.append(f"skipped (live): {entry.get('title') or e.get('movement_key')} — {swap_of}: the flagged pattern is off today")
+            continue
         if not hit:
             keep.append(e)
             continue
         tier, f, joint = hit
-        if tier == "avoid" and (e.get("live_swap") or {}).get("code") == "pain" and _stress(entry, joint) < STRESS["high"]:
-            tier = "reduce"  # #5861 FIX4: the session fit already swapped in the lower-stress regression — keep it, lighter
         name = entry.get("title") or e.get("movement_key")
         why = f"{f['source']} flag on {f['title']} ({joint.replace('_', ' ')}" + (f", {f['severity']:g}/10" if f["severity"] else "") + ")"
         stop = live_safety.stop_line(f["severity"])  # #5861 FIX4: every lift the pain rule touches carries an in-set stop line
-        if tier == "avoid":
-            new = ls._replacement(e, "joint", ctx, rotation, taken, limit=(joint, level))
-            lighter = None
-            if not new and _stress(entry, joint) >= STRESS["high"]:  # FIX4: no low member -> a moderate one, reduced
-                new = lighter = ls._replacement(e, "joint", ctx, rotation, taken, limit=(joint, STRESS["high"]))
-            if new:
-                taken.add(new)
-                swapped = e | {"movement_key": new, "template_id": None, "live_swap": {"from": e["movement_key"], "code": "joint"}}
-                swapped["live_stop"] = stop
-                if lighter:
-                    swapped["live_load"] = {"pct": int(PAIN_RULE["reduce_pct"]["value"]), "why": f"{joint.replace('_', ' ')} flag"}
-                    swapped["live_effort"] = min(int(PAIN_RULE["reduce_rpe"]["value"]), int(e.get("live_effort") or 99))
-                keep.append(swapped)
-                lines.append(
-                    f"swapped (live): {name} -> {(ctx['catalog'].get(new) or {}).get('title') or new} — {why}: same pattern, avoided"
-                    + (
-                        f"; no member loads the {joint.replace('_', ' ')} low — a moderate one, {PAIN_RULE['reduce_pct']['value']}% lighter, RPE <= 7"
-                        if lighter
-                        else ""
-                    )
-                )
-            else:
-                lines.append(f"skipped (live): {name} — {why}: same pattern, no member loads that joint less — nothing fills it")
+        if tier == "avoid":  # #5861 FIX5 (fifth red team): no moderate-stress member of the same pattern — the pattern is off
+            lines.append(f"skipped (live): {name} — {why}: above the mild line, the flagged pattern is off today — nothing fills it")
             continue
         e["live_load"] = {
             **(e.get("live_load") or {}),
@@ -390,6 +354,20 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
         lines.append(f"reduced (live): {name} — {why}: loads that joint, {PAIN_RULE['reduce_pct']['value']}% lighter, RPE <= 7")
     rx["exposures"] = [{k: v for k, v in e.items() if not (k == "template_id" and v is None)} for e in keep]
     return lines
+
+
+def _avoided_swap(e: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, Any]]) -> str | None:
+    """The session fit's pain swap (`live_session.fit_exposures`, code `pain`) for a movement whose flag reads `avoid`, in the same
+    pattern group: the reason it is dropped, else None (#5861 FIX5 — above the mild line nothing of the pattern stands in)."""
+    swap = e.get("live_swap") or {}
+    if swap.get("code") != "pain":
+        return None
+    src = _entry(swap.get("from"), ctx)
+    mid = ctx["idx"]["to_lib"].get(str(swap.get("from")))
+    f = next((f for f in flags if f["movement_id"] == mid and f["tier"] == "avoid"), None)
+    if f is None or _group(src.get("pattern")) != _group(_entry(e.get("movement_key"), ctx).get("pattern")):
+        return None
+    return f"stands in for {f['title']}, pain flag" + (f" {f['severity']:g}/10" if f["severity"] else "")
 
 
 # ── 4. stacking and stalls ────────────────────────────────────────────────────
@@ -548,10 +526,11 @@ def trunk_floor(rx: dict[str, Any], ctx: dict[str, Any], state: str | None = Non
     load-finding). Purpose-driven, never a filler: skipped on a strained/overreached day, when the session already has one,
     or when nothing is servable. Returns the rationale lines."""
     from training import live_session as ls
+    from training.live_rules import bad_day  # #5861 FIX5: a deload-recommended day adds nothing either
     from training.program_structure import EXPOSURES
 
     host = ctx.get("short_week_host") or TRUNK_FLOOR["role"]["value"]
-    if rx.get("session_role") != host or state in ("strained", "overreached") or ctx.get("behind"):
+    if rx.get("session_role") != host or state in ("strained", "overreached") or bad_day(rx) or ctx.get("behind"):
         return []
     if any(_entry(e.get("movement_key"), ctx).get("trunk_function") in TRUNK_FUNCTIONS for e in rx["exposures"]):
         return []
@@ -593,12 +572,14 @@ def trunk_floor(rx: dict[str, Any], ctx: dict[str, Any], state: str | None = Non
 
 
 def short_week_carry(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
-    """IN PLACE, live only: in a short week that skipped shoulders+arms (`short_week_roles`), the week's host session (its
+    """IN PLACE, live only: in a short week that skipped shoulders+arms (`live_sequence.SHORT_WEEK_PLANS`), the week's host session (its
     last) takes that day's carry exposure — the owner-pinned weekly carry (the concession ledger's "carries weekly") is not
     lost with the day. Returns the rationale lines."""
     from training import program_structure as ps
 
     if not ctx.get("short_week_host") or rx.get("session_role") != ctx["short_week_host"]:
+        return []
+    if SHORT_WEEK_SKIP not in (ctx.get("week_skip") or (SHORT_WEEK_SKIP,)):
         return []
     sa = ps.session_prescription_for_role(SHORT_WEEK_SKIP, catalog_movements=ctx["catalog"])
     carries = [e for e in sa["exposures"] if e.get("intensity") == "carry" and e.get("movement_key")]
@@ -678,8 +659,12 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
 
     lines = live_shape.add_slots(rx, ctx)  # the quadriceps slot, BEFORE the pain rule so a knee flag reaches it
     lines += lb.place_kb(rx, ctx, workouts)  # FIX4: placed first, so a pain flag reaches the slot where it lands
-    flags = joint_flags(ctx, workouts, ctx.get("discomfort") or set())
+    from training import live_rules  # #5861 FIX5
+
+    lines += live_rules.kb_filler(rx, ctx, workouts)  # the KB deadlift as filler: the swing, else nothing
+    flags = joint_flags(ctx, workouts, (ctx.get("discomfort") or set()) | (ctx.get("light_discomfort") or set()))
     lines += apply_joint_rule(rx, ctx, rotation, flags) + lb.pain_assess(rx, ctx, flags, workouts)
+    lines += live_rules.isolation_joint_cap(rx, ctx, flags)  # every isolation lift on a flagged joint: RPE <= 7, stop line
     lines += live_week.kb_slot(rx, ctx)  # the kettlebell slot names its implement, capped at RPE 7-8 (before stacking)
     lines += lb.allocate(rx, ctx)  # volume by priority: at/over-MAV isolation gives, priority muscles at MEV + 2 take (FIX4)
     lines += live_week.press_sets(rx, ctx)  # FIX4: the week's allocation already counted the press option's sets
@@ -849,6 +834,20 @@ def _cap_effort(note: str, rpe_max: int, clause: str | None, band: Any = None) -
     return sb.add_reason(text, clause) if clause else text
 
 
+def _novel_cap(note: str, e: dict[str, Any]) -> str:
+    """#5861 FIX5 (fifth red team: a new preacher curl at "RPE 8–9, last set 9–10, find the load"): a lift whose rows carry no
+    load on file — the "find the load" feeler, i.e. new to him — starts at the novel-again cap (NOVEL_START rpe), isolation
+    included. The kettlebell slot keeps its own band."""
+    from training import hevy_note_grammar as g
+    from training.live_week import NOVEL_START
+
+    if g.PICK_LOAD_OPEN_TAIL not in note or e.get("live_kb"):
+        return note
+    cap = int(NOVEL_START["rpe"]["value"])
+    e["live_effort"] = min(cap, int(e.get("live_effort") or 99))
+    return _cap_effort(note, cap, None)
+
+
 def _top(effort: str) -> float:
     import re
 
@@ -877,6 +876,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
             b.notes = live_week.kb_note(b.notes or "")
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))  # FIX3
         b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # FIX4: the in-set stop line
+        b.notes = _novel_cap(b.notes or "", e)  # FIX5: a lift with no load on file (new to him) starts at RPE <= 7
     from training import live_safety, selection_engine as se  # #5861 FIX4: no load step on a held lift; one effort; stop line
 
     rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))
