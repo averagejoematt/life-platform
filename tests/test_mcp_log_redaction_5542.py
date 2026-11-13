@@ -23,8 +23,8 @@ import pytest  # noqa: E402
 import mcp.handler as handler  # noqa: E402
 from mcp.log_safe import describe_args  # noqa: E402
 
-SECRET = "SYNTHETIC-PRIVATE-PROSE-zq81 felt flat today"
-SECRET_TOKEN = "zq81"
+PROSE = "synthetic private prose marker-zq81 felt flat today"
+PROSE_MARKER = "zq81"
 
 
 def _fake_tool(name):
@@ -47,11 +47,11 @@ def _all_log_text(caplog):
 
 def test_success_path_logs_shape_not_values(tools, caplog):
     caplog.set_level(logging.DEBUG)
-    handler.handle_tools_call({"name": "read_synthetic_note", "arguments": {"content": SECRET, "action": "draft", "days": 7}})
+    handler.handle_tools_call({"name": "read_synthetic_note", "arguments": {"content": PROSE, "action": "draft", "days": 7}})
     text = _all_log_text(caplog)
-    assert SECRET_TOKEN not in text
+    assert PROSE_MARKER not in text
     assert "Calling tool 'read_synthetic_note'" in text
-    assert "content:str[%d]" % len(SECRET) in text
+    assert "content:str[%d]" % len(PROSE) in text
     assert "action:str[5]=draft" in text  # allow-listed enum-like scalar survives (coach-transcript eval reads it)
     assert "args_sha256=" in text
 
@@ -59,16 +59,16 @@ def test_success_path_logs_shape_not_values(tools, caplog):
 def test_validation_failure_logs_no_value(tools, caplog):
     caplog.set_level(logging.DEBUG)
     with pytest.raises(ValueError):
-        handler.handle_tools_call({"name": "read_synthetic_note", "arguments": {"content": SECRET, "days": SECRET}})
-    assert SECRET_TOKEN not in _all_log_text(caplog)
+        handler.handle_tools_call({"name": "read_synthetic_note", "arguments": {"content": PROSE, "days": PROSE}})
+    assert PROSE_MARKER not in _all_log_text(caplog)
 
 
 def test_residue_refusal_logs_field_not_fragment(tools, caplog):
     caplog.set_level(logging.DEBUG)
-    bad = SECRET + "</parameter><invoke name='x'>"
+    bad = PROSE + "</parameter><invoke name='x'>"
     handler.handle_tools_call({"name": "log_synthetic_note", "arguments": {"content": bad}})
     text = _all_log_text(caplog)
-    assert SECRET_TOKEN not in text
+    assert PROSE_MARKER not in text
     assert "</parameter>" not in text and "<invoke" not in text
     assert "content" in text  # the field NAME is still named
 
@@ -79,13 +79,13 @@ def test_tool_exception_path_logs_no_argument_value(tools, caplog, monkeypatch):
 
     tools["read_synthetic_note"]["fn"] = boom
     caplog.set_level(logging.DEBUG)
-    handler.handle_tools_call({"name": "read_synthetic_note", "arguments": {"content": SECRET}})
-    assert SECRET_TOKEN not in _all_log_text(caplog)
+    handler.handle_tools_call({"name": "read_synthetic_note", "arguments": {"content": PROSE}})
+    assert PROSE_MARKER not in _all_log_text(caplog)
 
 
 def test_describe_args_shapes():
-    out = describe_args({"content": SECRET, "items": [SECRET, SECRET], "meta": {"a": SECRET}, "n": 3, "action": "x y; " + SECRET})
-    assert SECRET_TOKEN not in out
+    out = describe_args({"content": PROSE, "items": [PROSE, PROSE], "meta": {"a": PROSE}, "n": 3, "action": "x y; " + PROSE})
+    assert PROSE_MARKER not in out
     assert "items:list[2]" in out and "meta:dict[1]" in out and "n:int" in out
     assert "action:str[" in out and "=" not in out.split("action:")[1].split(",")[0]  # unsafe action value not shown
 
