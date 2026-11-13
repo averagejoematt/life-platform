@@ -206,6 +206,9 @@ HEURISTICS: dict[str, dict[str, Any]] = {
     },
 }
 
+for _row in HEURISTICS.values():
+    _row["label"] = H  # ruling 18: every row a labelled heuristic
+
 TRIM_ORDER: tuple[str, ...] = ("accessory_backoff", "anchor_backoff", "priority_last_set")
 """THE one time fit's order (fix round 9): non-priority accessory back-off sets, then non-priority anchor back-offs, then a
 priority muscle's last sets; never under 2 working sets, an accessory left at 2 is dropped whole only after every back-off is

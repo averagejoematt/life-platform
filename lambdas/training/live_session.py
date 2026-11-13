@@ -238,6 +238,7 @@ def for_live_draft(
     ctx: dict[str, Any] | None = None
     hold_all = None
     plan_rows: dict[str, float] = {}
+    plan: dict[str, Any] = {}
     lib: dict[str, Any] = {}
     catalog = catalog_movements or {}
     try:
@@ -294,7 +295,8 @@ def for_live_draft(
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
-    lines += live_volume.fit_sets(out, set_cap, catalog, lib)
+    slack = live_volume.floor_slack(plan) if ctx is not None else {}
+    lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)
     _refit(out)
     if ctx is not None:
         from training import live_rulings
@@ -316,6 +318,7 @@ def for_live_draft(
         "hold_all": hold_all,
         "layoff": (ctx or {}).get("layoff"),
         "plan_rows": plan_rows if ctx is not None else {},
+        "floor_slack": slack,
     }
     from training import live_rulings
 
@@ -544,6 +547,8 @@ def rationale_lines(rx: dict[str, Any]) -> list[str]:
     if MARK not in rx:
         return []
     out = list(rx[MARK].get("summary") or [])
+    # ruling 16 (evidence and completeness VISIBLE) and ruling 11 (the advisory loss-rate line) stay on the rationale
+    out += [ln for ln in rx[MARK].get("lines") or [] if ln.startswith(("evidence (live): ", "loss rate (advisory"))]
     fat = rx.get("fatigue") or {}
     if fat:
         sig = ", ".join(fat.get("strain_signals") or []) or "none"

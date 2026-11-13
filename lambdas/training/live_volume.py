@@ -484,10 +484,21 @@ def _work(b: Any) -> int:
     return sum(1 for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup")
 
 
-def _prio(key: Any, catalog: dict[str, Any], lib: dict[str, Any]) -> bool:
-    """The movement's main muscle (its largest credit) is a priority muscle."""
+def _prio(key: Any, catalog: dict[str, Any], lib: dict[str, Any], slack: dict[str, float] | None = None) -> bool:
+    """The time fit's protected tier: the movement's main muscle is a priority muscle, or the week's plan holds that muscle (or
+    one of its delt heads) within one set of its floor (`slack`: plan count minus floor) — the last sets a floor needs go last."""
     c = credits(lib_entry(key, catalog, lib), key, catalog)
-    return bool(c) and max(c, key=c.get) in {str(m) for m in _settings(lib).get("priority_muscles") or []}
+    if not c:
+        return False
+    main = max((m for m in c if m not in HEADS), key=c.get, default=None)
+    if main in {str(m) for m in _settings(lib).get("priority_muscles") or []}:
+        return True
+    return any(m in (slack or {}) and (slack or {})[m] < 1.0 for m in c)
+
+
+def floor_slack(plan: dict[str, Any]) -> dict[str, float]:
+    """Muscle (and delt head) -> the week plan's hard sets over its floor (what the time fit may spend before a floor breaks)."""
+    return {m: round(float(plan["counts"].get(m, 0.0)) - float(t["floor"]), 1) for m, t in plan["targets"].items() if t["floor"]}
 
 
 def next_cut(items: list[tuple[bool, bool, bool, int]]) -> tuple[int, str] | None:
@@ -506,7 +517,9 @@ def next_cut(items: list[tuple[bool, bool, bool, int]]) -> tuple[int, str] | Non
     return next((tier[-1] for tier in tiers if tier), None)
 
 
-def fit_sets(rx: dict[str, Any], cap: Any, catalog: dict[str, Any], lib: dict[str, Any]) -> list[str]:
+def fit_sets(
+    rx: dict[str, Any], cap: Any, catalog: dict[str, Any], lib: dict[str, Any], slack: dict[str, float] | None = None
+) -> list[str]:
     """IN PLACE: the prescription held to the session set ceiling by `next_cut` (before the routine is built — the generator
     asserts the ceiling). Returns the line."""
     if not cap:
@@ -537,6 +550,7 @@ def time_fit(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], c
     from training.session_shape import routine_minutes
 
     lib = se.load_library_failsoft() or {}
+    slack = (rx.get("live_session") or {}).get("floor_slack") or {}
     kinds = {e.get("movement_key"): e for e in rx.get("exposures") or []}
     before = routine_minutes(blocks, movements)["lifting_minutes"]
     done: list[str] = []
@@ -546,7 +560,7 @@ def time_fit(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], c
             (
                 kinds[blocks[i].movement_key].get("kind") == "anchor",
                 kinds[blocks[i].movement_key].get("intensity") == "carry",
-                _prio(blocks[i].movement_key, movements, lib),
+                _prio(blocks[i].movement_key, movements, lib, slack),
                 _work(blocks[i]),
             )
             for i in lifts

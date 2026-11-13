@@ -108,12 +108,12 @@ def deadlift_shape(rx: dict[str, Any]) -> list[str]:
 def aerobic_gap(live: dict[str, Any], today_minutes: int = 0) -> int | None:
     """The week's aerobic minutes still missing: the guideline floor less the walking credit, less every block performed this
     week before today, less today's block. None when steps were not read (unknown is never a gap)."""
-    from training import cardio_model, live_balance
+    from training import cardio_model, live_sequence
 
     aer = live.get("aerobic") or {}
     if not aer or intensity_unknown(aer):  # FIX8 (ruling 12): steps of unknown intensity are never a manufactured deficit
         return None
-    since, day = live_balance.week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
+    since, day = live_sequence.week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
     done = sum(
         int(r.get("duration_sec") or 0) // 60
         for rows in (live.get("by_machine") or {}).values()

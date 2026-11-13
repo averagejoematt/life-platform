@@ -214,42 +214,26 @@ def rate_line(inputs: Any, fatigue: dict[str, Any] | None, role: str | None, lib
 
 # ── ruling 18: every heuristic, with the metric a block retro re-tunes it on ──
 HEURISTIC_HOOKS: dict[str, str] = {
-    "live_rulings.LEAD_LIFT.second_band": "the non-lead lift's e1RM trend over the block (held = right; sliding = raise the cap a half band)",
-    "live_rulings.ARMS_FLOOR.add_per_slot": "short-week arm/shoulder e1RM and the next normal week's first-set reps",
-    "live_rulings.PRIORITY_ADD.progressing": "quadriceps anchor e1RM slope in weeks with vs without the added slot",
+    "live_settings.HEURISTICS": 'each row\'s own "Re-tuned on" column above',
     "cardio_model.MODERATE_METS": "Apple workout intensity vs the session RPE he logged, per modality",
     "cardio_model.CADENCE_MODERATE_SPM": "his own walking cadence at a logged talk-test / RPE (the ~100 spm figure is a population heuristic)",
     "cardio_model.RPE_MODERATE": "logged cardio RPE vs the talk test he notes",
     "rate_policy.CEILING_TAPER": "4-week loss rate vs anchor e1RM and lean-mass (DEXA) change at each block retro",
     "rate_policy.SUSTAINED_WEEKS": "weeks above the ceiling that preceded an anchor decline, across blocks",
     "rate_policy.SIGNAL_STEP_PCT": "loss rate in weeks with 1, 2, 3 slow signals vs strength the following week",
-    "live_program.LOAD_POLICY": "e1RM trend after a hold / step down vs after a step up",
-    "live_program.STALL_RULE": "e1RM over the exposures after a stall reset",
     "live_program.PAIN_RULE": "pain-note recurrence within 2 sessions of a reduce / avoid",
     "live_program.DELOAD_SHAPE": "readiness and first-set reps the week after a deload",
-    "live_program.TRUNK_FLOOR": "trunk-drill progression and back-discomfort notes",
-    "live_balance.ALLOCATION": "weekly sets per muscle vs that muscle's e1RM / rep PRs",
-    "live_balance.ADHERENCE_DIP": "sessions completed in the 2 weeks after a short-week response",
-    "live_shape.VOLUME": "priority-muscle sets vs their anchor trend",
-    "live_shape.QUAD_SLOT": "quadriceps anchor trend with the slot served",
+    "live_program.STACK_RULE": "low-back discomfort notes and squat/hinge e1RM in weeks at the cap",
+    "live_pain.PAIN_SCOPE": "pain-note recurrence within 2 sessions of a lift-only / pattern / pain-free-route answer, and the flagged muscle's hard sets",
+    "live_pain.SPINE_REACH": "low-back notes after a flag vs the lifts it reached",
     "live_shape.WALK_PROMPT": "walks logged after a prompt",
-    "live_week.CARDIO_ROOM": "conditioning-block minutes delivered vs lifting minutes lost",
-    "live_week.NOVEL_START": "RPE logged on a new movement's first exposures",
     "fatigue_model.THRESHOLDS": "strain calls vs the next session's first-set reps / RPE",
     "quality_rubric.NEUTRAL": "how often a reviewed input moved a provisional row's tier",
-    "fatigue_model.THRESHOLDS.deficit_hold_pct": "anchor e1RM 3 and 6 weeks after a 'holding' read in a deficit vs after a reset (held = right; sliding = tighten the band)",
-    "fatigue_model.THRESHOLDS.post_reset_min_exposures": "e1RM over the exposures after each reset; resets per lift per block",
-    "fatigue_model.THRESHOLDS.reset_detect_pct": "resets the record shows vs the resets the engine prescribed (false reads = a volume day called a reset)",
-    "live_pain.PAIN_SCOPE": "pain-note recurrence within 2 sessions of a lift-only / pattern / pain-free-route answer, and the flagged muscle's hard sets",
-    "live_stimulus.FAST_CUT": "anchor e1RM in the 2 weeks after a fast-cut volume answer vs after a load cut",
-    "live_stimulus.WEEK_FLOOR": "weekly HARD sets per muscle vs MEV, and the floor muscles' e1RM / rep PRs",
-    "live_stimulus.DELOAD_TOP_SET": "readiness and first-set reps the week after an unconfirmed-deload week",
-    "live_stimulus.PARITY": "priority-muscle sets vs the donors' and both muscles' rep PRs",
-    "live_week.FAMILIAR_SWAP": "RPE logged on a familiar swap's first sessions (over target = restore the novelty cap)",
 }
-"""Ruling 18: every labelled heuristic table the live engine reads -> the metric that should re-tune it at a block retro.
+"""Ruling 18: every labelled heuristic table the live engine reads -> the metric that should re-tune it at a block retro (fix
+round 9: the consolidated rules' rows live in `live_settings.HEURISTICS`, each with its own metric).
 Provenance (owner rulings 2026-11-13, FIX7 follow-up): `hard_conditioning_doses` = 1 is ruled (a setting, re-tuned on
-`live_week.CARDIO_ROOM`'s metric), and ruling 17 is clarified — glute stretch credit only for genuinely lengthened loading
+the conditioning-block minutes delivered), and ruling 17 is clarified — glute stretch credit only for genuinely lengthened loading
 (`quality_rubric.STRETCH_CAPS` empty, rubric 3.5.0), not a heuristic and so not a hook. The
 doc's "Block-retro hooks" table lists each key (tests/test_owner_rulings_5861.py holds the doc and this dict to each other, and
 each key to a real labelled table)."""
