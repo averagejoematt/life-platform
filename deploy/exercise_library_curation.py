@@ -103,6 +103,15 @@ EQUIPMENT_VOCABULARY: dict[str, str] = {
     "stair_climber": "stair climber",
     "foam_roller": "foam roller / mobility kit",
     "other_unspecified": "kit the history cannot name (review)",
+    # #5861 lane L2 (deploy/exercise_library_additions.py): equipment its new movements name
+    "recumbent_bike": "recumbent (back-supported) exercise bike",
+    "ski_erg": "ski ergometer",
+    "arm_ergometer": "arm / upper-body ergometer",
+    "swimming_pool": "swimming pool (not part of home_gym)",
+    "ruck_vest": "weighted vest or loaded rucksack",
+    "stability_ball": "stability / physio ball",
+    "wrist_roller": "wrist roller",
+    "hand_gripper": "hand gripper",
 }
 
 _C = "Crossref + PubMed, " + REVIEWED_ON
