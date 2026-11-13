@@ -126,7 +126,7 @@ What the selection cannot see, because it ranks slots:
   the fatigue decision; a lift that lost sets for recovery says so on its own Hevy note ("2 sets today: recovery.").
 
 **The programming pass (`live_program`, red-team fixes, 2026-11-13).** Every rule is a labelled heuristic table in the module
-(`LOAD_RULES`, `DELOAD_SHAPE`, `PAIN_RULE`, `STACK_RULE`, `STALL_RULE`, `TRUNK_FLOOR`, `TRUNK_FALLBACK_ORDER`), owner-adjustable:
+(`LOAD_POLICY`, `DELOAD_SHAPE`, `PAIN_RULE`, `STACK_RULE`, `STALL_RULE`, `TRUNK_FLOOR`, `TRUNK_FALLBACK_ORDER`), owner-adjustable:
 
 - **Pain by joint.** A pain flag (the classed overlay) or two discomfort notes on one movement reach EVERY movement that loads
   the same joint at moderate or more, every session while the flag stands. The pain-monitoring rule: a stated score at or under
@@ -214,7 +214,7 @@ layer — one person's usage count is fit, not modality quality.
 
 | Evidence-backed (verified citation, ±1 band) | Practitioner consensus (labelled) | Platform heuristic (labelled, owner-adjustable) |
 |---|---|---|
-| lengthened-position loading for some muscles; the glute stretch cap (Plotkin 2023); 14 direct-trial and 7 characteristic-trial hypertrophy rows | the functional, conditioning and mobility rubrics; joint-stress ratings; cue sheets; pain monitoring by a stated score | every fatigue threshold; the 14-day trend window; MAX_WEEKLY_EXPOSURES 2; MAX_HOLD_WEEKS 12; MAX_NEW_PER_WEEK 2; upgrades at block start; the systemic-slump rule (4 lifts, half); fatigue cost; surplus-first trimming; the adherence step; `live_program` LOAD_RULES (−10 % / −5 % / RPE 9.5 / RPE 9), DELOAD_SHAPE, PAIN_RULE (3/10), STACK_RULE (2 per session), STALL_RULE (+2 reps, −10 %), TRUNK_FLOOR, TRUNK_FALLBACK_ORDER, MIN_CARDIO_MINUTES 10 |
+| lengthened-position loading for some muscles; the glute stretch cap (Plotkin 2023); 14 direct-trial and 7 characteristic-trial hypertrophy rows | the functional, conditioning and mobility rubrics; joint-stress ratings; cue sheets; pain monitoring by a stated score | every fatigue threshold; the 14-day trend window; MAX_WEEKLY_EXPOSURES 2; MAX_HOLD_WEEKS 12; MAX_NEW_PER_WEEK 2; upgrades at block start; the systemic-slump rule (4 lifts, half); fatigue cost; surplus-first trimming; the adherence step; `live_program` LOAD_POLICY (−10 % / −5 % / RPE 9.5 / RPE 9), DELOAD_SHAPE, PAIN_RULE (3/10), STACK_RULE (2 per session), STALL_RULE (+2 reps, −10 %), TRUNK_FLOOR, TRUNK_FALLBACK_ORDER, MIN_CARDIO_MINUTES 10 |
 
 Volume landmarks (`config/training_landmarks.json`) are practitioner landmarks, not individual measurements.
 

@@ -10,7 +10,7 @@ week (`scripts/sample_weeks_5861.py`), not the architecture:
   1. LOAD SAFETY (`guard_loads`). The load floor and the double progression only ever raise, so a regressing squat (last
      exposure 4 reps at RPE 9, e1RM sliding) in an overreached week read "Heavier" +20 lb. Under live a load never steps UP on
      a regressing lift, a lift whose last top set was a grind at the bottom of its range, a stalled lift, or on a day the
-     fatigue model reads strain or overreach; it HOLDS at the last top set, and steps DOWN (LOAD_RULES) when the
+     fatigue model reads strain or overreach; it HOLDS at the last top set, and steps DOWN (LOAD_POLICY) when the
      e1RM regresses or an anchor's last top set overshot its RPE band. The commit gate reuses the generator's floor audit, so
      the guarded load is written into that audit row (`live_guard`) — a recorded, sanctioned reduction, never a silent one.
   2. DELOAD SHAPE (`fatigue_cost`, read by `fatigue_model.apply_to_session`). A recommended deload cuts the heavy compounds
@@ -38,7 +38,7 @@ from typing import Any
 ISSUE = "#5861"
 HEURISTIC = "heuristic"
 
-LOAD_RULES: dict[str, dict[str, Any]] = {
+LOAD_POLICY: dict[str, dict[str, Any]] = {
     "regress_down_pct": {
         "value": 10,
         "label": HEURISTIC,
@@ -581,18 +581,18 @@ def load_decision(
     said = f"{int(reps)} reps was RPE {float(rpe):g}" if rpe is not None and reps else None
     pct, why = 0, None
     if trend == "regressing":
-        pct, why = int(LOAD_RULES["regress_down_pct"]["value"]), "strength sliding"
-    elif e.get("kind") == "anchor" and rpe is not None and float(rpe) >= float(LOAD_RULES["overshoot_rpe"]["value"]):
-        pct, why = int(LOAD_RULES["overshoot_down_pct"]["value"]), said
+        pct, why = int(LOAD_POLICY["regress_down_pct"]["value"]), "strength sliding"
+    elif e.get("kind") == "anchor" and rpe is not None and float(rpe) >= float(LOAD_POLICY["overshoot_rpe"]["value"]):
+        pct, why = int(LOAD_POLICY["overshoot_down_pct"]["value"]), said
     if mark.get("pct") and int(mark["pct"]) > pct:
         pct, why = int(mark["pct"]), str(mark.get("why"))
     if pct:
         return {"mode": "down", "pct": pct, "why": why, "stall": mark.get("stall")}
-    if state in LOAD_RULES["hold_states"]["value"] or mark.get("hold"):
+    if state in LOAD_POLICY["hold_states"]["value"] or mark.get("hold"):
         return {"mode": "hold", "pct": 0, "why": "recovery first"}
     if trend == "stalled":
         return {"mode": "hold", "pct": 0, "why": "stalled, no step"}
-    if rpe is not None and float(rpe) >= float(LOAD_RULES["grind_rpe"]["value"]) and reps and rep_lo and int(reps) <= int(rep_lo):
+    if rpe is not None and float(rpe) >= float(LOAD_POLICY["grind_rpe"]["value"]) and reps and rep_lo and int(reps) <= int(rep_lo):
         return {"mode": "hold", "pct": 0, "why": said}
     return None
 
@@ -650,7 +650,7 @@ def guard_loads(
         out.append(rec)
         row = rows.get(b.movement_key)
         if row is not None:
-            row["live_guard"] = rec | {"rule": "live_program.LOAD_RULES (heuristic)"}
+            row["live_guard"] = rec | {"rule": "live_program.LOAD_POLICY (heuristic)"}
             row["floor_kg"] = min(float(row.get("floor_kg") or cap), cap)
             prog = row.get("progression") or {}
             row["progression"] = {**prog, "basis": "hold", "changes": [], "live_guard": True}
@@ -658,7 +658,7 @@ def guard_loads(
         rationale.append(
             f"load (live): {(entry.get('title') or b.movement_key)} {lb(top)} -> {lb(cap)} — {d['mode']}"
             + (f" {d['pct']}%" if d["pct"] else "")
-            + f": {d['why']} (last {prev['lb']:g} lb x {prev.get('reps')} @ RPE {prev.get('rpe')}; LOAD_RULES, heuristic)"
+            + f": {d['why']} (last {prev['lb']:g} lb x {prev.get('reps')} @ RPE {prev.get('rpe')}; LOAD_POLICY, heuristic)"
         )
     if ls.MARK in rx:
         rx[ls.MARK]["load_guard"] = out

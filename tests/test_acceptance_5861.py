@@ -578,7 +578,7 @@ def test_c4b_the_load_guard_holds_and_steps_down_by_rule():
     assert lp.load_decision(acc, "progressing", prev, "normal", 4)["mode"] == "hold"  # 4 reps at RPE 9, bottom of 4-6
     assert lp.load_decision(acc, "progressing", prev | {"rpe": 8.0, "reps": 6}, "strained", 4)["mode"] == "hold"
     assert lp.load_decision(acc, "progressing", prev | {"rpe": 8.0, "reps": 6}, "normal", 4) is None
-    with patch.dict(lp.LOAD_RULES, {"regress_down_pct": {"value": 0}}):  # control: the rule's step zeroed -> no down-step
+    with patch.dict(lp.LOAD_POLICY, {"regress_down_pct": {"value": 0}}):  # control: the rule's step zeroed -> no down-step
         assert lp.load_decision(anchor, "regressing", prev | {"rpe": 8.0, "reps": 6}, "normal", 4) is None
 
 
