@@ -622,6 +622,13 @@ def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
     aer = live.get("aerobic") or {}
     if kind in live_program.HARD_KINDS or not aer or aer.get("volume_covered"):
         return True, []
+    from training import live_shape  # #5861 FIX8 (ruling 12): high steps of unknown intensity — reported, no easy block
+
+    if live_shape.intensity_unknown(aer):
+        return False, [
+            f"cardio (live): no easy block — steps ~{aer.get('steps_per_day')}/day, intensity unknown: reported, not a deficit "
+            "(ruling 12; WALK_PROMPT active_steps, heuristic)"
+        ]
     since, day = week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
     done = sum(
         int(r.get("duration_sec") or 0) // 60

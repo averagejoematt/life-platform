@@ -983,7 +983,8 @@ def aerobic(inputs: Any) -> dict[str, Any] | None:
     line = rec.get("line") or "no recorded walks read: intensity unknown, nothing credited"
     if w.get("steps_per_day") is not None:
         line += f"; steps ~{w['steps_per_day']}/day reported as activity, not aerobic credit"
-    return {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": w["moderate_min_per_wk"], "line": line}
+    out = {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": w["moderate_min_per_wk"], "line": line}
+    return out | {"steps_per_day": w.get("steps_per_day")}  # #5861 FIX8: ruling 12 — unknown intensity is never a deficit
 
 
 def rate_line(fatigue: dict[str, Any] | None, sleep_hours: Any) -> str | None:

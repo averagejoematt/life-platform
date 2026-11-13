@@ -120,7 +120,8 @@ def fit_set_cap(rx: dict[str, Any], cap: Any) -> list[str]:
     pinned = _pinned(rx)
     acc = [e for e in reversed(ex) if e.get("kind") == "accessory" and not e.get("live_added") and e.get("slot") not in pinned]
     acc += [e for e in reversed(ex) if e.get("kind") == "accessory" and not e.get("live_added") and e.get("slot") in pinned]
-    acc.sort(key=lambda e: not any(k in str(e.get("movement_key")) for k in SURPLUS_FIRST))  # FIX7: delt surplus goes first
+    # FIX7: delt surplus goes first; FIX8: the week's only direct ab work (`live_keep`) last
+    acc.sort(key=lambda e: (bool(e.get("live_keep")), not any(k in str(e.get("movement_key")) for k in SURPLUS_FIRST)))
     for e in added:  # 1. live additions, whole
         if total <= int(cap):
             break

@@ -467,14 +467,22 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     before, dropped = shape["lifting_minutes"], []
     trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
     gone = Counter(trimmed)  # #5861 FIX4: what the drop order counts as off (the trimmed sets + every dropped accessory)
+    guests = live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=True)  # FIX8: a full-body day's guest back-offs
+    fixed = live_week._fixed(rx)
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
-        idx = live_shape.next_drop(blocks, movements, gone, live_week._fixed(rx), rx)  # FIX4: largest surplus over MEV first
+        idx = live_shape.next_drop(blocks, movements, gone, fixed, rx)  # FIX4: largest surplus over MEV first
         if idx is None:
             break
+        # FIX8: before a kept slot (a floor's, the only ab work) or a priority muscle's last sets under MEV go, the back-offs
+        if str(blocks[idx].movement_key) in fixed or live_shape.precious(blocks[idx], movements, gone, rx):
+            guests += live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False)
+            if routine_minutes(blocks, movements)["lifting_minutes"] <= cap:
+                break
         cut = blocks.pop(idx)
         _unpair(blocks, getattr(cut, "superset_id", None))
         dropped.append((movements.get(cut.movement_key) or {}).get("title") or cut.movement_key)
     dropped += live_shape.no_single_sets(blocks, movements)
+    anchors = live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False)  # FIX8: the ceiling holds, always
     from training import warmup_sets
 
     new = program_structure.enforce_session_shape(blocks, movements) | {
@@ -482,6 +490,11 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     }
     how = [", ".join(f"{n} {m}" for m, n in sorted(trimmed.items())) + " set(s) off (surplus over MEV first)"] if trimmed else []
     how += [f"dropped {', '.join(dropped)}"] if dropped else []
+    how += (
+        [f"anchor back-offs off: {', '.join(f'{n} {k}' for k, n in Counter(guests + anchors).items())} (TIME_FIT)"]
+        if guests + anchors
+        else []
+    )
     line = f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min lifting cap — {'; '.join(how)} -> ~{new['lifting_minutes']} min"
     rx[MARK]["lines"].append(line)  # `rationale_lines` writes it
     rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]
