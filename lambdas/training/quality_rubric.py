@@ -31,7 +31,12 @@ comparator it matched sits in a higher tier for the same target (`comparator`, c
 `exercise_library.validate`). A move past S or D is capped there. Body mass, heart history and enjoyment are never a term:
 they live in gates, cues, N=1 fit and selection.
 
-An `unknown` attribute never helps: a positive term scores 0 and an unknown joint counts as moderate.
+UNKNOWN IS NOT POOR (3.2.0, #5861 FIX2-DATA). A missing input is neither evidence of a poor exercise nor of a good one: a
+term whose input is `unknown` scores its NEUTRAL value (`NEUTRAL`, the middle of the term's range: stretch mid 3, stability 2,
+resistance profile 2, progressability 2, joint stress -1, carryover 0), never less — so a movement nobody has reviewed lands
+in the middle band (B), not at C/D. It still never HELPS: an unknown input fails the `inputs_known` S criterion, and an
+unknown ceiling or limiter keeps the B cap. A row whose inputs were not reviewed by hand, or still carry an unknown, is
+`provisional` (with `provisional_why`), shown beside its tier and evidence confidence: a heuristic placeholder, not a verdict.
 
 Pure: no I/O, no clock. The builder (`deploy/build_exercise_library.py`) writes `rubric_score`, `rubric_tier` and `tier`
 from these functions; `exercise_library.validate` and `tests/test_quality_tiers_5857.py` re-derive every row from them, so
@@ -44,7 +49,7 @@ from typing import Any
 
 from training import cardio_model
 
-RUBRIC_VERSION = "3.1.0"  # 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
+RUBRIC_VERSION = "3.2.0"  # 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
@@ -106,6 +111,19 @@ STRETCH_NOT_ESTABLISHED: dict[str, str] = {
     "traps": "a shrug's range is short by nature and length bias is not established for the traps: no stretch premium, no penalty",
 }
 BANDS: tuple[tuple[int, str], ...] = ((12, "S"), (10, "A"), (8, "B"), (5, "C"))
+# 3.2.0 (#5861 FIX2-DATA): term -> the points an UNKNOWN input scores — the middle of the term's range, so a missing input
+# never pushes a movement below what its class supports (red team: "C/D means nobody filled in the inputs"). A heuristic,
+# labelled as one. Carryover is a bonus: unknown never earns it. A fully unknown movement sums to 8 (B, the middle band).
+NEUTRAL: dict[str, int] = {"stretch": 3, "stability": 2, "resistance_profile": 2, "progressability": 2, "carryover": 0, "joint_stress": -1}
+# term -> the entry fields it reads (an `unknown` / missing value in any of them makes the term score at least NEUTRAL)
+TERM_INPUTS: dict[str, tuple[str, ...]] = {
+    "stretch": ("length_bias",),
+    "stability": ("stability",),
+    "resistance_profile": ("resistance_profile",),
+    "progressability": ("skill_complexity", "resistance_profile"),
+    "carryover": ("resistance_profile",),
+    "joint_stress": ("joint_stress",),
+}
 
 # A major muscle whose PROGRAMMABLE pool (S and A, owner ruling 2026-11-12) holds fewer than two selectable movements, and
 # why (#5857 acceptance: "at least 2 in the top band where the attributes support it, or the slot names why not").
@@ -149,8 +167,27 @@ def joint_penalty(entry: dict[str, Any]) -> int:
     return max(raw, JOINT_FLOOR)
 
 
+def _unknown(entry: dict[str, Any], field: str) -> bool:
+    if field == "joint_stress":
+        js = entry.get("joint_stress") or {}
+        return not js or any(str(v) == "unknown" for v in js.values())
+    return str(entry.get(field) or "unknown") == "unknown"
+
+
+def unknown_terms(entry: dict[str, Any]) -> list[str]:
+    """The rubric terms whose input is unknown (each scores at least its `NEUTRAL` value)."""
+    return [t for t, fields in TERM_INPUTS.items() if any(_unknown(entry, f) for f in fields)]
+
+
 def components(entry: dict[str, Any], target: str) -> dict[str, int]:
-    """Each rubric term for one (movement, target), as points — the job's terms (module docstring)."""
+    """Each rubric term for one (movement, target), as points — the job's terms (module docstring); a term whose input is
+    unknown scores at least its NEUTRAL value (3.2.0)."""
+    raw = _raw_components(entry, target)
+    unknown = unknown_terms(entry)
+    return {t: max(v, NEUTRAL[t]) if t in unknown else v for t, v in raw.items()}
+
+
+def _raw_components(entry: dict[str, Any], target: str) -> dict[str, int]:
     profile = str(entry.get("resistance_profile") or "unknown")
     compound = job(entry) == "compound"
     stability = (COMPOUND_STABILITY if compound else STABILITY).get(str(entry.get("stability")), 0)
@@ -251,6 +288,7 @@ S_CRITERIA = {
     "stimulus_to_fatigue": "systemic fatigue is not high for the stimulus",
     "no_high_joint_stress": "no joint is rated high",
     "reviewed_inputs": "the inputs the criteria read were checked by hand (`objective_inputs.reviewed`), not only derived by a title rule",
+    "inputs_known": "no input the rubric reads is unknown (an unknown scores neutral, so it can never carry a row to S)",
 }
 
 
@@ -285,7 +323,21 @@ def s_criteria(entry: dict[str, Any], row: dict[str, Any]) -> dict[str, bool]:
         "stimulus_to_fatigue": inp.get("systemic_fatigue") in ("low", "moderate"),
         "no_high_joint_stress": "high" not in [str(v) for v in (entry.get("joint_stress") or {}).values()],
         "reviewed_inputs": bool(inp.get("reviewed")),
+        "inputs_known": not unknown_terms(entry) and str(inp.get("ceiling") or "unknown") != "unknown",
     }
+
+
+def provisional_why(entry: dict[str, Any], hypertrophy: bool = True) -> list[str]:
+    """Why a rating is PROVISIONAL (empty = it rests on reviewed, known inputs): inputs derived by a title rule and never
+    reviewed by hand, and — for a hypertrophy row, the one objective that reads the attribute terms — inputs still unknown
+    (each scored neutral). The other objectives read only `objective_inputs`, so for them provisional = not reviewed."""
+    inp = _inputs(entry)
+    out = [] if inp.get("reviewed") else ["inputs derived by title rule, not reviewed"]
+    if not hypertrophy:
+        return out
+    unknown = sorted({f for t in unknown_terms(entry) for f in TERM_INPUTS[t] if _unknown(entry, f)})
+    unknown += ["ceiling"] if str(inp.get("ceiling") or "unknown") == "unknown" else []
+    return out + (["unknown (scored neutral): " + ", ".join(unknown)] if unknown else [])
 
 
 def hypertrophy_caps(entry: dict[str, Any], row: dict[str, Any]) -> list[tuple[str, str]]:
@@ -301,7 +353,30 @@ def hypertrophy_caps(entry: dict[str, Any], row: dict[str, Any]) -> list[tuple[s
     unmet = [k for k, ok in s_criteria(entry, row).items() if not ok]
     if unmet:
         caps.append(("A", "S needs " + ", ".join(unmet)))
+    ceiling_row = row.get("evidence_ceiling")
+    if isinstance(ceiling_row, dict) and ceiling_row.get("tier") in QUALITY_TIERS:
+        caps.append(
+            (
+                str(ceiling_row["tier"]),
+                f"evidence ordering: an untested form of {ceiling_row.get('movement')} (direct trial "
+                f"{ceiling_row.get('citation')}, {ceiling_row['tier']}) ties it at best, never outranks it",
+            )
+        )
     return caps
+
+
+def evidence_ceiling(tested_row: dict[str, Any], tested_key: str) -> dict[str, Any] | None:
+    """3.2.0 (#5861 FIX2-DATA, red team: "the movement with the trial evidence ranks under an unreviewed one"): the cap an
+    UNTESTED form of a trial-backed movement carries for the trial's target — the tested row's own tier, so heuristic points
+    (a pin stack's stability, a smaller load step) can tie the tested form but never outrank it. Only a direct trial that did
+    not find the tested movement inferior anchors it (a -1 adjustment means the trial ranked it lower). None = no anchor."""
+    adj = tested_row.get("evidence_adjustment")
+    if tested_row.get("evidence_confidence") not in EVIDENCE_ADJUSTERS or tested_row.get("tier") not in QUALITY_TIERS:
+        return None
+    if isinstance(adj, dict) and int(adj.get("bands") or 0) < 0:
+        return None
+    cite = next(iter(tested_row.get("citations") or []), None)
+    return {"tier": tested_row["tier"], "movement": tested_key, "citation": cite}
 
 
 def _worst(*tiers: str) -> str:
@@ -348,14 +423,17 @@ def finalize_row(entry: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
     else:
         out = {"target": target, "tier": quality_tier(entry, row), "rubric_tier": capped_tier(entry, row)}
         out |= {"rubric_score": score(entry, target), "points_tier": band(score(entry, target)), "basis": _hyp_basis(entry, row)}
-    out.update({k: v for k, v in row.items() if k not in out and k != "applicable"})
+        why = provisional_why(entry)
+        out |= {"provisional": bool(why)} | ({"provisional_why": why} if why else {})
+    skip = ("applicable", "provisional", "provisional_why")
+    out.update({k: v for k, v in row.items() if k not in out and k not in skip})
     return out
 
 
 def derivation_problems(entry: dict[str, Any], row: dict[str, Any]) -> list[str]:
     """Why a row's stored tier fields are not what the rubric (plus its recorded adjustment) derives."""
     want = finalize_row(entry, row)
-    keys = ("rubric_score", "rubric_tier", "tier", "points_tier", "basis", "applicable")
+    keys = ("rubric_score", "rubric_tier", "tier", "points_tier", "basis", "applicable", "provisional", "provisional_why")
     return [f"{k} {row.get(k)!r} != derived {want.get(k)!r}" for k in keys if row.get(k) != want.get(k)] + adjustment_problems(row)
 
 
@@ -484,13 +562,15 @@ def objective_ratings(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "by_target": {r["target"]: r["tier"] for r in rows},
             "basis": row.get("basis"),
             "evidence_confidence": row.get("evidence_confidence") if row.get("tier") else None,
+            "provisional": bool(row.get("provisional")) if row.get("tier") else None,
         }
     }
+    why = bool(provisional_why(entry, hypertrophy=False))
     for obj, rate in _RATERS.items():
         tier, basis = rate(entry)
         cm = _cardio(entry) if obj == "conditioning" else None
         conf = cm["evidence_confidence"] if cm is not None else _confidence(entry, tier)
-        out[obj] = {"tier": tier, "basis": basis, "evidence_confidence": conf}
+        out[obj] = {"tier": tier, "basis": basis, "evidence_confidence": conf, "provisional": why if tier else None}
     return out
 
 
@@ -570,7 +650,11 @@ def rubric_doc() -> dict[str, Any]:
                 "floor": JOINT_FLOOR,
             },
         },
-        "unknown": "an unknown attribute never helps: a positive term scores 0, an unknown joint counts as moderate",
+        "unknown": "an unknown input is not a poor one: its term scores the NEUTRAL value (the middle of its range), never less, "
+        "and never helps reach S (`inputs_known`); an unknown ceiling or limiter keeps the B cap",
+        "neutral": NEUTRAL,
+        "provisional": "a row whose inputs were derived by title rule and never reviewed by hand, or still carry an unknown, is "
+        "`provisional: true` with `provisional_why` — a placeholder shown beside its tier and evidence confidence, not a verdict",
         "max_score": {"isolation": MAX_SCORE, "compound": MAX_SCORE_COMPOUND},
         "bands": {tier: floor for floor, tier in BANDS} | {"D": "below C"},
         "evidence": {
@@ -586,6 +670,8 @@ def rubric_doc() -> dict[str, Any]:
             "cap_A": "any unmet S criterion",
             "s_criteria": S_CRITERIA,
             "evidence": "a direct trial moves the capped tier one band, never to S unless every S criterion holds",
+            "evidence_ordering": "an untested form of a trial-backed movement (`evidence_ceiling`, written by the builder from "
+            "the reviewed EVIDENCE_FORMS table) ties the tested form's tier at best, never outranks it",
             "not_applicable": {"categories": list(NOT_HYPERTROPHY_CATEGORIES), "targets": list(NOT_HYPERTROPHY_TARGETS)}
             | {"trunk_functions": list(ISOMETRIC_TRUNK)},
         },
