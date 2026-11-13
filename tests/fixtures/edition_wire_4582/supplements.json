@@ -1,11 +1,11 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:25.372049+00:00",
-  "served_at": "2026-10-18T07:15:25.372049+00:00",
+  "generated_at": "2026-11-13T16:55:31.269850+00:00",
+  "served_at": "2026-11-13T16:55:31.269850+00:00",
   "cache_seconds": 3600,
-  "request_id": "c19e1e0389764abe"
+  "request_id": "89d278e1ab86482a"
  },
- "as_of_date": "2026-10-17",
+ "as_of_date": "2026-11-12",
  "groups": {
   "sleep": {
    "name": "Sleep Architecture",

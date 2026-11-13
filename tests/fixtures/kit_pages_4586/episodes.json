@@ -2,61 +2,16 @@
  "episodes": [
   {
    "week": 4,
-   "title": "EP4 \u00b7 The Body Answers Back",
+   "title": "EP4 \u00b7 The Back Half",
    "date": "2026-10-01",
-   "url": "/panelcast/wk4.mp3",
-   "bytes": 4200960,
-   "duration_sec": 420,
+   "url": "/panelcast/wk4.wav",
+   "bytes": 20442330,
+   "duration_sec": 425,
    "byline": "Elena + Marcus Webb",
    "guest_id": "nutrition_coach",
    "guest_name": "Marcus Webb",
-   "excerpt": "Day 24. Twenty-three straight training days. Recovery at 54 percent. Marcus Webb is zero for nine on the season \u2014 and yet the team keeps returning to his warnings. Elena Voss talks with Webb about what the numbers are finally starting to sa",
+   "excerpt": "Protein hit its floor twice in seven days, then fell to under 100 grams on each of the last three. The rate flag is still lit. Marcus Webb has been warning about exactly this for nine straight predictions \u2014 and been wrong every time until n",
    "transcript_url": "/panelcast/wk4.transcript.json",
-   "image_url": "",
-   "image_credit": ""
-  },
-  {
-   "week": 3,
-   "title": "EP3 \u00b7 Storming Mode",
-   "date": "2026-09-24",
-   "url": "/panelcast/wk3.mp3",
-   "bytes": 4533120,
-   "duration_sec": 453,
-   "byline": "Elena + Max Reyes",
-   "guest_id": "physical_coach",
-   "guest_name": "Max Reyes",
-   "excerpt": "Day 17: the scan says 11.4 pounds of fat, one pound of question. But the rate flag is live, protein is short of the floor, and the man training every day says he doesn't want a day off.",
-   "transcript_url": "/panelcast/wk3.transcript.json",
-   "image_url": "",
-   "image_credit": ""
-  },
-  {
-   "week": 2,
-   "title": "EP2 \u00b7 Nine Days and No Rest",
-   "date": "2026-09-17",
-   "url": "/panelcast/wk2.mp3",
-   "bytes": 4370160,
-   "duration_sec": 436,
-   "byline": "Elena + Lisa Park",
-   "guest_id": "sleep_coach",
-   "guest_name": "Lisa Park",
-   "excerpt": "Day 10, nine straight training days, 975 minutes this week \u2014 and the scale is moving fast. Lisa Park opens 1-0 on her first graded call, but says she cannot fully read the recovery numbers without data Matthew hasn't given her yet.",
-   "transcript_url": "/panelcast/wk2.transcript.json",
-   "image_url": "",
-   "image_credit": ""
-  },
-  {
-   "week": 1,
-   "title": "EP1 \u00b7 The Strap Said 76%",
-   "date": "2026-09-10",
-   "url": "/panelcast/wk1.mp3",
-   "bytes": 4043040,
-   "duration_sec": 404,
-   "byline": "Elena + Nathan Reeves",
-   "guest_id": "mind_coach",
-   "guest_name": "Nathan Reeves",
-   "excerpt": "Day 3 of the experiment: the body is recovering well, but the man rated himself 2 out of 10. Nathan Reeves \u2014 the team's behavioral psychiatrist \u2014 names the gap the instruments couldn't close.",
-   "transcript_url": "/panelcast/wk1.transcript.json",
    "image_url": "",
    "image_credit": ""
   },
@@ -64,23 +19,38 @@
    "week": 0,
    "title": "EP0 \u00b7 Before the Numbers",
    "date": "2026-09-05",
-   "url": "/panelcast/wk0.mp3",
-   "bytes": 4020240,
-   "duration_sec": 401,
+   "url": "/panelcast/wk0.wav",
+   "bytes": 19347930,
+   "duration_sec": 403,
    "byline": "Elena + Eli Marsh",
    "guest_id": "eli_marsh",
    "guest_name": "Eli Marsh",
-   "excerpt": "Sixteen predictions are sealed, thirteen data sources are live, and tomorrow morning a Withings scale in Seattle will produce the first real number of a twelve-month experiment. Eli Marsh joins Elena Voss to talk about what it means to put ",
+   "excerpt": "Day 1 is tomorrow. Eight coaches have already put sixteen calls on the record \\ \\ \u2014 and not one instrument has spoken yet.",
    "transcript_url": "/panelcast/wk0.transcript.json",
    "image_url": "",
    "image_credit": ""
   }
  ],
- "pending": {
-  "week": 6,
-  "reason": "held_for_review",
-  "display": "This week's episode is in final review \u2014 it'll drop here as soon as it clears the quality bar.",
-  "expected_date": null,
-  "noted_at": "2026-10-18T04:31:07.667840+00:00"
- }
+ "retired": [
+  {
+   "week": 1,
+   "retired_at": "2026-11-05T22:42:07.124896+00:00"
+  },
+  {
+   "week": 2,
+   "retired_at": "2026-11-05T22:42:07.124896+00:00"
+  },
+  {
+   "week": 3,
+   "retired_at": "2026-11-05T22:42:07.124896+00:00"
+  },
+  {
+   "week": 5,
+   "retired_at": "2026-10-18T20:12:42.873196+00:00"
+  },
+  {
+   "week": 6,
+   "retired_at": "2026-10-18T20:12:43.879409+00:00"
+  }
+ ]
 }

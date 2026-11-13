@@ -1,8 +1,7 @@
 {
- "captured_at": "2026-10-18T07:15:07Z",
+ "captured_at": "2026-11-13T16:58:06Z",
  "base": "https://averagejoematt.com",
  "by": "scripts/capture_kit_page_fixtures.py (#4671) \u2014 one pass, read-only GETs; re-run it, never hand-edit a file",
- "_privacy": "Hand-edited once: real journal-activity values replaced with synthetic ones for privacy (owner ruling 2026-11-05). Every journal day count, last-entry date and the journal (notion) channel's absence/recency fields are synthetic, not the subject's; the remaining journal-silence wording is kept only as input for the journal-silence guards (common.journal_silence). Hand-edited a second time 2026-11-11: the wording and id of the two day-one calls the owner ruled private on 2026-11-09 (#5720) are replaced by stand-in text and a stand-in id; their structured fields are as captured. A re-run of the capture replaces this note with live (already journal-scrubbed) output. Hand-edited again 2026-11-11 (privacy cleanup): the wording of the day-one calls that stated the subject's sleep-window and HRV targets is replaced by stand-in text; ids and structured fields are as captured.",
  "files": {
   "achievements.json": "/api/achievements",
   "calls.json": "/api/calls",
@@ -15,7 +14,7 @@
   "coach_moves_2026-09-24.json": "/api/coach_moves?date=2026-09-24",
   "coach_moves_2026-10-01.json": "/api/coach_moves?date=2026-10-01",
   "coach_moves_2026-10-07.json": "/api/coach_moves?date=2026-10-07",
-  "coach_moves_2026-10-18.json": "/api/coach_moves?date=2026-10-18",
+  "coach_moves_2026-11-13.json": "/api/coach_moves?date=2026-11-13",
   "coach_physical_coach.json": "/api/coach/physical_coach",
   "coach_sleep_coach.json": "/api/coach/sleep_coach",
   "coaches.json": "/api/coaches",

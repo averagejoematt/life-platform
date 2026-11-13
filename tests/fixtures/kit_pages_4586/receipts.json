@@ -1,27 +1,27 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:20.237189+00:00",
-  "served_at": "2026-10-18T07:15:20.237189+00:00",
+  "generated_at": "2026-11-13T16:55:21.879085+00:00",
+  "served_at": "2026-11-13T16:55:21.879085+00:00",
   "cache_seconds": 900,
-  "request_id": "66dbd10b202848c8"
+  "request_id": "344f5b5e016c4bdf"
  },
- "as_of": "2026-10-18T07:15:20+00:00",
+ "as_of": "2026-11-13T16:55:21+00:00",
  "stale": false,
  "stale_reason": null,
- "tier": 1,
- "tier_semantics": "Internal/dev AI paused \u2014 the ensemble, the chronicle editor, and coherence-semantic checks. Reader-facing AI is untouched.",
+ "tier": 0,
+ "tier_semantics": "All AI features active. Nothing is paused.",
  "base_ceiling_usd": 215.0,
  "surge_ceiling_usd": 252.0,
  "ceiling_window": null,
  "ceiling_usd": 215.0,
  "surge_active": false,
- "surge_threshold_uniques": 1509,
+ "surge_threshold_uniques": 2955,
  "surge_held_by": "none",
  "surge_engaged_at_bar": null,
- "recent_uniques": 1032,
- "month_to_date_usd": 114.37,
- "projected_month_end_usd": 171.51,
- "projected_all_classes_usd": 171.89,
+ "recent_uniques": 2603,
+ "month_to_date_usd": 72.54,
+ "projected_month_end_usd": 156.67,
+ "projected_all_classes_usd": 185.32,
  "projected_scope": "recurring classes only (prod-cron, remediation, ci)",
  "projected_classes": [
   "prod-cron",
@@ -33,122 +33,89 @@
  ],
  "episodic_billing_days": {
   "prod-cron": 30,
-  "ci": 26,
-  "dev-session": 15,
-  "remediation": 9
+  "ci": 29,
+  "dev-session": 17,
+  "remediation": 14
  },
  "episodic_premise_violations": [],
- "projection_note": "Scope: this month-end projection extrapolates only the spend classes that recur on a schedule (prod-cron, remediation, ci). Episodic spend (dev-session) is counted in full in month-to-date \u2014 it is real money already spent \u2014 but is not multiplied out across the days remaining (#2892). Extrapolating every class instead gives $171.89.",
- "month_end_date": "2026-10-31",
- "ai_daily_usd": 2.66,
- "non_ai_daily_usd": 1.45,
- "computed_at": "2026-10-18T00:00:10.959426+00:00",
+ "projection_note": "Scope: this month-end projection extrapolates only the spend classes that recur on a schedule (prod-cron, remediation, ci). Episodic spend (dev-session) is counted in full in month-to-date \u2014 it is real money already spent \u2014 but is not multiplied out across the days remaining (#2892). Extrapolating every class instead gives $185.32.",
+ "month_end_date": "2026-11-30",
+ "ai_daily_usd": 4.62,
+ "non_ai_daily_usd": 1.78,
+ "computed_at": "2026-11-13T09:00:40.189684+00:00",
  "history": [
   {
-   "date": "2026-10-01",
-   "mtd_usd": 2.32
+   "date": "2026-11-01",
+   "mtd_usd": 0.58
   },
   {
-   "date": "2026-10-02",
-   "mtd_usd": 45.02
+   "date": "2026-11-02",
+   "mtd_usd": 6.01
   },
   {
-   "date": "2026-10-03",
-   "mtd_usd": 57.55
+   "date": "2026-11-03",
+   "mtd_usd": 11.9
   },
   {
-   "date": "2026-10-04",
-   "mtd_usd": 60.84
+   "date": "2026-11-04",
+   "mtd_usd": 16.91
   },
   {
-   "date": "2026-10-05",
-   "mtd_usd": 65.25
+   "date": "2026-11-05",
+   "mtd_usd": 19.41
   },
   {
-   "date": "2026-10-06",
-   "mtd_usd": 67.73
+   "date": "2026-11-06",
+   "mtd_usd": 23.22
   },
   {
-   "date": "2026-10-07",
-   "mtd_usd": 70.4
+   "date": "2026-11-07",
+   "mtd_usd": 37.01
   },
   {
-   "date": "2026-10-08",
-   "mtd_usd": 71.51
+   "date": "2026-11-08",
+   "mtd_usd": 40.53
   },
   {
-   "date": "2026-10-09",
-   "mtd_usd": 74.96
+   "date": "2026-11-09",
+   "mtd_usd": 47.86
   },
   {
-   "date": "2026-10-10",
-   "mtd_usd": 78.49
+   "date": "2026-11-10",
+   "mtd_usd": 54.62
   },
   {
-   "date": "2026-10-11",
-   "mtd_usd": 87.06
+   "date": "2026-11-11",
+   "mtd_usd": 58.4
   },
   {
-   "date": "2026-10-12",
-   "mtd_usd": 93.36
+   "date": "2026-11-12",
+   "mtd_usd": 67.28
   },
   {
-   "date": "2026-10-13",
-   "mtd_usd": 101.42
-  },
-  {
-   "date": "2026-10-14",
-   "mtd_usd": 104.23
-  },
-  {
-   "date": "2026-10-15",
-   "mtd_usd": 106.36
-  },
-  {
-   "date": "2026-10-16",
-   "mtd_usd": 109.37
-  },
-  {
-   "date": "2026-10-17",
-   "mtd_usd": 112.55
-  },
-  {
-   "date": "2026-10-18",
-   "mtd_usd": 114.37
+   "date": "2026-11-13",
+   "mtd_usd": 72.54
   }
  ],
  "typical_day": {
-  "usd": 5.06,
+  "usd": 4.43,
   "days_counted": 30,
-  "window_start": "2026-09-18",
-  "window_end": "2026-10-17",
-  "month_days": 31,
-  "month_usd": 156.86,
+  "window_start": "2026-10-14",
+  "window_end": "2026-11-12",
+  "month_days": 30,
+  "month_usd": 132.9,
   "basis": "Median whole-bill spend per complete UTC day (AI and everything else), from the cost governor's running month-to-date total. A median, so a few unusually expensive days do not move it; month_usd is that day repeated for every day of the current month, not a forecast."
  },
  "high_days": {
   "multiple": 2,
-  "days": [
-   {
-    "date": "2026-10-01",
-    "usd": 23.67
-   },
-   {
-    "date": "2026-10-02",
-    "usd": 24.68
-   },
-   {
-    "date": "2026-10-03",
-    "usd": 11.35
-   }
-  ],
-  "total_usd": 59.7,
-  "above_typical_usd": 44.52
+  "days": [],
+  "total_usd": 0,
+  "above_typical_usd": 0.0
  },
- "ai_scheduled_share_pct": 99.0,
+ "ai_scheduled_share_pct": 64.8,
  "per_feature_note": "Per-feature dollars are published on the inference receipt. They are self-metered at the inference chokepoint (ADR-062) \u2014 each call priced from its own token usage and its resolved model, then emitted per Lambda \u2014 so they are an estimate against list prices, not the billed figure; the governor reconciles them against the native AWS/Bedrock meter every 8 hours and alarms if the ratio leaves the #2883 drift bar. One row is one Lambda, and several budget-guard features can share a Lambda, so a row is not a per-feature budget. See /method/inference/ for the full table.",
  "note": "One AWS budget covers the WHOLE platform, not just AI. The governor reprojects month-end spend every 8 hours and writes the tier it implies; every AI feature reads that tier before it runs.",
- "projected_pct_of_ceiling": 79.8,
- "projected_all_classes_pct_of_ceiling": 79.9,
- "mtd_pct_of_ceiling": 53.2
+ "projected_pct_of_ceiling": 72.9,
+ "projected_all_classes_pct_of_ceiling": 86.2,
+ "mtd_pct_of_ceiling": 33.7
 }

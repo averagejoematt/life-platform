@@ -3,147 +3,131 @@
  "turns": [
   {
    "speaker": "Elena",
-   "line": "Tuesday morning, Day 24. The recovery score came in at 54 percent \u2014 the lowest reading of the week \u2014 while HRV had fallen to 39.5 milliseconds from a season-high just four days earlier. The body had spent 23 straight days being asked for more. This week, it started answering back."
+   "line": "Sunday, September 27th. He hiked more than eight miles, stacked an unprogrammed session on top of it, and ate about 1,170 calories. Protein that day: 92 grams, against a plan floor of 170."
   },
   {
    "speaker": "Elena",
-   "line": "Welcome to The Measured Life. I'm Elena Voss, an AI journalist following a year-long self-experiment \u2014 a man who once lost significant weight and regained most of it, now 24 days in with a sealed plan and a team of seven AI coaching personas whose predictions are graded against the numbers in real time. My guest is Marcus Webb, the team's nutritionist \u2014 an AI persona covering protein, adherence, and sustainable deficits. Marcus, welcome."
+   "line": "This is The Measured Life, Week 4, Day 24 of the experiment. I'm Elena Voss \u2014 an AI narrator covering a year-long documented health experiment, one man, every number on the record. The only day without a training session since the experiment began is Day 1. With me is Marcus Webb, the team's evidence-based nutrition coach \u2014 an AI persona like all seven members of this coaching team. His lens is protein, adherence, and sustainable deficits. Marcus, welcome to the panel."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "Thanks for having me. I should say upfront that I'm sitting at zero wins from nine predictions this season, so I'm aware of exactly how much credibility I'm walking in with today."
+   "line": "Glad to be here. I'll say this is not the week I expected to be sitting in this seat."
   },
   {
    "speaker": "Elena",
-   "line": "Let's score last week's bet first. We asked whether the body-composition scan would show fat-free mass at or above the target threshold. The scan came in above it \u2014 that bet grades right."
+   "line": "Before the lead \u2014 the Week 3 bet needs a verdict. The claim: a lighter weigh-in by Tuesday the 29th. It came in lighter. James Okafor called it \u2014 he wins; I had taken the other side."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "Good news on that front, at least. Max Reyes called it correctly \u2014 barely, but correctly."
+   "line": "A clean result. The scale is moving in the right direction, and the pace this window is 2.64 pounds per week \u2014 slower than the season average, which is exactly what the plan said would happen as the early water and glycogen drop fades."
   },
   {
    "speaker": "Elena",
-   "line": "So the streak. Twenty-three consecutive training days, 813 minutes of training, an 8-mile Sunday hike on top of it. Five of seven sessions logged sets above the prescribed intensity ceiling. He explained it himself, looking back on October 1st: 'I've actually probably been in a storming mode with the coaches, often going above their recommendations and ignoring rest days \u2026 and wanting to do more. So no - I've not wanted a day off, once I am on, I really want to be on and keep going.'"
+   "line": "The lead. Two of seven days at the protein floor. Then the back half of the week \u2014 Sunday through Tuesday, three consecutive days under 100 grams. The week's mean was about 135 grams. This is not a steady miss. It's a deteriorating one."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "That line tells me everything. He is not struggling to stay motivated. He is choosing volume over the programme on five of seven days, deliberately."
+   "line": "That's the distinction that matters. Wednesday and Friday were the only two days that cleared the floor \u2014 those looked like a man executing a plan. Then Sunday came in at 92, Monday at 99, Tuesday at 89. That's a pattern, not noise."
   },
   {
    "speaker": "Elena",
-   "line": "For three weeks the body agreed with him. Recovery peaked at 99 percent on Friday morning \u2014 the season high \u2014 and by Tuesday it had fallen to 54. That's the arc. What's your read?"
+   "line": "The rate flag is still active \u2014 about 2.6 pounds per week, just above the threshold. The bio-impedance scan shows fat-free mass down nearly two pounds since Day 1. That instrument is noisy, it includes water, but the direction is down, and the protein collapse landed in the same week."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "The arc is the story. One low reading is noise. Recovery fell over the last two mornings, 89 to 54, after 23 consecutive days. The body has not broken. But it has started to push back."
+   "line": "The bio-impedance number alone I'd hold loosely. But the combination is what the plan was designed to prevent \u2014 rate flag active, protein collapsing in the back half, lean-mass buffer being drawn on. There's meaningful buffer above the plan's hard floor. That's not a crisis. It's a signal that needs answering."
   },
   {
    "speaker": "Elena",
-   "line": "Wait \u2014 fifteen sets over the prescribed ceiling on Thursday alone. On the lower body session."
+   "line": "You asked last week whether dinner had been disrupted. You called that single answer the key to the next phase of testing. We now have three days that look exactly like your dinner-disruption scenario. Does that feel like confirmation?"
   },
   {
    "speaker": "Marcus Webb",
-   "line": "Fifteen. Squat, Romanian deadlift, leg press, plus accessory movements. That is a different session than the one that was written."
+   "line": "Partial confirmation. The pattern fits \u2014 protein collapsing on the same days calories collapsed, consistent with a disrupted dinner carrying the day's protein anchor down with it. But I don't have the meal-level data to confirm the mechanism. The ask is still open."
   },
   {
    "speaker": "Elena",
-   "line": "And your domain is nutrition, not training load. But you flagged recovery in your summary this week. Why?"
+   "line": "Here's what I want to push on. You are zero for nine on graded predictions through September 29th \u2014 the only coach on this team without a single win. And now the thing you kept warning about has actually happened. How do you hold both of those things?"
   },
   {
    "speaker": "Marcus Webb",
-   "line": "Because recovery doesn't live in one domain. Tuesday's reading, with resting heart rate at 58, is a nutrition story as much as a training story. You cannot fuel 23 consecutive days of this volume on a protein mean running below the plan floor and call it a structural success."
+   "line": "Honestly. Several of those losses are conditional calls \u2014 graded wrong because the triggering condition never fired during the grading window, not because the underlying mechanism was wrong. My headline weight-direction call is still ungraded. I was wrong about the trend repeatedly. I was not wrong about the vulnerability. Those are different things, and I don't want to paper over the record."
   },
   {
    "speaker": "Elena",
-   "line": "You've been saying that for nine predictions. And you've been wrong all nine times \u2014 graded on trend direction, with several conditional on a carb cut that never happened. Recovery kept rising. Protein trended up. How do you hold your own record against what you're telling me right now?"
+   "line": "Let's name the worst one. You filed a prediction that one disrupted dinner would cause the daily protein target to collapse entirely. It was graded wrong on a rising trend. Then Sunday came in at 92 grams."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "I've been wrong about the direction of every trend. I may not be wrong about the risk. Those are different things, and I want to be honest that the distinction is doing a lot of work for me right now."
+   "line": "The call was graded on a 14-day trend slope, and across that window protein was rising. So: wrong. What the data now shows is that the fragility I described is real \u2014 it just didn't trigger on the timeline I predicted. I was right about the mechanism and wrong about when it would show up. That's a loss, and I own it."
   },
   {
    "speaker": "Elena",
-   "line": "That's a fair thing to say. For the four days of nutrition data we have, protein averaged about 166 grams \u2014 only two of four days at or above the floor. Does that move you?"
+   "line": "Is the dinner-disruption pattern structural or situational? Was Sunday a one-off, or is this the fragility you've been describing finally showing its shape?"
   },
   {
    "speaker": "Marcus Webb",
-   "line": "Not on its own. My ask for two weeks has been: confirm whether dinner was disrupted around September 19th to the 26th. That window is exported \u2014 the per-meal answer is in the logs. That single answer either validates the structural vulnerability I've been describing or tells me I've been modelling the wrong failure mode entirely."
+   "line": "That's exactly what we need answered. If dinner is the single load-bearing meal for protein and it gets disrupted three days running, the back half of any week can look like this one. We need to know whether a backup source exists and whether it was available. Without that answer, we can't separate a structural problem from a bad stretch."
   },
   {
    "speaker": "Elena",
-   "line": "Nathan Reeves sits at five and two \u2014 the team's best record among coaches with meaningful volume. His calls on HRV and sleep have mostly landed on trend \u2014 though his sleep call failed by count. Does his record bother you?"
+   "line": "Secondary story. Seven sessions in seven days, 813 minutes total. Over-ceiling RPE sets in five of the six programmed loaded sessions \u2014 Thursday's lower session alone logged 15 sets above the prescribed ceiling. Then Sunday: a 174-minute hike, an unprogrammed session stacked on top, and the week's worst nutrition day underneath both."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "It should bother me more than it does. Nathan's calls have mostly landed, on trend. I've been calling what the numbers would do, and I've been wrong every time. The uncomfortable possibility is that the behavioural engine is running so hot it's overriding what the nutritional signals would normally predict."
+   "line": "That Sunday is the week in miniature. The physical output was enormous and the fuel going in was about 1,170 calories and 92 grams of protein. Those two things were happening at the same time."
   },
   {
    "speaker": "Elena",
-   "line": "Reeves's read this week is that the numbers are moving in a reasonable direction, with protein climbing, even as the streak runs on."
+   "line": "Wait \u2014 15 sets over the ceiling on Thursday alone?"
   },
   {
    "speaker": "Marcus Webb",
-   "line": "On direction, he's been right where I haven't. My record is zero right, nine wrong \u2014 the honest version is that the data has moved opposite to my predictions every single time."
+   "line": "That's what the data shows. And that's his call to make \u2014 the programme sets the ceiling, he decides whether to stay under it. The cumulative picture across seven days is what I'm watching alongside the nutrition."
   },
   {
    "speaker": "Elena",
-   "line": "Now the weight picture. Down about two and a half this week, fifteen total since Day 1. The rate flag is live \u2014 just above the platform's lean-mass risk threshold. The composition scan shows fat mass down more than thirteen pounds since the opening scan, fat-free mass roughly flat. How do you read those numbers alongside the rate flag?"
+   "line": "Recovery peaked at 99 percent on Friday morning \u2014 the season's best reading, with the season-high HRV alongside it. By Tuesday it had fallen to 54 percent. Four days, no rest, and protein under 100 grams on three of them."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "The composition split is good. Fat mass down more than thirteen pounds against under two pounds of fat-free \u2014 at this pace, with this volume, that is not a bad result. But the rate flag is live, the instrument is bio-impedance not a clinical measure, and fat-free mass includes water. One good scan is one good scan."
+   "line": "The recovery arc tells the story. Peak to 54 percent in four days, with Monday's lower session completing at 83 percent of prescribed sets \u2014 the first incomplete session in this window. The body left something on the table."
   },
   {
    "speaker": "Elena",
-   "line": "At the current pace he gets to the next waypoint fast. Is fast the problem?"
+   "line": "Nathan Reeves sits at four wins and three losses \u2014 a positive record, earned. He published a correction this week, naming a prediction he got wrong and discarding the explanation that failed. That's the clearest example this season of a coach changing their mind in the open."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "Fast is fine if protein holds and the composition continues to split cleanly. Fast alongside 23 consecutive training days, a live rate flag, and three days of nutrition data I cannot see \u2014 that is where I start watching very carefully."
+   "line": "That kind of correction is how you earn credibility in a system like this. He named what failed and asked a harder question instead of reaching for a replacement theory. I'd rather be in his position than mine on the scoreboard, but his method is the right one."
   },
   {
    "speaker": "Elena",
-   "line": "He also walked 8.2 miles on Sunday \u2014 his own idea, a longer route in his new area. Looking back on October 1st, he said: 'That felt good. I realized how much walking was a super power last time for weight loss, and this time around I am doing far more lifting, and so I wanted that Sunday to get back in the habit and also plot a longer walk since I live in a different area since last time.'"
+   "line": "The Month 2 waypoint remains distant. At the current pace of about 2.6 pounds per week, the original timeline no longer reaches it \u2014 the gap is large enough to name plainly, and a reassessment is coming."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "It matters nutritionally too. Nearly three hours of hiking at a sustained heart rate, on top of an afternoon workout \u2014 that is a caloric demand the logged data may not fully capture, especially with the export gap sitting right on top of it."
+   "line": "The plan's own note says the real fat-loss rate becomes visible around Week 3. We're at Week 4. The distance to that waypoint at the current pace is a different conversation than the one the original timeline assumed."
   },
   {
    "speaker": "Elena",
-   "line": "What's the call you got most wrong this season?"
+   "line": "One thing still unresolved heading into next week: is the dinner-disruption pattern structural or a bad stretch? Three days under 100 grams tells us the vulnerability is real. It doesn't yet tell us whether a named backup source exists or whether it was simply unavailable. That answer gates everything you're watching."
   },
   {
    "speaker": "Marcus Webb",
-   "line": "The recovery call from September 10th. I predicted under-fueling from aggressive carb cuts would compound recovery deficits faster than any other factor in the system. Recovery was trending up the whole time. I called the direction wrong and I called the mechanism wrong."
+   "line": "And until we have it, every protein call I make is built on incomplete information. The ask has been open since last week. The window closed September 29th with no confirmation."
   },
   {
    "speaker": "Elena",
-   "line": "What do you make of it now?"
+   "line": "The new bet. Recovery closed Tuesday at 54 percent \u2014 the week's low, and the lowest reading since the season low back in early September. The claim for next week: the Tuesday October 6th morning score will be higher than 54 percent, suggesting the body is absorbing the load rather than accumulating the debt. Marcus, you own this one \u2014 where do you come down?"
   },
   {
    "speaker": "Marcus Webb",
-   "line": "That his fitness base and his behavioural consistency are absorbing things my model said would surface as deficits. I have been modelling a more fragile system than the one that is actually running. Nine predictions in, that is the honest conclusion."
+   "line": "I'll call yes, and I want to be transparent about why that's uncomfortable. This body has absorbed a remarkable load throughout the experiment and the recovery signal has been resilient every time I expected it to crack. I'm calling it because the data has surprised me before, not because my confidence is high."
   },
   {
    "speaker": "Elena",
-   "line": "What we don't know yet: what the per-meal logs for September 19th to the 26th show about the dinner disruption you've been asking about for two weeks \u2014 whether it happened, or whether that question closes entirely."
-  },
-  {
-   "speaker": "Marcus Webb",
-   "line": "That is the open thread I most need answered. Everything else I'm building sits on top of it."
-  },
-  {
-   "speaker": "Elena",
-   "line": "This week's bet: the recovery score on Thursday morning, October 1st, will come in below 60 percent \u2014 given the end-of-week decline and 23 consecutive training days with no rest. Marcus, where do you land?"
-  },
-  {
-   "speaker": "Marcus Webb",
-   "line": "I'll take the side that says it comes in below 60. The arc is clear, the cumulative load is real, and there is no rest day in the data to interrupt it. For once, my read and the trend are pointing the same direction."
-  },
-  {
-   "speaker": "Elena",
-   "line": "I'll take the other side \u2014 not confidently, but because this body has rebounded before when the data said it shouldn't. We find out Thursday morning. If the score holds below 60, the question live since Day 1 \u2014 will he take a rest day before his body takes one for him \u2014 will have its most urgent data point yet. I'm Elena Voss. This has been The Measured Life."
+   "line": "I'll take the other side. No programmed rest days, three consecutive days under 100 grams of protein, and a reading that ended the week still falling. Whether the October 6th score shows the load being absorbed or slides further toward the season low is the first number that will matter when the data lands. I'm Elena Voss. This has been The Measured Life."
   }
  ]
 }

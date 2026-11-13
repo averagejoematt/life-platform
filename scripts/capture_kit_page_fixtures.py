@@ -12,7 +12,8 @@ This script is the only way that directory is written:
   * every route is fetched first, with read-only GETs against the live site, and nothing is
     written until every fetch has answered 200 with JSON;
   * the captured set is checked for one record (``record_disagreements`` below — the same
-    check tests/test_kit_page_fixtures_agree_4671.py holds the committed set to) and nothing
+    check tests/test_kit_page_fixtures_agree_4671.py holds the committed set to; a retired coach's
+    graded calls count by its ``retired`` predictions bucket, since it has no card) and nothing
     is written if it disagrees (a CloudFront copy one cache window older than its neighbour
     can do that: wait the window out and run again);
   * then every file is written, and ``_capture.json`` records the one capture time, the site
@@ -33,7 +34,7 @@ be re-dated to that manifest in the same change — tests/test_kit_fixtures_fres
 tests/fixtures/edition_contract_4582/editions.json`` and the scorecard fixture the JS test reads.
 The next recapture is dated on docs/OPERATING_CALENDAR.md (ritual ``preview-fixture-recapture``).
 
-Last recaptured: 2026-10-18 (#4839, #4864; the post-#4988 deploy recapture, #4580). tests/test_kit_fixtures_fresh_4839.py reds when
+Last recaptured: 2026-11-13 (preview-fixture-recapture ritual; a retired coach's graded call now counts by its bucket). tests/test_kit_fixtures_fresh_4839.py reds when
 ``_capture.json`` is more than ``MAX_AGE_DAYS`` (30) days old, and when this line and the
 manifest name different days — re-run the script, then change the date here.
 
@@ -172,6 +173,13 @@ def record_disagreements(fx: dict) -> list:
     listed = {c.get("persona_id"): c.get("record") for c in coaches if isinstance(c, dict)}
     right = sum((r or {}).get("confirmed") or 0 for r in listed.values())
     decided = sum((r or {}).get("n") or 0 for r in listed.values())
+    # A retired coach has no card on the Coaches list, but a call it sealed before retiring still counts in the
+    # predictions total once it is graded (Sarah Chen's 2026-09-06 steps call, graded 2026-11-10). Its bucket is
+    # added by name, from the predictions' own `retired` flag, so the sum stays exact rather than loosened.
+    for bucket in (fx["predictions.json"].get("by_coach") or {}).values():
+        if isinstance(bucket, dict) and bucket.get("retired") is True:
+            right += bucket.get("confirmed") or 0
+            decided += bucket.get("decided") or 0
     summed = (right, decided)
 
     if edition != predictions:

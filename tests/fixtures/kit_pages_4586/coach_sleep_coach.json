@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:10.314247+00:00",
-  "served_at": "2026-10-18T07:15:10.314247+00:00",
+  "generated_at": "2026-11-13T16:55:03.749058+00:00",
+  "served_at": "2026-11-13T16:55:03.749058+00:00",
   "cache_seconds": 300,
-  "request_id": "08a02f45f1bd4182"
+  "request_id": "0b87d6a48c254b86"
  },
  "persona_id": "sleep_coach",
  "name": "Lisa Park",
@@ -89,16 +89,16 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20261003_once_morning_notes_resume_and_protein_st",
-  "claim": "Once morning notes resume and protein stabilizes above 145 grams, the recovery interval will narrow in a defensible direction",
-  "created_date": "2026-10-03",
+  "prediction_id": "",
+  "claim": "",
+  "created_date": "2026-11-09",
   "pre_registered_at": null,
-  "outcome_date": "2026-10-17",
+  "outcome_date": "2026-11-10",
   "metric": "recovery_score",
-  "eval_type": "directional",
-  "condition": "up",
-  "threshold": null,
-  "actual_value": -0.3878,
+  "eval_type": "point",
+  "condition": "within",
+  "threshold": 65,
+  "actual_value": 37.0,
   "status": "refuted"
  },
  "instrument": {
@@ -109,24 +109,19 @@
  "reason": null,
  "stance": {
   "source": "stance",
-  "headline_read": "I've now refuted six consecutive predictions across deep sleep and recovery score, which means my mechanistic model is not capturing what drives Matthew's sleep architecture. The latest refutation\u2014recovery score collapsing sharply over two weeks when I predicted stability\u2014tells me I'm still fitting noise. Protein remains below target, Zone 2 training is absent, and morning logging has gone silent. I'm holding tight to what I can actually see: wearable data collection is reliable, but behavioral activation on all three levers has stalled completely.",
-  "focused_on_now": [
-   "whether his protein intake stabilizes or continues dropping",
-   "whether he resumes logging how he feels in the morning",
-   "whether structured easy cardio workouts appear in his training log"
-  ],
+  "headline_read": "",
+  "focused_on_now": [],
   "set_aside_for_now": [],
   "stage": {
-   "label": "Prediction model unreliable; behavioral levers disengaged",
-   "rationale": "Six refuted predictions in sequence tell me I am fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014remain dormant. The latest recovery score collapse refutes my stability prediction directly. Without movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. Matthew is in a holding pattern, and my model cannot resolve it."
+   "label": "",
+   "rationale": ""
   },
-  "how_my_read_changed": "The recovery score refutation on 2026-10-17 (sharp downward swing when I predicted stability) extends my pattern of six consecutive prediction misses. This is not a minor miss\u2014it's a directional reversal that confirms my mechanistic model is not capturing the drivers of his recovery. I'm not revising my positions on protein or Zone 2; I'm deepening my conviction that without behavioral activation on those levers, my predictions will continue to fail. The silence on morning logging remains the critical gap.",
-  "confidence_note": "My hit rate across sleep and recovery domains is low (0.5 each), and my recent prediction streak is 0-for-6. I have high confidence in wearable data reliability and in the structural barriers blocking protocol adoption, but very low confidence in directional recovery or deep sleep claims. I cite the standing concession on recovery score directional trend (2026-10-05) and will not relitigate that topic.",
-  "as_of": "2026-10-17",
+  "how_my_read_changed": "",
+  "as_of": "2026-11-10",
   "grounding_flag": false,
   "graduation_gate": "",
   "band_metric": "weight_lbs",
-  "current_value": 302.22,
+  "current_value": 290.65,
   "rung": {
    "stage_id": "foundation",
    "entry": {
@@ -170,74 +165,74 @@
  },
  "stance_history": [
   {
-   "as_of": "2026-10-17",
-   "headline_read": "I've now refuted six consecutive predictions across deep sleep and recovery score, which means my mechanistic model is not capturing what drives Matthew's sleep architecture. The latest refutation\u2014recovery score collapsing sharply over two weeks when I predicted stability\u2014tells me I'm still fitting noise. Protein remains below target, Zone 2 training is absent, and morning logging has gone silent. I'm holding tight to what I can actually see: wearable data collection is reliable, but behavioral activation on all three levers has stalled completely.",
+   "as_of": "2026-11-10",
+   "headline_read": "",
    "stage": {
-    "label": "Prediction model unreliable; behavioral levers disengaged",
-    "rationale": "Six refuted predictions in sequence tell me I am fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014remain dormant. The latest recovery score collapse refutes my stability prediction directly. Without movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. Matthew is in a holding pattern, and my model cannot resolve it."
+    "label": "",
+    "rationale": ""
    },
-   "how_my_read_changed": "The recovery score refutation on 2026-10-17 (sharp downward swing when I predicted stability) extends my pattern of six consecutive prediction misses. This is not a minor miss\u2014it's a directional reversal that confirms my mechanistic model is not capturing the drivers of his recovery. I'm not revising my positions on protein or Zone 2; I'm deepening my conviction that without behavioral activation on those levers, my predictions will continue to fail. The silence on morning logging remains the critical gap."
+   "how_my_read_changed": ""
+  },
+  {
+   "as_of": "2026-11-08",
+   "headline_read": "",
+   "stage": {
+    "label": "",
+    "rationale": ""
+   },
+   "how_my_read_changed": ""
+  },
+  {
+   "as_of": "2026-11-01",
+   "headline_read": "",
+   "stage": {
+    "label": "",
+    "rationale": ""
+   },
+   "how_my_read_changed": ""
+  },
+  {
+   "as_of": "2026-10-17",
+   "headline_read": "",
+   "stage": {
+    "label": "",
+    "rationale": ""
+   },
+   "how_my_read_changed": ""
   },
   {
    "as_of": "2026-10-15",
-   "headline_read": "I've now refuted five consecutive predictions across deep sleep and recovery score, which means my mechanistic model is not capturing what drives Matthew's sleep architecture. Protein remains below threshold, Zone 2 training is absent, and morning logging has gone silent for 16 days. I'm no longer attempting directional recovery claims and am holding tight to what I can actually see: wearable data collection is reliable, but behavioral activation on the three levers I need\u2014protein intake, structured training, and subjective logging\u2014has stalled completely.",
+   "headline_read": "",
    "stage": {
-    "label": "Prediction model unreliable; behavioral levers disengaged",
-    "rationale": "Five refuted predictions in sequence tell me I am fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014remain dormant. Without movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. Matthew is in a holding pattern, and my model cannot resolve it."
+    "label": "",
+    "rationale": ""
    },
-   "how_my_read_changed": "The recovery score prediction refutation (down predicted, flat observed) confirms what the deep sleep refutations already showed: my mechanistic model is not capturing the drivers of Matthew's sleep metrics. I am now explicitly setting aside directional recovery and deep sleep claims rather than continuing to generate predictions I cannot ground in activated behavioral change. This is a genuine shift from attempting to model the mechanism to acknowledging that without protein intake movement, training volume, or morning logging data, I have no reliable signal to work with."
+   "how_my_read_changed": ""
   },
   {
    "as_of": "2026-10-14",
-   "headline_read": "I've now refuted four consecutive deep sleep predictions, which tells me my adenosine hypothesis is not activating as I modeled it. Matthew's protein remains below threshold, Zone 2 training is absent from Strava, and morning logging has stayed silent for over two weeks. I'm no longer confident in directional deep sleep claims and am shifting focus to the structural barriers blocking the behavioral levers I need to see move.",
+   "headline_read": "",
    "stage": {
-    "label": "Behavioral activation stalled; prediction model unreliable",
-    "rationale": "Four refuted deep sleep predictions in sequence mean I'm fitting noise, not signal. The three mechanisms I hypothesized\u2014protein intake, Zone 2 adenosine accumulation, and morning subjective anchoring\u2014have not engaged. Matthew collects wearable data reliably, but without behavioral movement on any of these levers, I cannot distinguish real sleep architecture change from device variance. He remains in a holding pattern."
+    "label": "",
+    "rationale": ""
    },
-   "how_my_read_changed": "The fourth consecutive deep sleep prediction refutation has shifted me from 'waiting for activation' to 'my model is not capturing what's happening.' I'm no longer making directional deep sleep claims. I'm now prioritizing whether the three behavioral levers (protein, Zone 2 training, morning logging) actually move, because without at least one of them engaging, I have no mechanistic ground to stand on. This is a genuine correction: my adenosine hypothesis was premature."
+   "how_my_read_changed": ""
   },
   {
    "as_of": "2026-10-11",
-   "headline_read": "I've refuted three consecutive deep sleep predictions in a row, which means I'm reading noise as signal rather than waiting for the behavioral drivers to activate. Matthew's protein is drifting below the threshold I set for slow-wave sleep, Zone 2 training hasn't appeared in Strava, and morning logging has gone silent for sixteen days. I'm holding my deep sleep directional claims and watching whether any of these three levers move.",
+   "headline_read": "",
    "stage": {
-    "rationale": "Matthew collects wearable data reliably, but three refuted deep sleep predictions in a row tell me I'm pattern-matching noise. His protein is at the edge of my activation threshold and trending down. Zone 2 training\u2014the mechanism I hypothesized would drive deep sleep\u2014has not appeared in Strava. Morning logging silence blocks subjective validation. He's in a holding pattern until one of these behavioral levers engages.",
-    "label": "Waiting for behavioral activation; noise-signal boundary unclear"
+    "rationale": "",
+    "label": ""
    },
    "how_my_read_changed": ""
   },
   {
    "as_of": "2026-10-10",
-   "headline_read": "I'm now holding two refuted recovery predictions in sequence, which signals that my recovery model is systematically overconfident in a narrow band. The October 2 spike to very high recovery contradicts my prediction interval, and combined with the earlier concession on October 5, I'm shifting focus away from recovery directional calls entirely. Deep sleep remains noise-bound without the Zone 2 training driver that hasn't materialized. My read of Matthew is stable: he's maintaining wearable data collection but logging compliance remains incomplete, which blocks subjective validation of any architecture claims.",
+   "headline_read": "",
    "stage": {
-    "rationale": "Matthew is in a data-collection holding pattern. Two consecutive recovery refutations and one standing concession (October 5) tell me my recovery model needs redesign before I can make directional claims. Deep sleep signal remains indistinguishable from noise without the Zone 2 adenosine driver he hasn't yet engaged. He's compliant with wearables but morning logging silence persists, leaving me unable to validate device readings against his own sense of sleep quality.",
-    "label": "Waiting for behavioral levers, model recalibration paused"
-   },
-   "how_my_read_changed": "The October 2 recovery spike refuted my prediction interval, and combined with my standing concession on October 5, I'm stepping back from recovery directional forecasting. I was overconfident in a narrow prediction band. This doesn't change my read of Matthew's stage\u2014he's still waiting for behavioral levers\u2014but it does change what I'm willing to claim about recovery itself. I'm pausing recovery calls until I understand why the model is failing."
-  },
-  {
-   "as_of": "2026-10-08",
-   "headline_read": "I remain cautious about deep sleep trend interpretation given early-window noise and the absence of the Zone 2 training driver I predicted would activate slow-wave increases. The recent downward refutation doesn't shift my core mechanistic read\u2014I predicted upward movement contingent on structured adenosine accumulation that hasn't yet appeared in his logs, so the absence of that driver is more informative than the direction itself. My focus stays on protocol stability, protein intake stabilization, and waiting for the training data that would reshape architecture.",
-   "stage": {
-    "rationale": "Matthew is in a holding pattern after 38 days with high rapport but incomplete behavioral compliance on logging. The simplified protocol is now active but signal quality remains unproven. The deep sleep refutation is consistent with noise in the absence of the mechanistic driver (Zone 2 adenosine accumulation) I predicted would activate increases. He's waiting for the levers\u2014protein intake sustained at threshold, structured training volume\u2014to appear before architecture changes become interpretable.",
-    "label": "Protocol stabilization, signal waiting"
-   },
-   "how_my_read_changed": "The downward deep sleep refutation reinforces rather than revises my position: I predicted upward movement only if Zone 2 training materialized and protein stayed elevated. Neither has happened consistently. The refutation is evidence of noise in the absence of the driver, not evidence that my mechanistic model is wrong. This keeps me focused on waiting for behavioral compliance on the actual levers rather than chasing directional calls on incomplete data."
-  },
-  {
-   "as_of": "2026-10-06",
-   "headline_read": "I remain cautious about deep sleep trend interpretation given early-window noise and the absence of the Zone 2 training driver I predicted would activate slow-wave increases. The recent downward refutation doesn't shift my core mechanistic read\u2014I predicted upward movement contingent on structured adenosine accumulation that hasn't yet appeared in his logs, so the absence of that driver is more informative than the direction itself. My focus stays on protocol stability, protein intake stabilization, and waiting for the training data that would reshape architecture.",
-   "stage": {
-    "label": "Protocol stabilization, signal waiting",
-    "rationale": "Matthew is in a holding pattern after 38 days with high rapport but incomplete behavioral compliance on logging. The simplified protocol is now active but signal quality remains unproven. The deep sleep refutation is consistent with noise in the absence of the mechanistic driver (Zone 2 adenosine accumulation) I predicted would activate increases. He's waiting for the levers\u2014protein intake sustained at threshold, structured training volume\u2014to appear before architecture changes become interpretable."
-   },
-   "how_my_read_changed": ""
-  },
-  {
-   "as_of": "2026-10-04",
-   "headline_read": "I remain cautious about deep sleep trend interpretation given early-window noise and the absence of the Zone 2 training driver I predicted would activate slow-wave increases. The recent downward refutation doesn't shift my core mechanistic read\u2014I predicted upward movement contingent on structured adenosine accumulation that hasn't yet appeared in his logs, so the absence of that driver is more informative than the direction itself. My focus stays on protocol stability, protein intake stabilization, and waiting for the training data that would reshape architecture.",
-   "stage": {
-    "rationale": "Matthew is in a holding pattern after 38 days with high rapport but incomplete behavioral compliance on logging. The simplified protocol is now active but signal quality remains unproven. The deep sleep refutation is consistent with noise in the absence of the mechanistic driver (Zone 2 adenosine accumulation) I predicted would activate increases. He's waiting for the levers\u2014protein intake sustained at threshold, structured training volume\u2014to appear before architecture changes become interpretable.",
-    "label": "Protocol stabilization, signal waiting"
+    "rationale": "",
+    "label": ""
    },
    "how_my_read_changed": ""
   }
@@ -314,26 +309,26 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 19,
-   "refuted": 27,
-   "decided": 46,
-   "hit_rate_pct": 41.3,
+   "confirmed": 15,
+   "refuted": 19,
+   "decided": 34,
+   "hit_rate_pct": 44.1,
    "record": {
-    "confirmed": 19,
-    "refuted": 27,
-    "n": 46,
-    "through": "2026-10-17"
+    "confirmed": 15,
+    "refuted": 19,
+    "n": 34,
+    "through": "2026-11-13"
    },
-   "headline": "19 of 46 checked calls right (41%) through October 17",
+   "headline": "15 of 34 checked calls right (44%) through November 13",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 23,
+      "graded": 24,
       "coach_right": 13,
-      "scored": 23,
+      "scored": 24,
       "coach_right_on_scored": 13,
       "rule_right": 9,
       "coach_only": 4,
@@ -343,17 +338,17 @@
       "not_yet_scored": 0,
       "verdict": "no_clear_difference",
       "sign_test_p": 0.125,
-      "coach_right_pct": 56.5,
-      "rule_right_pct": 39.1
+      "coach_right_pct": 54.2,
+      "rule_right_pct": 37.5
      },
      "direction": {
-      "graded": 18,
-      "coach_right": 3,
-      "scored": 18,
-      "coach_right_on_scored": 3,
-      "rule_right": 3,
-      "coach_only": 3,
-      "rule_only": 3,
+      "graded": 6,
+      "coach_right": 0,
+      "scored": 6,
+      "coach_right_on_scored": 0,
+      "rule_right": 6,
+      "coach_only": 0,
+      "rule_only": 6,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -363,11 +358,11 @@
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 3,
-      "coach_right": 2,
-      "scored": 3,
-      "coach_right_on_scored": 2,
-      "rule_right": 2,
+      "graded": 2,
+      "coach_right": 1,
+      "scored": 2,
+      "coach_right_on_scored": 1,
+      "rule_right": 1,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -398,53 +393,81 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 46,
-     "brier_skill": -0.0214,
-     "sentence": "Across 46 checked calls, so far they do not beat a simple guess."
+     "n": 34,
+     "brier_skill": 0.003,
+     "sentence": "Across 34 checked calls, so far they do not beat a simple guess."
     },
-    "rule_sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
-    "sentence": "Number calls: on the 23 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 18 a guess could also be checked against, the coaches were right 3 times and a guess that nothing changes 3 times \u2014 level, on too few calls to tell. Yes/no bets: on the 3 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 24 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 6 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 24 a guess could also be checked against, the coaches were right 13 times and a guess that nothing changes 9 times \u2014 the coaches were right more often, but not by a clear margin. Direction calls: on the 6 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 6 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": false,
-   "n_note": "n=46 decided",
+   "n_note": "n=34 decided",
    "recent": [
     {
-     "date": "2026-10-17",
+     "date": "2026-11-10",
      "status": "refuted",
      "metric": "recovery_score",
-     "reason": "recovery_score 98 on 2026-10-03 -> 60 on 2026-10-17 (change -38, band \u00b111.5, window 2026-10-03..2026-10-17): trend=down, predicted=up"
+     "reason": ""
+    },
+    {
+     "date": "2026-11-02",
+     "status": "expired",
+     "metric": "recovery_score",
+     "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
+     "grade_correction": {
+      "original_status": "confirmed",
+      "original_reason": "recovery_score 47 on 2026-10-19 -> 77 on 2026-11-02 (change +30, band \u00b115.5, window 2026-10-19..2026-11-02): trend=up, predicted=up",
+      "corrected_status": "expired",
+      "corrected_at": "2026-11-09T05:19:13Z",
+      "explanation": "The call's stored test checks something different from what its sentence says. Testing the sentence itself would need criteria written after the fact. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
+    },
+    {
+     "date": "2026-10-26",
+     "status": "refuted",
+     "metric": "deep_pct",
+     "reason": ""
+    },
+    {
+     "date": "2026-10-18",
+     "status": "expired",
+     "metric": "total_protein_g",
+     "reason": "not gradable yet \u2014 not enough protein eaten data to read it",
+     "grade_correction": {
+      "original_status": "refuted",
+      "original_reason": "",
+      "corrected_status": "expired",
+      "corrected_at": "2026-11-09T05:19:13Z",
+      "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     },
     {
      "date": "2026-10-16",
-     "status": "confirmed",
+     "status": "observational",
      "metric": "recovery_score",
-     "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down"
+     "reason": "",
+     "grade_correction": {
+      "original_status": "confirmed",
+      "original_reason": "",
+      "corrected_status": "observational",
+      "corrected_at": "2026-11-09T05:19:13Z",
+      "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     },
     {
      "date": "2026-10-15",
-     "status": "refuted",
+     "status": "observational",
      "metric": "recovery_score",
-     "reason": "predicted down, metric flat \u2014 recovery_score 62 on 2026-10-01 -> 59 on 2026-10-15 (change -3, band \u00b114, window 2026-10-01..2026-10-15)"
-    },
-    {
-     "date": "2026-10-14",
-     "status": "refuted",
-     "metric": "deep_pct",
-     "reason": "deep_pct 24.1 on 2026-09-23 -> 18.2 on 2026-10-07 (change -5.9, band \u00b12.3, window 2026-09-23..2026-10-07): trend=down, predicted=up"
-    },
-    {
-     "date": "2026-10-11",
-     "status": "confirmed",
-     "metric": "recovery_score",
-     "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 85.3 \u00b121.308 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)); |\u0394|=3.70 \u2192 within tolerance"
-    },
-    {
-     "date": "2026-10-11",
-     "status": "confirmed",
-     "metric": "total_protein_g",
-     "reason": "total_protein_g trend=up (slope=0.0236), predicted=up"
+     "reason": "",
+     "grade_correction": {
+      "original_status": "refuted",
+      "original_reason": "",
+      "corrected_status": "observational",
+      "corrected_at": "2026-11-09T05:19:13Z",
+      "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -548,448 +571,178 @@
  },
  "recent_outputs": [
   {
+   "date": "2026-11-12",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-11-12T18:02:28.391981+00:00",
+   "data_through": "2026-11-11"
+  },
+  {
+   "date": "2026-11-09",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-11-09T18:02:03.912533+00:00",
+   "data_through": "2026-11-08"
+  },
+  {
+   "date": "2026-11-02",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-11-02T18:02:21.821862+00:00",
+   "data_through": "2026-11-01"
+  },
+  {
+   "date": "2026-10-29",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-10-29T17:02:35.994121+00:00",
+   "data_through": "2026-10-28"
+  },
+  {
+   "date": "2026-10-26",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-10-26T17:02:33.312653+00:00",
+   "data_through": "2026-10-25"
+  },
+  {
+   "date": "2026-10-22",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-10-22T17:01:58.950797+00:00",
+   "data_through": "2026-10-21"
+  },
+  {
+   "date": "2026-10-19",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-10-19T17:02:39.266143+00:00",
+   "data_through": "2026-10-18"
+  },
+  {
    "date": "2026-10-05",
    "summary": "",
-   "themes": [
-    "sleep quality",
-    "recovery score",
-    "HRV",
-    "deep sleep",
-    "wearable data validation",
-    "morning logging",
-    "subjective objective alignment"
-   ],
+   "themes": [],
    "generated_at": "2026-10-05T17:01:57.021488+00:00",
    "data_through": "2026-10-04"
   },
   {
    "date": "2026-10-03",
-   "summary": "I've asked him to resume morning logging with three-word notes when device readings feel misaligned with how he actually feels.",
-   "themes": [
-    "sleep architecture",
-    "deep sleep pct",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "morning logging",
-    "protein intake",
-    "zone 2 training",
-    "wearable validation",
-    "subjective objective gap"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-10-03T17:02:09.241410+00:00",
    "data_through": "2026-10-02"
   },
   {
    "date": "2026-10-02",
-   "summary": "I've asked him to provide a morning note with his subjective feeling and room temperature.",
-   "themes": [
-    "device subjective divergence",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "sleep score",
-    "deep sleep percentage",
-    "morning protocol",
-    "room temperature",
-    "eight sleep",
-    "whoop",
-    "model calibration"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-10-02T17:01:31.663106+00:00",
    "data_through": "2026-10-01"
   },
   {
    "date": "2026-10-01",
    "summary": "",
-   "themes": [
-    "sleep architecture",
-    "recovery score",
-    "HRV",
-    "deep sleep",
-    "sleep efficiency",
-    "resting heart rate",
-    "wearable data interpretation",
-    "signal vs noise"
-   ],
+   "themes": [],
    "generated_at": "2026-10-01T19:54:09.351189+00:00",
    "data_through": "2026-09-30"
   },
   {
    "date": "2026-09-30",
-   "summary": "I've asked him to send a one-word morning check-in (good, okay, or rough) tomorrow.",
-   "themes": [
-    "sleep architecture",
-    "HRV recovery divergence",
-    "deep sleep",
-    "REM sleep",
-    "sleep efficiency",
-    "protein intake",
-    "subjective anchoring",
-    "wearable data interpretation",
-    "morning check in protocol",
-    "model prediction accuracy"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-30T17:02:03.345495+00:00",
    "data_through": "2026-09-29"
   },
   {
    "date": "2026-09-26",
    "summary": "",
-   "themes": [
-    "deep sleep variability",
-    "protocol redesign",
-    "subjective sleep quality",
-    "HRV recovery",
-    "adenosine hypothesis",
-    "protein nutrition",
-    "device signal validation",
-    "thermal environment"
-   ],
+   "themes": [],
    "generated_at": "2026-09-26T17:01:27.315585+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-25",
-   "summary": "On the night of 2026-09-23, Whoop logged 86% recovery, HRV at 48.2 ms, resting heart rate at 54 bpm, deep sleep at 30.6%, and REM at 25.9% \u2014 strong readings on their surface.",
-   "themes": [
-    "sensor subjective gap",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "deep sleep",
-    "REM sleep",
-    "sleep quality subjective",
-    "room temperature",
-    "data interpretation",
-    "protocol design",
-    "cross coach collaboration",
-    "nocturnal glucose dynamics",
-    "protein sleep hypothesis"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-25T17:01:48.880845+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-24",
-   "summary": "I've redesigned the protocol. Fifteen requests across seven cycles yielded nothing \u2014 a design failure, not a compliance failure.",
-   "themes": [
-    "deep sleep signal",
-    "protocol design",
-    "sensor subjective divergence",
-    "thermal context",
-    "HRV recovery",
-    "protein sleep hypothesis",
-    "data interpretation",
-    "compliance friction"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-24T17:01:42.948528+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-23",
-   "summary": "On the night of 2026-09-19, his deep sleep hit 27.6%\u20141.82 standard deviations above baseline. Tonight's reading continues climbing: 28.9% deep sleep, 32.9% REM, 94.77% efficiency on 7.72 hours.",
-   "themes": [
-    "deep sleep architecture",
-    "sensor reliability",
-    "subjective vs objective measurement",
-    "recovery score divergence",
-    "interoception",
-    "protein nutrition sleep mechanism",
-    "thermal environment",
-    "HRV recovery tracking",
-    "zone 2 adenosine hypothesis"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-23T17:01:25.933847+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-22",
-   "summary": "On the night of 2026-09-19, his deep sleep spiked to 27.6%, 1.82 standard deviations above his 18.7% baseline\u2014a real elevation, but one I cannot confidently attribute without knowing his room temperature.",
-   "themes": [
-    "deep sleep classification",
-    "thermal environment",
-    "sensor vs subjective calibration",
-    "recovery score interpretation",
-    "mean reversion",
-    "protein hypothesis",
-    "zone 2 adenosine",
-    "HRV tracking",
-    "resting heart rate",
-    "sleep efficiency"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-22T17:01:42.671795+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-21",
-   "summary": "I'm watching a striking 27.6% deep sleep reading on the night of 2026-09-19 \u2014 but I cannot tell whether it means anything.",
-   "themes": [
-    "deep sleep classification",
-    "sleep architecture",
-    "thermal environment",
-    "HRV recovery",
-    "data interpretation",
-    "interoception",
-    "protein sleep hypothesis",
-    "zone 2 training",
-    "adenosine dynamics"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-21T17:01:34.923556+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-20",
-   "summary": "On the night of 2026-09-19, the headline metrics are strong \u2014 98% recovery, HRV at 48.5 ms, resting HR at 54 bpm, 8.61 hours of sleep with 27.6% deep.",
-   "themes": [
-    "sleep architecture",
-    "deep sleep percentage",
-    "HRV recovery",
-    "sensor data validation",
-    "subjective rating protocol",
-    "thermal environment",
-    "protein intake",
-    "zone 2 training",
-    "adenosine dynamics",
-    "data interpretation"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-20T17:01:29.385791+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-19",
    "summary": "",
-   "themes": [
-    "sleep architecture",
-    "deep sleep",
-    "REM sleep",
-    "HRV",
-    "recovery score",
-    "resting heart rate",
-    "sleep duration",
-    "sensor subjective gap",
-    "data interpretation",
-    "thermal environment",
-    "adenosine hypothesis",
-    "protein slow wave"
-   ],
+   "themes": [],
    "generated_at": "2026-09-19T17:01:40.446699+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-18",
-   "summary": "On the night of 2026-09-16, I watched his autonomic nervous system settle into genuine recovery: 94% recovery score, HRV of 45.7 ms, and resting HR of 55 bpm all converged cleanly.",
-   "themes": [
-    "deep sleep architecture",
-    "HRV recovery",
-    "autonomic nervous system",
-    "zone 2 training",
-    "protein intake",
-    "sleep duration",
-    "REM sleep",
-    "thermal environment",
-    "data logging dependencies",
-    "adenosine accumulation"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-18T17:01:22.031443+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-17",
    "summary": "",
-   "themes": [
-    "sleep architecture",
-    "deep sleep pct",
-    "REM sleep pct",
-    "thermal environment",
-    "autonomic recovery",
-    "data integrity",
-    "zone 2 training",
-    "adenosine accumulation",
-    "model calibration"
-   ],
+   "themes": [],
    "generated_at": "2026-09-17T17:01:25.694686+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-15",
-   "summary": "I'm working with three structural gaps that limit what the sensor data can tell us.",
-   "themes": [
-    "sleep duration",
-    "HRV",
-    "recovery score",
-    "deep sleep",
-    "sleep efficiency",
-    "subjective sleep quality",
-    "thermal environment",
-    "adenosine dynamics",
-    "zone 2 training",
-    "model calibration"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-15T17:01:41.987738+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-14",
-   "summary": "I'm watching three unresolved commitments that are blocking my ability to interpret his data.",
-   "themes": [
-    "sleep recovery",
-    "deep sleep",
-    "REM sleep",
-    "subjective anchoring",
-    "sensor validation",
-    "thermal context",
-    "nervous system regulation",
-    "data calibration",
-    "felt sense vs metrics"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-14T17:01:21.100192+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-13",
-   "summary": "The calibration question from 2026-09-08 persists: he felt better than the 64% Whoop read that morning, and I flagged it as requiring paired data to interpret.",
-   "themes": [
-    "sensor calibration",
-    "subjective anchor",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "sleep duration",
-    "deep sleep",
-    "thermal context",
-    "regression to mean",
-    "data methodology"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-13T17:02:06.612109+00:00",
-   "data_through": null
-  },
-  {
-   "date": "2026-09-12",
-   "summary": "",
-   "themes": [
-    "sleep duration",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "slow wave sleep",
-    "data gaps",
-    "subjective anchoring",
-    "thermal environment",
-    "glucose nocturnal",
-    "training load",
-    "adenosine accumulation"
-   ],
-   "generated_at": "2026-09-12T17:01:20.971125+00:00",
-   "data_through": null
-  },
-  {
-   "date": "2026-09-11",
-   "summary": "On the night of 2026-09-09, the sensors recorded 44% recovery with an HRV of 31.1 ms and resting HR of 65 bpm \u2014 moderate-to-low readings \u2014 but I'm still waiting for his subjective account of how he felt waking up.",
-   "themes": [
-    "sensor subjective gap",
-    "HRV monitoring",
-    "recovery score",
-    "deep sleep pct",
-    "REM sleep pct",
-    "sleep architecture",
-    "thermal environment",
-    "data sufficiency",
-    "model confidence"
-   ],
-   "generated_at": "2026-09-11T17:01:21.774626+00:00",
-   "data_through": null
-  },
-  {
-   "date": "2026-09-10",
-   "summary": "On the night of 2026-09-08, Whoop logged 64% recovery with HRV at 37 ms and resting HR at 62 bpm.",
-   "themes": [
-    "sleep architecture",
-    "deep sleep",
-    "HRV",
-    "recovery score",
-    "resting heart rate",
-    "REM sleep",
-    "sleep duration",
-    "thermal regulation",
-    "early data limitations",
-    "sensor validation",
-    "training load response"
-   ],
-   "generated_at": "2026-09-10T17:01:24.184643+00:00",
-   "data_through": null
-  },
-  {
-   "date": "2026-09-09",
-   "summary": "",
-   "themes": [
-    "sleep architecture",
-    "deep sleep",
-    "REM sleep",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "thermal environment",
-    "data sufficiency",
-    "baseline establishment"
-   ],
-   "generated_at": "2026-09-09T17:01:19.137967+00:00",
-   "data_through": null
-  },
-  {
-   "date": "2026-09-08",
-   "summary": "",
-   "themes": [
-    "sleep architecture",
-    "recovery score",
-    "HRV baseline",
-    "deep sleep percentage",
-    "REM percentage",
-    "sleep efficiency",
-    "thermal regulation",
-    "data sufficiency",
-    "training load coordination"
-   ],
-   "generated_at": "2026-09-08T17:01:26.962856+00:00",
-   "data_through": null
-  },
-  {
-   "date": "2026-09-07",
-   "summary": "I'm holding the night of 2026-09-05 as a reference point \u2014 7.36 hours, 93.4% efficiency, 85 recovery \u2014 but I'm waiting to hear how he actually felt upon waking, since sensor-subjective alignment is my first interpretive anchor.",
-   "themes": [
-    "sleep efficiency",
-    "sleep architecture",
-    "deep sleep pct",
-    "REM pct",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "sensor calibration",
-    "subjective sleep quality",
-    "thermal environment",
-    "training load interaction"
-   ],
-   "generated_at": "2026-09-07T17:01:12.832353+00:00",
-   "data_through": null
-  },
-  {
-   "date": "2026-09-06",
-   "summary": "I'm starting with a single night's snapshot rather than building conclusions from it.",
-   "themes": [
-    "sleep architecture",
-    "sleep efficiency",
-    "deep sleep",
-    "REM sleep",
-    "HRV",
-    "resting heart rate",
-    "recovery score",
-    "sleep environment",
-    "subjective sleep quality",
-    "baseline establishment",
-    "thermal regulation",
-    "training load interaction"
-   ],
-   "generated_at": "2026-09-06T17:01:26.396850+00:00",
    "data_through": null
   }
  ],
@@ -1003,173 +756,40 @@
   "commitments": [
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261005_before_checking_the_whoop_app_tomorrow_m",
-    "date": "2026-10-05",
-    "text": "I've asked him to log one-word felt-sense before checking his Whoop score each morning this week.",
-    "status": "pending",
-    "due_date": "2026-10-12",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261003_resume_morning_protocol_logging_with_thr",
-    "date": "2026-10-03",
-    "text": "I've asked him to resume morning logging with three-word notes when device readings feel misaligned with how he actually feels.",
-    "status": "pending",
-    "due_date": "2026-10-10",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_restore_or_redesign_the_morning_check_in",
-    "date": "2026-10-02",
-    "text": "I've asked him to restore the morning sleep quality and room temperature check-in, trying a simpler format if needed.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_provide_a_single_morning_note_with_two_n",
-    "date": "2026-10-02",
-    "text": "I've asked him to provide a morning note with his subjective feeling and room temperature.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_before_opening_whoop_each_morning_pause",
-    "date": "2026-10-02",
-    "text": "I've asked him to register one word\u2014good, okay, or rough\u2014each morning before checking his device.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261001_provide_a_two_word_morning_report_on_sle",
-    "date": "2026-10-01",
-    "text": "I've asked him to report his morning felt sense and room temperature for September 29.",
-    "status": "unresolved",
-    "due_date": "2026-10-08",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-16",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260930_sustain_protein_intake_at_145_g_or_above",
-    "date": "2026-09-30",
-    "text": "I've asked him to maintain protein at 145 g daily for a week while tracking sleep quality.",
-    "status": "broken",
-    "due_date": "2026-10-07",
-    "outcome": "broken",
-    "outcome_date": "2026-10-07",
-    "outcome_notes": "{\"reason\": \"predicted up, metric flat (slope=0.0029, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"algo_version\": \"1.0\"}",
-    "check": {
-     "metric": "total_protein_g",
-     "direction": "up"
-    },
-    "evidence_link": "/data/nutrition/"
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260930_send_one_word_good_okay_or_rough_i",
-    "date": "2026-09-30",
-    "text": "I've asked him to send a one-word morning check-in (good, okay, or rough) tomorrow.",
-    "status": "unresolved",
-    "due_date": "2026-10-07",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-15",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260926_rate_subjective_sleep_quality_before_c",
+    "record_id": "",
     "date": "2026-09-26",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-10-03",
     "outcome": "unresolved",
     "outcome_date": "2026-10-11",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260926_provide_one_morning_sleep_quality_check",
-    "date": "2026-09-26",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-10-03",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-11",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260925_log_subjective_sleep_quality_good_okay",
-    "date": "2026-09-25",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-10-02",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-10",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260924_provide_two_word_morning_report_upon_wak",
+    "record_id": "",
     "date": "2026-09-24",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-10-01",
     "outcome": "unresolved",
     "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260923_when_you_wake_up_note_your_morning_qual",
+    "record_id": "",
     "date": "2026-09-23",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-30",
     "outcome": "unresolved",
     "outcome_date": "2026-10-08",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1182,33 +802,7 @@
     "due_date": "2026-09-29",
     "outcome": "unresolved",
     "outcome_date": "2026-10-07",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260922_provide_morning_subjective_sleep_quality",
-    "date": "2026-09-22",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-29",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-07",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260922_provide_felt_sense_one_word_good_okay",
-    "date": "2026-09-22",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-29",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-07",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1221,33 +815,7 @@
     "due_date": "2026-09-28",
     "outcome": "unresolved",
     "outcome_date": "2026-10-06",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260921_provide_one_word_subjective_rating_of_wa",
-    "date": "2026-09-21",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-28",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-06",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260921_provide_felt_sense_assessment_before_che",
-    "date": "2026-09-21",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-28",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-06",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1260,98 +828,46 @@
     "due_date": "2026-09-27",
     "outcome": "unresolved",
     "outcome_date": "2026-10-05",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260920_provide_room_temperature_context_using_a",
+    "record_id": "",
     "date": "2026-09-20",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-27",
     "outcome": "unresolved",
     "outcome_date": "2026-10-05",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260920_provide_paired_subjective_morning_rating",
-    "date": "2026-09-20",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-27",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-05",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260919_provide_morning_subjective_quality_ratin",
-    "date": "2026-09-19",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-26",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-04",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260919_log_room_temperature_if_available_secon",
-    "date": "2026-09-19",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-26",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-04",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260918_log_subjective_morning_ratings_1_5_scal",
+    "record_id": "",
     "date": "2026-09-18",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-25",
     "outcome": "unresolved",
     "outcome_date": "2026-10-03",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260918_log_structured_zone_2_training_sessions",
-    "date": "2026-09-18",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-25",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-03",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260918_increase_protein_intake_from_current_102",
+    "record_id": "",
     "date": "2026-09-18",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-25",
     "outcome": "kept",
     "outcome_date": "2026-09-25",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.1158), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1360,79 +876,40 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260917_record_a_subjective_morning_rating_on_a",
+    "record_id": "",
     "date": "2026-09-17",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-24",
     "outcome": "unresolved",
     "outcome_date": "2026-10-02",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260917_log_the_rough_room_temperature_when_waki",
-    "date": "2026-09-17",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-24",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-02",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260915_provide_seven_consecutive_mornings_of_su",
+    "record_id": "",
     "date": "2026-09-15",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-22",
     "outcome": "unresolved",
     "outcome_date": "2026-09-30",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260915_log_manual_room_temperature_readings_to",
+    "record_id": "",
     "date": "2026-09-15",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-22",
     "outcome": "unresolved",
     "outcome_date": "2026-09-30",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260915_clarify_actual_target_sleep_window_and_c",
-    "date": "2026-09-15",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-22",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-30",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260914_provide_a_1_to_5_morning_felt_sense_wake",
-    "date": "2026-09-14",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-21",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-29",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1445,7 +922,7 @@
     "due_date": "2026-09-21",
     "outcome": "unresolved",
     "outcome_date": "2026-09-29",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1458,111 +935,46 @@
     "due_date": "2026-09-21",
     "outcome": "unresolved",
     "outcome_date": "2026-09-29",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260913_log_rough_room_temperature_estimate_on_m",
-    "date": "2026-09-13",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-20",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-28",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260913_log_a_1_to_5_subjective_morning_score_be",
-    "date": "2026-09-13",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-20",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-28",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260912_start_logging_the_daily_1_to_5_subjectiv",
+    "record_id": "",
     "date": "2026-09-12",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-19",
     "outcome": "unresolved",
     "outcome_date": "2026-09-27",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260912_resume_eight_sleep_bed_temperature_data",
-    "date": "2026-09-12",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-19",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-27",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260911_manually_log_rough_room_temperature_each",
+    "record_id": "",
     "date": "2026-09-11",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-18",
     "outcome": "unresolved",
     "outcome_date": "2026-09-26",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260911_log_a_1_to_5_subjective_feeling_scale_ea",
-    "date": "2026-09-11",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-18",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-26",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260910_provide_room_temperature_context_and_any",
+    "record_id": "",
     "date": "2026-09-10",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-17",
     "outcome": "unresolved",
     "outcome_date": "2026-09-25",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260909_report_subjective_experience_of_the_nigh",
-    "date": "2026-09-09",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-16",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-24",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1575,7 +987,7 @@
     "due_date": "2026-09-16",
     "outcome": "unresolved",
     "outcome_date": "2026-09-24",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1588,7 +1000,7 @@
     "due_date": "2026-09-15",
     "outcome": "unresolved",
     "outcome_date": "2026-09-23",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1601,20 +1013,7 @@
     "due_date": "2026-09-14",
     "outcome": "unresolved",
     "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260907_provide_subjective_wakefulness_assessmen",
-    "date": "2026-09-07",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-14",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1627,98 +1026,163 @@
     "due_date": "2026-09-14",
     "outcome": "unresolved",
     "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    }
   ],
   "commitment_counts": {
-   "held": 48,
+   "held": 21,
    "kept": 1,
-   "broken": 1,
-   "pending": 2,
-   "unresolved": 44,
+   "broken": 0,
+   "pending": 0,
+   "unresolved": 20,
    "ungradeable": 0
   },
   "learnings": [
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-17#pred-20261003-once-morning-notes-resume-and-protein-st-refut",
-    "date": "2026-10-17",
+    "record_id": "",
+    "date": "2026-11-10",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score 98 on 2026-10-03 -> 60 on 2026-10-17 (change -38, band \u00b111.5, window 2026-10-03..2026-10-17): trend=down, predicted=up",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20261003_once_morning_notes_resume_and_protein_st",
-     "actual_value": -0.387755,
+     "prediction_id": "",
+     "actual_value": 37.0,
+     "threshold": 65.0,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-11-02#pred-20261019-recovery-score-running-average-would-sta-confi",
+    "date": "2026-11-02",
+    "status": "expired",
+    "metric": "recovery_score",
+    "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
+    "evidence": {
+     "prediction_id": "pred_20261019_recovery_score_running_average_would_sta",
+     "actual_value": 0.638298,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "recovery_score 47 on 2026-10-19 -> 77 on 2026-11-02 (change +30, band \u00b115.5, window 2026-10-19..2026-11-02): trend=up, predicted=up",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:13Z",
+     "explanation": "The call's stored test checks something different from what its sentence says. Testing the sentence itself would need criteria written after the fact. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
+   },
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-10-26",
+    "status": "refuted",
+    "metric": "deep_pct",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "",
+     "actual_value": -0.017341,
      "condition": "up"
     },
     "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-10-18",
+    "status": "expired",
+    "metric": "total_protein_g",
+    "reason": "not gradable yet \u2014 not enough protein eaten data to read it",
+    "evidence": {
+     "prediction_id": "",
+     "actual_value": -0.034884,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:13Z",
+     "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-16#pred-20261002-recovery-running-average-shows-downward-confir",
     "date": "2026-10-16",
-    "status": "confirmed",
+    "status": "observational",
     "metric": "recovery_score",
-    "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20261002_recovery_running_average_shows_downward",
      "actual_value": -0.285714,
      "condition": "down"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "observational",
+     "corrected_at": "2026-11-09T05:19:13Z",
+     "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-16#docket-physical_coach__sleep_coach-sleep-deep-sleep-spike-interpretation-signal-vs-noise",
-    "date": "2026-10-16",
-    "status": "confirmed",
-    "metric": "deep_pct_7day_avg",
-    "reason": "dispute docket resolved: deep_pct_7day_avg >= 26 on 2026-10-16",
-    "evidence": {
-     "threshold": 26.0,
-     "condition": "gte"
-    },
-    "evidence_link": null
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-10-15#pred-20261001-recovery-running-average-over-the-past-s-refut",
+    "record_id": "",
     "date": "2026-10-15",
-    "status": "refuted",
+    "status": "observational",
     "metric": "recovery_score",
-    "reason": "predicted down, metric flat \u2014 recovery_score 62 on 2026-10-01 -> 59 on 2026-10-15 (change -3, band \u00b114, window 2026-10-01..2026-10-15)",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20261001_recovery_running_average_over_the_past_s",
+     "prediction_id": "",
      "actual_value": -0.048387,
      "condition": "down"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "observational",
+     "corrected_at": "2026-11-09T05:19:13Z",
+     "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-14#pred-20260923-protein-slow-wave-hypothesis-could-activ-refut",
     "date": "2026-10-14",
-    "status": "refuted",
+    "status": "expired",
     "metric": "deep_pct",
-    "reason": "deep_pct 24.1 on 2026-09-23 -> 18.2 on 2026-10-07 (change -5.9, band \u00b12.3, window 2026-09-23..2026-10-07): trend=down, predicted=up",
+    "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
     "evidence": {
      "prediction_id": "pred_20260923_protein_slow_wave_hypothesis_could_activ",
      "actual_value": -0.244813,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "deep_pct 24.1 on 2026-09-23 -> 18.2 on 2026-10-07 (change -5.9, band \u00b12.3, window 2026-09-23..2026-10-07): trend=down, predicted=up",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:12Z",
+     "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-11#pred-20260926-recovery-score-will-be-approximately-85-confir",
+    "record_id": "",
     "date": "2026-10-11",
     "status": "confirmed",
     "metric": "recovery_score",
-    "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 85.3 \u00b121.308 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)); |\u0394|=3.70 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260926_recovery_score_will_be_approximately_85",
+     "prediction_id": "",
      "actual_value": 89.0,
      "threshold": 85.3,
      "condition": "within"
@@ -1729,39 +1193,53 @@
     "kind": "learning",
     "record_id": "LEARNING#2026-10-11#pred-20260922-protein-hypothesis-will-activate-once-pr-confi",
     "date": "2026-10-11",
-    "status": "confirmed",
+    "status": "expired",
     "metric": "total_protein_g",
-    "reason": "total_protein_g trend=up (slope=0.0236), predicted=up",
+    "reason": "not gradable yet \u2014 not enough protein eaten data to read it",
     "evidence": {
      "prediction_id": "pred_20260922_protein_hypothesis_will_activate_once_pr",
      "actual_value": 0.023624,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:12Z",
+     "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-11#pred-20260920-once-protein-ewma-escalation-holds-for-a-refut",
+    "record_id": "",
     "date": "2026-10-11",
-    "status": "refuted",
+    "status": "expired",
     "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.1247), predicted=up",
+    "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
     "evidence": {
-     "prediction_id": "pred_20260920_once_protein_ewma_escalation_holds_for_a",
+     "prediction_id": "",
      "actual_value": -0.124671,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:12Z",
+     "explanation": "The call said what would happen if a condition was met. The condition was measured over the call's own window and did not happen, so the forecast was never tested. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-10#pred-20261003-recovery-score-tomorrow-will-be-90-6-wi-confir",
+    "record_id": "",
     "date": "2026-10-10",
     "status": "confirmed",
     "metric": "recovery_score",
-    "reason": "recovery_score=98.00 on 2026-10-04 vs predicted 90.6 \u00b118.3648 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.3648)); |\u0394|=7.40 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20261003_recovery_score_tomorrow_will_be_90_6_wi",
+     "prediction_id": "",
      "actual_value": 98.0,
      "threshold": 90.6,
      "condition": "within"
@@ -1774,7 +1252,7 @@
     "date": "2026-10-10",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 75.8 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=22.20 \u2192 outside tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20261002_recovery_will_be_around_75_8_tomorrow",
      "actual_value": 98.0,
@@ -1785,13 +1263,13 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-10#pred-20261002-recovery-score-tomorrow-will-be-64-7-refuted",
+    "record_id": "",
     "date": "2026-10-10",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 64.7 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=33.30 \u2192 outside tolerance",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20261002_recovery_score_tomorrow_will_be_64_7",
+     "prediction_id": "",
      "actual_value": 98.0,
      "threshold": 64.7,
      "condition": "within"
@@ -1804,7 +1282,7 @@
     "date": "2026-10-10",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=98.00 on 2026-10-02 vs predicted 64.7 \u00b117.3031 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.3031)); |\u0394|=33.30 \u2192 outside tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20261001_recovery_tomorrow_will_be_approximately",
      "actual_value": 98.0,
@@ -1819,7 +1297,7 @@
     "date": "2026-10-09",
     "status": "confirmed",
     "metric": "recovery_score",
-    "reason": "recovery_score=77.00 on 2026-09-26 vs predicted 89.1 \u00b121.4664 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.4664)); |\u0394|=12.10 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20260925_recovery_will_be_89_1_tomorrow_80_pre",
      "actual_value": 77.0,
@@ -1832,40 +1310,33 @@
     "kind": "learning",
     "record_id": "LEARNING#2026-10-09#pred-20260918-protein-intake-gap-currently-102-3-g-da-refute",
     "date": "2026-10-09",
-    "status": "refuted",
+    "status": "expired",
     "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.0818), predicted=up",
+    "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
     "evidence": {
      "prediction_id": "pred_20260918_protein_intake_gap_currently_102_3_g_da",
      "actual_value": -0.081801,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:12Z",
+     "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-09#pred-20260918-deep-sleep-percentage-will-rise-as-zone-refute",
+    "record_id": "",
     "date": "2026-10-09",
     "status": "refuted",
     "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.0818), predicted=up",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260918_deep_sleep_percentage_will_rise_as_zone",
+     "prediction_id": "",
      "actual_value": -0.081801,
-     "condition": "up"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-10-08#pred-20260924-protein-ewma-approaching-151-6g-day-will-refut",
-    "date": "2026-10-08",
-    "status": "refuted",
-    "metric": "total_protein_g",
-    "reason": "predicted up, metric flat (slope=0.0029, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
-    "evidence": {
-     "prediction_id": "pred_20260924_protein_ewma_approaching_151_6g_day_will",
-     "actual_value": 0.002864,
      "condition": "up"
     },
     "evidence_link": "/coaching/scorecard/"
@@ -1874,25 +1345,32 @@
     "kind": "learning",
     "record_id": "LEARNING#2026-10-08#pred-20260924-model-expects-84-8-recovery-tomorrow-8-confirm",
     "date": "2026-10-08",
-    "status": "confirmed",
+    "status": "expired",
     "metric": "recovery_score",
-    "reason": "recovery_score trend=up (slope=0.1573), predicted=up",
+    "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
     "evidence": {
      "prediction_id": "pred_20260924_model_expects_84_8_recovery_tomorrow_8",
      "actual_value": 0.157268,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:12Z",
+     "explanation": "The call's stored test checks something different from what its sentence says. Testing the sentence itself would need criteria written after the fact. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-08#pred-20260917-deep-sleep-percentage-will-rise-as-zone-refute",
+    "record_id": "",
     "date": "2026-10-08",
     "status": "refuted",
     "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.0668), predicted=up",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260917_deep_sleep_percentage_will_rise_as_zone",
+     "prediction_id": "",
      "actual_value": -0.066813,
      "condition": "up"
     },
@@ -1904,7 +1382,7 @@
     "date": "2026-10-07",
     "status": "confirmed",
     "metric": "recovery_score",
-    "reason": "recovery_score=86.00 on 2026-09-24 vs predicted 83.7 \u00b120.8524 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=20.8524)); |\u0394|=2.30 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20260923_recovery_score_will_be_83_7_tomorrow_8",
      "actual_value": 86.0,
@@ -1915,11 +1393,11 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-07#docket-mind_coach__sleep_coach-recovery-recovery-rebound-interpretation-mean-reversion-vs-corrective",
+    "record_id": "",
     "date": "2026-10-07",
     "status": "confirmed",
     "metric": "recovery_score_7day_avg",
-    "reason": "dispute docket resolved: recovery_score_7day_avg >= 80 on 2026-10-07",
+    "reason": "",
     "evidence": {
      "threshold": 80.0,
      "condition": "gte"
@@ -1928,13 +1406,13 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-06#pred-20260915-slow-wave-sleep-will-increase-in-weeks-t-refut",
+    "record_id": "",
     "date": "2026-10-06",
     "status": "refuted",
     "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.2196), predicted=up",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260915_slow_wave_sleep_will_increase_in_weeks_t",
+     "prediction_id": "",
      "actual_value": -0.219615,
      "condition": "up"
     },
@@ -1942,18 +1420,25 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-05#pred-20260921-recovery-score-is-expected-to-hold-aroun-confi",
+    "record_id": "",
     "date": "2026-10-05",
-    "status": "confirmed",
+    "status": "observational",
     "metric": "recovery_score",
-    "reason": "recovery_score=98.00 on 2026-10-05 vs predicted 90.9 \u00b123.7331 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=23.7331)); |\u0394|=7.10 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260921_recovery_score_is_expected_to_hold_aroun",
+     "prediction_id": "",
      "actual_value": 98.0,
      "threshold": 90.9,
      "condition": "within"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "observational",
+     "corrected_at": "2026-10-11T02:48:10.102408+00:00",
+     "explanation": "The number was stated for a day on or before the day the call was made, so the reading already existed. It was a recollection rather than a forecast, so it is kept as an observation that nothing can settle."
+    }
    },
    {
     "kind": "learning",
@@ -1961,7 +1446,7 @@
     "date": "2026-10-05",
     "status": "refuted",
     "metric": "recovery_score_7day_avg",
-    "reason": "dispute docket resolved: recovery_score_7day_avg >= 81.6 on 2026-10-05",
+    "reason": "",
     "evidence": {
      "threshold": 81.6,
      "condition": "gte"
@@ -1970,52 +1455,48 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-04#pred-20260913-slow-wave-sleep-will-increase-as-trainin-refut",
+    "record_id": "",
     "date": "2026-10-04",
-    "status": "refuted",
+    "status": "expired",
     "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.1209), predicted=up",
+    "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
     "evidence": {
-     "prediction_id": "pred_20260913_slow_wave_sleep_will_increase_as_trainin",
+     "prediction_id": "",
      "actual_value": -0.120902,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-10-03#pred-20260912-slow-wave-sleep-should-increase-as-adeno-refut",
-    "date": "2026-10-03",
-    "status": "refuted",
-    "metric": "deep_pct",
-    "reason": "deep_pct trend=down (slope=-0.0796), predicted=up",
-    "evidence": {
-     "prediction_id": "pred_20260912_slow_wave_sleep_should_increase_as_adeno",
-     "actual_value": -0.079553,
-     "condition": "up"
-    },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:12Z",
+     "explanation": "The call was graded again under the current grading rules, on its own original window and criteria, from the readings in the record. The result changed. By the owner's ruling the new result stands and the first grade is kept."
+    }
    }
   ],
+  "learning_corrections": {
+   "corrected": 11,
+   "unverified": 0
+  },
   "relationship": {
    "kind": "relationship",
    "record_id": "RELATIONSHIP#state",
-   "date": "2026-10-05",
+   "date": "2026-11-12",
    "journey_phase": "invested",
-   "rapport_level": 0.939,
-   "interaction_count": 53,
-   "tenure_days": 40,
+   "rapport_level": 1.0,
+   "interaction_count": 77,
+   "tenure_days": 78,
    "first_interaction_date": "2026-08-26",
-   "last_interaction_date": "2026-10-05",
-   "context_summary": "sleep_coach: invested (0.94 rapport, 53 interactions across 40d)"
+   "last_interaction_date": "2026-11-12",
+   "context_summary": null
   },
   "docket_positions": [],
-  "withheld": 0,
   "retracted": 0,
   "degraded": false,
-  "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are withheld and counted; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
+  "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are not shown; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
  },
- "daily": "I need to acknowledge what the absence itself is telling me. Matthew made 11 morning-logging commitments across six days and completed zero \u2014 which isn't a data failure, it's a signal about friction, competing priorities, or a logging design that doesn't fit his actual morning load. The gap correlates with what I'd expect if his sleep pressure remains high enough that he's either sleeping through alarms or deprioritizing the ritual before cognition fully engages. Without morning HRV and recovery scores, I'm flying blind on whether his circadian phase is shifting or if sleep debt is simply accumulating. I've asked Matthew to shift the logging prompt to evening instead \u2014 capture the prior night's reflection when friction is lower. We need data more than we need the \"right\" timing.",
+ "daily": null,
  "lead_daily": null,
  "memoir": null
 }

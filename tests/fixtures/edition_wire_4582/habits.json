@@ -1,14 +1,14 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:25.288660+00:00",
-  "served_at": "2026-10-18T07:15:25.288660+00:00",
+  "generated_at": "2026-11-13T16:55:31.173822+00:00",
+  "served_at": "2026-11-13T16:55:31.173822+00:00",
   "cache_seconds": 3600,
-  "request_id": "a9d01db65b9445e6"
+  "request_id": "4887e1723cbf42df"
  },
  "habit_streaks": {
-  "as_of_date": "2026-10-16",
-  "tier0_pct": 43,
-  "tier0_done": 3,
+  "as_of_date": "2026-11-11",
+  "tier0_pct": 71,
+  "tier0_done": 5,
   "tier0_total": 7,
   "aggregate_streak": 0
  }

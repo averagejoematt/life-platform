@@ -1,92 +1,84 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:25.180126+00:00",
-  "served_at": "2026-10-18T07:15:25.180126+00:00",
+  "generated_at": "2026-11-13T16:55:31.003660+00:00",
+  "served_at": "2026-11-13T16:55:31.003660+00:00",
   "cache_seconds": 900,
-  "request_id": "17cc4fcb56ca41ab"
+  "request_id": "c688c2fa787e4016"
  },
- "date": "2026-10-18",
+ "date": "2026-11-13",
  "state": "served",
  "reason": null,
  "source": "hevy-routine-draft",
  "kind": "program",
- "session_role": "upper_volume",
- "position_label": "week 4 \u00b7 session 2 of 4 \u00b7 upper-volume",
- "routine_ref": "acb501c44897",
+ "session_role": "lower_heavy",
+ "position_label": "week 7 \u00b7 session 5 of 5 \u00b7 lower-heavy",
+ "routine_ref": "7a3afe2358db",
  "exercises": [
   {
-   "name": "Bench Press (Barbell)",
-   "sets": 3,
-   "reps": "8\u201312",
-   "load_lbs": 185,
+   "name": "Squat (Barbell)",
+   "sets": 6,
+   "reps": 8,
+   "load_lbs": 265,
    "loads_lbs": [
+    135,
     185,
-    185,
-    185
+    225,
+    265,
+    240,
+    240
    ]
   },
   {
-   "name": "Dumbbell Row",
-   "sets": 3,
-   "reps": "8\u201312",
-   "load_lbs": 85,
+   "name": "Deadlift (Barbell)",
+   "sets": 4,
+   "reps": 5,
+   "load_lbs": 230,
    "loads_lbs": [
-    85,
-    85,
-    85
+    160,
+    230,
+    205,
+    205
    ]
   },
   {
-   "name": "Shoulder Press (Dumbbell)",
-   "sets": 3,
-   "reps": "8\u201312",
-   "load_lbs": 70,
-   "loads_lbs": [
-    70,
-    70,
-    70
-   ]
-  },
-  {
-   "name": "Lat Pulldown (Cable)",
-   "sets": 2,
-   "reps": "8\u201312",
-   "load_lbs": 155,
-   "loads_lbs": [
-    155,
-    155
-   ]
-  },
-  {
-   "name": "Cable Fly Crossovers",
+   "name": "Bulgarian Split Squat (Dumbbell)",
    "sets": 2,
    "reps": "8\u201315",
-   "load_lbs": 33,
+   "load_lbs": 22,
    "loads_lbs": [
-    33,
-    33
+    22,
+    22
    ]
   },
   {
-   "name": "Triceps Pushdown",
+   "name": "Seated Leg Curl (Machine)",
    "sets": 2,
    "reps": "8\u201315",
-   "load_lbs": 95,
+   "load_lbs": 110,
    "loads_lbs": [
-    95,
-    95
+    110,
+    110
    ]
   },
   {
-   "name": "Bicep Curl (Dumbbell)",
-   "sets": 2,
+   "name": "Seated Calf Raise",
+   "sets": 4,
    "reps": "8\u201315",
-   "load_lbs": 25,
+   "load_lbs": 120,
    "loads_lbs": [
-    25,
-    25
+    120,
+    120,
+    120,
+    120
    ]
+  },
+  {
+   "name": "Cycling",
+   "sets": 1,
+   "reps": null,
+   "load_lbs": null,
+   "loads_lbs": null
   }
  ],
- "as_of": "2026-10-18T07:15:24.909290+00:00"
+ "as_of": "2026-11-13T16:55:30.436608+00:00"
 }

@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:11.538199+00:00",
-  "served_at": "2026-10-18T07:15:11.538199+00:00",
+  "generated_at": "2026-11-13T16:55:05.661339+00:00",
+  "served_at": "2026-11-13T16:55:05.661339+00:00",
   "cache_seconds": 300,
-  "request_id": "d9264df500d444d2"
+  "request_id": "19e799c1f9554d03"
  },
  "persona_id": "physical_coach",
  "name": "Max Reyes",
@@ -94,16 +94,16 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20261015_weight_will_be_around_304_5_pounds_tomor",
-  "claim": "Weight will be around 304.5 pounds tomorrow morning",
-  "created_date": "2026-10-15",
+  "prediction_id": "",
+  "claim": "",
+  "created_date": "2026-11-05",
   "pre_registered_at": null,
-  "outcome_date": "2026-10-17",
+  "outcome_date": "2026-11-07",
   "metric": "weight_lbs",
   "eval_type": "point",
   "condition": "within",
-  "threshold": 304.5,
-  "actual_value": 304.03,
+  "threshold": 295,
+  "actual_value": 293.62,
   "status": "confirmed"
  },
  "instrument": {
@@ -113,29 +113,20 @@
  "absent": false,
  "reason": null,
  "stance": {
-  "source": "ladder",
-  "headline_read": "At this weight, total mass coming down is what most reduces health risk. Body composition nuance comes later.",
-  "focused_on_now": [
-   "weight trending down at all",
-   "blood pressure and resting heart rate",
-   "reducing metabolic load"
-  ],
-  "set_aside_for_now": [
-   "body-fat percentage precision",
-   "muscle-vs-fat partitioning",
-   "DEXA detail"
-  ],
+  "source": "stance",
+  "headline_read": "",
+  "focused_on_now": [],
+  "set_aside_for_now": [],
   "stage": {
-   "label": "Move the scale and protect the engine.",
-   "rationale": "At this weight, total mass coming down is what most reduces health risk. Body composition nuance comes later."
+   "label": "",
+   "rationale": ""
   },
   "how_my_read_changed": "",
-  "confidence_note": "",
-  "as_of": null,
-  "grounding_flag": false,
+  "as_of": "2026-11-08",
+  "grounding_flag": true,
   "graduation_gate": "A steady downward weight trend over a month unlocks the 'recomposition' rung.",
   "band_metric": "weight_lbs",
-  "current_value": 302.22,
+  "current_value": 290.65,
   "rung": {
    "stage_id": "foundation",
    "entry": {
@@ -178,7 +169,17 @@
    }
   ]
  },
- "stance_history": [],
+ "stance_history": [
+  {
+   "as_of": "2026-11-08",
+   "headline_read": "",
+   "stage": {
+    "label": "",
+    "rationale": ""
+   },
+   "how_my_read_changed": ""
+  }
+ ],
  "voice": {
   "decision_style": {
    "default_evidence_threshold": "high \u2014 body composition and longevity metrics change slowly, so it requires 4+ weeks of consistent data before calling a trend. Will not react to weekly fluctuations.",
@@ -251,28 +252,28 @@
  },
  "report_card": {
   "track_record": {
-   "confirmed": 13,
-   "refuted": 14,
-   "decided": 27,
-   "hit_rate_pct": 48.1,
+   "confirmed": 12,
+   "refuted": 7,
+   "decided": 19,
+   "hit_rate_pct": 63.2,
    "record": {
-    "confirmed": 13,
-    "refuted": 14,
-    "n": 27,
-    "through": "2026-10-17"
+    "confirmed": 12,
+    "refuted": 7,
+    "n": 19,
+    "through": "2026-11-13"
    },
-   "headline": "13 of 27 checked calls right (48%) through October 17",
+   "headline": "12 of 19 checked calls right (63%) through November 13",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
     "rule_version": 1,
     "records": {
      "number": {
-      "graded": 10,
-      "coach_right": 6,
-      "scored": 10,
-      "coach_right_on_scored": 6,
-      "rule_right": 6,
+      "graded": 12,
+      "coach_right": 8,
+      "scored": 12,
+      "coach_right_on_scored": 8,
+      "rule_right": 8,
       "coach_only": 0,
       "rule_only": 0,
       "unscorable": 0,
@@ -284,12 +285,12 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 13,
-      "coach_right": 5,
-      "scored": 13,
-      "coach_right_on_scored": 5,
+      "graded": 4,
+      "coach_right": 2,
+      "scored": 4,
+      "coach_right_on_scored": 2,
       "rule_right": 2,
-      "coach_only": 5,
+      "coach_only": 2,
       "rule_only": 2,
       "unscorable": 0,
       "unscorable_reasons": {},
@@ -300,13 +301,13 @@
       "rule_right_pct": null
      },
      "yes_no": {
-      "graded": 2,
+      "graded": 1,
       "coach_right": 1,
-      "scored": 2,
+      "scored": 1,
       "coach_right_on_scored": 1,
-      "rule_right": 1,
+      "rule_right": 0,
       "coach_only": 1,
-      "rule_only": 1,
+      "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
@@ -335,53 +336,67 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 27,
-     "brier_skill": 0.0324,
-     "sentence": "Across 27 checked calls, so far they beat a simple guess."
+     "n": 19,
+     "brier_skill": -0.0229,
+     "sentence": "Too few checked calls yet (19) to compare them with a simple guess."
     },
-    "rule_sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
-    "sentence": "Number calls: on the 10 a guess could also be checked against, the coaches were right 6 times and a guess that nothing changes 6 times \u2014 level, on too few calls to tell. Direction calls: on the 13 a guess could also be checked against, the coaches were right 5 times and a guess that nothing changes 2 times \u2014 the coaches were right more often, on too few calls to tell. Yes/no bets: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes once \u2014 level, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 12 a guess could also be checked against, the coaches were right 8 times and a guess that nothing changes 8 times \u2014 level, on too few calls to tell. Direction calls: on the 4 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
+    "sentence": "Number calls: on the 12 a guess could also be checked against, the coaches were right 8 times and a guess that nothing changes 8 times \u2014 level, on too few calls to tell. Direction calls: on the 4 a guess could also be checked against, the coaches were right 2 times and a guess that nothing changes 2 times \u2014 level, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell. Sealed day-one predictions: on the 2 a guess could also be checked against, the coaches were right once and a guess that nothing changes 0 times \u2014 the coaches were right more often, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
    "preliminary": false,
-   "n_note": "n=27 decided",
+   "n_note": "n=19 decided",
    "recent": [
     {
-     "date": "2026-10-17",
+     "date": "2026-11-07",
      "status": "confirmed",
      "metric": "weight_lbs",
-     "reason": "weight_lbs=304.03 on 2026-10-16 vs predicted 304.5 \u00b13.9712 (\u00b11 SD of the trailing 30-day personal series (n=29 readings, SD=3.9712)); |\u0394|=0.47 \u2192 within tolerance"
+     "reason": ""
     },
     {
-     "date": "2026-10-16",
+     "date": "2026-11-06",
      "status": "confirmed",
      "metric": "recovery_score",
-     "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down"
+     "reason": ""
     },
     {
-     "date": "2026-10-16",
+     "date": "2026-10-23",
      "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=up"
+     "metric": "total_protein_g",
+     "reason": ""
     },
     {
-     "date": "2026-10-14",
-     "status": "refuted",
+     "date": "2026-10-23",
+     "status": "observational",
      "metric": "steps",
-     "reason": "predicted up, metric flat \u2014 steps 2520 on 2026-09-23 -> 890 on 2026-10-07 (change -1630, band \u00b14432.82, window 2026-09-23..2026-10-07)"
+     "reason": "",
+     "grade_correction": {
+      "original_status": "refuted",
+      "original_reason": "",
+      "corrected_status": "observational",
+      "corrected_at": "2026-11-09T05:19:11Z",
+      "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     },
     {
-     "date": "2026-10-11",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 75.8 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=22.20 \u2192 outside tolerance"
-    },
-    {
-     "date": "2026-10-11",
+     "date": "2026-10-23",
      "status": "confirmed",
-     "metric": "recovery_score",
-     "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 85.3 \u00b121.308 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)); |\u0394|=3.70 \u2192 within tolerance"
+     "metric": "weight_lbs",
+     "reason": ""
+    },
+    {
+     "date": "2026-10-21",
+     "status": "observational",
+     "metric": "weight_lbs",
+     "reason": "",
+     "grade_correction": {
+      "original_status": "confirmed",
+      "original_reason": "",
+      "corrected_status": "observational",
+      "corrected_at": "2026-11-09T05:19:11Z",
+      "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -485,393 +500,177 @@
  },
  "recent_outputs": [
   {
+   "date": "2026-11-12",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-11-12T18:04:29.447536+00:00",
+   "data_through": "2026-11-11"
+  },
+  {
+   "date": "2026-11-09",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-11-09T18:04:12.272613+00:00",
+   "data_through": "2026-11-08"
+  },
+  {
+   "date": "2026-11-05",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-11-05T18:04:46.730820+00:00",
+   "data_through": "2026-11-04"
+  },
+  {
+   "date": "2026-11-02",
+   "summary": "",
+   "themes": [],
+   "generated_at": "2026-11-02T18:04:31.408499+00:00",
+   "data_through": "2026-11-01"
+  },
+  {
    "date": "2026-10-15",
-   "summary": "I've asked him to restart food logging tonight and explain the 36% step drop in one sentence.",
-   "themes": [
-    "step tracking",
-    "protein intake",
-    "body composition",
-    "weight loss",
-    "training stimulus",
-    "recovery",
-    "food logging",
-    "thyroid symptoms"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-10-15T17:04:46.751971+00:00",
    "data_through": "2026-10-14"
   },
   {
    "date": "2026-10-08",
-   "summary": "I've asked him to log food consistently and reach 170 grams of protein daily for seven straight days.",
-   "themes": [
-    "step tracking",
-    "protein intake",
-    "lean mass preservation",
-    "strength training",
-    "recovery",
-    "zone 2 training",
-    "weight loss",
-    "food logging"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-10-08T17:05:27.653776+00:00",
    "data_through": "2026-10-07"
   },
   {
    "date": "2026-10-03",
-   "summary": "I've asked him to reopen food logging and log tonight's dinner to restart protein visibility.",
-   "themes": [
-    "step tracking",
-    "food logging",
-    "protein intake",
-    "lean mass preservation",
-    "weight loss rate",
-    "training load",
-    "cardio progression"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-10-03T17:04:48.407107+00:00",
    "data_through": "2026-10-02"
   },
   {
    "date": "2026-10-02",
-   "summary": "I've asked him to resume food logging today and clarify why his step count dropped 36% from baseline.",
-   "themes": [
-    "protein intake",
-    "weight loss",
-    "lean mass preservation",
-    "step tracking",
-    "recovery trend",
-    "food logging",
-    "thyroid monitoring",
-    "resting heart rate",
-    "HRV",
-    "caloric deficit"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-10-02T17:05:24.370728+00:00",
    "data_through": "2026-10-01"
   },
   {
    "date": "2026-09-26",
-   "summary": "His recovery EWMA climbed to 81.6% over seven days with a 99% reading on the night of 2026-09-24, but I'm treating this as a favorable data point rather than a confirmed trend \u2014 autocorrelation analysis shows insufficient consecutive same-direction points.",
-   "themes": [
-    "recovery score",
-    "HRV monitoring",
-    "resting heart rate",
-    "step tracking",
-    "protein intake",
-    "weight loss",
-    "lean mass preservation",
-    "caloric intake",
-    "thyroid adaptation",
-    "zone 2 training",
-    "body composition"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-26T17:04:22.734728+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-25",
-   "summary": "On the night of 2026-09-23, his Whoop registered 86% recovery, HRV of 48.2 ms, and resting HR of 54 bpm \u2014 solid numbers with directional trend pointing the right way.",
-   "themes": [
-    "step tracking",
-    "movement contraction",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "protein intake",
-    "caloric deficit",
-    "lean mass preservation",
-    "thyroid function",
-    "zone 2 training",
-    "data reliability"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-25T17:05:56.896879+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-24",
-   "summary": "His step count contracted by roughly one-third over the past seven days, and I cannot distinguish from the data alone whether this is deliberate rest, logistical disruption, or baseline shift \u2014 so I've asked him directly.",
-   "themes": [
-    "step count contraction",
-    "weight loss trajectory",
-    "lean mass preservation",
-    "protein intake",
-    "recovery score",
-    "HRV trend",
-    "resting heart rate",
-    "zone 2 training",
-    "body composition",
-    "caloric deficit"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-24T17:05:22.433047+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-23",
-   "summary": "I'm grading two pre-registered predictions. Weight loss is confirmed\u2014his EWMA moved from 321.7 to 316.9 lbs over the past seven days, current scale 315.0 lbs as of 2026-09-22.",
-   "themes": [
-    "weight loss",
-    "caloric deficit",
-    "protein intake",
-    "lean mass preservation",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "step tracking",
-    "zone 2 training",
-    "thyroid health",
-    "cortisol glucose dynamics"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-23T17:04:44.454449+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-22",
    "summary": "",
-   "themes": [
-    "step volume contraction",
-    "weight loss trajectory",
-    "protein intake deficit",
-    "lean mass preservation",
-    "recovery score analysis",
-    "HRV stability",
-    "thyroid adaptation risk",
-    "caloric deficit management",
-    "body composition risk"
-   ],
+   "themes": [],
    "generated_at": "2026-09-22T17:04:33.251512+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-21",
-   "summary": "His weight is 316.9 lbs as of September 20th, down 10.4 lbs over 14 days and tracking the directional prediction from September 6th.",
-   "themes": [
-    "weight loss",
-    "step tracking",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "protein intake",
-    "lean mass preservation",
-    "training volume",
-    "metabolic health",
-    "thyroid function"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-21T17:05:41.324218+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-20",
-   "summary": "I'm watching two structural problems in the data.",
-   "themes": [
-    "step tracking",
-    "protein intake",
-    "lean mass preservation",
-    "weight loss rate",
-    "recovery score",
-    "HRV autocorrelation",
-    "thyroid function",
-    "caloric deficit",
-    "nocturnal glucose",
-    "zone 2 training"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-20T17:04:40.505854+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-18",
-   "summary": "I'm watching a significant contraction in his step volume\u2014down 36% over seven days to a 2,168-step EWMA\u2014and I need clarity on whether this is deliberate rest or something else before we can proceed with Zone 2 training.",
-   "themes": [
-    "step volume",
-    "movement tracking",
-    "protein intake",
-    "lean mass preservation",
-    "rapid weight loss",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "zone 2 training",
-    "nocturnal glucose",
-    "cortisol regulation"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-18T17:05:03.353175+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-17",
-   "summary": "On the night of September 15th, his Whoop recorded a 92% recovery score and a 56 bpm resting heart rate \u2014 solid numbers, but I'm treating them as signals rather than evidence of a true trend.",
-   "themes": [
-    "recovery score",
-    "HRV monitoring",
-    "resting heart rate",
-    "step volume",
-    "protein intake",
-    "weight loss rate",
-    "lean mass preservation",
-    "sleep architecture",
-    "zone 2 training",
-    "glucose stability",
-    "cortisol regulation",
-    "waist to height ratio",
-    "cardiometabolic risk"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-17T17:05:37.836267+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-16",
-   "summary": "The Garmin pause has created a data blind spot.",
-   "themes": [
-    "movement volume",
-    "protein intake",
-    "lean mass preservation",
-    "body composition",
-    "caloric deficit",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "sensor reliability",
-    "nocturnal glucose",
-    "cortisol regulation"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-16T17:05:26.628883+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-15",
    "summary": "",
-   "themes": [
-    "protein intake",
-    "body composition",
-    "lean mass preservation",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "activity tracking",
-    "caloric deficit",
-    "waist to height ratio"
-   ],
+   "themes": [],
    "generated_at": "2026-09-15T17:05:15.069962+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-14",
-   "summary": "On September 12th, his Whoop recorded 73% recovery, 36.4 ms HRV, and 60 bpm resting heart rate \u2014 solid single-night readings, though I'm treating them as observations rather than trend signals given the limited history.",
-   "themes": [
-    "movement baseline",
-    "protein intake",
-    "body composition",
-    "lean mass preservation",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "weight tracking",
-    "waist to height ratio",
-    "caloric deficit",
-    "nocturnal glucose"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-14T17:04:51.015633+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-13",
-   "summary": null,
-   "themes": [
-    "food logging compliance",
-    "movement baseline",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "protein intake",
-    "body composition",
-    "lean mass preservation",
-    "waist to height ratio",
-    "nocturnal glucose",
-    "cortisol regulation"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-13T17:05:00.012583+00:00",
-   "data_through": null,
-   "superseded": {
-    "note": "superseded \u2014 generated before the logging-record fix",
-    "claimed_logging_stopped_after": "2026-09-10",
-    "served_last_log": "2026-10-17",
-    "ref": "#4185 / #4227"
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-12",
-   "summary": "I'm establishing his waist-to-height ratio of 0.754 as the north star metric \u2014 it predicts cardiometabolic risk over 20 years, and the target of 0.6 requires roughly a 90-pound reduction.",
-   "themes": [
-    "body composition",
-    "waist to height ratio",
-    "visceral adiposity",
-    "protein intake",
-    "lean mass preservation",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "sleep architecture",
-    "nocturnal glucose",
-    "cardiometabolic risk",
-    "caloric deficit"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-12T17:04:31.590993+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-10",
-   "summary": "I'm anchoring this cycle to his waist-to-height ratio of 0.8043, the single metric that most reliably predicts cardiometabolic risk over the next two decades.",
-   "themes": [
-    "body composition",
-    "waist to height ratio",
-    "protein intake",
-    "muscle preservation",
-    "sleep glucose interaction",
-    "recovery score",
-    "HRV",
-    "thyroid function",
-    "caloric deficit",
-    "cardiometabolic risk",
-    "nocturnal glucose",
-    "cortisol regulation"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-10T17:04:02.440496+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-08",
-   "summary": "His waist-to-height ratio stands at 0.754, well above the 0.6 threshold where cardiometabolic risk changes structurally.",
-   "themes": [
-    "waist to height ratio",
-    "cardiometabolic risk",
-    "recovery score",
-    "HRV",
-    "resting heart rate",
-    "sleep architecture",
-    "deep sleep",
-    "REM sleep",
-    "movement tracking",
-    "protein intake",
-    "body composition",
-    "sleep glucose interaction",
-    "baseline validation",
-    "measurement pipeline"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-08T17:04:33.618036+00:00",
    "data_through": null
   },
   {
    "date": "2026-09-06",
-   "summary": "I'm anchoring this cycle to his waist-to-height ratio of 0.754, which sits well above the 0.6 threshold associated with elevated cardiometabolic risk.",
-   "themes": [
-    "waist to height ratio",
-    "central adiposity",
-    "cardiometabolic risk",
-    "body composition",
-    "movement volume",
-    "recovery architecture",
-    "resistance training",
-    "caloric deficit"
-   ],
+   "summary": "",
+   "themes": [],
    "generated_at": "2026-09-06T17:04:03.196891+00:00",
    "data_through": null
   }
@@ -886,11 +685,11 @@
   "commitments": [
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261015_restart_food_logging_tonight",
-    "date": "2026-10-15",
-    "text": "I've asked him to restart food logging tonight to verify protein intake direction.",
+    "record_id": "",
+    "date": "2026-11-12",
+    "text": "",
     "status": "pending",
-    "due_date": "2026-10-22",
+    "due_date": "2026-11-19",
     "outcome": null,
     "outcome_date": null,
     "outcome_notes": null,
@@ -902,40 +701,101 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261015_provide_one_sentence_explanation_of_the",
+    "record_id": "",
+    "date": "2026-11-09",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-11-16",
+    "outcome": null,
+    "outcome_date": null,
+    "outcome_notes": null,
+    "check": {
+     "metric": "total_protein_g",
+     "direction": "up"
+    },
+    "evidence_link": "/data/nutrition/"
+   },
+   {
+    "kind": "commitment",
+    "record_id": "",
+    "date": "2026-11-05",
+    "text": "",
+    "status": "pending",
+    "due_date": "2026-11-12",
+    "outcome": null,
+    "outcome_date": null,
+    "outcome_notes": null,
+    "check": null,
+    "evidence_link": null
+   },
+   {
+    "kind": "commitment",
+    "record_id": "COMMITMENT#commit_20261102_restore_protein_intake_to_170_g_daily_fl",
+    "date": "2026-11-02",
+    "text": "",
+    "status": "kept",
+    "due_date": "2026-11-09",
+    "outcome": "kept",
+    "outcome_date": "2026-11-09",
+    "outcome_notes": "",
+    "check": {
+     "metric": "total_protein_g",
+     "direction": "up"
+    },
+    "evidence_link": "/data/nutrition/"
+   },
+   {
+    "kind": "commitment",
+    "record_id": "COMMITMENT#commit_20261015_restart_food_logging_tonight",
     "date": "2026-10-15",
-    "text": "I've asked him to explain the 36% step drop in one sentence this week.",
-    "status": "pending",
+    "text": "",
+    "status": "broken",
     "due_date": "2026-10-22",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "broken",
+    "outcome_date": "2026-10-22",
+    "outcome_notes": "",
+    "check": {
+     "metric": "total_protein_g",
+     "direction": "up"
+    },
+    "evidence_link": "/data/nutrition/"
+   },
+   {
+    "kind": "commitment",
+    "record_id": "",
+    "date": "2026-10-15",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-10-22",
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-30",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261008_explain_the_reason_for_the_step_drop",
+    "record_id": "",
     "date": "2026-10-08",
-    "text": "I need him to explain the reason for the recent step drop.",
-    "status": "pending",
+    "text": "",
+    "status": "unresolved",
     "due_date": "2026-10-15",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-23",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261008_achieve_and_maintain_protein_intake_at_o",
+    "record_id": "",
     "date": "2026-10-08",
-    "text": "I've asked him to log food consistently and reach 170 grams of protein daily for seven straight days.",
+    "text": "",
     "status": "kept",
     "due_date": "2026-10-15",
     "outcome": "kept",
     "outcome_date": "2026-10-15",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0533), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -944,14 +804,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261003_reopen_food_logging_and_log_tonight_s_di",
+    "record_id": "",
     "date": "2026-10-03",
-    "text": "I've asked him to reopen food logging and log tonight's dinner to restart protein visibility.",
-    "status": "pending",
+    "text": "",
+    "status": "unresolved",
     "due_date": "2026-10-10",
-    "outcome": null,
-    "outcome_date": null,
-    "outcome_notes": null,
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-18",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -959,12 +819,12 @@
     "kind": "commitment",
     "record_id": "COMMITMENT#commit_20261002_stabilize_protein_running_average_upward",
     "date": "2026-10-02",
-    "text": "I've asked him to stabilize his protein intake upward toward the 190 g target.",
+    "text": "",
     "status": "broken",
     "due_date": "2026-10-09",
     "outcome": "broken",
     "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"predicted up, metric flat (slope=0.0040, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -973,14 +833,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_resume_food_logging_today_to_enable_prot",
+    "record_id": "",
     "date": "2026-10-02",
-    "text": "I've asked him to resume daily food logging starting today to track protein intake.",
+    "text": "",
     "status": "broken",
     "due_date": "2026-10-09",
     "outcome": "broken",
     "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"predicted up, metric flat (slope=0.0040, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -991,12 +851,12 @@
     "kind": "commitment",
     "record_id": "COMMITMENT#commit_20261002_resume_food_logging_specifically_dinner",
     "date": "2026-10-02",
-    "text": "I've asked him to resume food logging, specifically dinner, this week.",
+    "text": "",
     "status": "broken",
     "due_date": "2026-10-09",
     "outcome": "broken",
     "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"predicted up, metric flat (slope=0.0040, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1005,95 +865,43 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_provide_one_sentence_explanation_for_why",
+    "record_id": "",
     "date": "2026-10-02",
-    "text": "I've asked him to clarify why his step count dropped 36% from baseline.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_provide_answers_about_dinner_consistency",
-    "date": "2026-10-02",
-    "text": "I've asked him to clarify dinner consistency this week and report any unusual fatigue or cold sensitivity.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_if_dinner_has_held_adjust_protein_sourc",
-    "date": "2026-10-02",
-    "text": "I've asked him to clarify dinner consistency this week and report any unusual fatigue or cold sensitivity.",
-    "status": "broken",
-    "due_date": "2026-10-09",
-    "outcome": "broken",
-    "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"predicted up, metric flat (slope=0.0040, within \\u00b10.02 noise band) \\u2014 no movement to confirm the call\", \"algo_version\": \"1.0\"}",
-    "check": {
-     "metric": "total_protein_g",
-     "direction": "up"
-    },
-    "evidence_link": "/data/nutrition/"
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_identify_the_reason_for_the_step_contrac",
-    "date": "2026-10-02",
-    "text": "I've asked him to identify the reason for his recent step contraction.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_daily_two_data_point_thyroid_symptom_che",
-    "date": "2026-10-02",
-    "text": "I've asked him to log daily thyroid symptoms \u2014 fatigue rating and cold sensitivity \u2014 through April.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20261002_activate_thyroid_symptom_log",
-    "date": "2026-10-02",
-    "text": "I've asked him to activate his thyroid symptom log.",
-    "status": "unresolved",
-    "due_date": "2026-10-09",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-17",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260926_track_subjective_signals_of_fatigue_and",
-    "date": "2026-09-26",
     "text": "",
     "status": "unresolved",
-    "due_date": "2026-10-03",
+    "due_date": "2026-10-09",
     "outcome": "unresolved",
-    "outcome_date": "2026-10-11",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "",
+    "check": null,
+    "evidence_link": null
+   },
+   {
+    "kind": "commitment",
+    "record_id": "",
+    "date": "2026-10-02",
+    "text": "",
+    "status": "broken",
+    "due_date": "2026-10-09",
+    "outcome": "broken",
+    "outcome_date": "2026-10-09",
+    "outcome_notes": "",
+    "check": {
+     "metric": "total_protein_g",
+     "direction": "up"
+    },
+    "evidence_link": "/data/nutrition/"
+   },
+   {
+    "kind": "commitment",
+    "record_id": "",
+    "date": "2026-10-02",
+    "text": "",
+    "status": "unresolved",
+    "due_date": "2026-10-09",
+    "outcome": "unresolved",
+    "outcome_date": "2026-10-17",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1106,7 +914,7 @@
     "due_date": "2026-10-03",
     "outcome": "broken",
     "outcome_date": "2026-10-03",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=down (slope=-0.0819), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1122,20 +930,20 @@
     "due_date": "2026-10-03",
     "outcome": "unresolved",
     "outcome_date": "2026-10-11",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260925_reach_and_hold_protein_ewma_at_170_grams",
+    "record_id": "",
     "date": "2026-09-25",
     "text": "",
     "status": "broken",
     "due_date": "2026-10-02",
     "outcome": "broken",
     "outcome_date": "2026-10-02",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=down (slope=-0.0785), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1144,27 +952,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260925_monitor_and_report_subjective_signals_of",
+    "record_id": "",
     "date": "2026-09-25",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-10-02",
     "outcome": "unresolved",
     "outcome_date": "2026-10-10",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260925_clarify_the_cause_of_the_step_contractio",
-    "date": "2026-09-25",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-10-02",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-10",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1177,20 +972,20 @@
     "due_date": "2026-10-01",
     "outcome": "unresolved",
     "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260924_maintain_zone_2_training_hold_until_both",
+    "record_id": "",
     "date": "2026-09-24",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-10-01",
     "outcome": "unresolved",
     "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1212,14 +1007,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260923_sustain_protein_ewma_at_or_above_170g_fo",
+    "record_id": "",
     "date": "2026-09-23",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-30",
     "outcome": "kept",
     "outcome_date": "2026-09-30",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0914), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1235,33 +1030,20 @@
     "due_date": "2026-09-30",
     "outcome": "unresolved",
     "outcome_date": "2026-10-08",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260923_continue_daily_fatigue_and_cold_sensitiv",
-    "date": "2026-09-23",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-30",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-08",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260922_increase_protein_intake_to_meet_190g_dai",
+    "record_id": "",
     "date": "2026-09-22",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-29",
     "outcome": "kept",
     "outcome_date": "2026-09-29",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0914), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1270,27 +1052,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260922_continue_subjective_tracking_of_fatigue",
+    "record_id": "",
     "date": "2026-09-22",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-29",
     "outcome": "unresolved",
     "outcome_date": "2026-10-07",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260922_clarify_the_etiology_of_the_36_step_vol",
-    "date": "2026-09-22",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-29",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-07",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1303,7 +1072,7 @@
     "due_date": "2026-09-28",
     "outcome": "unresolved",
     "outcome_date": "2026-10-06",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1316,7 +1085,7 @@
     "due_date": "2026-09-28",
     "outcome": "kept",
     "outcome_date": "2026-09-28",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0914), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1325,14 +1094,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260921_focus_on_dinner_meal_structure_to_close",
+    "record_id": "",
     "date": "2026-09-21",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-28",
     "outcome": "kept",
     "outcome_date": "2026-09-28",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0914), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1341,27 +1110,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260921_begin_daily_subjective_logging_of_fatigu",
-    "date": "2026-09-21",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-28",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-06",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260920_develop_and_execute_a_backup_plan_for_di",
+    "record_id": "",
     "date": "2026-09-20",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-27",
     "outcome": "kept",
     "outcome_date": "2026-09-27",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0914), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1370,14 +1126,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260920_clarify_the_etiology_of_the_step_decline",
+    "record_id": "",
     "date": "2026-09-20",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-27",
     "outcome": "kept",
     "outcome_date": "2026-09-27",
-    "outcome_notes": "{\"reason\": \"steps trend=down (slope=-0.0654), predicted=down\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "steps",
      "direction": "down"
@@ -1386,27 +1142,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260920_begin_a_daily_thyroid_symptom_log_at_the",
-    "date": "2026-09-20",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-27",
-    "outcome": "unresolved",
-    "outcome_date": "2026-10-05",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260918_work_with_nutrition_coach_on_dinner_arch",
+    "record_id": "",
     "date": "2026-09-18",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-25",
     "outcome": "kept",
     "outcome_date": "2026-09-25",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.1158), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1415,14 +1158,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260918_provide_explanation_for_the_36_step_con",
+    "record_id": "",
     "date": "2026-09-18",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-25",
     "outcome": "unresolved",
     "outcome_date": "2026-10-03",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1435,7 +1178,7 @@
     "due_date": "2026-09-24",
     "outcome": "broken",
     "outcome_date": "2026-09-24",
-    "outcome_notes": "{\"reason\": \"steps trend=down (slope=-0.2022), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "steps",
      "direction": "up"
@@ -1444,14 +1187,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260917_get_protein_intake_up_from_101_1_g_day_t",
+    "record_id": "",
     "date": "2026-09-17",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-24",
     "outcome": "kept",
     "outcome_date": "2026-09-24",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2159), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1467,7 +1210,7 @@
     "due_date": "2026-09-23",
     "outcome": "broken",
     "outcome_date": "2026-09-23",
-    "outcome_notes": "{\"reason\": \"steps trend=down (slope=-0.1090), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "steps",
      "direction": "up"
@@ -1483,7 +1226,7 @@
     "due_date": "2026-09-23",
     "outcome": "kept",
     "outcome_date": "2026-09-23",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2159), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1499,7 +1242,7 @@
     "due_date": "2026-09-22",
     "outcome": "kept",
     "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2665), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1508,14 +1251,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260914_increase_protein_intake_from_current_94",
+    "record_id": "",
     "date": "2026-09-14",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-21",
     "outcome": "kept",
     "outcome_date": "2026-09-21",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2665), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1524,27 +1267,27 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260913_restore_garmin_sync_to_the_source_regist",
+    "record_id": "",
     "date": "2026-09-13",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-27",
     "outcome": "unresolved",
     "outcome_date": "2026-10-12",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260913_increase_protein_intake_from_current_79",
+    "record_id": "",
     "date": "2026-09-13",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-20",
     "outcome": "kept",
     "outcome_date": "2026-09-20",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2665), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1553,14 +1296,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260912_move_consistently_and_protect_sleep_as_p",
+    "record_id": "",
     "date": "2026-09-12",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-19",
     "outcome": "unresolved",
     "outcome_date": "2026-09-27",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1573,7 +1316,7 @@
     "due_date": "2026-09-19",
     "outcome": "kept",
     "outcome_date": "2026-09-19",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2377), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1582,27 +1325,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260910_log_subjectively_for_fatigue_and_cold_in",
-    "date": "2026-09-10",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-17",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-25",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260908_obtain_at_least_one_macrofactor_sync_to",
+    "record_id": "",
     "date": "2026-09-08",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-15",
     "outcome": "kept",
     "outcome_date": "2026-09-15",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=1.0989), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1611,27 +1341,27 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260908_continue_whoop_and_eight_sleep_data_coll",
+    "record_id": "",
     "date": "2026-09-08",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-15",
     "outcome": "unresolved",
     "outcome_date": "2026-09-23",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260908_bring_garmin_back_online_to_resolve_deli",
+    "record_id": "",
     "date": "2026-09-08",
     "text": "",
     "status": "broken",
     "due_date": "2026-09-15",
     "outcome": "broken",
     "outcome_date": "2026-09-15",
-    "outcome_notes": "{\"reason\": \"steps trend=down (slope=-0.0319), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "steps",
      "direction": "up"
@@ -1640,34 +1370,169 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260906_provide_a_clear_picture_of_typical_daily",
+    "record_id": "",
     "date": "2026-09-06",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-13",
     "outcome": "unresolved",
     "outcome_date": "2026-09-21",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    }
   ],
   "commitment_counts": {
-   "held": 53,
-   "kept": 15,
-   "broken": 9,
-   "pending": 5,
-   "unresolved": 24,
+   "held": 47,
+   "kept": 16,
+   "broken": 10,
+   "pending": 4,
+   "unresolved": 17,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-11-07",
+    "status": "confirmed",
+    "metric": "weight_lbs",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "",
+     "actual_value": 293.62,
+     "threshold": 295.0,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-11-06#pred-20261105-recovery-will-land-around-68-8-tomorrow-confir",
+    "date": "2026-11-06",
+    "status": "confirmed",
+    "metric": "recovery_score",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "pred_20261105_recovery_will_land_around_68_8_tomorrow",
+     "actual_value": 73.0,
+     "threshold": 68.8,
+     "condition": "within"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-10-23",
+    "status": "refuted",
+    "metric": "total_protein_g",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "",
+     "actual_value": 0.266667,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-23#pred-20261002-daily-steps-would-consistently-meet-targ-refut",
+    "date": "2026-10-23",
+    "status": "observational",
+    "metric": "steps",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "pred_20261002_daily_steps_would_consistently_meet_targ",
+     "actual_value": -0.224822,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "observational",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
+   },
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-10-23",
+    "status": "confirmed",
+    "metric": "weight_lbs",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "",
+     "actual_value": -0.022386,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-10-21",
+    "status": "observational",
+    "metric": "weight_lbs",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "",
+     "actual_value": -0.022572,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "observational",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-19#pred-20260921-weight-loss-trajectory-from-september-6t-confi",
+    "date": "2026-10-19",
+    "status": "confirmed",
+    "metric": "weight_lbs",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "pred_20260921_weight_loss_trajectory_from_september_6t",
+     "actual_value": -0.015039,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-10-18#pred-20261003-protein-intake-at-146-5-g-per-day-is-ins-refut",
+    "date": "2026-10-18",
+    "status": "expired",
+    "metric": "total_protein_g",
+    "reason": "not gradable yet \u2014 not enough protein eaten data to read it",
+    "evidence": {
+     "prediction_id": "pred_20261003_protein_intake_at_146_5_g_per_day_is_ins",
+     "actual_value": -0.130719,
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:12Z",
+     "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-17#pred-20261015-weight-will-be-around-304-5-pounds-tomor-confi",
     "date": "2026-10-17",
     "status": "confirmed",
     "metric": "weight_lbs",
-    "reason": "weight_lbs=304.03 on 2026-10-16 vs predicted 304.5 \u00b13.9712 (\u00b11 SD of the trailing 30-day personal series (n=29 readings, SD=3.9712)); |\u0394|=0.47 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20261015_weight_will_be_around_304_5_pounds_tomor",
      "actual_value": 304.03,
@@ -1678,17 +1543,24 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-16#pred-20261002-running-average-of-recovery-across-27-da-confi",
+    "record_id": "",
     "date": "2026-10-16",
-    "status": "confirmed",
+    "status": "observational",
     "metric": "recovery_score",
-    "reason": "recovery_score 98 on 2026-10-02 -> 70 on 2026-10-16 (change -28, band \u00b111.5, window 2026-10-02..2026-10-16): trend=down, predicted=down",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20261002_running_average_of_recovery_across_27_da",
+     "prediction_id": "",
      "actual_value": -0.285714,
      "condition": "down"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "observational",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
@@ -1706,30 +1578,24 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-16#docket-physical_coach__sleep_coach-sleep-deep-sleep-spike-interpretation-signal-vs-noise",
-    "date": "2026-10-16",
-    "status": "refuted",
-    "metric": "deep_pct_7day_avg",
-    "reason": "dispute docket resolved: deep_pct_7day_avg >= 26 on 2026-10-16",
-    "evidence": {
-     "threshold": 26.0,
-     "condition": "gte"
-    },
-    "evidence_link": null
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-10-14#pred-20260923-daily-steps-will-consistently-meet-the-t-refut",
+    "record_id": "",
     "date": "2026-10-14",
-    "status": "refuted",
+    "status": "observational",
     "metric": "steps",
-    "reason": "predicted up, metric flat \u2014 steps 2520 on 2026-09-23 -> 890 on 2026-10-07 (change -1630, band \u00b14432.82, window 2026-09-23..2026-10-07)",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260923_daily_steps_will_consistently_meet_the_t",
+     "prediction_id": "",
      "actual_value": -0.646825,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "observational",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call reported something that was already on the record when it was made, so it was not a forecast. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
@@ -1737,7 +1603,7 @@
     "date": "2026-10-11",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 75.8 \u00b117.8725 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.8725)); |\u0394|=22.20 \u2192 outside tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20261002_tomorrow_s_recovery_will_reach_approxima",
      "actual_value": 98.0,
@@ -1752,7 +1618,7 @@
     "date": "2026-10-11",
     "status": "confirmed",
     "metric": "recovery_score",
-    "reason": "recovery_score=89.00 on 2026-09-27 vs predicted 85.3 \u00b121.308 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=21.308)); |\u0394|=3.70 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20260926_recovery_score_will_be_85_3_tomorrow_wi",
      "actual_value": 89.0,
@@ -1765,25 +1631,32 @@
     "kind": "learning",
     "record_id": "LEARNING#2026-10-11#pred-20260924-the-model-expects-84-8-recovery-tomorro-refute",
     "date": "2026-10-11",
-    "status": "refuted",
+    "status": "expired",
     "metric": "recovery_score",
-    "reason": "recovery_score trend=down (slope=-0.0334), predicted=up",
+    "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
     "evidence": {
      "prediction_id": "pred_20260924_the_model_expects_84_8_recovery_tomorro",
      "actual_value": -0.033382,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call's stored test checks something different from what its sentence says. Testing the sentence itself would need criteria written after the fact. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-11#pred-20260912-tomorrow-s-recovery-score-will-rebound-t-refut",
+    "record_id": "",
     "date": "2026-10-11",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=73.00 on 2026-09-13 vs predicted 54.7 \u00b118.2532 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.2532)); |\u0394|=18.30 \u2192 outside tolerance",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260912_tomorrow_s_recovery_score_will_rebound_t",
+     "prediction_id": "",
      "actual_value": 73.0,
      "threshold": 54.7,
      "condition": "within"
@@ -1796,7 +1669,7 @@
     "date": "2026-10-10",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=98.00 on 2026-10-03 vs predicted 64.7 \u00b117.5951 (\u00b11 SD of the trailing 30-day personal series (n=30 readings, SD=17.5951)); |\u0394|=33.30 \u2192 outside tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20261002_recovery_will_reach_64_7_tomorrow_with",
      "actual_value": 98.0,
@@ -1807,13 +1680,13 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-10#pred-20260922-weight-will-be-approximately-315-lbs-tom-confi",
+    "record_id": "",
     "date": "2026-10-10",
     "status": "confirmed",
     "metric": "weight_lbs",
-    "reason": "weight_lbs=315.43 on 2026-09-23 vs predicted 315 \u00b15.1527 (\u00b11 SD of the trailing 30-day personal series (n=13 readings, SD=5.1527)); |\u0394|=0.43 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260922_weight_will_be_approximately_315_lbs_tom",
+     "prediction_id": "",
      "actual_value": 315.43,
      "threshold": 315.0,
      "condition": "within"
@@ -1822,13 +1695,13 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-10#pred-20260910-weight-tomorrow-morning-will-be-326-8-lb-expir",
+    "record_id": "",
     "date": "2026-10-10",
     "status": "expired",
     "metric": "weight_lbs",
-    "reason": "Expired: 30 days elapsed (window=1, max=2). No reading for 'weight_lbs' on 2026-09-11 (or within 2 days before it)",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260910_weight_tomorrow_morning_will_be_326_8_lb",
+     "prediction_id": "",
      "threshold": 326.8,
      "condition": "within"
     },
@@ -1836,27 +1709,34 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-09#pred-20260925-recovery-trend-is-pointing-the-right-dir-confi",
+    "record_id": "",
     "date": "2026-10-09",
-    "status": "confirmed",
+    "status": "expired",
     "metric": "recovery_score",
-    "reason": "recovery_score trend=up (slope=0.0626), predicted=up",
+    "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
     "evidence": {
-     "prediction_id": "pred_20260925_recovery_trend_is_pointing_the_right_dir",
+     "prediction_id": "",
      "actual_value": 0.062638,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call hedged: it said something may happen, and no outcome could show that wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-06#pred-20260922-recovery-score-will-be-approximately-86-confir",
+    "record_id": "",
     "date": "2026-10-06",
     "status": "confirmed",
     "metric": "recovery_score",
-    "reason": "recovery_score=80.00 on 2026-09-23 vs predicted 86.1 \u00b122.3731 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=22.3731)); |\u0394|=6.10 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260922_recovery_score_will_be_approximately_86",
+     "prediction_id": "",
      "actual_value": 80.0,
      "threshold": 86.1,
      "condition": "within"
@@ -1869,7 +1749,7 @@
     "date": "2026-10-05",
     "status": "confirmed",
     "metric": "recovery_score_7day_avg",
-    "reason": "dispute docket resolved: recovery_score_7day_avg >= 81.6 on 2026-10-05",
+    "reason": "",
     "evidence": {
      "threshold": 81.6,
      "condition": "gte"
@@ -1878,169 +1758,98 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-04#pred-20260920-if-recovery-stays-elevated-and-the-noctu-refut",
+    "record_id": "",
     "date": "2026-10-04",
-    "status": "refuted",
+    "status": "expired",
     "metric": "recovery_score",
-    "reason": "recovery_score trend=down (slope=-0.0434), predicted=up",
+    "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
     "evidence": {
-     "prediction_id": "pred_20260920_if_recovery_stays_elevated_and_the_noctu",
+     "prediction_id": "",
      "actual_value": -0.043371,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-04#pred-20260906-starting-from-326-2-lbs-on-day-1-body-w-refute",
     "date": "2026-10-04",
-    "status": "refuted",
+    "status": "confirmed",
     "metric": "weight_lbs",
-    "reason": "predicted down, metric flat (slope=-0.0076, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+    "reason": "Weight went down from 327.3 lb on September 6 to 316.9 lb on September 20, as called",
     "evidence": {
      "prediction_id": "pred_20260906_starting_from_326_2_lbs_on_day_1_body_w",
      "actual_value": -0.007577,
      "condition": "down"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "confirmed",
+     "corrected_at": "2026-10-12T16:52:52.522766+00:00",
+     "explanation": "The first grade compared only the most recent readings with the few before them. It was graded again on the change from the first to the last reading of the call's own window, measured against the normal day-to-day swing."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-02#pred-20260918-the-rebound-in-recovery-ewma-is-more-con-refut",
+    "record_id": "",
     "date": "2026-10-02",
-    "status": "refuted",
+    "status": "expired",
     "metric": "recovery_score",
-    "reason": "recovery_score trend=down (slope=-0.0882), predicted=up",
+    "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
     "evidence": {
-     "prediction_id": "pred_20260918_the_rebound_in_recovery_ewma_is_more_con",
+     "prediction_id": "",
      "actual_value": -0.088152,
      "condition": "up"
     },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-10-01#pred-20260917-if-recovery-stays-capped-through-septemb-refut",
-    "date": "2026-10-01",
-    "status": "refuted",
-    "metric": "recovery_score",
-    "reason": "recovery_score trend=down (slope=-0.1015), predicted=up",
-    "evidence": {
-     "prediction_id": "pred_20260917_if_recovery_stays_capped_through_septemb",
-     "actual_value": -0.101474,
-     "condition": "up"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-30#pred-20260916-recovery-will-remain-capped-despite-prot-confi",
-    "date": "2026-09-30",
-    "status": "confirmed",
-    "metric": "recovery_score",
-    "reason": "recovery_score trend=down (slope=-0.0719), predicted=down",
-    "evidence": {
-     "prediction_id": "pred_20260916_recovery_will_remain_capped_despite_prot",
-     "actual_value": -0.071913,
-     "condition": "down"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-29#pred-20260915-nocturnal-cgm-dips-are-triggering-cortis-confi",
-    "date": "2026-09-29",
-    "status": "confirmed",
-    "metric": "recovery_score",
-    "reason": "recovery_score trend=down (slope=-0.0428), predicted=down",
-    "evidence": {
-     "prediction_id": "pred_20260915_nocturnal_cgm_dips_are_triggering_cortis",
-     "actual_value": -0.042827,
-     "condition": "down"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-28#pred-20260914-nocturnal-cgm-dips-suppress-recovery-cei-refut",
-    "date": "2026-09-28",
-    "status": "refuted",
-    "metric": "recovery_score",
-    "reason": "predicted down, metric flat (slope=-0.0037, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
-    "evidence": {
-     "prediction_id": "pred_20260914_nocturnal_cgm_dips_suppress_recovery_cei",
-     "actual_value": -0.003718,
-     "condition": "down"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-27#pred-20260913-recovery-score-expected-to-be-approximat-confi",
-    "date": "2026-09-27",
-    "status": "confirmed",
-    "metric": "recovery_score",
-    "reason": "recovery_score=63.00 on 2026-09-14 vs predicted 57.9 \u00b118.6473 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.6473)); |\u0394|=5.10 \u2192 within tolerance",
-    "evidence": {
-     "prediction_id": "pred_20260913_recovery_score_expected_to_be_approximat",
-     "actual_value": 63.0,
-     "threshold": 57.9,
-     "condition": "within"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-27#pred-20260913-nocturnal-cgm-dips-may-be-driving-a-cort-refut",
-    "date": "2026-09-27",
-    "status": "refuted",
-    "metric": "recovery_score",
-    "reason": "recovery_score trend=up (slope=0.0481), predicted=down",
-    "evidence": {
-     "prediction_id": "pred_20260913_nocturnal_cgm_dips_may_be_driving_a_cort",
-     "actual_value": 0.048057,
-     "condition": "down"
-    },
-    "evidence_link": "/coaching/scorecard/"
-   },
-   {
-    "kind": "learning",
-    "record_id": "LEARNING#2026-09-27#pred-20260906-daily-step-counts-will-consistently-meet-refut",
-    "date": "2026-09-27",
-    "status": "refuted",
-    "metric": "steps",
-    "reason": "steps trend=down (slope=-0.0978), predicted=up",
-    "evidence": {
-     "prediction_id": "pred_20260906_daily_step_counts_will_consistently_meet",
-     "actual_value": -0.097801,
-     "condition": "up"
-    },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:19:11Z",
+     "explanation": "The call's sentence is an opinion or an explanation: its outcome names nothing that can be measured, so no reading can show it right or wrong. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    }
   ],
+  "learning_corrections": {
+   "corrected": 14,
+   "unverified": 0
+  },
   "relationship": {
    "kind": "relationship",
    "record_id": "RELATIONSHIP#state",
-   "date": "2026-10-15",
+   "date": "2026-11-12",
    "journey_phase": "invested",
-   "rapport_level": 0.995,
-   "interaction_count": 94,
-   "tenure_days": 50,
+   "rapport_level": 1.0,
+   "interaction_count": 123,
+   "tenure_days": 78,
    "first_interaction_date": "2026-08-26",
-   "last_interaction_date": "2026-10-15",
-   "context_summary": "physical_coach: invested (1.00 rapport, 94 interactions across 50d)"
+   "last_interaction_date": "2026-11-12",
+   "context_summary": null
   },
   "docket_positions": [],
-  "withheld": 0,
   "retracted": 0,
   "degraded": false,
-  "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are withheld and counted; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
+  "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are not shown; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
  },
  "daily": null,
  "lead_daily": null,
  "memoir": {
-  "text": "Nine graded calls. Five right, four wrong. A 55.6% hit rate against a career Brier score of 0.25 \u2014 the system still labels me \"not yet skillful,\" and I don't have a strong argument against that verdict at nine observations.\n\nThe miss I keep returning to is the September 11th recovery score. I predicted 59.5, with a standard deviation of 17.9 drawn from 31 trailing readings. The actual score came in at 24. That's a 35.5-point gap \u2014 outside tolerance, and not narrowly. My confidence interval was wide enough to suggest I understood the uncertainty in the series. I was wrong anyway. What that miss tells me is that I may be tracking the central tendency of the distribution reasonably well while systematically underweighting the tail. A score of 24 isn't noise \u2014 it's a signal that something sharper was happening that week, something my model wasn't positioned to see. Overconfidence in the mean is a depreciation curve I've been warned about before.\n\nI also called the steps trend up on September 27th. It went down. That same day I called recovery trending down \u2014 it went up. Two directional calls, two wrong directions, same date. That clustering suggests a coherent misread of that week's momentum, not random scatter.\n\nThe confirmed calls are real, and I won't discount them. The September 9th recovery score landed within 3 points of prediction. The trend calls on the 24th, 29th, and 30th were directionally accurate. But five confirmed out of nine isn't a portfolio I'd compound into \u2014 it's a starting position.\n\nAt nine graded observations, the career calibration is barely a sample. The Brier score of 0.25 is telling me the probability estimates have drag. What I can't yet distinguish is whether that drag is structural \u2014 bad modeling \u2014 or whether it reflects variance at low sample sizes. In either case, the honest read is the same: the track record is unresolved, and the next quarter will move the needle more than this one did.",
+  "text": "",
   "quarter": "2026-Q3",
-  "generated_at": "2026-10-01T15:01:36.555739+00:00"
+  "generated_at": "2026-10-01T15:01:36.555739+00:00",
+  "_publication": {
+   "state": "withheld",
+   "reason": "withheld: this text's sources are not recorded as publishable"
+  }
  }
 }

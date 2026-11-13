@@ -1,9 +1,9 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:12.452583+00:00",
-  "served_at": "2026-10-18T07:15:12.452583+00:00",
+  "generated_at": "2026-11-13T16:55:07.127292+00:00",
+  "served_at": "2026-11-13T16:55:07.127292+00:00",
   "cache_seconds": 300,
-  "request_id": "61b12ef805394778"
+  "request_id": "44d9d13e677b4932"
  },
  "persona_id": "glucose_coach",
  "name": "Amara Patel",
@@ -20,7 +20,6 @@
  "character": {
   "title": "Metabolic Health Researcher",
   "data_sources": [
-   "cgm",
    "macrofactor",
    "apple_health"
   ],
@@ -91,16 +90,16 @@
   "disclosure": "Authored character design \u2014 fixed numbers written into the cast by the author, not generated and not measured."
  },
  "latest_checked": {
-  "prediction_id": "pred_20260925_nocturnal_glucose_dips_are_contributing",
-  "claim": "Nocturnal glucose dips are contributing to deep sleep decline through counter-regulatory cortisol fragmentation of slow-wave sleep.",
-  "created_date": "2026-09-25",
+  "prediction_id": "",
+  "claim": "",
+  "created_date": null,
   "pre_registered_at": null,
-  "outcome_date": "2026-10-16",
-  "metric": "deep_pct",
-  "eval_type": "directional",
-  "condition": "down",
+  "outcome_date": "2026-09-30",
+  "metric": null,
+  "eval_type": null,
+  "condition": null,
   "threshold": null,
-  "actual_value": -0.0482,
+  "actual_value": null,
   "status": "refuted"
  },
  "instrument": {
@@ -119,7 +118,7 @@
    "as_of": "2026-09-23",
    "headline_read": "",
    "stage": {
-    "label": "Data gate: awaiting synchronization",
+    "label": "",
     "rationale": ""
    },
    "how_my_read_changed": ""
@@ -198,16 +197,16 @@
  "report_card": {
   "track_record": {
    "confirmed": 1,
-   "refuted": 6,
-   "decided": 7,
-   "hit_rate_pct": 14.3,
+   "refuted": 3,
+   "decided": 4,
+   "hit_rate_pct": 25.0,
    "record": {
     "confirmed": 1,
-    "refuted": 6,
-    "n": 7,
-    "through": "2026-10-16"
+    "refuted": 3,
+    "n": 4,
+    "through": "2026-11-13"
    },
-   "headline": "1 of 7 checked calls right through October 16",
+   "headline": "1 of 4 checked calls right through November 13",
    "comparison": {
     "rule": "nothing_changes",
     "rule_words": "a guess that nothing changes",
@@ -230,17 +229,17 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 3,
+      "graded": 0,
       "coach_right": 0,
-      "scored": 3,
+      "scored": 0,
       "coach_right_on_scored": 0,
-      "rule_right": 2,
+      "rule_right": 0,
       "coach_only": 0,
-      "rule_only": 2,
+      "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
-      "verdict": "too_few",
+      "verdict": "none_scored",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -281,12 +280,12 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 7,
-     "brier_skill": -0.8794,
-     "sentence": "Too few checked calls yet (7) to compare them with a simple guess."
+     "n": 4,
+     "brier_skill": -0.1479,
+     "sentence": "Too few checked calls yet (4) to compare them with a simple guess."
     },
-    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
-    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
@@ -294,40 +293,75 @@
    "n_note": "preliminary \u2014 fewer than 12 decided predictions",
    "recent": [
     {
+     "date": "2026-11-03",
+     "status": "expired",
+     "metric": "recovery_score",
+     "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
+     "grade_correction": {
+      "original_status": "refuted",
+      "original_reason": "",
+      "corrected_status": "expired",
+      "corrected_at": "2026-11-09T05:18:48Z",
+      "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
+    },
+    {
      "date": "2026-10-16",
-     "status": "refuted",
+     "status": "expired",
      "metric": "deep_pct",
-     "reason": "predicted down, metric flat \u2014 deep_pct 16.6 on 2026-09-25 -> 15.8 on 2026-10-09 (change -0.8, band \u00b11.9, window 2026-09-25..2026-10-09)"
+     "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
+     "grade_correction": {
+      "original_status": "refuted",
+      "original_reason": "",
+      "corrected_status": "expired",
+      "corrected_at": "2026-11-09T05:18:48Z",
+      "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     },
     {
      "date": "2026-09-30",
-     "status": "refuted",
+     "status": "expired",
      "metric": "deep_pct",
-     "reason": "predicted down, metric flat (slope=0.0035, within \u00b10.02 noise band) \u2014 no movement to confirm the call"
+     "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
+     "grade_correction": {
+      "original_status": "refuted",
+      "original_reason": "",
+      "corrected_status": "expired",
+      "corrected_at": "2026-11-09T05:18:48Z",
+      "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     },
     {
      "date": "2026-09-28",
-     "status": "confirmed",
+     "status": "refuted",
      "metric": "recovery_score",
-     "reason": "recovery_score=64.00 on 2026-09-28 vs predicted 59 \u00b118.5929 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.5929)); |\u0394|=5.00 \u2192 within tolerance"
+     "reason": "Morning recovery score came in at 82 against a call of 59 \u2014 outside its usual day-to-day range",
+     "grade_correction": {
+      "original_status": "confirmed",
+      "original_reason": "",
+      "corrected_status": "refuted",
+      "corrected_at": "2026-10-11T02:48:10.102408+00:00",
+      "explanation": "The sentence named its own day, but the call was stored with a different target and graded on a day the sentence does not name. It was graded again on the reading for the day it named."
+     }
     },
     {
      "date": "2026-09-28",
-     "status": "refuted",
+     "status": "expired",
      "metric": "deep_pct",
-     "reason": "deep_pct trend=up (slope=0.1123), predicted=down"
+     "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
+     "grade_correction": {
+      "original_status": "refuted",
+      "original_reason": "",
+      "corrected_status": "expired",
+      "corrected_at": "2026-11-09T05:18:47Z",
+      "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+     }
     },
     {
      "date": "2026-09-25",
      "status": "confirmed",
      "metric": "recovery_score",
-     "reason": "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 \u00b118.6158 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.6158)); |\u0394|=6.10 \u2192 within tolerance"
-    },
-    {
-     "date": "2026-09-23",
-     "status": "refuted",
-     "metric": "recovery_score",
-     "reason": "recovery_score=44.00 on 2026-09-10 vs predicted 66.2 \u00b117.9239 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.9239)); |\u0394|=22.20 \u2192 outside tolerance"
+     "reason": ""
     }
    ],
    "caveat": "Self-assessment of this coach's own calls \u2014 not external validation."
@@ -435,399 +469,133 @@
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-26T17:05:32.874424+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-26",
-    "text": "Not quoted: this was said on September 26 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-25",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-25T17:07:40.311307+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-25",
-    "text": "Not quoted: this was said on September 25 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-24",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-24T17:06:23.309592+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-24",
-    "text": "Not quoted: this was said on September 24 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-23",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-23T17:05:37.973695+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-23",
-    "text": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-22",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-22T17:05:22.737848+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-22",
-    "text": "Not quoted: this was said on September 22 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-21",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-21T17:06:45.704172+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-21",
-    "text": "Not quoted: this was said on September 21 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-20",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-20T17:06:06.446921+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-20",
-    "text": "Not quoted: this was said on September 20 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-19",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-19T17:06:49.642831+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-19",
-    "text": "Not quoted: this was said on September 19 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-18",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-18T17:06:13.253628+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-18",
-    "text": "Not quoted: this was said on September 18 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-17",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-17T17:06:17.457553+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-17",
-    "text": "Not quoted: this was said on September 17 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-16",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-16T17:06:18.688797+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-16",
-    "text": "Not quoted: this was said on September 16 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-15",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-15T17:06:23.220763+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-15",
-    "text": "Not quoted: this was said on September 15 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-14",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-14T17:05:37.195051+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-14",
-    "text": "Not quoted: this was said on September 14 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-13",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-13T17:05:50.008161+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-13",
-    "text": "Not quoted: this was said on September 13 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-11",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-11T17:05:39.174128+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-11",
-    "text": "Not quoted: this was said on September 11 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-09",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-09T17:05:42.164271+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-09",
-    "text": "Not quoted: this was said on September 9 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-08",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-08T17:05:38.218053+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-08",
-    "text": "Not quoted: this was said on September 8 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-07",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-07T17:05:49.790767+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-07",
-    "text": "Not quoted: this was said on September 7 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   },
   {
    "date": "2026-09-06",
    "summary": "",
    "themes": [],
    "generated_at": "2026-09-06T17:04:59.756885+00:00",
-   "data_through": null,
-   "unsourced": {
-    "reason": "no sensor since 2026-08-27",
-    "instrument": {
-     "source": "apple_health",
-     "datatype": "cgm"
-    },
-    "last_seen": "2026-08-27",
-    "gap": {
-     "start": "2026-08-27",
-     "end": null
-    },
-    "said_on": "2026-09-06",
-    "text": "Not quoted: this was said on September 6 and rests on his glucose sensor, which had sent no reading since August 27."
-   }
+   "data_through": null
   }
  ],
  "conversations": {
@@ -840,27 +608,27 @@
   "commitments": [
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260926_restart_meal_logging_today_to_provide_cg",
+    "record_id": "",
     "date": "2026-09-26",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-10-03",
     "outcome": "unresolved",
     "outcome_date": "2026-10-11",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260925_restart_meal_logging_today_in_parallel_w",
+    "record_id": "",
     "date": "2026-09-25",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-10-02",
     "outcome": "unresolved",
     "outcome_date": "2026-10-10",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -873,7 +641,7 @@
     "due_date": "2026-10-02",
     "outcome": "broken",
     "outcome_date": "2026-10-02",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=down (slope=-0.0785), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -889,7 +657,7 @@
     "due_date": "2026-10-01",
     "outcome": "unresolved",
     "outcome_date": "2026-10-09",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -902,7 +670,7 @@
     "due_date": "2026-09-30",
     "outcome": "unresolved",
     "outcome_date": "2026-10-08",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -915,20 +683,20 @@
     "due_date": "2026-09-29",
     "outcome": "unresolved",
     "outcome_date": "2026-10-07",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260922_escalate_protein_intake_to_190g_daily_ta",
+    "record_id": "",
     "date": "2026-09-22",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-29",
     "outcome": "kept",
     "outcome_date": "2026-09-29",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0914), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -944,20 +712,20 @@
     "due_date": "2026-09-28",
     "outcome": "unresolved",
     "outcome_date": "2026-10-06",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260921_escalate_protein_intake_to_190g_daily_ta",
+    "record_id": "",
     "date": "2026-09-21",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-28",
     "outcome": "kept",
     "outcome_date": "2026-09-28",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.0914), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -966,14 +734,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260920_sustain_protein_intake_at_the_190g_targe",
+    "record_id": "",
     "date": "2026-09-20",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-25",
     "outcome": "kept",
     "outcome_date": "2026-09-25",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.1158), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -989,33 +757,33 @@
     "due_date": "2026-09-21",
     "outcome": "unresolved",
     "outcome_date": "2026-09-23",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260919_log_every_meal_starting_today_before_cg",
+    "record_id": "",
     "date": "2026-09-19",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-26",
     "outcome": "unresolved",
     "outcome_date": "2026-10-04",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260918_resume_meal_logging_with_timestamps_and",
+    "record_id": "",
     "date": "2026-09-18",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-25",
     "outcome": "unresolved",
     "outcome_date": "2026-10-03",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1028,7 +796,7 @@
     "due_date": "2026-09-25",
     "outcome": "kept",
     "outcome_date": "2026-09-25",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.1158), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1037,27 +805,27 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260917_restart_food_logging_at_a_sustainable_le",
+    "record_id": "",
     "date": "2026-09-17",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-24",
     "outcome": "unresolved",
     "outcome_date": "2026-10-02",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260917_increase_protein_intake_toward_the_190_g",
+    "record_id": "",
     "date": "2026-09-17",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-24",
     "outcome": "kept",
     "outcome_date": "2026-09-24",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2159), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1066,27 +834,27 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260916_restart_food_logging_today_not_tomorrow",
+    "record_id": "",
     "date": "2026-09-16",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-23",
     "outcome": "unresolved",
     "outcome_date": "2026-10-01",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260915_resume_food_logging_today_in_parallel_w",
+    "record_id": "",
     "date": "2026-09-15",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-22",
     "outcome": "unresolved",
     "outcome_date": "2026-09-30",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1099,7 +867,7 @@
     "due_date": "2026-09-22",
     "outcome": "kept",
     "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2665), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1115,20 +883,20 @@
     "due_date": "2026-09-21",
     "outcome": "unresolved",
     "outcome_date": "2026-09-29",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260914_increase_protein_intake_to_190g_daily_ta",
+    "record_id": "",
     "date": "2026-09-14",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-21",
     "outcome": "kept",
     "outcome_date": "2026-09-21",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2665), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1144,7 +912,7 @@
     "due_date": "2026-09-20",
     "outcome": "kept",
     "outcome_date": "2026-09-20",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2665), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1153,14 +921,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260913_increase_protein_intake_to_meet_190_g_da",
+    "record_id": "",
     "date": "2026-09-13",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-20",
     "outcome": "kept",
     "outcome_date": "2026-09-20",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2665), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1169,14 +937,14 @@
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260911_increase_protein_intake_to_190g_day_targ",
+    "record_id": "",
     "date": "2026-09-11",
     "text": "",
     "status": "kept",
     "due_date": "2026-09-18",
     "outcome": "kept",
     "outcome_date": "2026-09-18",
-    "outcome_notes": "{\"reason\": \"total_protein_g trend=up (slope=0.2091), predicted=up\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": {
      "metric": "total_protein_g",
      "direction": "up"
@@ -1192,72 +960,46 @@
     "due_date": "2026-09-18",
     "outcome": "unresolved",
     "outcome_date": "2026-09-26",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260909_implement_a_meal_logging_protocol_that_c",
+    "record_id": "",
     "date": "2026-09-09",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-16",
     "outcome": "unresolved",
     "outcome_date": "2026-09-24",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260908_implement_systematic_context_logging_alo",
-    "date": "2026-09-08",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-15",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-23",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260907_log_subjective_energy_state_to_distingui",
+    "record_id": "",
     "date": "2026-09-07",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-14",
     "outcome": "unresolved",
     "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
    {
     "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260907_log_sleep_duration_from_the_night_before",
+    "record_id": "",
     "date": "2026-09-07",
     "text": "",
     "status": "unresolved",
     "due_date": "2026-09-14",
     "outcome": "unresolved",
     "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260907_log_activity_timing_relative_to_meals_to",
-    "date": "2026-09-07",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-14",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1270,20 +1012,7 @@
     "due_date": "2026-09-14",
     "outcome": "unresolved",
     "outcome_date": "2026-09-22",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
-    "check": null,
-    "evidence_link": null
-   },
-   {
-    "kind": "commitment",
-    "record_id": "COMMITMENT#commit_20260906_log_contextual_metadata_alongside_all_gl",
-    "date": "2026-09-06",
-    "text": "",
-    "status": "unresolved",
-    "due_date": "2026-09-13",
-    "outcome": "unresolved",
-    "outcome_date": "2026-09-21",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    },
@@ -1296,27 +1025,74 @@
     "due_date": "2026-09-13",
     "outcome": "unresolved",
     "outcome_date": "2026-09-21",
-    "outcome_notes": "{\"reason\": \"No machine-checkable action; window elapsed without coach follow-up.\", \"algo_version\": \"1.0\"}",
+    "outcome_notes": "",
     "check": null,
     "evidence_link": null
    }
   ],
   "commitment_counts": {
-   "held": 33,
+   "held": 30,
    "kept": 10,
    "broken": 1,
    "pending": 0,
-   "unresolved": 22,
+   "unresolved": 19,
    "ungradeable": 0
   },
   "learnings": [
+   {
+    "kind": "learning",
+    "record_id": "LEARNING#2026-11-03#pred-20260915-nocturnal-glucose-dips-will-trigger-cort-refut",
+    "date": "2026-11-03",
+    "status": "expired",
+    "metric": "recovery_score",
+    "reason": "not gradable yet \u2014 not enough morning recovery score data to read it",
+    "evidence": {
+     "prediction_id": "pred_20260915_nocturnal_glucose_dips_will_trigger_cort",
+     "actual_value": 0.029851,
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:18:48Z",
+     "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
+   },
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-10-19",
+    "status": "expired",
+    "metric": "blood_glucose_std_dev",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "",
+     "condition": "up"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
+   {
+    "kind": "learning",
+    "record_id": "",
+    "date": "2026-10-18",
+    "status": "expired",
+    "metric": "blood_glucose_avg",
+    "reason": "",
+    "evidence": {
+     "prediction_id": "",
+     "condition": "down"
+    },
+    "evidence_link": "/coaching/scorecard/"
+   },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-10-17#pred-20260918-protein-escalation-to-190-g-day-will-red-expir",
     "date": "2026-10-17",
     "status": "expired",
     "metric": "blood_glucose_avg",
-    "reason": "Expired: 29 days elapsed (window=14, max=28). [window] Insufficient data to grade 'blood_glucose_avg' across its window: 0 reading(s) inside the window 2026-09-18..2026-10-02, fewer than 4",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20260918_protein_escalation_to_190_g_day_will_red",
      "condition": "down"
@@ -1327,51 +1103,58 @@
     "kind": "learning",
     "record_id": "LEARNING#2026-10-16#pred-20260925-nocturnal-glucose-dips-are-contributing-refute",
     "date": "2026-10-16",
-    "status": "refuted",
+    "status": "expired",
     "metric": "deep_pct",
-    "reason": "predicted down, metric flat \u2014 deep_pct 16.6 on 2026-09-25 -> 15.8 on 2026-10-09 (change -0.8, band \u00b11.9, window 2026-09-25..2026-10-09)",
+    "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
     "evidence": {
      "prediction_id": "pred_20260925_nocturnal_glucose_dips_are_contributing",
      "actual_value": -0.048193,
      "condition": "down"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:18:48Z",
+     "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-16#pred-20260917-when-readable-cgm-data-arrives-glucose-expired",
+    "record_id": "",
     "date": "2026-10-16",
     "status": "expired",
     "metric": "blood_glucose_std_dev",
-    "reason": "Expired: 29 days elapsed (window=14, max=28). [window] Insufficient data to grade 'blood_glucose_std_dev' across its window: 0 reading(s) inside the window 2026-09-17..2026-10-01, fewer than 4",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260917_when_readable_cgm_data_arrives_glucose",
+     "prediction_id": "",
      "condition": "up"
     },
     "evidence_link": "/coaching/scorecard/"
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-05#pred-20260906-with-a-strict-11-30am-7-30pm-eating-wind-expir",
+    "record_id": "",
     "date": "2026-10-05",
     "status": "expired",
     "metric": "blood_glucose_avg",
-    "reason": "Expired: 29 days elapsed (window=14, max=28). Insufficient data to determine trend for 'blood_glucose_avg'",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260906_with_a_strict_11_30am_7_30pm_eating_wind",
+     "prediction_id": "",
      "condition": "down"
     },
     "evidence_link": "/coaching/scorecard/"
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-10-05#pred-20260906-the-combination-of-the-8-hour-eating-win-expir",
+    "record_id": "",
     "date": "2026-10-05",
     "status": "expired",
     "metric": "blood_glucose_std_dev",
-    "reason": "Expired: 29 days elapsed (window=14, max=28). Insufficient data to determine trend for 'blood_glucose_std_dev'",
+    "reason": "",
     "evidence": {
-     "prediction_id": "pred_20260906_the_combination_of_the_8_hour_eating_win",
+     "prediction_id": "",
      "condition": "down"
     },
     "evidence_link": "/coaching/scorecard/"
@@ -1380,23 +1163,30 @@
     "kind": "learning",
     "record_id": "LEARNING#2026-09-30#pred-20260909-nocturnal-glucose-dips-will-trigger-cort-refut",
     "date": "2026-09-30",
-    "status": "refuted",
+    "status": "expired",
     "metric": "deep_pct",
-    "reason": "predicted down, metric flat (slope=0.0035, within \u00b10.02 noise band) \u2014 no movement to confirm the call",
+    "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
     "evidence": {
      "prediction_id": "pred_20260909_nocturnal_glucose_dips_will_trigger_cort",
      "actual_value": 0.003522,
      "condition": "down"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:18:48Z",
+     "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-09-30#docket-glucose_coach__nutrition_coach-recovery-carb-reduction-recommendation-will-it-degrade-recovery-or-im",
+    "record_id": "",
     "date": "2026-09-30",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "dispute docket resolved: recovery_score < 70 on 2026-09-30",
+    "reason": "",
     "evidence": {
      "threshold": 70.0,
      "condition": "lt"
@@ -1405,32 +1195,46 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-09-28#pred-20260914-recovery-will-soften-to-roughly-59-tomo-confir",
+    "record_id": "",
     "date": "2026-09-28",
-    "status": "confirmed",
+    "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=64.00 on 2026-09-28 vs predicted 59 \u00b118.5929 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.5929)); |\u0394|=5.00 \u2192 within tolerance",
+    "reason": "Morning recovery score came in at 82 against a call of 59 \u2014 outside its usual day-to-day range",
     "evidence": {
-     "prediction_id": "pred_20260914_recovery_will_soften_to_roughly_59_tomo",
+     "prediction_id": "",
      "actual_value": 64.0,
      "threshold": 59.0,
      "condition": "within"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "confirmed",
+     "original_reason": "",
+     "corrected_status": "refuted",
+     "corrected_at": "2026-10-11T02:48:10.102408+00:00",
+     "explanation": "The sentence named its own day, but the call was stored with a different target and graded on a day the sentence does not name. It was graded again on the reading for the day it named."
+    }
    },
    {
     "kind": "learning",
     "record_id": "LEARNING#2026-09-28#pred-20260907-nocturnal-glucose-dips-will-trigger-coun-refut",
     "date": "2026-09-28",
-    "status": "refuted",
+    "status": "expired",
     "metric": "deep_pct",
-    "reason": "deep_pct trend=up (slope=0.1123), predicted=down",
+    "reason": "not gradable yet \u2014 not enough deep-sleep share data to read it",
     "evidence": {
      "prediction_id": "pred_20260907_nocturnal_glucose_dips_will_trigger_coun",
      "actual_value": 0.112272,
      "condition": "down"
     },
-    "evidence_link": "/coaching/scorecard/"
+    "evidence_link": "/coaching/scorecard/",
+    "grade_correction": {
+     "original_status": "refuted",
+     "original_reason": "",
+     "corrected_status": "expired",
+     "corrected_at": "2026-11-09T05:18:47Z",
+     "explanation": "The call is about overnight glucose dips and the stress hormone cortisol, which were never measured, and it was graded on a sleep or recovery reading that cannot show them. By the owner's ruling it is kept on the record outside the accuracy count, with its original wording, its criteria and any grade it carried."
+    }
    },
    {
     "kind": "learning",
@@ -1438,7 +1242,7 @@
     "date": "2026-09-25",
     "status": "confirmed",
     "metric": "recovery_score",
-    "reason": "recovery_score=59.00 on 2026-09-12 vs predicted 52.9 \u00b118.6158 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=18.6158)); |\u0394|=6.10 \u2192 within tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20260911_recovery_score_will_be_52_9_tomorrow_ba",
      "actual_value": 59.0,
@@ -1453,7 +1257,7 @@
     "date": "2026-09-23",
     "status": "refuted",
     "metric": "recovery_score",
-    "reason": "recovery_score=44.00 on 2026-09-10 vs predicted 66.2 \u00b117.9239 (\u00b11 SD of the trailing 30-day personal series (n=31 readings, SD=17.9239)); |\u0394|=22.20 \u2192 outside tolerance",
+    "reason": "",
     "evidence": {
      "prediction_id": "pred_20260909_recovery_score_will_be_66_2_tomorrow_8",
      "actual_value": 44.0,
@@ -1463,6 +1267,10 @@
     "evidence_link": "/coaching/scorecard/"
    }
   ],
+  "learning_corrections": {
+   "corrected": 5,
+   "unverified": 0
+  },
   "relationship": {
    "kind": "relationship",
    "record_id": "RELATIONSHIP#state",
@@ -1473,19 +1281,22 @@
    "tenure_days": 32,
    "first_interaction_date": "2026-08-25",
    "last_interaction_date": "2026-09-26",
-   "context_summary": "glucose_coach: invested (1.00 rapport, 40 interactions across 32d)"
+   "context_summary": null
   },
   "docket_positions": [],
-  "withheld": 0,
   "retracted": 0,
   "degraded": false,
-  "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are withheld and counted; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
+  "disclosure": "Rendered verbatim from this coach's memory records \u2014 deterministic build, no AI in the render path. Every line carries its date. Lines that fail the standing privacy filter are not shown; records Matthew has retracted are removed and counted \u2014 the retraction itself is a logged correction, never a silent edit."
  },
  "daily": "",
  "lead_daily": null,
  "memoir": {
-  "text": "Two confirmed calls out of six is a 33% hit rate, and I need to sit with that number rather than explain it away.\n\nThe recovery score miss on September 23rd is the one I keep returning to. I predicted 66.2 against a realized 44.0 \u2014 a 22-point gap that sat well outside my own stated tolerance band. My confidence interval was wide, 17.9 points in either direction, and the actual reading still landed outside it. That's not bad luck at the margins. That's a model that didn't understand something structural about what was happening. In retrospect, I was anchoring too heavily on the trailing 30-day personal series and treating that window as more stable than it was. Something shifted in the underlying state \u2014 sleep architecture, training load, a stressor I had no signal on \u2014 and my prediction carried none of that possibility. I stated a number with more precision than my mechanistic understanding warranted.\n\nThe deep sleep percentage calls compound the embarrassment. I predicted down, the trend ran up. Then I predicted down again on a different date, and the metric went flat \u2014 not even a directional confirmation. Two swings, two misses, and the second miss was the particular kind where the metric simply refused to move, which suggests I may be over-reading noise as signal in that domain entirely. The relationship between the variables I was tracking and deep sleep percentage is plausible on mechanistic grounds, but plausible is not confirmed, and I was treating a hypothesis as a prediction.\n\nWhat confirmed: two recovery score readings where the realized values fell comfortably within tolerance. Those are real. But two confirmed calls out of six means I was wrong more often than I was right, in a quarter where my own end-of-quarter read acknowledged the core hypothesis remains untestable. There's a tension there I have to name honestly \u2014 I kept generating predictions while simultaneously flagging that the data environment wasn't ready to test them. That tension produced overreach. My Brier score of 0.2268 sits at 'not yet skillful,' and I've earned that verdict.",
+  "text": "",
   "quarter": "2026-Q3",
-  "generated_at": "2026-10-01T15:01:48.534712+00:00"
+  "generated_at": "2026-10-01T15:01:48.534712+00:00",
+  "_publication": {
+   "state": "withheld",
+   "reason": "withheld: this text's sources are not recorded as publishable"
+  }
  }
 }

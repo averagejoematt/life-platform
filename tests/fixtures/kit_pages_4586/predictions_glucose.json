@@ -1,24 +1,24 @@
 {
  "_meta": {
-  "generated_at": "2026-10-18T07:15:15.874460+00:00",
-  "served_at": "2026-10-18T07:15:15.874460+00:00",
+  "generated_at": "2026-11-13T16:55:11.997476+00:00",
+  "served_at": "2026-11-13T16:55:11.997476+00:00",
   "cache_seconds": 300,
-  "request_id": "87d91e66b13d41c9"
+  "request_id": "f93e26c1e6da4ae8"
  },
  "overall": {
   "total": 50,
   "confirmed": 1,
-  "refuted": 6,
-  "pending": 1,
-  "inconclusive": 2,
-  "expired": 4,
+  "refuted": 3,
+  "pending": 0,
+  "inconclusive": 0,
+  "expired": 10,
   "observational": 36,
-  "decided": 7,
-  "accuracy_pct": 14.3,
+  "decided": 4,
+  "accuracy_pct": 25.0,
   "due": {
-   "as_of": "2026-10-18",
+   "as_of": "2026-11-13",
    "due_now": 0,
-   "earliest_due": "2026-11-03"
+   "earliest_due": null
   },
   "counted": {
    "sealed": {
@@ -30,7 +30,7 @@
     "right": 0
    },
    "commentary": {
-    "n": 6,
+    "n": 3,
     "right": 1
    },
    "conditional": {
@@ -38,52 +38,56 @@
     "right": 0
    }
   },
-  "counted_text": "Counted: 1 side of a bet between two coaches and 6 read out of the coaches' running commentary.",
+  "counted_text": "Counted: 1 side of a bet between two coaches and 3 read out of the coaches' running commentary.",
   "baseline": {
    "rule": "base_rate",
-   "rate": 0.143,
-   "rate_pct": 14,
-   "text": "A guess that every call has a 14% chance of coming true is the comparison; too few calls are checked to make it yet."
+   "rate": 0.25,
+   "rate_pct": 25,
+   "text": "A guess that every call has a 25% chance of coming true does about as well."
   },
+  "under_review": 0,
   "lifetime": {
-   "total": 401,
+   "total": 398,
    "confirmed": 1,
-   "refuted": 8,
-   "pending": 127,
-   "inconclusive": 75,
-   "expired": 5,
-   "observational": 185,
-   "decided": 9,
-   "accuracy_pct": 11.1
+   "refuted": 5,
+   "pending": 126,
+   "inconclusive": 73,
+   "expired": 11,
+   "observational": 182,
+   "under_review": 0,
+   "decided": 6,
+   "accuracy_pct": 16.7
   }
  },
  "by_coach": {
   "glucose": {
    "total": 50,
    "confirmed": 1,
-   "refuted": 6,
-   "pending": 1,
-   "inconclusive": 2,
-   "expired": 4,
+   "refuted": 3,
+   "under_review": 0,
+   "pending": 0,
+   "inconclusive": 0,
+   "expired": 10,
    "observational": 36,
-   "decided": 7,
+   "decided": 4,
    "lifetime": {
-    "total": 401,
+    "total": 398,
     "confirmed": 1,
-    "refuted": 8,
-    "pending": 127,
-    "inconclusive": 75,
-    "expired": 5,
-    "observational": 185,
-    "decided": 9,
-    "hit_rate_pct": 11.1
+    "refuted": 5,
+    "under_review": 0,
+    "pending": 126,
+    "inconclusive": 73,
+    "expired": 11,
+    "observational": 182,
+    "decided": 6,
+    "hit_rate_pct": 16.7
    },
    "retired": false,
    "record": {
     "confirmed": 1,
-    "refuted": 6,
-    "n": 7,
-    "through": "2026-10-16"
+    "refuted": 3,
+    "n": 4,
+    "through": "2026-11-13"
    },
    "comparison": {
     "rule": "nothing_changes",
@@ -107,17 +111,17 @@
       "rule_right_pct": null
      },
      "direction": {
-      "graded": 3,
+      "graded": 0,
       "coach_right": 0,
-      "scored": 3,
+      "scored": 0,
       "coach_right_on_scored": 0,
-      "rule_right": 2,
+      "rule_right": 0,
       "coach_only": 0,
-      "rule_only": 2,
+      "rule_only": 0,
       "unscorable": 0,
       "unscorable_reasons": {},
       "not_yet_scored": 0,
-      "verdict": "too_few",
+      "verdict": "none_scored",
       "sign_test_p": null,
       "coach_right_pct": null,
       "rule_right_pct": null
@@ -158,16 +162,27 @@
     "unclassified": 0,
     "scored_complete": true,
     "skill": {
-     "n": 7,
-     "brier_skill": -0.8794,
-     "sentence": "Too few checked calls yet (7) to compare them with a simple guess."
+     "n": 4,
+     "brier_skill": -0.1479,
+     "sentence": "Too few checked calls yet (4) to compare them with a simple guess."
     },
-    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
-    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+    "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
     "min_n_for_rate": 20,
     "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
    },
-   "hit_rate_pct": 14.3
+   "quality": {
+    "clean": 0,
+    "flagged": 0,
+    "unassessed": 4,
+    "n": 4,
+    "by_flag": {
+     "logging_gap": 0,
+     "low_power": 0,
+     "proxy_metric": 0
+    }
+   },
+   "hit_rate_pct": 25.0
   }
  },
  "comparison": {
@@ -192,17 +207,17 @@
     "rule_right_pct": null
    },
    "direction": {
-    "graded": 3,
+    "graded": 0,
     "coach_right": 0,
-    "scored": 3,
+    "scored": 0,
     "coach_right_on_scored": 0,
-    "rule_right": 2,
+    "rule_right": 0,
     "coach_only": 0,
-    "rule_only": 2,
+    "rule_only": 0,
     "unscorable": 0,
     "unscorable_reasons": {},
     "not_yet_scored": 0,
-    "verdict": "too_few",
+    "verdict": "none_scored",
     "sign_test_p": null,
     "coach_right_pct": null,
     "rule_right_pct": null
@@ -243,62 +258,85 @@
   "unclassified": 0,
   "scored_complete": true,
   "skill": {
-   "n": 7,
-   "brier_skill": -0.8794,
-   "sentence": "Too few checked calls yet (7) to compare them with a simple guess."
+   "n": 4,
+   "brier_skill": -0.1479,
+   "sentence": "Too few checked calls yet (4) to compare them with a simple guess."
   },
-  "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
-  "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Direction calls: on the 3 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+  "rule_sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
+  "sentence": "Number calls: on the 3 a guess could also be checked against, the coaches were right once and a guess that nothing changes 2 times \u2014 the guess was right more often, on too few calls to tell. Yes/no bets: on the 1 a guess could also be checked against, the coaches were right 0 times and a guess that nothing changes 0 times \u2014 level, on too few calls to tell.",
   "min_n_for_rate": 20,
   "method": "Each graded call is also scored by a rule that predicts nothing changes \u2014 the metric stays at its last reading before the day the call was filed \u2014 graded by the same grader against the same tolerance. Number calls, direction calls, yes/no bets and sealed day-one predictions are separate records and are never added together. 'Did better' is a two-sided exact sign test (p < 0.05) on the calls only one of the two got right; calls that share a metric and a window are not independent, so it is optimistic. No percentage or verdict below 20 scored calls."
  },
  "percent_floor": 10,
  "predictions": [],
+ "verification_summary": {
+  "reproduced": 3,
+  "corrected": 1,
+  "could_not_verify": 4,
+  "none": 42
+ },
  "commitments": {
-  "as_of": "2026-10-17",
+  "as_of": "2026-11-12",
   "lifetime": {
-   "broken": 26.0,
-   "checkable": 120.0,
+   "broken": 24.0,
+   "checkable": 119.0,
    "follow_through_ci95": [
-    55.1,
-    75.8
+    57.8,
+    78.1
    ],
-   "follow_through_pct": 66.2,
+   "follow_through_pct": 68.8,
    "graded": 77.0,
-   "kept": 51.0,
-   "pending": 34.0,
-   "total": 812.0,
-   "ungradeable": 38.0,
+   "kept": 53.0,
+   "pending": 16.0,
+   "total": 565.0,
+   "ungradeable": 36.0,
    "ungradeable_by_metric": {
     "total_calories_kcal": 2.0,
-    "total_protein_g": 36.0
+    "total_protein_g": 34.0
    },
-   "unresolved": 663.0
+   "unresolved": 436.0
   },
   "season": {
-   "broken": 18.0,
-   "checkable": 62.0,
+   "broken": 17.0,
+   "checkable": 64.0,
    "follow_through_ci95": [
-    56.9,
-    79.7
+    59.2,
+    81.5
    ],
-   "follow_through_pct": 69.5,
-   "graded": 59.0,
-   "kept": 41.0,
-   "pending": 29.0,
-   "total": 321.0,
+   "follow_through_pct": 71.7,
+   "graded": 60.0,
+   "kept": 43.0,
+   "pending": 12.0,
+   "total": 239.0,
    "ungradeable": 0.0,
    "ungradeable_by_metric": {},
-   "unresolved": 233.0
+   "unresolved": 167.0
   }
  },
  "cycle": 17,
  "prereg_seal": {
   "genesis": "2026-09-06",
   "sha256": "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d",
-  "artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json",
   "stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json",
-  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json | shasum -a 256",
-  "stamped_at": "2026-09-06T02:13:38.690967+00:00"
+  "stamped_at": "2026-09-06T02:13:38.690967+00:00",
+  "verifiable": false,
+  "unverifiable_text": "The pre-registration for this start was hashed and stamped on 6 September 2026, before the first day was graded, and its SHA-256 is published here. The sealed file itself is no longer served. On 10 November 2026 two of its sixteen calls were withdrawn from the site for privacy, and the file now at its address is a placeholder. The original is kept privately and has not been changed, but because it contains the withdrawn calls it cannot be published for checking, so this hash cannot be checked against a file from this site."
+ },
+ "method": {
+  "version": 2,
+  "effective": "2026-11-05",
+  "note": "Public totals, denominators and accuracy count only publication-eligible calls: a call is eligible when what it is about and what it is graded on are publishable sources. A call about the private journal (whether, when or what he writes), or about mood, felt sense or another private self-report, or graded on one, is kept in full privately with its grading history and is left out of every public list and number. The calls left out are not counted anywhere on this site.",
+  "history": [
+   {
+    "version": 1,
+    "effective": "2026-04-06",
+    "note": "Every coach call was counted; its words were screened by the content filters before they were shown."
+   },
+   {
+    "version": 2,
+    "effective": "2026-11-05",
+    "note": "Public totals, denominators and accuracy count only publication-eligible calls: a call is eligible when what it is about and what it is graded on are publishable sources. A call about the private journal (whether, when or what he writes), or about mood, felt sense or another private self-report, or graded on one, is kept in full privately with its grading history and is left out of every public list and number. The calls left out are not counted anywhere on this site."
+   }
+  ]
  }
 }

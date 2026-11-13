@@ -2,346 +2,101 @@
  "days": [
   {
    "_meta": {
-    "generated_at": "2026-10-18T07:15:20.499720+00:00",
-    "served_at": "2026-10-18T07:15:20.499720+00:00",
+    "generated_at": "2026-11-13T16:55:22.362713+00:00",
+    "served_at": "2026-11-13T16:55:22.362713+00:00",
     "cache_seconds": 300,
-    "request_id": "a1ef65354a15414a"
+    "request_id": "23f02b3db85c4cfe"
    },
    "state": "absent",
-   "date": "2026-10-18",
+   "date": "2026-11-13",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Sunday, October 18.",
+   "absent_text": "No coach line is recorded for Friday, November 13.",
    "lines": [],
    "absent": []
   },
   {
    "_meta": {
-    "generated_at": "2026-10-18T07:15:25.714715+00:00",
-    "served_at": "2026-10-18T07:15:25.714715+00:00",
+    "generated_at": "2026-11-13T16:55:32.127590+00:00",
+    "served_at": "2026-11-13T16:55:32.127590+00:00",
     "cache_seconds": 300,
-    "request_id": "2e749af8a2ad42e0"
-   },
-   "state": "ok",
-   "date": "2026-10-17",
-   "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Saturday, October 17.",
-   "lines": [
-    {
-     "coach_id": "mind_coach",
-     "coach": "Nathan Reeves",
-     "move": "call",
-     "move_label": "A call",
-     "text": "Something has gone quiet in Matthew that protein gains haven't touched \u2014 12 days without a journal entry, and my read is that the block isn't physical. I expect the silence continues until he names what he's actually avoiding, not until another number moves.",
-     "replies_to": null,
-     "bet_settles": null
-    }
-   ],
-   "absent": [
-    {
-     "coach": "glucose_coach",
-     "state": "absent",
-     "reason": "No new readings have reached this coach's area, so there is nothing new to read."
-    },
-    {
-     "coach": "sleep_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "nutrition_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "physical_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "labs_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "explorer_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    }
-   ]
-  },
-  {
-   "_meta": {
-    "generated_at": "2026-10-18T07:15:25.776254+00:00",
-    "served_at": "2026-10-18T07:15:25.776254+00:00",
-    "cache_seconds": 300,
-    "request_id": "f3deeca7fc4a4aca"
-   },
-   "state": "ok",
-   "date": "2026-10-16",
-   "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Friday, October 16.",
-   "lines": [
-    {
-     "coach_id": "physical_coach",
-     "coach": "Max Reyes",
-     "move": "reply",
-     "move_label": "A reply",
-     "text": "I was wrong on two counts today: Lisa Park called the recovery decline as a real trend, and my masked-depletion read didn't hold up \u2014 on 41 days of data, so far, the direction is exactly what she predicted and I should have trusted the simpler explanation.",
-     "replies_to": "Lisa Park",
-     "bet_settles": null
-    }
-   ],
-   "absent": [
-    {
-     "coach": "glucose_coach",
-     "state": "absent",
-     "reason": "No new readings have reached this coach's area, so there is nothing new to read."
-    },
-    {
-     "coach": "sleep_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "nutrition_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "mind_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "labs_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "explorer_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    }
-   ]
-  },
-  {
-   "_meta": {
-    "generated_at": "2026-10-18T07:15:25.833380+00:00",
-    "served_at": "2026-10-18T07:15:25.833380+00:00",
-    "cache_seconds": 300,
-    "request_id": "08679e5251df430b"
+    "request_id": "33f3dbdf298e4c5d"
    },
    "state": "absent",
-   "date": "2026-10-15",
+   "date": "2026-11-12",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Thursday, October 15.",
+   "absent_text": "No coach line is recorded for Thursday, November 12.",
    "lines": [],
-   "absent": [
-    {
-     "coach": "glucose_coach",
-     "state": "absent",
-     "reason": "No new readings have reached this coach's area, so there is nothing new to read."
-    },
-    {
-     "coach": "sleep_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "nutrition_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "mind_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "physical_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "labs_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "explorer_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    }
-   ]
+   "absent": []
   },
   {
    "_meta": {
-    "generated_at": "2026-10-18T07:15:25.899008+00:00",
-    "served_at": "2026-10-18T07:15:25.899008+00:00",
+    "generated_at": "2026-11-13T16:55:32.208138+00:00",
+    "served_at": "2026-11-13T16:55:32.208138+00:00",
     "cache_seconds": 300,
-    "request_id": "85b4ad781d4e4a61"
+    "request_id": "0e212f6e786d4101"
    },
-   "state": "ok",
-   "date": "2026-10-14",
+   "state": "absent",
+   "date": "2026-11-11",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Wednesday, October 14.",
-   "lines": [
-    {
-     "coach_id": "labs_coach",
-     "coach": "James Okafor",
-     "move": "call",
-     "move_label": "A call",
-     "text": "At 39 days and 21.9 lb down, my read is that without kidney labs in hand, protein can't safely climb further \u2014 so I expect this week's draw to either clear the path forward or force a hard ceiling. The journal silence still worries me more than the scale.",
-     "replies_to": null,
-     "bet_settles": null
-    }
-   ],
-   "absent": [
-    {
-     "coach": "glucose_coach",
-     "state": "absent",
-     "reason": "No new readings have reached this coach's area, so there is nothing new to read."
-    },
-    {
-     "coach": "sleep_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "nutrition_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "mind_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "physical_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "explorer_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    }
-   ]
+   "absent_text": "No coach line is recorded for Wednesday, November 11.",
+   "lines": [],
+   "absent": []
   },
   {
    "_meta": {
-    "generated_at": "2026-10-18T07:15:25.967242+00:00",
-    "served_at": "2026-10-18T07:15:25.967242+00:00",
+    "generated_at": "2026-11-13T16:55:32.338726+00:00",
+    "served_at": "2026-11-13T16:55:32.338726+00:00",
     "cache_seconds": 300,
-    "request_id": "7da2c7764fcd4490"
+    "request_id": "4fad94aa0557425e"
    },
-   "state": "ok",
-   "date": "2026-10-13",
+   "state": "absent",
+   "date": "2026-11-10",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Tuesday, October 13.",
-   "lines": [
-    {
-     "coach_id": "nutrition_coach",
-     "coach": "Marcus Webb",
-     "move": "reaction",
-     "move_label": "On a result",
-     "text": "My protein-collapse read was wrong \u2014 Matthew held at 147.2g across 29 logged days, not the floor-busting drop I expected. So far, the journaling silence looks more like a structural wall than a fuel problem, and I now think Nathan had the better call here.",
-     "replies_to": null,
-     "bet_settles": null
-    },
-    {
-     "coach_id": "mind_coach",
-     "coach": "Nathan Reeves",
-     "move": "reply",
-     "move_label": "A reply",
-     "text": "Marcus Webb is right to revise his call, and I was uneasy claiming victory \u2014 19.0 lb gone is real, protein held, yet 9 days of journaling silence remain. For now, I don't think this wall is metabolic; I think it's structural or emotional, and we still can't see inside it.",
-     "replies_to": "Marcus Webb",
-     "bet_settles": null
-    }
-   ],
-   "absent": [
-    {
-     "coach": "glucose_coach",
-     "state": "absent",
-     "reason": "No new readings have reached this coach's area, so there is nothing new to read."
-    },
-    {
-     "coach": "sleep_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "physical_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "labs_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "explorer_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    }
-   ]
+   "absent_text": "No coach line is recorded for Tuesday, November 10.",
+   "lines": [],
+   "absent": []
   },
   {
    "_meta": {
-    "generated_at": "2026-10-18T07:15:26.029072+00:00",
-    "served_at": "2026-10-18T07:15:26.029072+00:00",
+    "generated_at": "2026-11-13T16:55:32.537283+00:00",
+    "served_at": "2026-11-13T16:55:32.537283+00:00",
     "cache_seconds": 300,
-    "request_id": "5dc5943499684efd"
+    "request_id": "29ae41f73adf4caf"
    },
-   "state": "ok",
-   "date": "2026-10-12",
+   "state": "absent",
+   "date": "2026-11-09",
    "source": "/api/coach_moves",
-   "absent_text": "No coach line is recorded for Monday, October 12.",
-   "lines": [
-    {
-     "coach_id": "labs_coach",
-     "coach": "James Okafor",
-     "move": "question",
-     "move_label": "A question for Matthew",
-     "text": "My read is that 20.8 lb gone in 37 days is real progress, yet two items I flagged weeks ago remain unresolved \u2014 has Matthew taken any step this week to schedule either the blood draw or the symptom check-in?",
-     "replies_to": null,
-     "bet_settles": null
-    }
-   ],
-   "absent": [
-    {
-     "coach": "glucose_coach",
-     "state": "absent",
-     "reason": "No new readings have reached this coach's area, so there is nothing new to read."
-    },
-    {
-     "coach": "sleep_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "nutrition_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "mind_coach",
-     "state": "absent",
-     "reason": "This coach's line did not pass the day's checks, so it was held back."
-    },
-    {
-     "coach": "physical_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    },
-    {
-     "coach": "explorer_coach",
-     "state": "absent",
-     "reason": "This coach had nothing new to add."
-    }
-   ]
+   "absent_text": "No coach line is recorded for Monday, November 9.",
+   "lines": [],
+   "absent": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-11-13T16:55:32.631814+00:00",
+    "served_at": "2026-11-13T16:55:32.631814+00:00",
+    "cache_seconds": 300,
+    "request_id": "d4262da507934033"
+   },
+   "state": "absent",
+   "date": "2026-11-08",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Sunday, November 8.",
+   "lines": [],
+   "absent": []
+  },
+  {
+   "_meta": {
+    "generated_at": "2026-11-13T16:55:32.727524+00:00",
+    "served_at": "2026-11-13T16:55:32.727524+00:00",
+    "cache_seconds": 300,
+    "request_id": "3bd5c7ccb1204cdc"
+   },
+   "state": "absent",
+   "date": "2026-11-07",
+   "source": "/api/coach_moves",
+   "absent_text": "No coach line is recorded for Saturday, November 7.",
+   "lines": [],
+   "absent": []
   }
  ]
 }
