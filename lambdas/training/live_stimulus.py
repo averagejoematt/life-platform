@@ -358,7 +358,7 @@ def parity(env: dict[str, Any], adds: list[dict[str, Any]]) -> list[str]:
         w = lb._sum(rows, deltas)
         for a in adds:
             w[a["muscle"]] += a["sets"]
-        return w
+        return {k: float(v) for k, v in w.items()} | {m: 0.0 for m in marks if m not in w}
 
     def slot_sets(r: dict[str, Any]) -> int:
         return int(r["sets"]) + deltas.get((r["role"], str(r["slot"])), 0)

@@ -529,3 +529,49 @@ def apply_class_rules(movements: dict[str, dict[str, Any]]) -> dict[str, list[st
 def _record(e: dict[str, Any], rule: str, joint: str, level: str) -> None:
     audit = e.setdefault("attribute_audit", {"fields": [], "reason": ""})
     audit.setdefault("class_rule", []).append({"rule": rule, "joint": joint, "level": level, "pass": "#5861 FIX3"})
+
+
+# ── #5861 FIX7: the press family rated by implement ──────────────────────────
+PRESS_FAMILY_JOINTS: dict[str, tuple[dict[str, str], str]] = {
+    "barbell": (
+        {"elbow": "moderate"},
+        "a barbell press fixes a pronated grip: the elbow takes the load the hand cannot rotate away from — every barbell bench / "
+        "incline / decline / close-grip / overhead press alike (#5861 FIX7: the press family rated by implement, not one row at a time)",
+    ),
+    "barbell_horizontal": (
+        {"wrist": "moderate"},
+        "a barbell bench (any angle) loads the extended wrist under the bar at a fixed angle; overhead the bar stacks over the forearm",
+    ),
+    "free_hand": (
+        {"elbow": "low"},
+        "a dumbbell, machine-handle, cable or landmine press lets the grip and forearm rotate (neutral available): the elbow is low "
+        "for every member, flat, incline or overhead alike (#5861 FIX7)",
+    ),
+}
+"""#5861 FIX7 (sixth red team: DB bench elbow low vs incline DB moderate vs barbell bench moderate, machine shoulder press low vs DB
+shoulder press moderate — and those ratings decided pain outcomes): within the horizontal / vertical press family the elbow (and
+the barbell bench's wrist) are rated by IMPLEMENT (`press_implement`), consistently. Practitioner consensus (grip freedom), not a
+measured load; a kettlebell or bodyweight press keeps its own row."""
+
+
+def press_implement(e: dict) -> str | None:
+    """`barbell` | `free_hand` | None (not a press-family implement rule) for a horizontal / vertical press."""
+    eq = set(e.get("equipment") or [])
+    if e.get("pattern") not in ("horizontal_press", "vertical_press"):
+        return None
+    if "landmine" in eq or eq & {"dumbbell", "cable_stack"} or any(x.endswith("_machine") or x == "machine_unspecified" for x in eq):
+        return "free_hand"
+    if eq & {"barbell", "ez_bar", "smith_machine"}:
+        return "barbell"
+    return None
+
+
+def press_family_joints(e: dict) -> tuple[dict[str, str], str] | None:
+    """PRESS_FAMILY_JOINTS for one movement: its implement's ratings (and the barbell bench's wrist), or None."""
+    kind = press_implement(e)
+    if kind is None:
+        return None
+    ratings, why = dict(PRESS_FAMILY_JOINTS[kind][0]), PRESS_FAMILY_JOINTS[kind][1]
+    if kind == "barbell" and e.get("pattern") == "horizontal_press":
+        ratings |= PRESS_FAMILY_JOINTS["barbell_horizontal"][0]
+    return ratings, why

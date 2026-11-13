@@ -390,8 +390,8 @@ def loss_rate_pct(weights_by_day: Any) -> float | None:
     """The weekly loss (%BW/week) between the oldest and the newest 7 days of the weigh-ins read; None under two weeks of them."""
     from common.pacific_time import parse_day_key
 
-    days = {parse_day_key(str(k)[:10]): _num(v) for k, v in (weights_by_day or {}).items()} if isinstance(weights_by_day, dict) else {}
-    days = {d: v for d, v in days.items() if d is not None and v}
+    raw = {parse_day_key(str(k)[:10]): _num(v) for k, v in (weights_by_day or {}).items()} if isinstance(weights_by_day, dict) else {}
+    days = {d: float(v) for d, v in raw.items() if d is not None and v}
     if not days or (max(days) - min(days)).days < 13:
         return None
     lo, hi = min(days), max(days)

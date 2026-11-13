@@ -814,10 +814,10 @@ def apply_attribute_audit(movements: dict[str, dict[str, Any]]) -> None:
 
 
 def apply_press_family(movements: dict[str, dict[str, Any]]) -> None:
-    """#5861 FIX7: the press family rated by implement, consistently (targets.PRESS_FAMILY_JOINTS), after the class rules — a
+    """#5861 FIX7: the press family rated by implement, consistently (input_review.PRESS_FAMILY_JOINTS), after the class rules — a
     rated joint the family rule names is overwritten (and recorded on `attribute_audit.press_family`)."""
     for e in movements.values():
-        fam = targets.press_family_joints(e)
+        fam = input_review.press_family_joints(e)
         js = dict(e.get("joint_stress") or {})
         changed = sorted(j for j, v in (fam or ({}, ""))[0].items() if js.get(j) != v)
         if fam and changed:

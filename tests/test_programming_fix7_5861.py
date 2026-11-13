@@ -182,7 +182,7 @@ def test_the_press_family_is_rated_by_implement_and_pain_outcomes_follow():
     import json
 
     import build_exercise_library as b
-    import exercise_library_targets as targets
+    import exercise_library_input_review as targets
 
     mv = json.loads((REPO / "config" / "exercise_library.json").read_text())["movements"]
     for k, e in mv.items():

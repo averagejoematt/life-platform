@@ -372,7 +372,8 @@ def allocation_plan(catalog: dict[str, Any], lib: dict[str, Any], skipped: Any =
     ]
     lines += [f"{a['role']}.{a['slot']} +{a['sets']} set(s) ({a['key']})" for a in adds] + ceiling_lines
     out = {"deltas": {k: v for k, v in deltas.items() if v}, "before": before, "after": after, "lines": lines, "adds": adds}
-    return out | {"parity": sorted(env.get("parity") or [])}
+    parity: set[tuple[str, str]] = env.get("parity") or set()
+    return out | {"parity": sorted(parity)}
 
 
 def allocate(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
